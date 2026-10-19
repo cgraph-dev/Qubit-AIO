@@ -13,8 +13,13 @@ Shape:
   * each request/response is one JSON line over the child's stdin/stdout;
   * the parent polls the caller's ``stopped`` predicate every ~20 ms while it
     waits, and on a stop sends SIGTERM then SIGKILL to the child's process
-    group. The next reply after a stop starts a fresh worker (only then is
-    the load cost paid again).
+    group. The replacement worker is then pre-warmed in a background thread,
+    so the next reply after a stop is warm instead of paying the model load
+    (~1.7 s for piper/sherpa) a second time;
+  * an idle worker is reaped after ``QUBIT_TTS_SYNTH_WORKER_IDLE_S`` seconds
+    (default 300; ``0`` disables) so the extra model copy is not pinned in
+    memory forever on an idle service. A reap only ever costs the next
+    reply's load, never interruptibility or correctness.
 
 Safety: the child gets the config DATA over a pipe (never argv/env, so no
 secrets appear in the process list) and runs in its own session, so a stop
@@ -250,8 +255,158 @@ class _Worker:
                 str(msg.get("error", "") or "synthesis failed")[:300])
 
 
+#: Serializes real synthesis (the piper/espeak C library is not thread-safe).
 _LOCK = threading.Lock()
+#: Guards the cached worker and its bookkeeping. Never held across a synth.
+_STATE = threading.Lock()
 _WORKER: Optional[_Worker] = None
+_LAST_USED = 0.0
+_GENERATION = 0
+_PREWARM_EVENTS: Dict[str, threading.Event] = {}
+_REAPER: Optional[threading.Thread] = None
+
+#: Idle grace before a loaded worker is released (seconds; 0 disables).
+#: This is the memory/latency trade-off: the worker holds a provider/model
+#: copy, but reaping it means the first reply after a long silence reloads.
+#: A stopped worker is replaced eagerly, so stops are NOT penalised.
+_DEFAULT_IDLE_S = 300.0
+#: Reaper sleep between checks; tests shorten it.
+_REAP_TICK_S = 5.0
+
+
+def _idle_seconds() -> float:
+    try:
+        return max(0.0, float(os.environ.get(
+            "QUBIT_TTS_SYNTH_WORKER_IDLE_S", _DEFAULT_IDLE_S)))
+    except (TypeError, ValueError):
+        return _DEFAULT_IDLE_S
+
+
+def _ensure_reaper() -> None:
+    """Start the idle reaper exactly once (daemon thread)."""
+    global _REAPER
+    with _STATE:
+        if _REAPER is not None and _REAPER.is_alive():
+            return
+        thread = threading.Thread(target=_reaper_loop,
+                                  name="tts-synth-reaper", daemon=True)
+        _REAPER = thread
+    thread.start()
+
+
+def _reaper_loop() -> None:
+    """Release the cached worker after the configured idle grace."""
+    global _WORKER
+    while True:
+        try:
+            tick = float(_REAP_TICK_S)
+        except (TypeError, ValueError):
+            tick = 5.0
+        time.sleep(max(0.01, tick))
+        idle = _idle_seconds()
+        if idle <= 0:
+            continue
+        # Never pull a worker out from under a synthesizing call.
+        if not _LOCK.acquire(blocking=False):
+            continue
+        try:
+            with _STATE:
+                worker = _WORKER
+                if worker is None or _PREWARM_EVENTS:
+                    continue
+                if time.monotonic() - _LAST_USED < idle:
+                    continue
+                _WORKER = None
+            worker.kill()
+        finally:
+            _LOCK.release()
+
+
+def _await_prewarm(key: str, timeout: float,
+                   stopped: Optional[Callable[[], bool]] = None) -> None:
+    """Let an in-flight pre-warm finish before spawning a duplicate.
+
+    Polls ``stopped`` like the synth wait, so a STOP during the replacement's
+    model load still returns promptly instead of waiting for the pre-warm.
+    """
+    with _STATE:
+        event = _PREWARM_EVENTS.get(key)
+    if event is None:
+        return
+    end = time.monotonic() + max(0.0, min(float(timeout), 60.0))
+    while not event.is_set():
+        if stopped is not None:
+            try:
+                if stopped():
+                    raise SynthCancelled("the turn was stopped")
+            except SynthCancelled:
+                raise
+            except Exception:  # noqa: BLE001 - predicate is best-effort
+                pass
+        if time.monotonic() >= end:
+            return
+        event.wait(_POLL_S)
+
+
+def _start_prewarm(cfg: Any, key: str) -> None:
+    """Warm a replacement in the background (never blocks the stopped turn)."""
+    with _STATE:
+        worker = _WORKER
+        if worker is not None and worker.key == key and worker.alive():
+            return
+        if key in _PREWARM_EVENTS:
+            return
+        event = threading.Event()
+        _PREWARM_EVENTS[key] = event
+        generation = _GENERATION
+    thread = threading.Thread(
+        target=_prewarm_worker, args=(cfg, key, generation, event),
+        name="tts-synth-prewarm", daemon=True)
+    thread.start()
+
+
+def _prewarm_worker(cfg: Any, key: str, generation: int,
+                    event: threading.Event) -> None:
+    """Load a replacement provider in the background; best-effort."""
+    global _WORKER, _LAST_USED
+    worker: Optional[_Worker] = None
+    try:
+        with _STATE:
+            current = _WORKER
+            if (generation != _GENERATION
+                    or (current is not None and current.key == key
+                        and current.alive())):
+                return
+        worker = _Worker(cfg)
+        worker.start(timeout=60.0)
+        discard: Optional[_Worker] = None
+        installed = False
+        with _STATE:
+            current = _WORKER
+            if generation != _GENERATION:
+                pass  # shut down while loading: discard below
+            elif current is not None and current.alive():
+                # Some live worker (same key: a real call won the race;
+                # another key: the slot belongs to it) owns the cache.
+                pass
+            else:
+                discard = current
+                _WORKER = worker
+                _LAST_USED = time.monotonic()
+                worker = None
+                installed = True
+        if discard is not None:
+            discard.kill()
+        if installed:
+            _ensure_reaper()
+    except BaseException:  # noqa: BLE001 - next real call is typed
+        pass
+    finally:
+        with _STATE:
+            _PREWARM_EVENTS.pop(key, None)
+        if worker is not None:
+            worker.kill()
+        event.set()
 
 
 def synthesize_cancellable(cfg: Any, text: str, out_path: Path | str, *,
@@ -261,31 +416,52 @@ def synthesize_cancellable(cfg: Any, text: str, out_path: Path | str, *,
 
     Raises ``SynthCancelled`` when ``stopped`` trips. Serialized with a module
     lock (the piper/espeak C library is not thread-safe). A stop kills the
-    child at once; the next call starts a new one (paying the model load again
-    only after a stop).
+    child at once; a replacement is pre-warmed in the background so the next
+    call finds a loaded worker instead of paying the model load again.
     """
-    global _WORKER
+    global _WORKER, _LAST_USED
     out = Path(out_path)
+    key = _cfg_key(cfg)
     with _LOCK:
         for attempt in (0, 1):
-            worker = _WORKER
-            key = _cfg_key(cfg)
+            _await_prewarm(key, timeout, stopped)
+            with _STATE:
+                worker = _WORKER
+                if worker is not None and (worker.key != key
+                                           or not worker.alive()):
+                    _WORKER = None
+                    stale = worker
+                else:
+                    stale = None
+            if stale is not None:
+                stale.kill()
             if worker is None or worker.key != key or not worker.alive():
                 if worker is not None:
                     worker.kill()
                 worker = _Worker(cfg)
                 worker.start(stopped=stopped, timeout=timeout)
-                _WORKER = worker
+                with _STATE:
+                    _WORKER = worker
+                    _LAST_USED = time.monotonic()
+                _ensure_reaper()
             try:
                 worker.synthesize(text, out, stopped=stopped, timeout=timeout)
+                with _STATE:
+                    if _WORKER is worker:
+                        _LAST_USED = time.monotonic()
                 return worker.provider
             except SynthCancelled:
                 worker.kill()
-                _WORKER = None
+                with _STATE:
+                    if _WORKER is worker:
+                        _WORKER = None
+                _start_prewarm(cfg, key)
                 raise
             except SynthWorkerUnavailable:
                 worker.kill()
-                _WORKER = None
+                with _STATE:
+                    if _WORKER is worker:
+                        _WORKER = None
                 # A stop racing the child's death still wins as a stop.
                 if stopped is not None:
                     try:
@@ -302,11 +478,19 @@ def synthesize_cancellable(cfg: Any, text: str, out_path: Path | str, *,
 
 def shutdown() -> None:
     """Kill the cached worker (tests / orderly service shutdown)."""
-    global _WORKER
-    with _LOCK:
-        if _WORKER is not None:
-            _WORKER.kill()
-            _WORKER = None
+    global _WORKER, _LAST_USED, _GENERATION
+    with _STATE:
+        _GENERATION += 1
+        worker = _WORKER
+        _WORKER = None
+        _LAST_USED = 0.0
+        events = list(_PREWARM_EVENTS.values())
+    if worker is not None:
+        worker.kill()
+    # A pre-warm that was already loading must not re-install after shutdown.
+    # Wait briefly so tests/orders do not leave an orphan child behind.
+    for event in events:
+        event.wait(timeout=5.0)
 
 
 # ---------------------------------------------------------------------------

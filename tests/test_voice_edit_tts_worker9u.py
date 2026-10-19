@@ -14,6 +14,7 @@ The in-process path (dashboard calls / test doubles) must stay byte-identical.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import time
@@ -81,6 +82,9 @@ pidlog = os.environ.get("FAKE_PIDLOG")
 if pidlog:
     with open(pidlog, "a") as fh:
         fh.write(str(os.getpid()) + "\n")
+ready_s = float(os.environ.get("FAKE_READY_S", "0") or 0)
+if ready_s:
+    time.sleep(ready_s)
 if os.environ.get("FAKE_SLOW_READY"):
     time.sleep(30)
 print(json.dumps({"ready": True, "provider": "fake"}), flush=True)
@@ -89,7 +93,14 @@ for line in sys.stdin:
     if not line:
         continue
     req = json.loads(line)
-    mode = os.environ.get("FAKE_MODE", "ok")
+    mode_file = os.environ.get("FAKE_MODE_FILE")
+    if mode_file:
+        try:
+            mode = open(mode_file).read().strip() or "ok"
+        except Exception:
+            mode = "ok"
+    else:
+        mode = os.environ.get("FAKE_MODE", "ok")
     if mode == "sleep":
         time.sleep(30)
         continue
@@ -275,3 +286,219 @@ def test_stop_during_model_load_kills_the_child(tmp_path, fake_child,
     finally:
         timer.cancel()
     assert SW._WORKER is None, "a cancelled load must not leave a child"
+
+
+# ---------------------------------------------------------------------------
+# stop recovery: eager replacement pre-warm + idle reaping
+# ---------------------------------------------------------------------------
+def _wait_until(pred, timeout=8.0, step=0.02):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if pred():
+            return True
+        time.sleep(step)
+    return False
+
+
+def _stop_during_synth(cfg, out, mode):
+    """Cancel a sleeping synth; return elapsed seconds."""
+    mode.write_text("sleep")
+    stop = threading.Event()
+    timer = threading.Timer(0.3, stop.set)
+    timer.start()
+    t0 = time.monotonic()
+    try:
+        with pytest.raises(SW.SynthCancelled):
+            SW.synthesize_cancellable(cfg, "long", out,
+                                      stopped=stop.is_set, timeout=20)
+    finally:
+        timer.cancel()
+    return time.monotonic() - t0
+
+
+def test_stop_prewarms_a_replacement_worker(tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    mode = tmp_path / "mode.txt"
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    first_pid = SW._WORKER.proc.pid
+
+    _stop_during_synth(cfg, tmp_path / "stop.wav", mode)
+
+    assert _wait_until(lambda: SW._WORKER is not None
+                       and SW._WORKER.alive()), "no replacement was pre-warmed"
+    replacement = SW._WORKER
+    assert replacement.proc.pid != first_pid, "the stopped worker was reused"
+    assert not (tmp_path / "stop.wav").exists()
+
+    mode.write_text("ok")
+    t0 = time.monotonic()
+    provider = SW.synthesize_cancellable(cfg, "next", tmp_path / "b.wav",
+                                         stopped=lambda: False, timeout=10)
+    elapsed = time.monotonic() - t0
+    assert provider == "fake"
+    assert (tmp_path / "b.wav").read_bytes() == b"RIFFfake"
+    assert elapsed < 2.0, f"next reply was not warm ({elapsed:.2f}s)"
+    assert len(pidlog.read_text().split()) == 2, pidlog.read_text()
+
+
+def test_prewarm_makes_the_next_reply_warm_despite_a_slow_load(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    mode = tmp_path / "mode.txt"
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    # Only the replacement load is slow; the first spawn stayed fast.
+    monkeypatch.setenv("FAKE_READY_S", "0.8")
+
+    _stop_during_synth(cfg, tmp_path / "stop.wav", mode)
+
+    assert _wait_until(lambda: SW._WORKER is not None
+                       and SW._WORKER.alive(), timeout=10), \
+        "pre-warm did not finish"
+    mode.write_text("ok")
+    t0 = time.monotonic()
+    SW.synthesize_cancellable(cfg, "next", tmp_path / "b.wav",
+                              stopped=lambda: False, timeout=10)
+    elapsed = time.monotonic() - t0
+    assert elapsed < 0.4, (
+        f"next reply paid the load again ({elapsed:.2f}s)")
+    assert len(pidlog.read_text().split()) == 2, pidlog.read_text()
+
+
+def test_next_reply_waits_for_an_inflight_prewarm_without_double_load(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    mode = tmp_path / "mode.txt"
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    monkeypatch.setenv("FAKE_READY_S", "0.8")
+
+    _stop_during_synth(cfg, tmp_path / "stop.wav", mode)
+
+    # Do not wait for the pre-warm: a reply arriving mid-load must join it,
+    # not spawn a third provider.
+    mode.write_text("ok")
+    SW.synthesize_cancellable(cfg, "next", tmp_path / "b.wav",
+                              stopped=lambda: False, timeout=10)
+    assert len(pidlog.read_text().split()) == 2, pidlog.read_text()
+
+
+def test_idle_reaper_releases_the_worker(tmp_path, fake_child, monkeypatch):
+    monkeypatch.setenv("QUBIT_TTS_SYNTH_WORKER_IDLE_S", "0.15")
+    monkeypatch.setattr(SW, "_REAP_TICK_S", 0.02)
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "hello", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    pid = SW._WORKER.proc.pid
+
+    assert _wait_until(lambda: SW._WORKER is None, timeout=5), \
+        "idle worker was never reaped"
+    assert _wait_until(lambda: not _pid_alive(pid), timeout=5), \
+        "reaped worker process is still alive"
+
+
+def test_reaper_does_not_kill_a_busy_worker(tmp_path, fake_child, monkeypatch):
+    monkeypatch.setenv("QUBIT_TTS_SYNTH_WORKER_IDLE_S", "0.15")
+    monkeypatch.setattr(SW, "_REAP_TICK_S", 0.02)
+    mode = tmp_path / "mode.txt"
+    mode.write_text("sleep")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+    stop = threading.Event()
+    errors = []
+
+    def _run():
+        try:
+            SW.synthesize_cancellable(cfg, "long", tmp_path / "a.wav",
+                                      stopped=stop.is_set, timeout=20)
+        except SW.SynthCancelled:
+            pass
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    thread = threading.Thread(target=_run)
+    thread.start()
+    try:
+        assert _wait_until(lambda: SW._WORKER is not None, timeout=5)
+        time.sleep(0.5)
+        assert SW._WORKER is not None and SW._WORKER.alive(), \
+            "the reaper killed a synthesizing worker"
+    finally:
+        stop.set()
+        thread.join(timeout=5)
+    assert not errors, errors
+
+
+def test_shutdown_during_prewarm_does_not_reinstall_a_worker(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    mode = tmp_path / "mode.txt"
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    monkeypatch.setenv("FAKE_READY_S", "0.3")
+
+    _stop_during_synth(cfg, tmp_path / "stop.wav", mode)
+    SW.shutdown()
+
+    time.sleep(0.5)
+    assert SW._WORKER is None, "a pre-warm installed after shutdown"
+
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_READY_S", "0")
+    assert SW.synthesize_cancellable(cfg, "next", tmp_path / "b.wav",
+                                     stopped=lambda: False, timeout=10) == "fake"
+    assert SW._WORKER is not None and SW._WORKER.alive()
+
+
+def _pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def test_stop_while_waiting_for_a_prewarm_stays_prompt(
+        tmp_path, fake_child, monkeypatch):
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    mode = tmp_path / "mode.txt"
+    mode.write_text("ok")
+    monkeypatch.setenv("FAKE_MODE_FILE", str(mode))
+    cfg = _DataCfg()
+    SW.synthesize_cancellable(cfg, "one", tmp_path / "a.wav",
+                              stopped=lambda: False, timeout=10)
+    monkeypatch.setenv("FAKE_READY_S", "1.5")
+    _stop_during_synth(cfg, tmp_path / "stop.wav", mode)
+
+    stop = threading.Event()
+    timer = threading.Timer(0.15, stop.set)
+    timer.start()
+    t0 = time.monotonic()
+    try:
+        with pytest.raises(SW.SynthCancelled):
+            SW.synthesize_cancellable(cfg, "next", tmp_path / "b.wav",
+                                      stopped=stop.is_set, timeout=10)
+    finally:
+        timer.cancel()
+    elapsed = time.monotonic() - t0
+    assert elapsed < 0.9, f"stop waited for the pre-warm ({elapsed:.2f}s)"
