@@ -438,3 +438,40 @@ def test_gateway_local_complete_normal_call_is_unchanged(monkeypatch):
         res = GW._local_complete("hi", _Cfg(), 32, timeout_s=5.0,
                                  cancel=threading.Event().is_set)
         assert res.ok is True and res.text == "ok"
+
+
+def test_gateway_local_generate_and_chat_raw_are_abortable(monkeypatch):
+    # The raw `/api/generate` and `/api/chat` adapters used to inline a
+    # blocking urlopen; they now route through post_json(cancel=...) so a STOP
+    # aborts the live socket instead of waiting out the timeout.
+    import voicebridge.providers.gateway as G
+    from voicebridge import runner_contract
+
+    with _server(CHAT_BODY, hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+
+        class _RC:
+            alias = "test-model"
+            num_ctx = 4096
+            keep_alive = -1
+            url = ""
+
+        rc = _RC()
+        rc.url = url
+        monkeypatch.setattr(runner_contract, "resolve", lambda cfg: rc)
+        for mode in ("generate", "chat_raw"):
+            cancel = threading.Event()
+            out = {}
+
+            def run(mode=mode, cancel=cancel, out=out):
+                out["res"] = G._local_dispatch(
+                    "hi", cfg=object(), max_tokens=8,
+                    local_mode=mode, cancel=cancel.is_set)
+
+            t = threading.Thread(target=run, daemon=True)
+            t.start()
+            assert srv.requested.wait(timeout=2.0), f"{mode}: request never arrived"
+            srv.requested.clear()
+            _join_promptly(t, cancel)
+            assert out["res"].ok is False, (mode, out["res"])
+            assert out["res"].code == "CANCELLED", (mode, out["res"].code)
