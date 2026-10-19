@@ -660,6 +660,10 @@ def _mcp_registry_scope() -> Optional[str]:
     ticker) is a multiplexer too, even with the flag off — keying its connections by the bare name
     would hand one profile's credentialed connection to every other served profile (#111151).
     Single-profile processes (no override, or an override naming their own home) keep bare names."""
+    from tools.registry import current_session_tool_scope
+    session_scope = current_session_tool_scope()
+    if session_scope is not None:
+        return session_scope
     from agent.secret_scope import serves_routed_profile
     if not serves_routed_profile():
         return None
