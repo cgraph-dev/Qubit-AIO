@@ -48,17 +48,9 @@ def _completion_cwd(params: dict | None = None) -> str:
     # env var; the dashboard's in-memory gateway does NOT inherit the PTY child's bridged TERMINAL_CWD, so a configured
     # terminal.cwd is read directly.
     named_ssh = profile_home is not None and _cwd_is_remote(profile_home)
-    # A NAMED profile with no configured workspace (placeholder/unset terminal.cwd) never inherits
-    # the LAUNCH profile's cwd (#87584): the Desktop stamps the app-global workspace into every
-    # pooled backend's TERMINAL_CWD, and _launch_configured_cwd()/that env var hold the launch
-    # profile's value — a session for another profile would land in the wrong workspace. Its own
-    # home is the same default its standalone gateway would use (placeholder → $HOME).
-    named_local_default = (
-        str(profile_home) if profile_home is not None and not named_ssh and not client_cwd and not session_cwd else None
-    )
-    raw = str(client_cwd or session_cwd or _profile_workspace_cwd(profile_home)
+    raw = str(client_cwd or session_cwd or _profile_default_cwd(profile_home)
               # A named ssh profile never inherits the LAUNCH profile's host cwd: its remote default is ~.
-              or ("~" if named_ssh else "") or named_local_default or _launch_configured_cwd()
+              or ("~" if named_ssh else "") or _launch_configured_cwd()
               or os.environ.get("TERMINAL_CWD") or _sandbox_workspace_cwd(None) or os.getcwd())
     # An ssh cwd lives on the remote host: host expansion/isdir cannot vouch for it, and ``~`` names the REMOTE
     # user's home, never this host's. The launch profile keeps main's host fast path for everything else.
@@ -169,11 +161,43 @@ def _profile_workspace_cwd(profile_home) -> str | None:
 def _profile_default_cwd(profile_home) -> str | None:
     """Where a session for ``profile_home`` lands when nothing else is known: its configured workspace, else a NAMED
     local profile's own home. Never the LAUNCH profile's ``terminal.cwd``/``TERMINAL_CWD`` (#87584): those name
-    another profile's workspace (``/opt/data`` in the Docker image). Its home is what its standalone gateway uses."""
+    another profile's workspace (``/opt/data`` in the Docker image). Its home is what its standalone gateway uses.
+
+    ``profile_home`` may also be a profile NAME; a name is resolved on THIS host first, under the profile scope
+    that name's own home needs (a named profile's ``.env``/config read while the launch profile is bound would
+    answer for the wrong profile — ``tui_gateway/AGENTS.md``)."""
+    profile_home = _profile_home_for_workdir(profile_home)
     if workspace := _profile_workspace_cwd(profile_home):
         return workspace
     if profile_home is not None and _bound_terminal_backend(profile_home) == "local":
         return str(profile_home)
+    return None
+
+
+def _profile_home_for_workdir(profile_home):
+    """``profile_home`` as given (a home path), a profile NAME resolved to its home on THIS host, or None (launch)."""
+    if not _is_profile_name(profile_home):
+        return profile_home
+    home = _resolved_profile_home(profile_home)   # the name → home lookup itself reads no profile state
+    if home is None:
+        return None
+    # Everything downstream reads THIS profile's .env/config; bind it or a secondary session resolves against the
+    # launch profile (``model_switch._profile_runtime_scope_tokens``: home + secret + terminal scope together).
+    with _session_profile_runtime_scope({"profile_home": str(home)}, hydrate_secrets=False):
+        return Path(home)
+
+
+def _is_profile_name(value) -> bool:
+    """A non-empty string that is not already a path (``/p``, ``~/p``, ``name/sub``)."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    return not (os.path.isabs(value) or value.startswith("~") or os.sep in value)
+
+
+def _resolved_profile_home(profile_name):
+    """A profile NAME's home on this host, None for a name that is the launch profile, or None when it is gone."""
+    with contextlib.suppress(ProfileUnavailableError):
+        return _profile_home(profile_name.strip())
     return None
 
 
@@ -303,7 +327,9 @@ def _is_other_profiles_cwd(cwd: str, profile_home) -> bool:
     """Whether a NAMED local profile's stored cwd is a directory that belongs to another profile or to Qubit itself:
     the root (``/opt/data``), its subprocess home (``/opt/data/home``), a sibling profile's tree, or the install tree.
     Those are launch-profile workspaces that leaked into this profile's row before #87584, never a folder chosen for
-    it. Other folders under the root stay: a user may keep a workspace there."""
+    it. Other folders under the root stay: a user may keep a workspace there. ``profile_home`` may be a profile NAME;
+    it is resolved in that profile's own scope first (see :func:`_profile_default_cwd`)."""
+    profile_home = _profile_home_for_workdir(profile_home)
     if profile_home is None or _cwd_is_remote(profile_home) or not os.path.isabs(cwd):
         return False
     from agent.runtime_cwd import _is_install_tree
@@ -321,9 +347,13 @@ def _is_other_profiles_cwd(cwd: str, profile_home) -> bool:
 
 def _resumable_stored_cwd(cwd, profile_home) -> str:
     """A session row's stored cwd as a resume may adopt it: empty when an ssh session's row holds a path in Qubit's
-    own host tree (a host launch directory, never a remote workspace)."""
+    own host tree (a host launch directory, never a remote workspace), or a named profile's row holds another
+    profile's (the resume then lands in :func:`_profile_default_cwd` and re-persists it)."""
+    profile_home = _profile_home_for_workdir(profile_home)
     cwd = str(cwd or "")
     if cwd and _cwd_is_remote(profile_home) and _is_qubit_owned_cwd(cwd, profile_home):
+        return ""
+    if cwd and _is_other_profiles_cwd(cwd, profile_home):
         return ""
     return cwd
 
