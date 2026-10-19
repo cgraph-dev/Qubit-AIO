@@ -445,6 +445,15 @@ class VoiceEditService:
         self._session_store = session_store
         self._lock = threading.Lock()
         self._reqs: Dict[str, _Request] = {}
+        #: Ask-turn cancellation (orb STOP). One cancel event per in-flight
+        #: ``/api/voice-edit/ask`` request id: the helper's stop hits
+        #: ``/<rid>/cancel`` (:meth:`cancel`), which sets the event so
+        #: ``ask``/``_full_turn_answer`` skip or abort the expensive model or
+        #: agent call and never hand back a reply to be spoken. ``_ask_cancel_at``
+        #: timestamps the entries so an unconsumed tombstone (a cancel with no
+        #: in-flight ask) is pruned on the request TTL. Both guarded by ``_lock``.
+        self._ask_cancels: Dict[str, threading.Event] = {}
+        self._ask_cancel_at: Dict[str, float] = {}
         #: Real in-flight turns (see _counts_turn). Seeds 0; sessions that
         #: merely began (orb click staging, helper begins) are not turns.
         self._inflight = 0
@@ -707,12 +716,81 @@ class VoiceEditService:
                                  "unknown or expired request id", status=404)
         return req
 
+    def _ask_cancel_event(self, request_id: str) -> Optional[threading.Event]:
+        """The cancel event for an in-flight ask turn (created on first use).
+
+        The orb STOP reaches the helper first; the helper asks the service to
+        cancel the turn's ``request_id``. A cancel that arrives BEFORE ``ask``
+        registered here still wins: :meth:`cancel` creates and sets the same
+        event, so the turn observes it immediately. An empty request id
+        returns ``None`` — a direct ``/ask`` with no ``begin`` has no id a
+        cancel could name, so behavior stays byte-identical. Never raises.
+        """
+        rid = str(request_id or "").strip()
+        if not rid:
+            return None
+        try:
+            with self._lock:
+                self._prune()
+                ev = self._ask_cancels.get(rid)
+                if ev is None:
+                    ev = threading.Event()
+                    self._ask_cancels[rid] = ev
+                    self._ask_cancel_at[rid] = time.monotonic()
+                return ev
+        except Exception:  # noqa: BLE001 - cancellation is best-effort
+            return threading.Event()
+
+    def _release_ask_cancel(self, request_id: str,
+                            ev: Optional[threading.Event]) -> None:
+        """Drop this turn's cancel event once the turn has finished."""
+        if ev is None:
+            return
+        rid = str(request_id or "").strip()
+        try:
+            with self._lock:
+                if self._ask_cancels.get(rid) is ev:
+                    self._ask_cancels.pop(rid, None)
+                    self._ask_cancel_at.pop(rid, None)
+        except Exception:  # noqa: BLE001 - bookkeeping only
+            pass
+
+    @staticmethod
+    def _ask_stopped(ev: Optional[threading.Event]) -> bool:
+        """True when this turn's cancel event has been set. Never raises."""
+        try:
+            return bool(ev is not None and ev.is_set())
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _ask_cancelled(self, request_id: str, mode: str) -> Dict[str, Any]:
+        """Typed outcome for a turn stopped mid-flight (orb STOP).
+
+        Same plain-dict shape as every other refusal (``ok``/``code``/
+        ``detail``), so the route returns 400 and the helper renders a clean
+        stop instead of an answer it would then speak.
+        """
+        try:
+            self._audit("voice_edit.ask.cancelled", {
+                "request_id": request_id, "mode": mode})
+        except Exception:  # noqa: BLE001 - audit is additive
+            pass
+        return {"ok": False, "mode": mode,
+                "code": "VOICE_EDIT_ASK_CANCELLED",
+                "detail": "the turn was cancelled before it completed"}
+
     def _prune(self) -> None:
         now = time.monotonic()
         ttl = self.ttl()
         for rid in [r for r, x in self._reqs.items()
                     if now - x.created_at > ttl]:
             self._reqs.pop(rid, None)
+        # Unconsumed ask-cancel tombstones (a cancel naming no in-flight
+        # ask) share the request TTL so the bookkeeping cannot grow.
+        for rid in [r for r, ts in self._ask_cancel_at.items()
+                    if now - ts > ttl]:
+            self._ask_cancels.pop(rid, None)
+            self._ask_cancel_at.pop(rid, None)
 
     # -- capture / parse --------------------------------------------------
     def capture(self, request_id: str) -> Dict[str, Any]:
@@ -1222,6 +1300,24 @@ class VoiceEditService:
         # staged request. Junk-safe and signature-stable — the request
         # bookkeeping below is unchanged.
         _signal_helper_stop()
+        # Orb STOP / explicit cancel of an in-flight ask turn: flip the turn's
+        # cancel event BEFORE the staged-request bookkeeping. A tombstone is
+        # created when no ask has registered yet, so a cancel that arrives
+        # early still wins (ask picks up the already-set event). The service
+        # then skips/aborts the model or agent call and returns no reply for it.
+        rid = str(request_id or "")
+        if rid:
+            try:
+                with self._lock:
+                    self._prune()
+                    _ev = self._ask_cancels.get(rid)
+                    if _ev is None:
+                        _ev = threading.Event()
+                        self._ask_cancels[rid] = _ev
+                        self._ask_cancel_at[rid] = time.monotonic()
+                    _ev.set()
+            except Exception:  # noqa: BLE001 - cancellation is best-effort
+                pass
         with self._lock:
             req = self._reqs.pop(request_id, None)
         if req is None:
@@ -2655,11 +2751,30 @@ class VoiceEditService:
         is used and the decision is audited; an escalation with no configured
         target degrades to local, never to the resolver default.
         """
+        # Orb STOP / explicit cancel: register a per-request cancel event so
+        # the model or agent call and any service-side speech for this turn
+        # can be stopped — not just the helper's own playback. The event is
+        # released on every exit (one per request id); an empty request id
+        # has nothing a cancel can name and stays byte-identical.
+        _cancel = self._ask_cancel_event(request_id)
+        try:
+            return self._answer_question_text(
+                text, request_id=request_id, mode=mode, _cancel=_cancel)
+        finally:
+            self._release_ask_cancel(
+                str(request_id or "").strip(), _cancel)
+
+    def _answer_question_text(self, text: str, *, request_id: str = "",
+                              mode: str = "answer",
+                              _cancel: Optional[threading.Event] = None
+                              ) -> Dict[str, Any]:
         question = (text or "").strip()
         if not question:
             raise VoiceEditError("VOICE_EDIT_EMPTY_QUESTION",
                                  "no question to answer")
         self._require_estop_clear()
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
         self._maybe_prune_voice_sessions(request_id)
         # Slice 4a — manual sleep mode (owner decision 2026-10-03 §5 #1/#2).
         # "going to sleep" sets the mode (this turn is on-request: answered,
@@ -2735,7 +2850,7 @@ class VoiceEditService:
         if _ask_rw is not None and _ask_rw["route"] == "in-chat":
             question = _ask_rw["task_text"]
             _full_first = self._full_turn_answer(
-                question, request_id=request_id, mode=mode)
+                question, request_id=request_id, mode=mode, _cancel=_cancel)
             if _full_first is not None:
                 return _full_first
         elif _ask_rw is not None and _ask_rw["route"] == "quick":
@@ -2920,6 +3035,15 @@ class VoiceEditService:
             # the configured local profile — never profile None (the resolver
             # default, an API profile that fails closed on stock config).
             profile = self._local_profile()
+        # A STOP that landed during the cheap deterministic stages (facts,
+        # skills, reply drafts) must never reach the expensive brain call.
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
+
+        def _stopped() -> bool:
+            """Real abort hook for the brain call (event set -> stop)."""
+            return self._ask_stopped(_cancel)
+
         try:
             from ..providers import gateway as GW
             # Conversation memory: pass the bounded prior transcript as the
@@ -2952,6 +3076,9 @@ class VoiceEditService:
                 ctx = f"{ctx}\n\n{directive}\n{live}" if ctx else f"{directive}\n{live}"
             if style:
                 ctx = f"{ctx}\n\nSTYLE: {style}" if ctx else f"STYLE: {style}"
+            # ``cancel`` aborts the remote/frontier path; ``should_stop``
+            # aborts the local streaming adapter mid-generation. Both read the
+            # same event, so a normal (uncancelled) turn is byte-identical.
             res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
                               model=model_override,
@@ -2959,10 +3086,16 @@ class VoiceEditService:
                               timeout_s=30.0,
                               reasoning=reasoning,
                               conversation_prompt=convo,
-                              context=ctx)
+                              context=ctx,
+                              cancel=_stopped, should_stop=_stopped)
         except Exception as exc:
             return {"ok": False, "code": "VOICE_EDIT_ASK_FAILED",
                     "detail": str(exc)[:160]}
+        # The stop can arrive while the model call runs: never hand the reply
+        # back to be spoken (and never trigger the full-turn fallback) once the
+        # turn has been cancelled.
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
         spoken = False
         ok = bool(getattr(res, "ok", False))
         answer = str(getattr(res, "text", "") or "").strip()
@@ -2981,7 +3114,7 @@ class VoiceEditService:
         if not _quick_only and (
                 not ok or not answer or _looks_like_brain_refusal(answer)):
             full = self._full_turn_answer(question, request_id=request_id,
-                                          mode=mode)
+                                          mode=mode, _cancel=_cancel)
             if full is not None:
                 return full
         if not ok or not answer:
@@ -2999,7 +3132,9 @@ class VoiceEditService:
                 "spoken": bool(spoken)}
 
     def _full_turn_answer(self, question: str, *, request_id: str = "",
-                            mode: str = "answer") -> Optional[Dict[str, Any]]:
+                            mode: str = "answer",
+                            _cancel: Optional[threading.Event] = None
+                            ) -> Optional[Dict[str, Any]]:
         """Decision-26 fallback: answer through the full agent turn.
 
         Dispatches through ``chat_transport.turn`` — the same persisted,
@@ -3010,12 +3145,20 @@ class VoiceEditService:
         double-write the exchange). Returns the ask-shaped dict, or None
         when the full turn cannot answer (caller keeps the brain outcome).
 
+        A STOP keyed to this turn's ``request_id`` reaches the agent branch
+        through the existing ``chat_transport`` cancel transport: the
+        ``cancel`` callable reads the same event, so the agent turn aborts
+        and this method returns the typed cancelled outcome instead of a
+        reply.
+
         Staged confirmations (``CONFIRM_REQUIRED`` + ``confirmation_id``)
         deliberately fall through to None: the helper speaks staged
         confirmations for service.task mode, where voice "yes" settles the
         CT-staged record (Slice-1b) — speaking "say yes" here would
         double-promise the settle, so the brain answer stands instead.
         """
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
         try:
             from .. import chat_transport as CT
         except Exception as exc:
@@ -3031,21 +3174,31 @@ class VoiceEditService:
         if routed_session:
             self._audit("voice_edit.full_turn_session", {
                 "request_id": request_id, "session_id": routed_session})
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
+
+        def _stopped() -> bool:
+            return self._ask_stopped(_cancel)
+
         try:
             model = self._select_model(
                 _read_cfg(self.cfg, "voice_edit", "chat_model", default=""))
             res = CT.turn(self.cfg, question, session=session,
                           model=model or None, actor="voice:user",
-                          timeout_s=120.0)
+                          timeout_s=120.0, cancel=_stopped)
         except Exception as exc:
             self._audit("voice_edit.full_turn_error", {
                 "request_id": request_id, "chars": len(question),
                 "error": str(exc)[:160]})
             return None
+        if self._ask_stopped(_cancel):
+            return self._ask_cancelled(request_id, mode)
         if not isinstance(res, dict):
             self._audit("voice_edit.full_turn_malformed", {
                 "request_id": request_id})
             return None
+        if str(res.get("code") or "") == "CANCELLED":
+            return self._ask_cancelled(request_id, mode)
         if res.get("ok"):
             text = str(res.get("reply") or res.get("text") or "").strip()
             if text:

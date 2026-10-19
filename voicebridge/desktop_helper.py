@@ -1064,6 +1064,11 @@ class DesktopHelper:
         self._turn_seq = 0
         self._turn_stopped_seq = -1
         self._turn_stop_announced = False
+        # Which turn (epoch) already asked the service to cancel its in-flight
+        # /ask turn. A STOP asks once per turn: the service's own cancel
+        # signals the helper back with SIGUSR2, so an unguarded request would
+        # ping-pong forever. -1 means "no turn has asked yet".
+        self._turn_cancel_sent = -1
         # Accurate-model prewarm readiness (explicit, not blind): the background
         # prewarm sets the event/state, and the first activation waits for it
         # with a bounded timeout so the user is never left waiting blind.
@@ -1510,6 +1515,12 @@ class DesktopHelper:
         signal handler), idempotent, and never fatal: a failed terminate
         leaves the normal playback path intact. Does not touch the mic or
         the answer path.
+
+        When a turn is actually live (playing or PROCESSING) this also asks
+        the service to cancel the in-flight ``/ask`` turn by its
+        ``request_id`` (see :meth:`_request_service_cancel`), so the model or
+        agent call and any service-side speech for the turn stop too — not
+        just this helper's playback.
         """
         try:
             proc = getattr(self, "_playback_proc", None)
@@ -1522,6 +1533,10 @@ class DesktopHelper:
                     if self.state == self.PROCESSING:
                         self._turn_stopped_seq = self._turn_seq
                         _trace("speak.stop_pending", turn=self._turn_seq)
+                        try:
+                            self._request_service_cancel()
+                        except Exception:
+                            pass
                         return True
                 except Exception:
                     pass
@@ -1537,9 +1552,53 @@ class DesktopHelper:
                 except Exception:
                     pass
             _trace("speak.stop")
+            try:
+                self._request_service_cancel()
+            except Exception:
+                pass
             return True
         except Exception:
             return False
+
+    def _request_service_cancel(self) -> None:
+        """Ask the service to cancel this turn's in-flight ``/ask`` call.
+
+        The orb STOP reaches this helper first (SIGUSR2); the service owns the
+        expensive model/agent turn, so the helper tells it to cancel the
+        active ``self.request_id``. Best-effort, idempotent PER TURN (the
+        service's cancel signals the helper back with SIGUSR2, so an unguarded
+        request would ping-pong), and never fatal. The POST runs on a
+        short-lived daemon thread: this is reached from the SIGUSR2 handler
+        via :meth:`stop_speaking`, which must never block on the network. A
+        client without ``cancel`` (older/fake) is a quiet no-op.
+        """
+        rid = str(getattr(self, "request_id", "") or "")
+        if not rid:
+            return
+        try:
+            if getattr(self, "_turn_cancel_sent", -1) == getattr(
+                    self, "_turn_seq", 0):
+                return
+            self._turn_cancel_sent = getattr(self, "_turn_seq", 0)
+        except Exception:
+            return
+        cancel = getattr(getattr(self, "client", None), "cancel", None)
+        if not callable(cancel):
+            return
+        try:
+            threading.Thread(target=self._dispatch_service_cancel,
+                             args=(cancel, rid), daemon=True,
+                             name=f"orb-svc-cancel-{rid[:16]}").start()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _dispatch_service_cancel(cancel: Any, rid: str) -> None:
+        """Run one best-effort service cancel; never raises (daemon thread)."""
+        try:
+            cancel(rid)
+        except Exception:
+            pass
 
     def _hotkey_loop(self) -> None:
         while not self._hk_stop.is_set():
@@ -2837,6 +2896,15 @@ class DesktopHelper:
         try:
             if hasattr(self.client, "ask_result"):
                 out = self.client.ask_result(question, self.request_id)
+                # A STOP that cancelled the turn at the service returns this
+                # typed code (route 400): close the orb FSM with the canonical
+                # stop triple instead of an error — the turn was stopped, not
+                # broken. The service already aborted the model/agent call and
+                # returned no reply to speak.
+                if str(out.get("code") or "") == "VOICE_EDIT_ASK_CANCELLED":
+                    self._announce_turn_stop()
+                    self.state = self.PREVIEW
+                    return
                 reply = str(out.get("answer", "") or "")
                 # Lane 3 (2026-10-03): the service stages tool-shaped misses
                 # that reached ask() as conversation (timer-class) instead of
@@ -2856,6 +2924,13 @@ class DesktopHelper:
             else:  # compatibility seam (older/fake clients)
                 reply = self.client.ask(question, self.request_id)
         except HelperError as exc:
+            if exc.code == "VOICE_EDIT_ASK_CANCELLED":
+                # Orb STOP cancelled this turn at the service (the POST came
+                # back 400): the stop marker is already recorded, so emit the
+                # canonical stop triple once and end cleanly.
+                self._announce_turn_stop()
+                self.state = self.PREVIEW
+                return
             self._ui_error(exc.code, exc.detail)
             self._talk_emit("error", code=exc.code)
             self._finish_error()
