@@ -21,7 +21,7 @@ from fastapi.responses import StreamingResponse
 from qubit_cli.session_listing import subagent_listing_scope
 from qubit_cli.web_deps import late
 from qubit_cli.web_server_gateway import _strip_session_list_rows
-from qubit_cli.web_server_sessions import _session_latest_descendant
+from qubit_cli.web_server_sessions import _maybe_auto_archive_for_profile, _session_latest_descendant
 from qubit_cli.web_models import (
     BulkDeleteSessions, SessionImport, SessionOwnerBackfill, SessionPrune, SessionRename)
 from qubit_cli.web_routers._common import (
@@ -198,6 +198,11 @@ def get_sessions(
         raise HTTPException(status_code=400, detail="order must be one of: created, recent")
     profile_name = _cron_profile_home(profile)[0] if profile else None
     try:
+        # Auto-archive is the only write on this GET path: run it on its own
+        # maintenance connection, then open the listing connection read-only.
+        # `qubit serve` runs neither the CLI nor gateway startup hooks, so this
+        # session-list trigger is what makes sessions.auto_archive work there.
+        _maybe_auto_archive_for_profile(profile)
         db = _open_session_db_for_profile(profile, read_only=True)
         try:
             min_message_count = max(0, min_messages)

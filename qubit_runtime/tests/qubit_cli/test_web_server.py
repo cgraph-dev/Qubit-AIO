@@ -192,7 +192,7 @@ class TestRedactKey:
 
 
 class TestSessionTokenInjection:
-    """The desktop shell mints QUBIT_DASHBOARD_SESSION_TOKEN and signs its
+    """The desktop shell mints HERMES_DASHBOARD_SESSION_TOKEN and signs its
     /api + /api/ws calls with it. The backend must adopt that token, else every
     desktop request 401s ("gateway is offline"). A main-merge once silently
     dropped this read — this guards the contract, not a literal value.
@@ -203,7 +203,7 @@ class TestSessionTokenInjection:
 
         original_app = ws.app
         original_token = ws._SESSION_TOKEN
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
         assert ws._resolve_session_token() == "desktop-seeded-token"
         # No module reload: the loaded app and its adopted token are untouched.
         assert ws.app is original_app
@@ -217,9 +217,9 @@ class TestSessionTokenInjection:
         original_app = ws.app
         original_header_name = ws._SESSION_HEADER_NAME
         original_token = ws._SESSION_TOKEN
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
         assert ws._resolve_session_token() == "desktop-seeded-token"
-        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
         with patch.object(ws.secrets, "token_urlsafe", return_value="generated-token"):
             assert ws._resolve_session_token() == "generated-token"
 
@@ -1376,8 +1376,11 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert resp.json()["session_id"] == "primary-cont"
 
 
-    def test_update_qubit_returns_docker_guidance_without_spawning(self, monkeypatch):
+    def test_update_qubit_returns_docker_guidance_without_spawning(self, monkeypatch, tmp_path):
 
+        # The refusal still writes its action log: keep that write inside the test's tmp dir
+        # instead of the real home (home_io_guard correctly refuses the latter).
+        monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
         spawned = False
 
         def fail_spawn(*_args, **_kwargs):
@@ -1414,8 +1417,9 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert status_data["exit_code"] == 1
         assert status_data["pid"] is None
 
-    def test_update_qubit_returns_apt_guidance_without_spawning(self, monkeypatch):
+    def test_update_qubit_returns_apt_guidance_without_spawning(self, monkeypatch, tmp_path):
 
+        monkeypatch.setattr(_web_server_gateway, "_ACTION_LOG_DIR", tmp_path)
         spawned = False
 
         def fail_spawn(*_args, **_kwargs):
@@ -1453,6 +1457,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert check_data["update_command"] == data["update_command"]
 
     def test_update_status_recovers_completed_result_after_dashboard_restart(self, monkeypatch, tmp_path):
+        from qubit_cli.logs import log_file_path
 
         action_id = "c" * 32
         (tmp_path / "qubit-update.log").write_text(
@@ -1460,7 +1465,13 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             "pulling updates...\n",
             encoding="utf-8",
         )
-        (tmp_path / "update.log").write_text(
+        # The durable completion marker lives in the ROOT home's update.log — `qubit update`
+        # mirrors it there because it restarts this dashboard, so the profile-scoped action
+        # log cannot carry the proof. Write the fixture where the handler reads it.
+        durable_log = log_file_path("update")
+        assert durable_log is not None
+        durable_log.parent.mkdir(parents=True, exist_ok=True)
+        durable_log.write_text(
             "=== qubit update started 2026-08-17T11:19:35 ===\n"
             "✓ Update complete!\n"
             f"=== qubit-update completed {action_id} ===\n",
@@ -3185,7 +3196,7 @@ class TestNewEndpoints:
         """Each provider row carries a server-computed readiness `status`.
 
         Regression: the GUI pilled every zero-env-var row "Ready" — including
-        logged-out Nous Subscription rows, xAI TTS without Grok OAuth, and
+        logged-out Qubit Subscription rows, xAI TTS without Grok OAuth, and
         never-installed KittenTTS/Piper. The endpoint now reports the honest
         state so keyless ≠ ready.
         """
@@ -3217,7 +3228,7 @@ class TestNewEndpoints:
         # Genuinely-free keyless row stays Ready.
         assert by_name["Microsoft Edge TTS"]["status"] == "ready"
         # Keyless ≠ ready for gated rows:
-        assert by_name["Nous Subscription"]["status"] == "needs_auth"
+        assert by_name["Qubit Subscription"]["status"] == "needs_auth"
         assert by_name["xAI TTS"]["status"] == "needs_auth"
         assert by_name["KittenTTS"]["status"] == "needs_setup"
         assert by_name["Piper"]["status"] == "needs_setup"
@@ -3245,7 +3256,7 @@ class TestNewEndpoints:
 
         resp = self.client.put(
             "/api/tools/toolsets/browser/provider",
-            json={"provider": "Nous Subscription (Browser Use cloud)"},
+            json={"provider": "Qubit Subscription (Browser Use cloud)"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -3443,16 +3454,16 @@ class TestDesktopLoopbackAuthExemption:
     def test_exempt_with_desktop_env_and_session_token_on_loopback(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-minted")
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-minted")
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is True
         assert web_server._desktop_loopback_auth_exempt("::1") is True
 
     def test_exempt_via_ssh_spawn_credentials_without_env_token(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
         assert web_server._desktop_loopback_auth_exempt(
             "127.0.0.1", ssh_session_token="tok"
         )
@@ -3463,24 +3474,24 @@ class TestDesktopLoopbackAuthExemption:
     def test_not_exempt_without_desktop_env(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.delenv("QUBIT_DESKTOP", raising=False)
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "tok")
+        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "tok")
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is False
 
     def test_not_exempt_without_any_credential(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        # QUBIT_DESKTOP=1 alone is not enough: a plain serve with the env var
+        # HERMES_DESKTOP=1 alone is not enough: a plain serve with the env var
         # exported must stay gated.
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
         assert web_server._desktop_loopback_auth_exempt("127.0.0.1") is False
 
     def test_not_exempt_on_non_loopback_bind(self, monkeypatch):
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "tok")
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "tok")
         assert web_server._desktop_loopback_auth_exempt("0.0.0.0") is False
         assert web_server._desktop_loopback_auth_exempt("192.168.1.10") is False
 
@@ -3489,7 +3500,7 @@ class TestDesktopLoopbackAuthExemption:
 
         # Sanity: the base behaviour is untouched — a non-Desktop loopback
         # serve with a public_url configured stays ticket-gated.
-        monkeypatch.delenv("QUBIT_DESKTOP", raising=False)
+        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
         assert web_server.should_require_dashboard_auth(
             "127.0.0.1", frozenset({"dash.example.com"})
         ) is True
@@ -3510,8 +3521,8 @@ class TestDesktopHostRendezvousIsolation:
         from qubit_cli.plugins_activation import notify_serve_backend
 
         monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(web_server, "_SESSION_TOKEN", "desktop-spawn-token")
         monkeypatch.setattr(hr, "cleanup_on_exit", lambda role: None)
         dialed = []
@@ -3524,7 +3535,10 @@ class TestDesktopHostRendezvousIsolation:
                 return False
 
         def _fake_urlopen(request, timeout=None):
-            dialed.append((request.full_url, request.get_header("X-qubit-session-token")))
+            # HTTP header names are case-insensitive and urllib re-cases them on the way in,
+            # so look the credential up by lower-cased name rather than by the literal spelling.
+            headers = {key.lower(): value for key, value in request.header_items()}
+            dialed.append((request.full_url, headers.get("x-hermes-session-token")))
             return _Reply(b'{"ok": true}')
 
         monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen)
@@ -3544,12 +3558,12 @@ class TestDesktopHostRendezvousIsolation:
 
     def test_standalone_backend_still_claims_the_host_serve_record(self, monkeypatch):
         """The Desktop exclusion must not alter standalone dashboard discovery — including a
-        supervised service whose shell merely inherited QUBIT_DESKTOP=1 without the token."""
+        supervised service whose shell merely inherited HERMES_DESKTOP=1 without the token."""
         from gateway import host_rendezvous as hr
         import qubit_cli.web_server as web_server
 
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
         claimed = []
         published = []
         monkeypatch.setattr(
@@ -4768,6 +4782,24 @@ class TestPluginAPISecretScopeProductionMount:
         worker_home.mkdir(parents=True, exist_ok=True)
         (worker_home / ".env").write_text(f"{self._PROBE_KEY}=sk-workerb\n", encoding="utf-8")
 
+        # The plugin gate is per-profile: a user plugin runs only where that profile opts it in,
+        # so a ``?profile=workerb`` request must find its OWN installed+enabled copy (this is the
+        # operator's `qubit plugins install`/`enable` for that profile, not a bypass).
+        from qubit_cli.config import load_config, save_config
+        from qubit_constants import set_qubit_home_override, reset_qubit_home_override
+
+        worker_plugins = worker_home / "plugins" / "example-dashboard"
+        if worker_plugins.exists():
+            shutil.rmtree(worker_plugins)
+        shutil.copytree(_EXAMPLE_PLUGIN_FIXTURE, worker_plugins)
+        _token = set_qubit_home_override(str(worker_home))
+        try:
+            worker_cfg = load_config()
+            worker_cfg.setdefault("plugins", {})["enabled"] = ["example"]
+            save_config(worker_cfg)
+        finally:
+            reset_qubit_home_override(_token)
+
         # Launch profile A: an env-only credential (systemd ``Environment=`` style), frozen
         # into the launch scope when multi-profile hosting activates.
         monkeypatch.setenv(self._PROBE_KEY, "sk-launch-a")
@@ -5114,7 +5146,7 @@ def test_resolve_chat_argv_injects_gateway_ws_url(monkeypatch):
     _argv, _cwd, env = _web_server_chat._resolve_chat_argv()
 
     assert env is not None
-    gateway_url = env.get("QUBIT_TUI_GATEWAY_URL", "")
+    gateway_url = env.get("HERMES_TUI_GATEWAY_URL", "")
     assert gateway_url.startswith("ws://127.0.0.1:9119/api/ws?")
     assert "token=" in gateway_url
 
@@ -5406,8 +5438,8 @@ class TestDesktopCronTicker:
 
         called = threading.Event()
         monkeypatch.setattr(sched, "tick", lambda *a, **k: called.set())
-        monkeypatch.setenv("QUBIT_DESKTOP", "1")
-        monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
 
         with self._client():
             assert called.wait(3.0), "expected cron tick under a Desktop-owned backend"
@@ -5769,6 +5801,77 @@ class TestSessionPatchUnread:
         assert restored.status_code == 200
         rows = self.auth_client.get("/api/sessions?limit=100").json()["sessions"]
         assert bool(next(s for s in rows if s["id"] == "s1")["hidden"]) is False
+
+    def test_patch_title_renames_through_the_receipt_seam(self):
+        """A plain ``{"title": ...}`` PATCH renames on the caller's transaction.
+
+        The title path is the one metadata edit that does NOT go through the
+        ``_set_lineage_column`` helper; it writes via a title CAS on the mutation seam's own
+        connection. That seam was missing from this pin's SessionDB, so every rename (SPA,
+        Desktop, ``/title``) raised AttributeError inside the write. Assert both the response
+        and the persisted row so a 200 with a silent no-op cannot pass.
+        """
+        resp = self.auth_client.patch("/api/sessions/s1", json={"title": "renamed via patch"})
+        assert resp.status_code == 200
+        assert resp.json()["title"] == "renamed via patch"
+
+        rows = self.auth_client.get("/api/sessions?limit=100").json()["sessions"]
+        assert next(s for s in rows if s["id"] == "s1")["title"] == "renamed via patch"
+
+
+class TestPtyRegistryShutdownKeepsDetachedSessions:
+    """Backend shutdown must not kill a PTY whose client already left.
+
+    ``web_server`` shuts the registry down with ``close_all(keep_detached=True)`` so a Desktop
+    app restart does not destroy a running turn that the next backend reattaches to. The
+    registry's ``close_all`` accepted no such argument, so shutdown raised TypeError before it
+    reached the remaining teardown (managed runtime stop, desktop gateway termination).
+    """
+
+    @staticmethod
+    def _registry():
+        from qubit_cli.pty_session import PtySessionRegistry
+        return PtySessionRegistry(ttl=60.0, max_sessions=4, buffer_cap=1024, read_timeout=1.0)
+
+    @staticmethod
+    def _stub(*, attached: bool):
+        class _Stub:
+            def __init__(self):
+                self.attached = attached
+                self.last_detached_at = None if attached else 1.0
+                self.closed = False
+
+            async def close(self):
+                self.closed = True
+
+        return _Stub()
+
+    def test_keep_detached_closes_attached_and_preserves_detached(self):
+        import asyncio
+
+        registry = self._registry()
+        attached, detached = self._stub(attached=True), self._stub(attached=False)
+        registry._sessions = {"attached": attached, "detached": detached}
+
+        asyncio.run(registry.close_all(keep_detached=True))
+
+        assert attached.closed is True
+        assert detached.closed is False
+        assert list(registry._sessions) == ["detached"]
+
+    def test_default_close_all_still_closes_everything(self):
+        """A plain ``qubit serve`` shutdown (no keep_detached) keeps the full sweep."""
+        import asyncio
+
+        registry = self._registry()
+        attached, detached = self._stub(attached=True), self._stub(attached=False)
+        registry._sessions = {"attached": attached, "detached": detached}
+
+        asyncio.run(registry.close_all())
+
+        assert attached.closed is True
+        assert detached.closed is True
+        assert registry._sessions == {}
 
 
 def test_mount_spa_dynamic_web_dist_recheck(tmp_path, monkeypatch):

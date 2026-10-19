@@ -159,7 +159,8 @@ class UpdateReceipt:
         self.data["correlation_id"] = _launcher_correlation_id()
         # The dashboard action that spawned this run: the receipt store is root-wide, so the
         # action-status route certifies an outcome only from a receipt naming ITS action.
-        self.data["action_id"] = os.environ.get("HERMES_ACTION_ID", "").strip() or None
+        self.data["action_id"] = (os.environ.get("QUBIT_ACTION_ID", "").strip()
+                                     or os.environ.get("HERMES_ACTION_ID", "").strip() or None)
 
     def step(self, name: str, ok: bool, detail: str = "") -> None:
         self.data["steps"].append({"name": name, "ok": bool(ok), "detail": detail, "at": _utc_now_iso()})

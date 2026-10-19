@@ -294,6 +294,8 @@ _ACTION_LOG_FILES: Dict[str, str] = {
     "gateway-start": "gateway-start.log",
     "gateway-stop": "gateway-stop.log",
     "gateway-migrate": "gateway-migrate.log",
+    "qubit-update": "qubit-update.log",
+    # A run started before the rename still tails its own log.
     "hermes-update": "hermes-update.log",
     **{name: f"action-{name}.log" for name in (
         "doctor", "security-audit", "backup", "import", "checkpoints-prune", "skills-install",
@@ -510,7 +512,8 @@ def _spawn_qubit_action(
     _ACTION_RESULTS.pop(name, None)
     _ACTION_COMMANDS[name] = tuple(subcommand)
     _ACTION_PROCS[name] = proc
-    action_id = (env_overrides or {}).get("HERMES_ACTION_ID")
+    action_id = ((env_overrides or {}).get("QUBIT_ACTION_ID")
+                 or (env_overrides or {}).get("HERMES_ACTION_ID"))
     if action_id:
         _ACTION_IDS[name] = action_id
     else:

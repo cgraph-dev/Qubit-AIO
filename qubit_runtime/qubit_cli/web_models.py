@@ -264,6 +264,11 @@ class BulkDeleteSessions(BaseModel):
 class SessionImport(BaseModel):
     sessions: List[Dict[str, Any]]
     profile: Optional[str] = None
+    # Mutation identity/receipt (see SessionRename). Omitted by the dashboard SPA and
+    # Desktop; the endpoint resolves them server-side from the stored row.
+    request_id: Optional[str] = None
+    expected_revision: Optional[int] = None
+    expected_generation: Optional[int] = None
 
 class SessionRename(BaseModel):
     title: Optional[str] = None
@@ -273,6 +278,13 @@ class SessionRename(BaseModel):
     # Read-state watermark (sessions.last_read_at): True = unread, False = read now, None = leave.
     unread: Optional[bool] = None
     profile: Optional[str] = None  # session owned by another profile (opens its state.db)
+    # Mutation identity + optimistic fence. The dashboard SPA and Desktop send neither
+    # (api/sessions.ts PATCHes ``{unread|archived|pinned, profile}``), so the endpoint
+    # resolves an omitted pair server-side from the row it is about to edit; a caller
+    # that DOES send them keeps its precondition and still gets a 409 on a concurrent edit.
+    request_id: Optional[str] = None
+    expected_revision: Optional[int] = None
+    expected_generation: Optional[int] = None
 
 class SessionOwnerBackfill(BaseModel):
     """POST /api/sessions/owner-backfill (legacy migration). ``profile`` scopes WHICH state.db is

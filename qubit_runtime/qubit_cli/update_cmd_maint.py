@@ -317,9 +317,11 @@ def _print_update_completion(message: str) -> None:
     """
     from qubit_cli.update_cmd import _branch_head_suffix
     print(f"{message}{_branch_head_suffix()}")
-    action_id = os.environ.get("HERMES_ACTION_ID", "")
+    # ``QUBIT_ACTION_ID`` is what this product's dashboard mints; ``HERMES_ACTION_ID``
+    # stays readable for a run started before the rename.
+    action_id = os.environ.get("QUBIT_ACTION_ID", "") or os.environ.get("HERMES_ACTION_ID", "")
     if len(action_id) == 32 and all(char in "0123456789abcdef" for char in action_id):
-        print(f"=== hermes-update completed {action_id} ===")
+        print(f"=== qubit-update completed {action_id} ===")
 
 
 def _read_project_version() -> str | None:

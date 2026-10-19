@@ -357,8 +357,20 @@ class PtySessionRegistry:
         self._background_closes.add(task)
         task.add_done_callback(self._background_closes.discard)
 
-    async def close_all(self) -> None:
+    async def close_all(self, keep_detached: bool = False) -> None:
         # Close concurrently: each close() may wait out its helpers' SIGHUP grace, and shutdown runs
         # under the backend's SIGTERM -> SIGKILL budget (dashboard_procs._POSIX_TERM_GRACE_SECONDS).
-        sessions = [self._sessions.pop(key) for key in list(self._sessions)]
+        #
+        # ``keep_detached`` is the Desktop backend's shutdown contract: a PTY whose client already
+        # went away is owned by the next backend that reattaches to it, so killing it here would
+        # destroy a running turn on every app restart. Attached sessions still close (their socket
+        # is this process's), and a plain ``qubit serve`` shutdown keeps the default full sweep.
+        keys = list(self._sessions)
+        if keep_detached:
+            def _detached(key: str) -> bool:
+                session = self._sessions.get(key)
+                return (session is not None and not session.attached
+                        and session.last_detached_at is not None)
+            keys = [key for key in keys if not _detached(key)]
+        sessions = [self._sessions.pop(key) for key in keys]
         await asyncio.gather(*(s.close() for s in sessions), *self._background_closes, return_exceptions=True)

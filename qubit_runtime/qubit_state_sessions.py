@@ -960,6 +960,33 @@ class SessionSessionsMixin:
             (session_id, session_id, value),
         ) > 0
 
+    def _set_lineage_column_txn(self, conn, column: str, session_id: str, value: Any) -> List[str]:
+        """``_set_lineage_column`` on the CALLER'S write transaction.
+
+        The runtime mutation seam (``apply_action``) already holds the single writer and the
+        commit that carries the receipt; opening the method's own ``_execute_write`` there
+        would be a second transaction on the same connection. Returns the affected ids so the
+        caller can bump ``runtime_revision`` for exactly the rows that changed.
+        """
+        params = (session_id, session_id)
+        ids = [row[0] for row in conn.execute(
+            _LINEAGE_CTE_SQL + " SELECT id FROM lineage ", params).fetchall()]
+        if ids:
+            conn.execute(
+                _LINEAGE_CTE_SQL + f"""
+                UPDATE sessions
+                SET {column} = ?
+                WHERE id IN (SELECT id FROM lineage)
+                """,
+                (session_id, session_id, value),
+            )
+        return ids
+
+    def _set_lineage_column_in_transaction(self, conn, column: str, session_id: str,
+                                           value: Any) -> List[str]:
+        """Alias the mutation layer calls; see :meth:`_set_lineage_column_txn`."""
+        return self._set_lineage_column_txn(conn, column, session_id, value)
+
     def set_session_archived(self, session_id: str, archived: bool) -> bool:
         """Soft-hide (or unhide) a session and its compression lineage; messages are kept.
         This is the DELIBERATE archive (user, CLI, API): it clears the ``auto_archived``
