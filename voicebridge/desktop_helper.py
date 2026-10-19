@@ -3231,13 +3231,21 @@ class DesktopHelper:
                 # Both waits and returns when the process ends; a running
                 # process raises TimeoutExpired, so we poll the stop flag.
                 proc.wait(timeout=0.05)
-                return False
             except Exception:
                 try:
-                    if proc.poll() is not None:
-                        return False
+                    if proc.poll() is None:
+                        continue
                 except Exception:
                     return False
+            # The process ended. If the explicit stop flag is set, THIS end
+            # was the stop: ``stop_speaking`` terminates the player from the
+            # signal handler, so a ``proc.wait`` that was already blocked
+            # returns normally — reporting False here would drop the canonical
+            # ``interrupt`` event on a race with the 50 ms poll slice.
+            try:
+                return bool(stop.is_set())
+            except Exception:
+                return False
 
     def _play_with_barge_in(self, proc: Any) -> bool:
         """Block until ``proc`` ends; stop it on confident speech or STOP.

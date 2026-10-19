@@ -8441,13 +8441,37 @@ def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     out = Path(tempfile.gettempdir()) / (
         f"qubit-runtime-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
     try:
-        tts = _tts_from_cfg(cfg)
-        tts.load()
-        tts.synthesize(text[:4000], out)
-        # The synth itself (piper/sherpa) is not interruptible mid-call, so a
-        # STOP that lands DURING synthesis is caught here, before the audio is
-        # read/encoded/shipped: the work ran, but the stopped reply is never
-        # returned. The helper's own socket abort covers leaving it spoken.
+        # A keyed (orb) reply runs the synth in a KILLABLE child process:
+        # piper/sherpa synthesizes inside a blocking C call, so a thread
+        # cannot interrupt it, but the worker can be terminated the moment the
+        # turn's cancel is recorded. Normal (dashboard) calls keep the warm
+        # in-process provider path unchanged.
+        provider = ""
+        used_worker = False
+        if _rid:
+            from .tts.synth_worker import (
+                SynthCancelled, SynthWorkerUnavailable,
+                synthesize_cancellable, worker_supported)
+            if worker_supported(cfg):
+                try:
+                    provider = synthesize_cancellable(
+                        cfg, text[:4000], out,
+                        stopped=lambda: _speak_turn_stopped(cfg, _rid),
+                        timeout=60.0)
+                    used_worker = True
+                except SynthCancelled:
+                    return _gate(
+                        "AUDIO_SPEAK_CANCELLED",
+                        "the turn was stopped during speech synthesis",
+                        counterpart, 400)
+                except SynthWorkerUnavailable as exc:
+                    raise TTSUnavailable(str(exc)) from exc
+        if not used_worker:
+            tts = _tts_from_cfg(cfg)
+            tts.load()
+            tts.synthesize(text[:4000], out)
+            provider = str(getattr(tts, "name", "") or "")
+        # A stop that raced the synth boundary is still never shipped.
         if _speak_turn_stopped(cfg, _rid):
             return _gate("AUDIO_SPEAK_CANCELLED",
                          "the turn was stopped during speech synthesis",
@@ -8457,7 +8481,7 @@ def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 else "audio/mpeg")
         encoded = base64.b64encode(data).decode("ascii")
         return _ok(data_url=f"data:{mime};base64,{encoded}", mime_type=mime,
-                   provider=str(getattr(tts, "name", "") or ""))
+                   provider=provider)
     except TTSUnavailable as exc:
         return _gate("AUDIO_TTS_UNAVAILABLE",
                      "local TTS provider is unavailable: "
