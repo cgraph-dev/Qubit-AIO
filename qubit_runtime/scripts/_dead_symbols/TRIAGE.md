@@ -168,3 +168,31 @@ flag it* — because a probe file (`scripts/_probe_laneA_dead_symbols.py`) still
 reads the symbol. That was a contaminated control, not an instrument defect, and
 is recorded here because it is exactly the trap a negative control exists to
 catch.
+
+## Wave 2 verdicts — CORRECTLY UNWIRED (do not "fix" these by wiring)
+
+The detector reports a symbol whose *name* has no call site. A renamed sibling
+that already does the job is not a gap, and wiring the upstream spelling
+alongside it can be actively harmful. Each entry below was checked by reading
+the upstream call site and the local sibling.
+
+| symbol | module | verdict | evidence |
+|---|---|---|---|
+| `_replay_unanswered` | tools/bot_relay.py | **CORRECTLY UNWIRED** | Upstream re-offers `claimed/` envelopes unanswered on EVERY drain (bot_relay.py:358 merges them into the fresh rows). This fork's `_reoffer_unanswered` (bot_relay.py:430) is the same job with a *bound* upstream lacks: it re-offers at most once per envelope (`reoffered_at`), after `REOFFER_AFTER_SECONDS`, and expires against the outbox TTL. Wiring the upstream pass as well would hand out every unanswered envelope twice per drain — a double delivery of a DM, which is the bug the bound exists to prevent. `drain_outbox` already calls the local sibling at bot_relay.py:355. |
+| `admit_message` | gateway/session_ingress.py | **CORRECTLY UNWIRED (for now) — architectural gap, not an alias** | Upstream reaches it from `run_inbound._hm_authority_admission`, a method this fork does not have: native messaging ingress runs `_hm_admit_event` (gateway/run_inbound.py:205) straight to the in-process path, and no native path calls `authority.admit_native` (only `platforms/webhook_ingress.py` and `admit_message` itself do). Making the symbol live means porting the whole `_hm_authority_admission` ordering (`_hm_busy_preempt`, `_hm_post_admission_consume`, `executing_admission` semantics) — a partial port would double-admit or drop messages. Recorded so the next wave starts from the real shape instead of adding one call. |
+
+Wave 2 also corrected two stale fork-side copies rather than wiring new paths:
+
+* `cron/scheduler._finish_interrupted_run` was a private duplicate of
+  `cron/scheduler_bookkeeping.finish_interrupted_run` (verified identical); it
+  now delegates, so the upstream symbol is live and there is one implementation.
+* `plugins/platforms/telegram/adapter.py` carried inlined copies of the held-inbound
+  methods but never inherited `TelegramHeldInboundMixin`; the class now inherits
+  it (adding `adopt_held_inbound` / `_adopt_held_event`) and the inlined copies
+  are gone.
+
+The three secondary-profile `hand_over_held_inbound` sites (upstream
+run_adapters.py:1458,1484,1502) stay unwired: this fork's secondary reconnect
+carries `inbound_dedup_caches()` rather than the predecessor adapter, so there
+is no held queue in hand at that site.
+
