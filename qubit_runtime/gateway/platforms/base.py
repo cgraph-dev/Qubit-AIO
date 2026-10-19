@@ -3909,6 +3909,10 @@ class BasePlatformAdapter(ABC):
         state = self._text_debounce_store().pop(session_key, None)
         if state is not None:
             state.cancel_timer()
+        # A held same-sender burst belongs to the turn this command cancels: drop it too, or the
+        # next turn commits input the user already interrupted.
+        from gateway.session_ingress_burst import discard_busy_burst
+        discard_busy_burst(self, session_key)
 
     # ── Session task + guard ownership helpers: paired with the _session_tasks owner map so
     # reconciliation is deterministic across completion, /stop /new /reset, and stale-lock heal.
@@ -4066,15 +4070,32 @@ class BasePlatformAdapter(ABC):
         # On-entry self-heal: clear a guard whose owner task already exited.
         if session_key in self._active_sessions:
             self._heal_stale_session_lock(session_key)
-        if session_key in self._active_sessions:
+        if session_key in self._active_sessions or self._shared_burst_pending(event, session_key):
             await self._handle_message_while_active(event, session_key)
             return
         # Guard installed synchronously BEFORE the task spawns so a second message can't race in.
         event._gateway_accepted = self._start_session_processing(event, session_key)
 
+    def _shared_runtime_owns_input(self, event: MessageEvent) -> bool:
+        """True when a non-command input belongs to the shared runtime's session authority."""
+        runner = getattr(self._message_handler, "__self__", None)
+        return getattr(runner, "session_authority", None) is not None and not event.get_command()
+
+    def _shared_burst_pending(self, event: MessageEvent, session_key: str) -> bool:
+        """A held same-sender burst is still committing: later input must queue behind it."""
+        from gateway.session_ingress_burst import holds_busy_burst
+        return self._shared_runtime_owns_input(event) and holds_busy_burst(self, session_key)
+
     async def _handle_message_while_active(self, event: MessageEvent, session_key: str) -> None:
         """Route a message that arrived while ``session_key`` is busy: bypass
         commands / clarify replies dispatch inline, everything else is queued."""
+        # The shared runtime's durable FIFO replaces the adapter's busy-message slot: hold a
+        # same-sender photo/text burst for its bounded window so the thought split over two
+        # messages commits as ONE admission.
+        if self._shared_runtime_owns_input(event):
+            from gateway.session_ingress_burst import dispatch_busy_burst
+            await dispatch_busy_burst(self, event, session_key)
+            return
         # Bypass commands run inline: queued they'd leak as user text (/new) or deadlock
         # (/approve, /deny — the agent is blocked on Event.wait).  Dispatch inline by
         # calling the message handler directly and sending the response.  Do NOT use
