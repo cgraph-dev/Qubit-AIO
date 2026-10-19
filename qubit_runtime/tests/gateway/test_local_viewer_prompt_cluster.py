@@ -19,6 +19,16 @@ from gateway.session import SessionSource
 from gateway.turn_context import TurnContext
 
 
+@pytest.fixture(autouse=True)
+def _isolated_home(tmp_path, monkeypatch):
+    """``run_sync`` reads ``QUBIT_HOME`` (``_current_max_iterations`` reloads the profile's
+    ``.env``). Pin it per test so this file passes whatever ran before it in the same process."""
+    home = tmp_path / ".qubit"
+    home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    return home
+
+
 class _Agent:
     def __init__(self, **kwargs):
         self.model = kwargs["model"]
