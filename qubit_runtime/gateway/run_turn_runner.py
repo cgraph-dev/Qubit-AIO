@@ -1376,6 +1376,13 @@ class TurnRunner:
         agent.step_callback = ctx._step_callback_sync if ctx._hooks_ref.loaded_hooks else None
         agent.stream_delta_callback = stream_delta_cb
         agent.interim_assistant_callback = interim_assistant_cb if want_interim_messages else None
+        if getattr(self, "_approval_owner", None) is not None:
+            # An executing API admission feeds its request-owned sinks (Chat/Responses SSE, runs)
+            # reasoning/status/commentary; ``_approval_owner`` is set only by that path, and
+            # ``api_execution`` is the admission it is executing.
+            from gateway.session_api_turn import api_execution, wire_api_observers
+            if api_execution.get() is not None:
+                wire_api_observers(agent, self._approval_owner, want_interim_messages)
         agent.status_callback, agent.notice_callback = ctx._status_callback_sync, self._notice_callback_sync
         agent.notice_clear_callback = None  # sends can't be retracted
         agent.event_callback = ctx._event_callback_sync
@@ -2059,6 +2066,12 @@ class TurnRunner:
         # The local tree has no session-policy layer, so the session's own routing is the
         # runner-level ``_provider_routing`` (upstream's ``session_routing`` needs a live policy).
         pr = runner._provider_routing
+        # The executing API admission re-applies its own runtime precedence (confirmed Browser
+        # lock > requested provider/model > model route) before the agent is resolved; without
+        # this an admitted API turn ran on the gateway's default runtime instead of the one the
+        # request (and its settled receipt) named.
+        from gateway.session_api_turn import prepare_api_runtime
+        model, runtime_kwargs = prepare_api_runtime(model, runtime_kwargs)
         reasoning_config = runner._resolve_session_reasoning_config(source=ctx.source, session_key=ctx.session_key, model=model)
         runner._reasoning_config = reasoning_config
         runner._service_tier = runner._resolve_session_service_tier(source=ctx.source, session_key=ctx.session_key)
