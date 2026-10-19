@@ -1388,35 +1388,20 @@ def _counter_diff(a, b):
     return list(diff.elements())
 
 
-def test_wake_ribbons_are_gone_and_the_field_trails_are_not_painted(monkeypatch):
+def test_wake_ribbons_are_gone_and_the_field_trails_are_retired():
     # Owner 2026-10-19: the 3-point "RGB trail" ribbons rendered as thick bent
     # L/V check-mark sticks ("you didnt replace the L and V's!!!!!"), so the Qt
-    # painter no longer draws them at all. The field still PUBLISHES
-    # ``rgb_trail``/``dust_trail`` for other consumers; the frame must be
-    # byte-identical whether they return a long ribbon or nothing.
+    # painter no longer draws them at all. The field's trail builders are
+    # retired with them, leaving no API a renderer could pick back up.
+    from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
-    size = 192
-    t = 1.234
-
-    def _wide(tt, rr, body):
-        return [{"x": 10.0 * k, "y": 0.0, "hue": 0.5, "sat": 1.0, "val": 1.0,
-                 "alpha": 0.6, "size": 1.2, "depth": 0.5, "dof": 0.0,
-                 "k": float(k)} for k in range(9)]
-
-    with monkeypatch.context() as m:
-        m.setattr(Q._field, "rgb_trail", _wide)
-        m.setattr(Q._field, "dust_trail", _wide)
-        wide = _record(t=t, size=size)
-    with monkeypatch.context() as m:
-        m.setattr(Q._field, "rgb_trail", lambda *a, **k: [])
-        m.setattr(Q._field, "dust_trail", lambda *a, **k: [])
-        bare = _record(t=t, size=size)
-
-    assert _dump(wide) == _dump(bare), "a wake ribbon was still painted"
+    for name in ("rgb_trail", "dust_trail", "_rgb_trail"):
+        assert not hasattr(F, name), name
     # And the painter has no streak helper left to regress through.
     assert not hasattr(Q, "_streak")
     assert not hasattr(Q, "TRAIL_DRAW_SAMPLES")
+    assert _record(t=1.234, size=192) is not None
 
 
 def test_volume_particles_paint_as_dots_split_by_depth(monkeypatch):

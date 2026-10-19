@@ -828,145 +828,6 @@ def test_hue_to_rgb_is_a_deterministic_standard_wheel():
         tuple(c * 0.5 for c in full))
 
 
-def test_rgb_trail_is_pure_deterministic_and_starts_on_the_star():
-    from voicebridge.orb import mark_field as F
-    R, t = 64.0, 1.7
-    part = F.particle_state(t, R)[3]
-    a = F.rgb_trail(t, R, part)
-    assert a == F.rgb_trail(t, R, F.particle_state(t, R)[3])
-    assert len(a) == F.RGB_TRAIL_SAMPLES
-    for s in a:
-        assert set(s) >= {"x", "y", "hue", "sat", "val", "alpha", "size",
-                          "depth", "dof", "k"}
-        assert 0.0 <= s["hue"] < 1.0 and 0.0 <= s["sat"] <= 1.0
-        assert 0.0 <= s["val"] <= 1.0 and s["alpha"] >= 0.0
-    # Head sits exactly on the rendered star; the tail trails away from it.
-    assert (a[0]["x"], a[0]["y"]) == pytest.approx((part["x"], part["y"]))
-    assert math.dist((a[-1]["x"], a[-1]["y"]),
-                     (a[0]["x"], a[0]["y"])) > 1e-6
-
-
-def test_rgb_trail_is_a_duotone_pair_lerp_that_drifts_with_the_clock():
-    # Owner: two colours per streak, not a rainbow. Every streak is the
-    # head hue and its NEARBY partner, lerped along the tail.
-    from voicebridge.orb import mark_field as F
-    R, t = 64.0, 1.7
-    part = F.particle_state(t, R)[0]
-    samples = F.rgb_trail(t, R, part)
-    n = F.RGB_TRAIL_SAMPLES
-    head = (part["hue"] + t * F.RGB_TRAIL_HUE_DRIFT) % 1.0
-    tail = (head + F.HUE_PAIR_OFFSET) % 1.0
-    # A SMALL offset: two neighbouring tints of one colour family. A half-turn
-    # partner would make the lerp sweep the whole wheel (cyan->green->yellow->
-    # red) and the mark read as a rainbow (owner: "too coloured").
-    assert 0.0 < F.HUE_PAIR_OFFSET <= 0.15
-    for s in samples:
-        # One shared pair across the whole streak: exactly two hues.
-        assert s["hue2"] == pytest.approx(tail)
-    for s, k in zip(samples, range(n)):
-        assert s["hue"] == pytest.approx(
-            (head + (k / float(n - 1)) * F.HUE_PAIR_OFFSET) % 1.0)
-    steps = [(b["hue"] - a["hue"]) % 1.0 for a, b in zip(samples, samples[1:])]
-    assert all(s > 0.0 for s in steps), steps
-    assert all(s == pytest.approx(F.HUE_PAIR_OFFSET / (n - 1), abs=1e-9)
-               for s in steps)
-    # Head-to-tail spans exactly half the wheel: two colours, no spectrum.
-    span = (samples[-1]["hue"] - samples[0]["hue"]) % 1.0
-    assert span == pytest.approx(F.HUE_PAIR_OFFSET)
-    # The pair drifts with time TOGETHER, so no two moments share a streak.
-    later = F.rgb_trail(t + 1.0, R, part)
-    assert later[0]["hue"] != pytest.approx(samples[0]["hue"], abs=1e-6)
-    assert later[0]["hue2"] == pytest.approx(
-        (samples[0]["hue2"] + F.RGB_TRAIL_HUE_DRIFT) % 1.0)
-    # The short variant is a duotone too.
-    mote = F.dust_state(t, R)[0]
-    dust = F.dust_trail(t, R, mote)
-    assert len(dust) == F.DUST_TRAIL_SAMPLES
-    assert all(s["hue2"] == pytest.approx(dust[0]["hue2"]) for s in dust)
-    assert ((dust[-1]["hue"] - dust[0]["hue"]) % 1.0) == pytest.approx(
-        F.HUE_PAIR_OFFSET)
-
-
-def test_rgb_trail_head_is_a_neutral_highlight_tail_keeps_colour():
-    # Owner: restrained, professional. The leading edge of every streak is
-    # pulled toward white (low saturation) and the tail recovers colour, so a
-    # body reads as a specular highlight with a coloured wake rather than a
-    # saturated blob.
-    from voicebridge.orb import mark_field as F
-    R, t = 64.0, 1.7
-    part = F.particle_state(t, R)[0]
-    samples = F.rgb_trail(t, R, part)
-    assert F.RGB_TRAIL_WHITE_FRAC > 0.0
-    assert samples[0]["sat"] < samples[-1]["sat"], samples
-    assert samples[0]["sat"] <= 1.0 and samples[-1]["sat"] <= 1.0
-    # The tail keeps the body's colour family, never a white wash.
-    assert samples[-1]["sat"] > 0.3
-    # Still deterministic and junk-safe.
-    assert samples == F.rgb_trail(t, R, F.particle_state(t, R)[0])
-
-
-def test_rgb_trail_tapers_fades_and_follows_the_orbit_path():
-    from voicebridge.orb import mark_field as F
-    R, t = 64.0, 4.2
-    part = F.particle_state(t, R)[1]
-    a = F.rgb_trail(t, R, part)
-    assert all(b["alpha"] < p["alpha"] for p, b in zip(a, a[1:]))
-    assert all(b["size"] < p["size"] for p, b in zip(a, a[1:]))
-    # Samples stay on the mark's own orbit envelope (no teleporting tail).
-    dx, dy = F.camera_offset(t, R)
-    near, far = F.orbit_tilts(t)
-    for s in a:
-        lx, ly = s["x"] - dx, s["y"] - dy
-        assert abs(lx) <= R * F.RX_FRAC * 1.05 + 1e-6, s
-        assert abs(ly) <= R * F.RY_FRAC * 1.6 + 1e-6, s
-    # Consecutive samples never jump: the tail is a stroke, not a scatter.
-    for p, b in zip(a, a[1:]):
-        assert math.dist((p["x"], p["y"]), (b["x"], b["y"])) < 0.35 * R
-
-
-def test_rgb_trail_streaks_a_free_body_along_its_own_velocity():
-    from voicebridge.orb import mark_field as F
-    R, t = 64.0, 5.0
-    comet = F.comet(t, R)
-    assert comet["alpha"] > 0.0
-    a = F.rgb_trail(t, R, comet)
-    assert len(a) == F.RGB_TRAIL_SAMPLES
-    # The streak runs OPPOSITE the direction of travel.
-    head = (a[0]["x"], a[0]["y"])
-    tail = (a[-1]["x"], a[-1]["y"])
-    assert (tail[0] - head[0]) * comet["vx"] + (tail[1] - head[1]) * comet["vy"] < 0
-    body = F.satellites(t, R)[0]["body"]
-    b = F.rgb_trail(t, R, body)
-    assert len(b) == F.RGB_TRAIL_SAMPLES
-    assert (b[0]["x"], b[0]["y"]) == pytest.approx((body["x"], body["y"]))
-
-
-def test_rgb_trail_survives_a_body_with_no_path_and_no_velocity():
-    from voicebridge.orb import mark_field as F
-    a = F.rgb_trail(0.5, 32.0, {"x": 1.0, "y": 2.0})
-    assert len(a) == F.RGB_TRAIL_SAMPLES
-    assert all(math.isfinite(s["x"]) and math.isfinite(s["y"]) for s in a)
-    assert F.rgb_trail("bad", "bad", None)[0]["alpha"] >= 0.0
-
-
-def test_dust_trail_is_the_short_cheap_variant():
-    from voicebridge.orb import mark_field as F
-    R, t = 64.0, 1.7
-    mote = F.dust_state(t, R)[0]
-    a = F.dust_trail(t, R, mote)
-    assert len(a) == F.DUST_TRAIL_SAMPLES
-    assert F.DUST_TRAIL_SAMPLES < F.RGB_TRAIL_SAMPLES
-    # Every dense element can carry one, and they all move with the field.
-    for m in F.dust_state(t, R):
-        s = F.dust_trail(t, R, m)
-        assert s[0]["x"] == pytest.approx(m["x"])
-        assert math.dist((s[0]["x"], s[0]["y"]),
-                         (s[-1]["x"], s[-1]["y"])) > 0.0
-    # Sparkles and binary fragments take the same variant.
-    assert F.dust_trail(t, R, F.sparkles(3.3, R)[0])
-    assert F.dust_trail(t, R, F.binary_state(t, R)[3])
-
-
 def test_every_element_carries_a_hue_and_a_dof_value():
     from voicebridge.orb import mark_field as F
     R, t = 64.0, 1.7
@@ -1110,60 +971,6 @@ def test_ring_alpha_breathes_without_ever_vanishing_or_saturating():
             prev = cur
         # The two orbits breathe on different periods: the set never pulses.
         assert 0.0 < F.ring_alpha(0.0, ring) <= 1.0
-
-
-def test_rgb_trails_and_shells_stay_continuous_between_adjacent_frames():
-    # The same fluid contract as the drawn elements, extended to the layers
-    # added for the 3D/rgb round: the streaks behind every star, the three
-    # satellite bodies and the declared ring paths. Measured worst case over
-    # four windows is ~0.72 px/frame at R=32 against a 1.92 px budget.
-    R, dt, eps = 32.0, 1.0 / 60.0, CONTINUITY_EPS_FRAC * 32.0
-    for start in (0.0, 3.0, 5.1, 9.7):
-        prev = _streak_snapshot(start, R)
-        for k in range(1, 61):
-            cur = _streak_snapshot(start + k * dt, R)
-            for layer in cur:
-                for a, b in zip(prev[layer], cur[layer]):
-                    assert _worst_step(a, b) <= eps, (
-                        layer, start + k * dt, a, b)
-            prev = cur
-
-
-def _worst_step(a, b):
-    """Largest point-to-point step between two (possibly nested) samples."""
-    if isinstance(a[0], tuple):
-        return max(_worst_step(x, y) for x, y in zip(a, b))
-    return math.dist(a, b)
-
-
-def _streak_snapshot(t, R):
-    """Per-index point for every new layer: streaks, shell bodies, ring tips."""
-    return {
-        "rgb": [tuple((s["x"], s["y"]) for s in F.rgb_trail(t, R, p))
-                for p in F.particle_state(t, R)],
-        "dust": [tuple((s["x"], s["y"]) for s in F.dust_trail(t, R, m))
-                 for m in F.dust_state(t, R)],
-        "sat": [(s["body"]["x"], s["body"]["y"])
-                for s in F.satellites(t, R)],
-        "ring": [F.ring_path(t, R, r)[F.RING_PATH_SAMPLES // 2]
-                 for r in F.ring_geometry(t)],
-    }
-
-
-def test_rgb_trail_alpha_never_steps_between_frames():
-    # A streak that flickers between two alphas at the same sample index is a
-    # visible strobe even when its geometry is perfectly continuous.
-    R, dt = 64.0, 1.0 / 60.0
-    for idx in range(len(F.particle_state(0.0, R))):
-        prev = [(s["alpha"], s["size"]) for s in
-                F.rgb_trail(0.0, R, F.particle_state(0.0, R)[idx])]
-        for k in range(1, 181):
-            part = F.particle_state(k * dt, R)[idx]
-            cur = [(s["alpha"], s["size"]) for s in F.rgb_trail(k * dt, R, part)]
-            for (pa, ps), (ca, cs) in zip(prev, cur):
-                assert abs(ca - pa) < 0.02, (idx, k, pa, ca)
-                assert abs(cs - ps) < 0.1, (idx, k, ps, cs)
-            prev = cur
 
 
 # --------------------------------------------------------------------------- #
@@ -1330,12 +1137,9 @@ def test_every_element_dict_carries_volume_axes():
         assert 0.0 <= comet["z"] <= 1.0 and 0.0 <= comet["z2"] <= 1.0
         for s in comet["trail"]:
             assert 0.0 <= s["z"] <= 1.0 and 0.0 <= s["z2"] <= 1.0
-    # Every trail sample, too.
+    # Every existing tail sample, too.
     for p in F.particle_state(t, R):
-        for s in F.rgb_trail(t, R, p) + F.trails(t, R, p):
-            assert "z" in s and "z2" in s
-    for m in F.dust_state(t, R):
-        for s in F.dust_trail(t, R, m):
+        for s in F.trails(t, R, p):
             assert "z" in s and "z2" in s
 
 
@@ -1742,7 +1546,10 @@ def test_palette_is_disciplined_to_a_few_hues():
     spread = max(F.PALETTE_HUES) - min(F.PALETTE_HUES)
     assert spread <= 0.12, spread
     assert F.RGB_TRAIL_SAT_BASE <= 0.75
-    assert 0.0 < F.RGB_TRAIL_WHITE_FRAC <= 1.0
+    # The dead wake-trail API is gone, including its retired head-white factor.
+    assert not hasattr(F, "rgb_trail")
+    assert not hasattr(F, "dust_trail")
+    assert not hasattr(F, "RGB_TRAIL_WHITE_FRAC")
     # Across every layer's salt and hundreds of indices, the set of body hues
     # is exactly the palette — never a continuum, never more than 3.
     hues = set()
