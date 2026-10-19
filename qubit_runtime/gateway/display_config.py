@@ -108,19 +108,6 @@ OVERRIDEABLE_KEYS = frozenset(_GLOBAL_DEFAULTS.keys())
 _TIERS = {"high": _TIER_HIGH, "medium": _TIER_MEDIUM, "low": _TIER_LOW, "minimal": _TIER_MINIMAL}
 
 
-def _platform_defaults(platform_key: str) -> dict[str, Any]:
-    """Built-in defaults for *platform_key*: the table above, else the ``display_tier`` a plugin
-    platform registered (``PlatformEntry.display_tier``)."""
-    if platform_key in _PLATFORM_DEFAULTS:
-        return _PLATFORM_DEFAULTS[platform_key]
-    try:
-        from gateway.platform_registry import platform_registry
-        entry = platform_registry.get(platform_key)
-    except Exception:
-        return {}
-    return _TIERS.get(str(getattr(entry, "display_tier", "") or "").lower(), {})
-
-
 def resolve_display_setting(user_config: dict, platform_key: str, setting: str, fallback: Any = None) -> Any:
     """Resolve a display setting with per-platform override support (see module docstring for order).
 
