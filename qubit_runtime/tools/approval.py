@@ -339,16 +339,11 @@ def _permanent_set() -> set:
     """
     from qubit_constants import get_qubit_home_override, qubit_home_key
     if get_qubit_home_override() is None:
-        return _permanent_approved
-    home_key = qubit_home_key()
-    approved = _permanent_approved_by_home.get(home_key)
-    if approved is None:
-        try:
-            approved = _read_permanent_allowlist()
-        except Exception as e:
-            logger.warning("Failed to load permanent allowlist: %s", e)
-            approved = set()
-        _permanent_approved_by_home[home_key] = approved
+        approved, key = _permanent_approved, ""
+    else:
+        key = qubit_home_key()
+        approved = _permanent_approved_by_home.setdefault(key, set())
+    _sync_permanent_from_disk(approved, key)
     return approved
 
 
