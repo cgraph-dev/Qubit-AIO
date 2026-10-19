@@ -1320,7 +1320,7 @@ def _create_prefixed_full_backup(
     qubit_root = qubit_home or get_default_qubit_root()
     if not qubit_root.is_dir():
         return None
-    backup_dir = hermes_root / _PRE_UPDATE_BACKUPS_DIR
+    backup_dir = qubit_root / _PRE_UPDATE_BACKUPS_DIR
     try:
         backup_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
