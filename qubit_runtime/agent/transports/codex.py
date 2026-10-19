@@ -662,6 +662,20 @@ class ResponsesApiTransport(ProviderTransport):
         logger.warning("reasoning.context rejected by %s; omitting it for this session", self._last_issuer_model)
         return True
 
+    def drop_unverified_replay(self, *message_lists: Any) -> int:
+        """First ``invalid_encrypted_content`` rung: drop the replayed blobs the failing request could not vouch
+        for (not stamped by exactly its endpoint + model), keeping the session's own continuity. Returns the
+        count removed from the first list; 0 means only the route's own blobs were sent."""
+        from agent.codex_responses_adapter import strip_unverified_reasoning_items
+
+        if self._last_issuer_kind is None or self._last_issuer_model is None:
+            return 0
+        removed = [
+            strip_unverified_reasoning_items(msgs, issuer_kind=self._last_issuer_kind, issuer_model=self._last_issuer_model)
+            for msgs in message_lists
+        ]
+        return removed[0] if removed else 0
+
     @property
     def api_mode(self) -> str:
         return "codex_responses"
