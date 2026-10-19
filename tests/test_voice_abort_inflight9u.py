@@ -315,6 +315,77 @@ def test_local_stream_repeated_preset_cancel_is_safe():
         assert _no_stream_watchers_left()
 
 
+def test_local_stream_hook_path_never_touches_urlopen(monkeypatch):
+    # The abort path owns its http.client socket: no urlopen (and therefore
+    # no fp.raw._sock discovery) is involved at all when a hook is supplied.
+    def _boom(*a, **k):
+        raise AssertionError("the hook path must not call urlopen")
+
+    monkeypatch.setattr(LLM.urllib.request, "urlopen", _boom)
+    first = [{"message": {"content": "First."}}]
+    with _stream_server(first, hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+        cancel = threading.Event()
+        got: list[str] = []
+        out: dict = {}
+
+        def run():
+            try:
+                LLM.chat_local_stream(
+                    "hi", url=url, timeout_s=30.0, on_sentence=got.append,
+                    cancel=cancel.is_set)
+            except LLM.LocalLlmCancelled:
+                out["cancelled"] = True
+            except Exception as exc:  # noqa: BLE001 - surfaced in assertion
+                out["error"] = exc
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        assert srv.first_sent.wait(timeout=2.0), "stream never started"
+        assert _wait_emitted(got) == ["First."], got
+        _join_promptly(t, cancel)
+        assert out.get("cancelled") is True
+        assert "error" not in out
+        assert _no_stream_watchers_left()
+
+
+def test_local_stream_no_hook_path_is_urlopen_patch_compatible(monkeypatch):
+    # No hook => the exact urlopen seam hermetic callers patch stays in use.
+    lines = [
+        {"message": {"content": "One. "}},
+        {"message": {"content": "Two."}},
+        {"message": {"content": "", "done": True}},
+    ]
+    seen = {"calls": 0}
+
+    class FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def __iter__(self):
+            return iter([json.dumps(c).encode() + b"\n" for c in lines])
+
+    def fake_urlopen(req, timeout=None):
+        seen["calls"] += 1
+        payload = json.loads(req.data.decode())
+        assert payload["stream"] is True
+        return FakeResp()
+
+    def explode(*a, **k):  # pragma: no cover - must never be reached
+        raise AssertionError("the no-hook path is the urlopen path")
+
+    monkeypatch.setattr(LLM.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(LLM, "AbortableHTTPStream", explode)
+    got: list[str] = []
+    full = LLM.chat_local_stream("hi", on_sentence=got.append, timeout_s=5.0)
+    assert full == "One. Two."
+    assert got == ["One.", "Two."]
+    assert seen["calls"] == 1
+
+
 # ---------------------------------------------------------------------------
 # raw local adapters' blocking seam (`/api/generate`, `/api/chat`)
 # ---------------------------------------------------------------------------
