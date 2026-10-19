@@ -562,7 +562,7 @@ def test_reduced_motion_is_free_of_the_moving_layers():
         # no trails, dust, sparkles, comet, follower rings or nucleus sparks.
         # Ovals = 9 particle cores + the static nucleus stack (halo + gradient).
         assert len(c.ovals) == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
-        assert len(c.lines) == 2 * len(M.PARTICLES) + 3   # 18 arms + 3 rings
+        assert len(c.lines) == 2 * len(M.PARTICLES) + 5   # 18 arms + 5 rings (2 main + core + 2 accent)
 
 
 def test_speed_scale_drives_every_layer_on_one_clock():
@@ -1043,7 +1043,7 @@ def test_ring_geometry_declares_every_circle_back_to_front():
     for r in rings:
         assert set(r) >= {"id", "layer", "orbit", "tilt", "rx_frac",
                           "ry_frac", "alpha", "width", "echo", "seed"}
-        assert r["layer"] in ("main", "echo", "inner", "satellite")
+        assert r["layer"] in ("main", "echo", "inner", "satellite", "accent")
         assert 0.0 < r["rx_frac"] <= 1.0 and 0.0 < r["ry_frac"] <= 1.0
         assert 0.0 < r["alpha"] < 1.0 and r["width"] > 0.0
         assert isinstance(r["echo"], bool)
@@ -2008,3 +2008,25 @@ def test_depth_ladder_was_widened_for_volume():
     assert F.skew(0.0) == pytest.approx(F.SKEW_GAIN_DEG)
     assert F.skew(0.5) == pytest.approx(0.0, abs=1e-9)
     assert F.skew(1.0) == pytest.approx(-F.SKEW_GAIN_DEG)
+
+
+def test_two_accent_circles_at_1_6x_the_main_opacity():
+    # Owner 2026-10-19: "add 2 more circles again ... 60% more opacity than
+    # from the others so they be a little more visible".
+    from voicebridge.orb import mark_field as F
+    accent = [r for r in F.ring_geometry(1.3) if r["layer"] == "accent"]
+    assert len(accent) == 2, [r["id"] for r in F.ring_geometry(1.3)]
+    assert {r["id"] for r in accent} == {"accent_a", "accent_b"}
+    assert F.RING_ALPHA_ACCENT == pytest.approx(F.RING_ALPHA_MAIN * 1.6)
+    for r in accent:
+        assert r["alpha"] == pytest.approx(F.RING_ALPHA_MAIN * 1.6)
+        assert r["rx_frac"] == pytest.approx(F.RING_ACCENT_RX_FRAC)
+
+
+def test_particle_layers_move_in_both_directions():
+    # Owner 2026-10-19: "different motions ... not all in same direction".
+    from voicebridge.orb import mark_field as F
+    for layer in (F.dust_state, F.binary_state, F.sparkles):
+        bodies = layer(1.7, 32.0)
+        signs = {1 if b["vx"] >= 0 else -1 for b in bodies if b.get("vx")}
+        assert signs == {1, -1}, (layer.__name__, signs)

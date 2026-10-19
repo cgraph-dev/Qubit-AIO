@@ -226,7 +226,7 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
 #: 2026-10-19: "add more particles ... small ones". The count is up and every
 #: mote is smaller, so the field reads as a fine pinprick scatter instead of
 #: a handful of visible beads.
-DUST_COUNT = 80
+DUST_COUNT = 110
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
 DUST_SIZE_BASE = 0.070
@@ -304,7 +304,7 @@ SATELLITE_TRAIL_STEP_DEG = 7.0
 #: Glints: the dense twinkle cloud. Owner 2026-10-19: "add more particles".
 #: More, smaller glints fill the volume with pinpricks instead of a few
 #: readable stars. They are batched by the painter, so the count is cheap.
-SPARKLE_COUNT = 80
+SPARKLE_COUNT = 110
 SPARKLE_SEED_STEP = 97.3
 SPARKLE_R_MIN_FRAC = 0.30
 SPARKLE_R_SPAN_FRAC = 0.78
@@ -791,7 +791,9 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
     out: List[Dict[str, float]] = []
     for idx, (orbit, seed, size96, period) in enumerate(PARTICLES):
         tilt = near_tilt if orbit == "a" else far_tilt
-        ang = (seed + tt * 360.0 / max(0.1, period)
+        # Owner 2026-10-19: "different motions ... not all in same direction".
+        direction = 1.0 if hash01(idx, 19.3) >= 0.5 else -1.0
+        ang = (seed + direction * tt * 360.0 / max(0.1, period)
                + _phase_wobble(tt, seed))
         depth = _depth(ang)
         # Perspective: far points pull toward the centre.
@@ -1010,7 +1012,8 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
         ry = r * _finite(ring.get("ry_frac"), RY_FRAC) * rad
         seed = 360.0 * hash01(i, 1.7)
         period = DUST_PERIOD_BASE + DUST_PERIOD_SPAN * hash01(i, 3.1)
-        ang = (seed + tt * 360.0 / max(0.1, period)
+        direction = 1.0 if hash01(i, 21.1) >= 0.5 else -1.0
+        ang = (seed + direction * tt * 360.0 / max(0.1, period)
                + _phase_wobble(tt, seed))
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
@@ -1022,8 +1025,8 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
             "z": dz, "z2": dz2,
-            "vx": vx * 360.0 / max(0.1, period),
-            "vy": vy * 360.0 / max(0.1, period),
+            "vx": vx * direction * 360.0 / max(0.1, period),
+            "vy": vy * direction * 360.0 / max(0.1, period),
             "hue": _hue_for(i, 53.9), "hue2": _hue_pair(_hue_for(i, 53.9)),
             "dof": dof(depth),
             "skew": skew(depth),
@@ -1102,7 +1105,8 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
             continue
         f = phase / SPARKLE_VISIBLE_FRAC
         peak = 0.5 * (1.0 - math.cos(2.0 * math.pi * f))
-        rate = 18.0 + (i % 5) * 6.0
+        direction = 1.0 if hash01(i, 25.7) >= 0.5 else -1.0
+        rate = direction * (18.0 + (i % 5) * 6.0)
         ang = seed + tt * rate
         rfrac = SPARKLE_R_MIN_FRAC + SPARKLE_R_SPAN_FRAC * hash01(i, 13.7)
         depth = _depth(ang)
@@ -1132,7 +1136,7 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
 #: the envelope decides which dots are visible. Owner 2026-10-19: more of
 #: them, smaller, and spread further out, so the pinprick field reads as
 #: scattered data rather than a ring of beads.
-BLINK_COUNT = 40
+BLINK_COUNT = 52
 BLINK_SIZE_BASE = 0.060
 BLINK_SIZE_SPAN = 0.080
 BLINK_ALPHA_PEAK = 0.75
@@ -1253,7 +1257,7 @@ INNER_RING_TILT_BASE = 0.0
 #: starts near the core and the span reaches past the main orbit, so the glyphs
 #: scatter across the whole volume. More of them, each smaller, so they read as
 #: data dust instead of legible text.
-BINARY_COUNT = 128
+BINARY_COUNT = 168
 BINARY_SIZE_BASE = 0.060
 BINARY_SIZE_SPAN = 0.055
 BINARY_PERIOD_BASE = 6.0
@@ -1291,7 +1295,8 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         tilt = near_tilt if orbit == "a" else far_tilt
         seed = 360.0 * hash01(i, 2.7)
         period = BINARY_PERIOD_BASE + BINARY_PERIOD_SPAN * hash01(i, 4.1)
-        ang = (seed + tt * 360.0 / max(0.1, period)
+        direction = 1.0 if hash01(i, 27.1) >= 0.5 else -1.0
+        ang = (seed + direction * tt * 360.0 / max(0.1, period)
                + _phase_wobble(tt, seed))
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
@@ -1304,8 +1309,8 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
             "z": bz, "z2": bz2,
-            "vx": vx * 360.0 / max(0.1, period),
-            "vy": vy * 360.0 / max(0.1, period),
+            "vx": vx * direction * 360.0 / max(0.1, period),
+            "vy": vy * direction * 360.0 / max(0.1, period),
             "hue": _hue_for(i, 71.5), "hue2": _hue_pair(_hue_for(i, 71.5)),
             "dof": dof(depth),
             "size": (BINARY_SIZE_BASE + BINARY_SIZE_SPAN * hash01(i, 7.3))
@@ -1640,6 +1645,12 @@ RING_ALPHA_MAIN = 0.18
 RING_ALPHA_ECHO = 0.12
 RING_ALPHA_INNER = 0.12
 RING_ALPHA_SAT = 0.06
+#: Owner 2026-10-19: "add 2 more circles again ... 60% more opacity than from
+#: the others so they be a little more visible". A second orbit PAIR at a
+#: smaller radius, drawn at 1.6x the main orbits' declared alpha.
+RING_ALPHA_ACCENT = RING_ALPHA_MAIN * 1.6
+RING_ACCENT_RX_FRAC = 0.58
+RING_ACCENT_RY_FRAC = RING_ACCENT_RX_FRAC * (RY_FRAC / RX_FRAC)
 RING_WIDTH_MAIN = 1.0
 RING_WIDTH_ECHO = 1.0
 RING_WIDTH_INNER = 0.8
@@ -1820,6 +1831,18 @@ def _ring_specs(tt: float, near_tilt: float, far_tilt: float,
         "id": "orbit_a", "layer": "main", "orbit": "a", "tilt": near_tilt,
         "rx_frac": RX_FRAC, "ry_frac": RY_FRAC, "alpha": RING_ALPHA_MAIN,
         "width": RING_WIDTH_MAIN, "echo": False, "seed": 7.0})
+    # Owner 2026-10-19: a second orbit PAIR (far + near) at a smaller radius,
+    # at 1.6x the main orbits' opacity so it reads a little more strongly.
+    out.append({
+        "id": "accent_b", "layer": "accent", "orbit": "b", "tilt": far_tilt,
+        "rx_frac": RING_ACCENT_RX_FRAC, "ry_frac": RING_ACCENT_RY_FRAC,
+        "alpha": RING_ALPHA_ACCENT, "width": RING_WIDTH_MAIN, "echo": False,
+        "seed": 8.0})
+    out.append({
+        "id": "accent_a", "layer": "accent", "orbit": "a", "tilt": near_tilt,
+        "rx_frac": RING_ACCENT_RX_FRAC, "ry_frac": RING_ACCENT_RY_FRAC,
+        "alpha": RING_ALPHA_ACCENT, "width": RING_WIDTH_MAIN, "echo": False,
+        "seed": 9.0})
     # Additive details. The PLANE offset is shared (rigid set), while each ring
     # gets its own deterministic intensity/shimmer/streamer detail so a stroked
     # circle reads as a live accretion structure instead of a dead outline.
