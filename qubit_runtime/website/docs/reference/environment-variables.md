@@ -292,7 +292,7 @@ For cloud sandbox backends, persistence is filesystem-oriented. `TERMINAL_LIFETI
 | Variable | Description |
 |----------|-------------|
 | `TERMINAL_PERSISTENT_SHELL` | Enable persistent shell for non-local backends (default: `true`). Also settable via `terminal.persistent_shell` in config.yaml |
-| `TERMINAL_LOCAL_PERSISTENT` | Enable persistent shell for local backend (default: `false`) |
+| `TERMINAL_LOCAL_PERSISTENT` | Enable persistent shell for local backend (default: `true`); `false` starts every command from the login-time environment |
 | `TERMINAL_SSH_PERSISTENT` | Override persistent shell for SSH backend (default: follows `TERMINAL_PERSISTENT_SHELL`) |
 
 ## Egress proxy (sandbox-injected)

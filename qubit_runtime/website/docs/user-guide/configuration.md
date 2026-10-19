@@ -760,13 +760,17 @@ hermes config set terminal.persistent_shell false
 |-------|----------|---------|
 | Config | `terminal.persistent_shell` | `true` |
 | SSH override | `TERMINAL_SSH_PERSISTENT` | follows config |
-| Local override | `TERMINAL_LOCAL_PERSISTENT` | `false` |
+| Local override | `TERMINAL_LOCAL_PERSISTENT` | `true` |
 
-Per-backend environment variables take highest precedence. If you want persistent shell on the local backend too:
+Per-backend environment variables take highest precedence. Persistent shell is on for the local backend
+too; to start every command from a fresh login-time environment instead:
 
 ```bash
-export TERMINAL_LOCAL_PERSISTENT=true
+export TERMINAL_LOCAL_PERSISTENT=false
 ```
+
+With persistence on, profile functions and aliases from your shell rc do not survive past the first
+command of a session — that is the trade for exported variables carrying across commands.
 
 :::note
 Commands that require `stdin_data` or sudo automatically fall back to one-shot mode, since the persistent shell's stdin is already occupied by the IPC protocol.
