@@ -2070,85 +2070,88 @@ class TurnRunner:
         # lock > requested provider/model > model route) before the agent is resolved; without
         # this an admitted API turn ran on the gateway's default runtime instead of the one the
         # request (and its settled receipt) named.
-        from gateway.session_api_turn import prepare_api_runtime
+        from gateway.session_api_turn import api_policy_scope, prepare_api_runtime
         model, runtime_kwargs = prepare_api_runtime(model, runtime_kwargs)
-        reasoning_config = runner._resolve_session_reasoning_config(source=ctx.source, session_key=ctx.session_key, model=model)
-        runner._reasoning_config = reasoning_config
-        runner._service_tier = runner._resolve_session_service_tier(source=ctx.source, session_key=ctx.session_key)
-        stream_consumer, stream_delta_cb, interim_cb, want_interim = self._setup_stream_consumer(platform_key)
-        turn_route = runner._resolve_turn_agent_config(ctx.message, model, runtime_kwargs)
-        agent, reused_cached_agent = self._resolve_turn_agent(
-            turn_route, platform_key, combined_ephemeral, max_iterations, reasoning_config, pr,
-        )
-        if pending_fallback_notice:
-            # Reuse the in-agent one-shot notice so the pre-agent provider switch is user-visible too.
-            agent._pending_fallback_notice = pending_fallback_notice
-        self._wire_turn_agent_callbacks(agent, turn_route, reasoning_config, stream_delta_cb, interim_cb, want_interim)
-        agent_history, observed_group_context, history_media_paths = self._load_turn_history(agent, reused_cached_agent)
-        persist_msg, persist_ts = self._prepare_turn_message(agent_history)
-        compressions = getattr(getattr(agent, "context_compressor", None), "compression_count", None)
-        result = self._run_conversation_with_approval(agent, agent_history, observed_group_context, persist_msg, persist_ts)
-        persisted_turn = _persisted_turn(agent, agent_history, result, compressions)
-        self._finish_stream_consumer(result, agent_history, stream_consumer)
-        if _finite_viewer_turn() and getattr(agent, "_codex_session", None) is not None:
-            # The classic `chat -q` process exit bounded the codex app-server child; a finite turn
-            # hosted here must too, or every one-shot leaves one running until the idle-TTL sweep.
-            # Like a fresh process, the next turn respawns it and resumes the stored thread.
-            agent._close_codex_session()
-            agent._codex_session_prompt = None
-        # The streaming-TTS consumer's finish() runs on the outer loop thread after the executor
-        # returns, so early run_sync returns are also finalised.
-        # See the outer finally/completion section below. See #60671.
-        final_response = result.get("final_response")
-        # Actual token counts from the agent instance used for this run.
-        agent = ctx.agent_holder[0]
-        has_comp = bool(agent) and hasattr(agent, "context_compressor")
-        comp = agent.context_compressor if has_comp else None
-        usage = {
-            "last_prompt_tokens": getattr(comp, "last_prompt_tokens", 0) if has_comp else 0,
-            "input_tokens": getattr(agent, "session_prompt_tokens", 0) if has_comp else 0,
-            "output_tokens": getattr(agent, "session_completion_tokens", 0) if has_comp else 0,
-            "model": getattr(agent, "model", None) if agent else None,
-            "context_length": (getattr(comp, "context_length", 0) or 0) if has_comp else 0,
-            # The rest of the `-z --usage-file` ledger (qubit_cli/oneshot._USAGE_KEYS): a finite
-            # viewer reads the committed result over `prompt.receipt`, so the projection must keep
-            # what the in-process one-shot took straight from `run_conversation`.
-            **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS if key in result},
-        }
-        compacted_in_place, effective_session_id, history_offset = self._sync_session_after_run(agent_history)
-        # failure_reason must survive the empty-response path too (TUI billing, transient-failure
-        # persistence). compression_deferred (soft lock-contention defer) is distinct from
-        # compression_exhausted so the gateway never auto-resets a session a concurrent compressor is
-        # about to shrink.
-        common = {
-            "messages": result.get("messages", []), "api_calls": result.get("api_calls", 0),
-            "failed": result.get("failed", False), "failure_reason": result.get("failure_reason"),
-            "partial": result.get("partial", False), "completed": result.get("completed"),
-            "interrupted": result.get("interrupted", False), "interrupt_message": result.get("interrupt_message"),
-            "error": result.get("error"),
-            "compression_exhausted": result.get("compression_exhausted", False),
-            "compression_deferred": result.get("compression_deferred", False),
-            "tools": ctx.tools_holder[0] or [],
-            "history_offset": history_offset, "compacted_in_place": compacted_in_place, "session_id": effective_session_id,
-            **usage,
-            **({"persisted_turn": persisted_turn} if persisted_turn else {}),
-        }
-        if not final_response:
-            final_response = _normalize_empty_agent_response(result, final_response or "", history_len=len(agent_history))
-            final_response = _sanitize_gateway_final_response(ctx.source.platform, final_response)
+        # The admission's hosted-room execution policy holds for the whole turn body: approval
+        # gating reads it mid-run (tools/approval_context), not only during resolution.
+        with api_policy_scope():
+            reasoning_config = runner._resolve_session_reasoning_config(source=ctx.source, session_key=ctx.session_key, model=model)
+            runner._reasoning_config = reasoning_config
+            runner._service_tier = runner._resolve_session_service_tier(source=ctx.source, session_key=ctx.session_key)
+            stream_consumer, stream_delta_cb, interim_cb, want_interim = self._setup_stream_consumer(platform_key)
+            turn_route = runner._resolve_turn_agent_config(ctx.message, model, runtime_kwargs)
+            agent, reused_cached_agent = self._resolve_turn_agent(
+                turn_route, platform_key, combined_ephemeral, max_iterations, reasoning_config, pr,
+            )
+            if pending_fallback_notice:
+                # Reuse the in-agent one-shot notice so the pre-agent provider switch is user-visible too.
+                agent._pending_fallback_notice = pending_fallback_notice
+            self._wire_turn_agent_callbacks(agent, turn_route, reasoning_config, stream_delta_cb, interim_cb, want_interim)
+            agent_history, observed_group_context, history_media_paths = self._load_turn_history(agent, reused_cached_agent)
+            persist_msg, persist_ts = self._prepare_turn_message(agent_history)
+            compressions = getattr(getattr(agent, "context_compressor", None), "compression_count", None)
+            result = self._run_conversation_with_approval(agent, agent_history, observed_group_context, persist_msg, persist_ts)
+            persisted_turn = _persisted_turn(agent, agent_history, result, compressions)
+            self._finish_stream_consumer(result, agent_history, stream_consumer)
+            if _finite_viewer_turn() and getattr(agent, "_codex_session", None) is not None:
+                # The classic `chat -q` process exit bounded the codex app-server child; a finite turn
+                # hosted here must too, or every one-shot leaves one running until the idle-TTL sweep.
+                # Like a fresh process, the next turn respawns it and resumes the stored thread.
+                agent._close_codex_session()
+                agent._codex_session_prompt = None
+            # The streaming-TTS consumer's finish() runs on the outer loop thread after the executor
+            # returns, so early run_sync returns are also finalised.
+            # See the outer finally/completion section below. See #60671.
+            final_response = result.get("final_response")
+            # Actual token counts from the agent instance used for this run.
+            agent = ctx.agent_holder[0]
+            has_comp = bool(agent) and hasattr(agent, "context_compressor")
+            comp = agent.context_compressor if has_comp else None
+            usage = {
+                "last_prompt_tokens": getattr(comp, "last_prompt_tokens", 0) if has_comp else 0,
+                "input_tokens": getattr(agent, "session_prompt_tokens", 0) if has_comp else 0,
+                "output_tokens": getattr(agent, "session_completion_tokens", 0) if has_comp else 0,
+                "model": getattr(agent, "model", None) if agent else None,
+                "context_length": (getattr(comp, "context_length", 0) or 0) if has_comp else 0,
+                # The rest of the `-z --usage-file` ledger (qubit_cli/oneshot._USAGE_KEYS): a finite
+                # viewer reads the committed result over `prompt.receipt`, so the projection must keep
+                # what the in-process one-shot took straight from `run_conversation`.
+                **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS if key in result},
+            }
+            compacted_in_place, effective_session_id, history_offset = self._sync_session_after_run(agent_history)
+            # failure_reason must survive the empty-response path too (TUI billing, transient-failure
+            # persistence). compression_deferred (soft lock-contention defer) is distinct from
+            # compression_exhausted so the gateway never auto-resets a session a concurrent compressor is
+            # about to shrink.
+            common = {
+                "messages": result.get("messages", []), "api_calls": result.get("api_calls", 0),
+                "failed": result.get("failed", False), "failure_reason": result.get("failure_reason"),
+                "partial": result.get("partial", False), "completed": result.get("completed"),
+                "interrupted": result.get("interrupted", False), "interrupt_message": result.get("interrupt_message"),
+                "error": result.get("error"),
+                "compression_exhausted": result.get("compression_exhausted", False),
+                "compression_deferred": result.get("compression_deferred", False),
+                "tools": ctx.tools_holder[0] or [],
+                "history_offset": history_offset, "compacted_in_place": compacted_in_place, "session_id": effective_session_id,
+                **usage,
+                **({"persisted_turn": persisted_turn} if persisted_turn else {}),
+            }
             if not final_response:
-                final_response = t("gateway.shared.warn_passthrough", error=result["error"]) if result.get("error") else ""
-            # NOTE: deliberately omits agent_persisted/last_reasoning/response_* — the caller
-            # defaults agent_persisted differently when the key is absent.
-            return {"final_response": final_response, **common}
-        final_response = self._append_auto_media_tags(final_response, result, agent_history, history_media_paths)
-        # Auto-titling runs at TURN START (agent/turn_context.py) from the user's message alone, so a
-        # failed/interrupted turn is still titled.
-        return {
-            "final_response": final_response, "last_reasoning": result.get("last_reasoning"), **common,
-            "response_previewed": result.get("response_previewed", False),
-            "response_transformed": result.get("response_transformed", False),
-            # Lets the persistence block tell whether the codex app-server path self-persisted (it
-            # didn't — see codex_runtime.py); default True keeps skip-db for the standard runtime.
-            "agent_persisted": result.get("agent_persisted", True),
-        }
+                final_response = _normalize_empty_agent_response(result, final_response or "", history_len=len(agent_history))
+                final_response = _sanitize_gateway_final_response(ctx.source.platform, final_response)
+                if not final_response:
+                    final_response = t("gateway.shared.warn_passthrough", error=result["error"]) if result.get("error") else ""
+                # NOTE: deliberately omits agent_persisted/last_reasoning/response_* — the caller
+                # defaults agent_persisted differently when the key is absent.
+                return {"final_response": final_response, **common}
+            final_response = self._append_auto_media_tags(final_response, result, agent_history, history_media_paths)
+            # Auto-titling runs at TURN START (agent/turn_context.py) from the user's message alone, so a
+            # failed/interrupted turn is still titled.
+            return {
+                "final_response": final_response, "last_reasoning": result.get("last_reasoning"), **common,
+                "response_previewed": result.get("response_previewed", False),
+                "response_transformed": result.get("response_transformed", False),
+                # Lets the persistence block tell whether the codex app-server path self-persisted (it
+                # didn't — see codex_runtime.py); default True keeps skip-db for the standard runtime.
+                "agent_persisted": result.get("agent_persisted", True),
+            }
