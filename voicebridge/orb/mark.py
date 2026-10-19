@@ -16,11 +16,12 @@ Same visual language as ``frontend/qubit-web/src/components/QubitMark.tsx`` +
     ``accretion_stream``, ``photon_ring`` and ``infall_streaks`` layers, plus
     each circle's per-ring ``intensity``/``shimmer`` detail, so the rings read
     as live accretion rather than dead outlines,
-  * a chromatic fringe faked on the two MAIN hairline orbits only (Tk has no
-    blend modes, so the fringe is two extra offset strokes in dark red / blue
-    on near-black).
+  * circles stroked faintly and near-monochromatically: owner 2026-10-19,
+    "black holes need to be more transparent ... they look like galaxies", so
+    the old red/blue lens fringe and the spectral filament spray are gone and
+    every ring is one translucent tint.
 
-ALL of the motion — orbits, particles, streaks, dust, comet, beat, glints — comes
+ALL of the motion — orbits, particles, dust, comet, beat, glints — comes
 from :mod:`voicebridge.orb.mark_field`, the single deterministic description
 shared with the Qt renderer. This module is ONLY the Tk translator: it consumes
 the field, adds ``(cx, cy)`` to the centre-relative coordinates the field
@@ -41,9 +42,9 @@ Tk has no rotated ellipse, no per-item alpha and no gradient, so:
     primitive (``_mix`` + ``_hex`` + ``_dim``); circles are ``create_oval``;
   * a radial gradient is approximated by concentric filled ovals
     (``NUCLEUS_LAYERS`` for the body, ``_soft_oval`` for the aura/corona);
-  * a spectral streak is drawn as one short stroke per consecutive pair of the
-    field's ``rgb_trail`` / ``dust_trail`` samples, each coloured through
-    ``mark_field.hue_to_rgb`` — hue is NEVER interpolated across the wheel.
+  * a spectral wake is no longer drawn: owner 2026-10-19, "you didnt replace
+    the L and V's", retired the thick bent trail ribbons entirely. A body is
+    its glint (and, for the comet, its own small bead tail) and nothing more.
 
 Two whole-mark transforms are layered on every element:
 
@@ -86,7 +87,6 @@ from .mark_field import (
     TILT_A,
     TILT_B,
     NUCLEUS_FRAC,
-    FRINGE_PX,
     LIFT_RING,
     LIFT_BEAD,
     LIFT_NUCLEUS,
@@ -192,12 +192,6 @@ try:  # pragma: no cover
 except Exception:  # noqa: BLE001
     _field_screen_break = None
 
-#: Fringe offset in DEVICE pixels, never scaled with the radius: a lens fringe
-#: is a pixel-level artifact, and scaling it turned the mark into three separate
-#: rainbow rings instead of a hint on one hairline. Mirrors the Qt painter.
-FRINGE_PX_AT_96 = FRINGE_PX
-FRINGE_PIXELS = FRINGE_PX * 0.7
-
 #: Polyline sampling resolution for one ellipse drawn outside the declared set
 #: (the beat shockwave). The declared circles bring their own sampling.
 RING_SEGMENTS = 72
@@ -219,40 +213,22 @@ ALPHA_EPS = 0.004
 #: a whole layer would breathe on the renderer instead of on the field.
 FIELD_ALPHA_FLOOR = 1e-3
 
-# --- spectral streaks (the owner's "RGB trail, not an outer glow") -------------
-#: A star leaves a TAPERED WAKE built from the field's ``rgb_trail`` /
-#: ``dust_trail`` samples. There is no halo around a glint any more: the streak
-#: is the effect. Each consecutive pair of samples is one short stroke, coloured
-#: with ``hue_to_rgb`` for that sample (hue wraps like a colour wheel, so it is
-#: converted per sample and never interpolated across the wrap).
-STREAK_HALF_WIDTH = 0.30
-STREAK_MIN_HALF_PX = 0.34
-STREAK_MAX_WIDTH = 6
-#: Below this total arc length the wake is not drawn at all: a sub-pixel ribbon
-#: is one 8-bit step from appearing, which is exactly the hard pop the field's
-#: C1 envelopes exist to avoid.
-STREAK_MIN_LEN_PX = 0.75
-#: Owner 2026-10-18: "the curved lines what are those? ... refine even more".
-#: The field's trail follows the body's ORBITAL velocity, so at full length it
-#: curves along the orbit and read as an unexplained coloured line cutting
-#: across the mark. Only the head samples are drawn — a short local motion blur
-#: behind the body — so a wake can never span the mark. Parity with the Qt
-#: painter's ``TRAIL_DRAW_SAMPLES``.
-STREAK_DRAW_SAMPLES = 3
-#: Sparkles and satellite bodies take the SHORT streak: 40 glints and three
-#: shells must gain spectrum without turning the field into 40 comets.
-SHORT_STREAK_HALF_WIDTH = 0.34
-SATELLITE_STREAK_GAIN = 1.1
-SPARKLE_STREAK_GAIN = 1.0
-COMET_STREAK_HALF_WIDTH = 0.36
-COMET_STREAK_GAIN = 1.0
-#: A streak is pulled this far toward the state's lifted nucleus colour: full
-#: saturation is the point, but an untinted rainbow in a mark that changes
+# --- spectral colour anchoring ------------------------------------------------
+#: A body's hue is pulled this far toward the state's lifted nucleus colour: full
+#: saturation is not the point, and an untinted rainbow in a mark that changes
 #: colour with the state would read as a different product.
-STREAK_HUE_ANCHOR_BLEND = 0.10
-#: The comet's own bead tail rides the same hue ramp as its wake, so it reads as
-#: bright motion-blur debris inside the streak instead of a second grey tail.
+HUE_ANCHOR_BLEND = 0.10
+#: The comet's own small bead tail rides the same hue pair as its head, so it
+#: reads as bright motion-blur debris rather than a second grey tail.
 COMET_BEAD_SAT = 0.95
+
+# --- rings: translucent, near-monochrome ------------------------------------
+#: Owner 2026-10-19: the circles read as "galaxies", too bright and too coloured.
+#: The field already declares a low per-ring alpha; ``RING_ALPHA_SCALE`` lifts
+#: the main orbits back to full strength, so this painter-side factor is what
+#: makes every ring genuinely translucent instead of an opaque outline. One
+#: tint per frame (``ring_rgb``), never a red/blue fringe or a per-sample spray.
+RING_TRANSLUCENCY = 0.45
 
 # --- true-3D whole-mark tumble (parity with the Qt painter) ------------------
 #: Master spin: a slow 360 deg rotation of the whole mark in the screen plane.
@@ -317,8 +293,6 @@ DOF_ALPHA_SOFT = 0.22
 #: sweeps the whole circle and the ring reads continuous, at half the
 #: primitives.
 FILAMENT_TK_STRIDE = 2
-FILAMENT_TK_SAT = 0.90
-FILAMENT_TK_VAL = 0.98
 #: Ring-rider star colour: the field's own hue, kept bright but anchored to the
 #: state core like every other spectral stroke.
 RING_PARTICLE_SAT = 0.92
@@ -439,13 +413,6 @@ NUCLEUS_CORONA_BREATH_SPAN = 0.22
 #: ramp did.
 NUCLEUS_CORONA_HUE_TURNS = 0.018
 NUCLEUS_CORONA_HUE_SALT = 97.3
-#: Fringe: a faint, softened split on the two MAIN orbits only, so the crisp
-#: hairline stays the dominant stroke and the quiet circles stay quiet.
-#: A hard-edged Tk stroke cannot be a sub-pixel alpha nudge the way the Qt
-#: painter's 9% pen is: at any useful offset the fringe stops reading as a
-#: chromatic hint on one hairline and becomes a second coloured line beside it.
-#: Kept faint, it stays what the CSS mark's blurred drop shadow is — an edge.
-FRINGE_ALPHA_MULT = 0.30
 #: Hologram rim: a bright thin edge on the body plus a faint red/blue split
 #: offset by a pixel — the lens-fringe cue, drawn as OUTLINES so the edge
 #: stays a hairline and never a disc. Static (no time phase), so the still
@@ -884,7 +851,6 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     rx = r * RX_FRAC
     ry = r * RY_FRAC
-    fringe = FRINGE_PIXELS
     ring_w = 1 if r < 64 else 2
     ring_rgb = _mix(fam["core"], (255, 255, 255), LIFT_RING)
     nuc_rgb = _mix(fam["core"], (255, 255, 255), LIFT_NUCLEUS)
@@ -1046,64 +1012,9 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     def _anchor(rgb: Tuple[int, int, int]) -> Tuple[int, int, int]:
         """Pull a spectral colour a little toward the mark's own core colour."""
-        k = STREAK_HUE_ANCHOR_BLEND
+        k = HUE_ANCHOR_BLEND
         return tuple(_clamp8(c + (nuc_rgb[i] - c) * k)
                      for i, c in enumerate(rgb))
-
-    # ---- the streak (one tapered wake per travelling body) ------------------
-    def _streak(samples: Any, gain: float = 1.0,
-                half: float = STREAK_HALF_WIDTH,
-                zseed: Any = None, vol_z: Any = None,
-                vol_z2: Any = None) -> None:
-        """One body's spectral wake, walked sample by sample.
-
-        Owner 2026-10-18: a star should leave an RGB TRAIL, not sit inside an
-        outer glow. The field's ``rgb_trail`` / ``dust_trail`` samples are
-        stroked in order — one short line per consecutive pair, coloured through
-        ``hue_to_rgb`` for that sample and tapered by the sample's own size and
-        alpha, which Tk expresses as a mix toward the background.
-        """
-        smps = [s for s in (samples or []) if isinstance(s, dict)]
-        # A wake is a SHORT local motion blur, never a curved line crossing the
-        # mark (owner 2026-10-18): only the head samples of the field's trail
-        # are stroked. The head rides the body, so the stub stays glued to it.
-        smps = smps[:STREAK_DRAW_SAMPLES]
-        if len(smps) < 2:
-            return
-        # Every sample of one body's wake shares that body's volume offset, so
-        # the whole streak swings as one body and its head still rides the
-        # star (see ``test_a_body_draws_its_wake_then_its_star``).
-        pts = [_place3(_num(s.get("x")), _num(s.get("y")),
-                       _num(s.get("depth"), 0.5),
-                       zseed=zseed, zflat=True,
-                       vol_z=vol_z, vol_z2=vol_z2) for s in smps]
-        total = 0.0
-        for i in range(1, len(pts)):
-            total += math.dist(pts[i][:2], pts[i - 1][:2])
-        if total < STREAK_MIN_LEN_PX:
-            return
-        for i in range(len(pts) - 1):
-            here, nxt = smps[i], smps[i + 1]
-            g = pts[i][2]
-            a = _shade(_num(here.get("alpha")) * gain, here.get("depth"),
-                       g)
-            if a <= ALPHA_EPS:
-                continue
-            # Each segment takes the MEAN of its two endpoints' converted
-            # colours — the same thing the Qt painter's gradient does between
-            # two stops, and the only way every sample's hue reaches the frame
-            # in a stroke-per-segment translation.
-            colour = _anchor(tuple(
-                (c0 + c1) / 2.0 for c0, c1 in zip(
-                    _spec(here.get("hue"), here.get("sat", 1.0),
-                          here.get("val", 1.0)),
-                    _spec(nxt.get("hue"), nxt.get("sat", 1.0),
-                          nxt.get("val", 1.0)))))
-            w = (2.0 * max(STREAK_MIN_HALF_PX, _num(here.get("size")) * half)
-                 * g)
-            width = max(1, min(STREAK_MAX_WIDTH, int(round(w))))
-            _line([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]],
-                  _dim(colour, a * bright), width)
 
     # ---- one twinkling star -------------------------------------------------
     def _glint(x: float, y: float, size: Any, alpha: Any,
@@ -1163,30 +1074,25 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     # ---- one declared circle ----------------------------------------------
     def _ring_stroke(points: List[Tuple[float, float]], alpha: float,
-                     width: float, layer: str) -> None:
-        """Stroke one declared circle: fringe on the main orbits, nothing else.
+                     width: float) -> None:
+        """Stroke one declared circle as a single translucent tint.
+
+        Owner 2026-10-19: the red/blue lens fringe and the multi-hue spray are
+        gone — the circles read as galaxies. Every ring is now ONE tint
+        (``ring_rgb``) at ``RING_TRANSLUCENCY`` of its declared alpha, so it sits
+        quietly behind the bodies instead of glowing like an opaque outline.
 
         ``points`` are SCREEN positions — the caller projects each vertex at
         its own depth through the Y+X tumble first, so the circle bends with
         the turn instead of cutting a straight chord across the mark.
         """
-        a = _shade(alpha)
+        a = _shade(alpha) * RING_TRANSLUCENCY
         if a <= ALPHA_EPS or len(points) < 3:
             return
         flat: List[float] = []
         for sx, sy in points:
             flat += [sx, sy]
         w = max(1, int(round(width)))
-        if layer == "main":
-            # Chromatic fringe EXCLUSIVE to the two main orbits: it is the logo's
-            # signature, and an echo / core ring / satellite shell wearing it
-            # reads as four more logo orbits instead of the quiet circles they
-            # are. Red to the right of the stroke, blue to the left, so the
-            # overlap stays near-white and the edges split.
-            _line([v + fringe if i % 2 == 0 else v for i, v in enumerate(flat)],
-                  _dim(_FRINGE_RED, a * FRINGE_ALPHA_MULT), w)
-            _line([v - fringe if i % 2 == 0 else v for i, v in enumerate(flat)],
-                  _dim(_FRINGE_BLUE, a * FRINGE_ALPHA_MULT), w)
         _line(flat, _dim(ring_rgb, a), w)
 
     def _ring_pass(near: bool) -> None:
@@ -1266,8 +1172,7 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             _ring_stroke(pts,
                          ring_alpha(tt, spec) * scale * intensity * bright,
                          ring_w * _num(spec.get("width"), 1.0)
-                         * (1.15 if layer == "main" else 1.0),
-                         layer)
+                         * (1.15 if layer == "main" else 1.0))
 
     # ----------------------------------------------------------------- field
     # Every layer is one pure call; malformed input (already normalised) or a
@@ -1461,12 +1366,13 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     # ------------------------------------------------------------- the bodies
     def _particle(part: Dict[str, Any]) -> None:
-        """One logo particle: its spectral wake, then the star that left it."""
+        """One logo particle: the star itself, with no wake.
+
+        Owner 2026-10-19: the thick bent trail ribbons ("L and V's") are gone.
+        The field still exposes ``rgb_trail`` for renderers that want it; this
+        painter deliberately does not stroke it.
+        """
         depth = _num(part.get("depth"), 0.5)
-        if not reduced_motion:
-            _streak(rgb_trail(tt, r, part),
-                    zseed=_num(part.get("index"), None),
-                    vol_z=part.get("z"), vol_z2=part.get("z2"))
         x, y, g = _place3(_num(part.get("x")), _num(part.get("y")),
                            depth, zseed=_num(part.get("index"), None),
                            zflat=True, vol_z=part.get("z"),
@@ -1479,18 +1385,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         """One satellite BODY riding its declared shell circle.
 
         The circle itself is stroked by the declared-geometry ring pass; this is
-        only the traveller. It leaves the SHORT wake: a shell turns once in
-        5.5-13.5 s and the long streak's step is sized for the comet, so the
-        full one drew a near-straight scratch right across the mark. The
-        field's own ``vx``/``vy`` put even the short one on the real path.
+        only the traveller. It leaves no wake (owner 2026-10-19): the body and
+        its glint are the effect.
         """
         body = shell.get("body") or {}
         depth = _num(body.get("depth"), 0.5)
-        if not reduced_motion:
-            _streak(dust_trail(tt, r, body), gain=SATELLITE_STREAK_GAIN,
-                    half=SHORT_STREAK_HALF_WIDTH,
-                    zseed=_num(body.get("index"), None),
-                    vol_z=body.get("z"), vol_z2=body.get("z2"))
         x, y, g = _place3(_num(body.get("x")), _num(body.get("y")),
                            depth, zseed=_num(body.get("index"), None),
                            zflat=True, vol_z=body.get("z"),
@@ -1530,11 +1429,6 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
 
     def _sparkle(glint: Dict[str, Any]) -> None:
         depth = _num(glint.get("depth"), 0.5)
-        if not reduced_motion:
-            _streak(dust_trail(tt, r, glint), gain=SPARKLE_STREAK_GAIN,
-                    half=SHORT_STREAK_HALF_WIDTH,
-                    zseed=_num(glint.get("index"), None),
-                    vol_z=glint.get("z"), vol_z2=glint.get("z2"))
         x, y, g = _place3(_num(glint.get("x")), _num(glint.get("y")),
                            depth, zseed=_num(glint.get("index"), None),
                            zflat=True, vol_z=glint.get("z"),
@@ -1597,10 +1491,11 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                        pts[i][2]) * bright
             if a <= ALPHA_EPS:
                 continue
-            col = _anchor(_spec(here.get("hue"), FILAMENT_TK_SAT,
-                                FILAMENT_TK_VAL))
+            # One tint for the whole band (owner 2026-10-19): the per-sample
+            # spectral hue read as a rainbow spray around the core. The field's
+            # alpha wave still carries the motion; only the colour is quiet.
             _line([pts[i][0], pts[i][1], pts[j][0], pts[j][1]],
-                  _dim(col, a), 1)
+                  _dim(ring_rgb, a * RING_TRANSLUCENCY), 1)
 
     def _rider(item: Dict[str, Any]) -> None:
         """One cylinder-column mote: a plain dot, shaded by its height.
@@ -1780,11 +1675,10 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                skew_deg=body.get("skew"), depth=depth, gain=g)
 
     def _comet_head() -> None:
-        """The one fast traveller: a wake, its own debris tail, and a head.
+        """The one fast traveller: its own small debris tail and a head.
 
-        The field's bead tail rides the SAME hue ramp as the wake: left
-        untinted it read as a second, grey tail beside a rainbow one. The
-        beads walk the streak's duotone pair — head hue to ``hue2``, half a
+        The field's bead tail stays (owner 2026-10-19 removed only the long
+        wake ribbons). The beads walk the pair — head hue to ``hue2``, half a
         turn away — so the whole tail is exactly two colours, never a hue
         ramp of its own (the old ``HUE_STEP`` bead ramp is gone).
         """
@@ -1801,10 +1695,6 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         except (TypeError, ValueError):
             tail_hue = (head + 0.5) % 1.0
         if comet_on:
-            _streak(rgb_trail(tt, r, comet_info), gain=COMET_STREAK_GAIN,
-                    half=COMET_STREAK_HALF_WIDTH,
-                    zseed=_num(comet_info.get("index"), 0.0),
-                    vol_z=comet_info.get("z"), vol_z2=comet_info.get("z2"))
             trail = list(comet_info.get("trail") or [])
             for k, smp in enumerate(trail):
                 f = (k + 1.0) / (len(trail) + 1.0)
@@ -2208,8 +2098,8 @@ __all__ = [
     "DOF_ALPHA_SOFT",
     "NUCLEUS_RIM_ALPHA", "NUCLEUS_RIM_OFFSET_PX", "NUCLEUS_RIM_FRINGE_ALPHA",
     "NUCLEUS_RIM_OVALS",
-    "STREAK_HALF_WIDTH", "STREAK_MIN_LEN_PX", "ALPHA_EPS",
-    "STREAK_DRAW_SAMPLES",
+    "ALPHA_EPS",
+    "RING_TRANSLUCENCY",
     "VOLUME_SAT", "VOLUME_VAL",
     "ACCRETION_SAT", "ACCRETION_VAL", "PHOTON_SAT", "PHOTON_VAL",
     "INFALL_SAT", "INFALL_VAL", "INFALL_TAIL_GAIN",
@@ -2217,7 +2107,7 @@ __all__ = [
     "SCREEN_BREAK_DRAW_LIMIT", "SCREEN_BREAK_SAT",
     "echo_follower_tilt", "nucleus_radius", "NUCLEUS_RADIUS_MULT",
     "RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
-    "FRINGE_PX", "FRINGE_PX_AT_96", "FRINGE_PIXELS", "LIFT_RING", "LIFT_BEAD",
+    "LIFT_RING", "LIFT_BEAD",
     "LIFT_NUCLEUS", "MIN_MARK_BRIGHTNESS", "HALO_SCALE", "HALO_BASE",
     "HALO_WIDTH", "SHOCKWAVE_WIDTH", "RING_SWAY_DEG", "RING_PERIOD_NEAR",
     "RING_PERIOD_FAR",

@@ -3,15 +3,16 @@
 ``voicebridge.orb.mark.render`` is the Tk sibling of the live Qt painter, and
 this round added four things the Tk renderer could otherwise quietly lose:
 
-  * the spectral streak each travelling body leaves INSTEAD of an outer glow,
-    each exactly two colours (a duotone head/hue2 pair),
+  * NO spectral wake: owner 2026-10-19 retired the thick bent trail ribbons
+    ("you didnt replace the L and V's"). Each body is its glint; the comet
+    keeps only its own small bead tail,
   * a true-3D whole-mark tumble — full 360 turns about the vertical (Y, 20.5 s)
     and horizontal (X, 27.0 s) axes, Y first then X — so the mark NEVER thins
     to a line the way the old flat ``cos`` squash did,
   * blink dots: pinprick ovals that materialise out of nowhere (alpha-only
     envelopes, depth-split like everything else),
-  * ONE declared set of circles (the field's ``ring_geometry``), fringed only
-    on the two main orbits,
+  * ONE declared set of circles (the field's ``ring_geometry``), each stroked
+    once as ONE translucent tint — no red/blue fringe, no spectral spray,
   * a studio nucleus whose soft layers are concentric ovals, because Tk has no
     gradient and no alpha, finished with a hologram rim (bright edge plus a
     faint red/blue split).
@@ -540,11 +541,10 @@ def test_comet_beads_walk_the_duotone_pair(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# RGB streaks instead of an outer glow
+# no wakes: the field's trail builders are deliberately not stroked
 # --------------------------------------------------------------------------- #
 def _strip_moving_layers(monkeypatch):
-    """Leave one particle and its wake: nothing else in the frame can pose as
-    a streak."""
+    """Leave one particle, no wake: nothing else can pose as a trail."""
     part = dict(F.particle_state(1.7, R)[0])
     part.update({"x": 0.0, "y": 0.0, "depth": 0.5, "size": 1.0, "alpha": 0.9,
                  "lift": 0.4, "hue": 0.5})
@@ -576,39 +576,34 @@ def _strip_moving_layers(monkeypatch):
     return part
 
 
-def _sample(k, hue, step=5.0, alpha=0.9, size=1.6):
-    return {"x": step * k, "y": 0.0, "hue": hue, "sat": 1.0, "val": 1.0,
-            "alpha": alpha, "size": size, "depth": 0.5, "dof": 0.5,
-            "k": float(k)}
+def _thick_trail():
+    """A synthetic two-sample trail thick enough to be an unmistakable wake."""
+    return [
+        {"x": 0.0, "y": 0.0, "hue": 0.5, "sat": 1.0, "val": 1.0,
+         "alpha": 1.0, "size": 3.0, "depth": 0.5},
+        {"x": 20.0, "y": 0.0, "hue": 0.5, "sat": 1.0, "val": 1.0,
+         "alpha": 1.0, "size": 3.0, "depth": 0.5},
+    ]
 
 
-def test_every_travelling_body_leaves_a_streak(monkeypatch):
-    # Suppress the field's streak builders: the strokes that disappear are
-    # exactly the wakes. Particles, sparkles, the shell travellers and the
-    # comet all carry one, so this is a whole-layer contract, not a single
-    # body's.
+def test_no_travelling_body_draws_a_wake(monkeypatch):
+    # Owner 2026-10-19: "you didnt replace the L and V's". The renderer must
+    # never consult the field's trail builders: point them at a thick synthetic
+    # trail and the frame is byte-identical to their absence.
     full, _ = render(1.7)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: [])
-    monkeypatch.setattr(M, "dust_trail", lambda *a, **k: [])
+    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: _thick_trail())
+    monkeypatch.setattr(M, "dust_trail", lambda *a, **k: _thick_trail())
     bare, _ = render(1.7)
-    assert len(full.lines) - len(bare.lines) > 20
-    # The stars survive their absence: the frame is still a mark.
-    assert len(bare.ovals) > 0 and len(bare.lines) > 0
+    assert full.lines == bare.lines and full.ovals == bare.ovals
 
 
-def test_a_body_draws_its_wake_then_its_star(monkeypatch):
+def test_a_body_draws_its_star_without_a_wake(monkeypatch):
     part = _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail",
-                        lambda tt, rr, body: [_sample(0, 0.5), _sample(1, 0.55),
-                                              _sample(2, 0.6)])
+    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: _thick_trail())
     c, _ = render(1.7)
-    wake = _segments(c)
-    # The synthetic body sits at the field origin, which the whole-mark
-    # transforms carry to the mark's own centre — PLUS the body's own rotated
-    # depth (turn_qdepth, hash-broken and flat per element) and its screen-space
-    # z/z2 volume offset, so a turned body at the origin swings off-centre
-    # exactly as far as its volume takes it. Wake and star share that
-    # projection, so they still coincide.
+    assert not _segments(c), "the body left no wake"
+    # The body itself is still drawn: its glint core is a single pinprick at
+    # the same projection the trail would have shared.
     import math as _m2
     qd = M.turn_qdepth(0.5, part.get("index"), flat=True)
     _px, _py, _g = M.turn_point(1.7, R, 0.0, 0.0, qd)
@@ -617,88 +612,42 @@ def test_a_body_draws_its_wake_then_its_star(monkeypatch):
     _a = _m2.radians(_m2.fmod(M.spin_deg(1.7), 360.0))
     star_x = CX + _px * _m2.cos(_a) - _py * _m2.sin(_a)
     star_y = CY + _px * _m2.sin(_a) + _py * _m2.cos(_a)
-    assert len(wake) == 2, "one stroke per consecutive pair of samples"
-    # The head rides ON the star, so the first segment starts where the glint
-    # is drawn: the wake and the star cannot drift apart.
     at_star = [o for o, _kw in c.ovals
                if abs((o[0] + o[2]) / 2.0 - star_x) < 1e-6
                and abs((o[1] + o[3]) / 2.0 - star_y) < 1e-6
                and abs((o[2] - o[0]) / 2.0) < 1.0]
     assert len(at_star) == 1, "the star is still a single pinprick core"
-    star = ((at_star[0][0] + at_star[0][2]) / 2.0,
-            (at_star[0][1] + at_star[0][3]) / 2.0)
-    assert math.dist(wake[0][0][:2], star) < 1e-6, (wake[0][0], star)
 
 
-def test_streak_colours_are_converted_per_sample_not_lerped_across_the_wheel(
-        monkeypatch):
-    # Owner: "leave a RGB trail". The wheel is the FIELD's, and the renderer
-    # converts each sample with hue_to_rgb instead of interpolating hue — a
-    # lerp across the 1.0 -> 0.0 wrap sweeps the entire spectrum the wrong way
-    # round and turns a red-to-red streak magenta, green and blue.
-    _strip_moving_layers(monkeypatch)
-
-    def strokes(hues):
-        monkeypatch.setattr(M, "rgb_trail", lambda tt, rr, body: [
-            _sample(i, h) for i, h in enumerate(hues)])
-        c, _ = render(1.7)
-        return [_rgb(kw["fill"]) for _pts, kw in _segments(c)]
-
-    # Red -> green -> blue walks the ramp, so every segment is the blend of
-    # the two samples it joins: yellow at the head, cyan at the tail. Margins,
-    # not absolute levels: the tumble's rotated-depth gain legitimately dims
-    # or brightens the whole streak a few points (per-element hash-broken
-    # depth now feeds the projection), but it scales channels together, so a
-    # yellow head stays R-and-G-dominant-over-B whatever the gain.
-    straight = strokes((0.0, 0.34, 0.66))
-    head, tail = straight
-    assert head[0] - head[2] > 40 and head[1] - head[2] > 40, f"head: {head}"
-    assert tail[2] - tail[0] > 40 and tail[1] - tail[0] > 40, f"tail: {tail}"
-
-    wrapped = strokes((0.98, 1.0, 1.02))
-    # 0.98 and 1.02 are a twentieth of a turn apart on the wheel, so the two
-    # drawn colours must be nearly the SAME red, not a spectrum sweep.
-    assert wrapped[0][0] > 120 and wrapped[1][0] > 120, wrapped
-    assert all(abs(a - b) <= 12 for a, b in zip(wrapped[0], wrapped[1])), wrapped
-
-
-def test_streaks_taper_and_fade_along_their_length(monkeypatch):
-    _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail", lambda tt, rr, body: [
-        _sample(0, 0.5, alpha=0.85, size=3.0),
-        _sample(1, 0.5, alpha=0.45, size=1.8),
-        _sample(2, 0.5, alpha=0.20, size=0.9)])
+def test_a_live_frame_has_no_bent_wakes(monkeypatch):
+    # The only legitimate long two-point strokes in a live frame are the
+    # black-hole infall tails (thin, straight, radial); suppress them and the
+    # filament spray, and no thick bent segment may remain.
+    monkeypatch.setattr(M, "_field_infall_streaks", None)
+    monkeypatch.setattr(M, "filament_state", lambda *a, **k: [])
     c, _ = render(1.7)
-    wake = _segments(c)
-    assert len(wake) == 2
-    widths = [kw["width"] for _pts, kw in wake]
-    assert widths[0] >= widths[1], widths
-    lum = [sum(_rgb(kw["fill"])) for _pts, kw in wake]
-    assert lum[0] > lum[1], lum
-    assert lum[-1] > 0, "a faded tail is dimmer, never painted in background"
+    # ``_segments`` at 6 px clears a large body's glint arms (~5 px here).
+    seg = _segments(c, min_len=6.0)
+    assert not seg, f"{len(seg)} wake-like strokes remain"
 
 
-def test_a_sub_pixel_wake_is_not_drawn(monkeypatch):
-    # A ribbon shorter than a pixel is one 8-bit step from appearing, which is
-    # the hard pop the field's C1 envelopes exist to avoid.
+def test_reduced_motion_draws_no_wake_at_all(monkeypatch):
     _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: [])
-    collapsed, _ = render(1.7)
-    monkeypatch.setattr(M, "rgb_trail", lambda tt, rr, body: [
-        _sample(0, 0.5, step=0.01), _sample(1, 0.5, step=0.01),
-        _sample(2, 0.5, step=0.01)])
-    c, _ = render(1.7)
-    assert c.lines == collapsed.lines and c.ovals == collapsed.ovals
-
-
-def test_reduced_motion_draws_no_streak_at_all(monkeypatch):
-    _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: [
-        _sample(i, 0.5 + 0.05 * i) for i in range(4)])
+    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: _thick_trail())
     live, _ = render(1.7)
     frozen, _ = render(1.7, reduced=True)
-    assert _segments(live)
+    assert not _segments(live)
     assert not _segments(frozen)
+
+
+def test_a_long_field_trail_is_ignored(monkeypatch):
+    # Even a nine-sample field trail draws nothing now: the whole ribbon layer
+    # is gone, not merely truncated.
+    _strip_moving_layers(monkeypatch)
+    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: [
+        dict(_thick_trail()[0], x=float(k)) for k in range(9)])
+    c, _ = render(1.7)
+    assert not _segments(c)
 
 
 def test_a_glint_carries_no_halo(monkeypatch):
@@ -730,9 +679,10 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
     bare, _ = render(2.3)
     at_zero, _ = render(0.0)
     circles = _new_lines(full, bare)
-    # Two fringed main orbits (3 strokes each), two followers, three shells,
-    # one core ring.
-    assert len(circles) == 2 * 3 + 2 + 3 + 1, len(circles)
+    # One plain stroke per declared circle: two main orbits, two followers,
+    # three shells, one core ring. No fringe strokes any more (owner
+    # 2026-10-19: the circles looked like galaxies).
+    assert len(circles) == 2 + 2 + 3 + 1, len(circles)
     assert stats["lines"] > 0
 
     # ...and it is the DECLARED radius that is drawn, about the mark's centre.
@@ -764,11 +714,10 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
         R * probe["ry_frac"] * rscale, abs=1e-6)
 
 
-def test_only_the_two_main_orbits_carry_the_chromatic_fringe(monkeypatch):
-    # The fringe is the logo's signature. A follower / core ring / shell
-    # wearing it reads as four more logo orbits instead of the quiet circles
-    # they are, so a renderer that fringes everything has lost the art
-    # direction even though every circle is still drawn.
+def test_every_circle_is_one_plain_translucent_stroke(monkeypatch):
+    # Owner 2026-10-19: the red/blue lens fringe and the multi-hue spray made
+    # the rings read as galaxies. Every declared circle is now exactly ONE
+    # stroke — no follower / core ring / shell gains a second colour.
     specs = F.ring_geometry(2.3)
     monkeypatch.setattr(M, "ring_geometry", lambda tt: [])
     bare, _ = render(2.3)
@@ -777,8 +726,26 @@ def test_only_the_two_main_orbits_carry_the_chromatic_fringe(monkeypatch):
         monkeypatch.setattr(M, "ring_geometry", lambda tt, o=only: o)
         one, _ = render(2.3)
         strokes = _new_lines(one, bare)
-        assert len(strokes) == (3 if spec["layer"] == "main" else 1), (
-            spec["id"], len(strokes))
+        assert len(strokes) == 1, (spec["id"], len(strokes))
+        assert dict(strokes[0][1])["width"] >= 1
+    # The translucency factor is what keeps a declared-alpha stroke faint.
+    assert 0.0 < M.RING_TRANSLUCENCY < 0.75
+
+
+def test_rings_have_no_chromatic_fringe(monkeypatch):
+    # The retired fringe painted two extra offset strokes (dark red right, dark
+    # blue left) beside every MAIN orbit, so one circle produced three distinct
+    # fills. A near-monochrome circle produces exactly one tint at any alpha.
+    specs = F.ring_geometry(2.3)
+    monkeypatch.setattr(M, "ring_geometry", lambda tt: [])
+    bare, _ = render(2.3)
+    for spec in specs:
+        monkeypatch.setattr(M, "ring_geometry", lambda tt, o=spec: [o])
+        one, _ = render(2.3)
+        strokes = _new_lines(one, bare)
+        fills = {dict(kw)["fill"] for _pts, kw in strokes if len(kw)}
+        assert len(strokes) == 1, (spec["id"], len(strokes))
+        assert len(fills) == 1, (spec["id"], fills)
 
 
 def test_a_still_frame_drops_the_life_and_keeps_the_mark(monkeypatch):
@@ -807,7 +774,7 @@ def test_nucleus_stack_is_the_declared_primitive_count(monkeypatch):
 def test_a_still_frame_is_the_nine_glints_plus_the_nucleus_stack():
     frozen, stats = render(0.0, reduced=True)
     assert stats["ovals"] == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
-    assert stats["lines"] == 2 * len(M.PARTICLES) + 7
+    assert stats["lines"] == 2 * len(M.PARTICLES) + 3
 
 
 def test_on_body_detail_never_paints_a_flat_background_disc():
@@ -835,22 +802,8 @@ def test_on_body_detail_never_paints_a_flat_background_disc():
 
 
 # --------------------------------------------------------------------------- #
-# refine round: short wakes, math glyphs, screen-break bodies
+# refine round: math glyphs, screen-break bodies
 # --------------------------------------------------------------------------- #
-def test_a_long_field_trail_is_drawn_as_a_short_stub(monkeypatch):
-    # Owner: "the curved lines what are those? ... refine even more". The field
-    # trail follows the body's ORBITAL velocity, so at full length it curved
-    # along the orbit. Only the head samples are stroked now, so a NINE-sample
-    # trail still draws a single two-segment stub.
-    _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail",
-                        lambda tt, rr, body: [_sample(k, 0.5)
-                                              for k in range(9)])
-    c, _ = render(1.7)
-    wake = _segments(c)
-    assert len(wake) == 2, "only the first 3 samples are kept"
-
-
 def test_volume_particles_paint_as_glints_never_as_text(monkeypatch):
     # Owner retired the math-glyph TEXT layer ("they read as checkmarks /
     # v lines") for a real 3D particle field. The Tk renderer must draw each
