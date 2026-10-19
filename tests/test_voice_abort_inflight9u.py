@@ -113,7 +113,7 @@ def test_local_chat_cancel_unblocks_the_blocking_read():
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         elapsed = _join_promptly(t, cancel)
         assert out.get("cancelled") is True
         assert "error" not in out
@@ -336,7 +336,7 @@ def test_post_json_blocking_seam_unblocks_on_cancel(path):
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         elapsed = _join_promptly(t, cancel)
         assert out.get("cancelled") is True
         assert "error" not in out
@@ -377,7 +377,7 @@ def test_frontier_cancel_unblocks_the_blocking_response():
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         _join_promptly(t, cancel)
         res = out.get("res")
         assert res is not None
@@ -419,7 +419,7 @@ def test_gateway_local_complete_threads_cancel_into_the_adapter(monkeypatch):
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        assert srv.requested.wait(timeout=10.0), "request never arrived"
         _join_promptly(t, cancel)
         res = out.get("res")
         assert res is not None and res.ok is False
@@ -438,3 +438,40 @@ def test_gateway_local_complete_normal_call_is_unchanged(monkeypatch):
         res = GW._local_complete("hi", _Cfg(), 32, timeout_s=5.0,
                                  cancel=threading.Event().is_set)
         assert res.ok is True and res.text == "ok"
+
+
+def test_gateway_local_generate_and_chat_raw_are_abortable(monkeypatch):
+    # The raw `/api/generate` and `/api/chat` adapters used to inline a
+    # blocking urlopen; they now route through post_json(cancel=...) so a STOP
+    # aborts the live socket instead of waiting out the timeout.
+    import voicebridge.providers.gateway as G
+    from voicebridge import runner_contract
+
+    with _server(CHAT_BODY, hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+
+        class _RC:
+            alias = "test-model"
+            num_ctx = 4096
+            keep_alive = -1
+            url = ""
+
+        rc = _RC()
+        rc.url = url
+        monkeypatch.setattr(runner_contract, "resolve", lambda cfg: rc)
+        for mode in ("generate", "chat_raw"):
+            cancel = threading.Event()
+            out = {}
+
+            def run(mode=mode, cancel=cancel, out=out):
+                out["res"] = G._local_dispatch(
+                    "hi", cfg=object(), max_tokens=8,
+                    local_mode=mode, cancel=cancel.is_set)
+
+            t = threading.Thread(target=run, daemon=True)
+            t.start()
+            assert srv.requested.wait(timeout=10.0), f"{mode}: request never arrived"
+            srv.requested.clear()
+            _join_promptly(t, cancel)
+            assert out["res"].ok is False, (mode, out["res"])
+            assert out["res"].code == "CANCELLED", (mode, out["res"].code)

@@ -209,7 +209,9 @@ def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
                     options: Optional[dict] = None,
                     timeout_s: Optional[float] = None,
                     keep_alive: Optional[int] = None,
-                    model: Optional[str] = None) -> ProviderResult:
+                    model: Optional[str] = None,
+                    cancel: Optional[Callable[[], bool]] = None
+                    ) -> ProviderResult:
     """Raw local ``/api/generate`` adapter (classifier/summarizer shape).
 
     Preserves the Packet 4B canonical runner contract (model alias, num_ctx,
@@ -234,13 +236,11 @@ def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
             payload["system"] = system_prompt
         if structured_schema is not None:
             payload["format"] = structured_schema
-        req = urllib.request.Request(
-            f"{rc.url}/api/generate",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"})
+        from ..local_llm import post_json
         t0 = time.time()
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode())
+        body = json.loads(post_json(
+            f"{rc.url}/api/generate", payload, timeout,
+            cancel=cancel).decode())
         text = str(body.get("response") or "")
         ms = int((time.time() - t0) * 1000)
         if not text:
@@ -254,8 +254,11 @@ def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
             usage=UsageRecord(provider="local", model=alias,
                               identity=f"local/{alias}", latency_ms=ms))
     except Exception as exc:
+        from ..local_llm import LocalLlmCancelled
+        code = ("CANCELLED" if isinstance(exc, LocalLlmCancelled)
+                else "PROVIDER_OUTAGE")
         _m = (model or "").strip() or _default_local_model(cfg)
-        return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
+        return ProviderResult(ok=False, code=code,
                               message=redact_text(str(exc))[:200],
                               provider="local", model=_m,
                               identity=f"local/{_m}")
@@ -266,7 +269,9 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
                     options: Optional[dict] = None,
                     timeout_s: Optional[float] = None,
                     keep_alive: Optional[int] = None,
-                    model: Optional[str] = None) -> ProviderResult:
+                    model: Optional[str] = None,
+                    cancel: Optional[Callable[[], bool]] = None
+                    ) -> ProviderResult:
     """Raw local ``/api/chat`` adapter (planner/vision message shape).
 
     ``messages`` may carry role/content and, for vision, an ``images`` list.
@@ -308,13 +313,11 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
             "options": opts}
         if structured_schema is not None:
             payload["format"] = structured_schema
-        req = urllib.request.Request(
-            f"{rc.url}/api/chat",
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"})
+        from ..local_llm import post_json
         t0 = time.time()
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = json.loads(resp.read().decode())
+        body = json.loads(post_json(
+            f"{rc.url}/api/chat", payload, timeout,
+            cancel=cancel).decode())
         text = _extract_reply(body)
         ms = int((time.time() - t0) * 1000)
         if not text:
@@ -328,8 +331,11 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
             usage=UsageRecord(provider="local", model=alias,
                               identity=f"local/{alias}", latency_ms=ms))
     except Exception as exc:
+        from ..local_llm import LocalLlmCancelled
+        code = ("CANCELLED" if isinstance(exc, LocalLlmCancelled)
+                else "PROVIDER_OUTAGE")
         _m = (model or "").strip() or _default_local_model(cfg)
-        return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
+        return ProviderResult(ok=False, code=code,
                               message=redact_text(str(exc))[:200],
                               provider="local", model=_m,
                               identity=f"local/{_m}")
@@ -347,7 +353,8 @@ def _local_dispatch(prompt: str, cfg: Any, max_tokens: int, *,
             system_prompt=kw.get("system_prompt", ""),
             structured_schema=kw.get("structured_schema"),
             options=kw.get("options"), timeout_s=kw.get("timeout_s"),
-            keep_alive=kw.get("keep_alive"), model=kw.get("model"))
+            keep_alive=kw.get("keep_alive"), model=kw.get("model"),
+            cancel=cancel)
     if mode == "chat_raw":
         msgs = kw.get("messages")
         if msgs is None:
@@ -356,7 +363,8 @@ def _local_dispatch(prompt: str, cfg: Any, max_tokens: int, *,
             msgs, cfg, max_tokens,
             structured_schema=kw.get("structured_schema"),
             options=kw.get("options"), timeout_s=kw.get("timeout_s"),
-            keep_alive=kw.get("keep_alive"), model=kw.get("model"))
+            keep_alive=kw.get("keep_alive"), model=kw.get("model"),
+            cancel=cancel)
     return _local_complete(
         prompt, cfg, max_tokens,
         conversation_prompt=kw.get("conversation_prompt", ""),
