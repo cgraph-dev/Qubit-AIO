@@ -649,7 +649,8 @@ def _start_gateway_install_signal_handlers(loop, shutdown_signal_handler, restar
 async def _start_gateway_run_runner(runner, _signal_initiated_shutdown: list) -> Optional[bool]:
     """MCP discovery, then ``runner.start()``. Returns the exit verdict when the process must end
     before running mode (start failed, clean exit, aborted startup); None to continue into cron."""
-    from gateway.run import (_discover_gateway_mcp_tools, _resolve_gateway_exit_verdict,
+    from gateway.run import (_best_effort, _discover_gateway_mcp_tools,
+                             _resolve_gateway_exit_verdict,
                              _shutdown_gateway_health_export, _shutdown_mcp_servers_nonblocking)
     # discover_mcp_tools() blocks up to 120s; on the loop thread it would freeze platform heartbeats.
     try:
@@ -669,6 +670,17 @@ async def _start_gateway_run_runner(runner, _signal_initiated_shutdown: list) ->
     if not success:
         _shutdown_gateway_health_export(runner)
         return False
+
+    def _recover_pending() -> None:
+        """Leftovers a previous life spooled on its way down. The runner's own startup does not run
+        this step in this tree (upstream's ``run_startup`` does), so the boot owns it here rather than
+        dropping recovery of messages the previous gateway had already accepted."""
+        from gateway.shutdown_flush import recover_gateway_pending
+        recovered = recover_gateway_pending(runner)
+        if recovered:
+            logger.info("Recovered %d pending message(s) from shutdown flush", recovered)
+
+    _best_effort(_recover_pending)
 
     if runner.should_exit_cleanly:
         _shutdown_gateway_health_export(runner)

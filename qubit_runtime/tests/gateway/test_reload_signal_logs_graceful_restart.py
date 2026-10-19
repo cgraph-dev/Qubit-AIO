@@ -16,6 +16,13 @@ class _AbortedStartupRunner:
     """Aborts before running mode so start_gateway() returns right after installing signal handlers."""
 
     def __init__(self, config):
+        from gateway.session import SessionStore
+        from qubit_state import SessionDB
+        from qubit_constants import get_qubit_home
+        self.session_store = SessionStore(get_qubit_home() / 'sessions', config)
+        self._session_db = SessionDB(get_qubit_home() / 'state.db')
+        self.session_store._db = self._session_db
+        self._draining = False
         self.config = config
         self.adapters = {}
         self._running = False
@@ -32,6 +39,10 @@ class _AbortedStartupRunner:
 
     async def wait_for_shutdown(self):
         return None
+
+    async def stop(self):
+        self.session_store.close_all_db_handles()
+        self._session_db.close()
 
     def request_restart(self, *, detached=False, via_service=False):
         self.restart_calls.append({"detached": detached, "via_service": via_service})

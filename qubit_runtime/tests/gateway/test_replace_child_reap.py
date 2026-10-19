@@ -179,6 +179,13 @@ async def test_start_gateway_replace_reaps_old_gateway_children_posix(
 
     class _CleanExitRunner:
         def __init__(self, config):
+            from gateway.session import SessionStore
+            from qubit_state import SessionDB
+            from qubit_constants import get_qubit_home
+            self.session_store = SessionStore(get_qubit_home() / 'sessions', config)
+            self._session_db = SessionDB(get_qubit_home() / 'state.db')
+            self.session_store._db = self._session_db
+            self._draining = False
             self.config = config
             self.should_exit_cleanly = True
             self.exit_reason = None
@@ -190,7 +197,8 @@ async def test_start_gateway_replace_reaps_old_gateway_children_posix(
             return True
 
         async def stop(self):
-            return None
+            self.session_store.close_all_db_handles()
+            self._session_db.close()
 
     _pid_state = {"alive": True}
     monkeypatch.setattr(
