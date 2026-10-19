@@ -193,6 +193,13 @@ try:  # pragma: no cover
     from .mark_field import screen_break as _field_screen_break
 except Exception:  # noqa: BLE001
     _field_screen_break = None
+#: The slow parallax HAZE bed behind the whole mark. Imported defensively like
+#: every sibling layer, so this renderer runs against a field revision without
+#: it and simply draws nothing.
+try:  # pragma: no cover
+    from .mark_field import haze_state as _field_haze
+except Exception:  # noqa: BLE001
+    _field_haze = None
 
 #: Polyline sampling resolution for one ellipse drawn outside the declared set
 #: (the beat shockwave). The declared circles bring their own sampling.
@@ -503,6 +510,44 @@ INFALL_TAIL_GAIN = 0.85
 #: circle, so they run off the widget edge.
 SCREEN_BREAK_DRAW_LIMIT = 12
 SCREEN_BREAK_SAT = 0.95
+
+# --- haze: the slow parallax bed --------------------------------------------
+#: Owner 2026-10-19: "make more fluid ... more detailed ... more complex".
+#: Behind every hairline and body sits the field's ``haze_state``: a handful of
+#: large, very faint bodies on their own inclined orbits. The field's alpha is
+#: deliberately minute (2-7%), which is right for Qt's real alpha but below
+#: what Tk's opaque background-mix can show, so this painter applies its own
+#: medium gain. It is still a BED: two soft stops per body, muted saturation,
+#: and a hard alpha ceiling so it can never compete with the mark.
+HAZE_TK_SIZE_GAIN = 4.5
+HAZE_TK_ALPHA_GAIN = 3.2
+HAZE_TK_ALPHA_MAX = 0.16
+#: Inner/outer stop ratio and the outer stop's share of the body alpha: two
+#: concentric precomposited ovals approximate a soft disc without a gradient.
+HAZE_TK_INNER_FRAC = 0.62
+HAZE_TK_OUTER_ALPHA = 0.45
+HAZE_TK_MIN_RAD = 0.6
+HAZE_TK_SAT = 0.28
+HAZE_TK_VAL = 0.90
+
+# --- per-layer detail the field now publishes --------------------------------
+#: A particle's bounded micro-wobble (``particle_state.wobble``, the magnitude
+#: of ``micro_offset`` in px) also gives its glint arms a small extra shimmer,
+#: on top of the position wobble the field already applied. Bounded and purely
+#: visual: the core stays exactly where the field put it.
+PARTICLE_WOBBLE_ARM_GAIN = 0.12
+PARTICLE_WOBBLE_ARM_MAX = 0.18
+#: The filament's travelling ``crest`` (0..1) whitens the band where the wave
+#: is high, so the energy filament reads as a bright crest sweeping the ring
+#: rather than a uniform tint.
+FILAMENT_CREST_LIFT = 0.30
+#: The accretion stream's ``clump`` (0.70..1.00) is a travelling knot of
+#: density; lifting those samples toward white makes the knots glint.
+ACCRETION_CLUMP_LIFT = 0.20
+#: The photon ring's ``lobe`` (0..1) marks the bright lensed arcs; lifting
+#: them toward white (and leaving the dim between them cool) is what makes the
+#: two arcs legible in Tk's no-alpha medium.
+PHOTON_LOBE_LIFT = 0.24
 
 #: Exact primitive count of the nucleus stack, so a host or a test can predict
 #: a still frame's ovals. Everything here is a pure function of the clamped
@@ -1409,6 +1454,17 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     if not isinstance(sbreaks, list):
         sbreaks = []
     sbreaks = sbreaks[:SCREEN_BREAK_DRAW_LIMIT]
+    # The slow parallax HAZE bed: the field's newest layer. It is LIFE (it
+    # moves), so a reduced-motion frame carries none of it, exactly like dust,
+    # glints and the black-hole structure.
+    haze = []
+    if _field_haze is not None and not reduced_motion:
+        try:
+            haze = [h for h in _field_haze(tt, r) if isinstance(h, dict)]
+        except Exception:  # noqa: BLE001
+            haze = []
+    if not isinstance(haze, list):
+        haze = []
     if reduced_motion:
         # A clean static frame: no dust, no glints, no comet, no streaks, no
         # follower rings, no nucleus sparks and none of the new life layers.
@@ -1454,20 +1510,62 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     comet_on = (not reduced_motion) and _num(comet_info.get("alpha")) > 0.0
 
     # ------------------------------------------------------------- the bodies
+    def _haze(body: Dict[str, Any]) -> None:
+        """One slow parallax haze body: two faint concentric discs.
+
+        Owner 2026-10-19: the mark gained a "faint parallax bed behind
+        everything". The field places large, very faint bodies on their own
+        inclined orbits (``haze_state``); Tk has no alpha, so this paints the
+        bed as two precomposited background-mixed discs — a dim outer stop and
+        a slightly stronger inner one — at muted saturation and a hard alpha
+        ceiling. It carries the field's camera sway, per-body micro-wobble and
+        breathing alpha for free, and it is drawn before any hairline so it can
+        never erase one (the failure mode of Tk's opaque translucency
+        substitute).
+        """
+        depth = _num(body.get("depth"), 0.5)
+        x, y, g = _place3(_num(body.get("x")), _num(body.get("y")), depth,
+                          zseed=_num(body.get("index"), None), zflat=True,
+                          vol_z=body.get("z"), vol_z2=body.get("z2"))
+        hue = body.get("hue")
+        base = (_anchor(_spec(hue, HAZE_TK_SAT, HAZE_TK_VAL))
+                if hue is not None
+                else _lift(_num(body.get("lift"), 0.25)))
+        a = min(HAZE_TK_ALPHA_MAX,
+                _shade(_num(body.get("alpha")), depth, g)
+                * HAZE_TK_ALPHA_GAIN * bright)
+        if a <= ALPHA_EPS:
+            return
+        rad = max(HAZE_TK_MIN_RAD,
+                  _num(body.get("size")) * g * HAZE_TK_SIZE_GAIN)
+        _oval(x, y, rad, _dim(base, a * HAZE_TK_OUTER_ALPHA))
+        _oval(x, y, rad * HAZE_TK_INNER_FRAC, _dim(base, a))
+
     def _particle(part: Dict[str, Any]) -> None:
         """One logo particle: the star itself, with no wake.
 
         Owner 2026-10-19: the thick bent trail ribbons ("L and V's") are gone.
         The field still exposes ``rgb_trail`` for renderers that want it; this
         painter deliberately does not stroke it.
+
+        The field's new ``glint.flicker`` is already folded into the particle's
+        ``glint_scale``/``glint_alpha`` (and its ``wobble`` into x/y) at source,
+        so both reach the canvas through size/alpha/position. The wobble
+        MAGNITUDE additionally lengthens the arms a touch: a body that is
+        being displaced at that instant glints a little wider, which keeps the
+        micro-motion legible without moving the core the field placed.
         """
         depth = _num(part.get("depth"), 0.5)
         x, y, g = _place3(_num(part.get("x")), _num(part.get("y")),
                            depth, zseed=_num(part.get("index"), None),
                            zflat=True, vol_z=part.get("z"),
                            vol_z2=part.get("z2"))
+        wob = _num(part.get("wobble"))
+        arm_gain = 1.0 + min(PARTICLE_WOBBLE_ARM_MAX,
+                             max(0.0, wob) * PARTICLE_WOBBLE_ARM_GAIN)
         _glint(x, y, part.get("size"), part.get("alpha"),
                _lift(_num(part.get("lift"), LIFT_BEAD)),
+               arm_frac=GLINT_ARM_FRAC * arm_gain,
                skew_deg=part.get("skew"), depth=depth, gain=g)
 
     def _satellite(shell: Dict[str, Any]) -> None:
@@ -1583,8 +1681,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             # One tint for the whole band (owner 2026-10-19): the per-sample
             # spectral hue read as a rainbow spray around the core. The field's
             # alpha wave still carries the motion; only the colour is quiet.
+            # The wave's new ``crest`` (0..1) lifts that ONE tint toward white
+            # where the band is high, so the crest sweeps the ring as light
+            # rather than the whole band brightening as one flat colour.
+            crest = max(0.0, min(1.0, _num(here.get("crest"), 0.5)))
+            tint = _mix(ring_rgb, (255, 255, 255),
+                        FILAMENT_CREST_LIFT * crest)
             _line([pts[i][0], pts[i][1], pts[j][0], pts[j][1]],
-                  _dim(ring_rgb, a * RING_TRANSLUCENCY), 1,
+                  _dim(tint, a * RING_TRANSLUCENCY), 1,
                   splinesteps=FILAMENT_SPLINE_STEPS)
 
     def _rider(item: Dict[str, Any]) -> None:
@@ -1701,6 +1805,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         rgb = (_anchor(_spec(_num(hue), ACCRETION_SAT, ACCRETION_VAL))
                if hue is not None
                else _lift(_num(item.get("lift"), LIFT_BEAD)))
+        # The stream's ``clump`` (0.70..1.00) is a travelling density knot;
+        # the field already scales size/alpha by it. Lifting the knot's tint
+        # toward white makes it glint as matter, not as a uniform dotted line.
+        clump = max(0.0, min(1.0, (_num(item.get("clump"), 0.70) - 0.70)
+                               / 0.30))
+        rgb = _mix(rgb, (255, 255, 255), ACCRETION_CLUMP_LIFT * clump)
         _dot(x, y, max(0.22, _num(item.get("size"))), item.get("alpha"),
              rgb, depth=depth, gain=g)
 
@@ -1718,6 +1828,13 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         rgb = (_anchor(_spec(_num(hue), PHOTON_SAT, PHOTON_VAL))
                if hue is not None
                else _lift(_num(item.get("lift"), 0.5)))
+        # ``lobe`` is the two-arc lensing profile; the field folds it into
+        # alpha and its precessed sibling into size. Whitening the high-lobe
+        # samples is what leaves the DIM between-arc side cool, so the ring
+        # reads as two lensed arcs in Tk's no-alpha medium. ``sparkle`` is
+        # already folded into size at source.
+        lobe = max(0.0, min(1.0, _num(item.get("lobe"), 0.5)))
+        rgb = _mix(rgb, (255, 255, 255), PHOTON_LOBE_LIFT * lobe)
         _dot(x, y, max(0.18, _num(item.get("size"))), item.get("alpha"),
              rgb, depth=depth, gain=g)
 
@@ -1906,9 +2023,16 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 if not isinstance(sh, dict):
                     continue
                 d = _num(sh.get("depth"), 0.5)
-                sh_r = max(0.5, _num(sh.get("size")))
+                # The field's new per-shell ``swirl`` (0..1) is a secondary
+                # radial oscillation inward-biased inside the core. It is
+                # already in the shell's x/y; using it for size/alpha too makes
+                # the shell visibly breathe against its neighbours instead of
+                # sliding rigidly.
+                swirl = max(0.0, min(1.0, _num(sh.get("swirl"), 0.5)))
+                sh_r = max(0.5, _num(sh.get("size"))
+                           * (0.95 + 0.10 * swirl))
                 sh_a = min(1.0, _num(sh.get("alpha")) * (0.45 + 0.55 * d)
-                           * bright)
+                           * (0.90 + 0.20 * swirl) * bright)
                 sh_col = _anchor(_spec(sh.get("hue"), 0.86, 0.96))
                 _oval(cx_f + _num(sh.get("x")), cy_f + _num(sh.get("y")),
                       sh_r, _dim(sh_col, sh_a, nuc_rgb))
@@ -2031,6 +2155,14 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
     nuc_rad = nucleus_radius(r, tt, gain)
     hot_rgb = _mix(nuc_rgb, (255, 255, 255), NUCLEUS_CORE_LIFT)
     _nucleus_glow(nuc_rad, hot_rgb, beat)
+
+    # ------------------------------------------------------------ haze bed
+    # Behind every hairline and body, but ABOVE the aura: Tk's "translucent"
+    # fills are opaque background-mixes, so drawing the bed before the aura
+    # would let the (much stronger) glow paint straight over most of it. This
+    # is still the backmost layer a viewer reads as the mark's weather.
+    for _hz in haze:
+        _haze(_hz)
 
     # ------------------------------------------------------------- far field
     # Behind the nucleus: far circles, far dust, far particles + streaks, far

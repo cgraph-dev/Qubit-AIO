@@ -573,6 +573,9 @@ def _strip_moving_layers(monkeypatch):
     monkeypatch.setattr(M, "_field_photon_ring", None)
     monkeypatch.setattr(M, "_field_infall_streaks", None)
     monkeypatch.setattr(M, "_field_screen_break", None)
+    # The parallax haze bed is a life layer too: its soft discs would otherwise
+    # inflate an isolated-body frame's oval count.
+    monkeypatch.setattr(M, "_field_haze", None)
     return part
 
 
@@ -921,3 +924,63 @@ def test_reduced_motion_draws_no_volume_or_screen_break(monkeypatch):
     # all be absent from a still frame.)
     assert all(kw.get("text") in ("0", "1") for (_x, _y), kw in c.texts)
     assert stats["ovals"] == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
+
+
+# --------------------------------------------------------------------------- #
+# the parallax haze bed (field ``haze_state``)
+# --------------------------------------------------------------------------- #
+def _haze_probe(x=20.0):
+    return {"index": 0.0, "x": x, "y": 0.0, "depth": 0.5, "z": 0.5,
+            "z2": 0.5, "size": 2.0, "alpha": 0.05, "lift": 0.25,
+            "hue": 0.6, "hue2": 0.65, "breath": 0.5}
+
+
+def _pins_at(canvas, x, y=0.0):
+    """Ovals centred exactly at ``(CX + x, CY + y)`` (t=0 has no tumble)."""
+    return [(i, o, kw) for i, (o, kw) in enumerate(canvas.ovals)
+            if abs((o[0] + o[2]) / 2.0 - (CX + x)) < 1e-6
+            and abs((o[1] + o[3]) / 2.0 - (CY + y)) < 1e-6]
+
+
+def test_haze_is_a_faint_bed_behind_every_hairline(monkeypatch):
+    # Owner 2026-10-19: a faint parallax bed behind everything. Each body is
+    # two soft background-composited discs (an outer and an inner stop), and
+    # both are drawn BEFORE the first stroked circle so the bed can never
+    # erase a ring (Tk has no alpha compositing).
+    _strip_moving_layers(monkeypatch)
+    monkeypatch.setattr(M, "_field_haze",
+                        lambda tt, rr: [dict(_haze_probe())])
+    c, _stats = render(0.0)
+    pins = _pins_at(c, 20.0)
+    assert len(pins) == 2, "haze is two soft stops per body"
+    # Faint: both stops are much closer to the dark background than to white.
+    from voicebridge.orb import ember as E
+    for _i, _o, kw in pins:
+        fill = kw.get("fill")
+        rgb = tuple(int(fill[k:k + 2], 16) for k in (1, 3, 5))
+        assert sum(abs(a - b) for a, b in zip(rgb, E.NEAR_BLACK)) < 220
+    first_line = next(i for i, (kind, _j) in enumerate(c.calls)
+                      if kind == "line")
+    for oval_i, _o, _kw in pins:
+        call_i = next(i for i, (kind, j) in enumerate(c.calls)
+                      if kind == "oval" and j == oval_i)
+        assert call_i < first_line, "haze must sit behind the hairlines"
+
+
+def test_reduced_motion_draws_no_haze(monkeypatch):
+    _strip_moving_layers(monkeypatch)
+    monkeypatch.setattr(M, "_field_haze",
+                        lambda tt, rr: [dict(_haze_probe())])
+    live, _ = render(0.0)
+    frozen, _ = render(0.0, reduced=True)
+    assert len(_pins_at(live, 20.0)) == 2
+    assert _pins_at(frozen, 20.0) == [], "haze is motion and must freeze out"
+
+
+def test_haze_is_junk_safe(monkeypatch):
+    monkeypatch.setattr(M, "_field_haze", lambda tt, rr: [
+        None, "bad", {"index": "x", "x": "nope", "y": object(),
+                      "depth": None, "size": "?", "alpha": "!",
+                      "hue": "?"}])
+    c, stats = render(1.7)
+    assert stats["ovals"] > 0 and stats["lines"] > 0
