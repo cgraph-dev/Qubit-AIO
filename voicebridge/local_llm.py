@@ -163,6 +163,56 @@ def _watch_cancel(cancel: Any, holder: AbortableHTTPPost,
             holder.abort()
 
 
+def _response_socket(resp: Any) -> Any:
+    """Best-effort live socket behind a ``urlopen`` streaming response.
+
+    ``urllib`` hides the socket, but an ``http.client.HTTPResponse`` keeps it
+    at ``fp.raw._sock``. Returning ``None`` (a fake/patched response) is
+    normal: the caller still checks the hook between chunks.
+    """
+    try:
+        raw = getattr(getattr(resp, "fp", None), "raw", None)
+        return getattr(raw, "_sock", None)
+    except Exception:  # noqa: BLE001 - introspection is best-effort
+        return None
+
+
+def _shutdown_response(resp: Any) -> bool:
+    """``shutdown`` a streaming response's live socket from another thread.
+
+    ``shutdown`` (not ``close``) is what wakes a thread blocked in ``recv`` on
+    Linux. Idempotent and safe before the response exists.
+    """
+    sock = _response_socket(resp)
+    if sock is None:
+        return False
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+        return True
+    except Exception:  # noqa: BLE001 - already closed / fake socket
+        return False
+
+
+def _watch_stream(cancel: Any, should_stop: Any, holder: List[Any],
+                  state: Dict[str, bool], done: threading.Event) -> None:
+    """Abort the live stream socket when either hook fires.
+
+    ``cancel`` is typed (the caller raises :class:`LocalLlmCancelled`);
+    ``should_stop`` is cooperative (the caller keeps the partial reply). The
+    watcher exists so a socket blocked mid-chunk is unblocked instead of
+    waiting for the server or the request timeout.
+    """
+    while not done.wait(0.01):
+        if cancel is not None and _cancel_requested(cancel):
+            state["cancel"] = True
+            _shutdown_response(holder[0])
+            return
+        if should_stop is not None and _cancel_requested(should_stop):
+            state["stop"] = True
+            _shutdown_response(holder[0])
+            return
+
+
 def _post_chat(url: str, payload: Dict[str, Any], timeout_s: float,
                cancel: Any = None) -> bytes:
     """POST a chat payload, abortable when a cancel hook is supplied.
@@ -195,6 +245,18 @@ def _post_chat(url: str, payload: Dict[str, Any], timeout_s: float,
     finally:
         done.set()
         watcher.join(timeout=1.0)
+
+
+def post_json(url: str, payload: Dict[str, Any], timeout_s: float,
+              *, cancel: Any = None) -> bytes:
+    """Abortable JSON POST shared by the raw local adapters.
+
+    ``gateway._local_generate`` / ``_local_chat_raw`` currently inline their
+    own blocking ``urllib`` read. Routing that read through this seam with the
+    turn's ``cancel`` hook makes it abortable as well; with no hook the exact
+    ``urllib`` path is kept (byte-identical and patch-compatible).
+    """
+    return _post_chat(url, payload, timeout_s, cancel)
 
 
 class ReasoningInvalidError(ValueError):
@@ -740,15 +802,21 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
                       timeout_s: float = 4.0, max_tokens: int = 100,
                       context: str = "", on_sentence=None,
                       should_stop=None, num_ctx: Optional[int] = None,
-                      reasoning: Optional[str] = None) -> str:
+                      reasoning: Optional[str] = None,
+                      cancel: Any = None) -> str:
     """Stream a local reply; emit completed sentences via on_sentence(str)
     as they arrive so TTS can start synthesizing while the model is still
     generating (STEAL_LIST item 6 — pipeline overlap, ~0.3-0.5s faster turns).
 
     Returns the full reply, or "" on any failure (caller falls back to the
     non-streaming path / cloud).
-    `should_stop` = callable -> True aborts the stream mid-generation.
-    `reasoning` selects the same per-request output budget as
+    ``should_stop`` = callable -> True stops the stream mid-generation
+    cooperatively: the live socket is shut down so a blocked chunk read does
+    not wait for the server, and the sentences already emitted are kept.
+    ``cancel`` = callable -> bool / Event: the turn's typed STOP hook. It also
+    shuts down the live socket and raises :class:`LocalLlmCancelled` instead of
+    returning a partial reply.
+    ``reasoning`` selects the same per-request output budget as
     :func:`chat_local` so the streaming (default) path honors the selector
     instead of silently dropping it.
     """
@@ -757,7 +825,9 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
     if on_sentence is None:
         return chat_local(text, conversation_prompt, model=model, url=url,
                           timeout_s=timeout_s, max_tokens=max_tokens,
-                          context=context, reasoning=reasoning)
+                          context=context, reasoning=reasoning, cancel=cancel)
+    if cancel is not None and _cancel_requested(cancel):
+        raise LocalLlmCancelled("local model call cancelled")
     payload = _chat_payload(text, conversation_prompt, model, max_tokens,
                             context, stream=True, num_ctx=num_ctx)
     req = urllib.request.Request(
@@ -776,71 +846,103 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
             emitted.append(sentence)
             on_sentence(sentence)
 
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            for raw in resp:
-                if should_stop is not None and should_stop():
-                    resp.close()
-                    break
-                line = raw.decode("utf-8", "replace").strip()
-                if not line:
-                    continue
-                try:
-                    chunk = (json.loads(line).get("message", {}) or {})
-                except Exception:
-                    continue
-                delta = chunk.get("content") or ""
-                if not delta and not chunk.get("done"):
-                    # thinking models stream <think> text first: skip it, never speak it
-                    continue
-                buf += delta
-                full += delta
-                while True:
-                    m = re.search(r"[.!?…]\s*", buf)
-                    if not m:
-                        break
-                    sentence = buf[:m.end()].strip()
-                    buf = buf[m.end():]
-                    _flush(sentence)
-            _flush(buf.strip())
-    except Exception as exc:
-        log_event("conversation.local.stream_failed", error=str(exc)[:160],
-                  model=model)
-        # Speak-consistent partial: return ONLY what was actually emitted as
-        # sentences, never the un-spoken trailing fragment (caller falls back
-        # to the cloud path when nothing completed).
-        return " ".join(emitted).strip()
-    if not emitted and not full.strip() and not (should_stop and should_stop()):
-        # Packet 4B: instant-EOS / think-exhausted empty stream. One BOUNDED
-        # retry — safe here because nothing was emitted yet, so no partial
-        # speech can duplicate; a second consecutive empty returns "" for the
-        # caller's cloud fallback.
-        log_event("conversation.local.empty_retry", model=model, stream=True)
-        try:
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp2:
-                for raw in resp2:
-                    line = raw.decode("utf-8", "replace").strip()
-                    if not line:
-                        continue
-                    try:
-                        chunk = (json.loads(line).get("message", {}) or {})
-                    except Exception:
-                        continue
-                    delta = chunk.get("content") or ""
-                    if not delta and not chunk.get("done"):
-                        continue
-                    buf += delta
-                    full += delta
-                    while True:
-                        m = re.search(r"[.!?…]\s*", buf)
-                        if not m:
-                            break
-                        sentence = buf[:m.end()].strip()
-                        buf = buf[m.end():]
-                        _flush(sentence)
+    state = {"cancel": False, "stop": False}
+    holder: List[Any] = [None]
+    done = threading.Event()
+    watcher: Optional[threading.Thread] = None
+    if cancel is not None or should_stop is not None:
+        watcher = threading.Thread(
+            target=_watch_stream,
+            args=(cancel, should_stop, holder, state, done),
+            daemon=True, name="local-llm-stream-cancel")
+        watcher.start()
+
+    def _consume(lines: Any) -> bool:
+        """Parse NDJSON chunks; False when a cooperative stop ended the read."""
+        nonlocal buf, full
+        for raw in lines:
+            if cancel is not None and _cancel_requested(cancel):
+                raise LocalLlmCancelled("local model call cancelled")
+            if should_stop is not None and _cancel_requested(should_stop):
                 _flush(buf.strip())
+                return False
+            line = raw.decode("utf-8", "replace").strip()
+            if not line:
+                continue
+            try:
+                chunk = (json.loads(line).get("message", {}) or {})
+            except Exception:
+                continue
+            delta = chunk.get("content") or ""
+            if not delta and not chunk.get("done"):
+                # thinking models stream <think> text first: skip it, never speak it
+                continue
+            buf += delta
+            full += delta
+            while True:
+                m = re.search(r"[.!?…]\s*", buf)
+                if not m:
+                    break
+                sentence = buf[:m.end()].strip()
+                buf = buf[m.end():]
+                _flush(sentence)
+        _flush(buf.strip())
+        return True
+
+    def _cancelled_now() -> bool:
+        return state["cancel"] or _cancel_requested(cancel)
+
+    stopped = False
+    try:
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                holder[0] = resp
+                stopped = not _consume(resp)
+        except LocalLlmCancelled:
+            raise
         except Exception as exc:
-            log_event("conversation.local.retry_failed", error=str(exc)[:120])
+            if _cancelled_now():
+                raise LocalLlmCancelled(
+                    "local model call cancelled") from exc
+            if state["stop"]:
+                stopped = True
+                _flush(buf.strip())
+            else:
+                log_event("conversation.local.stream_failed",
+                          error=str(exc)[:160], model=model)
+                # Speak-consistent partial: return ONLY what was actually
+                # emitted as sentences, never the un-spoken trailing fragment
+                # (caller falls back to the cloud path when nothing completed).
+                return " ".join(emitted).strip()
+        if (not stopped and not emitted and not full.strip()
+                and not _cancelled_now()
+                and not _cancel_requested(should_stop)):
+            # Packet 4B: instant-EOS / think-exhausted empty stream. One
+            # BOUNDED retry — safe here because nothing was emitted yet, so no
+            # partial speech can duplicate; a second consecutive empty returns
+            # "" for the caller's cloud fallback.
+            log_event("conversation.local.empty_retry", model=model, stream=True)
+            try:
+                with urllib.request.urlopen(req, timeout=timeout_s) as resp2:
+                    holder[0] = resp2
+                    stopped = not _consume(resp2)
+            except LocalLlmCancelled:
+                raise
+            except Exception as exc:
+                if _cancelled_now():
+                    raise LocalLlmCancelled(
+                        "local model call cancelled") from exc
+                if state["stop"]:
+                    _flush(buf.strip())
+                else:
+                    log_event("conversation.local.retry_failed",
+                              error=str(exc)[:120])
+        if _cancelled_now():
+            raise LocalLlmCancelled("local model call cancelled")
+    finally:
+        done.set()
+        if watcher is not None:
+            watcher.join(timeout=1.0)
     log_event("conversation.local.stream", model=model, chars=len(full),
               elapsed_s=round(__import__("time").time() - t0, 3))
     return " ".join(emitted).strip()

@@ -29,6 +29,8 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import voicebridge.local_llm as LLM  # noqa: E402
@@ -156,6 +158,198 @@ def test_abortable_post_abort_is_idempotent_and_safe_before_connect():
         pass
     else:  # pragma: no cover - a pre-aborted post must fail typed
         raise AssertionError("aborted post did not fail typed")
+
+
+# ---------------------------------------------------------------------------
+# streaming local adapter: a blocked chunk read is unblocked by the hook
+# ---------------------------------------------------------------------------
+class _StreamHandler(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+
+    def do_POST(self) -> None:  # noqa: N802 - stdlib contract
+        length = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(length)
+        self.server.requested.set()  # type: ignore[attr-defined]
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            for chunk in self.server.first:  # type: ignore[attr-defined]
+                self.wfile.write((json.dumps(chunk) + "\n").encode())
+                self.wfile.flush()
+            self.server.first_sent.set()  # type: ignore[attr-defined]
+            if self.server.hold:  # type: ignore[attr-defined]
+                self.server.gate.wait(timeout=10.0)  # type: ignore[attr-defined]
+            for chunk in self.server.rest:  # type: ignore[attr-defined]
+                self.wfile.write((json.dumps(chunk) + "\n").encode())
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def log_message(self, *a) -> None:  # silence the test server
+        pass
+
+
+@contextlib.contextmanager
+def _stream_server(first, rest=(), *, hold=False):
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _StreamHandler)
+    srv.daemon_threads = True
+    srv.requested = threading.Event()  # type: ignore[attr-defined]
+    srv.first_sent = threading.Event()  # type: ignore[attr-defined]
+    srv.gate = threading.Event()  # type: ignore[attr-defined]
+    srv.first = list(first)  # type: ignore[attr-defined]
+    srv.rest = list(rest)  # type: ignore[attr-defined]
+    srv.hold = hold  # type: ignore[attr-defined]
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield srv
+    finally:
+        srv.gate.set()  # type: ignore[attr-defined]
+        srv.shutdown()
+        srv.server_close()
+
+
+def _wait_emitted(got, *, budget=2.0):
+    deadline = time.monotonic() + budget
+    while not got and time.monotonic() < deadline:
+        time.sleep(0.005)
+    return list(got)
+
+
+def _no_stream_watchers_left():
+    return not any(
+        t.name == "local-llm-stream-cancel" and t.is_alive()
+        for t in threading.enumerate())
+
+
+def test_local_stream_cancel_unblocks_a_blocked_chunk():
+    first = [{"message": {"content": "First."}}]
+    with _stream_server(first, hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+        cancel = threading.Event()
+        got: list[str] = []
+        out: dict = {}
+
+        def run():
+            try:
+                LLM.chat_local_stream(
+                    "hi", url=url, timeout_s=30.0, on_sentence=got.append,
+                    cancel=cancel.is_set)
+            except LLM.LocalLlmCancelled:
+                out["cancelled"] = True
+            except Exception as exc:  # noqa: BLE001 - surfaced in assertion
+                out["error"] = exc
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        assert srv.first_sent.wait(timeout=2.0), "stream never started"
+        assert _wait_emitted(got) == ["First."], got
+        elapsed = _join_promptly(t, cancel)
+        assert out.get("cancelled") is True
+        assert "error" not in out
+        assert elapsed < 0.5
+        assert _no_stream_watchers_left()
+
+
+def test_local_stream_should_stop_unblocks_a_blocked_chunk():
+    first = [{"message": {"content": "First."}}]
+    with _stream_server(first, hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+        stop = threading.Event()
+        got: list[str] = []
+        out: dict = {}
+
+        def run():
+            try:
+                out["full"] = LLM.chat_local_stream(
+                    "hi", url=url, timeout_s=30.0, on_sentence=got.append,
+                    should_stop=stop.is_set)
+            except Exception as exc:  # noqa: BLE001 - surfaced in assertion
+                out["error"] = exc
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        assert srv.first_sent.wait(timeout=2.0), "stream never started"
+        assert _wait_emitted(got) == ["First."], got
+        elapsed = _join_promptly(t, stop)
+        assert "error" not in out
+        # Cooperative stop keeps the spoken partial and never raises.
+        assert out.get("full") == "First."
+        assert elapsed < 0.5
+        assert _no_stream_watchers_left()
+
+
+def test_local_stream_normal_call_is_unchanged():
+    first = [
+        {"message": {"content": "One. "}},
+        {"message": {"content": "Two."}},
+    ]
+    rest = [{"message": {"content": "", "done": True}}]
+    with _stream_server(first, rest) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+        got: list[str] = []
+        full = LLM.chat_local_stream(
+            "hi", url=url, timeout_s=5.0, on_sentence=got.append,
+            cancel=threading.Event().is_set)
+        assert got == ["One.", "Two."]
+        assert full == "One. Two."
+        assert _no_stream_watchers_left()
+
+
+def test_local_stream_repeated_preset_cancel_is_safe():
+    with _stream_server([], hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}"
+        cancel = threading.Event()
+        cancel.set()
+        for _ in range(3):
+            t0 = time.monotonic()
+            with pytest.raises(LLM.LocalLlmCancelled):
+                LLM.chat_local_stream(
+                    "hi", url=url, timeout_s=30.0,
+                    on_sentence=lambda s: None, cancel=cancel.is_set)
+            assert time.monotonic() - t0 < 0.2
+        # A pre-set cancel must never reach the model server.
+        assert srv.requested.wait(timeout=0.1) is False
+        assert _no_stream_watchers_left()
+
+
+# ---------------------------------------------------------------------------
+# raw local adapters' blocking seam (`/api/generate`, `/api/chat`)
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("path", ["/api/generate", "/api/chat"])
+def test_post_json_blocking_seam_unblocks_on_cancel(path):
+    with _server(CHAT_BODY, hold=True) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}{path}"
+        cancel = threading.Event()
+        out: dict = {}
+
+        def run():
+            try:
+                LLM.post_json(url, {"stream": False}, 30.0,
+                              cancel=cancel.is_set)
+            except LLM.LocalLlmCancelled:
+                out["cancelled"] = True
+            except Exception as exc:  # noqa: BLE001 - surfaced in assertion
+                out["error"] = exc
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        assert srv.requested.wait(timeout=2.0), "request never arrived"
+        elapsed = _join_promptly(t, cancel)
+        assert out.get("cancelled") is True
+        assert "error" not in out
+        assert elapsed < 0.5
+
+
+@pytest.mark.parametrize("path", ["/api/generate", "/api/chat"])
+def test_post_json_blocking_seam_normal_call_is_unchanged(path):
+    with _server(CHAT_BODY) as srv:
+        url = f"http://127.0.0.1:{srv.server_port}{path}"
+        raw = LLM.post_json(url, {"stream": False}, 5.0,
+                            cancel=threading.Event().is_set)
+        assert json.loads(raw.decode()) == CHAT_BODY
 
 
 # ---------------------------------------------------------------------------
