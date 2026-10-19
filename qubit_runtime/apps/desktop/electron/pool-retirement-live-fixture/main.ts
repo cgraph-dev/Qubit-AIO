@@ -146,7 +146,7 @@ async function spawnResident(key: string, release: () => void): Promise<Resident
       USERPROFILE: join(root, key),
       QUBIT_HOME: home,
       HERMES_DESKTOP: '1',
-      HERMES_SERVE_HEADLESS: '1',
+      QUBIT_SERVE_HEADLESS: '1',
       HERMES_DASHBOARD_SESSION_TOKEN: token,
       PYTHONUNBUFFERED: '1',
       PYTHONDONTWRITEBYTECODE: '1',

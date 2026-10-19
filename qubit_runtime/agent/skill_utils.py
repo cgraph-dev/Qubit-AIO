@@ -951,8 +951,13 @@ _DEBRAND_PHRASES = (
 )
 #: Exact compatibility/legal identifiers that survive verbatim.
 _DEBRAND_PRESERVE_STRINGS = (
-    "__HERMES_BASE_PATH__", "__HERMES_SESSION_TOKEN__",
-    "__HERMES_AUTH_REQUIRED__", "__HERMES_PLUGINS__",
+    # The dashboard's browser globals are QUBIT-branded; the server writes and
+    # the SPA/desktop read these exact names. Preserve them so this pass can
+    # never rewrite one side of the contract back to the legacy spelling.
+    "__QUBIT_BASE_PATH__", "__QUBIT_SESSION_TOKEN__",
+    "__QUBIT_AUTH_REQUIRED__", "__QUBIT_INITIAL_PROFILE__",
+    "__QUBIT_DASHBOARD_PROFILE__", "__QUBIT_DASHBOARD_EMBEDDED_CHAT__",
+    "__HERMES_PLUGINS__",
     "__HERMES_PLUGIN_SDK__", "X-Hermes-Session-Token",
     "hermes_flow", "hermes.tokenReloadAttempted",
     "hermes-kanban", "hermes-flow", "hermes_achievements",

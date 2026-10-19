@@ -144,7 +144,7 @@ describe("management profile scope", () => {
   });
 
   it("falls back to the profile this backend serves when nothing is selected", async () => {
-    vi.stubGlobal("window", { __HERMES_DASHBOARD_PROFILE__: "served" });
+    vi.stubGlobal("window", { __QUBIT_DASHBOARD_PROFILE__: "served" });
     const fetchMock = jsonFetchMock();
     vi.stubGlobal("fetch", fetchMock);
     setManagementProfile("");
@@ -159,7 +159,7 @@ describe("management profile scope", () => {
   });
 
   it("keeps the selected profile ahead of the serving profile", async () => {
-    vi.stubGlobal("window", { __HERMES_DASHBOARD_PROFILE__: "served" });
+    vi.stubGlobal("window", { __QUBIT_DASHBOARD_PROFILE__: "served" });
     const fetchMock = jsonFetchMock();
     vi.stubGlobal("fetch", fetchMock);
     setManagementProfile("worker");

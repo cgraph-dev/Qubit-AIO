@@ -611,7 +611,7 @@ def _dashboard_skew_restart_hint() -> str:
 
     See #97046.
     """
-    if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
+    if os.environ.get("QUBIT_SERVE_HEADLESS") == "1":
         return (
             "restart the Desktop-owned backend to load the new code "
             "(use Restart backend in Qubit Desktop, or quit and reopen the app)"

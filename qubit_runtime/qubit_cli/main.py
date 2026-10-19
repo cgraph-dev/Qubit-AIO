@@ -2607,13 +2607,13 @@ def _dashboard_sanitize_desktop_env(headless_backend) -> None:
 
     Desktop Electron spawns its backend with HERMES_DESKTOP=1 plus
     HERMES_WEB_DIST=<packaged app.asar[/unpacked]/dist> (and often
-    HERMES_SERVE_HEADLESS=1). A shell inheriting those then running
+    QUBIT_SERVE_HEADLESS=1). A shell inheriting those then running
     `qubit dashboard` would serve the desktop renderer ("Desktop IPC bridge
     is unavailable", #52945) or disable the SPA. Only Electron-packaged
     WEB_DIST contamination is stripped from browser dashboards — caller-managed
     overrides (dev / custom builds) must still work, while headless `serve`
     keeps the packaged path used by the Desktop backend. Headless `serve`
-    re-sets HERMES_SERVE_HEADLESS itself.
+    re-sets QUBIT_SERVE_HEADLESS itself.
 
     The Desktop's legacy fallback spawn (`dashboard --no-open`, taken when the
     `serve --help` probe times out on a cold host) is not headless yet must keep
@@ -2629,7 +2629,7 @@ def _dashboard_sanitize_desktop_env(headless_backend) -> None:
     ):
         os.environ.pop("HERMES_WEB_DIST", None)
     if not headless_backend:
-        os.environ.pop("HERMES_SERVE_HEADLESS", None)
+        os.environ.pop("QUBIT_SERVE_HEADLESS", None)
 
 
 def _require_dashboard_web_deps() -> None:

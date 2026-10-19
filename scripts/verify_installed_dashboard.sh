@@ -115,9 +115,9 @@ try:
     st, _, _ = raw("/logs")
     assert st == 200, st
     st, _, body = raw("/chat")
-    assert st == 200 and b"__HERMES_BASE_PATH__" in body, st
-    assert b'__HERMES_BASE_PATH__=""' in body, "base path not root"
-    assert b"__HERMES_SESSION_TOKEN__" in body, "token not injected"
+    assert st == 200 and b"__QUBIT_BASE_PATH__" in body, st
+    assert b'__QUBIT_BASE_PATH__=""' in body, "base path not root"
+    assert b"__QUBIT_SESSION_TOKEN__" in body, "token not injected"
     asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()
     st, _, ab = raw("/" + asset)
     assert st == 200 and len(ab) > 1000, (asset, st, len(ab))

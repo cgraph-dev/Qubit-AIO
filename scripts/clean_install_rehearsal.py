@@ -268,7 +268,7 @@ try:
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     c.request("GET", "/sessions"); r = c.getresponse(); body = r.read()
     assert r.status == 200, r.status
-    assert b"__HERMES_BASE_PATH__" in body
+    assert b"__QUBIT_BASE_PATH__" in body
     asset = re.search(rb"/(assets/[^\"]+\.js)", body)
     assert asset, "no built dashboard asset referenced"
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)

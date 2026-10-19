@@ -85,7 +85,7 @@ class TestServedJsAssetContentType:
 
         normalize_web_asset_mime_types()
         monkeypatch.setattr(ws, "WEB_DIST", dist)
-        monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+        monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
         app = FastAPI()
         wsd.mount_spa(app)
         return TestClient(app)

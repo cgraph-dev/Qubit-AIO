@@ -209,12 +209,12 @@ def test_serve_startup_applies_limit_before_web_server(monkeypatch):
     import qubit_cli.plugins
     import qubit_cli.web_server
 
-    # cmd_dashboard(headless_backend=True) exports HERMES_SERVE_HEADLESS=1 into
+    # cmd_dashboard(headless_backend=True) exports QUBIT_SERVE_HEADLESS=1 into
     # this process's environment (main.py serve path). Touch the key through
     # monkeypatch FIRST so teardown restores the pre-test state — otherwise the
     # leaked flag flips later web-server tests (mount_spa) into the headless
     # 404 path.
-    monkeypatch.setenv("HERMES_SERVE_HEADLESS", "0")
+    monkeypatch.setenv("QUBIT_SERVE_HEADLESS", "0")
 
     calls: list[str] = []
     monkeypatch.setattr(

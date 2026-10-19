@@ -148,12 +148,12 @@ def test_desktop_child_dashboard_drops_packaged_renderer(main_mod, monkeypatch):
     packaged = "/Applications/Hermes.app/Contents/Resources/app.asar.unpacked/dist"
     monkeypatch.setenv("HERMES_DESKTOP", "1")
     monkeypatch.setenv("HERMES_WEB_DIST", packaged)
-    monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1")
+    monkeypatch.setenv("QUBIT_SERVE_HEADLESS", "1")
 
     main_mod._dashboard_sanitize_desktop_env(headless_backend=False)
 
     assert "HERMES_WEB_DIST" not in os.environ
-    assert "HERMES_SERVE_HEADLESS" not in os.environ
+    assert "QUBIT_SERVE_HEADLESS" not in os.environ
 
 
 def test_desktop_headless_serve_keeps_packaged_renderer(main_mod, monkeypatch):
