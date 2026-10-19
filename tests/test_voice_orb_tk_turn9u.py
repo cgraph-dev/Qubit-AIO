@@ -682,7 +682,7 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
     # One plain stroke per declared circle: two main orbits, two followers,
     # three shells, one core ring. No fringe strokes any more (owner
     # 2026-10-19: the circles looked like galaxies).
-    assert len(circles) == 2 + 2 + 3 + 1, len(circles)
+    assert len(circles) == 2 + 2 + 3 + 1 + 2, len(circles)
     assert stats["lines"] > 0
 
     # ...and it is the DECLARED radius that is drawn, about the mark's centre.
@@ -774,7 +774,7 @@ def test_nucleus_stack_is_the_declared_primitive_count(monkeypatch):
 def test_a_still_frame_is_the_nine_glints_plus_the_nucleus_stack():
     frozen, stats = render(0.0, reduced=True)
     assert stats["ovals"] == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
-    assert stats["lines"] == 2 * len(M.PARTICLES) + 3
+    assert stats["lines"] == 2 * len(M.PARTICLES) + 5
 
 
 def test_on_body_detail_never_paints_a_flat_background_disc():

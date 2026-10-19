@@ -400,9 +400,10 @@ def test_mark_ring_geometry_declares_every_circle_and_never_raises():
     from voicebridge.orb import qt_app as Q
 
     rings = Q.mark_ring_geometry(0.37)
-    assert len(rings) == len(F.ring_geometry(0.37)) == 8
+    assert len(rings) == len(F.ring_geometry(0.37)) == 10
     layers = [r["layer"] for r in rings]
     assert layers.count("main") == 2        # the two logo orbits
+    assert layers.count("accent") == 2      # the two added, more-visible circles
     assert layers.count("echo") == 2        # their followers
     assert layers.count("inner") == 1       # the core ring
     assert layers.count("satellite") == 3   # the shells
@@ -528,15 +529,18 @@ def test_ring_strokes_are_translucent_and_near_monochrome():
     strokes = [p for p in prims if p.kind == "path" and p.fill is None
                and p.pen is not None and max(p.w, p.h) >= 40.0
                and abs(p.width - Q.GLINT_PEN_W) > 0.05]
-    # The declared circles: two main, two echoes, three shells, one core.
+    # The declared circles: two main, two echoes, three shells, one core, two
+    # accent. Owner 2026-10-19 added the two accent circles at 60% MORE
+    # opacity than the main orbits, so the ceiling is the accent target.
     assert len(strokes) == len(F.ring_geometry(t))
     for p in strokes:
-        assert p.alpha <= Q.RING_DRAW_ALPHA["near_main"] + 0.02, p.alpha
+        assert p.alpha <= Q.RING_DRAW_ALPHA["accent"] + 0.02, p.alpha
         # Near-monochrome: the red/blue chromatic fringe is gone, so no ring
         # stroke wears either of its literal colours (the mark's own warm ring
         # tint is red-dominant by design, so test the fringe colours exactly).
         assert tuple(p.pen[:3]) not in ((255, 45, 85), (45, 130, 255)), p.pen
-    # Main orbits are the only comparatively visible circles.
+    # The accent circles are the most visible; the main orbits next.
+    assert Q.RING_DRAW_ALPHA["accent"] > Q.RING_DRAW_ALPHA["near_main"]
     assert Q.RING_DRAW_ALPHA["near_main"] > Q.RING_DRAW_ALPHA["echo"]
     assert Q.RING_DRAW_ALPHA["near_main"] > Q.RING_DRAW_ALPHA["satellite"]
 

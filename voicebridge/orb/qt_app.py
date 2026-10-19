@@ -352,6 +352,9 @@ RING_DRAW_ALPHA = {
     "echo": 0.07,
     "inner": INNER_RING_ALPHA,
     "satellite": 0.05,
+    # Owner 2026-10-19: the two added circles draw at 60% MORE opacity than
+    # the main orbits, so they are a little more visible than the rest.
+    "accent": 0.26 * 1.6,
 }
 RING_ALPHA_SCALE = {
     # The two main orbits straddle the nucleus: the far one is drawn dimmer
@@ -365,6 +368,7 @@ RING_ALPHA_SCALE = {
     # The core ring is the quietest circle in the mark.
     "inner": RING_DRAW_ALPHA["inner"] / _field.RING_ALPHA_INNER,
     "satellite": RING_DRAW_ALPHA["satellite"] / _field.RING_ALPHA_SAT,
+    "accent": RING_DRAW_ALPHA["accent"] / _field.RING_ALPHA_ACCENT,
 }
 #: Binary particles: tiny "1"/"0" data fragments. The field's ``size`` is a
 #: radius-like unit that already scales with the orb, so the glyph is sized
