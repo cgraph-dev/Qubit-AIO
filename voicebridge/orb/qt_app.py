@@ -123,37 +123,13 @@ GLINT_MIN_SIZE = 0.16
 GLINT_PEN_W = 0.8
 GLINT_CORE_SCALE = 0.58
 GLINT_CORE_MIN = 0.08
-# --- RGB spectral streaks (one tapered fill path per body) -----------------
-#: A streak's half-width is the body's field ``size`` times this, floored so a
-#: far/small body still antialiases to a visible hairline instead of snapping
-#: out of existence between frames.
-TRAIL_HALF_WIDTH = 0.30
-TRAIL_MIN_HALF_PX = 0.34
-#: Below this total arc length a streak is not drawn at all: a sub-pixel
-#: ribbon is one 8-bit step from appearing, which is exactly the hard pop the
-#: field's C1 envelopes exist to avoid.
-TRAIL_MIN_LEN_PX = 0.75
-#: Owner 2026-10-18: "the curved lines what are those? ... refine even more".
-#: The full field ``rgb_trail``/``dust_trail`` wake is a chain of samples
-#: following the body's ORBITAL velocity, so it curves along the orbit and,
-#: drawn at full length, read as an unexplained coloured curved line cutting
-#: across the mark. The RGB-trail IDEA stays — a short local motion blur behind
-#: a moving body — but only the brightest head samples are drawn, so a wake can
-#: never span the mark. This is a hard ceiling on the sample chain, applied to
-#: EVERY caller, so the field may keep publishing its full trail.
-TRAIL_DRAW_SAMPLES = 3
-#: Sparkles carry the short ``dust_trail``: four samples and a thinner ribbon,
-#: so 26 of them gain spectrum without turning the field into 26 comets.
-SPARKLE_TRAIL_HALF_WIDTH = 0.34
-SPARKLE_TRAIL_GAIN = 1.0
-#: A shell body is dimmer than a logo particle, so its streak starts dimmer too.
-SATELLITE_TRAIL_GAIN = 1.1
-#: The comet is the one body loud enough to earn the full streak.
-COMET_TRAIL_HALF_WIDTH = 0.36
-COMET_TRAIL_GAIN = 1.0
-#: Its field bead tail stays, tinted along the same hue ramp: bright
-#: motion-blur fragments sitting inside the streak read as meteor debris,
-#: where an untinted grey tail next to a rainbow wake read as two tails.
+# --- no wake ribbons -------------------------------------------------------
+#: Owner 2026-10-19: the RGB wake ribbons read as "L and V" check-mark sticks
+#: and are gone. The field still PUBLISHES ``rgb_trail``/``dust_trail`` (API
+#: compatibility for other consumers), but the Qt painter no longer strokes
+#: them: every body is a dot, a glint or a glyph, never a bent ribbon.
+#: The comet's field bead tail is unaffected (it is a chain of dots, not a
+#: filled path) and keeps its duotone tint.
 COMET_BEAD_SAT = 0.80
 #: Blink dots are pinpricks: no wake, no halo, just a dot in the dot's own
 #: spectral hue, floored so a far/small one still antialiases instead of
@@ -338,10 +314,11 @@ NUCLEUS_SMOKE = (
 NUCLEUS_SPEC_OFFSET_FRAC = 0.38
 NUCLEUS_SPEC_RADIUS_FRAC = 0.36
 NUCLEUS_SPEC_ALPHA = 0.90
-#: Ring chromatic fringe: a faint, softened split, never a second line, so the
-#: crisp main hairline stays the dominant stroke instead of a rainbow outline.
-FRINGE_WIDTH_MULT = 1.6
-FRINGE_ALPHA_MULT = 0.09
+#: Ring chromatic fringe: RETIRED on the rings (owner 2026-10-19: the circles
+#: "are too colored they look like galaxies"). The red/blue split on the two
+#: main orbits was the last multi-hue spray on the ring set; the nucleus keeps
+#: its own tiny chroma split, which is core light, not a circle. The old
+#: ``FRINGE_WIDTH_MULT`` / ``FRINGE_ALPHA_MULT`` knobs are deleted with it.
 #: Master spin: a slow 360 deg rotation of the WHOLE mark about its centre,
 #: layered on top of every other motion (the Tk sibling's
 #: ``mark.MASTER_SPIN_PERIOD_S``). One full turn per period, so nothing in the
@@ -353,8 +330,9 @@ MASTER_SPIN_PERIOD_S = 24.0
 NUCLEUS_RADIUS_MULT = 1.25
 #: Inner core ring: a third, THIN orbit around the nucleus — depth-neutral
 #: (drawn once, before the far pass), dim, and never chromatically fringed so
-#: it reads as a core path instead of a third logo orbit.
-INNER_RING_ALPHA = 0.16
+#: it reads as a core path instead of a third logo orbit. Cut with the rest of
+#: the ring set (owner 2026-10-19: the circles are too solid).
+INNER_RING_ALPHA = 0.08
 # --- one declared geometry, four rings' worth of art direction --------------
 #: ``mark_field.ring_geometry`` now declares EVERY circle of the mark once
 #: (two main orbits, their echo followers, the inner core ring and the three
@@ -362,29 +340,40 @@ INNER_RING_ALPHA = 0.16
 #: consumes that list and applies nothing but its own look on top, so the
 #: circles cannot drift from the declaration. These scales only translate a
 #: declared alpha into the mark's established brightness ladder.
+#: Owner 2026-10-19: the circles must be "more transparent" and stop reading as
+#: a galaxy. These are ABSOLUTE painter targets, not multipliers of the field's
+#: declared alpha: the field keeps its own breathing alpha, and each layer's
+#: scale converts that declared value into one of these quiet targets. Defining
+#: them as absolute stops a field-side alpha change from silently undoing the
+#: painter's translucency (the old ``0.95 / RING_ALPHA_MAIN`` form did exactly
+#: that).
+RING_DRAW_ALPHA = {
+    "far_main": 0.16,
+    "near_main": 0.26,
+    "echo": 0.07,
+    "inner": INNER_RING_ALPHA,
+    "satellite": 0.05,
+}
 RING_ALPHA_SCALE = {
     # The two main orbits straddle the nucleus: the far one is drawn dimmer
-    # behind it and the near one brighter in front, which is how the two
-    # complete ellipses read as one tilted plane.
-    "far_main": 0.60 / _field.RING_ALPHA_MAIN,
-    "near_main": 0.95 / _field.RING_ALPHA_MAIN,
-    # An echo follower breathes on top of the shared value, and the painter's
-    # depth-of-field softening pulls it down again. The scale puts the whole
-    # breathing band back above the alpha at which a follower still reads as a
-    # follower rather than dissolving, and far below the main orbits' ladder.
-    "echo": 1.35,
-    # The core ring is the quietest circle in the mark, and quieter than the
-    # echo followers: it is a core path, not another logo orbit.
-    "inner": INNER_RING_ALPHA / _field.RING_ALPHA_INNER,
-    "satellite": 1.0,
+    # behind it and the near one slightly brighter in front, which is how the
+    # two complete ellipses still read as one tilted plane — quietly.
+    "far_main": RING_DRAW_ALPHA["far_main"] / _field.RING_ALPHA_MAIN,
+    "near_main": RING_DRAW_ALPHA["near_main"] / _field.RING_ALPHA_MAIN,
+    # Echo followers are faint ghosts of their orbit: barely-there guides, not
+    # a second logo orbit.
+    "echo": RING_DRAW_ALPHA["echo"] / _field.RING_ALPHA_ECHO,
+    # The core ring is the quietest circle in the mark.
+    "inner": RING_DRAW_ALPHA["inner"] / _field.RING_ALPHA_INNER,
+    "satellite": RING_DRAW_ALPHA["satellite"] / _field.RING_ALPHA_SAT,
 }
 #: Binary particles: tiny "1"/"0" data fragments. The field's ``size`` is a
 #: radius-like unit that already scales with the orb, so the glyph is sized
 #: from it and floored: at orb size these are PINS, not a wall of text. (The Tk
 #: lane's much larger multiplier turned the same field into legible words.)
 BINARY_FONT_MIN_PX = 5
-BINARY_FONT_PX_PER_UNIT = 12.0
-BINARY_FONT_PX_OFFSET = 2.0
+BINARY_FONT_PX_PER_UNIT = 11.0
+BINARY_FONT_PX_OFFSET = 1.0
 # --- volume particles: the math-glyph TEXT layer's replacement -------------
 #: Owner 2026-10-19: the ``√``/``Δ``/``∇`` math glyphs read as "check marks / v
 #: lines" and are gone. The field now publishes ``volume_particles``: real 3D
@@ -407,12 +396,12 @@ INFALL_BUCKETS = 3
 #: Photon ring: the lensed arcs hug the core. Only the BRIGHT samples are
 #: drawn (its lobe profile is the point), capped so the arcs stay cheap.
 PHOTON_DRAW_LIMIT = 16
-PHOTON_MIN_ALPHA = 0.10
+PHOTON_MIN_ALPHA = 0.06
 #: The photon ring is a lensed overlay over the core: drawn there, its samples
 #: are enlarged and brightened in the painter, because the field's own sizes
 #: are calibrated for the field scale and disappear into the aura at orb size.
-PHOTON_SIZE_MULT = 2.4
-PHOTON_ALPHA_MULT = 1.5
+PHOTON_SIZE_MULT = 2.1
+PHOTON_ALPHA_MULT = 0.80
 #: Screen-break bodies are pushed this much further out in the painter, on top
 #: of the field's own >1 orbit fraction, so they genuinely clear the widget
 #: edge (owner: "do more of that") instead of being drawn back in by the
@@ -497,7 +486,13 @@ NUCLEUS_SWIRL_BEAT_GAIN = 0.55
 CORE_SHELL_MIN_PX = 0.4
 CORE_SHELL_SAT = 0.88
 CORE_SHELL_CORE_LIFT = 0.55
-CORE_SHELL_SIZE_MULT = 1.3
+#: The shells are INTERIOR detail: each one is capped at this fraction of the
+#: nucleus radius. The field's raw size is a few percent of R, but R is the
+#: whole mark, so at orb scale an uncapped shell rendered BIGGER than the core
+#: it lives in — a disc covering the nucleus (and, with the old depth offset,
+#: the stray "galaxy" blobs beside it).
+CORE_SHELL_SIZE_MULT = 0.42
+CORE_SHELL_MAX_NUC_FRAC = 0.34
 CORE_SHELL_RIM_W = 0.9
 CORE_SHELL_DRAW_LIMIT = 4
 #: Below this alpha a primitive is imperceptible: skip it rather than let the
@@ -1257,9 +1252,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     The geometry, motion and depth of every layer come from
     :mod:`voicebridge.orb.mark_field` — the ONE deterministic description
     shared with the Tk renderer. This function only translates field output
-    to QPainter: hairline fringed orbits with a thinner lagged echo ring
+    to QPainter: quiet translucent orbits with a thinner lagged echo ring
     following each, a z-split particle field (far elements behind the
-    nucleus, near elements in front), tapered duotone trails, dust, glints,
+    nucleus, near elements in front), dust, glints,
     blink dots that materialise out of nowhere, one comet, a spark shower
     thrown out of the nucleus on the beat, the beat shockwave and the beating
     nucleus with its Fresnel rim.
@@ -1269,7 +1264,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     reduced motion paints a completely static, sparkle-free frame.
     """
     from PySide6.QtCore import QPointF, QRectF
-    from PySide6.QtGui import (QBrush, QColor, QFont, QLinearGradient,
+    from PySide6.QtGui import (QBrush, QColor, QFont,
                                QPainterPath, QPen, QRadialGradient)
 
     # A cached QFont per (family, pixel size). The glyph layers draw ~128
@@ -1438,13 +1433,12 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # ``ring_geometry`` lists all eight circles back to front, so painting them
     # in that order IS the depth order. Radii, layer, order and width come from
     # the declaration; the painter adds only the mark's art direction (the
-    # chromatic fringe on the two MAIN orbits, the brightness ladder, and the
+    # brightness ladder, and the
     # stroke itself) — never its own geometry. Built once the clamped clock
     # exists, with the rest of the frame setup.
 
-    def _ring_stroke(points: Any, alpha: float, width: float,
-                     layer: str) -> None:
-        """Stroke one declared circle: fringe on the main orbits, nothing else."""
+    def _ring_stroke(points: Any, alpha: float, width: float) -> None:
+        """Stroke one declared circle as a quiet, translucent hairline."""
         a = _shade(alpha)
         if a <= ALPHA_EPS or len(points) < 3:
             return
@@ -1453,24 +1447,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         for px, py in points[1:]:
             path.lineTo(px, py)
         p.setBrush(Qt.NoBrush)
-        if layer == "main":
-            # Chromatic fringe: the same hairline offset in x, red left / blue
-            # right, so overlap reads near-white and the edges split (the CSS
-            # mark's technique, drawn with real alpha here).
-            # The CSS mark fringes with a BLURRED drop shadow. A crisp offset
-            # stroke reads as a second line (a rainbow outline); a wide, very
-            # translucent one reads as the soft chromatic halo the logo has.
-            # EXCLUSIVE to the two main orbits: it is the logo's signature, and
-            # an echo / core ring / satellite shell wearing it reads as four
-            # more logo orbits instead of the quiet circles they are.
-            for dx, col in ((fringe, QColor(255, 45, 85)),
-                            (-fringe, QColor(45, 130, 255))):
-                p.setPen(QPen(QColor(col.red(), col.green(), col.blue(),
-                                     _clamp8(255.0 * a * FRINGE_ALPHA_MULT)),
-                              width * FRINGE_WIDTH_MULT))
-                p.translate(dx, 0.0)
-                p.drawPath(path)
-                p.translate(-dx, 0.0)
         pen = QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
                           _clamp8(255.0 * min(1.0, a))),
                    max(0.6, width))
@@ -1589,8 +1565,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             _ring_stroke(warped,
                          _field.ring_alpha(tt, spec) * scale * bright * hot,
                          ring_w * _num(spec.get("width"), 1.0) * (
-                             1.15 if layer == "main" else 1.0),
-                         layer)
+                             1.15 if layer == "main" else 1.0))
 
     def _dot(x: float, y: float, rad: float, alpha: float,
              rgb: Tuple[int, int, int], gain: Any = 1.0) -> None:
@@ -1617,89 +1592,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                              _clamp8(255.0 * min(1.0, a))), width))
         p.drawPath(path)
         p.setPen(Qt.NoPen)
-
-    def _streak(samples: Any, depth: Any = 0.5, gain: float = 1.0,
-                half: float = TRAIL_HALF_WIDTH, zseed: Any = None) -> None:
-        """One body's spectral wake, as a SINGLE tapered fill path.
-
-        Owner 2026-10-18: a star should leave an RGB TRAIL, not sit inside an
-        outer glow. So the wake is built as a tapered ribbon — the field's
-        ``rgb_trail`` / ``dust_trail`` samples walked in order, each offset
-        perpendicular to the local direction by its OWN half width — and filled
-        with a linear gradient whose stops are ``hue_to_rgb`` per sample.
-
-        Hue is never interpolated: it wraps like a colour wheel, so each stop
-        is converted independently and only the resulting RGB blends between
-        neighbours. A streak whose hue runs 0.98 -> 0.02 therefore takes the
-        short way round the wheel instead of sweeping the entire spectrum the
-        wrong way. One path per body keeps the primitive budget flat.
-
-        The ribbon is built in SCREEN space, after the X+Y tumble projection,
-        so the wake bends with the turn instead of cutting a straight chord
-        across the mark: each sample carries its own depth, so its position,
-        its half width and its alpha all track how far that part of the wake
-        has swung toward or away from the viewer.
-        """
-        smps = [s for s in (samples or []) if isinstance(s, dict)]
-        # A wake is a SHORT local motion blur, never a curved line crossing the
-        # mark: only the head samples of the field's trail are drawn (owner
-        # 2026-10-18). The head rides the body, so the stub stays glued to it.
-        smps = smps[:TRAIL_DRAW_SAMPLES]
-        if len(smps) < 2:
-            return
-        placed = []
-        for s in smps:
-            d = _num(s.get("depth"), depth)
-            X, Y, g = _place(s.get("x"), s.get("y"), d, zseed=zseed,
-                             zflat=True, z=s.get("z"), z2=s.get("z2"))
-            placed.append((X, Y, d, g))
-        pts = [(px, py) for px, py, _d, _g in placed]
-        run = [0.0]
-        for i in range(1, len(pts)):
-            run.append(run[-1] + math.hypot(pts[i][0] - pts[i - 1][0],
-                                            pts[i][1] - pts[i - 1][1]))
-        total = run[-1]
-        alphas = [_shade(_num(s.get("alpha"), 0.0) * gain, d, g)
-                  for s, (_px, _py, d, g) in zip(smps, placed)]
-        # A sub-pixel ribbon is one 8-bit step away from not existing, which is
-        # the hard pop the field's C1 envelopes exist to avoid; and a fully
-        # transparent path is a wasted primitive.
-        if total < TRAIL_MIN_LEN_PX or max(alphas) <= ALPHA_EPS:
-            return
-        left: List[Tuple[float, float]] = []
-        right: List[Tuple[float, float]] = []
-        last = len(pts) - 1
-        for i in range(len(pts)):
-            j0 = i - 1 if i > 0 else 0
-            j1 = i + 1 if i < last else last
-            dx = pts[j1][0] - pts[j0][0]
-            dy = pts[j1][1] - pts[j0][1]
-            ln = math.hypot(dx, dy)
-            if ln <= 1e-9:
-                dx, dy, ln = 1.0, 0.0, 1.0
-            w = max(TRAIL_MIN_HALF_PX,
-                    _num(smps[i].get("size"), 0.0) * half * placed[i][3])
-            nx, ny = -dy / ln, dx / ln
-            left.append((pts[i][0] + nx * w, pts[i][1] + ny * w))
-            right.append((pts[i][0] - nx * w, pts[i][1] - ny * w))
-        path = QPainterPath()
-        path.moveTo(left[0][0], left[0][1])
-        for q in left[1:]:
-            path.lineTo(q[0], q[1])
-        for q in reversed(right):
-            path.lineTo(q[0], q[1])
-        path.closeSubpath()
-        grad = QLinearGradient(QPointF(*pts[0]), QPointF(*pts[-1]))
-        for i, smp in enumerate(smps):
-            rgb = _anchor(_spec_rgb(smp.get("hue"), smp.get("sat", 1.0),
-                                    smp.get("val", 1.0)))
-            grad.setColorAt(min(1.0, run[i] / total),
-                            QColor(rgb[0], rgb[1], rgb[2],
-                                   _clamp8(255.0 * min(1.0, alphas[i]))))
-        p.setPen(Qt.NoPen)
-        p.setBrush(QBrush(grad))
-        p.drawPath(path)
-        p.setBrush(Qt.NoBrush)
 
     def _glint(fx: float, fy: float, size: float, alpha: float,
                rgb: Tuple[int, int, int],
@@ -1742,15 +1634,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.setPen(pen)
         p.setBrush(Qt.NoBrush)
         p.drawLine(QPointF(gx - ax, gy - ay), QPointF(gx + ax, gy + ay))
-        p.drawLine(QPointF(gx - ay, gy + ax), QPointF(gx + ay, gy + ax))
+        # The SECOND arm must be perpendicular: ``(gx - ay, gy + ax)`` to
+        # ``(gx + ay, gy - ax)``. It used to end at ``gy + ax`` on both sides,
+        # which drew a HORIZONTAL stroke joined to the first arm's end — every
+        # glint rendered as an "L" / "V" hook instead of a four-point star.
+        # That was the owner's "you didnt replace the L and V's!!!!!".
+        p.drawLine(QPointF(gx - ay, gy + ax), QPointF(gx + ay, gy - ax))
         _dot(gx, gy, max(GLINT_CORE_MIN, sz * _field.GLINT_CORE_FRAC
                          * GLINT_CORE_SCALE), a, rgb, g)
 
-    def _particle(part: Dict[str, Any], draw_trails: bool) -> None:
+    def _particle(part: Dict[str, Any]) -> None:
+        # Owner 2026-10-19: no wake ribbon. The body is a glint only — the
+        # field's ``rgb_trail`` stays published for API compatibility but is
+        # never painted (the 3-point ribbon read as an L/V check-mark stick).
         depth = _num(part.get("depth"), 0.5)
         pseed = _num(part.get("index"), None)
-        if draw_trails:
-            _streak(_field.rgb_trail(tt, Rf, part), depth, zseed=pseed)
         _glint(_num(part.get("x"), 0.0), _num(part.get("y"), 0.0),
                _num(part.get("size"), 0.0),
                _shade(_num(part.get("alpha"), 0.0), depth),
@@ -1759,27 +1657,16 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                z=part.get("z"), z2=part.get("z2"))
 
 
-    def _satellite(shell: Dict[str, Any], draw_trail: bool) -> None:
+    def _satellite(shell: Dict[str, Any]) -> None:
         """One satellite body riding its declared shell circle.
 
         The circle itself is stroked by the declared-geometry ring pass; this
-        is only the body travelling it — a glint sized by depth, leaving the
-        same spectral wake every other travelling body leaves. The field's
-        ``vx``/``vy`` are what put the wake on the body's real path, so the
-        streak stays on the orbit instead of cutting a chord across it.
+        is only the body travelling it — a glint sized by depth. No wake: the
+        painter stopped drawing ``dust_trail`` ribbons (owner 2026-10-19).
         """
         body = shell.get("body") or {}
         depth = _num(body.get("depth"), 0.5)
         bseed = _num(body.get("index"), None)
-        if draw_trail:
-            # The SHORT streak here, not the full ``rgb_trail``: a shell body
-            # turns its shell once in 5.5-13.5 s, and the long streak's step is
-            # sized for the comet, so the full one drew a ~70px near-straight
-            # scratch right across the mark. The field's own ``vx``/``vy`` put
-            # even the short one on the body's real path, tangent to the shell.
-            _streak(_field.dust_trail(tt, Rf, body), depth,
-                    half=SPARKLE_TRAIL_HALF_WIDTH, gain=SATELLITE_TRAIL_GAIN,
-                    zseed=bseed)
         _glint(_num(body.get("x"), 0.0), _num(body.get("y"), 0.0),
                max(0.3, _num(body.get("size"), 0.0)),
                _shade(_num(body.get("alpha"), 0.0), depth),
@@ -1812,28 +1699,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              _shade(_num(mote.get("alpha"), 0.0) * bright, d, g),
              _lift(mote.get("lift")), g)
 
-    def _sparkle(glint: Dict[str, Any], draw_trail: bool) -> None:
-        depth = _num(glint.get("depth"), 0.5)
-        if draw_trail:
-            _streak(_field.dust_trail(tt, Rf, glint), depth,
-                    gain=SPARKLE_TRAIL_GAIN,
-                    half=SPARKLE_TRAIL_HALF_WIDTH,
-                    zseed=_num(glint.get("index"), None))
+    def _sparkle(glint: Dict[str, Any]) -> None:
         # The sparkle's DOT is not drawn here: the many field glints are
         # emitted as a few batched fill paths (_layer_batch) so the primitive
-        # ceiling holds while the cloud stays as dense. Its wake is personal
-        # and stays per-body.
+        # ceiling holds while the cloud stays as dense. No wake ribbon is
+        # painted any more (owner 2026-10-19).
+        return
 
-    def _comet(traveller: Dict[str, Any], draw_trail: bool) -> None:
+    def _comet(traveller: Dict[str, Any]) -> None:
         if _num(traveller.get("alpha"), 0.0) <= 0.0:
             return  # outside its sweep the field reports alpha 0
         depth = _num(traveller.get("depth"), 0.5)
         tseed = _num(traveller.get("index"), 0.0)
-        if draw_trail:
-            _streak(_field.rgb_trail(tt, Rf, traveller), depth,
-                    gain=COMET_TRAIL_GAIN, half=COMET_TRAIL_HALF_WIDTH,
-                    zseed=tseed)
-        # The field's own bead tail stays, tinted by the streak's duotone PAIR:
+        # No wake ribbon (owner 2026-10-19); the field's own DOT tail stays.
+        # The tail is tinted by the body's duotone PAIR:
         # bright motion-blur fragments riding inside the wake. The head hue
         # and its half-turn partner are the streak's two colours (the old
         # HUE_STEP ramp walked the whole wheel and read as a third, untinted
@@ -1962,8 +1841,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.drawEllipse(cx - r, cy - r, r * 2.0, r * 2.0)
         # Fresnel rim: a thin BRIGHT limb stroke at the body edge — a sphere
         # is brightest at grazing incidence — plus a faint chromatic split
-        # (the same red/blue hairline pair as the main orbits' fringe, at the
-        # same pixel offset, far dimmer). Static art direction, so stills stay
+        # (the red/blue hairline pair that used to sit on the main orbits, at
+        # the same pixel offset). Static art direction, so stills stay
         # self-consistent; physical light cues only, no scanlines, no flicker.
         _outline(r, (255, 255, 255), NUCLEUS_RIM_ALPHA, NUCLEUS_RIM_WIDTH)
         for dx, col in ((fringe, (255, 45, 85)), (-fringe, (45, 130, 255))):
@@ -2181,7 +2060,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         rgb = _anchor(_spec_rgb(hue, BLINK_DOT_SAT))
         _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
 
-    def _core_body(shell: Dict[str, Any]) -> None:
+    def _core_body(shell: Dict[str, Any], nuc_radius: float) -> None:
         """One nested interior body of the nucleus, as a tilted shaded disc.
 
         Sized and brightened by its rotated depth (a shell swinging toward the
@@ -2194,11 +2073,17 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         ellipse.
         """
         d = _num(shell.get("depth"), 0.5)
-        gx, gy, g = _place(shell.get("x"), shell.get("y"), d,
-                           zseed=_num(shell.get("index"), None),
-                           zflat=True, z=shell.get("z"), z2=shell.get("z2"))
+        # NO ``z``/``z2`` volume offset and NO ``zseed`` depth-hash here, and
+        # the PROJECTION uses a neutral 0.5 depth. The core shells are the
+        # nucleus's INTERIOR: their field position is a few percent of R, so the
+        # tumble's depth term (up to ~1.25·R) flung them clean out of the body
+        # as stray "galaxy" discs beside it. Their own depth still drives the
+        # shading/size below, so they keep their layered look.
+        gx, gy, g = _place(shell.get("x"), shell.get("y"), 0.5, zflat=True)
         rr = max(CORE_SHELL_MIN_PX, _num(shell.get("size"), 0.0) * g
                  * CORE_SHELL_SIZE_MULT)
+        # Interior only: never larger than a third of the core it sits in.
+        rr = min(rr, CORE_SHELL_MAX_NUC_FRAC * max(0.0, nuc_radius))
         a = _shade(_num(shell.get("alpha"), 0.0), d, g) * bright
         if a <= ALPHA_EPS or rr <= 0.0:
             return
@@ -2442,7 +2327,6 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     flares = ([] if reduced else strided(mark_flare_dots(t, Rf), FLARE_DRAW_LIMIT))
     filament = ([] if reduced
                 else strided(mark_filament(t, Rf), FILAMENT_DRAW_COUNT))
-    draw_trails = not reduced
 
     # ---- the two turns ---------------------------------------------------
     # 1. The MASTER spin is a painter transform about (cx, cy): a slow 360 deg
@@ -2511,15 +2395,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             if _is_near(smp, near):
                 _filament(smp)
         for shell in shells_:
-            _satellite(shell, draw_trails)
+            _satellite(shell)
         for mote in motes:
             _dust(mote)
         for part in bodies:
-            _particle(part, draw_trails)
+            _particle(part)
         for spark in sparks_:
             _spark(spark)
         for glint in glints_:
-            _sparkle(glint, draw_trails)
+            _sparkle(glint)
         for bit in bits:
             _binary(bit)
         for brk in breaks_:
@@ -2527,7 +2411,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         for bl in blinks_:
             _blink(bl)
         if traveller_ is not None:
-            _comet(traveller_, draw_trails)
+            _comet(traveller_)
 
     far_dust = [m for m in dust if m["depth"] < 0.5]
     near_dust = [m for m in dust if m["depth"] >= 0.5]
@@ -2578,7 +2462,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # Interior shells paint ON the body, far to near, so the core's inside is
     # layered depth that turns and pulses with the rest of the mark.
     for _shell in core_shells:
-        _core_body(_shell)
+        _core_body(_shell, nuc_r)
     # The photon ring is the LENSED image hugging the core: it is painted OVER
     # the nucleus (not z-split), so its bright arcs always read on top of the
     # silhouette instead of being swallowed by the body on the far half. Drawn

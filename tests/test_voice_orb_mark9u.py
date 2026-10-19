@@ -719,6 +719,66 @@ def test_satellite_shells_are_drawn_and_vanish_when_frozen():
     assert len(live.ovals) > len(frozen.ovals)
 
 
+def test_binary_fragments_are_small_and_scatter_across_the_volume():
+    # Owner 2026-10-19: "add more ... random 1 0 that spawn everywere small
+    # ones". The fragments are no longer parked on the outer orbit: their
+    # radius band starts near the core and reaches past the main orbit, and
+    # there are more of them, each smaller.
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 1.23
+    bits = F.binary_state(t, R)
+    assert len(bits) == F.BINARY_COUNT
+    assert F.BINARY_COUNT >= 120, "the fragment field stays dense"
+    # The old band was 0.80..1.05 R (one ring); the new one is wide.
+    assert F.BINARY_R_FRAC_MIN <= 0.20
+    assert F.BINARY_R_FRAC_MIN + F.BINARY_R_FRAC_SPAN >= 1.0
+    dx, dy = F.camera_offset(t, R)
+    radii = [math.hypot(b["x"] - dx, b["y"] - dy) / R for b in bits]
+    # Fragments actually populate the inner, middle AND outer thirds.
+    assert any(r < 0.40 for r in radii), min(radii)
+    assert any(0.55 < r < 0.95 for r in radii)
+    # Past the main orbit's declared radius (``RX_FRAC``): the old band sat
+    # right on it; the new field spills well outside it too.
+    assert any(r > 0.85 for r in radii), max(radii)
+    assert max(radii) > F.RX_FRAC
+    # Small: a pinprick, not legible text. (The painter floors the FONT, so
+    # the field size is what keeps them from reading as words.)
+    assert F.BINARY_SIZE_BASE <= 0.07
+    assert F.BINARY_SIZE_BASE + F.BINARY_SIZE_SPAN <= 0.13
+    for b in bits:
+        assert b["char"] in ("0", "1")
+        assert 0.0 <= b["z"] <= 1.0 and 0.0 <= b["z2"] <= 1.0
+
+
+def test_particle_field_is_denser_and_smaller_than_before():
+    # Owner 2026-10-19: "add more particles ... small ones it looks like shit".
+    # More bodies everywhere, each one smaller, so the field reads as pinprick
+    # dust rather than a handful of beads.
+    from voicebridge.orb import mark_field as F
+    assert F.DUST_COUNT >= 80
+    assert F.SPARKLE_COUNT >= 80
+    assert F.BLINK_COUNT >= 40
+    assert F.DUST_SIZE_BASE <= 0.08
+    assert F.SPARKLE_SIZE_BASE <= 0.07
+    assert F.BLINK_SIZE_BASE <= 0.07
+    # Spread: blink dots now reach well inside the orbit band as well as out.
+    assert F.BLINK_R_FRAC_MIN <= 0.25
+    assert F.BLINK_R_FRAC_MIN + F.BLINK_R_FRAC_SPAN >= 1.0
+
+
+def test_ring_set_is_translucent_and_near_monochrome():
+    # Owner 2026-10-19: the circles "need to be more transparent and they are
+    # too colored they look like galaxies". Every declared ring alpha is cut,
+    # and the echo/satellite layers sit far below the main orbits.
+    from voicebridge.orb import mark_field as F
+    assert F.RING_ALPHA_MAIN <= 0.20
+    assert F.RING_ALPHA_ECHO <= 0.14
+    assert F.RING_ALPHA_INNER <= 0.14
+    assert F.RING_ALPHA_SAT <= 0.08
+    assert F.RING_ALPHA_ECHO < F.RING_ALPHA_MAIN
+    assert F.RING_ALPHA_SAT < F.RING_ALPHA_ECHO
+
+
 def test_binary_state_determinism_and_count():
     from voicebridge.orb import mark_field as F
     a = F.binary_state(1.23, 32.0)

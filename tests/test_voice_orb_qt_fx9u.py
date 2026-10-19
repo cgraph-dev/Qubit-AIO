@@ -771,10 +771,15 @@ def _thin_orbit_outlines(prims, c, tol=0.75):
     centred on the axis (the far arc shrinks while the near arc grows), and
     the recorded box centre drifts a pixel or two with it.
     """
+    # Owner 2026-10-19: the whole ring set was cut to faint, translucent
+    # hairlines (followers now sit near 7% alpha, the main orbits at 16-26%),
+    # so the old 0.2..0.45 follower band no longer separates them. Callers
+    # identify a follower by its DECLARED box instead of by its alpha; this
+    # helper only filters "a thin centred elliptical outline".
     return [p for p in prims
             if p.kind == "path" and p.fill is None and p.pen is not None
             and math.hypot(p.cx - c, p.cy - c) <= tol
-            and p.width <= 1.2 and 0.2 <= p.alpha <= 0.45
+            and p.width <= 1.2 and 0.005 <= p.alpha <= 0.60
             and abs(p.w - p.h) > 4.0]
 
 
@@ -817,19 +822,24 @@ def test_echo_rings_are_two_thin_lagged_followers():
         stale.append(_declared_ring_box(t, R, ring, fresh[str(ring["orbit"])]))
 
     thin = _thin_orbit_outlines(prims, c, tol=0.05 * R)
-    assert len(thin) == 2, thin                 # exactly one per main orbit
-    for p in thin:
-        assert any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
-                   for w, h in want), (p.w, p.h, want)
+
+    def _matches(p, boxes):
+        return any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
+                   for w, h in boxes)
+
+    # Exactly one follower outline per main orbit, matched by the DECLARED
+    # (projected) box — the ring alphas were cut on 2026-10-19, so alpha no
+    # longer separates a follower from the main orbits.
+    followers = [p for p in thin if _matches(p, want)]
+    assert len(followers) == 2, followers
 
     # The lag matters: the follower sits at the orbit tilt ECHO_LAG_S ago, not
     # today's, and at this phase the two disagree by a visible margin. If the
     # painter were using today's tilt, these strokes would land on `stale`.
     assert any(abs(a[0] - b[0]) > 2.0 or abs(a[1] - b[1]) > 2.0
                for a, b in zip(sorted(want), sorted(stale))), (want, stale)
-    for p in thin:
-        assert not any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
-                       for w, h in stale), (p.w, p.h, stale)
+    for p in followers:
+        assert not _matches(p, stale), (p.w, p.h, stale)
     # The lag is real at this clock: the follower's tilt genuinely differs from
     # its own orbit's base tilt. (The old trailing check recovered an in-plane
     # tilt from the 3-D-projected bounding box, which is not a valid recovery
@@ -899,6 +909,73 @@ def test_nucleus_sparks_are_a_deterministic_outward_shower():
     assert peak > R * F.RX_FRAC * 1.2, peak
 
 
+def test_glint_arms_are_a_cross_not_an_L_or_V_hook():
+    # Owner 2026-10-19: "you didnt replace the L and V's!!!!!" — the glint's
+    # second arm was drawn from ``(gx-ay, gy+ax)`` to ``(gx+ay, gy+ax)``, i.e.
+    # a HORIZONTAL stroke sharing an endpoint with the first arm, so every star
+    # rendered as an L/V hook. Both arms must now cross at the core, span the
+    # same length and be perpendicular.
+    import os as _os
+
+    from PySide6.QtGui import QColor, QImage, QPainter
+
+    from voicebridge.orb import ember as E
+    from voicebridge.orb import qt_app as Q
+
+    size, t = 192, 0.4
+    _qt_app()
+    fam = E.family_from_core(E.state_core("idle"))
+    img = QImage(size, size, QImage.Format_ARGB32_Premultiplied)
+    img.fill(QColor(*BG))
+    p = QPainter(img)
+    p.setRenderHint(QPainter.Antialiasing, True)
+
+    class _Lines(_Recorder):
+        def __init__(self, painter):
+            super().__init__(painter)
+            object.__setattr__(self, "segs", [])
+
+        def drawLine(self, *args):
+            try:
+                a, b = args
+                object.__setattr__(self, "segs", self.segs + [
+                    ((float(a.x()), float(a.y())),
+                     (float(b.x()), float(b.y())))])
+            except Exception:
+                pass
+            super().drawLine(*args)
+
+    rec = _Lines(p)
+    Q._paint_mark(rec, size / 2.0, size / 2.0, size / 2.0 - 6.0, t, "idle",
+                  1.0, fam)
+    p.end()
+
+    # Pair up the two arms of each glint by their shared midpoint.
+    groups = {}
+    for (x0, y0), (x1, y1) in rec.segs:
+        mid = (round((x0 + x1) / 2.0, 3), round((y0 + y1) / 2.0, 3))
+        groups.setdefault(mid, []).append(((x0, y0), (x1, y1)))
+
+    checked = 0
+    for mid, segs in groups.items():
+        if len(segs) != 2:
+            continue
+        (a0, a1), (b0, b1) = segs
+        da = (a1[0] - a0[0], a1[1] - a0[1])
+        db = (b1[0] - b0[0], b1[1] - b0[1])
+        la = math.hypot(*da)
+        lb = math.hypot(*db)
+        if la < 0.5 or lb < 0.5:
+            continue
+        # Equal-length arms...
+        assert la == pytest.approx(lb, rel=0.02), (mid, la, lb)
+        # ...that are perpendicular (dot product ~ 0), i.e. a CROSS.
+        dot = (da[0] * db[0] + da[1] * db[1]) / (la * lb)
+        assert abs(dot) < 0.05, (mid, dot, da, db)
+        checked += 1
+    assert checked >= 10, checked
+
+
 def test_nucleus_sparks_paint_glints():
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
@@ -961,8 +1038,20 @@ def test_reduced_motion_has_no_echo_or_sparks(monkeypatch):
     assert "sparkles" not in calls and "comet" not in calls
     assert "trails" not in calls
     assert _dump(a) == _dump(b)
-    # No thin follower outline can survive into the still frame.
-    assert _thin_orbit_outlines(a, 96.0) == []
+    # No FOLLOWER outline can survive into the still frame. Match the declared
+    # follower boxes (the still-frame ring set legitimately keeps its main
+    # orbits, which are also thin centred outlines).
+    from voicebridge.orb import mark_field as F
+    frozen = 0.0
+    lagged = {str(e["orbit"]): e["tilt"] for e in F.echo_rings(frozen)}
+    R_still = 90.0
+    follower_boxes = [
+        _declared_ring_box(frozen, R_still, ring, lagged[str(ring["orbit"])])
+        for ring in F.ring_geometry(frozen) if ring["layer"] == "echo"]
+    thin = _thin_orbit_outlines(a, 96.0)
+    for p in thin:
+        assert not any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
+                       for w, h in follower_boxes), (p.w, p.h, follower_boxes)
 
 
 def test_comet_and_glints_ease_instead_of_stepping():
@@ -1294,15 +1383,15 @@ def _counter_diff(a, b):
     return list(diff.elements())
 
 
-def test_streak_wakes_are_truncated_to_short_local_stubs(monkeypatch):
-    # Owner 2026-10-18: "the curved lines what are those? ... refine even
-    # more". A wake follows the body's ORBITAL velocity, so at full length it
-    # curves along the orbit and reads as an unexplained coloured line cutting
-    # across the mark. The renderer keeps only the head samples, so even a
-    # field trail with MANY samples spread across a wide span is drawn short.
+def test_wake_ribbons_are_gone_and_the_field_trails_are_not_painted(monkeypatch):
+    # Owner 2026-10-19: the 3-point "RGB trail" ribbons rendered as thick bent
+    # L/V check-mark sticks ("you didnt replace the L and V's!!!!!"), so the Qt
+    # painter no longer draws them at all. The field still PUBLISHES
+    # ``rgb_trail``/``dust_trail`` for other consumers; the frame must be
+    # byte-identical whether they return a long ribbon or nothing.
     from voicebridge.orb import qt_app as Q
 
-    size, R = 192, 90.0
+    size = 192
     t = 1.234
 
     def _wide(tt, rr, body):
@@ -1319,13 +1408,10 @@ def test_streak_wakes_are_truncated_to_short_local_stubs(monkeypatch):
         m.setattr(Q._field, "dust_trail", lambda *a, **k: [])
         bare = _record(t=t, size=size)
 
-    wakes = [p for p in _counter_diff(wide, bare)
-             if p.kind == "path" and p.fill is not None]
-    assert wakes, "no wakes drawn"
-    # Only 3 samples are kept (2 steps of 10 field units), so every drawn wake
-    # is far shorter than the orb: a local stub, never a crossing line.
-    worst = max(math.hypot(p.w, p.h) for p in wakes)
-    assert worst <= 0.5 * R, worst
+    assert _dump(wide) == _dump(bare), "a wake ribbon was still painted"
+    # And the painter has no streak helper left to regress through.
+    assert not hasattr(Q, "_streak")
+    assert not hasattr(Q, "TRAIL_DRAW_SAMPLES")
 
 
 def test_volume_particles_paint_as_dots_split_by_depth(monkeypatch):
