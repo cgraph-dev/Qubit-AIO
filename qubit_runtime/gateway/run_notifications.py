@@ -1356,17 +1356,8 @@ class GatewayNotificationsMixin:
             raw_sid = str(evt.get("origin_session_id") or "").strip() or str(source.chat_id or "")
             return await self._self_post_api_server(adapter, synth_text, raw_sid, evt)
         try:
-            metadata = {"notification_origin": "process_registry_synthetic"}
             synth_text = _mark_internal_notification(synth_text)
-            session_key = str(evt.get("session_key") or "").strip()
-            from agent.notification_presentation import diagnostic_process_event
-            if diagnostic_process_event(evt):
-                metadata["notification_category"] = "diagnostic"
-            if session_key.startswith("agent:"):
-                metadata["gateway_session_key"] = session_key
-            parent_session_id = str(evt.get("parent_session_id") or "").strip()
-            if parent_session_id:
-                metadata["gateway_session_id"] = parent_session_id
+            metadata = _watch_notification_metadata(evt, source)
             # The queued event's ``message_id`` is the message that STARTED the process, and the
             # persisted origin carries the same stale id. A synthetic completion is not a reply to
             # it: by delivery time the user has often continued elsewhere, and an event anchored
