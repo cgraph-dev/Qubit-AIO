@@ -40,6 +40,15 @@ backlog is explicitly out of scope until retirement.
 - When the production gap for THIS revision reaches zero, verify, then retire hermes.
 - Do not move this pin until hermes is gone.
 
+## Declared exclusions (deliberate, do NOT re-port)
+
+Recorded so a future port wave does not re-add these as "missing symbols". Each leaves the
+audit one symbol short of zero by design; the audit's job is to report that, not to erase it.
+
+| symbol | file | why it is gone |
+|---|---|---|
+| `_housekeeping_media_caches` | `gateway/run.py` | Byte-identical DEAD DUPLICATE of the live `gateway/run_housekeeping_disk.py::housekeeping_media_caches`, which the registered chore (`run.py`) already calls. A 6-lane merge re-added the copy; it never executed. Deleting it is behaviour-preserving — re-adding it would restore a dead symbol, not a capability. |
+
 ## Numbers
 
 Baseline at the re-freeze (2026-10-17, first complete-blob read of the pin):
