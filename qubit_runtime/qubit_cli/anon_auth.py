@@ -437,12 +437,15 @@ def exchange_anon_jwt(
     if not isinstance(payload.get("access_token"), str) or not payload["access_token"]:
         logger.info("Qubit free tier token exchange returned no token")
         raise _anon_err(ANON_FAILURE_COPY[ANON_SERVER_ERROR], ANON_SERVER_ERROR)
-    anon_challenge.note_optional_challenges(payload, portal_base_url)
+    # A connectors-only grant must neither clear nor announce an inference challenge.
+    if not is_connectors_only(payload["access_token"]):
+        anon_challenge.note_optional_challenges(payload, portal_base_url)
     return payload
 
 
 def apply_exchange_to_state(state: Dict[str, Any], exchanged: Dict[str, Any]) -> None:
-    """Write a fresh exchange result into a guest state in place (token, expiry, routing)."""
+    """Write a fresh exchange result into a guest state in place: an inference token (token, expiry,
+    routing) into the state itself, a connectors-only one into ``connectors_token`` beside it."""
     from qubit_cli.auth_nous import _validate_nous_inference_url_from_network
     access_token = exchanged["access_token"]
     claims = _decode_jwt_claims(access_token)
@@ -452,6 +455,9 @@ def apply_exchange_to_state(state: Dict[str, Any], exchanged: Dict[str, Any]) ->
         expires_at = datetime.fromtimestamp(float(exp), tz=UTC)
     else:
         expires_at = now + timedelta(seconds=int(exchanged.get("expires_in") or 900))
+    if is_connectors_only(access_token):
+        state["connectors_token"] = {"access_token": access_token, "expires_at": expires_at.isoformat()}
+        return
     # NAS names the welcome host on every exchange; absent (older NAS) or outside the allowlist
     # (a staging host without NOUS_INFERENCE_BASE_URL set), the literal stands in. Never the paid
     # host: the gateway cross-refuses an anonymous JWT there.

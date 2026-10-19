@@ -166,8 +166,8 @@ RETIRED_TOOLSET_NAMES = frozenset({"setup", "start_chat"})
 _LIVE_TOOL_NAMES = BUILTIN_TOOL_NAMES | BRIDGE_TOOL_NAMES | {"connector", "mcp", "plugin", "unknown"}
 TOOL_NAMES = _LIVE_TOOL_NAMES | RETIRED_TOOL_NAMES
 TOOL_ERROR_CLASSES = frozenset({
-    "blocked", "contract_violation", "exception", "interrupted", "invalid_arguments", "none",
-    "timeout", "tool_error", "unknown",
+    "alias", "blocked", "connection_required", "connector_backend", "contract_violation", "exception",
+    "interrupted", "invalid_arguments", "none", "not_allowed", "timeout", "tool_error", "unknown",
 })
 SIZE_BUCKETS = frozenset({
     "0", "1", "2", "3_to_5", "6_to_10", "11_to_25", "26_to_100", "101_to_250", "gte_251",
@@ -793,8 +793,8 @@ RETIRED_TOOLSET_NAMES = frozenset({"setup", "start_chat"})
 _LIVE_TOOL_NAMES = BUILTIN_TOOL_NAMES | BRIDGE_TOOL_NAMES | {"connector", "mcp", "plugin", "unknown"}
 TOOL_NAMES = _LIVE_TOOL_NAMES | RETIRED_TOOL_NAMES
 TOOL_ERROR_CLASSES = frozenset({
-    "blocked", "contract_violation", "exception", "interrupted", "invalid_arguments", "none",
-    "timeout", "tool_error", "unknown",
+    "alias", "blocked", "connection_required", "connector_backend", "contract_violation", "exception",
+    "interrupted", "invalid_arguments", "none", "not_allowed", "timeout", "tool_error", "unknown",
 })
 SIZE_BUCKETS = frozenset({
     "0", "1", "2", "3_to_5", "6_to_10", "11_to_25", "26_to_100", "101_to_250", "gte_251",
@@ -2446,13 +2446,16 @@ _TOOL_ERROR_TYPES = {
 
 def tool_error_class(kwargs: dict[str, Any], outcome: str | None = None) -> str:
     """Closed failure class from Qubit's own error_type; exception class names become
-    ``exception`` so plugin-defined identifiers never leave the machine."""
+    ``exception`` so plugin-defined identifiers never leave the machine. A connector entry's
+    gateway error code names its class instead of ``tool_error``."""
     outcome = outcome or tool_outcome(kwargs)
     if outcome in _TOOL_STATUS_ERROR_CLASSES:
         return _TOOL_STATUS_ERROR_CLASSES[outcome]
     if outcome != "failed":
         return "unknown"
     error_type = _norm(kwargs.get("error_type"))
+    if error_type == "tool_error" and (connector_class := connector_error_class(kwargs)):
+        return connector_class
     return _TOOL_ERROR_TYPES.get(error_type, "exception" if error_type else "unknown")
 
 
@@ -2484,6 +2487,18 @@ def connector_error_class(kwargs: dict[str, Any]) -> str | None:
 
     family = execute_error_family(code, error.get("family") if isinstance(error.get("family"), str) else None)
     return _CONNECTOR_FAMILY_CLASSES.get(family or "") or _CONNECTOR_CODE_CLASSES.get(code)
+
+
+def _result_error(result: Any) -> dict[str, Any]:
+    if isinstance(result, str):
+        try:
+            import json
+
+            result = json.loads(result)
+        except ValueError:
+            return {}
+    error = result.get("error") if isinstance(result, dict) else None
+    return error if isinstance(error, dict) else {}
 
 
 def tool_latency_bucket(value: Any, *, fallback_duration_ms: int | None = None) -> str:
