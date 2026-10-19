@@ -125,7 +125,28 @@ def adopt_legacy_session(authority, actor, row):
     params, api_mode = legacy_launch_params(row)
     params['source'] = LEGACY_CREATION_SOURCES.get(row['source'], row['source'])
     private = {}
-    policy = build_policy(params, _load_gateway_config(), private_secrets=private)
+    config = _load_gateway_config()
+    model_cfg = config.get('model')
+    if isinstance(model_cfg, dict) and ('provider' in params or 'base_url' in params):
+        from gateway.session_route_identity import ROUTE_BOUND_KEYS, resolved_route, same_route
+        saved = {'provider': params.get('provider', model_cfg.get('provider')), 'base_url': params.get('base_url')}
+        # ``auto`` matches every route, so an ``auto`` side proves nothing about the saved endpoint.
+        if ('auto' not in (resolved_route(model_cfg, config)[0], resolved_route(saved, config)[0])
+                and same_route(saved, model_cfg, config)):
+            # The profile still selects this endpoint: resume on the profile's route, so its own
+            # credential (inline key, ${ENV} key, key_env) keeps its normal precedence.
+            params.pop('provider', None)
+            params.pop('base_url', None)
+        else:
+            # Another route than the profile's: its endpoint, wire mode, context pin and credential
+            # (inline key, key_env pointer, api_key_from) stay with the profile, never paired with the
+            # legacy route. ``provider`` stays: the saved route's own provider is in params, or it is
+            # the profile's when the saved row carried only a base_url (resolved by _endpoint_owner).
+            dropped = tuple(k for k in ROUTE_BOUND_KEYS if k != 'provider')
+            config['model'] = {k: v for k, v in model_cfg.items() if k not in dropped}
+            if saved['base_url']:
+                params['provider'] = _endpoint_owner(saved, config)
+    policy = build_policy(params, config, private_secrets=private)
     if api_mode:
         config = json.loads(policy.config_json)
         config.setdefault('model', {})['api_mode'] = api_mode
