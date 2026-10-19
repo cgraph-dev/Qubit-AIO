@@ -17,6 +17,20 @@ recorded:
 This mode exercises a PRIVATE helper instance inside the harness process. It
 proves the code path, not the actually-running service.
 
+**Speak-test mode (``--speak-test TEXT``).** Opt-in, double-gated
+(``--speak-test`` AND ``QUBIT_ORB_LIVE_ALLOW_SPEAK_TEST=1``). When the live
+helper is idle there is normally no reply to stop, and starting a turn needs
+the mic. This mode instead asks the RUNNING service for real TTS
+(``POST /agent/api/audio/speak`` — the one provider chain, no model, no mic),
+plays the returned WAV through the host's REAL player (``paplay``/``aplay``,
+the same player the helper uses), then delivers the orb STOP: the service's
+``/api/interrupt`` plus SIGUSR2 to the validated live helper, and terminates
+the player. It asserts the player was really playing before the stop and
+ended promptly after it, that the live helper survived, and — when the helper
+owns playback (an open ``playback.started``) — the canonical
+``interrupt``/``playback.stopped``/``response.done`` triple. A missing
+provider/player/helper degrades honestly; it never fabricates a PASS.
+
 **Live mode (``--live-helper``).** Inspects/verifies the RUNNING helper
 (``qubit-voice-typing.service``) and its journal, not a private copy:
 
@@ -58,8 +72,11 @@ Run::
     scripts/verify_orb_stop_live.py --use-service-tts --text "Testing stop."
     scripts/verify_orb_stop_live.py --live-helper --json
     scripts/verify_orb_stop_live.py --live-signal --json   # permits one SIGUSR2
+    QUBIT_ORB_LIVE_ALLOW_SPEAK_TEST=1 \\
+        scripts/verify_orb_stop_live.py --speak-test "Qubit live stop test."
 
-Exit codes: 0 PASS, 1 FAIL, 3 DEGRADED (environment cannot demonstrate it).
+Exit codes: 0 PASS, 1 FAIL, 2 BLOCKED (gate not opened), 3 DEGRADED
+(environment cannot demonstrate it).
 """
 from __future__ import annotations
 
@@ -84,6 +101,19 @@ if str(REPO_ROOT) not in sys.path:
 DEFAULT_OUT = "output/orb_capture/stop_live"
 TALK_PREFIX = "voice_edit.talk."
 STOP_TRIPLE = ("interrupt", "playback.stopped", "response.done")
+
+#: Opt-in gate for ``--speak-test`` (mirrors the synthetic-input gate spirit:
+#: an explicit env flag AND the explicit CLI flag are both required).
+SPEAK_TEST_ENV = "QUBIT_ORB_LIVE_ALLOW_SPEAK_TEST"
+
+#: The live service endpoints used by speak-test. The TTS authority is mounted
+#: under ``/agent`` (``HelperClient``'s prefix); ``/api/interrupt`` is the
+#: webui dashboard stop route (no ``/agent`` prefix).
+SERVICE_TTS_PATH = "/agent/api/audio/speak"
+SERVICE_INTERRUPT_PATH = "/api/interrupt"
+#: Journal row emitted by the service dashboard interrupt (``had_playback``
+#: is the proof the service's own player was live when the stop arrived).
+SERVICE_STOP_EVENT = "interrupt.request"
 
 #: The live helper's cmdline marker (mirrors ``voicebridge.orb.client``).
 HELPER_CMDLINE_MARK = "voicebridge.desktop_helper"
@@ -397,6 +427,92 @@ def read_tail_talk_rows(path: Path,
         if ev is not None:
             events.append(ev)
     return events, size
+
+
+def classify_service_row(row: Any) -> Optional[Dict[str, Any]]:
+    """Normalize one journal row to a service stop boundary, or ``None``.
+
+    Only the dashboard interrupt row is service evidence here; it carries the
+    decisive ``had_playback`` flag (True = a real player was live when the
+    stop arrived, False = idle/no-op).
+    """
+    try:
+        if not isinstance(row, dict):
+            return None
+        name = row.get("event")
+        if name != SERVICE_STOP_EVENT:
+            return None
+        ts = row.get("ts")
+        if not isinstance(ts, (int, float)) or isinstance(ts, bool):
+            ts = None
+        return {
+            "ts": ts,
+            "event": name,
+            "type": SERVICE_STOP_EVENT,
+            "had_playback": row.get("had_playback"),
+            "announce": row.get("announce"),
+            "pid": row.get("pid"),
+        }
+    except Exception:  # noqa: BLE001 - parsing is fail-soft
+        return None
+
+
+def read_service_rows(path: Path,
+                      offset: int = 0) -> Tuple[List[Dict[str, Any]], int]:
+    """Read completed service-stop journal lines from ``offset`` (append-safe)."""
+    events: List[Dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            fh.seek(max(0, int(offset)))
+            while True:
+                pos = fh.tell()
+                line = fh.readline()
+                if not line:
+                    break
+                if not line.endswith("\n"):
+                    fh.seek(pos)
+                    break
+                line = line.strip()
+                if not line or SERVICE_STOP_EVENT not in line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except Exception:  # noqa: BLE001
+                    continue
+                ev = classify_service_row(row)
+                if ev is not None:
+                    events.append(ev)
+            return events, fh.tell()
+    except Exception:  # noqa: BLE001
+        return events, offset
+
+
+def analyze_service_stop(events: List[Dict[str, Any]], *,
+                         t_stop: Optional[float] = None) -> Dict[str, Any]:
+    """Reduce service ``interrupt.request`` rows to stop evidence (pure).
+
+    Only rows at/after ``t_stop`` count (an older interrupt cannot make this
+    stop look successful). ``had_playback`` is the newest relevant row's
+    flag, so a stop that found the service player live is distinguishable
+    from an idle no-op.
+    """
+    relevant: List[Dict[str, Any]] = []
+    for ev in events:
+        ts = ev.get("ts")
+        if t_stop is not None:
+            if not isinstance(ts, (int, float)) or isinstance(ts, bool):
+                continue
+            if float(ts) < float(t_stop):
+                continue
+        relevant.append(ev)
+    last = relevant[-1] if relevant else None
+    return {
+        "stop_seen": bool(relevant),
+        "count": len(relevant),
+        "had_playback": (None if last is None
+                         else bool(last.get("had_playback"))),
+        "ts": None if last is None else last.get("ts"),
+    }
 
 
 def analyze_playback(events: List[Dict[str, Any]], *,
@@ -1089,6 +1205,526 @@ def run_live(*, out_dir: Optional[Path] = None, allow_signal: bool = False,
     return result
 
 
+# ---------------------------------------------------------------------------
+# gated speak-test (real service TTS -> real host player -> real STOP)
+# ---------------------------------------------------------------------------
+def speak_test_allowed(environ: Optional[Dict[str, str]] = None) -> bool:
+    """True only when the explicit opt-in env gate is opened (pure)."""
+    env = os.environ if environ is None else environ
+    try:
+        return str(env.get(SPEAK_TEST_ENV, "") or "").strip().lower() in (
+            "1", "true", "yes", "on")
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def summarize_speak_test(*, provider: str = "", wav_bytes: int = 0,
+                         player_started: bool = False,
+                         player_exited: Optional[bool] = None,
+                         playback_live_before_stop: Optional[bool] = None,
+                         helper_pid: Optional[int] = None,
+                         helper_alive_after: Optional[bool] = None,
+                         triple: Optional[Dict[str, Any]] = None,
+                         service_stop: Optional[Dict[str, Any]] = None,
+                         degraded: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Reduce speak-test observations to a PASS/FAIL/DEGRADED verdict (pure).
+
+    A PASS requires a REAL provider clip, a player that was live immediately
+    before the stop and ended after it, and a live helper that survived the
+    stop. The canonical triple is required only when the helper owned playback
+    (``triple.applicable``); the service-player path is explicitly marked
+    ``triple_applicable=False`` rather than claiming a triple it never emits.
+    """
+    degraded = list(degraded or [])
+    triple = triple or {}
+    service_stop = service_stop or {}
+    applicable = bool(triple.get("applicable", False))
+    ordered = bool(triple.get("ordered", False))
+    present = bool(triple.get("present", False))
+    missing = list(triple.get("missing") or [])
+
+    if not provider or int(wav_bytes or 0) <= 0:
+        verdict = "DEGRADED"
+        reason = "the live service returned no TTS audio (provider unavailable)"
+    elif not player_started:
+        verdict = "DEGRADED"
+        reason = "the host player never started (no paplay/aplay or audio server)"
+    elif playback_live_before_stop is False:
+        verdict = "DEGRADED"
+        reason = "the player exited before the stop (no audio device?)"
+    elif player_exited is False:
+        verdict = "FAIL"
+        reason = "the player was still alive after the stop"
+    elif helper_pid is not None and helper_alive_after is False:
+        verdict = "FAIL"
+        reason = "the live helper did not survive the stop signal"
+    elif applicable and not present:
+        verdict = "FAIL"
+        reason = ("the live helper owned playback but the canonical stop "
+                  "boundaries are missing: " + ", ".join(missing))
+    elif applicable and not ordered:
+        verdict = "FAIL"
+        reason = "canonical stop boundaries are present but out of order"
+    else:
+        verdict = "PASS"
+        if applicable:
+            reason = ("live helper stopped its playback and journaled the "
+                      "canonical stop triple")
+        else:
+            reason = ("real service TTS + real host player stopped; no helper "
+                      "playback was live, so no helper triple applies")
+    return {
+        "verdict": verdict,
+        "reason": reason,
+        "provider": provider or "",
+        "wav_bytes": int(wav_bytes or 0),
+        "player_started": bool(player_started),
+        "player_exited": player_exited,
+        "playback_live_before_stop": playback_live_before_stop,
+        "helper_pid": helper_pid,
+        "helper_alive_after": helper_alive_after,
+        "triple_applicable": applicable,
+        "triple_present": present,
+        "triple_ordered": ordered,
+        "missing": missing,
+        "stop_latency_s": triple.get("latency_s"),
+        "service_stop": service_stop,
+        "degraded": degraded,
+    }
+
+
+def _service_headers(token: str) -> Dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["X-Api-Token"] = token
+        headers["X-Qubit-Session-Token"] = token
+    return headers
+
+
+def _post_json(base: str, path: str, token: str, payload: Dict[str, Any],
+               timeout: float = 60.0) -> Dict[str, Any]:
+    """POST one JSON request to the live service; never raises."""
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(
+        f"{base.rstrip('/')}{path}", data=json.dumps(payload).encode(),
+        method="POST", headers=_service_headers(token))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", "replace")
+        out = json.loads(body) if body.strip() else {}
+        return out if isinstance(out, dict) else {"value": out}
+    except urllib.error.HTTPError as exc:
+        try:
+            parsed = json.loads(exc.read().decode("utf-8", "replace") or "{}")
+        except Exception:  # noqa: BLE001
+            parsed = {}
+        return {"ok": False, "code": str(parsed.get("code") or f"HTTP_{exc.code}"),
+                "detail": str(parsed.get("detail", "") or "")[:200]}
+    except Exception as exc:  # noqa: BLE001 - unreachable service is DEGRADED
+        return {"ok": False, "code": "SERVICE_UNREACHABLE",
+                "detail": str(exc)[:200]}
+
+
+def service_tts(base: str, token: str, text: str,
+                timeout: float = 60.0) -> Dict[str, Any]:
+    """Ask the RUNNING service for real TTS; return ``{ok, wav, provider}``."""
+    import base64
+    out = _post_json(base, SERVICE_TTS_PATH, token, {"text": str(text)},
+                     timeout=timeout)
+    url = str(out.get("data_url", "") or "")
+    wav = b""
+    if url.startswith("data:audio/") and "," in url:
+        try:
+            wav = base64.b64decode(url.split(",", 1)[1])
+        except Exception:  # noqa: BLE001
+            wav = b""
+    return {
+        "ok": bool(wav),
+        "wav": wav,
+        "provider": str(out.get("provider", "") or ""),
+        "code": str(out.get("code", "") or ""),
+        "detail": str(out.get("detail", "") or ""),
+    }
+
+
+def service_interrupt(base: str, token: str, mode: str = "stop",
+                      timeout: float = 10.0) -> Dict[str, Any]:
+    """Deliver the live service's dashboard STOP (never raises)."""
+    return _post_json(base, SERVICE_INTERRUPT_PATH, token, {"mode": str(mode)},
+                      timeout=timeout)
+
+
+def _spawn_player(wav: bytes, capture_dir: Path) -> Any:
+    """Start the host's real player on ``wav``; return the Popen (or None)."""
+    import subprocess
+    player = "paplay" if shutil.which("paplay") else (
+        "aplay" if shutil.which("aplay") else "")
+    if not player:
+        return None
+    path = capture_dir / "speak.wav"
+    try:
+        path.write_bytes(wav)
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        return subprocess.Popen(
+            [player, str(path)], stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _write_speak_evidence(capture_dir: Path, result: Dict[str, Any],
+                          events: List[Dict[str, Any]], t0: float) -> None:
+    header = [
+        f"live speak-test STOP harness — {result.get('started')}",
+        f"provider: {result.get('provider') or '(none)'} "
+        f"wav_bytes={result.get('wav_bytes')}",
+        f"player: {result.get('player') or '(none)'} "
+        f"pid={result.get('player_pid') or '-'}",
+        f"helper pid: {result.get('helper_pid') or '-'} "
+        f"alive_after={result.get('helper_alive_after')}",
+        f"stop: interrupt_request="
+        f"{(result.get('service_stop') or {}).get('stop_seen')} "
+        f"had_playback={(result.get('service_stop') or {}).get('had_playback')} "
+        f"latency={result.get('stop_latency_s')}s",
+        f"triple: applicable={result.get('triple_applicable')} "
+        f"present={result.get('triple_present')} "
+        f"ordered={result.get('triple_ordered')}",
+        f"verdict: {result.get('verdict')} — {result.get('reason')}",
+    ]
+    if result.get("degraded"):
+        header.append("degraded: " + "; ".join(result["degraded"]))
+    header.append("--- talk timeline (voice_edit.talk.*) ---")
+    try:
+        (capture_dir / "timeline.txt").write_text(
+            build_timeline(events, t0, header=header), encoding="utf-8")
+        (capture_dir / "evidence.json").write_text(
+            json.dumps({**result, "events": events[-200:]}, indent=2),
+            encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 - evidence is best-effort
+        result.setdefault("degraded", []).append(f"evidence write failed: {exc}")
+
+
+def run_speak_test(*, text: str = "Qubit live stop test.",
+                   out_dir: Optional[Path] = None, duration: float = 6.0,
+                   timeout: float = 6.0,
+                   journal: Optional[Path] = None,
+                   base_url: Optional[str] = None,
+                   token: Optional[str] = None,
+                   serve_fn: Optional[Callable[[], Tuple[str, str]]] = None,
+                   speak_fn: Optional[Callable[[str], Dict[str, Any]]] = None,
+                   interrupt_fn: Optional[Callable[..., Any]] = None,
+                   player_fn: Optional[Callable[[bytes, Path], Any]] = None,
+                   resolve_fn: Optional[Callable[..., Dict[str, Any]]] = None,
+                   signal_fn: Callable[[int, int], Any] = os.kill,
+                   alive_fn: Optional[Callable[[int], bool]] = None,
+                   now_fn: Callable[[], float] = time.time,
+                   sleep_fn: Callable[[float], None] = time.sleep) -> Dict[str, Any]:
+    """Gated real-provider/real-player STOP demonstration. Never raises.
+
+    Asks the RUNNING service for TTS, plays it through the host's real player,
+    then delivers the orb STOP (service interrupt + SIGUSR2 to the validated
+    live helper) and terminates the player. A private helper instance is never
+    constructed; the only audio path is the live service's provider plus the
+    host player. The live helper's canonical triple is asserted only when a
+    real helper playback is already open in the journal.
+    """
+    t0 = float(now_fn())
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(t0))
+    base = Path(out_dir) if out_dir else (REPO_ROOT / DEFAULT_OUT)
+    capture_dir = base / f"{stamp}-speak"
+    try:
+        capture_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:  # noqa: BLE001
+        pass
+    alive_fn = alive_fn or _pid_alive
+    result: Dict[str, Any] = {
+        "mode": "speak-test",
+        "started": _iso(t0),
+        "capture_dir": str(capture_dir),
+        "verdict": "DEGRADED",
+        "reason": "",
+        "degraded": [],
+        "text_chars": len(str(text or "")),
+        "provider": "",
+        "wav_bytes": 0,
+        "player": None,
+        "player_pid": None,
+        "player_started": False,
+        "player_exited": None,
+        "playback_live_before_stop": None,
+        "stop_at": None,
+        "stop_to_exit_s": None,
+        "helper_pid": None,
+        "helper_alive_after": None,
+        "signal_sent": False,
+        "service_stop": None,
+        "triple_applicable": False,
+        "triple_present": None,
+        "triple_ordered": None,
+        "missing": [],
+        "stop_latency_s": None,
+        "events": [],
+        "events_after_stop": [],
+    }
+    if not speak_test_allowed():
+        result["verdict"] = "BLOCKED"
+        result["reason"] = (f"speak-test is not enabled; set {SPEAK_TEST_ENV}=1 "
+                            "to permit a real TTS/player stop")
+        result["degraded"].append(result["reason"])
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    # -- live helper (required: it is the thing whose STOP we exercise) -----
+    if resolve_fn is None:
+        def resolve_fn(**_kw: Any) -> Dict[str, Any]:
+            return resolve_live_helper(**_kw)
+    helper = resolve_fn()
+    result["helper_pid"] = helper.get("pid")
+    if not helper.get("ok"):
+        reason = str(helper.get("reason") or "no live helper")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+    pid = int(helper["pid"])
+    mask = read_proc_signal_mask(pid)
+    handler_ok = handler_installed(mask, signal.SIGUSR2)
+    if not handler_ok:
+        reason = ("refusing speak-test: the SIGUSR2 handler is not installed "
+                  "(the stop would terminate the live helper)")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    if journal is None:
+        try:
+            from voicebridge.config import canonical_state_dir
+            journal = canonical_state_dir() / "events.jsonl"
+        except Exception:  # noqa: BLE001
+            journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
+                       / "events.jsonl")
+    result["journal"] = str(journal)
+    hb = helper.get("heartbeat") or {}
+    state = str(hb.get("state") or "") if isinstance(hb, dict) else ""
+    result["helper_state"] = state or None
+
+    # -- pre-stop journal state (does the HELPER already own playback?) -----
+    try:
+        pre_events, offset = read_tail_talk_rows(Path(journal))
+        pre = analyze_playback(pre_events, now=now_fn())
+    except Exception:  # noqa: BLE001
+        pre, offset = {"speaking": False, "turn_id": None}, 0
+    helper_owned = bool(pre.get("speaking"))
+    result["triple_applicable"] = helper_owned
+    if offset <= 0:
+        try:
+            offset = Path(journal).stat().st_size
+        except Exception:  # noqa: BLE001
+            offset = 0
+    # Safety: never send SIGUSR2 into an unrelated in-flight turn. LISTENING
+    # is safe (the stop is a no-op); PROCESSING/PREVIEW would mark that turn
+    # stopped, so refuse unless a real playback is already open.
+    if not helper_owned and state in ("processing", "preview"):
+        reason = (f"refusing speak-test: the live helper is busy ({state!r}) "
+                  "with an unrelated turn")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    # -- real service TTS ---------------------------------------------------
+    if serve_fn is not None:
+        base_url, token = serve_fn()
+    elif base_url is None:
+        try:
+            from voicebridge.config import Config
+            from voicebridge.desktop_helper import (
+                resolve_service_base, resolve_token)
+            cfg = Config.load()
+            base_url = resolve_service_base(cfg)
+            token = resolve_token(cfg)
+        except Exception as exc:  # noqa: BLE001
+            result["degraded"].append(f"service config unavailable: {exc}")
+            base_url, token = "", ""
+    result["service_base"] = base_url or ""
+    if not base_url:
+        result["reason"] = "the live service address could not be resolved"
+        result["degraded"].append(result["reason"])
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+    speak_fn = speak_fn or (lambda t: service_tts(base_url, token or "", t))
+    try:
+        speech = speak_fn(str(text))
+    except Exception as exc:  # noqa: BLE001
+        speech = {"ok": False, "code": "SPEAK_FAILED", "detail": str(exc)[:200]}
+    result["provider"] = str(speech.get("provider", "") or "")
+    wav = bytes(speech.get("wav") or b"")
+    result["wav_bytes"] = len(wav)
+    if not speech.get("ok") or not wav:
+        reason = ("the live service could not synthesize audio: "
+                  f"{speech.get('code') or 'no audio'} "
+                  f"{str(speech.get('detail') or '')[:120]}".strip())
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+    wav = pad_wav_min_duration(wav, max(0.5, float(duration)))
+
+    # -- real host player ---------------------------------------------------
+    player_fn = player_fn or _spawn_player
+    try:
+        proc = player_fn(wav, capture_dir)
+    except Exception:  # noqa: BLE001
+        proc = None
+    if proc is None:
+        result["reason"] = "no host player (paplay/aplay) is available"
+        result["degraded"].append(result["reason"])
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+    result["player"] = "paplay" if shutil.which("paplay") else (
+        "aplay" if shutil.which("aplay") else "")
+    try:
+        result["player_pid"] = int(getattr(proc, "pid", 0) or 0) or None
+    except Exception:  # noqa: BLE001
+        result["player_pid"] = None
+    deadline = now_fn() + max(0.1, float(timeout))
+    while now_fn() < deadline:
+        try:
+            if proc.poll() is None:
+                result["player_started"] = True
+                break
+        except Exception:  # noqa: BLE001
+            break
+        sleep_fn(0.02)
+    if not result["player_started"]:
+        result["reason"] = "the player exited before playback could start"
+        result["degraded"].append(result["reason"])
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+    sleep_fn(0.2)  # settle: prove it stays alive on a real audio device
+    try:
+        alive_before = proc.poll() is None
+    except Exception:  # noqa: BLE001
+        alive_before = False
+    result["playback_live_before_stop"] = bool(alive_before)
+    if not alive_before:
+        result["player_exited"] = True
+        result["reason"] = "the player exited before the stop (no audio device?)"
+        result["degraded"].append(result["reason"])
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    # -- deliver the STOP: service interrupt + live helper SIGUSR2 + player --
+    try:
+        now_events, _ = read_tail_talk_rows(Path(journal))
+        live_now = analyze_playback(now_events, now=now_fn())
+    except Exception:  # noqa: BLE001
+        live_now = {"speaking": False, "turn_id": None}
+    if helper_owned or live_now.get("speaking"):
+        helper_owned = True
+        pre = live_now if live_now.get("speaking") else pre
+        result["triple_applicable"] = True
+    t_stop = float(now_fn())
+    result["stop_at"] = t_stop
+    interrupt_fn = interrupt_fn or (
+        lambda mode="stop": service_interrupt(base_url, token or "", mode))
+    try:
+        interrupt_fn("stop")
+    except Exception as exc:  # noqa: BLE001
+        result["degraded"].append(f"service interrupt failed: {exc}")
+    # Re-validate right before the signal: never signal a changed pid or one
+    # without the handler.
+    fresh = resolve_fn()
+    mask2 = (read_proc_signal_mask(int(fresh["pid"]))
+             if fresh.get("ok") else None)
+    if (fresh.get("ok") and int(fresh.get("pid") or 0) == pid
+            and handler_installed(mask2, signal.SIGUSR2)):
+        try:
+            signal_fn(pid, signal.SIGUSR2)
+            result["signal_sent"] = True
+        except Exception as exc:  # noqa: BLE001
+            result["degraded"].append(f"could not signal the live helper: {exc}")
+    else:
+        result["degraded"].append(
+            "live helper pid changed/disappeared or lost its SIGUSR2 handler "
+            "before the stop; not signalled")
+    # The helper does not own this player (it was idle), so end it exactly as
+    # the helper's own stop would (SIGTERM, then SIGKILL on a linger).
+    try:
+        proc.terminate()
+    except Exception:  # noqa: BLE001
+        pass
+    exit_at: Optional[float] = None
+    try:
+        proc.wait(timeout=max(0.2, float(timeout)))
+        exit_at = now_fn()
+    except Exception:  # noqa: BLE001 - still alive: bound it
+        try:
+            proc.kill()
+            exit_at = now_fn()
+        except Exception:  # noqa: BLE001
+            exit_at = None
+    result["helper_alive_after"] = bool(alive_fn(pid))
+    result["player_exited"] = exit_at is not None
+    if exit_at is not None:
+        result["stop_to_exit_s"] = round(float(exit_at) - t_stop, 4)
+
+    # -- journal evidence (triple only when the helper owned playback) ------
+    new_events: List[Dict[str, Any]] = []
+    rows: List[Dict[str, Any]] = []
+    service_offset = offset
+    deadline = now_fn() + max(0.5, float(timeout))
+    while now_fn() < deadline:
+        try:
+            batch, offset = read_talk_rows(Path(journal), offset)
+            new_events.extend(batch)
+            stop_batch, service_offset = read_service_rows(
+                Path(journal), service_offset)
+            rows.extend(stop_batch)
+        except Exception:  # noqa: BLE001
+            pass
+        types = [e.get("type") for e in new_events]
+        service_stop = analyze_service_stop(rows, t_stop=t_stop)
+        if helper_owned and all(name in types for name in STOP_TRIPLE):
+            break
+        if not helper_owned and service_stop["stop_seen"]:
+            break
+        sleep_fn(0.05)
+    result["events_after_stop"] = new_events[-100:]
+    result["events"] = new_events[-200:]
+    if helper_owned:
+        relevant = new_events
+        if pre.get("turn_id") is not None:
+            relevant = [e for e in new_events
+                        if e.get("turn_id") == pre.get("turn_id")]
+        triple = ordered_triple(relevant, t_stop=t_stop)
+    else:
+        triple = {"present": False, "ordered": False, "missing": [],
+                  "latency_s": None}
+    service_stop = analyze_service_stop(rows, t_stop=t_stop)
+    result["service_stop"] = service_stop
+    result["triple_present"] = triple["present"]
+    result["triple_ordered"] = triple["ordered"]
+    result["missing"] = triple["missing"]
+    result["stop_latency_s"] = triple["latency_s"]
+
+    evidence = summarize_speak_test(
+        provider=result["provider"], wav_bytes=result["wav_bytes"],
+        player_started=result["player_started"],
+        player_exited=result["player_exited"],
+        playback_live_before_stop=result["playback_live_before_stop"],
+        helper_pid=pid, helper_alive_after=result["helper_alive_after"],
+        triple={"applicable": helper_owned, **triple},
+        service_stop=service_stop, degraded=result["degraded"])
+    result.update(evidence)
+    _write_speak_evidence(capture_dir, result, new_events, t0)
+    return result
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(
         description="Live-capable orb STOP harness (read-only by default).")
@@ -1119,8 +1755,50 @@ def main(argv: Optional[List[str]] = None) -> int:
                          f"stale (default: {LIVE_STALE_AFTER_S:g}s)")
     ap.add_argument("--live-tail-bytes", type=int, default=LIVE_TAIL_BYTES,
                     help=f"journal tail to scan (default: {LIVE_TAIL_BYTES})")
+    ap.add_argument("--speak-test", metavar="TEXT", default=None,
+                    help="GATED: synthesize TEXT with the live service, play it "
+                         "through the real host player, deliver the orb STOP and "
+                         f"verify it (requires {SPEAK_TEST_ENV}=1)")
+    ap.add_argument("--speak-duration", type=float, default=6.0,
+                    help="minimum audio length in seconds so the stop lands "
+                         "mid-playback (default: 6)")
+    ap.add_argument("--speak-timeout", type=float, default=6.0,
+                    help="seconds to wait for playback start/stop (default: 6)")
     ap.add_argument("--json", action="store_true", help="print JSON only")
     args = ap.parse_args(argv)
+
+    if args.speak_test is not None:
+        speak = run_speak_test(
+            text=args.speak_test,
+            out_dir=Path(args.out) if args.out else None,
+            duration=args.speak_duration,
+            timeout=args.speak_timeout,
+            journal=Path(args.live_journal) if args.live_journal else None,
+        )
+        if args.json:
+            print(json.dumps(speak, indent=2))
+        else:
+            print(f"verdict: {speak.get('verdict')} — {speak.get('reason')}")
+            print(f"provider: {speak.get('provider') or '-'} "
+                  f"wav_bytes={speak.get('wav_bytes')} "
+                  f"player={speak.get('player') or '-'} "
+                  f"pid={speak.get('player_pid') or '-'}")
+            print(f"helper: pid={speak.get('helper_pid') or '-'} "
+                  f"alive_after={speak.get('helper_alive_after')} "
+                  f"signal_sent={speak.get('signal_sent')}")
+            print(f"playback: started={speak.get('player_started')} "
+                  f"live_before_stop={speak.get('playback_live_before_stop')} "
+                  f"exited={speak.get('player_exited')} "
+                  f"stop_to_exit={speak.get('stop_to_exit_s')}s")
+            print(f"triple: applicable={speak.get('triple_applicable')} "
+                  f"present={speak.get('triple_present')} "
+                  f"ordered={speak.get('triple_ordered')}")
+            print(f"evidence: {speak.get('capture_dir')}/evidence.json")
+            if speak.get("degraded"):
+                for item in speak["degraded"]:
+                    print(f"degraded: {item}")
+        return {"PASS": 0, "FAIL": 1, "BLOCKED": 2}.get(
+            str(speak.get("verdict")), 3)
 
     if args.live_helper or args.live_signal:
         live = run_live(

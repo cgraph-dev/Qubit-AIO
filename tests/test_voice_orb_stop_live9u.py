@@ -10,7 +10,11 @@ parsing/verdict logic. These tests pin:
     when no player could start;
   * the wav padding keeps a short synth'd clip alive long enough for a stop;
   * ``run`` writes ``evidence.json`` + ``timeline.txt`` and returns DEGRADED
-    (no traceback) when no player is installed.
+    (no traceback) when no player is installed;
+  * the gated ``--speak-test`` path refuses without the opt-in env flag and
+    verifies a real service-TTS -> host-player stop without fabricating a
+    helper triple it never emitted (and still requires that triple when the
+    helper really owned playback).
 """
 from __future__ import annotations
 
@@ -447,3 +451,300 @@ def test_live_check_ignores_triple_from_another_turn(harness, tmp_path):
     assert out["triple_ordered"] is False
     assert out["verdict"] == "FAIL"
     assert "missing" in out["reason"]
+
+
+# ---------------------------------------------------------------------------
+# gated speak-test: pure decision logic + injected service/player seams
+# ---------------------------------------------------------------------------
+def _service_stop(ts, had_playback, pid=1):
+    return {"ts": ts, "event": "interrupt.request",
+            "type": "interrupt.request", "had_playback": had_playback,
+            "announce": False, "pid": pid}
+
+
+def test_speak_test_gate_requires_the_env_flag(harness):
+    assert harness.speak_test_allowed({}) is False
+    assert harness.speak_test_allowed({harness.SPEAK_TEST_ENV: "0"}) is False
+    for value in ("1", "true", "YES", "on"):
+        assert harness.speak_test_allowed({harness.SPEAK_TEST_ENV: value}) is True
+
+
+def test_classify_and_analyze_service_stop(harness):
+    row = harness.classify_service_row(
+        {"ts": 5.0, "event": "interrupt.request", "had_playback": True,
+         "announce": False, "pid": 9})
+    assert row["type"] == "interrupt.request" and row["had_playback"] is True
+    assert harness.classify_service_row({"event": "tts.speak"}) is None
+    assert harness.classify_service_row("nope") is None
+
+    out = harness.analyze_service_stop(
+        [_service_stop(4.0, True), _service_stop(6.0, False)], t_stop=5.0)
+    assert out["stop_seen"] is True and out["count"] == 1
+    assert out["had_playback"] is False  # newest relevant row wins
+
+    none = harness.analyze_service_stop([_service_stop(4.0, True)],
+                                        t_stop=5.0)
+    assert none["stop_seen"] is False and none["had_playback"] is None
+
+
+def test_read_service_rows_is_append_safe(harness, tmp_path):
+    path = tmp_path / "events.jsonl"
+    _write_journal(path, [_service_stop(1.0, True)])
+    rows, end = harness.read_service_rows(path)
+    assert [r["type"] for r in rows] == ["interrupt.request"]
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(_service_stop(2.0, False)) + "\n")
+    rows2, _ = harness.read_service_rows(path, end)
+    assert len(rows2) == 1 and rows2[0]["had_playback"] is False
+
+
+def test_summarize_speak_test_real_service_player_passes_without_triple(harness):
+    out = harness.summarize_speak_test(
+        provider="piper", wav_bytes=4096, player_started=True,
+        player_exited=True, playback_live_before_stop=True,
+        helper_pid=7, helper_alive_after=True,
+        triple={"applicable": False, "present": False, "ordered": False},
+        service_stop={"stop_seen": True, "had_playback": False})
+    assert out["verdict"] == "PASS", out
+    assert out["triple_applicable"] is False
+    assert "no helper triple applies" in out["reason"]
+
+
+def test_summarize_speak_test_degrades_without_provider_or_player(harness):
+    no_tts = harness.summarize_speak_test(
+        provider="", wav_bytes=0, player_started=False,
+        playback_live_before_stop=None)
+    assert no_tts["verdict"] == "DEGRADED"
+    assert "no TTS audio" in no_tts["reason"]
+
+    no_player = harness.summarize_speak_test(
+        provider="piper", wav_bytes=10, player_started=False,
+        playback_live_before_stop=None)
+    assert no_player["verdict"] == "DEGRADED"
+    assert "player never started" in no_player["reason"]
+
+    died = harness.summarize_speak_test(
+        provider="piper", wav_bytes=10, player_started=True,
+        playback_live_before_stop=False)
+    assert died["verdict"] == "DEGRADED"
+    assert "before the stop" in died["reason"]
+
+
+def test_summarize_speak_test_fails_linger_dead_helper_and_missing_triple(harness):
+    linger = harness.summarize_speak_test(
+        provider="piper", wav_bytes=10, player_started=True,
+        player_exited=False, playback_live_before_stop=True,
+        helper_pid=7, helper_alive_after=True)
+    assert linger["verdict"] == "FAIL" and "still alive" in linger["reason"]
+
+    dead = harness.summarize_speak_test(
+        provider="piper", wav_bytes=10, player_started=True,
+        player_exited=True, playback_live_before_stop=True,
+        helper_pid=7, helper_alive_after=False)
+    assert dead["verdict"] == "FAIL" and "survive" in dead["reason"]
+
+    missing = harness.summarize_speak_test(
+        provider="piper", wav_bytes=10, player_started=True,
+        player_exited=True, playback_live_before_stop=True,
+        helper_pid=7, helper_alive_after=True,
+        triple={"applicable": True, "present": False,
+                "missing": ["playback.stopped"]})
+    assert missing["verdict"] == "FAIL"
+    assert "playback.stopped" in missing["reason"]
+
+
+class _FakeProc:
+    def __init__(self, *, alive_after_stop=False, linger=False,
+                 kill_fails=False):
+        self.pid = 4242
+        self.args = ["paplay", "x.wav"]
+        self._alive = True
+        self.terminated = False
+        self.killed = False
+        self._alive_after_stop = alive_after_stop
+        self._linger = linger
+        self._kill_fails = kill_fails
+
+    def poll(self):
+        return None if self._alive else 0
+
+    def terminate(self):
+        self.terminated = True
+        if not self._linger:
+            self._alive = bool(self._alive_after_stop)
+
+    def kill(self):
+        self.killed = True
+        if self._kill_fails:
+            raise RuntimeError("cannot kill")
+        self._alive = False
+
+    def wait(self, timeout=None):
+        if self._linger:
+            raise TimeoutError("still alive")
+        self._alive = bool(self._alive_after_stop)
+        return 0
+
+
+def _fake_helper():
+    return {"ok": True, "pid": 777, "heartbeat": {"pid": 777, "state": "idle"},
+            "cmdline": "python -m voicebridge.desktop_helper", "reason": ""}
+
+
+def test_run_speak_test_is_blocked_without_the_gate(harness, tmp_path, monkeypatch):
+    monkeypatch.delenv(harness.SPEAK_TEST_ENV, raising=False)
+    out = harness.run_speak_test(out_dir=tmp_path, text="hi")
+    assert out["verdict"] == "BLOCKED"
+    assert harness.SPEAK_TEST_ENV in out["reason"]
+    assert (Path(out["capture_dir"]) / "evidence.json").is_file()
+
+
+def test_run_speak_test_degrades_without_a_helper(harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    out = harness.run_speak_test(
+        out_dir=tmp_path,
+        resolve_fn=lambda **_kw: {"ok": False, "reason": "helper not live",
+                                  "pid": None, "heartbeat": None,
+                                  "cmdline": ""})
+    assert out["verdict"] == "DEGRADED"
+    assert "helper not live" in out["reason"]
+
+
+def test_run_speak_test_refuses_without_sigusr2_handler(harness, tmp_path,
+                                                        monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 9)
+    out = harness.run_speak_test(out_dir=tmp_path,
+                                 resolve_fn=lambda **_kw: _fake_helper())
+    assert out["verdict"] == "DEGRADED"
+    assert "SIGUSR2 handler" in out["reason"]
+
+
+def test_run_speak_test_degrades_when_service_tts_is_unavailable(
+        harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 11)
+    out = harness.run_speak_test(
+        out_dir=tmp_path, journal=tmp_path / "events.jsonl",
+        resolve_fn=lambda **_kw: _fake_helper(),
+        serve_fn=lambda: ("http://127.0.0.1:9", ""),
+        speak_fn=lambda _t: {"ok": False, "wav": b"", "provider": "",
+                             "code": "AUDIO_TTS_UNAVAILABLE",
+                             "detail": "no voice pack"})
+    assert out["verdict"] == "DEGRADED"
+    assert "AUDIO_TTS_UNAVAILABLE" in out["reason"]
+
+
+def test_run_speak_test_real_player_path_passes(harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 11)
+    journal = tmp_path / "events.jsonl"
+    journal.write_text("", encoding="utf-8")
+    signals = []
+
+    def interrupt(mode="stop"):
+        with journal.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(_service_stop(1000.0, False)) + "\n")
+        return {"ok": True}
+
+    out = harness.run_speak_test(
+        out_dir=tmp_path, journal=journal, text="Qubit live stop test.",
+        resolve_fn=lambda **_kw: _fake_helper(),
+        serve_fn=lambda: ("http://127.0.0.1:9", ""),
+        speak_fn=lambda _t: {"ok": True, "wav": b"RIFF0000", "provider": "piper"},
+        interrupt_fn=interrupt,
+        player_fn=lambda _w, _d: _FakeProc(),
+        signal_fn=lambda pid, sig: signals.append((pid, sig)),
+        alive_fn=lambda _pid: True,
+        now_fn=lambda: 1000.0, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "PASS", out
+    assert out["provider"] == "piper" and out["wav_bytes"] == 8
+    assert out["playback_live_before_stop"] is True
+    assert out["player_exited"] is True and out["helper_alive_after"] is True
+    assert signals == [(777, signal.SIGUSR2)]
+    assert out["triple_applicable"] is False
+    assert out["service_stop"]["stop_seen"] is True
+    cap = Path(out["capture_dir"])
+    assert (cap / "evidence.json").is_file()
+    assert json.loads((cap / "evidence.json").read_text())["verdict"] == "PASS"
+
+
+def test_run_speak_test_fails_when_the_player_lingers(harness, tmp_path,
+                                                      monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 11)
+    journal = tmp_path / "events.jsonl"
+    journal.write_text("", encoding="utf-8")
+    proc = _FakeProc(linger=True, kill_fails=True)
+    clock = {"t": 1000.0}
+
+    def now():
+        clock["t"] += 0.05
+        return clock["t"]
+
+    out = harness.run_speak_test(
+        out_dir=tmp_path, journal=journal,
+        resolve_fn=lambda **_kw: _fake_helper(),
+        serve_fn=lambda: ("http://127.0.0.1:9", ""),
+        speak_fn=lambda _t: {"ok": True, "wav": b"RIFF0000", "provider": "piper"},
+        interrupt_fn=lambda mode="stop": {"ok": True},
+        player_fn=lambda _w, _d: proc,
+        signal_fn=lambda _pid, _sig: None,
+        alive_fn=lambda _pid: True,
+        now_fn=now, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "FAIL"
+    assert proc.terminated is True and proc.killed is True
+    assert "still alive" in out["reason"]
+
+
+def test_run_speak_test_requires_triple_when_the_helper_owned_playback(
+        harness, tmp_path, monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 11)
+    journal = tmp_path / "events.jsonl"
+    _write_journal(journal, [_live_event("playback.started", 999.0, 1)])
+
+    def kill(pid, sig):
+        assert (pid, sig) == (777, signal.SIGUSR2)
+        with journal.open("a", encoding="utf-8") as fh:
+            for seq, etype in enumerate(
+                    ("interrupt", "playback.stopped", "response.done"), start=2):
+                fh.write(json.dumps(_live_event(
+                    etype, 1000.0 + seq / 100, seq)) + "\n")
+
+    out = harness.run_speak_test(
+        out_dir=tmp_path, journal=journal,
+        resolve_fn=lambda **_kw: _fake_helper(),
+        serve_fn=lambda: ("http://127.0.0.1:9", ""),
+        speak_fn=lambda _t: {"ok": True, "wav": b"RIFF0000", "provider": "piper"},
+        interrupt_fn=lambda mode="stop": {"ok": True},
+        player_fn=lambda _w, _d: _FakeProc(),
+        signal_fn=kill,
+        alive_fn=lambda _pid: True,
+        now_fn=lambda: 1000.0, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "PASS", out
+    assert out["triple_applicable"] is True
+    assert out["triple_present"] is True and out["triple_ordered"] is True
+
+
+def test_run_speak_test_refuses_to_signal_a_busy_helper(harness, tmp_path,
+                                                        monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 11)
+    busy = _fake_helper()
+    busy["heartbeat"]["state"] = "processing"
+    calls = []
+    out = harness.run_speak_test(
+        out_dir=tmp_path, journal=tmp_path / "events.jsonl",
+        resolve_fn=lambda **_kw: busy,
+        serve_fn=lambda: ("http://127.0.0.1:9", ""),
+        speak_fn=lambda _t: {"ok": True, "wav": b"RIFF0000",
+                             "provider": "piper"},
+        interrupt_fn=lambda mode="stop": calls.append(("interrupt", mode)),
+        player_fn=lambda _w, _d: _FakeProc(),
+        signal_fn=lambda pid, sig: calls.append(("signal", pid, sig)),
+        alive_fn=lambda _pid: True,
+        now_fn=lambda: 1000.0, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "DEGRADED"
+    assert "busy" in out["reason"]
+    assert calls == []
