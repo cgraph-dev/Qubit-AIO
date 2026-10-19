@@ -290,6 +290,20 @@ def _claim_launch_home():
 
 
 def main():
+    # The home's single owner, claimed before any writer opens its state.db. A home a running gateway
+    # already reserved (``gateway.lock``) refuses this process instead of racing it on the same store.
+    home = _claim_launch_home()
+    if home is None:
+        _log_exit(f"refused: {server._launch_home()} is owned by a running gateway; attach to it instead")
+        sys.exit(1)
+    try:
+        _serve()
+    finally:
+        from gateway.runtime_ownership import process_ownership
+        process_ownership.release(home)
+
+
+def _serve():
     # stdout is this process's JSON-RPC client channel: peer-less global broadcasts belong on it.
     server._stdio_is_rpc_channel = True
     try:
