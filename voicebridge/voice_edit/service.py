@@ -79,6 +79,26 @@ def _signal_helper_stop() -> bool:
         return False
 
 
+def ask_turn_stopped(cfg: Any, request_id: str) -> bool:
+    """True when the ONE voice-edit service recorded this turn as stopped.
+
+    ``qubit_compat.h_audio_speak`` calls this before (and after) synthesis so
+    a reply's speech is not synthesized after an orb STOP, keyed to the turn
+    id the helper sends. It reads the SAME service instance the helper's
+    ``/<rid>/cancel`` reached (``routes.service_for``). Fail-open: an empty
+    id, no service, or any error -> False, so a dashboard caller that sends
+    no ``request_id`` stays byte-identical. Never raises.
+    """
+    rid = str(request_id or "").strip()
+    if not rid:
+        return False
+    try:
+        from . import routes as _routes
+        return bool(_routes.service_for(cfg).ask_turn_is_stopped(rid))
+    except Exception:  # noqa: BLE001 - gate is best-effort
+        return False
+
+
 #: Worker narration shapes (Lane 2, 2026-10-03, journal test-4 09:54:53):
 #: the headless worker ran an irrelevant tool (``local.open_app`` for a
 #: create-file task) and summarized with assistant chatter
@@ -761,6 +781,26 @@ class VoiceEditService:
         try:
             return bool(ev is not None and ev.is_set())
         except Exception:  # noqa: BLE001
+            return False
+
+    def ask_turn_is_stopped(self, request_id: str) -> bool:
+        """True when a recorded cancel marks this turn stopped (orb STOP).
+
+        Read by the ``/api/audio/speak`` gate (``ask_turn_stopped``) so a
+        reply's speech is not synthesized after the user stopped. A cancel
+        creates the event even when no ask is in flight (a tombstone), so the
+        gate holds whether the stop arrived during the ask or just before the
+        speech. Fail-open: empty/unknown id or any error -> False. Never
+        raises.
+        """
+        rid = str(request_id or "").strip()
+        if not rid:
+            return False
+        try:
+            with self._lock:
+                ev = self._ask_cancels.get(rid)
+            return bool(ev is not None and ev.is_set())
+        except Exception:  # noqa: BLE001 - fail-open gate
             return False
 
     def _ask_cancelled(self, request_id: str, mode: str) -> Dict[str, Any]:
