@@ -26,7 +26,7 @@ from gateway.config import (
     platform_binds_port as _platform_binds_port,
 )
 from gateway.platforms.base import BasePlatformAdapter
-from gateway.platforms.helpers import carry_inbound_dedup, inbound_dedup_caches
+from gateway.platforms.helpers import carry_inbound_dedup, hand_over_held_inbound, inbound_dedup_caches
 from gateway.restart import is_global_startup_conflict
 from gateway.run_shutdown import _log_suppressed
 from gateway.session import SessionSource
@@ -246,6 +246,8 @@ class GatewayAdapterLifecycleMixin:
             "credential_claim": self._adapter_credential_claim(platform, adapter),
             "listener_claim": self._adapter_listener_claim(platform, adapter),
             "inbound_dedup": inbound_dedup_caches(adapter),
+            # The replaced instance: its dedup caches seed each candidate, its held inbound moves on publish.
+            "predecessor": adapter,
         }
 
     def _queue_retryable_fatal_platform(self, adapter: BasePlatformAdapter) -> bool:
@@ -869,10 +871,14 @@ class GatewayAdapterLifecycleMixin:
                 # __init__ stay open until the next GC pass — and aiohttp/SQLite handles don't get GC'd
                 # promptly, so 2 fds/retry leak at 300s backoff cap = ~12 fds/hour (#37011).
                 await _dispose_unused_adapter(adapter)
+                # Inbound it held during connect or salvaged in disconnect goes back to the predecessor.
+                hand_over_held_inbound(adapter, info.get("predecessor"))
         except Exception as e:
             if adapter is not None:
                 # An exception escaping connect leaves the adapter in the same unowned state.
                 await _dispose_unused_adapter(adapter)
+                if self.adapters.get(platform) is not adapter:  # an installed adapter owns its queue
+                    hand_over_held_inbound(adapter, info.get("predecessor"))
             # A reconnect exception is transient; keep retrying at the cap rather than auto-pausing.
             backoff = self._bump_reconnect_backoff(platform, info, attempt, None, str(e))
             logger.warning("Reconnect %s error: %s, next retry in %ds", platform.value, e, backoff)
@@ -901,7 +907,7 @@ class GatewayAdapterLifecycleMixin:
         """Publish a freshly reconnected primary adapter and replay what it missed while down."""
         self._publish_primary_adapter(platform, adapter)
         self.delivery_router.adapters = self.adapters
-        del self._failed_platforms[platform]
+        hand_over_held_inbound(self._failed_platforms.pop(platform).get("predecessor"), adapter)
         # connect() returning True does not mean the receive path is confirmed -- Telegram's degraded
         # reconnect returns True so the gateway stays up while its own ladder retries. Stamping "connected"
         # here would undo the adapter's accurate status.
