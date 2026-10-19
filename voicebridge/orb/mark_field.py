@@ -43,6 +43,8 @@ Layers, back to front:
   * ``infall_streaks``  — fast radial streaks with an inward velocity + tail.
   * ``screen_break``    — fast bodies on wide orbits that reach BEYOND R (and
     past the widget edge): the deliberate overflow the owner asked for.
+  * ``haze_state``      — a slow, very faint parallax haze of large soft bodies
+    behind everything, each breathing on its own non-harmonic period.
 
 Depth convention: ``depth = 0.5 + 0.5*cos(radians(angle))`` on a particle's
 orbit — 1.0 is nearest the viewer. Renderers draw every ``depth < 0.5`` element
@@ -144,6 +146,15 @@ Z2_SALT = 42.9
 CAMERA_SWAY_FRAC = 0.016
 CAMERA_SPEED_X = 0.27
 CAMERA_SPEED_Y = 0.19
+#: A second, much slower camera term on a NON-HARMONIC period. One sine per
+#: axis reads as a metronome; summing two periods that never lock gives the
+#: slow, unrepeating float of a hand-held camera. The weights sum to 1.0, so
+#: the total sway is still bounded by :data:`CAMERA_SWAY_FRAC`.
+CAMERA_SWAY_WEIGHTS = (0.68, 0.32)
+CAMERA_SWAY_PERIOD_X2 = 11.7
+CAMERA_SWAY_PERIOD_Y2 = 17.3
+CAMERA_SWAY_PHASE_X2 = 1.1
+CAMERA_SWAY_PHASE_Y2 = 2.4
 
 # ------------------------------------------------------------------ orbits
 PRECESSION_DEG = 30.0
@@ -198,6 +209,10 @@ SHOCKWAVE_S = 0.50
 SHOCKWAVE_MAX_SCALE = 2.30
 SHOCKWAVE_ALPHA = 0.20
 SHOCKWAVE_WIDTH = 1.0
+#: Fraction of the ring's life spent fading IN from zero alpha. Without an
+#: attack the ring popped into existence at full opacity on the beat; with it
+#: the expansion is born out of the nucleus and only then becomes visible.
+SHOCKWAVE_ATTACK_FRAC = 0.18
 
 #: A particle is a GLINT (a twinkling four-point star), never a filled orb —
 #: the nucleus is the mark's only solid body. ``GLINT_ARM_FRAC`` is the star
@@ -536,7 +551,7 @@ def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
             # No path and no velocity: hold the body's place rather than invent
             # a direction, so a hand-built dict still yields a usable streak.
             x, y, depth = bx, by, _finite(body.get("depth"), 0.5)
-        tz, tz2 = depth_axes(int(_finite(idx)) + k, 123.4)
+        tz, tz2 = _volume_axes(tt, int(_finite(idx)) + k, 123.4)
         out.append({
             "k": float(k),
             "x": x, "y": y,
@@ -624,6 +639,107 @@ def depth_axes(index: Any, salt: float = 0.0) -> Tuple[float, float]:
     return (hash01(i, Z_SALT + salt), hash01(i, Z2_SALT + salt))
 
 
+#: The volume axes are no longer frozen per body: each one breathes on its own
+#: slow NON-HARMONIC period, so a renderer's parallax offset drifts gently and
+#: the cloud keeps changing shape instead of translating as one rigid slab.
+#: The sway is deliberately small (±5% of an axis) — it must read as the volume
+#: settling, never as a body teleporting between depth planes.
+VOLUME_SWAY_PERIOD_A = 9.7
+VOLUME_SWAY_PERIOD_B = 13.3
+VOLUME_SWAY_SPAN = 0.052
+VOLUME_SWAY_PHASE = 0.7
+
+
+def _volume_axes(t: Any, index: Any, salt: float = 0.0) -> Tuple[float, float]:
+    """Time-varying ``(z, z2)``: :func:`depth_axes` plus a gentle parallax sway.
+
+    ADDITIVE on top of :func:`depth_axes` (which stays the pure, frozen hash
+    contract): the two axes drift on independent non-harmonic periods around
+    their hashed home, clamped back into 0..1. The motion is C1 in ``t`` and
+    carries zero velocity at the turnarounds, so a body's volume offset never
+    steps between frames.
+    """
+    i = int(_finite(index))
+    z, z2 = depth_axes(i, salt)
+    tt = _finite(t)
+    seed = hash01(i + 1, 907.3 + _finite(salt)) * 2.0 * math.pi
+    z += VOLUME_SWAY_SPAN * math.sin(
+        2.0 * math.pi * tt / VOLUME_SWAY_PERIOD_A + seed)
+    z2 += VOLUME_SWAY_SPAN * math.sin(
+        2.0 * math.pi * tt / VOLUME_SWAY_PERIOD_B + seed * 1.37
+        + VOLUME_SWAY_PHASE)
+    return (min(1.0, max(0.0, z)), min(1.0, max(0.0, z2)))
+
+
+# --------------------------------------------------------- micro-motion field
+#: Owner 2026-10-19: "refine orb complex animations more make more fluid ...
+#: more detailed". Every body gains a SECONDARY, bounded micro-oscillation on
+#: top of its orbit: two non-harmonic sines per axis (sum of weights = 1.0),
+#: so neighbouring bodies never wobble in unison and the field shimmers like
+#: something alive. It is pure screen-space displacement — it cannot change an
+#: orbit's topology or a ring's declared shape.
+MICRO_WOBBLE_FRAC = 0.010
+MICRO_WOBBLE_PERIOD_A = 6.9
+MICRO_WOBBLE_PERIOD_B = 11.3
+MICRO_WOBBLE_PERIOD_C = 8.7
+MICRO_WOBBLE_PERIOD_D = 15.1
+MICRO_WOBBLE_WEIGHTS = (0.62, 0.38)
+
+
+def micro_offset(t: Any, index: Any, R: float,
+                 salt: float = 0.0) -> Tuple[float, float]:
+    """Bounded screen-space micro-wobble ``(dx, dy)`` in pixels.
+
+    Two non-harmonic sines per axis, each weighted so every AXIS stays within
+    ``MICRO_WOBBLE_FRAC * R`` (the 2-D magnitude can reach ``sqrt(2)`` times
+    that). Deterministic in ``(index, salt)``, C1 in ``t`` (pure sines, no
+    wrap), and junk-safe like every field helper.
+    """
+    i = int(_finite(index))
+    r = abs(_finite(R, 32.0)) or 32.0
+    tt = _finite(t)
+    amp = MICRO_WOBBLE_FRAC * r
+    w0, w1 = MICRO_WOBBLE_WEIGHTS
+    s = hash01(i + 1, 911.7 + _finite(salt)) * 2.0 * math.pi
+    x = (w0 * math.sin(2.0 * math.pi * tt / MICRO_WOBBLE_PERIOD_A + s)
+         + w1 * math.sin(2.0 * math.pi * tt / MICRO_WOBBLE_PERIOD_B
+                         + s * 1.61 + 0.9))
+    y = (w0 * math.sin(2.0 * math.pi * tt / MICRO_WOBBLE_PERIOD_C + s * 0.73)
+         + w1 * math.sin(2.0 * math.pi * tt / MICRO_WOBBLE_PERIOD_D
+                         + s * 2.17 + 2.1))
+    return (amp * x, amp * y)
+
+
+#: A slow, per-body drift in 0..1 (inward-only when a layer multiplies a radius
+#: by ``1 - k * drift``). A single cosine on a per-body non-harmonic period, so
+#: nothing breathes as one. Used for the breathing radius/glow detail on the
+#: volume, orbiter, cylinder, core and break layers.
+DRIFT_PERIOD_BASE = 7.9
+DRIFT_PERIOD_SPAN = 6.3
+GLOW_PERIOD_BASE = 4.7
+GLOW_PERIOD_SPAN = 5.3
+
+
+def _drift01(t: Any, index: Any, salt: float = 0.0) -> float:
+    """A smooth per-body 0..1 drift on its own non-harmonic period."""
+    i = int(_finite(index))
+    tt = _finite(t)
+    period = DRIFT_PERIOD_BASE + DRIFT_PERIOD_SPAN * hash01(i + 1, 919.1 + salt)
+    phase = hash01(i + 1, 921.7 + salt) * 2.0 * math.pi
+    return 0.5 + 0.5 * math.sin(
+        2.0 * math.pi * tt / max(0.1, period) + phase)
+
+
+def _glow(t: Any, index: Any, salt: float = 0.0) -> float:
+    """A smooth per-body glow multiplier around 1.0, own non-harmonic period."""
+    i = int(_finite(index))
+    tt = _finite(t)
+    period = GLOW_PERIOD_BASE + GLOW_PERIOD_SPAN * hash01(i + 1, 923.3 + salt)
+    phase = hash01(i + 1, 927.1 + salt) * 2.0 * math.pi
+    return 1.0 + 0.10 * math.sin(
+        2.0 * math.pi * tt / max(0.1, period) + phase)
+
+
 def smoothstep(x: Any) -> float:
     """Clamped 0..1 ramp whose slope is ZERO at both ends.
 
@@ -648,11 +764,22 @@ def ease(x: Any) -> float:
 
 
 def camera_offset(t: Any, R: float) -> Tuple[float, float]:
-    """Small floating sway of the whole mark; sells the depth fake."""
+    """Small floating sway of the whole mark; sells the depth fake.
+
+    Two non-harmonic periods per axis, summed with weights that total 1.0, so
+    the drift never settles into a visible beat and never exceeds the declared
+    sway. Continuous in ``t`` (pure sines).
+    """
     tt = _finite(t)
     r = _finite(R, 1.0) or 1.0
-    return (math.sin(tt * CAMERA_SPEED_X) * r * CAMERA_SWAY_FRAC,
-            math.cos(tt * CAMERA_SPEED_Y) * r * CAMERA_SWAY_FRAC * 0.6)
+    w0, w1 = CAMERA_SWAY_WEIGHTS
+    sx = (w0 * math.sin(tt * CAMERA_SPEED_X)
+          + w1 * math.sin(2.0 * math.pi * tt / CAMERA_SWAY_PERIOD_X2
+                          + CAMERA_SWAY_PHASE_X2))
+    sy = (w0 * math.cos(tt * CAMERA_SPEED_Y)
+          + w1 * math.sin(2.0 * math.pi * tt / CAMERA_SWAY_PERIOD_Y2
+                          + CAMERA_SWAY_PHASE_Y2))
+    return (sx * r * CAMERA_SWAY_FRAC, sy * r * CAMERA_SWAY_FRAC * 0.6)
 
 
 def orbit_tilts(t: Any) -> Tuple[float, float]:
@@ -718,8 +845,16 @@ def shockwave(t: Any) -> Tuple[float, float]:
     if age >= SHOCKWAVE_S:
         return (0.0, 0.0)
     f = age / SHOCKWAVE_S
-    return (1.0 + (SHOCKWAVE_MAX_SCALE - 1.0) * f,
-            SHOCKWAVE_ALPHA * (1.0 - f) ** 1.4)
+    # Eased expansion, with a short attack so the ring does not pop into
+    # existence at full opacity on the beat. smoothstep has zero slope at both
+    # ends: the ring is born out of the nucleus, expands, and settles as it
+    # dies — no velocity or opacity step anywhere, and exactly (0, 0) outside
+    # the window.
+    grow = smoothstep(f)
+    attack = SHOCKWAVE_ATTACK_FRAC
+    rise = smoothstep(f / attack) if attack > 0.0 else 1.0
+    return (1.0 + (SHOCKWAVE_MAX_SCALE - 1.0) * grow,
+            SHOCKWAVE_ALPHA * rise * (1.0 - grow))
 
 
 def _speed_mod(t: float, seed: float) -> float:
@@ -737,11 +872,18 @@ def _speed_mod(t: float, seed: float) -> float:
 def _phase_wobble(t: float, seed: float) -> float:
     """Bounded phase offset (degrees) added to a particle's orbit angle.
 
-    Constant angular speed + a small sinusoidal offset: the motion breathes
-    without ever accelerating with uptime.
+    Constant angular speed + a small offset: the motion breathes without ever
+    accelerating with uptime. The offset is a SUM of two non-harmonic sines
+    (weights total 1.0), so the wander is irregular rather than a pure
+    back-and-forth; it stays bounded by :data:`SPEED_MOD_DEG` and is C1 in
+    ``t`` because both terms are pure sines of absolute time.
     """
-    return SPEED_MOD_DEG * math.sin(t * SPEED_MOD_HZ * 2.0 * math.pi
-                                    + seed * math.pi / 180.0)
+    tt = _finite(t)
+    ph = seed * math.pi / 180.0
+    fast = math.sin(tt * SPEED_MOD_HZ * 2.0 * math.pi + ph)
+    slow = math.sin(tt * SPEED_MOD_HZ * 0.37 * 2.0 * math.pi + ph * 1.7
+                    + 0.9)
+    return SPEED_MOD_DEG * (0.66 * fast + 0.34 * slow)
 
 
 def _depth(angle_deg: float) -> float:
@@ -801,13 +943,18 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
         par = (depth - 0.5) * DEPTH_PARALLAX * r
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
         nx, ny = (math.sin(math.radians(tilt)), -math.cos(math.radians(tilt)))
-        # Parallax along the orbit normal, then the camera sway.
+        # Parallax along the orbit normal, then the camera sway, then the
+        # per-body micro-wobble (a second, smaller oscillation on top of the
+        # orbit, so no two stars move on identical rails).
         tw = glint(tt, seed)
-        pz, pz2 = depth_axes(idx, 17.1)
+        wx, wy = micro_offset(tt, idx, r, 17.1)
+        pz, pz2 = _volume_axes(tt, idx, 17.1)
         out.append({
             "index": float(idx), "orbit": orbit, "angle": ang, "depth": depth,
-            "x": x + nx * par + dx, "y": y + ny * par * 0.35 + dy,
+            "x": x + nx * par + dx + wx,
+            "y": y + ny * par * 0.35 + dy + wy,
             "z": pz, "z2": pz2,
+            "wobble": math.hypot(wx, wy),
             "size": _depth_size(depth, size96 * scale) * tw["scale"],
             "alpha": _depth_alpha(depth) * tw["alpha"],
             "lift": _depth_lift(depth),
@@ -830,8 +977,18 @@ def glint(t: Any, seed: float) -> Dict[str, float]:
     period = GLINT_TWINKLE_BASE_S + GLINT_TWINKLE_SPAN_S * hash01(int(seed) % 97, 17.3)
     phase = (tt / max(0.1, period) + seed / 360.0) % 1.0
     wave = 0.5 * (1.0 - math.cos(2.0 * math.pi * phase))
-    return {"scale": 0.75 + 0.45 * wave,
-            "alpha": GLINT_MIN_ALPHA + (1.0 - GLINT_MIN_ALPHA) * wave}
+    # A second, faster shimmer on an absolute-time period (NOT a multiple of
+    # the wrapped phase, which would step at the phase seam). It is deliberately
+    # small: the twinkle stays the main event, but a glint now has a live
+    # micro-flicker instead of a single clean cosine.
+    flicker = 0.5 + 0.5 * math.sin(
+        2.0 * math.pi * tt / 1.13 + seed * 0.021)
+    scale = 0.75 + 0.45 * wave + 0.055 * (flicker - 0.5)
+    alpha = (GLINT_MIN_ALPHA + (1.0 - GLINT_MIN_ALPHA) * wave
+             + 0.08 * (flicker - 0.5))
+    return {"scale": scale,
+            "alpha": min(1.0, max(GLINT_MIN_ALPHA, alpha)),
+            "flicker": flicker}
 
 
 def echo_rings(t: Any) -> List[Dict[str, float]]:
@@ -867,6 +1024,9 @@ def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
         if phase >= NUCLEUS_SPARK_VISIBLE:
             continue
         f = phase / NUCLEUS_SPARK_VISIBLE
+        # The launch profile is part of the published spark contract (Qt's
+        # outward-shower test recovers the phase from these curves), so it is
+        # kept: ``f ** 0.65`` is the ejection, ``(1 - f) ** 1.5`` the fade.
         grow = f ** 0.65
         dist = r * NUCLEUS_SPARK_REACH * grow
         ang = math.radians(seed + 40.0 * phase)
@@ -876,7 +1036,7 @@ def nucleus_sparks(t: Any, R: float) -> List[Dict[str, float]]:
         fade = (1.0 - f) ** 1.5
         if NUCLEUS_SPARK_ALPHA * fade < NUCLEUS_SPARK_MIN_ALPHA:
             continue
-        sz, sz2 = depth_axes(i, 197.9)
+        sz, sz2 = _volume_axes(tt, i, 197.9)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": 0.5 + 0.5 * math.cos(ang),
@@ -921,14 +1081,14 @@ def satellites(t: Any, R: float) -> List[Dict[str, Any]]:
             d = _depth(a)
             pp = 1.0 - DEPTH_PERSPECTIVE * (1.0 - d)
             tx, ty = orbit_point(0.0, 0.0, rx * pp, ry * pp, tilt, a)
-            sz, sz2 = depth_axes(int(idx) * 100 + k, 151.7)
+            sz, sz2 = _volume_axes(tt, int(idx) * 100 + k, 151.7)
             trail.append({"x": tx + dx, "y": ty + dy,
                           "z": sz, "z2": sz2,
                           "size": _depth_size(d, size96 * scale) * 0.5,
                           "alpha": 0.30 * alpha * (1.0 - k / (SATELLITE_TRAIL_SAMPLES + 1.0)),
                           "lift": lift})
         bvx, bvy = _orbit_velocity(rx, ry, tilt, ang)
-        bz, bz2 = depth_axes(idx, 157.3)
+        bz, bz2 = _volume_axes(tt, idx, 157.3)
         out.append({
             "index": float(idx),
             "ring": {"tilt": tilt, "rx_frac": rx_frac,
@@ -965,7 +1125,7 @@ def trails(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
-        tz, tz2 = depth_axes(int(_finite(particle.get("index", 0.0))) + k,
+        tz, tz2 = _volume_axes(tt, int(_finite(particle.get("index", 0.0))) + k,
                              173.1)
         out.append({
             "x": x + dx, "y": y + dy,
@@ -1020,7 +1180,7 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
         grow = DUST_R_FRAC_MIN + DUST_R_FRAC_SPAN * hash01(i, 5.9)
         x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow, tilt, ang)
         vx, vy = _orbit_velocity(rx * pull * grow, ry * pull * grow, tilt, ang)
-        dz, dz2 = depth_axes(i, 23.3)
+        dz, dz2 = _volume_axes(tt, i, 23.3)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
@@ -1072,14 +1232,14 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
         d = _depth(a)
         p = 1.0 - DEPTH_PERSPECTIVE * (1.0 - d)
         tx, ty = orbit_point(0.0, 0.0, rx * p, ry * p, near_tilt, a)
-        tz, tz2 = depth_axes(k, 181.3)
+        tz, tz2 = _volume_axes(tt, k, 181.3)
         tail.append({"x": tx + dx, "y": ty + dy,
                      "z": tz, "z2": tz2,
                      "size": COMET_SIZE * scale * 0.62 * (1.0 - k / 14.0),
                      "alpha": COMET_ALPHA * fade * (1.0 - k / (COMET_TRAIL_SAMPLES + 1.0)) ** 1.3,
                      "lift": COMET_LIFT})
     cvx, cvy = _orbit_velocity(rx * pull, ry * pull, near_tilt, ang)
-    cz, cz2 = depth_axes(0, 187.7)
+    cz, cz2 = _volume_axes(tt, 0, 187.7)
     return {"x": x + dx, "y": y + dy, "depth": depth,
             "index": 0.0, "hue": _hue_for(0, 101.3),
             "hue2": _hue_pair(_hue_for(0, 101.3)),
@@ -1114,8 +1274,10 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
         sx, sy = r * rfrac * RX_FRAC * pull, r * rfrac * RY_FRAC * pull
         x, y = orbit_point(0.0, 0.0, sx, sy, near_tilt, ang)
         vx, vy = _orbit_velocity(sx, sy, near_tilt, ang)
-        gz, gz2 = depth_axes(i, 191.3)
-        out.append({"index": float(i), "x": x + dx, "y": y + dy,
+        wx, wy = micro_offset(tt, i, r, 189.7)
+        gz, gz2 = _volume_axes(tt, i, 191.3)
+        out.append({"index": float(i), "x": x + dx + wx,
+                    "y": y + dy + wy,
                     "depth": depth, "hue": _hue_for(i, 67.1),
                     "hue2": _hue_pair(_hue_for(i, 67.1)),
                     "z": gz, "z2": gz2,
@@ -1174,7 +1336,7 @@ def blink_dots(t: Any, R: float) -> List[Dict[str, float]]:
         x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull * grow,
                            r * RY_FRAC * pull * grow, tilt, ang)
         hue = _hue_for(i, 91.7)
-        bz, bz2 = depth_axes(i, 227.1)
+        bz, bz2 = _volume_axes(tt, i, 227.1)
         out.append({
             "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
             "hue": hue, "hue2": _hue_pair(hue),
@@ -1231,7 +1393,7 @@ def flare_dots(t: Any, R: float) -> List[Dict[str, float]]:
         x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull * grow,
                            r * RY_FRAC * pull * grow, tilt, ang)
         hue = _hue_for(i, 107.3)
-        fz, fz2 = depth_axes(i, 233.9)
+        fz, fz2 = _volume_axes(tt, i, 233.9)
         out.append({
             "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
             "hue": hue, "hue2": _hue_pair(hue),
@@ -1304,7 +1466,10 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         x, y = orbit_point(0.0, 0.0, rx * pull * grow, ry * pull * grow,
                            tilt, ang)
         vx, vy = _orbit_velocity(rx * pull * grow, ry * pull * grow, tilt, ang)
-        bz, bz2 = depth_axes(i, 211.3)
+        # NOTE: keep binary positions on their exact orbit path — the dense
+        # glyph field is sampled positionally by the renderer contracts, so no
+        # additive screen wobble here.
+        bz, bz2 = _volume_axes(tt, i, 211.3)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
@@ -1334,7 +1499,7 @@ def binary_state(t: Any, R: float) -> List[Dict[str, Any]]:
         x, y = orbit_point(0.0, 0.0, rx_s * pull, ry_s * pull, tilt, ang)
         vx, vy = _orbit_velocity(rx_s * pull, ry_s * pull, tilt, ang)
         i = main_n + j
-        bz, bz2 = depth_axes(i, 223.7)
+        bz, bz2 = _volume_axes(tt, i, 223.7)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
@@ -1437,7 +1602,12 @@ def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
         u, v = math.cos(ar), math.sin(ar)
         # The particle's own inclined plane: y is foreshortened by the
         # inclination, the out-of-plane component becomes depth (near half in
-        # front of the core, far half behind it).
+        # front of the core, far half behind it). A slow INWARD-only radial
+        # drift gives each body a breathing radius, so the shell lives instead
+        # of tracing one frozen circle; it can never grow past its declared
+        # orbit (and so never past the layer's radius bound).
+        drift = _drift01(tt, idx, 731.9)
+        rad = rad * (1.0 - 0.045 * drift)
         x = rad * u
         y = rad * v * math.cos(inc)
         zunit = v * math.sin(inc)
@@ -1451,10 +1621,13 @@ def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
         spin_period = (VOLUME_SPIN_PERIOD_BASE
                        + VOLUME_SPIN_PERIOD_SPAN * hash01(idx, 733.3))
         spin = (360.0 * tt / max(0.1, spin_period) + phase0) % 360.0
+        # A third, much slower per-body glow on its own non-harmonic period:
+        # the field's brightness is a living tissue, not one shared flicker.
+        glow = _glow(tt, idx, 733.9)
         # Screen velocity per second (the dt of the orbit), for streaking.
         vx = -rad * v * rate
         vy = rad * u * math.cos(inc) * rate
-        cz, cz2 = depth_axes(idx, 723.9)
+        cz, cz2 = _volume_axes(tt, idx, 723.9)
         hue = _hue_for(idx, 729.1)
         out.append({
             "index": float(idx),
@@ -1466,15 +1639,17 @@ def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
                 depth,
                 (VOLUME_SIZE_BASE
                  + VOLUME_SIZE_SPAN * hash01(idx, 731.3)) * scale)
-                * (0.72 + 0.56 * pulse)),
-            "alpha": (_depth_alpha(depth, VOLUME_ALPHA_BASE
-                                   + VOLUME_ALPHA_GAIN * hash01(idx, 737.1))
-                      * (0.55 + 0.45 * pulse)),
+                * (0.72 + 0.56 * pulse) * (0.96 + 0.08 * drift)),
+            "alpha": min(1.0, (_depth_alpha(
+                depth, VOLUME_ALPHA_BASE
+                + VOLUME_ALPHA_GAIN * hash01(idx, 737.1))
+                * (0.55 + 0.45 * pulse) * glow)),
             "lift": VOLUME_LIFT_BASE + VOLUME_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
             "r": rad, "inc": inc,
             "pulse": min(1.0, max(0.0, pulse)), "spin": spin,
+            "drift": drift, "glow": glow,
         })
     return out
 
@@ -1499,12 +1674,19 @@ def math_state(t: Any, R: float) -> List[Dict[str, Any]]:
 #: them as layered depth INSIDE the core (owner: "make inside orb more 3d give
 #: more depth and animations"). Radii are fractions of the MARK radius and sit
 #: comfortably inside the nucleus body (``NUCLEUS_FRAC`` = 0.05).
-CORE_SHELL_COUNT = 4
-CORE_SHELL_R_FRAC_MIN = 0.014
-CORE_SHELL_R_FRAC_SPAN = 0.031
+CORE_SHELL_COUNT = 6
+CORE_SHELL_R_FRAC_MIN = 0.012
+CORE_SHELL_R_FRAC_SPAN = 0.033
 #: One full-turn period per shell (seconds). Non-harmonic against each other,
-#: against the ring turns (9.5/13.5) and against the spins (20.5/27).
-CORE_SHELL_PERIODS_S = (2.9, 4.3, 5.9, 8.1)
+#: against the ring turns (9.5/13.5) and against the spins (20.5/27). Six
+#: shells (was four) give the interior a deeper, more layered read; the two
+#: extra periods are chosen so no pair approaches a simple ratio.
+CORE_SHELL_PERIODS_S = (2.9, 4.3, 5.9, 8.1, 6.7, 10.3)
+#: Per-shell radius swirl: a small secondary radial oscillation on its own
+#: non-harmonic period, so a shell's orbit breathes instead of tracing one
+#: fixed circle. Inward-biased (it multiplies by ``1 - span*drift``), so it can
+#: never escape the interior or the ``NUCLEUS_FRAC`` bound.
+CORE_SHELL_SWIRL_SPAN = 0.14
 #: Each shell's orbit plane tilt: base + step*index, so the shells nest at
 #: different angles instead of sharing one plane.
 CORE_SHELL_TILT_BASE = 16.0
@@ -1540,7 +1722,11 @@ def core_shells(t: Any, R: float) -> List[Dict[str, float]]:
         direction = 1.0 if (i % 2 == 0) else -1.0
         rfrac = (CORE_SHELL_R_FRAC_MIN
                  + CORE_SHELL_R_FRAC_SPAN * hash01(i, 61.3))
-        rx = r * rfrac
+        # A secondary radial swirl (inward-biased, so the shell can never
+        # escape the nucleus) plus a bounded micro-wobble: the interior bodies
+        # drift against each other instead of running one rigid clockwork.
+        swirl = _drift01(tt, i, 61.3)
+        rx = r * rfrac * (1.0 - CORE_SHELL_SWIRL_SPAN * swirl)
         ry = rx * (RY_FRAC / RX_FRAC)
         tilt = CORE_SHELL_TILT_BASE + CORE_SHELL_TILT_STEP * i
         ang = (360.0 * direction * tt / max(0.1, period)
@@ -1548,11 +1734,14 @@ def core_shells(t: Any, R: float) -> List[Dict[str, float]]:
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
-        cz, cz2 = depth_axes(i, 73.0)
+        wx, wy = micro_offset(tt, i, r, 73.0)
+        cz, cz2 = _volume_axes(tt, i, 73.0)
         hue = _hue_for(i, 79.7)
         out.append({
-            "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
+            "index": float(i), "x": x + dx + wx, "y": y + dy + wy,
+            "depth": depth,
             "z": cz, "z2": cz2,
+            "swirl": swirl,
             "size": ((CORE_SHELL_SIZE_FRAC
                       + CORE_SHELL_SIZE_SPAN * hash01(i, 65.7)) * r
                      * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
@@ -1579,6 +1768,13 @@ FILAMENT_RX_FRAC = 0.78
 FILAMENT_PERIOD_S = 8.3
 FILAMENT_WAVE_COUNT = 3
 FILAMENT_WAVE_SPEED = 0.55
+#: A second, counter-travelling wave on a NON-HARMONIC crest count and speed.
+#: One bare sine travelling around the ring reads as a rotating highlight; two
+#: waves crossing make the filament's crests merge, split and slide — a live
+#: energy band. Weights total 1.0.
+FILAMENT_WAVE_COUNT_2 = 5
+FILAMENT_WAVE_SPEED_2 = -0.31
+FILAMENT_WAVE_WEIGHTS = (0.72, 0.28)
 FILAMENT_TILT_BASE = 12.0
 FILAMENT_TILT_SWAY_DEG = 8.0
 FILAMENT_ALPHA_BASE = 0.06
@@ -1612,15 +1808,22 @@ def filament_state(t: Any, R: float) -> List[Dict[str, float]]:
         depth = _depth(ang)
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
-        wave = 0.5 + 0.5 * math.sin(
+        w0, w1 = FILAMENT_WAVE_WEIGHTS
+        wave_a = 0.5 + 0.5 * math.sin(
             2.0 * math.pi * (FILAMENT_WAVE_COUNT * i / float(n)
                              - FILAMENT_WAVE_SPEED * tt
                              / max(0.1, FILAMENT_PERIOD_S)))
-        fz, fz2 = depth_axes(i, 251.3)
+        wave_b = 0.5 + 0.5 * math.sin(
+            2.0 * math.pi * (FILAMENT_WAVE_COUNT_2 * i / float(n)
+                             - FILAMENT_WAVE_SPEED_2 * tt
+                             / max(0.1, FILAMENT_PERIOD_S)) + 1.7)
+        wave = w0 * wave_a + w1 * wave_b
+        fz, fz2 = _volume_axes(tt, i, 251.3)
         hue = (_hue_for(i, 109.3) + tt * RGB_TRAIL_HUE_DRIFT) % 1.0
         out.append({
             "index": float(i), "x": x + dx, "y": y + dy, "depth": depth,
             "z": fz, "z2": fz2,
+            "crest": wave,
             "size": (FILAMENT_SIZE_BASE + FILAMENT_SIZE_PEAK * wave)
                     * (r / 32.0) * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
             "alpha": (FILAMENT_ALPHA_BASE + FILAMENT_ALPHA_PEAK * wave)
@@ -1628,6 +1831,94 @@ def filament_state(t: Any, R: float) -> List[Dict[str, float]]:
             "hue": hue, "hue2": _hue_pair(hue),
             "lift": FILAMENT_LIFT,
             "dof": dof(depth), "skew": skew(depth),
+        })
+    return out
+
+
+# ------------------------------------------------------------------- haze
+#: Owner 2026-10-19: "make more fluid, more professional, more detailed ...
+#: more complex". Behind everything else sits a slow parallax HAZE: a handful
+#: of large, very faint bodies on their own inclined orbits, each breathing on
+#: its own non-harmonic period. It is the cheapest way to make the volume feel
+#: deep and alive without another dense particle population — the renderers can
+#: draw it as soft translucent discs, and the whole layer stays at the declared
+#: low alpha so it never competes with the mark. ADDITIVE layer: a renderer that
+#: does not consume it simply ignores it.
+HAZE_COUNT = 14
+HAZE_R_FRAC_MIN = 0.30
+HAZE_R_FRAC_SPAN = 0.78
+HAZE_PERIOD_BASE = 23.0
+HAZE_PERIOD_SPAN = 19.0
+HAZE_INC_MIN_DEG = 12.0
+HAZE_INC_SPAN_DEG = 152.0
+HAZE_SIZE_BASE = 0.16
+HAZE_SIZE_SPAN = 0.26
+HAZE_ALPHA_BASE = 0.020
+HAZE_ALPHA_GAIN = 0.045
+HAZE_BREATH_PERIOD_BASE = 12.7
+HAZE_BREATH_PERIOD_SPAN = 15.1
+HAZE_LIFT = 0.18
+
+
+def haze_state(t: Any, R: float) -> List[Dict[str, Any]]:
+    """Slow, large, very faint parallax bodies behind the whole mark.
+
+    One dict per body: ``{"index", "x", "y", "depth", "z", "z2", "size",
+    "alpha", "lift", "hue", "hue2", "dof", "skew", "r", "inc", "phase",
+    "breath"}``. Each body rides its own inclined orbit at its own slow,
+    non-harmonic period, its radius drifts inward-only (so the layer never
+    exceeds its declared band) and its alpha breathes on a second,
+    independent period. Deterministic in ``(t, R)``, C1 in ``t``, junk-safe;
+    it is a moving layer, so a renderer drops it under reduced motion exactly
+    like the other life layers.
+    """
+    tt = _finite(t)
+    r = _finite(R, 32.0) or 32.0
+    dx, dy = camera_offset(tt, r)
+    scale = r / 32.0
+    out: List[Dict[str, Any]] = []
+    for i in range(HAZE_COUNT):
+        idx = i + 1
+        rad = r * (HAZE_R_FRAC_MIN
+                   + HAZE_R_FRAC_SPAN * hash01(idx, 941.3))
+        inc = math.radians(HAZE_INC_MIN_DEG
+                           + HAZE_INC_SPAN_DEG * hash01(idx, 943.7))
+        period = (HAZE_PERIOD_BASE
+                  + HAZE_PERIOD_SPAN * hash01(idx, 947.1))
+        direction = 1.0 if hash01(idx, 949.3) >= 0.5 else -1.0
+        phase0 = 360.0 * hash01(idx, 953.9)
+        ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
+               + _phase_wobble(tt, phase0))
+        drift = _drift01(tt, idx, 957.1)
+        rad = rad * (1.0 - 0.05 * drift)
+        ar = math.radians(ang)
+        u, v = math.cos(ar), math.sin(ar)
+        x = rad * u
+        y = rad * v * math.cos(inc)
+        depth = min(1.0, max(0.0, 0.5 + 0.5 * v * math.sin(inc)))
+        bperiod = (HAZE_BREATH_PERIOD_BASE
+                   + HAZE_BREATH_PERIOD_SPAN * hash01(idx, 959.7))
+        breath = 0.5 + 0.5 * math.sin(
+            2.0 * math.pi * tt / max(0.1, bperiod)
+            + hash01(idx, 961.3) * 2.0 * math.pi)
+        wx, wy = micro_offset(tt, idx, r, 963.7)
+        cz, cz2 = _volume_axes(tt, idx, 967.1)
+        hue = _hue_for(idx, 971.3)
+        out.append({
+            "index": float(idx),
+            "x": x + dx + wx, "y": y + dy + wy,
+            "depth": depth,
+            "z": cz, "z2": cz2,
+            "size": _depth_size(
+                depth, (HAZE_SIZE_BASE
+                        + HAZE_SIZE_SPAN * hash01(idx, 973.9))
+                * scale * (0.85 + 0.30 * breath)),
+            "alpha": min(1.0, (HAZE_ALPHA_BASE + HAZE_ALPHA_GAIN * depth)
+                         * (0.55 + 0.45 * breath)),
+            "lift": HAZE_LIFT,
+            "hue": hue, "hue2": _hue_pair(hue),
+            "dof": dof(depth), "skew": skew(depth),
+            "r": rad, "inc": inc, "phase": ang, "breath": breath,
         })
     return out
 
@@ -1947,10 +2238,16 @@ def ring_intensity(t: Any, ring: Any = None) -> float:
     period = _ring_detail_period(
         ring, "intensity_period_s", RING_INTENSITY_PERIOD_BASE,
         RING_INTENSITY_PERIOD_SPAN, 601.1)
-    phase = (2.0 * math.pi * _finite(t) / max(0.1, period)
-             + _finite(ring.get("seed")) * 0.83)
-    return RING_INTENSITY_MIN + RING_INTENSITY_SPAN * (
-        0.5 + 0.5 * math.sin(phase))
+    tt = _finite(t)
+    seed = _finite(ring.get("seed"))
+    phase = 2.0 * math.pi * tt / max(0.1, period) + seed * 0.83
+    # Two non-harmonic harmonics per ring: the hot spot slides and its width
+    # breathes, so a ring's brightness is a live accretion signature rather
+    # than one clean sine. The pair is normalised to stay inside the declared
+    # [MIN, MIN + SPAN] band.
+    phase2 = 2.0 * math.pi * tt / max(0.1, period * 0.43) + seed * 1.91 + 1.3
+    mix = 0.70 * math.sin(phase) + 0.30 * math.sin(phase2)
+    return RING_INTENSITY_MIN + RING_INTENSITY_SPAN * (0.5 + 0.5 * mix)
 
 
 def ring_shimmer(t: Any, ring: Any = None) -> float:
@@ -1965,9 +2262,14 @@ def ring_shimmer(t: Any, ring: Any = None) -> float:
     period = _ring_detail_period(
         ring, "shimmer_period_s", RING_SHIMMER_PERIOD_BASE,
         RING_SHIMMER_PERIOD_SPAN, 603.7)
-    phase = (2.0 * math.pi * _finite(t) / max(0.1, period)
-             + _finite(ring.get("seed")) * 1.37)
-    return 1.0 + RING_SHIMMER_SPAN * 0.5 * math.sin(phase)
+    tt = _finite(t)
+    seed = _finite(ring.get("seed"))
+    phase = 2.0 * math.pi * tt / max(0.1, period) + seed * 1.37
+    # A second, faster radius texture on a 0.61x (non-harmonic) period. Weighted
+    # so the total stays inside the declared sub-percent shimmer span.
+    phase2 = 2.0 * math.pi * tt / max(0.1, period * 0.61) + seed * 2.29 + 0.7
+    mix = 0.76 * math.sin(phase) + 0.24 * math.sin(phase2)
+    return 1.0 + RING_SHIMMER_SPAN * 0.5 * mix
 
 
 # -------------------------------------------------------------- ring particles
@@ -2026,7 +2328,7 @@ def ring_particles(t: Any, R: float) -> List[Dict[str, Any]]:
             depth = _depth(ang)
             pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
             x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
-            pz, pz2 = depth_axes(gi, 223.9)
+            pz, pz2 = _volume_axes(tt, gi, 223.9)
             hue = _hue_for(gi, 227.1)
             out.append({
                 "index": float(gi), "x": x + dx, "y": y + dy, "depth": depth,
@@ -2099,7 +2401,15 @@ def accretion_stream(t: Any, R: float) -> List[Dict[str, Any]]:
             0.92 + 0.16 * hash01(idx, 811.3))
         r_in = r * ACCRETION_R_IN_FRAC * (
             0.85 + 0.30 * hash01(idx, 813.9))
+        # A second radial ripple on a non-harmonic harmonic of the winding
+        # period: the stream's inflow is not one clean cosine, so the spiral
+        # gains travelling density waves (the clumps a real accretion flow
+        # shows) without ever leaving the declared inner/outer band.
+        ripple = 0.5 + 0.5 * math.sin(
+            phase * 2.37 + hash01(idx, 815.3) * 2.0 * math.pi)
         rad = r_out + (r_in - r_out) * inward
+        rad = min(r_out, max(r_in, rad + (r_out - r_in)
+                             * 0.035 * (0.5 - ripple)))
         ang = (phase0 + direction * 360.0 * tt / max(0.1, period)
                + ACCRETION_SPIRAL_TURNS * 360.0 * inward * direction
                + _phase_wobble(tt, phase0))
@@ -2108,24 +2418,31 @@ def accretion_stream(t: Any, R: float) -> List[Dict[str, Any]]:
         rr = rad * pull
         x, y = orbit_point(0.0, 0.0, rr, rr * (RY_FRAC / RX_FRAC), tilt, ang)
         vx, vy = _orbit_velocity(rr, rr * (RY_FRAC / RX_FRAC), tilt, ang)
-        cz, cz2 = depth_axes(idx, 819.7)
+        wx, wy = micro_offset(tt, idx, r, 817.1)
+        cz, cz2 = _volume_axes(tt, idx, 819.7)
         hue = _hue_for(idx, 821.1)
+        # Travelling clumps: a slow per-sample brightness wave so the stream
+        # glints in knots rather than as a uniform dotted spiral.
+        clump = 0.70 + 0.30 * (0.5 + 0.5 * math.sin(
+            2.0 * math.pi * tt / 5.9 + hash01(idx, 825.7) * 2.0 * math.pi))
         out.append({
             "index": float(idx),
-            "x": x + dx, "y": y + dy, "depth": depth,
+            "x": x + dx + wx, "y": y + dy + wy, "depth": depth,
             "z": cz, "z2": cz2,
             "vx": vx * 360.0 / max(0.1, period),
             "vy": vy * 360.0 / max(0.1, period),
             "size": _depth_size(
                 depth, (ACCRETION_SIZE_BASE
-                        + ACCRETION_SIZE_SPAN * hash01(idx, 823.3)) * scale),
-            "alpha": _depth_alpha(depth, ACCRETION_ALPHA_BASE
-                                  + ACCRETION_ALPHA_GAIN
-                                  * (0.35 + 0.65 * inward)),
+                        + ACCRETION_SIZE_SPAN * hash01(idx, 823.3)) * scale
+                * (0.92 + 0.16 * clump)),
+            "alpha": min(1.0, _depth_alpha(depth, ACCRETION_ALPHA_BASE
+                                           + ACCRETION_ALPHA_GAIN
+                                           * (0.35 + 0.65 * inward))
+                         * clump),
             "lift": ACCRETION_LIFT + 0.30 * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
-            "s": inward, "r": rad,
+            "s": inward, "r": rad, "clump": clump,
             "ring_id": str(ring.get("id") or ""),
         })
     return out
@@ -2143,6 +2460,10 @@ PHOTON_TILT_BASE = 10.0
 PHOTON_TILT_SWAY_DEG = 6.0
 PHOTON_PERIOD_S = 7.3
 PHOTON_LOBES = 2
+#: Slow precession of the lensed arcs (their bright lobes slide around the
+#: ring) plus a fast per-sample sparkle, both non-harmonic with the ring spin.
+PHOTON_PRECESS_PERIOD_S = 11.9
+PHOTON_SPARKLE_PERIOD_S = 2.7
 PHOTON_ALPHA_BASE = 0.08
 PHOTON_ALPHA_PEAK = 0.52
 PHOTON_SIZE_BASE = 0.055
@@ -2179,21 +2500,36 @@ def photon_ring(t: Any, R: float) -> List[Dict[str, Any]]:
         pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
         x, y = orbit_point(0.0, 0.0, rx * pull, ry * pull, tilt, ang)
         ar = math.radians(ang)
+        # The two bright lensed arcs slide around the ring on a slow
+        # non-harmonic precession, and a small counter-travelling ripple bends
+        # their outline — the lensed image of a moving far side, not a mask.
+        precess = (0.24 * math.sin(2.0 * math.pi * tt
+                                   / max(0.1, PHOTON_PRECESS_PERIOD_S))
+                   + 0.10 * math.sin(2.0 * math.pi * tt / 17.3 + ar * 1.7))
+        # ``lobe`` drives ALPHA and is kept exactly as published: the Qt
+        # painter culls photon samples by alpha against its own threshold, so
+        # the primitive count must not drift. The lensed precession instead
+        # moves ``lobe_glow``, which drives SIZE only — richer light without a
+        # primitive spent.
         lobe = 0.5 + 0.5 * math.cos(PHOTON_LOBES * ar - spin)
-        cz, cz2 = depth_axes(i, 831.7)
+        lobe_glow = 0.5 + 0.5 * math.cos(PHOTON_LOBES * ar - spin + precess)
+        sparkle = 0.82 + 0.18 * (0.5 + 0.5 * math.sin(
+            2.0 * math.pi * tt / max(0.1, PHOTON_SPARKLE_PERIOD_S)
+            + i * 0.61))
+        cz, cz2 = _volume_axes(tt, i, 831.7)
         hue = _hue_for(i, 833.1)
         out.append({
             "index": float(i),
             "x": x + dx, "y": y + dy, "depth": depth,
             "z": cz, "z2": cz2,
-            "size": (PHOTON_SIZE_BASE + PHOTON_SIZE_PEAK * lobe)
-                    * scale * (0.7 + 0.5 * depth),
+            "size": (PHOTON_SIZE_BASE + PHOTON_SIZE_PEAK * lobe_glow)
+                    * scale * (0.7 + 0.5 * depth) * (0.92 + 0.16 * sparkle),
             "alpha": (PHOTON_ALPHA_BASE + PHOTON_ALPHA_PEAK * lobe)
                      * (0.45 + 0.55 * depth),
             "lift": PHOTON_LIFT + 0.35 * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
-            "angle": ang,
+            "angle": ang, "lobe": lobe, "sparkle": sparkle,
         })
     return out
 
@@ -2249,6 +2585,10 @@ def infall_streaks(t: Any, R: float) -> List[Dict[str, Any]]:
         r_out = r * INFALL_R_OUT_FRAC * (0.90 + 0.16 * hash01(idx, 851.3))
         r_in = r * INFALL_R_IN_FRAC * (0.80 + 0.35 * hash01(idx, 853.9))
         rad = r_out + (r_in - r_out) * inward
+        # A small second radial ripple on the inbound leg: the stream has
+        # density knots instead of one clean cosine fall.
+        rad += (r_out - r_in) * 0.020 * (
+            0.5 - 0.5 * math.sin(phase * 3.1 + hash01(idx, 855.1) * 6.283))
         ang = (phase0 + direction * 70.0 * tt / max(0.1, period)
                + 0.6 * direction * 360.0 * inward
                + _phase_wobble(tt, phase0))
@@ -2265,25 +2605,32 @@ def infall_streaks(t: Any, R: float) -> List[Dict[str, Any]]:
             math.radians(ang))
         vy = dr_dt * math.sin(math.radians(ang)) + tang * math.cos(
             math.radians(ang))
-        cz, cz2 = depth_axes(idx, 859.7)
+        wx, wy = micro_offset(tt, idx, r, 857.3)
+        cz, cz2 = _volume_axes(tt, idx, 859.7)
         hue = _hue_for(idx, 861.1)
+        # Per-streak brightness and tail flicker: falling matter gutters.
+        flicker = 0.78 + 0.22 * (0.5 + 0.5 * math.sin(
+            2.0 * math.pi * tt / 3.1 + hash01(idx, 865.9) * 2.0 * math.pi))
         out.append({
             "index": float(idx),
-            "x": x + dx, "y": y + dy, "depth": depth,
+            "x": x + dx + wx, "y": y + dy + wy, "depth": depth,
             "z": cz, "z2": cz2,
             "vx": vx, "vy": vy,
             "size": _depth_size(
                 depth, (INFALL_SIZE_BASE
-                        + INFALL_SIZE_SPAN * hash01(idx, 863.3)) * scale),
-            "alpha": _depth_alpha(depth, INFALL_ALPHA_BASE
-                                  + INFALL_ALPHA_GAIN
-                                  * (0.30 + 0.70 * inward)),
+                        + INFALL_SIZE_SPAN * hash01(idx, 863.3)) * scale
+                * (0.9 + 0.2 * flicker)),
+            "alpha": min(1.0, _depth_alpha(depth, INFALL_ALPHA_BASE
+                                          + INFALL_ALPHA_GAIN
+                                          * (0.30 + 0.70 * inward))
+                         * flicker),
             "lift": INFALL_LIFT + 0.32 * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
             "r": rad,
-            "tail_len": INFALL_TAIL_LEN_FRAC * r * (0.6 + 0.8 * inward),
-            "s": inward,
+            "tail_len": INFALL_TAIL_LEN_FRAC * r * (0.6 + 0.8 * inward)
+                        * (0.8 + 0.4 * flicker),
+            "s": inward, "flicker": flicker,
         })
     return out
 
@@ -2365,26 +2712,34 @@ def orbiter_particles(t: Any, R: float) -> List[Dict[str, Any]]:
         ar = math.radians(ang)
         u = math.cos(ar)
         v = math.sin(ar)
+        # Slow per-body radial drift (inward-only, so the declared `r` stays
+        # the outer bound) plus its own glow: the shell breathes instead of
+        # running as one rigid gyroscope.
+        drift = _drift01(tt, idx, 423.1)
+        r_eff = rad * (1.0 - 0.045 * drift)
         # The orbit's own plane: y is foreshortened by the inclination, the
         # out-of-plane component becomes depth (near half in front of the
         # core, far half behind it).
-        x = rad * u
-        y = rad * v * math.cos(inc)
+        x = r_eff * u
+        y = r_eff * v * math.cos(inc)
         zunit = v * math.sin(inc)
         depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
-        cz, cz2 = depth_axes(idx, 421.9)
+        cz, cz2 = _volume_axes(tt, idx, 421.9)
         hue = _hue_for(idx, 431.3)
+        glow = _glow(tt, idx, 425.7)
         out.append({
             "index": float(idx),
             "x": x + dx, "y": y + dy,
             "depth": depth,
             "z": cz, "z2": cz2,
-            "size": _depth_size(depth, ORBITER_SIZE_BASE * scale),
-            "alpha": _depth_alpha(depth, ORBITER_ALPHA_BASE),
+            "size": _depth_size(depth, ORBITER_SIZE_BASE * scale
+                                * (0.96 + 0.08 * drift)),
+            "alpha": min(1.0, _depth_alpha(depth, ORBITER_ALPHA_BASE)
+                         * glow),
             "lift": ORBITER_LIFT_BASE + ORBITER_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
-            "r": rad, "inc": inc,
+            "r": rad, "inc": inc, "drift": drift, "glow": glow,
         })
     return out
 
@@ -2415,25 +2770,31 @@ def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
         ang = (phase0 + direction * 360.0 * tt / max(0.1, CYLINDER_PERIOD_S)
                + _phase_wobble(tt, phase0))
         depth = 0.5 + 0.5 * math.sin(math.radians(ang))
+        h_phase = (2.0 * math.pi * tt / max(0.1, CYLINDER_DRIFT_PERIOD_S)
+                   + hash01(idx, 327.9) * 2.0 * math.pi)
+        # Two non-harmonic vertical waves: the column drifts up and down like
+        # a slow tide instead of one metronomic bob. Amplitude is split so the
+        # total stays inside ``CYLINDER_H_FRAC``.
         h_unit = (CYLINDER_H_BASE * (2.0 * hash01(idx, 323.3) - 1.0)
-                  + CYLINDER_DRIFT_AMP
-                  * math.sin(2.0 * math.pi * tt
-                             / max(0.1, CYLINDER_DRIFT_PERIOD_S)
-                             + hash01(idx, 327.9) * 2.0 * math.pi))
+                  + 0.72 * CYLINDER_DRIFT_AMP * math.sin(h_phase)
+                  + 0.28 * CYLINDER_DRIFT_AMP * math.sin(
+                      h_phase * 1.63 + 0.8))
         h = r * CYLINDER_H_FRAC * h_unit
-        cz, cz2 = depth_axes(idx, 331.1)
+        cz, cz2 = _volume_axes(tt, idx, 331.1)
         hue = _hue_for(idx, 337.7)
+        glow = _glow(tt, idx, 333.7)
         out.append({
             "index": float(idx),
             "x": rad * math.cos(math.radians(ang)) + dx, "y": h + dy,
             "depth": depth,
             "z": cz, "z2": cz2,
             "size": _depth_size(depth, CYLINDER_SIZE_BASE * scale),
-            "alpha": _depth_alpha(depth, CYLINDER_ALPHA_BASE),
+            "alpha": min(1.0, _depth_alpha(depth, CYLINDER_ALPHA_BASE)
+                         * glow),
             "lift": CYLINDER_LIFT_BASE + CYLINDER_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
-            "r": rad, "h": h,
+            "r": rad, "h": h, "glow": glow,
         })
     return out
 
@@ -2497,6 +2858,10 @@ def screen_break(t: Any, R: float) -> List[Dict[str, Any]]:
         ang = phase0 + rate * tt + _phase_wobble(tt, phase0)
         ar = math.radians(ang)
         u, v = math.cos(ar), math.sin(ar)
+        # Inward-only radial breath: the break bodies surge toward and away
+        # from the edge without ever exceeding the declared ceiling.
+        drift = _drift01(tt, idx, 613.1)
+        rad = rad * (1.0 - 0.045 * drift)
         x = rad * u
         y = rad * v * math.cos(inc)
         zunit = v * math.sin(inc)
@@ -2505,20 +2870,24 @@ def screen_break(t: Any, R: float) -> List[Dict[str, Any]]:
         # streak the body through :func:`_rgb_trail`.
         vx = -rad * v * rate
         vy = rad * u * math.cos(inc) * rate
-        bz, bz2 = depth_axes(idx, 623.7)
+        wx, wy = micro_offset(tt, idx, r, 619.9)
+        bz, bz2 = _volume_axes(tt, idx, 623.7)
         hue = _hue_for(idx, 629.1)
+        glow = _glow(tt, idx, 621.1)
         out.append({
             "index": float(idx),
-            "x": x + dx, "y": y + dy,
+            "x": x + dx + wx, "y": y + dy + wy,
             "depth": depth,
             "z": bz, "z2": bz2,
             "vx": vx, "vy": vy,
-            "size": _depth_size(depth, SCREEN_BREAK_SIZE_BASE * scale),
-            "alpha": _depth_alpha(depth, SCREEN_BREAK_ALPHA_BASE),
+            "size": _depth_size(depth, SCREEN_BREAK_SIZE_BASE * scale
+                                * (0.94 + 0.12 * drift)),
+            "alpha": min(1.0, _depth_alpha(depth, SCREEN_BREAK_ALPHA_BASE)
+                         * glow),
             "lift": SCREEN_BREAK_LIFT_BASE + SCREEN_BREAK_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
-            "r": rad, "inc": inc,
+            "r": rad, "inc": inc, "drift": drift, "glow": glow,
         })
     return out
 
@@ -2529,6 +2898,7 @@ __all__ = [
     "MIN_MARK_BRIGHTNESS",
     "HEART_PERIOD_S", "HEART_SCALE_AMP", "HALO_SCALE", "HALO_BASE",
     "HALO_WIDTH", "SHOCKWAVE_S", "SHOCKWAVE_MAX_SCALE", "SHOCKWAVE_ALPHA",
+    "SHOCKWAVE_ATTACK_FRAC",
     "DEPTH_RADIUS_BASE", "DEPTH_RADIUS_GAIN", "DEPTH_ALPHA_BASE",
     "DEPTH_ALPHA_GAIN", "DEPTH_LIFT_BASE", "DEPTH_LIFT_GAIN",
     "DEPTH_PARALLAX", "DEPTH_PERSPECTIVE", "TRAIL_SAMPLES", "TRAIL_ALPHA_BASE",
@@ -2627,4 +2997,15 @@ __all__ = [
     "SCREEN_BREAK_INC_MIN_DEG", "SCREEN_BREAK_INC_SPAN_DEG",
     "SCREEN_BREAK_SIZE_BASE", "SCREEN_BREAK_ALPHA_BASE",
     "SCREEN_BREAK_LIFT_BASE", "SCREEN_BREAK_LIFT_GAIN",
+    "haze_state", "HAZE_COUNT", "HAZE_R_FRAC_MIN", "HAZE_R_FRAC_SPAN",
+    "HAZE_PERIOD_BASE", "HAZE_PERIOD_SPAN", "HAZE_INC_MIN_DEG",
+    "HAZE_INC_SPAN_DEG", "HAZE_SIZE_BASE", "HAZE_SIZE_SPAN",
+    "HAZE_ALPHA_BASE", "HAZE_ALPHA_GAIN", "HAZE_BREATH_PERIOD_BASE",
+    "HAZE_BREATH_PERIOD_SPAN", "HAZE_LIFT",
+    "micro_offset", "MICRO_WOBBLE_FRAC", "VOLUME_SWAY_PERIOD_A",
+    "VOLUME_SWAY_PERIOD_B", "VOLUME_SWAY_SPAN",
+    "CAMERA_SWAY_WEIGHTS", "CAMERA_SWAY_PERIOD_X2", "CAMERA_SWAY_PERIOD_Y2",
+    "FILAMENT_WAVE_COUNT_2", "FILAMENT_WAVE_SPEED_2",
+    "FILAMENT_WAVE_WEIGHTS", "CORE_SHELL_SWIRL_SPAN",
+    "PHOTON_PRECESS_PERIOD_S", "PHOTON_SPARKLE_PERIOD_S",
 ]

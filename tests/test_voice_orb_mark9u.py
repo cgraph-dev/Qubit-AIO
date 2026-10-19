@@ -240,13 +240,17 @@ def test_shockwave_ring_present_on_beat_absent_between(monkeypatch):
     # (Comparing two different phases was wrong — sparkles come and go between
     # them, so the line delta was not the ring.)
     on_beat, no_ring = FakeCanvas(), FakeCanvas()
-    s_on = M.render(on_beat, 34.0, 34.0, 32.0, 0.0, "idle")   # thump -> ring
+    # Just after the thump: the ring's short attack has brought it to a
+    # visible alpha (it starts at 0, so t=0 is intentionally blank now).
+    t_ring = F.SHOCKWAVE_ATTACK_FRAC * F.SHOCKWAVE_S * 1.5
+    s_on = M.render(on_beat, 34.0, 34.0, 32.0, t_ring, "idle")
     monkeypatch.setattr(M, "shockwave", lambda t: (0.0, 0.0))
-    s_quiet = M.render(no_ring, 34.0, 34.0, 32.0, 0.0, "idle")
+    s_quiet = M.render(no_ring, 34.0, 34.0, 32.0, t_ring, "idle")
     assert s_on["lines"] == s_quiet["lines"] + 1, "one extra outline ring"
     monkeypatch.undo()
     # The ring is outline-only: it never adds a filled disc.
-    assert F.shockwave(0.0)[1] > 0.0
+    assert F.shockwave(0.0)[1] == pytest.approx(0.0)
+    assert F.shockwave(t_ring)[1] > 0.0
     assert F.shockwave(0.70) == (0.0, 0.0)
     # And reduced motion never draws it.
     frozen = FakeCanvas()
@@ -2030,3 +2034,99 @@ def test_particle_layers_move_in_both_directions():
         bodies = layer(1.7, 32.0)
         signs = {1 if b["vx"] >= 0 else -1 for b in bodies if b.get("vx")}
         assert signs == {1, -1}, (layer.__name__, signs)
+
+
+# --------------------------------------------------------------------------- #
+# FLUID DETAIL — owner 2026-10-19: "refine orb complex animations more make
+# more fluid, more professional, more detailed, more complex". The field gained
+# a bounded micro-wobble, time-varying volume axes, a parallax haze, richer
+# core/accretion/photon structure and two-frequency envelopes. These tests pin
+# the properties the renderers rely on: determinism, bounds, smoothness and a
+# frozen-clock ("still") contract.
+# --------------------------------------------------------------------------- #
+def test_micro_motion_is_bounded_deterministic_and_smooth():
+    from voicebridge.orb import mark_field as F
+    R = 64.0
+    for idx, salt in ((0, 0.0), (3, 5.0), (17, 11.5)):
+        a = F.micro_offset(1.7, idx, R, salt)
+        assert a == F.micro_offset(1.7, idx, R, salt), "not deterministic"
+        assert abs(a[0]) <= F.MICRO_WOBBLE_FRAC * R + 1e-9
+        assert abs(a[1]) <= F.MICRO_WOBBLE_FRAC * R + 1e-9
+        assert math.hypot(*a) <= math.sqrt(2.0) * F.MICRO_WOBBLE_FRAC * R + 1e-9
+        # C1-ish between adjacent 1/60s frames: no positional pop.
+        prev = F.micro_offset(0.0, idx, R, salt)
+        for k in range(1, 240):
+            cur = F.micro_offset(k / 60.0, idx, R, salt)
+            assert math.hypot(cur[0] - prev[0], cur[1] - prev[1]) < 0.5
+            prev = cur
+    # Junk-safe: bad clock/index/radius still give finite pixels.
+    for bad in ("bad", None, float("nan"), float("inf")):
+        dx, dy = F.micro_offset(bad, bad, bad, bad)
+        assert math.isfinite(dx) and math.isfinite(dy)
+
+
+def test_volume_axes_sway_but_stay_inside_the_published_range():
+    from voicebridge.orb import mark_field as F
+    base = F.depth_axes(7, 3.0)
+    assert base == F.depth_axes(7, 3.0)
+    # The frozen hash contract is untouched; the animated variant drifts.
+    assert F._volume_axes(2.2, 7, 3.0) != base
+    assert F._volume_axes(2.2, 7, 3.0) == F._volume_axes(2.2, 7, 3.0)
+    for k in range(120):
+        z, z2 = F._volume_axes(k / 30.0, 7, 3.0)
+        assert 0.0 <= z <= 1.0 and 0.0 <= z2 <= 1.0
+
+
+def test_haze_state_is_a_slow_faint_deterministic_parallax_layer():
+    from voicebridge.orb import mark_field as F
+    R, t = 64.0, 2.4
+    haze = F.haze_state(t, R)
+    assert len(haze) == F.HAZE_COUNT
+    assert haze == F.haze_state(t, R), "not deterministic"
+    # A frozen clock is static; a moving clock is not.
+    assert haze != F.haze_state(t + 0.5, R)
+    r_max = (F.HAZE_R_FRAC_MIN + F.HAZE_R_FRAC_SPAN) * R
+    for h in haze:
+        assert set(h) >= {"index", "x", "y", "depth", "z", "z2", "size",
+                          "alpha", "lift", "hue", "hue2", "dof", "skew",
+                          "r", "inc", "phase", "breath"}, h
+        assert 0.0 <= h["depth"] <= 1.0
+        assert 0.0 <= h["z"] <= 1.0 and 0.0 <= h["z2"] <= 1.0
+        assert 0.0 <= h["breath"] <= 1.0
+        assert h["r"] <= r_max + 1e-9
+        assert h["size"] > 0.0
+        # Faint by construction: the haze must never compete with the mark.
+        assert 0.0 < h["alpha"] <= (
+            F.HAZE_ALPHA_BASE + F.HAZE_ALPHA_GAIN + 1e-9)
+        assert h["hue2"] == pytest.approx((h["hue"] + F.HUE_PAIR_OFFSET) % 1.0)
+    # Continuous: the layer breathes, it never teleports.
+    prev = [(h["x"], h["y"]) for h in haze]
+    for k in range(1, 120):
+        cur = [(h["x"], h["y"]) for h in F.haze_state(t + k / 60.0, R)]
+        for (x, y), (px, py) in zip(cur, prev):
+            assert math.hypot(x - px, y - py) < 3.0, k
+        prev = cur
+
+
+def test_core_shells_gained_two_more_swirling_interior_bodies():
+    from voicebridge.orb import mark_field as F
+    assert F.CORE_SHELL_COUNT == 6
+    assert len(F.CORE_SHELL_PERIODS_S) >= F.CORE_SHELL_COUNT
+    shells = F.core_shells(2.3, 64.0)
+    assert len(shells) == F.CORE_SHELL_COUNT
+    assert all("swirl" in s for s in shells)
+    assert len({round(s["swirl"], 9) for s in shells}) > 1
+    # The extra bodies stay inside the nucleus and keep distinct radii/tilts.
+    nuc_r = 64.0 * F.NUCLEUS_FRAC
+    assert len({round(s["r_frac"], 9) for s in shells}) == len(shells)
+    assert len({s["tilt"] for s in shells}) == len(shells)
+    assert all(math.hypot(s["x"], s["y"]) < nuc_r * 1.6 for s in shells)
+
+
+def test_extended_motion_layers_are_pure_and_frozen_at_a_clock():
+    from voicebridge.orb import mark_field as F
+    for fn in (F.haze_state, F.volume_particles, F.orbiter_particles,
+               F.cylinder_particles, F.screen_break):
+        a = fn(2.1, 48.0)
+        assert a == fn(2.1, 48.0), fn.__name__
+        assert a != fn(2.7, 48.0), fn.__name__

@@ -552,3 +552,49 @@ def test_nucleus_sparks_are_glints_that_reach_past_the_orbits(renderer,
     assert cores, f"[{name}] sparks carry no core glint"
     assert all(p.r < nuc_r for p in cores), (
         f"[{name}] a spark core was drawn as a solid disc (r={max(p.r for p in cores):.2f})")
+
+
+# --------------------------------------------------------------------------- #
+# (h) FLUID ENVELOPES — field-level, renderer-independent
+# --------------------------------------------------------------------------- #
+def test_field_envelopes_have_no_velocity_step():
+    """Every scalar envelope is C1 at a 1/240s sampling, wrap included.
+
+    The motion was made richer (two-frequency wobbles, a swaying volume, an
+    eased shockwave), and richer is only an improvement if it stays fluid: no
+    linear ramp that starts/stops with a velocity step, and no hard wrap that
+    snaps. The shockwave's SCALE is exempt at its end-of-life reset because its
+    alpha is exactly zero there, so nothing is visible to jerk.
+    """
+    from voicebridge.orb import mark_field as F
+
+    dt = 1.0 / 240.0
+
+    def worst(fn, tol, n=1200, **kw):
+        prev = fn(0.0, **kw)
+        peak = 0.0
+        for k in range(1, n):
+            cur = fn(k * dt, **kw)
+            peak = max(peak, abs(cur - prev))
+            prev = cur
+        assert peak <= tol, f"{getattr(fn, '__name__', fn)} stepped {peak:.5f}"
+
+    worst(F.heartbeat, 0.06)
+    worst(lambda t: F.shockwave(t)[1], 0.03)
+    worst(lambda t: F.camera_offset(t, 64.0)[0], 0.01)
+    worst(lambda t: F.camera_offset(t, 64.0)[1], 0.01)
+    worst(lambda t: F.micro_offset(t, 3, 64.0, 5.0)[0], 0.01)
+    worst(lambda t: F.micro_offset(t, 3, 64.0, 5.0)[1], 0.01)
+    worst(lambda t: F._phase_wobble(t, 33.0), 0.05)
+    worst(lambda t: F.glint(t, 33.0)["scale"], 0.01)
+    worst(lambda t: F.glint(t, 33.0)["alpha"], 0.01)
+
+    ring = F.ring_geometry(0.0)[0]
+    worst(lambda t: F.ring_intensity(t, ring), 0.005)
+    worst(lambda t: F.ring_shimmer(t, ring), 0.001)
+    worst(lambda t: F.haze_state(t, 64.0)[0]["alpha"], 0.001)
+
+    # New layers are deterministic and safe on junk input.
+    for fn in (F.haze_state, F.volume_particles):
+        assert fn(2.2, 48.0) == fn(2.2, 48.0)
+        assert isinstance(fn("bad", None), list)
