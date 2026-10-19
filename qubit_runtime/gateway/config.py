@@ -574,6 +574,10 @@ def _needs_extra(*keys: str) -> Callable[[PlatformConfig], bool]:
 # Core-only "sufficiently configured?" checks (no plugin entry). Plugin platforms declare theirs as
 # ``PlatformEntry.config_connected_fn`` (or rely on the generic ``token or api_key`` check).
 _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] = {
+    # WhatsApp Cloud is a core built-in (``_BUILTIN_ADAPTERS``), so no plugin entry supplies its
+    # ``config_connected_fn``: without this row a YAML-configured Cloud bot reads as not connected
+    # and is dropped from ``get_connected_platforms()``.
+    Platform.WHATSAPP_CLOUD: _needs_extra("phone_number_id", "access_token"),
     Platform.API_SERVER: lambda cfg: _has_usable_api_server_key(cfg.extra.get("key") if cfg else None),
     Platform.WEBHOOK: lambda cfg: True,
     Platform.MSGRAPH_WEBHOOK: lambda cfg: bool(str(cfg.extra.get("client_state") or "").strip()),
