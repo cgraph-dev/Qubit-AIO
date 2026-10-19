@@ -70,7 +70,7 @@ class OwnedTwilioNumber:
 
 
 def _qubit_home() -> Path:
-    return Path(os.environ.get("QUBIT_HOME", "~/.hermes")).expanduser()
+    return Path(os.environ.get("QUBIT_HOME", "~/.qubit")).expanduser()
 
 
 def _env_path() -> Path:

@@ -32,8 +32,8 @@ def _state_dir() -> Path:
     override = os.environ.get("WATCHER_STATE_DIR")
     if override:
         return Path(override)
-    # Default: $QUBIT_HOME/watcher-state/, falling back to ~/.hermes/watcher-state/.
-    qubit_home = os.environ.get("QUBIT_HOME") or str(Path.home() / ".hermes")
+    # Default: $QUBIT_HOME/watcher-state/, falling back to ~/.qubit/watcher-state/.
+    qubit_home = os.environ.get("QUBIT_HOME") or str(Path.home() / ".qubit")
     return Path(qubit_home) / "watcher-state"
 
 
