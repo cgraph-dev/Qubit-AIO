@@ -34,10 +34,14 @@ SIZE = 160
 BG = (11, 13, 18)
 
 FRAMES = 120
-#: Generous mean cap: the mark paints a few dozen anti-aliased primitives into
-#: a 160x160 ARGB image. Real cost is well under 2 ms/frame; 25 ms leaves room
-#: for a heavily loaded host while still failing on an accidental O(n^2) blowup.
-MEAN_FRAME_CAP_S = 0.025
+#: Generous mean cap. The full FX mark is CPU-bound at ~34 ms/frame on this
+#: host (it paints hundreds of anti-aliased primitives; the orb's own adaptive
+#: frame budget runs it at ~25 fps / 40 ms — measured with time.process_time,
+#: so this is real work, not host load). 45 ms is ~30% headroom over the
+#: measured cost: it still fails on an accidental O(n^2) blowup without
+#: flaking on a busy host. (The old 25 ms cap predated the FX stack and could
+#: never pass.)
+MEAN_FRAME_CAP_S = 0.045
 #: Fixed upper bound on primitives per frame. The pre-FX mark is ~16; the full
 #: FX stack (trails + sparkles + three satellite shells + the binary field)
 #: measures 195..239 at R=70 with three shells orbiting. The RGB streak field
