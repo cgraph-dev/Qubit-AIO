@@ -244,4 +244,11 @@ def resolve_client_voice_config() -> Dict[str, Any]:
         except Exception:
             logger.exception("client voice-config %s resolution failed", key.upper())
             out[key] = _relay("resolution error")
+    # Live dictation always goes through the host's /api/audio/transcribe-stream socket (keys stay
+    # server-side), independent of client_direct; the verdict above remains the blob fallback.
+    from tools.transcription_streaming import streaming_available
+    try:
+        out["stt"]["streaming"] = streaming_available()
+    except Exception:
+        logger.debug("live STT capability probe failed", exc_info=True)
     return out

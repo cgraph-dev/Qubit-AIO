@@ -132,8 +132,12 @@ def _modal_unavailable_reason(modal_state: Dict[str, Any]) -> tuple[str, str]:
 
 # --- Environment builders. Signature: (*, image, cwd, timeout, cc, task_id, ssh_config, host_cwd)
 # (env_type is only forwarded to the plugin-registry fallback, not to the built-in builders.)
-def _build_local_env(*, cwd, timeout, **_):
-    return _LocalEnvironment(cwd=cwd, timeout=timeout)
+def _build_local_env(*, cwd, timeout, local_config=None, **_):
+    # LocalEnvironment defaults to a fresh shell per command; only ``persistent`` switches on the
+    # exported-env carry-over (TERMINAL_LOCAL_PERSISTENT). Without this the knob reached the
+    # creator and stopped there.
+    return _LocalEnvironment(cwd=cwd, timeout=timeout,
+                             persist_env=bool((local_config or {}).get("persistent", True)))
 
 
 def _build_docker_env(*, image, cwd, timeout, cc, task_id, host_cwd, **_):
@@ -244,13 +248,16 @@ def _create_environment(env_type: str, image: str, cwd: str, timeout: int,
                         ssh_config: dict | None = None, container_config: dict | None = None,
                         local_config: dict | None = None, task_id: str = "default",
                         host_cwd: Optional[str] = None, probe_only: bool = False):
+    # ``local_config`` is named (not swallowed by ``**kwargs``) so it reaches the local builder —
+    # the header comment above the builders says so, and the local persistence switch rides on it.
     """Create an execution environment (instance with ``execute()``) for *env_type*. ``image`` is ignored
     for local/ssh/vercel; ``container_config`` carries the container_*/docker_* resource keys; ``host_cwd`` is
     the host dir bound into Docker when cwd mounting is enabled. ``probe_only`` asks ssh for a throwaway
     connection with no remote setup/sync (the prompt-time probe). Unknown types fall through to plugin backends."""
     builder = _ENV_BUILDERS.get(env_type)
     kwargs = dict(image=image, cwd=cwd, timeout=timeout, cc=container_config or {}, task_id=task_id,
-                  ssh_config=ssh_config, host_cwd=host_cwd, probe_only=probe_only)
+                  ssh_config=ssh_config, host_cwd=host_cwd, probe_only=probe_only,
+                  local_config=local_config)
     if builder is not None:
         env = builder(**kwargs)
     else:

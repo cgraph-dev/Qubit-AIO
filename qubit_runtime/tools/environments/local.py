@@ -1031,8 +1031,11 @@ class LocalEnvironment(BaseEnvironment):
             name for name in merged
             if isinstance(name, str) and _matches_terminal_first_party_prefix(name)))
 
-    def __init__(self, cwd: str = "", timeout: int = 60, env: dict = None):
-        super().__init__(cwd=_resolve_local_initial_cwd(cwd), timeout=timeout, env=env)
+    def __init__(self, cwd: str = "", timeout: int = 60, env: dict = None, persist_env: bool = True):
+        # ``persist_env`` is the ``TERMINAL_LOCAL_PERSISTENT`` verdict (off = every command starts
+        # from the login snapshot again).
+        super().__init__(cwd=_resolve_local_initial_cwd(cwd), timeout=timeout, env=env,
+                         persist_env=persist_env)
         self.init_session()
 
     def get_temp_dir(self) -> str:

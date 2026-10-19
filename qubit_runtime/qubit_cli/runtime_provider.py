@@ -948,9 +948,14 @@ def _raise_if_local_alias_missing_endpoint(requested_provider: str, explicit_bas
 def _resolve_vertex_runtime(requested_provider: str) -> Dict[str, Any]:
     """Vertex AI (OAuth2). The credential *path* (GOOGLE_APPLICATION_CREDENTIALS) must never be
     treated as a static API key; a short-lived token is minted per call, and mid-session expiry is
-    recovered on 401 by run_agent._try_refresh_vertex_client_credentials()."""
-    from agent.vertex_adapter import get_vertex_config
-    token, base_url = get_vertex_config()
+    recovered on 401 by run_agent._try_refresh_vertex_client_credentials(). Under
+    :func:`deferred_token_mint` the credentials are loaded (same failure copy) but the token is a
+    callable minted on first use, so a process that only routes never exchanges a JWT."""
+    from agent.vertex_adapter import get_vertex_base_url, get_vertex_config, vertex_access_token
+    if _DEFER_TOKEN_MINT.get():
+        token, base_url = vertex_access_token, get_vertex_base_url()
+    else:
+        token, base_url = get_vertex_config()
     if not token or not base_url:
         raise AuthError("Vertex AI credentials could not be resolved. Vertex uses OAuth2 (not a static API key): provide a "
                         f"service-account JSON via GOOGLE_APPLICATION_CREDENTIALS (or VERTEX_CREDENTIALS_PATH) in {display_qubit_home()}/.env, "

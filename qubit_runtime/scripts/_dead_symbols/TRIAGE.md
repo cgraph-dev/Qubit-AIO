@@ -196,3 +196,68 @@ run_adapters.py:1458,1484,1502) stay unwired: this fork's secondary reconnect
 carries `inbound_dedup_caches()` rather than the predecessor adapter, so there
 is no held queue in hand at that site.
 
+## Wave 5 (branch `fix/dead-symbols-wave5`) — measured before/after
+
+Integrated the unmerged `fix/dead-symbols-tranche3` (6 commits) and triaged the
+remainder. Commands, from the worktree root:
+
+```bash
+.venv/bin/python qubit_runtime/scripts/check_dead_symbols.py --json /tmp/dead-wave5.json -v
+```
+
+| state | dead_count |
+|---|--:|
+| main `6e70aea31` (owner-reported) | 251 |
+| branch after the tranche3 cherry-picks | 241 |
+| branch after the wave-5 batches | **224** |
+
+The 17 symbols resolved by the wave-5 batches were diffed against the
+before-file (0 new): `publish_micro`, `publish_prune`, `publish_provider_native`,
+`carry_compression_automation`, `drop_context_cache_rows`, `is_demoted_stub`,
+`demote_stale_tail_tools`, `observe_tool_result`, `keep_after_turn_budget`,
+`stage_skills_index_note`, `outage_covers`, `_fire_secret_scope`,
+`boundary_note`, `current_session_tool_scope`, `streaming_available`,
+`_llamacpp_context` (deleted), `_normalize_newlines` (deleted).
+
+### Wave 5 triage (33 symbols, not covered above)
+
+| # | symbol | module | verdict | evidence |
+|--:|---|---|---|---|
+| 1 | `publish_micro` | agent/compaction_events.py | GENUINE DEAD → WIRED | upstream `agent/micro_compaction.py:377`; local `_emit_micro_compaction_telemetry` emitted the JSON line with no publish |
+| 2 | `publish_prune` | agent/compaction_events.py | GENUINE DEAD → WIRED | upstream `agent/turn_preflight.py:390`; local proactive-prune commit had no publish |
+| 3 | `publish_provider_native` | agent/compaction_events.py | GENUINE DEAD → WIRED | upstream `agent/codex_runtime.py:257`; local `_record_codex_app_server_compaction` had no publish |
+| 4 | `carry_compression_automation` | agent/compression_automation.py | GENUINE DEAD → WIRED | upstream `agent/conversation_compression.py:3275`; local `_carry_session_state_to_child` inlined the 3 migrations and lost the `RuntimeSessionStore` guard |
+| 5 | `drop_context_cache_rows` | agent/model_metadata_cache.py | GENUINE DEAD → WIRED | upstream `agent/model_metadata.py:1199,1212`; local `_invalidate_cached_context_length` inlined the write without the cross-process lock |
+| 6 | `is_demoted_stub` | agent/context_compressor_tail.py | GENUINE DEAD → WIRED | upstream `agent/context_compressor.py:836,895` |
+| 7 | `demote_stale_tail_tools` | agent/context_compressor_tail.py | GENUINE DEAD → WIRED | upstream `agent/context_compressor.py:3662`; local method was a weaker inline copy (no skill reload marker) |
+| 8 | `observe_tool_result` | agent/onboarding_record.py | GENUINE DEAD → WIRED | upstream `agent/tool_executor.py:1095` (as `observe_onboarding_result`) |
+| 9 | `keep_after_turn_budget` | agent/plugin_live_notes.py | GENUINE DEAD → WIRED | upstream `agent/tool_executor.py:1217` |
+| 10 | `stage_skills_index_note` | agent/skills_index_delta.py | GENUINE DEAD → WIRED | upstream `agent/turn_context.py:1180`; local `build_turn_context` never called it |
+| 11 | `outage_covers` | cron/store_health.py | GENUINE DEAD → WIRED | upstream `cron/jobs.py:3139`; local `_retire_expired_oneshot` retired an outage-skipped one-shot as missed |
+| 12 | `_fire_secret_scope` | cron/scheduler.py | GENUINE DEAD → WIRED | upstream `cron/scheduler.py:2855`; local crash path called `_deliver_crash_failure` without the scope |
+| 13 | `boundary_note` | tools/fuzzy_match.py | GENUINE DEAD → WIRED | upstream `tools/file_operations.py:1621,1642`; local patch-replace returned no approximate-match note |
+| 14 | `current_session_tool_scope` | tools/registry.py | GENUINE DEAD → WIRED | upstream `tools/mcp_tool.py:700`; local `_mcp_registry_scope` skipped the session scope |
+| 15 | `streaming_available` | tools/transcription_streaming.py | GENUINE DEAD → WIRED | upstream `tools/voice_client_config.py:250`; local config resolver omitted the STT streaming verdict |
+| 16 | `_llamacpp_context` | agent/model_metadata.py | GENUINE DEAD → DELETED | superseded by `agent/model_metadata_llamacpp.py::llamacpp_context` (live probe table calls it); the in-file copy had no call site |
+| 17 | `_normalize_newlines` | cron/scheduler.py | GENUINE DEAD → DELETED | fork's run-doc framing diverged (no `_PROMPT_FRAME`), so its only upstream call site does not exist; unused |
+| 18 | `carrier_record` | agent/reasoning_carriers.py | GENUINE DEAD (deferred) | upstream `agent/chat_completion_helpers.py:1764`; local `build_assistant_message` preserves SDK `reasoning_details` but never captures Gemini thought_signature / Copilot reasoning_opaque |
+| 19 | `StreamCarriers` | agent/reasoning_carriers.py | GENUINE DEAD (deferred) | upstream `agent/chat_completion_helpers.py:3050`; local stream accumulator does not feed it |
+| 20 | `run_canonical_job` | cron/scheduler_authority.py | GENUINE DEAD (deferred) | upstream `cron/scheduler.py:2578`; local `scheduler.py` has no reference to `cron.scheduler_authority` at all — the whole authority transport is unported |
+| 21 | `pause_for_unknown` | cron/scheduler_authority.py | GENUINE DEAD (deferred) | upstream `cron/scheduler.py:3425`; same authority transport gap |
+| 22 | `external_worker_exited_reason` | cron/scheduler_worker_failure.py | GENUINE DEAD (deferred) | upstream `cron/scheduler.py:3551`; local worker-exit path diverges |
+| 23 | `give_up_execution` | cron/executions.py | GENUINE DEAD (deferred) | upstream `cron/scheduler.py:3424`; local executor path diverges |
+| 24 | `worker_output_log` + `open_output_log` + `record_exit_command` + `adoptable_log` + `ProcessOutputLogMixin` | tools/process_registry_output_log.py | GENUINE DEAD (deferred) | upstream `tools/process_registry.py:37,674,1195,1214,1224`; local `ProcessRegistry` does not inherit `ProcessOutputLogMixin` and the whole module is unreferenced |
+| 25 | `_session_slot_key` | tools/registry.py | GENUINE DEAD (deferred) | upstream `tools/registry.py:510,546`; local registry keys overlays by `qubit_home_key` and never reads the session slot |
+| 26 | `GatewayInboundHooksMixin` | gateway/run_inbound_hooks.py | GENUINE DEAD (deferred) | upstream `gateway/run_inbound.py:71`; local `GatewayInboundMixin` inlines the hook methods and does not inherit the mixin (same shape as the Wave-2 telegram fix) |
+| 27 | `GatewayPluginInjectionMixin` | gateway/run_plugin_injection.py | GENUINE DEAD (deferred) | upstream `gateway/run_inbound.py:71`; same inline-vs-inherit divergence |
+| 28 | `relay_chat_metadata` | agent/auxiliary_wire.py | GENUINE DEAD (deferred) | upstream `agent/auxiliary_client.py:2627,2651`; local auxiliary client does not wire relay metadata |
+| 29 | `_emit_blocked_attempt_telemetry` (and `_snapshot_compression_effect_input`, `_record_committed_attempt_effect`) | agent/conversation_compression_telemetry.py | GENUINE DEAD (deferred) | upstream `agent/conversation_compression.py:4163,4234,4255,4344`; local facade lacks those call sites |
+| 30 | `CatalogApproved` / `CatalogServerError` | tui_gateway/contracts/connectors_operation.py | GENUINE DEAD (deferred) | upstream `connectors_operation.py:163,167` use them as `CatalogRow` fields; local `CatalogRow` dropped `approved`/`server_errors` along with `enabled`/`missing_env`/`already_installed` |
+| 31 | `OnboardingStateParams` | tui_gateway/contracts/profiles_vault_complete_foreign_subagents.py | CORRECTLY UNWIRED | the file's own comment (`:379`) records the deliberate replacement by Qubit's setup-profile state; `onboarding.state` is registered with `Params` at `:521` |
+| 32 | `explicit_static_config` | tests/agent/test_relay_runtime_plugins.py | FALSE POSITIVE | pytest fixture requested as a parameter at `:235,250,273,318,335,454,503,518,758` |
+| 33 | `TestTerminalResultsCarryTheFreeTierBlock` | tests/agent/test_welcome_tier_recovery.py | FALSE POSITIVE | pytest test class collected by name (`:198`), never called |
+
+Additional test-only genuine-dead noted, not wired: `_metric`
+(`tests/monitoring/test_cron_health_export.py:5`, defined, never called),
+`TestPatchReplace` (`tests/tools/test_file_tools_live.py:133`, test class — FP).
+

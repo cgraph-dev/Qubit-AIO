@@ -3116,7 +3116,14 @@ def _retire_expired_oneshot(d: _DueJob) -> bool:
     still in flight elsewhere — skip but keep the record so its mark_job_run can land."""
     if _elapsed_seconds(d.scan.now, d.next_run_dt) <= ONESHOT_GRACE_SECONDS:
         return False
-    if not (d.job.get("run_claim") or d.job.get("fire_claim")):
+    # Due during an outage of its store: it was skipped, not missed; fire it once on recovery.
+    if store_health.outage_covers(_current_cron_store().cron_dir, d.next_run_dt.timestamp(), ONESHOT_GRACE_SECONDS):
+        return False
+    claim = d.job.get("run_claim")
+    # An outage-covered claim that never reached its fire claim never started: it stays covered.
+    if isinstance(claim, dict) and claim.get("outage") and not d.job.get("fire_claim"):
+        return False
+    if not (claim or d.job.get("fire_claim")):
         _write_missed_oneshot_diagnostic(d.job, d.next_run)
         d.scan.retire(d.job["id"])
     return True

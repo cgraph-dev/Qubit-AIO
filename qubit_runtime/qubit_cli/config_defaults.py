@@ -387,7 +387,8 @@ DEFAULT_CONFIG = {
         # Trusted profiles sharing one Docker container identity; empty = per-profile boundary.
         "docker_shared_container_key": "",
         # Keep a long-lived bash shell across execute() calls so cwd/env/shell variables survive.
-        # Applies to non-local backends (SSH); local is opt-in via TERMINAL_LOCAL_PERSISTENT env.
+        # Applies to non-local backends (SSH); the local backend has its own default-on knob,
+        # TERMINAL_LOCAL_PERSISTENT.
         "persistent_shell": True,
     },
 
