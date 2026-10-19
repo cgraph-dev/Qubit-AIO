@@ -40,7 +40,8 @@ def catalog_dir(tmp_path, monkeypatch):
     """Provide an isolated optional-mcps/ directory."""
     cat = tmp_path / "optional-mcps"
     cat.mkdir()
-    monkeypatch.setenv("HERMES_OPTIONAL_MCPS", str(cat))
+    # Canonical spelling; the legacy HERMES_ form is a dual-read fallback.
+    monkeypatch.setenv("QUBIT_OPTIONAL_MCPS", str(cat))
     return cat
 
 
@@ -525,7 +526,12 @@ class TestInstall:
         install_entry(_entry("demo"), enable=True)
         install_entry(_entry("demo"), enable=True)
 
-        assert calls == [{"kind": "mcp_server", "source": "catalog", "name": "demo", "outcome": "success"}]
+        # HEAD added ``failure_class``/``error`` to record_extension_install's
+        # signature (shared_metrics_events.py:139) and record_mcp_install always
+        # forwards both (mcp_catalog.py:734-741), so a success row carries them
+        # as None. ``registry`` is not passed on the MCP path.
+        assert calls == [{"kind": "mcp_server", "source": "catalog", "name": "demo", "outcome": "success",
+                          "failure_class": None, "error": None}]
 
     def test_install_with_api_key_prompts_and_saves(self, catalog_dir, monkeypatch):
         body = _basic_manifest(
@@ -949,8 +955,9 @@ class TestShippedCatalog:
         manifest. Intentionally NOT a snapshot of catalog names (those are
         expected to change as PRs land).
         """
-        # Use the actual repo's optional-mcps directory (no HERMES_OPTIONAL_MCPS
+        # Use the actual repo's optional-mcps directory (no QUBIT_OPTIONAL_MCPS
         # override) so this test catches real manifests.
+        monkeypatch.delenv("QUBIT_OPTIONAL_MCPS", raising=False)
         monkeypatch.delenv("HERMES_OPTIONAL_MCPS", raising=False)
         from qubit_cli.mcp_catalog import _catalog_root, _parse_manifest
 
@@ -982,6 +989,7 @@ class TestShippedCatalog:
         pin at the transport layer (the server runs elsewhere / comes from the
         SHA-pinned clone), so they're exempt.
         """
+        monkeypatch.delenv("QUBIT_OPTIONAL_MCPS", raising=False)
         monkeypatch.delenv("HERMES_OPTIONAL_MCPS", raising=False)
         from qubit_cli.mcp_catalog import _catalog_root, _parse_manifest
 
