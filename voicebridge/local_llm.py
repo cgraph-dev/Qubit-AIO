@@ -155,6 +155,127 @@ class AbortableHTTPPost:
                 pass
 
 
+class AbortableHTTPStream:
+    """One streaming POST over a socket this object owns, abortable.
+
+    The sibling of :class:`AbortableHTTPPost`: ``http.client`` keeps the live
+    connection, so ``abort()`` can ``shutdown`` it (``shutdown``, not just
+    ``close``, wakes a thread blocked in ``recv`` on Linux) while a chunk read
+    is mid-flight. Idempotent and safe before the socket exists.
+
+    Reopenable for the bounded empty-retry path; a closed instance keeps its
+    original (non-aborted) state and opens a fresh connection.
+    """
+
+    def __init__(self, url: str, body: bytes, headers: Optional[dict] = None,
+                 timeout_s: float = 4.0) -> None:
+        parts = urllib.parse.urlsplit(url)
+        self._scheme = (parts.scheme or "http").lower()
+        self._host = parts.hostname or "127.0.0.1"
+        self._port = parts.port
+        self._path = parts.path or "/"
+        if parts.query:
+            self._path = f"{self._path}?{parts.query}"
+        self._body = body
+        self._headers = dict(headers or {})
+        self._timeout_s = float(timeout_s)
+        self._lock = threading.Lock()
+        self._conn: Any = None
+        self._live_socket: Any = None
+        self._resp: Any = None
+        self._aborted = False
+
+    def abort(self) -> bool:
+        """Shut down the live socket; returns True when one was in flight."""
+        with self._lock:
+            self._aborted = True
+            conn = self._conn
+            sock = self._live_socket
+        if sock is None and conn is not None:
+            sock = getattr(conn, "sock", None)
+        if conn is None and sock is None:
+            return False
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except Exception:  # noqa: BLE001 - abort is best-effort
+                pass
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        return True
+
+    def open(self) -> "AbortableHTTPStream":
+        """Connect + send the request; returns this object for line iteration."""
+        cls = (http.client.HTTPSConnection if self._scheme == "https"
+               else http.client.HTTPConnection)
+        conn = cls(self._host, self._port, timeout=self._timeout_s)
+        with self._lock:
+            if self._aborted:
+                raise LocalLlmCancelled("local model call cancelled")
+            self._conn = conn
+        try:
+            # Connect explicitly so abort() always has a live socket to shut
+            # down, even while the request is still in flight.
+            conn.connect()
+            with self._lock:
+                if self._aborted:
+                    raise LocalLlmCancelled("local model call cancelled")
+                # ``getresponse`` hands the socket to the response when the
+                # server says Connection: close (and clears ``conn.sock``), so
+                # keep our own reference now — the socket we own, never
+                # private response internals.
+                self._live_socket = getattr(conn, "sock", None)
+            conn.request("POST", self._path, body=self._body,
+                         headers=self._headers)
+            with self._lock:
+                if self._aborted:
+                    raise LocalLlmCancelled("local model call cancelled")
+            resp = conn.getresponse()
+            with self._lock:
+                if self._aborted:
+                    raise LocalLlmCancelled("local model call cancelled")
+                self._resp = resp
+            return self
+        except LocalLlmCancelled:
+            self.close()
+            raise
+        except Exception as exc:  # noqa: BLE001 - abort vs real failure
+            with self._lock:
+                aborted = self._aborted
+            self.close()
+            if aborted:
+                raise LocalLlmCancelled(
+                    "local model call cancelled") from exc
+            raise
+
+    def __iter__(self) -> Any:
+        return iter(self._resp)
+
+    def __enter__(self) -> "AbortableHTTPStream":
+        return self
+
+    def __exit__(self, *exc_info: Any) -> bool:
+        self.close()
+        return False
+
+    def close(self) -> None:
+        """Close the owned connection; safe from any thread and repeatable."""
+        with self._lock:
+            conn, self._conn = self._conn, None
+            resp, self._resp = self._resp, None
+            self._live_socket = None
+        for obj in (resp, conn):
+            if obj is None:
+                continue
+            try:
+                obj.close()
+            except Exception:  # noqa: BLE001 - cleanup only
+                pass
+
+
 def _watch_cancel(cancel: Any, holder: AbortableHTTPPost,
                   done: threading.Event) -> None:
     """Poll the turn's cancel hook and abort the owned socket when it fires."""
@@ -163,33 +284,14 @@ def _watch_cancel(cancel: Any, holder: AbortableHTTPPost,
             holder.abort()
 
 
-def _response_socket(resp: Any) -> Any:
-    """Best-effort live socket behind a ``urlopen`` streaming response.
-
-    ``urllib`` hides the socket, but an ``http.client.HTTPResponse`` keeps it
-    at ``fp.raw._sock``. Returning ``None`` (a fake/patched response) is
-    normal: the caller still checks the hook between chunks.
-    """
-    try:
-        raw = getattr(getattr(resp, "fp", None), "raw", None)
-        return getattr(raw, "_sock", None)
-    except Exception:  # noqa: BLE001 - introspection is best-effort
-        return None
-
-
-def _shutdown_response(resp: Any) -> bool:
-    """``shutdown`` a streaming response's live socket from another thread.
-
-    ``shutdown`` (not ``close``) is what wakes a thread blocked in ``recv`` on
-    Linux. Idempotent and safe before the response exists.
-    """
-    sock = _response_socket(resp)
-    if sock is None:
+def _abort_owned_stream(owner: Any) -> bool:
+    """``shutdown`` the owned streaming connection from the watcher thread."""
+    abort = getattr(owner, "abort", None)
+    if not callable(abort):
         return False
     try:
-        sock.shutdown(socket.SHUT_RDWR)
-        return True
-    except Exception:  # noqa: BLE001 - already closed / fake socket
+        return bool(abort())
+    except Exception:  # noqa: BLE001 - abort is best-effort
         return False
 
 
@@ -205,11 +307,11 @@ def _watch_stream(cancel: Any, should_stop: Any, holder: List[Any],
     while not done.wait(0.01):
         if cancel is not None and _cancel_requested(cancel):
             state["cancel"] = True
-            _shutdown_response(holder[0])
+            _abort_owned_stream(holder[0])
             return
         if should_stop is not None and _cancel_requested(should_stop):
             state["stop"] = True
-            _shutdown_response(holder[0])
+            _abort_owned_stream(holder[0])
             return
 
 
@@ -830,9 +932,10 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
         raise LocalLlmCancelled("local model call cancelled")
     payload = _chat_payload(text, conversation_prompt, model, max_tokens,
                             context, stream=True, num_ctx=num_ctx)
+    body = json.dumps(payload).encode()
     req = urllib.request.Request(
         f"{url}/api/chat",
-        data=json.dumps(payload).encode(),
+        data=body,
         headers={"Content-Type": "application/json"},
     )
     t0 = __import__("time").time()
@@ -850,12 +953,25 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
     holder: List[Any] = [None]
     done = threading.Event()
     watcher: Optional[threading.Thread] = None
+    owned: Optional[AbortableHTTPStream] = None
     if cancel is not None or should_stop is not None:
+        # A hook is supplied: own the socket so the watcher can shut it down
+        # mid-chunk. With no hook the exact urlopen path below is kept.
+        owned = AbortableHTTPStream(
+            f"{url}/api/chat", body,
+            headers={"Content-Type": "application/json"},
+            timeout_s=timeout_s)
+        holder[0] = owned
         watcher = threading.Thread(
             target=_watch_stream,
             args=(cancel, should_stop, holder, state, done),
             daemon=True, name="local-llm-stream-cancel")
         watcher.start()
+
+    def _open() -> Any:
+        if owned is not None:
+            return owned.open()
+        return urllib.request.urlopen(req, timeout=timeout_s)
 
     def _consume(lines: Any) -> bool:
         """Parse NDJSON chunks; False when a cooperative stop ended the read."""
@@ -895,7 +1011,7 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
     stopped = False
     try:
         try:
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            with _open() as resp:
                 holder[0] = resp
                 stopped = not _consume(resp)
         except LocalLlmCancelled:
@@ -923,7 +1039,7 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
             # "" for the caller's cloud fallback.
             log_event("conversation.local.empty_retry", model=model, stream=True)
             try:
-                with urllib.request.urlopen(req, timeout=timeout_s) as resp2:
+                with _open() as resp2:
                     holder[0] = resp2
                     stopped = not _consume(resp2)
             except LocalLlmCancelled:

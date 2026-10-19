@@ -681,6 +681,39 @@ def _fake_stream_factory(chunks, fail_after=None):
     return llm, fake_urlopen
 
 
+def _patch_owned_stream(monkeypatch, llm, chunks):
+    """Patch the abortable stream transport (a hook means an owned socket).
+
+    Tests that supply ``should_stop``/``cancel`` no longer hit ``urlopen``:
+    the real transport owns an ``http.client`` socket so a blocked chunk can
+    be shut down. This fake keeps those tests hermetic while yielding the
+    same NDJSON lines.
+    """
+    lines = [json.dumps(c).encode() + b"\n" for c in chunks]
+
+    class FakeOwnedStream:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def open(self):
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def __iter__(self):
+            return iter(lines)
+
+        def abort(self):
+            return False
+
+    monkeypatch.setattr(llm, "AbortableHTTPStream", FakeOwnedStream)
+    return FakeOwnedStream
+
+
 class TestItem6StreamTTS:
     def test_sentences_emitted_incrementally(self, monkeypatch):
         m, fake = _fake_stream_factory([
@@ -719,11 +752,12 @@ class TestItem6StreamTTS:
         assert full == "First part."
 
     def test_should_stop_aborts_without_hang(self, monkeypatch):
-        m, fake = _fake_stream_factory([
+        import voicebridge.local_llm as m
+
+        _patch_owned_stream(monkeypatch, m, [
             {"message": {"content": "one."}}, {"message": {"content": "two."}},
             {"message": {"content": "three."}},
         ])
-        monkeypatch.setattr(m.urllib.request, "urlopen", fake)
         seen = []
 
         def maybe_stop():
@@ -754,12 +788,11 @@ class TestItem6StreamTTS:
                     return self.s
                 return default
 
-        m, fake = _fake_stream_factory([
+        _patch_owned_stream(monkeypatch, llm, [
             {"message": {"content": "Hello there. "}},
             {"message": {"content": "Bye!"}},
             {"message": {"content": "", "done": True}},
         ])
-        monkeypatch.setattr(llm.urllib.request, "urlopen", fake)
         monkeypatch.setattr(llm, "chat_local", lambda *a, **k: blocked_reply)
 
         spoken = []
