@@ -32,6 +32,7 @@ from utils import file_signature, is_truthy_value
 from qubit_state_ids import new_session_id
 from tools.environments.local import qubit_subprocess_env
 from agent.replay_cleanup import canonicalize_replay_history
+from agent.fast_mode import STATIC_TIERS as _STATIC_TIERS
 from agent.reasoning_effort import clamp_effort, route_supported_efforts
 from agent.voice_turn_route import session_runtime_view
 from agent.compaction_display import project_compaction_message_for_display  # noqa: F401
@@ -2418,7 +2419,12 @@ def _session_info(agent, session: dict | None = None) -> dict:
         "model": model,
         "provider": pending_provider or provider,
         "reasoning_effort": reasoning_effort, "reasoning_effort_wire": reasoning_effort_wire,
-        "service_tier": service_tier, "fast": service_tier == "priority",
+        "service_tier": service_tier,
+        # A profile-wide fast tier reaches only routes that serve it: the same gate every request
+        # builder asks, so a local server/proxy is never reported as Fast.
+        "fast": service_tier in _STATIC_TIERS and _fast_tier_applies(
+            agent, model, pending_provider or provider,
+            route_known=not pending_provider, tier=service_tier),
         "yolo": yolo, "approval_mode": approval_mode,
         "tools": dict(mirror.get("tools") or {}) if isinstance(mirror.get("tools"), dict) else {},
         "skills": dict(mirror.get("skills") or {}) if isinstance(mirror.get("skills"), dict) else {},
