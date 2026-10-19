@@ -23,7 +23,11 @@ Shape:
   * an idle worker is reaped after ``QUBIT_TTS_SYNTH_WORKER_IDLE_S`` seconds
     (default 300; ``0`` disables) so the extra model copy is not pinned in
     memory forever on an idle service. A reap only ever costs the next
-    reply's load, never interruptibility or correctness.
+    reply's load, never interruptibility or correctness;
+  * ``warm_async`` lets a KEYED ask turn begin that load in the background
+    while the brain is still thinking, so the first reply after an idle reap
+    is warm without pinning the model while the service is idle. It never
+    blocks the turn, never raises, and never starts a second load.
 
 Safety: the child gets the config DATA over a pipe (never argv/env, so no
 secrets appear in the process list) and runs in its own session, so a stop
@@ -411,6 +415,42 @@ def _prewarm_worker(cfg: Any, key: str, generation: int,
         if worker is not None:
             worker.kill()
         event.set()
+
+
+def warm_async(cfg: Any) -> bool:
+    """Start loading the worker in the background if it is cold.
+
+    Returns ``True`` only when this call queued a load; ``False`` when a
+    worker is already warm or loading, when the worker path is disabled
+    (``QUBIT_TTS_SYNTH_WORKER=0`` or a config double without ``data``), or on
+    any internal error. Never blocks the caller on the model load, never
+    raises, and never starts a duplicate load: the loading state is tracked in
+    ``_PREWARM_EVENTS`` and a real ``synthesize_cancellable`` joins it via
+    ``_await_prewarm`` instead of spawning its own child.
+
+    The parent process does not build a provider here (the load happens in the
+    child), so the one-copy property is unchanged; the idle reaper still
+    releases the worker if no reply follows.
+    """
+    try:
+        if not worker_supported(cfg):
+            return False
+        key = _cfg_key(cfg)
+        with _STATE:
+            worker = _WORKER
+            if worker is not None and worker.alive():
+                # Same identity: already warm. Different identity: the live
+                # worker owns the slot, so warming this one now would put a
+                # second model copy in memory only to discard it (the next
+                # real synth replaces it).
+                return False
+            if key in _PREWARM_EVENTS:
+                return False
+        _start_prewarm(cfg, key)
+        with _STATE:
+            return key in _PREWARM_EVENTS
+    except Exception:  # noqa: BLE001 - warming must never break a turn
+        return False
 
 
 def synthesize_cancellable(cfg: Any, text: str, out_path: Path | str, *,
