@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from agent.message_sanitization import _sanitize_surrogates
 from qubit_state_common import _COMPRESSION_CHILD_SQL, escape_like as _escape_like
@@ -152,6 +152,41 @@ class SessionTitlesMixin:
             )
         else:
             raise ValueError(f"Title '{title}' is already in use by session {conflict_id}")
+
+    def _set_session_title_in_transaction(self, conn, session_id: str, title: str, *,
+                                          source: str) -> List[str]:
+        """``_set_session_title`` on the CALLER'S write transaction.
+
+        The runtime mutation seam holds the single writer (and the commit carrying the
+        receipt), so the title CAS has to ride that connection rather than open its own
+        transaction. Semantics are the method's — including provenance precedence and the
+        canonical-Bot-Chat refusal — and the return is the affected id list (empty when the
+        write was a no-op) so the caller can fence ``runtime_revision``.
+        """
+        title = self.sanitize_title(title)
+        is_user = source == self.TITLE_SOURCE_USER
+        new_rank = None if is_user else self._title_rank(source)
+        current = conn.execute(
+            "SELECT title, title_source, hidden FROM sessions WHERE id = ?", (session_id,),
+        ).fetchone()
+        if current is None:
+            return []
+        if ((current["title"] or "") == self.CANONICAL_BOT_CHAT_TITLE and bool(current["hidden"])
+                and title != self.CANONICAL_BOT_CHAT_TITLE):
+            if is_user:
+                raise ValueError("This is the bot's canonical Bot Chat — its name is its "
+                                 "identity, and renaming it would orphan the conversation. "
+                                 "To start fresh, create a new bot instead.")
+            return []
+        if not is_user and current["title"] is not None and self._title_rank(current["title_source"]) >= new_rank:
+            return []
+        if title:
+            self._resolve_title_conflict(conn, session_id, title)
+        changed = conn.execute(
+            "UPDATE sessions SET title = ?, title_source = ? WHERE id = ? AND title IS ? AND title_source IS ?",
+            (title, source if title else None, session_id, current["title"], current["title_source"]),
+        ).rowcount
+        return [session_id] if changed else []
 
     def set_session_title(self, session_id: str, title: str) -> bool:
         """Set a title on the user's behalf (``user`` provenance). Empty clears it. Raises

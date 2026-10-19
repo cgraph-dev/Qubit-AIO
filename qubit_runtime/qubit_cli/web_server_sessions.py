@@ -6,6 +6,7 @@ import logging
 import asyncio
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
@@ -181,6 +182,56 @@ def _mutate_offline_store(profile, actor, params):
     return _with_session_maintenance(profile, run)
 
 
+def _resolve_session_mutation_identity(profile, session_id, request_id, expected_revision,
+                                       expected_generation, operation):
+    """Fill in mutation identity the caller omitted, from the row being edited.
+
+    The durable seam below (``mutate_runtime_session``) requires a non-empty
+    ``request_id`` and a concrete ``expected_revision`` (plus ``expected_generation``
+    for generation-fenced operations such as delete). The HTTP callers on the sidebar
+    path do not send any of them — Desktop's ``setSessionUnreadRemote`` /
+    ``setSessionArchived`` / ``setSessionPinnedRemote`` PATCH ``{flag, profile}``, and
+    the SPA does the same — so requiring a client-supplied receipt made every plain
+    sidebar edit 500 (``SessionRename`` had no such field) or 409.
+
+    An omitted value is resolved HERE, server-side: a minted receipt id and the
+    revision/generation the row carries at request time. A caller that DOES send
+    ``expected_revision``/``expected_generation`` keeps its optimistic precondition
+    untouched, so a concurrent edit still answers ``revision_conflict`` (409) rather
+    than overwriting — this fills a gap, it does not remove the fence.
+    """
+    if request_id and expected_revision is not None:
+        return request_id, expected_revision, expected_generation
+    # ``import`` creates its anchor row, so a generation fence can only answer
+    # ``stale_generation`` (the store has no row to compare against).
+    fenced_operations = operation != 'import'
+    revision, generation = 0, 0
+    try:
+        db = _open_session_db_for_profile(profile, read_only=True)
+        try:
+            with db._read_ctx() as conn:
+                row = conn.execute(
+                    'SELECT runtime_revision, runtime_generation FROM sessions WHERE id=?',
+                    (session_id,)).fetchone()
+            if row is not None:
+                revision, generation = int(row[0] or 0), int(row[1] or 0)
+        finally:
+            db.close()
+    except Exception:  # an unreadable store refuses below, on its own terms
+        _log.debug("mutation identity: could not read the target row", exc_info=True)
+    if expected_generation is not None:
+        resolved_generation = expected_generation
+    elif not fenced_operations:
+        resolved_generation = None   # import: the anchor row does not exist yet
+    else:
+        resolved_generation = generation   # 0 for an absent row; delete maps not_found
+    return (
+        request_id or uuid.uuid4().hex,
+        expected_revision if expected_revision is not None else revision,
+        resolved_generation,
+    )
+
+
 async def _mutate_session_request(request, profile, session_id, *, request_id,
                                   expected_revision, operation, payload, expected_generation=None):
     """Resolve the authenticated principal and owner; never open a second writer."""
@@ -196,8 +247,9 @@ async def _mutate_session_request(request, profile, session_id, *, request_id,
         _, errors = authority.db._validate_import_payload(payload['sessions'])
         if errors:
             raise HTTPException(status_code=400, detail={'errors': errors})
-    if request_id is None or expected_revision is None:
-        raise HTTPException(status_code=409, detail='mutation_identity_required')
+    request_id, expected_revision, expected_generation = await asyncio.to_thread(
+        _resolve_session_mutation_identity, profile, session_id, request_id,
+        expected_revision, expected_generation, operation)
     params = dict(session_id=session_id, request_id=request_id, expected_revision=expected_revision,
         operation=operation, payload=payload)
     if expected_generation is not None:

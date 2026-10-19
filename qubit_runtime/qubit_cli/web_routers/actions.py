@@ -52,8 +52,10 @@ _ACTION_LOG_TAIL_MAX_BYTES = 256 * 1024
 _ACTION_LOG_TAIL_INITIAL_CHUNK_BYTES = 8 * 1024
 _ACTION_LOG_TAIL_MAX_CHUNK_BYTES = 64 * 1024
 
-_UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== hermes-update completed ([0-9a-f]{32}) ===$")
-_UPDATE_ACTION_STARTED_RE = re.compile(r"^=== hermes-update started .* ([0-9a-f]{32}) ===$")
+# Both spellings: `qubit-update` is what this product writes, `hermes-update` is what a run
+# started before the rename left in its log — the status page must read either.
+_UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== (?:qubit|hermes)-update completed ([0-9a-f]{32}) ===$")
+_UPDATE_ACTION_STARTED_RE = re.compile(r"^=== (?:qubit|hermes)-update started .* ([0-9a-f]{32}) ===$")
 
 _MANAGED_EXTERNALLY_MESSAGE = "Qubit updates are managed outside this dashboard in containerized environments."
 
@@ -63,6 +65,12 @@ _UPDATE_REFUSAL_ERROR_CODES = {
     "image-marker-invalid": "docker_update_unsupported", "apt": "apt_update_required",
     "nix": "nix_update_unsupported",
 }
+
+# The Status page's update action. ``qubit-update`` is the product's name for it; the
+# ``hermes-update`` spelling stays readable so a run started before the rename (its log,
+# its ``HERMES_ACTION_ID``, its completion marker) still reports instead of 404ing.
+_UPDATE_ACTION = "qubit-update"
+_UPDATE_ACTION_NAMES = frozenset({_UPDATE_ACTION, "hermes-update"})
 
 
 def _finish_action(name: str, exit_code: Optional[int], pid: Optional[int]) -> None:
@@ -139,9 +147,10 @@ def _durable_completed_update_action_id(lines: List[str]) -> Optional[str]:
 
 
 def _latest_spawned_update_action_id(lines: List[str]) -> Optional[str]:
-    """Action id named by the latest ``hermes-update started`` header of THIS dashboard's log."""
+    """Action id named by the latest update-started header of THIS dashboard's log."""
+    prefixes = tuple(f"=== {name} started " for name in sorted(_UPDATE_ACTION_NAMES))
     for line in reversed(lines):
-        if line.startswith("=== hermes-update started "):
+        if line.startswith(prefixes):
             match = _UPDATE_ACTION_STARTED_RE.fullmatch(line.strip())
             return match.group(1) if match else None
     return None
@@ -230,9 +239,9 @@ async def gateway_drain(request: Request):
 
 
 def _update_refused(error: str, message: str, update_command: str) -> Dict[str, Any]:
-    _record_completed_action("hermes-update", message, exit_code=1)
+    _record_completed_action(_UPDATE_ACTION, message, exit_code=1)
     return {
-        "ok": False, "pid": None, "name": "hermes-update", "error": error, "message": message,
+        "ok": False, "pid": None, "name": _UPDATE_ACTION, "error": error, "message": message,
         "update_command": update_command,
     }
 
@@ -260,18 +269,18 @@ async def update_hermes():
         record_refusal_receipt(refusal)
         return response
 
-    existing = _ACTION_PROCS.get("hermes-update")
+    existing = _ACTION_PROCS.get(_UPDATE_ACTION)
     if existing is not None and existing.poll() is None:
-        response = {"ok": True, "pid": existing.pid, "name": "hermes-update", "already_running": True}
-        action_id = _ACTION_IDS.get("hermes-update")
+        response = {"ok": True, "pid": existing.pid, "name": _UPDATE_ACTION, "already_running": True}
+        action_id = _ACTION_IDS.get(_UPDATE_ACTION)
         if action_id:
             response["action_id"] = action_id
         return response
 
     action_id = secrets.token_hex(16)
     with http_failure("Failed to spawn qubit update", 500, "Failed to start update"):
-        proc = _spawn_qubit_action(["update"], "hermes-update", env_overrides={"HERMES_ACTION_ID": action_id})
-    return {"ok": True, "pid": proc.pid, "name": "hermes-update", "action_id": action_id}
+        proc = _spawn_qubit_action(["update"], _UPDATE_ACTION, env_overrides={"QUBIT_ACTION_ID": action_id})
+    return {"ok": True, "pid": proc.pid, "name": _UPDATE_ACTION, "action_id": action_id}
 
 
 _NON_APPLYABLE_MESSAGES = {
@@ -376,7 +385,7 @@ async def get_action_status(name: str, lines: int = 200):
 
     durable_update_action_id = None
     update_receipt_summary = action_receipt_summary = None
-    if name == "hermes-update":
+    if name in _UPDATE_ACTION_NAMES:
         # ``qubit update`` mirrors to the ROOT home's update.log (main_dashboard), never this
         # dashboard's profile home: read it where it is written.
         from qubit_cli.logs import log_file_path
@@ -384,13 +393,21 @@ async def get_action_status(name: str, lines: int = 200):
         durable_update_action_id = _durable_completed_update_action_id(_tail_lines(log_file_path("update"), 2000))
         spawned_action_id = (_latest_spawned_update_action_id(_tail_lines(log_dir / log_file_name, 2000))
                              or _persisted_action_id(log_dir, name) or _ACTION_IDS.get(name))
-        if durable_update_action_id != spawned_action_id:
+        if spawned_action_id is not None and durable_update_action_id != spawned_action_id:
             # The root log is shared by every profile: another profile's (or an older) run's
-            # completion never certifies the action this dashboard started.
+            # completion never certifies the action this dashboard started. An ABSENT local id
+            # is not that evidence — after a dashboard restart the in-memory/sidecar record is
+            # gone and the durable marker is the only proof left, so it must stand.
             durable_update_action_id = None
         if durable_update_action_id:
-            marker = f"=== hermes-update completed {durable_update_action_id} ==="
-            if marker not in tail:
+            markers = [f"=== {_UPDATE_ACTION} completed {durable_update_action_id} ==="]
+            markers += [f"=== {legacy} completed {durable_update_action_id} ==="
+                        for legacy in sorted(_UPDATE_ACTION_NAMES - {_UPDATE_ACTION})]
+            for marker in markers:
+                if marker in tail:
+                    break
+            else:
+                marker = markers[0]
                 tail = [*tail, marker][-requested_lines:]
         # The update receipt is the durable, structured truth about the last
         # update (written by every run, incl. refused/failed; survives the
