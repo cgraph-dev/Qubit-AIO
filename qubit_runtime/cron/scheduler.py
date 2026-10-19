@@ -3188,22 +3188,12 @@ def _save_compose_deliver(
 
 def _finish_interrupted_run(job: dict, execution_id: str, delivery_error: Optional[str]) -> None:
     """Shutdown already wrote last_status, so mark_job_run is skipped (a second call would skip a
-    fire or auto-delete the job); an unsent notice is recorded via update_job instead."""
-    if delivery_error:
-        try:
-            # The gateway shutdown already wrote last_status for this run, so mark_job_run is skipped below
-            # — but it could not know that the notice we just tried to send never left the process (the
-            # adapters were torn down first, #82232). Record the delivery failure on its own via update_job:
-            # mark_job_run also advances next_run_at and the repeat counter, and running that a second time
-            # for one run would skip a fire or auto-delete the job early.
-            from cron.jobs import update_job
-            update_job(job["id"], {"last_delivery_error": delivery_error})
-        except Exception as _rec_err:
-            logger.debug(
-                "Failed recording delivery_error for interrupted job %s: %s", job["id"], _rec_err)
-    finish_execution(
-        execution_id, success=False,
-        error="Interrupted by gateway shutdown before terminal completion.")
+    fire or auto-delete the job); an unsent notice is recorded via update_job instead.
+
+    Delegates to ``cron.scheduler_bookkeeping.finish_interrupted_run`` (upstream's name and home
+    for this phase); this name is the facade the scheduler's own call site uses."""
+    from cron.scheduler_bookkeeping import finish_interrupted_run
+    finish_interrupted_run(job, execution_id, delivery_error)
 
 
 def _finish_completed_run(d: _RunDelivery, fire_owner: Optional[str], execution_id: str) -> bool:
