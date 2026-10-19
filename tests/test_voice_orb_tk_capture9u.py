@@ -41,6 +41,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -236,22 +237,44 @@ def _postscript(t: float, state: str) -> str:
 
 
 def _rasterize(ps: str, out_png: Path) -> bool:
-    """PostScript -> PNG via ghostscript; return success."""
+    """PostScript -> PNG via ghostscript, on the orb's dark background.
+
+    Tk's postscript does not emit the canvas background, so rendering it as
+    ``png16m`` yields a white page. Render with alpha instead and composite
+    the (transparent) page onto ``BG`` with PIL, so the artifact is a faithful
+    dark-background frame; without PIL, keep the raw raster.
+    """
     ps_path = None
+    tmp_png = out_png.with_name(out_png.stem + ".raw.png")
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".ps", delete=False) as fh:
             fh.write(ps)
             ps_path = fh.name
         proc = subprocess.run(
             ["gs", "-q", "-dSAFER", "-dBATCH", "-dNOPAUSE",
-             "-sDEVICE=png16m", "-r72", f"-sOutputFile={out_png}", ps_path],
+             "-sDEVICE=pngalpha", "-dEPSCrop", "-r72",
+             f"-sOutputFile={tmp_png}", ps_path],
             capture_output=True)
-        return proc.returncode == 0 and out_png.is_file()
+        if proc.returncode != 0 or not tmp_png.is_file():
+            return False
+        try:
+            from PIL import Image
+            src = Image.open(tmp_png).convert("RGBA")
+            bg = Image.new("RGB", src.size, BG)
+            bg.paste(src, mask=src.split()[3])
+            bg.save(out_png)
+        except Exception:  # noqa: BLE001 - no PIL: keep the raw raster
+            os.replace(tmp_png, out_png)
+        return out_png.is_file()
     except Exception:  # noqa: BLE001 - a capture fault must not fail the suite
         return False
     finally:
-        if ps_path and os.path.exists(ps_path):
-            os.unlink(ps_path)
+        for p in (ps_path, tmp_png):
+            if p and os.path.exists(p):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
 
 
 class _StubLayer:
@@ -272,8 +295,55 @@ class _StubLayer:
         return False
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _headless_display():
+    """Give the real-pixel path an X display on a headless host.
+
+    Tk cannot build a canvas without a display, so the PNG capture used to be
+    skipped entirely on CI/headless runs. When no DISPLAY/WAYLAND_DISPLAY is
+    set and ``Xvfb`` exists, start a private virtual display for this module
+    and tear it down after; the primitive-stream capture still runs either way.
+    """
+    if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+        yield
+        return
+    xvfb = shutil.which("Xvfb")
+    if not xvfb:
+        yield
+        return
+    disp = None
+    for n in range(120, 220):
+        if not Path(f"/tmp/.X11-unix/X{n}").exists():
+            disp = n
+            break
+    if disp is None:
+        yield
+        return
+    proc = subprocess.Popen(
+        [xvfb, f":{disp}", "-screen", "0", "1024x1024x24", "-nolisten", "tcp"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    prev = os.environ.get("DISPLAY")
+    os.environ["DISPLAY"] = f":{disp}"
+    try:
+        for _ in range(100):
+            if Path(f"/tmp/.X11-unix/X{disp}").exists():
+                break
+            time.sleep(0.05)
+        yield
+    finally:
+        if prev is None:
+            os.environ.pop("DISPLAY", None)
+        else:
+            os.environ["DISPLAY"] = prev
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:  # noqa: BLE001 - best effort teardown
+            proc.kill()
+
+
 @pytest.fixture(scope="module")
-def captured():
+def captured(_headless_display):
     """Render every frame once and cache the per-frame evidence."""
     # The capture is about the LIVE look: a stray reduced-motion env from the
     # host must not silently blank every moving layer. ``mark.render`` takes
