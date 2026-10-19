@@ -51,15 +51,15 @@ class FakeCanvas:
         return len(self.texts)
 
 
-def test_draws_two_fringed_rings_and_every_particle():
+def test_draws_translucent_rings_and_every_particle():
     c = FakeCanvas()
-    # t=0.70 is between beats: no shockwave ring adds a line, so the only
-    # lines are the two orbits' fringe strokes.
+    # t=0.70 is between beats: no shockwave ring adds a line, so the lines are
+    # the declared circles (one plain stroke each) plus every particle glint.
     stats = M.render(c, 34.0, 34.0, 32.0, 0.70, "idle")
-    # Contract, not a snapshot: the two orbits are fringed (3 strokes each) and
+    # Contract, not a snapshot: the rings are single translucent strokes and
     # every particle is drawn as a glint (2 arms) — so lines are numerous, not
     # a fixed number. An exact count here was a change-detector.
-    assert stats["lines"] >= 6, "the two fringed orbits must be drawn"
+    assert stats["lines"] >= 6, "the declared circles must be drawn"
     assert stats["points"] > 0 and stats["bars"] is False
     assert stats["min_y"] < stats["max_y"]
     # The nucleus is the ONLY solid orb; everything else is a glint (a star of
@@ -402,8 +402,8 @@ def test_echo_rings_are_two_declared_follower_strokes(monkeypatch):
         monkeypatch.setattr(M, "ring_geometry", lambda tt, o=only: o)
         M.render(c, 34.0, 34.0, R, t, "idle")
         monkeypatch.undo()
-        # One follower is exactly one plain stroke: never fringed, because the
-        # fringe is the logo's signature on the two MAIN orbits only.
+        # One follower is exactly one plain translucent stroke: the ring
+        # fringe was retired (owner 2026-10-19).
         assert len(c.lines) - len(zero.lines) == 1
         nuc_pos = _call_pos(c, "oval", c.ovals.index(_nucleus(c, R=R, t=t)))
         # Each half of the z-seam opens with its circles, so the follower's
@@ -557,11 +557,12 @@ def test_reduced_motion_is_free_of_the_moving_layers():
     for t in (0.0, 9.5):
         c = FakeCanvas()
         M.render(c, 34.0, 34.0, R, t, "idle", reduced_motion=True)
-        # Nine particle glints (2 arms + 1 core) and the two fringed orbits:
+        # Nine particle glints (2 arms + 1 core) and the two main orbits plus
+        # the core ring, each one plain translucent stroke:
         # no trails, dust, sparkles, comet, follower rings or nucleus sparks.
         # Ovals = 9 particle cores + the static nucleus stack (halo + gradient).
         assert len(c.ovals) == len(M.PARTICLES) + M.NUCLEUS_OVAL_COUNT
-        assert len(c.lines) == 2 * len(M.PARTICLES) + 7   # 18 arms + 6 ring strokes + inner ring
+        assert len(c.lines) == 2 * len(M.PARTICLES) + 3   # 18 arms + 3 rings
 
 
 def test_speed_scale_drives_every_layer_on_one_clock():
@@ -615,10 +616,11 @@ def test_bad_inputs_never_raise():
 
 def test_new_constants_are_exported():
     for name in ("RX_FRAC", "RY_FRAC", "TILT_A", "TILT_B", "NUCLEUS_FRAC",
-                 "FRINGE_PX", "LIFT_RING", "LIFT_BEAD", "LIFT_NUCLEUS",
+                 "LIFT_RING", "LIFT_BEAD", "LIFT_NUCLEUS",
                  "MIN_MARK_BRIGHTNESS", "HALO_SCALE", "HALO_BASE",
                  "HALO_WIDTH", "SHOCKWAVE_WIDTH", "RING_SWAY_DEG",
                  "RING_PERIOD_NEAR", "RING_PERIOD_FAR", "PARTICLES",
+                 "RING_TRANSLUCENCY",
                  "heartbeat", "nucleus_scale", "shockwave", "camera_offset",
                  "orbit_tilts", "orbit_point", "particle_state", "trails",
                  "dust_state", "comet", "sparkles", "resolve_core",
@@ -631,8 +633,8 @@ def test_new_constants_are_exported():
 
 def test_app_defaults_to_the_mark(monkeypatch):
     # The owner took the mark as the orb's default look: draw_orb_frame with
-    # no style override must produce the mark's structure (2 fringed orbits +
-    # beads/trails/dust + nucleus/halo + glints), not the ember bands.
+    # no style override must produce the mark's structure (translucent orbits +
+    # beads/dust + nucleus/halo + glints), not the ember bands.
     monkeypatch.delenv("QUBIT_ORB_STYLE", raising=False)
     from voicebridge.orb import app as orb_app
 
@@ -649,7 +651,7 @@ def test_app_defaults_to_the_mark(monkeypatch):
             return 1
 
     stats = orb_app.draw_orb_frame(C(), 68, "idle", 4.2)
-    # Contract: the two fringed orbits are present (>= 6 strokes) and the
+    # Contract: the declared circles are present (>= 6 strokes) and the
     # frame is a mark, not the ember bands. Exact totals move with every
     # animation layer, so they are not asserted here.
     assert stats["lines"] >= 6
