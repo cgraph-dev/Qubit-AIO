@@ -222,12 +222,15 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
     ("b", 291.0, 0.95, 16.3),
 )
 
-#: Dust motes: a denser, slower field so the orbits are never bare.
-DUST_COUNT = 64
+#: Dust motes: a denser, slower field so the orbits are never bare. Owner
+#: 2026-10-19: "add more particles ... small ones". The count is up and every
+#: mote is smaller, so the field reads as a fine pinprick scatter instead of
+#: a handful of visible beads.
+DUST_COUNT = 80
 DUST_R_FRAC_MIN = 0.86
 DUST_R_FRAC_SPAN = 0.30
-DUST_SIZE_BASE = 0.10
-DUST_SIZE_SPAN = 0.13
+DUST_SIZE_BASE = 0.070
+DUST_SIZE_SPAN = 0.090
 DUST_PERIOD_BASE = 4.0
 DUST_PERIOD_SPAN = 10.0
 DUST_ALPHA_BASE = 0.16
@@ -298,7 +301,10 @@ SATELLITE_TRAIL_SAMPLES = 5
 SATELLITE_TRAIL_STEP_DEG = 7.0
 
 # ----------------------------------------------------------------- glints
-SPARKLE_COUNT = 52
+#: Glints: the dense twinkle cloud. Owner 2026-10-19: "add more particles".
+#: More, smaller glints fill the volume with pinpricks instead of a few
+#: readable stars. They are batched by the painter, so the count is cheap.
+SPARKLE_COUNT = 80
 SPARKLE_SEED_STEP = 97.3
 SPARKLE_R_MIN_FRAC = 0.30
 SPARKLE_R_SPAN_FRAC = 0.78
@@ -306,8 +312,8 @@ SPARKLE_LIFE_BASE = 1.1
 SPARKLE_LIFE_STEP = 0.35
 SPARKLE_VISIBLE_FRAC = 0.45
 SPARKLE_MAX_ALPHA = 0.60
-SPARKLE_SIZE_BASE = 0.09
-SPARKLE_SIZE_PEAK = 0.18
+SPARKLE_SIZE_BASE = 0.060
+SPARKLE_SIZE_PEAK = 0.110
 SPARKLE_LIFT = 0.60
 
 
@@ -1123,16 +1129,18 @@ def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
 #: with NO travel — only a raised-cosine alpha envelope 0 -> peak -> 0, so
 #: each dot fades in from nothing and vanishes the same way, like data
 #: materialising. The full count is always returned (stable frame to frame);
-#: the envelope decides which dots are visible.
-BLINK_COUNT = 32
-BLINK_SIZE_BASE = 0.10
-BLINK_SIZE_SPAN = 0.12
+#: the envelope decides which dots are visible. Owner 2026-10-19: more of
+#: them, smaller, and spread further out, so the pinprick field reads as
+#: scattered data rather than a ring of beads.
+BLINK_COUNT = 40
+BLINK_SIZE_BASE = 0.060
+BLINK_SIZE_SPAN = 0.080
 BLINK_ALPHA_PEAK = 0.75
 BLINK_LIFE_BASE = 2.2
 BLINK_LIFE_SPAN = 2.6
 BLINK_LIFT = 0.65
-BLINK_R_FRAC_MIN = 0.35
-BLINK_R_FRAC_SPAN = 0.60
+BLINK_R_FRAC_MIN = 0.22
+BLINK_R_FRAC_SPAN = 0.80
 
 
 def blink_dots(t: Any, R: float) -> List[Dict[str, float]]:
@@ -1240,17 +1248,22 @@ INNER_RING_DIRECTION = 1.0
 INNER_RING_TILT_BASE = 0.0
 
 # ------------------------------------------------------------- binary particle field
-BINARY_COUNT = 88
-BINARY_SIZE_BASE = 0.07
-BINARY_SIZE_SPAN = 0.06
+#: Owner 2026-10-19: "add more ... random 1 0 that spawn everywere small ones".
+#: The fragments are no longer parked on the outer orbit: ``BINARY_R_FRAC_MIN``
+#: starts near the core and the span reaches past the main orbit, so the glyphs
+#: scatter across the whole volume. More of them, each smaller, so they read as
+#: data dust instead of legible text.
+BINARY_COUNT = 128
+BINARY_SIZE_BASE = 0.060
+BINARY_SIZE_SPAN = 0.055
 BINARY_PERIOD_BASE = 6.0
 BINARY_PERIOD_SPAN = 12.0
-BINARY_ALPHA_BASE = 0.20
-BINARY_ALPHA_GAIN = 0.35
+BINARY_ALPHA_BASE = 0.16
+BINARY_ALPHA_GAIN = 0.30
 BINARY_LIFT_BASE = 0.50
 BINARY_LIFT_GAIN = 0.30
-BINARY_R_FRAC_MIN = 0.80
-BINARY_R_FRAC_SPAN = 0.25
+BINARY_R_FRAC_MIN = 0.14
+BINARY_R_FRAC_SPAN = 0.95
 
 
 def inner_ring_tilt(t: Any) -> float:
@@ -1619,10 +1632,14 @@ def filament_state(t: Any, R: float) -> List[Dict[str, float]]:
 #: their echo followers, the inner core ring and the satellite shells — is
 #: declared ONCE here, as a stroke description in the tilted plane, so the Qt
 #: and Tk renderers cannot drift into two slightly different sets of circles.
-RING_ALPHA_MAIN = 0.34
-RING_ALPHA_ECHO = 0.20
-RING_ALPHA_INNER = 0.24
-RING_ALPHA_SAT = 0.14
+#: Owner 2026-10-19: the circles "need to be more transparent ... they look
+#: like galaxies". Every declared alpha is cut hard and the main orbits keep
+#: only a faint identity, so the ring set reads as quiet glass paths rather
+#: than a bright multi-coloured accretion disc.
+RING_ALPHA_MAIN = 0.18
+RING_ALPHA_ECHO = 0.12
+RING_ALPHA_INNER = 0.12
+RING_ALPHA_SAT = 0.06
 RING_WIDTH_MAIN = 1.0
 RING_WIDTH_ECHO = 1.0
 RING_WIDTH_INNER = 0.8
@@ -1947,7 +1964,7 @@ RING_PARTICLE_DEFAULT = 2
 RING_PARTICLE_PERIOD_BASE = 6.5
 RING_PARTICLE_PERIOD_SPAN = 9.0
 RING_PARTICLE_SIZE = 0.14
-RING_PARTICLE_ALPHA = 0.55
+RING_PARTICLE_ALPHA = 0.34
 RING_PARTICLE_LIFT_BASE = 0.30
 RING_PARTICLE_LIFT_GAIN = 0.35
 
@@ -2017,8 +2034,8 @@ ACCRETION_PERIOD_SPAN = 7.4
 ACCRETION_SPIRAL_TURNS = 1.35
 ACCRETION_SIZE_BASE = 0.12
 ACCRETION_SIZE_SPAN = 0.10
-ACCRETION_ALPHA_BASE = 0.26
-ACCRETION_ALPHA_GAIN = 0.40
+ACCRETION_ALPHA_BASE = 0.12
+ACCRETION_ALPHA_GAIN = 0.20
 ACCRETION_LIFT = 0.34
 
 
@@ -2171,8 +2188,8 @@ INFALL_PERIOD_BASE = 3.6
 INFALL_PERIOD_SPAN = 4.8
 INFALL_SIZE_BASE = 0.13
 INFALL_SIZE_SPAN = 0.08
-INFALL_ALPHA_BASE = 0.30
-INFALL_ALPHA_GAIN = 0.42
+INFALL_ALPHA_BASE = 0.14
+INFALL_ALPHA_GAIN = 0.22
 INFALL_LIFT = 0.36
 INFALL_TAIL_LEN_FRAC = 0.30
 

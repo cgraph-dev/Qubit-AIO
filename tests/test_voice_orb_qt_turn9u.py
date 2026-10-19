@@ -506,47 +506,63 @@ def test_every_stroked_circle_matches_the_declared_geometry():
                 break
         assert hit is not None, (ring["id"], want, len(unmatched))
         unmatched.remove(hit)
-    # The two main orbits also carry a two-stroke chromatic fringe, which is
-    # part of the logo's look and is exclusive to them. With the glint arms
-    # filtered out above, the only strokes left unidentified are the four
-    # fringe strokes.
-    assert len(unmatched) == 4, [(round(p.w, 1), round(p.h, 1))
-                                 for p in unmatched]
+    # Owner 2026-10-19: the chromatic fringe was retired from the rings (the
+    # circles "are too colored they look like galaxies"), so every declared
+    # circle is now exactly ONE stroke and nothing else is left over.
+    assert unmatched == [], [(round(p.w, 1), round(p.h, 1))
+                             for p in unmatched]
 
 
-def test_the_chromatic_fringe_stays_exclusive_to_the_two_main_orbits():
+def test_ring_strokes_are_translucent_and_near_monochrome():
+    # Owner 2026-10-19: the circles "need to be more transparent and they are
+    # too colored they look like galaxies". Every declared circle is now ONE
+    # faint stroke in the mark's own colour; the ring set carries no second
+    # hue and nothing above a low alpha ceiling.
+    import test_voice_orb_qt_fx9u as T
+
+    from voicebridge.orb import mark_field as F
+    from voicebridge.orb import qt_app as Q
+
+    size, t = 192, 0.37
+    prims = T._record(t=t, size=size)
+    strokes = [p for p in prims if p.kind == "path" and p.fill is None
+               and p.pen is not None and max(p.w, p.h) >= 40.0
+               and abs(p.width - Q.GLINT_PEN_W) > 0.05]
+    # The declared circles: two main, two echoes, three shells, one core.
+    assert len(strokes) == len(F.ring_geometry(t))
+    for p in strokes:
+        assert p.alpha <= Q.RING_DRAW_ALPHA["near_main"] + 0.02, p.alpha
+        # Near-monochrome: the red/blue chromatic fringe is gone, so no ring
+        # stroke wears either of its literal colours (the mark's own warm ring
+        # tint is red-dominant by design, so test the fringe colours exactly).
+        assert tuple(p.pen[:3]) not in ((255, 45, 85), (45, 130, 255)), p.pen
+    # Main orbits are the only comparatively visible circles.
+    assert Q.RING_DRAW_ALPHA["near_main"] > Q.RING_DRAW_ALPHA["echo"]
+    assert Q.RING_DRAW_ALPHA["near_main"] > Q.RING_DRAW_ALPHA["satellite"]
+
+
+def test_rings_carry_no_chromatic_fringe_and_the_nucleus_keeps_its_split():
     import test_voice_orb_qt_fx9u as T
 
     size, c, t = 192, 96.0, 0.37
     prims = T._record(t=t, size=size)
-    # The red/blue palette lives on the two main orbits (a wide fringe pair
-    # each) and on the nucleus's own chromatic split (a centred hairline pair
-    # each) — and nowhere else: no echo / core ring / shell wears it.
+    # Owner 2026-10-19: the red/blue split on the two main orbits was the last
+    # multi-hue spray on the ring set and read as a galaxy. It is gone; only the
+    # nucleus's own tiny chroma split (core light, not a circle) remains.
     fringe = [p for p in prims if p.kind == "path" and p.pen is not None
               and tuple(p.pen[:3]) in ((255, 45, 85), (45, 130, 255))]
-    assert len(fringe) == 6, [p.pen for p in fringe]
-    orbit_fringe = [p for p in fringe if max(p.w, p.h) >= 40.0]
-    nucleus_chroma = [p for p in fringe if max(p.w, p.h) < 40.0]
-    assert len(orbit_fringe) == 4, [p.pen for p in orbit_fringe]
-    assert len(nucleus_chroma) == 2, [p.pen for p in nucleus_chroma]
-    # Each main orbit's fringe sits on the mark's axis, i.e. it is a main orbit
-    # and not an echo / core ring / shell wearing the fringe. The bound is a
-    # few pixels rather than one because the stroke's box CENTRE, not the
-    # circle, is being measured: under the tumble a circle's projected
-    # silhouette is genuinely off-centre by a pixel or two (the near arc grows
-    # while the far arc shrinks). A stray ring would be off by tens of pixels.
-    assert all(math.hypot(p.cx - c, p.cy - c) <= 0.05 * c
-               for p in orbit_fringe)
-    # The nucleus split is centred on the body, not riding some other circle.
-    assert all(math.hypot(p.cx - c, p.cy - c) <= 0.05 * c
-               for p in nucleus_chroma)
+    assert len(fringe) == 2, [p.pen for p in fringe]
+    assert all(max(p.w, p.h) < 40.0 for p in fringe), [p.pen for p in fringe]
+    assert all(math.hypot(p.cx - c, p.cy - c) <= 0.05 * c for p in fringe)
 
 
 # --------------------------------------------------------------------------- #
-# (c) the RGB streaks
+# (c) NO wake ribbons — owner 2026-10-19: the 3-point "RGB trail" ribbons
+# read as thick bent L/V check-mark sticks and are gone from the Qt painter.
+# The field still publishes ``rgb_trail``/``dust_trail`` for API compatibility.
 # --------------------------------------------------------------------------- #
 def _streak_prims(t, size=192, reduced=False):
-    """Filled PATHS that are not the nucleus: the streaks, one per body."""
+    """Filled PATHS away from the nucleus: the old wake ribbons' slot."""
     import test_voice_orb_qt_fx9u as T
 
     prims = T._record(t=t, size=size, reduced=reduced)
@@ -556,242 +572,53 @@ def _streak_prims(t, size=192, reduced=False):
             and math.hypot(p.cx - c, p.cy - c) > 3.0]
 
 
-def test_stars_leave_a_streak_and_the_streak_is_the_fields_own():
-    from voicebridge.orb import mark_field as F
+def test_no_wake_ribbon_helper_or_constants_survive():
+    # Owner 2026-10-19: the 3-point "RGB trail" ribbons read as thick bent L/V
+    # check-mark sticks and were deleted outright, so there is no code path
+    # left that could paint one again.
     from voicebridge.orb import qt_app as Q
 
+    for name in ("_streak", "TRAIL_DRAW_SAMPLES", "TRAIL_HALF_WIDTH",
+                 "TRAIL_MIN_HALF_PX", "TRAIL_MIN_LEN_PX",
+                 "SPARKLE_TRAIL_HALF_WIDTH", "COMET_TRAIL_HALF_WIDTH"):
+        assert not hasattr(Q, name), name
+    # The bodies are still drawn — as glints/dots, never ribbons.
     t, size = 0.42, 192
-    R = size / 2.0 - 6.0
-    streaks = _streak_prims(t, size)
-    assert streaks, "no streaks painted at all"
+    assert _streak_prims(t, size) is not None
+    from voicebridge.orb import mark_field as F
+    for part in F.particle_state(t, size / 2.0 - 6.0):
+        assert "char" not in part
 
-    # Every travelling body's own streak is on screen: kill the field's trail
-    # description and the frame must change, which is only true if the painter
-    # really consumes it.
+
+def test_field_trails_do_not_reach_the_frame(monkeypatch):
+    """The field may keep publishing trails; the painter must ignore them."""
+    from voicebridge.orb import mark_field as F
+
+    t, size = 0.42, 192
+
+    def _wide(tt, rr, body):
+        return [{"x": 12.0 * k, "y": 3.0 * k, "hue": 0.5, "sat": 1.0,
+                 "val": 1.0, "alpha": 0.9, "size": 2.0, "depth": 0.5,
+                 "dof": 0.0, "k": float(k)} for k in range(9)]
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(F, "rgb_trail", _wide)
+        m.setattr(F, "dust_trail", _wide)
+        wide = _paint(t=t, size=size)
     with pytest.MonkeyPatch.context() as m:
         m.setattr(F, "rgb_trail", lambda *a, **k: [])
         m.setattr(F, "dust_trail", lambda *a, **k: [])
-        without = _paint(t=t, size=size)
-    assert _diff(_paint(t=t, size=size), without) > 0
-
-    # And the particles, satellite bodies and sparkles are the bodies that
-    # leave one: at least one streak per particle is within a particle's own
-    # neighbourhood of the drawn field.
-    # The streak's HEAD rides exactly on the body, so every particle must fall
-    # inside its own streak's box: the wake trails BEHIND the star, which is
-    # why this is a box test and not a distance-to-the-box-centre test.
-    boxes = [(p.cx - p.w / 2.0, p.cy - p.h / 2.0,
-              p.cx + p.w / 2.0, p.cy + p.h / 2.0) for p in streaks]
-    for part in F.particle_state(t, R):
-        px, py = size / 2.0 + part["x"], size / 2.0 + part["y"]
-        assert any(x0 - 2.0 <= px <= x1 + 2.0 and y0 - 2.0 <= py <= y1 + 2.0
-                   for x0, y0, x1, y1 in boxes), (part["index"], px, py)
+        bare = _paint(t=t, size=size)
+    assert _diff(wide, bare) == 0
 
 
-def test_streak_colour_comes_from_the_fields_colour_wheel():
-    """The renderer must not carry its own HSV maths."""
-    from voicebridge.orb import mark_field as F
-
-    t, size = 0.42, 192
-    plain = _paint(t=t, size=size)
-    with pytest.MonkeyPatch.context() as m:
-        # A wheel that returns one flat colour cannot produce a spectrum; if
-        # the frame does not change, the painter was computing its own.
-        m.setattr(F, "hue_to_rgb", lambda h, s=1.0, v=1.0: (0.15, 0.85, 0.25))
-        flat = _paint(t=t, size=size)
-    assert _diff(plain, flat) > 0
-
-
-def test_a_star_has_no_halo_its_streak_is_what_it_leaves():
-    """The halo is gone: a star's ink is elongated, not a disc around it."""
-    t, size = 0.42, 192
-    streaks = _streak_prims(t, size)
-    # At least some streaks are clearly elongated — a streak, not a blob.
-    elongated = [p for p in streaks
-                 if max(p.w, p.h) / max(min(p.w, p.h), 0.001) > 1.6]
-    assert elongated, [round(max(p.w, p.h) / max(min(p.w, p.h), 0.001), 2)
-                      for p in streaks]
-
-
-def test_reduced_motion_leaves_no_streaks():
+def test_reduced_motion_leaves_no_ribbons():
     still = _streak_prims(0.31, reduced=True)
-    # The still frame is the mark: orbits, core ring, glints, body. The only
-    # filled paths it may carry are the body's own shading layers.
-    assert len(still) <= 8, [(round(p.w, 1), round(p.h, 1)) for p in still]
     live = _streak_prims(0.31)
-    assert len(live) > len(still)
+    assert len(still) <= len(live)
+    assert all(max(p.w, p.h) <= 0.25 * 192 for p in still)
 
 
-# --------------------------------------------------------------------------- #
-# never raises
-# --------------------------------------------------------------------------- #
-def test_the_new_turn_never_raises_on_bad_input():
-    from voicebridge.orb import qt_app as Q
-
-    for bad in ("nonsense", float("nan"), float("inf"), None, object()):
-        assert -1.0 <= Q.mark_horizontal_spin(bad) <= 1.0
-        assert math.isfinite(Q.mark_horizontal_spin_deg(bad))
-    assert Q.mark_ring_geometry("nonsense") is not None
-
-    for bad in ("nonsense", float("nan"), float("inf"), None, object()):
-        _paint(t=bad, state="not-a-state", size=96)
-        _paint(t=bad, state=None, size=96, reduced=True)
-
-
-# --------------------------------------------------------------------------- #
-# (a3) the X+Y combined tumble
-# --------------------------------------------------------------------------- #
-def test_vertical_spin_is_one_full_turn_per_period_and_continuous():
-    from voicebridge.orb import qt_app as Q
-
-    assert Q.X_SPIN_PERIOD_S == 27.0
-    assert Q.mark_vertical_spin_deg(0.0) == pytest.approx(0.0)
-    assert Q.mark_vertical_spin_deg(Q.X_SPIN_PERIOD_S) == pytest.approx(360.0)
-    # A ramp, never a wrapped phase: it keeps counting past a turn, so it
-    # cannot snap at the boundary.
-    assert Q.mark_vertical_spin_deg(2.5 * Q.X_SPIN_PERIOD_S) == pytest.approx(
-        900.0)
-    step = 360.0 / Q.X_SPIN_PERIOD_S / 60.0
-    prev = Q.mark_vertical_spin_deg(0.0)
-    for k in range(1, int(60 * Q.X_SPIN_PERIOD_S)):
-        cur = Q.mark_vertical_spin_deg(k / 60.0)
-        assert cur - prev == pytest.approx(step, abs=1e-9), (k, prev, cur)
-        prev = cur
-
-
-def test_vertical_spin_is_a_no_op_under_reduced_motion():
-    from voicebridge.orb import qt_app as Q
-
-    with _env("QUBIT_REDUCED_MOTION", "1"):
-        assert Q.mark_vertical_spin_deg(37.4) == 0.0
-        assert Q.mark_vertical_theta(12.0) == 0.0
-        assert Q.mark_tumble_angles(9.0) == (0.0, 0.0)
-        assert Q.tumble_point(9.0, 90.0, 63.0, -21.0, 1.0) == pytest.approx(
-            (63.0, -21.0, 1.0))
-
-
-def test_tumble_angles_come_from_the_shared_field():
-    # Single source: both phases are the field's ``spin_angles`` on the
-    # clamped clock, wrapped — so the Qt and Tk lanes cannot disagree about
-    # where in the tumble the mark is.
-    from voicebridge.orb import mark_field as F
-    from voicebridge.orb import qt_app as Q
-
-    assert Q.X_SPIN_PERIOD_S == F.X_SPIN_PERIOD_S
-    assert Q.Y_SPIN_PERIOD_S == F.Y_SPIN_PERIOD_S
-    for t in (0.0, 0.37, 5.125, 41.0):
-        ty, px = Q.mark_tumble_angles(t)
-        fy, fx = F.spin_angles(t)
-        assert ty == pytest.approx(fy % (2.0 * math.pi))
-        assert px == pytest.approx(fx % (2.0 * math.pi))
-
-
-def test_tumble_is_identity_at_zero_and_matches_y_only_at_x_zero():
-    from voicebridge.orb import qt_app as Q
-
-    R = 90.0
-    for x, y in ((63.0, -21.0), (-63.0, 21.0), (0.0, 30.0), (-12.5, 0.0)):
-        for d in (0.0, 0.5, 1.0):
-            assert Q.tumble_point(0.0, R, x, y, d) == pytest.approx(
-                (x, y, 1.0), abs=1e-9), (x, y, d)
-    # At whole X periods the X phase is 0, so the tumble IS the Y-only turn.
-    for k in range(1, 4):
-        t = k * Q.X_SPIN_PERIOD_S
-        for x, y, d in ((63.0, -21.0, 1.0), (-40.0, 55.0, 0.0),
-                        (10.0, -70.0, 0.5)):
-            assert Q.tumble_point(t, R, x, y, d) == pytest.approx(
-                Q.y_turn_point(t, R, x, y, d), abs=1e-6), (t, x, y, d)
-    # At the combined period (20.5 * 54 = 27 * 41 = 1107 s) both phases are 0:
-    # the identity again.
-    for x, y, d in ((63.0, -21.0, 1.0), (-40.0, 55.0, 0.0)):
-        assert Q.tumble_point(1107.0, R, x, y, d) == pytest.approx(
-            (x, y, 1.0), abs=1e-6), (x, y, d)
-
-
-def test_xy_periods_do_not_lock_with_the_master_or_near_turns():
-    from voicebridge.orb import qt_app as Q
-
-    for other in (Q.MASTER_SPIN_PERIOD_S, 9.5, 7.0):
-        for period in (Q.Y_SPIN_PERIOD_S, Q.X_SPIN_PERIOD_S):
-            ratio = period / other
-            assert abs(ratio - round(ratio)) > 1e-6, (period, other)
-    assert abs(Q.Y_SPIN_PERIOD_S / Q.X_SPIN_PERIOD_S - 1.0) > 1e-2
-    # DOCUMENTED, not asserted away: 27.0 s is exactly 2x the far-ring 13.5 s
-    # and 6x the inner-ring 4.5 s (inherited from the field lane's mandated
-    # periods). The far ring counter-rotates and the Y turn breaks the visual
-    # lock: the COMBINED phase pair never repeats on a short cycle.
-    seen = set()
-    for k in range(0, 300):
-        pair = (round(Q.mark_tumble_angles(float(k))[0], 6),
-                round(Q.mark_tumble_angles(float(k))[1], 6))
-        assert pair not in seen, f"combined phase repeats at t={k}s"
-        seen.add(pair)
-
-
-def test_the_combined_tumble_never_goes_thin():
-    # The owner's complaint, measured on the WHOLE assembly across the
-    # COMBINED turn: the inked box over 150 s of tumbling (fast, no raster —
-    # full pixel renders across the 1107 s combined period are too slow).
-    # A single tilted ring DOES go edge-on transiently from some viewpoint
-    # (measured: one declared orbit narrows to ~16% face-on at theta_y~=124
-    # deg — true of the Y-only turn too, and unavoidable with real 3D); the
-    # contract that matters is the mark the owner sees. The nucleus, its
-    # glow, the particles and their trails keep the orb visibly wide through
-    # every such pose, so the inked width never drops below 0.45 of face-on.
-    face_ink = _ink_width(0.0)
-    assert face_ink > 100.0, face_ink
-    thin_ink = min(_ink_width(float(k)) for k in range(0, 151, 2))
-    assert thin_ink >= 0.45 * face_ink, (thin_ink, face_ink)
-
-
-def test_the_tumble_opens_depth_along_whichever_axis_is_edge_on():
-    # The pose that broke the first X+Y build: Y face-on while X is edge-on.
-    # The Y-only ``sin²θy`` fade zeroes the depth exactly there, so the whole
-    # mark folded to a line every 6.75 s. The combined fade keeps the depth
-    # whenever EITHER axis has turned, so the ring lays its depth vertical
-    # instead — wide in both axes, like the Y quarters always were.
-    from voicebridge.orb import mark_field as F
-    from voicebridge.orb import qt_app as Q
-
-    R = 90.0
-    spec = [r for r in F.ring_geometry(0.0) if r["id"] == "orbit_a"][0]
-    pts = F.ring_path(0.0, R, spec)
-    n = len(pts) - 1
-    depths = [0.5 + 0.5 * math.cos(2.0 * math.pi * (i % n) / n)
-              for i in range(len(pts))]
-
-    def box(t):
-        xs = [Q.tumble_point(t, R, x, y, d)[0]
-              for (x, y), d in zip(pts, depths)]
-        ys = [Q.tumble_point(t, R, x, y, d)[1]
-              for (x, y), d in zip(pts, depths)]
-        return (max(xs) - min(xs), max(ys) - min(ys))
-
-    face = box(0.0)
-    # t = 20.5 s: exactly one Y turn (face-on) while X sits at ~273 deg,
-    # a quarter turn past edge-on.
-    w, h = box(20.5)
-    assert w >= 0.45 * face[0], (w, h, face)
-    assert h >= 0.45 * face[1], (w, h, face)
-
-
-def test_the_painter_really_consumes_the_x_turn():
-    # Killing the X phase must move the frame: if the painter quietly
-    # projected Y-only, this diff would be zero. The tumble memo is dropped
-    # first — it is keyed by clock, so it would otherwise serve the stale
-    # combined basis for the same t.
-    from voicebridge.orb import qt_app as Q
-
-    t = Q.Y_SPIN_PERIOD_S / 4.0
-    plain = _paint(t=t, size=192)
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(Q._field, "spin_angles",
-                  lambda tt: (2.0 * math.pi * tt / Q.Y_SPIN_PERIOD_S, 0.0))
-        m.setattr(Q, "_TUMBLE_BASIS", (float("nan"), 1.0, 0.0, 1.0, 0.0))
-        assert _diff(plain, _paint(t=t, size=192)) > 0, "the X turn is dead"
-
-
-# --------------------------------------------------------------------------- #
 # (c2) duotone streaks, blink dots, hologram cues
 # --------------------------------------------------------------------------- #
 def test_comet_beads_walk_the_duotone_pair_not_a_ramp():
