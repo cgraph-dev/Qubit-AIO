@@ -172,12 +172,41 @@ def _settle_api_runtime_lock(agent, result, captured):
         result.update(final_response='', failed=True, completed=False, error=str(exc))
 
 
-class TurnRunner:
+class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
     """Per-turn collaborator carrying ``GatewayRunner._run_agent_inner``'s tool-progress callbacks."""
+
+    # ``None`` is a legitimate state: a turn with no owning session authority (messaging
+    # adapters without a canonical session) publishes no execution events and takes no
+    # controls snapshot. Class-level so every publish/snapshot seam can read it unconditionally.
+    _approval_owner = None
 
     def __init__(self, runner: GatewayRunner, ctx: TurnContext) -> None:
         self._runner = runner
         self._ctx = ctx
+        from gateway.session_authorities import active_authority
+        authority = active_authority(runner)
+        if authority is not None:
+            source = getattr(ctx, 'source', None)
+            owner_id = (source.chat_id if getattr(source, 'platform', None) == Platform.LOCAL
+                        else authority.logical_owner(ctx.session_id))
+            if owner_id in authority.sessions:
+                generation = authority.db.get_session(owner_id)["runtime_generation"]
+                self._approval_owner = (authority, owner_id, generation)
+
+    def _publish_execution(self, event_type, payload):
+        if self._approval_owner is not None:
+            authority, session_id, generation = self._approval_owner
+            return authority.publish_execution(session_id, generation, event_type, payload)
+        return False
+
+    def _publish_api_tool(self, event_type, call_id, tool_name, args, result=None):
+        """The retained tool payload reaches the API observers of this exact admission only;
+        the shared viewer stream keeps its ID-correlated frames."""
+        if self._approval_owner is not None:
+            from gateway.session_api_turn import publish_api_tool_event
+            authority, session_id, generation = self._approval_owner
+            publish_api_tool_event(authority, session_id, generation, event_type,
+                                   str(call_id or ""), str(tool_name or "tool"), args, result)
 
     # ── shared thread→loop plumbing ─────────────────────────────────────────────────────────
 
@@ -2071,10 +2100,32 @@ class TurnRunner:
             # Reuse the in-agent one-shot notice so the pre-agent provider switch is user-visible too.
             agent._pending_fallback_notice = pending_fallback_notice
         self._wire_turn_agent_callbacks(agent, turn_route, reasoning_config, stream_delta_cb, interim_cb, want_interim)
-        agent_history, observed_group_context, history_media_paths = self._load_turn_history(agent, reused_cached_agent)
-        persist_msg, persist_ts = self._prepare_turn_message(agent_history)
-        compressions = getattr(getattr(agent, "context_compressor", None), "compression_count", None)
-        result = self._run_conversation_with_approval(agent, agent_history, observed_group_context, persist_msg, persist_ts)
+        from gateway.run_turn_progress import local_viewer_turn
+        local_sinks = None
+        if local_viewer_turn(self) and not ctx.mute_notification_reply:
+            # Per turn on the shared cached agent: installed here, restored when the run returns.
+            from gateway import local_viewer_events
+            local_sinks = local_viewer_events.wire(self, agent)
+            from gateway.session_usage import TURN_BASE_ATTR
+            setattr(agent, TURN_BASE_ATTR, int(getattr(agent, "session_output_tokens", 0) or 0))
+        try:
+            agent_history, observed_group_context, history_media_paths = self._load_turn_history(agent, reused_cached_agent)
+            persist_msg, persist_ts = self._prepare_turn_message(agent_history)
+            compressions = getattr(getattr(agent, "context_compressor", None), "compression_count", None)
+            from gateway.session_cli_turn import run_classic_cli_turn
+            from gateway.session_secret_prompt import secret_prompt_scope
+            from gateway.session_sudo_prompt import sudo_prompt_scope
+            with sudo_prompt_scope(self, agent), secret_prompt_scope(self, agent):
+                result = run_classic_cli_turn(self, lambda: self._run_conversation_with_approval(
+                    agent, agent_history, observed_group_context, persist_msg, persist_ts))
+        finally:
+            if local_sinks is not None:
+                from gateway import local_viewer_events
+                local_viewer_events.restore(agent, local_sinks)
+                from gateway.session_usage import publish_usage
+                publish_usage(self, agent, record=True)  # turn end: the final API call's counters
+                from gateway.session_local_inventory import publish_settled_info
+                publish_settled_info(self, agent)
         persisted_turn = _persisted_turn(agent, agent_history, result, compressions)
         self._finish_stream_consumer(result, agent_history, stream_consumer)
         if _finite_viewer_turn() and getattr(agent, "_codex_session", None) is not None:
