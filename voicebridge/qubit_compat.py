@@ -8383,6 +8383,23 @@ def h_audio_stt_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                detail="read-only streaming STT health; no secrets or audio")
 
 
+def _speak_turn_stopped(cfg: Any, request_id: str) -> bool:
+    """Fail-open orb-STOP gate for a keyed ``/api/audio/speak`` synth.
+
+    Thin wrapper over ``voice_edit.service.ask_turn_stopped`` so the compat
+    handler stays import-light and never fails on a missing/odd service.
+    Empty id or any error -> False (no behavior change for callers that send
+    no turn id). Never raises.
+    """
+    if not str(request_id or "").strip():
+        return False
+    try:
+        from .voice_edit.service import ask_turn_stopped
+        return bool(ask_turn_stopped(cfg, request_id))
+    except Exception:  # noqa: BLE001 - gate is best-effort
+        return False
+
+
 def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/audio/speak -> local TTS rendered as a base64 data URL.
@@ -8410,12 +8427,31 @@ def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "text has no speakable words after removing "
                      "markdown/code/URLs",
                      counterpart, 400)
+    # Orb STOP gate (2026-10-19): a reply's speech must not be synthesized
+    # after the user stopped. The desktop helper keys this request to its turn
+    # id; when that turn's cancel is recorded, refuse BEFORE the (largely
+    # uninterruptible) synth — the earliest cancellation point. A caller that
+    # sends no request_id (the dashboard) stays byte-identical; the check is
+    # fail-open on any error.
+    _rid = str(b.get("request_id", "") or "")
+    if _speak_turn_stopped(cfg, _rid):
+        return _gate("AUDIO_SPEAK_CANCELLED",
+                     "the turn was stopped before speech started",
+                     counterpart, 400)
     out = Path(tempfile.gettempdir()) / (
         f"qubit-runtime-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
     try:
         tts = _tts_from_cfg(cfg)
         tts.load()
         tts.synthesize(text[:4000], out)
+        # The synth itself (piper/sherpa) is not interruptible mid-call, so a
+        # STOP that lands DURING synthesis is caught here, before the audio is
+        # read/encoded/shipped: the work ran, but the stopped reply is never
+        # returned. The helper's own socket abort covers leaving it spoken.
+        if _speak_turn_stopped(cfg, _rid):
+            return _gate("AUDIO_SPEAK_CANCELLED",
+                         "the turn was stopped during speech synthesis",
+                         counterpart, 400)
         data = out.read_bytes()
         mime = ("audio/wav" if out.suffix.lower() == ".wav"
                 else "audio/mpeg")

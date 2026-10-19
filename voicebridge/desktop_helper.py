@@ -293,17 +293,167 @@ class _NsFilterMic:
             return frame
 
 
+def _default_conn_factory(scheme: str, host: str, port: Any,
+                          timeout: float) -> Any:
+    """Real HTTP(S) connection for the abortable ask/speak transport."""
+    import http.client
+    cls = (http.client.HTTPSConnection if scheme == "https"
+           else http.client.HTTPConnection)
+    return cls(host, port, timeout=timeout)
+
+
+class _ReadableResponse:
+    """Minimal response for the abortable transport (``with`` + ``read``)."""
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def close(self) -> None:
+        return None
+
+    def __enter__(self) -> "_ReadableResponse":
+        return self
+
+    def __exit__(self, *exc: Any) -> bool:
+        return False
+
+
 class HelperClient:
     """Thin authenticated HTTP client for the voice-edit service."""
 
     def __init__(self, base_url: str, token: str = "",
-                 opener: Optional[Callable[..., Any]] = None) -> None:
+                 opener: Optional[Callable[..., Any]] = None,
+                 conn_factory: Optional[Callable[..., Any]] = None) -> None:
         self.base = base_url.rstrip("/")
         self.token = token
+        self._has_custom_opener = opener is not None
         self._opener = opener or urllib.request.urlopen
+        # Abortable transport (2026-10-19): ``ask_result``/``speak`` open a
+        # socket this client OWNS so an orb STOP can shut it down from another
+        # thread and unblock the worker at once, instead of waiting out the
+        # 90 s / 60 s timeout. ``conn_factory`` is the hermetic test seam; a
+        # caller that injected a custom ``opener`` keeps that exact seam.
+        self._conn_factory = conn_factory or _default_conn_factory
+        self._abort_lock = threading.RLock()
+        self._live_conn: Any = None
+        self._aborted_conn: Any = None
+        self._live_token = 0
+        # The turn's request id, learned when ``ask``/``ask_result`` runs, so
+        # ``speak`` can key its synth to the turn WITHOUT a signature change
+        # (every fake client keeps ``speak(text)``).
+        self._turn_rid = ""
+
+    def _open(self, req: Any, *, timeout: float, abortable: bool) -> Any:
+        """Open one request; an abortable ask/speak owns its own socket."""
+        if abortable and not self._has_custom_opener:
+            return self._open_abortable(req, float(timeout))
+        return self._opener(req, timeout=timeout)
+
+    def _open_abortable(self, req: Any, timeout: float) -> Any:
+        """Open ``req`` on a socket this client owns, abortable mid-read.
+
+        Uses ``http.client`` directly (not the injected opener) so
+        :meth:`abort` can ``shutdown`` the live socket from another thread and
+        raise the worker out of a blocking read at once. Non-2xx maps to the
+        same ``urllib.error.HTTPError`` the urllib path raises, so the typed
+        error handling in :meth:`_request` is unchanged; an abort raises the
+        typed cancelled ``HelperError``. Only used without a custom opener.
+        """
+        import io
+        import urllib.parse
+        parts = urllib.parse.urlsplit(req.full_url)
+        path = parts.path or "/"
+        if parts.query:
+            path = f"{path}?{parts.query}"
+        conn = self._conn_factory(parts.scheme or "http", parts.hostname,
+                                  parts.port, timeout)
+        with self._abort_lock:
+            self._live_conn = conn
+            self._aborted_conn = None
+            self._live_token += 1
+            token = self._live_token
+        try:
+            try:
+                conn.request(req.get_method(), path, body=req.data,
+                             headers=dict(req.header_items()))
+                resp = conn.getresponse()
+            except HelperError:
+                raise
+            except Exception as exc:  # noqa: BLE001 - abort vs real failure
+                if self._was_aborted(conn):
+                    raise HelperError(
+                        "VOICE_EDIT_ASK_CANCELLED",
+                        "the turn was cancelled") from exc
+                raise
+            status = int(getattr(resp, "status", 200) or 200)
+            try:
+                body = resp.read()
+            except Exception as exc:  # noqa: BLE001 - abort vs real failure
+                if self._was_aborted(conn):
+                    raise HelperError(
+                        "VOICE_EDIT_ASK_CANCELLED",
+                        "the turn was cancelled") from exc
+                raise
+            if status >= 400:
+                raise urllib.error.HTTPError(
+                    req.full_url, status, "request refused", None,
+                    io.BytesIO(body))
+            return _ReadableResponse(body)
+        finally:
+            with self._abort_lock:
+                if self._live_token == token:
+                    self._live_conn = None
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def _was_aborted(self, conn: Any) -> bool:
+        try:
+            with self._abort_lock:
+                return self._aborted_conn is conn
+        except Exception:  # noqa: BLE001 - detection only
+            return False
+
+    def abort(self) -> bool:
+        """Shut down the live ask/speak socket so its worker unblocks at once.
+
+        The orb STOP reaches the helper first (SIGUSR2); ``stop_speaking``
+        calls this against the request thread's live connection. ``shutdown``
+        (not just ``close``) is what actually wakes a thread blocked in
+        ``recv`` on Linux. Non-blocking and safe from a signal handler;
+        returns True when a live request was aborted, False when nothing was
+        in flight — so an idle stop stays a no-op. Never raises.
+        """
+        conn = None
+        try:
+            with self._abort_lock:
+                conn = self._live_conn
+                if conn is not None:
+                    self._aborted_conn = conn
+            if conn is None:
+                return False
+            try:
+                sock = getattr(conn, "sock", None)
+                if sock is not None:
+                    import socket as _socket
+                    sock.shutdown(_socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
 
     def _request(self, method: str, path: str, payload: Optional[dict] = None,
-                 timeout: float = 90.0) -> Dict[str, Any]:
+                 timeout: float = 90.0, *, abortable: bool = False
+                 ) -> Dict[str, Any]:
         url = f"{self.base}/agent{path}"
         data = json.dumps(payload).encode() if payload is not None else None
         req = urllib.request.Request(url, data=data, method=method)
@@ -312,7 +462,8 @@ class HelperClient:
             req.add_header("X-Api-Token", self.token)
             req.add_header("X-Qubit-Session-Token", self.token)
         try:
-            with self._opener(req, timeout=timeout) as resp:
+            with self._open(req, timeout=timeout,
+                            abortable=abortable) as resp:
                 body = resp.read().decode("utf-8", "replace")
                 return json.loads(body) if body.strip() else {}
         except urllib.error.HTTPError as exc:
@@ -323,6 +474,8 @@ class HelperClient:
                 parsed = {}
             code = str(parsed.get("code") or f"HTTP_{exc.code}")
             raise HelperError(code, str(parsed.get("detail", "") or "")[:200])
+        except HelperError:
+            raise
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise HelperError("VOICE_EDIT_SERVICE_UNREACHABLE",
                               str(exc)[:160])
@@ -380,16 +533,30 @@ class HelperClient:
         return str(self.ask_result(text, request_id).get("answer", "") or "")
 
     def ask_result(self, text: str, request_id: str = "") -> Dict[str, Any]:
-        """Ask and return the full result (answer + whether it was spoken)."""
+        """Ask and return the full result (answer + whether it was spoken).
+
+        The POST owns its socket (``abortable``) so an orb STOP can end the
+        blocking wait at once instead of after the 90 s timeout; the turn id
+        is remembered so the reply's :meth:`speak` synth is keyed to it.
+        """
+        self._turn_rid = str(request_id or "")
         return self._request("POST", "/api/voice-edit/ask",
                              {"text": text, "request_id": request_id},
-                             timeout=90.0)
+                             timeout=90.0, abortable=True)
 
     def speak(self, text: str) -> bytes:
-        """Render ``text`` with the ONE local TTS authority (returns WAV bytes)."""
+        """Render ``text`` with the ONE local TTS authority (returns WAV bytes).
+
+        Abortable too: a STOP that lands while the synth request is in flight
+        shuts this socket down, and the request carries the turn id so the
+        service can skip synthesizing a stopped reply (see
+        ``h_audio_speak``).
+        """
         import base64
-        out = self._request("POST", "/api/audio/speak", {"text": text},
-                            timeout=60.0)
+        out = self._request("POST", "/api/audio/speak",
+                            {"text": text,
+                             "request_id": getattr(self, "_turn_rid", "")},
+                            timeout=60.0, abortable=True)
         url = str(out.get("data_url", "") or "")
         if not url.startswith("data:audio/"):
             return b""
@@ -1534,6 +1701,10 @@ class DesktopHelper:
                         self._turn_stopped_seq = self._turn_seq
                         _trace("speak.stop_pending", turn=self._turn_seq)
                         try:
+                            self._abort_client_request()
+                        except Exception:
+                            pass
+                        try:
                             self._request_service_cancel()
                         except Exception:
                             pass
@@ -1546,6 +1717,10 @@ class DesktopHelper:
             except Exception:
                 pass
             self._barge_interrupted = True
+            try:
+                self._abort_client_request()
+            except Exception:
+                pass
             if proc is not None:
                 try:
                     proc.terminate()
@@ -1559,6 +1734,25 @@ class DesktopHelper:
             return True
         except Exception:
             return False
+
+    def _abort_client_request(self) -> None:
+        """Best-effort close the live ``/ask`` / ``/api/audio/speak`` socket.
+
+        The orb STOP's first job is to make this helper's blocking POST
+        return at once: ``HelperClient.abort`` shuts down the live socket so
+        the worker thread unblocks immediately instead of waiting for the
+        request timeout. Non-blocking (``shutdown`` + ``close`` only), so it
+        is safe to call from the SIGUSR2 handler. A client without ``abort``
+        (older/fake) is a quiet no-op, and an abort with nothing in flight
+        stays a no-op. Never raises.
+        """
+        abort = getattr(getattr(self, "client", None), "abort", None)
+        if not callable(abort):
+            return
+        try:
+            abort()
+        except Exception:
+            pass
 
     def _request_service_cancel(self) -> None:
         """Ask the service to cancel this turn's in-flight ``/ask`` call.
@@ -3209,6 +3403,15 @@ class DesktopHelper:
             wav = self.client.speak(spoken[:400])
         except HelperError as exc:
             _trace("speak_error", code=exc.code)
+            # A STOP that aborted the synth socket (or the service gate
+            # refusing a stopped synth) is honored the same as a post-synth
+            # stop: never play the reply and close the orb FSM with the
+            # canonical triple instead of leaving it waiting.
+            if (exc.code in ("VOICE_EDIT_ASK_CANCELLED",
+                             "AUDIO_SPEAK_CANCELLED")
+                    or self._turn_reply_stopped()
+                    or self._speak_stop.is_set()):
+                self._announce_turn_stop()
             return
         if not wav:
             return
