@@ -144,3 +144,30 @@ class TestPreflightRelayFronted:
             ids = {t["id"] for t in cron_delivery_targets()}
         assert "slack" in ids
         assert "telegram" not in ids
+
+
+class TestBuiltinHomeTargetTable:
+    """The built-in platform->env-var table must be READ, not merely defined.
+
+    Upstream looks it up in two places: ``_resolve_home_env_var``
+    (``_HOME_TARGET_ENV_VARS.get(name) or _plugin_cron_env_var(name)``) and
+    ``_iter_home_target_platforms`` (``yield from _HOME_TARGET_ENV_VARS``).
+    Without them every built-in platform resolves to an empty env var and the
+    home-target iterator only sees plugin platforms, so cron delivery to a
+    built-in home channel silently loses its channel.
+    """
+
+    def test_resolve_home_env_var_reads_builtin_table(self):
+        assert sched_delivery._resolve_home_env_var("telegram") == "TELEGRAM_HOME_CHANNEL"
+        assert sched_delivery._resolve_home_env_var("discord") == "DISCORD_HOME_CHANNEL"
+        assert sched_delivery._resolve_home_env_var("email") == "EMAIL_HOME_ADDRESS"
+        # Case-folded, as upstream.
+        assert sched_delivery._resolve_home_env_var("MATRIX") == "MATRIX_HOME_ROOM"
+        assert sched_delivery._resolve_home_env_var("not_a_platform") == ""
+
+    def test_iter_home_target_platforms_yields_builtin_first(self):
+        yielded = list(sched_delivery._iter_home_target_platforms())
+        builtins = list(sched_delivery._HOME_TARGET_ENV_VARS)
+        assert builtins, "table is empty"
+        assert yielded[: len(builtins)] == builtins
+        assert set(builtins) <= set(yielded)

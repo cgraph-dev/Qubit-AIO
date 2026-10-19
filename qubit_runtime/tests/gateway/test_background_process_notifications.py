@@ -59,6 +59,11 @@ def _build_runner(monkeypatch, tmp_path, mode: str) -> GatewayRunner:
     import gateway.run as gateway_run
 
     monkeypatch.setattr(gateway_run, "_qubit_home", tmp_path)
+    # ``_VOICE_MODE_PATH`` is a CLASS attribute bound at import from the real
+    # home, so patching the module's ``_qubit_home`` cannot reach it — the
+    # home-I/O guard then aborts construction. Bind it to the sandbox too.
+    monkeypatch.setattr(gateway_run.GatewayRunner, "_VOICE_MODE_PATH",
+                        tmp_path / "gateway_voice_mode.json", raising=False)
 
     runner = GatewayRunner(GatewayConfig())
     adapter = SimpleNamespace(send=AsyncMock(), handle_message=AdmittingHandler())
@@ -273,6 +278,47 @@ async def test_inject_watch_notification_routes_from_session_store_origin(monkey
     assert synth_event.source.thread_id == "42"
     assert synth_event.source.user_id == "123"
     assert synth_event.source.user_name == "Emiliyan"
+
+
+@pytest.mark.asyncio
+async def test_inject_watch_notification_uses_watch_metadata_helper(monkeypatch, tmp_path):
+    """The synthetic-send path calls ``_watch_notification_metadata`` rather than an
+    inline subset, so automation identities / proven session / completion ids reach
+    the event metadata (upstream run_notifications.py:857)."""
+    from gateway import run_notifications
+    from gateway.session import SessionSource
+
+    runner = _build_runner(monkeypatch, tmp_path, "all")
+    adapter = runner.adapters[Platform.TELEGRAM]
+    runner.session_store._entries["agent:main:telegram:group:-100:42"] = SimpleNamespace(
+        origin=SessionSource(
+            platform=Platform.TELEGRAM, chat_id="-100", chat_type="group",
+            thread_id="42", user_id="123", user_name="Emiliyan",
+        )
+    )
+    calls = []
+    real = run_notifications._watch_notification_metadata
+
+    def spy(evt, source):
+        calls.append(evt)
+        return real(evt, source)
+
+    monkeypatch.setattr(run_notifications, "_watch_notification_metadata", spy)
+    evt = {
+        "session_id": "proc_watch",
+        "session_key": "agent:main:telegram:group:-100:42",
+        "proven_session_id": "proven-1",
+        "completion_ids": ["dlg-1"],
+        "_automation_identities": ["auto-1"],
+    }
+    await runner._inject_watch_notification("[SYSTEM: Background process matched]", evt)
+
+    assert calls == [evt], "helper was not called with the queued event"
+    synth_event = adapter.handle_message.await_args.args[0]
+    assert synth_event.metadata["notification_origin"] == "process_registry_synthetic"
+    assert synth_event.metadata["gateway_proven_session_id"] == "proven-1"
+    assert synth_event.metadata["gateway_completion_ids"] == ["dlg-1"]
+    assert synth_event.metadata["automation_identities"] == ["auto-1"]
 
 
 @pytest.mark.asyncio

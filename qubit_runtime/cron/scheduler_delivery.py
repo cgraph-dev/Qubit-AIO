@@ -432,8 +432,9 @@ def _is_known_delivery_platform(platform_name: str) -> bool:
 
 
 def _resolve_home_env_var(platform_name: str) -> str:
-    """Env var name for a platform's cron home channel (``PlatformEntry.cron_deliver_env_var``)."""
-    return _plugin_cron_env_var(platform_name.lower())
+    """Env var name for a platform's cron home channel (built-in table, then plugin registry)."""
+    name = platform_name.lower()
+    return _HOME_TARGET_ENV_VARS.get(name) or _plugin_cron_env_var(name)
 
 
 def _get_config_home_channel(platform_name: str):
@@ -522,14 +523,15 @@ def _get_home_target_thread_id(platform_name: str) -> Optional[str]:
 
 
 def _iter_home_target_platforms():
-    """Iterate plugin platform names that expose a home channel, ``_HOME_TARGET_PRIORITY`` first."""
+    """Iterate built-in + plugin platform names that expose a home channel."""
+    yield from _HOME_TARGET_ENV_VARS
     with contextlib.suppress(Exception):
         from qubit_cli.plugins import discover_plugins
         discover_plugins()  # idempotent
         from gateway.platform_registry import platform_registry
-        named = [e.name for e in platform_registry.plugin_entries() if e.cron_deliver_env_var]
-        yield from (n for n in _HOME_TARGET_PRIORITY if n in named)
-        yield from (n for n in named if n not in _HOME_TARGET_PRIORITY)  # registry order, as before
+        for entry in platform_registry.plugin_entries():
+            if entry.cron_deliver_env_var and entry.name not in _HOME_TARGET_ENV_VARS:
+                yield entry.name
 
 
 def _relay_fronted_delivery_platforms(connected: set) -> set:
