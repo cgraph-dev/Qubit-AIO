@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """LIVE-capable STOP harness for the desktop helper's playback path.
 
-What it proves (best-effort, on a machine with a working player): a wav is
-played through the SAME ``DesktopHelper._speak`` path the orb uses, a STOP is
+Two modes:
+
+**Demo mode (default).** Best-effort, on a machine with a working player: a wav
+is played through the SAME ``DesktopHelper._speak`` path the orb uses, a STOP is
 delivered (SIGUSR2, exactly like the orb's stop press), and the evidence is
 recorded:
 
@@ -12,25 +14,50 @@ recorded:
     ``voice_edit.talk.response.done``;
   * ``evidence.json`` + ``timeline.txt`` are written under ``--out``.
 
+This mode exercises a PRIVATE helper instance inside the harness process. It
+proves the code path, not the actually-running service.
+
+**Live mode (``--live-helper``).** Inspects/verifies the RUNNING helper
+(``qubit-voice-typing.service``) and its journal, not a private copy:
+
+  * resolves the helper pid from the heartbeat file with the same validation
+    the orb uses (fresh heartbeat + ``/proc`` cmdline naming
+    ``voicebridge.desktop_helper``);
+  * reads ``SigCgt`` from ``/proc/<pid>/status`` to prove the SIGUSR1/SIGUSR2
+    handlers are installed BEFORE any signal could be sent;
+  * tails the live journal for an open ``playback.started`` (no matching
+    ``playback.stopped``/``response.done``).
+
+Read-only by default. Any signal is gated behind BOTH ``--live-helper`` and
+``--live-signal``. When the helper is idle and idle in the heartbeat, the
+explicit signal is a no-op survival probe (handler installed); when it is
+speaking, the signal is the real orb STOP and the harness asserts the player
+halts and the canonical triple lands. It never starts/stops a service, never
+opens the mic, and never sends synthetic input. Not speaking -> honest
+``DEGRADED`` (never a fabricated PASS).
+
 Safety by default:
   * NO synthetic input (no xdotool, no clicks, no keys);
   * NO microphone (barge-in is forced off; the real ``_speak`` path is used);
   * NO running-service mutation (``request_id`` is empty, so no cancel POST);
+  * no service is ever started or stopped;
+  * a missing display/audio/helper degrades with a clear ``DEGRADED`` verdict
+    instead of failing hard;
   * it writes only its output dir (and an isolated journal) unless an explicit
-    ``--journal`` is supplied;
-  * with no ``paplay``/``aplay`` or no working audio server it degrades with a
-    clear ``DEGRADED`` verdict instead of failing hard.
+    ``--journal`` is supplied.
 
-Audio source: a generated 6 s low-volume tone by default (deterministic, no
-service needed). ``--use-service-tts`` asks the live voice-edit service to
-synthesize ``--text`` instead (read-only HTTP), padding it to the requested
-duration so the stop always lands mid-playback.
+Audio source (demo mode): a generated 6 s low-volume tone by default
+(deterministic, no service needed). ``--use-service-tts`` asks the live
+voice-edit service to synthesize ``--text`` instead (read-only HTTP), padding
+it to the requested duration so the stop always lands mid-playback.
 
 Run::
 
     scripts/verify_orb_stop_live.py
     scripts/verify_orb_stop_live.py --duration 8 --out /tmp/orbstop --json
     scripts/verify_orb_stop_live.py --use-service-tts --text "Testing stop."
+    scripts/verify_orb_stop_live.py --live-helper --json
+    scripts/verify_orb_stop_live.py --live-signal --json   # permits one SIGUSR2
 
 Exit codes: 0 PASS, 1 FAIL, 3 DEGRADED (environment cannot demonstrate it).
 """
@@ -57,6 +84,13 @@ if str(REPO_ROOT) not in sys.path:
 DEFAULT_OUT = "output/orb_capture/stop_live"
 TALK_PREFIX = "voice_edit.talk."
 STOP_TRIPLE = ("interrupt", "playback.stopped", "response.done")
+
+#: The live helper's cmdline marker (mirrors ``voicebridge.orb.client``).
+HELPER_CMDLINE_MARK = "voicebridge.desktop_helper"
+#: How much of the (large) live journal to scan for the current playback state.
+LIVE_TAIL_BYTES = 16 * 1024 * 1024
+#: An "open" ``playback.started`` older than this is treated as stale, not live.
+LIVE_STALE_AFTER_S = 120.0
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +239,451 @@ def build_timeline(events: List[Dict[str, Any]], t0: float,
         seq_s = f"seq={seq}" if seq is not None else "seq=-"
         lines.append(f"{rel}  {ev.get('type', ''):<22} turn={turn:<9} {seq_s}")
     return "\n".join(lines) + "\n"
+
+
+def ordered_triple(events: List[Dict[str, Any]],
+                   *, t_stop: Optional[float] = None) -> Dict[str, Any]:
+    """Canonical stop-boundary status for ``events`` (pure).
+
+    ``ordered`` requires ``interrupt`` -> ``playback.stopped`` ->
+    ``response.done`` in that relative order; ``latency_s`` is the first
+    ``interrupt`` timestamp minus ``t_stop`` when both are known.
+    """
+    types = [str(e.get("type", "")) for e in events]
+    indices = {name: _first_index(types, name) for name in STOP_TRIPLE}
+    missing = [name for name, idx in indices.items() if idx is None]
+    present = not missing
+    ordered = bool(
+        present
+        and indices["interrupt"] < indices["playback.stopped"]
+        < indices["response.done"])
+    latency: Optional[float] = None
+    if t_stop is not None:
+        for ev in events:
+            if ev.get("type") == "interrupt" and isinstance(
+                    ev.get("ts"), (int, float)) and not isinstance(
+                        ev.get("ts"), bool):
+                latency = round(float(ev["ts"]) - float(t_stop), 4)
+                break
+    return {"triple": list(STOP_TRIPLE), "present": present,
+            "ordered": ordered, "missing": missing, "latency_s": latency}
+
+
+# ---------------------------------------------------------------------------
+# live helper inspection (read-only)
+# ---------------------------------------------------------------------------
+def read_proc_cmdline(pid: int, proc_root: Path = Path("/proc")) -> str:
+    """One process's cmdline as text ("" when unreadable). Never raises."""
+    try:
+        raw = (Path(proc_root) / str(int(pid)) / "cmdline").read_bytes()
+        return raw.replace(b"\0", b" ").decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def read_proc_signal_mask(pid: int,
+                          proc_root: Path = Path("/proc")) -> Optional[int]:
+    """``SigCgt`` (caught-signal bitmask) for ``pid``; ``None`` if unreadable.
+
+    Bit ``signum - 1`` is set when a handler is installed for that signal.
+    Reading this is how the harness proves a SIGUSR2 handler exists BEFORE it
+    would ever signal the live helper (sending SIGUSR2 to a helper without a
+    handler terminates it).
+    """
+    try:
+        text = (Path(proc_root) / str(int(pid)) / "status").read_text(
+            encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return None
+    for line in text.splitlines():
+        if line.startswith("SigCgt:"):
+            try:
+                return int(line.split()[1], 16)
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def handler_installed(mask: Optional[int], signum: int) -> bool:
+    """True when the caught-signal ``mask`` covers ``signum`` (pure)."""
+    try:
+        return mask is not None and bool(
+            (int(mask) >> (int(signum) - 1)) & 1)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def resolve_live_helper(*, proc_root: Path = Path("/proc"),
+                        live_fn: Optional[Callable[[], bool]] = None,
+                        read_fn: Optional[Callable[[], Any]] = None) -> Dict[str, Any]:
+    """Resolve the RUNNING helper pid the same validated way the orb does.
+
+    Requires a fresh heartbeat (``heartbeat.live``) AND a ``/proc`` cmdline
+    that names ``voicebridge.desktop_helper``, so a stale heartbeat naming a
+    recycled/foreign pid is refused. Never raises.
+    """
+    out: Dict[str, Any] = {"ok": False, "pid": None, "heartbeat": None,
+                           "cmdline": "", "reason": ""}
+    try:
+        if live_fn is None or read_fn is None:
+            from voicebridge.voice_edit import heartbeat as _hb
+            live_fn = live_fn or _hb.live
+            read_fn = read_fn or _hb.read
+        if not live_fn():
+            out["reason"] = "helper heartbeat is missing/stale (helper not live)"
+            return out
+        hb = read_fn()
+        if not isinstance(hb, dict):
+            out["reason"] = "helper heartbeat is unreadable"
+            return out
+        out["heartbeat"] = hb
+        try:
+            pid = int(hb.get("pid", 0) or 0)
+        except (TypeError, ValueError):
+            pid = 0
+        if pid <= 0:
+            out["reason"] = "helper heartbeat carries no pid"
+            return out
+        cmdline = read_proc_cmdline(pid, proc_root)
+        out["cmdline"] = cmdline
+        if HELPER_CMDLINE_MARK not in cmdline:
+            out["reason"] = ("heartbeat pid is not a live desktop helper "
+                             "(cmdline validation)")
+            return out
+        out["pid"] = pid
+        out["ok"] = True
+        return out
+    except Exception as exc:  # noqa: BLE001
+        out["reason"] = f"helper resolution failed: {exc}"
+        return out
+
+
+def read_tail_talk_rows(path: Path,
+                        max_bytes: int = LIVE_TAIL_BYTES
+                        ) -> Tuple[List[Dict[str, Any]], int]:
+    """Read the last ``max_bytes`` of a journal; return ``(events, size)``.
+
+    The journal is large (hundreds of MB); only the tail is parsed and only
+    lines containing ``voice_edit.talk.`` are decoded. A partial first line
+    (the file is read mid-write) is dropped. ``size`` is the file size (the
+    append offset for a subsequent stop observation); ``0`` when unreadable.
+    """
+    try:
+        with Path(path).open("rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            start = max(0, size - max(0, int(max_bytes)))
+            prev = b""
+            if start > 0:
+                fh.seek(start - 1)
+                prev = fh.read(1)
+            fh.seek(start)
+            data = fh.read()
+    except Exception:  # noqa: BLE001
+        return [], 0
+    lines = data.decode("utf-8", "replace").splitlines()
+    if start > 0 and prev != b"\n" and lines:
+        lines = lines[1:]  # a concurrent writer is mid-line at the boundary
+    events: List[Dict[str, Any]] = []
+    for line in lines:
+        line = line.strip()
+        if not line or TALK_PREFIX not in line:
+            continue
+        try:
+            row = json.loads(line)
+        except Exception:  # noqa: BLE001
+            continue
+        ev = classify_talk_row(row)
+        if ev is not None:
+            events.append(ev)
+    return events, size
+
+
+def analyze_playback(events: List[Dict[str, Any]], *,
+                     now: Optional[float] = None,
+                     stale_after: float = LIVE_STALE_AFTER_S) -> Dict[str, Any]:
+    """Reduce the journal tail to the helper's current playback state (pure).
+
+    ``speaking`` is true when the newest ``playback.started`` has no later
+    ``playback.stopped``/``response.done``. An open start older than
+    ``stale_after`` is reported as ``stale`` and NOT as speaking (a crashed
+    writer must not fabricate a live reply).
+    """
+    now = float(now if now is not None else time.time())
+    last: Dict[str, Tuple[int, Dict[str, Any]]] = {}
+    for i, ev in enumerate(events):
+        t = ev.get("type")
+        if t in ("playback.started", "interrupt", "playback.stopped",
+                 "response.done"):
+            last[str(t)] = (i, ev)
+    started = last.get("playback.started")
+    stopped = last.get("playback.stopped")
+    done = last.get("response.done")
+    open_ = False
+    if started is not None:
+        open_ = stopped is None or started[0] > stopped[0]
+        if (done is not None and done[0] > started[0]
+                and (stopped is None or done[0] > stopped[0])):
+            open_ = False  # response.done closes an error/empty turn
+    started_ts: Optional[float] = None
+    age: Optional[float] = None
+    if started is not None:
+        raw = started[1].get("ts")
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+            started_ts = float(raw)
+            age = max(0.0, now - started_ts)
+    stale = bool(open_ and age is not None and age > float(stale_after))
+    speaking = bool(open_ and not stale)
+    last_boundary = None
+    if last:
+        idx, name = max((v[0], k) for k, v in last.items())
+        last_boundary = {"type": name, "ts": last[name][1].get("ts"),
+                         "turn_id": last[name][1].get("turn_id")}
+    return {
+        "speaking": speaking,
+        "open": open_,
+        "stale": stale,
+        "started_ts": started_ts,
+        "started_age_s": None if age is None else round(age, 3),
+        "turn_id": started[1].get("turn_id") if started else None,
+        "last_boundary": last_boundary,
+        "event_count": len(events),
+    }
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def live_check(*, allow_signal: bool = False,
+               journal: Optional[Path] = None,
+               stale_after: float = LIVE_STALE_AFTER_S,
+               timeout: float = 6.0,
+               tail_bytes: int = LIVE_TAIL_BYTES,
+               proc_root: Path = Path("/proc"),
+               now_fn: Callable[[], float] = time.time,
+               sleep_fn: Callable[[float], None] = time.sleep,
+               kill_fn: Callable[[int, int], Any] = os.kill,
+               alive_fn: Optional[Callable[[int], bool]] = None,
+               live_fn: Optional[Callable[[], bool]] = None,
+               read_fn: Optional[Callable[[], Any]] = None) -> Dict[str, Any]:
+    """Verify the RUNNING helper's stop path. Read-only unless allowed.
+
+    Never raises. Signals the live helper only when ``allow_signal`` is true,
+    the SIGUSR2 handler is proven installed, the pid re-validates immediately
+    before the signal, and (for an idle probe) the heartbeat state is
+    ``idle`` so an in-flight turn is never cancelled.
+    """
+    alive_fn = alive_fn or _pid_alive
+    result: Dict[str, Any] = {
+        "mode": "live",
+        "verdict": "DEGRADED",
+        "reason": "",
+        "degraded": [],
+        "helper_pid": None,
+        "helper_state": None,
+        "heartbeat": None,
+        "sigusr1_handler": None,
+        "sigusr2_handler": None,
+        "signal_allowed": bool(allow_signal),
+        "signal_sent": False,
+        "survives_sigusr2": None,
+        "helper_alive_after": None,
+        "stop_at": None,
+        "journal": str(journal) if journal is not None else None,
+        "playback": None,
+        "triple_present": None,
+        "triple_ordered": None,
+        "missing": [],
+        "stop_latency_s": None,
+        "events": [],
+        "events_after_stop": [],
+    }
+    if journal is None:
+        try:
+            from voicebridge.config import canonical_state_dir
+            journal = canonical_state_dir() / "events.jsonl"
+        except Exception:  # noqa: BLE001
+            journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
+                       / "events.jsonl")
+        result["journal"] = str(journal)
+
+    helper = resolve_live_helper(proc_root=proc_root, live_fn=live_fn,
+                                 read_fn=read_fn)
+    result["helper_pid"] = helper.get("pid")
+    result["heartbeat"] = helper.get("heartbeat")
+    hb = helper.get("heartbeat") or {}
+    state = str(hb.get("state") or "") if isinstance(hb, dict) else ""
+    result["helper_state"] = state or None
+    if not helper.get("ok"):
+        reason = str(helper.get("reason") or "no live helper")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        return result
+
+    pid = int(helper["pid"])
+    mask = read_proc_signal_mask(pid, proc_root)
+    result["sigusr1_handler"] = handler_installed(mask, signal.SIGUSR1)
+    result["sigusr2_handler"] = handler_installed(mask, signal.SIGUSR2)
+    handler_ok = bool(result["sigusr2_handler"])
+    if mask is None:
+        result["degraded"].append(
+            "cannot read /proc/<pid>/status: signal-handler state unknown")
+
+    events, end = read_tail_talk_rows(journal, tail_bytes)
+    result["events"] = events[-200:]
+    play = analyze_playback(events, now=now_fn(), stale_after=stale_after)
+    result["playback"] = play
+    if end <= 0:
+        reason = f"live journal is missing/unreadable: {journal}"
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        return result
+
+    if play["speaking"]:
+        if not allow_signal:
+            result["reason"] = ("live helper is speaking; read-only mode sent no "
+                                "signal (pass --live-signal to send the STOP)")
+            result["degraded"].append(result["reason"])
+            return result
+        if not handler_ok:
+            result["reason"] = ("refusing to signal: SIGUSR2 handler is not "
+                                "installed (the signal would terminate the live "
+                                "helper)")
+            result["degraded"].append(result["reason"])
+            return result
+        # Re-validate immediately before any signal: never signal a pid that
+        # changed or a process without the handler.
+        fresh = resolve_live_helper(proc_root=proc_root, live_fn=live_fn,
+                                    read_fn=read_fn)
+        mask2 = (read_proc_signal_mask(int(fresh["pid"]), proc_root)
+                 if fresh.get("ok") else None)
+        if (not fresh.get("ok") or int(fresh.get("pid") or 0) != pid
+                or not handler_installed(mask2, signal.SIGUSR2)):
+            result["reason"] = ("live helper pid changed/disappeared or lost its "
+                                "SIGUSR2 handler before the stop; not signalled")
+            result["degraded"].append(result["reason"])
+            return result
+        t_stop = float(now_fn())
+        try:
+            kill_fn(pid, signal.SIGUSR2)
+        except Exception as exc:  # noqa: BLE001
+            result["reason"] = f"could not signal the live helper: {exc}"
+            result["degraded"].append(result["reason"])
+            return result
+        result["signal_sent"] = True
+        result["stop_at"] = t_stop
+        new_events: List[Dict[str, Any]] = []
+        offset = end
+        deadline = t_stop + max(0.5, float(timeout))
+        # Only the speaking turn's boundaries count (a later turn's events
+        # cannot make this stop look successful).
+        active_turn = play.get("turn_id")
+
+        def _relevant(evs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            if active_turn is None:
+                return evs
+            return [e for e in evs if e.get("turn_id") == active_turn]
+
+        while now_fn() < deadline:
+            batch, offset = read_talk_rows(journal, offset)
+            new_events.extend(batch)
+            types = [e.get("type") for e in _relevant(new_events)]
+            if all(name in types for name in STOP_TRIPLE):
+                break
+            sleep_fn(0.05)
+        result["events_after_stop"] = new_events[-100:]
+        alive = bool(alive_fn(pid))
+        result["helper_alive_after"] = alive
+        relevant = _relevant(new_events)
+        triple = ordered_triple(relevant, t_stop=t_stop)
+        result["triple_present"] = triple["present"]
+        result["triple_ordered"] = triple["ordered"]
+        result["missing"] = triple["missing"]
+        result["stop_latency_s"] = triple["latency_s"]
+        ended_before = any(
+            e.get("type") == "playback.stopped"
+            and isinstance(e.get("ts"), (int, float))
+            and not isinstance(e.get("ts"), bool)
+            and float(e["ts"]) < t_stop for e in relevant)
+        if not alive:
+            result["verdict"] = "FAIL"
+            result["reason"] = "live helper did not survive the stop signal"
+        elif ended_before and not triple["ordered"]:
+            result["reason"] = ("playback ended before the stop was exercised; "
+                                "no stop could be observed")
+            result["degraded"].append(result["reason"])
+        elif triple["missing"]:
+            result["verdict"] = "FAIL"
+            result["reason"] = ("stop boundaries missing after the signal: "
+                                + ", ".join(triple["missing"]))
+        elif not triple["ordered"]:
+            result["verdict"] = "FAIL"
+            result["reason"] = "stop boundaries present but out of order"
+        else:
+            result["verdict"] = "PASS"
+            result["reason"] = ("live helper stopped playback and journaled the "
+                                "canonical stop triple")
+        return result
+
+    # --- not speaking -------------------------------------------------------
+    if play["stale"]:
+        note = (f"last playback.started is {play['started_age_s']}s old with no "
+                "matching playback.stopped; treating it as stale")
+    elif play["started_ts"] is None:
+        note = "no playback.started in the journal tail"
+    else:
+        note = "no open playback in the journal tail"
+    result["degraded"].append(note + " — live helper is not speaking")
+    if not allow_signal:
+        result["reason"] = ("live helper is not speaking; read-only mode sent no "
+                            "signal (DEGRADED: nothing live to stop)")
+        return result
+    if state != "idle":
+        result["reason"] = (f"refusing idle stop probe: helper state is "
+                            f"{state!r} (it could cancel an in-flight turn)")
+        result["degraded"].append(result["reason"])
+        return result
+    if not handler_ok:
+        result["reason"] = ("refusing to signal: SIGUSR2 handler is not "
+                            "installed (the signal would terminate the live "
+                            "helper)")
+        result["degraded"].append(result["reason"])
+        return result
+    fresh = resolve_live_helper(proc_root=proc_root, live_fn=live_fn,
+                                read_fn=read_fn)
+    mask2 = (read_proc_signal_mask(int(fresh["pid"]), proc_root)
+             if fresh.get("ok") else None)
+    if (not fresh.get("ok") or int(fresh.get("pid") or 0) != pid
+            or not handler_installed(mask2, signal.SIGUSR2)):
+        result["reason"] = ("live helper pid changed/disappeared or lost its "
+                            "SIGUSR2 handler before the probe; not signalled")
+        result["degraded"].append(result["reason"])
+        return result
+    t_stop = float(now_fn())
+    try:
+        kill_fn(pid, signal.SIGUSR2)
+    except Exception as exc:  # noqa: BLE001
+        result["reason"] = f"could not signal the live helper: {exc}"
+        result["degraded"].append(result["reason"])
+        return result
+    result["signal_sent"] = True
+    result["stop_at"] = t_stop
+    sleep_fn(0.15)
+    alive = bool(alive_fn(pid))
+    result["helper_alive_after"] = alive
+    result["survives_sigusr2"] = alive
+    if alive:
+        result["reason"] = ("live helper is idle; SIGUSR2 was survived (handler "
+                            "installed) but there was no playback to stop")
+    else:
+        result["verdict"] = "FAIL"
+        result["reason"] = "live helper did not survive SIGUSR2"
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -541,6 +1020,75 @@ def _finish(summary: Dict[str, Any], events: List[Dict[str, Any]], t0: float,
     return summary
 
 
+def run_live(*, out_dir: Optional[Path] = None, allow_signal: bool = False,
+             journal: Optional[Path] = None,
+             stale_after: float = LIVE_STALE_AFTER_S, timeout: float = 6.0,
+             tail_bytes: int = LIVE_TAIL_BYTES,
+             now_fn: Callable[[], float] = time.time,
+             sleep_fn: Callable[[float], None] = time.sleep) -> Dict[str, Any]:
+    """Verify the RUNNING helper; write live evidence. Never raises."""
+    t0 = float(now_fn())
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(t0))
+    base = Path(out_dir) if out_dir else (REPO_ROOT / DEFAULT_OUT)
+    capture_dir = base / stamp
+    try:
+        capture_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:  # noqa: BLE001 - evidence is best-effort
+        pass
+    try:
+        result = live_check(allow_signal=allow_signal, journal=journal,
+                            stale_after=stale_after, timeout=timeout,
+                            tail_bytes=tail_bytes, now_fn=now_fn,
+                            sleep_fn=sleep_fn)
+    except Exception as exc:  # noqa: BLE001
+        result = {"mode": "live", "verdict": "DEGRADED",
+                  "reason": f"live check crashed: {exc}",
+                  "degraded": [f"live check crashed: {exc}"],
+                  "events": [], "events_after_stop": []}
+    result["started"] = _iso(t0)
+    result["capture_dir"] = str(capture_dir)
+
+    events = list(result.get("events") or [])
+    events.extend(result.get("events_after_stop") or [])
+    seen = set()
+    unique: List[Dict[str, Any]] = []
+    for ev in events:
+        key = (ev.get("ts"), ev.get("seq"), ev.get("type"), ev.get("turn_id"))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(ev)
+
+    header = [
+        f"live helper STOP check — {result['started']}",
+        f"helper pid: {result.get('helper_pid') or '-'} "
+        f"state={result.get('helper_state') or '-'}",
+        f"journal: {result.get('journal')}",
+        f"sigusr1 handler: {result.get('sigusr1_handler')} "
+        f"sigusr2 handler: {result.get('sigusr2_handler')}",
+        f"signal sent: {result.get('signal_sent')} "
+        f"(allowed={result.get('signal_allowed')})",
+        f"verdict: {result.get('verdict')} — {result.get('reason')}",
+    ]
+    if result.get("degraded"):
+        header.append("degraded: " + "; ".join(result["degraded"]))
+    header.append("--- talk timeline (voice_edit.talk.*) ---")
+    ts_values = [float(e["ts"]) for e in unique
+                 if isinstance(e.get("ts"), (int, float))
+                 and not isinstance(e.get("ts"), bool)]
+    timeline_t0 = min(ts_values) if ts_values else t0
+    try:
+        (capture_dir / "timeline.txt").write_text(
+            build_timeline(unique, timeline_t0, header=header),
+            encoding="utf-8")
+        (capture_dir / "evidence.json").write_text(
+            json.dumps({**result, "events": unique[-200:]}, indent=2),
+            encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        result.setdefault("degraded", []).append(f"evidence write failed: {exc}")
+    return result
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(
         description="Live-capable orb STOP harness (read-only by default).")
@@ -556,8 +1104,57 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="deliver SIGUSR2 (default) or call stop_speaking()")
     ap.add_argument("--journal", default=None,
                     help="append to this journal instead of the isolated one")
+    ap.add_argument("--live-helper", action="store_true",
+                    help="verify the RUNNING helper/orb (read-only)")
+    ap.add_argument("--live-signal", action="store_true",
+                    help="permit one SIGUSR2 to the RUNNING helper "
+                         "(implies --live-helper)")
+    ap.add_argument("--live-journal", default=None,
+                    help="live journal path (default: <state>/events.jsonl)")
+    ap.add_argument("--live-timeout", type=float, default=6.0,
+                    help="seconds to wait for the stop triple (default: 6)")
+    ap.add_argument("--live-stale-after", type=float,
+                    default=LIVE_STALE_AFTER_S,
+                    help="treat an open playback.started older than this as "
+                         f"stale (default: {LIVE_STALE_AFTER_S:g}s)")
+    ap.add_argument("--live-tail-bytes", type=int, default=LIVE_TAIL_BYTES,
+                    help=f"journal tail to scan (default: {LIVE_TAIL_BYTES})")
     ap.add_argument("--json", action="store_true", help="print JSON only")
     args = ap.parse_args(argv)
+
+    if args.live_helper or args.live_signal:
+        live = run_live(
+            out_dir=Path(args.out) if args.out else None,
+            allow_signal=bool(args.live_signal),
+            journal=Path(args.live_journal) if args.live_journal else None,
+            stale_after=args.live_stale_after,
+            timeout=args.live_timeout,
+            tail_bytes=args.live_tail_bytes,
+        )
+        if args.json:
+            print(json.dumps(live, indent=2))
+        else:
+            print(f"verdict: {live.get('verdict')} — {live.get('reason')}")
+            print(f"helper: pid={live.get('helper_pid') or '-'} "
+                  f"state={live.get('helper_state') or '-'} "
+                  f"sigusr1={live.get('sigusr1_handler')} "
+                  f"sigusr2={live.get('sigusr2_handler')}")
+            print(f"signal sent: {live.get('signal_sent')} "
+                  f"survived={live.get('survives_sigusr2')} "
+                  f"alive_after={live.get('helper_alive_after')}")
+            play = live.get("playback") or {}
+            print(f"playback: speaking={play.get('speaking')} "
+                  f"stale={play.get('stale')} "
+                  f"started_age={play.get('started_age_s')}s "
+                  f"last={((play.get('last_boundary') or {}).get('type'))}")
+            print(f"triple: present={live.get('triple_present')} "
+                  f"ordered={live.get('triple_ordered')} "
+                  f"latency={live.get('stop_latency_s')}s")
+            print(f"evidence: {live.get('capture_dir')}/evidence.json")
+            if live.get("degraded"):
+                for item in live["degraded"]:
+                    print(f"degraded: {item}")
+        return {"PASS": 0, "FAIL": 1}.get(str(live.get("verdict")), 3)
 
     result = run(
         out_dir=Path(args.out) if args.out else None,
