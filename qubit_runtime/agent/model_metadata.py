@@ -1933,6 +1933,8 @@ def _fetch_codex_oauth_context_lengths_with_source(access_token: str, base_url: 
         logger.debug("Codex /models probe failed: %s", exc)
         _remember_no_codex_catalog(cache_key)
         return {}, False
+    from agent.codex_service_tiers import remember_catalog
+    remember_catalog(cache_key, entries)
     result: Dict[str, int] = {}
     max_result: Dict[str, int] = {}
     for item in entries:
