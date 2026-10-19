@@ -8,9 +8,13 @@ limits are reported honestly.
 """
 from __future__ import annotations
 
+import http.client
 import json
+import socket
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Callable, Dict, List, Optional
 
@@ -63,6 +67,132 @@ def urllib_transport(url: str, headers: Dict[str, str], payload: Dict[str, Any],
     except Exception as exc:
         # Map stdlib errors to typed shapes via status 0 + error body.
         return 0, {"__transport_error__": str(exc)[:300]}
+
+
+class AbortableHTTPTransport:
+    """Default frontier transport over a socket the client can abort.
+
+    Behaves like :func:`urllib_transport` (same browser User-Agent, status
+    mapping and typed transport errors) but keeps the live connection so
+    :meth:`abort` can ``shutdown`` it from another thread while a response is
+    still being read. ``shutdown`` — not just ``close`` — is what wakes a
+    thread blocked in ``recv`` on Linux. An abort before the connection
+    exists is remembered and the next call fails typed at once; repeated
+    aborts are safe.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._conn: Any = None
+        self._abort_pending = False
+
+    def abort(self) -> bool:
+        """Shut down the live frontier socket; False when none was in flight."""
+        with self._lock:
+            self._abort_pending = True
+            conn = self._conn
+        if conn is None:
+            return False
+        try:
+            sock = getattr(conn, "sock", None)
+            if sock is not None:
+                sock.shutdown(socket.SHUT_RDWR)
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        return True
+
+    def __call__(self, url: str, headers: Dict[str, str],
+                 payload: Dict[str, Any], timeout_s: float
+                 ) -> tuple[int, Dict[str, Any]]:
+        merged = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                "Chrome/126.0 Safari/537.36",
+                  "Accept": "application/json"}
+        merged.update(headers or {})
+        with self._lock:
+            if self._abort_pending:
+                self._abort_pending = False
+                return 0, {"__transport_error__": "request aborted"}
+        parts = urllib.parse.urlsplit(url)
+        cls = (http.client.HTTPSConnection if (parts.scheme or "http") == "https"
+               else http.client.HTTPConnection)
+        path = parts.path or "/"
+        if parts.query:
+            path = f"{path}?{parts.query}"
+        conn = cls(parts.hostname, parts.port, timeout=float(timeout_s))
+        with self._lock:
+            self._conn = conn
+        try:
+            conn.request("POST", path, body=json.dumps(payload).encode(),
+                         headers=merged)
+            resp = conn.getresponse()
+            status = int(getattr(resp, "status", 200) or 200)
+            raw = resp.read()
+            if status == 200:
+                try:
+                    body = json.loads(raw.decode() or "{}")
+                except Exception as exc:  # noqa: BLE001 - same as urllib
+                    return 0, {"__transport_error__": str(exc)[:300]}
+            else:
+                try:
+                    body = json.loads(raw.decode() or "{}")
+                except Exception:
+                    body = {"__http_error__":
+                            raw.decode("utf-8", "replace")[:300]}
+            return status, body if isinstance(body, dict) else {}
+        except Exception as exc:  # noqa: BLE001 - typed transport error
+            return 0, {"__transport_error__": str(exc)[:300]}
+        finally:
+            with self._lock:
+                self._conn = None
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001 - cleanup only
+                pass
+
+
+class _CancelWatch:
+    """Watch a cancel hook for the duration of one blocking transport call.
+
+    The watcher polls the hook and calls ``transport.abort()`` when it fires,
+    which unblocks a response still being read. A transport without ``abort``
+    (an injected fake / ``urllib_transport``) is left untouched: the existing
+    pre-send and between-retry checks still apply.
+    """
+
+    def __init__(self, cancel: Optional[Callable[[], bool]],
+                 transport: Any) -> None:
+        self.cancel = cancel
+        self.abort = getattr(transport, "abort", None)
+        self._done = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def __enter__(self) -> "_CancelWatch":
+        if self.cancel is None or not callable(self.abort):
+            return self
+
+        def _run() -> None:
+            while not self._done.wait(0.01):
+                try:
+                    if self.cancel():
+                        self.abort()
+                except Exception:  # noqa: BLE001 - hook must not crash
+                    return
+
+        self._thread = threading.Thread(
+            target=_run, daemon=True, name="frontier-cancel")
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: Any) -> bool:
+        self._done.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+        return False
 
 
 _REFUSAL_MARKERS = (
@@ -240,9 +370,17 @@ class FrontierClient:
                                       message="cancelled during retry",
                                       provider=self.provider, model=self.model,
                                       identity=f"{self.provider}/{self.model}")
-            status, body = self.transport(url, real_headers, payload,
-                                          self.timeout_s)
+            # Abort the live socket when the turn's cancel fires mid-response;
+            # a transport without ``abort`` keeps the unchanged checks below.
+            with _CancelWatch(self.cancel, self.transport):
+                status, body = self.transport(url, real_headers, payload,
+                                              self.timeout_s)
             ms = int((time.time() - t0) * 1000)
+            if self.cancel is not None and self.cancel():
+                return ProviderResult(ok=False, code="CANCELLED",
+                                      message="cancelled during provider call",
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}")
             if status == 0:
                 err = str(body.get("__transport_error__", ""))[:300]
                 low = err.lower()

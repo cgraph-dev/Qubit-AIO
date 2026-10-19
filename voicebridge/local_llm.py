@@ -8,9 +8,13 @@ goes to the cloud path.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
+import socket
+import threading
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -44,6 +48,153 @@ REASONING_BUDGETS = {"none": 64, "minimal": 128, "low": 256,
                      "medium": 512, "high": 1024, "xhigh": 1536,
                      "max": 2048, "ultra": 4096}
 DEFAULT_REASONING_BUDGET = 100
+
+
+class LocalLlmCancelled(Exception):
+    """A local model call was aborted by the turn's cancel hook."""
+
+
+def _cancel_requested(cancel: Any) -> bool:
+    """True when a cancel hook (callable or Event) says stop. Never raises."""
+    if cancel is None:
+        return False
+    try:
+        if callable(cancel):
+            return bool(cancel())
+        is_set = getattr(cancel, "is_set", None)
+        if callable(is_set):
+            return bool(is_set())
+    except Exception:  # noqa: BLE001 - a broken hook must not crash the call
+        return False
+    return False
+
+
+class AbortableHTTPPost:
+    """One POST over a socket this object owns, abortable from another thread.
+
+    ``urllib`` gives no handle on the live socket, so a STOP could only wait
+    out the timeout. This keeps the ``http.client`` connection so ``abort()``
+    can ``shutdown`` it (``shutdown``, not just ``close``, is what wakes a
+    thread blocked in ``recv`` on Linux) and the call fails typed immediately.
+    Idempotent and safe to call before the socket exists or more than once.
+    """
+
+    def __init__(self, url: str, body: bytes, headers: Optional[dict] = None,
+                 timeout_s: float = 4.0) -> None:
+        parts = urllib.parse.urlsplit(url)
+        self._scheme = (parts.scheme or "http").lower()
+        self._host = parts.hostname or "127.0.0.1"
+        self._port = parts.port
+        self._path = parts.path or "/"
+        if parts.query:
+            self._path = f"{self._path}?{parts.query}"
+        self._body = body
+        self._headers = dict(headers or {})
+        self._timeout_s = float(timeout_s)
+        self._lock = threading.Lock()
+        self._conn: Any = None
+        self._aborted = False
+
+    def abort(self) -> bool:
+        """Shut down the live socket; returns True when one was in flight."""
+        with self._lock:
+            self._aborted = True
+            conn = self._conn
+        if conn is None:
+            return False
+        try:
+            sock = getattr(conn, "sock", None)
+            if sock is not None:
+                sock.shutdown(socket.SHUT_RDWR)
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        return True
+
+    def post(self) -> bytes:
+        cls = (http.client.HTTPSConnection if self._scheme == "https"
+               else http.client.HTTPConnection)
+        conn = cls(self._host, self._port, timeout=self._timeout_s)
+        with self._lock:
+            if self._aborted:
+                raise LocalLlmCancelled("local model call cancelled")
+            self._conn = conn
+        try:
+            # Connect explicitly so abort() always has a live socket to shut
+            # down, even while the request is still in flight.
+            conn.connect()
+            with self._lock:
+                if self._aborted:
+                    raise LocalLlmCancelled("local model call cancelled")
+            conn.request("POST", self._path, body=self._body,
+                         headers=self._headers)
+            resp = conn.getresponse()
+            data = resp.read()
+            with self._lock:
+                if self._aborted:
+                    raise LocalLlmCancelled("local model call cancelled")
+            return data
+        except LocalLlmCancelled:
+            raise
+        except Exception as exc:  # noqa: BLE001 - abort vs real failure
+            with self._lock:
+                aborted = self._aborted
+            if aborted:
+                raise LocalLlmCancelled(
+                    "local model call cancelled") from exc
+            raise
+        finally:
+            with self._lock:
+                self._conn = None
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001 - cleanup only
+                pass
+
+
+def _watch_cancel(cancel: Any, holder: AbortableHTTPPost,
+                  done: threading.Event) -> None:
+    """Poll the turn's cancel hook and abort the owned socket when it fires."""
+    while not done.wait(0.01):
+        if _cancel_requested(cancel):
+            holder.abort()
+
+
+def _post_chat(url: str, payload: Dict[str, Any], timeout_s: float,
+               cancel: Any = None) -> bytes:
+    """POST a chat payload, abortable when a cancel hook is supplied.
+
+    With no hook the exact ``urllib`` path is kept (byte-identical, and the
+    seam hermetic tests patch). A keyed turn supplies the hook, so its
+    blocking read runs on a socket the cancel watcher can shut down.
+    """
+    if cancel is None:
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            return resp.read()
+    if _cancel_requested(cancel):
+        raise LocalLlmCancelled("local model call cancelled")
+    holder = AbortableHTTPPost(
+        url, json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"}, timeout_s=timeout_s)
+    done = threading.Event()
+    watcher = threading.Thread(
+        target=_watch_cancel, args=(cancel, holder, done), daemon=True,
+        name="local-llm-cancel")
+    watcher.start()
+    try:
+        body = holder.post()
+        if _cancel_requested(cancel):
+            raise LocalLlmCancelled("local model call cancelled")
+        return body
+    finally:
+        done.set()
+        watcher.join(timeout=1.0)
 
 
 class ReasoningInvalidError(ValueError):
@@ -510,7 +661,7 @@ def chat_local(text: str, conversation_prompt: str = "",
                model: str = "qubit-brain4", url: str = "http://127.0.0.1:11434",
                timeout_s: float = 4.0, max_tokens: int = 100,
                context: str = "", num_ctx: Optional[int] = None,
-               reasoning: Optional[str] = None) -> str:
+               reasoning: Optional[str] = None, cancel: Any = None) -> str:
     """Return a short local reply, or "" on any failure (caller falls back).
 
     `context` = personal knowledge (MEMORY.md, personal-knowledge.md) the
@@ -519,21 +670,25 @@ def chat_local(text: str, conversation_prompt: str = "",
     `reasoning` (None/minimal/low/medium/high/max) selects a per-request
     output budget only — never runner options, so the resident model is
     never reloaded. Unknown levels fail closed to the default budget.
+
+    `cancel` (callable -> bool, or an Event) is the turn's STOP hook. When
+    supplied, the request runs over a socket this module owns and a watcher
+    shuts it down as soon as the hook fires, raising
+    :class:`LocalLlmCancelled` instead of waiting out ``timeout_s``. With no
+    hook the exact ``urllib`` path is kept, byte-identical.
     """
     if reasoning is not None:
         max_tokens = resolve_reasoning_budget(reasoning)
     payload = _chat_payload(text, conversation_prompt, model, max_tokens,
                             context, stream=False, num_ctx=num_ctx)
-    req = urllib.request.Request(
-        f"{url}/api/chat",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-    )
     t0 = __import__("time").time()
     try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            body = json.loads(resp.read().decode())
+        body = json.loads(_post_chat(
+            f"{url}/api/chat", payload, timeout_s, cancel).decode())
         reply = _extract_reply(body)
+    except LocalLlmCancelled:
+        log_event("conversation.local.cancelled", model=model)
+        raise
     except Exception as exc:
         log_event("conversation.local.failed", error=str(exc)[:160], model=model)
         return ""
@@ -541,11 +696,15 @@ def chat_local(text: str, conversation_prompt: str = "",
     # empty turn occasionally even under /no_think. One BOUNDED retry — never
     # a loop; a second consecutive empty returns "" for the caller's fallback.
     if not reply:
+        if _cancel_requested(cancel):
+            raise LocalLlmCancelled("local model call cancelled")
         log_event("conversation.local.empty_retry", model=model)
         try:
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp2:
-                body2 = json.loads(resp2.read().decode())
+            body2 = json.loads(_post_chat(
+                f"{url}/api/chat", payload, timeout_s, cancel).decode())
             reply = _extract_reply(body2)
+        except LocalLlmCancelled:
+            raise
         except Exception as exc:
             log_event("conversation.local.retry_failed", error=str(exc)[:120])
     elapsed = __import__("time").time() - t0
@@ -553,6 +712,8 @@ def chat_local(text: str, conversation_prompt: str = "",
     # reply drifted into another language, retry ONCE with an explicit lock;
     # if it still drifts, keep the retry (best effort) but log it.
     if reply and _reply_is_other_language(reply):
+        if _cancel_requested(cancel):
+            raise LocalLlmCancelled("local model call cancelled")
         log_event("conversation.local.lang_drift", lang="non-english", chars=len(reply),
                   preview=reply[:80])
         payload["messages"] = payload["messages"][:-1] + [
@@ -560,15 +721,13 @@ def chat_local(text: str, conversation_prompt: str = "",
              "\n[STRICT: answer in plain ENGLISH only. No other language.]"},
         ]
         try:
-            req2 = urllib.request.Request(
-                f"{url}/api/chat",
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req2, timeout=timeout_s) as resp2:
-                body2 = json.loads(resp2.read().decode())
+            body2 = json.loads(_post_chat(
+                f"{url}/api/chat", payload, timeout_s, cancel).decode())
             fixed = _extract_reply(body2)
             if fixed and not _reply_is_other_language(fixed):
                 reply = fixed
+        except LocalLlmCancelled:
+            raise
         except Exception as exc:
             log_event("conversation.local.retry_failed", error=str(exc)[:120])
     log_event("conversation.local", model=model, chars=len(reply),

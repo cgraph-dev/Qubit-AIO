@@ -86,6 +86,14 @@ def _opencode_session_transport(base: Any, provider: str, base_url: str,
             merged.setdefault(key, value)
         return base(url, merged, payload, timeout_s)
 
+    # Keep the abort seam reachable through the header wrapper, so a STOP can
+    # still shut down the live OpenCode relay socket mid-response.
+    abort = getattr(base, "abort", None)
+    if callable(abort):
+        try:
+            _wrapped.abort = abort  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
     return _wrapped
 
 
@@ -119,7 +127,8 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
                     should_stop: Optional[Callable[[], bool]] = None,
                     reasoning: Optional[str] = None,
                     num_ctx: Optional[int] = None,
-                    model: Optional[str] = None) -> ProviderResult:
+                    model: Optional[str] = None,
+                    cancel: Optional[Callable[[], bool]] = None) -> ProviderResult:
     """Local path: existing runner contract, no network beyond Ollama.
 
     ``on_sentence`` selects the streaming adapter (TTS overlap); otherwise the
@@ -154,7 +163,7 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
                               model=alias, timeout_s=timeout,
                               max_tokens=max_tokens, context=context,
                               num_ctx=num_ctx or rc.num_ctx,
-                              reasoning=reasoning, **extra)
+                              reasoning=reasoning, cancel=cancel, **extra)
         ms = int((time.time() - t0) * 1000)
         if not text:
             # Distinct from a transport exception so callers can map an empty
@@ -181,6 +190,13 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
                               usage=usage, details=details)
     except Exception as exc:
         _m = (model or "").strip() or _default_local_model(cfg)
+        from ..local_llm import LocalLlmCancelled  # noqa: E402 - lazy adapter
+
+        if isinstance(exc, LocalLlmCancelled):
+            return ProviderResult(ok=False, code="CANCELLED",
+                                  message="cancelled during local model call",
+                                  provider="local", model=_m,
+                                  identity=f"local/{_m}")
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
                               provider="local", model=_m,
@@ -320,7 +336,9 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
 
 
 def _local_dispatch(prompt: str, cfg: Any, max_tokens: int, *,
-                    local_mode: str = "chat", **kw: Any) -> ProviderResult:
+                    local_mode: str = "chat",
+                    cancel: Optional[Callable[[], bool]] = None,
+                    **kw: Any) -> ProviderResult:
     """Route one local request to the matching shared local adapter."""
     mode = (local_mode or "chat").lower()
     if mode == "generate":
@@ -345,7 +363,7 @@ def _local_dispatch(prompt: str, cfg: Any, max_tokens: int, *,
         context=kw.get("context", ""), timeout_s=kw.get("timeout_s"),
         on_sentence=kw.get("on_sentence"), should_stop=kw.get("should_stop"),
         reasoning=kw.get("reasoning"), num_ctx=kw.get("num_ctx"),
-        model=kw.get("model"))
+        model=kw.get("model"), cancel=cancel)
 
 
 def resolve_role(cfg: Any, role: str = "chat", *,
@@ -603,7 +621,8 @@ def run(req: ProviderRequest, cfg: Any,
 
     def _fallback(reason: str, msg: str) -> ProviderResult:
         fb = _local_complete(req.prompt, cfg,
-                             min(req.max_tokens, policy.max_tokens))
+                             min(req.max_tokens, policy.max_tokens),
+                             cancel=cancel)
         if fb.ok and fb.usage is not None:
             fb.usage = UsageRecord(provider=fb.usage.provider,
                                    model=fb.usage.model,
@@ -635,7 +654,7 @@ def run(req: ProviderRequest, cfg: Any,
             structured_schema=req.structured_schema, messages=messages,
             options=options, keep_alive=keep_alive, on_sentence=on_sentence,
             should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx,
-            model=(req.model or None))
+            model=(req.model or None), cancel=cancel)
     if not policy.enabled:
         if requested == "auto":
             return _fallback("CLOUD_DISABLED",
@@ -806,7 +825,7 @@ def run(req: ProviderRequest, cfg: Any,
     # only when the caller did not already supply a transport.
     if transport is None:
         transport = _opencode_session_transport(
-            _frontier.urllib_transport, provider, base_url, session_id,
+            _frontier.AbortableHTTPTransport(), provider, base_url, session_id,
             str(req.idempotency_key or ""), profile_id)
     client = _frontier.FrontierClient(base_url, key, provider, model,
                                      timeout_s=min(req.timeout_s, policy.timeout_s),
