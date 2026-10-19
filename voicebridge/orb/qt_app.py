@@ -260,13 +260,12 @@ TURN_TONE_SLOPE = 0.28
 #: and would have locked. Identity at t=0 and under reduced motion.
 X_SPIN_PERIOD_S = 27.0
 #: Nucleus hologram: a thin BRIGHT limb stroke at the body edge (the Fresnel
-#: rim — a sphere is brightest at grazing incidence) plus a faint chromatic
-#: split (two offset hairline rims, red/blue, very low alpha). Static art
-#: direction, so reduced-motion stills stay self-consistent. Physical light
-#: cues only: no scanlines, no flicker.
+#: rim — a sphere is brightest at grazing incidence). Owner 2026-10-19: the
+#: red/blue chromatic split that used to sit here read as a galaxy colour and
+#: is retired. Static art direction, so reduced-motion stills stay
+#: self-consistent. Physical light cues only: no scanlines, no flicker.
 NUCLEUS_RIM_ALPHA = 0.55
 NUCLEUS_RIM_WIDTH = 1.1
-NUCLEUS_CHROMA_ALPHA = 0.10
 #: The nucleus is exempt from the tumble squash (a sphere's silhouette is a
 #: circle from every angle) but it still rides the turn: a small uniform
 #: scale breathing with the combined phase, exactly 1.0 at t=0 and under
@@ -1318,8 +1317,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     if Rf <= 0.0:
         Rf = 32.0
     ring_w = 1.1
-    # A lens fringe is a PIXEL effect (fixed offset), never scaled with R.
-    fringe = _field.FRINGE_PX * 0.7
+    # The old lens-fringe pixel offset is retired with the nucleus chroma
+    # split (owner 2026-10-19).
     # The sidebar mark is a BRIGHT near-white hairline with a chromatic
     # hint, not a dim state tint: lift luminance hard and use the state hue
     # only as the tint. Idle must never read as "almost off".
@@ -1840,22 +1839,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.setBrush(QBrush(body))
         p.drawEllipse(cx - r, cy - r, r * 2.0, r * 2.0)
         # Fresnel rim: a thin BRIGHT limb stroke at the body edge — a sphere
-        # is brightest at grazing incidence — plus a faint chromatic split
-        # (the red/blue hairline pair that used to sit on the main orbits, at
-        # the same pixel offset). Static art direction, so stills stay
-        # self-consistent; physical light cues only, no scanlines, no flicker.
+        # is brightest at grazing incidence. Owner 2026-10-19: the red/blue
+        # chromatic split that used to sit here read as a galaxy colour, so it
+        # is retired; the limb is a single neutral highlight.
         _outline(r, (255, 255, 255), NUCLEUS_RIM_ALPHA, NUCLEUS_RIM_WIDTH)
-        for dx, col in ((fringe, (255, 45, 85)), (-fringe, (45, 130, 255))):
-            p.setBrush(Qt.NoBrush)
-            p.setPen(QPen(QColor(col[0], col[1], col[2],
-                                 _clamp8(255.0 * NUCLEUS_CHROMA_ALPHA)),
-                          NUCLEUS_RIM_WIDTH * 0.7))
-            p.translate(dx, 0.0)
-            rim = QPainterPath()
-            rim.addEllipse(QRectF(cx - r, cy - r, r * 2.0, r * 2.0))
-            p.drawPath(rim)
-            p.translate(-dx, 0.0)
-            p.setPen(Qt.NoPen)
         if bt > 0.0:
             # Caustic: the boiling highlight inside the core. Between beats it
             # never vanishes entirely, so the centre keeps a live inner light

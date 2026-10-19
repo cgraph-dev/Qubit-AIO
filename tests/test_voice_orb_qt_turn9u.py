@@ -541,19 +541,17 @@ def test_ring_strokes_are_translucent_and_near_monochrome():
     assert Q.RING_DRAW_ALPHA["near_main"] > Q.RING_DRAW_ALPHA["satellite"]
 
 
-def test_rings_carry_no_chromatic_fringe_and_the_nucleus_keeps_its_split():
+def test_no_chromatic_fringe_anywhere():
     import test_voice_orb_qt_fx9u as T
 
     size, c, t = 192, 96.0, 0.37
     prims = T._record(t=t, size=size)
-    # Owner 2026-10-19: the red/blue split on the two main orbits was the last
-    # multi-hue spray on the ring set and read as a galaxy. It is gone; only the
-    # nucleus's own tiny chroma split (core light, not a circle) remains.
+    # Owner 2026-10-19: the red/blue split — on the two main orbits AND on the
+    # nucleus rim — was the last multi-hue spray and read as a galaxy. It is
+    # retired everywhere: no red/blue chromatic stroke remains anywhere.
     fringe = [p for p in prims if p.kind == "path" and p.pen is not None
               and tuple(p.pen[:3]) in ((255, 45, 85), (45, 130, 255))]
-    assert len(fringe) == 2, [p.pen for p in fringe]
-    assert all(max(p.w, p.h) < 40.0 for p in fringe), [p.pen for p in fringe]
-    assert all(math.hypot(p.cx - c, p.cy - c) <= 0.05 * c for p in fringe)
+    assert fringe == [], [p.pen for p in fringe]
 
 
 # --------------------------------------------------------------------------- #
@@ -700,16 +698,11 @@ def test_nucleus_carries_a_fresnel_rim_and_chroma_split():
     assert len(limb) == 1, limb
     assert limb[0].alpha == pytest.approx(Q.NUCLEUS_RIM_ALPHA, abs=0.02)
     assert limb[0].width == pytest.approx(Q.NUCLEUS_RIM_WIDTH, abs=0.2)
-    # The chromatic split: the same red/blue pair as the orbits, as a centred
-    # hairline pair on the body — pinned here, counted in the fringe test.
+    # The chromatic split is retired (owner 2026-10-19): no red/blue rim.
     chroma = [p for p in prims if p.kind == "path" and p.fill is None
               and p.pen is not None
-              and tuple(p.pen[:3]) in ((255, 45, 85), (45, 130, 255))
-              and math.hypot(p.cx - c, p.cy - c) <= 0.05 * c
-              and max(p.w, p.h) < 40.0]
-    assert len(chroma) == 2, chroma
-    assert all(p.alpha == pytest.approx(Q.NUCLEUS_CHROMA_ALPHA, abs=0.02)
-               for p in chroma)
+              and tuple(p.pen[:3]) in ((255, 45, 85), (45, 130, 255))]
+    assert chroma == [], chroma
 
 
 def test_near_far_separation_spread_is_wide():

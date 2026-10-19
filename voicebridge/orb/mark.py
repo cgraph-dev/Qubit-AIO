@@ -413,14 +413,12 @@ NUCLEUS_CORONA_BREATH_SPAN = 0.22
 #: ramp did.
 NUCLEUS_CORONA_HUE_TURNS = 0.018
 NUCLEUS_CORONA_HUE_SALT = 97.3
-#: Hologram rim: a bright thin edge on the body plus a faint red/blue split
-#: offset by a pixel — the lens-fringe cue, drawn as OUTLINES so the edge
-#: stays a hairline and never a disc. Static (no time phase), so the still
-#: frame keeps it.
+#: Hologram rim: a bright thin edge on the body. Owner 2026-10-19: the
+#: red/blue split that used to sit here read as a galaxy colour and is
+#: retired. Drawn as an OUTLINE so the edge stays a hairline and never a disc.
+#: Static (no time phase), so the still frame keeps it.
 NUCLEUS_RIM_ALPHA = 0.85
-NUCLEUS_RIM_OFFSET_PX = 0.6
-NUCLEUS_RIM_FRINGE_ALPHA = 0.35
-NUCLEUS_RIM_OVALS = 3
+NUCLEUS_RIM_OVALS = 1
 #: Binary particles: tiny "1"/"0" data fragments. Sized from the field's own
 BINARY_FONT_MIN_PX = 5
 BINARY_FONT_PX_PER_UNIT = 12.0
@@ -472,12 +470,8 @@ NUCLEUS_OVAL_COUNT = (
     + (NUCLEUS_SPEC_LAYERS - 1)
     + 1                                             # the orbiting specular
     + CORE_SHELL_COUNT   # nested interior bodies: real depth INSIDE the orb
-    + NUCLEUS_RIM_OVALS  # hologram rim: bright edge + red/blue split
+    + NUCLEUS_RIM_OVALS  # hologram rim: bright edge
 )
-
-#: Fringe channel colors, mixed toward the background (Tk alpha substitute).
-_FRINGE_RED = (150, 30, 55)
-_FRINGE_BLUE = (30, 80, 160)
 
 #: Signature-compatible alias: the Qt renderer calls ``_mark._orbit_point``.
 _orbit_point = orbit_point
@@ -1801,19 +1795,12 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 _oval(cx_f + _num(sh.get("x")), cy_f + _num(sh.get("y")),
                       sh_r, _dim(sh_col, sh_a, nuc_rgb))
 
-        # Hologram rim: a bright thin edge on the body plus a faint red/blue
-        # split offset by a pixel — the lens-fringe cue. OUTLINES, so the edge
-        # stays a hairline and never a disc; drawn glow-first-order-safe (all
-        # glow was painted before the seam) and static, so the still frame
-        # keeps it.
+        # Hologram rim: a bright thin edge on the body. Owner 2026-10-19: the
+        # red/blue split that used to sit here read as a galaxy colour and is
+        # retired. Drawn as an OUTLINE so the edge stays a hairline and never a
+        # disc; static, so the still frame keeps it.
         _ring_oval(cx_f, cy_f, n_r,
                    _dim(hot, NUCLEUS_RIM_ALPHA * bright), 1)
-        _ring_oval(cx_f + NUCLEUS_RIM_OFFSET_PX, cy_f, n_r,
-                   _dim(_FRINGE_RED,
-                        NUCLEUS_RIM_FRINGE_ALPHA * bright), 1)
-        _ring_oval(cx_f - NUCLEUS_RIM_OFFSET_PX, cy_f, n_r,
-                   _dim(_FRINGE_BLUE,
-                        NUCLEUS_RIM_FRINGE_ALPHA * bright), 1)
 
         # Caustic: the boiling highlight inside the core, on its own slow turn
         # and louder on the thump, but never fully gone between beats.
