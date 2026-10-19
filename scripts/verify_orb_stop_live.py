@@ -102,9 +102,20 @@ DEFAULT_OUT = "output/orb_capture/stop_live"
 TALK_PREFIX = "voice_edit.talk."
 STOP_TRIPLE = ("interrupt", "playback.stopped", "response.done")
 
-#: Opt-in gate for ``--speak-test`` (mirrors the synthetic-input gate spirit:
-#: an explicit env flag AND the explicit CLI flag are both required).
+#: Opt-in gate for ``--speak-test`` / ``--helper-speak`` (mirrors the
+#: synthetic-input gate spirit: an explicit env flag AND the explicit CLI flag
+#: are both required).
 SPEAK_TEST_ENV = "QUBIT_ORB_LIVE_ALLOW_SPEAK_TEST"
+
+#: The helper's own on-demand canned-speak protocol (mirrors
+#: ``voicebridge.desktop_helper`` / ``voicebridge.orb.client``; pinned by
+#: tests). The helper-side env gate must ALSO be open in the RUNNING helper
+#: before it will speak — the harness only ever checks this, never sets it.
+HELPER_SPEAK_ENV = "QUBIT_ORB_HELPER_SPEAK"
+HELPER_SPEAK_SIGNAL = int(getattr(signal, "SIGRTMIN", 34)) + 3
+HELPER_SPEAK_MAX_CHARS = 400
+#: Names the helper uses for its player subprocess (``_speak`` picks one).
+PLAYER_NAMES = ("paplay", "aplay")
 
 #: The live service endpoints used by speak-test. The TTS authority is mounted
 #: under ``/agent`` (``HelperClient``'s prefix); ``/api/interrupt`` is the
@@ -341,6 +352,70 @@ def handler_installed(mask: Optional[int], signum: int) -> bool:
             (int(mask) >> (int(signum) - 1)) & 1)
     except Exception:  # noqa: BLE001
         return False
+
+
+def read_proc_environ(pid: int,
+                      proc_root: Path = Path("/proc")) -> Optional[str]:
+    """One process's environment block as text; ``None`` when unreadable."""
+    try:
+        raw = (Path(proc_root) / str(int(pid)) / "environ").read_bytes()
+    except Exception:  # noqa: BLE001
+        return None
+    return raw.decode("utf-8", "replace")
+
+
+def proc_env_flag(pid: int, name: str,
+                  proc_root: Path = Path("/proc")) -> Optional[bool]:
+    """``True``/``False`` for an opt-in env flag; ``None`` when unreadable.
+
+    Used read-only to explain a refusal BEFORE a signal: the running helper
+    must carry ``QUBIT_ORB_HELPER_SPEAK=1``. A value outside the truthy set
+    (including an absent key) is ``False``; unreadable ``/proc`` is ``None``
+    (unknown, not "off").
+    """
+    text = read_proc_environ(pid, proc_root)
+    if text is None:
+        return None
+    prefix = f"{name}="
+    for item in text.split("\x00"):
+        if item.startswith(prefix):
+            value = item[len(prefix):].strip().lower()
+            return value in ("1", "true", "yes", "on")
+    return False
+
+
+def read_proc_children(pid: int,
+                       proc_root: Path = Path("/proc")) -> List[int]:
+    """Direct child pids of ``pid`` (``/proc`` children file); [] if absent."""
+    pids: List[int] = []
+    for rel in ((str(int(pid)), "task", str(int(pid)), "children"),
+                (str(int(pid)), "children")):
+        try:
+            text = (Path(proc_root).joinpath(*rel)).read_text(
+                encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            continue
+        for token in text.split():
+            try:
+                pids.append(int(token))
+            except (TypeError, ValueError):
+                continue
+        return pids
+    return pids
+
+
+def helper_player_pids(helper_pid: int,
+                       proc_root: Path = Path("/proc")) -> List[int]:
+    """The helper's live player subprocess pids (paplay/aplay), best effort."""
+    out: List[int] = []
+    for child in read_proc_children(helper_pid, proc_root):
+        cmdline = read_proc_cmdline(child, proc_root)
+        if not cmdline:
+            continue
+        program = Path(cmdline.split()[0]).name if cmdline.split() else ""
+        if program in PLAYER_NAMES:
+            out.append(child)
+    return out
 
 
 def resolve_live_helper(*, proc_root: Path = Path("/proc"),
@@ -1725,6 +1800,482 @@ def run_speak_test(*, text: str = "Qubit live stop test.",
     return result
 
 
+# ---------------------------------------------------------------------------
+# gated helper-speak: ask the RUNNING helper to speak, then stop its playback
+# ---------------------------------------------------------------------------
+def summarize_helper_speak(*, gate_open: bool = True,
+                           helper_pid: Optional[int] = None,
+                           helper_gate: Optional[bool] = None,
+                           request_sent: bool = False,
+                           playback_started: bool = False,
+                           playback_live_before_stop: Optional[bool] = None,
+                           player_ended: Optional[bool] = None,
+                           helper_alive_after: Optional[bool] = None,
+                           triple: Optional[Dict[str, Any]] = None,
+                           degraded: Optional[List[str]] = None
+                           ) -> Dict[str, Any]:
+    """Reduce helper-speak observations to a PASS/FAIL/DEGRADED verdict (pure).
+
+    PASS requires PROOF that the RUNNING helper owned the playback
+    (``playback_started`` in its own journal), that the playback was live when
+    the STOP was delivered, that the helper survived, that its player ended,
+    and that the canonical ``interrupt`` -> ``playback.stopped`` ->
+    ``response.done`` triple landed in order. Anything the environment cannot
+    demonstrate is DEGRADED, never a fabricated PASS.
+    """
+    degraded = list(degraded or [])
+    triple = triple or {}
+    present = bool(triple.get("present", False))
+    ordered = bool(triple.get("ordered", False))
+    missing = list(triple.get("missing") or [])
+
+    if not gate_open:
+        verdict = "BLOCKED"
+        reason = (f"helper-speak is not enabled; set {SPEAK_TEST_ENV}=1 to "
+                  "permit a real helper playback stop")
+    elif helper_pid is None:
+        verdict = "DEGRADED"
+        reason = "no live desktop helper"
+    elif helper_gate is False:
+        verdict = "DEGRADED"
+        reason = (f"the live helper does not have {HELPER_SPEAK_ENV}=1; it "
+                  "refuses on-demand speech (restart is required to opt in)")
+    elif not request_sent:
+        verdict = "DEGRADED"
+        reason = "the canned-speak request could not be delivered"
+    elif not playback_started:
+        verdict = "DEGRADED"
+        reason = ("the live helper never journaled playback.started after the "
+                  "request (gate disabled, TTS unavailable, or not idle)")
+    elif playback_live_before_stop is False:
+        verdict = "DEGRADED"
+        reason = "the helper playback ended before the stop was delivered"
+    elif helper_alive_after is False:
+        verdict = "FAIL"
+        reason = "the live helper did not survive the stop signal"
+    elif player_ended is False:
+        verdict = "FAIL"
+        reason = "the helper's player subprocess was still alive after the stop"
+    elif not present:
+        verdict = "FAIL"
+        reason = ("the helper owned playback but the canonical stop boundaries "
+                  "are missing: " + ", ".join(missing))
+    elif not ordered:
+        verdict = "FAIL"
+        reason = "canonical stop boundaries are present but out of order"
+    else:
+        verdict = "PASS"
+        reason = ("the live helper spoke on demand, its player ended on the "
+                  "STOP, and the canonical stop triple is journaled")
+    return {
+        "verdict": verdict,
+        "reason": reason,
+        "helper_pid": helper_pid,
+        "helper_gate": helper_gate,
+        "request_sent": bool(request_sent),
+        "playback_started": bool(playback_started),
+        "playback_live_before_stop": playback_live_before_stop,
+        "player_ended": player_ended,
+        "helper_alive_after": helper_alive_after,
+        "triple": list(STOP_TRIPLE),
+        "triple_present": present,
+        "triple_ordered": ordered,
+        "missing": missing,
+        "stop_latency_s": triple.get("latency_s"),
+        "degraded": degraded,
+    }
+
+
+def _write_helper_speak_evidence(capture_dir: Path, result: Dict[str, Any],
+                                 events: List[Dict[str, Any]], t0: float) -> None:
+    header = [
+        f"live helper-speak STOP harness — {result.get('started')}",
+        f"helper pid: {result.get('helper_pid') or '-'} "
+        f"state={result.get('helper_state') or '-'} "
+        f"gate={result.get('helper_gate')} "
+        f"speak_handler={result.get('speak_handler')}",
+        f"request: sent={result.get('request_sent')} "
+        f"file={result.get('request_file') or '-'} "
+        f"signal={result.get('speak_signal')}",
+        f"playback: started={result.get('playback_started')} "
+        f"turn={result.get('playback_turn') or '-'} "
+        f"live_before_stop={result.get('playback_live_before_stop')} "
+        f"player_pids={result.get('player_pids_before')} -> "
+        f"{result.get('player_pids_after')}",
+        f"stop: sent={result.get('stop_sent')} "
+        f"helper_alive_after={result.get('helper_alive_after')} "
+        f"latency={result.get('stop_latency_s')}s",
+        f"triple: present={result.get('triple_present')} "
+        f"ordered={result.get('triple_ordered')}",
+        f"verdict: {result.get('verdict')} — {result.get('reason')}",
+    ]
+    if result.get("degraded"):
+        header.append("degraded: " + "; ".join(result["degraded"]))
+    header.append("--- talk timeline (voice_edit.talk.*) ---")
+    try:
+        (capture_dir / "timeline.txt").write_text(
+            build_timeline(events, t0, header=header), encoding="utf-8")
+        (capture_dir / "evidence.json").write_text(
+            json.dumps({**result, "events": events[-200:]}, indent=2),
+            encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 - evidence is best-effort
+        result.setdefault("degraded", []).append(f"evidence write failed: {exc}")
+
+
+def _open_playback_turn(events: List[Dict[str, Any]],
+                        turn_id: Any) -> bool:
+    """True when ``turn_id`` has a ``playback.started`` with no later close."""
+    relevant = [e for e in events if e.get("turn_id") == turn_id]
+    types = [str(e.get("type", "")) for e in relevant]
+    if "playback.started" not in types:
+        return False
+    started = types.index("playback.started")
+    return not any(name in types[started + 1:]
+                   for name in ("playback.stopped", "response.done"))
+
+
+def run_helper_speak(*, text: str = "Qubit helper live stop test.",
+                     out_dir: Optional[Path] = None, timeout: float = 15.0,
+                     settle: float = 0.25,
+                     journal: Optional[Path] = None,
+                     resolve_fn: Optional[Callable[..., Dict[str, Any]]] = None,
+                     request_fn: Optional[Callable[[str], Any]] = None,
+                     stop_fn: Optional[Callable[[], Any]] = None,
+                     player_pids_fn: Optional[Callable[[int], List[int]]] = None,
+                     alive_fn: Optional[Callable[[int], bool]] = None,
+                     proc_root: Path = Path("/proc"),
+                     now_fn: Callable[[], float] = time.time,
+                     sleep_fn: Callable[[float], None] = time.sleep
+                     ) -> Dict[str, Any]:
+    """Ask the RUNNING helper to speak a canned text, then deliver the STOP.
+
+    Double-gated: ``--helper-speak`` AND ``QUBIT_ORB_LIVE_ALLOW_SPEAK_TEST=1``.
+    The helper must additionally run with ``QUBIT_ORB_HELPER_SPEAK=1`` and have
+    installed the real-time speak handler; otherwise the harness refuses to
+    signal (the real-time default disposition would terminate the helper) and
+    reports DEGRADED. No mic, no synthetic input, no network server, no
+    service restart. Never raises.
+    """
+    t0 = float(now_fn())
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(t0))
+    base = Path(out_dir) if out_dir else (REPO_ROOT / DEFAULT_OUT)
+    capture_dir = base / f"{stamp}-helper"
+    try:
+        capture_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:  # noqa: BLE001
+        pass
+    alive_fn = alive_fn or _pid_alive
+    player_pids_fn = player_pids_fn or (
+        lambda pid: helper_player_pids(pid, proc_root))
+    gate_open = speak_test_allowed()
+    result: Dict[str, Any] = {
+        "mode": "helper-speak",
+        "started": _iso(t0),
+        "capture_dir": str(capture_dir),
+        "verdict": "DEGRADED",
+        "reason": "",
+        "degraded": [],
+        "text_chars": len(str(text or "")),
+        "helper_pid": None,
+        "helper_state": None,
+        "helper_gate": None,
+        "speak_handler": None,
+        "speak_signal": HELPER_SPEAK_SIGNAL,
+        "request_sent": False,
+        "request_file": None,
+        "playback_started": False,
+        "playback_turn": None,
+        "playback_live_before_stop": None,
+        "player_pids_before": [],
+        "player_pids_after": [],
+        "player_ended": None,
+        "stop_sent": False,
+        "stop_at": None,
+        "stop_to_exit_s": None,
+        "helper_alive_after": None,
+        "triple_present": False,
+        "triple_ordered": False,
+        "missing": [],
+        "stop_latency_s": None,
+        "events": [],
+        "events_after_stop": [],
+    }
+    if not gate_open:
+        result.update(summarize_helper_speak(
+            gate_open=False, degraded=result["degraded"]))
+        result["verdict"] = "BLOCKED"
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    if resolve_fn is None:
+        def resolve_fn(**_kw: Any) -> Dict[str, Any]:
+            return resolve_live_helper(proc_root=proc_root, **_kw)
+    helper = resolve_fn()
+    pid = helper.get("pid")
+    result["helper_pid"] = pid
+    hb = helper.get("heartbeat") or {}
+    state = str(hb.get("state") or "") if isinstance(hb, dict) else ""
+    result["helper_state"] = state or None
+    result["helper_gate"] = (proc_env_flag(int(pid), HELPER_SPEAK_ENV,
+                                           proc_root)
+                             if helper.get("ok") and pid else None)
+    if journal is None:
+        try:
+            from voicebridge.config import canonical_state_dir
+            journal = canonical_state_dir() / "events.jsonl"
+        except Exception:  # noqa: BLE001
+            journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
+                       / "events.jsonl")
+    result["journal"] = str(journal)
+    if not helper.get("ok"):
+        result["reason"] = str(helper.get("reason") or "no live helper")
+        result["degraded"].append(result["reason"])
+        result.update(summarize_helper_speak(
+            helper_pid=None, helper_gate=result["helper_gate"],
+            degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    pid = int(pid)
+    mask = read_proc_signal_mask(pid, proc_root)
+    result["speak_handler"] = handler_installed(mask, HELPER_SPEAK_SIGNAL)
+    if not result["speak_handler"]:
+        reason = (f"the live helper has no handler for "
+                  f"SIGRTMIN+3 ({HELPER_SPEAK_SIGNAL}); refusing to signal "
+                  "(the default disposition would terminate it). The running "
+                  "helper predates this mechanism or was not restarted with "
+                  "the new code — no service was restarted by this harness.")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            request_sent=False, degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    if result["helper_gate"] is False:
+        reason = (f"the live helper does not carry {HELPER_SPEAK_ENV}=1; it "
+                  "would refuse this request (restart is required to opt in)")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=False, request_sent=False,
+            degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    if state and state != "idle":
+        reason = (f"refusing helper-speak: the live helper is busy "
+                  f"({state!r}) with an unrelated turn")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    # Pre-request journal state: a helper already owning playback must not be
+    # confused with the playback this request will start.
+    try:
+        pre_events, offset = read_tail_talk_rows(Path(journal))
+        pre = analyze_playback(pre_events, now=now_fn())
+    except Exception:  # noqa: BLE001
+        pre, offset = {"speaking": False, "turn_id": None}, 0
+    if pre.get("speaking"):
+        reason = ("refusing helper-speak: the live helper already owns a "
+                  "playback (wait for it to finish)")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+    if offset <= 0:
+        try:
+            offset = Path(journal).stat().st_size
+        except Exception:  # noqa: BLE001
+            offset = 0
+
+    if request_fn is None:
+        def request_fn(value: str) -> Any:
+            from voicebridge.orb.client import OrbClient
+            return OrbClient("", "").request_helper_speak(value)
+    try:
+        request_out = request_fn(str(text))
+        result["request_sent"] = True
+        if isinstance(request_out, dict):
+            result["request_file"] = request_out.get("request")
+    except Exception as exc:  # noqa: BLE001
+        reason = f"the canned-speak request failed: {str(exc)[:160]}"
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            request_sent=False, degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, [], t0)
+        return result
+
+    # -- wait for the helper's OWN playback.started (proof of real playback) -
+    t_req = float(now_fn())
+    new_events: List[Dict[str, Any]] = []
+    started: Optional[Dict[str, Any]] = None
+    deadline = t_req + max(0.5, float(timeout))
+    while now_fn() < deadline:
+        try:
+            batch, offset = read_talk_rows(Path(journal), offset)
+            new_events.extend(batch)
+        except Exception:  # noqa: BLE001
+            pass
+        for ev in new_events:
+            if ev.get("type") != "playback.started":
+                continue
+            raw_ts = ev.get("ts")
+            if (isinstance(raw_ts, (int, float))
+                    and not isinstance(raw_ts, bool)
+                    and float(raw_ts) + 0.5 < t_req):
+                continue  # an older boundary cannot be this request's playback
+            started = ev
+            break
+        if started is not None:
+            break
+        sleep_fn(0.05)
+    result["events"] = new_events[-200:]
+    if started is None:
+        result["reason"] = (
+            "the live helper accepted the request but journaled no "
+            "playback.started (gate refused, TTS unavailable, or not idle)")
+        result["degraded"].append(result["reason"])
+        reason = result["reason"]
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            request_sent=True, playback_started=False,
+            degraded=result["degraded"]))
+        result["reason"] = reason
+        _write_helper_speak_evidence(capture_dir, result, new_events, t0)
+        return result
+
+    result["playback_started"] = True
+    result["playback_turn"] = started.get("turn_id")
+    turn = started.get("turn_id")
+    sleep_fn(max(0.0, float(settle)))
+    try:
+        more, offset = read_talk_rows(Path(journal), offset)
+        new_events.extend(more)
+    except Exception:  # noqa: BLE001
+        pass
+    live_before = _open_playback_turn(new_events, turn)
+    result["playback_live_before_stop"] = live_before
+    if not live_before:
+        result["reason"] = "the helper playback ended before the stop"
+        result["degraded"].append(result["reason"])
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            request_sent=True, playback_started=True,
+            playback_live_before_stop=False, degraded=result["degraded"]))
+        _write_helper_speak_evidence(capture_dir, result, new_events, t0)
+        return result
+    try:
+        before_players = list(player_pids_fn(pid))
+    except Exception:  # noqa: BLE001
+        before_players = []
+    result["player_pids_before"] = before_players
+    if not before_players:
+        result["degraded"].append(
+            "no helper player child visible in /proc (player proof falls back "
+            "to the journal playback boundaries)")
+
+    # -- deliver the orb STOP (SIGUSR2) to the same validated helper ---------
+    t_stop = float(now_fn())
+    result["stop_at"] = t_stop
+    if stop_fn is None:
+        def stop_fn() -> Any:
+            from voicebridge.orb.client import OrbClient
+            return OrbClient("", "").stop_speaking()
+    # Re-validate immediately before the signal: never signal a changed pid or
+    # one that lost its handler.
+    fresh = resolve_fn()
+    mask2 = (read_proc_signal_mask(int(fresh["pid"]), proc_root)
+             if fresh.get("ok") else None)
+    if (not fresh.get("ok") or int(fresh.get("pid") or 0) != pid
+            or not handler_installed(mask2, signal.SIGUSR2)):
+        reason = ("live helper pid changed/disappeared or lost its SIGUSR2 "
+                  "handler before the stop; not signalled")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        result.update(summarize_helper_speak(
+            helper_pid=pid, helper_gate=result["helper_gate"],
+            request_sent=True, playback_started=True,
+            playback_live_before_stop=True, degraded=result["degraded"]))
+        _write_helper_speak_evidence(capture_dir, result, new_events, t0)
+        return result
+    try:
+        stop_fn()
+        result["stop_sent"] = True
+    except Exception as exc:  # noqa: BLE001
+        result["degraded"].append(f"the STOP signal failed: {str(exc)[:120]}")
+
+    # -- collect the canonical triple for THIS helper turn -------------------
+    deadline = now_fn() + max(0.5, float(timeout))
+    while now_fn() < deadline:
+        try:
+            batch, offset = read_talk_rows(Path(journal), offset)
+            new_events.extend(batch)
+        except Exception:  # noqa: BLE001
+            pass
+        types = [e.get("type") for e in new_events
+                 if e.get("turn_id") == turn]
+        if all(name in types for name in STOP_TRIPLE):
+            break
+        sleep_fn(0.05)
+    result["events_after_stop"] = new_events[-100:]
+    result["events"] = new_events[-200:]
+    result["helper_alive_after"] = bool(alive_fn(pid))
+
+    # Player end: wait briefly for the helper's child to disappear. When no
+    # child was visible before, the journal boundaries are the proof.
+    after_players: List[int] = []
+    player_deadline = now_fn() + max(0.2, min(3.0, float(timeout)))
+    while now_fn() < player_deadline:
+        try:
+            after_players = list(player_pids_fn(pid))
+        except Exception:  # noqa: BLE001
+            after_players = []
+        if not after_players:
+            break
+        sleep_fn(0.05)
+    result["player_pids_after"] = after_players
+    if before_players:
+        result["player_ended"] = not bool(after_players)
+    else:
+        result["player_ended"] = None
+    if result.get("stop_at") is not None and result.get("player_ended"):
+        result["stop_to_exit_s"] = round(
+            float(now_fn()) - float(result["stop_at"]), 4)
+
+    relevant = [e for e in new_events if e.get("turn_id") == turn]
+    triple = ordered_triple(relevant, t_stop=t_stop)
+    result["triple_present"] = triple["present"]
+    result["triple_ordered"] = triple["ordered"]
+    result["missing"] = triple["missing"]
+    result["stop_latency_s"] = triple["latency_s"]
+    result.update(summarize_helper_speak(
+        helper_pid=pid, helper_gate=result["helper_gate"], request_sent=True,
+        playback_started=True, playback_live_before_stop=True,
+        player_ended=result["player_ended"],
+        helper_alive_after=result["helper_alive_after"], triple=triple,
+        degraded=result["degraded"]))
+    _write_helper_speak_evidence(capture_dir, result, new_events, t0)
+    return result
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(
         description="Live-capable orb STOP harness (read-only by default).")
@@ -1764,8 +2315,54 @@ def main(argv: Optional[List[str]] = None) -> int:
                          "mid-playback (default: 6)")
     ap.add_argument("--speak-timeout", type=float, default=6.0,
                     help="seconds to wait for playback start/stop (default: 6)")
+    ap.add_argument("--helper-speak", metavar="TEXT", default=None,
+                    help="GATED: ask the RUNNING helper to speak TEXT on "
+                         "demand (real helper TTS + real helper player), then "
+                         "deliver the orb STOP and verify its canonical triple. "
+                         f"Requires {SPEAK_TEST_ENV}=1 AND the live helper "
+                         f"running with {HELPER_SPEAK_ENV}=1")
+    ap.add_argument("--helper-speak-timeout", type=float, default=15.0,
+                    help="seconds to wait for helper playback/stop (default: 15)")
     ap.add_argument("--json", action="store_true", help="print JSON only")
     args = ap.parse_args(argv)
+
+    if args.helper_speak is not None:
+        helper_speak = run_helper_speak(
+            text=args.helper_speak,
+            out_dir=Path(args.out) if args.out else None,
+            timeout=args.helper_speak_timeout,
+            journal=Path(args.live_journal) if args.live_journal else None,
+        )
+        if args.json:
+            print(json.dumps(helper_speak, indent=2))
+        else:
+            print(f"verdict: {helper_speak.get('verdict')} — "
+                  f"{helper_speak.get('reason')}")
+            print(f"helper: pid={helper_speak.get('helper_pid') or '-'} "
+                  f"state={helper_speak.get('helper_state') or '-'} "
+                  f"gate={helper_speak.get('helper_gate')} "
+                  f"speak_handler={helper_speak.get('speak_handler')}")
+            print(f"request: sent={helper_speak.get('request_sent')} "
+                  f"file={helper_speak.get('request_file') or '-'} "
+                  f"signal={helper_speak.get('speak_signal')}")
+            print(f"playback: started={helper_speak.get('playback_started')} "
+                  f"turn={helper_speak.get('playback_turn') or '-'} "
+                  f"live_before_stop="
+                  f"{helper_speak.get('playback_live_before_stop')} "
+                  f"player_ended={helper_speak.get('player_ended')}")
+            print(f"stop: sent={helper_speak.get('stop_sent')} "
+                  f"helper_alive_after="
+                  f"{helper_speak.get('helper_alive_after')} "
+                  f"stop_to_exit={helper_speak.get('stop_to_exit_s')}s")
+            print(f"triple: present={helper_speak.get('triple_present')} "
+                  f"ordered={helper_speak.get('triple_ordered')} "
+                  f"latency={helper_speak.get('stop_latency_s')}s")
+            print(f"evidence: {helper_speak.get('capture_dir')}/evidence.json")
+            if helper_speak.get("degraded"):
+                for item in helper_speak["degraded"]:
+                    print(f"degraded: {item}")
+        return {"PASS": 0, "FAIL": 1, "BLOCKED": 2}.get(
+            str(helper_speak.get("verdict")), 3)
 
     if args.speak_test is not None:
         speak = run_speak_test(
