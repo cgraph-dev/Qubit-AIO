@@ -252,7 +252,12 @@ class FanoutTransport:
         except Exception:
             logger.debug("fanout overflow close failed; membership already dropped", exc_info=True)
 
-    def write(self, obj: dict) -> bool:
+    def write(self, obj: dict, *, overflow: Callable[[Transport], Optional[dict]] | None = None) -> bool:
+        """Fan *obj* out. A peer whose bounded backlog is full loses its subscription; *overflow*
+        (called with its transport, under the membership lock) may return one final frame that
+        replaces the dropped backlog, so a socket that is still healthy learns it must resume
+        rather than silently continuing with partial history. Without such a notice the peer's
+        transport is closed so the client notices, reconnects and replays."""
         # Freeze the queued frame so a caller cannot mutate it after admission. Same serialization
         # guard as the single-peer transports: an unserializable frame reaches every peer as -32603.
         encoded = serialize_frame(obj, "fanout", logger)
@@ -266,8 +271,24 @@ class FanoutTransport:
                 if (len(peer.pending) >= self._MAX_PENDING_FRAMES
                         or peer.pending_bytes + size > self._MAX_PENDING_BYTES):
                     logger.warning("fanout subscriber backlog full; detaching peer")
-                    overflowed.append(peer.transport)
                     self._remove(peer)
+                    notice = overflow(peer.transport) if overflow is not None else None
+                    if notice is None:
+                        overflowed.append(peer.transport)
+                    else:
+                        # Carry the resume notice on a FRESH generation of the same peer, so the
+                        # writer that would otherwise let go of a detached peer delivers it. A
+                        # later ``attach`` reuses this peer and bumps the generation again, so the
+                        # stale notice can never be sent into a live subscription.
+                        peer.pending.append((notice, 0))
+                        if peer not in self._peers:
+                            self._peers.append(peer)
+                        peer.attached = True
+                        peer.generation += 1
+                        if not peer.writing:
+                            peer.writing = True
+                            threading.Thread(target=self._drain, args=(peer,),
+                                             name="tui-fanout", daemon=True).start()
                     continue
                 peer.pending.append((frame, size))
                 peer.pending_bytes += size
