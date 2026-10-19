@@ -37,9 +37,13 @@ printed as an exact partition of the total:
         upstream-internal helper nothing here calls, or a symbol deliberately
         not carried. Zero work unless a feature is ported on purpose.
   (v)   DELIBERATE-OMISSION   -- whose upstream module/symbol is a surface the
-        docs name as intentionally absent (docs/PARITY.md: raw PTY/console, WS
-        dialect, secret reveal, remote fetch; docs/BRAND.md legal-attribution
-        exemption). A policy decision, not a gap.
+        docs name as intentionally absent. The declared list is
+        ``docs/FROZEN_TARGET.md`` section "Declared exclusions"; the surface
+        tokens matched here (raw PTY/console, WS dialect, secret reveal, remote
+        fetch, ``codex-runtime``, ``credentials``, ``vault``) are carried by this
+        module's ``OMISSION_TOKENS``, which no live doc enumerates, plus
+        ``docs/BRAND.md``'s legal-attribution exemption. A policy decision, not
+        a gap.
 
 The classifier is AST-based and never imports the tree. A reference is
 MODULE-AWARE: `from M import S`, `import M as A; A.S`, and `from M import S as X`
@@ -286,10 +290,12 @@ def collect_refs(root: Path, dirs) -> tuple[dict[str, set[str]], int]:
 
 # Surfaces Qubit documents as *intentionally* not carried, from:
 #   docs/BRAND.md  -- legal-attribution exemption only; no capability omissions.
-#   docs/PARITY.md -- "deliberate policy refusals": no raw PTY/console, no WS
-#     dialect, no secret reveal, no remote fetch, operator-owned update; and the
-#     CLI surfaces `qubit chat` (QUBIT_NATIVE_CHAT), `codex-runtime`,
-#     `credentials`, `vault` are named missing-by-policy.
+#   docs/FROZEN_TARGET.md, section "Declared exclusions" -- the declared list.
+#   No live doc enumerates the rest since the PARITY.md rewrite: the surface
+#   refusals (no raw PTY/console, no WS dialect, no secret reveal, no remote
+#   fetch) and the CLI surfaces `qubit chat` (QUBIT_NATIVE_CHAT), `codex-runtime`,
+#   `credentials`, `vault` are carried by OMISSION_TOKENS below, which is their
+#   only in-tree statement. Keep it literal and small.
 # A symbol whose upstream module or name matches one of these tokens is a
 # DECISION, not a gap, and is reported under "deliberate omissions" rather than
 # charged against the work estimate. Kept deliberately small and literal --

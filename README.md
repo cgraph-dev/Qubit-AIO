@@ -4,10 +4,10 @@
 > 🔊 **Audio:** read `config/voice.example.yaml` (`output_device` stays EMPTY,
 > `speak_web_locally: false`) **before** touching any audio/mic/TTS setting.
 >
-> The three docs previously linked here (`docs/VOICE_BRIDGE_SYSTEM.md`,
-> `docs/STEAL_LIST.md`, `docs/AUDIO_SETUP.md`) were purged in `eafb54e26` and no
-> longer exist. Do not cite them; retrieve from git history
-> (`git show eafb54e26^:<path>`) only if you need the historical text.
+> The three docs previously linked here (`VOICE_BRIDGE_SYSTEM.md`,
+> `STEAL_LIST.md`, `AUDIO_SETUP.md` — all under `docs/`) were purged in
+> `eafb54e26` and no longer exist. Do not cite them; retrieve from git history
+> (`git show eafb54e26^:` + the same path) only if you need the historical text.
 
 A **production-style local voice interface for Qubit Agent (Qubit VoiceBridge)** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
@@ -54,18 +54,18 @@ The bridge reads `~/.config/qubit-voicebridge/personal-knowledge.md` (shipped as
 bounded context compiler (Packet 4B): each chat turn gets a secret-stripped,
 size-capped excerpt of your facts — no whole-file injection and no restart needed,
 since the file is re-read per turn. The model knows your projects, preferences, and
-how you want answers, and replies **only in English** (documented language policy;
-see docs/VOICE_BRIDGE_SYSTEM.md). Nothing personal is baked into the model artifact.
+how you want answers, and replies **only in English** (owner ruling; see
+`docs/DECISIONS.md` ruling 3 and `docs/IDENTITY.md`). Nothing personal is baked
+into the model artifact.
 
 Without the two API keys the bridge still fully works for local chat + all
 agent task routing; only long/web conversational answers fall back.
 
 ## Install on a fresh PC
 
-The **one supported installer** is the packaged product surface
-(`docs/OPERATIONS_8KP.md`). It works from a release artifact — no source
-checkout or repository-local virtualenv — and is lock + journal guarded,
-idempotent, and typed:
+The **one supported installer** is the packaged product surface. It works from
+a release artifact — no source checkout or repository-local virtualenv — and is
+lock + journal guarded, idempotent, and typed:
 
 ```bash
 pip install qubit-voicebridge        # from the release artifact
@@ -255,7 +255,7 @@ what the agent is doing live.
 - **Audio on the PC (opt-in)**: web/dashboard requests play in the browser once;
   they also speak through the PC speakers ONLY when `webui.speak_web_locally:
   true` is explicitly set. The tuned setup keeps it `false` so nothing
-  double-speaks (docs/AUDIO_SETUP.md rule 5).
+  double-speaks (`config/voice.example.yaml`, `speak_web_locally`).
 - **Activity dashboard**: `http://<this-pc-ip>:8890/activity` — live feed
   of what the agent did: recognized text, routing decision, status, the
   final spoken summary, latency, and (for tool runs) the raw output behind
@@ -377,7 +377,9 @@ Watch for `mic.utterance`, `asr.transcribe`, `routing.decision`,
 
 ## Release certification (Packet 8K)
 
-`docs/OPERATIONS_8K.md` is the release-certification runbook: build the wheel
+Release certification — the former `OPERATIONS_8K.md` runbook was deleted in
+`42d64b846` (2026-09-23), before the 2026-10-09 doc purge, and has no live
+replacement; the commands below are the runbook now. Build the wheel
 and sdist, inspect and install them into a clean HOME outside the checkout,
 run import / entry-point / resource / unit / smoke checks with no
 `PYTHONPATH` or source-tree `sys.path` insertion, and record provenance,
@@ -396,9 +398,10 @@ Personal tool. No telemetry, no cloud dependency for the core loop.
 
 Licensing: original Qubit material is covered by the school-project terms in
 `LICENSE`. Third-party/upstream-derived material keeps its original license;
-see `docs/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
-`docs/UPSTREAM_REUSE.md`. The repository as a whole is not an OSI-approved
-open-source project.
+see `THIRD_PARTY_NOTICES.md` (root) for the attribution list. The former
+`LICENSING.md` / `UPSTREAM_REUSE.md` docs were deleted and have no live
+replacement. The repository as a whole is not an OSI-approved open-source
+project.
 
 This is a **school-only submission**: artifact signing and private-source
 distribution are NOT required and are reported honestly as NOT APPLICABLE — no

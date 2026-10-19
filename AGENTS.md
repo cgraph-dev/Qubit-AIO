@@ -48,30 +48,52 @@ no API key, $0).
   of them**. Do not describe Qubit as "a fork"; upstream lineage is provenance,
   named only where load-bearing, per `docs/BRAND.md`. Tagline: *"Nobody knows
   what it will become."*
-- The **fresh docs set is authoritative and living**: `docs/README.md` (index +
-  review checklist), `docs/STATUS.md` (current evidence-backed truth),
-  `docs/PARITY.md` (the parity target + method), `docs/MIGRATION.md` (port from
-  the reference home), `docs/BRAND.md` (zero legacy brand),   `docs/PLAN.md` (milestones/critical path), `docs/EXECUTION_PLAN.md` (sequenced
-  workstreams W0–W9), `docs/CHECKLIST.md` (the master tick-list),
-  `docs/DECISIONS.md` (owner rulings in force),
-  `docs/ARCHITECTURE.md`. Read them before any Qubit task and update
-  `STATUS.md` every session.
+- The **living docs set is authoritative**: `docs/README.md` (index + review
+  checklist), `docs/STATUS.md` (current evidence-backed truth), `docs/PARITY.md`
+  (the parity axes, instruments and gap docs), `docs/MIGRATION.md` (the three
+  kinds of migration and their shipped commands), `docs/BRAND.md` (zero legacy
+  brand), `docs/PLAN.md` (where the plan lives + claim rules),
+  `docs/EXECUTION_PLAN.md` (sequencing and dispatch rules), `docs/CHECKLIST.md`
+  (the machine-measured tick-list), `docs/DECISIONS.md` (owner rulings in force,
+  with provenance), `docs/ARCHITECTURE.md` (layers and paths). Read them before
+  any Qubit task and update `STATUS.md` every session. `docs/` was purged once
+  (`eafb54e26`, 340 files under `docs/`); never re-create a deleted doc from
+  memory, and never cite a doc path you have not `test -f`'d — mark the loss
+  instead (`scripts/verify_doc_citations.py` checks this file).
 - **Owner directives in force:** everything that works on the local reference
   dashboard `http://127.0.0.1:9119/?profile=default` must work in Qubit and be
   commandable by voice (`docs/PARITY.md`); zero legacy brand on product surfaces,
   with legal attribution the required exception (`docs/BRAND.md`).
 - Owner rulings in force — staged gates (`M1`/`M2` as progress markers only,
   `VERIFIED` remains the sole release verdict), the `OPERATOR_ONLY` split, and the
-  three rulings — are in `docs/DECISIONS.md` and
-  `docs/QUBIT_OWNER_AMENDMENT_2026-09-22_STAGED_GATES_AND_RULINGS.md`.
-- Frozen contracts and owner amendments are authoritative by content and are
-  preserved under `docs/archive/2026-09-21/` (see its `README.md`). Never edit a
-  frozen contract; changing a requirement needs owner sign-off. Do not edit
-  `docs/differential/INTERFACE.md`.
-- The **pre-reset docs** (the 2026-09-21 authoritative contracts and the former
-  active brief) are preserved under `docs/archive/2026-09-22-pre-reset/`. They
-  remain the definition of done, **amended by `docs/DECISIONS.md`**, and must not
-  override it.
+  three rulings — are indexed with their sources in `docs/DECISIONS.md`, which is
+  the authority. The owner amendment that first set them out
+  (`QUBIT_OWNER_AMENDMENT_2026-09-22_STAGED_GATES_AND_RULINGS.md`) was purged in
+  `eafb54e26` and is **not** in the tree; `docs/DECISIONS.md` ruling 5 carries the
+  standing text plus the retrieval command. Cite `docs/DECISIONS.md`, not the
+  amendment.
+- `docs/archive/2026-09-21/` now holds **frozen `*.json` data records only**. The
+  archive's own markdown — its `README.md`, plus `AUDIO_SETUP`,
+  `STEAL_LIST`, `VOICE_BRIDGE_SYSTEM`, `LICENSING`, `UPSTREAM_REUSE` and the
+  2026-09-18 implementation-first amendment — was purged in `eafb54e26` and is
+  **not restorable as a path**: do not cite those files, do not hunt for them, and
+  do not re-author them. Active tests and generators must never read or write
+  `docs/archive/`; never edit a frozen record — changing a requirement needs owner
+  sign-off.
+- The **pre-reset docs are not in the tree**: the `2026-09-22-pre-reset` archive
+  directory was purged in `eafb54e26`. Where the pre-reset contracts still apply
+  they are amended by `docs/DECISIONS.md`, which is the authority; never cite a
+  pre-reset path as a live requirement. For history only,
+  `git show eafb54e26^:docs/archive/2026-09-22-pre-reset/` lists what it held.
+- ⚠️ **Open loss — owner decision needed (differential interface contract).**
+  The frozen v1 interface consumed by the live `scripts/differential_parity.py`
+  (`INTERFACE.md`, and the whole `differential/` directory beside it under
+  `docs/`) was purged in `eafb54e26`. The only surviving in-tree pointer is
+  `tests/fixtures/differential/README.md`, which names an ephemeral
+  `/tmp/qubit-differential/INTERFACE.md` that will not outlive a reboot. Do **not**
+  re-author the contract or invent schema fields; recover it read-only with
+  `git show eafb54e26^:docs/differential/INTERFACE.md`, and treat any change to it
+  as an owner sign-off item.
 - Status comes from freshly regenerated ledgers/manifests (`QUBIT_GAP_LEDGER.*`,
   `QUBIT_*_MANIFEST.json`, `QUBIT_*_INVENTORY.json`), not prose. Re-run the
   generators; do not trust any prior completion claim without verifying against
@@ -84,21 +106,31 @@ no API key, $0).
   authority is carried by this file and the `opencode.json` `instructions` list.
 
 ## Voice Bridge docs (read before editing audio/voice)
-These were preserved under `docs/archive/2026-09-21/`:
-- `docs/archive/2026-09-21/AUDIO_SETUP.md` — the WORKING HyperX audio config
-  (mic = mono USB, output = HyperX digital; keep output_device EMPTY;
-  speak_web_locally=false).
-- `docs/archive/2026-09-21/STEAL_LIST.md` — what to implement next from
-  CopilotKit/AirLLM/OpenSandbox (smarter 4B model tier, live streaming, tool
-  schema, etc).
-- `docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md` — full pipeline + roadmap.
+Three docs were once listed here — `AUDIO_SETUP.md`, `STEAL_LIST.md` and
+`VOICE_BRIDGE_SYSTEM.md` under `docs/archive/2026-09-21/`. All three were purged
+in `eafb54e26` and are **not** in the tree; do not cite them.
+- **Audio config — the operative content of `AUDIO_SETUP`** now lives in
+  `config/voice.example.yaml`: `output_device` / `output_device_name` stay EMPTY
+  (never pin an index) and `speak_web_locally: false` so the browser does not
+  double-speak:
+  ```bash
+  grep -n 'output_device\|speak_web_locally' config/voice.example.yaml
+  ```
+- **Pipeline and routing lanes:** `docs/VOICE-BRIDGE-AUDIT.md` (live).
+- **Steal list** (what to port next from CopilotKit/AirLLM/OpenSandbox) and the
+  original full-system pipeline + roadmap: **purged, no live replacement**.
+  Recover read-only if you need the historical text —
+  `git show eafb54e26^:docs/archive/2026-09-21/STEAL_LIST.md`.
 
 ## Licensing and upstream reuse
 - `LICENSE` applies only to original Qubit material; it does not relicense
   third-party or upstream-derived code.
-- Read `docs/archive/2026-09-21/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
-  `docs/archive/2026-09-21/UPSTREAM_REUSE.md` before copying or adapting
-  external source.
+- Read `THIRD_PARTY_NOTICES.md` (root) and `docs/BRAND.md` §2 ("What a rename
+  must never touch") before copying or adapting external source. The licensing
+  docs once cited here — `LICENSING.md` and `UPSTREAM_REUSE.md` under
+  `docs/archive/2026-09-21/` — were purged in `eafb54e26` and have **no live
+  replacement**; recover them read-only from git history if provenance is in
+  doubt, and never re-author them.
 - Record the exact upstream repository, commit, source path, license, and
   local changes before implementation. Preserve required copyright/license
   notices and stop with `BLOCKED — LICENSE REVIEW REQUIRED` when provenance or
@@ -106,7 +138,8 @@ These were preserved under `docs/archive/2026-09-21/`:
 
 ## Implementation-first verification cadence
 
-Follow `docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-18_IMPLEMENTATION_FIRST_VERIFICATION.md`.
+Follow this cadence (the owner amendment that first set it out was purged in
+`eafb54e26`; the rules below are restated here and are what you follow).
 Finish code-side implementation and inventory work before running expensive
 verification. Until the integration lead declares `IMPLEMENTATION_COMPLETE`,
 do not run the full pytest suite, broad Vitest/Playwright sweeps, complete

@@ -8,6 +8,10 @@ exposes, diffed against the working Qubit surface and classified as
 inventory (an agent wrote it by hand and it drifted) with a re-runnable
 generator.
 
+``docs/PARITY.md`` is the *method* doc, not the omission list: deliberate
+omissions are declared in ``docs/FROZEN_TARGET.md``, section "Declared
+exclusions", and a symbol listed there must not be charged as a gap.
+
 Classification semantics (unchanged from the schema):
 
 * ``PORTED``  -- a Qubit counterpart is registered and dispatches to a real
