@@ -2190,9 +2190,6 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             if not final_response:
                 final_response = _normalize_empty_agent_response(result, final_response or "", history_len=len(agent_history))
                 final_response = _sanitize_gateway_final_response(ctx.source.platform, final_response)
-            if not final_response:
-                final_response = _normalize_empty_agent_response(result, final_response or "", history_len=len(agent_history))
-                final_response = _sanitize_gateway_final_response(ctx.source.platform, final_response)
                 if not final_response:
                     final_response = t("gateway.shared.warn_passthrough", error=result["error"]) if result.get("error") else ""
                 # NOTE: deliberately omits agent_persisted/last_reasoning/response_* — the caller
