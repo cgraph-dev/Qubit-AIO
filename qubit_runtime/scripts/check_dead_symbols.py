@@ -400,6 +400,24 @@ def main() -> int:
         "excluded_benign": [h.as_dict() for h in excluded],
     }
 
+    # Build the JSON BEFORE the table. For a file target, write it FIRST: a piped
+    # run (`... | head`) closes stdout early, and the report is the artifact worth
+    # keeping -- a truncated pipe must not cost it.
+    payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    to_stdout = args.json_path == "-"
+    if to_stdout:
+        # `--json -` means "the JSON IS the output": emit nothing else on stdout,
+        # so `| jq` / `| python -m json.tool` work. The table would otherwise
+        # prefix the JSON and no consumer could parse the stream.
+        sys.stdout.write(payload)
+        if unparsed:
+            print(f"FATAL: {len(unparsed)} owned files unparsable; result is incomplete, "
+                  f"not clean: {sorted(unparsed)[:5]}", file=sys.stderr)
+            return 2
+        return 1 if dead else 0
+    if args.json_path:
+        Path(args.json_path).write_text(payload)
+
     print(f"dead-symbol check  pin={rev[:12]}  root={root}")
     print(f"  owned .py parsed     : {len(facts)}"
           + (f"   UNPARSED {len(unparsed)}" if unparsed else ""))
@@ -421,12 +439,7 @@ def main() -> int:
             print(f"    {h.name:38} {h.module:44} {h.reason}")
 
     if args.json_path:
-        payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
-        if args.json_path == "-":
-            sys.stdout.write(payload)
-        else:
-            Path(args.json_path).write_text(payload)
-            print(f"\n  JSON -> {args.json_path}")
+        print(f"\n  JSON -> {args.json_path}")
 
     if unparsed:
         print(f"\nFATAL: {len(unparsed)} owned files unparsable; result is incomplete, "
