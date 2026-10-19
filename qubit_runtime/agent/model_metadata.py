@@ -1237,11 +1237,8 @@ def _invalidate_cached_context_length(model: str, base_url: str) -> None:
     Bedrock callers without a runtime endpoint must pass ``bedrock://``, as
     the resolver does; a blank URL addresses the distinct generic cache key.
     """
+    from agent.model_metadata_cache import drop_context_cache_rows
     key = _context_cache_key(model, base_url)
-    document = _load_context_cache_document()
-    cache = document.get("context_lengths") or {}
-    confirmed = document.get("bedrock_confirmed_v1") or {}
-    confirmed = confirmed if isinstance(confirmed, dict) else {}
     # Also drop the in-memory TTL probe entries, or the next resolution inside the TTL window reuses the stale value.
     bare, stripped = _strip_provider_prefix(model), (base_url or "").rstrip("/")
     _LOCAL_CTX_PROBE_CACHE.pop((bare, stripped), None)
@@ -1252,17 +1249,8 @@ def _invalidate_cached_context_length(model: str, base_url: str) -> None:
     for memo_key in list(_BEDROCK_PROBE_FAILURE_CACHE):  # snapshot: another thread may be memoising
         if memo_key[:2] == (qubit_home_key(), stripped) and memo_key[2] in (model, bare):
             _BEDROCK_PROBE_FAILURE_CACHE.pop(memo_key, None)
-    # Every key shape get_cached_context_length consults.
-    stale_keys = {key, f"{model}@{base_url}", f"{key}/"}
-    if not any(k in cache or k in confirmed for k in stale_keys):
-        return
-    for k in stale_keys:
-        cache.pop(k, None)
-        confirmed.pop(k, None)
-    try:
-        _write_context_cache(cache, confirmed)
-    except Exception as e:
-        logger.debug("Failed to invalidate context length cache entry %s: %s", key, e)
+    # Every key shape get_cached_context_length consults. Only the file update takes the cache lock.
+    drop_context_cache_rows({key, f"{model}@{base_url}", f"{key}/"}, key)
 
 
 def get_next_probe_tier(current_length: int) -> Optional[int]:
@@ -1616,23 +1604,6 @@ def _lmstudio_context(client, lmstudio_url: str, model: str) -> Optional[int]:
     for m in resp.json().get("models", []):
         if _model_id_matches(m.get("key", ""), model) or _model_id_matches(m.get("id", ""), model):
             return next((ctx for ctx in (_positive_int(inst.get("config", {}).get("context_length")) for inst in m.get("loaded_instances", [])) if ctx is not None), None)
-    return None
-
-
-def _llamacpp_context(client, server_url: str, model: str) -> Optional[int]:
-    """llama.cpp /props: the RUNTIME n_ctx, answered by the router even for a not-yet-loaded model
-    (while /v1/models has meta=null), so a lazily-loaded model doesn't fall to a family catch-all."""
-    import httpx
-    for props_path in (f"/props?model={model}", "/props"):
-        try:
-            resp = client.get(f"{server_url}{props_path}")
-        except httpx.HTTPError:
-            return None
-        if resp.status_code != 200:
-            continue
-        n_ctx = _positive_int((resp.json().get("default_generation_settings") or {}).get("n_ctx"))
-        if n_ctx is not None:
-            return n_ctx
     return None
 
 

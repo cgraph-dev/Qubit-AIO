@@ -2299,11 +2299,6 @@ def _finalize_cron_session(session_db, agent, job_id: str, job_name: str, cron_s
         logger.debug("Job '%s': failed to close SQLite session store: %s", job_id, e)
 
 
-def _normalize_newlines(text: str) -> str:
-    """CRLF/CR -> LF, matching what text-mode reads of the archive return."""
-    return text.replace("\r\n", "\n").replace("\r", "\n")
-
-
 def _run_doc_header(job: dict, title: str, job_id: str, prompt: str) -> str:
     """Header of the persisted run document (title, ids, schedule, prompt)."""
     return (
@@ -3545,8 +3540,10 @@ def _run_one_job_body(
             and not isinstance(e, _FireClaimLostDuringSideEffect)
             and not _fire_claim_ownership_lost()
         ):
-            delivery_error, delivery_outcome = _deliver_crash_failure(
-                job, _err_text, adapters=adapters, loop=loop)
+            # Returns before _run_one_job_body / record_unknown_worker_outcome install the scope; get_secret fails closed without one under multiplex.
+            with _fire_secret_scope():
+                delivery_error, delivery_outcome = _deliver_crash_failure(
+                    job, _err_text, adapters=adapters, loop=loop)
         try:
             if (
                 not _consume_interrupted_flag(job["id"], execution_token)

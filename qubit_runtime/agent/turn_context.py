@@ -23,6 +23,7 @@ from agent.memory_context import build_memory_context_block
 from agent.memory_provider import is_trivial_prompt
 from agent.message_content import flatten_message_text
 from agent.message_metadata import PERSISTENCE_ONLY_MESSAGE_FIELDS, append_message, stamp_message_timestamp
+from agent.skills_index_delta import stage_skills_index_note
 from agent.model_metadata import (
     estimate_messages_tokens_rough,
     estimate_native_anthropic_request_tokens_rough,
@@ -1168,6 +1169,9 @@ def build_turn_context(
         original_user_message=original_user_message, messages=messages,
         conversation_history=conversation_history,
     )
+    # Every turn, not only on a prompt restore: a long-lived agent (CLI, TUI, Desktop) keeps its
+    # prompt in memory for the whole conversation and would never re-check its skills index.
+    stage_skills_index_note(agent, active_system_prompt, messages)
     plugin_user_context = _merge_gateway_notes(
         agent, messages, current_turn_user_idx, plugin_user_context
     )

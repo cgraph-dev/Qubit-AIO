@@ -11,6 +11,8 @@ import logging
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
+from agent.onboarding_record import observe_tool_result
+
 logger = logging.getLogger(__name__)
 
 
@@ -267,6 +269,7 @@ __all__ = [
     "first_contact_turn_note",
     "is_seen",
     "mark_seen",
+    "observe_tool_result",
     "openclaw_residue_hint_cli",
     "profile_build_directive",
     "profile_build_mode",
