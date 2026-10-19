@@ -99,6 +99,28 @@ def ask_turn_stopped(cfg: Any, request_id: str) -> bool:
         return False
 
 
+def warm_tts_worker(cfg: Any) -> bool:
+    """Best-effort: start the killable TTS model load in the background.
+
+    Called at the EARLIEST voice request that precedes a spoken reply (the
+    helper's ``session``/``begin`` call, ``/capture``, ``/transform``,
+    ``/route``, and the unkeyed dashboard ``/api/audio/transcribe``) so the
+    load runs while the mic, STT, router and brain do their work — a fast or
+    deterministic answer then still finds a warm worker instead of waiting
+    out whatever part of the load the brain turn did not cover.
+
+    ``warm_async`` is a no-op when a worker is live or already loading, never
+    blocks on the load, never raises, and loads in the child process (so the
+    service parent never builds a provider copy). Keeping the call here means
+    every hook shares the same guarded seam.
+    """
+    try:
+        from ..tts.synth_worker import warm_async
+        return bool(warm_async(cfg))
+    except Exception:  # noqa: BLE001 - warming must never break a turn
+        return False
+
+
 #: Worker narration shapes (Lane 2, 2026-10-03, journal test-4 09:54:53):
 #: the headless worker ran an irrelevant tool (``local.open_app`` for a
 #: create-file task) and summarized with assistant chatter
@@ -686,6 +708,11 @@ class VoiceEditService:
               target_app: str = "") -> Dict[str, Any]:
         self._require_enabled()
         self._require_estop_clear()
+        # Earliest hook in the real helper flow: ``begin`` always precedes
+        # capture -> STT -> route/ask -> speak, so starting the TTS load here
+        # hides it behind the whole voice turn (the keyed ``ask`` hook alone
+        # still left a fast deterministic answer waiting out the remainder).
+        warm_tts_worker(self.cfg)
         rid = request_id or uuid.uuid4().hex
         req = _Request(rid, session_id)
         req.target_app = target_app
@@ -920,6 +947,7 @@ class VoiceEditService:
     def capture(self, request_id: str) -> Dict[str, Any]:
         req = self._get(request_id)
         self._require_estop_clear()
+        warm_tts_worker(self.cfg)
         snap = self.desktop.capture_selection(self.cfg)
         req.selection = snap
         req.original = snap.text
@@ -948,6 +976,7 @@ class VoiceEditService:
                   style_override: str = "") -> Dict[str, Any]:
         req = self._get(request_id)
         self._require_estop_clear()
+        warm_tts_worker(self.cfg)
         if req.selection is None:
             raise VoiceEditError("VOICE_EDIT_NO_CAPTURE",
                                  "capture the selection before transforming")
@@ -1155,6 +1184,7 @@ class VoiceEditService:
         """
         req = self._get(request_id)
         self._require_estop_clear()
+        warm_tts_worker(self.cfg)
         # Voice-final repair lane (2026-10-04): waveform commands ("show /
         # hide waveform" + owner shapes "waveform on/off", "turn on/off",
         # "enable/disable" — see _WAVEFORM_SHOW_RE) must reach ask() (which flips the setting deterministically)
@@ -2881,15 +2911,12 @@ class VoiceEditService:
         # released on every exit (one per request id); an empty request id
         # has nothing a cancel can name and stays byte-identical.
         _cancel = self._ask_cancel_event(request_id)
-        # Warm the killable TTS worker while the brain works. After the idle
-        # reaper releases it, the first keyed reply would otherwise pay a cold
-        # model load; starting it here hides that behind the model call. This
-        # is a no-op when the worker is already warm/loading, never blocks,
-        # never raises, and does not touch unkeyed (dashboard) speech.
+        # A direct keyed ask (no preceding begin/capture) still gets the
+        # warm-up. The earliest hooks above normally already started it, so
+        # this is a cheap no-op; keeping it makes the ask path self-sufficient.
         try:
             if str(request_id or "").strip() and not self._ask_stopped(_cancel):
-                from ..tts.synth_worker import warm_async
-                warm_async(self.cfg)
+                warm_tts_worker(self.cfg)
         except Exception:  # noqa: BLE001 - warming must never break a turn
             pass
         try:

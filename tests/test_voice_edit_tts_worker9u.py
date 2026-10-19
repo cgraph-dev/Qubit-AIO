@@ -150,6 +150,7 @@ def test_keyed_speak_uses_the_killable_worker(monkeypatch, tmp_path):
         Path(out).write_bytes(b"RIFFworker")
         return "worker-provider"
 
+    monkeypatch.setattr(SW, "warm_async", lambda cfg: False)
     monkeypatch.setattr(SW, "synthesize_cancellable", _fake_synth)
     monkeypatch.setattr(QC, "_tts_from_cfg",
                         lambda cfg: pytest.fail("in-process factory used"))
@@ -166,6 +167,7 @@ def test_worker_cancel_maps_to_typed_stopped(monkeypatch):
     def _cancelled(cfg, text, out, *, stopped=None, timeout=60.0):
         raise SW.SynthCancelled("stopped")
 
+    monkeypatch.setattr(SW, "warm_async", lambda cfg: False)
     monkeypatch.setattr(SW, "synthesize_cancellable", _cancelled)
     status, out = QC.h_audio_speak(
         _SvcCfg(), {}, {"text": "hi", "request_id": "rid-c"}, {})
@@ -177,6 +179,7 @@ def test_worker_unavailable_is_typed_tts_unavailable(monkeypatch):
     def _broken(cfg, text, out, *, stopped=None, timeout=60.0):
         raise SW.SynthWorkerUnavailable("no voice pack")
 
+    monkeypatch.setattr(SW, "warm_async", lambda cfg: False)
     monkeypatch.setattr(SW, "synthesize_cancellable", _broken)
     status, out = QC.h_audio_speak(
         _SvcCfg(), {}, {"text": "hi", "request_id": "rid-u"}, {})
@@ -192,6 +195,7 @@ def test_unkeyed_dashboard_call_uses_the_same_worker(monkeypatch):
         Path(out).write_bytes(b"RIFFworker")
         return "worker-provider"
 
+    monkeypatch.setattr(SW, "warm_async", lambda cfg: False)
     monkeypatch.setattr(SW, "synthesize_cancellable", _fake_synth)
     monkeypatch.setattr(QC, "_tts_from_cfg",
                         lambda cfg: pytest.fail("in-process factory used"))
@@ -706,3 +710,163 @@ def test_stop_while_waiting_for_a_prewarm_stays_prompt(
         timer.cancel()
     elapsed = time.monotonic() - t0
     assert elapsed < 0.9, f"stop waited for the pre-warm ({elapsed:.2f}s)"
+
+
+# ---------------------------------------------------------------------------
+# earlier keyed hooks: begin/capture/transform/route warm before the turn
+# ---------------------------------------------------------------------------
+def _warm_recorder(monkeypatch):
+    calls = []
+    monkeypatch.setattr(SW, "warm_async",
+                        lambda cfg: calls.append(cfg) or True)
+    return calls
+
+
+def _svc_with_estop_clear():
+    return VoiceEditService(_SvcCfg(), estop=lambda cfg: False)
+
+
+def test_begin_warms_the_tts_worker_before_the_turn(monkeypatch):
+    """The session/begin call is the earliest request; it starts the load."""
+    calls = _warm_recorder(monkeypatch)
+    svc = _svc_with_estop_clear()
+    monkeypatch.setattr(VoiceEditService, "_ensure_voice_session",
+                        lambda self, session_id="": {})
+
+    out = svc.begin(request_id="rid-earliest")
+
+    assert out["request_id"] == "rid-earliest"
+    assert calls == [svc.cfg], "begin did not warm the worker"
+
+
+def test_capture_warms_the_tts_worker(monkeypatch):
+    from voicebridge.voice_edit.schema import SelectionSnapshot
+
+    calls = _warm_recorder(monkeypatch)
+    svc = _svc_with_estop_clear()
+    monkeypatch.setattr(VoiceEditService, "_ensure_voice_session",
+                        lambda self, session_id="": {})
+    svc.begin(request_id="rid-cap")
+    snap = SelectionSnapshot(available=True, text="hello", char_count=5)
+
+    def _capture(cfg):
+        return snap
+
+    monkeypatch.setattr(svc.desktop, "capture_selection", _capture)
+    out = svc.capture("rid-cap")
+
+    assert out["ok"] is True
+    assert calls == [svc.cfg, svc.cfg], \
+        "begin and capture must both reach the warm seam (idempotent load)"
+
+
+def test_transform_and_route_warm_before_doing_work(monkeypatch):
+    import types
+
+    calls = _warm_recorder(monkeypatch)
+    svc = _svc_with_estop_clear()
+    monkeypatch.setattr(VoiceEditService, "_require_estop_clear",
+                        lambda self: None)
+    monkeypatch.setattr(VoiceEditService, "_get",
+                        lambda self, rid: types.SimpleNamespace(
+                            request_id=rid, selection=None))
+
+    with pytest.raises(Exception):
+        svc.transform("rid-t", "rewrite this")
+    assert calls == [svc.cfg], "transform did not warm the worker"
+
+    def _boom(self, text):
+        raise RuntimeError("stop after the warm hook")
+
+    monkeypatch.setattr(VoiceEditService, "waveform_ingame_command", _boom)
+    with pytest.raises(RuntimeError):
+        svc.route("rid-r", "hello")
+    assert calls == [svc.cfg, svc.cfg], "route did not warm the worker"
+
+
+def test_repeated_early_hooks_never_start_a_second_load(
+        tmp_path, fake_child, monkeypatch):
+    """begin + capture + ask all call warm; only ONE child is ever spawned."""
+    from voicebridge.voice_edit.schema import SelectionSnapshot
+
+    pidlog = tmp_path / "pids.txt"
+    monkeypatch.setenv("FAKE_PIDLOG", str(pidlog))
+    monkeypatch.setenv("FAKE_READY_S", "0.6")
+    svc = _svc_with_estop_clear()
+    monkeypatch.setattr(VoiceEditService, "_ensure_voice_session",
+                        lambda self, session_id="": {})
+    monkeypatch.setattr(
+        VoiceEditService, "_answer_question_text",
+        lambda self, text, **kw: {"ok": True, "answer": "fast"})
+    snap = SelectionSnapshot(available=True, text="hello", char_count=5)
+    monkeypatch.setattr(svc.desktop, "capture_selection", lambda cfg: snap)
+
+    svc.begin(request_id="rid-one")
+    svc.capture("rid-one")
+    assert svc.ask("fast answer?", request_id="rid-one")["ok"] is True
+
+    assert _wait_until(lambda: SW._WORKER is not None and SW._WORKER.alive(),
+                       timeout=5), "the shared warm-up never finished"
+    assert len(pidlog.read_text().split()) == 1, pidlog.read_text()
+
+
+def test_warm_helper_never_raises(monkeypatch):
+    from voicebridge.voice_edit import service as SVC
+
+    def _boom(cfg):
+        raise RuntimeError("warming failed")
+
+    monkeypatch.setattr(SW, "warm_async", _boom)
+    assert SVC.warm_tts_worker(_DataCfg()) is False
+
+
+# ---------------------------------------------------------------------------
+# unkeyed dashboard speech: transcribe/speak arrival hooks
+# ---------------------------------------------------------------------------
+def test_unkeyed_speak_warms_on_arrival(monkeypatch):
+    calls = _warm_recorder(monkeypatch)
+
+    def _fake_synth(cfg, text, out, *, stopped=None, timeout=60.0):
+        Path(out).write_bytes(b"RIFFworker")
+        return "worker-provider"
+
+    monkeypatch.setattr(SW, "synthesize_cancellable", _fake_synth)
+    status, out = QC.h_audio_speak(_DataCfg(), {}, {"text": "dashboard"}, {})
+    assert status == 200 and out["ok"] is True, out
+    assert len(calls) == 1, "an unkeyed speak did not warm the worker"
+
+
+def test_stopped_keyed_speak_does_not_warm(monkeypatch):
+    calls = _warm_recorder(monkeypatch)
+    svc = _svc(monkeypatch)
+    svc.cancel("rid-stopped")
+    monkeypatch.setattr(
+        SW, "synthesize_cancellable",
+        lambda *a, **k: pytest.fail("a stopped turn must not synthesize"))
+
+    status, out = QC.h_audio_speak(
+        _DataCfg(), {}, {"text": "late", "request_id": "rid-stopped"}, {})
+    assert status == 400 and out["code"] == "AUDIO_SPEAK_CANCELLED", out
+    assert calls == [], "a stopped turn started a load"
+
+
+def test_unkeyed_transcribe_warms_before_asr(monkeypatch):
+    import base64
+
+    calls = _warm_recorder(monkeypatch)
+
+    class _FakeASR:
+        def load(self):
+            pass
+
+        def transcribe(self, path):
+            return type("T", (), {
+                "empty": False, "text": "hello", "provider": "fake-asr",
+                "language": "en", "confidence": 0.9, "duration_s": 0.2})()
+
+    monkeypatch.setattr(QC, "_asr_from_cfg", lambda cfg: _FakeASR())
+    payload = "data:audio/webm;base64," + base64.b64encode(b"fake-audio").decode()
+    status, out = QC.h_audio_transcribe(
+        _DataCfg(), {}, {"data_url": payload, "mime_type": "audio/webm"}, {})
+    assert status == 200 and out["transcript"] == "hello", out
+    assert len(calls) == 1, "an unkeyed transcribe did not warm the worker"

@@ -14,8 +14,21 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+
+@pytest.fixture(autouse=True)
+def _no_background_warm(monkeypatch):
+    """This module pins text sanitization, not worker lifecycle.
+
+    ``h_audio_speak`` now warms the shared worker on arrival; keeping that
+    inert avoids spawning a real model load beside these fake-provider tests.
+    """
+    from voicebridge.tts import synth_worker as SW
+    monkeypatch.setattr(SW, "warm_async", lambda cfg: False)
 
 
 def _cfg(tmp_path, monkeypatch):

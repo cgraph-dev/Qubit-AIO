@@ -8299,6 +8299,12 @@ def h_audio_transcribe(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not (norm.startswith("audio/") or norm == "video/webm"):
         return _gate("AUDIO_BAD_PAYLOAD",
                      "payload must be an audio recording", counterpart, 400)
+    # Unkeyed dashboard voice turn: this transcribe request is the earliest
+    # signal before the reply and its spoken output. Warm the shared killable
+    # TTS child while the audio decodes and ASR runs, so a dashboard reply
+    # after an idle reap is spoken from a warm worker. Non-blocking, no-op when
+    # already warm/loading, and it never loads a provider in this process.
+    _warm_tts_worker(cfg)
     # Cap the ENCODED length before decoding so an oversized body cannot force
     # a huge base64 allocation (25 MiB decoded ~= 33.4 MiB encoded).
     if len(encoded) > (_AUDIO_MAX_UPLOAD_BYTES // 3) * 4 + 8:
@@ -8400,6 +8406,20 @@ def _speak_turn_stopped(cfg: Any, request_id: str) -> bool:
         return False
 
 
+def _warm_tts_worker(cfg: Any) -> bool:
+    """Best-effort background warm-up of the killable TTS worker.
+
+    Thin wrapper over ``voice_edit.service.warm_tts_worker`` so this module
+    stays import-light and a warming fault can never break an audio request.
+    Never raises; ``False`` on any failure or when the worker path is off.
+    """
+    try:
+        from .voice_edit.service import warm_tts_worker
+        return bool(warm_tts_worker(cfg))
+    except Exception:  # noqa: BLE001 - warming is an optimization only
+        return False
+
+
 def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/audio/speak -> local TTS rendered as a base64 data URL.
@@ -8438,6 +8458,13 @@ def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _gate("AUDIO_SPEAK_CANCELLED",
                      "the turn was stopped before speech started",
                      counterpart, 400)
+    # Unkeyed dashboard speech has no voice-edit begin/capture of its own, so
+    # this request is the earliest hook available to it. Starting the load
+    # here is non-blocking and a no-op when the worker is already warm/loading;
+    # it does not change the synth wait for THIS first cold request, but it
+    # covers the unkeyed flow when a preceding transcribe/voice request already
+    # warmed the shared child. A stopped turn is skipped (no load after STOP).
+    _warm_tts_worker(cfg)
     out = Path(tempfile.gettempdir()) / (
         f"qubit-runtime-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
     try:

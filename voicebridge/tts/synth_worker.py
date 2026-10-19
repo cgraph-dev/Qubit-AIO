@@ -24,10 +24,13 @@ Shape:
     (default 300; ``0`` disables) so the extra model copy is not pinned in
     memory forever on an idle service. A reap only ever costs the next
     reply's load, never interruptibility or correctness;
-  * ``warm_async`` lets a KEYED ask turn begin that load in the background
-    while the brain is still thinking, so the first reply after an idle reap
-    is warm without pinning the model while the service is idle. It never
-    blocks the turn, never raises, and never starts a second load.
+  * ``warm_async`` lets the EARLIEST voice request that precedes a reply
+    begin that load in the background — the keyed voice-edit ``begin`` /
+    ``capture`` / ``transform`` / ``route`` hooks, the direct keyed ``ask``,
+    and the unkeyed dashboard ``/api/audio/transcribe`` / ``/api/audio/speak``
+    arrival — so the model loads while the mic, STT, router and brain work and
+    a fast deterministic answer still finds a warm worker. It never blocks
+    the turn, never raises, and never starts a second load.
 
 Safety: the child gets the config DATA over a pipe (never argv/env, so no
 secrets appear in the process list) and runs in its own session, so a stop
