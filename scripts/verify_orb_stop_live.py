@@ -2135,9 +2135,15 @@ def run_helper_speak(*, text: str = "Qubit helper live stop test.",
         except Exception:  # noqa: BLE001
             pass
         for ev in new_events:
-            if ev.get("type") == "playback.started":
-                started = ev
-                break
+            if ev.get("type") != "playback.started":
+                continue
+            raw_ts = ev.get("ts")
+            if (isinstance(raw_ts, (int, float))
+                    and not isinstance(raw_ts, bool)
+                    and float(raw_ts) + 0.5 < t_req):
+                continue  # an older boundary cannot be this request's playback
+            started = ev
+            break
         if started is not None:
             break
         sleep_fn(0.05)
