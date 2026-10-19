@@ -1,12 +1,13 @@
 # Qubit VoiceBridge
 
-> 📘 **Read `docs/VOICE_BRIDGE_SYSTEM.md`** for the full system map, what we
-> cherry-picked from open-source (CopilotKit/AirLLM/OpenSandbox), the roadmap,
-> and the "smarter model" plan.
-> 🧠 **Read `docs/STEAL_LIST.md`** for a focused speed / smarter / minimal-VRAM
-> steal-list (specific techniques we can lift from each source and implement).
-> 🔊 **Read `docs/AUDIO_SETUP.md`** for the working HyperX audio config (mic + output)
-> — read this FIRST before touching any audio/mic/TTS setting.
+> 📘 **Docs index:** `docs/README.md` lists every authoritative doc and what each is for.
+> 🔊 **Audio:** read `config/voice.example.yaml` (`output_device` stays EMPTY,
+> `speak_web_locally: false`) **before** touching any audio/mic/TTS setting.
+>
+> The three docs previously linked here (`docs/VOICE_BRIDGE_SYSTEM.md`,
+> `docs/STEAL_LIST.md`, `docs/AUDIO_SETUP.md`) were purged in `eafb54e26` and no
+> longer exist. Do not cite them; retrieve from git history
+> (`git show eafb54e26^:<path>`) only if you need the historical text.
 
 A **production-style local voice interface for Qubit Agent (Qubit VoiceBridge)** — push-to-talk,
 natural speech in, spoken results out. Built for an **RTX 3070 Ti 8 GB** box
