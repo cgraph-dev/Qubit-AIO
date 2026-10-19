@@ -71,6 +71,7 @@ STATES = ("idle", "listening", "speaking")
 #: ``mark_field`` attribute after import would NOT affect the painter (the
 #: binding is already resolved), so the renderer seam is the ``mark`` attribute.
 LAYERS = (
+    ("haze_state", "_field_haze"),
     ("volume_particles", "_field_volume_particles"),
     ("accretion_stream", "_field_accretion_stream"),
     ("photon_ring", "_field_photon_ring"),
