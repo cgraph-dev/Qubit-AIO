@@ -1022,7 +1022,11 @@ class TurnRunner:
         # display.platforms.<plat>.streaming may disable streaming per platform; None = follow global.
         plat_streaming = ctx.resolve_display_setting(ctx.user_config, platform_key, "streaming")
         want_stream_deltas = not ctx.scheduled_heartbeat and scfg.enabled_for(plat_streaming)
-        want_interim_messages = bool(ctx.interim_assistant_messages_enabled) and not ctx.scheduled_heartbeat
+        # A finite (`-z`, `chat -q`) viewer prints only the terminal reply, like the classic quiet
+        # CLI that never wired commentary. Commentary it cannot see must not be recorded as a
+        # delivery, or a final that arrives as commentary (codex app-server) suppresses the reply.
+        want_interim_messages = (bool(ctx.interim_assistant_messages_enabled) and not ctx.scheduled_heartbeat
+                                 and not _finite_viewer_turn())
         if want_stream_deltas or want_interim_messages:
             try:
                 from gateway.stream_consumer import GatewayStreamConsumer
@@ -1066,9 +1070,17 @@ class TurnRunner:
         stream_delta_cb = None
         if delta_sinks:
             def stream_delta_cb(text: Optional[str]) -> None:
-                if ctx._run_still_current():
-                    for sink in delta_sinks:
-                        sink.on_delta(text)
+                if not ctx._run_still_current():
+                    return
+                delivered = bool(delta_sinks)
+                for sink in delta_sinks:
+                    sink.on_delta(text)
+                if text is not None and (not delivered or _finite_viewer_turn()):
+                    # Nobody the user is looking at saw this text: no live viewer/observer/adapter
+                    # sink, or a finite (`-z`, `chat -q`) viewer, which prints the terminal reply
+                    # only. The agent must treat it as undelivered, else a stream that dies here is
+                    # stitched as a "partial delivery" nobody received (classic -q parity).
+                    raise _NoStreamConsumer()
 
         def interim_assistant_cb(text: str, *, already_streamed: bool = False) -> None:
             if not ctx._run_still_current():
@@ -1814,8 +1826,19 @@ class TurnRunner:
             if ctx.inbound_message_id is not None:
                 kwargs["persist_user_platform_id"] = str(ctx.inbound_message_id)
             from agent.notification_presentation import notification_turn
+            from gateway.session_results import execution_result
+            captured = execution_result.get()
+            before = (getattr(agent, 'session_prompt_tokens', 0) or 0,
+                      getattr(agent, 'session_completion_tokens', 0) or 0)
             with notification_turn(agent, muted=ctx.mute_notification_reply, session_id=ctx.session_id or ""):
-                return agent.run_conversation(api_message, **kwargs)
+                result = agent.run_conversation(api_message, **kwargs)
+            if captured is not None:
+                incoming = max(0, (getattr(agent, 'session_prompt_tokens', 0) or 0) - before[0])
+                outgoing = max(0, (getattr(agent, 'session_completion_tokens', 0) or 0) - before[1])
+                captured['usage'] = {'input_tokens': incoming, 'output_tokens': outgoing,
+                                     'total_tokens': incoming + outgoing}
+                _settle_api_runtime_lock(agent, result, captured)
+            return result
         finally:
             unregister_gateway_notify(session_key)
             # Cancel pending clarify entries so blocked agent threads don't hang past the end of the
@@ -2036,8 +2059,16 @@ class TurnRunner:
         self._wire_turn_agent_callbacks(agent, turn_route, reasoning_config, stream_delta_cb, interim_cb, want_interim)
         agent_history, observed_group_context, history_media_paths = self._load_turn_history(agent, reused_cached_agent)
         persist_msg, persist_ts = self._prepare_turn_message(agent_history)
+        compressions = getattr(getattr(agent, "context_compressor", None), "compression_count", None)
         result = self._run_conversation_with_approval(agent, agent_history, observed_group_context, persist_msg, persist_ts)
+        persisted_turn = _persisted_turn(agent, agent_history, result, compressions)
         self._finish_stream_consumer(result, agent_history, stream_consumer)
+        if _finite_viewer_turn() and getattr(agent, "_codex_session", None) is not None:
+            # The classic `chat -q` process exit bounded the codex app-server child; a finite turn
+            # hosted here must too, or every one-shot leaves one running until the idle-TTL sweep.
+            # Like a fresh process, the next turn respawns it and resumes the stored thread.
+            agent._close_codex_session()
+            agent._codex_session_prompt = None
         # The streaming-TTS consumer's finish() runs on the outer loop thread after the executor
         # returns, so early run_sync returns are also finalised.
         # See the outer finally/completion section below. See #60671.
@@ -2052,6 +2083,10 @@ class TurnRunner:
             "output_tokens": getattr(agent, "session_completion_tokens", 0) if has_comp else 0,
             "model": getattr(agent, "model", None) if agent else None,
             "context_length": (getattr(comp, "context_length", 0) or 0) if has_comp else 0,
+            # The rest of the `-z --usage-file` ledger (qubit_cli/oneshot._USAGE_KEYS): a finite
+            # viewer reads the committed result over `prompt.receipt`, so the projection must keep
+            # what the in-process one-shot took straight from `run_conversation`.
+            **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS if key in result},
         }
         compacted_in_place, effective_session_id, history_offset = self._sync_session_after_run(agent_history)
         # failure_reason must survive the empty-response path too (TUI billing, transient-failure
@@ -2069,6 +2104,7 @@ class TurnRunner:
             "tools": ctx.tools_holder[0] or [],
             "history_offset": history_offset, "compacted_in_place": compacted_in_place, "session_id": effective_session_id,
             **usage,
+            **({"persisted_turn": persisted_turn} if persisted_turn else {}),
         }
         if not final_response:
             final_response = _normalize_empty_agent_response(result, final_response or "", history_len=len(agent_history))
