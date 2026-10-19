@@ -579,30 +579,19 @@ def _strip_moving_layers(monkeypatch):
     return part
 
 
-def _thick_trail():
-    """A synthetic two-sample trail thick enough to be an unmistakable wake."""
-    return [
-        {"x": 0.0, "y": 0.0, "hue": 0.5, "sat": 1.0, "val": 1.0,
-         "alpha": 1.0, "size": 3.0, "depth": 0.5},
-        {"x": 20.0, "y": 0.0, "hue": 0.5, "sat": 1.0, "val": 1.0,
-         "alpha": 1.0, "size": 3.0, "depth": 0.5},
-    ]
-
-
-def test_no_travelling_body_draws_a_wake(monkeypatch):
-    # Owner 2026-10-19: "you didnt replace the L and V's". The renderer must
-    # never consult the field's trail builders: point them at a thick synthetic
-    # trail and the frame is byte-identical to their absence.
+def test_no_travelling_body_draws_a_wake():
+    # Owner 2026-10-19: "you didnt replace the L and V's". The wake-trail API
+    # is retired outright, so there is no field builder left to consult.
+    from voicebridge.orb import mark_field as F
+    for name in ("rgb_trail", "dust_trail", "_rgb_trail"):
+        assert not hasattr(M, name), name
+        assert not hasattr(F, name), name
     full, _ = render(1.7)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: _thick_trail())
-    monkeypatch.setattr(M, "dust_trail", lambda *a, **k: _thick_trail())
-    bare, _ = render(1.7)
-    assert full.lines == bare.lines and full.ovals == bare.ovals
+    assert full is not None
 
 
 def test_a_body_draws_its_star_without_a_wake(monkeypatch):
     part = _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: _thick_trail())
     c, _ = render(1.7)
     assert not _segments(c), "the body left no wake"
     # The body itself is still drawn: its glint core is a single pinprick at
@@ -636,21 +625,10 @@ def test_a_live_frame_has_no_bent_wakes(monkeypatch):
 
 def test_reduced_motion_draws_no_wake_at_all(monkeypatch):
     _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: _thick_trail())
     live, _ = render(1.7)
     frozen, _ = render(1.7, reduced=True)
     assert not _segments(live)
     assert not _segments(frozen)
-
-
-def test_a_long_field_trail_is_ignored(monkeypatch):
-    # Even a nine-sample field trail draws nothing now: the whole ribbon layer
-    # is gone, not merely truncated.
-    _strip_moving_layers(monkeypatch)
-    monkeypatch.setattr(M, "rgb_trail", lambda *a, **k: [
-        dict(_thick_trail()[0], x=float(k)) for k in range(9)])
-    c, _ = render(1.7)
-    assert not _segments(c)
 
 
 def test_a_glint_carries_no_halo(monkeypatch):

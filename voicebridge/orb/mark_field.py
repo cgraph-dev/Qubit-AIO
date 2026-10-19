@@ -21,9 +21,6 @@ Layers, back to front:
   * ``sparkles``        — short-lived deterministic glints across the plane.
   * ``blink_dots``      — pinpricks that materialise in place and vanish.
   * ``flare_dots``      — a second, rarer family of larger flare blinks.
-  * ``rgb_trail``       — the spectrum streak each star LEAVES instead of an
-    outer glow: hue walks the wheel along the tail and with the clock, and
-    ``hue_to_rgb`` is the one colour conversion both renderers use.
   * ``core_shells``     — the nucleus's INTERIOR structure: nested bodies at
     different radii and tilts, each turning at its own period.
   * ``filament_state``  — a travelling standing wave running around a ring.
@@ -332,53 +329,28 @@ SPARKLE_SIZE_PEAK = 0.110
 SPARKLE_LIFT = 0.60
 
 
-# ------------------------------------------------------------- RGB streaks
-#: Owner: the stars carried a soft OUTER AURA; they should leave a TRAIL
-#: instead. A trail is a polyline whose hue ROTATES along its own length and
-#: with the clock, so one star leaves a spectrum streak rather than sitting
-#: inside a halo. The field emits the samples; a renderer strokes them in
-#: order with :func:`hue_to_rgb` per sample.
-RGB_TRAIL_SAMPLES = 9
-RGB_TRAIL_STEP_NEAR_DEG = 5.5
-RGB_TRAIL_STEP_FAR_DEG = 3.6
-RGB_TRAIL_STEP_PX = 2.8          # per sample, for bodies that carry a velocity
-RGB_TRAIL_ALPHA_BASE = 0.62
-RGB_TRAIL_SIZE_BASE = 0.85
-RGB_TRAIL_TAPER = 0.78
-RGB_TRAIL_FALLOFF = 1.25
-#: Hue turns along the trail (one turn = the full spectrum) and per second of
-#: clock, so the streak is never a static painted gradient.
-RGB_TRAIL_HUE_STEP = 0.055
-RGB_TRAIL_HUE_DRIFT = 0.018
-#: Owner: two colours per streak, not a rainbow. Every streak is a DUOTONE:
-#: a head hue and exactly one partner ``HUE_PAIR_OFFSET`` of a turn away, and
-#: every sample's hue is the lerp between the two — two hues per streak by
-#: construction. ``_hue_pair`` is the one place the partner is computed.
+# --------------------------------------------------- duotone hue + matte band
+#: Owner: two colours per element, not a rainbow. Every duotone pair is a head
+#: hue and exactly one partner ``HUE_PAIR_OFFSET`` of a turn away.
 #:
 #: The partner is a NEARBY hue (a fraction of a turn), NOT the opposite colour.
 #: A half-turn partner (the original 0.5) made the lerp between the two ends
 #: sweep straight through the whole wheel — cyan -> green -> yellow -> red — so
-#: every streak was a full rainbow and the mark read "too coloured" (owner
-#: 2026-10-18). A small offset keeps the streak two neighbouring tints of ONE
+#: every body was a full rainbow and the mark read "too coloured" (owner
+#: 2026-10-18). A small offset keeps the pair two neighbouring tints of ONE
 #: colour family, so the mark stays a couple of colours total. Owner follow-up
 #: ("more professional"): the offset is tightened again so even the two-tone
 #: walk stays inside one hue family rather than crossing into a neighbour.
 HUE_PAIR_OFFSET = 0.045
-#: Saturation of a streak. Lowered from the neon 0.90 the owner called "too
-#: colored": most bodies now sit in the 0.62..0.82 band, a restrained, matte
-#: look rather than a saturated glow. The HEAD of every streak is pulled
-#: further toward white (see ``RGB_TRAIL_WHITE_FRAC``) so each body carries a
-#: neutral highlight and only its tail keeps colour — the "professional"
-#: highlight/lowlight split rather than a coloured blob.
+#: Restrained saturation shared by the body dot families and the photon ring.
+#: Lowered from the neon 0.90 the owner called "too colored": bodies sit in a
+#: matte band rather than a saturated glow.
 RGB_TRAIL_SAT_BASE = 0.62
-RGB_TRAIL_SAT_SPAN = 0.20
-#: How far toward white (zero saturation) the HEAD of a streak is pulled;
-#: 0.0 = fully coloured head, 1.0 = white head. Falls off along the tail, so
-#: only the leading edge reads as a neutral specular highlight.
-RGB_TRAIL_WHITE_FRAC = 0.55
-RGB_TRAIL_VAL_BASE = 1.00
+#: Hue drift per second of clock applied to a travelling body's tail, so the
+#: tail is never a static painted gradient.
+RGB_TRAIL_HUE_DRIFT = 0.018
 #: Body hues live in a band around the mark's own cyan/violet so a field of
-#: them still reads as ONE mark; the trail then walks the wheel away from it.
+#: them still reads as ONE mark.
 #: Kept for API compatibility; body hues now come from :data:`PALETTE_HUES`
 #: through :func:`palette_hue`, not from this band.
 PARTICLE_HUE_BASE = 0.52
@@ -390,18 +362,11 @@ PARTICLE_HUE_SPAN = 0.34
 #: fixed set — now just TWO adjacent cool hues, the mark's own cyan and the
 #: azure next to it — and :func:`palette_hue` is the ONE place a body hue is
 #: chosen, so the whole field carries at most two colours. The duotone partner
-#: still comes from :func:`_hue_pair` (a small nearby offset), so streaks stay
-#: two-colour. The breadth moved OUT of the hue axis and INTO value/warmth:
-#: the neutral white heads carry the highlights the extra hues used to.
+#: still comes from :func:`_hue_pair` (a small nearby offset), so each body
+#: stays two-colour. The breadth moved OUT of the hue axis and INTO
+#: value/warmth: restrained value steps carry the highlights the extra hues
+#: used to.
 PALETTE_HUES: Tuple[float, ...] = (0.54, 0.60)
-
-#: The short version for the dense field (dust and glints): fewer samples,
-#: dimmer and shorter, so 30 motes do not turn into 30 comets.
-DUST_TRAIL_SAMPLES = 4
-DUST_TRAIL_STEP_PX = 1.5
-DUST_TRAIL_ALPHA_BASE = 0.22
-DUST_TRAIL_SIZE_BASE = 0.70
-DUST_TRAIL_HUE_STEP = 0.09
 
 
 # ------------------------------------------------------------------ helpers
@@ -481,128 +446,6 @@ def _orbit_velocity(rx: float, ry: float, tilt_deg: float,
     x0, y0 = orbit_point(0.0, 0.0, rx, ry, tilt_deg, ang_deg - h)
     x1, y1 = orbit_point(0.0, 0.0, rx, ry, tilt_deg, ang_deg + h)
     return ((x1 - x0) / (2.0 * h), (y1 - y0) / (2.0 * h))
-
-
-def _rgb_trail(t: Any, R: float, body: Dict[str, Any], samples: int,
-               step_deg: float, step_px: float, alpha_base: float,
-               size_base: float, hue_step: float) -> List[Dict[str, float]]:
-    """Shared streak builder behind :func:`rgb_trail` and :func:`dust_trail`.
-
-    Sample 0 sits ON the body, the rest trail behind it. A body that carries an
-    orbit angle is sampled back along the orbit (the streak stays on the path);
-    any other body is back-projected along its own ``vx``/``vy``.
-
-    Duotone: the streak's pair is the drifted head hue and its
-    :func:`_hue_pair` partner, and sample ``k`` is the lerp between them —
-    exactly two hues per streak, never a spectrum walk. ``hue_step`` is kept
-    for signature compatibility only.
-    """
-    tt = _finite(t)
-    r = _finite(R, 32.0) or 32.0
-    n = max(1, int(samples))
-    body = body if isinstance(body, dict) else {}
-    dx, dy = camera_offset(tt, r)
-    idx = body.get("index", 0.0)
-    base_hue = _finite(body.get("hue"), -1.0)
-    if not 0.0 <= base_hue <= 1.0:
-        base_hue = _hue_for(idx, 31.7)
-    # The pair drifts with the clock TOGETHER: both endpoints shift by the
-    # same amount, so the half-turn relationship survives every moment.
-    head = (base_hue + tt * RGB_TRAIL_HUE_DRIFT) % 1.0
-    tail = _hue_pair(head)
-    sat = RGB_TRAIL_SAT_BASE + RGB_TRAIL_SAT_SPAN * hash01(
-        int(_finite(idx)) + 1, 43.1)
-    # The streak breathes with its body: a twinkling star's trail dims with it.
-    strength = _finite(body.get("glint_alpha"), 1.0)
-    strength = min(1.0, max(0.0, strength))
-    size = abs(_finite(body.get("size"), 1.0))
-    ang0 = body.get("angle")
-    orbit = str(body.get("orbit") or "") if ang0 is not None else ""
-    bx, by = _finite(body.get("x")), _finite(body.get("y"))
-    vx = _finite(body.get("vx"), 0.0)
-    vy = _finite(body.get("vy"), 0.0)
-    speed = math.hypot(vx, vy)
-    if speed > 1e-9:
-        vx, vy = vx / speed, vy / speed
-    else:
-        vx = vy = 0.0
-    near_tilt, far_tilt = orbit_tilts(tt)
-    out: List[Dict[str, float]] = []
-    for k in range(n):
-        f = k / float(n)
-        if k == 0:
-            # The head rides ON the body, so the streak starts exactly at the
-            # rendered star and inherits its camera sway and parallax.
-            x, y, depth = bx, by, _finite(body.get("depth"), 0.5)
-        elif orbit:
-            tilt = near_tilt if orbit == "a" else far_tilt
-            ang = _finite(ang0) - k * step_deg
-            depth = _depth(ang)
-            pull = 1.0 - DEPTH_PERSPECTIVE * (1.0 - depth)
-            x, y = orbit_point(0.0, 0.0, r * RX_FRAC * pull,
-                               r * RY_FRAC * pull, tilt, ang)
-            x += dx
-            y += dy
-        elif vx or vy:
-            dist = k * step_px * (r / 32.0)
-            depth = _finite(body.get("depth"), 0.5)
-            x, y = bx - vx * dist, by - vy * dist
-        else:
-            # No path and no velocity: hold the body's place rather than invent
-            # a direction, so a hand-built dict still yields a usable streak.
-            x, y, depth = bx, by, _finite(body.get("depth"), 0.5)
-        tz, tz2 = _volume_axes(tt, int(_finite(idx)) + k, 123.4)
-        out.append({
-            "k": float(k),
-            "x": x, "y": y,
-            "hue": (head + (k / float(n - 1) if n > 1 else 0.0)
-                    * HUE_PAIR_OFFSET) % 1.0,
-            "hue2": tail,
-            "sat": max(0.0, min(1.0,
-                               sat * (1.0 - RGB_TRAIL_WHITE_FRAC * (1.0 - f)))),
-            "val": RGB_TRAIL_VAL_BASE * (1.0 - 0.25 * f),
-            "alpha": alpha_base * strength * ((1.0 - f) ** RGB_TRAIL_FALLOFF),
-            "size": size * size_base * (1.0 - RGB_TRAIL_TAPER * f),
-            "depth": depth,
-            "z": tz, "z2": tz2,
-            "dof": dof(depth),
-        })
-    return out
-
-
-def rgb_trail(t: Any, R: float, particle: Dict[str, Any]) -> List[Dict[str, float]]:
-    """The duotone streak behind one orbiting star.
-
-    ``RGB_TRAIL_SAMPLES`` samples, head first: ``{"x", "y", "hue", "hue2",
-    "sat", "val", "alpha", "size", "depth", "dof", "k"}``. ``hue``/``hue2``
-    are the streak's pair in TURNS (feed ``hue`` to :func:`hue_to_rgb`): the
-    head's drifted hue and its half-turn partner, lerped along the tail, so
-    one star leaves a two-colour streak. The pair drifts with the clock, so
-    the tail is alive rather than a painted gradient. A particle dict from
-    :func:`particle_state` works as-is; any dict with ``x``/``y``/``vx``/``vy``
-    streaks along its own velocity.
-
-    Hue wraps at 1.0 like the colour wheel does: convert per sample with
-    :func:`hue_to_rgb` and do not lerp hue linearly across the wrap.
-    """
-    body = particle if isinstance(particle, dict) else {}
-    orbit = str(body.get("orbit") or "a")
-    return _rgb_trail(t, R, particle, RGB_TRAIL_SAMPLES,
-                      RGB_TRAIL_STEP_NEAR_DEG if orbit == "a"
-                      else RGB_TRAIL_STEP_FAR_DEG,
-                      RGB_TRAIL_STEP_PX, RGB_TRAIL_ALPHA_BASE,
-                      RGB_TRAIL_SIZE_BASE, RGB_TRAIL_HUE_STEP)
-
-
-def dust_trail(t: Any, R: float, mote: Dict[str, Any]) -> List[Dict[str, float]]:
-    """The short duotone streak for a dust mote or a sparkle.
-
-    Same sample dict as :func:`rgb_trail`, four samples and much dimmer, so a
-    dense field gains colour without gaining a comet per mote.
-    """
-    return _rgb_trail(t, R, mote, DUST_TRAIL_SAMPLES, 0.0,
-                      DUST_TRAIL_STEP_PX, DUST_TRAIL_ALPHA_BASE,
-                      DUST_TRAIL_SIZE_BASE, DUST_TRAIL_HUE_STEP)
 
 
 #: Memo for ``hash01``. Every field layer hashes each element's INDEX with a
@@ -1569,8 +1412,8 @@ def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
     * ``depth`` is the shared shading / z-split scalar; ``z``/``z2`` are two
       INDEPENDENT volume axes (see :func:`depth_axes`), so a renderer can build
       a true 3D cloud instead of one scalar.
-    * ``vx``/``vy`` are the screen velocity per second, so a renderer can streak
-      the particle through :func:`rgb_trail`.
+    * ``vx``/``vy`` are the screen velocity per second, so a renderer can
+      orient the particle or draw its own small motion tail.
     * ``pulse`` in 0..1 is the body's own twinkle animation (size and alpha
       already carry it); ``spin`` in 0..360 is its own rotation angle for a 3D
       body. Both are per-body, deterministic and non-harmonic.
@@ -2538,8 +2381,8 @@ def photon_ring(t: Any, R: float) -> List[Dict[str, Any]]:
 #: Fast radial streaks falling toward the core: the third piece of the
 #: "blackhole" structure the owner asked for. Each streak carries an inward
 #: velocity (``vx``/``vy``) and a ``tail_len`` the renderer can draw as a
-#: tapering streak (or feed to :func:`rgb_trail`, which uses ``vx``/``vy``),
-#: so the field reads as matter falling IN rather than orbiting forever.
+#: tapering streak, so the field reads as matter falling IN rather than
+#: orbiting forever.
 INFALL_COUNT = 14
 INFALL_R_OUT_FRAC = 1.00
 INFALL_R_IN_FRAC = 0.20
@@ -2867,7 +2710,7 @@ def screen_break(t: Any, R: float) -> List[Dict[str, Any]]:
         zunit = v * math.sin(inc)
         depth = min(1.0, max(0.0, 0.5 + 0.5 * zunit))
         # Screen velocity per second (the dt of the orbit), so a renderer can
-        # streak the body through :func:`_rgb_trail`.
+        # draw the body's own motion tail.
         vx = -rad * v * rate
         vy = rad * u * math.cos(inc) * rate
         wx, wy = micro_offset(tt, idx, r, 619.9)
@@ -2926,10 +2769,8 @@ __all__ = [
     "VOLUME_LIFT_BASE", "VOLUME_LIFT_GAIN", "VOLUME_PULSE_PERIOD_BASE",
     "VOLUME_PULSE_PERIOD_SPAN", "VOLUME_SPIN_PERIOD_BASE",
     "VOLUME_SPIN_PERIOD_SPAN",
-    "hue_to_rgb", "rgb_trail", "dust_trail", "RGB_TRAIL_SAMPLES",
-    "RGB_TRAIL_HUE_STEP", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_ALPHA_BASE",
-    "RGB_TRAIL_WHITE_FRAC", "RGB_TRAIL_SAT_BASE", "RGB_TRAIL_SAT_SPAN",
-    "DUST_TRAIL_SAMPLES", "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
+    "hue_to_rgb", "RGB_TRAIL_HUE_DRIFT", "RGB_TRAIL_SAT_BASE",
+    "PARTICLE_HUE_BASE", "PARTICLE_HUE_SPAN",
     "PALETTE_HUES", "palette_hue", "_hue_for",
     "HUE_PAIR_OFFSET", "_hue_pair",
     "dof", "DOF_NEAR", "DOF_FAR", "DOF_GAMMA", "skew", "SKEW_GAIN_DEG",

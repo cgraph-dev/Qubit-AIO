@@ -131,8 +131,6 @@ from .mark_field import (
     binary_state,
     hue_to_rgb,
     palette_hue,
-    rgb_trail,
-    dust_trail,
     ring_geometry,
     ring_path,
     ring_alpha,
@@ -1545,8 +1543,8 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         """One logo particle: the star itself, with no wake.
 
         Owner 2026-10-19: the thick bent trail ribbons ("L and V's") are gone.
-        The field still exposes ``rgb_trail`` for renderers that want it; this
-        painter deliberately does not stroke it.
+        The field's wake-trail builders are retired too, so this painter draws
+        the star itself and no wake.
 
         The field's new ``glint.flicker`` is already folded into the particle's
         ``glint_scale``/``glint_alpha`` (and its ``wobble`` into x/y) at source,
@@ -1901,9 +1899,9 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
         """
         depth = _num(comet_info.get("depth"), 0.5)
         hue0 = _num(comet_info.get("hue"))
-        # The drifted head hue and its half-turn partner: the pair the field's
-        # own streak builder lerps between, read defensively so a hand-built
-        # comet dict still yields a usable tail.
+        # The drifted head hue and its half-turn partner: the duotone pair the
+        # field carries on every body, read defensively so a hand-built comet
+        # dict still yields a usable tail.
         head = (hue0 + tt * RGB_TRAIL_HUE_DRIFT) % 1.0
         try:
             tail_hue = float(comet_info.get("hue2"))
@@ -2370,7 +2368,7 @@ __all__ = [
     "nucleus_sparks", "NUCLEUS_SPARK_COUNT", "NUCLEUS_SPARK_REACH",
     "inner_ring_tilt", "binary_state", "INNER_RING_RX_FRAC", "BINARY_COUNT",
     "blink_dots", "BLINK_COUNT", "spin_angles",
-    "hue_to_rgb", "rgb_trail", "dust_trail", "ring_geometry", "ring_path",
+    "hue_to_rgb", "ring_geometry", "ring_path",
     "ring_alpha", "ring_tilt_spin", "ring_radius_scale",
     "core_shells", "CORE_SHELL_COUNT", "flare_dots", "FLARE_COUNT",
     "filament_state", "FILAMENT_SAMPLES",

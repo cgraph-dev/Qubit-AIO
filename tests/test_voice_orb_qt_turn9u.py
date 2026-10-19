@@ -9,8 +9,7 @@ the live Qt renderer that no other module pins:
                   reduced motion.
   (b) GEOMETRY  — every circle the painter strokes comes from the field's
                   single declared ``ring_geometry`` list.
-  (c) SPECTRUM  — a star leaves a streak (no halo), the streak is what the
-                  field's ``rgb_trail`` / ``dust_trail`` describe, and its
+  (c) SPECTRUM  — a star is drawn as a glint with no halo or wake, and its
                   colour comes from the FIELD's colour wheel, not from HSV
                   maths duplicated in the renderer.
 
@@ -561,7 +560,7 @@ def test_no_chromatic_fringe_anywhere():
 # --------------------------------------------------------------------------- #
 # (c) NO wake ribbons — owner 2026-10-19: the 3-point "RGB trail" ribbons
 # read as thick bent L/V check-mark sticks and are gone from the Qt painter.
-# The field still publishes ``rgb_trail``/``dust_trail`` for API compatibility.
+# The field's trail builders are retired with them.
 # --------------------------------------------------------------------------- #
 def _streak_prims(t, size=192, reduced=False):
     """Filled PATHS away from the nucleus: the old wake ribbons' slot."""
@@ -592,26 +591,13 @@ def test_no_wake_ribbon_helper_or_constants_survive():
         assert "char" not in part
 
 
-def test_field_trails_do_not_reach_the_frame(monkeypatch):
-    """The field may keep publishing trails; the painter must ignore them."""
+def test_field_trails_are_retired():
+    """The dead wake-trail API is gone from the field and the painter."""
     from voicebridge.orb import mark_field as F
 
-    t, size = 0.42, 192
-
-    def _wide(tt, rr, body):
-        return [{"x": 12.0 * k, "y": 3.0 * k, "hue": 0.5, "sat": 1.0,
-                 "val": 1.0, "alpha": 0.9, "size": 2.0, "depth": 0.5,
-                 "dof": 0.0, "k": float(k)} for k in range(9)]
-
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(F, "rgb_trail", _wide)
-        m.setattr(F, "dust_trail", _wide)
-        wide = _paint(t=t, size=size)
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(F, "rgb_trail", lambda *a, **k: [])
-        m.setattr(F, "dust_trail", lambda *a, **k: [])
-        bare = _paint(t=t, size=size)
-    assert _diff(wide, bare) == 0
+    for name in ("rgb_trail", "dust_trail", "_rgb_trail"):
+        assert not hasattr(F, name), name
+    assert _paint(t=0.42, size=192) is not None
 
 
 def test_reduced_motion_leaves_no_ribbons():
@@ -629,11 +615,9 @@ def test_comet_beads_walk_the_duotone_pair_not_a_ramp():
 
     t, size = 5.0, 192
     plain = _paint(t=t, size=size)
-    # The old HUE_STEP ramp is dead: changing it must not move a pixel.
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(F, "RGB_TRAIL_HUE_STEP", 999.0)
-        assert _diff(plain, _paint(t=t, size=size)) == 0
-    # ...while the pair's second hue drives the beads: moving hue2 moves ink.
+    # The old HUE_STEP ramp is retired with the trail API: no constant remains.
+    assert not hasattr(F, "RGB_TRAIL_HUE_STEP")
+    # The pair's second hue drives the beads: moving hue2 moves ink.
     real = F.comet
 
     def shifted(tt, rr):
