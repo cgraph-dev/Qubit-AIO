@@ -77,6 +77,30 @@ Usage:
     .venv/bin/python scripts/check_dead_symbols.py
     .venv/bin/python scripts/check_dead_symbols.py --json out.json -v
     .venv/bin/python scripts/check_dead_symbols.py --root /tmp/scratch-copy
+
+NEGATIVE CONTROL (run this after changing the detector; a checker that cannot be
+made to fire proves nothing). The control must be INJECTED, never a real symbol:
+deleting the call site of a real symbol (`_claim_launch_home`) once FAILED to flag
+it, because a probe file in the tree still read the name -- a contaminated
+control, not a defect. Use a fresh name upstream reads and we do not define:
+
+  1. copy the tree:      cp -a qubit_runtime $SCRATCH/qubit_runtime
+                         mkdir -p $SCRATCH/scripts
+                         cp scripts/frozen_target_progress.py $SCRATCH/scripts/
+  2. add a def + ONE call site, with a name absent from our tree but read
+     upstream (find one with:
+       git -C ~/upstream/hermes-agent grep -o '^def _[a-z_]*' <pin> -- '*.py')
+     $SCRATCH/qubit_runtime/_negctl_target.py:
+         def _abort_at_the_commit_fence(reason): return reason
+     $SCRATCH/qubit_runtime/_negctl_caller.py:
+         from _negctl_target import _abort_at_the_commit_fence
+         def use_it(): return _abort_at_the_commit_fence("smoke")
+  3. --root $SCRATCH  -> the symbol must NOT be listed (it has a call site)
+  4. delete the call site from _negctl_caller.py and re-run
+     -> dead count +1 and the symbol IS listed
+
+Measured: 301 -> 302 with the call site removed, on the tree at the time of the
+detector's rescue. Repeat it whenever the use-site walk changes.
 """
 from __future__ import annotations
 
