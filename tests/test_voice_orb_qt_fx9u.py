@@ -695,7 +695,7 @@ def _turned(t, R, x, y, depth=0.5):
     return xr * persp, yr * persp
 
 
-def _pix(t, R, c, item, depth=None, zseed="auto"):
+def _pix(t, R, c, item, depth=None, zseed="auto", micro_salt=None):
     """The painted PIXEL position of one field element (``c`` is the centre).
 
     ``depth`` defaults to the element's own ``depth`` field; pass ``None``
@@ -706,7 +706,8 @@ def _pix(t, R, c, item, depth=None, zseed="auto"):
     sample that rides its body's rigid streak). The field's two VOLUME axes
     (``z``/``z2``) add the painter's screen-space volume displacement
     (:func:`qt_app.volume_offset`) on top of the projection, exactly as
-    ``_place`` does.
+    ``_place`` does. ``micro_salt`` adds the field's bounded micro-wobble for
+    the painter passes that consume it (volume/orbiter/cylinder/filament/...).
     """
     from voicebridge.orb import qt_app as Q
     d = item.get("depth", 0.5) if depth is None else depth
@@ -714,6 +715,10 @@ def _pix(t, R, c, item, depth=None, zseed="auto"):
     qd = Q.turn_qdepth(d, seed, flat=True) if seed is not None else d
     tx, ty = _turned(t, R, item.get("x", 0.0), item.get("y", 0.0), qd)
     ox, oy = Q.volume_offset(t, R, item.get("z"), item.get("z2"))
+    if micro_salt is not None:
+        mx, my = Q._field.micro_offset(t, item.get("index"), R, micro_salt)
+        ox += mx
+        oy += my
     return c + tx + ox, c + ty + oy
 
 
@@ -1443,7 +1448,7 @@ def test_volume_particles_paint_as_dots_split_by_depth(monkeypatch):
     # No text at all: the retired math layer must stay retired.
     assert not [p for p in prims if p.kind == "text"]
     for s in bodies:
-        px, py = _pix(t, R, c, s)
+        px, py = _pix(t, R, c, s, micro_salt=719.9)
         dots = [p for p in prims if p.kind == "ellipse" and p.fill is not None
                 and math.hypot(p.cx - px, p.cy - py) <= 0.75]
         assert dots, (s["index"], px, py)
@@ -1453,7 +1458,7 @@ def test_volume_particles_paint_as_dots_split_by_depth(monkeypatch):
     assert len(seam) == 1, seam
     # Split by the FIELD's depth, not by paint order alone.
     def _dot_index(s):
-        px, py = _pix(t, R, c, s)
+        px, py = _pix(t, R, c, s, micro_salt=719.9)
         return min(i for i, p in enumerate(prims)
                    if p.kind == "ellipse" and p.fill is not None
                    and math.hypot(p.cx - px, p.cy - py) <= 0.75)
@@ -1554,3 +1559,90 @@ def test_atmospheric_bloom_lights_the_room_under_the_mark():
     # colour), which is why this pins presence and count, not opacity.
     assert len(big) == 1, [round(max(p.w, p.h), 1) for p in big]
 
+
+# --------------------------------------------------------------------------- #
+# (q) the fluid refinement pass: haze bed + the new per-body keys
+# --------------------------------------------------------------------------- #
+def test_haze_bed_is_painted_and_dropped_under_reduced_motion(monkeypatch):
+    # Owner: "make more fluid ... more detailed ... more complex". The field's
+    # ``haze_state`` is the slow atmospheric parallax bed behind the mark; the
+    # painter consumes it as soft glows. Full motion must paint it; reduced
+    # motion must drop the moving layer and stay a still frame.
+    from voicebridge.orb import qt_app as Q
+
+    size = 192
+    t = 4.7
+    with_haze = _record(t=t, size=size)
+    with monkeypatch.context() as m:
+        m.setattr(Q, "mark_haze", lambda tt, rr: [])
+        bare = _record(t=t, size=size)
+    assert _counter_diff(with_haze, bare), "the haze bed was not painted"
+
+    with monkeypatch_env("QUBIT_REDUCED_MOTION", "1"):
+        assert Q.mark_haze(1.0, 90.0) == []
+        a = _record(t=1.0, size=size, reduced=True)
+        b = _record(t=37.4, size=size, reduced=True)
+    assert _dump(a) == _dump(b)
+
+
+def test_volume_glow_breathes_the_dot_size(monkeypatch):
+    # ``glow`` is folded into ALPHA only for the volume layer in the field, so
+    # the painter uses it for a size breath (an additive detail, not a double
+    # count).
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    t = 0.42
+    base = {"index": 0.0, "x": -24.0, "y": 6.0, "depth": 0.6, "size": 1.4,
+            "alpha": 0.9, "lift": 0.5, "hue": 0.58}
+
+    def rec(glow):
+        with monkeypatch.context() as m:
+            m.setattr(Q, "mark_volume_particles",
+                      lambda tt, rr: [dict(base, glow=glow)])
+            return _record(t=t, size=size)
+
+    def radius(prims):
+        px, py = _pix(t, R, c, base, micro_salt=719.9)
+        hits = [p for p in prims if p.kind == "ellipse"
+                and p.fill is not None
+                and math.hypot(p.cx - px, p.cy - py) <= 0.75]
+        assert hits, (px, py)
+        return max(p.r for p in hits)
+
+    assert radius(rec(1.25)) > radius(rec(0.75)) * 1.1
+
+
+def test_photon_lobe_blends_toward_the_second_palette_hue(monkeypatch):
+    # ``lobe`` is the lensed bright-arc profile. The painter keeps the field's
+    # alpha contract and uses ``lobe`` for a hue blend toward the sample's
+    # paired ``hue2`` (red -> green here), so the bright arcs are not a flat
+    # single-colour dotted circle.
+    from voicebridge.orb import qt_app as Q
+
+    size, R, c = 192, 90.0, 96.0
+    t = 0.0
+    samples = [
+        {"index": 0.0, "x": -0.18 * R, "y": 0.0, "depth": 0.6, "size": 0.34,
+         "alpha": 0.7, "lift": 0.5, "hue": 0.0, "hue2": 1.0 / 3.0,
+         "lobe": 0.0, "sparkle": 1.0},
+        {"index": 1.0, "x": 0.18 * R, "y": 0.0, "depth": 0.6, "size": 0.34,
+         "alpha": 0.7, "lift": 0.5, "hue": 0.0, "hue2": 1.0 / 3.0,
+         "lobe": 1.0, "sparkle": 1.0},
+    ]
+    with monkeypatch.context() as m:
+        m.setattr(Q, "mark_photon_ring",
+                  lambda tt, rr: [dict(s) for s in samples])
+        prims = _record(t=t, size=size)
+
+    def fill_at(item):
+        px, py = _pix(t, R, c, item)
+        hits = [p for p in prims if p.kind == "ellipse"
+                and p.fill is not None
+                and math.hypot(p.cx - px, p.cy - py) <= 0.75]
+        assert hits, (item["index"], px, py)
+        return max(hits, key=lambda p: p.r).fill
+
+    cold = fill_at(samples[0])
+    hot = fill_at(samples[1])
+    assert hot[1] > cold[1] + 8, (cold, hot)
