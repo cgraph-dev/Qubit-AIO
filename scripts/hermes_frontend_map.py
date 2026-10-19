@@ -43,12 +43,12 @@ _REBRAND_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("tests/test_hermes_frontend_inventory8u.py",
      "tests/test_qubit_frontend_inventory8u.py"),
     # The local base-path constant is QUBIT_BASE_PATH; the injected browser
-    # global keeps the upstream wire name and is masked around this rename.
+    # global carries the same QUBIT spelling and is masked around this rename.
     ("HERMES_BASE_PATH", "QUBIT_BASE_PATH"),
 )
-#: Injected browser global keeps the upstream wire name; mask it so the bare
-#: ``HERMES_BASE_PATH`` rename above cannot rewrite ``window.__HERMES_BASE_PATH__``.
-_WIRE_BASE_PATH = "window.__HERMES_BASE_PATH__"
+#: Injected browser global; mask it so the bare ``HERMES_BASE_PATH`` rename
+#: above cannot rewrite ``window.__QUBIT_BASE_PATH__``.
+_WIRE_BASE_PATH = "window.__QUBIT_BASE_PATH__"
 _WIRE_BASE_PATH_MASK = "\x00__HERMES_WIRE_BASE_PATH__\x00"
 #: Category labels the deep rebrand rewrote in the vendored Achievements engine.
 _REBRAND_CATEGORY = {"Hermes Native": "Qubit Native"}

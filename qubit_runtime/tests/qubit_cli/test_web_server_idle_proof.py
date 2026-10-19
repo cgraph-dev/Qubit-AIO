@@ -121,7 +121,7 @@ def _spawn_desktop_child(tmp_path: Path, name: str, *, busy: bool) -> subprocess
         env.pop(k, None)
     env.update(
         QUBIT_HOME=str(home),
-        HERMES_SERVE_HEADLESS="1",
+        QUBIT_SERVE_HEADLESS="1",
         HERMES_DESKTOP="1",
         HERMES_DASHBOARD_SESSION_TOKEN=TOKEN,
         PYTHONUNBUFFERED="1",

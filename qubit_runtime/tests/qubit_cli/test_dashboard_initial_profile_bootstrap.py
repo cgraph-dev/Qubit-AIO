@@ -12,7 +12,7 @@ def test_spa_bootstrap_includes_dashboard_initial_profile(tmp_path, monkeypatch)
         encoding="utf-8",
     )
     monkeypatch.setattr(web_server, "WEB_DIST", dist)
-    monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+    monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
 
     app = FastAPI()
     app.state.initial_profile = "worker_x"
@@ -21,7 +21,7 @@ def test_spa_bootstrap_includes_dashboard_initial_profile(tmp_path, monkeypatch)
     response = TestClient(app).get("/chat?resume=session-1")
 
     assert response.status_code == 200
-    assert 'window.__HERMES_INITIAL_PROFILE__="worker_x";' in response.text
+    assert 'window.__QUBIT_INITIAL_PROFILE__="worker_x";' in response.text
 
 
 def test_spa_bootstrap_escapes_initial_profile_for_script_context(
@@ -34,7 +34,7 @@ def test_spa_bootstrap_escapes_initial_profile_for_script_context(
         encoding="utf-8",
     )
     monkeypatch.setattr(web_server, "WEB_DIST", dist)
-    monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+    monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
 
     app = FastAPI()
     app.state.initial_profile = "bad</script><script>alert(1)</script>"

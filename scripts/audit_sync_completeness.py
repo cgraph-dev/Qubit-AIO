@@ -214,7 +214,9 @@ REBRAND_TOKENS = _load_rebrand_tokens()
 # `preserved_wire_identifiers`). A symbol naming one of these is never credited
 # by the twin pass even if a mechanical transform would produce a twin.
 PRESERVED_WIRE = {
-    "__HERMES_BASE_PATH__", "__HERMES_SESSION_TOKEN__", "__HERMES_AUTH_REQUIRED__",
+    "__QUBIT_BASE_PATH__", "__QUBIT_SESSION_TOKEN__", "__QUBIT_AUTH_REQUIRED__",
+    "__QUBIT_INITIAL_PROFILE__", "__QUBIT_DASHBOARD_PROFILE__",
+    "__QUBIT_DASHBOARD_EMBEDDED_CHAT__",
     "__HERMES_PLUGINS__", "__HERMES_PLUGIN_SDK__", "X-Hermes-Session-Token",
     "hermes_flow", "hermes.tokenReloadAttempted", "hermes-kanban", "hermes-flow",
     "hermes_achievements", "hermes-achievements", "HERMES_QWEN_", "qubit-hermes",

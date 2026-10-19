@@ -226,8 +226,8 @@ try:
     st, loc, _ = raw("/")
     assert (st, loc) == (302, "/sessions"), (st, loc)
     st, _, body = raw("/sessions")
-    assert st == 200 and b"__HERMES_BASE_PATH__" in body, st
-    assert b'__HERMES_BASE_PATH__=""' in body, "base path not root"
+    assert st == 200 and b"__QUBIT_BASE_PATH__" in body, st
+    assert b'__QUBIT_BASE_PATH__=""' in body, "base path not root"
     asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()
     st, _, ab = raw("/" + asset)
     assert st == 200 and len(ab) > 1000, (asset, st, len(ab))

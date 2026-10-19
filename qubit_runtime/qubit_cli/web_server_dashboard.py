@@ -76,7 +76,7 @@ def _render_active_theme_bootstrap_css() -> str:
             def _esc(s: str) -> str:  # defensive ``</style>`` escape
                 return str(s).replace("</", "<\\/")
             return (
-                '<style id="hermes-theme-bootstrap">'
+                '<style id="qubit-theme-bootstrap">'
                 ":root{"
                 f"--background-base:{_esc(_layer_hex(palette, 'background', '#0a0a0a'))};"
                 f"--midground-base:{_esc(_layer_hex(palette, 'midground', '#e5e5e5'))};"
@@ -111,7 +111,7 @@ def mount_spa(application: FastAPI):
     The session token is injected into index.html via a ``<script>`` tag so the SPA can
     authenticate without a separate token-dispensing endpoint. Behind a path-prefix reverse
     proxy (``X-Forwarded-Prefix: /qubit``) the served index.html is rewritten so absolute
-    asset URLs and the runtime ``__HERMES_BASE_PATH__`` honour that prefix without a rebuild.
+    asset URLs and the runtime ``__QUBIT_BASE_PATH__`` honour that prefix without a rebuild.
 
     A missing WEB_DIST is deliberately NOT a mount-time terminal state: every route copes
     with a missing dist per-request (404 JSON / ``check_dir=False``), so a long-lived
@@ -122,12 +122,12 @@ def mount_spa(application: FastAPI):
 
     # `qubit serve` is the headless backend: it must NEVER serve the browser SPA, even if a
     # dist is lying around, so only the JSON-RPC/WS/API surface is reachable.
-    if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
+    if os.environ.get("QUBIT_SERVE_HEADLESS") == "1":
 
         @application.get("/{full_path:path}")
         async def no_frontend(full_path: str):
             # Desktop token handshake: the Electron shell boots by fetching `/` and reading
-            # ``window.__HERMES_SESSION_TOKEN__`` for /api/ws auth. When headless 404'd every
+            # ``window.__QUBIT_SESSION_TOKEN__`` for /api/ws auth. When headless 404'd every
             # path, a renderer whose spawn token no longer matched (e.g. after `qubit update`)
             # white-screened. Serve a token-only page at the exact root, but ONLY when the auth
             # gate is off: on a gated serve the token must never be readable without auth.
@@ -136,8 +136,8 @@ def mount_spa(application: FastAPI):
             if full_path == "" and not gated:
                 return HTMLResponse(
                     "<!doctype html><html><head><script>"
-                    f"window.__HERMES_SESSION_TOKEN__={json.dumps(_server()._SESSION_TOKEN)};"
-                    "window.__HERMES_AUTH_REQUIRED__=false;"
+                    f"window.__QUBIT_SESSION_TOKEN__={json.dumps(_server()._SESSION_TOKEN)};"
+                    "window.__QUBIT_AUTH_REQUIRED__=false;"
                     f"</script></head><body>{_HEADLESS_MSG}</body></html>",
                     headers=_NO_STORE,
                 )
@@ -157,7 +157,7 @@ def mount_spa(application: FastAPI):
 
         When the OAuth auth gate is active (``app.state.auth_required``), the legacy
         ``_SESSION_TOKEN`` is NOT injected — the SPA reads identity from ``/api/auth/me`` over
-        cookie auth; ``__HERMES_AUTH_REQUIRED__`` tells it which scheme to use for /api/pty
+        cookie auth; ``__QUBIT_AUTH_REQUIRED__`` tells it which scheme to use for /api/pty
         and /api/ws (ticket vs token).
         """
         try:
@@ -167,7 +167,7 @@ def mount_spa(application: FastAPI):
             return JSONResponse({"error": "Frontend not built. Run: cd web && npm run build"}, status_code=404)
         chat_js = "true" if _DASHBOARD_EMBEDDED_CHAT_ENABLED else "false"
         gated = bool(getattr(app.state, "auth_required", False))
-        token_js = "" if gated else f'window.__HERMES_SESSION_TOKEN__="{_server()._SESSION_TOKEN}";'
+        token_js = "" if gated else f'window.__QUBIT_SESSION_TOKEN__="{_server()._SESSION_TOKEN}";'
         # Launcher-preselected profile (``--open-profile``): the SPA's fallback scope when the URL
         # omits ``?profile=`` (#73085). ``</`` escaped so a hostile name cannot close the script tag.
         initial_profile_js = json.dumps(str(getattr(application.state, "initial_profile", "") or "")).replace("</", "<\\/")
@@ -179,11 +179,11 @@ def mount_spa(application: FastAPI):
         serving_profile_js = json.dumps(_serving_profile_name()).replace("</", "<\\/")
         bootstrap_script = (
             f"<script>{token_js}"
-            f"window.__HERMES_DASHBOARD_EMBEDDED_CHAT__={chat_js};"
-            f'window.__HERMES_BASE_PATH__="{prefix}";'
-            f"window.__HERMES_AUTH_REQUIRED__={'true' if gated else 'false'};"
-            f"window.__HERMES_INITIAL_PROFILE__={initial_profile_js};"
-            f"window.__HERMES_DASHBOARD_PROFILE__={serving_profile_js};"
+            f"window.__QUBIT_DASHBOARD_EMBEDDED_CHAT__={chat_js};"
+            f'window.__QUBIT_BASE_PATH__="{prefix}";'
+            f"window.__QUBIT_AUTH_REQUIRED__={'true' if gated else 'false'};"
+            f"window.__QUBIT_INITIAL_PROFILE__={initial_profile_js};"
+            f"window.__QUBIT_DASHBOARD_PROFILE__={serving_profile_js};"
             f"</script>"
         )
         if prefix:

@@ -168,8 +168,8 @@ ALLOWLISTED_CATEGORIES: Dict[str, List[str]] = {
     "wire_identifiers": [
         "HERMES_HOME", "X-Hermes-Session-Token", "HERMES_SUPERVISED_CHILD",
         "HERMES_UPDATE_* / HERMES_DESKTOP_* / HERMES_DASHBOARD_* env names",
-        "window.__HERMES_* / __HERMES_BASE_PATH__ / __HERMES_PLUGINS__ / "
-        "__HERMES_PLUGIN_SDK__ / __HERMES_SESSION_TOKEN__ globals",
+        "window.__HERMES_* / __HERMES_PLUGINS__ / "
+        "__HERMES_PLUGIN_SDK__ globals",
         "hermes:* IPC channel names", "com.nousresearch.hermes app id",
         "@hermes/plugin-sdk / @hermes/shared / @/hermes / @/types/hermes / "
         "./windows-hermes-path module specifiers",
