@@ -1053,6 +1053,17 @@ class DesktopHelper:
         # barge-in is disabled. Both are junk-safe / never fatal.
         self._playback_proc: Any = None
         self._speak_stop = threading.Event()
+        # Orb STOP before TTS starts (thinking/working): ``_turn_seq`` is the
+        # current reply turn's epoch, bumped at the START of every turn in
+        # ``_process_transcript``. A stop that lands while a turn is
+        # PROCESSING but nothing is playing records that epoch in
+        # ``_turn_stopped_seq``, and the reply ``_speak`` for THAT turn then
+        # aborts instead of speaking. Scoping by epoch means an idle stop
+        # never silences a later reply (a new turn bumps the epoch).
+        # ``_turn_stop_announced`` emits the canonical stop triple once.
+        self._turn_seq = 0
+        self._turn_stopped_seq = -1
+        self._turn_stop_announced = False
         # Accurate-model prewarm readiness (explicit, not blind): the background
         # prewarm sets the event/state, and the first activation waits for it
         # with a bounded timeout so the user is never left waiting blind.
@@ -1486,18 +1497,34 @@ class DesktopHelper:
         """Stop the current spoken reply now (explicit orb STOP path).
 
         Returns True when a reply was live (``_speaking`` or a player
-        subprocess). Sets ``_speak_stop`` and terminates ``_playback_proc``;
-        the owning ``_speak`` then emits the same ``interrupt`` /
-        ``playback.stopped`` / ``response.done`` events the barge-in path
-        does, so the orb's state machine ends immediately. Safe to call
-        from any thread (including a signal handler), idempotent, and
-        never fatal: a failed terminate leaves the normal playback path
-        intact. Does not touch the mic or the answer path.
+        subprocess) OR a turn was THINKING/WORKING (the reply has not
+        reached ``_speak`` yet). Sets ``_speak_stop`` and terminates
+        ``_playback_proc``; the owning ``_speak`` then emits the same
+        ``interrupt`` / ``playback.stopped`` / ``response.done`` events the
+        barge-in path does, so the orb's state machine ends immediately.
+
+        A stop before any player exists (thinking/working) marks THIS turn's
+        epoch stopped, so the pending reply ``_speak`` aborts instead of
+        speaking; the marker is scoped to the turn, so an idle stop never
+        silences a later reply. Safe to call from any thread (including a
+        signal handler), idempotent, and never fatal: a failed terminate
+        leaves the normal playback path intact. Does not touch the mic or
+        the answer path.
         """
         try:
             proc = getattr(self, "_playback_proc", None)
             was_live = bool(getattr(self, "_speaking", False)) or proc is not None
             if not was_live:
+                # Nothing playing yet: suppress a reply still in flight
+                # (thinking/working) by marking this turn stopped. Idle
+                # (no turn) stays a no-op so a later reply is never cut.
+                try:
+                    if self.state == self.PROCESSING:
+                        self._turn_stopped_seq = self._turn_seq
+                        _trace("speak.stop_pending", turn=self._turn_seq)
+                        return True
+                except Exception:
+                    pass
                 return False
             try:
                 self._speak_stop.set()
@@ -2573,6 +2600,12 @@ class DesktopHelper:
             return False
 
     def _process_transcript(self, transcript: str = "") -> None:
+        # New reply turn: bump the epoch. A stop marker from an earlier turn
+        # is scoped to that epoch, so an idle stop can never silence this
+        # turn's reply; the per-turn stop announcement also resets.
+        self._turn_seq += 1
+        self._turn_stopped_seq = -1
+        self._turn_stop_announced = False
         if self.snapshot is None and self.request_id:
             # Ensure the selection snapshot exists even if capture lagged.
             self._capture_selection()
@@ -3027,6 +3060,39 @@ class DesktopHelper:
                 pass
         return interrupted
 
+    def _turn_reply_stopped(self) -> bool:
+        """True when an orb STOP marked the CURRENT turn before playback.
+
+        Scoped by epoch: a marker only counts while the turn that recorded
+        it is still current, so a new turn (new epoch) always speaks.
+        Never raises.
+        """
+        try:
+            return (self._turn_seq > 0
+                    and self._turn_stopped_seq == self._turn_seq)
+        except Exception:
+            return False
+
+    def _announce_turn_stop(self) -> None:
+        """Emit the canonical stop triple once for a turn stopped pre-TTS.
+
+        Mirrors what the player-owning ``_speak`` emits on an explicit stop,
+        so the orb FSM ends from the same typed boundaries. Idempotent per
+        turn; never raises.
+        """
+        if getattr(self, "_turn_stop_announced", False):
+            return
+        self._turn_stop_announced = True
+        self._barge_interrupted = True
+        _trace("speak.stop_pending_honored",
+               turn=getattr(self, "_turn_seq", 0))
+        try:
+            self._talk_emit("interrupt")
+            self._talk_emit("playback.stopped")
+            self._talk_emit("response.done")
+        except Exception:
+            pass
+
     def _speak(self, text: str) -> None:
         """Speak the gist of ``text`` through the service's TTS, locally.
 
@@ -3045,6 +3111,12 @@ class DesktopHelper:
         import shutil
         import subprocess
         import tempfile
+        # A STOP that landed while this turn was THINKING/WORKING (before any
+        # player existed) is honored here: never synthesize or speak the
+        # pending reply, and close the orb FSM with the canonical stop triple.
+        if self._turn_reply_stopped():
+            self._announce_turn_stop()
+            return
         # Fresh reply: a STOP flag from a previous turn must never cut this
         # one. Cleared before synth so an orb STOP arriving mid-synthesis is
         # still honored when playback starts.
@@ -3064,6 +3136,11 @@ class DesktopHelper:
             _trace("speak_error", code=exc.code)
             return
         if not wav:
+            return
+        # A STOP that arrived DURING synthesis (still no player) must not
+        # start playback either; emit the stop triple and drop the wav.
+        if self._turn_reply_stopped() or self._speak_stop.is_set():
+            self._announce_turn_stop()
             return
         # Real-equalizer TTS timeline: FFT the reply wav ONCE at synth time
         # (ts = synth-complete ≈ playback start, ms apart). Published even

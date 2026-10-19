@@ -448,3 +448,190 @@ def test_signal_helper_stop_kill_error_is_false(monkeypatch):
     monkeypatch.setattr(hb, "other_live_pid", lambda exclude=0: 7)
     monkeypatch.setattr(os, "kill", boom)
     assert svc_mod._signal_helper_stop() is False
+
+
+# ---------------------------------------------------------------------------
+# stop while THINKING/WORKING (before TTS starts) suppresses the pending reply
+# ---------------------------------------------------------------------------
+class TurnClient(FakeClient):
+    """Routes to an ``answer`` turn; ``ask_result`` can block on a gate.
+
+    ``gate`` is the blocker held while the turn is PROCESSING so a test can
+    deliver a STOP before the reply reaches ``_speak``.
+    """
+
+    def __init__(self, answer="Here is the full spoken answer.", *, gate=None):
+        super().__init__()
+        self.answer = answer
+        self._gate = gate
+        self.entered = threading.Event()
+        self.asked = []
+
+    def status(self):
+        return {"enabled": True, "estop": False}
+
+    def begin(self):
+        return {"ok": True, "request_id": "req-1"}
+
+    def route(self, rid, text):
+        return {"ok": True, "mode": "answer", "question": text}
+
+    def ask_result(self, question, request_id):
+        self.asked.append(question)
+        self.entered.set()
+        if self._gate is not None:
+            self._gate.wait(timeout=5.0)
+        return {"answer": self.answer}
+
+
+class SynthGateClient(TurnClient):
+    """Blocks inside ``speak`` so a STOP can land during synthesis."""
+
+    def __init__(self, answer="Here is the full spoken answer."):
+        super().__init__(answer)
+        self.synth_entered = threading.Event()
+        self.synth_release = threading.Event()
+
+    def speak(self, text):
+        self.synth_entered.set()
+        self.synth_release.wait(timeout=5.0)
+        return super().speak(text)
+
+
+def _turn_helper(monkeypatch, client, *, barge_in=True):
+    procs = []
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/paplay")
+
+    class FakePopen:
+        def __init__(self, argv, **kw):
+            self._inner = SelfEndingProc()
+            procs.append(self._inner)
+
+        def poll(self):
+            return self._inner.poll()
+
+        def terminate(self):
+            self._inner.terminate()
+
+        def kill(self):
+            self._inner.kill()
+
+        def wait(self, timeout=None):
+            return self._inner.wait(timeout=timeout)
+
+    monkeypatch.setattr("subprocess.Popen", FakePopen)
+    h = dh.DesktopHelper(_cfg(barge_in=barge_in), client=client,
+                         overlay=FakeOverlay(), desktop=FakeDesktop(),
+                         mic_factory=lambda: FakeMic())
+    h._warm_event.set()
+    h._warm_state = "skipped"
+    return h, procs
+
+
+def _run_turn(h, text):
+    t = threading.Thread(target=h._process_transcript, args=(text,), daemon=True)
+    t.start()
+    return t
+
+
+def test_stop_while_processing_suppresses_the_pending_reply(monkeypatch):
+    gate = threading.Event()
+    client = TurnClient(answer="This reply must never be heard.", gate=gate)
+    h, procs = _turn_helper(monkeypatch, client)
+    t = _run_turn(h, "what is the time")
+    assert client.entered.wait(timeout=3.0), "turn never reached the brain"
+    assert h.state == h.PROCESSING
+    # The whole point: a STOP here must not be a silent no-op.
+    assert h.stop_speaking() is True
+    gate.set()
+    t.join(timeout=3.0)
+    assert not t.is_alive()
+    assert procs == [], "a stopped turn must not play the reply"
+    assert h._speaking is False
+    types = _event_types(h)
+    assert "interrupt" in types
+    assert "playback.stopped" in types
+    assert "response.done" in types
+    assert "playback.started" not in types, "nothing was ever played"
+
+
+def test_stop_while_processing_works_with_barge_in_disabled(monkeypatch):
+    gate = threading.Event()
+    client = TurnClient(answer="Suppressed even without barge-in.", gate=gate)
+    h, procs = _turn_helper(monkeypatch, client, barge_in=False)
+    t = _run_turn(h, "another question")
+    assert client.entered.wait(timeout=3.0)
+    assert h.stop_speaking() is True
+    gate.set()
+    t.join(timeout=3.0)
+    assert procs == []
+    assert "interrupt" in _event_types(h)
+
+
+def test_stop_during_synthesis_suppresses_playback(monkeypatch):
+    client = SynthGateClient(answer="Synth-gated reply.")
+    h, procs = _turn_helper(monkeypatch, client)
+    t = _run_turn(h, "synthesize this")
+    assert client.synth_entered.wait(timeout=3.0), "synth never started"
+    assert h.state == h.PROCESSING
+    assert h.stop_speaking() is True
+    client.synth_release.set()
+    t.join(timeout=3.0)
+    assert procs == [], "a mid-synthesis stop must not start playback"
+    types = _event_types(h)
+    assert "interrupt" in types and "response.done" in types
+
+
+def test_idle_stop_does_not_suppress_the_next_reply(monkeypatch):
+    client = TurnClient(answer="A normal spoken reply.")
+    h, procs = _turn_helper(monkeypatch, client)
+    assert h.state == h.IDLE
+    assert h.stop_speaking() is False, "idle stop is a scoped no-op"
+    _run_turn(h, "hello there").join(timeout=3.0)
+    assert procs, "the next reply must still play after an idle stop"
+    assert h._barge_interrupted is False
+
+
+def test_new_turn_after_a_processing_stop_speaks_normally(monkeypatch):
+    gate = threading.Event()
+    client = TurnClient(answer="First reply.", gate=gate)
+    h, procs = _turn_helper(monkeypatch, client)
+    t = _run_turn(h, "first question")
+    assert client.entered.wait(timeout=3.0)
+    assert h.stop_speaking() is True
+    gate.set()
+    t.join(timeout=3.0)
+    assert procs == [], "first turn was stopped"
+    # A fresh turn is a new epoch: the stop must not leak into it.
+    h.client = TurnClient(answer="Second reply.")
+    _run_turn(h, "second question").join(timeout=3.0)
+    assert procs, "a fresh turn after a stop must speak"
+
+
+def test_repeated_processing_stop_emits_once(monkeypatch):
+    gate = threading.Event()
+    client = TurnClient(answer="One emission only.", gate=gate)
+    h, procs = _turn_helper(monkeypatch, client)
+    t = _run_turn(h, "stop me twice")
+    assert client.entered.wait(timeout=3.0)
+    assert h.stop_speaking() is True
+    assert h.stop_speaking() is True
+    gate.set()
+    t.join(timeout=3.0)
+    types = _event_types(h)
+    assert types.count("interrupt") == 1
+    assert types.count("response.done") == 1
+
+
+def test_processing_stop_is_safe_from_signal_handler(monkeypatch):
+    """on_orb_stop() routes the pre-TTS stop without raising or playing."""
+    gate = threading.Event()
+    client = TurnClient(answer="Signal handler stop.", gate=gate)
+    h, procs = _turn_helper(monkeypatch, client)
+    t = _run_turn(h, "handler path")
+    assert client.entered.wait(timeout=3.0)
+    h.on_orb_stop()
+    gate.set()
+    t.join(timeout=3.0)
+    assert procs == []
+    assert "interrupt" in _event_types(h)
