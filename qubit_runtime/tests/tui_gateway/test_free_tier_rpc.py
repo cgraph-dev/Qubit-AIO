@@ -102,6 +102,41 @@ def test_status_without_an_identity_is_a_pure_read(tmp_path, monkeypatch):
     assert status["has_guest"] is False and status["available"] is False and status["enabled"] is True
 
 
+def test_trial_claimable_is_read_by_the_free_tier_rpcs_and_the_owner_gate_holds(tmp_path, monkeypatch):
+    """``_trial_claimable`` is upstream's "can the welcome trial be claimed here" term of ``enabled``.
+
+    Both RPCs must CALL it; on this install it is False because the owner ruling pins
+    ``anon_auth.on_local_desktop_backend()`` to False (the ladder's first blocker). False is the
+    gate holding, not a bug — and the machinery is kept, not deleted.
+    """
+    from tui_gateway import methods_free_tier
+
+    assert anon_auth.on_local_desktop_backend() is False          # the owner gate
+    assert srv._trial_claimable() is False                        # ... so nothing is claimable  # noqa: SLF001
+
+    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    calls = []
+    real = methods_free_tier._trial_claimable
+
+    def spy():
+        calls.append(1)
+        return real()
+
+    monkeypatch.setattr(srv, "_trial_claimable", spy)
+    monkeypatch.setattr(anon_auth, "guest_enabled", lambda: False)
+    status = _call("free_tier.status")
+    provision = _call("free_tier.provision")
+    assert len(calls) >= 3, f"status + provision must read the trial term, saw {len(calls)}"
+    assert status["enabled"] is False and provision["enabled"] is False
+
+    # The trial machinery survives the wiring: the claim is never attempted while the gate holds.
+    from qubit_cli import welcome_trial
+    monkeypatch.setattr(welcome_trial, "claim_desktop_free_tier",
+                        lambda **kw: pytest.fail("the owner-gated trial must never be claimed"))
+    _call("free_tier.provision")
+    assert anon_auth.guest_enabled() is False and calls, "the blocking guest-off arm still ran its gate"
+
+
 def test_provision_sets_the_free_tier_up_through_the_lifecycle_primitive(tmp_path, monkeypatch):
     """``free_tier.provision`` is the desktop's explicit retry: it calls the one creator
     (``ensure_portal_identity(explicit=True)``) only when no identity exists, and reports the outcome."""

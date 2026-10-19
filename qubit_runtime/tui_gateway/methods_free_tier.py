@@ -32,7 +32,10 @@ def _(rid, params: dict) -> dict:
     try:
         from qubit_cli import anon_auth
         has_guest = anon_auth.has_guest()
-        enabled = anon_auth.guest_enabled()
+        # ``enabled``: the free tier is on here, OR the welcome trial can still be claimed on this
+        # machine (``_trial_claimable``; upstream's reading). Qubit's owner ruling pins the trial
+        # structurally unreachable, so the term is False here and ``enabled`` is ``guest_enabled()``.
+        enabled = anon_auth.guest_enabled() or _trial_claimable()
         payload = {
             "has_guest": has_guest, "enabled": enabled, "available": has_guest and enabled,
             "notice_pending": bool(has_guest and enabled and anon_auth.guest_notice_pending()),
@@ -56,6 +59,11 @@ def _(rid, params: dict) -> dict:
 
 
 def _trial_claimable() -> bool:
+    """The welcome trial (free inference on ``qubit/welcome`` for a first install) can be claimed on
+    this machine. ``free_tier.status``/``provision`` read it to decide whether the trial is part of
+    what ``enabled`` reports. Qubit's owner ruling pins ``anon_auth.on_local_desktop_backend`` to
+    False, which is the first blocker in the ladder, so this is False on every install — the
+    machinery is kept, deliberately, as the design to rebrand if Qubit ships its own sign-in."""
     from qubit_cli.welcome_trial import claim_blocker
     return claim_blocker() is None
 
@@ -72,8 +80,19 @@ def _(rid, params: dict) -> dict:
     try:
         from qubit_cli import anon_auth
         from qubit_cli import free_tier_bootstrap
-        enabled = anon_auth.guest_enabled()
-        if enabled and not anon_auth.has_guest():
+        guest_on = anon_auth.guest_enabled()
+        # The welcome trial's claim, exactly as upstream asks for it: only when nothing blocks it on
+        # this machine. Qubit's owner ruling pins ``on_local_desktop_backend()`` to False, so this is
+        # always skipped here — the branch stays as the design to rebrand if Qubit ships its own sign-in.
+        if _trial_claimable():
+            try:
+                from qubit_cli import welcome_trial
+                welcome_trial.claim_desktop_free_tier(force=True)
+            except Exception as exc:   # memoised by the mint primitive before it re-raised
+                logger.info("welcome trial claim failed: %s", exc)
+            if not params.get("profile") and free_tier_bootstrap.current_record() is not None:
+                free_tier_bootstrap.refresh_record()
+        elif guest_on and not anon_auth.has_guest():
             if free_tier_bootstrap.current_record() is not None and not params.get("profile"):
                 # The launch profile: refresh the boot record too, so ``setup.status`` and the
                 # ``setup.ready`` listeners move with the outcome.
@@ -84,6 +103,7 @@ def _(rid, params: dict) -> dict:
                 except Exception as exc:   # memoised by the primitive before it re-raised
                     logger.info("free tier provisioning failed: %s", exc)
         has_guest = anon_auth.has_guest()
+        enabled = guest_on or _trial_claimable()
         payload = {"has_guest": has_guest, "enabled": enabled}
         if enabled and not has_guest:
             payload.update(anon_auth.last_mint_failure() or {})
