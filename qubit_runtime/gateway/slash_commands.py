@@ -986,9 +986,11 @@ class GatewaySlashCommandsMixin(
 
     async def _handle_busy_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
         """Handle /busy — control what happens when messaging while Qubit is working."""
+        from gateway.session_setting_commands import local_live, session_busy_mode
         arg = event.get_command_args().strip().lower()
+        live = local_live(self, event.source)
         if not arg or arg == "status":
-            mode = self._effective_busy_input_mode(event.source)
+            mode = session_busy_mode(self, live) if live is not None else self._effective_busy_input_mode(event.source)
             behavior = t(_BUSY_MODE_BEHAVIOR.get(mode, _BUSY_MODE_BEHAVIOR["interrupt"])[0])
             return EphemeralReply(t("gateway.busy.status", mode=mode, behavior=behavior))
         if arg not in _BUSY_MODE_BEHAVIOR:
@@ -998,6 +1000,8 @@ class GatewaySlashCommandsMixin(
         from cli import save_config_value
         if not save_config_value("display.busy_input_mode", arg):
             return EphemeralReply(t("gateway.busy.save_failed"))
+        if live is not None:
+            live.busy_input_mode = arg  # the frozen session does not re-read config.yaml
         profile_name = self._busy_profile_name_for_source(event.source)
         if profile_name:
             from gateway.run import _load_gateway_config
