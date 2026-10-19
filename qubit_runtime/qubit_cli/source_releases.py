@@ -55,6 +55,7 @@ class SourceTarget:
     branch: str | None = None
     version: str | None = None
     build_id: str | None = None
+    ahead: bool = False
 
     @property
     def retired(self) -> bool:
@@ -62,6 +63,9 @@ class SourceTarget:
 
     @property
     def label(self) -> str:
+        if self.ahead:
+            return (f"{self.channel} v{self.version}; this checkout is newer and waits for the next release"
+                    " (`qubit update --set-channel main` follows every commit)")
         return f"{self.channel} v{self.version} ({self.commit[:12]})" if self.commit else self.channel
 
 
@@ -76,6 +80,24 @@ def _resolve_channel(name: str, repository: str):
     from qubit_cli.release_channels import ChannelReader
 
     return ChannelReader(_PUBLIC_BASE, repository=repository).resolve(name)
+
+
+def _probe(git_cmd, cwd, *args):
+    """``git <args>`` in ``cwd``, or None when git did not answer: an unknown relation, not a claim.
+
+    Before the updater's fetch the release commit is usually absent, and git 2.43 spends 7-12 s
+    of CPU on a blobless clone failing to find it even with lazy fetch off (#137646).
+    """
+    from qubit_cli.source_check import source_git_env
+
+    try:
+        return subprocess.run(
+            [*git_cmd, *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=10, stdin=subprocess.DEVNULL, env=source_git_env(),
+            check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("git %s did not answer: %s", " ".join(args), exc)
+        return None
 
 
 def _head_containing(git_cmd, cwd, commit: str, repository: str) -> str | None:
@@ -128,8 +150,13 @@ def _describe_release_failure(failure: BaseException) -> str:
     return f"No published stable release could be verified: {failure}"
 
 
-def resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=None) -> SourceTarget:
-    """Resolve every subscription, including default labels, through R2."""
+def resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=None,
+                          forward_only: bool = False) -> SourceTarget:
+    """Resolve every subscription, including default labels, through R2.
+
+    ``forward_only`` (an unchosen default subscription) pins a checkout that already
+    contains the release to its own HEAD, so the update is a no-op instead of a downgrade.
+    """
     from qubit_cli.release_channels import ChannelNotFound, validate_name
 
     validate_name(channel)
@@ -162,8 +189,15 @@ def resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=No
         raise ValueError("Channel build has no exact source commit")
     if resolved.requested["state"] == "retired":
         _refuse_retirement_downgrade(request, terminal, git_cmd, cwd)
-    return SourceTarget(channel, destination, repository, commit=commit,
-                        version=request["sourceVersion"], build_id=request["buildId"])
+    target = SourceTarget(channel, destination, repository, commit=commit,
+                          version=request["sourceVersion"], build_id=request["buildId"])
+    if forward_only and git_cmd is not None and cwd is not None:
+        head = _head_containing(git_cmd, cwd, target.commit, target.repository)
+        if head is not None and head != target.commit:
+            from dataclasses import replace
+
+            return replace(target, commit=head, ahead=True)
+    return target
 
 
 def _resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=None) -> SourceTarget:
