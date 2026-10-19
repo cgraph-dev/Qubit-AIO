@@ -48,6 +48,9 @@ audit one symbol short of zero by design; the audit's job is to report that, not
 | symbol | file | why it is gone |
 |---|---|---|
 | `_housekeeping_media_caches` | `gateway/run.py` | Byte-identical DEAD DUPLICATE of the live `gateway/run_housekeeping_disk.py::housekeeping_media_caches`, which the registered chore (`run.py`) already calls. A 6-lane merge re-added the copy; it never executed. Deleting it is behaviour-preserving — re-adding it would restore a dead symbol, not a capability. |
+| `_import_members` | `qubit_cli/backup.py` | Superseded by inlining: `run_import` (backup.py, `with exclusive_maintenance(import_homes, purpose="import")`) reserves every affected home itself and publishes inline, and it is strictly BETTER than the upstream helper — it marks the reservation `purpose="import"` (a contender can tell this publication window from a live gateway) and drops the `gateway.lock` files the reservation created (`created_locks`), so the import leaves no seeded lock. Upstream calls its copy from `hermes_cli/backup.py:802`; here the call site is the inline block. Wiring it would re-introduce a second, weaker publish path. |
+| `_import_members_exclusive` | `qubit_cli/backup.py` | The body of the same inlined publish loop in `run_import`; reachable only from `_import_members`. No behaviour is lost. |
+| `_import_external_member` | `qubit_cli/backup.py` | Its only caller was `_import_members_exclusive`; the `_external/` branch of `run_import`'s inline loop is the same code (home-relative target, `relative_to(home_dir)` traversal refusal, atomic extract, `0600` for secret suffixes). Kept as a helper it would be dead code the detector flags. |
 
 ## Numbers
 
