@@ -742,8 +742,13 @@ async def _token_auth_seam(request: Request, call_next):
     + ``token_authenticated`` so downstream gates skip enforcement. Non-token
     routes pass through untouched.
     """
+    from qubit_cli.dashboard_auth.native_http import authenticate_native_http, native_profile_scope
     from qubit_cli.dashboard_auth.token_auth import token_auth_middleware
-    return await token_auth_middleware(request, call_next)
+    rejection = await authenticate_native_http(request)
+    if rejection is not None:
+        return rejection
+    with native_profile_scope(request):
+        return await token_auth_middleware(request, call_next)
 
 
 _DASHBOARD_HEALTH_WINDOW_SECONDS = 300.0

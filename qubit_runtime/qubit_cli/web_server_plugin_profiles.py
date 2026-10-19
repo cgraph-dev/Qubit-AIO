@@ -32,8 +32,12 @@ from qubit_constants import get_process_qubit_home
 _log = logging.getLogger("qubit_cli.web_server")
 
 # Valid for every served profile, so a profile's plugin code must never receive them.
+# The gateway ticket header is spelled `x-hermes-gateway-ticket` at its single mint site
+# (`dashboard_auth/native_http.py::HEADER`); stripping only the rebranded spelling let the
+# REAL credential through to a sibling profile's plugin host. Strip both spellings.
 _GATEWAY_CREDENTIAL_HEADERS = frozenset({
-    "authorization", "cookie", "host", "x-qubit-gateway-ticket", "x-qubit-session-token"})
+    "authorization", "cookie", "host",
+    "x-hermes-gateway-ticket", "x-qubit-gateway-ticket", "x-qubit-session-token"})
 # Every query credential the gateway accepts (``web_server_chat._ws_auth_ok``, ``_has_valid_query_token``,
 # the display bridge, the PTY reattach key) and the profile selector; compared after URL-decoding.
 _GATEWAY_QUERY_KEYS = frozenset({"token", "ticket", "internal", "display_ticket", "attach", "profile"})
