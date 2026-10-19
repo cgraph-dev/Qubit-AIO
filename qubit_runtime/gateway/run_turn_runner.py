@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from agent.i18n import t
 from agent.interrupt_compat import _accepts_keyword
+from agent.managed_worker import LEDGER_PASSTHROUGH_KEYS as _WORKER_LEDGER_KEYS
 from agent.replay_cleanup import canonicalize_replay_history
 from gateway.config import Platform
 from gateway.media_repair import repair_explicit_computer_use_media_paths
@@ -67,9 +68,12 @@ def _clarify_expired_notice() -> str:
 
 # run_conversation result keys the gateway projection carries verbatim so a finite viewer's
 # `-z --usage-file` ledger (qubit_cli/oneshot._USAGE_KEYS) reads what the in-process path did.
+# `total_tokens` rides this projection but is NOT taken from the result: the result's value is the
+# provider's cumulative session total, while the turn's own sum (line below) is what the ledger
+# wants. The keys come from `agent.managed_worker.LEDGER_PASSTHROUGH_KEYS` so the worker frame and
+# this in-process projection can never drift apart.
 _LEDGER_PASSTHROUGH_KEYS = (
-    "estimated_cost_usd", "cost_status", "cost_source", "cache_read_tokens", "cache_write_tokens",
-    "reasoning_tokens", "total_tokens", "provider", "turn_exit_reason", "service_tier",
+    'total_tokens', *_WORKER_LEDGER_KEYS,
 )
 
 
@@ -1835,8 +1839,18 @@ class TurnRunner:
             if captured is not None:
                 incoming = max(0, (getattr(agent, 'session_prompt_tokens', 0) or 0) - before[0])
                 outgoing = max(0, (getattr(agent, 'session_completion_tokens', 0) or 0) - before[1])
-                captured['usage'] = {'input_tokens': incoming, 'output_tokens': outgoing,
-                                     'total_tokens': incoming + outgoing}
+                # ``captured['usage']`` is what settlement commits and ``prompt.receipt`` returns
+                # (``session_results.execution_result``). It must carry the whole `-z --usage-file`
+                # ledger, not just the three token counts: the turn-result projection in
+                # ``_finish_turn_result`` never reaches a finite viewer, so a cost/cache/reasoning
+                # read there saw nothing (#ledger-absent). ``total_tokens`` stays the turn's own
+                # sum, never the provider's cumulative session total.
+                captured['usage'] = {
+                    'input_tokens': incoming, 'output_tokens': outgoing,
+                    'total_tokens': incoming + outgoing,
+                    **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS
+                       if key != 'total_tokens' and key in result},
+                }
                 _settle_api_runtime_lock(agent, result, captured)
             return result
         finally:

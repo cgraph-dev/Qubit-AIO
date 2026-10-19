@@ -386,8 +386,10 @@ BINARY_FONT_PX_OFFSET = 1.0
 #: ``z2``), a per-body pulse and spin. They are drawn as round DOTS (never text,
 #: never arms that could read as a check mark), sized/alpha'd by their own
 #: depth. ``*_DRAW_LIMIT`` keeps the pass flat: the field publishes 52 bodies
-#: and the painter draws an even subset of them.
-VOLUME_DRAW_LIMIT = 16
+#: and the painter draws an even subset of them. Trimmed 16 -> 12 to make room
+#: in the primitive budget for the new atmospheric haze bed without reducing
+#: the volume's read (13 -> 11 dots of the same palette).
+VOLUME_DRAW_LIMIT = 12
 #: Restrained saturation for the new dot families: the FIELD's own matte band,
 #: never the old near-neon values, so the palette stays professional.
 VOLUME_PARTICLE_SAT = _field.RGB_TRAIL_SAT_BASE
@@ -418,6 +420,19 @@ SCREEN_BREAK_PUSH = 1.22
 #: them to a circle, so they genuinely run off the widget edge.
 SCREEN_BREAK_DRAW_LIMIT = 12
 SCREEN_BREAK_SAT = 0.84
+#: Atmospheric haze bed (owner: "make more fluid ... more detailed ... more
+#: complex"). The field publishes ``haze_state``: a handful of slow, large,
+#: very faint parallax bodies behind everything. The field's own sizes are
+#: calibrated for the field scale (sub-pixel at orb size), so the painter
+#: enlarges them into SOFT radial glows (never flat discs, whose edge reads as
+#: a bubble) and strides the layer so only a few paths are emitted. The alpha
+#: is boosted off the field's near-invisible base into a readable but still
+#: subtle bed, and the ``breath`` the field already folded in keeps it alive.
+HAZE_DRAW_LIMIT = 2
+HAZE_SIZE_MULT = 11.0
+HAZE_ALPHA_MULT = 1.25
+HAZE_ALPHA_MAX = 0.075
+HAZE_POWER = 2.2
 #: Nucleus swirl: two counter-rotating hot lobes inside the body, so the centre
 #: has internal movement instead of a static gradient.
 NUCLEUS_SWIRL_RADIUS_FRAC = 0.22
@@ -500,6 +515,10 @@ CORE_SHELL_SIZE_MULT = 0.42
 CORE_SHELL_MAX_NUC_FRAC = 0.34
 CORE_SHELL_RIM_W = 0.9
 CORE_SHELL_DRAW_LIMIT = 4
+#: How far the field's per-shell ``swirl`` tips an interior disc (degrees):
+#: small enough that the stack stays a core, large enough that the shells
+#: visibly counter-rotate.
+CORE_SHELL_SWIRL_TILT_DEG = 34.0
 #: Below this alpha a primitive is imperceptible: skip it rather than let the
 #: 8-bit quantisation snap it to zero in one frame (a tiny hard pop).
 ALPHA_EPS = 0.004
@@ -1214,6 +1233,15 @@ def mark_cylinder_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
 def mark_orbiter_particles(t: Any, R: Any) -> List[Dict[str, Any]]:
     """Bodies circling the NUCLEUS on inclined 3D orbits; empty when still."""
     return _field_layer("orbiter_particles", t, R, reduced_empty=True)
+
+
+def mark_haze(t: Any, R: Any) -> List[Dict[str, Any]]:
+    """The slow atmospheric parallax bed; empty under reduced motion.
+
+    ``haze_state`` is a moving layer (its bodies ride inclined orbits), so a
+    still frame drops it exactly like every other life layer. Never raises.
+    """
+    return _field_layer("haze_state", t, R, reduced_empty=True)
 
 
 def strided(items: Any, target: int) -> List[Dict[str, Any]]:
@@ -2012,7 +2040,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         vx, vy, g = _place(body.get("x"), body.get("y"), d,
                            zseed=_num(body.get("index"), None), zflat=True,
                            z=body.get("z"), z2=body.get("z2"))
-        size = _num(body.get("size"), 0.0)
+        # The field's own bounded micro-wobble (not baked into this layer) plus
+        # its glow-driven size breath: the volume shimmers and breathes instead
+        # of drifting on rails.
+        wox, woy = _field.micro_offset(tt, body.get("index"), Rf, 719.9)
+        vx += _num(wox, 0.0)
+        vy += _num(woy, 0.0)
+        size = _num(body.get("size"), 0.0) * max(
+            0.0, _num(body.get("glow"), 1.0))
         focus = _focus(body, d)
         alpha = _num(body.get("alpha"), 0.0) * bright * _shade(1.0, d, g, focus)
         if alpha <= ALPHA_EPS or size <= 0.0:
@@ -2035,16 +2070,32 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         px, py, g = _place(smp.get("x"), smp.get("y"), d,
                            zseed=_num(smp.get("index"), None), zflat=True,
                            z=smp.get("z"), z2=smp.get("z2"))
-        size = _num(smp.get("size"), 0.0) * PHOTON_SIZE_MULT
+        # ``lobe`` and ``sparkle`` (owner: "more detailed"): the bright lensed
+        # arcs shift toward the sample's SECOND palette hue and each sample
+        # breathes in size/brightness on its own fast period, so the ring is a
+        # living lensed image instead of a static dotted circle.
+        lobe = min(1.0, max(0.0, _num(smp.get("lobe"), 0.0)))
+        sparkle = min(1.0, max(0.0, _num(smp.get("sparkle"), 1.0)))
+        size = (_num(smp.get("size"), 0.0) * PHOTON_SIZE_MULT
+                * (0.90 + 0.20 * sparkle))
         focus = _focus(smp, d)
-        alpha = (min(1.0, _num(smp.get("alpha"), 0.0) * PHOTON_ALPHA_MULT)
+        alpha = (min(1.0, _num(smp.get("alpha"), 0.0) * PHOTON_ALPHA_MULT
+                     * (0.92 + 0.16 * sparkle))
                  * bright * _shade(1.0, d, g, focus))
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         hue = smp.get("hue")
-        rgb = (_anchor(_spec_rgb(hue, PHOTON_RING_SAT))
-               if hue is not None
-               else _lift(_num(smp.get("lift"), 0.5)))
+        if hue is not None:
+            alt = smp.get("hue2")
+            base_rgb = _spec_rgb(hue, PHOTON_RING_SAT)
+            if alt is not None:
+                alt_rgb = _spec_rgb(alt, PHOTON_RING_SAT)
+                base_rgb = tuple(_clamp8(base_rgb[i]
+                                         + (alt_rgb[i] - base_rgb[i]) * lobe)
+                                 for i in range(3))
+            rgb = _anchor(base_rgb)
+        else:
+            rgb = _lift(_num(smp.get("lift"), 0.5))
         _dot(px, py, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
 
     def _screen_break(body: Dict[str, Any]) -> None:
@@ -2069,9 +2120,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # keeps the deliberate overflow (owner: "do more of that") without
         # touching the field's own declared geometry.
         push = max(1.0, _num(SCREEN_BREAK_PUSH, 1.0))
+        # ``glow`` (not folded into this layer's size) breathes the break
+        # bodies as they surge past the edge.
+        glow = max(0.0, _num(body.get("glow"), 1.0))
         _glint(_num(body.get("x"), 0.0) * push,
                _num(body.get("y"), 0.0) * push,
-               body.get("size"), body.get("alpha"), rgb,
+               _num(body.get("size"), 0.0) * glow,
+               body.get("alpha"), rgb,
                skew_deg=body.get("skew"), depth=depth,
                zseed=_num(body.get("index"), None), zflat=True,
                z=body.get("z"), z2=body.get("z2"))
@@ -2123,8 +2178,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         a = _shade(_num(shell.get("alpha"), 0.0), d, g) * bright
         if a <= ALPHA_EPS or rr <= 0.0:
             return
+        # ``swirl`` (the field's per-shell inward drift) tilts each interior
+        # disc as it swirls, so the nested shells turn against each other
+        # instead of sitting as a fixed stack.
+        swirl = min(1.0, max(0.0, _num(shell.get("swirl"), 0.0)))
         tilt = math.radians(_num(shell.get("tilt"), 0.0)
-                            + _num(shell.get("spin_deg"), 0.0))
+                            + _num(shell.get("spin_deg"), 0.0)
+                            + CORE_SHELL_SWIRL_TILT_DEG * swirl)
         ry = max(CORE_SHELL_MIN_PX, rr * (0.30 + 0.70 * abs(math.cos(tilt))))
         rgb = _anchor(_spec_rgb(_num(shell.get("hue"), 0.0), CORE_SHELL_SAT))
         hot = _lift(CORE_SHELL_CORE_LIFT)
@@ -2157,7 +2217,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         return px, py, max(0.0, _num(body.get("size"), 0.0) * g)
 
     def _layer_batch(items: Any, buckets: int, arm_frac: float = 0.0,
-                     streak_s: float = 0.0) -> None:
+                     streak_s: float = 0.0, wobble_salt: Any = None,
+                     glow_size: bool = False,
+                     streak_key: Any = None) -> None:
         """Draw MANY field bodies as a FEW batched paths, bucketed by hue.
 
         The field's new layers return dozens of bodies (ring particles on
@@ -2174,10 +2236,23 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         moving matter instead of a static dot at no extra primitive cost. It
         is a chain of DOTS, never a stroked ribbon (owner 2026-10-19: the bent
         ribbons read as L/V check marks and are gone).
+
+        Owner 2026-10-19 "more fluid ... more detailed": three optional,
+        additive refinements the field now publishes.
+        ``wobble_salt`` applies the shared
+        :func:`mark_field.micro_offset` to bodies whose layer does not already
+        bake it in (orbiters, ring bodies, flares), so they shimmer on their
+        own bounded screen-space oscillation. ``glow_size`` multiplies each
+        body's radius by its published ``glow`` (the field folds ``glow`` into
+        ALPHA only for these layers, so this is size breathing, not a double
+        count). ``streak_key`` scales the motion tail per body by that key
+        (infall ``flicker``, accretion ``clump``), so falling matter gutters
+        and the spiral glints in knots rather than streaking uniformly.
         """
         n = max(1, int(buckets))
+        # (px, py, size, alpha, hue, vx, vy, streak_mult)
         groups: List[List[Tuple[float, float, float, float, float,
-                                float, float]]] = [[] for _ in range(n)]
+                                float, float, float]]] = [[] for _ in range(n)]
         for b in items:
             if not isinstance(b, dict):
                 continue
@@ -2185,13 +2260,22 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             focus = _focus(b, d)
             alpha = _shade(_num(b.get("alpha"), 0.0), d, dof=focus) * bright
             px, py, size = _project_body(b)
+            if wobble_salt is not None:
+                wox, woy = _field.micro_offset(
+                    tt, b.get("index"), Rf, wobble_salt)
+                px += _num(wox, 0.0)
+                py += _num(woy, 0.0)
+            if glow_size:
+                size *= max(0.0, _num(b.get("glow"), 1.0))
             if alpha <= ALPHA_EPS or size <= 0.0:
                 continue
             hue = max(0.0, min(0.999, _num(b.get("hue"), 0.0)))
+            key = (max(0.0, _num(b.get(streak_key), 1.0))
+                   if streak_key is not None else 1.0)
             k = int(hue * n) % n
             groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha,
                               hue, _num(b.get("vx"), 0.0),
-                              _num(b.get("vy"), 0.0)))
+                              _num(b.get("vy"), 0.0), key))
         for k, pts in enumerate(groups):
             if not pts:
                 continue
@@ -2202,7 +2286,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _anchor(_spec_rgb(pts[0][4], BLINK_DOT_SAT))
             if arm_frac > 0.0:
                 stroke = QPainterPath()
-                for px, py, size, _a, _h, _vx, _vy in pts:
+                for px, py, size, _a, _h, _vx, _vy, _k in pts:
                     arm = size * arm_frac
                     stroke.moveTo(px - arm, py - arm)
                     stroke.lineTo(px + arm, py + arm)
@@ -2211,14 +2295,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 p.setBrush(Qt.NoBrush)
                 p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
                                      _clamp8(255.0 * max(
-                                         a for _x, _y, _s, a, _h, _vx, _vy
+                                         a for _x, _y, _s, a, _h, _vx, _vy, _k
                                          in pts))),
                               GLINT_PEN_W))
                 p.drawPath(stroke)
                 p.setPen(Qt.NoPen)
             path = QPainterPath()
             st = max(0.0, _num(streak_s, 0.0))
-            for px, py, size, _a, _h, vx, vy in pts:
+            for px, py, size, _a, _h, vx, vy, sk in pts:
                 rr = size * (GLINT_CORE_SCALE if arm_frac > 0.0 else 1.0)
                 rr = max(GLINT_CORE_MIN, rr)
                 path.addEllipse(QRectF(px - rr, py - rr, rr * 2.0, rr * 2.0))
@@ -2226,18 +2310,20 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     # A tapering chain of discs behind the body, inside the
                     # same path: motion detail, zero extra primitives.
                     for step, scale in ((1.0, 0.62), (1.85, 0.36)):
-                        tx = px - vx * st * step
-                        ty = py - vy * st * step
+                        tx = px - vx * st * step * sk
+                        ty = py - vy * st * step * sk
                         tr = max(GLINT_CORE_MIN, rr * scale)
                         path.addEllipse(QRectF(tx - tr, ty - tr,
                                                tr * 2.0, tr * 2.0))
-            peak = max(a for _x, _y, _s, a, _h, _vx, _vy in pts)
+            peak = max(a for _x, _y, _s, a, _h, _vx, _vy, _k in pts)
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
-    def _cylinder_batch(items: Any, buckets: int) -> None:
+    def _cylinder_batch(items: Any, buckets: int,
+                        wobble_salt: Any = None,
+                        glow_size: bool = False) -> None:
         """The vertical column, batched; bodies dim toward the column ends."""
         n = max(1, int(buckets))
         groups: List[List[Tuple[float, float, float, float, float]]] = [
@@ -2252,6 +2338,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             alpha = _shade(_num(b.get("alpha"), 0.0) * dim, d,
                            dof=focus) * bright
             px, py, size = _project_body(b)
+            if wobble_salt is not None:
+                wox, woy = _field.micro_offset(
+                    tt, b.get("index"), Rf, wobble_salt)
+                px += _num(wox, 0.0)
+                py += _num(woy, 0.0)
+            if glow_size:
+                size *= max(0.0, _num(b.get("glow"), 1.0))
             if alpha <= ALPHA_EPS or size <= 0.0:
                 continue
             hue = max(0.0, min(0.999, _num(b.get("hue"), 0.0)))
@@ -2274,14 +2367,59 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
+    def _haze_batch(items: Any) -> None:
+        """The atmospheric parallax bed, as a few SOFT radial glows.
+
+        ``haze_state`` publishes large, very faint bodies behind the whole
+        mark. They are drawn as soft power-falloff smoke (a gradient path
+        each, no rim) rather than flat discs: a flat fill at a readable alpha
+        leaves a visible circular edge — a "bubble" — which is exactly the
+        cheap-looking artefact this must avoid. The layer is strided to
+        ``HAZE_DRAW_LIMIT`` so the bed adds depth while the primitive cost
+        stays a handful of paths. ``HAZE_SIZE_MULT`` lifts the field's
+        field-scale sizes into readable glows (they are sub-pixel at orb size)
+        and ``HAZE_ALPHA_MULT`` lifts the near-invisible declared alpha into a
+        subtle but visible bed.
+        """
+        for b in items:
+            if not isinstance(b, dict):
+                continue
+            d = _num(b.get("depth"), 0.5)
+            focus = _focus(b, d)
+            alpha = min(HAZE_ALPHA_MAX,
+                        _shade(_num(b.get("alpha"), 0.0) * HAZE_ALPHA_MULT,
+                               d, dof=focus) * bright)
+            px, py, g = _place(b.get("x"), b.get("y"), d,
+                               zseed=_num(b.get("index"), None), zflat=True,
+                               z=b.get("z"), z2=b.get("z2"))
+            size = _num(b.get("size"), 0.0) * HAZE_SIZE_MULT * g
+            if alpha <= ALPHA_EPS or size <= 0.0:
+                continue
+            hue = _num(b.get("hue"), 0.0)
+            rgb = (_anchor(_spec_rgb(hue, VOLUME_PARTICLE_SAT))
+                   if b.get("hue") is not None
+                   else _lift(_num(b.get("lift"), 0.5)))
+            _smoke(px, py, max(1.0, size), rgb, alpha, power=HAZE_POWER)
+
     def _filament(smp: Dict[str, Any]) -> None:
-        """One sample of the travelling energy filament, a pulsing dot."""
+        """One sample of the travelling energy filament, a pulsing dot.
+
+        The field's ``crest`` (the travelling wave value) is consumed here on
+        top of the size/alpha it already folds in: a wave crest swells and
+        brightens a little further and rides the shared micro-wobble, so the
+        filament reads as a live current rather than a dotted ring.
+        """
         d = _num(smp.get("depth"), 0.5)
         fx, fy, g = _place(smp.get("x"), smp.get("y"), d,
                            zseed=_num(smp.get("index"), None), zflat=True,
                            z=smp.get("z"), z2=smp.get("z2"))
-        size = _num(smp.get("size"), 0.0)
-        alpha = _num(smp.get("alpha"), 0.0) * bright * g
+        wox, woy = _field.micro_offset(tt, smp.get("index"), Rf, 257.1)
+        fx += _num(wox, 0.0)
+        fy += _num(woy, 0.0)
+        crest = min(1.0, max(0.0, _num(smp.get("crest"), 0.0)))
+        size = _num(smp.get("size"), 0.0) * (0.88 + 0.28 * crest)
+        alpha = (_num(smp.get("alpha"), 0.0) * (0.82 + 0.36 * crest)
+                 * bright * g)
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         rgb = _anchor(_spec_rgb(_num(smp.get("hue"), 0.0), BLINK_DOT_SAT))
@@ -2385,6 +2523,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     flares = ([] if reduced else strided(mark_flare_dots(t, Rf), FLARE_DRAW_LIMIT))
     filament = ([] if reduced
                 else strided(mark_filament(t, Rf), FILAMENT_DRAW_COUNT))
+    # The atmospheric parallax bed: a slow, very faint layer of large soft
+    # bodies BEHIND everything (owner: "more fluid ... more detailed"). It is
+    # a moving layer, so it is dropped under reduced motion exactly like the
+    # rest of the life.
+    haze = strided(mark_haze(t, Rf), HAZE_DRAW_LIMIT)
 
     # ---- the two turns ---------------------------------------------------
     # 1. The MASTER spin is a painter transform about (cx, cy): a slow 360 deg
@@ -2428,16 +2571,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # sparkle dots. Their individual positions come from the field; only
         # the draw is grouped, so the primitive cost stays flat.
         _layer_batch([p for p in ring_parts if _is_near(p, near)],
-                     RING_PARTICLE_BUCKETS, arm_frac=_field.GLINT_ARM_FRAC * 0.8)
+                     RING_PARTICLE_BUCKETS,
+                     arm_frac=_field.GLINT_ARM_FRAC * 0.8,
+                     wobble_salt=219.3)
         _cylinder_batch([p for p in cyl_parts if _is_near(p, near)],
-                        CYLINDER_BUCKETS)
+                        CYLINDER_BUCKETS, wobble_salt=327.5, glow_size=True)
         # Accretion + infall: dense dot families riding the rings / falling in.
         # Batched (they are dots, not wakes), so 28 + 14 samples cost a few
-        # paths while the spiral and the inward motion stay visible.
+        # paths while the spiral and the inward motion stay visible. Their
+        # motion tails are scaled per body by the field's ``clump`` (a knot in
+        # the stream) and ``flicker`` (guttering infall), so the tails vary in
+        # length instead of streaking uniformly.
         _layer_batch([p for p in accretion if _is_near(p, near)],
-                     ACCRETION_BUCKETS, streak_s=0.055)
+                     ACCRETION_BUCKETS, streak_s=0.055, streak_key="clump")
         _layer_batch([p for p in infall if _is_near(p, near)], INFALL_BUCKETS,
-                     streak_s=0.075)
+                     streak_s=0.075, streak_key="flicker")
         for body in volumes_:
             _volume_particle(body)
         # Orbiters circle the NUCLEUS on inclined 3D orbits, so they split by
@@ -2445,10 +2593,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # in front of it — that is what reads as orbiting the middle rather
         # than sliding along a ring. Plain dots (no glint arms): at orbiter
         # size the arms are sub-pixel, and the batched arm stroke read as a
-        # third thin "orbit" outline to the echo-ring contract.
+        # third thin "orbit" outline to the echo-ring contract. They take the
+        # field's own micro-wobble (not baked into this layer) and breathe in
+        # size with their published ``glow``.
         _layer_batch([p for p in orbiters if _is_near(p, near)],
-                     ORBITER_BUCKETS)
-        _layer_batch([p for p in flares if _is_near(p, near)], FLARE_BUCKETS)
+                     ORBITER_BUCKETS, wobble_salt=427.7, glow_size=True)
+        _layer_batch([p for p in flares if _is_near(p, near)], FLARE_BUCKETS,
+                     wobble_salt=421.1)
         _layer_batch(glints_, SPARKLE_BUCKETS)
         for smp in filament:
             if _is_near(smp, near):
@@ -2476,6 +2627,16 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     near_dust = [m for m in dust if m["depth"] >= 0.5]
     far_parts = [q for q in parts if q["depth"] < 0.5]
     near_parts = [q for q in parts if q["depth"] >= 0.5]
+
+    # ---- atmospheric haze: the parallax bed behind the whole mark ---------
+    # Painted before the master spin transform is pushed, so the bed holds
+    # still while the mark turns: it is the room, not part of the assembly.
+    # One call, a couple of batched paths, and defensive like the bloom — a
+    # haze fault must never blank the mark.
+    try:
+        _haze_batch(haze)
+    except Exception:  # noqa: BLE001 - atmosphere must never blank the mark
+        pass
 
     p.save()
     if spin:

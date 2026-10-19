@@ -635,3 +635,42 @@ def test_processing_stop_is_safe_from_signal_handler(monkeypatch):
     t.join(timeout=3.0)
     assert procs == []
     assert "interrupt" in _event_types(h)
+
+
+class _BlockedWaitProc(StopProc):
+    """A player whose ``wait`` was already blocked when the stop terminated it.
+
+    ``stop_speaking`` calls ``terminate`` from the signal handler, so the
+    helper's 50 ms ``proc.wait`` returns NORMALLY (not TimeoutExpired). The
+    stop flag must still classify that end as the stop; otherwise the
+    canonical ``interrupt`` boundary is dropped on this race.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.released = threading.Event()
+
+    def terminate(self):
+        super().terminate()
+        self.released.set()
+
+    def wait(self, timeout=None):
+        self.released.wait(timeout=timeout or 0.05)
+        return 0
+
+    def poll(self):
+        return None if self.alive else 0
+
+
+def test_stop_interrupt_survives_a_blocked_wait_returning_normally(monkeypatch):
+    h = _helper(monkeypatch, _cfg(barge_in=False), FakeMic(), [],
+                proc_cls=_BlockedWaitProc)
+    t = _speak_in_thread(h, "long reply that a blocked wait was reading")
+    assert h.stop_speaking() is True
+    t.join(timeout=3.0)
+    assert not t.is_alive()
+    types = _event_types(h)
+    assert "interrupt" in types, (
+        "a stop that terminates a blocked player wait must still emit "
+        f"interrupt; got {types}")
+    assert types.index("interrupt") < types.index("playback.stopped")
