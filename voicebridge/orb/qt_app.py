@@ -148,7 +148,7 @@ RING_PARTICLE_DRAW_LIMIT = 22
 CYLINDER_DRAW_LIMIT = 32
 ORBITER_DRAW_LIMIT = 30
 FLARE_DRAW_LIMIT = 8
-FILAMENT_DRAW_COUNT = 10
+FILAMENT_DRAW_COUNT = 8
 RING_PARTICLE_BUCKETS = 3
 CYLINDER_BUCKETS = 2
 ORBITER_BUCKETS = 2
@@ -296,14 +296,16 @@ RING_WARP_SAMPLES = _field.RING_PATH_SAMPLES
 #: ONE solid ellipse; glow and highlight are gradient paths beside it. All of
 #: it is static, so reduced motion is a valid still frame.
 NUCLEUS_CORE_LIFT = 0.78
-NUCLEUS_GLOW_MULT = 3.15
-NUCLEUS_GLOW_ALPHA = 0.135
+#: A little wider and a little quieter than the old glare: the halo should read
+#: as atmosphere radiating off the core, not as a bright second disc beside it.
+NUCLEUS_GLOW_MULT = 3.55
+NUCLEUS_GLOW_ALPHA = 0.118
 #: The aura is SMOKE, not a disc: a long power falloff sampled at many stops so
 #: there is no alpha plateau and no visible rim, plus a few slow drifting
 #: plumes that break the perfect circle. A 3-stop gradient at this radius read
 #: as a flat grey disc — the plateau beside the opaque body was the hard edge.
-NUCLEUS_AURA_POWER = 3.9
-NUCLEUS_AURA_STOPS = 24
+NUCLEUS_AURA_POWER = 3.4
+NUCLEUS_AURA_STOPS = 30
 #: (orbit_frac, size_frac, period_s, phase_deg, alpha_scale) per smoke plume.
 NUCLEUS_SMOKE = (
     (0.34, 0.92, 17.0, 0.0, 0.55),
@@ -385,7 +387,7 @@ BINARY_FONT_PX_OFFSET = 1.0
 #: never arms that could read as a check mark), sized/alpha'd by their own
 #: depth. ``*_DRAW_LIMIT`` keeps the pass flat: the field publishes 52 bodies
 #: and the painter draws an even subset of them.
-VOLUME_DRAW_LIMIT = 18
+VOLUME_DRAW_LIMIT = 16
 #: Restrained saturation for the new dot families: the FIELD's own matte band,
 #: never the old near-neon values, so the palette stays professional.
 VOLUME_PARTICLE_SAT = _field.RGB_TRAIL_SAT_BASE
@@ -1386,19 +1388,38 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             py += oy
         return cx + px, cy + py, g
 
-    def _shade(alpha: Any, depth: Any = 0.5, gain: Any = 1.0) -> float:
+    def _focus(item: Any, depth: Any = 0.5) -> float:
+        """The element's own out-of-focus amount, from the field if it carries one.
+
+        The field publishes ``dof`` per body (0 sharp / 1 far). Prefer it when
+        present so a richer field lane can refine the focus per element; fall
+        back to the shared depth convention otherwise. Junk-safe: a missing,
+        bad or out-of-range value degrades to the depth-derived value.
+        """
+        raw = None
+        if isinstance(item, dict):
+            raw = item.get("dof")
+        if raw is not None:
+            return min(1.0, max(0.0, _num(raw, 0.0)))
+        return _field.dof(min(1.0, max(0.0, _num(depth, 0.5))))
+
+    def _shade(alpha: Any, depth: Any = 0.5, gain: Any = 1.0,
+               dof: Any = None) -> float:
         """Alpha after the turn's depth gain and the depth-of-field softening.
 
         ``gain`` is the element's own :func:`y_turn_gain` (bigger and brighter
         as it swings toward the viewer); ``depth`` is its FIELD depth, which
-        drives the focus term. ``bright`` is deliberately NOT folded in here:
-        several callers already apply it and a second application would
-        quietly flatten the mark's brightness ladder.
+        drives the focus term. ``dof`` may carry the element's own published
+        focus value; when omitted the depth convention is used. ``bright`` is
+        deliberately NOT folded in here: several callers already apply it and a
+        second application would quietly flatten the mark's brightness ladder.
         """
         a = _num(alpha, 0.0)
         d = min(1.0, max(0.0, _num(depth, 0.5)))
+        focus = (_field.dof(d) if dof is None
+                 else min(1.0, max(0.0, _num(dof, _field.dof(d)))))
         a *= _num(gain, 1.0)
-        a *= 1.0 - DOF_ALPHA_SOFT * _field.dof(d)
+        a *= 1.0 - DOF_ALPHA_SOFT * focus
         return a
 
     def _tone(rgb: Tuple[int, int, int], gain: Any = 1.0
@@ -1699,7 +1720,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                            zflat=True, z=mote.get("z"), z2=mote.get("z2"))
         _dot(mx, my,
              max(0.25, _num(mote.get("size"), 0.0) * g),
-             _shade(_num(mote.get("alpha"), 0.0) * bright, d, g),
+             _shade(_num(mote.get("alpha"), 0.0) * bright, d, g,
+                    _focus(mote, d)),
              _lift(mote.get("lift")), g)
 
     def _sparkle(glint: Dict[str, Any]) -> None:
@@ -1730,6 +1752,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         pair_span = (hue2_t - hue_h) % 1.0
         trail = list(traveller.get("trail") or [])
         n_beads = max(1, len(trail))
+        focus = _focus(traveller, depth)
         for k, smp in enumerate(trail):
             hue = (head_hue + ((k + 1) / float(n_beads)) * pair_span) % 1.0
             bx, by, bg = _place(smp.get("x"), smp.get("y"), depth,
@@ -1737,14 +1760,16 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                                 z=smp.get("z"), z2=smp.get("z2"))
             _dot(bx, by,
                  _num(smp.get("size"), 0.0) * bg,
-                 _shade(_num(smp.get("alpha"), 0.0) * bright, depth, bg),
+                 _shade(_num(smp.get("alpha"), 0.0) * bright, depth, bg,
+                        focus),
                  _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg)
         hx, hy, hg = _place(traveller.get("x"), traveller.get("y"), depth,
                             zseed=tseed, zflat=True,
                             z=traveller.get("z"), z2=traveller.get("z2"))
         _dot(hx, hy,
              max(0.4, _num(traveller.get("size"), 0.0) * hg),
-             _shade(_num(traveller.get("alpha"), 0.0) * bright, depth, hg),
+             _shade(_num(traveller.get("alpha"), 0.0) * bright, depth, hg,
+                    focus),
              _anchor(_spec_rgb(head_hue, COMET_BEAD_SAT)), hg)
 
     def _smoke(ox: float, oy: float, rad: float, rgb: Tuple[int, int, int],
@@ -1790,6 +1815,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         hot = _lift(NUCLEUS_CORE_LIFT)
         ck = _num(tt, 0.0)
         bt = _num(beat, 0.0)
+        # The fixed room light, carried by the combined tumble: ``cos_y`` and
+        # ``cos_x`` are +1 face-on and -1 mirrored, so the highlight sweeps
+        # across the face on both axes as the sphere turns. It is also the
+        # FOCAL POINT of the body gradient below, which is what makes the core
+        # read as a lit sphere (a hot spot off-centre with the surface falling
+        # away from it) rather than a flat disc with a symmetric glow.
+        sx = cx - r * NUCLEUS_SPEC_OFFSET_FRAC * cos_y
+        sy = cy - r * NUCLEUS_SPEC_OFFSET_FRAC * cos_x
         # Chromatic corona first, so the white aura and the body sit ON it and
         # it reads as light radiated by the core rather than a haze lying over
         # it. Hue comes from the field's wheel and turns slowly: fast enough to
@@ -1835,10 +1868,17 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             _smoke(cx, cy,
                    max(0.6, r * NUCLEUS_FLARE_RADIUS_FRAC * (0.45 + 0.75 * bt)),
                    hot, NUCLEUS_FLARE_ALPHA * bt)
-        body = QRadialGradient(QPointF(cx, cy), r)
+        # Shaded sphere with a FOCAL light: the hot core sits at the specular
+        # point (not at the geometric centre) and the surface dies away toward
+        # the limb, so the body has a lit side and a shadow side. More stops
+        # than the old four give a smooth terminator instead of two visible
+        # bands.
+        body = QRadialGradient(QPointF(cx, cy), r, QPointF(sx, sy))
         body.setColorAt(0.0, QColor(hot[0], hot[1], hot[2], 255))
-        body.setColorAt(0.34, QColor(rgb[0], rgb[1], rgb[2], 250))
-        body.setColorAt(0.70, QColor(rgb[0], rgb[1], rgb[2], 200))
+        body.setColorAt(0.16, QColor(hot[0], hot[1], hot[2], 252))
+        body.setColorAt(0.44, QColor(rgb[0], rgb[1], rgb[2], 248))
+        body.setColorAt(0.72, QColor(rgb[0], rgb[1], rgb[2], 214))
+        body.setColorAt(0.90, QColor(rgb[0], rgb[1], rgb[2], 132))
         body.setColorAt(1.0, QColor(rgb[0], rgb[1], rgb[2], 0))
         p.setBrush(QBrush(body))
         p.drawEllipse(cx - r, cy - r, r * 2.0, r * 2.0)
@@ -1847,17 +1887,43 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # chromatic split that used to sit here read as a galaxy colour, so it
         # is retired; the limb is a single neutral highlight.
         _outline(r, (255, 255, 255), NUCLEUS_RIM_ALPHA, NUCLEUS_RIM_WIDTH)
-        if bt > 0.0:
-            # Caustic: the boiling highlight inside the core. Between beats it
-            # never vanishes entirely, so the centre keeps a live inner light
-            # while the flare above it is the thump.
-            craw = math.radians(360.0 * ck / NUCLEUS_CAUSTIC_PERIOD_S)
-            ca = (NUCLEUS_CAUSTIC_ALPHA_BASE
-                  + NUCLEUS_CAUSTIC_ALPHA * bt
-                  * (0.5 + 0.5 * math.sin(2.0 * craw)))
-            _smoke(cx + r * 0.16 * math.cos(craw),
-                   cy + r * 0.16 * math.sin(craw),
-                   max(0.6, r * NUCLEUS_CAUSTIC_RADIUS_FRAC), hot, ca)
+        # Crisp key specular at the focal point: the broad gradient gives the
+        # surface its lit side; this small glossy highlight is what makes it
+        # read as a polished body rather than a matte ball. It rides the same
+        # tumble (the light is fixed in the room).
+        sr = r * NUCLEUS_SPEC_RADIUS_FRAC * 0.5
+        spec = QRadialGradient(QPointF(sx, sy), sr)
+        spec.setColorAt(0.0, QColor(255, 255, 255,
+                                    _clamp8(255.0 * NUCLEUS_SPEC_ALPHA)))
+        spec.setColorAt(0.45, QColor(255, 255, 255,
+                                     _clamp8(255.0 * NUCLEUS_SPEC_ALPHA
+                                             * 0.32)))
+        spec.setColorAt(1.0, QColor(255, 255, 255, 0))
+        spath = QPainterPath()
+        spath.addEllipse(QRectF(sx - sr, sy - sr, sr * 2.0, sr * 2.0))
+        p.setBrush(QBrush(spec))
+        p.drawPath(spath)
+        # Bounce light: a soft, cooler fill on the side AWAY from the key
+        # light. Physically it is light reflected back onto the sphere; visually
+        # it keeps the shadow side from going flat, which is the difference
+        # between a lit ball and a one-sided sticker. It is deliberately much
+        # dimmer than the key so it never competes with the hot core.
+        _smoke(cx + r * NUCLEUS_SPEC_OFFSET_FRAC * cos_y,
+               cy + r * NUCLEUS_SPEC_OFFSET_FRAC * cos_x,
+               max(0.6, r * 0.46), hot,
+               NUCLEUS_SPEC_ALPHA * 0.14, power=2.1)
+        # Caustic: the boiling highlight inside the core. It NEVER goes out —
+        # between beats it is the live inner light; on the thump it swells and
+        # brightens. (The old version existed only during the beat, so the
+        # quiet core was a dead ball for most of the cycle.)
+        craw = math.radians(360.0 * ck / NUCLEUS_CAUSTIC_PERIOD_S)
+        ca = ((NUCLEUS_CAUSTIC_ALPHA_BASE
+               + NUCLEUS_CAUSTIC_ALPHA * bt
+               * (0.5 + 0.5 * math.sin(2.0 * craw)))
+              * (0.86 + 0.14 * (0.5 + 0.5 * math.sin(craw))))
+        _smoke(cx + r * 0.16 * math.cos(craw),
+               cy + r * 0.16 * math.sin(craw),
+               max(0.6, r * NUCLEUS_CAUSTIC_RADIUS_FRAC), hot, ca)
         # Inner swirl: two counter-rotating hot lobes inside the body. They
         # give the centre internal motion the flat gradient could never have,
         # and they open on the beat so the core's internal motion is louder on
@@ -1884,32 +1950,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             lpath.addEllipse(QRectF(lx - lr, ly - lr, lr * 2.0, lr * 2.0))
             p.setBrush(QBrush(lobe))
             p.drawPath(lpath)
-        # Specular highlight, carried by the combined tumble. The body is
-        # exempt from that tumble (a sphere's silhouette is a circle from every
-        # angle), but it is NOT exempt from rotating: the light is fixed in the
-        # room and the sphere turns under it, so the highlight sweeps across
-        # the face on both axes — off to one side at face-on, across the
-        # centre and to the far side as each axis turns, and back. A static
-        # off-centre highlight on a turning body reads as a flat disc with a
-        # smudge on it; a sweeping one is what makes the core read as a sphere
-        # that is turning.
-        sr = r * NUCLEUS_SPEC_RADIUS_FRAC
-        # ``cos_y``/``cos_x`` are the tumble's two cosines: +1 face-on, -1
-        # mirrored. The highlight therefore crosses the centre on both axes
-        # across a combined turn and is exactly where it was on a still frame
-        # (both phases 0). A static off-centre highlight on a turning body
-        # reads as a flat disc with a smudge on it; a sweeping one is what
-        # makes the core read as a sphere that is turning.
-        sx = cx - r * NUCLEUS_SPEC_OFFSET_FRAC * cos_y
-        sy = cy - r * NUCLEUS_SPEC_OFFSET_FRAC * cos_x
-        spec = QRadialGradient(QPointF(sx, sy), sr)
-        spec.setColorAt(0.0, QColor(255, 255, 255,
-                                    _clamp8(255.0 * NUCLEUS_SPEC_ALPHA)))
-        spec.setColorAt(1.0, QColor(255, 255, 255, 0))
-        spath = QPainterPath()
-        spath.addEllipse(QRectF(sx - sr, sy - sr, sr * 2.0, sr * 2.0))
-        p.setBrush(QBrush(spec))
-        p.drawPath(spath)
+        # The key highlight is no longer a second gradient disc: it is the
+        # body gradient's FOCAL POINT above, so it is part of the sphere's own
+        # shading rather than a sticker laid over it (and one fewer primitive).
         # Orbiting specular: a small hot dot running once around the body per
         # period — the cue that reads as rotation rather than pulsing.
         pang = math.radians(360.0 * _num(tt, 0.0) / NUCLEUS_SPECULAR_PERIOD_S
@@ -1970,7 +2013,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                            zseed=_num(body.get("index"), None), zflat=True,
                            z=body.get("z"), z2=body.get("z2"))
         size = _num(body.get("size"), 0.0)
-        alpha = _num(body.get("alpha"), 0.0) * bright * _shade(1.0, d, g)
+        focus = _focus(body, d)
+        alpha = _num(body.get("alpha"), 0.0) * bright * _shade(1.0, d, g, focus)
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         hue = body.get("hue")
@@ -1992,8 +2036,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                            zseed=_num(smp.get("index"), None), zflat=True,
                            z=smp.get("z"), z2=smp.get("z2"))
         size = _num(smp.get("size"), 0.0) * PHOTON_SIZE_MULT
+        focus = _focus(smp, d)
         alpha = (min(1.0, _num(smp.get("alpha"), 0.0) * PHOTON_ALPHA_MULT)
-                 * bright * _shade(1.0, d, g))
+                 * bright * _shade(1.0, d, g, focus))
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         hue = smp.get("hue")
@@ -2111,8 +2156,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                            z=body.get("z"), z2=body.get("z2"))
         return px, py, max(0.0, _num(body.get("size"), 0.0) * g)
 
-    def _layer_batch(items: Any, buckets: int, arm_frac: float = 0.0
-                     ) -> None:
+    def _layer_batch(items: Any, buckets: int, arm_frac: float = 0.0,
+                     streak_s: float = 0.0) -> None:
         """Draw MANY field bodies as a FEW batched paths, bucketed by hue.
 
         The field's new layers return dozens of bodies (ring particles on
@@ -2122,22 +2167,31 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         each group is emitted as ONE fill path (plus, when ``arm_frac`` > 0,
         ONE stroke path for glint arms). The cloud reads dense and spectral
         while the per-frame primitive cost stays flat.
+
+        ``streak_s`` adds a short motion tail to bodies that carry the field's
+        ``vx``/``vy`` (accretion and infall): two smaller trailing discs are
+        appended INTO the same path, so a falling or winding body reads as
+        moving matter instead of a static dot at no extra primitive cost. It
+        is a chain of DOTS, never a stroked ribbon (owner 2026-10-19: the bent
+        ribbons read as L/V check marks and are gone).
         """
         n = max(1, int(buckets))
-        groups: List[List[Tuple[float, float, float, float, float]]] = [
-            [] for _ in range(n)]
+        groups: List[List[Tuple[float, float, float, float, float,
+                                float, float]]] = [[] for _ in range(n)]
         for b in items:
             if not isinstance(b, dict):
                 continue
             d = _num(b.get("depth"), 0.5)
-            alpha = _shade(_num(b.get("alpha"), 0.0), d) * bright
+            focus = _focus(b, d)
+            alpha = _shade(_num(b.get("alpha"), 0.0), d, dof=focus) * bright
             px, py, size = _project_body(b)
             if alpha <= ALPHA_EPS or size <= 0.0:
                 continue
             hue = max(0.0, min(0.999, _num(b.get("hue"), 0.0)))
             k = int(hue * n) % n
             groups[k].append((px, py, max(BLINK_DOT_MIN_PX, size), alpha,
-                              hue))
+                              hue, _num(b.get("vx"), 0.0),
+                              _num(b.get("vy"), 0.0)))
         for k, pts in enumerate(groups):
             if not pts:
                 continue
@@ -2148,7 +2202,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _anchor(_spec_rgb(pts[0][4], BLINK_DOT_SAT))
             if arm_frac > 0.0:
                 stroke = QPainterPath()
-                for px, py, size, _a, _h in pts:
+                for px, py, size, _a, _h, _vx, _vy in pts:
                     arm = size * arm_frac
                     stroke.moveTo(px - arm, py - arm)
                     stroke.lineTo(px + arm, py + arm)
@@ -2157,16 +2211,27 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 p.setBrush(Qt.NoBrush)
                 p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
                                      _clamp8(255.0 * max(
-                                         a for _x, _y, _s, a, _h in pts))),
+                                         a for _x, _y, _s, a, _h, _vx, _vy
+                                         in pts))),
                               GLINT_PEN_W))
                 p.drawPath(stroke)
                 p.setPen(Qt.NoPen)
             path = QPainterPath()
-            for px, py, size, _a, _h in pts:
+            st = max(0.0, _num(streak_s, 0.0))
+            for px, py, size, _a, _h, vx, vy in pts:
                 rr = size * (GLINT_CORE_SCALE if arm_frac > 0.0 else 1.0)
                 rr = max(GLINT_CORE_MIN, rr)
                 path.addEllipse(QRectF(px - rr, py - rr, rr * 2.0, rr * 2.0))
-            peak = max(a for _x, _y, _s, a, _h in pts)
+                if st > 0.0 and (abs(vx) + abs(vy)) > 1e-6:
+                    # A tapering chain of discs behind the body, inside the
+                    # same path: motion detail, zero extra primitives.
+                    for step, scale in ((1.0, 0.62), (1.85, 0.36)):
+                        tx = px - vx * st * step
+                        ty = py - vy * st * step
+                        tr = max(GLINT_CORE_MIN, rr * scale)
+                        path.addEllipse(QRectF(tx - tr, ty - tr,
+                                               tr * 2.0, tr * 2.0))
+            peak = max(a for _x, _y, _s, a, _h, _vx, _vy in pts)
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
             p.drawPath(path)
@@ -2181,9 +2246,11 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             if not isinstance(b, dict):
                 continue
             d = _num(b.get("depth"), 0.5)
+            focus = _focus(b, d)
             hh = abs(_num(b.get("h"), 0.0)) / (Rf if Rf > 0.0 else 1.0)
             dim = 1.0 - CYLINDER_HEIGHT_DIM * min(1.0, hh)
-            alpha = _shade(_num(b.get("alpha"), 0.0) * dim, d) * bright
+            alpha = _shade(_num(b.get("alpha"), 0.0) * dim, d,
+                           dof=focus) * bright
             px, py, size = _project_body(b)
             if alpha <= ALPHA_EPS or size <= 0.0:
                 continue
@@ -2368,8 +2435,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # Batched (they are dots, not wakes), so 28 + 14 samples cost a few
         # paths while the spiral and the inward motion stay visible.
         _layer_batch([p for p in accretion if _is_near(p, near)],
-                     ACCRETION_BUCKETS)
-        _layer_batch([p for p in infall if _is_near(p, near)], INFALL_BUCKETS)
+                     ACCRETION_BUCKETS, streak_s=0.055)
+        _layer_batch([p for p in infall if _is_near(p, near)], INFALL_BUCKETS,
+                     streak_s=0.075)
         for body in volumes_:
             _volume_particle(body)
         # Orbiters circle the NUCLEUS on inclined 3D orbits, so they split by
@@ -2414,6 +2482,22 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         p.translate(cx, cy)
         p.rotate(spin)
         p.translate(-cx, -cy)
+
+    # ---- atmospheric bloom: the mark's own light on the room --------------
+    # A single, very soft state-tinted falloff UNDER everything else. The mark
+    # emits light; without it the construction floats as hard vector shapes on
+    # whatever is behind the translucent window. It is a wide, low-alpha smoke
+    # path (one primitive) with a long power falloff, so it has no rim and
+    # reads as atmosphere rather than a second disc. The hue is one of the
+    # field's own palette tints, anchored toward the core, so the bloom can
+    # never introduce a colour the mark does not already own.
+    try:
+        _bloom_hue = (tuple(_field.PALETTE_HUES) or (0.56,))[0]
+        _smoke(cx, cy, Rf * 1.18,
+               _anchor(_spec_rgb(_bloom_hue, VOLUME_PARTICLE_SAT)),
+               0.090, power=2.35)
+    except Exception:  # noqa: BLE001 - atmosphere must never blank the mark
+        pass
 
     # ---- far field (depth < 0.5), behind the nucleus ---------------------
     # Its circles include the inner core ring, which is depth-neutral: drawn

@@ -1534,3 +1534,23 @@ def test_batched_layer_colours_come_from_field_hues(monkeypatch):
              and p.kind == "path"]
     assert any(g > r + 40 and g > b + 40 for r, g, b in fills), fills
 
+
+# --------------------------------------------------------------------------- #
+# (p) studio light: atmospheric bloom + depth-of-field bokeh
+# --------------------------------------------------------------------------- #
+def test_atmospheric_bloom_lights_the_room_under_the_mark():
+    # Owner: "soft glows/bloom ... professional". The mark emits its own light:
+    # ONE wide, low-alpha state-tinted fill path sits under the whole
+    # construction (bigger than the mark's own radius), so the vector shapes
+    # read as floating in the orb's atmosphere rather than pasted on a void.
+    from voicebridge.orb import qt_app as Q
+
+    size, R = 192, 90.0
+    prims = _record(t=0.42, size=size)
+    big = [p for p in prims if p.kind == "path" and p.fill is not None
+           and max(p.w, p.h) > 2.0 * R]
+    # Exactly one such path (the bloom); it is a soft gradient fill, so the
+    # recorder cannot read its apex alpha (gradient brushes report their base
+    # colour), which is why this pins presence and count, not opacity.
+    assert len(big) == 1, [round(max(p.w, p.h), 1) for p in big]
+
