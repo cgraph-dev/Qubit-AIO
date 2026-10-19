@@ -670,6 +670,10 @@ def _fixed_temperature_for_model(
     if _is_openai_default_temperature_only(model):
         logger.debug("Omitting temperature for %r (accepts only the default)", model)
         return OMIT_TEMPERATURE
+    from agent.gemini_native_adapter import gemini_sampling_deprecated
+    if gemini_sampling_deprecated(_bare_model(model)):
+        logger.debug("Omitting temperature for %r (Gemini 3.6+ ignores sampling)", model)
+        return OMIT_TEMPERATURE
     from agent.auxiliary_structured_output import _route_key
     if (_route_key(provider, base_url), _bare_model(model)) in _TEMPERATURE_REJECTED_ROUTES:
         logger.debug("Omitting temperature for %r (route rejected it earlier)", model)
