@@ -11,8 +11,13 @@ from gateway.config import GatewayConfig, Platform, PlatformConfig
 
 
 def _gateway(**platforms):
+    # Platform keys must be the Platform ENUM, not bare strings: ``_PLATFORM_CONNECTED_CHECKERS``
+    # is keyed by the enum, so a string key silently misses the lookup and every platform reads
+    # as not-connected (which also makes a "needs both keys" negative test pass for the wrong
+    # reason).
     return GatewayConfig(platforms={
-        p: (cfg if isinstance(cfg, PlatformConfig) else PlatformConfig(enabled=True, **cfg))
+        Platform(p) if isinstance(p, str) else p: (
+            cfg if isinstance(cfg, PlatformConfig) else PlatformConfig(enabled=True, **cfg))
         for p, cfg in platforms.items()
     })
 
