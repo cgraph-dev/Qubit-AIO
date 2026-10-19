@@ -33,6 +33,19 @@ def _create_titled_session(title):
     return fn(title)
 
 
+def _stub_gateway_writer(monkeypatch, result):
+    """Replace the gateway writer main must delegate to (no live gateway in a unit test)."""
+    from qubit_cli import gateway_session_store
+
+    seen = []
+    monkeypatch.setattr(
+        gateway_session_store,
+        "create_titled_session",
+        lambda title: seen.append(title) or result,
+    )
+    return seen
+
+
 class TestCreateIfMissingFlagParsing:
     def test_flag_parses_on_chat_subparser(self):
         """--create-if-missing is accepted by the real chat parser."""
@@ -57,33 +70,27 @@ class TestCreateIfMissingFlagParsing:
 
 
 class TestCreateTitledSession:
-    def test_creates_session_with_title(self, isolated_home):
-        sid = _create_titled_session("Bot Chat")
-        assert sid, "should return a session id"
+    def test_delegates_to_the_gateway_writer(self, isolated_home, monkeypatch):
+        """The gateway is the single writer: main must call
+        ``gateway_session_store.create_titled_session`` rather than mint a local row (#86794)."""
+        seen = _stub_gateway_writer(monkeypatch, "gw-session-id")
+        assert _create_titled_session("Bot Chat") == "gw-session-id"
+        assert seen == ["Bot Chat"]
 
-        from qubit_state import SessionDB
+    def test_gateway_refusal_returns_none(self, isolated_home, monkeypatch):
+        """A refused create (no gateway) surfaces as None so the caller prints its copy."""
+        _stub_gateway_writer(monkeypatch, None)
+        assert _create_titled_session("Bot Chat") is None
 
-        db = SessionDB()
-        try:
-            session = db.get_session(sid)
-            assert session is not None
-            assert db.get_session_title(sid) == "Bot Chat"
-        finally:
-            db.close()
+    def test_writer_failure_is_logged_and_returns_none(self, isolated_home, monkeypatch, caplog):
+        from qubit_cli import gateway_session_store
 
-    def test_created_session_resolvable_by_title(self, isolated_home):
-        """After creation, resolve_session_by_title finds it (idempotent sends)."""
-        sid = _create_titled_session("Bot Chat")
-        assert sid
+        def _boom(title):
+            raise RuntimeError("gateway unavailable")
 
-        from qubit_state import SessionDB
-
-        db = SessionDB()
-        try:
-            resolved = db.resolve_session_by_title("Bot Chat")
-            assert resolved == sid
-        finally:
-            db.close()
+        monkeypatch.setattr(gateway_session_store, "create_titled_session", _boom)
+        assert _create_titled_session("Bot Chat") is None
+        assert "Failed to create titled session 'Bot Chat'" in caplog.text
 
 
 class TestChatCFailLoudlyOnStderr:
@@ -134,9 +141,10 @@ class TestChatCFailLoudlyOnStderr:
         assert not stderr_lines[0].startswith("Use 'hermes sessions list'")
 
     def test_create_if_missing_sets_resume(self, isolated_home, monkeypatch):
-        """--create-if-missing resolves to a new session id on args.resume."""
+        """--create-if-missing resolves to the id the gateway writer created."""
         import qubit_cli.main as main_mod
 
+        seen = _stub_gateway_writer(monkeypatch, "gw-created-id")
         args = type(
             "Args",
             (),
@@ -149,11 +157,41 @@ class TestChatCFailLoudlyOnStderr:
 
         main_mod._resolve_continue_arg(args, use_tui=False)
 
-        assert args.resume, "resume should be set to the new session id"
-        from qubit_state import SessionDB
+        assert args.resume == "gw-created-id"
+        assert seen == ["Bot Chat"]
 
-        db = SessionDB()
-        try:
-            assert db.get_session_title(args.resume) == "Bot Chat"
-        finally:
-            db.close()
+    def test_create_if_missing_refusal_exits_loudly(self, isolated_home, monkeypatch):
+        """A gateway refusal still fails loudly on stderr (never a silent no-op)."""
+        import sys
+
+        import qubit_cli.main as main_mod
+
+        _stub_gateway_writer(monkeypatch, None)
+        stderr_lines = []
+
+        class _Exit(Exception):
+            pass
+
+        class _Stderr:
+            def write(self, text):
+                stderr_lines.append(text)
+                return len(text)
+
+        monkeypatch.setattr(sys, "exit", lambda code: (_ for _ in ()).throw(_Exit(code)))
+        monkeypatch.setattr(sys, "stderr", _Stderr())
+
+        args = type(
+            "Args",
+            (),
+            {
+                "continue_last": "Bot Chat",
+                "resume": None,
+                "create_if_missing": True,
+            },
+        )()
+
+        with pytest.raises(_Exit) as ei:
+            main_mod._resolve_continue_arg(args, use_tui=False)
+
+        assert ei.value.args[0] == 1
+        assert any("a new titled session could not be created" in line for line in stderr_lines)
