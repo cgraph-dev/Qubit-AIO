@@ -1508,6 +1508,33 @@ def run_speak_test(*, text: str = "Qubit live stop test.",
             journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
                        / "events.jsonl")
     result["journal"] = str(journal)
+    hb = helper.get("heartbeat") or {}
+    state = str(hb.get("state") or "") if isinstance(hb, dict) else ""
+    result["helper_state"] = state or None
+
+    # -- pre-stop journal state (does the HELPER already own playback?) -----
+    try:
+        pre_events, offset = read_tail_talk_rows(Path(journal))
+        pre = analyze_playback(pre_events, now=now_fn())
+    except Exception:  # noqa: BLE001
+        pre, offset = {"speaking": False, "turn_id": None}, 0
+    helper_owned = bool(pre.get("speaking"))
+    result["triple_applicable"] = helper_owned
+    if offset <= 0:
+        try:
+            offset = Path(journal).stat().st_size
+        except Exception:  # noqa: BLE001
+            offset = 0
+    # Safety: never send SIGUSR2 into an unrelated in-flight turn. LISTENING
+    # is safe (the stop is a no-op); PROCESSING/PREVIEW would mark that turn
+    # stopped, so refuse unless a real playback is already open.
+    if not helper_owned and state in ("processing", "preview"):
+        reason = (f"refusing speak-test: the live helper is busy ({state!r}) "
+                  "with an unrelated turn")
+        result["reason"] = reason
+        result["degraded"].append(reason)
+        _write_speak_evidence(capture_dir, result, [], t0)
+        return result
 
     # -- real service TTS ---------------------------------------------------
     if serve_fn is not None:
@@ -1546,20 +1573,6 @@ def run_speak_test(*, text: str = "Qubit live stop test.",
         _write_speak_evidence(capture_dir, result, [], t0)
         return result
     wav = pad_wav_min_duration(wav, max(0.5, float(duration)))
-
-    # -- pre-stop journal state (does the HELPER already own playback?) -----
-    try:
-        pre_events, offset = read_tail_talk_rows(Path(journal))
-        pre = analyze_playback(pre_events, now=now_fn())
-    except Exception:  # noqa: BLE001
-        pre, offset = {"speaking": False, "turn_id": None}, 0
-    helper_owned = bool(pre.get("speaking"))
-    result["triple_applicable"] = helper_owned
-    if offset <= 0:
-        try:
-            offset = Path(journal).stat().st_size
-        except Exception:  # noqa: BLE001
-            offset = 0
 
     # -- real host player ---------------------------------------------------
     player_fn = player_fn or _spawn_player
@@ -1606,6 +1619,15 @@ def run_speak_test(*, text: str = "Qubit live stop test.",
         return result
 
     # -- deliver the STOP: service interrupt + live helper SIGUSR2 + player --
+    try:
+        now_events, _ = read_tail_talk_rows(Path(journal))
+        live_now = analyze_playback(now_events, now=now_fn())
+    except Exception:  # noqa: BLE001
+        live_now = {"speaking": False, "turn_id": None}
+    if helper_owned or live_now.get("speaking"):
+        helper_owned = True
+        pre = live_now if live_now.get("speaking") else pre
+        result["triple_applicable"] = True
     t_stop = float(now_fn())
     result["stop_at"] = t_stop
     interrupt_fn = interrupt_fn or (

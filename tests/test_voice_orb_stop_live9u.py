@@ -725,3 +725,26 @@ def test_run_speak_test_requires_triple_when_the_helper_owned_playback(
     assert out["verdict"] == "PASS", out
     assert out["triple_applicable"] is True
     assert out["triple_present"] is True and out["triple_ordered"] is True
+
+
+def test_run_speak_test_refuses_to_signal_a_busy_helper(harness, tmp_path,
+                                                        monkeypatch):
+    monkeypatch.setenv(harness.SPEAK_TEST_ENV, "1")
+    monkeypatch.setattr(harness, "read_proc_signal_mask", lambda _pid: 1 << 11)
+    busy = _fake_helper()
+    busy["heartbeat"]["state"] = "processing"
+    calls = []
+    out = harness.run_speak_test(
+        out_dir=tmp_path, journal=tmp_path / "events.jsonl",
+        resolve_fn=lambda **_kw: busy,
+        serve_fn=lambda: ("http://127.0.0.1:9", ""),
+        speak_fn=lambda _t: {"ok": True, "wav": b"RIFF0000",
+                             "provider": "piper"},
+        interrupt_fn=lambda mode="stop": calls.append(("interrupt", mode)),
+        player_fn=lambda _w, _d: _FakeProc(),
+        signal_fn=lambda pid, sig: calls.append(("signal", pid, sig)),
+        alive_fn=lambda _pid: True,
+        now_fn=lambda: 1000.0, sleep_fn=lambda _s: None)
+    assert out["verdict"] == "DEGRADED"
+    assert "busy" in out["reason"]
+    assert calls == []
