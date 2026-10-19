@@ -1,0 +1,28 @@
+# laneA bootstrap: fork runtime root on sys.path (see tests/gateway/conftest.py).
+from voicebridge import qubit_runtime as _laneA_qbh
+_laneA_qbh.ensure_path()
+
+"""Shared fixtures for tests/qubit_state."""
+import pytest
+
+
+@pytest.fixture
+def worker(tmp_path):
+    """A registered compute worker execution on session ``owned``: ``(db, RuntimeSessionStore)``."""
+    # Imported here, not at module level: this conftest loads for every qubit_state test file.
+    from agent.runtime_session_store import RuntimeSessionStore
+    from qubit_state import SessionDB
+    from qubit_state_runtime import begin_runtime_epoch, mutate_worker_execution, register_worker_execution
+
+    db = SessionDB(tmp_path / 'state.db')
+    db.create_session('owned', 'cli', system_prompt='prefix')
+    db.create_session('foreign', 'cli', system_prompt='secret')
+    epoch = begin_runtime_epoch(db, instance_id='fixture')
+    scope = dict(epoch=epoch, execution_id='worker', session_id='owned', generation=0)
+    register_worker_execution(db, **scope, kind='compute', adoption_secret='secret')
+    store = RuntimeSessionStore(lambda method, **p: mutate_worker_execution(db, **p), scope, tmp_path / 'outbox')
+    yield db, store
+    store.failure = None
+    store.journal['pending'] = []
+    store.close()
+    db.close()
