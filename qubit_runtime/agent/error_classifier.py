@@ -361,7 +361,7 @@ _CONTENT_POLICY_BLOCKED_PATTERNS = (
     "violates our usage policies", "violates openai's usage policies", "your request was flagged by",
     "prompt was flagged by our safety", "responses cannot be generated due to safety",
     "content_filter", "responsibleaipolicyviolation", "new_sensitive",
-    "content exists risk",
+    "content exists risk", "data may contain inappropriate content", "data_inspection_failed",
 )
 
 # Auth patterns (non-status-code signals).
