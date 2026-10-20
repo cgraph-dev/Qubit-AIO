@@ -32,3 +32,22 @@ def test_inherit_launch_model_carries_a_custom_provider_gateway(monkeypatch, tmp
     assert set(cfg["providers"]) == {"my-gateway"}
     # The gateway travels as the launch file wrote it: the ref, never the launch secret.
     assert cfg["providers"]["my-gateway"]["api_key"] == "${FAKE_GW_TOKEN}"
+
+
+def test_inherit_launch_model_carries_a_custom_providers_endpoint(monkeypatch, tmp_path):
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    (home / "config.yaml").write_text(
+        "model:\n  provider: custom:lab\n  default: lab-model\n"
+        "custom_providers:\n  - name: lab\n    base_url: https://lab.internal.example.com/v1\n")
+    profile = home / "profiles" / "scout"
+    profile.mkdir(parents=True)
+
+    assert srv._inherit_launch_model(profile) is True
+
+    cfg = yaml.safe_load((profile / "config.yaml").read_text())
+    assert (cfg["model"]["provider"], cfg["model"]["default"]) == ("custom:lab", "lab-model")
+    assert cfg["custom_providers"] == [
+        {"name": "lab", "base_url": "https://lab.internal.example.com/v1"}
+    ]

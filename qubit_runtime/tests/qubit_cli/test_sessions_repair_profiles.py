@@ -334,3 +334,22 @@ def test_a_failing_row_moves_alone_and_its_lineage_waits_with_it(homes, monkeypa
         root.close()
         acme.close()
     assert not any(f["kind"] == "wrong_store" for f in _report()["findings"])
+
+
+def test_ledgered_lineage_is_held_instead_of_moved(homes):
+    _seed_crossings(homes)
+    root = SessionDB(homes["default"] / "state.db")
+    try:
+        root._execute_write(lambda conn: conn.execute(
+            "INSERT INTO session_admissions (admission_id, request_id, principal_id, target_session_id, "
+            "lineage_json, payload_json, payload_digest, intent, status) "
+            "VALUES ('adm-1', 'req-1', 'p', 'stray-parent', '[]', '{}', 'd', 'queue', 'queued')"))
+    finally:
+        root.close()
+
+    report = _report()
+    parent = next(f for f in report["findings"] if f["subject"] == "stray-parent")
+    assert parent["kind"] == "wrong_store" and parent["action"] is None
+    assert "gateway admission/worker history" in parent["reason"]
+    child = next(f for f in report["findings"] if f["subject"] == "stray-child")
+    assert child["action"] is None and "lineage holds stray-parent" in child["reason"]

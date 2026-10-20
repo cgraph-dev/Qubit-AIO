@@ -31,6 +31,7 @@ from .shared_metrics_contract import (
     client_resource_is_valid,
     counter_dimensions_are_valid,
 )
+from .shared_metrics_drift import conform_counter_dimensions, counter_dimensions_shape_is_known
 
 
 _PACKAGE_SCHEMA_VERSION = "qubit.shared_metrics.v3"
@@ -650,10 +651,22 @@ class SharedMetricsStore:
         if metric_name == LEGACY_MODEL_CALL_METRIC:
             metric_name = MODEL_CALL_METRIC
         dimensions = json.loads(row["dimensions_json"])
-        if not isinstance(dimensions, dict) or not counter_dimensions_are_valid(
-            metric_name, dimensions
-        ):
+        # An unknown field set is tamper evidence and fails closed (must-not-be-exported). A known
+        # shape whose values fell out of the contract was recorded by an earlier build or catalog
+        # (#133017): re-bucket it inside the closed enum, or leave the row out when its field has no
+        # bucket, rather than abort the whole period's package. Either way no stale value leaves.
+        if not isinstance(dimensions, dict) or not counter_dimensions_shape_is_known(metric_name, dimensions):
             raise ValueError(f"Unsupported dimensions for shared metric: {metric_name}")
+        if not counter_dimensions_are_valid(metric_name, dimensions):
+            conformed = conform_counter_dimensions(metric_name, dimensions)
+            if conformed is None:
+                logger.info("Shared-metric %s row holds a retired value with no bucket; not packaged", metric_name)
+                return None
+            logger.info(
+                "Shared-metric %s row drifted out of the contract since it was recorded; "
+                "packaged with bucketed dimensions %s", metric_name, _compact_json(conformed),
+            )
+            dimensions = conformed
         return {
             "name": metric_name, "type": "counter", "dimensions": dimensions,
             "value": row["value"] - row["packaged_value"],

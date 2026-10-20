@@ -567,6 +567,14 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 logger.warning(*warn_args)
                 self._set_fatal_error(code, message, retryable=False)
                 return False
+        if (missing := ensure_aiohttp()) is not None:  # may install it: connect runs this off the event loop
+            why, retryable = missing
+            message = (f"aiohttp is unavailable ({why}); the WhatsApp bridge client needs it. "
+                       "Run `qubit pm install --extra sms` (it ships aiohttp; `qubit pm repair` for a damaged install), "
+                       "then restart `qubit gateway`.")
+            logger.warning("[%s] %s", self.name, message)
+            self._set_fatal_error("whatsapp_aiohttp_missing", message, retryable=retryable)
+            return False
         logger.info("[%s] Bridge found at %s", self.name, bridge_path)
         return True
 

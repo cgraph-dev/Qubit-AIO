@@ -1546,6 +1546,8 @@ class GatewayStartupMixin:
         # auto-resume stays visible on the next user message.
         self._schedule_resume_pending_sessions()
         await self._finish_startup_restore()
+        from gateway.run_runtime import recover_gateway_native_sessions
+        await recover_gateway_native_sessions(self)
         # Surface state.db init failures to messaging platforms before the user loses data.
         # See #88235.
         await self._send_session_db_warning_notifications()

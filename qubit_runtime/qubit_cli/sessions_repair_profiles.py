@@ -196,7 +196,15 @@ class RepairPlan:
         db = session.db(store)
         crossed = db.find_crossed_profile_sessions(store.profile)
         moving: Set[str] = set()
+        held = _ledgered_lineages([r for r in crossed["foreign"] if self._would_move(store, r)])
         for row in crossed["foreign"]:
+            if row["id"] in held:
+                moving.add(row["id"])  # neither relabelled nor severed in place: it is a stray
+                self._add(Finding(
+                    "wrong_store", store.profile, row["id"],
+                    f"key {row['session_key']!r} ({row['message_count']} messages) sits in the "
+                    f"{store.profile} store", reason=held[row["id"]]))
+                continue
             self._plan_foreign_row(store, row, moving)
         for row in crossed["mislabelled"]:
             if row["id"] in moving:
@@ -215,6 +223,12 @@ class RepairPlan:
                 f"{row['key_profile']!r} row inherits from parent {row['parent_session_id']} keyed under "
                 f"{row['parent_profile']!r}", action="sever parent_session_id",
                 _fix=lambda s, st=store, sid=row["id"]: {"severed": s.db(st).sever_crossed_parents([sid])}))
+
+    def _would_move(self, store: Store, row: Dict[str, Any]) -> bool:
+        """Mirror of :meth:`_plan_foreign_row`: does the plan copy this row to another store?"""
+        if row["key_profile"] == "default" and store.profile != "default":
+            return self.legacy_main == "move" and self.routing_store is not None
+        return row["key_profile"] in self.claimed
 
     def _plan_foreign_row(self, store: Store, row: Dict[str, Any], moving: Set[str]) -> None:
         key_profile, sid = row["key_profile"], row["id"]
@@ -395,9 +409,16 @@ class _MoveBatch:
         if self._result is not None:
             return self._result
         src_db, dst_db = session.db(self.src), session.db(self.dst)
-        payloads = {sid: src_db.export_session_for_move(sid) for sid in self.ids}
+        from qubit_state_profile_repair import SessionLedgeredError
+        payloads: Dict[str, Optional[Dict[str, Any]]] = {}
+        for sid in self.ids:
+            try:
+                payloads[sid] = src_db.export_session_for_move(sid)
+            except SessionLedgeredError as exc:  # gained ledger rows since the scan: never copied
+                self._errors[sid] = exc
         ordered = _parents_first([p for p in payloads.values() if p is not None])
-        result: Dict[str, Dict[str, int]] = {sid: {"missing": 1} for sid, p in payloads.items() if p is None}
+        result: Dict[str, Dict[str, int]] = {sid: {"missing": 1} for sid, p in payloads.items()
+                                             if p is None and sid not in self._errors}
         for payload in ordered:
             sid, parent = payload["session"]["id"], payload["session"].get("parent_session_id")
             if parent in self._errors:

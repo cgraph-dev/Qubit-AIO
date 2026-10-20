@@ -28,6 +28,7 @@ from gateway.restart import (
     effective_stop_drain_timeout, effective_stop_watchdog_delay, resolve_cron_drain_budget
 )
 from gateway.run_common import _UNSET
+from gateway.run_runtime import managed_turn_count
 from gateway.run_shutdown_session_end import GatewaySessionEndMixin
 from gateway.shutdown_watchdog import arm_shutdown_watchdog, resolve_shutdown_watchdog_delay
 
@@ -193,6 +194,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         """All agent work the gateway must expose and drain as one total."""
         return (
             self._running_agent_count()
+            + managed_turn_count(self)
             + self._active_cron_job_count()
             + self._active_api_run_count()
             + self._active_deferred_agent_worker_count()
@@ -802,7 +804,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
     def _drain_work_counts(self) -> tuple:
         """``(agents, cron, api, deferred)`` — the four sources the drain waits on."""
         return (
-            self._running_agent_count(), self._active_cron_job_count(),
+            self._running_agent_count() + managed_turn_count(self), self._active_cron_job_count(),
             self._active_api_run_count(), self._active_deferred_agent_worker_count(),
         )
 
@@ -1563,6 +1565,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         """
         non_cron = (
             self._running_agent_count()
+            + managed_turn_count(self)
             + self._active_api_run_count()
             + self._active_deferred_agent_worker_count()
         )
@@ -1606,7 +1609,8 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
                               "pid": job["worker_pid"] or os.getpid(), "external": bool(job["worker_pid"]),
                               "wedged": job["job_id"] in wedged,
                               "restart_safe": bool(job.get("restart_safe"))})
-        for kind, count in (("api", self._active_api_run_count()), ("deferred", self._active_deferred_agent_worker_count())):
+        for kind, count in (("managed", managed_turn_count(self)), ("api", self._active_api_run_count()),
+                            ("deferred", self._active_deferred_agent_worker_count())):
             units.extend({"kind": kind, "pid": os.getpid()} for _ in range(count))
         return units
 
@@ -1925,7 +1929,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         logger.info("Shutdown phase: allowing %.1fs for interrupted agents to unwind", interrupt_grace_timeout)
 
         def _work_live() -> bool:
-            return bool(self._running_agents or self._active_api_run_count() or ctx.deferred_count())
+            return bool(self._running_agents or managed_turn_count(self) or self._active_api_run_count() or ctx.deferred_count())
 
         # Wait on API-server work too, or an API turn's tool subprocesses are killed before it unwinds.
         while _work_live() and loop.time() < interrupt_deadline:
@@ -2075,7 +2079,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         _cron_live = self._active_cron_job_count()
         _api_live = ctx.api_live
         _api_worker_live = self._active_api_worker_count()
-        _deferred_live = ctx.deferred_count()
+        _deferred_live = ctx.deferred_count() + managed_turn_count(self)
         if _cron_live or _api_live or _api_worker_live or _deferred_live:
             logger.warning(
                 "Shutdown phase: %d cron job(s) / %d API-server run(s) / %d API-server worker(s) / "

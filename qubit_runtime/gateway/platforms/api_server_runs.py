@@ -1349,6 +1349,16 @@ async def _handle_stop_run(self, request: "web.Request", *, _api_server) -> "web
         self, request, _api_server=_api_server, permission="stop", active_fallback=True)
     if err is not None:
         return err
+    # A run whose turn a live Bot Chat owns (``_execute_run_via_live_owner``) is not an API
+    # admission: its stop is the legacy in-process task cancel below, never ``stop_run``.
+    if (getattr(self.gateway_runner, 'session_authority', None) is not None
+            and not (task is not None and status.get("delivery_id"))):
+        from gateway.platforms.api_server_authority_runs import stop_run, store_error_response
+        from qubit_state_runtime import RuntimeStoreError
+        try:
+            return web.json_response(await stop_run(self, run_id))
+        except RuntimeStoreError as exc:
+            return store_error_response(_openai_error, exc)
     if status.get("status") in TERMINAL_STATUSES:
         return web.json_response(status)
     if agent is None and task is None:
