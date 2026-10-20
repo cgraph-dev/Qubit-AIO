@@ -11,6 +11,10 @@ _JOB = {"id": "fb-test", "name": "fb test", "prompt": "hello", "model": None, "p
         "provider_snapshot": None, "base_url": None}
 
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 def _run(tmp_path, *, response: str, primary_fails: bool):
     (tmp_path / "config.yaml").write_text(
         "model:\n  default: gpt-5.6-sol\n  provider: openai-codex\n"

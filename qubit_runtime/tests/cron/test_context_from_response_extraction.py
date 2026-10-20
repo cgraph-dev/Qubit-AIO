@@ -16,6 +16,8 @@ import run_agent
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch):
     """Isolated cron environment with temp QUBIT_HOME."""

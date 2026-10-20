@@ -23,6 +23,10 @@ _RUNTIME = {
 }
 
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner_passthrough")
+
 class HangingSessionDB:
     def __init__(self, release: threading.Event):
         self.release = release

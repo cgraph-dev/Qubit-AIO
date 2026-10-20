@@ -22,6 +22,10 @@ _RUNTIME = {
 }
 
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner_passthrough")
+
 class _FakeCronAgent:
     """Stand-in for the cron AIAgent: creates its session row on the first turn exactly
     like AIAgent's lazy create (source 'cron', no cwd — _launch_cwd_for_session records

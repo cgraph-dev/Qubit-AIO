@@ -22,6 +22,8 @@ from tools import approval as approval_module
 from tools import approval_context
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 class _DummySessionDB:
     def set_session_title(self, *args, **kwargs):
         pass

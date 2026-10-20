@@ -17,6 +17,8 @@ from unittest.mock import Mock
 import pytest
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @pytest.fixture
 def execution_ledger(tmp_path, monkeypatch):
     import cron.executions as executions
