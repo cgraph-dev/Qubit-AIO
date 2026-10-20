@@ -161,11 +161,17 @@ class CLIChatTurnMixin:
         try:
             from agent.context_references import preprocess_context_references
             from agent.model_metadata import get_model_context_length
+            from agent.runtime_cwd import scope_terminal_cwd, scoped_session_cwd
             _ctx_len = get_model_context_length(
                 self.model, base_url=self.base_url or "", api_key=self.api_key or "",
                 provider=self.provider or "",
                 config_context_length=getattr(self.agent, "_config_context_length", None) if self.agent else None)
-            _ctx_result = preprocess_context_references(message, cwd=os.getcwd(), context_length=_ctx_len)
+            # The session workspace, not the process cwd: a joined worktree or a resumed
+            # session retargets TERMINAL_CWD without an os.chdir (sub-thread worktree join),
+            # and an active gateway turn carries its own policy cwd. Same accessor order as
+            # qubit_cli.plugin_session.session_cwd; os.getcwd() is the launch dir fallback.
+            _ctx_cwd = scoped_session_cwd() or scope_terminal_cwd().strip() or os.getcwd()
+            _ctx_result = preprocess_context_references(message, cwd=_ctx_cwd, context_length=_ctx_len)
             if _ctx_result.expanded or _ctx_result.blocked:
                 if _ctx_result.references:
                     _cprint(f"  {_DIM}{t('cli.chat.context_refs', count=len(_ctx_result.references), tokens=_ctx_result.injected_tokens)}{_RST}")
