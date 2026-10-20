@@ -2041,6 +2041,10 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         """Platform context + YAML channel_prompts hint + channel_overrides system_prompt (or global
         ephemeral) + the gateway ephemeral prompt."""
         ctx = self._ctx
+        from gateway.session_api_turn import api_execution
+        api = api_execution.get()
+        if api is not None:
+            return api['settings'].get('ephemeral_system_prompt') or ''
         combined = ctx.context_prompt or ""
         for extra in (
             (ctx.channel_prompt or "").strip(),
