@@ -54,6 +54,8 @@ _profile_cli_args = late("_profile_cli_args", "qubit_cli.web_server_profiles")
 get_install_id = late("get_install_id")
 get_running_pid_cached = late("get_running_pid_cached", "gateway.status")
 get_runtime_status_running_pid = late("get_runtime_status_running_pid", "gateway.status")
+served_profile_runtime = late("served_profile_runtime", "gateway.status_served")
+local_liveness_pid = late("local_liveness_pid", "gateway.status_served")
 load_config = late("load_config", "qubit_cli.config")
 read_runtime_status = late("read_runtime_status", "gateway.status")
 _open_session_db_for_profile = late("_open_session_db_for_profile", "qubit_cli.web_server_sessions")
@@ -304,15 +306,28 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> Di
     runtime = local_runtime
     if runtime is None and remote_health_body and remote_health_body.get("gateway_state"):
         runtime = remote_health_body
+    # Unscoped, the profile is the process's own home (a pooled ``qubit --profile X serve``).
+    own_home = profile_dir or get_process_qubit_home()
     if liveness.runtime is not None:
         # Served by the multiplexer: its record is this profile's runtime, with the profile's own
-        # adapters under ``<profile>:<platform>`` re-keyed to the standalone shape. Unscoped, the
-        # profile is the process's own home (a pooled ``qubit --profile X serve``).
+        # adapters under ``<profile>:<platform>`` re-keyed to the standalone shape.
         # Fold on the profile NAME, never ``profile_dir.name``: ``?profile=default`` resolves the
         # root itself, whose basename (``.qubit``) matched nothing and read as a named id (#123088).
-        served_name = profile_name_for_home(profile_dir or get_process_qubit_home())
+        served_name = profile_name_for_home(own_home)
         runtime = {**liveness.runtime,
                    "platforms": profile_platforms_from_multiplexer(liveness.runtime, served_name or "")}
+    elif local_liveness_pid(liveness) is not None:
+        # The PID rung answers before the multiplexer rung, and a served profile's gateway.lock is
+        # held by the multiplexer itself, so the ladder returns without its record while the
+        # profile's own gateway_state.json may be a retired standalone gateway's (#139080). The
+        # shared rule (also the messaging card's) picks the multiplexer record only when the lock
+        # holder IS the multiplexer and the profile's own record proves no live gateway.
+        try:
+            runtime = await run_in_threadpool(
+                served_profile_runtime, own_home, local_runtime, gateway_pid=local_liveness_pid(liveness)) or runtime
+        except Exception:  # health: allow BLE001 -- status route must never 500; traceback is logged
+            # A failed lookup keeps the profile's own record.
+            _log.warning("/api/status multiplexer record lookup failed", exc_info=True)
 
     gateway_state = None
     gateway_platforms: dict = {}

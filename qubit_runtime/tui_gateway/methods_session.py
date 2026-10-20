@@ -341,20 +341,9 @@ def _seed_row(record: dict) -> None:
 
 def _create_overrides(params: dict) -> tuple:
     """PER-SESSION (model, reasoning, service_tier) overrides from the composer — never a global config
-    write. ``fast`` presence is the contract: omitted inherits, true pins priority, false pins normal ("")."""
-    create_model = _str_param(params, "model")
-    model_override = None
-    if create_model:
-        model_override = {"model": create_model, "provider": _str_param(params, "provider") or None}
-    reasoning_override = None
-    if effort := _str_param(params, "reasoning_effort"):
-        with contextlib.suppress(Exception):
-            from qubit_constants import parse_reasoning_effort
-            reasoning_override = parse_reasoning_effort(effort)
-    service_tier_override = None
-    if "fast" in params:
-        service_tier_override = "priority" if is_truthy_value(params.get("fast")) else ""
-    return model_override, reasoning_override, service_tier_override
+    write. The guard module owns the precedence (explicit ``service_tier`` over legacy ``fast``)."""
+    from .methods_session_model_guard import create_overrides
+    return create_overrides(params)
 
 
 def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> dict:
@@ -896,7 +885,8 @@ def _resume_deferred(ctx: _Resume) -> dict:
     sid, source, cwd = ctx.mint()
     with _profile_build_scope(ctx.profile_home):
         overrides = _stored_session_runtime_overrides(ctx.found)
-    record = ctx.record(source, cwd, [], overrides)
+    record = ctx.record(source, cwd, [], overrides,
+                        todo_state=_todo_state_from_db(ctx.db, ctx.target))
     record.update(resume_history_ready=threading.Event(), resume_hydrating=True,
                   resume_message_count=int(ctx.found.get("message_count") or 0))
     if (reused := ctx.claim(sid, record)) is not None:
@@ -1961,6 +1951,8 @@ def _(rid, params: dict, session: dict) -> dict:
                 removed = _rewind_active_session_history(session, user_turns - 1)[2]
             except Exception as exc:
                 return _err(rid, 5008, f"undo: {exc}")
+    if removed:  # Ink /retry is undo + resend and says so via ``intent`` (helper: methods_tools).
+        _tui_model_friction("retry" if params.get("intent") == "retry" else "undo", session)
     return _ok(rid, {"removed": removed})
 
 

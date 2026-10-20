@@ -1318,11 +1318,8 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
 
     def _increment_restart_failure_counts(self, active_session_keys: set) -> None:
         """Increment persisted restart-failure counters for active sessions; drop the rest (loop broken)."""
-        from utils import atomic_json_write
-        path = self._stuck_loop_counts_path()
-        counts = self._read_json_counts(path) or {}
-        with suppress(Exception):
-            atomic_json_write(path, {key: counts.get(key, 0) + 1 for key in active_session_keys}, indent=None)
+        from gateway.stuck_loop_counts import increment_restart_failure_counts
+        increment_restart_failure_counts(self._stuck_loop_counts_path(), active_session_keys)
 
     def _suspend_stuck_loop_sessions(self) -> int:
         """Suspend sessions active across too many restarts (startup, AFTER crash-turn recovery)."""
@@ -1353,22 +1350,13 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
 
     async def _clear_restart_failure_count(self, session_key: str) -> None:
         """Clear a completed session's restart-failure counter off-loop (atomic_json_write fsyncs)."""
-        from utils import atomic_json_write
+        from gateway.stuck_loop_counts import clear_restart_failure_count
         path = self._stuck_loop_counts_path()
         if not path.exists():
             return
-        # The whole read/mutate/write is guarded (as on main): a corrupt counters file
-        # (non-dict JSON) must never raise out of a session-completion path.
-        try:
-            counts = self._read_json_counts(path) or {}
-            if session_key in counts:
-                del counts[session_key]
-                if counts:
-                    await asyncio.to_thread(atomic_json_write, path, counts, indent=None)
-                else:
-                    path.unlink(missing_ok=True)
-        except Exception:
-            pass
+        # Load/mutate/save run whole in one worker under the counters lock: a split read-on-loop /
+        # write-off-loop let two completing sessions rewrite each other's stale snapshot.
+        await asyncio.to_thread(clear_restart_failure_count, path, session_key)
 
     # Restart orchestration
     @staticmethod
@@ -1697,6 +1685,8 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         self._restart_task_started = True
         # Refuse new turns; keep ``_running`` True so the active turn can still deliver its final response.
         self._draining = True
+        from gateway.drain_control import open_restart_wait
+        open_restart_wait(self)  # clients may still answer a turn parked on approval/clarify (#139041)
         # The restart's after-turn wait is a drain window too: pollers of GET /v1/runs/{id} must see
         # the boundary from the moment new turns are refused, not only once stop() begins (#115133).
         self._mark_api_runs_shutdown_requested()

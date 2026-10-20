@@ -348,7 +348,12 @@ class PythonEnvironment:
                     except BaseException:
                         tail.close(False)
                         raise
-                    tail.close(result.returncode == 0)
+                    if "--compile-bytecode" in args and _is_bytecode_compile_failure(result):
+                        # Caller retries without the flag. A failure banner here
+                        # would report a recovered install as failed.
+                        tail.discard()
+                    else:
+                        tail.close(result.returncode == 0)
                     return result
                 return subprocess.run(command, cwd=str(cwd), env=env, capture_output=True,
                                       text=True, encoding="utf-8", errors="replace", timeout=timeout)
@@ -418,6 +423,17 @@ class PythonEnvironment:
         for group in sorted(set(groups)):
             command += ["--group", group]
         result = self._run(command, cwd=source, timeout=timeout)
+        if _is_bytecode_compile_failure(result):
+            # Compile is an optimization. Retry once without the flag so a
+            # locked temp script cannot fail pm repair/bootstrap. Imports
+            # compile lazily on first use.
+            if self.output is not None:
+                self.output.write(
+                    "Bytecode compile failed; retrying the install without it. "
+                    "Modules will compile on first import.\n"
+                )
+            fallback = [arg for arg in command if arg != "--compile-bytecode"]
+            result = self._run(fallback, cwd=source, timeout=timeout)
         if result.returncode:
             raise classify_uv_failure("sync", result.returncode, result.stderr or result.stdout)
 

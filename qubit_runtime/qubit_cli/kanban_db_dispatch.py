@@ -1046,7 +1046,8 @@ class _DeadWorker:
 
 
 def _classify_dead_worker(
-    pid: int, claimer: Optional[str], *, task_id: Optional[str] = None, board: Optional[str] = None,
+    pid: int, claimer: Optional[str], exit_code=None, *, task_id: Optional[str] = None,
+    board: Optional[str] = None,
 ) -> _DeadWorker:
     """Map a dead worker's reaped exit status to its reclaim bookkeeping.
 
@@ -1054,7 +1055,7 @@ def _classify_dead_worker(
     in the event payload, appended to the error text) so the board and the retry
     worker see WHY instead of a bare label; a rate-limited requeue does not need it.
     """
-    dead = _classify_dead_worker_exit(pid, claimer, task_id=task_id, board=board)
+    dead = _classify_dead_worker_exit(pid, claimer, exit_code, task_id=task_id, board=board)
     if task_id and not dead.rate_limited:
         worker_output = _worker_final_output(task_id, board=board)
         if worker_output:
@@ -1066,6 +1067,7 @@ def _classify_dead_worker(
 def _classify_dead_worker_exit(
     pid: int,
     claimer: Optional[str],
+    exit_code=None,
     *,
     task_id: Optional[str] = None,
     board: Optional[str] = None,
@@ -1079,7 +1081,9 @@ def _classify_dead_worker_exit(
     epilogue (killed, OOM) leaves no trailer and stays a plain crash.
     """
     kind, code = _classify_worker_exit(pid)
-    if kind == "unknown" and task_id:
+    if exit_code is not None:
+        kind, code = _exit_code_kind(int(exit_code))
+    elif kind == "unknown" and task_id:
         logged = _worker_log_exit_code(task_id, board=board)
         if logged is not None:
             kind, code = _exit_code_kind(logged)
@@ -1154,20 +1158,27 @@ def _reclaim_dead_workers(conn: sqlite3.Connection, board: Optional[str] = None)
             "WHERE status = 'running' AND worker_pid IS NOT NULL"
         ).fetchall()
         host_prefix = _kb._host_prefix()
+        from qubit_cli.kanban_owner_recovery import bound_interpreter_gone, managed_run_exit_code, owner_reclaim_paused
         for row in rows:
             lock = row["claim_lock"] or ""
             if not lock.startswith(host_prefix):
                 continue
             # Launch-window grace so a freshly-spawned worker isn't reclaimed
             # before its PID is visible on /proc.
-            started_at = _kb._row_get(row, "started_at")
+            started_at = _kb._to_epoch(_kb._row_get(row, "started_at"))
             if started_at is not None and time.time() - started_at < _kb._resolve_crash_grace_seconds():
                 continue
             if _worker_alive(row["worker_pid"], _kb._row_get(row, "worker_started_at")):
                 continue
+            # An ambiguous owner receipt holds the card while the attempt may still run; once the
+            # interpreter the owner bound to this run is dead nothing can, and it is a crash.
+            if owner_reclaim_paused(conn, row["id"]) and not bound_interpreter_gone(conn, row["id"]):
+                continue
 
             pid = int(row["worker_pid"])
-            dead = _classify_dead_worker(pid, row["claim_lock"], task_id=row["id"], board=board)
+            # A managed run's authority-recorded exit (its bound interpreter's, under this claim).
+            exit_code = managed_run_exit_code(conn, row["id"], pid, row["claim_lock"])
+            dead = _classify_dead_worker(pid, row["claim_lock"], exit_code, task_id=row["id"], board=board)
             retry_status = _kb._retry_status_for_run(conn, row["id"])
             dead.event_payload["retry_status"] = retry_status
             cur = conn.execute(

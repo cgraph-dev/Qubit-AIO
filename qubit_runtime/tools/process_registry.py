@@ -34,6 +34,7 @@ from qubit_cli.config import get_qubit_home
 
 from tools.process_registry_notifications import format_process_notification, heartbeat_output_tail
 from tools.process_registry_checkpoint import ProcessCheckpointMixin
+from tools.process_registry_output_log import ProcessOutputLogMixin, open_output_log, record_exit_command, worker_output_log
 from tools.process_registry_termination import ProcessTerminationMixin
 from tools.process_registry_results import load_completed_results, save_completed_result
 from tools.process_registry_env_log import log_delta_command
@@ -565,6 +566,7 @@ class ProcessSession:
     handoff_note: str = ""                      # why a subagent handed this process to its parent (rides the notice)
     persist_on_release: bool = False           # opt out of agent-lifecycle cleanup (release()/turn-abandon kill
                                                 # sweeps), per terminal(background=true, persist_on_release=true) (#41225)
+    output_log: str = ""                        # file the process writes to (worker spawns; no pipe to lose)
     # Watcher/notification routing (persisted for crash recovery)
     # systemd_unit: str = ""                      # transient scope unit name when spawned under systemd-run
     # (#70716)
@@ -653,7 +655,7 @@ _CHECKPOINT_FIELDS = (
     "started_at", "task_id", "owner_task_id", "session_key",
     *(f"watcher_{k}" for k in _WATCHER_ROUTE_KEYS), "watcher_interval",
     "parent_session_id", "notify_on_complete", "completion_output_chars", "watch_patterns",
-    "heartbeat_seconds", "persist_on_release")
+    "heartbeat_seconds", "persist_on_release", "output_log")
 _CHECKPOINT_DEFAULTS = {
     f.name: ([] if f.name == "watch_patterns" else f.default)
     for f in ProcessSession.__dataclass_fields__.values()
@@ -696,7 +698,7 @@ def _is_wsl_launcher_command(command: str) -> bool:
     return False
 
 
-class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
+class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin, ProcessOutputLogMixin):
     """In-memory registry of running and finished background processes.
     Thread-safe: accessed from executor threads (terminal_tool, process handlers),
     the gateway asyncio loop (watchers, reset checks) and the cleanup thread."""
@@ -1023,8 +1025,8 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
         A completion is not queued here: recovery has no waitable handle, so it
         never collected an exit status.
         """
-        if session is None or session.exited or not session.detached or session.pid_scope != "host":
-            return session
+        if session is None or session.exited or not session.detached or session.pid_scope != "host" or session.output_log:
+            return session  # a log-backed adoption's reader collects the recorded exit itself
         fate = self._detached_host_fate(session.pid, session.host_start_time)
         if fate == "running":
             return session
@@ -1149,7 +1151,9 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
     def _spawn_env(env_vars: dict) -> dict:
         """Sanitized child env; PYTHONUNBUFFERED so tqdm/datasets-style buffering
         doesn't hide progress from process(action="poll")."""
-        env = _sanitize_subprocess_env(os.environ, env_vars)
+        from tools.environments.local import _terminal_env
+
+        env = _terminal_env(_sanitize_subprocess_env(os.environ, env_vars))
         env["PYTHONUNBUFFERED"] = "1"
         return env
 
@@ -1210,7 +1214,9 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
         session = self._new_session(command, task_id, owner_task_id, session_key, _resolve_safe_cwd(cwd or os.getcwd()),
                                     persist_on_release=persist_on_release)
         pty_scope_attempted = False
-        if use_pty:
+        # A worker's pipe or PTY dies with the worker (the child's next write is SIGPIPE): write to a log.
+        log = worker_output_log(session.id)
+        if use_pty and log is None:
             try:
                 return self._spawn_local_pty(session, safe_command, env_vars)
             except ImportError:
@@ -1228,7 +1234,8 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
         # Pipe path (non-PTY or PTY fallback).
         _popen_kwargs = {"creationflags": windows_hide_flags()} if _IS_WINDOWS else {}
         unit_suffix = f"{session.id}-pipe-fallback" if pty_scope_attempted else session.id
-        spawn_argv = self._scope_argv(session, safe_command, unit_suffix, "Local")
+        spawn_argv = self._scope_argv(session, record_exit_command(log, safe_command) if log else safe_command,
+                                      unit_suffix, "Local")
         spawn_env = self._spawn_env(env_vars)
         if session.systemd_unit:
             spawn_env = systemd_user_bus_env(spawn_env)
@@ -1237,15 +1244,20 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
         # share the foreground process group and background spawns would stop the whole
         # session (observed as dead TUIs in state T). Cgroup isolation is unaffected —
         # the scope attaches to the invoked process, not the spawning session.
-        proc = subprocess.Popen(
-            spawn_argv, text=True, cwd=session.cwd, env=spawn_env, encoding="utf-8",
-            errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-            start_new_session=True, **_popen_kwargs)
-        session.process = proc
+        output = open_output_log(log) if log else subprocess.PIPE
+        try:
+            proc = subprocess.Popen(
+                spawn_argv, text=True, cwd=session.cwd, env=spawn_env, encoding="utf-8",
+                errors="replace", stdout=output, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                start_new_session=True, **_popen_kwargs)
+        finally:
+            if log:
+                os.close(output)
+        session.process, session.output_log = proc, str(log or "")
         session.pid = proc.pid
         session.host_start_time = self._safe_host_start_time(session.pid)
         try:
-            self._track_started(session, self._reader_loop, f"proc-reader-{session.id}")
+            self._track_started(session, self._log_reader_loop if log else self._reader_loop, f"proc-reader-{session.id}")
         except Exception:
             self._reap_untracked(session, proc)
             raise
@@ -2055,7 +2067,7 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
             # final drain is partial and must not suppress the full completion.
             if not finalizing:
                 self._poll_observed.add(session_id)
-        if session.detached:
+        if session.detached and not session.output_log:
             result.update(detached=True, note="Process recovered after restart -- output history unavailable")
         return result
 

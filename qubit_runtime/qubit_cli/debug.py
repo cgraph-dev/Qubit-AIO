@@ -60,6 +60,16 @@ def _save_pending(entries: list[dict]) -> None:
         pass  # non-fatal — worst case the user runs ``qubit debug delete`` manually
 
 
+@contextlib.contextmanager
+def _pending_lock():
+    """Cross-process lock for pending.json read-modify-write (gateway sweep vs CLI/gateway share)."""
+    from qubit_cli.auth import _file_lock
+    path = _pending_file()
+    with _file_lock(path.with_name(path.name + ".lock"), _PENDING_LOCK_HOLDER, 10.0,
+                    f"Timed out waiting for the pending paste list lock ({path})"):
+        yield
+
+
 def _sweep_expired_pastes(now: Optional[float] = None) -> tuple[int, int]:
     """Synchronously DELETE pending pastes whose ``expire_at`` has passed → (deleted, remaining).
 
@@ -70,27 +80,28 @@ def _sweep_expired_pastes(now: Optional[float] = None) -> tuple[int, int]:
     if not entries:
         return (0, 0)
     current = time.time() if now is None else now
-    deleted = 0
-    remaining: list[dict] = []
+    reaped: set[str] = set()
     for entry in entries:
         try:
             expire_at = float(entry.get("expire_at", 0))
         except (TypeError, ValueError):
-            continue  # drop malformed entries
+            continue  # malformed entries are dropped below
         if expire_at > current:
-            remaining.append(entry)
             continue
         try:
             gone = delete_paste(entry.get("url", ""))
         except Exception:
             gone = False  # network hiccup, 404 (already gone), ...
         if gone or expire_at + 86400 <= current:
-            deleted += 1  # deleted, or given up on → count as reaped
-        else:
-            remaining.append(entry)
-    if deleted:
-        _save_pending(remaining)
-    return (deleted, len(remaining))
+            reaped.add(entry.get("url", ""))  # deleted, or given up on → count as reaped
+    # DELETEs can take minutes; a share may have scheduled new pastes meanwhile, so
+    # re-read under the lock and drop only what this sweep reaped (and malformed rows).
+    with _pending_lock():
+        latest = _load_pending()
+        remaining = [e for e in latest if _keep_after_sweep(e, reaped, current)]
+        if len(remaining) != len(latest):
+            _save_pending(remaining)
+    return (len(reaped), len(remaining))
 
 
 def _keep_after_sweep(entry: dict, reaped: set[str], current: float) -> bool:
@@ -625,9 +636,11 @@ def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
     try:
         res = share_to_nous(build_nous_bundle(bundle, redact=redact))
     except Exception as exc:
+        from pm.network import edge_block
+
         error = redact_debug_support_text(exc)
-        print(f"\nNous upload failed: {error}\n"
-              "\nThe Nous diagnostics service may be unavailable or not yet provisioned.\n"
+        cause = edge_block(exc) or "The Nous diagnostics service may be unavailable or not yet provisioned"
+        print(f"\nNous upload failed: {error}\n\n{cause}.\n"
               "Run `qubit debug share --local` to print the report instead, "
               "or `qubit debug share` to upload to a public paste service.\n", file=sys.stderr)
         sys.exit(1)

@@ -1014,6 +1014,10 @@ class GatewayBusySessionMixin:
 
     async def _send_command_ack(self, source, text: str, label: str) -> None:
         """Best-effort acknowledgment for a slash command that falls through to agent processing."""
+        from gateway.session_command_sink import active_sink
+        if (sink := active_sink()) is not None:
+            sink.notices.append(text)  # a local slash.exec: the ack rides the client's directive
+            return
         try:
             adapter = self._delivery_adapter_for(source)
             if adapter:

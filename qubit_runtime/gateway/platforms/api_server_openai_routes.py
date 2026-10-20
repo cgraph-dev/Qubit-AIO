@@ -749,22 +749,9 @@ class OpenAICompatRoutesMixin:
             return _invalid_request("Missing or invalid 'messages' field")
         stream = _coerce_request_bool(body.get("stream"), default=False)
 
-        # System messages -> ephemeral system prompt layered ON TOP of core, flattened to text
-        # (Anthropic rejects images there, OpenAI text models ignore them).
-        system_prompt = None
-        conversation_messages: List[Dict[str, str]] = []
-        for idx, msg in enumerate(messages):
-            role = msg.get("role", "")
-            raw_content = msg.get("content", "")
-            if role == "system":
-                content = _normalize_chat_content(raw_content)
-                system_prompt = content if system_prompt is None else system_prompt + "\n" + content
-            elif role in {"user", "assistant"}:
-                try:
-                    content = _normalize_multimodal_content(raw_content)
-                except ValueError as exc:
-                    return _multimodal_validation_error(exc, param=f"messages[{idx}].content")
-                conversation_messages.append({"role": role, "content": content})
+        system_prompt, conversation_messages, messages_err = _parse_chat_messages(messages)
+        if messages_err is not None:
+            return messages_err
         user_message: Any = (conversation_messages[-1].get("content", "") if conversation_messages else "")
         history = conversation_messages[:-1]
         if not _content_has_visible_payload(user_message):
@@ -1271,8 +1258,7 @@ class OpenAICompatRoutesMixin:
             return await self._run_agent(**run_kwargs)
         outcome, err = await self._run_idempotent(
             request, body, _compute_response, log_label="responses",
-            fingerprint_keys=["input", "instructions", "previous_response_id", "conversation", "model", "provider", "model_options", "tools"],
-            route="responses",
+            fingerprint_keys=list(_responses_fingerprint_keys(body)), route="responses",
         )
         if err is not None:
             return err

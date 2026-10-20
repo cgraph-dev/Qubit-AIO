@@ -65,7 +65,7 @@ def _thaw_params(payload: bytes, seq: int) -> dict:
 
 
 def _stamp_event(obj: dict) -> None:
-    """Stamp one outgoing event frame (mutates obj in place) and record it."""
+    """Stamp one outgoing event frame (mutates obj in place) and record a frozen snapshot."""
     if obj.get("method") != "event":
         return
     params = obj.get("params")
@@ -75,10 +75,11 @@ def _stamp_event(obj: dict) -> None:
     if not sid:
         # Session-less global events (skin.changed etc.) are re-fetchable via their own RPCs.
         return
-    # Sizing stays OUTSIDE the lock (same rule as transport.write) so one large payload cannot
-    # stall other threads' frames; ``seq`` is not stamped yet, a few bytes off a MiB budget.
-    size = len(json.dumps(params, ensure_ascii=False, separators=(",", ":")).encode(
-        "utf-8", errors="surrogatepass"))
+    # Freeze OUTSIDE the lock (same rule as transport.write) so one large payload cannot stall
+    # other threads' frames. The server-owned seq is restored when replaying, so the snapshot can
+    # be serialized before sequence assignment without retaining the mutable params dict.
+    payload = _freeze_params(params)
+    size = len(payload)
     with _replay_lock:
         global _replay_total_bytes
         seq = _replay_next_seq.get(sid, 0) + 1
@@ -107,7 +108,7 @@ def _stamp_event(obj: dict) -> None:
         if size > _REPLAY_BUFFER_BYTES_MAX or size > _REPLAY_PROCESS_BYTES_MAX:
             _replay_evicted_through[sid] = seq
             return
-        buf.append((seq, params, size))
+        buf.append((seq, payload, size))
         _replay_buffer_bytes[sid] += size
         _replay_total_bytes += size
         while len(buf) > _REPLAY_BUFFER_MAX or _replay_buffer_bytes[sid] > _REPLAY_BUFFER_BYTES_MAX:
@@ -129,11 +130,13 @@ def events_since(sid: str, last_seen: int) -> list[dict]:
     """Recorded EVENT OBJECTS (each frame's ``params`` dict) with seq > last_seen for *sid*.
 
     Returning the full JSON-RPC envelope would make every replayed event fail the
-    client's ``event.type`` gate and be silently dropped.
+    client's ``event.type`` gate and be silently dropped. Decode after releasing the ring lock so a
+    large replay cannot block concurrent event stamping.
     """
     with _replay_lock:
         buf = _replay_buffers.get(sid or "")
-        return [event for seq, event, _size in buf if seq > last_seen] if buf else []
+        snapshots = [(seq, payload) for seq, payload, _size in buf if seq > last_seen] if buf else []
+    return [_thaw_params(payload, seq) for seq, payload in snapshots]
 
 
 def is_truncated(sid: str, last_seen: int) -> bool:
