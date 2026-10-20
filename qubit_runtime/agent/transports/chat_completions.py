@@ -724,6 +724,10 @@ class ChatCompletionsTransport(ProviderTransport):
             provider_data["reasoning_content"] = reasoning_content
         if getattr(msg, "reasoning_details", None):
             provider_data["reasoning_details"] = msg.reasoning_details
+        # Message-level carriers (Gemini text-turn signature, Copilot reasoning): agent/reasoning_carriers.py.
+        for key in ("extra_content", "reasoning_opaque", "reasoning_text"):
+            if (value := _attr_or_model_extra(msg, key)) is not None:
+                provider_data[key] = _dump_extra_content(value)
 
         # OpenAI structured refusal (``message.refusal`` set, ``content`` empty); without
         # promotion the loop retries a deterministic refusal as an empty response.
@@ -739,7 +743,9 @@ class ChatCompletionsTransport(ProviderTransport):
 
         return NormalizedResponse(
             content=content, tool_calls=tool_calls, finish_reason=finish_reason,
-            reasoning=getattr(msg, "reasoning", None), usage=usage, provider_data=provider_data or None,
+            # Copilot /chat/completions names its readable reasoning ``reasoning_text``.
+            reasoning=getattr(msg, "reasoning", None) or provider_data.get("reasoning_text"), usage=usage,
+            provider_data=provider_data or None,
         )
 
     def _normalize_tool_call(self, tc: Any) -> ToolCall | None:
