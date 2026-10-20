@@ -66,11 +66,6 @@ def policy_identity(policy, unhashed=()):
         data.pop('editor_mcp_json', None)
     if not data.get('coding_posture'):
         data.pop('coding_posture', None)
-    for name in ('client_env_json', 'client_env_rules_json'):
-        if data.get(name) is None:
-            data.pop(name, None)
-    if not data.get('client_env_remote'):
-        data.pop('client_env_remote', None)
     for name in unhashed:  # _legacy_identities: a field the stamping gateway did not have yet
         data.pop(name, None)
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
@@ -83,7 +78,12 @@ def policy_identity(policy, unhashed=()):
 _LATER_POLICY_FIELDS = (('skills_prompt', None),          # 2ee1cd1ebb02
                         ('kanban_json', None),            # c8f8d9ae6384
                         ('safe_mode', False),             # 53d362e18741
-                        ('ignore_user_config', False))    # 53d362e18741
+                        ('ignore_user_config', False),    # 53d362e18741
+                        # A reference stamped before client-env binding hashed these at their
+                        # defaults, where they carry nothing; a re-bind writes ``bound`` instead.
+                        ('client_env_json', None),
+                        ('client_env_rules_json', None),
+                        ('client_env_remote', False))
 
 
 def _legacy_identities(policy):
