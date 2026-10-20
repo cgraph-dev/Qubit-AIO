@@ -267,7 +267,7 @@ SKILLS_GUIDANCE = (
 
 KANBAN_GUIDANCE = (
     "# Kanban task execution protocol\n"
-    "You have been assigned ONE task from the shared board at `~/.hermes/kanban.db`. Your task id is in "
+    "You have been assigned ONE task from the shared board at the Qubit kanban DB. Your task id is in "
     "`$HERMES_KANBAN_TASK`; your workspace is `$HERMES_KANBAN_WORKSPACE`. The `kanban_*` tools in your schema are your "
     "primary coordination surface — they write directly to the shared SQLite DB and work regardless of terminal "
     "backend (local/docker/modal/ssh).\n"

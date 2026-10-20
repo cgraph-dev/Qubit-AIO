@@ -1650,7 +1650,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
         if entry.source == "claude_code":
             store = "~/.claude/.credentials.json"
         elif entry.source == "hermes_pkce":
-            store = "~/.hermes/.anthropic_oauth.json"
+            store = "the Qubit auth store"
         else:
             return
         try:

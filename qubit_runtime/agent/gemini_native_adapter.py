@@ -53,7 +53,7 @@ _STANDARD_KEY_GUIDANCE = (
     "'Standard' Google Cloud keys for the Gemini API on June 19, 2026, and all Standard keys stop working in "
     "September 2026. Open https://aistudio.google.com/api-keys, check the key's type and status, and create a "
     "replacement Gemini API key (or, as a temporary bridge, restrict the Standard key to "
-    "generativelanguage.googleapis.com). Then update GEMINI_API_KEY / GOOGLE_API_KEY in ~/.hermes/.env, "
+    "generativelanguage.googleapis.com). Then update GEMINI_API_KEY / GOOGLE_API_KEY in your Qubit `.env`, "
     "delete any leftover Windows/system copy of those variables, and restart. A stale shell key can hide "
     "the .env value. Details: https://ai.google.dev/gemini-api/docs/api-key"
 )
@@ -89,7 +89,7 @@ _FINISH_REASON_MAP = {
 _HTTP_ERROR_CODES = {401: "gemini_unauthorized", 429: "gemini_rate_limited", 404: "gemini_model_not_found"}
 _MISSING_KEY_ERROR = (
     "Gemini native client requires an API key, but none was provided. Set GOOGLE_API_KEY or GEMINI_API_KEY in your "
-    "environment / ~/.hermes/.env (get one at https://aistudio.google.com/app/apikey), or run `qubit setup` to "
+    "environment / your Qubit `.env` (get one at https://aistudio.google.com/app/apikey), or run `qubit setup` to "
     "configure the Google provider."
 )
 

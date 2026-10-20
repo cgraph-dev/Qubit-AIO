@@ -4622,7 +4622,7 @@ def _warn_stale_openai_base_url(runtime_provider: str) -> None:
             "OPENAI_BASE_URL is set (%s) but model.provider is '%s'. "
             "Auxiliary clients may route to the wrong endpoint. "
             "Run: qubit model to reconfigure, or remove "
-            "OPENAI_BASE_URL from ~/.hermes/.env",
+            "OPENAI_BASE_URL from your Qubit `.env`",
             _env_base, _cfg_provider,
         )
         _stale_base_url_warned = True

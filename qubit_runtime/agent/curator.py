@@ -318,7 +318,7 @@ CURATOR_REVIEW_PROMPT = (
     "to local curator-managed skills only; external skills are externally "
     "owned and read-only to this background curator.\n"
     "2. DO NOT delete any skill. Archiving (moving the skill's directory "
-    "into ~/.hermes/skills/.archive/) is the maximum destructive action. "
+    "into the Qubit skills archive) is the maximum destructive action. "
     "Archives are recoverable; deletion is not.\n"
     "3. DO NOT touch skills shown as pinned=yes. Skip them entirely.\n"
     "3b. DO NOT archive, delete, consolidate, move, or otherwise modify any "
@@ -772,11 +772,11 @@ def _cron_rewrite_lines(entry: Dict[str, Any]) -> List[str]:
 _REPORT_SECTIONS = (
     ("consolidated", "Consolidated into umbrella skills",
      "_These skills were **absorbed into another skill** during this run — their content still lives, just under a different name. "
-     "The original directory was moved to `~/.hermes/skills/.archive/` for safety and can be restored via "
+     "The original directory was moved to the Qubit skills archive for safety and can be restored via "
      "`qubit curator restore <name>` if the consolidation was wrong._\n", _consolidated_lines, 50, "see `run.json`"),
     ("pruned", "Pruned — archived for staleness",
      "_These skills were archived without being merged into an umbrella (e.g. stale, unused, or judged irrelevant). "
-     "Directories live under `~/.hermes/skills/.archive/`. Restore any via `qubit curator restore <name>`._\n",
+     "Directories live in the Qubit skills archive. Restore any via `qubit curator restore <name>`._\n",
      _pruned_lines, 50, "see `run.json`"),
     ("added", "New skills this run", "_Usually these are new class-level umbrellas created via `skill_manage action=create`._\n",
      lambda n: [f"- `{n}`"], None, ""),
@@ -822,7 +822,7 @@ def _render_report_markdown(p: Dict[str, Any]) -> str:
     elif not error and (p.get("llm_summary") or ""):
         lines += ["## LLM summary\n", p.get("llm_summary"), ""]
     lines += ["## Recovery\n", "- Restore an archived skill: `qubit curator restore <name>`",
-              "- All archives live under `~/.hermes/skills/.archive/` and are recoverable by `mv`",
+              "- All archives live in the Qubit skills archive and are recoverable by `mv`",
               "- See `run.json` in this directory for the full machine-readable record.", ""]
     return "\n".join(lines)
 
