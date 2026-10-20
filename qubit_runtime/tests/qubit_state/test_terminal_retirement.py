@@ -99,7 +99,6 @@ def test_nonterminal_obligations_prevent_any_retirement(tmp_path):
                 assert not c.execute("SELECT 1 FROM state_meta WHERE key LIKE 'gateway.retired_session.v1.%'").fetchall()
 
 
-@pytest.mark.xfail(strict=False, reason='wave-12 port: local update_token_counts/ensure_session still backfill a retired row (no RuntimeStoreError); exposed gap, unmodified')
 def test_late_accounting_backfill_cannot_resurrect_a_retired_session(tmp_path):
     """A delayed background-review usage callback lands after delete committed: the
     retirement fence must refuse the missing-row backfill instead of recreating the
@@ -274,7 +273,6 @@ def test_deleted_history_is_not_recoverable_from_worker_or_mutation_receipts(tmp
                     canonical_target='gone', payload={'operation': 'compression.history', 'payload': history}))
 
 
-@pytest.mark.xfail(strict=False, reason='wave-12 port: local delete_session on the reset child does not delete the logical parent; exposed gap, unmodified')
 def test_mutation_receipts_naming_a_deleted_physical_target_drop_its_text(tmp_path):
     """D7 / pastels M07: a local owner's rewind receipt is keyed by the logical id but copies the
     rewound turn from the physical reset child. Deleting that child (``qubit sessions delete`` on
@@ -333,7 +331,6 @@ def test_retirement_drops_the_turn_user_row_copy(tmp_path):
         assert retired['final_response'] == 'reply' and '_turn_user_row' not in retired
 
 
-@pytest.mark.xfail(strict=False, reason='wave-12 port: local prune_sessions does not reclaim gateway.retired_session.* tombstones past the horizon; exposed gap, unmodified')
 def test_tombstones_past_the_retry_horizon_are_reclaimed_by_the_prune_pass(tmp_path, monkeypatch):
     """Deletion tombstones keep byte-exact retry replies for the 7-day horizon, then the maintenance
     prune pass reclaims every row they hold (B2-06)."""

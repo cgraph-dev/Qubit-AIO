@@ -811,6 +811,12 @@ class SessionCompressionMixin:
         chain = self.get_compression_chain(session_id)
         return chain[-1] if chain else session_id
 
+    def _compression_tip_on(self, conn, session_id: str) -> str:
+        """``get_compression_tip`` read on a writer's own connection: inside its transaction no rotation
+        can publish between finding the tip and writing it."""
+        return _walk_compression_chain(
+            session_id, lambda current: conn.execute(_CHAIN_STEP_SQL, (current,)).fetchone())[-1]
+
     def _is_compression_child_row(self, child: Dict[str, Any]) -> bool:
         parent_id = child.get("parent_session_id")
         # A reset fork of a compression-ended parent is its own conversation, not the continuation (#114271).
