@@ -40,6 +40,26 @@ from unittest.mock import MagicMock
 import pytest
 
 
+@pytest.fixture
+def private_db_probe_cleanup(tmp_path):
+    """Release only this test's probe fds after its explicit SQLite-handle finalizers.
+
+    Production intentionally keeps these probes open: closing one while SQLite still
+    owns the inode cancels its POSIX locks. Opt-in tests must first register normal
+    runner/store cleanup and use only databases underneath their private tmp_path.
+    """
+    import qubit_state_dbfile as dbfile
+
+    with dbfile._HEADER_PROBE_LOCK:
+        existing = set(dbfile._HEADER_PROBE_FDS)
+    yield
+    with dbfile._HEADER_PROBE_LOCK:
+        for key in set(dbfile._HEADER_PROBE_FDS) - existing:
+            if Path(key).is_relative_to(tmp_path):
+                fd, _dev, _ino = dbfile._HEADER_PROBE_FDS.pop(key)
+                os.close(fd)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _bind_lark_sdk_globals_when_installed():
     """Bind the feishu adapter's lark SDK globals once per test session.
@@ -163,6 +183,14 @@ def _ensure_telegram_mock() -> None:
 
     # Update.ALL_TYPES used in start_polling()
     mod.Update.ALL_TYPES = []
+
+    # PerChatUpdateProcessor subclasses this at import time: a MagicMock base
+    # would turn the subclass itself into a mock that fails on its second call.
+    class SimpleUpdateProcessor:
+        def __init__(self, max_concurrent_updates):
+            self.max_concurrent_updates = max_concurrent_updates
+
+    mod.SimpleUpdateProcessor = SimpleUpdateProcessor
 
     for name in (
         "telegram",
@@ -606,3 +634,49 @@ def _write_guard_cache_atomic(cache_file: Path, content: str) -> None:
         except OSError:
             pass
 
+
+# ---------------------------------------------------------------------------
+# Canonical session-authority fixtures shared by several test files.
+#
+# Imports stay inside the fixture bodies: this conftest must install the
+# telegram/discord mocks above before any gateway module is imported.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def owner(tmp_path):
+    """A canonical ``SessionAuthority`` over a fresh profile ``state.db``."""
+    from types import SimpleNamespace
+
+    from gateway.config import GatewayConfig
+    from gateway.session import SessionStore
+    from gateway.session_authority import SessionAuthority
+    from qubit_state import SessionDB
+    from qubit_state_runtime import begin_runtime_epoch
+
+    db = SessionDB(tmp_path / 'state.db')
+    store = SessionStore(config=GatewayConfig(), sessions_dir=tmp_path / 'sessions')
+    store._db = db  # production: the routing store and the authority share the profile's state.db
+    runner = SimpleNamespace(_draining=False, session_store=store)
+    authority = SessionAuthority(runner, profile_id='default', instance_id='first', db=db,
+                                 epoch=begin_runtime_epoch(db, instance_id='first'))
+    runner.session_authority = authority
+    yield authority
+    db.close()
+
+
+@pytest.fixture
+def api(owner, tmp_path, monkeypatch):
+    """The API server adapter bound to ``owner``'s runner and database."""
+    from gateway.config import PlatformConfig
+    from gateway.platforms.api_server import APIServerAdapter
+
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
+    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    adapter = APIServerAdapter(PlatformConfig(enabled=True))
+    adapter.gateway_runner = owner.runner
+    adapter._session_db = owner.db
+    owner.runner._adapter_for_source = lambda source: adapter
+    yield adapter
+    adapter._response_store.close()
+    adapter._run_idempotency_store.close()
