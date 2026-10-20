@@ -21,12 +21,12 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 Full evidence in `docs/STATUS.md` (top entry). Durable state:
 
-- ✅ Landed: `same_create_retry` + contract test (`5c578fcdd`); source-release test-stub sync (`b9e1a3b3b`); dead symbols **216 → 170** incl. worker output-log port (`023b9e479`); 20 test files ported, absent tests **804 → 784** (`8f0e0fafe`); connectors-only reader + brand copy fixed (`74ecc8410`).
+- ✅ Landed: `same_create_retry` + contract test (`5c578fcdd`); source-release test-stub sync (`b9e1a3b3b`); dead symbols **216 → 167** on merged main (0 new) incl. worker output-log port (`023b9e479`); 20 test files ported, absent tests **804 → 784** (`8f0e0fafe`); connectors-only reader + brand copy fixed (`74ecc8410`).
 - 🟡 **Not applied live:** the boot/worker changes are still merged-but-not-running (no service restart by design).
 - 🔴 **Owner decisions needed:** F4 — a control-socket bind failure is now fatal in `run_bootstrap.py:855`, while the old `run.py` body and `control_socket.py:191` call it non-fatal. F5 — the dead-symbol wave added exclusions to `docs/FROZEN_TARGET.md:51-55` (owner-declared table) without sign-off.
 - 🔴 **Next structural lane:** F2 — seven `_start_gateway_*` helpers exist twice (`run.py` vs `run_bootstrap.py`) with divergent bodies; two tests import the stale copies (`test_multiplex_hot_serve.py:167`, `test_startup_restart_race.py:382`). De-dup carefully; `_start_gateway_replace_existing_instance` is live in both contexts.
 - 🔴 **9 production defects found by the test-parity lane, unmodified:** memory single-op `patch` unreachable (`tools/memory_tool.py:104,136`; `qubit_cli/write_approval_commands.py:105`); Alibaba content-policy refusal classes (`agent/error_classifier.py:359`); repeated-answer history reconcile by `(role,text)` instead of row identity (`tui_gateway/server.py:3153`); theme callbacks absent (`tui_gateway/agent_callbacks.py:146`); ACP `list_sessions` creates storage / ignores read-only catalog (`acp_adapter/session.py:210`); session-search read path creates the DB (`tools/session_search_tool.py:629`); bot receipt reader lacks the writer lock (`tools/bot_live_delivery.py:459`); `cron.jobs.mark_job_run` lacks `execution_id` (`cron/jobs.py:2424`); duplicate session-key namespace inverse (`gateway/session.py:666` vs `qubit_state_keys.py:77`). Each has the upstream test named in `docs/STATUS.md`.
-- 🔴 **Still open:** 170 dead symbols; 784 absent + 894 short-port test symbols; retirement.
+- 🔴 **Still open:** 167 dead symbols; 784 absent + 894 short-port test symbols; retirement.
 
 ---
 
