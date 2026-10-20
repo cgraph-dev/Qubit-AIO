@@ -1378,15 +1378,20 @@ def drain_delivery_queue(adapters, loop) -> int:
     # open/create entirely until a worker has actually queued something.
     if not _path().exists():
         return 0
-    return drain(
-        lambda queued_job, queued_content, queued_for_failure: _deliver_result(
-            queued_job,
-            queued_content,
-            adapters=adapters,
-            loop=loop,
+
+    def send(queued_job, queued_content, queued_for_failure):
+        error = _deliver_result(
+            queued_job, queued_content, adapters=adapters, loop=loop,
             for_failure=queued_for_failure,
         )
-    )
+        # The ping left the process: book the incident alerted. A notice every target hid
+        # (warning notifications suppressed) is a durable disposition, not an alert.
+        if (not error and queued_for_failure
+                and not queued_job.get("_notification_all_targets_suppressed")):
+            _mark_incident_alerted(queued_job.get("_failure_incident_id"))
+        return error
+
+    return drain(send)
 
 
 _DEFAULT_SCRIPT_TIMEOUT = 3600  # seconds (1 hour)
@@ -3169,6 +3174,26 @@ def _save_compose_deliver(
         _normalize_deliver_value(_delivery_lane_value(job, for_failure=not d.success)) == "origin"
         and not _resolve_delivery_targets(job, for_failure=not d.success)
     )
+    execution_id = job.get('execution_id')
+    if execution_id and not job.get('no_agent'):
+        from cron.delivery_queue import enqueue
+        # Nothing to send: an origin-less job is ``not_configured``, never a queued "delivery".
+        if d.unresolved_origin or _normalize_deliver_value(
+                _delivery_lane_value(job, for_failure=not d.success)) == "local":
+            return
+        queued_job = dict(job)
+        if d.failure_incident_id:
+            queued_job["_failure_incident_id"] = d.failure_incident_id
+        # The queue row IS the send: publish it under the same fence as a direct send, so a claim
+        # stolen after the lost() sample above cannot leave this stale fire's notice queued.
+        with fence.side_effect_fence() as owns_delivery:
+            if not owns_delivery:
+                raise _FireClaimLostDuringSideEffect
+            queued = enqueue(execution_id, queued_job, deliver_content, for_failure=not d.success)
+            # The queue owns this send even if subsequent bookkeeping fails.
+            d.delivery_attempted = True
+        job['last_delivery_queued'] = {'canonical': {'status': queued['status'], 'execution_id': execution_id}}
+        return
     try:
         with fence.side_effect_fence() as owns_delivery:
             if not owns_delivery:
@@ -3201,53 +3226,12 @@ def _finish_interrupted_run(job: dict, execution_id: str, delivery_error: Option
 
 
 def _finish_completed_run(d: _RunDelivery, fire_owner: Optional[str], execution_id: str) -> bool:
-    """mark_job_run (owner-fenced) + execution ledger row for a run that reached delivery."""
-    job = d.job
-    if not d.should_deliver and job.get("last_delivery_queued"):
-        from cron.jobs import update_job
-        update_job(job["id"], {"last_delivery_queued": None})
-        job["last_delivery_queued"] = None
-    mark_kwargs: dict = {"delivery_error": d.delivery_error}
-    if not d.success and job.pop("_model_unreachable", False):
-        # Never-reached-the-model failure: schedule the Cowork-style bounded re-run
-        # (cron/unreachable_retry.py) inside the same fenced store write.
-        mark_kwargs["model_unreachable"] = True
-    _hold_s = job.pop("_quota_hold_seconds", None)
-    if not d.success and _hold_s:
-        # Provider window closed for a known duration: park past it (cron/quota_hold.py, #89376).
-        mark_kwargs["quota_hold_seconds"] = _hold_s
-        mark_kwargs["recover_consumed_fire"] = bool(job.get("_scheduled_instant"))
-    if d.success and not d.delivery_error and d.should_deliver and job.get("last_delivery_queued"):
-        mark_kwargs["status"] = "delivery_queued"
-    if fire_owner is not None:
-        mark_kwargs["expected_fire_owner"] = fire_owner
-    if d.blocked_config:
-        mark_kwargs["status"] = "blocked_config"
-    # A run that removed its own record has nothing left to mark; the delivery above is its result.
-    marked = self_removal_delivery_allowed(job["id"]) or mark_job_run(
-        job["id"], d.success, d.error, **mark_kwargs)
-    if fire_owner is not None and not marked:
-        finish_execution(
-            execution_id, success=False,
-            error="Fire claim ownership lost before terminal completion.")
-        return True
-    delivery_outcome = _classify_delivery_outcome(
-        delivery_error=d.delivery_error,
-        delivery_queued=job.get("last_delivery_queued"),
-        notification_suppressed=bool(job.get("_notification_all_targets_suppressed")),
-        should_deliver=d.should_deliver,
-        unresolved_origin=d.unresolved_origin,
-        # Read the lane the notice was actually routed through (failure_deliver on failure).
-        normalized_deliver=_normalize_deliver_value(_delivery_lane_value(job, for_failure=not d.success)),
-        incident_acked=d.incident_acked,
-        success=d.success,
-    )
-    if delivery_outcome in ("delivered", "not_configured") and not d.success:
-        # Failure ping left the process (or had a configured target): mark the incident alerted.
-        _mark_incident_alerted(d.failure_incident_id)
-    finish_execution(
-        execution_id, success=d.success, error=d.error, delivery_outcome=delivery_outcome)
-    return True
+    """mark_job_run (owner-fenced) + execution ledger row for a run that reached delivery.
+
+    Delegates to ``cron.scheduler_bookkeeping.finish_completed_run`` (upstream's name and home for
+    this phase); this name is the facade the scheduler's own call site uses."""
+    from cron.scheduler_bookkeeping import finish_completed_run
+    return finish_completed_run(d, fire_owner, execution_id)
 
 
 def _deliver_crash_failure(
