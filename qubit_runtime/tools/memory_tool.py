@@ -2,7 +2,7 @@
 """Memory Tool - persistent curated memory (MEMORY.md = agent notes, USER.md = user
 profile). Both enter the system prompt as a FROZEN snapshot at session start;
 mid-session writes hit disk but never change the prompt (prefix cache intact).
-Single `memory` tool: add/replace/remove or a batch `operations` list."""
+Single `memory` tool: add/replace/patch/remove or a batch `operations` list."""
 
 import copy
 import json
@@ -41,7 +41,7 @@ def get_memory_dir() -> Path:
 
 
 from tools.memory_tool_store import (  # noqa: E402,F401  (re-exports)
-    ENTRY_DELIMITER, MEMORY_BLOCK_HEADERS, MemoryStore, _scan_memory_content)
+    ENTRY_DELIMITER, MEMORY_BLOCK_HEADERS, PATCH_DROP_HINT, MemoryStore, _scan_memory_content)
 
 
 def load_on_disk_store() -> MemoryStore:
@@ -108,7 +108,11 @@ _STORE_ACTIONS = {
                 lambda label, content, old_text: (f"replace in {label}",
                                                   f"entry matching: {old_text}\nwhole entry becomes: {content}")),
     "remove": (lambda store, target, content, old_text, entry=None: store.remove(target, old_text, entry),
-               lambda label, content, old_text: (f"remove from {label}", old_text or ""))}
+               lambda label, content, old_text: (f"remove from {label}", old_text or "")),
+    "patch": (lambda store, target, content, old_text, entry=None: store.patch(target, old_text, content, entry),
+              lambda label, content, old_text: (f"patch in {label}",
+                                                f"entry matching: {old_text}\nspan '{old_text}' becomes: {content} "
+                                                "(rest of the entry is kept)"))}
 
 
 def _batch_op_line(op: Dict[str, Any]) -> str:
@@ -116,6 +120,8 @@ def _batch_op_line(op: Dict[str, Any]) -> str:
     act, content, old = op.get("action", "?"), op.get("content") or op.get("new_text") or "", op.get("old_text", "")
     if act == "remove":
         return f"- remove: {old}"
+    if act == "patch":
+        return f"- patch span '{old}' -> '{content}' (rest of the entry is kept)"
     # Whole-entry contract (#117952): the approver must not read this as a span patch.
     return (f"- replace entry matching '{old}' -> whole entry becomes: {content}" if act == "replace"
             else f"- {act}: {content}")
@@ -139,7 +145,7 @@ def _validate_single_op(store, action, target, content, old_text) -> Optional[st
     the Codex backend rejects): return the inventory plus a retry instruction."""
     if action == "add" and not content:
         return tool_error("Content is required for 'add' action.", success=False)
-    if action in ("replace", "remove") and not old_text:
+    if action in ("replace", "remove", "patch") and not old_text:
         replace_hint = (" For 'replace', content is the COMPLETE new entry -- the whole "
                         "matched entry is overwritten, not just the old_text span."
                         if action == "replace" else "")
@@ -151,10 +157,13 @@ def _validate_single_op(store, action, target, content, old_text) -> Optional[st
             "current_entries": store._entries_for(target), "usage": store._usage(target)}, ensure_ascii=False)
     if action == "replace" and not content:
         return tool_error("content is required for 'replace' action.", success=False)
+    if action == "patch" and not content:
+        return tool_error(f"content (the new text for the old_text span) is required for 'patch' action. "
+                          f"{PATCH_DROP_HINT}", success=False)
     return None
 
 
-_BG_DELETE_ACTIONS = ("replace", "remove")
+_BG_DELETE_ACTIONS = ("replace", "remove", "patch")
 # 'replace' is no longer offered to the model; it stays here so writes staged before its
 # removal still pin, display and replay.
 _REPLACE_REMOVED = ("'replace' is not available; use 'patch'. old_text is the exact span to change and "
@@ -255,12 +264,12 @@ def _memory_tool(action, target, content, old_text, new_text, operations, store)
     # *why* the call was malformed and can trigger repeated retries. (#64291)
     if not action and not operations:
         return "rejected", tool_error(
-            "Missing required parameter: provide 'action' (add/replace/remove) "
+            "Missing required parameter: provide 'action' (add/replace/patch/remove) "
             "or 'operations' (batch list). Got neither.",
             success=False,
         )
     if action not in _STORE_ACTIONS:
-        return "rejected", tool_error(f"Unknown action '{action}'. Use: add, replace, remove", success=False)
+        return "rejected", tool_error(f"Unknown action '{action}'. Use: add, replace, patch, remove", success=False)
     invalid = (_validate_single_op(store, action, target, content, old_text)
                or _background_delete_gate(store, action, None, target, content, old_text)
                or _apply_write_gate(store, action, target, content, old_text))
