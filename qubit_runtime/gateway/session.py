@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Any
 
 from .config import Platform, GatewayConfig, HomeChannel
 from .whatsapp_identity import canonical_whatsapp_identifier
+from qubit_state_keys import profile_from_session_key_namespace
 from gateway.session_identity import transport_profile_of
 from gateway.session_persistence import SessionPersistenceMixin, _DB_UNPINNED
 from gateway.session_prompt_pin import SessionPromptPinMixin, sanitize_prompt_pin
@@ -661,14 +662,6 @@ def _session_key_namespace(profile: Optional[str]) -> str:
     if not profile or profile == "default":
         return "agent:main"
     return "agent:main~" if profile == "main" else f"agent:{profile}"
-
-
-def profile_from_session_key_namespace(namespace: str) -> str:
-    """Inverse of :func:`_session_key_namespace` for the ``<ns>`` slot of a key: ``"default"`` for
-    ``main``, ``"main"`` for the marked ``main~``, else the slot is the profile id."""
-    if namespace == "main":
-        return "default"
-    return "main" if namespace == "main~" else namespace
 
 
 def _canonical_participant(source: SessionSource) -> Optional[str]:
