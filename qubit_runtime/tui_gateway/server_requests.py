@@ -72,7 +72,7 @@ def settle_batch(locked: dict, frame_result=None, *, ended: str | None = None) -
 
 class ServerRequest:
     __slots__ = ("id", "sid", "method", "params", "event", "result", "answered", "created_at",
-                 "qids", "locked", "on_result", "declined")
+                 "qids", "locked", "on_result", "declined", "writing", "withdrawn")
 
     def __init__(self, sid: str, method: str, params: dict, *, qids: list[str] | None = None,
                  on_result: Callable[[dict | None], None] | None = None) -> None:
@@ -90,6 +90,9 @@ class ServerRequest:
         self.on_result = on_result
         # Client transports that answered NOT_SHOWN_CODE (no window there shows this session).
         self.declined: set = set()
+        # Published but frame not yet written; a cancel in that gap parks its reason in ``withdrawn`` for _register.
+        self.writing = False
+        self.withdrawn: str | None = None
 
     def frame(self) -> dict:
         return {"jsonrpc": "2.0", "id": self.id, "method": self.method,
@@ -180,8 +183,17 @@ def _register(req: ServerRequest) -> None:
     if problem is not None:
         raise ValueError(problem)  # a key the renderer's typed handler would never read: our bug
     with _lock:
+        req.writing = True
         _open[req.id] = req
-    _write(req.frame())
+    try:
+        _write(req.frame())
+    finally:
+        with _lock:
+            req.writing = False
+            withdrawn = req.withdrawn
+    if withdrawn is not None:
+        # cancel() landed between publish and write: its request.cancel must follow the frame, not precede it.
+        _emit_cancel(req, withdrawn)
 
 
 def send(method: str, sid: str, params: dict, *, timeout: float | None,
@@ -345,11 +357,15 @@ def cancel(sid: str | None = None, reason: str = "interrupted") -> int:
                 req.result, req.answered = settle_batch(req.locked, ended="cancelled"), True
             else:
                 req.result, req.answered = None, False
+            if req.writing:
+                req.withdrawn = reason
+        announced = {req.id for req in targets if not req.writing}
     for req in targets:
         if req.on_result is not None:
             req.on_result(None)
         req.event.set()
-        _emit_cancel(req, reason)
+        if req.id in announced:
+            _emit_cancel(req, reason)
     return len(targets)
 
 
