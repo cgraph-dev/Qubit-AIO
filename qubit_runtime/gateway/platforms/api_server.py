@@ -139,6 +139,7 @@ from gateway.platforms import api_server_room_dispatch as _room_dispatch
 from gateway.platforms import api_server_room_grants as _room_grants
 from gateway.platforms import api_server_runs as _api_runs
 from gateway.platforms.api_server_openai_routes import OpenAICompatRoutesMixin
+from gateway.platforms.api_server_response_store import ResponseStore
 from gateway.platforms.api_server_memory_sessions import ApiServerMemorySessions
 from gateway.platforms.base import (
     MEDIA_TAG_CLEANUP_RE, BasePlatformAdapter, SendResult, _terminal_sentinel_start, is_network_accessible,
@@ -691,108 +692,6 @@ async def _abandon_agent_task(
 def check_api_server_requirements() -> bool:
     """Check if API server dependencies are available."""
     return AIOHTTP_AVAILABLE
-
-
-class ResponseStore:
-    """SQLite-backed LRU store for Responses API state (full conversation history per response
-    for ``previous_response_id`` chaining). Persists across restarts; in-memory fallback."""
-
-    def __init__(self, max_size: int = MAX_STORED_RESPONSES, db_path: str = None):
-        self._max_size = max_size
-        if db_path is None:
-            db_path = ":memory:"
-            with suppress(Exception):
-                from qubit_cli.config import get_qubit_home
-                db_path = str(get_qubit_home() / "response_store.db")
-        self._db_path: Optional[str] = db_path if db_path != ":memory:" else None
-        try:
-            self._conn = sqlite3.connect(db_path, check_same_thread=False)
-        except Exception:
-            self._conn = sqlite3.connect(":memory:", check_same_thread=False)
-            self._db_path = None
-        # Shared WAL-fallback so response_store.db degrades gracefully on NFS/SMB/FUSE homes.
-        from qubit_state_wal import apply_wal_with_fallback
-        apply_wal_with_fallback(self._conn, db_label="response_store.db")
-        self._conn.execute(
-            "CREATE TABLE IF NOT EXISTS responses ("
-            "response_id TEXT PRIMARY KEY, data TEXT NOT NULL, accessed_at REAL NOT NULL)")
-        self._conn.execute(
-            "CREATE TABLE IF NOT EXISTS conversations (name TEXT PRIMARY KEY, response_id TEXT NOT NULL)")
-        self._conn.commit()
-        # Conversation history lives here: owner-only perms, once at init (not per commit).
-        self._tighten_file_permissions()
-
-    def _tighten_file_permissions(self) -> None:
-        """Force owner-only permissions on the DB and SQLite sidecars."""
-        if not self._db_path:
-            return
-        for candidate in (Path(self._db_path), Path(f"{self._db_path}-wal"), Path(f"{self._db_path}-shm")):
-            try:
-                if candidate.exists():
-                    candidate.chmod(0o600)
-            except OSError:
-                logger.debug("Failed to restrict response store permissions for %s", candidate, exc_info=True)
-
-    def get(self, response_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a stored response by ID (updates access time for LRU)."""
-        row = self._conn.execute(
-            "SELECT data FROM responses WHERE response_id = ?", (response_id,)).fetchone()
-        if row is None:
-            return None
-        self._conn.execute(
-            "UPDATE responses SET accessed_at = ? WHERE response_id = ?",
-            (time.time(), response_id))
-        self._conn.commit()
-        try:
-            return json.loads(row[0])
-        except (json.JSONDecodeError, TypeError):
-            logger.warning("Corrupted JSON in response store for id=%s, evicting entry", response_id)
-            self._conn.execute("DELETE FROM responses WHERE response_id = ?", (response_id,))
-            self._conn.commit()
-            return None
-
-    def put(self, response_id: str, data: Dict[str, Any]) -> None:
-        """Store a response, evicting the oldest if at capacity."""
-        self._conn.execute(
-            "INSERT OR REPLACE INTO responses (response_id, data, accessed_at) VALUES (?, ?, ?)",
-            (response_id, json.dumps(data, default=str), time.time()))
-        count = self._conn.execute("SELECT COUNT(*) FROM responses").fetchone()[0]
-        if count > self._max_size:
-            evict_ids = [row[0] for row in self._conn.execute(
-                "SELECT response_id FROM responses ORDER BY accessed_at ASC LIMIT ?",
-                (count - self._max_size,)).fetchall()]
-            if evict_ids:
-                placeholders = ",".join("?" for _ in evict_ids)
-                # Conversation mappings pointing at evicted responses go too.
-                self._conn.execute(f"DELETE FROM conversations WHERE response_id IN ({placeholders})", evict_ids)
-                self._conn.execute(f"DELETE FROM responses WHERE response_id IN ({placeholders})", evict_ids)
-        self._conn.commit()
-
-    def delete(self, response_id: str) -> bool:
-        """Remove a response (and conversation mappings to it). True if found and deleted."""
-        self._conn.execute("DELETE FROM conversations WHERE response_id = ?", (response_id,))
-        cursor = self._conn.execute("DELETE FROM responses WHERE response_id = ?", (response_id,))
-        self._conn.commit()
-        return cursor.rowcount > 0
-
-    def get_conversation(self, name: str) -> Optional[str]:
-        """Get the latest response_id for a conversation name."""
-        row = self._conn.execute("SELECT response_id FROM conversations WHERE name = ?", (name,)).fetchone()
-        return row[0] if row else None
-
-    def set_conversation(self, name: str, response_id: str) -> None:
-        """Map a conversation name to its latest response_id."""
-        self._conn.execute("INSERT OR REPLACE INTO conversations (name, response_id) VALUES (?, ?)", (name, response_id))
-        self._conn.commit()
-
-    def close(self) -> None:
-        """Close the database connection."""
-        with suppress(Exception):
-            self._conn.close()
-
-    def __len__(self) -> int:
-        row = self._conn.execute("SELECT COUNT(*) FROM responses").fetchone()
-        return row[0] if row else 0
 
 
 _CORS_HEADERS = {
@@ -4207,6 +4106,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         route: Optional[Dict[str, Any]] = None, session_model: Optional[str] = None,
         requested_runtime: Optional[Dict[str, Any]] = None, route_source: str = "global",
         confirmed_runtime_lock: bool = False, bind_declared_conversation: bool = False,
+        request_id: Optional[str] = None, history_from_session: bool = False, run_owner_scope=None,
         session_history_delivery: str = "", turn_author: Optional[Dict[str, Any]] = None,
         relay_metadata: Optional[Dict[str, Any]] = None, notification_category: str = "result",
         resume_unanswered_turn: bool = False, approval_notify_callback=None,
@@ -4223,8 +4123,23 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         ``turn_author`` only labels the turn for memory attribution. It grants nothing.
         ``resume_unanswered_turn`` marks a policy-gated re-run of a turn whose user row the failed attempt
         already persisted: the transcript's unanswered tail row is adopted from ``conversation_history``
-        as THIS turn's user message instead of being appended a second time
-        (``agent.session_persistence.adopt_unanswered_turn``; #115325)."""
+        as THIS turn's user message instead of being appended a second time (#115325)."""
+        if getattr(self.gateway_runner, "session_authority", None) is not None:
+            from gateway.session_api_turn import run_api_turn
+            return await run_api_turn(self, user_message=user_message, conversation_history=conversation_history,
+                ephemeral_system_prompt=ephemeral_system_prompt, session_id=session_id,
+                stream_delta_callback=stream_delta_callback, tool_progress_callback=tool_progress_callback,
+                tool_start_callback=tool_start_callback, tool_complete_callback=tool_complete_callback,
+                interim_assistant_callback=interim_assistant_callback, reasoning_callback=reasoning_callback,
+                status_callback=status_callback,
+                agent_ref=agent_ref, active_run_id=active_run_id, gateway_session_key=gateway_session_key,
+                requested_model=requested_model, requested_provider=requested_provider, model_options=model_options,
+                route=route, session_model=session_model, requested_runtime=requested_runtime,
+                route_source=route_source, confirmed_runtime_lock=confirmed_runtime_lock,
+                bind_declared_conversation=bind_declared_conversation, request_id=request_id, run_owner_scope=run_owner_scope,
+                history_from_session=history_from_session, session_history_delivery=session_history_delivery,
+                turn_author=turn_author, resume_unanswered_turn=resume_unanswered_turn, relay_metadata=relay_metadata,
+                approval_notify_callback=approval_notify_callback, approval_session_key=approval_session_key)
         loop = asyncio.get_running_loop()
         # ContextVars do not follow run_in_executor threads: capture here, re-enter in _run().
         request_profile = _api_request_profile.get()
