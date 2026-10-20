@@ -41,7 +41,8 @@ def get_memory_dir() -> Path:
 
 
 from tools.memory_tool_store import (  # noqa: E402,F401  (re-exports)
-    ENTRY_DELIMITER, MEMORY_BLOCK_HEADERS, PATCH_DROP_HINT, MemoryStore, _scan_memory_content)
+    ENTRY_DELIMITER, FAILURE_CLASS, MEMORY_BLOCK_HEADERS, PATCH_DROP_HINT, MemoryStore,
+    _scan_memory_content)
 
 
 def load_on_disk_store() -> MemoryStore:
@@ -242,9 +243,7 @@ def _memory_tool(action, target, content, old_text, new_text, operations, store)
     # An omitted optional string can arrive as "" (#90468): let the new_text alias fill it.
     if not content and new_text:
         content = new_text
-    # Strict providers send JSON null for optional fields; treat as omitted.
-    target = "memory" if target is None else target
-    target_error = _memory_target_error(store, target)
+    target_error = _memory_target_error(store, target, operations)
     if target_error is not None:
         return "rejected", json.dumps(target_error)
     if operations:
@@ -307,15 +306,35 @@ def check_memory_requirements() -> bool:
     return flags[0] or flags[1]
 
 
-def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str, Any]]:
-    """Return a shared validation error for an invalid or disabled target."""
-    if target not in {"memory", "user"}:
+def _memory_target_error(
+    store: "MemoryStore", target: Optional[str], operations: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Validate one explicit store before writing, staging, or replaying a batch."""
+    if target is None:
+        FAILURE_CLASS.set("invalid_args")
+        return {"success": False, "error": (
+            "Missing required target. Retry with target='memory' or target='user' at the top level. "
+            "For a batch, remove target from every operation; use separate calls for different stores. "
+            "Nothing was written or staged.")}
+    if not isinstance(target, str) or target not in {"memory", "user"}:
         from tools.registry import _bound_error_text
+        FAILURE_CLASS.set("invalid_args")
         return {"success": False,
                 "error": _bound_error_text(f"Invalid memory target '{target}'. Use 'memory' or 'user'.")}
+    if isinstance(operations, list):
+        for index, op in enumerate(operations, 1):
+            # A nested target equal to the call's (or null) is redundant, not wrong; only a
+            # different one asks for two stores in one call, which a batch cannot do.
+            if isinstance(op, dict) and op.get("target") not in (None, target):
+                FAILURE_CLASS.set("invalid_args")
+                return {"success": False, "error": (
+                    f"Operation {index} names a different target than the one at the top level. "
+                    "One call writes one store: retry with separate calls for different stores. "
+                    "Nothing was written or staged.")}
     if store.target_enabled(target):
         return None
     label = "USER.md" if target == "user" else "MEMORY.md"
+    FAILURE_CLASS.set("disabled")
     return {"success": False, "error": f"Built-in {label} writes are disabled in memory config.", "target": target}
 
 
@@ -324,8 +343,8 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
     replace/remove applies to exactly its pinned ``matched_entry`` or is refused; a record
     staged before pinning has no verifiable target, so it is refused rather than replayed by
     old_text (which could hit a newer entry the approver never saw)."""
-    action, target = payload.get("action"), payload.get("target", "memory")
-    target_error = _memory_target_error(store, target)
+    action, target = payload.get("action"), payload.get("target")
+    target_error = _memory_target_error(store, target, payload.get("operations"))
     if target_error is not None:
         return target_error
     if any(not op.get("matched_entry") for op in destructive_ops(payload)):
@@ -446,7 +465,7 @@ registry.register(
     toolset="memory",
     schema=MEMORY_SCHEMA,
     handler=lambda args, **kw: memory_tool(
-        action=args.get("action", ""), target=args.get("target", "memory"), store=kw.get("store"),
+        action=args.get("action", ""), target=args.get("target"), store=kw.get("store"),
         **{k: args.get(k) for k in ("content", "old_text", "new_text", "operations")}),
     check_fn=check_memory_requirements,
     emoji="🧠",
