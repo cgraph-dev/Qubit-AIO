@@ -3514,6 +3514,14 @@ def _run_one_job_body(
         return _finish_completed_run(d, fire_owner, execution_id)
 
     except BaseException as e:  # noqa: BLE001 — deliberate: see below
+        from cron.scheduler_authority import CronExecutionUnknown
+        if isinstance(e, CronExecutionUnknown):
+            from cron.executions import give_up_execution
+            from cron.scheduler_authority import pause_for_unknown
+            pause_for_unknown(job["id"], execution_id, str(e))
+            give_up_execution(execution_id, reason=str(e))
+            logger.error("Cron %s paused with unverified admission: %s", job["id"], e)
+            return False
         # BaseException, not Exception: CancelledError/KeyboardInterrupt/SystemExit propagate here.
         # Without mark_job_run(False) a finite one-shot is wedged: claim_dispatch consumed
         # repeat.completed but last_run_at is never written. Record first, then re-raise
