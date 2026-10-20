@@ -40,6 +40,16 @@ def _is_live_system_guard(exc: BaseException) -> bool:
 class SessionPersistenceMixin:
     """SessionStore storage plumbing: SessionDB handle resolution and routing-index load/save."""
 
+    def retire_runtime_sessions(self, session_ids):
+        """Publish committed retirement; durable fences reject delayed saves."""
+        with self._lock:
+            targets = set(session_ids)
+            for key, entry in list(self._entries.items()):
+                if entry.session_id in targets:
+                    del self._entries[key]
+            for sid in targets:
+                self._session_owner_hints.pop(sid, None)
+
     def _open_session_db_for_active_scope(self, db_path: Optional[Path] = None):
         """SessionDB for the active profile scope. ``db_path`` pins the store; otherwise
         ``_default_db_path()`` follows the context-local QUBIT_HOME (resolved per call so
