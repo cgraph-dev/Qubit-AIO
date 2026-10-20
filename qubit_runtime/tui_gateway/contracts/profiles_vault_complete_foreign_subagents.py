@@ -376,10 +376,13 @@ class OnboardingRunStateResult(Result):
     run_id: str | None = None
 
 
-# Moved to the fork's own state enum (below): upstream's OnboardingStateParams/OnboardingRunStateResult
-# shape was replaced by Qubit's setup-profile state, which already carries onboarding.state here.
-# The upstream classes stay declared above for the frozen contract surface; only the registry entry
-# moves, so this file keeps exactly one onboarding.state contract.
+# ``onboarding.state`` is the saved-run model (run/eligible/session_id/run_id), so its params carry
+# the desktop's ``--fresh-install`` flag. The setup-profile state (eligible/intro/failed_starts/
+# completed_at/profile) answers ``onboarding.record_failed_start`` and ``onboarding.mark_seen``.
+method("onboarding.state", params=OnboardingStateParams, result=OnboardingRunStateResult,
+       doc="Whether desktop first-run onboarding is due, and the chat in progress; reads the root profile's config.")
+
+
 class OnboardingSetRunParams(Params):
     """``mark_profile_offered`` also latches ``onboarding.seen.profile_build_offered`` in the root config,
     so the first chat after onboarding gets the plain intro instead of the profile offer."""
@@ -518,7 +521,6 @@ class OnboardingStateResult(Result):
     profile: str | None = None
 
 
-method("onboarding.state", params=Params, result=OnboardingStateResult)
 method("onboarding.record_failed_start", params=Params, result=OnboardingStateResult)
 method("onboarding.mark_seen", params=Params, result=OnboardingStateResult)
 

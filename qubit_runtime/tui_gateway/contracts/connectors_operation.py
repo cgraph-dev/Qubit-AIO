@@ -135,6 +135,8 @@ class ConnectionOperationTarget(Payload):
     connect_url: str | None = None
     # The vendor account a managed mint created or observed; never the desktop transport's id.
     connection_id: str | None = None
+    # The name of the one hosted account this row connects or repairs.
+    alias: str | None = None
     attempt: str | None = None
     # Present only on an MCP install that is waiting for credentials.
     required_env: list[ConnectionTargetEnvField] | None = None
@@ -150,12 +152,20 @@ class ConnectionOperationTarget(Payload):
     subdir: str | None = None
     scan: CatalogScan | None = None
     requirements: list[str] | None = None
+    # The Qubit version range the plugin needs; its env vars ride in ``required_env``.
+    requires_hermes: str | None = None
     has_desktop_half: bool | None = None
     target_profile: str | None = None
     app_state: CatalogAppState | None = None
     # On an installed skill row: the qualified skill name the model can now load.
     skill: str | None = None
     phase: InstallPhase | None = None
+    approved: CatalogApproved | None = None
+    # Facts on an installed row, drawn by the card (``detail`` words them for the model).
+    enabled: bool | None = None
+    missing_env: list[str] | None = None
+    server_errors: list[CatalogServerError] | None = None
+    already_installed: bool | None = None
 
 
 class ConnectionDisplay(Payload):
