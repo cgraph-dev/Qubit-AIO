@@ -405,14 +405,21 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
                 # Resolve active backends exactly as the web_search/web_extract
                 # dispatchers do, so badges reflect what a call would hit now.
                 try:
-                    from tools.web_tools import _get_extract_backend, _get_search_backend
+                    from plugins.web.firecrawl.provider import is_managed_route
+                    from tools.web_tools import _get_extract_backend, _get_search_backend, _managed_web_search
 
                     search_backend = _get_search_backend()
                     extract_backend = _get_extract_backend()
+                    search_managed = _managed_web_search() or (
+                        search_backend == "firecrawl" and is_managed_route("search"))
+                    extract_managed = extract_backend == "firecrawl" and is_managed_route("extract")
                 except Exception:
                     search_backend = extract_backend = None
+                    search_managed = extract_managed = False
                 payload["active_search_backend"] = search_backend
                 payload["active_extract_backend"] = extract_backend
+                payload["search_via_nous"] = bool(search_managed)
+                payload["extract_via_nous"] = bool(extract_managed)
         return payload
 
     return await asyncio.to_thread(_read)
