@@ -144,6 +144,9 @@ def _setup_choose_request(sid: str, payload: dict) -> dict | None:
 
 
 def _agent_cbs(sid: str) -> dict:
+    # Late import: bind_module rebinds this function to server.py's globals and skips plain imports.
+    from tui_gateway.theme_bridge import theme_request
+
     def _read_block(method: str, timeout: int):
         # read_terminal / read_preview (desktop GUI): server request like clarify; the preview
         # read gets longer since a URL tab extracts text from a live page.
@@ -184,6 +187,8 @@ def _agent_cbs(sid: str) -> dict:
         "connection_callback": lambda payload: _emit("connection.request", sid, dict(payload)) and None,
         # tour (desktop GUI): renderer drives driver.js and answers the ``tour`` request.
         "tour_callback": lambda payload: _tour_request(sid, payload),
+        # set_theme (desktop GUI): theme.apply with the tour probe ladder, or a theme.pick card.
+        "theme_callback": lambda payload: theme_request(sid, payload),
         "setup_choose_callback": lambda payload: _setup_choose_request(sid, payload)}
 
     # Interim assistant commentary (text alongside tool calls), gated on display.interim_assistant_
