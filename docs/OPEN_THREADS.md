@@ -17,6 +17,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 11 — 2026-10-20 (56 dead symbols; retirement audit)
+
+- ✅ Landed: API chat `_handle_message` seam + keyed Responses durable replay; strict web models; session-delete retirement; DELETE-mode `_read_ctx` deadlock; watch completion identity; HMWA signature; worker usage projection; `/stop`/`/new` durable follow-up cancel.
+- ✅ Dead **73 → 56** merged (0 new); test gap **639 → 610** absent (29 files/67 tests).
+- 📋 `docs/RETIREMENT-READINESS.md`: production gap = 10 symbols (9 declared exclusions + undeclared `_gateway_lock_handle`); audits use `~/upstream/hermes-agent`, not `.pre-retirement`; live identify is ready; frontend bundle stale.
+- 🔴 Next wave: reasoning-field rejection recovery; codex compaction attempt record; hygiene `trigger="gateway_hygiene"`; B1 exclusion declaration (owner); remaining dead/test parity.
+- 🔴 Owner: F4 control-socket fatal vs non-fatal; F5 exclusion sign-off; retirement checklist unassigned.
+
+---
+
 ## Wave 10 — 2026-10-20 (73 dead symbols)
 
 - ✅ Landed: cron transport-only + queued delivery (with the upstream owner-seam test port), internal-wake anchor, A2A `input_id`, `machine.facts`, notification-poller stop, memory-target contract, state transactional worker methods, compression `trigger=`, reasoning replay/carriers, skills-hub raw fetch, connector wire identity.
