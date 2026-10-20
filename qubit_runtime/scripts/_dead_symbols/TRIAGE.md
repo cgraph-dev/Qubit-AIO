@@ -261,3 +261,148 @@ Additional test-only genuine-dead noted, not wired: `_metric`
 (`tests/monitoring/test_cron_health_export.py:5`, defined, never called),
 `TestPatchReplace` (`tests/tools/test_file_tools_live.py:133`, test class — FP).
 
+
+## Wave 6 (branch `fix/dead-symbols-wave6`, based on main `0b5ebc401`)
+
+Measured with the documented command (from the repo root):
+
+```bash
+.venv/bin/python qubit_runtime/scripts/check_dead_symbols.py --json /tmp/dead-wave6-final.json -v
+```
+
+| state | dead_count |
+|---|---:|
+| main `0b5ebc401` | 216 |
+| branch after 9 batches | **170** |
+
+**46 symbols resolved, 0 new** (set diff of `/tmp/dead-wave6.json` vs
+`/tmp/dead-wave6-final.json`). One of the 13 deferred architectural ports was taken
+end-to-end: the **worker output-log family** (`worker_output_log`, `open_output_log`,
+`record_exit_command`, `adoptable_log`, `ProcessOutputLogMixin`) plus the
+`ProcessSession.output_log` field, checkpoint merge/adoption and the log reader.
+No symbol was deleted, so **no Declared-exclusions entry was added**.
+
+### Wired in this wave (46)
+
+| # | symbol | module | upstream call site (pin) |
+|--:|---|---|---|
+| 1 | `ProcessOutputLogMixin` | tools/process_registry_output_log.py | `tools/process_registry.py:674` (base class) |
+| 2 | `worker_output_log` | tools/process_registry_output_log.py | `tools/process_registry.py:1195` |
+| 3 | `open_output_log` | tools/process_registry_output_log.py | `tools/process_registry.py:1224` |
+| 4 | `record_exit_command` | tools/process_registry_output_log.py | `tools/process_registry.py:1214` |
+| 5 | `adoptable_log` | tools/process_registry_output_log.py | `tools/process_registry_checkpoint.py:62,79,113` |
+| 6 | `_bot_chat_tip` | tools/bot_live_delivery.py | same file `:59`; local `find_canonical_owner` duplicated it |
+| 7 | `_freeze_params` | tui_gateway/event_replay.py | same file `:81`; the local ring stored live dicts |
+| 8 | `_thaw_params` | tui_gateway/event_replay.py | same file `:141` |
+| 9 | `_is_bytecode_compile_failure` | pm/environment.py | same file `:354,429`; `LiveTail.discard` added |
+| 10 | `_keep_after_sweep` | qubit_cli/debug.py | same file `:101`; `_pending_lock` added |
+| 11 | `_parse_chat_messages` | gateway/platforms/api_server_openai_routes.py | same file `:834`; handler inlined a copy |
+| 12 | `_responses_fingerprint_keys` | gateway/platforms/api_server_openai_routes.py | same file `:1358` |
+| 13 | `_session_answering_clients` | tui_gateway/session_transports.py | `tui_gateway/server.py:734` (`bind_sinks` 4th sink) |
+| 14 | `_session_slot_key` | tools/registry.py | same file `:510,546` (implicit-scope reads) |
+| 15 | `_terminal_env` | tools/environments/local.py | `tools/process_registry.py:1133` (`_spawn_env`) |
+| 16 | `_todo_state_from_db` | tui_gateway/tool_progress.py | `tui_gateway/methods_session.py:951` (deferred resume) |
+| 17 | `_tui_model_friction` | tui_gateway/methods_tools.py | same file `:771,870`; `methods_session.py:2037` |
+| 18 | `active_sink` | gateway/session_command_sink.py | `gateway/run_busy.py:945`, `gateway/slash_commands_goals.py:80` |
+| 19 | `api_storage_source` | gateway/session_api.py | `gateway/session_recovery.py:334` |
+| 20 | `background_counts` | qubit_cli/gateway_tools.py | `qubit_cli/cli_status_bar_mixin.py:277` |
+| 21 | `bound_interpreter_gone` | qubit_cli/kanban_owner_recovery.py | `qubit_cli/kanban_db_dispatch.py:1185` |
+| 22 | `chat_catalog_ids` | qubit_cli/chat_catalog.py | `providers/base.py:430`; local listed ids without filtering |
+| 23 | `clear_restart_failure_count` | gateway/stuck_loop_counts.py | `gateway/run_shutdown.py:1355` |
+| 24 | `connection_profile_home` | tui_gateway/ws_legacy_fallback.py | `tui_gateway/methods_complete.py:45`, `server.py:644` |
+| 25 | `create_overrides` | tui_gateway/methods_session_model_guard.py | `tui_gateway/methods_session.py:401` |
+| 26 | `edge_block` | pm/network.py | `pm/downloader.py:140`, `qubit_cli/debug.py:626` |
+| 27 | `increment_restart_failure_counts` | gateway/stuck_loop_counts.py | `gateway/run_shutdown.py:1318` |
+| 28 | `legacy_plugin_alias` | qubit_cli/left_core_migration.py | `qubit_cli/plugins_cmd.py:676` |
+| 29 | `legacy_plugin_keys` | qubit_cli/left_core_migration.py | `qubit_cli/plugins_cmd.py:558`, `plugins_discovery.py:264` |
+| 30 | `local_liveness_pid` | gateway/status_served.py | `qubit_cli/web_routers/status.py:326` |
+| 31 | `managed_run_exit_code` | qubit_cli/kanban_owner_recovery.py | `qubit_cli/kanban_db_dispatch.py:1190` |
+| 32 | `moved_plugin_hint` | qubit_cli/left_core_migration.py | `qubit_cli/plugins_cmd.py:466` |
+| 33 | `open_restart_wait` | gateway/drain_control.py | `gateway/run_shutdown.py:1687` |
+| 34 | `owner_reclaim_paused` | qubit_cli/kanban_owner_recovery.py | `qubit_cli/kanban_db_dispatch.py:1185` + 4 more |
+| 35 | `owns_user_path` | qubit_cli/_launchers.py | `qubit_cli/_install_repair.py:305` |
+| 36 | `record_terminal_failure` | gateway/session_results.py | `gateway/run_turn.py:1622` |
+| 37 | `redact_detached_stdio` | qubit_logging.py | `qubit_cli/gateway.py:4586` |
+| 38 | `runtime_downgrade_watcher` | gateway/runtime_downgrade_exit.py | `gateway/run_startup.py:1595` |
+| 39 | `say_queue_lock` | plugins/google_meet/_jsonfile.py | `node/server.py:48`, `process_manager.py:178`, `realtime/openai_client.py:194` |
+| 40 | `selected_session_db` | gateway/platforms/api_server_store.py | `gateway/platforms/api_server.py:1798,1843,1859` |
+| 41 | `served_profile_runtime` | gateway/status_served.py | `qubit_cli/web_routers/status.py:334`, `messaging.py:305` |
+| 42 | `session_tools` | qubit_cli/gateway_tools.py | `qubit_cli/cli_info_mixin.py:406` |
+| 43 | `skip_deep_merge` | qubit_cli/moa_config.py | `qubit_cli/config.py:912` |
+| 44 | `theme_request` | tui_gateway/theme_bridge.py | `tui_gateway/agent_callbacks.py:143,183` |
+| 45 | `turn_references` | gateway/session_context_refs.py | `gateway/run_inbound.py:1651` |
+| 46 | `viewer_driven` | gateway/session_viewer_automation.py | `gateway/run_goals.py:351` |
+
+### Triage of remaining symbols (not wired)
+
+| symbol | module | verdict | evidence |
+|---|---|---|---|
+| `completion_admission` | gateway/session_automation.py | **FALSE POSITIVE** | live as a JSON metadata key: `qubit_state_detached_results.py:37-38` stores/reads `display_metadata.completion_admission` |
+| `drop_completion_delivery` | tools/async_delegation.py | **FALSE POSITIVE** | value in `gateway/run_notifications.py:88` `_DURABLE_CLAIM_OPS["drop"]`, invoked via `getattr(_ad, fn_name)` at `:1501` |
+| `launch_supervisor` | gateway/control_socket.py | **FALSE POSITIVE** | read via string key `for key in ("launch_supervisor", "supervisor")` `:157`, emitted `:173` (Wave 1 taxonomy) |
+| `gateway_spawn_intent_subcommand` | gateway/status.py | **FALSE POSITIVE** | imported as `spawn_intent` and called at `tests/gateway/test_gateway_command_line_matcher.py:129-149` |
+| `loopback_app`, `_seed_stores`, `legacy_digests`, `cron_home`, `existing_install`, `explicit_static_config` | tests/** | **FALSE POSITIVE** | pytest fixtures requested by parameter name; never called |
+| `TestRateLimit`, `TestPasswordLoginRoute`, `TestPatchReplace`, `TestTerminalResultsCarryTheFreeTierBlock` | tests/** | **FALSE POSITIVE** | pytest test classes collected by name; never called |
+| `_metric` | tests/monitoring/test_cron_health_export.py | test-only dead | defined at `:5`, no caller in any test; no product surface |
+| `has_pending` | tools/clarify_gateway.py | **CORRECTLY UNWIRED** | upstream product code never calls it (only `tests/tools/test_clarify_gateway.py`); the session path reads `_entries` directly |
+| `snapshot_native` | gateway/session_envelope.py | **CORRECTLY UNWIRED** | upstream product code uses `prepare_native`→`_snapshot_native`; only tests/fixtures call the wrapper |
+| `_replay_unanswered` | tools/bot_relay.py | **CORRECTLY UNWIRED** | Wave 2: local `_reoffer_unanswered` is the same job with a once-per-envelope bound; wiring both double-delivers |
+| `OnboardingStateParams`, `_setup_beat_request`, `_carry_onboarding_toolset`, `_onboarding_prelude`, `_stage_onboarding_turn_note` | tui_gateway/** | **CORRECTLY UNWIRED** | the local onboarding flow is the `setup_choose` replacement (`agent_callbacks.py:187`), documented at `OnboardingStateParams`' own comment |
+| `admit_message` | gateway/session_ingress.py | **DEFERRED** (Wave 2) | needs `_hm_authority_admission` ordering (`_hm_busy_preempt`, `_hm_post_admission_consume`, `executing_admission`); a partial port double-admits |
+| `admit_route_wake` | gateway/session_automation.py | **DEFERRED** | upstream goal/loop/kanban wake admission (`run_goals.py:331,491`, `wake.py:105`); local `_enqueue_fifo` path is a different (pre-admission) mechanism |
+| `require_ledger_owner` | tools/async_delegation_worker.py | **DEFERRED** | blocker is the whole worker-ledger routing set: `_persist_dispatch` lacks the `worker_ledger().dispatch` branch and 6 delivery transitions still write SQLite directly |
+| `CompressionTelemetryMixin` | agent/context_compressor_telemetry.py | **DEFERRED** | `ContextCompressor` has 3 of its 6 methods inlined; mixing in without deleting them would leave the stale copies authoritative and change telemetry fields |
+| `GatewayInboundHooksMixin`, `GatewayPluginInjectionMixin` | gateway/run_inbound*.py | **DEFERRED** | `GatewayInboundMixin` inlines the hook methods; needs the Wave-2 telegram-style "inherit + delete inlined copies" refactor over ~1.4k lines |
+| `GatewayRuntimeInitMixin`, `GatewayTurnPrepareMixin`, `GatewayTurnHygieneMixin`, `GatewayTurnPersistenceMixin` | gateway/run_*.py | **DEFERRED** | same inline-vs-inherit split; each mixin's methods exist as local copies and must be deleted in one verified move |
+| `carrier_record`, `StreamCarriers` | agent/reasoning_carriers.py | **DEFERRED** (Wave 5) | local stream accumulator does not capture Gemini thought_signature / Copilot reasoning_opaque |
+| `run_canonical_job`, `pause_for_unknown` | cron/scheduler_authority.py | **DEFERRED** (Wave 5) | the authority transport is unported: `cron/scheduler.py` has no reference to `cron.scheduler_authority` |
+| `give_up_execution`, `external_worker_exited_reason` | cron/** | **DEFERRED** (Wave 5) | local executor/worker-exit paths diverge from upstream |
+| `message_context_id`, `extract_message_id`, `logged_input` | plugins/platforms/a2a/protocol.py | **DEFERRED** | upstream's retry admission (`_note_forwarded_input`, `logged_input`, `rec.input_id`) is absent from the local adapter; context naming alone would not make retries safe |
+| `prepare_context`, `identify_output`, `_response_identity` | gateway/platforms/api_server_response_*.py | **DEFERRED** | the durable Responses admission (`durable_key`, request fingerprint, replay) is absent from the local `/v1/responses` handler |
+| `_handle_run_clarify`, `_handle_resolve_unknown_run`, `_steer_refused`, `_run_idempotency_identity`, `_run_user_message`, `_admit_run_to_authority` | gateway/platforms/api_server_runs.py | **DEFERRED** | local `_http_routes` does not register the clarify/resolve-unknown routes and the run handler inlines a different admission path |
+| `bind_api_session`, `admit_api_turn`, `run_api_turn`, `recover_api_turns`, `owns_api_run` | gateway/session_api*.py | **DEFERRED** | the API-turn authority flow is only partially ported; wiring one entry point would not make the transaction complete |
+| `_session_slot_key` neighbours are not listed here; remaining 170 are the measured residual | — | — | re-run the detector; this table covers 46 wired + ~55 triaged-not-wired (grouped rows expand to more symbols) |
+
+### Focused verification for the wave
+
+| batch | command (cwd `qubit_runtime/`) | result |
+|---|---|---|
+| 1 | `pytest -q tests/tui_gateway/test_tui_gateway_event_replay.py tests/providers/test_fetch_models_base_url.py tests/tools/test_bot_live_owner_delivery.py tests/qubit_cli/test_moa_config.py` | 45 passed |
+| 1 | `pytest -q tests/pm/test_environment_build.py tests/pm/test_progress.py tests/qubit_cli/test_config.py tests/qubit_cli/test_moa_preset_config_warnings.py` | 195 passed, 21 skipped, 1 pre-existing fail (baseline `test_upgrades_pre_rewrite_default_soul_md`) |
+| 2 | `pytest -q tests/gateway/test_stuck_loop.py tests/gateway/test_context_ref_expansion_runtime.py tests/gateway/test_local_viewer_prompt_cluster.py tests/gateway/test_empty_sentinel_rewrite_copy.py` | 11 passed |
+| 2 | `pytest -q tests/gateway/test_api_server_bind_guard.py tests/gateway/test_busy_command.py tests/gateway/test_gateway_command_dispatch_minimal.py` | 16 passed, 1 skipped |
+| 3 | `pytest -q tests/plugins/test_google_meet_node.py tests/plugins/test_google_meet_plugin.py tests/plugins/test_google_meet_realtime.py tests/qubit_cli/test_debug.py tests/tools/test_registry.py tests/gateway/test_goal_continuation_drain.py tests/gateway/test_goal_verdict_send.py` | 126 passed |
+| 3 | `pytest -q tests/pm/test_downloader.py tests/pm/test_downloader_integrity.py tests/pm/test_download_retry_limits.py tests/qubit_cli/test_device_poll_waf_backoff.py` | 49 passed |
+| 3 | `pytest -q tests/qubit_cli/test_served_profile_mirror_platforms.py tests/qubit_cli/test_gateway_multiplex_served_record.py tests/qubit_cli/test_web_server_messaging_stale_runtime.py` | 24 passed |
+| 3 | `pytest -q tests/qubit_cli/test_debug.py tests/qubit_cli/test_debug_share_update_logs.py tests/qubit_cli/test_ensure_windows_bin_launchers.py tests/qubit_cli/test_legacy_launchers_windows_live.py` | 66 passed, 20 skipped |
+| worker port | `pytest -q tests/tools/test_process_checkpoint_worker_handoff.py` | 2 passed (new: owner/worker checkpoint merge + live worker log/exit) |
+| worker port | `pytest -q tests/tools/test_process_registry.py tests/tools/test_process_checkpoint_readopt.py tests/tools/test_process_registry_lazy_restore.py tests/tools/test_process_registry_completion_races.py` (deselect the baseline-failing `TestPopenLeakOnSetupFailure`) | 139 passed, 4 skipped, 1 deselected |
+| 4 | `pytest -q tests/tui_gateway/test_todo_state_events.py tests/gateway/test_chat_completions_final_fallback.py tests/gateway/test_chat_completions_approval.py tests/tui_gateway/test_resume_live_lazy_session.py tests/tui_gateway/test_session_resume_db_ownership.py tests/gateway/test_warning_notifications.py` | 61 passed, 1 pre-existing fail (baseline `test_resume_closes_profile_db_when_reopen_fails`) |
+| 5 | `pytest -q tests/tui_gateway/test_undo_command.py tests/tui_gateway/test_legacy_fallback_profile_scope.py tests/agent/test_openai_ultrafast.py tests/tui_gateway/test_profiles_configure_model_guard.py` | 16 passed, 1 pre-existing fail (baseline `test_every_config_loader_parses_tiers_through_the_same_table`) |
+| 6 | `pytest -q tests/qubit_cli/test_plugins_cmd_activation_keys.py tests/qubit_cli/test_plugins_cmd_enable_disable_nested.py tests/qubit_cli/test_plugins_cmd.py tests/qubit_cli/test_kanban_reclaim_claim_lock_guard.py tests/qubit_cli/test_kanban_dispatch_tick_hook.py tests/qubit_cli/test_kanban_dispatch_unknown_assignee_event.py` | 54 passed, 15 skipped |
+| 6 | `pytest -q tests/qubit_cli/test_left_core_migration.py` | 25 passed, 4 pre-existing fails (byte-identical on baseline) |
+| 7 | `pytest -q tests/qubit_cli/test_cli_status_bar.py tests/qubit_cli/test_cli_background_status_indicator.py tests/qubit_cli/test_cli_status_bar_goal.py` | 43 passed |
+| 7 | `pytest -q tests/qubit_cli/test_cli_tools_command.py tests/gateway/test_external_drain_control.py` | 19 passed |
+| 7 | `pytest -q tests/gateway/test_restart_after_turn.py tests/gateway/test_restart_drain.py` | 26 passed, 2 skipped |
+| 8 | `pytest -q tests/gateway/test_session_recovery.py tests/gateway/test_reaped_session_recovery.py` | 5 passed |
+| 8 | `pytest -q tests/tui_gateway/test_protocol.py` | 71 passed, 7 pre-existing fails (baseline: 70 passed, 8 fails — `test_window_owned_request_refuses_at_once_when_no_window_shows_the_session` now passes) |
+
+Pre-existing failures were confirmed byte-identical on a detached baseline worktree
+(`0b5ebc401`), not inferred.
+
+### Architectural-port decision
+
+**Done: worker output-log family.** `ProcessSession` gained `output_log`; the
+registry inherits `ProcessOutputLogMixin`; `spawn_local` writes the child's stdout
+to the profile log only under a registered worker (`is_worker_process()`), wraps
+the command with `record_exit_command`, and closes the parent's duplicate fd;
+checkpoint writes merge foreign handoffs under the cross-process file lock and
+recovery adopts a logged entry even when the PID is gone/recycled; `poll` no
+longer reports "output history unavailable" for a log-backed adoption. It cannot
+double-deliver: outside a worker the code path is byte-for-byte the old pipe path
+(`log is None`), and one reader owns each adoption (`_track_started`).
+
+**Still deferred, with blockers:** see the triage table above; the closest
+remaining candidates are the run-turn/run-inbound mixin inheritance (blocked on
+deleting ~1.4k lines of inlined copies in one verified move) and
+`require_ledger_owner` (blocked on completing the worker-ledger routing set).
