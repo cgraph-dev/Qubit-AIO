@@ -2429,6 +2429,7 @@ def mark_job_run(
     status: Optional[str] = None,
     *,
     expected_fire_owner: Optional[str] = None,
+    execution_id: Optional[str] = None,
     model_unreachable: bool = False,
     quota_hold_seconds: Optional[float] = None,
     recover_consumed_fire: bool = False,
@@ -2453,6 +2454,8 @@ def mark_job_run(
     (cron/quota_hold.py, #89376).
     """
     def apply(jobs, _i, job):
+        if execution_id is not None and execution_id in job.get("canonical_completions", []):
+            return True
         if expected_fire_owner is not None:
             claim = job.get("fire_claim")
             if not isinstance(claim, dict) or claim.get("by") != expected_fire_owner:
@@ -2462,6 +2465,9 @@ def mark_job_run(
                 return False
         now = _qubit_now().isoformat()
         _record_run_outcome(job, success, error, delivery_error, status, now)
+        if execution_id is not None:  # retire ids recovery can no longer replay; latest stays last
+            from cron.scheduler_authority import replayable_completions as live
+            job["canonical_completions"] = [*live(job_id, job.get("canonical_completions")), execution_id]
         _advance_after_run(job, now)
         from cron import quota_hold
         from cron.unreachable_retry import clear_state, plan_retry
