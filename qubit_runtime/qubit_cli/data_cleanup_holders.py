@@ -15,7 +15,7 @@ _OWNER_STOP_HINTS = {
 
 
 def _drain_manual_gateway(home: Path) -> None:
-    from gateway.control_socket import identify_gateway, pause_gateway_for_update
+    from gateway.control_socket import identify_gateway, launch_supervisor, pause_gateway_for_update
     from gateway.status import (
         get_process_start_time, get_running_pid_identity_strict, _pid_exists, record_home)
 
@@ -27,9 +27,9 @@ def _drain_manual_gateway(home: Path) -> None:
     identity_home = record_home(identity)
     if not identity_home or Path(identity_home).resolve() != home:
         raise RuntimeError(f"gateway control identity does not match {home}")
-    owner = identity.get("supervisor")
+    owner = launch_supervisor(identity)
     if owner != "manual":
-        hint = _OWNER_STOP_HINTS.get(owner, "stop it through its supervisor before retrying")
+        hint = _OWNER_STOP_HINTS.get(owner or "", "stop it through its supervisor before retrying")
         raise RuntimeError(f"{owner or 'unknown'} gateway still owns {home}; {hint}")
     if identity.get("served_profiles"):
         raise RuntimeError("gateway serves multiple profiles; stop it explicitly before deleting one profile's data")
