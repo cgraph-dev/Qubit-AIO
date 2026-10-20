@@ -224,6 +224,10 @@ class PlatformRegistry:
         # A failed loader is no longer discoverable, but its identity remains
         # until ownership teardown can CAS-restore the displaced predecessor.
         self._consumed_loaders: dict[_LoadKey, _Loader] = {}
+        # Manifest-declared env names per deferred platform (``requires_env``), recorded without
+        # importing the adapter so ``gateway.platform_activation`` can tell a configured platform
+        # from an unconfigured one. A hint only: a stale entry costs one extra import, never a miss.
+        self._activation_env: dict[str, frozenset[str]] = {}
 
     @staticmethod
     def current_scope_key() -> str:
@@ -248,6 +252,16 @@ class PlatformRegistry:
         if entry is None and loader is None:
             loader = self._inflight_loaders.get((scope, name)) or self._consumed_loaders.get((scope, name))
         return entry, loader
+
+    def note_activation_env(self, name: str, env_names) -> None:
+        """Record the env names a deferred platform's manifest declares (see ``_activation_env``)."""
+        names = frozenset(str(n).strip() for n in env_names or () if str(n).strip())
+        with self._lock:
+            self._activation_env[name] = self._activation_env.get(name, frozenset()) | names
+
+    def activation_env(self, name: str) -> frozenset[str]:
+        with self._lock:
+            return self._activation_env.get(name, frozenset())
 
     def _prune_scope(self, scope: Optional[str]) -> None:
         for maps in (self._scoped_entries, self._scoped_deferred) if scope is not None else ():
@@ -357,9 +371,8 @@ class PlatformRegistry:
         with self._lock:
             return (scope, name) in self._cancelled_inflight
 
-    def _resolve_all(self) -> None:
-        """Run every pending deferred loader (only ``all_entries``/``plugin_entries`` call this;
-        CLI chat never iterates the full set)."""
+    def _pending_names(self) -> list[str]:
+        """Names with a pending deferred loader (current profile scope and process-global)."""
         active_scope = self.current_scope_key()
         with self._lock:
             _entries, scoped_deferred = self._scope_maps(active_scope)
@@ -370,10 +383,28 @@ class PlatformRegistry:
                     scoped_names.add(name)
                 elif inflight_scope is None:
                     global_names.add(name)
+        return [*sorted(scoped_names), *sorted(global_names)]
+
+    def _resolve_all(self, wanted: Optional[Callable[[str], bool]] = None) -> None:
+        """Run every pending deferred loader, or only those *wanted* accepts (``all_entries`` /
+        ``plugin_entries`` / ``configured_entries``; CLI chat never iterates the full set)."""
+        active_scope = self.current_scope_key()
         # Load outside the registry lock; each name has an in-flight event so concurrent
         # readers wait for the same materialization.
-        for name in (*sorted(scoped_names), *sorted(global_names)):
-            self._resolve(name, active_scope)
+        for name in self._pending_names():
+            if wanted is None or wanted(name):
+                self._resolve(name, active_scope)
+
+    def configured_entries(self, wanted: Callable[[str], bool]) -> list[PlatformEntry]:
+        """Loaded entries, after materializing only the deferred platforms *wanted* accepts.
+
+        The gateway's config/env passes need each platform's hooks only for platforms the profile
+        actually configures; importing every bundled adapter (~20 SDKs) just to read metadata cost
+        every cold start ~0.5 s. *wanted* is :func:`gateway.platform_activation.activation_predicate`
+        (or a test stub); entries that are already loaded are always returned."""
+        self._resolve_all(wanted)
+        with self._lock:
+            return list({**self._entries, **self._scoped_entries.get(self.current_scope_key(), {})}.values())
 
     def register(self, entry: PlatformEntry, *, scope: Optional[str] = None) -> None:
         """Register a platform adapter entry (last writer wins on name clash)."""
