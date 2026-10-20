@@ -17,6 +17,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 13 — 2026-10-20 (34 dead symbols)
+
+- ✅ Landed: API admission/interrupted-run/`/chat`; overflow detach + attachment Path; `route_runtime` fallback + `@file` cwd; MSGraph admission + ACP no-MCP; HTTP lifespan/WS auth; `_compression_tip_on`, `SessionEntry.yolo`, terminal-retirement gaps.
+- ✅ Dead **46 → 34** merged (12 resolved, 0 new; 6 deleted with exclusions). Test gap **566 → 536** absent (30 files/60 tests).
+- 🟡 Combined-process-only isolation leak: `test_ingress_admission_off_loop` fails with leaked profile scope when run beside other files; passes alone and under `scripts/run_tests.sh` per-file isolation.
+- 🔴 New defects: relay metadata handoff; coding-worktree prompt note; Codex rotated item ids; `backup_cron_prompts` `hermes_home`; per-skill plugin notice; launcher legacy alias; `request.cancel` ordering; cross-process skills index; 56 gateway behavior gaps.
+- 🔴 Remaining: 34 dead, 536 absent + 914 short-port tests, B1/F4/F5, retirement checklist.
+
+---
+
 ## Wave 12 — 2026-10-20 (56 → 46 dead symbols)
 
 - ✅ Landed (`e79624c65`, `a0d165157`, `6e4f36cd9`, `a23e4621f`, `11fe1ce99`): api/runs helper dedup; hosted-room work-evidence test port; cron-health and profile-export test callers restored for `_metric`/`_seed_stores`; terminal-retirement test port; clarify interrupt withdrawal for unlimited waits + its `has_pending` test.
