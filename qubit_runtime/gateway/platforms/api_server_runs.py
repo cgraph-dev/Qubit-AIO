@@ -706,22 +706,12 @@ async def _handle_runs(self, request: "web.Request", *, _api_server) -> "web.Res
         return _json_error(
             _openai_error, "Idempotency-Key must be 1-255 visible ASCII characters",
             code="invalid_idempotency_key", status=400)
-    idempotency_scope = idempotency_fingerprint = ""
-    if idempotency_key:
-        idempotency_scope = self._run_idempotency_scope(request)
-        idempotency_fingerprint = hashlib.sha256(json.dumps(
-            {"body": body, "gateway_session_key": gateway_session_key or ""},
-            sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-        ).encode()).hexdigest()
+    idempotency_scope, idempotency_fingerprint = _run_idempotency_identity(
+        self, request, body, gateway_session_key, idempotency_key)
     raw_input = body.get("input")
-    if not raw_input:
-        return _json_error(_openai_error, "Missing 'input' field", status=400)
-    if isinstance(raw_input, str):
-        user_message = raw_input
-    else:
-        user_message = raw_input[-1].get("content", "") if isinstance(raw_input, list) else ""
-    if not user_message:
-        return _json_error(_openai_error, "No user message found in input", status=400)
+    user_message, input_err = _run_user_message(raw_input, _openai_error)
+    if input_err is not None:
+        return input_err
     try:
         turn_author = _api_server._request_turn_author(body)
     except ValueError as exc:
@@ -1318,9 +1308,7 @@ async def _handle_steer_run(self, request: "web.Request", *, _api_server) -> "we
     # /stop keeps agent refs during cooperative shutdown, so the status gate (not the
     # agent ref) is what rejects stop-then-steer.
     if status.get("status") != "running" or not hasattr(agent, "steer"):
-        return _json_error(
-            _openai_error, f"Run is not currently accepting steer input: {run_id}",
-            code="run_not_accepting_steer", status=409)
+        return _steer_refused(_openai_error, run_id)
     body, err = await self._read_json_body(request)
     if err:
         return err
