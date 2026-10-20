@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, List, Optional
 from qubit_constants import get_qubit_home, qubit_home_key
 from tools.daemon_pool import DaemonThreadPoolExecutor
 from tools.thread_context import propagate_context_to_thread
-from tools.async_delegation_worker import worker_ledger
+from tools.async_delegation_worker import require_ledger_owner, worker_ledger
 from tools.delegation_redaction import redact_child_result, redact_completion_event
 
 logger = logging.getLogger(__name__)
@@ -190,6 +190,7 @@ def _persist_dispatch(record: Dict[str, Any]) -> None:
 
 def _prune_durable_records() -> None:
     """Bound terminal history, preferring delivered records for deletion."""
+    require_ledger_owner()
     cutoff = time.time() - _DURABLE_RETENTION_SECONDS
     with _DB_LOCK, _transaction() as conn:
         conn.execute(
@@ -276,6 +277,7 @@ def _owner_liveness() -> Optional[Callable[[Any, Any], bool]]:
 def recover_abandoned_delegations() -> int:
     """Classify records whose owning process disappeared as outcome unknown; children a multi-child unit had already
     recorded (``record_unit_child``) are replayed with their real results."""
+    require_ledger_owner()
     alive = _owner_liveness()
     if alive is None:
         return 0
@@ -453,6 +455,7 @@ def _update_delivery(sql: str, params: tuple) -> bool:
 
 def mark_completion_delivered(delegation_id: str) -> bool:
     """Atomically acknowledge successful injection of a durable completion."""
+    require_ledger_owner()
     now = time.time()
     return _update_delivery(
         """UPDATE async_delegations SET delivery_state='delivered', delivered_at=?, updated_at=?
