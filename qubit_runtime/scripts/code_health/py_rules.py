@@ -12,6 +12,8 @@ import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 
+from scripts.code_health.py_rules_sleep import wall_clock_sleep
+
 _FUNCS = (ast.FunctionDef, ast.AsyncFunctionDef)
 _CAPTURE_CALLS = {
     "get_qubit_home",
@@ -931,4 +933,5 @@ CHECKERS: dict[str, Callable[[ast.Module, Ctx], Iterable[int]]] = {
     "HX010": bool_of_env,
     "HX011": elif_ladder,
     "HX012": raw_thread,
+    "HX013": wall_clock_sleep,
 }
