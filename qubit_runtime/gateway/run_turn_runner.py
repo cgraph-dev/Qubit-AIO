@@ -1620,15 +1620,26 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         return response, answered
 
     def _approval_notify_sync(self, approval_data: dict) -> None:
+        if self._approval_owner is not None:
+            authority, session_id, generation = self._approval_owner
+            authority.check_approval_generation(session_id, generation)
+        # A native decline must finish before any observer can authorize work.
+        self._render_approval_sync(approval_data)
+        # Register the shared projection whatever the render outcome: a button card that was sent
+        # (or may have been sent) still needs a prompt in the shared attach snapshot.
+        if self._approval_owner is not None:
+            from gateway import local_viewer_events
+            authority.register_approval(
+                session_id, generation, self._ctx.session_key, approval_data,
+                timeout_s=local_viewer_events.prompt_timeout_s(self, "approval"))
+
+    def _render_approval_sync(self, approval_data: dict) -> None:
         """Send the approval request from the agent thread: the adapter's interactive button
         approvals (``send_exec_approval``) when available, else plain text with ``/approve`` steps."""
         from gateway.run import _approval_send_outcome, _format_exec_approval_fallback, _interim_metadata, _redact_approval_command
         from gateway.run_turn_runner_approval_settle import register_timeout_notice
         ctx = self._ctx
         adapter = ctx._status_adapter
-        if self._approval_owner is not None:
-            authority, session_id, generation = self._approval_owner
-            authority.check_approval_generation(session_id, generation)
         # Slack's assistant_threads_setStatus disables the compose box, so the user can't type
         # /approve while "is thinking..." shows. Pausing stops _keep_typing re-setting it; resumed
         # in approve/deny.
@@ -1719,11 +1730,6 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 register_timeout_notice(self, approval_data, command=cmd, card_message_id=None)
         except Exception as e:
             logger.error("Failed to send approval request: %s", e)
-        if self._approval_owner is not None:
-            from gateway import local_viewer_events
-            authority.register_approval(
-                session_id, generation, self._ctx.session_key, approval_data,
-                timeout_s=local_viewer_events.prompt_timeout_s(self, "approval"))
 
     # ── run_sync phases ─────────────────────────────────────────────────────────────────────
 
