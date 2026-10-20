@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 15 — 2026-10-21 (29 dead symbols)
+
+- ✅ Landed: API caller system/instructions + canonical stream; shutdown PID/lock ordering + admitted completion; compressed receipt + hosted work evidence; snapshot restore + frozen config credentials; shared approval snapshot + connectors guest identity; long-home control pointer/loop-tick witness/session reset/dashboard issuer/coding posture; inbound plugin-injection + turn-hygiene mixin inheritance.
+- ✅ Dead **32 → 29** merged (0 new). All wave-15 branches merged; worktrees removed.
+- 🔴 Residuals: `test_session_authority_cancel_settlement` needs `authority.adopt_agent` in `run_turn_runner.py`; `test_api_canonical_projection` API-lane-owned; 16 pre-existing connector-operation/managed failures; 29 dead = deferred architectural/release groups.
+- 🟡 Live services were not restarted this wave; existing gateway is on the authority boot path.
+
+---
+
 ## Wave 14 — 2026-10-20 (32 dead symbols)
 
 - ✅ Landed: relay metadata handoff; coding-worktree note; Codex rotating ids; backup-cron keyword; per-skill plugin notice; launcher legacy alias; `request`/`request.cancel` order; cross-process skills index; HX013 sleep rule; four gateway-gap tests (production already conformed).
