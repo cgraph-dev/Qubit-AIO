@@ -111,7 +111,7 @@ def _restore_under_cron_lock(home: Path, snap_prompts: dict[str, str]) -> list[s
 
 def restore_cron_prompt_fields_if_degraded(
     snapshot_id: str,
-    hermes_home: Optional[Path] = None,
+    qubit_home: Optional[Path] = None,
 ) -> Optional[dict[str, Any]]:
     """Safety net for field-level cron-job degradation across ``hermes update``.
 
@@ -139,7 +139,7 @@ def restore_cron_prompt_fields_if_degraded(
     Args:
         snapshot_id: The pre-update quick-snapshot id (from
             :func:`create_quick_snapshot`).
-        hermes_home: Override for the Hermes home directory (tests/siblings).
+        qubit_home: Override for the Qubit home directory (tests/siblings).
 
     Returns:
         ``None`` when no action was taken (the common, healthy path). On a
@@ -151,7 +151,7 @@ def restore_cron_prompt_fields_if_degraded(
 
     from qubit_cli.backup import _CRON_JOBS_REL, _quick_snapshot_root
 
-    home = hermes_home or get_qubit_home()
+    home = qubit_home or get_qubit_home()
     live_path = home / _CRON_JOBS_REL
     snap_path = _quick_snapshot_root(home) / snapshot_id / _CRON_JOBS_REL
 
@@ -218,7 +218,7 @@ def restore_cron_prompt_fields_all_profiles(
             continue
         try:
             result = restore_cron_prompt_fields_if_degraded(
-                snap_id, hermes_home=profile_home
+                snap_id, qubit_home=profile_home
             )
         except Exception as exc:
             logger.debug(
