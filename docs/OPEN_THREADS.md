@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 14 — 2026-10-20 (32 dead symbols)
+
+- ✅ Landed: relay metadata handoff; coding-worktree note; Codex rotating ids; backup-cron keyword; per-skill plugin notice; launcher legacy alias; `request`/`request.cancel` order; cross-process skills index; HX013 sleep rule; four gateway-gap tests (production already conformed).
+- ✅ Dead **34 → 32** merged (0 new). Test gap **525 → 492** absent (30 files/81 tests).
+- 🔴 New defects: API caller system/instructions dropped; shutdown releases PID/lock before drain; compression receipt transcript; hosted work-evidence capture; snapshot restore drops gateway session; config credential recovery; admitted completion dropped; shared approval snapshot; canonical stream events; `tools.connectors.ensure_guest_identity`.
+- 🔴 Remaining: 32 dead, 492 absent + 924 short-port tests, B1/F4/F5, retirement checklist.
+
+---
+
 ## Wave 13 — 2026-10-20 (34 dead symbols)
 
 - ✅ Landed: API admission/interrupted-run/`/chat`; overflow detach + attachment Path; `route_runtime` fallback + `@file` cwd; MSGraph admission + ACP no-MCP; HTTP lifespan/WS auth; `_compression_tip_on`, `SessionEntry.yolo`, terminal-retirement gaps.
