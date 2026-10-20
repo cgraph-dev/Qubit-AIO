@@ -85,17 +85,6 @@ def _slash_command(text):
     return command.name if command is not None else None
 
 
-def _submit_fingerprint(session_id, text, attachments):
-    """Content identity of one logical prompt: its text and the staged image bytes (staging names
-    are disposable; the authority reconciles a retry by the same digests)."""
-    import hashlib
-    digest = hashlib.sha256(text.encode())
-    for item in attachments:
-        with open(item['path'], 'rb') as staged:
-            digest.update(item['mime'].encode() + b'\0' + hashlib.sha256(staged.read()).digest())
-    return session_id, digest.hexdigest()
-
-
 def _bypass_route():
     """--safe-mode / --ignore-user-config read no profile default route, so the session freezes the
     launch's explicit one (``qubit -m <model> --provider <name> --safe-mode acp``). Both, refused at

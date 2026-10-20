@@ -130,6 +130,33 @@ class TestPlatformRegistry:
         reg.register(entry)
         assert reg.create_adapter("novalidate", MagicMock()) is mock_adapter
 
+    def test_deferred_activation_env_is_recorded_without_loading(self):
+        reg = PlatformRegistry()
+        loader = MagicMock()
+        reg.register_deferred("deferred", loader)
+        reg.note_activation_env("deferred", ["TWILIO_SID", " TWILIO_TOKEN ", ""])
+
+        assert reg.activation_env("deferred") == frozenset({"TWILIO_SID", "TWILIO_TOKEN"})
+        assert reg.activation_env("missing") == frozenset()
+        loader.assert_not_called()
+
+    def test_configured_entries_materializes_only_wanted_deferred(self):
+        reg = PlatformRegistry()
+        wanted, other = self._make_entry("wanted")[0], self._make_entry("other")[0]
+        wanted_loader, other_loader = MagicMock(), MagicMock()
+
+        def _load_wanted():
+            reg.register(wanted)
+
+        reg.register_deferred("wanted", _load_wanted)
+        reg.register_deferred("other", other_loader)
+
+        configured = reg.configured_entries(lambda name: name == "wanted")
+
+        assert [entry.name for entry in configured] == ["wanted"]
+        other_loader.assert_not_called()
+        assert reg.get("other") is None
+
     def test_registered_names_includes_deferred_without_materializing(self):
         reg = PlatformRegistry()
         entry, _ = self._make_entry("concrete")
