@@ -595,6 +595,10 @@ class SessionDB(
         finally:
             del caller
         self._lock = threading.Lock()
+        # Nesting depth of _read_ctx on the writer connection in THIS thread. The lock is not
+        # reentrant, so a read issued from inside an outer read (DELETE journal mode / read-only)
+        # reuses the connection the outer context already owns instead of self-deadlocking.
+        self._read_ctx_local = threading.local()
         # Read-path split (WAL only): reads borrow from a BOUNDED read-only pool so they
         # never queue behind writer flushes on self._lock (see _read_ctx); unbounded
         # per-thread connections pinned fds for the process lifetime and hit EMFILE.
@@ -952,16 +956,17 @@ class SessionDB(
                     # permits == maxsize, load-bearing if they drift): surplus.
                     self._close_read_conn(conn)
             return
-        with self._lock:
-            if self._conn is None:  # close() raced a still-unwinding reader
-                if not reopen:
-                    raise sqlite3.ProgrammingError(f"SessionDB for {self.db_path} is closed")
-                self._reopen_after_close_locked(context="read")
+        depth = getattr(self._read_ctx_local, "depth", 0)
+        if depth:
+            # A nested read while this thread already holds the writer under self._lock
+            # (DELETE journal mode, or a read-only handle): the lock is not reentrant, so
+            # re-enter the connection the outer context owns rather than deadlocking on it.
             conn = cast(sqlite3.Connection, self._conn)
-            if self._wal_active or self.read_only:  # WAL: no SHARED-lock wait; ro: opened with the read budget
+            if conn is None:
+                raise sqlite3.ProgrammingError(f"SessionDB for {self.db_path} is closed")
+            if self._wal_active or self.read_only:
                 yield conn
                 return
-            # DELETE-mode writer connection: wait out a sibling's commit like a pooled reader would.
             previous_ms = conn.execute("PRAGMA busy_timeout").fetchone()[0]
             conn.execute(f"PRAGMA busy_timeout={int(_READ_BUSY_TIMEOUT_S * 1000)}")
             try:
@@ -969,6 +974,28 @@ class SessionDB(
             finally:
                 with suppress(sqlite3.Error):
                     conn.execute(f"PRAGMA busy_timeout={int(previous_ms)}")
+            return
+        with self._lock:
+            if self._conn is None:  # close() raced a still-unwinding reader
+                if not reopen:
+                    raise sqlite3.ProgrammingError(f"SessionDB for {self.db_path} is closed")
+                self._reopen_after_close_locked(context="read")
+            conn = cast(sqlite3.Connection, self._conn)
+            self._read_ctx_local.depth = depth + 1
+            try:
+                if self._wal_active or self.read_only:  # WAL: no SHARED-lock wait; ro: opened with the read budget
+                    yield conn
+                    return
+                # DELETE-mode writer connection: wait out a sibling's commit like a pooled reader would.
+                previous_ms = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+                conn.execute(f"PRAGMA busy_timeout={int(_READ_BUSY_TIMEOUT_S * 1000)}")
+                try:
+                    yield conn
+                finally:
+                    with suppress(sqlite3.Error):
+                        conn.execute(f"PRAGMA busy_timeout={int(previous_ms)}")
+            finally:
+                self._read_ctx_local.depth = depth
 
     def _reopen_after_close_locked(self, context: str = "write") -> None:
         """Reopen the writer after ``close()`` raced a live caller (a teardown owner

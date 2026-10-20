@@ -41,6 +41,19 @@ def delete_mode_db(tmp_path, monkeypatch):
     db.close()
 
 
+def test_nested_read_inside_read_ctx_reuses_the_writer_without_deadlock(delete_mode_db):
+    """The DELETE-mode read path holds the non-reentrant writer lock; a read issued from inside
+    that context (``get_session`` inside ``_read_ctx``) must reuse the writer, not re-lock it."""
+    assert delete_mode_db._wal_active is False
+    with delete_mode_db._read_ctx() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
+        assert delete_mode_db.get_session("s1")["id"] == "s1"
+        with delete_mode_db._read_ctx() as nested:
+            assert nested.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
+    # The outer context released the lock: ordinary reads still work after the nesting.
+    assert delete_mode_db.get_session("s1")["id"] == "s1"
+
+
 @pytest.mark.parametrize("read_only", [True, False], ids=["read_only_handle", "writer_handle"])
 def test_delete_mode_read_waits_for_other_process_commit(delete_mode_db, read_only):
     holder = subprocess.Popen(
