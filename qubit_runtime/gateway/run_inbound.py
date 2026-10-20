@@ -648,6 +648,8 @@ class GatewayInboundMixin:
             _denied = self._check_slash_access(source, _cmd_def_inner.name)
             if _denied is not None:
                 return True, _denied
+            if _cmd_def_inner.name in ("stop", "new"):
+                await self._hm_stop_owner_turn(_quick_key)
             # Any recognized slash command dispatches per its declared busy_policy (dispatch /
             # interrupt_then_dispatch / reject). Unrecognized commands and plain text fall through.
             return True, await self._dispatch_busy_slash_command(event, _cmd_def_inner, _quick_key, source)
@@ -659,6 +661,37 @@ class GatewayInboundMixin:
             self._hm_merge_pending_for_source(source, _quick_key, event)
             return True, None
         return False, None
+
+    async def _hm_stop_owner_turn(self, _quick_key: str) -> None:
+        """Messaging /stop and /new (busy, idle or confirmed) act on the authority's turn, as main
+        cancelled the adapter task that ran it and dropped its pending slot. Cancels the still-queued
+        ``messaging:*`` rows of this route's logical owner first (automation wakes, LOCAL/API input
+        and ``unknown`` rows are untouched; settled silently, no pause notice), then interrupts the
+        claimed generation: a turn still constructing its agent latches the Stop for adopt_agent."""
+        from gateway.session_authorities import active_authority
+        authority = active_authority(self)
+        sid = authority.logical_owner(self.session_store.peek_session_id(_quick_key)) if authority else None
+        if not sid or sid not in authority.sessions:
+            return
+        from gateway.session_contract import Principal, SessionRef
+        from qubit_state_runtime import RuntimeStoreError, list_session_admissions
+        ref = SessionRef(authority.profile_id, sid)
+        actor = Principal('messaging-control', authority.profile_id,
+                          frozenset({'session:submit', 'session:control'}), 'busy-command')
+        rows = await asyncio.to_thread(list_session_admissions, authority.db, session_id=sid)
+        # A FIFO paused on a lost (``unknown``) turn is the operator's to resume: its pause notice
+        # promised the queued followers stay saved, so a /new from the chat leaves them queued.
+        paused = any(row['status'] == 'unknown' for row in rows)
+        for row in [] if paused else rows:
+            if row['status'] == 'queued' and row['principal_id'].startswith('messaging:'):
+                # Claimed meanwhile (stale_generation): it runs as main's post-claim race does.
+                with suppress(RuntimeStoreError):
+                    await authority.cancel_queued(actor, ref, row['admission_id'])
+        handle = authority._handle(ref)
+        if handle.execution_state == 'running':
+            # Settled meanwhile (stale_generation): there is no claimed turn left to stop.
+            with suppress(RuntimeStoreError):
+                await authority.interrupt(actor, ref, handle.execution_generation)
 
     def _hm_busy_telegram_grace_queue(
         self, event: MessageEvent, source: SessionSource, _quick_key: str, effective_busy_input_mode: str
