@@ -35,7 +35,7 @@ TASK_STATUSES = frozenset(get_args(TaskStatus))
 TERMINAL_STATUSES = frozenset({"settled", "failed", "cancelled"})
 
 _TASK_PAYLOAD_REQUIRED_FIELDS = frozenset({"target_profile", "prompt", "source_event_seq"})
-_TASK_PAYLOAD_OPTIONAL_FIELDS = frozenset({"target_member_id"})
+_TASK_PAYLOAD_OPTIONAL_FIELDS = frozenset({"target_member_id", "input_context", "attachments"})
 _LEASE_COLUMNS = frozenset({
     "room_id", "gateway_id", "authority_epoch", "process_generation", "lease_generation", "expires_at", "acquired_at",
     "updated_at", "released_at"})
@@ -173,8 +173,17 @@ def _task_payload(value: Any) -> tuple[dict[str, Any], str, str]:
     source_event_seq = _bounded_int(
         value["source_event_seq"], message="source_event_seq must be a positive integer", low=1)
     normalized = {"target_profile": target_profile, "prompt": prompt, "source_event_seq": source_event_seq}
+    if "input_context" in value:
+        from gateway.hosted_room_task_input import validate_task_input
+
+        try:
+            normalized["input_context"] = validate_task_input(value["input_context"])
+        except ValueError as exc:
+            raise DriverValidationError(str(exc)) from exc
     if "target_member_id" in value:
         normalized["target_member_id"] = _identifier(value["target_member_id"], label="target_member_id")
+    if "attachments" in value:
+        normalized["attachments"] = validate_bound_task_manifest(value["attachments"])
     encoded = compact_json(normalized)
     return normalized, encoded, hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
