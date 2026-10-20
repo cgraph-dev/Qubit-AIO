@@ -164,7 +164,10 @@ def _socket_path(home: Path) -> Path:
     # The owner may have a different TMPDIR (notably launchd/native apps).
     # Authenticate its private pointer and profile-specific directory, not our
     # process-local temporary-root preference.
-    if target.name != "control.sock" or target.parent.name != f"hermes-gw-{_home_hash(home)}":
+    # The server publishes ``qubit-gw-<hash>``; accept the pre-rebrand spelling so a
+    # pointer left by an older gateway keeps resolving (read-old, writer is canonical).
+    directory_names = {f"qubit-gw-{_home_hash(home)}", f"hermes-gw-{_home_hash(home)}"}
+    if target.name != "control.sock" or target.parent.name not in directory_names:
         raise DiscoveryError("invalid_control_pointer")
     _private_node(target.parent, kind="directory")
     _private_node(target, kind="socket")
