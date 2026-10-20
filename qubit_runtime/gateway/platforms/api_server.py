@@ -3404,7 +3404,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         receipt on the same budget as the local path, so the peer still gets the reply on this call.
         """
         session_id = ctx["session_id"]
-        admitted = await self._admit_to_live_bot_chat(session_id, ctx["user_message"], ctx["run_kwargs"]["turn_author"])
+        admitted = await self._admit_to_live_bot_chat(session_id, ctx["user_message"], ctx["run_kwargs"].get("turn_author"))
         if admitted is None:
             return None
         record = await self._await_live_bot_chat_receipt(*admitted)
@@ -3445,7 +3445,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         the run's single ``assistant.completed`` event; a receipt still open at the budget is a
         ``run.queued`` event (the 202 shape), a failed one an ``error`` event carrying the reason."""
         session_id = ctx["session_id"]
-        admitted = await self._admit_to_live_bot_chat(session_id, ctx["user_message"], ctx["run_kwargs"]["turn_author"])
+        admitted = await self._admit_to_live_bot_chat(session_id, ctx["user_message"], ctx["run_kwargs"].get("turn_author"))
         if admitted is None:
             return None
         events = _SessionEventQueue(session_id, f"run_{uuid.uuid4().hex}")
@@ -3492,6 +3492,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         ctx, err = await self._prepare_session_chat(request)
         if err is not None:
             return err
+        from gateway.platforms.api_server_openai_routes import _response_status
         handed_off = await self._answer_through_live_bot_chat(ctx)
         if handed_off is not None:
             return handed_off
@@ -3517,7 +3518,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             result.get("final_response", "") if is_dict else "")
         headers = self._session_headers(effective_session_id or session_id, gateway_session_key)
         return web.json_response(
-            {"object": "hermes.session.chat.completion",
+            {"object": "hermes.session.chat.completion", "status": _response_status(result),
              "session_id": effective_session_id or session_id,
              "message": {"role": "assistant", "content": final_response}, "usage": usage,
              "runtime": self._effective_turn_runtime(ctx["runtime_request"], result, usage)},
