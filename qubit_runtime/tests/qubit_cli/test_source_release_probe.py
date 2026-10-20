@@ -13,7 +13,9 @@ def test_invalid_config_refuses_desktop_channel_probe(tmp_path, content):
     home.mkdir()
     config = home / "config.yaml"
     config.write_bytes(content.encode() if isinstance(content, str) else content)
-    root = Path(__file__).resolve().parents[2]
+    # Qubit keeps the tests under qubit_runtime/tests/..., one level deeper than
+    # upstream's tests/..., so the install root is the repository root above it.
+    root = Path(__file__).resolve().parents[3]
     result = subprocess.run(
         [sys.executable, "-m", "qubit_cli.source_check", "--install-root", str(root), "--home", str(home)],
         cwd=root, env={**os.environ, "QUBIT_HOME": str(home), "HERMES_IGNORE_USER_CONFIG": "0"},
