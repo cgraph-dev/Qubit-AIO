@@ -823,6 +823,13 @@ class OpenAICompatRoutesMixin:
             # id from a header-less client is NOT: delegate_task keeps its forced-sync fallback
             # there — the wake would hard-fail or land in history that client never reloads.
             session_history_delivery=("1" if provided_session_id else ""))
+        if getattr(self.gateway_runner, 'session_authority', None) is not None:
+            key = request.headers.get('Idempotency-Key')
+            # The durable admission identity carries the authenticated namespace: a rotated
+            # API key (or another profile) reusing a client key is a new principal, not a retry.
+            run_kwargs.update(
+                request_id=f'chat:{self._run_idempotency_scope(request)}:{key}' if key else None,
+                history_from_session=bool(provided_session_id), run_owner_scope=self._run_idempotency_scope(request))
         # This is presentation only. The ordinary API-key/session authorization
         # above still applies; it grants no internal ingress or control authority.
         if provided_session_id and body.get("hermes_notification_category") == "diagnostic":
@@ -939,9 +946,12 @@ class OpenAICompatRoutesMixin:
         route), folded into the key because the store keeps the fingerprint only as the slot's value.
         """
         from gateway.platforms.api_server import _error_response, _idem_cache, _make_request_fingerprint
+        from qubit_state_runtime import RuntimeStoreError
         idempotency_key = request.headers.get("Idempotency-Key")
         try:
-            if idempotency_key:
+            # Durable /v1/runs admissions own idempotency under session authority; the in-memory
+            # cache only serves the pre-authority path.
+            if idempotency_key and getattr(self.gateway_runner, 'session_authority', None) is None:
                 principal_scope = self._run_idempotency_scope(request)
                 scoped_key = f"{principal_scope}\0{route}\0{idempotency_key}"
                 fp = _make_request_fingerprint(body, keys=fingerprint_keys)
@@ -949,6 +959,10 @@ class OpenAICompatRoutesMixin:
             else:
                 result, usage = await compute()
             return (result, usage), None
+        except RuntimeStoreError as exc:
+            from gateway.platforms.api_server import _openai_error
+            from gateway.platforms.api_server_authority_runs import store_error_response
+            return None, store_error_response(_openai_error, exc)
         except Exception as e:
             logger.error("Error running agent for %s: %s", log_label, e, exc_info=True)
             message = "" if getattr(e, "_notification_presentation_suppressed", False) is True else f"Internal server error: {e}"
@@ -1336,6 +1350,8 @@ class OpenAICompatRoutesMixin:
         from gateway.platforms.api_server import APIServerAdapter
         prior = list(conversation_history)
         current_user = {"role": "user", "content": user_message}
+        if isinstance(result, dict) and isinstance(result.get("_turn_user_row"), dict):
+            current_user = dict(result["_turn_user_row"])  # settled canonical turn: carries api_content
         agent_messages = result.get("messages") if isinstance(result, dict) else None
         if isinstance(agent_messages, list) and agent_messages:
             turn_start = APIServerAdapter._response_messages_turn_start_index(
