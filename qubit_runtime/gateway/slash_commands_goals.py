@@ -77,6 +77,12 @@ class GatewayGoalCommandsMixin:
         the turn to the client as its ``send`` directive instead (the client submits it with its own
         input id).
         """
+        from gateway.session_command_sink import active_sink
+        if (sink := active_sink()) is not None:
+            sink.prompt = text
+            if not kickoff:
+                sink.display = "/goal resume"
+            return
         try:
             adapter, quick_key = self._adapter_and_key_for(event)
             if text and adapter and quick_key:
