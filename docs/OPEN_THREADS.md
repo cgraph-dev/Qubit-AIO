@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 10 — 2026-10-20 (73 dead symbols)
+
+- ✅ Landed: cron transport-only + queued delivery (with the upstream owner-seam test port), internal-wake anchor, A2A `input_id`, `machine.facts`, notification-poller stop, memory-target contract, state transactional worker methods, compression `trigger=`, reasoning replay/carriers, skills-hub raw fetch, connector wire identity.
+- ✅ Dead **85 → 73** merged (13 resolved; 1 new is the `cron_owner` pytest fixture, known FP). Test gap **683 → 660** absent (23 files/61 tests).
+- 🔴 Next wave: `_ResponsesStream` durable replay; `web_models` strict coercion; session-delete admission/worker retirement; `_completion_delivery_identity` watch branches; `_hmwa_first_contact_notes` signature; API chat `_handle_message` seam; legacy desktop `_read_ctx` hang; managed-worker usage keys; messaging stop timeouts.
+- 🔴 Remaining: 73 dead, 660 absent + 911 short-port tests, retirement, F4/F5.
+
+---
+
 ## Wave 9 — 2026-10-20 (security parity + 85 dead symbols)
 
 - ✅ Landed: cron give-up/pause, approval warnings crash, safe-worker guards, parked-auth retry, `/reload-mcp` content-aware, startup delegation restore, gateway SPA-token withholding, `retire_runtime_sessions`, native ingress trust, Discord role reauth, ACP edit-approval cwd/boundary.
