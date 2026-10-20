@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-from agent.managed_worker import accept_result, encode_frame, read_frame
+from agent.managed_worker import accept_result, encode_frame, ledger_usage, read_frame
 from gateway.session_worker_reservation import reserve_admission_worker
 from qubit_state_runtime import RuntimeStoreError
 
@@ -583,9 +583,12 @@ async def execute_managed(authority, ref, row, policy):
                 # A slow or non-zero interpreter exit after it is close()'s cleanup, not a loss.
                 with suppress(subprocess.TimeoutExpired):
                     await asyncio.to_thread(process.wait, 10)
-                # Like in-process execution, settlement belongs to the drain's stream lock.
+                # Like in-process execution, settlement belongs to the drain's stream lock. The
+                # three-token gateway projection is upstream's `accept_result` shape; the receipt
+                # ledger rides `captured['usage']` exactly as the in-process turn projects it.
                 authority.pending_results[row['admission_id']] = {
-                    'result': {**accepted, 'local_viewer': True}, 'usage': usage,
+                    'result': {**accepted, 'local_viewer': True},
+                    'usage': {**usage, **ledger_usage(accepted)},
                     **await asyncio.to_thread(_settled_session_usage, authority, scope['session_id'], accepted, scope['execution_id'])}
                 return accepted['final_response']
             raise RuntimeStoreError('invalid_worker_frame')
