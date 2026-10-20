@@ -1686,3 +1686,38 @@ class TestSealedReasoningResendOnce:
             with pytest.raises(Exception, match="ValidationException"):
                 call_converse(region="us-east-1", model="m", messages=[{"role": "user", "content": "hi"}])
         assert client.converse.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-on-Bedrock classifier
+# ---------------------------------------------------------------------------
+
+def _openai_bedrock_id_forms():
+    from agent.bedrock_adapter import BEDROCK_OPENAI_RESPONSES_MODEL_IDS
+    return [f"{prefix}{model_id}" for model_id in BEDROCK_OPENAI_RESPONSES_MODEL_IDS
+            for prefix in ("", "us.", "global.")]
+
+
+class TestOpenAIBedrockClassifier:
+    """Bedrock-hosted OpenAI models are addressed by a bare in-Region ID (Mantle) or a geo/global
+    inference-profile ID (bedrock-runtime); both are the same model and both must be recognised."""
+
+    @pytest.mark.parametrize("model_id", _openai_bedrock_id_forms())
+    def test_every_allowlisted_id_form_is_a_bedrock_openai_model(self, model_id):
+        from agent.bedrock_adapter import is_openai_bedrock_model
+        assert is_openai_bedrock_model(model_id) is True
+
+    @pytest.mark.parametrize("model_id", [
+        "openai.gpt-6-astra", "openai.gpt-6-sol", "openai.gpt-6-luna", "openai.gpt-6.1-sol",
+    ])
+    def test_gpt6_generation_is_allowlisted(self, model_id):
+        from agent.bedrock_adapter import is_openai_bedrock_model
+        assert is_openai_bedrock_model(model_id) is True
+
+    @pytest.mark.parametrize("model_id", [
+        "openai.gpt-oss-120b", "us.openai.gpt-oss-120b-1:0", "anthropic.claude-opus-5",
+        "us.anthropic.claude-opus-5", "openai.gpt-99", "bogus.openai.gpt-6.1-sol", "", None,
+    ])
+    def test_non_allowlisted_ids_stay_off_the_openai_route(self, model_id):
+        from agent.bedrock_adapter import is_openai_bedrock_model
+        assert is_openai_bedrock_model(model_id) is False
