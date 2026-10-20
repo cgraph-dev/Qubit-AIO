@@ -380,19 +380,45 @@ def load_permanent(patterns: set):
         governing.update(patterns)
 
 
-def _persist_choice(session_key: str, choice: str, warnings: list[tuple]) -> None:
-    """Persist a human ``session``/``always`` choice for each ``(key, _, is_tirith)``. Tirith
-    findings are session-max by design (no broad permanent allowlisting of content-level
-    findings), so ``always`` downgrades them to session. ``once`` persists nothing."""
-    for key, _, is_tirith in warnings:
+def _normalize_warnings(warnings: list) -> list[tuple]:
+    """Return ``(key, description, is_tirith)`` triples from either accepted caller shape.
+
+    Upstream passes a flat list of pattern-key strings; Qubit's gate passes warning
+    triples carrying the tirith flag. A malformed entry is a caller bug, so it raises
+    here instead of silently persisting nothing.
+    """
+    normalized = []
+    for entry in warnings:
+        if isinstance(entry, str):
+            normalized.append((entry, None, False))
+            continue
+        if isinstance(entry, (tuple, list)) and len(entry) == 3:
+            key, description, is_tirith = entry
+            if not isinstance(key, str):
+                raise TypeError(f"approval warning key must be a string, got {key!r}")
+            normalized.append((key, description, bool(is_tirith)))
+            continue
+        raise ValueError(
+            "approval warnings must be pattern-key strings or "
+            f"(key, description, is_tirith) triples, got {entry!r}"
+        )
+    return normalized
+
+
+def _persist_choice(session_key: str, choice: str, warnings: list) -> None:
+    """Persist a human ``session``/``always`` choice for each warning. Tirith findings are
+    session-max by design (no broad permanent allowlisting of content-level findings), so
+    ``always`` downgrades them to session. ``once`` persists nothing. Accepts either the
+    upstream flat key list or the gate's ``(key, _, is_tirith)`` triples."""
+    for key, _, is_tirith in _normalize_warnings(warnings):
         if choice not in ("session", "always"):
             continue
         approve_session(session_key, key)
         if choice == "always" and not is_tirith:
             approve_permanent(key)
             with _lock:
-                snapshot = set(_permanent_set())
-            save_permanent_allowlist(snapshot)
+                grants = _permanent_set() - _permanent_baseline_by_home.get(_baseline_key(), set())
+            save_permanent_allowlist(grants)
 
 
 # --- Config persistence for permanent allowlist ---------------------------------------------------------------------
