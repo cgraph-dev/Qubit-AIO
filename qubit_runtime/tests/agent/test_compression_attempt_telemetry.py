@@ -220,3 +220,27 @@ def test_automatic_compaction_counts_once_in_shared_metrics(monkeypatch):
     assert [compression_fields(**kw) for kw in calls] == [
         {"trigger": "auto", "outcome": "success", "context_fill_bucket": "75_to_90", "failure_class": "none"}
     ]
+
+
+def test_committed_attempt_effect_is_recorded_for_a_real_rewrite(caplog):
+    """The committed transcript shape, not the candidate, is what the attempt records."""
+    with patch("agent.context_compressor.get_model_context_length", return_value=100_000):
+        compressor = ContextCompressor(
+            model="test/main-model",
+            provider="test-provider",
+            threshold_percent=0.50,
+            quiet_mode=True,
+            config_context_length=100_000,
+        )
+    compressor.tail_token_budget = 10
+    agent = _Agent(compressor)
+
+    with patch.object(compressor, "_generate_summary", return_value="SANITIZED SUMMARY"), \
+            patch("agent.conversation_compression._record_committed_attempt_effect") as record:
+        with caplog.at_level(logging.INFO, logger="agent.conversation_compression"):
+            compress_context(agent, _messages(), "system prompt", approx_tokens=75_000, force=True)
+
+    record.assert_called_once()
+    _agent, before, after, verbatim_tail, split_status = record.call_args.args
+    assert _agent is agent and before is not None and after is not None
+    assert verbatim_tail is None and split_status == "not_applicable"
