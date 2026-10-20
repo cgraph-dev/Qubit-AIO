@@ -56,6 +56,7 @@ audit one symbol short of zero by design; the audit's job is to report that, not
 | `_settle_pre_upgrade_claim` | `tools/bot_relay.py` | Reachable only from the deleted `_replay_unanswered`. The fork's envelope schema does not carry upstream's `canonical_delivery_v1` marker, so the pre-upgrade settlement branch cannot run either. No behaviour is lost. |
 | `_normalize_newlines` | `cron/scheduler.py` | Left behind when this fork's run-document framing diverged from upstream's (`_PROMPT_FRAME`/`_RESPONSE_FRAME` are not present here), so its only upstream call site does not exist. Unused private helper; no behaviour is lost. |
 | `_submit_fingerprint` | `acp_adapter/gateway_server.py` | Superseded by `acp_adapter/gateway_media.py::submit_fingerprint`, which the live `_prepare_submit` path calls. The split-module version fingerprints the editor content *before* staging, so a retry of the same prompt matches without re-fetching a remote image (whose second download could fail or return other bytes). The in-file copy was left behind by that split and had no call site; re-adding it would restore a second, weaker identity path. |
+| `legacy_digests` | `tests/qubit_cli/test_local_legacy_engine.py` | Unused test helper: the local fixtures hand `legacy_install` the `pinned` digest list directly and no local test calls it. Upstream reads its copy only from `tests/hermes_cli/test_local_legacy_engine.py`. Deleted as dead test code; re-porting it would restore a call-less helper, not a capability, and production behaviour is untouched. |
 
 ## Numbers
 
