@@ -1490,12 +1490,31 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             logger.warning("%s boundary timed out or failed: %s", reason, err)
             return False
 
+    async def _send_shared_clarify(self, entry, **kwargs):
+        result = await self._ctx._status_adapter.send_clarify(**kwargs)
+        if self._approval_owner is not None and result.success:
+            authority, session_id, generation = self._approval_owner
+            from gateway import local_viewer_events
+            authority.register_clarify(session_id, generation, entry,
+                                       timeout_s=local_viewer_events.prompt_timeout_s(self, "clarify"))
+        return result
+
     def _clarify_callback_sync(self, questions) -> dict:
         """Answer the clarify tool's questions (clarify_tool's synchronous contract): one card per
         question, stop at the first the user never answers. The stream/typing re-arm waits for the
         last question — between two cards it only opens a bubble the next boundary closes."""
         from gateway.run_turn_runner_clarify_delivery import UNDELIVERED, UNDELIVERED_DECLINED, UNDELIVERED_NO_SURFACE
         from tools.clarify_gateway import CANCELLED, SKIPPED
+        if _finite_viewer_turn():
+            # `chat -q` / `-z`: the viewer detaches on the first prompt, so nobody can answer.
+            # Answer headless at once, as main's _single_query_clarify_callback did in process.
+            from gateway.session_finite import finite_clarify_reply
+            return finite_clarify_reply()
+        from gateway.session_cli_turn import clarify_batch_turn
+        if clarify_batch_turn(self):
+            # Main's classic CLI shows every question at once in its batch panel: one request.
+            from gateway.session_clarify_batch import ask_clarify_batch
+            return ask_clarify_batch(self, questions)
         answers: Dict[str, Any] = {}
         reply: Dict[str, Any] = {"answers": answers, "outcome": "submitted"}
         last = len(questions) - 1
@@ -1540,7 +1559,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             """Schedule the plain-text prompt when the native card cannot render; None = no such path."""
             coro = text_fallback_coro(ctx._status_adapter, **send_kwargs)
             return None if coro is None else self._schedule(coro, "Clarify text fallback failed to schedule")
-        clarify_mod.register(
+        entry = clarify_mod.register(
             clarify_id=clarify_id, session_key=session_key, question=question, choices=choices,
             multi_select=bool(multi_select),
         )
@@ -1561,7 +1580,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         except Exception:
             logger.debug("Stream-consumer flush before clarify prompt failed", exc_info=True)
         fut = self._schedule(
-            ctx._status_adapter.send_clarify(**send_kwargs),
+            self._send_shared_clarify(entry, **send_kwargs),
             "Clarify send failed to schedule",
         )
         # Boundary rule (see _approval_send_outcome): a send timeout is AMBIGUOUS — the card may
@@ -1571,6 +1590,9 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         response, answered = _clarify_send_then_wait(
             fut, clarify_id=clarify_id, session_key=session_key, clarify_mod=clarify_mod,
             fallback=_text_fallback)
+        if self._approval_owner is not None:
+            authority, session_id, generation = self._approval_owner
+            authority.sessions[session_id].controls.snapshot(session_id, generation)
         # Branch on the explicit flag, never on the text: a real answer can start with '[' (a
         # "[A] staging" label, "[urgent] ..." free text) and must not be mistaken for a sentinel.
         if not answered:
@@ -1604,6 +1626,9 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         from gateway.run_turn_runner_approval_settle import register_timeout_notice
         ctx = self._ctx
         adapter = ctx._status_adapter
+        if self._approval_owner is not None:
+            authority, session_id, generation = self._approval_owner
+            authority.check_approval_generation(session_id, generation)
         # Slack's assistant_threads_setStatus disables the compose box, so the user can't type
         # /approve while "is thinking..." shows. Pausing stops _keep_typing re-setting it; resumed
         # in approve/deny.
@@ -1694,6 +1719,11 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 register_timeout_notice(self, approval_data, command=cmd, card_message_id=None)
         except Exception as e:
             logger.error("Failed to send approval request: %s", e)
+        if self._approval_owner is not None:
+            from gateway import local_viewer_events
+            authority.register_approval(
+                session_id, generation, self._ctx.session_key, approval_data,
+                timeout_s=local_viewer_events.prompt_timeout_s(self, "approval"))
 
     # ── run_sync phases ─────────────────────────────────────────────────────────────────────
 

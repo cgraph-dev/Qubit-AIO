@@ -454,6 +454,20 @@ def _import_plugin_dir(plugin_dir: Path, source: str, *, home_key: str = "") -> 
     init_file = plugin_dir / "__init__.py"
     if not init_file.exists():
         return
+    if source != "bundled":
+        from qubit_cli.plugin_isolation import ISOLATION_HOST, isolation_mode
+        if isolation_mode() == ISOLATION_HOST:  # the plugin's code runs in the plugin host
+            from qubit_cli.plugin_host_profiles import load_hosted_profiles
+            _current_source = source
+            try:
+                for profile in load_hosted_profiles(plugin_dir, _user_module_name(plugin_dir, home_key)):
+                    register_provider(profile)
+            except Exception as exc:
+                logger.warning("Failed to load user provider plugin %s in the plugin host: %s",
+                               plugin_dir.name, exc)
+            finally:
+                _current_source = None
+            return
 
     # Give bundled plugins a stable import path (``plugins.model_providers.<name>``)
     # so relative imports within the plugin work. User plugins load via

@@ -514,11 +514,15 @@ def _(rid, params: dict, db) -> dict:
 
 @method("session.most_recent")
 def _(rid, params: dict) -> dict:
-    """Most recent human-facing session (session.list deny-list); errors fold into ``session_id: null``."""
+    """Most recent human-facing session, skipping auto-resume-denied rows (deny-list
+    plus ``source='unknown'`` guard placeholders, #54320); errors fold into ``session_id: null``."""
     with _profile_db(params) as db:
         try:
-            # Generous over-fetch: many ``tool`` rows must not yield a false "none".
-            for row in _listing_rows(db, 200)[:1] if db is not None else ():
+            # Generous over-fetch: many denied rows must not yield a false "none".
+            rows = ([row for row in _listing_rows(db, 200)
+                     if not _auto_resume_denied_source(row)]
+                    if db is not None else [])
+            for row in rows[:1]:
                 return _ok(rid, {"session_id": row.get("id"), "title": row.get("title") or "",
                                  "started_at": row.get("started_at") or 0, "source": row.get("source") or ""})
         except Exception:

@@ -2275,7 +2275,10 @@ def _last_known_good_fallback(config_path: Path, path_key: str, cache_sig, exc: 
         from qubit_cli.config_backups import load_newest_good_backup
         raw_good = load_newest_good_backup(config_path)
         if raw_good is not None:
-            normalized = _canonicalize_config(_deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw_good))
+            from qubit_cli.moa_config import apply_user_moa_presets
+            merged_good = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw_good)
+            apply_user_moa_presets(merged_good, raw_good)
+            normalized = _canonicalize_config(merged_good)
             expanded_good: Dict[str, Any] = _expand_env_vars(normalized)  # type: ignore[assignment]
             lkg, _ = _merge_managed_overlay(expanded_good)
             fallback = "last-known-good-backup"
@@ -2382,6 +2385,8 @@ def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
                     user_config.pop("max_turns", None)
 
                 config = _deep_merge(config, user_config)
+                from qubit_cli.moa_config import apply_user_moa_presets
+                apply_user_moa_presets(config, user_config)
                 # A copy of the file that just parsed is what a FRESH process falls back to when the
                 # next edit breaks the YAML (see _last_known_good_fallback). backup_config() skips
                 # byte-identical repeats and keeps a bounded count, so steady-state loads cost one stat.
@@ -2513,8 +2518,8 @@ def save_config(
         # swallows transient stat/open errors into ``{}``, and a ``{}`` at this point makes the
         # strip pass drop every user section whose value matches a default (#113301).
         _raw_for_paths = require_readable_config_before_write(config_path)
-        if merge_existing and _raw_for_paths:
-            config = _merge_partial_save(_raw_for_paths, config)
+        from qubit_cli.config_worker_save import rebase_for_save  # frozen-worker writes + merge_existing
+        config = rebase_for_save(config, _raw_for_paths, merge_existing)
 
         current_normalized = _canonicalize_config(config)
         normalized = current_normalized
@@ -4013,8 +4018,8 @@ def _cmd_config_check(args):
 
 
 _CONFIG_SUBCOMMANDS = {
-    None: lambda args: show_config(),
-    "show": lambda args: show_config(),
+    None: lambda args: _cmd_config_show(),
+    "show": lambda args: _cmd_config_show(),
     "edit": lambda args: edit_config(),
     "get": _cmd_config_get,
     "set": _cmd_config_set,

@@ -1943,10 +1943,7 @@ def _spawn_swr_refresh(cache_key: str, refresh_fn=None) -> None:
         try:
             entry = (refresh_fn or _default_refresh)()
             if entry:
-                # Under the write lock: the GUI read path spawns one of these per stale provider, so
-                # the plain load-modify-save would let concurrent warms drop each other's rows.
-                with _cache_write_lock:
-                    _store_cache_entry(cache_key, entry)
+                _store_cache_entry(cache_key, entry)
         except Exception:
             logger.debug("SWR refresh failed for %s", cache_key, exc_info=True)
         finally:
@@ -2071,9 +2068,6 @@ def _load_provider_models_cache() -> dict:
         return {}
 
 
-_cache_write_lock = threading.Lock()
-
-
 def _save_provider_models_cache(data: dict) -> None:
     """Persist the cache dict. Best-effort — silent on any error."""
     try:
@@ -2082,12 +2076,17 @@ def _save_provider_models_cache(data: dict) -> None:
         pass
 
 
-def _store_cache_entry(cache_key: str, entry: dict, cache: Optional[dict] = None) -> None:
-    """Write one row into the disk cache (reloading the latest state unless ``cache`` is given)."""
-    if cache is None:
+def _store_cache_entry(cache_key: str, entry: dict) -> None:
+    """Write one row into the disk cache, re-reading it under the thread + cross-process locks: a slow
+    fetch worker or another process must never write back the snapshot it loaded before fetching."""
+    from qubit_cli.models_cache_lock import write_under_cache_lock
+
+    def write_row() -> None:
         cache = _load_provider_models_cache()
-    cache[cache_key] = entry
-    _save_provider_models_cache(cache)
+        cache[cache_key] = entry
+        _save_provider_models_cache(cache)
+
+    write_under_cache_lock(_provider_models_cache_path(), write_row)
 
 
 def update_provider_cache_entry(provider: str, models: list[str]) -> None:
@@ -2098,8 +2097,7 @@ def update_provider_cache_entry(provider: str, models: list[str]) -> None:
         if not normalized or not models:
             return
         fp = _credential_fingerprint(normalized)
-        with _cache_write_lock:
-            _store_cache_entry(normalized, _cache_entry(fp, models))
+        _store_cache_entry(normalized, _cache_entry(fp, models))
     except Exception:
         pass
 
@@ -2159,13 +2157,13 @@ def cached_provider_model_ids(
         if fresh is None:
             # The live fetch degraded to the curated list; the account's real catalog is on disk.
             return _chat_catalog_rows([model for model in entry["models"] if not _model_requires_account_discovery(normalized, model)])
-        _store_cache_entry(normalized, fresh, cache)
+        _store_cache_entry(normalized, fresh)
         return _chat_catalog_rows(list(live))
 
     if is_ollama:
         if _ollama_native_probe_reachable():
             # A reachable empty native catalog is authoritative; do not resurrect a stale disk catalog.
-            _store_cache_entry(normalized, _cache_entry(fp, [], now), cache)
+            _store_cache_entry(normalized, _cache_entry(fp, [], now))
             return []
         # A failed/non-native probe is not authoritative: keep a stale catalog rather than blanking
         # the picker during a transient outage.
@@ -3012,7 +3010,7 @@ def cached_fetch_api_models(
     live = _live()
     if live or isinstance(live, _NativePickerModelList):
         stored = _entry(live, now)
-        _store_cache_entry(cache_key, stored, cache)
+        _store_cache_entry(cache_key, stored)
         return _catalog(stored)
     # Live returned nothing (offline, timeout, auth hiccup): a stale same-fingerprint entry beats it
     # (non-empty only: an empty native row is not worth resurrecting over the generic fallback).

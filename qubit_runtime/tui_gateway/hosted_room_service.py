@@ -427,14 +427,22 @@ class HostedRoomService:
                 room, list(snapshot.events), local_profiles=self.room_profiles(room),
                 initial_watermarks=snapshot.watermarks)
             if decision.status == "task" and decision.task is not None:
-                driver.admit_task(
-                    self.db_path, decision.task.identity, payload=decision.task.payload,
-                    clock=time.time)
+                existing = driver.get_task_for_turn(self.db_path, decision.task.identity)
+                if existing is not None and existing["payload"] == decision.task.payload:
+                    # A rebuilt cache re-planned the same coordinates: verify the committed
+                    # admission reconstructs from the log and keep it instead of re-admitting.
+                    discussion.reconstruct_task_plan(
+                        room, list(snapshot.events), existing, local_profiles=self.room_profiles(room))
+                    admitted = existing
+                else:
+                    admitted = driver.admit_task(
+                        self.db_path, decision.task.identity, payload=decision.task.payload,
+                        clock=time.time)
                 # A stop can race the policy read from another process: re-read after admission
                 # and cancel a task whose source event is now behind the room stop fence.
                 fence = self._policy_snapshot(self._room(binding.room_id)).stopped_through_seq
                 if decision.source_event_seq is not None and decision.source_event_seq < fence:
-                    self.runtime.cancel(decision.task.identity, cancel_id=f"stop-fence:{fence}")
+                    self.runtime.cancel(admitted["identity"], cancel_id=f"stop-fence:{fence}")
             elif decision.status in {"settled", "bounded"}:
                 self._append_room_status(room, decision)
 
@@ -459,10 +467,10 @@ class HostedRoomService:
     def send(self, *, room_id: str, event_id: str, payload: Any) -> dict[str, Any]:
         normalized = discussion.validate_user_payload(payload)
         gateway_id, epoch = self._owned_authority(room_id)
-        event = hosted_rooms.append_event(
-            self.db_path, room_id=room_id, event_id=event_id, kind="message.user",
-            actor={"kind": "user", "id": "desktop"}, payload=normalized,
-            authority_gateway_id=gateway_id, authority_epoch=epoch)
+        from gateway.session_hosted_attachments import append_user_event
+        event = append_user_event(
+            self, room_id=room_id, event_id=event_id, payload=normalized,
+            gateway_id=gateway_id, epoch=epoch)
         binding = next((b for b in self.bindings() if b.room_id == room_id), None)
         if binding is None:
             raise hosted_rooms.RoomNotFoundError("hosted room not found")

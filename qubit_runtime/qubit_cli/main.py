@@ -930,8 +930,10 @@ from qubit_cli.main_web_build import (  # frozen updater surface: update_cmd*.py
     _run_npm_install_deterministic,
 )
 from qubit_cli.main_tui_launch import (
+    _bypass_chat_launch,
     _launch_tui,
     _pin_kanban_board_env,
+    _refuse_unforwarded_tui_flags,
     _resolve_use_tui,
     _sync_bundled_skills_quietly,
 )
@@ -1749,7 +1751,12 @@ def cmd_chat(args):
     _guard_noninteractive_user_config(args)
     from qubit_cli.stream_json import stream_json_requested
     # Structured stdout is a non-interactive protocol: it overrides HERMES_TUI/display.interface too.
-    use_tui = False if stream_json_requested(args) else _resolve_use_tui(args)
+    # A --safe-mode / --ignore-user-config launch rides no profile surface either (the profile is the
+    # thing under investigation), so it stays classic unless --tui was explicit.
+    use_tui = False if stream_json_requested(args) or _bypass_chat_launch(args) else _resolve_use_tui(args)
+    if use_tui:
+        # The Ink client cannot carry every launch flag in session.create yet; refuse, never drop.
+        _refuse_unforwarded_tui_flags(args)
 
     _resolve_chat_session_args(args, use_tui)
 
@@ -2904,6 +2911,8 @@ _AGENT_SUBCOMMANDS = {
 
 
 def _is_tui_chat_launch(args) -> bool:
+    if _bypass_chat_launch(args):
+        return False
     if getattr(args, "tui", False) or os.environ.get("HERMES_TUI") == "1":
         return True
     # The chat path decides TUI-vs-classic via _resolve_use_tui (--cli/--tui

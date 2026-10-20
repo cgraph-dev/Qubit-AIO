@@ -546,6 +546,8 @@ def validate_plugin_dir(
     _check_trusted_inbound(report, recorded)
     _check_security_scan(report, plugin_dir)
     check_core_override(report, plugin_dir)
+    from qubit_cli.plugin_validate_private_imports import check_private_imports
+    check_private_imports(report, plugin_dir)
     check_desktop_surface(report, plugin_dir)
     check_language_packs(report, manifest, plugin_dir)
     from qubit_cli.plugin_isolation_audit import audit_plugin_dir

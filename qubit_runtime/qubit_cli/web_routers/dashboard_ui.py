@@ -113,14 +113,20 @@ async def set_dashboard_font(body: FontSetBody, profile: Optional[str] = None):
 async def get_dashboard_plugins(profile: Optional[str] = None):
     """Return discovered dashboard plugins (excludes user-hidden and non-enabled ones)."""
     def _run():
+        plugins = _get_dashboard_plugins()
         hidden: list = cfg_get(load_config(), "dashboard", "hidden_plugins", default=[]) or []
-        # The consent the asset route and the API gates apply, so no listed tab fails to load.
-        return [p for p in _get_dashboard_plugins()
-                if p.get("name", "") not in hidden and not _plugin_consent_withheld(p)]
+        return plugins, hidden, *_plugin_enable_sets()
+
+    plugins, hidden, enabled_set, disabled_set = await config_scoped_to_thread(profile, _run)
 
     # Strip internal fields before sending to frontend.
-    return [{k: v for k, v in p.items() if not k.startswith("_")}
-            for p in await config_scoped_to_thread(profile, _run)]
+    return [
+        {k: v for k, v in p.items() if not k.startswith("_")}
+        for p in plugins
+        # The consent the asset route and the API gates apply, so no listed tab fails to load.
+        if p.get("name", "") not in hidden and _plugin_activated(p, enabled_set, disabled_set)
+        and not _plugin_consent_withheld(p)
+    ]
 
 
 @router.get("/api/dashboard/plugins/rescan")
@@ -405,7 +411,9 @@ async def serve_plugin_asset(plugin_name: str, file_path: str, profile: Optional
     """
     def _consented() -> Optional[dict]:
         plugin = next((p for p in _get_dashboard_plugins() if p["name"] == plugin_name), None)
-        return None if not plugin or _plugin_consent_withheld(plugin) else plugin
+        if not plugin or _plugin_consent_withheld(plugin):
+            return None
+        return plugin if _plugin_activated(plugin, *_plugin_enable_sets()) else None
 
     try:
         plugin = await config_scoped_to_thread(profile, _consented)

@@ -5484,6 +5484,9 @@ def _restart_all_as_host(owner, system: bool) -> None:
     # Retract the stopped owner's rendezvous record. Leaving it made this very function a silent
     # no-op: the re-entered `gateway run` below read the corpse's record and ATTACHED to it.
     _discard_dead_host_record()
+    # The retraction only invalidates when it removed a record; the pre-stop memo must go either way.
+    from qubit_cli.gateway_host_record import _forget_host_gateway_probe
+    _forget_host_gateway_probe()
 
     print("Starting gateway...")
     # Even without a registered task, gateway_windows.start() uses the detached launcher.
@@ -5621,6 +5624,8 @@ def _cmd_restart(args):
         print("✓ Stopped gateway for this profile")
     _wait_for_gateway_exit(timeout=10.0, force_after=5.0)
     _wait_for_api_server_port_free()
+    from qubit_cli.gateway_host_record import _forget_host_gateway_probe
+    _forget_host_gateway_probe()
     print("Starting gateway...")
     run_gateway(verbose=0, force=force)
 
@@ -5663,6 +5668,7 @@ def _status_host_kind() -> str:
 
 def _cmd_status(args):
     from qubit_cli.gateway_profile_lifecycle import print_parked_status
+    from qubit_cli.gateway_status_notes import report_incompatible_owner
     deep = getattr(args, "deep", False)
     full = getattr(args, "full", False)
     system = getattr(args, "system", False)
@@ -5694,11 +5700,14 @@ def _cmd_status(args):
         else:
             _gw_windows().status(deep=deep)
         _print_gateway_process_mismatch(snapshot)
+        report_incompatible_owner(())
         _print_multiplex_standalone_reason()
         _print_served_ingress_urls()
     else:
         pids = list(snapshot.gateway_pids)
-        if pids:
+        if pids and report_incompatible_owner(pids):
+            pass  # an older Qubit's gateway: alive, but every client of this version refuses it
+        elif pids:
             print(f"✓ Gateway is running (PID: {', '.join(map(str, pids))})")
             print("  (Running manually, not as a system service)")
             _print_runtime_health()
@@ -5727,16 +5736,10 @@ def _cmd_status(args):
 
 
 def _print_standalone_by_config() -> None:
-    """Default-profile status: name the profiles that opted out of the host multiplexer by config,
-    so the served set the host gateway reports is not mistaken for the installed roster."""
-    from qubit_cli.profiles import get_active_profile_name, profiles_to_serve
-    if (get_active_profile_name() or "default") != "default":
-        return
-    roster = {name for name, _home in profiles_to_serve(True, include_standalone=True)}
-    served = {name for name, _home in profiles_to_serve(True)}
-    names = sorted(roster - served - {"default"})
-    if names:
-        print(f"standalone by config (temporary compatibility shim): {', '.join(names)}")
+    """Default-profile status: name the profiles that opted out of the host multiplexer by config
+    (the shared implementation; kept as a module seam for callers and tests)."""
+    from qubit_cli.gateway_status_notes import print_standalone_by_config
+    print_standalone_by_config()
 
 
 def _cmd_list(args):
