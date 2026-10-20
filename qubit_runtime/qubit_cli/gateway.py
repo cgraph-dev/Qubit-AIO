@@ -4643,6 +4643,9 @@ def run_gateway(verbose: int = 0, quiet: bool = False, replace: bool = False, fo
         except Exception:
             pass  # best-effort; don't block gateway startup
 
+    if _gateway_detached_env():
+        from qubit_logging import redact_detached_stdio
+        redact_detached_stdio()
     from gateway.run import start_gateway
     print("┌─────────────────────────────────────────────────────────┐")
     print("│           ☤ Qubit Gateway Starting...                 │")

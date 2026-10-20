@@ -22,6 +22,7 @@ from typing import Any, Dict, Optional
 from qubit_constants import get_qubit_home
 
 from utils import atomic_json_write
+from plugins.google_meet._jsonfile import say_queue_lock
 
 
 def _root() -> Path:
@@ -174,7 +175,7 @@ def enqueue_say(text: str) -> Dict[str, Any]:
         return {"ok": False, "reason": f"out_dir missing: {out_dir}"}
     queue_path = out_dir / "say_queue.jsonl"
     entry = {"id": uuid.uuid4().hex[:12], "text": text}
-    with queue_path.open("a", encoding="utf-8") as f:
+    with say_queue_lock(queue_path), queue_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
     return {"ok": True, "meetingId": active.get("meeting_id"), "enqueued_id": entry["id"],
             "queue_path": str(queue_path)}
