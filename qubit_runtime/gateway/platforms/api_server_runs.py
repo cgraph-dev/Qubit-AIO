@@ -225,6 +225,8 @@ def _initialize_run_state(self, *, store_factory) -> None:
     self._stopping_run_ids: set[str] = set()
     self._shutdown_interrupted_run_ids: set[str] = set()
     self._run_shutdown_requested_at: Optional[float] = None
+    # Streaming run id -> its canonical admission id, held while that request observes the turn.
+    self._run_admission_aliases: dict[str, str] = {}
     (
         self._run_owners, self._run_streams, self._run_streams_created, self._active_run_agents,
         self._active_run_tasks, self._run_statuses, self._run_approval_sessions,
@@ -400,6 +402,14 @@ def _owner_alive(owner_pid: int, owner_started: int) -> bool:
 
 def _durable_run_status(self, request: "web.Request", run_id: str) -> Dict[str, Any] | None:
     """Hydrate a scoped run status and fail stale owners closed."""
+    from gateway.platforms.api_server_authority_runs import run_projection
+    canonical = run_projection(self, run_id)
+    if canonical is not None:
+        # The documented poll shape: the canonical projection decides status/output/usage; the
+        # retained run record still names the object, the requested model and the served runtime.
+        retained = self._run_statuses.get(run_id) or {}
+        return {"object": "hermes.run", **{key: retained[key] for key in ("model", "runtime", "created_at")
+                                           if key in retained}, **canonical}
     status = self._run_statuses.get(run_id)
     if status is not None:
         if run_id in self._run_idempotency_ids:
@@ -507,6 +517,7 @@ class _RunLaunch:
     browser_control_principal: Any
     browser_control_transport_family: Any
     turn_author: Optional[Dict[str, Any]] = None  # memory-attribution label only; grants nothing
+    admission: Any = None
 
     @property
     def approval_session_key(self) -> str:
@@ -795,11 +806,19 @@ async def _handle_runs(self, request: "web.Request", *, _api_server) -> "web.Res
         browser_control_principal=_api_server._api_request_browser_control_principal.get(),
         browser_control_transport_family=_api_server._api_request_browser_control_transport_family.get(),
         turn_author=turn_author)
-    self._activate_admitted_request()
     # A canonical Bot Chat that a Desktop holds live is that Desktop's to run: executing here would
     # be a second writer beside its lease (#114959). The owner's mailbox takes the turn and its
     # receipt drives this run's status, so `peer run` keeps its run_id and `peer status` still works.
+    # Under session authority the same call admits the turn to the Bot Chat's own FIFO, which is
+    # why it is decided BEFORE ``admit_api_turn`` would bind the chat as an API conversation.
     admitted = await self._admit_to_live_bot_chat(session_id, user_message, turn_author) if selected_session_id else None
+    if admitted is None and getattr(self.gateway_runner, 'session_authority', None) is not None:
+        refused = await _admit_run_to_authority(
+            self, launch, run_id, session_history_delivery, _declared_selected,
+            idempotency_scope, idempotency_key, _openai_error)
+        if refused is not None:
+            return refused
+    self._activate_admitted_request()
     if admitted is not None:
         task = self._active_run_tasks[run_id] = asyncio.create_task(
             _execute_run_via_live_owner(self, launch, *admitted, _api_server=_api_server))

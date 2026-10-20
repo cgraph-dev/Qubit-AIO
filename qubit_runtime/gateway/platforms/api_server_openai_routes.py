@@ -100,7 +100,7 @@ def _result_flags(result: Any) -> tuple:
     """``(completed, partial, failed, error)`` from an agent result dict (defaults if not a dict)."""
     if not isinstance(result, dict):
         return True, False, False, None
-    return (bool(result.get("completed", True)), bool(result.get("partial")),
+    return (bool(result.get("completed", True)) and not result.get('interrupted'), bool(result.get("partial")),
             bool(result.get("failed")), result.get("error"))
 
 
@@ -112,7 +112,7 @@ def _finish_reason(completed, is_partial, is_failed, err_msg, agent_error=None) 
         return "length"
     if agent_error is not None or is_failed or (not completed and err_msg):
         return "error"
-    return "stop"
+    return 'cancelled' if not completed else 'stop'
 
 
 def _qubit_extras(completed, is_partial, is_failed, err_msg, finish_reason: str) -> Dict[str, Any]:
