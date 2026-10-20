@@ -64,6 +64,10 @@ def _runner(tmp_path, monkeypatch):
     runner._start_one_profile_adapters = _start
     runner._adapter_credential_fingerprint = lambda adapter: getattr(adapter, "token", None)
     runner._started = started
+    # The live control socket publishes the runtime descriptor and mints tickets; the boot
+    # path sets these in initialize_gateway_runtime, which this hand-built runner skips.
+    runner.session_runtime_descriptor = {}
+    runner.session_ticket_store = MagicMock()
     return runner, home
 
 
@@ -164,7 +168,7 @@ async def test_profile_control_verbs_round_trip_and_refusals(tmp_path, monkeypat
 @pytest.mark.platforms("linux")
 @pytest.mark.asyncio
 async def test_profile_lifecycle_over_real_control_socket(tmp_path, monkeypatch):
-    from gateway.run import _start_gateway_start_control_socket
+    from gateway.run_bootstrap import _start_gateway_start_control_socket
     from gateway import control_socket
     runner, home = _runner(tmp_path, monkeypatch)
     secondary = _mkprofile(home, "worker")
