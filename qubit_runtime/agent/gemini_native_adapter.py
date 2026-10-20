@@ -447,6 +447,11 @@ def _build_gemini_contents(
             if (call_id := _tool_call_id(tool_call)) and tool_name:
                 tool_name_by_call_id[call_id] = tool_name
             parts.append(_translate_tool_call_to_gemini(tool_call, include_ids=include_tool_call_ids))
+        # Text-turn signature goes back on the last part, where it was received (a functionCall part
+        # keeps its own signature).
+        if role == "assistant" and parts and "functionCall" not in parts[-1] and (
+                sig := _tool_call_extra_signature(msg)):
+            parts[-1] = {**parts[-1], "thoughtSignature": sig}
         if parts:
             contents.append({"role": "model" if role == "assistant" else "user", "parts": parts})
     joined_system = "\n".join(part for part in system_text_parts if part).strip()
@@ -681,6 +686,7 @@ class _GeminiStreamChunk(SimpleNamespace): ...
 
 def _make_stream_chunk(
     *, model: str, content: str = "", tool_call_delta: Optional[Dict[str, Any]] = None, finish_reason: Optional[str] = None, reasoning: str = "",
+    text_signature: Optional[str] = None,
 ) -> _GeminiStreamChunk:
     d = tool_call_delta
     tool_calls = None if d is None else [
@@ -688,6 +694,8 @@ def _make_stream_chunk(
     ]
     delta = SimpleNamespace(role="assistant", content=content or None, tool_calls=tool_calls, reasoning=reasoning or None,
                             reasoning_content=reasoning or None)
+    if text_signature:
+        delta.extra_content = _tool_call_extra_from_part({"thoughtSignature": text_signature})
     choice = SimpleNamespace(index=0, delta=delta, finish_reason=finish_reason)
     return _envelope(model, "chat.completion.chunk", choice, None, cls=_GeminiStreamChunk)
 
@@ -770,6 +778,8 @@ def translate_stream_event(event: Dict[str, Any], model: str, tool_call_indices:
             continue
         if text:
             chunks.append(_make_stream_chunk(model=model, content=text))
+        if sig := _text_part_signature(part):
+            chunks.append(_make_stream_chunk(model=model, text_signature=sig))
         if fc := _part_function_call(part):
             name = str(fc["name"])
             args_str = _dump_call_args(fc, sort_keys=True)

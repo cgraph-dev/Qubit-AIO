@@ -1660,6 +1660,11 @@ def _assistant_tool_call_dict(agent, tool_call, index: int) -> dict:
     extra = getattr(tool_call, "extra_content", None)
     if extra is not None:
         tc_dict["extra_content"] = _dump_if_model(extra)
+    # Copilot's Gemini 3 variant signs the call inside ``function`` (replayed only to Copilot).
+    from agent.reasoning_carriers import field
+    fn_sig = field(tool_call, "thought_signature") or getattr(tool_call.function, "thought_signature", None)
+    if isinstance(fn_sig, str) and fn_sig:
+        tc_dict["function"]["thought_signature"] = fn_sig
     return tc_dict
 
 
@@ -1755,6 +1760,13 @@ def build_assistant_message(agent, assistant_message, finish_reason: str) -> dic
                         from agent.conversation_compression import _reset_read_dedup_caches
 
                         _reset_read_dedup_caches(task_id, session_id=getattr(agent, "session_id", None) or "")
+
+    from agent.reasoning_carriers import carrier_record
+    if record := carrier_record(assistant_message):
+        # Gemini text-turn signature / Copilot reasoning_opaque+text: top-level for the live
+        # history, a private reasoning_details record for persistence (reasoning_carriers.py).
+        msg.update({k: v for k, v in record.items() if k != "type"})
+        msg["reasoning_details"] = [*msg.get("reasoning_details", ()), record]
 
     if assistant_tool_calls:
         msg["tool_calls"] = [_assistant_tool_call_dict(agent, tc, i) for i, tc in enumerate(assistant_tool_calls)]

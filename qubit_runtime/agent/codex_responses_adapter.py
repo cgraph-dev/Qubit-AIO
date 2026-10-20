@@ -486,10 +486,9 @@ def _replay_reasoning_items(
         foreign_issuer = current_issuer_kind is not None and item_issuer is not None and item_issuer != current_issuer_kind
         # No model stamp → trust the endpoint stamp. Native compaction checkpoints and reasoning persisted
         # before model stamping carry none; dropping them would erase every existing session's context
-        # once. A wrong guess is caught by the invalid_encrypted_content 400 classifier.
-        foreign_model = (
-            current_issuer_model is not None and item_model is not None and item_model != current_issuer_model
-        )
+        # once. A wrong guess is caught by the invalid_encrypted_content 400 classifier, whose first rung
+        # strips exactly these unverified (unstamped / sibling-family) items.
+        foreign_model = not _model_can_read_blob(current_issuer_kind, item_model, current_issuer_model)
         if foreign_issuer or foreign_model:
             if not _CROSS_ISSUER_WARN_EMITTED:
                 logger.warning(
