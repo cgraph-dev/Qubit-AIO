@@ -63,6 +63,7 @@ def _decode_attach_payload(
 
 def _sniff_image_ext(img_bytes: bytes, filename: str = "") -> str:
     """Extension from the filename hint, else magic bytes (WebP: RIFF container), else ``.png``."""
+    from pathlib import Path
     if filename and (suffix := Path(filename).suffix.lower()):
         return suffix
     head = img_bytes[:16]
