@@ -55,6 +55,7 @@ audit one symbol short of zero by design; the audit's job is to report that, not
 | `_replay_unanswered` | `tools/bot_relay.py` | The fork's drain deliberately replaced upstream's unbounded claimed-envelope replay with `_reoffer_unanswered`: one bounded re-offer per envelope after `REOFFER_AFTER_SECONDS`, never a turn loop against a target nobody is listening for. The upstream helper had no caller; re-adding it would re-introduce a second re-delivery path beside the bounded one. |
 | `_settle_pre_upgrade_claim` | `tools/bot_relay.py` | Reachable only from the deleted `_replay_unanswered`. The fork's envelope schema does not carry upstream's `canonical_delivery_v1` marker, so the pre-upgrade settlement branch cannot run either. No behaviour is lost. |
 | `_normalize_newlines` | `cron/scheduler.py` | Left behind when this fork's run-document framing diverged from upstream's (`_PROMPT_FRAME`/`_RESPONSE_FRAME` are not present here), so its only upstream call site does not exist. Unused private helper; no behaviour is lost. |
+| `_submit_fingerprint` | `acp_adapter/gateway_server.py` | Superseded by `acp_adapter/gateway_media.py::submit_fingerprint`, which the live `_prepare_submit` path calls. The split-module version fingerprints the editor content *before* staging, so a retry of the same prompt matches without re-fetching a remote image (whose second download could fail or return other bytes). The in-file copy was left behind by that split and had no call site; re-adding it would restore a second, weaker identity path. |
 
 ## Numbers
 
