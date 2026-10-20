@@ -154,11 +154,11 @@ def retire_mutation_receipts(conn, session_ids):
     a rewind/compress/rename result carries, so a retry after the delete cannot read it back."""
     if not session_ids:
         return
-    named = ' OR '.join(f"json_extract(value,'{path}') IN (SELECT value FROM json_each(?1))"
+    named = ' OR '.join(f"json_extract(value,'{path}') IN (SELECT value FROM json_each(:ids))"
                         for path in _RECEIPT_SESSION_PATHS)
     rows = conn.execute(
         "SELECT key,value FROM state_meta WHERE key GLOB 'gateway.mutation.v1.*' AND "
-        f"CASE WHEN json_valid(value) THEN ({named}) END", (json.dumps(list(session_ids)),)).fetchall()
+        f"CASE WHEN json_valid(value) THEN ({named}) END", {"ids": json.dumps(list(session_ids))}).fetchall()
     for key, raw in rows:
         receipt = json.loads(raw)
         result = receipt.get('result')

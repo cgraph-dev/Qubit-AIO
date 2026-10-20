@@ -1784,6 +1784,8 @@ class SessionSessionsMixin:
                 for covered_id, expected in expected_display_messages.items()
             ):
                 return False
+            from qubit_state_mutation_retirement import retire_sessions
+            retire_sessions(conn, [session_id])
             removed_ids.extend(_delete_delegate_children(conn, [session_id]))
             conn.execute(  # orphan remaining children (branches) so FK is satisfied
                 "UPDATE sessions SET parent_session_id = NULL WHERE parent_session_id = ?", (session_id,),
@@ -1794,6 +1796,8 @@ class SessionSessionsMixin:
             removed_ids.append(session_id)
             return True
         deleted = self._execute_write(_do)
+        from qubit_state_media import collect_retired_media
+        collect_retired_media(self)
         for sid in removed_ids:
             self._remove_session_files(sessions_dir, sid)
         return bool(deleted)
@@ -1902,6 +1906,8 @@ class SessionSessionsMixin:
                     expanded = self._expand_compression_lineage(conn, existing)
                 else:
                     expanded = existing
+            from qubit_state_mutation_retirement import retire_sessions
+            retire_sessions(conn, expanded)
             removed_ids.extend(_delete_delegate_children(conn, expanded))
             for chunk in _id_chunks(expanded):
                 ph = _session_ids_placeholders(chunk)
@@ -1917,6 +1923,8 @@ class SessionSessionsMixin:
             # 3 rows, however many physical links those rows had.
             return len(existing)
         count = self._execute_write(_do)
+        from qubit_state_media import collect_retired_media
+        collect_retired_media(self)
         for sid in removed_ids:
             self._remove_session_files(sessions_dir, sid)
         return count
