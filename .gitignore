@@ -159,3 +159,7 @@ graphify-out.*/
 
 # Impeccable skill runtime scratch (regenerable local state).
 .impeccable/
+
+# runtime cron markers written at the repo root by the live gateway
+/cron-heartbeat
+/cron-started
