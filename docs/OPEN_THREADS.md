@@ -17,6 +17,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 12 — 2026-10-20 (56 → 46 dead symbols)
+
+- ✅ Landed (`e79624c65`, `a0d165157`, `6e4f36cd9`, `a23e4621f`, `11fe1ce99`): api/runs helper dedup; hosted-room work-evidence test port; cron-health and profile-export test callers restored for `_metric`/`_seed_stores`; terminal-retirement test port; clarify interrupt withdrawal for unlimited waits + its `has_pending` test.
+- ✅ Dead **56 → 46** (10 resolved, 0 new); all 46 remaining triaged at the pin in `TRIAGE.md` §Wave 12.
+- ✅ Deletion recorded: `legacy_digests` (test helper) in `docs/FROZEN_TARGET.md`.
+- 🔴 Newly exposed, xfailed: retired-row backfill via `update_token_counts`/`ensure_session`; reset-child delete leaves the logical parent; `prune_sessions` does not reclaim past-horizon retirement tombstones.
+- 🔴 Blockers unchanged: hosted-room attachments/`input_context`; bot-chat authority/FIFO family; durable run admission + clarify/resolve-unknown routes; hot-serve (`serve_profile_runtime` durable recovery can double-admit); inbound/turn mixins; `completion_admission`; `one_turn_route`; release admission; HX013.
+
+---
+
 ## Wave 11 — 2026-10-20 (56 dead symbols; retirement audit)
 
 - ✅ Landed: API chat `_handle_message` seam + keyed Responses durable replay; strict web models; session-delete retirement; DELETE-mode `_read_ctx` deadlock; watch completion identity; HMWA signature; worker usage projection; `/stop`/`/new` durable follow-up cancel.
