@@ -850,6 +850,7 @@ def _cmd_retry(rid, params, session, name, arg):
         if err:
             return err
         content = cc.retryable_user_text(rewound[1].get("content"))
+    _tui_model_friction("retry", session)
     return _ok(rid, {"type": "send", "message": content})
 
 
@@ -956,6 +957,7 @@ def _cmd_undo(rid, params, session, name, arg):
             # The session's profile scope: a multiplexed manager refuses a hook naming no profile (#140058).
             with contextlib.suppress(Exception), _session_profile_runtime_scope(session):
                 step()
+    _tui_model_friction("undo", session, turns_undone)
     turn_word = "turn" if turns_undone == 1 else "turns"
     notice = f"↶ Undid {turns_undone} {turn_word} ({rewound_count} message(s)). Edit and resubmit, or send a new message."
     return _ok(rid, {"type": "prefill", "message": target_text, "notice": notice})
