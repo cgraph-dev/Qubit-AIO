@@ -630,6 +630,12 @@ def _wait_live_dm(home: str, delivery_id: str, *, dm_file: "str | os.PathLike | 
     return 0 if status in ("settled", "queued", "claimed") else 1
 
 
+def _local_profile_argv(argv: list[str]) -> bool:
+    """Whether ``argv`` is this product's ``<cli> -p <profile> …`` local delivery form."""
+    cli = (argv[0] if argv else "").rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
+    return len(argv) >= 3 and cli in ("hermes", "hermes.exe", "qubit", "qubit.exe") and argv[1] == "-p"
+
+
 def _local_delivery_home(argv: list[str]) -> Path | None:
     cli = (argv[0] if argv else "").rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
     if len(argv) < 3 or cli not in ("hermes", "hermes.exe") or argv[1] != "-p":
@@ -716,6 +722,13 @@ def _run_delivery(argv: list[str], dm_file: str, *, stdin_file: bool,
                 return 1
             if record is not None:
                 return _wait_live_dm(record["profile_home"], record["delivery_id"], dm_file=dm_file)
+        if _local_profile_argv(argv):
+            # A local-profile DM has no canonical Bot Chat authority to admit it. Refuse and
+            # retain the payload instead of spawning another executor for the same input.
+            # Upstream 43faacfb8de7 tools/bot_mode_dm.py:589.
+            print(json.dumps({"reason": "runtime_unavailable",
+                              "error": "No canonical Bot Chat authority; payload retained."}))
+            return 1
     try:
         from tools.bot_relay import delivery_env
 

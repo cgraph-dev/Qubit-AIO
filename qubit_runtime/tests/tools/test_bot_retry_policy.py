@@ -66,6 +66,7 @@ def home(tmp_path, monkeypatch):
 def _deliver(params):
     import tui_gateway.server as srv
 
+    params.setdefault("id", "a" * 32)
     return srv._methods["bot_relay.deliver"](1, params)
 
 
@@ -157,7 +158,7 @@ def test_deliver_never_retries_auth_failure(home, monkeypatch):
 # ── local delivery runner consumes the policy ────────────────────────────────
 
 
-def test_run_delivery_retries_transient_and_reemits_stdout(monkeypatch, tmp_path, capsys):
+def test_local_turn_retries_transient_and_reemits_stdout(monkeypatch, tmp_path, capsys):
     from tools import bot_mode_dm
 
     dm = tmp_path / "dm.txt"
@@ -171,17 +172,16 @@ def test_run_delivery_retries_transient_and_reemits_stdout(monkeypatch, tmp_path
         return _Proc(0, stdout="the reply text")
 
     monkeypatch.setattr(bot_mode_dm.subprocess, "run", _fake_run)
-    rc = bot_mode_dm._run_delivery(
-        ["hermes", "-p", "ops", "chat"], str(dm), stdin_file=False
+    rc = bot_mode_dm._run_local_turn(
+        ["hermes", "-p", "ops", "chat"], str(dm)
     )
     assert rc == 0
     assert len(calls) == 2
     assert calls[0] == calls[1]
     assert "the reply text" in capsys.readouterr().out
-    assert not dm.exists(), "dm file must be cleaned up"
 
 
-def test_run_delivery_no_retry_for_missing_config(monkeypatch, tmp_path):
+def test_local_turn_no_retry_for_missing_config(monkeypatch, tmp_path):
     from tools import bot_mode_dm
 
     dm = tmp_path / "dm.txt"
@@ -193,8 +193,8 @@ def test_run_delivery_no_retry_for_missing_config(monkeypatch, tmp_path):
         return _Proc(1, stderr="No LLM provider configured")
 
     monkeypatch.setattr(bot_mode_dm.subprocess, "run", _fake_run)
-    rc = bot_mode_dm._run_delivery(
-        ["hermes", "-p", "ops", "chat"], str(dm), stdin_file=False
+    rc = bot_mode_dm._run_local_turn(
+        ["hermes", "-p", "ops", "chat"], str(dm)
     )
     assert rc == 1
     assert len(calls) == 1
