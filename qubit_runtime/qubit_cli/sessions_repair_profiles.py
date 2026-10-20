@@ -409,9 +409,16 @@ class _MoveBatch:
         if self._result is not None:
             return self._result
         src_db, dst_db = session.db(self.src), session.db(self.dst)
-        payloads = {sid: src_db.export_session_for_move(sid) for sid in self.ids}
+        from qubit_state_profile_repair import SessionLedgeredError
+        payloads: Dict[str, Optional[Dict[str, Any]]] = {}
+        for sid in self.ids:
+            try:
+                payloads[sid] = src_db.export_session_for_move(sid)
+            except SessionLedgeredError as exc:  # gained ledger rows since the scan: never copied
+                self._errors[sid] = exc
         ordered = _parents_first([p for p in payloads.values() if p is not None])
-        result: Dict[str, Dict[str, int]] = {sid: {"missing": 1} for sid, p in payloads.items() if p is None}
+        result: Dict[str, Dict[str, int]] = {sid: {"missing": 1} for sid, p in payloads.items()
+                                             if p is None and sid not in self._errors}
         for payload in ordered:
             sid, parent = payload["session"]["id"], payload["session"].get("parent_session_id")
             if parent in self._errors:
