@@ -747,6 +747,11 @@ if [ "${#STARTED_AT}" -ne "${#NOW}" ] \
   STARTED_AT="$NOW"
 fi
 printf '%s\n%s\n' "$$" "$STARTED_AT" > "$MARKER" 2>/dev/null || log "WARNING: could not write update marker"
+# The marker's owner (line 1) is this hand-off. Tell the update child, so a later
+# generation reparented away from us (a relaunch or a takeover) still recognises the
+# custodian through update_lock._is_partner instead of refusing its own claim.
+export HERMES_UPDATE_HANDOFF_PID="$$"
+log "update marker names its custodian pid $$ (hand-off pid $$)"
 
 if [ "$SELF_TEST_MARKER" -eq 1 ]; then
   trap - EXIT

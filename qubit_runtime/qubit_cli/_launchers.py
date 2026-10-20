@@ -108,6 +108,22 @@ ENTRY_POINTS = {
     "qubit-acp": ("acp_adapter.entry", "main"),
 }
 
+#: Pre-rebrand launcher names, kept as a read-old alias: an installed launcher,
+#: the Desktop hand-off's fixture, and ``WINDOWS_BIN_LAUNCHERS`` still name
+#: these, but the canonical entries above are what new launchers publish.
+LEGACY_ENTRY_POINTS = {
+    "hermes": ("qubit_cli.main", "main"),
+    "hermes-acp": ("acp_adapter.entry", "main"),
+}
+
+
+def _entry_point(name: str) -> tuple[str, str]:
+    """The ``(module, callable)`` for a launcher name, canonical first, then the read-old alias."""
+    try:
+        return ENTRY_POINTS[name]
+    except KeyError:
+        return LEGACY_ENTRY_POINTS[name]
+
 
 def _is_windows() -> bool:
     return os.name == "nt"
@@ -219,7 +235,7 @@ def mint_launcher(
     site_packages: Path | None,
 ) -> Path | None:
     """Write a native launcher with the shared bootstrap script, or return None."""
-    module, func = ENTRY_POINTS[name]
+    module, func = _entry_point(name)
     out_dir = Path(out_dir)
     script = _launcher_script(name, Path(repo_root), site_packages)
 
@@ -409,7 +425,7 @@ def _qubit_closure_repair():
 
 
 def _launcher_script(name: str, repo_root: Path, dependencies: Path | None) -> str:
-    module, func = ENTRY_POINTS[name]
+    module, func = _entry_point(name)
     # Profile boot repairs shared launchers: their default must stay at the
     # install's dependency root, not whichever profile triggered publication.
     #
