@@ -34,7 +34,9 @@ from agent.conversation_compression_codex import _codex_compaction_cooldown_rema
 from agent.conversation_compression_deadline import (  # noqa: F401  (re-exported for existing importers)
     DEFAULT_CONTEXT_TIMEOUT_SECONDS, DEFAULT_CONTEXT_TOTAL_CEILING_SECONDS, resolve_context_compression_timeouts,
 )
-from agent.conversation_compression_telemetry import _emit_aborted_attempt_telemetry, _emit_compression_attempt_telemetry
+from agent.conversation_compression_telemetry import (
+    _emit_aborted_attempt_telemetry, _emit_blocked_attempt_telemetry, _emit_compression_attempt_telemetry,
+)
 from agent.memory_provider import PRE_COMPRESS_CHECKPOINT_API_VERSION
 from agent.model_metadata import estimate_messages_tokens_rough, estimate_request_tokens_rough
 from agent.session_activity import ActivityProvenance, normalize_activity_provenance
@@ -4142,6 +4144,10 @@ def compress_context(
     # Another path may have compacted this session in place since construction;
     # re-read breaker state under the lock, not the bind_session_state() snapshot.
     if not force and _automatic_compression_gate_blocks(agent, bypass_cooldown, include_cooldown=False):
+        reason_fn = getattr(agent.context_compressor, "_compression_block_reason", None)
+        block_reason = reason_fn() if callable(reason_fn) else None
+        _emit_blocked_attempt_telemetry(
+            agent, attempt.started_at, approx_tokens, None, block_reason or "blocked")
         lease.release()
         return messages, _existing_system_prompt(agent, system_message)
 
