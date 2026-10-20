@@ -17,6 +17,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 9 — 2026-10-20 (security parity + 85 dead symbols)
+
+- ✅ Landed: cron give-up/pause, approval warnings crash, safe-worker guards, parked-auth retry, `/reload-mcp` content-aware, startup delegation restore, gateway SPA-token withholding, `retire_runtime_sessions`, native ingress trust, Discord role reauth, ACP edit-approval cwd/boundary.
+- ✅ Dead **103 → 85** merged (0 new); test parity 25 files/79 tests (absent 730 → 704 on the branch).
+- 🟡 Not merged: cron agent transport-only (`726144831`) regresses 18 pre-pin `test_scheduler.py` bodies; port the upstream owner-seam test first.
+- 🔴 Next wave: internal-wake reply anchor; A2A `input_id`; `machine.facts`; TUI notification poller; `_memory_target_error` signature; cron queued delivery; `SessionDB` transactional worker methods; compression `trigger=`; reasoning replay/carriers; skills-hub raw fetch; connector wire identity.
+- 🔴 Remaining: 85 dead, 704 absent tests, retirement, F4/F5.
+
+---
+
 ## Wave 8 — 2026-10-20 (live boot applied; 103 dead symbols)
 
 Full evidence in `docs/STATUS.md` (top entry).
