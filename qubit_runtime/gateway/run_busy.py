@@ -713,6 +713,63 @@ class GatewayBusySessionMixin:
             demoted_for_compression=demoted_for_compression, steered=steered, redirected=redirected,
         )
 
+    async def _hm_busy_preempt(self, event: MessageEvent, source: SessionSource, _quick_key: str) -> bool:
+        """busy_input_mode for a follow-up the durable FIFO is about to admit, through main's own busy
+        resolution (voice transcribed into steer/interrupt, steer folded into the turn, busy ack).
+        Returns True when the text already landed inside the running turn (steer / redirect), so it
+        must NOT also be admitted as its own turn; False when the caller should admit it (queue mode,
+        a demotion, or an interrupt — the ended turn lets the FIFO run the follow-up next)."""
+        from gateway.run import _AGENT_PENDING_SENTINEL
+        mode = self._effective_busy_input_mode(source)
+        state = self._peek_session_state(_quick_key)
+        running_agent = state.turn.agent if state else None
+        adapter = self._delivery_adapter_for(source)
+        if (self._draining or adapter is None or running_agent is None or running_agent is _AGENT_PENDING_SENTINEL
+                or (event.message_type == MessageType.TEXT and mode != "steer"
+                    and self._effective_busy_text_mode(source) == "queue")):
+            return False
+        outcome = await self._resolve_busy_steer_or_redirect(event, _quick_key, mode, running_agent)
+        await self._busy_interrupt_and_ack(event, _quick_key, adapter, state, running_agent, outcome)
+        return bool(outcome.steered or outcome.redirected)
+
+    async def _busy_interrupt_and_ack(self, event, session_key, adapter, _busy_state, running_agent, _steer) -> None:
+        """Interrupt-mode abort (voice transcribed) and the busy ack, after the steer/redirect resolution.
+        Shared by the in-process busy handler and the session authority's busy preempt."""
+        from gateway.run import _AGENT_PENDING_SENTINEL
+        effective_mode, redirected = _steer.effective_mode, _steer.redirected
+        is_queue_mode = effective_mode == "queue"
+        is_steer_mode = effective_mode == "steer"
+        is_redirect_mode = effective_mode == "interrupt" and redirected
+        if (
+            effective_mode == "interrupt" and not redirected
+            and running_agent and running_agent is not _AGENT_PENDING_SENTINEL
+        ):
+            await self._interrupt_running_agent_for_busy_event(event, adapter, running_agent)
+
+        # Disabled ack: still process input. Checked before debounce so an undelivered ack never
+        # stamps the "last ack" timestamp.
+        if os.environ.get("HERMES_GATEWAY_BUSY_ACK_ENABLED", "true").lower() != "true":
+            logger.debug("Busy ack suppressed for session %s", session_key)
+            return  # input still processed, just no ack sent
+
+        # Debounce (30s) before the config-heavy display lookup.
+        now = time.time()
+        if now - (_busy_state.turn.busy_ack_ts if _busy_state else 0) < 30:
+            return  # interrupt sent (if not queue), ack already delivered recently
+
+        if is_steer_mode and not self._busy_steer_ack_enabled(event, session_key):
+            return
+
+        self._session_state(session_key).turn.busy_ack_ts = now
+
+        message = self._compose_busy_ack_message(
+            event, now, _busy_state, running_agent, is_steer_mode=is_steer_mode,
+            is_queue_mode=is_queue_mode, is_redirect_mode=is_redirect_mode,
+            demoted_for_subagents=_steer.demoted_for_subagents,
+            demoted_for_compression=_steer.demoted_for_compression,
+        )
+        await self._send_busy_ack_reply(event, adapter, message)
+
     @staticmethod
     def _demote_interrupt(session_key: str, why: str) -> str:
         logger.info("Demoting busy_input_mode 'interrupt' to 'queue' for session %s because %s", session_key, why)
