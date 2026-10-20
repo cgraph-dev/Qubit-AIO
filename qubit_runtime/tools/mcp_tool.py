@@ -320,7 +320,7 @@ class MCPServerTask(MCPServerRunMixin, MCPServerTransportMixin, MCPServerHealthM
         "_auth_type", "_refresh_lock", "_rpc_lock", "_pending_refresh_tasks", "_pending_call_context",
         "_lifecycle_started_at", "_last_tool_call_at", "_idle_timeout_seconds", "_max_lifetime_seconds",
         "_recycled_reason", "initialize_result", "_ping_unsupported", "_list_cache_meta",
-        "_reconnect_retries", "_session_proven", "_was_parked", "_inflight_tasks", "_reconnecting",
+        "_reconnect_retries", "_session_proven", "_was_parked", "_auth_park", "_inflight_tasks", "_reconnecting",
         "_suspect_reason", "_teardown_race", "_permanent_grace_used", "_stdio_child_pids",
         "_ever_connected", "_sse_fallback", "_park_reason", "_last_park_line", "_resolved_identity")
 
@@ -358,6 +358,10 @@ class MCPServerTask(MCPServerRunMixin, MCPServerTransportMixin, MCPServerHealthM
         self._http_rejection: dict = {}
         # True from park until proven healthy again; logs the revival once.
         self._was_parked: bool = False
+        # OAuth credential stamp captured when an auth failure parked this server. Until a
+        # re-authorization rewrites the token files, a discovery nudge has nothing new to try:
+        # replaying the same rejected refresh token per agent build got the user rate-limited.
+        self._auth_park: Optional[tuple] = None
         # Why the server is parked (the revival_reason handed to _park), None once healthy again.
         # Lets cron preflight tell a network-blip park (recovering) from a permanent-error park
         # (revoked credentials, dead endpoint) that must not run the job tool-less forever.

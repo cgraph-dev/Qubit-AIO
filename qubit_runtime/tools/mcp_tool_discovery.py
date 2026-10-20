@@ -10,7 +10,7 @@ import logging
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from tools.mcp_tool_common import _core, _parse_boolish, mcp_server_enabled
 from tools import mcp_tool_config as _config
 from tools import mcp_tool_errors as _errors
@@ -356,6 +356,44 @@ async def _discover_and_register_server(name: str, config: dict) -> List[str]:
     return registered_names
 
 
+def _oauth_credential_stamp(server_name: str) -> Optional[tuple]:
+    """``stat()`` of the token and client files: what any re-authorization rewrites. No bytes read.
+    ``None`` when the storage layer is unavailable (then the caller revives normally)."""
+    try:
+        from tools.mcp_oauth import QubitTokenStorage
+        storage = QubitTokenStorage(server_name)
+        stamp = []
+        for path in (storage._tokens_path(), storage._client_info_path()):
+            try:
+                st = path.stat()
+            except OSError:
+                stamp.append(None)
+            else:
+                stamp.append((st.st_mtime_ns, st.st_size, st.st_ino))
+        return tuple(stamp)
+    except Exception:  # noqa: BLE001 - a stamp we cannot read must not wedge revival
+        return None
+
+
+def _arm_auth_park(server: Any) -> Optional[tuple]:
+    """Capture the OAuth credential stamp of an auth-failure park, or ``None`` when this server
+    is not parked on authentication. A network/reconnect park keeps nudging normally."""
+    if not getattr(server, "_was_parked", False):
+        server._auth_park = None
+        return None
+    if str(getattr(server, "_auth_type", "") or "").lower() != "oauth":
+        return None
+    if "permanent" not in str(getattr(server, "_park_reason", "") or "").lower():
+        return None
+    existing = getattr(server, "_auth_park", None)
+    if existing is not None:
+        return existing
+    stamp = _oauth_credential_stamp(getattr(server, "name", ""))
+    if stamp is not None:
+        server._auth_park = stamp
+    return getattr(server, "_auth_park", None)
+
+
 def _select_new_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
     """Pick connect candidates (enabled, not connected/connecting/lazy, not in backoff) and
     refresh per-server bookkeeping. Known servers without a live session are parked or
@@ -391,6 +429,13 @@ def _select_new_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
             else:
                 _core._parallel_safe_servers.discard(own_key)
     for srv in stale_cached:
+        auth_park = _arm_auth_park(srv)
+        # Parked on an OAuth failure and not re-authorized since: leave it to its timed self-probe.
+        if auth_park is not None:
+            current = _oauth_credential_stamp(getattr(srv, "name", ""))
+            if current is None or current == auth_park:
+                continue
+            srv._auth_park = None
         _loop._signal_reconnect(srv)
     return new_servers
 
