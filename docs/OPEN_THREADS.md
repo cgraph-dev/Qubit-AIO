@@ -24,8 +24,8 @@ Full evidence is in `docs/STATUS.md` (top entry). Durable state:
 - ✅ Merged on `main`: `49f749514` (scoped turn half + fanout overflow), `c7f5c7409` (3 security/correctness defects), `b0a3d8613` (titled session / welcome trial / owner prune), `bd4e2d913` (dead-symbol tranche 3 + 17), `f3a1e6898` (boot reservation + session authority; `worker.adopt` rung 4 on a scratch home).
 - 🟡 **Not applied live:** the boot/worker changes are merged but the running `qubit-gateway.service` still executes the pre-merge code (no restart by design). A restart is needed to exercise it live; prove on a scratch home first if in doubt.
 - 🔴 **Open residuals (pre-existing, named by the lanes, not fixed):**
-  - `qubit_runtime/gateway/session_local.py` + `session_policy.py` import `same_create_retry` from `qubit_state_local`, which does not define it → `ImportError` on an exact `session.create` retry/resume path.
-  - `session.create` emits a `SessionCreateResult` `extra_forbidden` contract-noise log on the boot path.
+  - ✅ Fixed on branch `fix/residual-gw-wave6` (`f33527445`): `same_create_retry` is defined in `qubit_state_local.py`, with both call sites' retry/conflict paths tested.
+  - ✅ Already fixed in `main` by `6a8dbf5c1` (canonical contract module imported), pinned by `d4bd5e917`; the boot path now validates against `CanonicalSnapshot`, not `SessionCreateResult`.
   - `test_source_release_channels.py` / `test_source_release_probe.py` still have pre-existing failures unrelated to `_probe`/forward-only (later `_prepare_git_command` lambda signature, zip fallback, config-probe subprocess).
 - 🔴 **Remaining milestone work:** 216 dead symbols (13 deferred architectural ports, evidence in `TRIAGE.md`); 1,691 test symbols / 804 files (non-blocking); retirement steps. Re-run `qubit_runtime/scripts/check_dead_symbols.py` and `scripts/audit_sync_completeness.py` rather than quoting these counts.
 
