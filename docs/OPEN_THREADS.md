@@ -17,6 +17,19 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 7 — 2026-10-20 (10 lanes; defects closed, 128 dead symbols)
+
+Full evidence in `docs/STATUS.md` (top entry). Durable state:
+
+- ✅ Closed: the 9 parity defects (memory `patch`, Alibaba refusal classes, TUI history identity, ACP read-only catalog, session-search read path, bot receipt lock, `mark_job_run(execution_id=)`, session-key namespace) and F2 (duplicate `_start_gateway_*` helpers). Theme callbacks were already correct on HEAD; the upstream test was ported.
+- ✅ Measured on merged main: dead symbols **167 → 128** (0 new); absent test files **783 → 764**; `test_source_channel_integration.py` **23 failed → 33 passed**; 158 focused tests green.
+- 🟡 Not live: boot/worker changes remain merged-but-not-running (no service restart).
+- 🔴 New defects exposed by the parity lane, unmodified: (1) `gateway/session.py:1297::list_sessions` raises `TypeError` comparing naive vs aware `updated_at` when recovered UTC routes meet legacy local-time routes; (2) ACP credential binding is replaced after the editor path (`tests/acp_adapter/test_policy_identity_compat.py`).
+- 🔴 Owner decisions still open: F4 control-socket bind failure is fatal in `run_bootstrap.py:855` (old body and `control_socket.py:191` say non-fatal); F5 exclusions added to `docs/FROZEN_TARGET.md` without sign-off.
+- 🔴 Remaining: 128 dead symbols (deferred blockers in `TRIAGE.md` §Wave 7), 764 absent + 894 short-port test symbols, retirement.
+
+---
+
 ## Wave 6 — 2026-10-20 (residuals + dead symbols + test parity + adversarial verify)
 
 Full evidence in `docs/STATUS.md` (top entry). Durable state:
