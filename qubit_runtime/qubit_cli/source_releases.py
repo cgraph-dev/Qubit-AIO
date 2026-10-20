@@ -127,29 +127,6 @@ def _head_containing(git_cmd, cwd, commit: str, repository: str) -> str | None:
     return None if status in ("behind", "diverged") else head
 
 
-def _resolve_stable(repository: str, git_cmd=None, cwd=None) -> SourceTarget:
-    """Stable IS the repository's latest published GitHub release: the tag a release
-    publishes (non-draft, non-prerelease, strict vX.Y.Z), verified against origin.
-    No R2 record or pointer is consulted; publishing the release is the only promotion.
-    """
-    try:
-        tag, commit = _resolve_release("stable", git_cmd, cwd, repository=repository, pointer=False)
-    except (OSError, ValueError, subprocess.SubprocessError) as exc:
-        logger.warning("Could not resolve the stable source release: %s", exc)
-        raise ValueError(_describe_release_failure(exc)) from exc
-    return SourceTarget("stable", "stable", repository, commit=commit, version=str(tag).removeprefix("v"))
-
-
-def _describe_release_failure(failure: BaseException) -> str:
-    """A transport failure names its cause (a rate limit is not "no release")."""
-    if isinstance(failure, (urllib.error.URLError, TimeoutError)):
-        from qubit_cli.github_api import describe_github_failure
-
-        # The request that failed, not the configuration: a rejected token retries anonymously.
-        return describe_github_failure(failure, authenticated=getattr(failure, "qubit_authenticated", False))
-    return f"No published stable release could be verified: {failure}"
-
-
 def resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=None,
                           forward_only: bool = False) -> SourceTarget:
     """Resolve every subscription, including default labels, through R2.
@@ -198,43 +175,6 @@ def resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=No
 
             return replace(target, commit=head, ahead=True)
     return target
-
-
-def _resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=None) -> SourceTarget:
-    from qubit_cli.release_channels import validate_name
-
-    validate_name(channel)
-    repository = repository or source_repository(git_cmd, cwd)
-    if channel == "stable":
-        return _resolve_stable(repository, git_cmd, cwd)
-    if channel == "main":
-        # main IS the git branch. No R2 record is read: none was ever published, and a
-        # network that answers it with 403 instead of 404 (regional WAFs) must not stop
-        # an install from following the branch it is on.
-        return SourceTarget(channel, channel, repository, branch="main")
-    resolved = _resolve_channel(channel, repository)
-    terminal = resolved.terminal
-    if terminal["repository"].lower() != repository.lower():
-        raise ValueError("Channel repository does not match this source installation")
-    destination = validate_name(terminal["name"])
-    if terminal["policy"] == "source-branch":
-        if resolved.requested["state"] == "retired":
-            raise ValueError("Source retirement requires a published destination commit")
-        delivery = terminal["delivery"]
-        if delivery["kind"] != "source-branch":
-            raise ValueError("Channel has no source-branch delivery")
-        return SourceTarget(channel, destination, repository, branch=delivery["branch"])
-    if resolved.manifest is None:
-        raise ValueError(f"No build published for channel {destination}")
-    request = resolved.manifest["request"]
-
-    commit = request["commit"]
-    if not isinstance(commit, str) or not _SHA.fullmatch(commit):
-        raise ValueError("Channel build has no exact source commit")
-    if resolved.requested["state"] == "retired":
-        _refuse_retirement_downgrade(request, terminal, git_cmd, cwd)
-    return SourceTarget(channel, destination, repository, commit=commit,
-                        version=request["sourceVersion"], build_id=request["buildId"])
 
 
 def _refuse_retirement_downgrade(request: dict, terminal: dict, git_cmd, cwd) -> None:
@@ -365,45 +305,6 @@ def _release_pointer(channel: str) -> tuple[str | None, str | None]:
     if len(page.tags) != 1 or not _valid_tag(page.tags[0], channel):
         raise ValueError(f"Invalid {channel} release pointer")
     return page.tags[0], None
-
-
-def _resolve_release(channel: str, git_cmd=None, cwd=None, *, repository=None,
-                     pointer: bool = True) -> tuple[str, str]:
-    """``resolve_source_release`` that raises the failure instead of returning ``(None, None)``."""
-    if channel not in ("stable", "canary"):
-        raise ValueError(f"Not a release channel: {channel}")
-    repository = repository or source_repository(git_cmd, cwd)
-    base = f"https://api.github.com/repos/{repository}"
-    tag, pinned_sha = (_release_pointer(channel)
-                       if pointer and repository.lower() == OFFICIAL_REPOSITORY.lower() else (None, None))
-    if tag is None:
-        release = _published_fallback(channel, base)
-        tag = release["tag_name"]
-    else:
-        release = _json(f"{base}/releases/tags/{tag}")
-    if not _published(release, channel) or release["tag_name"] != tag:
-        raise ValueError(f"{tag} is not a published {channel} release")
-    commit = _json(f"{base}/commits/{tag}")
-    sha = commit.get("sha") if isinstance(commit, dict) else None
-    if not isinstance(sha, str) or not _SHA.fullmatch(sha):
-        raise ValueError(f"No published commit for release {tag}")
-    if git_cmd is not None:
-        from qubit_cli.source_check import source_git_env
-
-        ref = f"refs/tags/{tag}"
-        result = subprocess.run(
-            [*git_cmd, "ls-remote", "--tags", "origin", ref, ref + "^{}"],
-            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-            check=True, timeout=60, stdin=subprocess.DEVNULL,
-            env=source_git_env(),
-        )
-        refs = dict((parts[1], parts[0]) for line in result.stdout.splitlines()
-                    if len(parts := line.split()) == 2)
-        if refs.get(ref + "^{}", refs.get(ref)) != sha:
-            raise ValueError(f"Origin tag {tag} does not match the published release commit")
-    if pinned_sha is not None and sha != pinned_sha:
-        raise ValueError(f"Release {tag} no longer matches its published commit")
-    return tag, sha
 
 
 def resolve_source_release(channel: str, git_cmd=None, cwd=None, *, repository=None) -> tuple[str | None, str | None]:

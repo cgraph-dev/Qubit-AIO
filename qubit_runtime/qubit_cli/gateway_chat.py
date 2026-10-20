@@ -240,13 +240,6 @@ def resume_policy_error(keys):
                               f"session's launch: resume without {them}{after}.")
 
 
-def exit_on_resume_refusal(exc):
-    """A refused resume is a usage error on every classic path (interactive startup's copy): ``Error:``, exit 2."""
-    if isinstance(exc, GatewayClientError) and str(exc).startswith(_RESUME_POLICY_MISMATCH):
-        print(f"Error: {exc}", file=sys.stderr)
-        raise SystemExit(2) from None
-
-
 def _launch_flags(args):
     """The creation flags the user passed. Identity, not equality: ``--max-turns 0`` (unlimited)
     is a value, while ``0 == False`` would drop it to the profile default."""

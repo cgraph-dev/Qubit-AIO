@@ -149,9 +149,3 @@ def _tool_listing(names: List[str]) -> str:
             desc = _short_desc(fn.get("description") or "")
             rows.append(f"{name}: {desc}" if desc else name)
     return "\n".join(sorted(rows))
-
-
-def _tool_prefix(server: str) -> str:
-    """``mcp__<server>__``: the start of every registered tool name of ``server``."""
-    from tools.mcp_tool_schema import MCP_TOOL_NAME_PREFIX, sanitize_mcp_name_component
-    return f"{MCP_TOOL_NAME_PREFIX}{sanitize_mcp_name_component(server)}__"
