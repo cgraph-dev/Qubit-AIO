@@ -406,3 +406,111 @@ double-deliver: outside a worker the code path is byte-for-byte the old pipe pat
 remaining candidates are the run-turn/run-inbound mixin inheritance (blocked on
 deleting ~1.4k lines of inlined copies in one verified move) and
 `require_ledger_owner` (blocked on completing the worker-ledger routing set).
+
+## Wave 7 (branch `fix/dead-symbols-wave7`, based on main `1ee45b700`)
+
+Measured with the documented command from the worktree root (warm cache symlinked
+from the primary checkout):
+
+```bash
+.venv/bin/python qubit_runtime/scripts/check_dead_symbols.py --json /tmp/dead-wave7-before.json -v
+```
+
+| state | dead_count |
+|---|---:|
+| main `1ee45b700` | 167 |
+| after batch 1 `04406cb34` | 161 |
+| after batch 2 `30a65f3fe` | 148 |
+| after batch 3 `a22b3dcdb` | 139 |
+| after batch 4 `bb414b27f` | **129** |
+
+**38 resolved, 0 new** (set diff of the before file and the final file). No
+upstream-defined symbol was deleted, so **no Declared-exclusions entry was added**
+to `docs/FROZEN_TARGET.md`. The only removals were fork-private duplicates whose
+bodies were replaced by the module implementation (`_finish_profile_layout`,
+`_print_standalone_by_config`'s body, the two inlined notification-ownership
+methods); none of those names is read upstream, so none appears in the dead list.
+
+### Wired in this wave (38)
+
+| symbol | module | upstream call site (pin) |
+|---|---|---|
+| `start_turn_worker` | gateway/session_runtime_workers.py | `gateway/run_turn.py:1551` (register `_turn_workers`) |
+| `prompt_timeout_s` | gateway/local_viewer_events.py | `gateway/run_turn_runner.py:499,635` |
+| `ask_clarify_batch` | gateway/session_clarify_batch.py | `gateway/run_turn_runner.py:517` |
+| `clarify_batch_turn` | gateway/session_cli_turn.py | `gateway/run_turn_runner.py:514` |
+| `_keeps_profile_route` | gateway/session_policy.py | `gateway/session_policy.py:408` |
+| `disable_dropped_secrets` | gateway/session_policy_credentials.py | `gateway/session_policy.py:100` |
+| `_cmd_config_show` | qubit_cli/config.py | its own subcommand table (`None`/`show`) |
+| `rebase_for_save` | qubit_cli/config_worker_save.py | `qubit_cli/config.py:2500` |
+| `apply_user_moa_presets` | qubit_cli/moa_config.py | `qubit_cli/config.py:2262,2375` |
+| `write_under_cache_lock` | qubit_cli/models_cache_lock.py | `qubit_cli/models.py:2071,2172` |
+| `_krea_image_default` | qubit_cli/nous_subscription.py | `qubit_cli/nous_subscription.py:517,585` |
+| `_forget_host_gateway_probe` | qubit_cli/gateway_host_record.py | `qubit_cli/gateway.py:5418,5556` |
+| `report_incompatible_owner` | qubit_cli/gateway_status_notes.py | `qubit_cli/gateway.py:5631,5636` |
+| `print_standalone_by_config` | qubit_cli/gateway_status_notes.py | `qubit_cli/gateway.py:5663` |
+| `queue_admitted_turn` | qubit_cli/gateway_tools_notify.py | `qubit_cli/cli_process_notifications.py:37,42` |
+| `_stop_background_work` | qubit_cli/cli_commands_session_tools.py | its own `/stop` handler:108,114 |
+| `_print_local_delegations` | qubit_cli/cli_commands_session_tools.py | its own `/agents` handler:134 |
+| `_bypass_chat_launch` | qubit_cli/main_tui_launch.py | `qubit_cli/main.py:1702,2861,2912` |
+| `_refuse_unforwarded_tui_flags` | qubit_cli/main_tui_launch.py | `qubit_cli/main.py:1710` |
+| `_auto_resume_denied_source` | tui_gateway/methods_session.py | `tui_gateway/methods_session.py:576` |
+| `admit_heartbeat` | gateway/run_heartbeat_acceptance.py | `gateway/run_goals.py:147` |
+| `GatewayNotificationOwnershipMixin` | gateway/run_notifications_ownership.py | `gateway/run_notifications.py:155` (base class) |
+| `get_task_for_turn` | gateway/hosted_room_driver.py | `tui_gateway/hosted_room_service.py:442` |
+| `append_user_event` | gateway/session_hosted_attachments.py | `tui_gateway/hosted_room_service.py:490` |
+| `DiscordAuthorizationMixin` | plugins/platforms/discord/adapter_authorization.py | `plugins/platforms/discord/adapter.py:1221` (base) |
+| `DiscordSlashAuthMixin` | plugins/platforms/discord/adapter_slash_auth.py | same base list |
+| `DiscordThreadTitlesMixin` | plugins/platforms/discord/adapter_thread_titles.py | same base list |
+| `DiscordVoiceInfoMixin` | plugins/platforms/discord/adapter_voice_info.py | same base list |
+| `unattended_turn` | gateway/session_finite.py | `tools/approval.py:333` |
+| `check_private_imports` | qubit_cli/plugin_validate_private_imports.py | `qubit_cli/plugin_validate.py:539` |
+| `sweep_pending_plugin_deletes` | qubit_cli/plugins_cmd_remove.py | `gateway/run_startup.py:1070` |
+| `_plugin_enable_sets` | qubit_cli/web_routers/dashboard_ui.py | same file `:137,400` |
+| `_plugin_activated` | qubit_cli/web_routers/dashboard_ui.py | same file `:145,400` |
+| `finish_profile_layout` | qubit_cli/profiles_initialization.py | `qubit_cli/profiles.py:1455` |
+| `_find_our_wrapper` | qubit_cli/profiles.py | same file `:576,1020,1768` |
+| `load_hosted_profiles` | qubit_cli/plugin_host_profiles.py | `providers/__init__.py:476` |
+| `guest_without_free_tier` | qubit_cli/anon_auth.py | `agent/credential_pool.py:2620`, `qubit_cli/auth_nous.py:1111` |
+| `set_guest_flag` | qubit_cli/anon_auth.py | `qubit_cli/anon_auth.py:978` |
+
+### Triaged but not wired (new in this wave, with evidence)
+
+| symbol | module | verdict | evidence |
+|---|---|---|---|
+| `_message_manifest`, `_bounded_task_delta` | gateway/hosted_room_discussion.py | **CORRECTLY UNWIRED** | this fork's boundary is text-only by test: `tests/gateway/test_hosted_room_discussion.py::test_attachment_payload_is_rejected_by_local_text_only_boundary`. Upstream reads them only on the attachment path (`hosted_room_discussion.py:204,214,390,722`); wiring needs attachments restored end-to-end, not one call. |
+| `_kill_process_tree` | tools/browser_tool_lifecycle.py | test-only | upstream product code never calls it either (only `tests/tools/test_browser_process_tree.py`); it exists as the local fallback body of `_legacy_kill_process_tree`. |
+| `retain_result`, `worker_exit_code`, `prepare_delivery_locked`, `acknowledge_locked`, `api_auth_ws_ticket` | gateway/session_results.py, gateway/session_kanban.py, gateway/hosted_room_work_records.py, qubit_cli/dashboard_auth/routes.py | test-only | every upstream read is a test/fixture (`test_admission_results`, `test_kanban_result_exit`, `test_room_work_evidence`, `test_authenticated_session_identity`); no product call site exists upstream at the pin. |
+| `forward_to_owner` | gateway/session_a2a.py | **DEFERRED** | the local `_forward_to_profile` forwards in-process through its own session/DB route (`plugins/platforms/a2a/adapter.py:584`), not by dialing the destination owner's gateway. Adopting `forward_to_owner` changes the delivery contract (`input_id`, timeout, receipt, `a2a.forward` admission); a partial port would forward twice. |
+| `_gateway_launch`, `_record_shell_hook_consent`, `exit_on_resume_refusal` | qubit_cli/cli_init_mixin.py, qubit_cli/gateway_chat.py | **CORRECTLY UNWIRED in this fork** | their upstream callers `_ensure_gateway_session`/`_new_session_id` do not exist locally; this CLI builds `run_agent.AIAgent` in-process (`cli_agent_setup_mixin._init_agent`) and `GatewaySessionStore.open_session` is never called. |
+| `one_turn_route` | gateway/session_cli_turn.py | **DEFERRED** | upstream passes the session-policy object (`policy.config(active_authority(...))`); this tree has no session-policy layer at the turn site and already applies committed one-turn model overrides through `_apply_session_model_override`. Wiring both could double-apply. |
+| `configured_plugin_entries` | gateway/platform_activation.py | **DEFERRED** | `PlatformRegistry` here lacks `configured_entries()` and `activation_env()`/`note_activation_env()`; `config_env._enable_plugin_platforms_from_env` uses `plugin_entries()`. The filter cannot be ported without those registry methods. |
+| `migrate_honcho_profile_host` | qubit_cli/profiles_honcho.py | **CORRECTLY UNWIRED** | the module still writes `hermes_<profile>` hosts; the local `_migrate_honcho_profile_host` was rebranded to write `qubit_<profile>` (accepting `hermes_`/`qubit.` as legacy sources). Wiring the module would regress the host key. |
+| `_resolve_source_target` | qubit_cli/source_releases.py | **CORRECTLY UNWIRED** | the local public `resolve_source_target` deliberately resolves every subscription through R2 (its docstring), while the private upstream copy resolves `stable` from GitHub releases. Replacing the public path would change the release source. |
+| `select_apply_target`, `downgrade_refusal` | qubit_cli/update_cmd_check.py, qubit_cli/update_downgrade_guard.py | **DEFERRED** | local `update_cmd` runs the older inline update flow; upstream's `_check.select_apply_target` belongs with the newer preflight/commit-obligation ordering (`_refuse_before_commit_point`). Wiring it into the old flow would skip that ordering. |
+| `app_lifespan` | qubit_cli/web_server_app.py | **DEFERRED** | adopting it replaces the single local `_lifespan` with `standalone_lifespan` + `http_lifespan`; the two bodies have diverged (install probe, desktop-owned backend) and the HTTP arm needs an owner `gateway_runner`. Not a one-line wire. |
+| `GatewayInboundHooksMixin`, `GatewayPluginInjectionMixin` | gateway/run_inbound_hooks.py, gateway/run_plugin_injection.py | **DEFERRED** | `GatewayInboundMixin` inlines several of the mixin's methods with divergent bodies (`_hm_pre_gateway_dispatch_hook` 1784 vs 2732 chars; `_hm_dispatch_quick_and_plugin_commands` 3975 vs 2204). The Wave-2 telegram-style "inherit + delete every inlined copy" move must be done in one verified change. |
+| `GatewayRuntimeInitMixin`, `GatewayTurnHygieneMixin`, `GatewayTurnPersistenceMixin`, `GatewayTurnPrepareMixin` | gateway/run_*.py | **DEFERRED** | same inline-vs-inherit split; the mixins' methods exist as local copies and must be deleted together with the inheritance. |
+| `CatalogApproved`, `CatalogServerError` | tui_gateway/contracts/connectors_operation.py | **DEFERRED** | local `CatalogRow` dropped `approved`/`server_errors` (and `enabled`/`missing_env`/`already_installed`); the types need those fields and their producers. |
+| `OnboardingEndedPayload` | tui_gateway/contracts/events.py | **CORRECTLY UNWIRED** | local onboarding is the `setup_choose` replacement; `OnboardingStateParams`' own comment records the deliberate replacement and `onboarding.state` is registered with `Params`. |
+| `GatewayLoopManager`, `GatewayHeartbeatManager` | qubit_cli/gateway_automation.py | **CORRECTLY UNWIRED in this fork** | the remote managers are only used by upstream's `_automation_connection`; `GatewaySessionStore` is never constructed here, so the local in-process managers are the live path. |
+| `_prepare_deferred_agent_startup` | cli.py | **CORRECTLY UNWIRED** | the call site was deliberately replaced by the in-process agent; the local comment (`cli_agent_setup_mixin.py:636`) records "used to run here; it is a no-op in this tree". |
+
+### Focused verification for the wave
+
+| batch | command (cwd `qubit_runtime/`) | result |
+|---|---|---|
+| 1 | `pytest -q tests/gateway/test_local_viewer_prompt_cluster.py tests/gateway/test_approval_send_timeout_ambiguity.py tests/gateway/test_clarify_delivery_fallback.py tests/gateway/test_clarify_card_retire_on_timeout.py tests/gateway/test_approval_prompt_redaction.py` | 30 passed |
+| 1 | `pytest -q tests/gateway/test_session_create_retry.py tests/gateway/test_session_auxiliary_scope.py tests/gateway/test_session_model_override_routing.py tests/gateway/test_custom_provider_request_overrides.py tests/gateway/test_session_model_override_credential_pool.py` | 13 passed |
+| 2 | `pytest -q tests/qubit_cli/test_config_lkg_backup.py tests/qubit_cli/test_config_worker_save_deletion.py tests/qubit_cli/test_model_cache_parallel_prefetch.py tests/qubit_cli/test_model_cache_swr.py tests/qubit_cli/test_nous_subscription.py tests/qubit_cli/test_show_config_credential.py tests/qubit_cli/test_managed_scope_surfacing.py` | 60 passed |
+| 2 | `pytest -q tests/qubit_cli/test_config_save_integrity.py tests/qubit_cli/test_config.py` | 187 passed, 1 pre-existing fail (`test_upgrades_pre_rewrite_default_soul_md`) |
+| 2 | `pytest -q tests/qubit_cli/test_moa_preset_deletion.py` | 11 failed, 4 passed — baseline `1ee45b700` is 13 failed, 2 passed (the two load-path tests now pass) |
+| 2 | `pytest -q tests/qubit_cli/test_classic_cli_routing.py tests/qubit_cli/test_gateway_multiplex_status.py` | all pass |
+| 2 | `pytest -q tests/qubit_cli/test_cli_interrupt_drain_regression.py tests/qubit_cli/test_process_notification_display.py tests/qubit_cli/test_busy_policy_invariants.py` | 11 passed |
+| 3 | `pytest -q tests/gateway/test_heartbeat_acceptance.py tests/gateway/test_heartbeat_poller.py tests/gateway/test_heartbeat_execution_ownership.py tests/gateway/test_background_process_notifications.py tests/gateway/test_api_notification_outcomes.py tests/gateway/test_warning_notifications.py tests/tui_gateway/test_hosted_room_service.py tests/tui_gateway/test_hosted_room_server_rpc.py tests/plugins/test_discord_runtime_failure.py` | 140 passed, 7 pre-existing fails (byte-identical on baseline: hosted-room compression `IndexError`, heartbeat compression case) |
+| 3 | `pytest -q tests/tui_gateway/test_tui_gateway_server.py -k "most_recent or session_list"` | 9 passed |
+| 4 | `pytest -q tests/tools/test_approval_unattended_presence.py tests/tools/test_approval_yolo.py tests/tools/test_approval.py tests/qubit_cli/test_plugin_validate.py tests/qubit_cli/test_plugin_host.py tests/qubit_cli/test_anon_connectors_only.py tests/qubit_cli/test_anon_first_notice.py tests/qubit_cli/test_profile_delete_wrapper.py tests/qubit_cli/test_dashboard_plugin_routes_secret_scope.py` | 212 passed, 4 pre-existing fails (byte-identical on baseline) |
+| 4 | `pytest -q tests/qubit_cli/test_profile_clone_channels.py tests/qubit_cli/test_profiles.py tests/qubit_cli/test_apply_profile_override.py tests/qubit_cli/test_profile_listing_cache.py tests/qubit_cli/test_models_catalog_late_plugin_provider.py tests/agent/test_credential_pool_nous_refresh_stampede.py tests/qubit_cli/test_anon_auth_core.py` | 193 passed, 2 pre-existing fails (byte-identical on baseline) |
+
+Pre-existing failures were confirmed by stashing the wave-7 files and re-running
+the same tests on `1ee45b700`; no failure was inferred.
