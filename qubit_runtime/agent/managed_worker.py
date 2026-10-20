@@ -61,10 +61,12 @@ def result_frame(result):
 
 
 # The receipt ledger a finite viewer's `-z --usage-file` reads (``qubit_cli/oneshot._USAGE_KEYS``),
-# projected from the result frame alongside the three token counts. Kept here, next to
-# ``RESULT_FIELDS``, so both result legs (this worker frame and the in-process turn) carry the SAME
-# ledger into ``captured['usage']`` -- which is what settlement commits and ``prompt.receipt``
-# returns; the turn-result projection alone never reaches a finite viewer.
+# projected from the accepted result by each leg's owner. Kept here, next to ``RESULT_FIELDS``, so
+# both result legs (this worker frame and the in-process turn) carry the SAME ledger into
+# ``captured['usage']`` -- which is what settlement commits and ``prompt.receipt`` returns; the
+# turn-result projection alone never reaches a finite viewer. ``accept_result`` deliberately returns
+# only the three-token gateway projection (upstream's contract); the owner adds this ledger when it
+# stores ``captured['usage']`` (``gateway/session_managed_worker.py``).
 LEDGER_PASSTHROUGH_KEYS = ('estimated_cost_usd', 'cost_status', 'cost_source', 'cache_read_tokens',
                            'cache_write_tokens', 'reasoning_tokens', 'provider', 'turn_exit_reason',
                            'service_tier')
@@ -77,8 +79,7 @@ def ledger_usage(values) -> dict:
 
 def accept_result(result):
     """Owner side of the worker's result frame: ``(result, usage)`` in the in-process turn's shape
-    (gateway projection: prompt/completion tokens as input/output, plus the receipt ledger), or
-    ValueError."""
+    (gateway projection: prompt/completion tokens as input/output), or ValueError."""
     if (not isinstance(result, dict) or set(result) - set(RESULT_FIELDS) or not isinstance(result.get('final_response'), str)
             or result.get('billing_block') is not None and not _billing_block(result['billing_block'])
             or any(not _scalar(value) for key, value in result.items() if key not in ('final_response', 'billing_block'))):
@@ -97,7 +98,6 @@ def accept_result(result):
              'output_tokens': outgoing or 0 if turn_out is None else turn_out}
     # The turn's OWN token sum, never the provider's cumulative session ``total_tokens``.
     usage['total_tokens'] = usage['input_tokens'] + usage['output_tokens']
-    usage.update(ledger_usage(accepted))
     accepted.update(input_tokens=incoming or 0, output_tokens=outgoing or 0)
     return accepted, usage
 
