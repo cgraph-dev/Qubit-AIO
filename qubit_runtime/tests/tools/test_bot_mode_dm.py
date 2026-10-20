@@ -726,7 +726,7 @@ def test_local_turn_reemits_empty_stdout_for_a_bare_silence_marker(tmp_path, cap
     assert capsys.readouterr().out.strip() == prose
 
 
-def test_query_file_delivery_closes_stdin_for_initial_attempt_and_retry(
+def test_local_turn_closes_stdin_for_initial_attempt_and_retry(
     tmp_path, monkeypatch
 ):
     dm_file = tmp_path / "message.txt"
@@ -743,8 +743,8 @@ def test_query_file_delivery_closes_stdin_for_initial_attempt_and_retry(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    returncode = bot_mode_dm._run_delivery(
-        ["hermes", "-p", "researcher"], str(dm_file), stdin_file=False
+    returncode = bot_mode_dm._run_local_turn(
+        ["hermes", "-p", "researcher"], str(dm_file)
     )
 
     assert returncode == 0
@@ -753,14 +753,12 @@ def test_query_file_delivery_closes_stdin_for_initial_attempt_and_retry(
         subprocess.DEVNULL,
         subprocess.DEVNULL,
     ]
-    assert not dm_file.exists()
 
 
 @pytest.mark.parametrize("mode, author", [
     ("stdin", {"id": "bot:eri-mac.local/coder", "name": "coder", "is_bot": True}),
-    ("query-file", {"id": "bot:coder", "name": "coder", "is_bot": True}),
-    ("query-file", None),
-], ids=["stdin", "query-file", "no author"])
+    ("stdin", None),
+], ids=["stdin", "no author"])
 def test_delivery_main_child_env_carries_only_the_argv_author(tmp_path, monkeypatch, mode, author):
     """The ``--author`` payload becomes HERMES_TURN_AUTHOR on the child. Without it the runner drops the
     variable it inherited from the sending bot's own turn instead of passing it on as the recipient's author."""

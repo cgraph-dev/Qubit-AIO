@@ -141,71 +141,10 @@ def test_turn_wait_seconds_reads_config(monkeypatch):
     assert bot_relay.turn_wait_seconds() == 7.0
 
 
-# ── wiring: local teammate delivery (tools/bot_mode_dm.py) ──────────────────
-
-
-def test_run_delivery_holds_profile_lock_during_turn(root, tmp_path, monkeypatch):
-    """The local `qubit -p <profile>` turn runs UNDER the profile lock."""
-    home = root / ".hermes"
-    home.mkdir()
-    monkeypatch.setenv("QUBIT_HOME", str(home))
-    dm = tmp_path / "dm.txt"
-    dm.write_text("hi", encoding="utf-8")
-    observed = {}
-
-    def _fake_run(argv, **kwargs):
-        # While the turn runs, a second acquire on the same profile must fail.
-        with pytest.raises(TurnBusyError):
-            with acquire_turn_lock(home, "ops", timeout_seconds=0.15):
-                pass  # pragma: no cover
-        observed["argv"] = argv
-
-        class _P:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-
-        return _P()
-
-    monkeypatch.setattr(bot_mode_dm.subprocess, "run", _fake_run)
-    rc = bot_mode_dm._run_delivery(
-        ["hermes", "-p", "ops", "chat"], str(dm), stdin_file=False
-    )
-    assert rc == 0
-    assert observed["argv"][:3] == ["hermes", "-p", "ops"]
-    # …and after the turn, the lock is free again.
-    with acquire_turn_lock(home, "ops", timeout_seconds=0.5):
-        pass
-
-
-def test_delivery_main_reports_target_busy_json(root, tmp_path, monkeypatch, capsys):
-    """A queued delivery that exceeds its budget surfaces the structured error."""
-    home = root / ".hermes"
-    home.mkdir()
-    monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 0.2)
-    dm = tmp_path / "dm.txt"
-    dm.write_text("hi", encoding="utf-8")
-
-    held = threading.Event()
-    release = threading.Event()
-    t = threading.Thread(
-        target=_hold_flock, args=(turn_lock_path(home, "ops"), held, release)
-    )
-    t.start()
-    assert held.wait(timeout=5)
-    try:
-        rc = bot_mode_dm._delivery_main(
-            ["--run-delivery", "query-file", str(dm), "hermes", "-p", "ops", "chat"]
-        )
-        assert rc == 1
-        payload = json.loads(capsys.readouterr().out.strip())
-        assert payload["reason"] == "target_busy"  # #93091 item-1 enum extension
-        assert "ops" in payload["error"]
-    finally:
-        release.set()
-        t.join(timeout=5)
-    assert not dm.exists(), "DM plaintext must be reclaimed even on refusal"
+# ── wiring: peer transport (tools/bot_mode_dm.py) never contends locally ──────
+# Retired: the local query-file CLI turn under the profile lock. Local Bot Chat
+# delivery is admitted by the profile authority, which owns its own FIFO.
+# Upstream 43faacfb8de7 tools/bot_mode_dm.py:589 refuses instead of spawning.
 
 
 def test_peer_stdin_delivery_skips_local_lock(root, tmp_path, monkeypatch):
@@ -302,7 +241,7 @@ def test_relay_deliver_returns_target_busy_error(tmp_path, monkeypatch):
     t.start()
     assert held.wait(timeout=5)
     try:
-        out = srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "x"})
+        out = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000001", "profile": "ops", "message": "x"})
         assert "error" in out
         assert out["error"]["code"] == 5096
         assert "target_busy" in out["error"]["message"]
@@ -338,7 +277,7 @@ def test_relay_deliver_serializes_then_succeeds(tmp_path, monkeypatch):
     assert held.wait(timeout=5)
     threading.Timer(0.3, release.set).start()
     start = time.monotonic()
-    out = srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "x"})
+    out = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000002", "profile": "ops", "message": "x"})
     t.join(timeout=5)
     assert "error" not in out, out
     assert out["result"]["reply"] == "pong"
@@ -387,7 +326,7 @@ def test_every_relay_refusal_carries_its_typed_reason(tmp_path, monkeypatch, fai
 
     monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", _raise)
 
-    out = srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "x"})
+    out = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000003", "profile": "ops", "message": "x"})
 
     assert out["error"]["code"] == code
     assert out["error"]["data"]["reason"] == reason

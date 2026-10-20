@@ -126,7 +126,7 @@ def test_deliver_validates_profile_and_runs_transport(home, monkeypatch):
 
     monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", _fake_run)
     out = _result(
-        srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping"})
+        srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000001", "profile": "ops", "message": "ping"})
     )
     assert out["reply"] == "pong from ops"
     # The cap bounds the turn; the relay wants the printed answer, so a reported child is
@@ -141,20 +141,20 @@ def test_deliver_validates_profile_and_runs_transport(home, monkeypatch):
     assert "Bot Chat" in argv and "--query-file" in argv
 
     # 'hermes' alias resolves to default
-    _result(srv._methods["bot_relay.deliver"](2, {"profile": "hermes", "message": "x"}))
+    _result(srv._methods["bot_relay.deliver"](2, {"id": "00000000000000000000000000000002", "profile": "hermes", "message": "x"}))
     assert calls["argv"][1:3] == ["-p", "default"]
 
     # unknown profile refuses without spawning; so does a bare infra dir under profiles/ (#99392)
     calls.clear()
     (home / "profiles" / "sessions" / "cron").mkdir(parents=True)
     for target in ("ghost", "sessions"):
-        err = srv._methods["bot_relay.deliver"](3, {"profile": target, "message": "x"})
+        err = srv._methods["bot_relay.deliver"](3, {"id": "00000000000000000000000000000003", "profile": target, "message": "x"})
         assert "error" in err and target in err["error"]["message"]
     assert not calls
 
 
 def test_deliver_requires_params(home):
-    err = srv._methods["bot_relay.deliver"](1, {"profile": "", "message": ""})
+    err = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000004", "profile": "", "message": ""})
     assert "error" in err
 
 
@@ -182,9 +182,9 @@ def test_deliver_restamps_relayed_sender_with_a_reply_safe_handle(home, monkeypa
     ])
     stamp = "Message from 🤖 CoS Bot (@hermes): are we done?"
     sender = {"from_profile": "default", "from_handle": "hermes", "from_connection": "vps-1"}
-    _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": stamp, **sender}))
-    _result(srv._methods["bot_relay.deliver"](2, {"profile": "ops", "message": stamp, **sender, "from_connection": "lan-2"}))
-    _result(srv._methods["bot_relay.deliver"](3, {"profile": "ops", "message": "plain text (@hermes): x", **sender}))
+    _result(srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000005", "profile": "ops", "message": stamp, **sender}))
+    _result(srv._methods["bot_relay.deliver"](2, {"id": "00000000000000000000000000000006", "profile": "ops", "message": stamp, **sender, "from_connection": "lan-2"}))
+    _result(srv._methods["bot_relay.deliver"](3, {"id": "00000000000000000000000000000007", "profile": "ops", "message": "plain text (@hermes): x", **sender}))
     assert seen == ["Message from 🤖 CoS Bot (@cos-bot): are we done?",
                     "Message from 🤖 CoS Bot (@hermes@lan-2): are we done?",
                     "plain text (@hermes): x"]
@@ -198,10 +198,10 @@ def test_deliver_relays_empty_reply_for_a_bare_silence_marker(home, monkeypatch)
         stdout = " *NO_REPLY* "
 
     monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", lambda *_a, **_k: _Proc())
-    assert _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping"}))["reply"] == ""
+    assert _result(srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000008", "profile": "ops", "message": "ping"}))["reply"] == ""
 
     _Proc.stdout = "The NO_REPLY marker means do not answer."
-    out = _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping"}))
+    out = _result(srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000009", "profile": "ops", "message": "ping"}))
     assert out["reply"] == _Proc.stdout.strip()
 
 
@@ -236,7 +236,7 @@ def test_deliver_lands_in_live_bot_chat_instead_of_subprocess(home, monkeypatch)
         "live-ops",
         {"profile_home": str(home / "profiles" / "ops"), "pending_title": "Bot Chat", "history": []},
     )
-    out = _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping"}))
+    out = _result(srv._methods["bot_relay.deliver"](1, {"id": "0000000000000000000000000000000a", "profile": "ops", "message": "ping"}))
     # queued=True is the invariant: a DM never interrupts a turn in flight.
     assert submitted == [{"session_id": "live-ops", "text": "ping", "queued": True}]
     assert not spawned
@@ -247,7 +247,7 @@ def test_deliver_lands_in_live_bot_chat_instead_of_subprocess(home, monkeypatch)
     srv._sessions["live-ops"]["pending_title"] = "Scratch"
     submitted.clear()
 
-    out = _result(srv._methods["bot_relay.deliver"](2, {"profile": "ops", "message": "ping"}))
+    out = _result(srv._methods["bot_relay.deliver"](2, {"id": "0000000000000000000000000000000b", "profile": "ops", "message": "ping"}))
     assert out["reply"] == "pong" and spawned and not submitted
 
 
@@ -331,8 +331,7 @@ def test_deliver_into_an_open_bot_chat_returns_the_owners_answer(home, monkeypat
     monkeypatch.setattr("tools.bot_mode_dm._LIVE_WAIT_SECONDS", 10)
     try:
         owner = _owner_settles(ops_home, outcome)
-        out = srv._methods["bot_relay.deliver"](1, {
-            "profile": "ops", "message": "ping", "from_profile": "cody", "from_handle": "cody",
+        out = srv._methods["bot_relay.deliver"](1, {"id": "0000000000000000000000000000000c", "profile": "ops", "message": "ping", "from_profile": "cody", "from_handle": "cody",
             "from_connection": "conn-a"})
         owner.join(timeout=10)
         assert not spawned and submitted == []
@@ -358,8 +357,7 @@ def test_deliver_into_a_busy_open_bot_chat_reports_it_queued_and_keeps_the_recei
     monkeypatch.setattr(srv, "_sessions", {})
     monkeypatch.setattr("tools.bot_mode_dm._LIVE_WAIT_SECONDS", 0.6)
     try:
-        out = _result(srv._methods["bot_relay.deliver"](1, {
-            "profile": "ops", "message": "ping", "from_profile": "cody", "from_handle": "cody",
+        out = _result(srv._methods["bot_relay.deliver"](1, {"id": "0000000000000000000000000000000d", "profile": "ops", "message": "ping", "from_profile": "cody", "from_handle": "cody",
             "from_connection": "conn-a"}))
         assert not spawned and "open Bot Chat" in out["reply"] and "Do not resend" in out["reply"]
         (queued,) = [
@@ -414,7 +412,7 @@ def test_deliver_write_failure_still_removes_tempfile(home, monkeypatch, tmp_pat
 
     monkeypatch.setattr("tempfile.mkstemp", _tracking_mkstemp)
     monkeypatch.setattr("os.fdopen", lambda fd, *a, **k: _BrokenWriter(fd))
-    err = srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "x"})
+    err = srv._methods["bot_relay.deliver"](1, {"id": "0000000000000000000000000000000e", "profile": "ops", "message": "x"})
     assert "error" in err
     assert made, "mkstemp was never reached"
     assert not glob.glob(str(tmp_path / "hermes-relay-dm-*")), "tempfile leaked"
@@ -454,7 +452,7 @@ def test_deliver_child_env_carries_the_envelope_sender_on_every_attempt(home, mo
     monkeypatch.setenv("HERMES_RELAY_TEST_MARKER", "kept")
     monkeypatch.setenv(TURN_AUTHOR_ENV, json.dumps({"id": "bot:stale", "name": "stale", "is_bot": True}))
 
-    _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping", **sender}))
+    _result(srv._methods["bot_relay.deliver"](1, {"id": "0000000000000000000000000000000f", "profile": "ops", "message": "ping", **sender}))
 
     envs = [c["env"] for c in calls]
     assert len(envs) == 2
@@ -504,7 +502,7 @@ def test_deliver_accepts_a_sender_from_an_admitted_non_login_client(home, fake_r
     calls, _outcomes = fake_runs
     bound_client.auth_identity = identity
 
-    _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping", **SENDER}))
+    _result(srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000010", "profile": "ops", "message": "ping", **SENDER}))
 
     assert [json.loads(c["env"][TURN_AUTHOR_ENV]) for c in calls] == [SENDER_AUTHOR]
 
@@ -528,7 +526,7 @@ def test_deliver_from_a_logged_in_client_is_attributed_to_its_principal_never_to
 
     shapes = ({"from_profile": "scout"}, {"from_connection": "cloud-1"}, SENDER, {})
     for rid, sender in enumerate(shapes):
-        _result(srv._methods["bot_relay.deliver"](rid, {"profile": "ops", "message": "ping", **sender}))
+        _result(srv._methods["bot_relay.deliver"](rid, {"id": "00000000000000000000000000000011", "profile": "ops", "message": "ping", **sender}))
 
     assert len(calls) == len(shapes), "every relayed dm from a logged-in client must still run its turn"
     authors = [json.loads(c["env"][TURN_AUTHOR_ENV]) for c in calls]
@@ -539,7 +537,7 @@ def test_deliver_from_a_logged_in_client_is_attributed_to_its_principal_never_to
     assert len({a["id"] for a in authors}) == 1, "one signed-in principal, one author — with or without sender fields"
 
     bound_client.auth_identity = {"user_id": "bob", "provider": "google"}
-    _result(srv._methods["bot_relay.deliver"](9, {"profile": "ops", "message": "ping", **SENDER}))
+    _result(srv._methods["bot_relay.deliver"](9, {"id": "00000000000000000000000000000012", "profile": "ops", "message": "ping", **SENDER}))
     assert json.loads(calls[-1]["env"][TURN_AUTHOR_ENV])["id"] != authors[0]["id"], "a different principal is a different author"
 
 

@@ -3,8 +3,31 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _live_authority_for_synthetic_owners(monkeypatch):
+    """``deliver_to_live_owner`` now needs a live canonical authority.
+
+    Tests that build a real registry (a ``state.db``) keep using the real
+    discovery, including its ``None`` for an incapable owner. Tests that use a
+    synthetic owner on a bare tmp dir stand in a live authority so the mailbox
+    mechanics they exercise remain reachable.
+    """
+    from tools import bot_live_delivery as mailbox
+
+    real = mailbox.find_canonical_live_owner
+
+    def _live(home):
+        if (Path(home) / "state.db").exists():
+            return real(home)
+        return {"profile_home": str(Path(home).resolve()), "session_id": "chat",
+                "lease_id": "lease", "live_session_id": "live"}
+
+    monkeypatch.setattr(mailbox, "find_canonical_live_owner", _live)
 
 @pytest.mark.parametrize("terminal_status", ["settled", "failed", "cancelled"])
 def test_delivery_is_idempotent_fenced_and_permanent(tmp_path, terminal_status):

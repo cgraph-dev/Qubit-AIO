@@ -94,6 +94,17 @@ def _(rid, params: dict, _root=_relay_root, _run=_run_delivery,
     GATEWAY via the one-turn ``qubit -p <profile> chat -c "Bot Chat"`` transport local DMs use →
     ``{reply}``. Blocking by design (Desktop relay worker; the RPC pool keeps it off the reader)."""
     import tempfile
+    # A relayed DM must carry its envelope id before anything can execute: a legacy caller
+    # without one is refused, never turned into a fresh turn (upstream 43faacfb8de7
+    # tui_gateway/methods_bot_relay.py:70-78).
+    from tools.bot_live_delivery import _delivery_id
+    from tools.bot_relay import _HANDLE_RE
+    try:
+        _delivery_id(params.get("id"))
+        if not isinstance(params.get("profile"), str) or not _HANDLE_RE.fullmatch(params["profile"]):
+            raise ValueError("invalid profile")
+    except ValueError:
+        return _err(rid, 4090, "invalid_params", data={"reason": "invalid_params"})
     profile = str(params.get("profile") or "").strip()
     message = str(params.get("message") or "").strip()
     if not profile or not message:

@@ -323,7 +323,12 @@ def deliver_to_live_owner(
 
     Retry with the same id AND pinned owner/message to inspect the existing
     state. Reusing an id with a different payload is an error, never an overwrite.
+
+    A stale owner advertisement is refused before it can create another execution
+    queue: admission needs a live canonical authority for this profile.
     """
+    if find_canonical_live_owner(profile_home) is None:
+        raise ValueError("profile authority is not ready")
     return _door(authority_delivery, profile_home, owner, message, delivery_id=delivery_id, author=author,
                  notification_category=notification_category)
 

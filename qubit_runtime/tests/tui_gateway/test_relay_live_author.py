@@ -68,7 +68,7 @@ def test_live_relay_stamps_the_sender_as_a_delivery_author(tmp_path, monkeypatch
     monkeypatch.setitem(srv._sessions, "live-ops",
                         {"profile_home": str(home / "profiles" / "ops"), "pending_title": "Bot Chat", "history": []})
 
-    _result(srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "ping", "from_profile": "coder", "from_handle": "coder"}))
+    _result(srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000001", "profile": "ops", "message": "ping", "from_profile": "coder", "from_handle": "coder"}))
 
     assert submitted == [{"session_id": "live-ops", "text": "ping", "queued": True, "_turn_author": DeliveryAuthor(AUTHOR)}]
 
