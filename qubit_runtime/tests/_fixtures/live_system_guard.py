@@ -265,6 +265,41 @@ def _live_system_guard(request, monkeypatch):
 
     from tests.git_safety import blocked_git_mutation
 
+    def _sandboxed_gateway_child(cmd_str: str, env) -> bool:
+        """The disposable-daemon fixtures (``tests/gateway/fixtures/*``, the socket-path-length
+        probes) launch the bare ``python -m gateway.run`` module entry with an explicit ``env``
+        that re-homes BOTH ``QUBIT_HOME`` and ``HOME`` away from the developer's account. Such a
+        child resolves no developer unit or config, holds no live port, and is reaped by its
+        test: the orphan class the guard exists for is the ``qubit gateway run|start|restart``
+        CLI spawn against the real home, which the fixtures never use."""
+        if not isinstance(env, dict):
+            return False
+        try:
+            tokens = _shlex.split(cmd_str)
+        except ValueError:
+            tokens = cmd_str.split()
+        if "-m" not in tokens or tokens[tokens.index("-m") + 1:][:1] != ["gateway.run"]:
+            return False
+        qubit_home, home = env.get("QUBIT_HOME"), env.get("HOME")
+        if not qubit_home or not home:
+            return False
+        # The developer's account home from the passwd db: tests re-point ``Path.home`` at their
+        # tmp user dir, which would make a sandboxed child look like it runs against the real one.
+        try:
+            import pwd
+            real_home = Path(pwd.getpwuid(_os.getuid()).pw_dir).resolve()
+        except (ImportError, KeyError):
+            real_home = Path.home().resolve()
+        # The child must not resolve the REAL Qubit root. Comparing QUBIT_HOME against the whole
+        # account home refused every Windows sandbox: %TEMP% lives under %USERPROFILE%.
+        from qubit_state_guard import _real_platform_state_root
+        real_root = _real_platform_state_root() or real_home / ".qubit"
+        try:
+            return (Path(home).resolve() != real_home
+                    and not Path(qubit_home).resolve().is_relative_to(real_root))
+        except Exception:
+            return False
+
     def _check_subprocess_cmd(name, cmd, kwargs=None):
         git_verb = blocked_git_mutation(cmd, kwargs, _LIVE_GUARD_PROTECTED_GIT_ROOTS)
         if git_verb is not None:
@@ -334,14 +369,15 @@ def _live_system_guard(request, monkeypatch):
         # webhook port. 2026-09-03: 39 such orphans lived 6 days after a
         # sibling refactor moved the spawn seam and left tests patching the
         # facade. The canonical matcher, never an argv substring.
-        from gateway.status import _gateway_command_subcommand
-        # A gateway launched INSIDE a container (`docker exec … hermes gateway start`) cannot
+        from gateway.status import gateway_spawn_intent_subcommand
+        # A gateway launched INSIDE a container (`docker exec … qubit gateway start`) cannot
         # reach the host's systemd unit or webhook port; tests/docker/ exists to exercise it.
         in_container = _first_token_basename(cmd_str) in _CONTAINER_RUNTIMES
         if (
             not lookalike_ok
             and not in_container
-            and _gateway_command_subcommand(cmd_str) in ("run", "start", "restart")
+            and gateway_spawn_intent_subcommand(cmd_str) in ("run", "start", "restart")
+            and not _sandboxed_gateway_child(cmd_str, (kwargs or {}).get("env"))
         ):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "

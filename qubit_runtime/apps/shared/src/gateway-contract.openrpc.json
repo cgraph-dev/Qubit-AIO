@@ -1735,6 +1735,24 @@
       }
     },
     {
+      "name": "machine.facts",
+      "summary": "Facts about the machine running this backend and its OS account, for the desktop first run.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/Params"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MachineFactsResult"
+        }
+      }
+    },
+    {
       "name": "mcp.catalog",
       "summary": "Curated MCP presets with per-profile installed/enabled state and the env keys each needs.",
       "params": [
@@ -2095,20 +2113,74 @@
       }
     },
     {
-      "name": "onboarding.state",
-      "summary": "",
+      "name": "onboarding.set_run",
+      "summary": "Write onboarding.run in the root profile's config.yaml; answers the new state.",
       "params": [
         {
           "name": "params",
           "schema": {
-            "$ref": "#/components/schemas/Params"
+            "$ref": "#/components/schemas/OnboardingSetRunParams"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "#/components/schemas/OnboardingStateResult"
+          "$ref": "#/components/schemas/OnboardingRunStateResult"
+        }
+      }
+    },
+    {
+      "name": "onboarding.skip",
+      "summary": "Skip setup: end the session's onboarding run and close the card that waits.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OnboardingSkipParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingSkipResult"
+        }
+      }
+    },
+    {
+      "name": "onboarding.start",
+      "summary": "Open the onboarding chat in the default profile: create it, write its run record and play the opening.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OnboardingStartParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingStartResult"
+        }
+      }
+    },
+    {
+      "name": "onboarding.state",
+      "summary": "Whether desktop first-run onboarding is due, and the chat in progress; reads the root profile's config.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/OnboardingStateParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/OnboardingRunStateResult"
         }
       }
     },
@@ -7718,6 +7790,38 @@
         "title": "CatalogAppState",
         "type": "string"
       },
+      "CatalogApproved": {
+        "additionalProperties": false,
+        "description": "The non-secret Advanced choices the user approved on a catalog row; a Try again after the\noperation settled repeats them.",
+        "properties": {
+          "force": {
+            "title": "Force",
+            "type": "boolean"
+          },
+          "enable": {
+            "title": "Enable",
+            "type": "boolean"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ref"
+          }
+        },
+        "required": [
+          "force",
+          "enable"
+        ],
+        "title": "CatalogApproved",
+        "type": "object"
+      },
       "CatalogPluginPresence": {
         "additionalProperties": false,
         "description": "A named catalog plugin this OS runs. ``state`` is the pinned ``plugin.json`` app declaration judged\non this host; ``sentence`` names what is missing (empty when present or unknown); ``disclosure`` is the\ncatalog description's ``Disclosure:`` sentence (empty when it has none).",
@@ -7780,9 +7884,30 @@
         "title": "CatalogScanStatus",
         "type": "string"
       },
+      "CatalogServerError": {
+        "additionalProperties": false,
+        "description": "An MCP server an installed plugin brought that did not connect, with the raw reason.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "error"
+        ],
+        "title": "CatalogServerError",
+        "type": "object"
+      },
       "CatalogTier": {
         "enum": [
           "official",
+          "verified",
           "community"
         ],
         "title": "CatalogTier",
@@ -8481,6 +8606,18 @@
             "default": "",
             "title": "Warning",
             "type": "string"
+          },
+          "plugin_discovery_error": {
+            "default": "",
+            "title": "Plugin Discovery Error",
+            "type": "string"
+          },
+          "plugin_commands": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Plugin Commands",
+            "type": "object"
           }
         },
         "title": "CommandsCatalogResult",
@@ -9549,6 +9686,18 @@
             "default": null,
             "title": "Connection Id"
           },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Alias"
+          },
           "attempt": {
             "anyOf": [
               {
@@ -9715,6 +9864,18 @@
             "default": null,
             "title": "Requirements"
           },
+          "requires_hermes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requires Hermes"
+          },
           "has_desktop_half": {
             "anyOf": [
               {
@@ -9772,6 +9933,71 @@
               }
             ],
             "default": null
+          },
+          "approved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogApproved"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "missing_env": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Missing Env"
+          },
+          "server_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CatalogServerError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Server Errors"
+          },
+          "already_installed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Already Installed"
           }
         },
         "required": [
@@ -17551,6 +17777,66 @@
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Key"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tools"
+          },
+          "hooks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Hooks"
+          },
+          "commands": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Commands"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
           }
         },
         "required": [
@@ -17815,6 +18101,175 @@
           "deferred_by_goal"
         ],
         "title": "LoopSnapshot",
+        "type": "object"
+      },
+      "MachineFactsResult": {
+        "additionalProperties": false,
+        "description": "``machine_kind`` is ``Spark``, ``Mac``, ``PC`` or ``computer``. ``nvidia_platform`` is\n``products.nvidia_platform()``: ``rtx_spark``, ``dgx_spark``, ``discrete`` or null. ``locale`` is the OS\naccount's first UI language, null when the OS has none.",
+        "properties": {
+          "machine": {
+            "$ref": "#/components/schemas/MachineInfo"
+          },
+          "machine_kind": {
+            "title": "Machine Kind",
+            "type": "string"
+          },
+          "has_nvidia_gpu": {
+            "title": "Has Nvidia Gpu",
+            "type": "boolean"
+          },
+          "nvidia_platform": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rtx_spark",
+                  "dgx_spark",
+                  "discrete"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Nvidia Platform"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Locale"
+          }
+        },
+        "required": [
+          "machine",
+          "machine_kind",
+          "has_nvidia_gpu"
+        ],
+        "title": "MachineFactsResult",
+        "type": "object"
+      },
+      "MachineInfo": {
+        "additionalProperties": false,
+        "description": "Measured hardware; a key that was not measured is absent.",
+        "properties": {
+          "os_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Os Family"
+          },
+          "os_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Os Release"
+          },
+          "native_arch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Native Arch"
+          },
+          "cpu_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cpu Model"
+          },
+          "ram_gb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ram Gb"
+          },
+          "gpu_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gpu Class"
+          },
+          "vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Vendor"
+          },
+          "wsl": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wsl"
+          },
+          "container": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Container"
+          }
+        },
+        "title": "MachineInfo",
         "type": "object"
       },
       "McpCatalogEntry": {
@@ -20023,7 +20478,7 @@
       },
       "NotificationShowPayload": {
         "additionalProperties": false,
-        "description": "``agent/credits_tracker.py::AgentNotice`` via notice_callback, and ``server._await_agent_ready``'s\nslow-build notice. ``level``: info | warn | error | success; ``kind``: sticky | ttl | agent.",
+        "description": "``agent/credits_tracker.py::AgentNotice`` via notice_callback, and ``server._await_agent_ready``'s\nslow-build notice. ``level``: info | warn | error | success; ``kind``: sticky | ttl | agent.\n``detail``: the full text behind a short ``text`` (the low-disk auto-prune question): Desktop shows\nit in the toast's expandable body, the Ink TUI prints it into the transcript.",
         "properties": {
           "text": {
             "title": "Text",
@@ -20072,6 +20527,18 @@
             ],
             "default": null,
             "title": "Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
           }
         },
         "required": [
@@ -20253,6 +20720,30 @@
         "title": "OnboardingCatalogPlugin",
         "type": "object"
       },
+      "OnboardingEndedPayload": {
+        "additionalProperties": false,
+        "description": "``agent/onboarding_record.py::_transition``: the run ``run_id`` stopped being in progress.\n``stored_session_id`` is its chat at the compression tip. ``done``: the first-task card was answered;\n``skipped``: Skip setup; ``replaced``: a rerun opened a new run; ``deleted``: its chat was deleted.",
+        "properties": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "stored_session_id": {
+            "title": "Stored Session Id",
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/OnboardingOutcome"
+          }
+        },
+        "required": [
+          "run_id",
+          "stored_session_id",
+          "outcome"
+        ],
+        "title": "OnboardingEndedPayload",
+        "type": "object"
+      },
       "OnboardingEnsureSetupProfileResult": {
         "additionalProperties": false,
         "description": "``created`` is false when an existing setup profile was found (and returned untouched).",
@@ -20331,12 +20822,30 @@
         "title": "OnboardingEnsureSetupSessionResult",
         "type": "object"
       },
+      "OnboardingFactsSource": {
+        "enum": [
+          "local",
+          "remote"
+        ],
+        "title": "OnboardingFactsSource",
+        "type": "string"
+      },
       "OnboardingIntro": {
         "enum": [
           "unseen",
           "seen"
         ],
         "title": "OnboardingIntro",
+        "type": "string"
+      },
+      "OnboardingOutcome": {
+        "enum": [
+          "done",
+          "skipped",
+          "replaced",
+          "deleted"
+        ],
+        "title": "OnboardingOutcome",
         "type": "string"
       },
       "OnboardingResetSetupProfileResult": {
@@ -20363,8 +20872,195 @@
         "title": "OnboardingResetSetupProfileResult",
         "type": "object"
       },
+      "OnboardingRunStateResult": {
+        "additionalProperties": false,
+        "description": "``run``: onboarding opens on this launch (root config ``onboarding.run``, else a machine that\nnever used Hermes). ``eligible``: this is the desktop's local backend and the welcome trial or a\nconfigured provider can carry the first chat.\n``session_id``: the stored id of the onboarding chat still in progress, so a relaunch reopens it;\n``run_id``: that run's id, which ``onboarding.ended`` names.",
+        "properties": {
+          "run": {
+            "title": "Run",
+            "type": "boolean"
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Run Id"
+          }
+        },
+        "required": [
+          "run",
+          "eligible"
+        ],
+        "title": "OnboardingRunStateResult",
+        "type": "object"
+      },
+      "OnboardingSetRunParams": {
+        "additionalProperties": false,
+        "description": "``mark_profile_offered`` also latches ``onboarding.seen.profile_build_offered`` in the root config,\nso the first chat after onboarding gets the plain intro instead of the profile offer.",
+        "properties": {
+          "run": {
+            "title": "Run",
+            "type": "boolean"
+          },
+          "mark_profile_offered": {
+            "default": false,
+            "title": "Mark Profile Offered",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "OnboardingSetRunParams",
+        "type": "object"
+      },
+      "OnboardingSkipParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "OnboardingSkipParams",
+        "type": "object"
+      },
+      "OnboardingSkipResult": {
+        "additionalProperties": false,
+        "properties": {
+          "skipped": {
+            "title": "Skipped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "skipped"
+        ],
+        "title": "OnboardingSkipResult",
+        "type": "object"
+      },
+      "OnboardingStartParams": {
+        "additionalProperties": false,
+        "description": "``rerun``: start a new onboarding chat even when one is in progress (Settings, Run onboarding\nagain; it never claims the welcome trial). ``fresh_launch``: the app's once-per-launch start; a run\nthe app was closed on does not count, so its chat is deleted and the run starts over.\n``facts_source``: whether the backend runs on the user's own computer. ``locale``: the desktop's UI\nlanguage, preferred over the backend OS locale. ``assume_fresh``: as on ``onboarding.state``. A new\nrun on a first install claims the welcome trial before its chat exists; a failed claim is error\n5079 and leaves no guest and no chat. A claim that is blocked (another install took the trial) with\nno trial or provider to run on is error 5080 and opens no chat.",
+        "properties": {
+          "rerun": {
+            "default": false,
+            "title": "Rerun",
+            "type": "boolean"
+          },
+          "fresh_launch": {
+            "default": false,
+            "title": "Fresh Launch",
+            "type": "boolean"
+          },
+          "assume_fresh": {
+            "default": false,
+            "title": "Assume Fresh",
+            "type": "boolean"
+          },
+          "facts_source": {
+            "$ref": "#/components/schemas/OnboardingFactsSource",
+            "default": "local"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Locale"
+          }
+        },
+        "title": "OnboardingStartParams",
+        "type": "object"
+      },
+      "OnboardingStartResult": {
+        "additionalProperties": false,
+        "description": "``session_id`` is the runtime id the client attaches to; ``resumed`` is true when an onboarding\nchat already in progress was reopened instead of a new one started. ``run_id`` names the run in\n``onboarding.ended``.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "stored_session_id": {
+            "title": "Stored Session Id",
+            "type": "string"
+          },
+          "resumed": {
+            "title": "Resumed",
+            "type": "boolean"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "stored_session_id",
+          "resumed",
+          "run_id"
+        ],
+        "title": "OnboardingStartResult",
+        "type": "object"
+      },
+      "OnboardingStateParams": {
+        "additionalProperties": false,
+        "description": "``assume_fresh``: the unpackaged desktop's ``--fresh-install`` launch; the backend treats this\nmachine as one that never used Hermes. Packaged builds never send it.",
+        "properties": {
+          "assume_fresh": {
+            "default": false,
+            "title": "Assume Fresh",
+            "type": "boolean"
+          }
+        },
+        "title": "OnboardingStateParams",
+        "type": "object"
+      },
       "OnboardingStateResult": {
         "additionalProperties": false,
+        "description": "Qubit's onboarding state: ``qubit_cli.setup_profile`` is the authority (the setup profile's\nmarker), not upstream's saved-run model. ``eligible`` is answered liveness-aware;\n``profile`` names the resumable setup profile when there is one.",
         "properties": {
           "eligible": {
             "title": "Eligible",
@@ -22857,6 +23553,30 @@
         "title": "PluginSettingFieldType",
         "type": "string"
       },
+      "PluginToolsetRow": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description"
+        ],
+        "title": "PluginToolsetRow",
+        "type": "object"
+      },
       "PluginsAction": {
         "enum": [
           "list",
@@ -22885,6 +23605,36 @@
             },
             "title": "Plugins",
             "type": "array"
+          },
+          "toolsets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PluginToolsetRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Toolsets"
+          },
+          "portable_mcp_servers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Portable Mcp Servers"
           }
         },
         "required": [
@@ -27739,6 +28489,7 @@
       },
       "ReloadMcpResult": {
         "additionalProperties": false,
+        "description": "``session``: what the calling local session's MCP servers did (a new policy generation, nothing to\nchange, or deferred while a turn runs or waits); ``unavailable``: configured servers that did not connect\nbeside what did apply; ``session_servers``: the MCP servers that session's committed policy runs.",
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ReloadMcpStatus"
@@ -27800,6 +28551,47 @@
             ],
             "default": null,
             "title": "Host Ack"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReloadMcpSession"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "unavailable": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unavailable"
+          },
+          "session_servers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Servers"
           }
         },
         "required": [
@@ -27807,6 +28599,15 @@
         ],
         "title": "ReloadMcpResult",
         "type": "object"
+      },
+      "ReloadMcpSession": {
+        "enum": [
+          "applied",
+          "unchanged",
+          "busy"
+        ],
+        "title": "ReloadMcpSession",
+        "type": "string"
       },
       "ReloadMcpStatus": {
         "enum": [
@@ -28195,6 +28996,18 @@
             ],
             "default": null,
             "title": "Profile"
+          },
+          "all": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "All"
           }
         },
         "required": [
@@ -32910,15 +33723,128 @@
       },
       "SessionUsagePayload": {
         "additionalProperties": false,
-        "description": "``server._start_usage_ticker``.",
+        "description": "``usage``: the status-bar view (``server._get_usage``), sent by the embedded backend's ticker\n(``server._start_usage_ticker``) and by a canonical local viewer's gateway after every API call\nand at turn end (``gateway/session_usage.publish_usage``). Read this.\n\nDeprecated: the top-level session-cumulative counters (``usage_stats``, the ``session.stats``\ndict) that the gateway frame also carries. They are kept for existing readers; new readers use\n``usage``, or ``session.stats`` for the raw counters. The embedded ticker never sends them.",
         "properties": {
           "usage": {
-            "$ref": "#/components/schemas/Usage"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output Tokens"
+          },
+          "cache_read_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cache Read Tokens"
+          },
+          "cache_write_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Cache Write Tokens"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Completion Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Tokens"
+          },
+          "reasoning_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reasoning Tokens"
+          },
+          "api_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Api Calls"
           }
         },
-        "required": [
-          "usage"
-        ],
         "title": "SessionUsagePayload",
         "type": "object"
       },
@@ -33233,6 +34159,164 @@
         "title": "SessionWorkspaceMoveResult",
         "type": "object"
       },
+      "SetupBeat": {
+        "enum": [
+          "name",
+          "theme",
+          "layout",
+          "connectors",
+          "plugins",
+          "tour",
+          "build"
+        ],
+        "title": "SetupBeat",
+        "type": "string"
+      },
+      "SetupBeatRequestParams": {
+        "additionalProperties": false,
+        "description": "``card`` is the beat's data (``agent/onboarding_flow.py::BEATS``): name, theme, connectors and\nplugins have their own shape; layout, tour and build carry ``options``. ``tool_call_id`` is the\nsetup_beat call the card belongs to: only that transcript row draws it.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "beat": {
+            "$ref": "#/components/schemas/SetupBeat"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Question"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tool Call Id"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupNameCard"
+              },
+              {
+                "$ref": "#/components/schemas/SetupThemeCard"
+              },
+              {
+                "$ref": "#/components/schemas/SetupOptionsCard"
+              },
+              {
+                "$ref": "#/components/schemas/SetupConnectorsCard"
+              },
+              {
+                "$ref": "#/components/schemas/SetupPluginsCard"
+              }
+            ],
+            "title": "Card"
+          }
+        },
+        "required": [
+          "session_id",
+          "beat",
+          "card"
+        ],
+        "title": "SetupBeatRequestParams",
+        "type": "object"
+      },
+      "SetupBeatResult": {
+        "additionalProperties": false,
+        "description": "``answer`` holds the shown beat's picks; ids must be one of the card's options (the backend\nrejects any other answer). ``said`` is composer text typed while the name card waited: the name.\n``wrote_instead``: the user sent a message instead of answering; the backend ends the turn and the\nclient sends that message as the next one. A response with none of these, or none within 300 s,\ncloses the card unanswered.",
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupNameAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SetupThemeAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SetupLayoutAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SetupConnectorsAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SetupPluginsAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SetupTourAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/SetupBuildAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Answer"
+          },
+          "said": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Said"
+          },
+          "wrote_instead": {
+            "default": false,
+            "title": "Wrote Instead",
+            "type": "boolean"
+          }
+        },
+        "title": "SetupBeatResult",
+        "type": "object"
+      },
+      "SetupBuildAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "build": {
+            "title": "Build",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          }
+        },
+        "required": [
+          "build"
+        ],
+        "title": "SetupBuildAnswer",
+        "type": "object"
+      },
       "SetupChooseKind": {
         "enum": [
           "question",
@@ -33390,6 +34474,176 @@
           }
         },
         "title": "SetupChooseResult",
+        "type": "object"
+      },
+      "SetupConnectorsAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "connected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Connected",
+            "type": "array"
+          },
+          "newly_connected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Newly Connected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "SetupConnectorsAnswer",
+        "type": "object"
+      },
+      "SetupConnectorsCard": {
+        "additionalProperties": false,
+        "properties": {
+          "suggested": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggested",
+            "type": "array"
+          }
+        },
+        "required": [
+          "suggested"
+        ],
+        "title": "SetupConnectorsCard",
+        "type": "object"
+      },
+      "SetupLayoutAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "layout": {
+            "title": "Layout",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "SetupLayoutAnswer",
+        "type": "object"
+      },
+      "SetupNameAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SetupNameAnswer",
+        "type": "object"
+      },
+      "SetupNameCard": {
+        "additionalProperties": false,
+        "properties": {
+          "suggested": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Suggested"
+          }
+        },
+        "title": "SetupNameCard",
+        "type": "object"
+      },
+      "SetupOption": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "SetupOption",
+        "type": "object"
+      },
+      "SetupOptionsCard": {
+        "additionalProperties": false,
+        "properties": {
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/SetupOption"
+            },
+            "title": "Options",
+            "type": "array"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "title": "SetupOptionsCard",
+        "type": "object"
+      },
+      "SetupPluginsAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "installed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Installed",
+            "type": "array"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          }
+        },
+        "required": [
+          "installed"
+        ],
+        "title": "SetupPluginsAnswer",
+        "type": "object"
+      },
+      "SetupPluginsCard": {
+        "additionalProperties": false,
+        "properties": {
+          "plugins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Plugins",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plugins"
+        ],
+        "title": "SetupPluginsCard",
         "type": "object"
       },
       "SetupReadyPayload": {
@@ -33746,6 +35000,77 @@
           }
         },
         "title": "SetupStatusResult",
+        "type": "object"
+      },
+      "SetupThemeAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "accent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Accent"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Mode"
+          }
+        },
+        "title": "SetupThemeAnswer",
+        "type": "object"
+      },
+      "SetupThemeCard": {
+        "additionalProperties": false,
+        "properties": {
+          "picker": {
+            "title": "Picker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "picker"
+        ],
+        "title": "SetupThemeCard",
+        "type": "object"
+      },
+      "SetupTourAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "tour": {
+            "title": "Tour",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          }
+        },
+        "required": [
+          "tour"
+        ],
+        "title": "SetupTourAnswer",
         "type": "object"
       },
       "SharedMetricsConsentResult": {
@@ -40763,6 +42088,24 @@
       }
     },
     {
+      "name": "setup_beat",
+      "summary": "The onboarding chat's card for one beat; blocks setup_beat until answered (300 s).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SetupBeatRequestParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SetupBeatResult"
+        }
+      }
+    },
+    {
       "name": "setup_choose",
       "summary": "",
       "params": [
@@ -41341,6 +42684,18 @@
       ]
     },
     {
+      "name": "onboarding.ended",
+      "summary": "A first-run onboarding run ended; sent to every connected window.",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/OnboardingEndedPayload"
+          }
+        }
+      ]
+    },
+    {
       "name": "pairing.changed",
       "summary": "Pairing state moved; refetch pairing.",
       "params": [
@@ -41624,6 +42979,18 @@
           "name": "payload",
           "schema": {
             "$ref": "#/components/schemas/SetupReadyPayload"
+          }
+        }
+      ]
+    },
+    {
+      "name": "skills.changed",
+      "summary": "A skill root moved (installed/removed elsewhere); refetch commands.catalog from the gateway.",
+      "params": [
+        {
+          "name": "payload",
+          "schema": {
+            "$ref": "#/components/schemas/ChangeSignalPayload"
           }
         }
       ]
