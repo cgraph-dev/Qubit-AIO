@@ -943,30 +943,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             "type": "tool.completed", "tool_call_id": str(call_id or ""), "tool_name": name, "is_error": bool(is_error),
         })
 
-    def combined_tool_start_callback(self, call_id, tool_name, args):
-        """Compose the voice ack + native task-card start consumers."""
-        if self._ctx._voice_ack_guild[0] is not None:
-            self.voice_ack_callback(call_id, tool_name, args)
-        if self._ctx._native_slack_task_cards:
-            self.native_tool_start_callback(call_id, tool_name, args)
-
     # ── hook / status bridges (agent thread → gateway loop) ────────────────────────────────
-
-    def _step_callback_sync(self, iteration: int, prev_tools: list) -> None:
-        ctx = self._ctx
-        if not ctx._run_still_current():
-            return
-        # prev_tools may be list[str] or list[dict] with "name"/"result" keys. Normalise so
-        # "tool_names" stays backward-compatible for user hooks that do ', '.join(tool_names).
-        names = [(t.get("name") or "") if isinstance(t, dict) else str(t) for t in (prev_tools or [])]
-        self._schedule(
-            ctx._hooks_ref.emit("agent:step", {
-                "platform": ctx.source.platform.value if ctx.source.platform else "",
-                "user_id": ctx.source.user_id, "session_id": ctx.session_id,
-                "iteration": iteration, "tool_names": names, "tools": prev_tools,
-            }),
-            "agent:step hook scheduling error",
-        )
 
     def _event_callback_sync(self, event_type: str, context: dict) -> None:
         ctx = self._ctx
@@ -1101,11 +1078,18 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             ) if sc is not None
         ]
         stream_delta_cb = None
-        if delta_sinks:
+        local_viewer_route = getattr(ctx.source, "platform", None) == Platform.LOCAL
+        if delta_sinks or self._approval_owner is not None:
             def stream_delta_cb(text: Optional[str]) -> None:
                 if not ctx._run_still_current():
                     return
                 delivered = bool(delta_sinks)
+                if text is not None:
+                    delivered = self._publish_execution("message.delta", {"text": text}) or delivered
+                elif local_viewer_route:
+                    # The segment boundary (main's ``_stream_delta(None)`` closes the reply box
+                    # before tool lines); messaging routes only close their native stream.
+                    self._publish_execution("message.delta", {"text": None})
                 for sink in delta_sinks:
                     sink.on_delta(text)
                 if text is not None and (not delivered or _finite_viewer_turn()):
@@ -1402,9 +1386,16 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             if (ctx._voice_ack_guild[0] is not None or ctx._native_slack_task_cards) else None
         )
         agent.tool_complete_callback = ctx.native_tool_complete_callback if ctx._native_slack_task_cards else None
-        agent.step_callback = ctx._step_callback_sync if ctx._hooks_ref.loaded_hooks else None
+        if getattr(self, "_approval_owner", None) is not None:
+            # A canonical execution publishes its tool lifecycle to the shared viewer stream
+            # (message.start/delta + tool.start/complete + agent.step), not only to native cards.
+            agent.tool_start_callback = self.combined_tool_start_callback
+            agent.tool_complete_callback = self.combined_tool_complete_callback
+        agent.step_callback = ctx._step_callback_sync if (
+            ctx._hooks_ref.loaded_hooks or getattr(self, "_approval_owner", None) is not None) else None
         agent.stream_delta_callback = stream_delta_cb
         agent.interim_assistant_callback = interim_assistant_cb if want_interim_messages else None
+        agent.reasoning_callback = None  # per turn: a reused agent never keeps an earlier API turn's sink
         if getattr(self, "_approval_owner", None) is not None:
             # An executing API admission feeds its request-owned sinks (Chat/Responses SSE, runs)
             # reasoning/status/commentary; ``_approval_owner`` is set only by that path, and
