@@ -45,6 +45,7 @@ from qubit_cli.observability.shared_metrics_contract import (
     TASK_TERMINATIONS,
     TOOL_APPROVAL_ATTRIBUTIONS,
     TOOL_APPROVAL_OUTCOMES,
+    TOOL_CALL_METRIC,
     TOOL_CATEGORIES,
     TOOL_LATENCY_BUCKETS,
     TOOL_OUTCOMES,
@@ -1219,6 +1220,31 @@ def test_package_builder_rejects_tampered_dimensions(tmp_path):
         store.create_and_export_package()
 
     assert list(outbox_directory.glob("*.json")) == []
+
+
+def test_package_builder_rebuckets_a_known_shape_with_a_retired_value(tmp_path):
+    database_path = tmp_path / "metrics.sqlite3"
+    outbox_directory = tmp_path / "outbox"
+    store = SharedMetricsStore(database_path, outbox_directory)
+    store.record_counter(
+        TOOL_CALL_METRIC,
+        {"approval_outcome": "not_required", "outcome": "success", "tool_category": "file"},
+        _resource(),
+    )
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            "UPDATE counter_aggregates SET dimensions_json = ?",
+            (json.dumps({"approval_outcome": "not_required", "outcome": "success",
+                         "tool_category": "retired-catalog-entry"}),),
+        )
+
+    packages = store.create_and_export_package()
+
+    assert len(packages) == 1
+    payload = json.loads(packages[0].read_text())
+    metrics = [metric for package in payload.get("packages", [payload]) for metric in package.get("metrics", [])]
+    assert metrics, payload
+    assert metrics[0]["dimensions"]["tool_category"] == "other"
 
 
 def test_package_builder_rejects_tampered_client_resources(tmp_path):
