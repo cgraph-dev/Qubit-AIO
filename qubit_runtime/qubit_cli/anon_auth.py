@@ -973,24 +973,7 @@ def mark_guest_notice_shown() -> bool:
     """Persist ``guest_notice_shown`` on the guest's ``providers.qubit`` state (whichever store holds it).
 
     Returns True when a flag was written; False when there is no guest to mark."""
-    from qubit_cli.auth import (
-        _auth_file_path, _load_auth_store, _provider_state_transaction, _same_path, _save_auth_store,
-        _store_section)
-    with _provider_state_transaction("nous") as (auth_store, state, source_path):
-        if not is_guest_state(state) or source_path is None:
-            return False
-        if state.get(GUEST_NOTICE_FLAG):
-            return True
-        state = dict(state)
-        state[GUEST_NOTICE_FLAG] = True
-        if _same_path(source_path, _auth_file_path()):
-            _store_section(auth_store, "providers")["nous"] = state
-            _save_auth_store(auth_store)
-        else:
-            source_store = _load_auth_store(source_path)
-            _store_section(source_store, "providers")["nous"] = state
-            _save_auth_store(source_store, target_path=source_path)
-    return True
+    return set_guest_flag(GUEST_NOTICE_FLAG) is not None
 
 
 def set_guest_flag(flag: str) -> Optional[dict[str, Any]]:
