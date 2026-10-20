@@ -17,6 +17,18 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 8 — 2026-10-20 (live boot applied; 103 dead symbols)
+
+Full evidence in `docs/STATUS.md` (top entry).
+
+- ✅ Live: gateway restarted onto the merged boot path; identify publishes `runtime_protocol=1`, `state=ready`, `session-authority-v1`; `/chat` session survived.
+- ✅ Closed: list_sessions mixed-clock TypeError; ACP pre-editor credential binding; three bot-delivery gaps (profile scope, no fallback, stale-owner refusal). Dead **128 → 103** (0 new); test gap **756 → 736** absent.
+- 🔴 New defects for the next wave: cron agent prompt preparation (should be transport-only); cron `CronExecutionUnknown` pause/give-up; approval warnings-shape unpack crash; safe-worker MCP spawn + plugin-load guards; `/reload-mcp` content-aware schema (3 call sites); gateway startup restore of undelivered delegation completions; parked MCP auth retry loop.
+- 🟡 Bot delivery's full authority-only mailbox/relay rewrite is deferred (architectural; local mailbox queue and tests still in place).
+- 🔴 Owner: F4 fatal vs non-fatal control-socket bind; F5 exclusions without sign-off.
+
+---
+
 ## Wave 7 — 2026-10-20 (10 lanes; defects closed, 128 dead symbols)
 
 Full evidence in `docs/STATUS.md` (top entry). Durable state:
