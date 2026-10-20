@@ -448,6 +448,9 @@ class GatewayBusySessionMixin:
 
     # Metadata that must match for two pending events to merge into one slot.
     _SECURITY_METADATA_KEYS = (
+        # Read both spellings: the injector writes the canonical Qubit keys, while events queued
+        # by an older build (or a plugin carrying the legacy names) still carry the read-old pair.
+        "qubit_plugin_id", "qubit_plugin_injection",
         "hermes_plugin_id", "hermes_plugin_injection", "gateway_session_key",
         "gateway_session_id", "gateway_session_strict",
         "notification_category",
