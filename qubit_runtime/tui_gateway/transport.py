@@ -173,7 +173,11 @@ class FanoutTransport:
                     if peer.attached:
                         return False
                     # Reuse the in-flight writer: reconnect cannot spawn more
-                    # threads or overtake a write already inside this socket.
+                    # threads or overtake a write already inside this socket. A
+                    # stale overflow notice or partial backlog must not reach the
+                    # resumed subscription; its snapshot covers that history.
+                    peer.pending.clear()
+                    peer.pending_bytes = 0
                     peer.attached = True
                     peer.generation += 1
                     return True
@@ -211,7 +215,10 @@ class FanoutTransport:
     def _drain(self, peer: _FanoutPeer) -> None:
         while True:
             with self._lock:
-                if not peer.attached or not peer.pending:
+                # A detached peer's mailbox is empty except for the one overflow notice
+                # ``write`` leaves behind; deliver it, then let go. A reattach clears the
+                # pending notice, so it can never reach a live subscription.
+                if not peer.pending:
                     peer.writing = False
                     if not peer.attached:
                         self._remove(peer)
@@ -264,6 +271,7 @@ class FanoutTransport:
         size = len(encoded.encode("utf-8", errors="surrogatepass"))
         frame = json.loads(encoded)
         overflowed: list[Transport] = []
+        noticed = False
         with self._lock:
             for peer in list(self._peers):
                 if not peer.attached:
@@ -276,15 +284,14 @@ class FanoutTransport:
                     if notice is None:
                         overflowed.append(peer.transport)
                     else:
-                        # Carry the resume notice on a FRESH generation of the same peer, so the
-                        # writer that would otherwise let go of a detached peer delivers it. A
-                        # later ``attach`` reuses this peer and bumps the generation again, so the
-                        # stale notice can never be sent into a live subscription.
+                        # Leave the peer detached: its writer delivers this one notice and then
+                        # lets go, so a retired subscription never keeps receiving frames. The
+                        # notice itself takes the frame (the consumer resumes from it), so the
+                        # publish still counts as delivered even when this was the only peer.
+                        noticed = True
                         peer.pending.append((notice, 0))
                         if peer not in self._peers:
                             self._peers.append(peer)
-                        peer.attached = True
-                        peer.generation += 1
                         if not peer.writing:
                             peer.writing = True
                             threading.Thread(target=self._drain, args=(peer,),
@@ -299,7 +306,7 @@ class FanoutTransport:
             remaining = any(peer.attached for peer in self._peers)
         for transport in overflowed:
             self._signal_overflow_detach(transport)
-        return remaining
+        return remaining or noticed
 
     def close(self) -> None:
         """Detach without closing sockets owned by the connection handlers."""
