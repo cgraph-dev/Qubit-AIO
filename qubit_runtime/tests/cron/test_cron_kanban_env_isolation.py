@@ -34,6 +34,8 @@ import threading
 import pytest
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @pytest.fixture(autouse=True)
 def _clear_kanban_detect_cache():
     """`_detect_environment` memoizes per process; kanban is context-dependent."""

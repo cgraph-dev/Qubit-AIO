@@ -19,6 +19,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @pytest.fixture
 def hermes_env(tmp_path, monkeypatch):
     """Isolate QUBIT_HOME for each test so jobs/scripts don't leak."""

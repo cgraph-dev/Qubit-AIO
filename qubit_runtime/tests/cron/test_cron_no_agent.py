@@ -277,7 +277,7 @@ def test_agent_job_provider_classification_unchanged(error, expected):
 # ---------------------------------------------------------------------------
 
 
-def test_run_job_no_agent_uses_configured_interpreter(qubit_env):
+def test_run_job_no_agent_uses_configured_interpreter(hermes_env):
     """A no-agent job's script must run through the configured interpreter.
 
     Proves the override survives the no_agent branch of ``run_job`` →
@@ -290,7 +290,7 @@ def test_run_job_no_agent_uses_configured_interpreter(qubit_env):
     from cron.scheduler import run_job
 
     # A wrapper that re-execs the real interpreter with an env marker.
-    wrapper = qubit_env / "venv" / "bin" / "python3"
+    wrapper = hermes_env / "venv" / "bin" / "python3"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text(
         f"#!{sys.executable}\n"
@@ -301,7 +301,7 @@ def test_run_job_no_agent_uses_configured_interpreter(qubit_env):
     )
     wrapper.chmod(wrapper.stat().st_mode | _stat.S_IXUSR)
 
-    script_path = qubit_env / "scripts" / "marker.py"
+    script_path = hermes_env / "scripts" / "marker.py"
     script_path.write_text(
         'import os\nprint(os.environ.get("CRON_WRAPPER_USED", "0"))\n'
     )
@@ -322,7 +322,7 @@ def test_run_job_no_agent_uses_configured_interpreter(qubit_env):
     assert "1" in doc
 
 
-def test_a_routed_profile_script_never_receives_a_launch_only_name(qubit_env, monkeypatch):
+def test_a_routed_profile_script_never_receives_a_launch_only_name(hermes_env, monkeypatch):
     """A no_agent script fired for a SIBLING profile runs with that profile's scope overlaid and
     NONE of the launch profile's residue (#107695 review): a name the launch ``.env`` defines, and a
     name a launch external source SUPPLIED — applied, or skipped because a process value already won
@@ -380,7 +380,7 @@ def test_a_routed_profile_script_never_receives_a_launch_only_name(qubit_env, mo
     assert dict(os.environ) == environ_before
 
 
-def test_a_routed_profile_script_keeps_administrator_managed_values_over_its_own(qubit_env, monkeypatch):
+def test_a_routed_profile_script_keeps_administrator_managed_values_over_its_own(hermes_env, monkeypatch):
     """Managed-scope precedence (#107695 review on f5f88d5058): the administrator's managed ``.env`` is
     applied LAST with override in the launch process, so it beats the user's own ``.env``. Managed keys
     are not launch residue, and they are re-applied over the routed scope so the child sees the same

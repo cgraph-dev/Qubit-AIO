@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @pytest.mark.platforms("posix")
 @pytest.mark.live_system_guard_bypass
 @pytest.mark.parametrize("trigger", ["cancel", "timeout"])
@@ -369,8 +371,8 @@ def _run_claimed_job_with_mid_run_action(
     """Fire a claimed job through run_one_job with a stubbed agent run that performs ``mid_run``
     on its own record, keeps working past one fire-claim heartbeat tick, then completes (or
     raises ``crash``)."""
-    import cron.jobs as jobs
-    import cron.scheduler as scheduler
+    from cron import jobs
+    from cron import scheduler
 
     def _run_job(job, **_kwargs):
         mid_run(jobs, job)
@@ -379,7 +381,20 @@ def _run_claimed_job_with_mid_run_action(
             raise crash
         return True, "saved output", "D1 is promoting", None
 
-    delivered = MagicMock(return_value=None)
+    # A completed agent run hands its notice to the durable delivery queue; a gateway drain that
+    # wins the race against the run's bookkeeping sends it through ``_deliver_result``. A crash
+    # alerts inline through the same stubbed door.
+    from cron import delivery_queue
+    monkeypatch.setattr(delivery_queue, "DELIVERY_DB", tmp_path / "cron" / "deliveries.db")
+    real_enqueue = delivery_queue.enqueue
+
+    def _enqueue_then_drain(*args, **kwargs):
+        queued = real_enqueue(*args, **kwargs)
+        assert scheduler.drain_delivery_queue({}, None) == 1
+        return queued
+
+    delivered = MagicMock(side_effect=_enqueue_then_drain)
+    monkeypatch.setattr(scheduler, "_deliver_result", MagicMock(return_value=None))
     finished = MagicMock()
     monkeypatch.setattr(scheduler, "_RUN_CLAIM_HEARTBEAT_SECONDS", 0.05)
     monkeypatch.setattr(scheduler, "run_job", _run_job)
@@ -388,7 +403,7 @@ def _run_claimed_job_with_mid_run_action(
     monkeypatch.setattr(scheduler, "finish_execution", finished)
     if stub_output:
         monkeypatch.setattr(scheduler, "save_job_output", lambda *_args: "output.md")
-    monkeypatch.setattr(scheduler, "_deliver_result", delivered)
+    monkeypatch.setattr("cron.delivery_queue.enqueue", delivered)
 
     with jobs.use_cron_store(tmp_path):
         job = jobs.create_job(

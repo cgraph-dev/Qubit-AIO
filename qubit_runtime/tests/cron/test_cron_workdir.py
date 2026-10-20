@@ -16,6 +16,8 @@ import sys
 import pytest
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @pytest.fixture()
 def tmp_cron_dir(tmp_path, monkeypatch):
     """Isolate cron job storage into a temp dir so tests don't stomp on real jobs."""

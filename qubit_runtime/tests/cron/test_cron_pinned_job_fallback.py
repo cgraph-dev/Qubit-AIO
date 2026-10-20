@@ -32,6 +32,8 @@ _CONFIG = (
 _CHAIN = [{"provider": "openrouter", "model": "z-ai/glm-5.2"}]
 
 
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 def _runtime(provider):
     return {"api_key": "k", "base_url": "https://example.invalid/v1", "provider": provider,
             "api_mode": "chat_completions"}

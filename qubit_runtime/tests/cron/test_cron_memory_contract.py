@@ -48,6 +48,10 @@ from unittest.mock import MagicMock, patch
 
 from cron.scheduler import run_job
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 @contextlib.contextmanager
 def _run_job_patches(tmp_path):
     """Patch bundle so run_job runs offline; yields (fake_db, mock_agent_cls).

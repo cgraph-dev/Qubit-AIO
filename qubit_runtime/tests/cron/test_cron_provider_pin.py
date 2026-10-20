@@ -21,6 +21,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from cron.scheduler import run_job
 
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 def _base_job(**overrides):
     job = {
         "id": "pin-test",

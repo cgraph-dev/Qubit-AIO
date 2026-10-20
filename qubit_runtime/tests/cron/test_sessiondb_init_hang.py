@@ -39,6 +39,10 @@ _RUNTIME = {
 }
 
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner_passthrough")
+
 def _session_db_executor(timeouts: list, *, instant_timeout: bool = True):
     """Wrap ``ThreadPoolExecutor`` so SessionDB's ``result(timeout=...)`` is observable.
 

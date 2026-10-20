@@ -36,6 +36,10 @@ _RUNTIME = {
 }
 
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("cron_owner")
+
 def _job(**overrides):
     job = {
         "id": "pf-test",
@@ -45,7 +49,7 @@ def _job(**overrides):
         "state": "scheduled",
         "schedule": {"kind": "interval", "minutes": 5, "display": "every 5m"},
         "deliver": "local",
-        "model": None,
+        "model": "test-model",
         "provider": None,
         "base_url": None,
     }
@@ -126,33 +130,31 @@ class TestMissingProviderKeyBlocks:
     def test_single_alert_across_two_ticks_and_blocked_status(self, tmp_path):
         """Two ticks of a blocked job through run_one_job deliver exactly ONE
         alert and persist last_status='blocked_config'."""
-        job = _job()
+        job = _job(failure_deliver="slack:alerts")
         deliveries = []
 
-        def fake_deliver(job, content, adapters=None, loop=None, **kwargs):
+        def fake_deliver(execution_id, job, content, **kwargs):
             deliveries.append(content)
-            return None
+            return {"status": "pending"}
 
         with cron_jobs.use_cron_store(tmp_path):
             cron_jobs.save_jobs([job])
-            fake_db = MagicMock()
             for _tick in range(2):
-                fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
+                fresh = next(j for j in cron_jobs.load_jobs() if j["id"] == job["id"])
                 with patch("cron.scheduler._qubit_home", tmp_path), \
                      patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                      patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                      patch("qubit_cli.env_loader.reset_secret_source_cache"), \
-                     patch("qubit_state_registry.acquire", return_value=fake_db), \
                      patch("tools.mcp_tool_discovery.discover_mcp_tools", return_value=[]), \
                      patch("qubit_cli.runtime_provider.resolve_runtime_provider",
                            side_effect=_AuthErrorFactory()), \
-                     patch.object(sched, "_deliver_result", side_effect=fake_deliver), \
+                     patch("cron.delivery_queue.enqueue", side_effect=fake_deliver), \
                      patch("run_agent.AIAgent") as mock_agent_cls:
                     ok = sched.run_one_job(fresh)
                     assert ok is True
                     assert mock_agent_cls.called is False
 
-            stored = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
+            stored = next(j for j in cron_jobs.load_jobs() if j["id"] == job["id"])
 
         assert stored["last_status"] == "blocked_config"
         assert len(deliveries) == 1, (
@@ -179,7 +181,8 @@ class TestMissingProviderKeyBlocks:
                 raise AuthError("no key")
             return {**_RUNTIME, "provider": "openrouter"}
 
-        job = _job()
+        # Unpinned: a job carrying its own model is pinned (#100437) and gets no chain.
+        job = _job(model=None)
         with cron_jobs.use_cron_store(tmp_path):
             cron_jobs.save_jobs([job])
             success, output, final_response, error, agent_constructed = \
@@ -259,27 +262,25 @@ class TestOptOut:
         (tmp_path / "config.yaml").write_text(
             "cron:\n  preflight: false\n", encoding="utf-8"
         )
-        job = _job()
+        job = _job(failure_deliver="slack:alerts")
         deliveries = []
 
-        def fake_deliver(job, content, adapters=None, loop=None, **kwargs):
+        def fake_deliver(execution_id, job, content, **kwargs):
             deliveries.append(content)
-            return None
+            return {"status": "pending"}
 
         with cron_jobs.use_cron_store(tmp_path):
             cron_jobs.save_jobs([job])
-            fake_db = MagicMock()
             for _tick in range(2):
-                fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
+                fresh = next(j for j in cron_jobs.load_jobs() if j["id"] == job["id"])
                 with patch("cron.scheduler._qubit_home", tmp_path), \
                      patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                      patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                      patch("qubit_cli.env_loader.reset_secret_source_cache"), \
-                     patch("qubit_state_registry.acquire", return_value=fake_db), \
                      patch("tools.mcp_tool_discovery.discover_mcp_tools", return_value=[]), \
                      patch("qubit_cli.runtime_provider.resolve_runtime_provider",
                            side_effect=_AuthErrorFactory()), \
-                     patch.object(sched, "_deliver_result", side_effect=fake_deliver), \
+                     patch("cron.delivery_queue.enqueue", side_effect=fake_deliver), \
                      patch("run_agent.AIAgent") as mock_agent_cls:
                     sched.run_one_job(fresh)
                     assert mock_agent_cls.called is False
