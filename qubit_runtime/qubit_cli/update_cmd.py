@@ -1264,6 +1264,14 @@ def _refuse_before_commit_point(git_cmd, target_ref, _windows_gateway_resume) ->
     """Preconditions that used to fail AFTER the swap: refuse with the install untouched."""
     reason = _commit.preflight_refusal(git_cmd, _m().PROJECT_ROOT, target_ref, _UPDATE_CRITICAL_FILES)
     if reason is None:
+        from qubit_cli.update_downgrade_guard import downgrade_refusal
+
+        # A pre-runtime release would move the code back under a state.db that already
+        # holds gateway runtime ledger rows those releases cannot delete or prune.
+        reason = downgrade_refusal(git_cmd, _m().PROJECT_ROOT, target_ref)
+        if reason is not None:
+            _record_stop("downgrade_refused")
+    if reason is None:
         return
     print(reason)
     print("  No update was applied; your install is unchanged.")

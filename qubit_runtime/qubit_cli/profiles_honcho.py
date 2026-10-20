@@ -19,12 +19,17 @@ def _atomic_write_json(path: Path, data: dict) -> bool:
 
 
 def migrate_honcho_profile_host(old_name: str, new_name: str, new_dir: Path) -> None:
-    """Rename Honcho host blocks for a renamed profile without changing peers."""
+    """Rename Honcho host blocks for a renamed profile without changing peers.
+
+    Qubit-owned host keys use the ``qubit_<profile>`` prefix. ``hermes_<profile>``
+    (the pre-rebrand key) and the dot-form ``qubit.<profile>`` are still accepted as
+    legacy sources so a host block written before the rename is migrated, not orphaned."""
     from qubit_cli.profiles import _get_default_qubit_home
 
-    old_host = f"hermes_{old_name}"
-    legacy_old_host = f"hermes.{old_name}"
-    new_host = f"hermes_{new_name}"
+    legacy_hermes_old_host = f"hermes_{old_name}"
+    old_host = f"qubit_{old_name}"
+    legacy_dot_old_host = f"qubit.{old_name}"
+    new_host = f"qubit_{new_name}"
     candidates = [
         new_dir / "honcho.json", _get_default_qubit_home() / "honcho.json", Path.home() / ".honcho" / "config.json"
     ]
@@ -44,15 +49,17 @@ def migrate_honcho_profile_host(old_name: str, new_name: str, new_dir: Path) -> 
         hosts = raw.get("hosts")
         if not isinstance(hosts, dict):
             continue
-        source_host = old_host if old_host in hosts else legacy_old_host
-        if source_host not in hosts:
+        source_host = next(
+            (h for h in (old_host, legacy_hermes_old_host, legacy_dot_old_host) if h in hosts), None
+        )
+        if source_host is None:
             continue
         if new_host in hosts:
             print(f"⚠ Honcho host block not migrated: {new_host} already exists in {path}")
             continue
         block = hosts[source_host]
         if isinstance(block, dict) and "aiPeer" not in block:
-            block["aiPeer"] = old_name  # source_host is ``hermes_<old>`` or legacy ``hermes.<old>``
+            block["aiPeer"] = old_name  # legacy source: ``hermes_<old>`` or dot-form ``qubit.<old>``
         hosts[new_host] = hosts.pop(source_host)
         if _atomic_write_json(path, raw):
             print(f"✓ Honcho host updated: {source_host} → {new_host}")

@@ -34,7 +34,10 @@ from agent.conversation_compression_codex import _codex_compaction_cooldown_rema
 from agent.conversation_compression_deadline import (  # noqa: F401  (re-exported for existing importers)
     DEFAULT_CONTEXT_TIMEOUT_SECONDS, DEFAULT_CONTEXT_TOTAL_CEILING_SECONDS, resolve_context_compression_timeouts,
 )
-from agent.conversation_compression_telemetry import _emit_aborted_attempt_telemetry, _emit_compression_attempt_telemetry
+from agent.conversation_compression_telemetry import (
+    _emit_aborted_attempt_telemetry, _emit_blocked_attempt_telemetry, _emit_compression_attempt_telemetry,
+    _record_committed_attempt_effect, _snapshot_compression_effect_input,
+)
 from agent.memory_provider import PRE_COMPRESS_CHECKPOINT_API_VERSION
 from agent.model_metadata import estimate_messages_tokens_rough, estimate_request_tokens_rough
 from agent.session_activity import ActivityProvenance, normalize_activity_provenance
@@ -4142,6 +4145,10 @@ def compress_context(
     # Another path may have compacted this session in place since construction;
     # re-read breaker state under the lock, not the bind_session_state() snapshot.
     if not force and _automatic_compression_gate_blocks(agent, bypass_cooldown, include_cooldown=False):
+        reason_fn = getattr(agent.context_compressor, "_compression_block_reason", None)
+        block_reason = reason_fn() if callable(reason_fn) else None
+        _emit_blocked_attempt_telemetry(
+            agent, attempt.started_at, approx_tokens, None, block_reason or "blocked")
         lease.release()
         return messages, _existing_system_prompt(agent, system_message)
 
@@ -4163,6 +4170,7 @@ def compress_context(
     messages, compressed = phase.messages, phase.compressed
     messages_before_compression = phase.messages_before_compression
     approx_tokens, _pre_msg_count = phase.approx_tokens, phase.pre_msg_count
+    effect_messages_before = _snapshot_compression_effect_input(messages_before_compression, verbatim_tail)
     _commit_fence_entered = False
     try:
         # Capture the verdict before rotation callbacks: lifecycle hooks may reset
@@ -4248,10 +4256,15 @@ def compress_context(
         lifecycle.commit_status = (
             "committed" if split_status in {"not_applicable", "in_place_committed", "rotated_committed"} else "aborted"
         )
+        # A rewrite that survived a later bookkeeping failure is still what the model sees: count it as saved.
+        rewritten = commit.compacted_in_place or compressed is not messages
+        if rewritten or lifecycle.commit_status == "committed":
+            _record_committed_attempt_effect(
+                agent, effect_messages_before, compressed, verbatim_tail, split_status)
         _emit_compression_attempt_telemetry(
             agent, started_at=attempt.started_at, commit_status=lifecycle.commit_status, split_status=split_status,
             failure_class=("session_split_failed" if split_status in {"failed_not_indexed", "aborted"} else None),
-            commit_started_at=commit.commit_started_at,
+            commit_started_at=commit.commit_started_at, history_rewritten=rewritten,
         )
         return compressed, new_system_prompt
     finally:

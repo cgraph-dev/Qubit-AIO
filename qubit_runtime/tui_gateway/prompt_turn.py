@@ -698,6 +698,7 @@ def _prepare_turn_input(sid: str, session: dict, st: _TurnRun, text: Any, images
     # Install-first-message onboarding (#82750): gateway parity for the TUI/Desktop
     # surface — no-op unless this is the install's very first message ever.
     _stage_first_contact_onboarding_note(session, agent, not st.history, text if isinstance(text, str) else "")
+    _stage_onboarding_turn_note(sid, agent, not st.history)
     cwd = _session_cwd(session)
     _register_session_cwd(session)
     cols = session.get("cols", 80)
@@ -797,6 +798,10 @@ def _invoke_agent(
         from agent.initiate_setup_prompt import initiate_setup_prelude
         prelude = initiate_setup_prelude(
             text, _resolve_agent_platform(_session_source(session)), agent.valid_tool_names, st.history)
+        if prelude is None:
+            # The setup_beat onboarding opening is a different flow from /initiate-setup:
+            # it plays the greeting and the name card, and keeps the fork's flow first.
+            prelude = _onboarding_prelude(agent, st.history)
         if prelude is not None:
             run_kwargs["prelude"] = prelude
     _adopt_submit_user_row(session, agent, run_kwargs["persist_user_message"], text)
