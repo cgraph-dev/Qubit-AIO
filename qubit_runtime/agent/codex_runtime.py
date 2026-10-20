@@ -1077,7 +1077,6 @@ class _CodexResponseAssembler:
         # Done items stay authoritative; only successful streams settle missing done events.
         output: list[Any] = self._settled_output() if self.saw_response_completed else list(self.output_items)
         # With only plain text deltas (no tool calls), synthesize one message item.
-        output: List[Any] = list(self.output_items)
         if not output and self.text_deltas and not self.has_tool_calls:
             content = [SimpleNamespace(type="output_text", text="".join(self.text_deltas))]
             output = [SimpleNamespace(type="message", role="assistant", status="completed", content=content)]
