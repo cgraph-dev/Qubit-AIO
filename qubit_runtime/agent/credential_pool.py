@@ -59,12 +59,15 @@ def _load_config_safe() -> Optional[dict]:
 
     ``load_config_readonly()`` skips the deepcopy ``load_config()`` pays per
     call; the picker calls ``load_pool()`` once per provider row, which made
-    that copy the dominant cost of ``model.options``.
+    that copy the dominant cost of ``model.options``. Inside
+    ``frozen_runtime_config`` it is the session's frozen config: a key rotated
+    in config.yaml must never seed a frozen session's pool.
     """
     try:
         from qubit_cli.config import load_config_readonly
+        from qubit_cli.runtime_provider import _FROZEN_RUNTIME_CONFIG
 
-        return load_config_readonly()
+        return _FROZEN_RUNTIME_CONFIG.get() or load_config_readonly()
     except Exception:
         return None
 
@@ -542,6 +545,7 @@ def _pool_keys_for_custom_entry(norm_name: str, entry: Dict[str, Any]) -> List[s
 def custom_provider_pool_key_candidates(
     base_url: Optional[str],
     provider_name: Optional[str] = None,
+    config: Optional[dict] = None,
 ) -> List[str]:
     """Return pool keys to try for a custom endpoint.
 
@@ -549,14 +553,16 @@ def custom_provider_pool_key_candidates(
     durable config slug; older rows and legacy ``custom_providers:`` entries
     live under ``custom:<display-name>``. Try the slug first, then the legacy
     namespace, so a populated pool is not skipped in favour of the
-    ``no-key-required`` placeholder.
+    ``no-key-required`` placeholder. ``config`` is a frozen route's config:
+    ITS entry owns the endpoint, so a live edit of that entry's URL neither
+    drops nor redirects the pool.
     """
     if not base_url:
         return []
     # A named pool holds credentials for its configured endpoint only: a launch-overridden base_url
     # must not inherit them (R2-M1), nor borrow a sibling's by URL.
     from agent.custom_entry_pool import custom_entry_for_endpoint
-    match = custom_entry_for_endpoint(base_url, provider_name)
+    match = custom_entry_for_endpoint(base_url, provider_name, config)
     return _pool_keys_for_custom_entry(*match) if match else []
 
 
