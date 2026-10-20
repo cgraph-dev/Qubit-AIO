@@ -1096,9 +1096,14 @@ def _wire_session_agent(sid: str, key: str, agent) -> bool:
 
 
 def _start_session_services(sid: str, key: str, current: dict) -> None:
-    """Start the notification poller and fire the session-reset boundary hook."""
+    """Start the notification poller (exactly one live per session) and fire the session-reset boundary hook."""
     with _sessions_lock:
         if (rec := _sessions.get(sid)) is not None:
+            # An agent rebuild re-enters here for the SAME session: stop the previous poller before
+            # replacing its stop event, or the orphaned old loop keeps draining the process-global
+            # completion queue (and close can only signal the newest event) — #138806.
+            if (old_stop := rec.get("_notif_stop")) is not None:
+                old_stop.set()
             rec["_notif_stop"] = _start_notification_poller(sid, rec)
     _notify_session_boundary("on_session_reset", key, _session_source(current))
 
@@ -3740,6 +3745,7 @@ from . import (  # noqa: E402
     methods_connectors as _methods_connectors, methods_connectors_account as _methods_connectors_account,
     methods_display as _methods_display, methods_display_watch as _methods_display_watch,
     methods_onboarding as _methods_onboarding, methods_i18n as _methods_i18n,
+    methods_machine as _methods_machine,
     methods_shared_metrics as _methods_shared_metrics, methods_start_chat as _methods_start_chat,
     methods_plugin_catalog as _methods_plugin_catalog)
 
@@ -3753,6 +3759,6 @@ for _m in (
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
     _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors,
     _methods_connectors_account, _methods_display, _methods_display_watch, _methods_onboarding,
-    _methods_i18n, _methods_shared_metrics, _methods_start_chat, _methods_plugin_catalog):
+    _methods_i18n, _methods_machine, _methods_shared_metrics, _methods_start_chat, _methods_plugin_catalog):
     _m.register(sys.modules[__name__])
 del _m
