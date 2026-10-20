@@ -30,13 +30,15 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 from agent.auxiliary_client import AuxiliaryExplicitCancellation
 from agent.context_engine import automatic_compaction_status_message, sanitize_memory_context
-from agent.conversation_compression_codex import _codex_compaction_cooldown_remaining
+from agent.conversation_compression_codex import (  # noqa: F401  (re-exported for existing importers)
+    _codex_compaction_cooldown_remaining, _compress_context_via_codex_app_server, _record_codex_compaction_failure,
+)
 from agent.conversation_compression_deadline import (  # noqa: F401  (re-exported for existing importers)
     DEFAULT_CONTEXT_TIMEOUT_SECONDS, DEFAULT_CONTEXT_TOTAL_CEILING_SECONDS, resolve_context_compression_timeouts,
 )
 from agent.conversation_compression_telemetry import (
-    _emit_aborted_attempt_telemetry, _emit_blocked_attempt_telemetry, _emit_compression_attempt_telemetry,
-    _record_committed_attempt_effect, _snapshot_compression_effect_input,
+    _emit_aborted_attempt_telemetry, _emit_blocked_attempt_telemetry, _emit_bypassed_attempt_telemetry,
+    _emit_compression_attempt_telemetry, _record_committed_attempt_effect, _snapshot_compression_effect_input,
 )
 from agent.memory_provider import PRE_COMPRESS_CHECKPOINT_API_VERSION
 from agent.model_metadata import estimate_messages_tokens_rough, estimate_request_tokens_rough
@@ -3932,6 +3934,9 @@ class _Attempt:
     snapshot: dict
     generation: int
     started_at: float
+    # This attempt's id, start session and trigger. Its emits pass it explicitly: the agent's copy is replaced
+    # when a stall fallback begins while this attempt is still unwinding.
+    seed: dict[str, Any]
     durable_cooldown_authoritative: Optional[bool] = None
     durable_cooldown_state: Optional[dict[str, Any]] = None
 
@@ -3971,15 +3976,16 @@ def _begin_compression_attempt(
     started_at = time.monotonic()
     attempt_id = uuid.uuid4().hex
     trigger = trigger or ("manual" if force else "auto")
+    seed = {
+        "attempt_id": attempt_id, "session_id": getattr(agent, "session_id", None) or "", "trigger_source": trigger,
+    }
     with contextlib.suppress(Exception):
         agent._compression_attempt_id = attempt_id
         from qubit_cli.observability.shared_metrics_events import begin_compression_attempt
 
         begin_compression_attempt(trigger, approx_tokens or getattr(agent.context_compressor, "last_prompt_tokens", None))
-        agent.context_compressor._compression_telemetry_seed = {
-            "attempt_id": attempt_id, "session_id": agent.session_id or "", "trigger_source": trigger,
-        }
-    return _Attempt(snapshot, generation, started_at)
+        agent.context_compressor._compression_telemetry_seed = dict(seed)
+    return _Attempt(snapshot, generation, started_at, seed)
 
 
 def _route_codex_compaction(
@@ -3989,10 +3995,15 @@ def _route_codex_compaction(
     """Codex owns the real thread: run its own compact under the commit fence bracket."""
     if commit_fence is not None and not commit_fence.begin_commit(getattr(agent, "_hard_interrupt_requested", None)):
         attempt.restore_compressor(agent.context_compressor)
+        _emit_bypassed_attempt_telemetry(
+            agent, attempt.started_at, commit_status="aborted", failure_class="commit_fence_cancelled",
+            approx_tokens=approx_tokens, route="codex_app_server", attempt_seed=attempt.seed,
+        )
         return messages, _existing_system_prompt(agent, system_message)
     try:
         return _compress_context_via_codex_app_server(
-            agent, messages, system_message, approx_tokens=approx_tokens, task_id=task_id, force=force
+            agent, messages, system_message, approx_tokens=approx_tokens, task_id=task_id, force=force,
+            started_at=attempt.started_at, attempt_seed=attempt.seed,
         )
     finally:
         if commit_fence is not None:
@@ -4072,9 +4083,14 @@ def compress_context(
     checkpoint_required = getattr(agent, "compression_checkpoint_required", False) is True
     if getattr(agent, "api_mode", None) == "codex_app_server":
         if checkpoint_required:
-            raise _checkpoint_blocked(
+            blocked = _checkpoint_blocked(
                 "codex_app_server owns the authoritative thread and does not expose a truthful pre-compaction transcript boundary"
             )
+            _emit_bypassed_attempt_telemetry(
+                agent, attempt.started_at, commit_status="aborted", failure_class=f"exception:{type(blocked).__name__}",
+                approx_tokens=approx_tokens, route="codex_app_server", attempt_seed=attempt.seed,
+            )
+            raise blocked
         return _route_codex_compaction(
             agent, messages, system_message, commit_fence=commit_fence, attempt=attempt, approx_tokens=approx_tokens,
             task_id=task_id, force=force,
@@ -4275,90 +4291,6 @@ def compress_context(
         finally:
             if _commit_fence_entered:
                 commit_fence.finish_commit()
-
-
-def _record_codex_compaction_failure(agent: Any, error: str) -> None:
-    """Arm the shared compression-failure cooldown after a failed codex compaction.
-    The codex path returns the transcript unchanged, so without a cooldown the still-over-threshold session
-    would retry every turn."""
-    from agent.context_compressor import _SUMMARY_FAILURE_COOLDOWN_SECONDS
-    compressor = getattr(agent, "context_compressor", None)
-    recorder = getattr(compressor, "_record_compression_failure_cooldown", None)
-    if not callable(recorder):
-        return
-    with _swallow('codex compaction cooldown persist failed', exc_info=True):
-        recorder(_SUMMARY_FAILURE_COOLDOWN_SECONDS, error)
-
-
-def _compress_context_via_codex_app_server(
-    agent: Any, messages: list, system_message: Optional[str], *, approx_tokens: Optional[int] = None,
-    task_id: str = "default", force: bool = False,
-) -> Tuple[list, str]:
-    """Route compaction to Codex app-server for Codex-owned threads.
-    Rewriting the local transcript would not shrink the Codex thread, so Codex compacts its own thread and
-    Qubit' transcript is left unchanged."""
-    _sid = getattr(agent, "session_id", None) or "none"
-    _tokens = f"{approx_tokens:,}" if approx_tokens else "unknown"
-    auto_mode = str(getattr(agent, "codex_app_server_auto_compaction", "native") or "native").lower()
-    if auto_mode not in {"native", "hermes", "off"}:
-        auto_mode = "native"
-    skip_reason = None
-    if not force and auto_mode != "hermes":
-        skip_reason = f"mode={auto_mode} force=false"
-    elif not force:
-        # Automatic entrypoints honor the compressor-owned cooldown: a recent compaction
-        # failed, and retrying every turn is what thrashes.
-        _cooldown_remaining = _codex_compaction_cooldown_remaining(agent)
-        if _cooldown_remaining > 0:
-            skip_reason = f"failure cooldown active for {_cooldown_remaining:.0f}s"
-    codex_session = getattr(agent, "_codex_session", None)
-    if skip_reason is None and codex_session is None:
-        skip_reason = "no active codex thread"
-    if skip_reason is not None:
-        logger.info(
-            "codex app-server compaction skipped: %s (session=%s messages=%d tokens=~%s)", skip_reason, _sid,
-            len(messages), _tokens,
-        )
-        return messages, _existing_system_prompt(agent, system_message)
-    logger.info("codex app-server compaction started: session=%s messages=%d tokens=~%s", _sid, len(messages), _tokens)
-    with contextlib.suppress(Exception):
-        agent._emit_status(COMPACTION_STATUS)
-    _activity_heartbeat = _CompressionActivityHeartbeat(agent, emit_client_status=True).start()
-    try:
-        result = codex_session.compact_thread()
-    except BaseException:
-        _activity_heartbeat.stop("context compression failed")
-        raise
-    failed = bool(getattr(result, "interrupted", False) or getattr(result, "error", None))
-    _activity_heartbeat.stop("context compression failed" if failed else "context compression completed")
-    if getattr(result, "should_retire", False):
-        with contextlib.suppress(Exception):
-            codex_session.close()
-        agent._codex_session = None
-    if failed:
-        with contextlib.suppress(Exception):
-            agent._emit_warning(f"⚠ Codex app-server compaction failed: {result.error}")
-        # The transcript is returned unchanged, so the session is still over
-        # threshold. Without a brake the next turn retries immediately.
-        _record_codex_compaction_failure(agent, str(getattr(result, "error", None) or "compaction interrupted"))
-        return messages, _existing_system_prompt(agent, system_message)
-    with _swallow('codex compaction bookkeeping failed', exc_info=True):
-        from agent.codex_runtime import _record_codex_app_server_compaction, _record_codex_app_server_usage
-        _record_codex_app_server_compaction(agent, result, approx_tokens=approx_tokens, force=True)
-        # An empty usage report must consume the pending verdict, not leave deferral
-        # armed until a later turn; minimal test engines may lack update_from_response.
-        if hasattr(agent.context_compressor, "update_from_response"):
-            _record_codex_app_server_usage(agent, result, messages=messages)
-    _reset_read_dedup_caches(task_id, session_id=agent.session_id or "")
-    logger.info(
-        "codex app-server compaction done: session=%s thread=%s turn=%s", _sid,
-        getattr(result, "thread_id", None) or "", getattr(result, "turn_id", None) or "",
-    )
-    existing_prompt = _existing_system_prompt(agent, system_message)
-    # Terminal edge only on success — failure/interrupt paths above return
-    # without it, matching the main compress_context() gating.
-    _emit_compaction_done(agent)
-    return messages, existing_prompt
 
 
 # 4 MB leaves headroom under Anthropic's 5 MB; shrinking loses quality but only
