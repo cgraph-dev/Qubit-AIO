@@ -2523,7 +2523,7 @@ def _schedule_mcp_late_refresh(sid: str, agent) -> None:
                 return  # conversation started: a rebuild would invalidate the cached prompt prefix
             try:
                 from tools.mcp_tool_agent import refresh_agent_mcp_tools
-                added = refresh_agent_mcp_tools(agent, quiet_mode=True)
+                added = refresh_agent_mcp_tools(agent, quiet_mode=True, content_aware=True)
             except Exception as exc:
                 logger.warning("Late MCP refresh: tool snapshot rebuild failed for %s: %s", sid, exc)
                 return
