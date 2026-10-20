@@ -2257,6 +2257,12 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             "compression_deferred": result.get("compression_deferred", False),
             "tools": ctx.tools_holder[0] or [],
             "history_offset": history_offset, "compacted_in_place": compacted_in_place, "session_id": effective_session_id,
+            # Same rule as the direct API path (``_finish_turn_result``): the returned `messages` replaced the
+            # transcript, so a stored receipt must keep it whole instead of cutting it to this turn's suffix.
+            **({"_compressed": True} if compacted_in_place or effective_session_id != ctx.session_id else {}),
+            # The loop's proven current-turn row (``export_current_turn_boundary``) for the same `messages`: the
+            # stored receipt cuts there instead of re-guessing from text (multimodal or rewritten input + a nudge).
+            **({"current_turn_user_idx": result["current_turn_user_idx"]} if "current_turn_user_idx" in result else {}),
             **usage,
             **({"persisted_turn": persisted_turn} if persisted_turn else {}),
         }
