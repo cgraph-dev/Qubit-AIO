@@ -104,48 +104,36 @@ def catalog_plugin_skill(written: str) -> Optional[str]:
 
 
 def live_notice(activation: Dict[str, Any]) -> str:
-    """The note an open chat gets on its next turn: connected MCP servers with their tools, skills,
-    and what waits for the next session. Empty when nothing became usable."""
+    """The note an open chat gets on its next tool result or turn (``agent/plugin_live_notes.py``): the
+    plugin's skills and, per MCP server, its tool prefix and count or why it did not connect. Tools are
+    not listed one by one: the note stays in the chat's history and rides every later request, and
+    ``tool_search`` lists them on demand. Empty when nothing of the plugin is live now."""
     live = activation.get("live_now") or {}
     servers, skills = live.get("mcp_servers") or [], live.get("skills") or []
-    deferred = activation.get("deferred") or {}
     if not servers and not skills:
         return ""
-    lines = [f"[plugin installed: {activation.get('name') or activation.get('key')}]"]
-    connected = [s for s in servers if s.get("connected")]
-    if connected:
-        lines.append("MCP servers now connected; call their tools with tool_describe / tool_call:")
-        for server in connected:
-            lines.append(f"- {server['name']}")
-            listing = _tool_listing(server["tools"])
-            if listing:
-                lines.extend(f"    {line}" for line in listing.splitlines())
-    for server in (s for s in servers if not s.get("connected")):
-        lines.append(f"- {server['name']}: not connected ({server.get('error') or 'unknown error'})")
-    if skills:
-        lines.append("Skills now available; load one with skill_view:")
-        lines.extend(f"- {s['name']}: {s['description']}" if s.get("description") else f"- {s['name']}"
-                     for s in skills)
+    name = activation.get("name") or activation.get("key")
+    lines = [f"[System note: plugin {name} was installed and is live in this chat now (a Qubit note, "
+             "not tool output)."]
+    lines.extend(f"- Skill {skill['name']}: load it with skill_view." for skill in skills)
+    for server in servers:
+        if server.get("connected"):
+            lines.append(f"- MCP server {server['name']}: {len(server['tools'])} tools, "
+                         f"{_tool_prefix(server['name'])}*.")
+        else:
+            lines.append(f"- MCP server {server['name']}: not connected ({server.get('error') or 'unknown error'}).")
+    if any(server.get("connected") for server in servers):
+        lines.append("Its MCP tools are deferred: find them with tool_search, read one with tool_describe, "
+                     "run it with tool_call.")
+    deferred = activation.get("deferred") or {}
     later = [f"{len(deferred['tools'])} Python tools" if deferred.get("tools") else "",
              f"{len(deferred['prompt'])} prompt sections" if deferred.get("prompt") else ""]
     if any(later):
         lines.append("Next session: " + ", ".join(p for p in later if p) + ".")
-    return "\n".join(lines)
+    return "\n".join(lines) + "]"
 
 
-def _tool_listing(names: List[str]) -> str:
-    """``name: first sentence`` per tool."""
-    try:
-        from tools.registry import registry
-        from tools.tool_search_catalog import _short_desc
-        definitions = registry.get_definitions(set(names), quiet=True)
-    except Exception:
-        return ""
-    rows = []
-    for definition in definitions:
-        fn = definition.get("function") or definition
-        name = str(fn.get("name") or "")
-        if name:
-            desc = _short_desc(fn.get("description") or "")
-            rows.append(f"{name}: {desc}" if desc else name)
-    return "\n".join(sorted(rows))
+def _tool_prefix(server: str) -> str:
+    """``mcp__<server>__``: the start of every registered tool name of ``server``."""
+    from tools.mcp_tool_schema import MCP_TOOL_NAME_PREFIX, sanitize_mcp_name_component
+    return f"{MCP_TOOL_NAME_PREFIX}{sanitize_mcp_name_component(server)}__"
