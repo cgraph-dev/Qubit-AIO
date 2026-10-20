@@ -57,6 +57,43 @@ def commit_local_session(db, *, epoch, receipt):
     return db._execute_write(write)
 
 
+def client_request(request_json, derived=None):
+    """A frozen create request as the client sent it: an owner-resolved ``-m`` route (``model_requested``)
+    compares by the name the client typed, not by the model and the *derived* fields (a receipt from
+    before ``route_derived``: the endpoint) its ``${VAR}`` refs expanded to at the time."""
+    request = json.loads(request_json)
+    if derived is None:
+        request.pop('route_derived', None)
+    if 'model_requested' in request:
+        request.pop('model', None)
+        for key in ('base_url',) if derived is None else derived:
+            request.pop(key, None)
+    return request
+
+
+def same_create_request(saved_json, retry_json):
+    """Whether a create retry carries the frozen request it resumes: one check for a retry that finds the
+    session committed and one staged before it was. The saved receipt's provenance names the owner's
+    fields; one from before a same-name alias got ``model_requested`` compares exactly, as it did."""
+    derived = json.loads(saved_json).get('route_derived')
+    if client_request(saved_json, derived) == client_request(retry_json, derived):
+        return True
+    retry = json.loads(retry_json)
+    if retry.get('model_requested') == retry.get('model'):
+        retry.pop('model_requested', None)
+        retry.pop('route_derived', None)
+    return json.loads(saved_json) == retry
+
+
+def same_create_retry(saved_policy, retry_json, client_request):
+    """The one exact-retry identity of a create: ``same_create_request`` on what the client sent, and its
+    ``client_env`` (``client_request``: the retry's own, never stored) judged by the rules frozen with
+    *saved_policy*. Used by a retry that finds the session committed, at commit, and by one overlapping
+    the attempt that holds the session's key slot."""
+    from agent.session_client_env import retry_matches
+    return same_create_request(saved_policy['request_json'], retry_json) and retry_matches(saved_policy, client_request)
+
+
 def _row_cwd(policy):
     """The sessions-row ``cwd``: the create request's ``row_cwd`` (``""`` = none) when it sent one,
     else the execution cwd. Row metadata only (workspace grouping, ``-c``, cwd restore); the
