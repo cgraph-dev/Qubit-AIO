@@ -1409,7 +1409,7 @@ class GatewayTurnMixin:
             )
         return bounded
 
-    async def _hmwa_first_contact_notes(self, source, history, turn_sidecar_notes, message, internal=False):
+    async def _hmwa_first_contact_notes(self, source, history, turn_sidecar_notes, internal=False, *, message=""):
         """First-ever-message onboarding note + one-time 'no home channel' prompt (both only when
         the session has no history). Delivered on the user message (sidecar), NOT the ephemeral
         system prompt: present-on-turn-1/absent-on-turn-2 was a guaranteed prompt diff + rebuild."""
@@ -1423,7 +1423,7 @@ class GatewayTurnMixin:
             from agent.onboarding import first_contact_turn_note, setup_command
             note = first_contact_turn_note(
                 _load_gateway_config(), _gateway_config_home() / "config.yaml",
-                session_history_empty=True, install_has_prior_sessions=False, message=message,
+                session_history_empty=True, install_has_prior_sessions=False, message=message or "",
                 command=setup_command(source.platform.value),
             )
             if note:
@@ -2102,7 +2102,9 @@ class GatewayTurnMixin:
             self._clear_session_env(_session_env_tokens)
             return t("gateway.errors.history_unavailable"), _session_env_tokens
 
-        await self._hmwa_first_contact_notes(source, history, turn_sidecar_notes, event.text, internal=event.internal)
+        await self._hmwa_first_contact_notes(
+            source, history, turn_sidecar_notes, internal=event.internal, message=event.text,
+        )
 
         # Voice channel state rides the user message ONLY when changed (in the system prompt it
         # forced a rebuild + prompt-cache re-key per message).

@@ -506,7 +506,7 @@ class GatewayTurnPrepareMixin:
         if _lease_token is not None:
             self._session_state(_quick_key).turn.lease_tokens[run_generation] = _lease_token
 
-    async def _hmwa_first_contact_notes(self, source, history, turn_sidecar_notes, internal=False):
+    async def _hmwa_first_contact_notes(self, source, history, turn_sidecar_notes, internal=False, *, message=""):
         """First-ever-message onboarding note + one-time 'no home channel' prompt (both only when
         the session has no history). Delivered on the user message (sidecar), NOT the ephemeral
         system prompt: present-on-turn-1/absent-on-turn-2 was a guaranteed prompt diff + rebuild."""
@@ -520,10 +520,11 @@ class GatewayTurnPrepareMixin:
         if human_platform and source.chat_type == "dm" and not await self.async_session_store.has_any_sessions():
             # Same branch logic as the TUI (profile-build offer once when "ask", else plain intro);
             # first_contact_turn_note already falls back to the plain intro on error.
-            from agent.onboarding import first_contact_turn_note
+            from agent.onboarding import first_contact_turn_note, setup_command
             note = first_contact_turn_note(
                 _load_gateway_config(), _gateway_config_home() / "config.yaml",
-                session_history_empty=True, install_has_prior_sessions=False,
+                session_history_empty=True, install_has_prior_sessions=False, message=message or "",
+                command=setup_command(source.platform.value),
             )
             if note:
                 turn_sidecar_notes.append(note)
