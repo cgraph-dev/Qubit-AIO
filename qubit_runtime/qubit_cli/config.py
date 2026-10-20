@@ -935,6 +935,8 @@ def _format_config_get_value(value, *, as_json: bool) -> str:
 
 def get_missing_config_fields() -> List[Dict[str, Any]]:
     """Check which config fields are missing or outdated (recursive)."""
+    from qubit_cli.moa_config import skip_deep_merge
+
     missing = []
 
     def _check(defaults: dict, current: dict, prefix: str = ""):
@@ -945,7 +947,8 @@ def get_missing_config_fields() -> List[Dict[str, Any]]:
             if key not in current:
                 missing.append({"key": full_key, "default": default_value,
                                 "description": f"New config option: {full_key}"})
-            elif isinstance(default_value, dict) and isinstance(current.get(key), dict):
+            elif (isinstance(default_value, dict) and isinstance(current.get(key), dict)
+                    and not skip_deep_merge(prefix, key)):
                 _check(default_value, current[key], full_key)
 
     _check(DEFAULT_CONFIG, load_config())

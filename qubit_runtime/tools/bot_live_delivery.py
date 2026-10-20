@@ -47,17 +47,11 @@ def _bot_chat_tip(home: Path) -> str | None:
 def find_canonical_owner(profile_home: Path | str) -> dict[str, Any] | None:
     """Return the exact Bot Chat tip's lease, including unsupported CLI owners."""
     from qubit_cli.active_sessions import active_session_registry_snapshot
-    from qubit_state import SessionDB
 
     home = Path(profile_home).resolve()
     if not (home / "state.db").is_file():
         return None
-    db = SessionDB(db_path=home / "state.db", read_only=True)
-    try:
-        row = db.get_session_by_title("Bot Chat")
-        session_id = db.get_compression_tip(row["id"]) if row else None
-    finally:
-        db.close()
+    session_id = _bot_chat_tip(home)
     if not session_id:
         return None
     for entry in active_session_registry_snapshot(registry_home=home):

@@ -1149,7 +1149,9 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin):
     def _spawn_env(env_vars: dict) -> dict:
         """Sanitized child env; PYTHONUNBUFFERED so tqdm/datasets-style buffering
         doesn't hide progress from process(action="poll")."""
-        env = _sanitize_subprocess_env(os.environ, env_vars)
+        from tools.environments.local import _terminal_env
+
+        env = _terminal_env(_sanitize_subprocess_env(os.environ, env_vars))
         env["PYTHONUNBUFFERED"] = "1"
         return env
 
