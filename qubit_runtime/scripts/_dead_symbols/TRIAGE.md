@@ -514,3 +514,129 @@ methods); none of those names is read upstream, so none appears in the dead list
 
 Pre-existing failures were confirmed by stashing the wave-7 files and re-running
 the same tests on `1ee45b700`; no failure was inferred.
+
+## Wave 8 (branch `fix/dead-symbols-wave8`, based on main `6aaf931f1`)
+
+Measured with the documented command from the worktree root (warm cache symlinked
+from the primary checkout):
+
+```bash
+.venv/bin/python qubit_runtime/scripts/check_dead_symbols.py --json /tmp/dead-wave8-before.json -v
+# ... 13 batches ...
+.venv/bin/python qubit_runtime/scripts/check_dead_symbols.py --json /tmp/dead-wave8-after.json -v
+```
+
+| state | dead_count |
+|---|---:|
+| main `6aaf931f1` | 128 |
+| after 13 batches | **109** |
+
+**19 symbols resolved, 0 new** (set diff of `/tmp/dead-wave8-before.json` vs
+`/tmp/dead-wave8-after.json`). **No symbol was deleted**, so no Declared-exclusions
+entry was added to `docs/FROZEN_TARGET.md`.
+
+### Wired in this wave (19 measured + 1 string-bound)
+
+| # | symbol | module | upstream call site (pin) |
+|--:|---|---|---|
+| 1 | `_source_match_clause` | qubit_state_common.py | `hermes_state_sessions.py:138,1548` |
+| 2 | `exclude_superseded_segments` | qubit_state_local.py | `hermes_state_sessions.py:1352,1432,1576,1594` |
+| 3 | `annotate_local_lineages` | qubit_state_local.py | `hermes_state_sessions.py:1449` |
+| 4 | `retire_prunable` | qubit_state_mutation_retirement.py | `hermes_state_maintenance.py:128,346`, `hermes_state_sessions.py:1930` |
+| 5 | `prune_retired_tombstones` | qubit_state_mutation_retirement.py | `hermes_state_maintenance.py:347` |
+| 6 | `SessionLedgeredError` | qubit_state_profile_repair.py | `hermes_cli/sessions_repair_profiles.py:409-414`, `hermes_state_profile_repair.py:230` |
+| 7 | `_ledgered_lineages` | qubit_cli/sessions_repair_profiles.py | same file `:196` |
+| 8 | `managed_turn_count` | gateway/run_runtime.py | `gateway/run_shutdown.py:197,807,1562,1606,1925,2075` |
+| 9 | `retained_destination` | gateway/platforms/webhook_delivery.py | `gateway/platforms/webhook.py:319,321` |
+| 10 | `recover_gateway_native_sessions` | gateway/run_runtime.py | `gateway/run_startup.py:1548-1549` |
+| 11 | `stop_run` | gateway/platforms/api_server_authority_runs.py | `gateway/platforms/api_server_runs.py:1438-1441` |
+| 12 | `ensure_aiohttp` | plugins/platforms/whatsapp/adapter.py | same file `:594` |
+| 13 | `is_managed_route` | plugins/web/firecrawl/provider.py | `hermes_cli/web_routers/tools.py:412-419` |
+| 14 | `is_connector_batch` | qubit_cli/observability/shared_metrics_connectors.py | `relay_shared_metrics.py:473,560` |
+| 15 | `batch_entry_ran` | qubit_cli/observability/shared_metrics_connectors.py | `relay_shared_metrics.py:564` |
+| 16 | `ConnectorSessionState` | qubit_cli/observability/shared_metrics_connectors.py | `relay_shared_metrics.py:193,211` |
+| 17 | `tool_batch_fields` | qubit_cli/observability/shared_metrics_connectors.py | `shared_metrics_model.py:169-174` |
+| 18 | `counter_dimensions_shape_is_known` | qubit_cli/observability/shared_metrics_drift.py | `shared_metrics.py:678` |
+| 19 | `conform_counter_dimensions` | qubit_cli/observability/shared_metrics_drift.py | `shared_metrics.py:681` |
+| — | `merge_endpoint_seed` (string-bound) | qubit_cli/profile_model_seed.py | `tui_gateway/methods_profiles.py:529` — wired through `_lazy(...)`, which the detector cannot see; it remains in the list but is live at runtime. |
+
+### Batches and focused verification
+
+| batch | commit | command (cwd `qubit_runtime/`) | result |
+|---|---|---|---|
+| 1 | `66aef7dab` | `pytest -q tests/qubit_state/test_session_list_created_source_lineage.py tests/qubit_state/test_hermes_state.py tests/qubit_state/test_pinned_lineage.py tests/qubit_state/test_session_list_index_choice.py tests/qubit_state/test_compression_lineage_guard.py` | 3 new pass; 301 passed, 10 pre-existing fails (byte-identical on baseline) |
+| 2 | `7a163c978` | `pytest -q tests/qubit_state/test_prune_activity_recency.py tests/qubit_state/test_empty_sweep_archived_transcript.py tests/qubit_state/test_sweep_orphaned_sessions.py tests/qubit_state/test_never_active_keyed_prune.py tests/qubit_cli/test_prune_spares_pinned.py tests/qubit_cli/test_sessions_owner_prune_wiring.py` | 56 passed, 4 pre-existing fails (byte-identical on baseline) |
+| 3 | `cb8758eac` | `pytest -q tests/gateway/test_restart_after_turn.py tests/gateway/test_restart_drain.py tests/gateway/test_external_drain_control.py tests/gateway/test_stuck_loop.py` and `...test_drain_active_work_report.py test_gateway_shutdown.py test_api_server_active_work_drain.py test_cron_active_work_drain.py` | 45 passed + 41 passed |
+| 4 | `73cecba8a` | `pytest -q tests/gateway/test_webhook_adapter.py tests/gateway/test_webhook_deliver_only.py tests/gateway/test_webhook_integration.py tests/gateway/test_delivery_ledger_producer.py` | 56 passed |
+| 5 | `62f4397a4` | `pytest -q tests/tui_gateway/test_profiles_inherit_launch_model.py tests/tui_gateway/test_profiles_configure.py tests/tui_gateway/test_profiles_configure_model_guard.py` | 8 passed (new custom_providers case) |
+| 6 | `7cf616722` | `pytest -q tests/qubit_cli/test_sessions_repair_profiles.py` | 6 passed |
+| 7 | `690c0d0d1` | `pytest -q tests/qubit_cli/test_sessions_repair_profiles.py` | 7 passed (new ledgered-lineage case) |
+| 8 | `1794dffa2` | `pytest -q tests/qubit_cli/test_relay_shared_metrics.py tests/qubit_cli/test_shared_metrics_reliability.py tests/qubit_cli/test_shared_metrics_harness.py` | 130 passed, 2 pre-existing fails (byte-identical on baseline) |
+| 9 | `d28be1181` | `pytest -q tests/qubit_cli/test_shared_metrics_connector_errors.py tests/qubit_cli/test_shared_metrics_signals.py tests/qubit_cli/test_shared_metrics_surface_attribution.py` | 66 passed, 4 pre-existing fails (byte-identical on baseline) |
+| 10 | `dc6ca48fe` | `pytest -q tests/qubit_cli/test_relay_shared_metrics.py tests/qubit_cli/test_relay_shared_metrics_runtime.py tests/qubit_cli/test_shared_metrics_connectors.py` | 164 passed (4 new) |
+| 11 | `5741f2e33` | `pytest -q tests/gateway/test_whatsapp_connect.py tests/gateway/test_whatsapp_bridge_dir_resolution.py` and web-server toolset tests | 14 passed, 3 skipped; 3 passed |
+| 12 | `99fc3525f` | `pytest -q tests/gateway/test_session_db_recovery.py test_active_turn_recovery.py test_reaped_session_recovery.py test_hosted_room_gateway_lifecycle.py test_profile_spool_recovery.py test_gateway_inline_bootstrap_identity.py test_runner_startup_failures.py test_boot_runtime_lock_reservation.py` | 41 + 34 passed |
+| 13 | `81dc63d8e` | `pytest -q tests/gateway/test_api_server_runs.py tests/gateway/test_api_server_runs_import_isolation.py` and stop-filtered `test_peer_dm_into_open_bot_chat.py`/`test_api_server.py` | 76 passed; 4 passed |
+
+Every pre-existing failure was re-run on a detached baseline before being called
+pre-existing. No service was restarted.
+
+### New triage (not wired) — evidence at the pin
+
+| # | symbol | module | verdict | evidence |
+|--:|---|---|---|---|
+| 1 | `validate_task_input` | gateway/hosted_room_task_input.py | GENUINE GAP, DEFERRED | upstream reads it at `hosted_room_discussion.py:22,732,777`, `hosted_room_driver.py:178`, `hosted_room_policy_checkpoint.py:17,362`; the local callers carry no `input_context` at all, so wiring one call would accept unvalidated checkpoint input. |
+| 2 | `is_openai_bedrock_model` | agent/bedrock_adapter.py | TEST-ONLY at the pin | product code never calls it; only `tests/agent/test_bedrock_adapter.py:1079-1095`. (Corrects the Wave-1 "genuine" label.) |
+| 3 | `terminal_worker_receipt` | qubit_state_terminal.py | TEST-ONLY at the pin | only `tests/hermes_state/test_terminal_retirement.py` reads it; no upstream product call site. |
+| 4 | `prepare_delivery_locked` | gateway/hosted_room_work_records.py | TEST-ONLY at the pin | only `tests/gateway/test_room_work_evidence.py`. |
+| 5 | `acknowledge_locked` | gateway/hosted_room_work_records.py | TEST-ONLY at the pin | only `tests/gateway/test_room_work_evidence.py`. |
+| 6 | `_tool_prefix` | qubit_cli/plugins_activation_live.py | CORRECTLY UNWIRED | local activation note lists each tool via `_tool_listing`; upstream's prefix+count line is a different message shape, not a dropped call. |
+| 7 | `reset_local_session` | gateway/session_local_recovery.py | BLOCKED — FILE OWNED BY ANOTHER LANE | its only upstream call site is `gateway/session.py:1145-1146`; `gateway/session.py` is out of scope for this lane. |
+| 8 | `_submit_fingerprint` | acp_adapter/gateway_server.py | BLOCKED — FILE OWNED BY ANOTHER LANE | `acp_adapter/**` is out of scope; upstream calls it at `acp_adapter/gateway_server.py:558`. |
+| 9 | `unpark_profile` | gateway/run_runtime.py | DEFERRED | upstream hot-serve reconcile calls it at `run_profile_reconcile.py:157-197`; this fork's reconcile serves adapters only and has no runtime reservation/serve phase (`_apply_profile_changes` never calls `reserve_profile_home`/`serve_profile_runtime`), so parking state cannot be maintained partially. |
+| 10 | `reserve_profile_home` | gateway/run_runtime.py | DEFERRED | same hot-serve runtime phase (`run_profile_reconcile.py:270-273`). |
+| 11 | `serve_profile_runtime` | gateway/run_runtime.py | DEFERRED | same (`run_profile_reconcile.py:270-280`); needs the per-profile authority build wired into reconcile. |
+| 12 | `unserve_profile_runtime` | gateway/run_runtime.py | DEFERRED | same (`run_profile_reconcile.py:339-341`); teardown would otherwise retire nothing while the adapter teardown proceeds. |
+| 13 | `register_transport_home` | gateway/session_ingress_context.py | DEFERRED | upstream registers it from `run_adapters.py:1713-1748` where the message handlers also open `native_callback`; the local handlers open no callback, so wiring the registration alone leaves provenance half-bound. |
+| 14 | `create_peer_bot_chat` | gateway/platforms/api_server_bot_chat.py | DEFERRED | upstream endpoint is wired at `api_server.py:3074-3075`; this fork's api_server registers no peer-DM create route. |
+| 15 | `admit_peer_turn` | gateway/platforms/api_server_bot_chat.py | DEFERRED | same peer-DM route (`api_server.py:3426-3427`). |
+| 16 | `await_live_delivery` | gateway/platforms/api_server_bot_chat.py | DEFERRED | same peer-DM delivery (`api_server.py:3482-3490`, `api_server_runs.py:955-971`). |
+| 17 | `wall_clock_sleep` | scripts/code_health/py_rules_sleep.py | DEFERRED | upstream registers it as HX013 (`py_rules.py:17,876`, `config.py:143-150`); this fork's rule table stops at HX012 and registration needs a baseline allow-comment sweep. |
+| 18 | `_require_release_line` | scripts/releases/entrypoint.py | DEFERRED | upstream calls it at `entrypoint.py:243`; the local release flow uses `_require_remote_main` and a different outstanding/abandon path, so wiring the upstream helper changes release admission. |
+| 19 | `_is_claim_run` | scripts/releases/entrypoint.py | DEFERRED | upstream call sites `:136,453` belong to the diverged release-admission flow. |
+| 20 | `_abandon_confirmed` / `_abandon_prompt` | scripts/releases/entrypoint.py | DEFERRED | upstream `:282,587`; local abandon flow differs. |
+| 21 | `release_line_refspecs` | scripts/releases/stable.py | DEFERRED | upstream `entrypoint.py:67`, `stable.py:566,615`; the local release scripts have diverged and call site wiring is release-critical. |
+| 22 | `require_targets_match_claim` | scripts/releases/stable.py | DEFERRED | upstream `stable.py:1016`; needs the full claim/manifest flow. |
+| 23 | `baseline_covers` | scripts/releases/stable.py | DEFERRED | upstream `stable.py:773`. |
+| 24 | `check_controller` | scripts/releases/stable.py | DEFERRED | upstream `stable.py:548`. |
+| 25 | `authenticated_push` | scripts/releases/stable.py | DEFERRED | upstream `stable.py:907`. |
+| 26 | `prepare_context`, `identify_output`, `_response_identity` | gateway/platforms/api_server_response_*.py | DEFERRED | the durable Responses admission (`durable_key`/fingerprint/replay) is absent locally. |
+| 27 | `_handle_run_clarify`, `_handle_resolve_unknown_run`, `_steer_refused`, `_run_idempotency_identity`, `_run_user_message`, `_admit_run_to_authority` | gateway/platforms/api_server_runs.py | DEFERRED | clarify/resolve-unknown routes are not registered locally and the run handler inlines a different admission path. |
+| 28 | `bind_api_session`, `admit_api_turn`, `run_api_turn`, `recover_api_turns`, `owns_api_run` | gateway/session_api*.py | DEFERRED | API-turn authority transaction is only partially ported. |
+| 29 | `GatewayInboundHooksMixin`, `GatewayPluginInjectionMixin` | gateway/run_inbound_hooks.py, gateway/run_plugin_injection.py | DEFERRED | inline-vs-inherit split over ~1.4k lines; needs the Wave-2 telegram-style "inherit + delete every inlined copy" move. |
+| 30 | `GatewayRuntimeInitMixin`, `GatewayTurnHygieneMixin`, `GatewayTurnPersistenceMixin`, `GatewayTurnPrepareMixin` | gateway/run_*.py | DEFERRED | same inline-vs-inherit split. |
+| 31 | `CatalogApproved`, `CatalogServerError` | tui_gateway/contracts/connectors_operation.py | DEFERRED | local `CatalogRow` dropped `approved`/`server_errors` (and `enabled`/`missing_env`/`already_installed`). |
+| 32 | `forward_to_owner` | gateway/session_a2a.py | DEFERRED | local `_forward_to_profile` forwards in-process; adopting the owner-dial path changes the delivery contract and could forward twice. |
+| 33 | `configured_plugin_entries` | gateway/platform_activation.py | DEFERRED | local `PlatformRegistry` lacks `configured_entries()`/`activation_env()`. |
+| 34 | `app_lifespan` | qubit_cli/web_server_app.py | DEFERRED | replacing the single `_lifespan` with standby/http lifespans needs the owner `gateway_runner`. |
+| 35 | `completion_admission`, `drop_completion_delivery`, `launch_supervisor`, `gateway_spawn_intent_subcommand`, `has_pending`, `snapshot_native`, `_replay_unanswered` | various | FALSE POSITIVE / CORRECTLY UNWIRED | Wave 1-7 verdicts still hold (string-bound keys, test-only call sites, or a bounded local sibling that would double-deliver). |
+| 36 | test fixtures and test classes (`loopback_app`, `legacy_digests`, `_seed_stores`, `cron_home`, `TestRateLimit`, `TestPatchReplace`, `TestTerminalResultsCarryTheFreeTierBlock`, `explicit_static_config`, `_metric`) | tests/** | FALSE POSITIVE / TEST-ONLY | pytest collects/requests these by name; no product call site. |
+
+### Declared exclusions
+
+**None.** No upstream-defined symbol was deleted; every removal in the batches was
+a replaced/duplicated fork-private body, and no `docs/FROZEN_TARGET.md` entry was
+needed.
+
+### Explicit not-done
+
+- The hot-serve runtime family (reservation/serve/unserve/park) is **not** ported;
+  the local reconcile still serves adapters without building per-profile session
+  authorities. Its four blockers are named above.
+- The release-script helpers, the API-turn/Responses admission, the inbound/turn
+  mixin inheritance, and the `CatalogRow` fields remain deferred with the exact
+  upstream paths above.
+- `merge_endpoint_seed` is wired at runtime but still reported by the detector
+  because its consumer is string-bound through `_lazy`.
+- No service was restarted, nothing was applied live, and no global E2E/release
+  verdict is claimed.
