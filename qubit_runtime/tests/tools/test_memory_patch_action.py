@@ -6,13 +6,8 @@ matched entry, preserving the rest of the entry verbatim.
 
 Adapted from upstream ``tests/tools/test_memory_patch_action.py`` at pin
 ``43faacfb8de7b29548547a7fbdedad0cc6e7391c`` (hermes -> qubit names, QUBIT_HOME).
-
-Upstream's batch-apply cases (``apply_batch`` with a ``patch`` op) are not
-reproduced here: on this base every ``MemoryStore.apply_batch`` call raises
-``TypeError`` because ``memory_tool_store._batch`` calls the pinned 3-argument
-``_memory_target_error(store, target, operations)`` while this tree still has the
-older 2-argument definition. That is an independent, pre-existing port gap
-unrelated to the ``patch`` action and outside this change's scope.
+The target/key contract that gates every batch apply is pinned separately in
+``tests/tools/test_memory_target_contract.py``.
 """
 
 import json
