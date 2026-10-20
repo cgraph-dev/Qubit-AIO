@@ -27,6 +27,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 12 — 2026-10-20 (46 dead symbols; brand strings fixed)
+
+- ✅ Landed: reasoning-field rejection recovery; codex compaction attempt records; hygiene `trigger="gateway_hygiene"`; dead **56 → 46** (0 new); parity 25 files/48 tests (absent 596 → 571); user-facing `~/.hermes` guidance replaced with Qubit wording (`check_brand_half_rename.py` OK, 46 globals).
+- 🔴 New defects: API admission alias, `prompt_attachments.Path`, `_compression_tip_on`, `SessionEntry.yolo`, `route_runtime` fallback, model alias, `@file` cwd, interrupted-run status, MSGraph admit, ACP MCP discovery, HTTP lifespan/WS, event overflow; plus three dead-12 xfails (late backfill resurrects retired session, reset-child delete leaves parent, tombstone prune).
+- 🟡 Load-bearing `hermes` names remain and are allowed: `HERMES_*` env vars, the legacy home fallback (`_LEGACY_HOME_DIR`), wire-protocol keys (`hermes.status`, `hermes.run`, ACP `hermes` meta), upstream attribution/provenance, and tests.
+- 🔴 Remaining: 46 dead, 571 absent + 897 short-port tests, B1/F4/F5 owner items, retirement checklist.
+
+---
+
 ## Wave 11 — 2026-10-20 (56 dead symbols; retirement audit)
 
 - ✅ Landed: API chat `_handle_message` seam + keyed Responses durable replay; strict web models; session-delete retirement; DELETE-mode `_read_ctx` deadlock; watch completion identity; HMWA signature; worker usage projection; `/stop`/`/new` durable follow-up cancel.
