@@ -93,8 +93,21 @@ def _read_user_token_override() -> Optional[str]:
 
 def peek_nous_access_token() -> Optional[str]:
     """Cheap token probe: env override or cached auth-store token, no expiry check and no network —
-    availability scans must stay off the synchronous OAuth refresh path (:func:`read_nous_access_token`)."""
-    return _read_user_token_override() or _clean((_read_nous_provider_state() or {}).get("access_token"))
+    availability scans must stay off the synchronous OAuth refresh path (:func:`read_nous_access_token`).
+
+    A guest with no inference credential can still hold a connectors-only grant; it is the bearer a
+    connectors / managed-tools call sends, so the probe must see it instead of reporting None.
+    """
+    explicit = _read_user_token_override()
+    if explicit:
+        return explicit
+    state = _read_nous_provider_state() or {}
+    cached = _clean(state.get("access_token"))
+    if cached:
+        return cached
+    from qubit_cli.anon_auth import held_connectors_token
+
+    return _clean(held_connectors_token(state))
 
 
 def read_nous_access_token() -> Optional[str]:
@@ -111,6 +124,13 @@ def read_nous_access_token() -> Optional[str]:
     if not nous_provider:
         return None
     cached_token = peek_nous_access_token()
+    # Connectors-only guest: there is no inference token to refresh, and the inference refresh path
+    # must not run for a grant that only authorises connectors. Its own expiry is on the slot.
+    from qubit_cli.anon_auth import held_connectors_token, is_connectors_only
+
+    if cached_token and is_connectors_only(cached_token) and not _clean(nous_provider.get("access_token")):
+        connectors = held_connectors_token(nous_provider, skew_seconds=_NOUS_ACCESS_TOKEN_REFRESH_SKEW_SECONDS)
+        return connectors or cached_token
     if cached_token and not _access_token_is_expiring(nous_provider.get("expires_at"), _NOUS_ACCESS_TOKEN_REFRESH_SKEW_SECONDS):
         return cached_token
     try:

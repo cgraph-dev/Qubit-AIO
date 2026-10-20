@@ -66,3 +66,28 @@ def test_inference_exchange_still_replaces_the_state_token():
     assert state["access_token"] == inference
     assert state["inference_base_url"] == WELCOME
     assert "connectors_token" not in state
+
+
+def test_connectors_only_guest_is_visible_to_managed_tool_readers(monkeypatch):
+    """The connector bearer a managed-tools call sends must be the connectors-only grant.
+
+    A guest with no inference token has no ``access_token``; before this was wired the reader
+    returned None and every managed-tools/connector call looked unauthenticated even though the
+    grant was stored (writer/reader split).
+    """
+    from tools import managed_tool_gateway as mtg
+
+    connectors = make_jwt(scope="connectors:invoke")
+    state = {"auth_method": "anonymous", "anon_token": "anon_1"}
+    anon_auth.apply_exchange_to_state(state, {"access_token": connectors})
+    assert state["connectors_token"]["access_token"] == connectors
+
+    monkeypatch.setattr(mtg, "_read_nous_provider_state", lambda: state)
+    monkeypatch.setattr(mtg, "_read_user_token_override", lambda: None)
+
+    assert mtg.peek_nous_access_token() == connectors
+    monkeypatch.setattr(
+        "qubit_cli.auth.resolve_nous_access_token",
+        lambda **_: pytest.fail("a connectors-only grant must not run the inference refresh"),
+    )
+    assert mtg.read_nous_access_token() == connectors

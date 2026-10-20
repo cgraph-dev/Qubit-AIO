@@ -185,3 +185,12 @@ def test_cmd_sessions_without_an_owner_keeps_the_local_writer(monkeypatch, tmp_p
 
     assert seen["owner_endpoint"] is None
     assert opened == [False]
+
+
+def test_owner_failure_copy_names_the_qubit_command(capsys):
+    from qubit_cli.sessions_owner import report_owner_failure
+
+    assert report_owner_failure(RuntimeError("boom")) == 1
+    out = capsys.readouterr().out
+    assert "qubit sessions prune --dry-run" in out
+    assert "hermes" not in out

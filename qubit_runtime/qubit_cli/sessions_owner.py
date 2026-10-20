@@ -33,6 +33,6 @@ def owner_prune(endpoint, **params) -> dict:
 
 
 def report_owner_failure(exc) -> int:
-    print(f"Error: the gateway did not complete the prune ({exc}). Run `hermes sessions prune --dry-run` "
+    print(f"Error: the gateway did not complete the prune ({exc}). Run `qubit sessions prune --dry-run` "
           "with the same filters to see what is left.")
     return 1

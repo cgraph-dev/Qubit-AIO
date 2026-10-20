@@ -1885,7 +1885,19 @@ def _resolve_nous_access_token(
                     refresh_guest_state(state, client)
                 persist()
                 _write_shared_nous_state(state)
-                return _memo(state["access_token"])
+                from qubit_cli.anon_auth import held_connectors_token, is_connectors_only
+                token = held_connectors_token(state)
+                if not token:
+                    raise _nous_err(
+                        "No access token found for Qubit Labs login.",
+                        "nous_auth_missing_access_token", relogin=True)
+                if is_connectors_only(token) and not state.get("access_token"):
+                    # A connectors-only grant cannot carry inference; surface that as a typed auth
+                    # refusal instead of handing inference a token it may not use.
+                    raise _nous_err(
+                        "This Qubit Labs credential only authorises connectors, not inference.",
+                        "nous_auth_no_inference_scope", relogin=True)
+                return _memo(token)
 
             merged_shared = _merge_shared_nous_oauth_state(state)
             access_token = state.get("access_token")
