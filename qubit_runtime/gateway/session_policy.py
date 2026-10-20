@@ -105,8 +105,9 @@ class LocalSessionPolicy:
         config = present_sections(json.loads(self.config_json))
         live = self.read_profile(authority)
         if self.config_secret_ref is not None and authority is not None and secrets:
-            from gateway.session_policy_credentials import recover_config_secrets
-            for path, value in recover_config_secrets(authority, self).items():
+            from gateway.session_policy_credentials import disable_dropped_secrets, recover_config_secrets
+            recovered = recover_config_secrets(authority, self)
+            for path, value in recovered.items():
                 if path[0] is None:  # private terminal projection, not config
                     continue
                 target = config
@@ -114,6 +115,7 @@ class LocalSessionPolicy:
                     # An alias entry added after creation is absent from the frozen tree.
                     target = target.setdefault(key, {}) if isinstance(target, dict) else target[key]
                 target[path[-1]] = value
+            disable_dropped_secrets(config, getattr(recovered, 'dropped', ()), getattr(recovered, 'session', None))
         model = self.model
         if live:
             frozen, request = config.get('model') or {}, json.loads(self.request_json)
@@ -454,6 +456,19 @@ def _apply_launch_overrides(params, config):
     from qubit_cli.config import resolve_turn_limit
     from qubit_constants import parse_reasoning_effort
     params = _with_entry_pick(_without_auto_pick(params), config)
+    if 'provider' in params and not _keeps_profile_route(params['provider'], config):
+        model = config.setdefault('model', {})
+        # A provider pick is a route change: the profile's endpoint, wire protocol and
+        # credential pointers belong to the provider being replaced, and pairing the new one
+        # with them sends its key to the old host (401) or the old key down the new route.
+        # They are dropped before the overrides fold in, so the target provider resolves its
+        # own — the same route keys a committed /model switch rewrites (#138843). An explicit
+        # base_url is applied after the drop, so a pinned endpoint survives without carrying
+        # the replaced provider's other pins, and a same-provider re-pick keeps the profile's.
+        from gateway.session_route_identity import ROUTE_BOUND_KEYS
+        # The replaced provider's context window goes too: it was sized for the old model.
+        for stale in ROUTE_BOUND_KEYS:
+            model.pop(stale, None)
     for key in ('provider', 'base_url'):
         if key in params:
             value = params[key]
