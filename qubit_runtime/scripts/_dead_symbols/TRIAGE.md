@@ -1140,3 +1140,87 @@ the local tree calls the helper. Deleted, and recorded in
   helpers) is left to a release-focused lane.
 - The detector still reports fixtures/classes, one decorator-registered route
   and two string-bound helpers; those are instrument FPs, not gaps.
+
+## Wave 13 — 46 → 37, 9 resolved, 0 new (2026-10-20, branch `fix/dead-symbols-wave13`)
+
+Measured on `fa01262d3` with the warm cache (`cd qubit_runtime && python
+scripts/check_dead_symbols.py --json /tmp/dead-wave13-before.json`): **46 dead**
+(45 unique names; `TestRateLimit` appears twice). After two focused batches:
+**37 dead** (36 unique), set diff **9 resolved / 0 new**. No production behaviour
+was removed: one deferred architectural family was ported end-to-end, and six
+symbols whose upstream call sites do not exist in this fork were deleted as
+declared exclusions.
+
+### Batches and focused verification
+
+| batch | commit | change | command (cwd `qubit_runtime/`) | result |
+|---|---|---|---|---|
+| 1 | `4bdded050` | Port the deferred hosted-room attachments/`input_context` family: `validate_user_payload` + `_validate_member_message` accept/normalize manifests and member recipients; `_derive_member_watermarks` honors the discussion sequence; `plan_next_task` consumes `_bounded_task_delta` (whole-event prefixes, frozen `input_context`); `_make_task_plan`/`reconstruct_task_plan` carry and verify `input_context`+`attachments`; `driver._task_payload` validates both. Ports `tests/gateway/test_hosted_discussion_manifests.py`. | `pytest -q tests/gateway/test_hosted_discussion_manifests.py tests/gateway/test_hosted_room_discussion.py tests/gateway/test_hosted_room_driver.py` | **92 passed** |
+| 1 | `4bdded050` | same | `pytest -q tests/gateway/test_hosted_room_*.py tests/gateway/test_hosted_discussion_manifests.py tests/gateway/test_hosted_rooms.py tests/gateway/test_hosted_rooms_read_path.py` | **188 passed** |
+| 1 | `4bdded050` | same (top-level attachment suite) | `pytest -q tests/gateway/test_hosted_room_attachments.py` (repo root) | **24 passed** |
+| 2 | `0051c83ec` | Delete four dead upstream call-site-absent helpers and their closed chain: `_resolve_source_target`/`_resolve_stable`/`_describe_release_failure`/`_resolve_release` (live public R2 path), `_tool_prefix` (local `_tool_listing`), `GatewayLoopManager`/`GatewayHeartbeatManager` (local managers selected), `exit_on_resume_refusal` (stream-json error path), `_gateway_launch`/`_explicit_launch_skills`/`_ROUTE_FLAGS` (in-process agent + gateway-chat policy). Recorded in `docs/FROZEN_TARGET.md`. | `pytest -q tests/qubit_cli/test_source_release_channels.py tests/qubit_cli/test_source_release_head_containing.py tests/qubit_cli/test_source_check.py tests/qubit_cli/test_banner_release_channel.py tests/qubit_cli/test_gateway_chat_plugin_inject.py tests/qubit_cli/test_gateway_chat_failures.py tests/qubit_cli/test_cli_init.py tests/qubit_cli/test_loops.py tests/qubit_cli/test_heartbeat.py` | **234 passed, 1 skipped, 4 failed** — all 4 fail byte-identically on detached base `fa01262d3` (3 `test_source_check` network/target tests, `test_cli_init::test_real_typo_still_warns`) |
+
+### Triage of the remaining 37 (36 unique; all re-verified at `43faacfb8de7`)
+
+| # | symbol | module | verdict / evidence at the pin |
+|--:|---|---|---|
+| 1 | `create_peer_bot_chat` | gateway/platforms/api_server_bot_chat.py | DEFERRED — upstream `api_server.py:3074-3075`; local `_handle_create_session` writes the row directly (legacy path). File is lane-owned this wave. |
+| 2 | `admit_peer_turn` | gateway/platforms/api_server_bot_chat.py | DEFERRED — upstream `api_server.py:3426-3427`; local `_admit_to_live_bot_chat` uses the legacy mailbox, not the authority door. Lane-owned. |
+| 3 | `await_live_delivery` | gateway/platforms/api_server_bot_chat.py | DEFERRED — upstream `api_server.py:3482-3490`, `api_server_runs.py:955-971`; same authority-FIFO family. Lane-owned. |
+| 4 | `_admit_run_to_authority` | gateway/platforms/api_server_runs.py | DEFERRED — upstream self-call `:823`; local `_handle_runs` never admits to session authority. Lane-owned; durable-run admission. |
+| 5 | `_handle_run_clarify` | gateway/platforms/api_server_runs.py | DEFERRED — upstream route `:246`, handler `:1356`, test `test_api_canonical_projection.py:252`; local `_http_routes` omits it and `respond_run` needs authority admission. Lane-owned. |
+| 6 | `_handle_resolve_unknown_run` | gateway/platforms/api_server_runs.py | DEFERRED — upstream route `:248`, handler `:1461`; acknowledging a lost owner epoch is only safe once local runs are authority-owned. Lane-owned. |
+| 7 | `GatewayPluginInjectionMixin` | gateway/run_plugin_injection.py | DEFERRED — upstream `run_inbound.py:30,71`; local `GatewayInboundMixin` inlines the injector plus keyless/origin/profile checks, so inheriting the narrower mixin would regress those paths. |
+| 8 | `unpark_profile` | gateway/run_runtime.py | DEFERRED — upstream `run_profile_reconcile.py:157,159,177,197`; local reconcile parks but a boot-parked home is withdrawn from the reservation, so unparking without `reserve_profile_home` would advertise an unserved profile. |
+| 9 | `reserve_profile_home` | gateway/run_runtime.py | DEFERRED — upstream `run_profile_reconcile.py:270-273`; hot-serve reservation is not wired. |
+| 10 | `serve_profile_runtime` | gateway/run_runtime.py | DEFERRED — upstream `run_profile_reconcile.py:270-280`, `test_run_runtime_hot_serve_cleanup.py:123`; serving runs durable recovery (`recover_local_sessions`, `recover_webhook_finalizations`), so a partial wire could double-admit live work. |
+| 11 | `GatewayTurnHygieneMixin` | gateway/run_turn_hygiene.py | DEFERRED — upstream `run_turn.py:170,174`. Local `run_turn.py` inlines 42 `_hmwa_*` methods; 15 of the 18 hygiene methods are byte-identical but `_hmwa_hygiene_adopt_transcript`, `_hmwa_hygiene_on_timeout` and `_hmwa_hygiene_wait_for_summary` are newer locally. Wiring the mixin would revert those three; `run_turn.py` was lane-owned in wave 12. |
+| 12 | `completion_admission` | gateway/session_automation.py | DEFERRED — upstream `run_notifications.py:1172,1267,1413`; the local durable delivery ledger already gates, so calling it would double-suppress. |
+| 13 | `one_turn_route` | gateway/session_cli_turn.py | DEFERRED — upstream `run_turn_runner.py:1179-1180`; local `_apply_session_model_override` already applies the route, so calling it would double-apply. |
+| 14 | `api_auth_ws_ticket` | qubit_cli/dashboard_auth/routes.py | FALSE POSITIVE — registered by `@router.post("/api/auth/ws-ticket")` (`routes.py:531`); live test POSTs it (`tests/qubit_cli/test_dashboard_auth_ws_auth.py:118`). |
+| 15 | `merge_endpoint_seed` | qubit_cli/profile_model_seed.py | FALSE POSITIVE — string-bound `_lazy("qubit_cli.profile_model_seed", "merge_endpoint_seed")` at `tui_gateway/methods_profiles.py:534`. |
+| 16 | `select_apply_target` | qubit_cli/update_cmd_check.py | DEFERRED — upstream `update_cmd.py:1862`; the local update flow inlines the same block at `update_cmd.py:1864-1904` but drops `forward_only`/`target_is_head`. Wiring is a release-critical behaviour change, not a dead-symbol cleanup. |
+| 17 | `app_lifespan` | qubit_cli/web_server_app.py | DEFERRED — upstream `web_server.py:192,217`; local `web_server.py` has a diverged `_lifespan` (no `_probe_install_before_state_db`/`start_due_boot`, different shutdown join order). File is lane-owned this wave. |
+| 18 | `wall_clock_sleep` | scripts/code_health/py_rules_sleep.py | DEFERRED — upstream `py_rules.py:17,876` registers HX013; the local `CHECKERS` stops at HX012 and registering needs a repo-wide test-sleep allow sweep. |
+| 19 | `_require_release_line` | scripts/releases/entrypoint.py | DEFERRED — upstream self-call `:243`; local release entrypoint predates the lanes/claim rewrite so its claim path differs. Release lane. |
+| 20 | `_is_claim_run` | scripts/releases/entrypoint.py | DEFERRED — upstream `:136,453`; same pre-lanes divergence. |
+| 21 | `_abandon_confirmed` | scripts/releases/entrypoint.py | DEFERRED — upstream `:282`; release-critical abandon flow. |
+| 22 | `_abandon_prompt` | scripts/releases/entrypoint.py | DEFERRED — upstream `:587`, tested at `tests/scripts/test_release_entrypoint.py:325`; local flow differs. |
+| 23 | `release_line_refspecs` | scripts/releases/stable.py | DEFERRED — upstream `entrypoint.py:67`, `stable.py:566,615`; release lines are not in the local flow. |
+| 24 | `require_targets_match_claim` | scripts/releases/stable.py | DEFERRED — upstream `:1016`, tested at `test_stable_release.py:230`; release admission. |
+| 25 | `baseline_covers` | scripts/releases/stable.py | DEFERRED — upstream `:773`; release admission. |
+| 26 | `check_controller` | scripts/releases/stable.py | DEFERRED — upstream `:548`; release admission. |
+| 27 | `authenticated_push` | scripts/releases/stable.py | DEFERRED — upstream `:907`, tested at `test_stable_release.py:1404`; release admission. |
+| 28 | `explicit_static_config` | tests/agent/test_relay_runtime_plugins.py | FALSE POSITIVE — pytest fixture (upstream `:167`, requested at `:303,318,362,385`); detector tags `[fixture]`. |
+| 29 | `TestTerminalResultsCarryTheFreeTierBlock` | tests/agent/test_welcome_tier_recovery.py | FALSE POSITIVE — pytest-collected class (`:202`), self-referenced upstream at `:291`. |
+| 30 | `cron_owner` | tests/cron/conftest.py | FALSE POSITIVE — pytest fixture (`:136`, requested throughout `tests/cron/`); upstream `tests/fakes/cron_owner.py`. |
+| 31 | `TestPasswordLoginRoute` | tests/qubit_cli/test_dashboard_auth_password_login.py | FALSE POSITIVE — pytest-collected class (has test methods at `:228`). |
+| 32 | `TestRateLimit` | tests/qubit_cli/test_dashboard_auth_password_login.py | FALSE POSITIVE — pytest-collected class (test methods at `:316`). |
+| 33 | `loopback_app` | tests/qubit_cli/test_dashboard_auth_ws_auth.py | FALSE POSITIVE — pytest fixture (upstream `tests/hermes_cli/test_dashboard_auth_middleware.py:356,374`). |
+| 34 | `cron_home` | tests/qubit_cli/test_update_stale_gateway_yield.py | FALSE POSITIVE — pytest fixture (upstream `tests/cron/test_tick_without_gateway.py:19,41`). |
+| 35 | `TestPatchReplace` | tests/tools/test_file_tools_live.py | FALSE POSITIVE — pytest-collected class, self-referenced upstream at `:187`. |
+| 36 | `TestRateLimit` | tests/tools/test_mcp_tool.py | FALSE POSITIVE — pytest-collected class (test methods at `:2159`). |
+| 37 | `drop_completion_delivery` | tools/async_delegation.py | FALSE POSITIVE — string-bound dispatch `_DURABLE_CLAIM_OPS["drop"]` at `gateway/run_notifications.py:73,1362`. |
+
+### Declared exclusions
+
+Added to `docs/FROZEN_TARGET.md`: the abandoned `source_releases` chain
+(`_resolve_source_target`, `_resolve_stable`, `_describe_release_failure`,
+`_resolve_release`), `_tool_prefix`, `GatewayLoopManager`,
+`GatewayHeartbeatManager`, `exit_on_resume_refusal`, and
+`_gateway_launch`/`_explicit_launch_skills`/`_ROUTE_FLAGS`. Each has a named
+live replacement or no local consumer; none was removed for the counter alone.
+
+### Explicit not-done
+
+- No service was restarted, nothing was applied live, and no global E2E/release
+  verdict is claimed.
+- The deferred architectural families stay deferred with the blockers above:
+  bot-chat authority/FIFO, durable run admission + its clarify/resolve routes,
+  hot-serve runtime, inbound/turn mixin inheritance, `completion_admission`
+  (double-suppress) and `one_turn_route` (double-apply).
+- Release-script admission and `select_apply_target` are left to a
+  release-focused lane (the local update/release flow genuinely diverges).
+- The detector still reports nine pytest fixtures/classes, one decorator-
+  registered route, two string-bound helpers and `wall_clock_sleep`; those are
+  instrument FPs or a deferred sweep, not wired for the number.
