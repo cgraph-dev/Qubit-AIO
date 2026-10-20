@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, SecretStr, StrictBool, field_validator
+from pydantic import BaseModel, Field, SecretStr, StrictBool, StrictInt, field_validator
 
 
 class ConfigUpdate(BaseModel):
@@ -267,24 +267,24 @@ class SessionImport(BaseModel):
     # Mutation identity/receipt (see SessionRename). Omitted by the dashboard SPA and
     # Desktop; the endpoint resolves them server-side from the stored row.
     request_id: Optional[str] = None
-    expected_revision: Optional[int] = None
-    expected_generation: Optional[int] = None
+    expected_revision: Optional[StrictInt] = Field(None, ge=0)
+    expected_generation: Optional[StrictInt] = Field(None, ge=0)
 
 class SessionRename(BaseModel):
     title: Optional[str] = None
-    archived: Optional[bool] = None
-    hidden: Optional[bool] = None  # also used by cross-profile reconciliation
-    pinned: Optional[bool] = None  # durable "keep" (Desktop pins); exempt from auto_archive
+    archived: Optional[StrictBool] = None
+    hidden: Optional[StrictBool] = None  # also used by cross-profile reconciliation
+    pinned: Optional[StrictBool] = None  # durable "keep" (Desktop pins); exempt from auto_archive
     # Read-state watermark (sessions.last_read_at): True = unread, False = read now, None = leave.
-    unread: Optional[bool] = None
+    unread: Optional[StrictBool] = None
     profile: Optional[str] = None  # session owned by another profile (opens its state.db)
     # Mutation identity + optimistic fence. The dashboard SPA and Desktop send neither
     # (api/sessions.ts PATCHes ``{unread|archived|pinned, profile}``), so the endpoint
     # resolves an omitted pair server-side from the row it is about to edit; a caller
     # that DOES send them keeps its precondition and still gets a 409 on a concurrent edit.
     request_id: Optional[str] = None
-    expected_revision: Optional[int] = None
-    expected_generation: Optional[int] = None
+    expected_revision: Optional[StrictInt] = Field(None, ge=0)
+    expected_generation: Optional[StrictInt] = Field(None, ge=0)
 
 class SessionOwnerBackfill(BaseModel):
     """POST /api/sessions/owner-backfill (legacy migration). ``profile`` scopes WHICH state.db is
