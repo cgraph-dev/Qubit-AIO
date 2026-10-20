@@ -139,12 +139,14 @@ def _ensure_section(config: Dict[str, object], key: str) -> Dict[str, object]:
     return value
 
 
-def _select_nous(config: Dict[str, object], key: str) -> None:
+def _select_nous(config: Dict[str, object], key: str, model: Optional[str] = None) -> None:
     """Store the managed ``qubit`` selection in the ``key`` section (field per _GATEWAY_SECTION_FIELDS)."""
     section_key, field = _GATEWAY_SECTION_FIELDS[key]
     section = _ensure_section(config, section_key)
     section[field] = "nous"
     section.pop("use_gateway", None)
+    if model:
+        section["model"] = model
 
 
 def _norm(value: object, default: str = "") -> str:
@@ -509,7 +511,10 @@ def apply_nous_managed_defaults(config: Dict[str, object], *, enabled_toolsets: 
     # Video gen is not funded by the free tool pool: only wire managed video for entitled (paid) users.
     for key, category in (("image_gen", None), ("video_gen", "fal-video")):
         if key in selected_toolsets and not fal_key_is_configured() and (category is None or account_info.tool_gateway_entitled_for(category)):
-            _select_nous(config, key)
+            model = None
+            if key == "image_gen" and not features.features[key].explicit_configured:
+                model = _krea_image_default(config, account_info)
+            _select_nous(config, key, model=model)
             changed.add(key)
     return changed
 
@@ -570,13 +575,13 @@ def get_gateway_eligible_tools(config: Optional[Dict[str, object]] = None, *, fo
     return unconfigured, has_direct, explicit_configured, already_managed
 
 
-def apply_gateway_defaults(config: Dict[str, object], tool_keys: list[str]) -> set[str]:
+def apply_gateway_defaults(config: Dict[str, object], tool_keys: list[str], account_info=None) -> set[str]:
     """Store the managed selection for ``tool_keys``; returns the set of tools actually changed."""
     for key in _DEFAULT_SECTIONS:
         _ensure_section(config, key)
     changed = [key for key in _ALL_GATEWAY_KEYS if key in tool_keys]  # table order: config key order
     for key in changed:
-        _select_nous(config, key)
+        _select_nous(config, key, model=_krea_image_default(config, account_info) if key == "image_gen" else None)
     return set(changed)
 
 
@@ -624,7 +629,7 @@ def prompt_enable_tool_gateway(config: Dict[str, object], *, force_fresh: bool =
     newly_declined = [k for k in unconfigured if k not in chosen_keys and k not in declined]
     if newly_declined or (declined & set(chosen_keys)):
         config["tool_gateway_declined_tools"] = sorted((declined | set(newly_declined)) - set(chosen_keys))
-    changed = apply_gateway_defaults(config, chosen_keys) if chosen_keys else set()
+    changed = apply_gateway_defaults(config, chosen_keys, account_info) if chosen_keys else set()
     if changed or newly_declined:
         from qubit_cli.config import save_config
 
