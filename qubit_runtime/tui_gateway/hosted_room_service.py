@@ -377,6 +377,7 @@ class HostedRoomService:
 
     def _publish_terminal_tasks(self, room: Mapping[str, Any]) -> bool:
         changed, room_id, local_profiles = False, str(room["room_id"]), self.room_profiles(room)
+        cursor = int(room["latest_seq"])
         for task in self._list_tasks(room_id, _TERMINAL_STATUSES):
             status, execution_generation = task["status"], int(task["execution_generation"])
             if self.policy_checkpoint.publication_exists(
@@ -384,15 +385,23 @@ class HostedRoomService:
                 execution_generation=execution_generation):
                 continue
             task_events = self.policy_checkpoint.events_for_task(
-                room_id=room_id, source_event_seq=int(task["payload"]["source_event_seq"]))
+                room_id=room_id, source_event_seq=int(task["payload"]["source_event_seq"]),
+                input_context=task["payload"].get("input_context"), task_id=task["identity"].task_id)
             plan = discussion.reconstruct_task_plan(
                 room, task_events, task, local_profiles=local_profiles)
+            message_id = f"dmessage:{task['identity'].task_id.removeprefix('dtask:')}"
+            if any(event.get("event_id") == message_id and event["kind"] == "message.member" for event in task_events):
+                # Finish an already visible immutable reply even if a later request arrived.
+                task_events = [event for event in task_events if event["kind"] != "message.user"
+                               or int(event["seq"]) <= int(task["payload"]["source_event_seq"])]
             publication = discussion.plan_publication(
                 room, task_events, plan, status=status, result=task.get("result"),
                 execution_generation=execution_generation if status == "deferred" else None,
                 local_profiles=local_profiles)
             for event in publication.events:
-                hosted_rooms.append_event(self.db_path, **event.append_kwargs(room_id))
+                appended = hosted_rooms.append_event(
+                    self.db_path, **event.append_kwargs(room_id), expected_latest_seq=cursor)
+                cursor = max(cursor, int(appended["seq"]))
             changed = True
         return changed
 
@@ -415,7 +424,12 @@ class HostedRoomService:
         with self._policy_lock:
             room = self._room(binding.room_id)
             snapshot = self._policy_snapshot(room)  # sync() side effect feeds the publish below
-            if self._publish_terminal_tasks(room):
+            try:
+                changed = self._publish_terminal_tasks(room)
+            except hosted_rooms.EventCursorConflictError:
+                # Rebuild publication next poll; the settled task is never readmitted.
+                return
+            if changed:
                 room = self._room(binding.room_id)
                 snapshot = self._policy_snapshot(room)
             self.policy_checkpoint.compact_completed(room_id=binding.room_id)

@@ -337,7 +337,6 @@ def test_roomlink_reprobes_and_upgrades_back_to_primary_after_cooldown():
     assert client.active_link.name == "direct"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: peer transport accepts a submit for another room member")
 def test_peer_transport_refuses_a_submit_for_another_member():
     client = FakePeerClient()
     transport = _transport(client)

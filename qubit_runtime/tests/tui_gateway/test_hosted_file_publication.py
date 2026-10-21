@@ -42,7 +42,6 @@ def test_service_share_retains_bytes_and_reuses_frozen_task(tmp_path):
         authority_gateway_id=service.bindings()[0].gateway_id, authority_epoch=1).data == b'\x00exact shared bytes\xff'
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a publication cursor race duplicates the member event")
 def test_publication_cursor_race_retries_without_new_task(tmp_path, monkeypatch):
     db = tmp_path / 'state.db'
     service = service_at(db)
