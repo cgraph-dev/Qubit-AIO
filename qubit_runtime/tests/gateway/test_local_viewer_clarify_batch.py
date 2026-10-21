@@ -79,7 +79,6 @@ def test_runner_routes_a_classic_cli_turn_to_the_batch(monkeypatch):
         assert runner._clarify_callback_sync(QUESTIONS) == {'answers': {'q0': 'blue'}, 'outcome': 'submitted'}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _clarify_callback_sync appends the messaging skip hint for LOCAL viewers, which main's modal does not show")
 def test_a_cli_source_turn_the_classic_cli_did_not_submit_keeps_one_card_per_question(monkeypatch):
     """A ``cli``-source session is also driven by editors (ACP) and raw WebSocket viewers that answer
     ``clarify.request`` cards, never the batch ``clarify`` server request: only a turn the classic

@@ -118,7 +118,6 @@ def _run_turn(runner, admission_id="adm-1"):
     return result, ctx.agent_holder[0]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: TurnRunner._prepare_turn_message no longer applies the committed cli_turn api_text, so the model gets the clean text")
 def test_the_turn_sends_api_text_persists_the_clean_text_and_runs_the_one_turn_model():
     from gateway.session_cli_turn import cli_turn_scope
     from qubit_cli.model_switch import ModelSwitchResult
