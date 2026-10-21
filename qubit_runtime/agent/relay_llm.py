@@ -694,7 +694,7 @@ def _logical_parent(
                 handle = turn.logical_llm_calls[request_id] = runtime.run_in_session(
                     session, runtime.relay.scope.push, relay_runtime.LOGICAL_LLM_SCOPE,
                     runtime.relay.ScopeType.Function, handle=parent, input={},
-                    metadata=relay_runtime.runtime_metadata(runtime.runtime_id, **{"hermes.call_role": call_role}),
+                    metadata=relay_runtime.runtime_metadata(runtime.runtime_id, **{"qubit.call_role": call_role}),
                 )
     return turn, handle, request_id
 
