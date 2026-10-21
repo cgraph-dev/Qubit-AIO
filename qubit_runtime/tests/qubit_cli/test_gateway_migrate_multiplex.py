@@ -988,3 +988,17 @@ def test_standalone_profile_is_listed_left_alone_and_not_a_fold_target(fleet):
     assert payload["standalone_by_config"] == list(plan.standalone_by_config)
     assert "ops" not in [p["profile"] for p in payload["profiles"]]
     assert any("ops" in line for line in gm.format_plan(plan, dry_run=True))
+
+
+def test_update_hook_reads_a_masked_default_unit_as_an_opt_out(fleet, capsys, monkeypatch, tmp_path):
+    """`systemctl mask qubit-gateway` is the operator's "never start this": no refusal, no change (#139324)."""
+    from qubit_cli import gateway as gw
+    unit = tmp_path / "systemd/user/qubit-gateway.service"
+    unit.parent.mkdir(parents=True)
+    unit.symlink_to(os.devnull)  # exactly what `systemctl --user mask` leaves on disk
+    monkeypatch.setattr(gw, "get_systemd_unit_path", lambda system=False: unit if not system else tmp_path / "none")
+    fleet.services["default"] = ("systemd", False)
+    gm.maybe_auto_migrate_after_update()
+    out = capsys.readouterr().out
+    assert "masked" in out and "refused" not in out and gm.MIGRATE_COMMAND in out
+    assert fleet.ops == [] and _config_flag(fleet.root) is None
