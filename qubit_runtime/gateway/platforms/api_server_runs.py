@@ -952,7 +952,7 @@ async def _execute_run_via_live_owner(self, run: _RunLaunch, home, record: Dict[
     as ``cancelled`` while the chat finishes on its own; the stop handler already reports that a
     run without an in-process agent is not interruptible here.
     """
-    from tools.bot_live_delivery import await_delivery_async
+    from gateway.platforms.api_server_bot_chat import await_live_delivery
 
     run_id = run.run_id
     delivery_id = record["delivery_id"]
@@ -968,8 +968,8 @@ async def _execute_run_via_live_owner(self, run: _RunLaunch, home, record: Dict[
 
     try:
         self._set_run_status(run_id, "running", delivery_id=delivery_id)
-        record = await await_delivery_async(
-            home, delivery_id, None, should_stop=lambda: run_id in self._stopping_run_ids) or record
+        record = await await_live_delivery(
+            self, home, record, None, should_stop=lambda: run_id in self._stopping_run_ids)
         if record["status"] in ("queued", "claimed"):
             _finish("cancelled", completed=False, partial=False, interrupted=True)
             return
