@@ -141,3 +141,9 @@ def install_portal(monkeypatch, tmp_path, fake: FakePortal | None = None) -> Fak
     # by an earlier test must not be served to this one.
     monkeypatch.setattr(auth_mod, "_RESOLVE_TOKEN_CACHE", {})
     return fake
+
+
+def as_local_desktop_backend(monkeypatch) -> None:
+    """This process is the backend the desktop spawned on this machine (the local spawn's credential)."""
+    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "test-spawn-token")
