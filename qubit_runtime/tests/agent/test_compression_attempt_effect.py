@@ -92,7 +92,6 @@ def shared_metric_rows(monkeypatch):
     return rows
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: shared metric maps pre_api trigger to 'other' instead of 'auto'")
 def test_committed_summary_records_trigger_effect_and_method_without_content(caplog, shared_metric_rows):
     agent = _Agent(_compressor())
 
@@ -259,7 +258,6 @@ def test_codex_route_refused_for_a_required_checkpoint_logs_one_record_and_raise
 @pytest.mark.parametrize(
     "trigger", ["idle", "turn_start_threshold", "engine_preflight", "pre_api", "post_tool", "gateway_hygiene"]
 )
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: automatic triggers are not bucketed to 'auto'")
 def test_precise_automatic_triggers_keep_the_coarse_shared_metric_bucket(trigger):
     fields = compression_fields(trigger=trigger, outcome="success", tokens_before=1, context_length=10)
     assert fields["trigger"] == "auto"
@@ -282,7 +280,6 @@ def test_blocked_record_never_carries_the_cooldown_seconds(caplog):
     ("backoff", "tripped", "label", "transient"),
     [(True, False, "blocked:structural_backoff", True), (False, True, "blocked:ineffective", False)],
 )
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: overflow block reports the bypassed cooldown instead of the guard that blocked")
 def test_overflow_block_names_the_guard_that_blocked_not_the_bypassed_cooldown(
     caplog, backoff, tripped, label, transient,
 ):
@@ -341,11 +338,9 @@ def _refuse_on_a_saturated_pool(agent):
     ("abort", "trigger", "failure_class"),
     [
         (_abort_on_stale_snapshot, "post_tool", "snapshot_stale"),
-        pytest.param(_abort_at_the_commit_fence, "post_tool", "commit_fence_cancelled",
-                     marks=pytest.mark.xfail(strict=True, reason="wave-18 parity defect: aborted attempt loses its trigger source")),
+        (_abort_at_the_commit_fence, "post_tool", "commit_fence_cancelled"),
         # Refused before any attempt begins: a fresh id, and the host does not know the trigger.
-        pytest.param(_refuse_on_a_saturated_pool, "unknown", "pool_saturated",
-                     marks=pytest.mark.xfail(strict=True, reason="wave-18 parity defect: aborted attempt loses its trigger source")),
+        (_refuse_on_a_saturated_pool, "unknown", "pool_saturated"),
     ],
 )
 def test_aborted_record_after_a_commit_describes_its_own_attempt(caplog, abort, trigger, failure_class):
@@ -471,7 +466,6 @@ def test_committed_effect_includes_the_retained_partial_compression_tail(
     assert record["tokens_reclaimed"] == record["tokens_before"] - record["tokens_after"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: empty-transcript failure class reaches the shared metric as 'unknown'")
 def test_engine_that_returns_an_empty_transcript_logs_one_aborted_record(caplog, shared_metric_rows):
     """An engine that hands back no messages for a non-empty transcript is refused before any split, and the
     attempt still logs its one record and counts once."""

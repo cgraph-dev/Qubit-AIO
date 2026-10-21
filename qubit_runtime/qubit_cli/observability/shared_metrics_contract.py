@@ -230,8 +230,8 @@ COMPRESSION_SKIP_CLASSES = frozenset({
     "lock_contended", "no_compressible_window", "snapshot_stale",
 })
 COMPRESSION_FAILURE_CLASSES = COMPRESSION_SKIP_CLASSES | frozenset({
-    "aux_model_fallback", "commit_fence_cancelled", "exception", "feasibility_skip", "no_progress", "none",
-    "other", "pool_saturated", "rollback", "session_split_failed", "stall_deterministic_fallback",
+    "aux_model_fallback", "commit_fence_cancelled", "empty_transcript", "exception", "feasibility_skip",
+    "no_progress", "none", "other", "pool_saturated", "rollback", "session_split_failed", "stall_deterministic_fallback",
     "stall_interrupted", "summary_auth_failure", "summary_empty_content_failure", "summary_generation_aborted",
     "summary_generation_failed", "summary_network_failure", "summary_overload_degraded",
     "summary_overload_failure", "summary_truncated_failure", "unknown", "would_grow",
@@ -857,8 +857,8 @@ COMPRESSION_SKIP_CLASSES = frozenset({
     "lock_contended", "no_compressible_window", "snapshot_stale",
 })
 COMPRESSION_FAILURE_CLASSES = COMPRESSION_SKIP_CLASSES | frozenset({
-    "aux_model_fallback", "commit_fence_cancelled", "exception", "feasibility_skip", "no_progress", "none",
-    "other", "pool_saturated", "rollback", "session_split_failed", "stall_deterministic_fallback",
+    "aux_model_fallback", "commit_fence_cancelled", "empty_transcript", "exception", "feasibility_skip",
+    "no_progress", "none", "other", "pool_saturated", "rollback", "session_split_failed", "stall_deterministic_fallback",
     "stall_interrupted", "summary_auth_failure", "summary_empty_content_failure", "summary_generation_aborted",
     "summary_generation_failed", "summary_network_failure", "summary_overload_degraded",
     "summary_overload_failure", "summary_truncated_failure", "unknown", "would_grow",

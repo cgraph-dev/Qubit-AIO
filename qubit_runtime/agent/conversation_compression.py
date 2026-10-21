@@ -1253,7 +1253,7 @@ def run_compress_context_with_progress_timeout(
         if telemetry_agent is not None:
             _emit_compression_attempt_telemetry(
                 telemetry_agent, started_at=time.monotonic(), commit_status="aborted", split_status="aborted",
-                failure_class="pool_saturated",
+                failure_class="pool_saturated", include_last_telemetry=False,
             )
         return messages, _resolve_fallback_prompt()
 
@@ -1508,9 +1508,16 @@ def context_compression_timed_out(agent: Any) -> bool:
 
 def _accepts_keyword(callable_obj: Any, name: str) -> bool:
     """True when ``callable_obj`` accepts the keyword ``name``."""
-    with contextlib.suppress(TypeError, ValueError):
-        return name in inspect.signature(callable_obj).parameters
-    return False
+    try:
+        parameters = inspect.signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        return False
+    if any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
+        return True
+    parameter = parameters.get(name)
+    return parameter is not None and parameter.kind in (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY,
+    )
 
 
 def _automatic_compression_gate_blocks(
@@ -3658,7 +3665,7 @@ def _commit_compaction(
     messages_before_compression: Optional[list], made_progress: bool, attempt: _Attempt,
     verbatim_tail: Optional[list] = None, carried_messages: Optional[list] = None,
 ) -> _CommitOutcome:
-    """Persist the compacted transcript: memory extraction, anti-growth guard, then the
+    """Persist the compacted transcript: anti-growth guard, memory extraction, then the
     in-place archive or the parent->child rotation.
 
     Failures roll the live list back and arm the split-failure cooldown; a refused (would-grow) candidate returns
@@ -3673,23 +3680,22 @@ def _commit_compaction(
     if agent._session_db:
         split_status = "pending"
         try:
-            # Memory extraction runs in BOTH modes: pre-compaction turns are summarized
-            # away whether or not the id rotates.
-            # The engine's session-end reset nulls the in-flight attempt telemetry the success emit
-            # still needs (#118580), so hold it across the call.
-            with _hold_attempt_telemetry(agent.context_compressor):
-                agent.commit_memory_session(messages)
-
             # Pop _compaction_tail tags before the size estimate / rotation: they must not
             # inflate anti-growth or reach the provider. Track ids: salvage may subset list.
             _tail_tagged_ids = {id(m) for m in compressed if isinstance(m, dict) and m.pop("_compaction_tail", None)}
+            original_messages = messages_before_compression if messages_before_compression is not None else messages
             compressed, _refused_sp = _salvage_or_refuse_grown_transcript(
-                agent, messages, compressed, system_message=system_message, attempt=attempt,
+                agent, original_messages, compressed, system_message=system_message, attempt=attempt,
             )
             if compressed is None:
                 return _CommitOutcome(
                     compressed=messages, refused_prompt=_refused_sp, commit_started_at=commit_started_at
                 )
+            # Publish memory only after every refusal gate, from the immutable pre-compression snapshot.
+            # The engine's session-end reset nulls the in-flight attempt telemetry the success emit
+            # still needs (#118580), so hold it across the call.
+            with _hold_attempt_telemetry(agent.context_compressor):
+                agent.commit_memory_session(original_messages)
             from agent.context_compressor import PROACTIVE_PRUNE_REARM_MODEL_CONFIG_KEY, stamp_db_persisted_markers
             from qubit_cli.partial_compress import rejoin_compressed_head_and_tail
             if in_place:
@@ -3731,7 +3737,7 @@ def _commit_compaction(
                 from agent.conversation_compression_archive import coverage_for_commit
                 covered_ids, unresolved_held = coverage_for_commit(
                     agent._session_db, agent.session_id,
-                    messages_before_compression if messages_before_compression is not None else messages,
+                    original_messages,
                     verbatim_tail)
                 agent._session_db.archive_and_compact(
                     agent.session_id, persisted, model_config_patch={PROACTIVE_PRUNE_REARM_MODEL_CONFIG_KEY: None},
@@ -3912,7 +3918,9 @@ def _run_summary_phase(
             _restore_messages_snapshot(messages, messages_before_compression)
             _stop_heartbeat("context compression rollback failed")
             lease.release()
-            _emit_aborted_attempt_telemetry(agent, attempt.started_at, f"rollback:{type(_rollback_exc).__name__}")
+            _emit_aborted_attempt_telemetry(
+                agent, attempt.started_at, f"rollback:{type(_rollback_exc).__name__}", attempt.seed
+            )
             raise
         _restore_messages_snapshot(messages, messages_before_compression)
         # Record after restore so rollback cannot wipe a stall backoff, and
@@ -3931,14 +3939,16 @@ def _run_summary_phase(
         _emit_aborted_attempt_telemetry(
             agent, attempt.started_at,
             STALL_INTERRUPTED_FAILURE_CLASS if _stall_backoff
-            else "commit_fence_cancelled" if _host_cancel else "explicit_interrupt",
+            else "commit_fence_cancelled" if _host_cancel else "explicit_interrupt", attempt.seed,
         )
         return _SummaryPhase(messages=messages, abort_prompt=_existing_system_prompt(agent, system_message))
     except BaseException as _compress_exc:
-        # Any failure after lock acquisition must release it or the session is permanently blocked from compression.
+        _restore_messages_snapshot(messages, messages_before_compression)
         _stop_heartbeat("context compression failed")
         lease.release()
-        _emit_aborted_attempt_telemetry(agent, attempt.started_at, f"exception:{type(_compress_exc).__name__}")
+        _emit_aborted_attempt_telemetry(
+            agent, attempt.started_at, f"exception:{type(_compress_exc).__name__}", attempt.seed,
+        )
         raise
     finally:
         _stop_heartbeat("context compression completed")
@@ -4225,6 +4235,8 @@ def compress_context(
         if _candidate_rejected(
             agent, compressed, messages, messages_before_compression, attempt=attempt,
         ):
+            # Engines may mutate their input in place; a refused candidate must not leak that mutation.
+            _restore_messages_snapshot(messages, messages_before_compression)
             return messages, _existing_system_prompt(agent, system_message)
         if commit_fence is not None:
             _commit_fence_entered = commit_fence.begin_commit(_hard_cancel_event)
@@ -4242,7 +4254,7 @@ def compress_context(
                 _existing_sp = _existing_system_prompt(agent, system_message)
                 _emit_aborted_attempt_telemetry(
                     agent, attempt.started_at,
-                    STALL_INTERRUPTED_FAILURE_CLASS if _stall_backoff else "commit_fence_cancelled",
+                    STALL_INTERRUPTED_FAILURE_CLASS if _stall_backoff else "commit_fence_cancelled", attempt.seed,
                 )
                 return messages, _existing_sp
         _warn_summary_or_aux_fallback(agent)
@@ -4280,6 +4292,7 @@ def compress_context(
             carried_messages=[reinserted_reply] if reinserted_reply is not None else None,
         )
         if commit.refused_prompt is not None:
+            _restore_messages_snapshot(messages, messages_before_compression)
             return messages, commit.refused_prompt
         compressed = commit.compressed
         split_status = commit.split_status
