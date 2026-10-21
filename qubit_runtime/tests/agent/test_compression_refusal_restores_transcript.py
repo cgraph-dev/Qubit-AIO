@@ -19,8 +19,6 @@ from unittest.mock import patch
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-18 parity defect: a refused mutating compression candidate is not rolled back to the original transcript")
-
 from agent.conversation_compression import CompressionCommitFence
 from qubit_state import SessionDB
 
