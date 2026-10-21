@@ -7,7 +7,6 @@ import pytest
 from gateway.session_api_turn import admit_api_turn, api_execution
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: API cutover keeps the session identity instead of the admission-scoped author")
 def test_declared_key_is_durable_and_cannot_rebind(api, owner):
     def admit(sid, key, bind=True):
         return admit_api_turn(api, session_id=sid, gateway_session_key=key,
@@ -28,7 +27,6 @@ def test_declared_key_is_durable_and_cannot_rebind(api, owner):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: API cutover keeps the session identity instead of the admission-scoped author")
 async def test_structured_content_bypasses_text_parser_without_losing_parts(api, owner, monkeypatch):
     from gateway.session_ingress import execute_admission
     from gateway.run_turn_runner import TurnRunner
@@ -53,7 +51,6 @@ async def test_structured_content_bypasses_text_parser_without_losing_parts(api,
     assert await execute_admission(owner, ref, row) == 'ok'
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: API cutover keeps the session identity instead of the admission-scoped author")
 def test_api_author_is_admission_scoped_not_session_identity(api, owner):
     from gateway.session_api_turn import prepare_api_execution
     from gateway.run_turn_runner import TurnRunner
