@@ -2,7 +2,6 @@
 import pytest
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB._archive_and_compact_on_conn is absent (worker compaction call site)")
 def test_watermarked_compaction_preserves_foreign_tail_and_rejects_stale_holder(worker):
     db, store = worker
     store.append_messages_batch('owned', [{'role': 'user', 'content': 'old'}, {'role': 'assistant', 'content': 'carry'}])
@@ -56,7 +55,6 @@ def test_publication_replay_advances_assignment_once_and_keeps_markers(worker):
     assert db.get_session('child')['system_prompt'] == 'prefix'
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB._archive_and_compact_on_conn is absent (worker compaction call site)")
 def test_in_place_archive_without_a_lease_persists_from_a_worker(worker):
     """Micro-compaction and proactive prune archive without a compression lease; the worker RPC
     must accept the same ``lock_holder=None`` the in-process store does, or the journal sticks in
@@ -73,7 +71,6 @@ def test_in_place_archive_without_a_lease_persists_from_a_worker(worker):
     assert [r['content'] for r in store.get_messages_as_conversation('owned')] == ['pruned', 'after']
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB._archive_and_compact_on_conn is absent (worker compaction call site)")
 def test_micro_compaction_live_dicts_persist_through_the_worker_like_direct(worker):
     """The real micro-compaction commit hands its LIVE list (``_db_persisted`` stamps, the marker's
     ``_micro_compact_marker``) to archive_and_compact. The worker facade projects those dicts onto the
