@@ -50,7 +50,6 @@ def _rpc(method, transport=None, **params):
     return next(frame for frame in transport.frames if frame.get("id") == 1)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connectors.connect RPC rejects alias/connection_id and PortalConnectorClient.rename_account is absent")
 def test_account_connect_with_an_alias_mints_that_account(monkeypatch):
     mints = []
     minted = threading.Event()
@@ -76,7 +75,6 @@ def test_account_connect_with_an_alias_mints_that_account(monkeypatch):
     assert [(t["name"], t.get("alias")) for t in reply["result"]["targets"]] == [("gmail", "work")]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connectors.connect RPC rejects alias/connection_id and PortalConnectorClient.rename_account is absent")
 def test_a_session_retry_for_another_account_does_not_re_mint_the_open_one(monkeypatch):
     from tools.connectors.contract import Actor, TargetState
     from tools.connectors.operation import ConnectionOperation, Target
@@ -116,7 +114,6 @@ def test_a_session_retry_for_another_account_does_not_re_mint_the_open_one(monke
     assert mints == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connectors.connect RPC rejects alias/connection_id and PortalConnectorClient.rename_account is absent")
 def test_a_session_retry_with_the_open_accounts_id_reissues_it(monkeypatch):
     from tools.connectors.contract import Actor, TargetState
     from tools.connectors.operation import ConnectionOperation, Target
@@ -150,7 +147,6 @@ def test_a_session_retry_with_the_open_accounts_id_reissues_it(monkeypatch):
     assert mints == [(("gmail",), "ca_work")]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connectors.connect RPC rejects alias/connection_id and PortalConnectorClient.rename_account is absent")
 def test_rename_to_a_name_another_account_holds_is_alias_taken(monkeypatch):
     def taken(self, connection_id, alias):
         raise IdempotencyConflict("alias taken", code="alias_taken", status=409)
