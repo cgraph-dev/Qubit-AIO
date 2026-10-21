@@ -38,7 +38,6 @@ def pair():
         registry.stop_all()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_unbounded_reply_retains_late_attachment_for_consumer_cleanup(pair):
     server, _registry, _sup, handle = pair
     abandoned = threading.Event()
@@ -58,7 +57,6 @@ def test_unbounded_reply_retains_late_attachment_for_consumer_cleanup(pair):
     assert server.methods_on(1).count('Target.detachFromTarget') == 1
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_dispatch_deadline_refuses_queued_command_after_timeout(pair):
     server, _registry, sup, handle = pair
     entered = threading.Event()
@@ -74,7 +72,6 @@ def test_dispatch_deadline_refuses_queued_command_after_timeout(pair):
     assert 'Probe.expired' not in server.methods_on(1)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_before_send_checks_cancellation_on_supervisor_loop(pair):
     server, _registry, sup, handle = pair
     entered, release, abandoned = threading.Event(), threading.Event(), threading.Event()
@@ -102,7 +99,6 @@ def test_before_send_checks_cancellation_on_supervisor_loop(pair):
     assert 'Probe.cancelled' not in server.methods_on(1)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_unbounded_reply_fails_promptly_on_socket_close(pair):
     server, _registry, _sup, handle = pair
     failures = []
@@ -122,7 +118,6 @@ def test_unbounded_reply_fails_promptly_on_socket_close(pair):
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_unbounded_wait_ends_when_loop_closes_with_dispatch_queued(pair, monkeypatch):
     _server, registry, _sup, handle = pair
     from agent import async_utils
@@ -150,7 +145,6 @@ def test_unbounded_wait_ends_when_loop_closes_with_dispatch_queued(pair, monkeyp
 
 
 @pytest.mark.parametrize('timeout', [0, -1, float('inf'), float('nan'), 1e300, True, '5'])
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_invalid_timeout(pair, timeout):
     server, _, _, cap = pair
     before = list(server.methods_on(1))
@@ -159,7 +153,6 @@ def test_invalid_timeout(pair, timeout):
     assert server.methods_on(1) == before
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: browser supervisor dispatch lacks before_send cancellation, bounded timeouts and late-attachment retention")
 def test_async_validator_refuses(pair):
     server, _, _, cap = pair
     before = list(server.methods_on(1))
