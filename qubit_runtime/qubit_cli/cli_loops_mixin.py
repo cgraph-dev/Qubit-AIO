@@ -501,6 +501,24 @@ class CLILoopsMixin:
         setattr(self, attr, mgr)
         return mgr
 
+    def _automation_connection(self):
+        """``(gateway, connection)``: on a gateway session store the managers are the gateway's
+        (``qubit_cli.gateway_automation``), and none exists until the gateway session is open, so this
+        process never opens state.db read-write nor calls the goal judge. Off the gateway (tests, the
+        TUI slash worker's shadow CLI) main's in-process managers apply."""
+        from qubit_cli.gateway_session_store import GatewaySessionStore
+        store = getattr(self, "_session_db", None)
+        if not isinstance(store, GatewaySessionStore):
+            return False, None
+        return True, store.connection if getattr(self, "_gateway_session_open", False) else None
+
+    def _automation_manager(self, attr, label, local, remote):
+        gateway, connection = self._automation_connection()
+        if gateway and connection is None:
+            return None
+        return self._session_bound_manager(
+            attr, label, (lambda: lambda sid: remote(sid, connection)) if gateway else local)
+
     def _get_goal_manager(self):
         """GoalManager bound to the current session_id (see ``_session_bound_manager``)."""
         def load():
@@ -522,14 +540,22 @@ class CLILoopsMixin:
         def load():
             from qubit_cli.heartbeat import HeartbeatManager
             return lambda sid: HeartbeatManager(session_id=sid)
-        return self._session_bound_manager("_heartbeat_manager", "heartbeat manager", load)
+
+        def remote(sid, connection):
+            from qubit_cli.gateway_automation import GatewayHeartbeatManager
+            return GatewayHeartbeatManager(sid, connection)
+        return self._automation_manager("_heartbeat_manager", "heartbeat manager", load, remote)
 
     def _get_loop_manager(self):
         """LoopManager bound to the current session_id (see ``_session_bound_manager``)."""
         def load():
             from qubit_cli.loops import LoopManager
             return lambda sid: LoopManager(session_id=sid)
-        return self._session_bound_manager("_loop_manager", "loop manager", load)
+
+        def remote(sid, connection):
+            from qubit_cli.gateway_automation import GatewayLoopManager
+            return GatewayLoopManager(sid, connection)
+        return self._automation_manager("_loop_manager", "loop manager", load, remote)
 
     def _start_heartbeat_watchdog(self):
         """Start the idle-poll daemon that injects a due heartbeat prompt into
