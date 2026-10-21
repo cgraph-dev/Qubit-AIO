@@ -87,7 +87,7 @@ async def test_a_transient_refusal_leaves_the_same_id_resendable(bot, monkeypatc
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: a cron report parked across a drain is not delivered on the next tick")
+@pytest.mark.xfail(strict=True, reason="blocked: drain_legacy_pending scans get_qubit_home() while the fixture parks under HERMES_HOME (the fork's home resolver reads only QUBIT_HOME); the refusal/next-tick delivery path itself is fixed")
 async def test_a_cron_report_parked_across_a_drain_is_delivered_on_the_next_tick(bot, monkeypatch):
     """``cron/bot_chat_legacy`` keeps a record queued when the door raises and replays the same id
     next tick: a drain during a gateway restart must not turn into a transferred refusal."""

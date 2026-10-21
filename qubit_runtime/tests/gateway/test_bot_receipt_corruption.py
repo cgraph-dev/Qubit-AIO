@@ -87,7 +87,6 @@ async def test_recovery_skips_structurally_corrupt_canonical_neighbor(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: recovery converts a real admission lookup failure into storage_unavailable")
 async def test_recovery_does_not_hide_real_admission_lookup_failure(tmp_path):
     db = SessionDB(tmp_path / "state.db")
     try:

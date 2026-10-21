@@ -72,7 +72,9 @@ def find_canonical_live_owner(profile_home: Path | str) -> dict[str, Any] | None
 
 def _owner(home: Path | str, owner: dict[str, Any]) -> dict[str, str]:
     pinned = {key: owner.get(key) for key in _OWNER_KEYS}
-    if not all(isinstance(value, str) and value for value in pinned.values()):
+    # An empty session_id is the discovered "no Bot Chat yet" state; the door creates it.
+    if not all(isinstance(value, str) and (value or key in ("session_id", "live_session_id"))
+               for key, value in pinned.items()):
         raise ValueError("owner requires profile_home, session_id, lease_id and live_session_id")
     if pinned["profile_home"] != str(Path(home).resolve()):
         raise ValueError("owner belongs to a different profile home")
@@ -324,11 +326,10 @@ def deliver_to_live_owner(
     Retry with the same id AND pinned owner/message to inspect the existing
     state. Reusing an id with a different payload is an error, never an overwrite.
 
-    A stale owner advertisement is refused before it can create another execution
-    queue: admission needs a live canonical authority for this profile.
+    The canonical authority owns admission; its receipt is the answer. Only when this profile
+    advertises a live owner but its authority is not reachable does the durable mailbox keep the
+    delivery queued for that owner (legacy producer behaviour).
     """
-    if find_canonical_live_owner(profile_home) is None:
-        raise ValueError("profile authority is not ready")
     return _door(authority_delivery, profile_home, owner, message, delivery_id=delivery_id, author=author,
                  notification_category=notification_category)
 
@@ -345,7 +346,21 @@ def _door(call: Callable[[Path, dict], dict], profile_home, owner, message, *, d
     pinned = _owner(profile_home, owner)
     if not isinstance(message, str):
         raise ValueError("message must be a string")
+    if notification_category not in ("result", "diagnostic"):
+        raise ValueError("invalid notification category")
     key = _delivery_id(delivery_id if delivery_id is not None else uuid.uuid4().hex)
+    home = Path(profile_home).resolve()
+    category = {"notification_category": "diagnostic"} if notification_category == "diagnostic" else {}
+    params = dict(id=key, profile=home.name if home.parent.name == "profiles" else "default",
+                  message=message, **({"session_id": pinned["session_id"]} if pinned["session_id"] else {}),
+                  **({"author": dict(author)} if author else {}), **category)
+    try:
+        return call(home, params)
+    except ValueError:
+        # No reachable authority. Keep the legacy mailbox queue only for a profile that still
+        # advertises a live owner (its poller consumes it); an unadvertised owner is a refusal.
+        if find_canonical_live_owner(profile_home) is None:
+            raise
     with _locked(profile_home) as root:
         path = root / f"{key}.json"
         existing = _read(path)
@@ -356,9 +371,7 @@ def _door(call: Callable[[Path, dict], dict], profile_home, owner, message, *, d
             return existing
         record = dict(delivery_id=key, id=key, owner=pinned, **pinned,
                       message=message, status="queued", created_at=time.time_ns(),
-                      sequence=_next_sequence(root), **({"author": dict(author)} if author else {}))
-        if notification_category == "diagnostic":
-            record["notification_category"] = notification_category
+                      sequence=_next_sequence(root), **({"author": dict(author)} if author else {}), **category)
         _write(path, record)
         return record
 
