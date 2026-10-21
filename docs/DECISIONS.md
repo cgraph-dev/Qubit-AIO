@@ -46,6 +46,25 @@ does not add policy of its own.
    (Neither `docs/generated/` nor `docs/differential/` exists in the tree today; the ruling still
    forbids reading or writing `docs/archive/`.)
 
+8. **Exclusions require owner sign-off; the 2026-10-21 F5 set was rejected, not
+   re-affirmed.** The 21 rows agents had added to `docs/FROZEN_TARGET.md` were ordered
+   ported literally instead; wave 16 restored and wired the 20 production symbols,
+   `_tool_prefix` was already live (stale row), and the `legacy_digests` test helper was
+   restored and used. Only `gateway/status.py::_gateway_lock_handle` remains excluded, by
+   explicit owner sign-off the same day (the pin defines it only as an unread `= None`;
+   the live acquire/release machinery is post-freeze and would double-flock against
+   `runtime_ownership`).
+   → Provenance: owner session 2026-10-21; evidence in `docs/STATUS.md` (wave 16) and
+   `docs/FROZEN_TARGET.md` §"Declared exclusions".
+
+9. **A control-socket bind failure is fatal at gateway bootstrap (F4).** This matches the
+   frozen pin's `gateway/run_bootstrap.py`, which raises when the listener is unavailable;
+   the "non-fatal" body is post-freeze `69948c0057`, and session-ticket attach has no scan
+   fallback. The `GatewayControlServer` docstring records the split (server reports `None`;
+   the bootstrap escalates), pinned by
+   `qubit_runtime/tests/gateway/test_control_listener_fatal.py`.
+   → Provenance: owner ruling 2026-10-21 after the read-only investigation in wave 16.
+
 ## Why this file is not the original
 
 The previous `docs/DECISIONS.md` (214 lines, including then-current `OPERATOR_ONLY` counts) was

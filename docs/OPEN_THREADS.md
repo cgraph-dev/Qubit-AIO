@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 16 — 2026-10-21 (F5 ported; 27 dead)
+
+- ✅ Owner rulings: B1 `_gateway_lock_handle` declared an exclusion (upstream-dead at the pin); F4 kept fatal (pin behaviour) and documented; F5 rejected — all 21 exclusion rows ported literally.
+- ✅ Landed: f5-small (housekeeping, backup 3, ACP fingerprint, bot_relay 2, llamacpp, cron newlines, `legacy_digests`; `_tool_prefix` was already live), f5-release (source_releases 4, loop/heartbeat managers, resume refusal, classic launch policy), authority `adopt_agent` + its ported test, API canonical projection + clarify/resolve routes, 26-file test-parity batch, orb `ExecStartPre` display wait.
+- ✅ Measured on merged `main`: dead **29 → 27** (2 resolved, 0 new); production missing **20 → 1** (declared B1); total missing **922 → 766**; absent **451 → 448**; brand guard OK.
+- 🔴 Residuals: 27 dead (deferred groups in `TRIAGE.md` §Wave 15); 448 absent + 766 short-port test symbols; parity defects triaged but unported (write_file baseline, shared metrics connector rows, recommendation floor, compaction events, auxiliary relay, inline bootstrap identity, left-core, agent plugins, skills guard); orb installed unit not refreshed and no service restarted; frontend bundle still stale.
+- 🟡 No service restart, nothing applied live, no global E2E/release verdict.
+
 ## Wave 15 — 2026-10-21 (29 dead symbols)
 
 - ✅ Landed: API caller system/instructions + canonical stream; shutdown PID/lock ordering + admitted completion; compressed receipt + hosted work evidence; snapshot restore + frozen config credentials; shared approval snapshot + connectors guest identity; long-home control pointer/loop-tick witness/session reset/dashboard issuer/coding posture; inbound plugin-injection + turn-hygiene mixin inheritance.

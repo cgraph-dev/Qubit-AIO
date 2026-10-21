@@ -47,38 +47,33 @@ audit one symbol short of zero by design; the audit's job is to report that, not
 
 | symbol | file | why it is gone |
 |---|---|---|
-| `_housekeeping_media_caches` | `gateway/run.py` | Byte-identical DEAD DUPLICATE of the live `gateway/run_housekeeping_disk.py::housekeeping_media_caches`, which the registered chore (`run.py`) already calls. A 6-lane merge re-added the copy; it never executed. Deleting it is behaviour-preserving — re-adding it would restore a dead symbol, not a capability. |
-| `_import_members` | `qubit_cli/backup.py` | Superseded by inlining: `run_import` (backup.py, `with exclusive_maintenance(import_homes, purpose="import")`) reserves every affected home itself and publishes inline, and it is strictly BETTER than the upstream helper — it marks the reservation `purpose="import"` (a contender can tell this publication window from a live gateway) and drops the `gateway.lock` files the reservation created (`created_locks`), so the import leaves no seeded lock. Upstream calls its copy from `hermes_cli/backup.py:802`; here the call site is the inline block. Wiring it would re-introduce a second, weaker publish path. |
-| `_import_members_exclusive` | `qubit_cli/backup.py` | The body of the same inlined publish loop in `run_import`; reachable only from `_import_members`. No behaviour is lost. |
-| `_import_external_member` | `qubit_cli/backup.py` | Its only caller was `_import_members_exclusive`; the `_external/` branch of `run_import`'s inline loop is the same code (home-relative target, `relative_to(home_dir)` traversal refusal, atomic extract, `0600` for secret suffixes). Kept as a helper it would be dead code the detector flags. |
-| `_llamacpp_context` | `agent/model_metadata.py` | Superseded by `agent/model_metadata_llamacpp.py::llamacpp_context`, which the live probe table calls (`model_metadata.py`, typed probe dict) and which is strictly better (passes `autoload=false` and falls back to the router's `--ctx-size`). The in-file copy was left behind by that refactor and had no call site. Deleting it is behaviour-preserving. |
-| `_replay_unanswered` | `tools/bot_relay.py` | The fork's drain deliberately replaced upstream's unbounded claimed-envelope replay with `_reoffer_unanswered`: one bounded re-offer per envelope after `REOFFER_AFTER_SECONDS`, never a turn loop against a target nobody is listening for. The upstream helper had no caller; re-adding it would re-introduce a second re-delivery path beside the bounded one. |
-| `_settle_pre_upgrade_claim` | `tools/bot_relay.py` | Reachable only from the deleted `_replay_unanswered`. The fork's envelope schema does not carry upstream's `canonical_delivery_v1` marker, so the pre-upgrade settlement branch cannot run either. No behaviour is lost. |
-| `_normalize_newlines` | `cron/scheduler.py` | Left behind when this fork's run-document framing diverged from upstream's (`_PROMPT_FRAME`/`_RESPONSE_FRAME` are not present here), so its only upstream call site does not exist. Unused private helper; no behaviour is lost. |
-| `_submit_fingerprint` | `acp_adapter/gateway_server.py` | Superseded by `acp_adapter/gateway_media.py::submit_fingerprint`, which the live `_prepare_submit` path calls. The split-module version fingerprints the editor content *before* staging, so a retry of the same prompt matches without re-fetching a remote image (whose second download could fail or return other bytes). The in-file copy was left behind by that split and had no call site; re-adding it would restore a second, weaker identity path. |
-| `legacy_digests` | `tests/qubit_cli/test_local_legacy_engine.py` | Unused test helper: the local fixtures hand `legacy_install` the `pinned` digest list directly and no local test calls it. Upstream reads its copy only from `tests/hermes_cli/test_local_legacy_engine.py`. Deleted as dead test code; re-porting it would restore a call-less helper, not a capability, and production behaviour is untouched. |
-| `_resolve_source_target`, `_resolve_stable`, `_describe_release_failure`, `_resolve_release` | `qubit_cli/source_releases.py` | An abandoned GitHub-release resolution chain. The live `resolve_source_target` resolves every channel through R2 `ChannelRecord`s (including `stable` and `main`), and `resolve_source_release` is the tested public read path; the private chain's only consumers were each other. Deleting all four leaves the public functions untouched and no call site changes. |
-| `_tool_prefix` | `qubit_cli/plugins_activation_live.py` | Upstream's `live_notice` prints `mcp__<server>__*` plus a tool count; this fork deliberately lists each tool name with its one-line description through `_tool_listing`, which is strictly more informative in the chat note. No local caller exists; re-adding it would restore a second, unused listing format. |
-| `GatewayLoopManager`, `GatewayHeartbeatManager` | `qubit_cli/gateway_automation.py` | This CLI's `_get_loop_manager`/`_get_heartbeat_manager` construct the local `qubit_cli.loops.LoopManager` / `qubit_cli.heartbeat.HeartbeatManager`, and no local code path opens a gateway connection for them. `GatewayGoalManager` (the one remote manager this CLI does use) stays. |
-| `exit_on_resume_refusal` | `qubit_cli/gateway_chat.py` | Upstream's classic resume path converts a policy-mismatch refusal into `SystemExit(2)`; this fork's gateway launch reports the refusal through the stream-json error contract instead, so raising `SystemExit` would bypass the protocol. No call site. |
-| `_gateway_launch`, `_explicit_launch_skills`, `_ROUTE_FLAGS` | `qubit_cli/cli_init_mixin.py` | Upstream's classic CLI handed explicit launch flags to a gateway `session.create`; this fork builds `AIAgent` in-process (`cli_agent_setup_mixin._init_agent`) and the gateway-chat path builds its own `session.create` policy in `gateway_chat._requested_policy`. No local consumer. |
+| `_gateway_lock_handle` | `gateway/status.py` | Owner sign-off 2026-10-21. At the frozen pin this is only `_gateway_lock_handle = None` (`gateway/status.py:44`); the pin never reads or writes it. The acquire/release/owns machinery is post-freeze `69948c0057`, which this fork replaced with `gateway.runtime_ownership.process_ownership` (a second independent flock on an inode this process already holds is refused on POSIX and aborts our own boot). Porting the pin would add an inert, misleading global; porting the post-freeze behaviour would double-flock. |
+
+> **Owner ruling 2026-10-21 (F5):** the 21 rows previously in this table were REJECTED,
+> not re-affirmed. The 20 production symbols among them were ported literally and wired
+> in wave 16; `_tool_prefix` was already live at the base (the row was stale), and the
+> `legacy_digests` test helper was restored and is now used by its test. See
+> `docs/STATUS.md` (wave 16) and `docs/DECISIONS.md` ruling 8.
 
 ## Numbers
 
 Baseline at the re-freeze (2026-10-17, first complete-blob read of the pin):
 
-| metric | at freeze | now (2026-10-19) |
+| metric | at freeze | now (2026-10-21) |
 |---|---|---|
 | upstream `.py` files | 9,503 | 9,503 |
-| absent files | 974 | 901 |
-| short_port files / symbols | 610 / 1,649 | 453 / 1,189 |
+| absent files | 974 | 448 |
+| short_port files / symbols | 610 / 1,649 | 341 / 766 |
 | behind_head files / symbols | 0 / 0 | 0 / 0 |
-| **total missing symbols** | **2,623** | **1,189** |
-| — production | — | **296** (78 files) |
-| — tests (non-blocking) | — | 1,794 |
+| **total missing symbols** | **2,623** | **766** |
+| — production | — | **1** (declared exclusion) |
+| — tests (non-blocking) | — | 1,213 |
 
-Closed since the freeze: **1,434 symbols** (~55% of the gap). The verdict is driven by
-PRODUCTION only — tests cannot block retiring hermes.
+Closed since the freeze: **1,857 symbols** (~71% of the gap). The verdict is driven by
+PRODUCTION only — tests cannot block retiring hermes. The one remaining production symbol
+is `gateway/status.py::_gateway_lock_handle`, declared by owner sign-off (see the table
+above); the audit does not subtract declared exclusions, so it still prints `NOT AT TARGET
+-- 1 production missing`.
 
 Read it in one command:
 
