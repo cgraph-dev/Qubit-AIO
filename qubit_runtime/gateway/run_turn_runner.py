@@ -1822,6 +1822,14 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         )
         ctx = self._ctx
         persist_override: Optional[Any] = ctx.persist_user_message
+        from gateway.session_cli_turn import cli_turn
+        api_text = cli_turn(ctx.inbound_message_id).get('api_text')
+        if api_text is not None:
+            # The classic CLI's model-facing message (voice prefix, its own model-switch and
+            # skills-reload notes); the admitted text stays the persisted user row.
+            clean_text = persist_override if persist_override is not None else ctx.message
+            persist_override = clean_text
+            ctx.message = api_text
         self._prepend_pending_note("_pending_model_notes")
         # Auto-continue: history ending with a tool result means the previous turn was cut off
         # (restart, crash, SIGTERM). Session-level resume_pending (drain-timeout shutdown) uses
