@@ -712,7 +712,11 @@ def _find_plugin_entry(name: str) -> Optional[tuple]:
     entries = _discover_all_plugins()
     from qubit_cli.left_core_migration import legacy_plugin_alias
     target = legacy_plugin_alias(name) or name  # ``observability/langfuse`` -> its catalog plugin
-    exact = next((entry for entry in entries if target in (entry[0], entry[5])), None)
+    # The canonical key first: this tree still ships the bundled ``observability/langfuse`` copy, and
+    # its manifest name is ``langfuse``. Prefer the catalog plugin installed under the canonical key
+    # (what the pin's tree, which no longer bundles it, resolves to) over the legacy bundled copy.
+    exact = (next((entry for entry in entries if entry[5] == target), None)
+             or next((entry for entry in entries if entry[0] == target), None))
     if exact is not None:
         return exact
     leaf_matches = [entry for entry in entries if name == entry[5].split("/")[-1]]

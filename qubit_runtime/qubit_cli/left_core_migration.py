@@ -237,18 +237,21 @@ def moved_command_hint(prog: str, value: str, action: str = "") -> str:
     how to get it for the active home, else ``""``."""
     from qubit_constants import get_qubit_home
     feature = next((f for f in LEFT_CORE if f.cli and f.cli == value), None)
-    if feature is None or prog not in {"hermes", "hermes auth"}:
+    # Both the pre-rebrand spellings (``hermes``/``hermes auth``, which older callers still pass) and
+    # the canonical ones name the same command; the hint always prints the canonical name.
+    if feature is None or prog not in {"qubit", "qubit auth", "hermes", "hermes auth"}:
         return ""
+    is_auth = prog in {"qubit auth", "hermes auth"}
     home = Path(get_qubit_home())
     install = _install_command(feature.plugin, home)
     if not plugin_present(feature.plugin, home):
         get = f" Install it with: `{install}`."
     else:
-        get = f" Enable it with: `{install.replace(' install ', ' enable ')}`." if prog == "hermes" else ""
-    if prog == "hermes auth":
-        old = " ".join(p for p in ("hermes auth", action, value) if p)
+        get = f" Enable it with: `{install.replace(' install ', ' enable ')}`." if not is_auth else ""
+    if is_auth:
+        old = " ".join(p for p in ("qubit auth", action, value) if p)
         return (f"{feature.label} moved out of core into the '{feature.plugin}' plugin: `{old}` is now "
-                f"`hermes {value} {action or 'login'}`.{get}")
+                f"`qubit {value} {action or 'login'}`.{get}")
     return f"{feature.label} moved out of core into the '{feature.plugin}' plugin, which is not loaded.{get}"
 
 
