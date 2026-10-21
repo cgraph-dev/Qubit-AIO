@@ -737,3 +737,70 @@ def test_delivery_env_carries_only_the_given_author(monkeypatch):
     assert "HERMES_SESSION_ID" not in env
     assert "HERMES_SESSION_PROFILE" not in env
     assert env["HERMES_SESSION_STALL_TIMEOUT"] == "97"
+
+
+def test_delivery_env_single_profile_host_passes_the_process_env_through(tmp_path, monkeypatch):
+    """Without multiplex nothing is pinned or overlaid: the child sees the process env as before."""
+    (tmp_path / ".env").write_text("OPENROUTER_API_KEY=from-dotenv\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "from-shell")
+
+    assert bot_relay.delivery_env(None, None)["OPENROUTER_API_KEY"] == "from-shell"
+
+
+def test_delivery_env_under_multiplex_names_the_pinned_launch_home(tmp_path, monkeypatch):
+    """A relayed DM into the launch profile spawns with the launch home and its secrets, even after a
+    host mirrors another home into HERMES_HOME; a bound scope or home override still wins."""
+    from agent.secret_scope import reset_secret_scope, set_multiplex_active, set_secret_scope
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+    launch, mirrored = tmp_path / "launch", tmp_path / "mirrored"
+    launch.mkdir()
+    mirrored.mkdir()
+    (launch / ".env").write_text("OPENROUTER_API_KEY=sk-launch\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(launch))
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    set_multiplex_active(True)  # pins the launch home
+    monkeypatch.setenv("QUBIT_HOME", str(mirrored))
+
+    env = bot_relay.delivery_env(None, None)
+    assert env["QUBIT_HOME"] == str(launch)
+    assert env["OPENROUTER_API_KEY"] == "sk-launch"
+
+    token = set_secret_scope({"OPENROUTER_API_KEY": "sk-bound"})
+    try:
+        assert bot_relay.delivery_env(None, None)["OPENROUTER_API_KEY"] == "sk-bound"
+    finally:
+        reset_secret_scope(token)
+
+    (mirrored / ".env").write_text("OPENROUTER_API_KEY=sk-override\n", encoding="utf-8")
+    home_token = set_qubit_home_override(str(mirrored))
+    try:
+        env = bot_relay.delivery_env(None, None)
+        assert (env["QUBIT_HOME"], env["OPENROUTER_API_KEY"]) == (str(mirrored), "sk-override")
+    finally:
+        reset_qubit_home_override(home_token)
+
+
+def test_replayed_unanswered_dm_precedes_mail_queued_after_it(root):
+    """A Desktop that reconnects before the first DM's reply drains it again as a replay, beside a
+    second DM queued since. Both reach the target's delivery lane in this list's order, so the
+    claimed-but-unanswered one (sent first) must come first — not after the fresh outbox row."""
+    first = bot_relay.enqueue_envelope(
+        root, target=_target(), message="do this first",
+        sender_profile="default", sender_handle="hermes",
+    )
+    base = bot_relay.relay_root(root)
+    now = _time2.time()
+    _os2.utime(base / bot_relay.OUTBOX_DIR / f"{first['id']}.json", (now - 2, now - 2))
+    assert [e["id"] for e in bot_relay.claim_pending_envelopes(root)] == [first["id"]]
+    second = bot_relay.enqueue_envelope(
+        root, target=_target(), message="then this",
+        sender_profile="default", sender_handle="hermes",
+    )
+    _os2.utime(base / bot_relay.OUTBOX_DIR / f"{second['id']}.json", (now - 1, now - 1))
+
+    drained = bot_relay.claim_pending_envelopes(root)
+
+    assert [e["message"] for e in drained] == ["do this first", "then this"]
+    assert [e["id"] for e in drained] == [first["id"], second["id"]]  # stable ids, no re-mint

@@ -223,3 +223,30 @@ def test_describe_prefers_the_plugin_title_over_the_server_slug(tmp_path):
     assert sentence.startswith("Example Tools")
     assert "Example App" not in sentence
     assert "MCP connection is missing" in sentence
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: declared app offer ignores requires.gpu")
+def test_gpu_requirement_hides_a_connected_server_and_says_which_gpu(monkeypatch):
+    """A connected server whose `requires.gpu` the host misses is not offered, and its status is a
+    state the Plugins tab can carry, with a sentence that names the GPU instead of "Install <app>"."""
+    from qubit_cli import agent_plugins
+    from qubit_platform.host import facts
+    from tools import mcp_liveness, mcp_tool_handlers
+    from tui_gateway.contracts.tools_mcp_plugins import PluginServerState
+
+    monkeypatch.setattr(facts, "gpu_class", lambda: "intel")
+    monkeypatch.setattr(agent_plugins, "liveness_for", lambda name: None, raising=False)
+    decl = declaration.parse_declaration("RTX Tool", None, {"gpu": "nvidia"}, where="test")
+    declaration.register("example-server", decl)
+    try:
+        offerable = mcp_tool_handlers._declared_app_offerable("example-server")
+        current = mcp_liveness.status("example-server")
+    finally:
+        declaration.unregister("example-server")
+
+    assert offerable is False
+    assert current is not None and current.state in {s.value for s in PluginServerState}
+    assert current.retry == "never_here"
+    sentence = mcp_liveness.describe(decl, current.availability, current.state)
+    assert "an NVIDIA GPU" in sentence and "Install" not in sentence
+
