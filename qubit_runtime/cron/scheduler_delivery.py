@@ -850,27 +850,46 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         # Read BEFORE discovery: the previous owner may have exited after accepting.
         # No receipt state, including ambiguous/failed, authorizes a CLI replay.
         receipt = read_delivery_result(home, key)
+        target = f"bot-chat:{profile_label}"
         if receipt is None and not deferred:
             from cron.bot_chat_delivery import defer, read_pending
             from tools.bot_live_delivery import find_canonical_owner
 
             pending = read_pending(key)
+            try:
+                live_owner = find_canonical_live_owner(home)
+            except ValueError:
+                # The target's gateway is down or starting: not a disposition. Park the output
+                # under its delivery id; a later tick admits it once the owner is reachable.
+                from cron.bot_chat_legacy import defer as defer_legacy
+                defer_legacy(key, dict(job), content, home, for_failure=for_failure)
+                job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
+                    "status": "queued", "delivery_id": key}
+                return f"{target} queued (receipt {key}): target profile not running; admitted once it is"
             # Suppression is a durable disposition, not a send: record it under the producer
             # lock even when a live owner exists, so the deferred lane never replays it.
             if (pending is not None or suppress_notification
-                    or (find_canonical_live_owner(home) is None and find_canonical_owner(home))):
+                    or (live_owner is None and find_canonical_owner(home))):
                 pending = defer(key, dict(job), content, profile, home,
                                 for_failure=for_failure, suppressed=suppress_notification)
             if pending is not None:
                 status = pending["status"]
-                target = f"bot-chat:{profile_label}"
                 job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
                     "status": status, "delivery_id": key}
                 if status == "suppressed":
                     job["_notification_all_targets_suppressed"] = True
                 return None if status in ("settled", "suppressed") else f"{target} {status} (receipt {key}): completion unverified; do not resend"
         if receipt is None:
-            owner = find_canonical_live_owner(home)
+            try:
+                owner = find_canonical_live_owner(home)
+            except ValueError:
+                # Discovery uncertainty is never a failed delivery: park it, never book it.
+                if deferred is None:
+                    from cron.bot_chat_legacy import defer as defer_legacy
+                    defer_legacy(key, dict(job), content, home, for_failure=for_failure)
+                job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
+                    "status": "queued", "delivery_id": key}
+                return f"{target} queued (receipt {key}): target profile not running; admitted once it is"
             if owner is not None:
                 receipt = deliver_to_live_owner(home, owner, message, delivery_id=key,
                     **({"notification_category": "diagnostic"} if for_failure else {}))
@@ -879,7 +898,6 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
                     or receipt.get("notification_category", "result") != ("diagnostic" if for_failure else "result")):
                 raise ValueError("delivery id already belongs to a different payload")
             status = receipt["status"]
-            target = f"bot-chat:{profile_label}"
             receipts = job.setdefault("_bot_chat_delivery_receipts", {})
             receipts[target] = {"status": status, "delivery_id": key}
             logger.info("Job '%s': Bot Chat %s receipt=%s status=%s",
