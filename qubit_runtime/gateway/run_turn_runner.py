@@ -1396,6 +1396,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         agent.stream_delta_callback = stream_delta_cb
         agent.interim_assistant_callback = interim_assistant_cb if want_interim_messages else None
         agent.reasoning_callback = None  # per turn: a reused agent never keeps an earlier API turn's sink
+        agent.status_callback, agent.notice_callback = ctx._status_callback_sync, self._notice_callback_sync
         if getattr(self, "_approval_owner", None) is not None:
             # An executing API admission feeds its request-owned sinks (Chat/Responses SSE, runs)
             # reasoning/status/commentary; ``_approval_owner`` is set only by that path, and
@@ -1403,7 +1404,6 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             from gateway.session_api_turn import api_execution, wire_api_observers
             if api_execution.get() is not None:
                 wire_api_observers(agent, self._approval_owner, want_interim_messages)
-        agent.status_callback, agent.notice_callback = ctx._status_callback_sync, self._notice_callback_sync
         agent.notice_clear_callback = None  # sends can't be retracted
         agent.event_callback = ctx._event_callback_sync
         agent.reasoning_config, agent.service_tier = reasoning_config, runner._service_tier
