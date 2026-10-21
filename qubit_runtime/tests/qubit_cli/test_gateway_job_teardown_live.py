@@ -36,6 +36,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 import pytest
+import contextlib
 
 pytestmark = pytest.mark.platforms("windows")  # native Windows only
 
@@ -330,3 +331,74 @@ class TestResumeVerificationLive:
             f"(#48820). Printed:\n{text}"
         )
         assert "could not be verified" in text
+
+
+CREATE_SUSPENDED = 0x00000004
+
+SYNCHRONIZE = 0x00100000
+
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+WAIT_OBJECT_0 = 0x0
+
+WAIT_TIMEOUT = 0x102
+
+def _kernel32():
+    # A private WinDLL with typed HANDLE signatures: windll's shared instance
+    # passes Python ints as 32-bit C ints, and argtypes set on it would leak
+    # into every other ctypes user in this process.
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+    k.CreateJobObjectW.restype = wintypes.HANDLE
+    k.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    k.SetInformationJobObject.restype = wintypes.BOOL
+    k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    k.AssignProcessToJobObject.restype = wintypes.BOOL
+    k.IsProcessInJob.argtypes = [
+        wintypes.HANDLE,
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.BOOL),
+    ]
+    k.IsProcessInJob.restype = wintypes.BOOL
+    k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    k.OpenProcess.restype = wintypes.HANDLE
+    k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k.WaitForSingleObject.restype = wintypes.DWORD
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    k.CloseHandle.restype = wintypes.BOOL
+    return k
+
+def _start_driver_in_job(k, job: int, argv: list[str]) -> subprocess.Popen:
+    """Start ``argv`` inside ``job`` before it runs a single instruction.
+
+    The process is created suspended, assigned, then resumed — the same seam
+    the updater uses (``update_lock.bind_child_to_update_tree`` +
+    ``resume_suspended_child``). Assigning a RUNNING process is racy: a venv's
+    ``Scripts\\python.exe`` is a redirector that starts the real interpreter as
+    its own child, and a child created before ``AssignProcessToJobObject``
+    lands stays outside the job. That interpreter is the one that spawns the
+    grandchild, so the grandchild escaped the job and survived the teardown
+    (~6% of CI runs before this).
+    """
+    from qubit_cli.update_lock import resume_suspended_child
+
+    driver = subprocess.Popen(argv, cwd=str(_REPO_ROOT), creationflags=CREATE_SUSPENDED)
+    if not k.AssignProcessToJobObject(job, int(driver._handle)):
+        error = ctypes.get_last_error()
+        driver.kill()
+        driver.wait(timeout=30)
+        pytest.fail(f"AssignProcessToJobObject failed (winerror={error})")
+    resume_suspended_child(driver)
+    return driver
+
+def _read_pid(path: Path) -> int | None:
+    try:
+        text = path.read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        return None
+    return int(text) if text.isdigit() else None
