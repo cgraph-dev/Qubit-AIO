@@ -195,7 +195,7 @@ def test_logged_in_entitled_account_yields_a_state_for_every_feature(monkeypatch
     """The logged-in + entitled branch must produce a state for EVERY feature, including
     those with no config selection field (modal). Regression: the managed-availability
     table indexed the selection map by every feature key and raised KeyError('modal'),
-    crashing `qubit status`, `qubit tools`, and the dashboard toolsets API."""
+    crashing `hermes status`, `hermes tools`, and the dashboard toolsets API."""
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _pool_account())
     monkeypatch.setattr(ns, "is_managed_tool_gateway_ready", lambda gateway: True)
     monkeypatch.setattr(ns, "get_env_value", lambda name: "")
@@ -249,7 +249,7 @@ def test_get_gateway_eligible_tools_treats_explicit_backend_as_configured(monkey
     """A keyless local backend (e.g. searxng) has no credentials to detect,
     but an explicit non-nous selection must still keep it out of
     'unconfigured' — regression for #92647, where it was pre-checked and a
-    single Enter during `qubit model` overwrote it to `web.backend: nous`.
+    single Enter during `hermes model` overwrote it to `web.backend: nous`.
     """
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _account(logged_in=True, paid=True))
     monkeypatch.setattr(
@@ -424,8 +424,49 @@ def test_apply_nous_managed_defaults_writes_video_gen_config(monkeypatch):
     assert "use_gateway" not in config["video_gen"]
 
 
+def _defaults_for(monkeypatch, account, config):
+    monkeypatch.setattr(tool_backend_helpers, "managed_nous_tools_enabled", lambda **kw: True)
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.setattr(ns, "fal_key_is_configured", lambda: False)
+    monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: account)
+    ns.apply_nous_managed_defaults(config, enabled_toolsets=["image_gen"])
+    return config["image_gen"]
+
+
+def test_paid_account_defaults_to_the_krea_image_model(monkeypatch):
+    section = _defaults_for(monkeypatch, _account(logged_in=True, paid=True), {"model": {"provider": "nous"}})
+    assert section == {"provider": "nous", "model": ns.MANAGED_IMAGE_DEFAULT_KREA_MODEL}
+
+
+def test_pool_account_keeps_the_fal_image_default(monkeypatch):
+    section = _defaults_for(monkeypatch, _pool_account(), {"model": {"provider": "nous"}})
+    assert section["provider"] == "nous"
+    assert "model" not in section
+
+
+def test_first_run_gateway_acceptance_writes_the_krea_image_model():
+    """`hermes setup --portal` stores selections through apply_gateway_defaults, not the managed-defaults
+    pass, so the Krea default must apply there too; an existing model and the free pool are left on FAL."""
+    paid, pool = _account(logged_in=True, paid=True), _pool_account()
+    fresh = {}
+    ns.apply_gateway_defaults(fresh, ["image_gen"], paid)
+    assert fresh["image_gen"] == {"provider": "nous", "model": ns.MANAGED_IMAGE_DEFAULT_KREA_MODEL}
+    pooled = {}
+    ns.apply_gateway_defaults(pooled, ["image_gen"], pool)
+    assert "model" not in pooled["image_gen"]
+    kept = {"image_gen": {"model": FAL_DEFAULT_MODEL}}
+    ns.apply_gateway_defaults(kept, ["image_gen"], paid)
+    assert kept["image_gen"]["model"] == FAL_DEFAULT_MODEL
+
+
+def test_configured_image_section_is_left_alone(monkeypatch):
+    config = {"model": {"provider": "nous"}, "image_gen": {"provider": "nous", "model": FAL_DEFAULT_MODEL}}
+    section = _defaults_for(monkeypatch, _account(logged_in=True, paid=True), config)
+    assert section["model"] == FAL_DEFAULT_MODEL
+
+
 # ---------------------------------------------------------------------------
-# ensure_nous_portal_access — inline login gate for `qubit tools`
+# ensure_nous_portal_access — inline login gate for `hermes tools`
 # ---------------------------------------------------------------------------
 
 
