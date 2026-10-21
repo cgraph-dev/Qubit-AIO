@@ -70,14 +70,14 @@ _OPERATIONS = {
 
 @pytest.mark.parametrize("operation", _OPERATIONS, ids=_OPERATIONS)
 def test_io_guard_denies_protected_roots_before_mutation(protected_home, operation):
-    with pytest.raises((AssertionError, pytest.fail.Exception), match="REAL qubit home"):
+    with pytest.raises((AssertionError, pytest.fail.Exception), match="REAL hermes home"):
         _OPERATIONS[operation](protected_home / "file.txt")
 
 
 def test_rename_cannot_overwrite_a_protected_destination(protected_home, tmp_path):
     source = tmp_path / "source.txt"
     source.write_text("external", encoding="utf-8")
-    with pytest.raises((AssertionError, pytest.fail.Exception), match="REAL qubit home"):
+    with pytest.raises((AssertionError, pytest.fail.Exception), match="REAL hermes home"):
         source.replace(protected_home / "file.txt")
     assert source.read_text(encoding="utf-8") == "external"
 
@@ -164,7 +164,7 @@ def test_path_metadata_exemption_tracks_path_changes(protected_home, monkeypatch
     monkeypatch.setenv("PATH", str(protected_home))
     guard.check(target, metadata=True)  # executable lookup, not a state read
     monkeypatch.setenv("PATH", str(protected_home.parent))
-    with pytest.raises(AssertionError, match="REAL qubit home"):
+    with pytest.raises(AssertionError, match="REAL hermes home"):
         guard.check(target, metadata=True)
 
 
@@ -180,7 +180,7 @@ def test_relative_path_metadata_exemption_tracks_working_directory(protected_hom
     monkeypatch.chdir(other)
     guard.check(target, metadata=True)
     monkeypatch.chdir(other / "nested")
-    with pytest.raises(AssertionError, match="REAL qubit home"):
+    with pytest.raises(AssertionError, match="REAL hermes home"):
         guard.check(target, metadata=True)
 
 
@@ -194,7 +194,7 @@ def test_checkout_inside_a_guarded_root_is_not_qubit_state():
     guard = HomeIOGuard(lambda: [PROJECT_ROOT.parent])
     guard.check(PROJECT_ROOT / "tests" / "home_io_guard.py")
     guard.check(PROJECT_ROOT / ".venv" / "bin" / "python", metadata=True)
-    with pytest.raises(AssertionError, match="REAL qubit home"):
+    with pytest.raises(AssertionError, match="REAL hermes home"):
         guard.check(PROJECT_ROOT.parent / "config.yaml")
 
 
@@ -223,6 +223,111 @@ def test_qubit_exported_scratch_tmp_is_not_the_test_temp_root(tmp_path):
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-p", "tests.conftest", "-p", "no:cacheprovider", "-q", str(probe)],
         cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed" in result.stdout
+
+
+def test_checkout_inside_a_guarded_root_is_not_qubit_state():
+    """The default install checks the repo out INSIDE the home (install.sh:
+    INSTALL_DIR=$QUBIT_HOME/qubit): the checkout, its .venv and test
+    data are exempt even when the guarded root contains them; siblings under
+    that root are still refused."""
+    from tests.home_io_guard import HomeIOGuard
+
+    guard = HomeIOGuard(lambda: [PROJECT_ROOT.parent])
+    guard.check(PROJECT_ROOT / "tests" / "home_io_guard.py")
+    guard.check(PROJECT_ROOT / ".venv" / "bin" / "python", metadata=True)
+    with pytest.raises(AssertionError, match="REAL hermes home"):
+        guard.check(PROJECT_ROOT.parent / "config.yaml")
+
+
+def test_qubit_exported_scratch_tmp_is_not_the_test_temp_root(tmp_path):
+    """A Hermes-launched shell hands pytest TMPDIR=<home>/cache/scratch (tagged by
+    QUBIT_SCRATCH_DIR). With that home guarded, honoring it would put the session
+    sandbox, basetemp and every tempfile default inside the guarded root; the
+    conftest must drop Hermes' own export before anything allocates temp space."""
+    home = tmp_path / "home"
+    scratch = home / "cache" / "scratch"
+    scratch.mkdir(parents=True)
+    probe = tmp_path / "test_probe.py"
+    probe.write_text(textwrap.dedent(f"""
+        import tempfile
+        from pathlib import Path
+
+        def test_temp_root_is_outside_the_honored_home():
+            home = Path({str(home)!r}).resolve()
+            assert not Path(tempfile.gettempdir()).resolve().is_relative_to(home)
+            with tempfile.TemporaryDirectory() as made:
+                assert not Path(made).resolve().is_relative_to(home)
+        """), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("TMPDIR", "TMP", "TEMP", "QUBIT_SCRATCH_DIR", "QUBIT_TEST_SANDBOX_HOME")}
+    env.update(QUBIT_HOME=str(home), TMPDIR=str(scratch), QUBIT_SCRATCH_DIR=str(scratch))
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "tests.conftest", "-p", "no:cacheprovider", "-q", str(probe)],
+        cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed" in result.stdout
+
+
+def test_resolving_a_path_entry_under_the_home_is_command_lookup(protected_home, monkeypatch):
+    """Command resolution realpath()s a PATH entry under the home (``~/.hermes/tools/<tool>``)
+    to tell Qubit-managed bin dirs apart; that lstats the entry and each of its ancestors."""
+    from tests.home_io_guard import HomeIOGuard
+
+    entry = protected_home / "tools" / "npm" / "bin"
+    guard = HomeIOGuard(lambda: [protected_home])
+    monkeypatch.setenv("PATH", str(entry))
+    guard.check(entry, metadata=True)
+    guard.check(entry.parent, metadata=True)
+    with pytest.raises(AssertionError, match="REAL hermes home"):
+        guard.check(protected_home / "tools" / "other", metadata=True)
+    with pytest.raises(AssertionError, match="REAL hermes home"):
+        guard.check(entry.parent, metadata=False)
+
+
+def test_checkout_inside_a_guarded_root_is_not_qubit_state():
+    """The default install checks the repo out INSIDE the home (install.sh:
+    INSTALL_DIR=$QUBIT_HOME/qubit-agent): the checkout, its .venv and test
+    data are exempt even when the guarded root contains them; siblings under
+    that root are still refused."""
+    from tests.home_io_guard import HomeIOGuard
+
+    guard = HomeIOGuard(lambda: [PROJECT_ROOT.parent])
+    guard.check(PROJECT_ROOT / "tests" / "home_io_guard.py")
+    guard.check(PROJECT_ROOT / ".venv" / "bin" / "python", metadata=True)
+    with pytest.raises(AssertionError, match="REAL hermes home"):
+        guard.check(PROJECT_ROOT.parent / "config.yaml")
+
+
+def test_qubit_exported_scratch_tmp_is_not_the_test_temp_root(tmp_path):
+    """A Qubit-launched shell hands pytest TMPDIR=<home>/cache/scratch (tagged by
+    HERMES_SCRATCH_DIR). With that home guarded, honoring it would put the session
+    sandbox, basetemp and every tempfile default inside the guarded root; the
+    conftest must drop Qubit's own export before anything allocates temp space."""
+    home = tmp_path / "home"
+    scratch = home / "cache" / "scratch"
+    scratch.mkdir(parents=True)
+    probe = tmp_path / "test_probe.py"
+    probe.write_text(textwrap.dedent(f"""
+        import tempfile
+        from pathlib import Path
+
+        def test_temp_root_is_outside_the_honored_home():
+            home = Path({str(home)!r}).resolve()
+            assert not Path(tempfile.gettempdir()).resolve().is_relative_to(home)
+            with tempfile.TemporaryDirectory() as made:
+                assert not Path(made).resolve().is_relative_to(home)
+        """), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("TMPDIR", "TMP", "TEMP", "HERMES_SCRATCH_DIR", "HERMES_TEST_SANDBOX_HOME")}
+    env.update(QUBIT_HOME=str(home), TMPDIR=str(scratch), HERMES_SCRATCH_DIR=str(scratch))
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "tests.conftest", "-p", "no:cacheprovider", "-q", str(probe)],
+        cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, timeout=120,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "1 passed" in result.stdout
