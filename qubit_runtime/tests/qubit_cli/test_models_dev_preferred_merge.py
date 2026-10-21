@@ -143,7 +143,6 @@ class TestProviderModelIdsPreferred:
         assert captured["models"] == _PROVIDER_MODELS["kimi-coding"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: setup merge always leads with models.dev instead of curated for non-live-first providers")
 def test_setup_menu_merge_leads_with_curated_in_full():
     from qubit_cli.model_setup_flows_common import _models_dev_merged
     with patch("agent.models_dev.list_agentic_models", return_value=["a/x", "b/Y", "c/z"]):

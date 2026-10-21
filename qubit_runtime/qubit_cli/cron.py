@@ -317,7 +317,7 @@ def cron_tick():
 
     begin_process("cron")
     try:
-        tick(verbose=True)
+        tick(verbose=True, headless=True)
     except CronTickYielded as exc:
         # Inert for a one-shot CLI (no boot fingerprint); report cleanly rather than traceback.
         print(color(f"✗ {exc}", Colors.YELLOW))

@@ -209,10 +209,8 @@ class TestChatSubparserInheritedValueFlags:
 
 
 @pytest.mark.parametrize("argv", [
-    pytest.param(["--tui", "--checkpoints"], marks=pytest.mark.xfail(
-        strict=True, reason="wave-20 parity defect: --checkpoints is declared only on the chat subparser")),
-    pytest.param(["--checkpoints", "chat"], marks=pytest.mark.xfail(
-        strict=True, reason="wave-20 parity defect: --checkpoints is declared only on the chat subparser")),
+    ["--tui", "--checkpoints"],
+    ["--checkpoints", "chat"],
     ["chat", "--tui", "--checkpoints"],
 ])
 def test_checkpoints_parses_at_the_top_level_and_survives_chat(argv):

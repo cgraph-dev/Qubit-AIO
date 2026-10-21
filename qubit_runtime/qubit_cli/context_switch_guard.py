@@ -46,10 +46,7 @@ def _estimate_tokens(agent: Any, messages: Optional[List[dict]]) -> Optional[int
             pass
 
     last = int(getattr(cc, "last_prompt_tokens", 0) or 0)
-    if last > 0:
-        return last
-    session_prompt = int(getattr(agent, "session_prompt_tokens", 0) or 0)
-    return session_prompt if session_prompt > 0 else None
+    return last if last > 0 else None
 
 
 def merge_preflight_compression_warning(
