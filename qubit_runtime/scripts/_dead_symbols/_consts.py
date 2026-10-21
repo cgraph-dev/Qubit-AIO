@@ -33,6 +33,26 @@ STUB_DECORATORS = frozenset({"overload", "abstractmethod", "abstractclassmethod"
                              "abstractstaticmethod", "abstractproperty",
                              "runtime_checkable"})
 FIXTURE_DECORATORS = frozenset({"fixture", "pytest_fixture"})
+# Functions that resolve a symbol from a string at runtime. The string names a
+# real call site even though the callee is not written as a Name/Attribute Load.
+# `STRING_BOUND_CALLS` is the stdlib/patch family already counted as a use site;
+# `LAZY_LOOKUP_CALLS` are module-attribute resolvers. Both are held in
+# `dispatch_refs` (not `uses`) so they never make an unrelated name look like a
+# module-level assignment.
+STRING_BOUND_CALLS = frozenset({"patch", "setattr", "getattr", "delattr"})
+LAZY_LOOKUP_CALLS = frozenset({
+    "_lazy", "_lazy_attr", "lazy_attr", "_lazy_call", "_lazy_shim", "lazy_import",
+})
+# Decorator verb -> route registration (FastAPI/Starlette/Flask/Quart/aiohttp
+# style). A handler wired this way is invoked by the framework, not by a Name.
+ROUTE_DECORATORS = frozenset({
+    "get", "post", "put", "patch", "delete", "head", "options", "trace",
+    "route", "api_route", "websocket", "websocket_route",
+})
+# pytest's default collection rule is `python_classes = Test*`; unittest-style
+# classes are collected by base class regardless of name.
+PYTEST_CLASS_PREFIX = "Test"
+UNITTEST_BASES = frozenset({"TestCase"})
 HTTP_HANDLER_METHODS = frozenset({
     "do_GET", "do_POST", "do_PUT", "do_DELETE", "do_PATCH", "do_HEAD",
     "do_OPTIONS", "do_CONNECT", "do_TRACE", "log_message", "log_request",
