@@ -73,13 +73,7 @@ def _history():
     ]
 
 
-_XFAIL = {"bedrock_opus", "bedrock_fips", "vertex", "foundry", "native_haiku55", "native_opus48", "deepseek_on_bedrock_host"}
-
-
-@pytest.mark.parametrize("case", [
-    pytest.param(c, marks=pytest.mark.xfail(strict=True, reason="wave-18 parity defect: signed-thinking replay policy diverges on this route"))
-    if c in _XFAIL else c for c in _CASES
-])
+@pytest.mark.parametrize("case", list(_CASES))
 def test_signed_thinking_replays_exactly_where_the_route_can_verify_it(case):
     """Invariant: the transport entry point sends the route's signed blocks in their captured order,
     the signature-400 self-heal covers every signed route, accounting charges prior-turn thinking

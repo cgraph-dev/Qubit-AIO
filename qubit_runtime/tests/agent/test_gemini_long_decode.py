@@ -79,7 +79,6 @@ def test_dropped_stream_without_a_clean_checkpoint_raises(monkeypatch, streams, 
     assert len(sent) == requests
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: Gemini long-decode hop ceiling is not enforced")
 def test_long_decode_hop_ceiling_ends_as_length(monkeypatch):
     """A server that keeps answering CONTINUATION must not bill forever: past ceil(budget / 32,768) + 1
     hops the turn ends as ``length`` (unary and streaming), with usage summed over the hops taken."""
@@ -134,7 +133,6 @@ def test_long_decode_hop_ceiling_ends_as_length(monkeypatch):
     assert (finishes[0].usage.prompt_tokens, finishes[0].usage.initial_prompt_tokens) == (30, 10)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: usage object lacks initial_prompt_tokens/initial_cached_tokens")
 def test_long_decode_usage_keeps_canonical_buckets_on_first_hop():
     """Context engines read the canonical buckets: input/cache_read follow the same first-hop split as
     prompt_tokens, so cache_read never exceeds the context-facing prompt."""
