@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 17 — 2026-10-21 (17 dead)
+
+- ✅ Landed: write-file baseline (9 xfails→pass), shared metrics connector/tool_search + recommendation floor (7 xfails→pass), compaction events + auxiliary relay (call_role split fixed), inline bootstrap shape + left-core, agent plugins + skills-guard v10/plugin-guard v11, release admission (10 dead resolved) + `select_apply_target`, 28 test files ported.
+- ✅ Measured on merged `main`: dead **27 → 17** (10 resolved, 0 new); production **1** (declared B1); total missing **766 → 642**; absent **448 → 420**; brand guard OK.
+- 🔴 New defects xfailed strict (unported): ACP launch flags dropped; ultrafast catalog omits `gpt-6.1-sol`; bot-chat owner-read not parked/receipted; local viewer misses `review.summary`; resume reset-tip unknown admission; read-only export mutates `state.db`; title transfer parent revision fence; fanout drain concrete-`WSTransport` only.
+- 🔴 Remaining: 17 dead (bot-chat authority/FIFO, hot-serve pair, `one_turn_route`, detector FPs); 420 absent + 642 short-port test symbols.
+- 🟡 Wave 16 applied live; wave 17 restart follows the commit. No global E2E/release verdict.
+
 ## Wave 16 — 2026-10-21 (F5 ported; 27 dead)
 
 - ✅ Owner rulings: B1 `_gateway_lock_handle` declared an exclusion (upstream-dead at the pin); F4 kept fatal (pin behaviour) and documented; F5 rejected — all 21 exclusion rows ported literally.
