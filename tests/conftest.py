@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 import tmp_policy
+from tests._fixtures.model_peer import model_peer  # noqa: F401  (registers the model_peer fixture for gateway/CLI daemon tests)
 
 
 def pytest_addoption(parser):  # noqa: D103
