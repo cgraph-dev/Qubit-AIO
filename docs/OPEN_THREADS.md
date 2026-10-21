@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 20 — 2026-10-21 (309 missing; 0 dead)
+
+- ✅ Ported ~280 upstream test files across 8 disjoint lanes (gateway A/B/C, qubit_cli A/B, agent, tools, tui/acp/rest).
+- ✅ Measured: absent **361 → 286**; short-port **328/638 → 155/309**; total **638 → 309**; production **1** (declared B1); dead **0**.
+- 🟡 255 newly exposed production defects are strict xfails (`wave-20 parity defect: …`): gateway authority/settlement/watchdog, API idempotency/steer, managed-worker drain, CLI update/doctor/session, agent provider/pricing, MCP/browser/connectors, hosted-room/ACP onboarding.
+- 🔴 Remaining: 286 absent + 309 short-port test symbols; 255 xfails.
+- 🟡 No service restart for this test-only wave; no global E2E/release verdict.
+
 ## Wave 19 — 2026-10-21 (0 dead; 0 wave-18 xfails)
 
 - ✅ Fixed 118 parity-exposed defects across reasoning, compression, safe-worker/MCP, gateway lifecycle, state/session, connectors/files, onboarding/config, TUI/hosted/approval/browser; the last (cron manual-run exit code) fixed separately.
