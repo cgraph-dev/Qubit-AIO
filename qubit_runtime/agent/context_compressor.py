@@ -5464,7 +5464,7 @@ Write only the summary body. Do not include any preamble or prefix."""
 
     def _finalize_compressed(
         self, compressed: List[Dict[str, Any]], messages: List[Dict[str, Any]], n_messages: int,
-        spare_pending_images: bool,
+        spare_pending_images: bool, pruned_count: int = 0,
     ) -> List[Dict[str, Any]]:
         """Post-assembly cleanup: orphan pairs, media, savings, markers, replay prune, mem trim."""
         # Single-prompt cron shape: the only live instruction sits in the protected head, BEFORE the
@@ -5501,6 +5501,7 @@ Write only the summary body. Do not include any preamble or prefix."""
         _pruned_replay = _prune_stale_reasoning_replay(compressed)
         if _pruned_replay and not self.quiet_mode:
             logger.info("Pruned stale replay items from %d assistant message(s) during compaction", _pruned_replay)
+        self._record_compression_effect(n_messages, compressed, pre_estimate, pruned_count, _pruned_replay)
         self._last_compression_made_progress = True
 
         # Compaction frees the biggest allocation: hand pages back to the OS (glibc/config-gated,
@@ -5546,6 +5547,7 @@ Write only the summary body. Do not include any preamble or prefix."""
 
         _raise_if_stale_attempt(self)
         telemetry = self._begin_compress_attempt(current_tokens, force)
+        telemetry["has_focus_topic"] = bool(focus_topic)
         n_messages = len(messages)
         # Only need head + 3 tail messages minimum (token budget decides the real tail size)
         _min_for_compress = self._protect_head_size(messages) + 3 + 1
@@ -5627,7 +5629,9 @@ Write only the summary body. Do not include any preamble or prefix."""
             )
         # Phase 4: Assemble compressed message list
         compressed = self._assemble_compressed(messages, compress_start, compress_end, scan, summary)
-        return self._finalize_compressed(compressed, canonical_messages, n_messages, spare_pending_images)
+        return self._finalize_compressed(
+            compressed, canonical_messages, n_messages, spare_pending_images, pruned_count=pruned_count,
+        )
 
     def _assemble_compressed(
         self, messages: List[Dict[str, Any]], compress_start: int, compress_end: int, scan: _HandoffScan, summary: str,
