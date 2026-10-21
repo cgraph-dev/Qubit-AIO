@@ -1,6 +1,7 @@
 """Exercise publisher/reader through the real signed HTTP transport."""
 from __future__ import annotations
 
+import base64
 from contextlib import contextmanager
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,6 +12,8 @@ from urllib.parse import parse_qs, urlsplit
 import xml.sax.saxutils
 
 import pytest
+
+from scripts.releases import lanes as lane_set
 
 
 @contextmanager
@@ -421,6 +424,12 @@ def test_accepted_release_receipts_feed_the_protected_head_without_rebuilding(tm
                         name = f"{identity['artifactNamePascal']}-2.0.0-mac-{arch}.{suffix}"
                         files[name] = (name + " fixture bytes").encode()
                     metadata["filename"] = f"{identity['artifactNamePascal']}-2.0.0-mac-{arch}.zip"
+                    # The per-arch electron feed leg, as the macOS build stages it.
+                    leg = {"version": "2.0.0", "files": [
+                        {"url": name, "size": len(files[name]),
+                         "sha512": base64.b64encode(hashlib.sha512(files[name]).digest()).decode("ascii")}
+                        for name in (f"{identity['artifactNamePascal']}-2.0.0-mac-{arch}.{ext}" for ext in ("zip", "dmg"))]}
+                    files[f"{arch}-stable-mac.yml"] = canonical_json(leg)
                 else:
                     metadata.update(publisher="CN=Fixture", applicationId=identity["appNamePascal"])
                     files[f"{identity['artifactNamePascal']}-2.0.0-win-{arch}.msix"] = b"fixture msix"
@@ -472,7 +481,7 @@ def test_accepted_release_receipts_feed_the_protected_head_without_rebuilding(tm
                             lambda policy, env, **_kwargs: (tag, commit))
         monkeypatch.setattr(channel_releases.stable, "final_context",
                             lambda env: (tag, commit, {"claim_epoch": 1_787_965_323,
-                                                       "skip_bundles": False, "skip_tests": False}))
+                                                       "lanes": lane_set.DEFAULT}))
         monkeypatch.setattr(channel_releases, "accepted_stable", lambda *args, **kwargs: accepted)
         promotion_attempts = [0]
         def promote_stable_feeds(*args):
@@ -509,7 +518,7 @@ def test_protected_transaction_refuses_custom_workflow_and_unpublished_release(m
            "GITHUB_REPOSITORY": "example/hermes-agent", "RELEASE_TAG": attempt,
            "RELEASE_COMMIT": commit, "RELEASE_CLAIM_TAG": attempt,
            "RELEASE_CLAIM_OBJECT": "b" * 40,
-           "GITHUB_WORKFLOW_REF": "example/hermes-agent/.github/workflows/stable-release.yml@refs/tags/" + attempt}
+           "GITHUB_WORKFLOW_REF": "example/hermes-agent/.github/workflows/stable-release.yml@refs/heads/main"}
     published = [True]
 
     def final_context(_env, run):
@@ -544,7 +553,7 @@ def test_stable_admission_requires_an_attempt_ref_release_tag(monkeypatch):
            "GITHUB_REPOSITORY": "example/hermes-agent", "RELEASE_TAG": attempt,
            "RELEASE_COMMIT": commit, "RELEASE_CLAIM_TAG": attempt,
            "RELEASE_CLAIM_OBJECT": "b" * 40,
-           "GITHUB_WORKFLOW_REF": "example/hermes-agent/.github/workflows/stable-release.yml@refs/tags/" + attempt}
+           "GITHUB_WORKFLOW_REF": "example/hermes-agent/.github/workflows/stable-release.yml@refs/heads/main"}
     monkeypatch.setattr(channel_releases.stable, "final_context",
                         lambda _env, run: ("v1.2.3", commit, {}))
 
@@ -593,15 +602,15 @@ def test_accepted_stable_reads_the_release_archive_by_tag(monkeypatch):
         objects[key] = raw
         candidate_env = {"CANDIDATE_MANIFEST_SHA256": hashlib.sha256(raw).hexdigest(), "CANDIDATE_MANIFEST_URL": pub.public_base + "/" + key}
         assert channel_releases.accepted_stable(pub, candidate_env, attempt, commit, release_epoch,
-                                                skip_tests=False) == candidate
-        # Passed smokes cannot stand behind a claim that skipped tests, or the reverse.
+                                                lanes=lane_set.DEFAULT) == candidate
+        # Passed smokes cannot stand behind a claim whose lanes run none, or the reverse.
         with pytest.raises(ValueError, match="test policy"):
             channel_releases.accepted_stable(pub, candidate_env, attempt, commit, release_epoch,
-                                             skip_tests=True)
+                                             lanes=lane_set.select(without=["smoke"]))
         faults["stale_public"] = b"{}"
         with pytest.raises(ChannelError):
             channel_releases.accepted_stable(pub, candidate_env, attempt, commit, release_epoch,
-                                             skip_tests=False)
+                                             lanes=lane_set.DEFAULT)
 
 
 def test_request_inputs_are_rejected_before_allocating():

@@ -13,7 +13,9 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path, PureWindowsPath
+from typing import Iterable
 
+from scripts.releases import lanes as lane_set
 from scripts.releases.stable import read_admitted_candidate, accepted_smoke_results, validate_candidates
 
 
@@ -164,16 +166,24 @@ ALL_HANDOFFS = ("win32-x64", "win32-arm64", "darwin-x64", "darwin-arm64", "termu
 
 
 def assemble(root: Path, tag: str, commit: str, public_base: str, out: Path,
-             *, smoke_results: dict, release_epoch: int, archive: str) -> dict:
+             *, smoke_results: dict, release_epoch: int, archive: str,
+             lanes: Iterable[str]) -> dict:
     """Bind the native metadata to files already staged by their build jobs.
 
     `tag` stays the plain payload identity; `archive` is the attempt ref the
-    manifest and every artifact URL are keyed under."""
+    manifest and every artifact URL are keyed under. `lanes` are the claim's:
+    a handoff group a lane did not build must have no target in the manifest.
+    The Windows groups build together, so the universal bundle (`windows`) and
+    the Store bundle (`windows-store`) are each present exactly when their lane is."""
     from scripts.releases.handoff import receipt_name, validate_receipt
     from scripts.releases.r2 import put, staging_key_for
 
-    smoke_results = accepted_smoke_results(smoke_results)
-    expected = ALL_HANDOFFS
+    lanes = frozenset(lanes)
+    expected = lane_set.handoffs(lanes, ALL_HANDOFFS)
+    if not expected:
+        raise ValueError("Invalid candidate handoff set: the lanes built no package")
+    absent = frozenset(lane_set.TARGET_LANE) - lane_set.targets(lanes)
+    smoke_results = accepted_smoke_results(smoke_results, absent=absent)
     by_name = {}
     for name in expected:
         file = root / receipt_name(name)
@@ -195,16 +205,23 @@ def assemble(root: Path, tag: str, commit: str, public_base: str, out: Path,
                 raise ValueError(f"Candidate local digest mismatch: {name}")
             if name.startswith("metadata-"):
                 rows.append(json.loads(file.read_text(encoding="utf-8-sig")))
-    universal_name = single(name for name in by_name if name.endswith(".msixbundle") and not name.startswith("Store-"))
-    single(name for name in by_name if name.endswith(".msixbundle") and name.startswith("Store-"))
-    windows = [r for r in rows if r["platform"] == "windows"]
-    validate_windows_bundle(root / universal_name, windows)
+    universal_name = None
+    if "windows" in lanes:
+        universal_name = single(name for name in by_name if name.endswith(".msixbundle") and not name.startswith("Store-"))
+        validate_windows_bundle(root / universal_name, [r for r in rows if r["platform"] == "windows"])
+    elif any(name.endswith(".msixbundle") and not name.startswith("Store-") for name in by_name):
+        raise ValueError("Candidate carries a signed Windows bundle the claim did not build")
+    stores = [name for name in by_name if name.endswith(".msixbundle") and name.startswith("Store-")]
+    if len(stores) != ("windows-store" in lanes):
+        raise ValueError("Candidate Store bundle differs from the claim's windows-store lane")
     files = [{**row, "url": f"{public_base.rstrip('/')}/{staging_key_for(archive, name)}"}
              for name, row in sorted(by_name.items()) if not name.startswith("metadata-")]
     by_name = {item["path"]: item for item in files}
     packages = []
     for row in rows:
-        stamp_matches(row, tag, commit)
+        # record() verified each package's own stamp; a row is metadata and carries no baseVersion.
+        if row.get("commit") != commit or row.get("tag") != tag:
+            raise ValueError("Built package provenance does not match the release")
         filename = universal_name if row["platform"] == "windows" else row["filename"]
         item = by_name[filename]
         packages.append({k: v for k, v in {**row, "artifact": {"url": item["url"], "sha256": item["sha256"]}}.items() if k != "filename"})
@@ -212,8 +229,9 @@ def assemble(root: Path, tag: str, commit: str, public_base: str, out: Path,
               "archive": archive,
               "packages": packages, "files": files, "smoke_results": smoke_results}
     validate_candidates(result, tag, commit, public_base, release_epoch, archive=archive)
-    if not any(row["platform"] == "termux" for row in packages):
-        raise ValueError("Missing Termux candidate")
+    present = {f"{row['platform']}/{row['arch']}" for row in packages}
+    if present != set(lane_set.TARGET_LANE) - absent:
+        raise ValueError("Candidate package rows differ from the built handoffs")
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     put(tag=archive, key="release-candidates.json", file=out, immutable=True)
     return result
@@ -397,7 +415,8 @@ def main(argv: list[str] | None = None) -> None:
             parser.error("assemble requires the admitted --archive ref")
         assemble(args.root, args.tag, args.commit, args.public_base, args.out,
                  smoke_results=json.loads(os.environ.get("RELEASE_NEEDS", "{}")),
-                 release_epoch=args.release_epoch, archive=args.archive)
+                 release_epoch=args.release_epoch, archive=args.archive,
+                 lanes=lane_set.from_flags(json.loads(os.environ.get("LANES") or "null")))
         if os.environ.get("GITHUB_OUTPUT"):
             with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as file:
                 file.write(f"manifest-url={args.public_base.rstrip('/')}/releases/tag/{args.archive}/release-candidates.json\nmanifest-sha256={sha256_file(args.out)}\n")

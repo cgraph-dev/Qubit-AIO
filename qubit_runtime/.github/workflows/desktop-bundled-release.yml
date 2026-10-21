@@ -98,7 +98,19 @@ on:
         type: string
         default: 'darwin-arm64,darwin-x64,win32-arm64,win32-x64,win32-bundle,linux-x64,linux-arm64,termux'
       skip-tests:
-        description: 'Stable candidates only: build and stage without native smokes or in-build test suites (the claim skipped tests).'
+        description: 'Stable candidates only: build and stage without native smokes or in-build test suites (the claim has no smoke lane).'
+        type: boolean
+        default: false
+      skip-signed:
+        description: 'Stable candidates only: build no signed Windows package (the claim has no windows lane). Needs no Azure signing.'
+        type: boolean
+        default: false
+      skip-store:
+        description: 'Stable only: build no Microsoft Store bundle and submit none (the claim has no windows-store lane).'
+        type: boolean
+        default: false
+      windows-smokes-with-bundle:
+        description: 'Stable only: smoke the staged per-arch MSIX packages in the win32-bundle call, beside assembly, instead of after each per-arch build.'
         type: boolean
         default: false
     outputs:
@@ -584,7 +596,7 @@ jobs:
       # Signing vars the build only warns and ships UNSIGNED binaries, which
       # is right for a fork or a local build and wrong for a release.
       - name: Require Azure signing when publishing
-        if: inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != ''
+        if: inputs.skip-signed != true && (inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != '')
         shell: bash
         env:
           AZURE_SIGN_ENDPOINT: ${{ vars.AZURE_SIGN_ENDPOINT }}
@@ -604,7 +616,7 @@ jobs:
           fi
 
       - name: Azure login (OIDC)
-        if: vars.AZURE_CLIENT_ID != ''
+        if: vars.AZURE_CLIENT_ID != '' && inputs.skip-signed != true
         uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -612,7 +624,7 @@ jobs:
           allow-no-subscriptions: true
 
       - name: Mint federated token for the signing dlib
-        if: vars.AZURE_CLIENT_ID != ''
+        if: vars.AZURE_CLIENT_ID != '' && inputs.skip-signed != true
         shell: bash
         run: |
           file="$RUNNER_TEMP/azure-federated-token"
@@ -631,17 +643,21 @@ jobs:
         env:
           HERMES_BUNDLE_ENV_JSON: ${{ inputs.bundle_env }}
           PYTHONUTF8: '1'
-          AZURE_SIGN_ENDPOINT: ${{ vars.AZURE_SIGN_ENDPOINT }}
-          AZURE_SIGN_ACCOUNT: ${{ vars.AZURE_SIGN_ACCOUNT }}
-          AZURE_SIGN_PROFILE: ${{ vars.AZURE_SIGN_PROFILE }}
-          AZURE_SIGN_PUBLISHER: ${{ vars.AZURE_SIGN_PUBLISHER }}
-          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SIGN_ENDPOINT: ${{ inputs.skip-signed != true && vars.AZURE_SIGN_ENDPOINT || '' }}
+          AZURE_SIGN_ACCOUNT: ${{ inputs.skip-signed != true && vars.AZURE_SIGN_ACCOUNT || '' }}
+          AZURE_SIGN_PROFILE: ${{ inputs.skip-signed != true && vars.AZURE_SIGN_PROFILE || '' }}
+          AZURE_SIGN_PUBLISHER: ${{ inputs.skip-signed != true && vars.AZURE_SIGN_PUBLISHER || '' }}
+          AZURE_CLIENT_ID: ${{ inputs.skip-signed != true && vars.AZURE_CLIENT_ID || '' }}
+          AZURE_TENANT_ID: ${{ inputs.skip-signed != true && vars.AZURE_TENANT_ID || '' }}
           AZURE_TOKEN_CREDENTIALS: prod
+          SKIP_SIGNED: ${{ inputs.skip-signed }}
+          SKIP_STORE: ${{ inputs.skip-store }}
         run: |
-          python scripts/bundles/desktop.py --prepared "$env:RUNNER_TEMP/desktop-job/prepared.json" --variant bundled
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not $env:CHANNEL_BUILD -and -not $env:HERMES_BUILD_COMMIT -and $env:HERMES_PAYLOAD_TAG -notlike "*+canary.*") {
+          if ($env:SKIP_SIGNED -ne 'true') {
+              python scripts/bundles/desktop.py --prepared "$env:RUNNER_TEMP/desktop-job/prepared.json" --variant bundled
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if ($env:SKIP_STORE -ne 'true' -and -not $env:CHANNEL_BUILD -and -not $env:HERMES_BUILD_COMMIT -and $env:HERMES_PAYLOAD_TAG -notlike "*+canary.*") {
               python scripts/bundles/desktop.py --prepared "$env:RUNNER_TEMP/desktop-job/prepared.json" --variant store
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
@@ -1307,7 +1323,7 @@ jobs:
     if: >-
       !cancelled() && needs.validate.result == 'success' && needs.validate.outputs.sha != ''
       && needs.build-darwin-arm64.result == 'success' && needs.validate.outputs.darwin-arm64 == 'true'
-      && needs.stage-receipt-darwin-arm64.result == 'success'
+      && (inputs.release-phase != 'candidate' || needs.stage-receipt-darwin-arm64.result == 'success')
       && (inputs.release-phase == '' || inputs.release-phase == 'candidate')
       && (inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != '')
       && inputs.skip-tests != true
@@ -1340,7 +1356,7 @@ jobs:
     if: >-
       !cancelled() && needs.validate.result == 'success' && needs.validate.outputs.sha != ''
       && needs.build-darwin-x64.result == 'success' && needs.validate.outputs.darwin-x64 == 'true'
-      && needs.stage-receipt-darwin-x64.result == 'success'
+      && (inputs.release-phase != 'candidate' || needs.stage-receipt-darwin-x64.result == 'success')
       && (inputs.release-phase == '' || inputs.release-phase == 'candidate')
       && (inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != '')
       && inputs.skip-tests != true
@@ -1372,10 +1388,14 @@ jobs:
     needs: [validate, build-win32-x64]
     if: >-
       !cancelled() && needs.validate.result == 'success' && needs.validate.outputs.sha != ''
-      && needs.build-win32-x64.result == 'success' && needs.validate.outputs.win32-x64 == 'true'
+      && ((inputs.windows-smokes-with-bundle != true
+           && needs.build-win32-x64.result == 'success' && needs.validate.outputs.win32-x64 == 'true')
+        || (inputs.windows-smokes-with-bundle == true && needs.validate.outputs.win32-bundle == 'true'
+           && (needs.validate.outputs.win32-x64 != 'true' || needs.build-win32-x64.result == 'success')))
       && (inputs.release-phase == '' || inputs.release-phase == 'candidate')
       && (inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != '')
       && inputs.skip-tests != true
+      && inputs.skip-signed != true
     permissions:
       contents: read
     uses: ./.github/workflows/desktop-bundle-smoke.yml
@@ -1400,10 +1420,14 @@ jobs:
     needs: [validate, build-win32-arm64]
     if: >-
       !cancelled() && needs.validate.result == 'success' && needs.validate.outputs.sha != ''
-      && needs.build-win32-arm64.result == 'success' && needs.validate.outputs.win32-arm64 == 'true'
+      && ((inputs.windows-smokes-with-bundle != true
+           && needs.build-win32-arm64.result == 'success' && needs.validate.outputs.win32-arm64 == 'true')
+        || (inputs.windows-smokes-with-bundle == true && needs.validate.outputs.win32-bundle == 'true'
+           && (needs.validate.outputs.win32-arm64 != 'true' || needs.build-win32-arm64.result == 'success')))
       && (inputs.release-phase == '' || inputs.release-phase == 'candidate')
       && (inputs.upload_release == true || inputs.release-phase == 'candidate' || inputs.build_commit != '' || inputs.channel != '')
       && inputs.skip-tests != true
+      && inputs.skip-signed != true
     permissions:
       contents: read
     uses: ./.github/workflows/desktop-bundle-smoke.yml
@@ -1459,6 +1483,8 @@ jobs:
       AZURE_SIGN_ACCOUNT: ${{ vars.AZURE_SIGN_ACCOUNT }}
       AZURE_SIGN_PROFILE: ${{ vars.AZURE_SIGN_PROFILE }}
       AZURE_SIGN_PUBLISHER: ${{ vars.AZURE_SIGN_PUBLISHER }}
+      SKIP_SIGNED: ${{ inputs.skip-signed }}
+      SKIP_STORE: ${{ inputs.skip-store }}
     steps:
       # Full checkout: stage-msixbundle.mjs imports ./msix-shared.mjs and the
       # job runs it with no checkout at all today — ERR_MODULE_NOT_FOUND.
@@ -1579,8 +1605,10 @@ jobs:
           fi
           args=()
           if [ "$RELEASE_PHASE" = candidate ]; then args+=(--candidate); fi
-          node scripts/stage-msixbundle.mjs --tag "$HERMES_PAYLOAD_TAG" --variant bundled "${args[@]}"
-          if [ "$RELEASE_PHASE" = candidate ]; then
+          if [ "$SKIP_SIGNED" != true ]; then
+            node scripts/stage-msixbundle.mjs --tag "$HERMES_PAYLOAD_TAG" --variant bundled "${args[@]}"
+          fi
+          if [ "$RELEASE_PHASE" = candidate ] && [ "$SKIP_STORE" != true ]; then
             node scripts/bundle-store-msixbundle.mjs --tag "$HERMES_PAYLOAD_TAG"
           fi
 
@@ -1605,7 +1633,7 @@ jobs:
         # Same receipt-before-smoke contract as the darwin arches (decision 11):
         # the bundle and its per-arch metadata are staged and digest-verified;
         # acceptance still blocks publication.
-        if: inputs.release-phase == 'candidate'
+        if: inputs.release-phase == 'candidate' && inputs.skip-signed != true
         id: receipt
         env:
           RELEASE_TAG: ${{ inputs.tag }}
@@ -2384,7 +2412,7 @@ jobs:
   stable-store:
     name: Submit the verified Store package
     needs: [validate, stable-publish]
-    if: inputs.release-phase == 'publish'
+    if: inputs.release-phase == 'publish' && inputs.skip-store != true
     runs-on: windows-latest-32-core
     environment: release-signing
     timeout-minutes: 60
