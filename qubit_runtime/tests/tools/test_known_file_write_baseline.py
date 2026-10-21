@@ -130,7 +130,6 @@ def task(request):
     clear_file_ops_cache(task_id)
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_own_replace_patch_after_full_read_keeps_the_baseline(tmp_path, task):
     path = tmp_path / "probe.txt"
     _ok(_write(path, task, "first=old\nsecond=old\n"))
@@ -143,7 +142,6 @@ def test_own_replace_patch_after_full_read_keeps_the_baseline(tmp_path, task):
     assert path.read_text() == "first=new\nsecond=new\n"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_own_patch_after_own_write_keeps_the_baseline(tmp_path, task):
     path = tmp_path / "written.txt"
     _ok(_write(path, task, "a=1\nb=1\n"))
@@ -154,7 +152,6 @@ def test_own_patch_after_own_write_keeps_the_baseline(tmp_path, task):
     assert path.read_text() == "a=3\nb=3\n"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_own_v4a_patch_keeps_the_baseline_for_every_file(tmp_path, task):
     one, two = tmp_path / "one.txt", tmp_path / "two.txt"
     for p in (one, two):
@@ -183,7 +180,6 @@ def test_own_v4a_patch_keeps_the_baseline_for_every_file(tmp_path, task):
     assert added.read_text() == "replaced\n"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_own_patch_keeps_crlf_and_bom_files_writable(tmp_path, task):
     path = tmp_path / "crlf.txt"
     path.write_bytes(b"\xef\xbb\xbfone\r\ntwo\r\n")
@@ -193,7 +189,6 @@ def test_own_patch_keeps_crlf_and_bom_files_writable(tmp_path, task):
     _ok(_write(path, task, "three\n"))
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_blind_patch_never_gains_a_baseline(tmp_path, task):
     path = tmp_path / "blind.txt"
     path.write_text("one\ntwo\nthree\n")
@@ -216,7 +211,6 @@ def test_blind_patch_never_gains_a_baseline(tmp_path, task):
     assert path.read_text() == "merged\n"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_sibling_patch_voids_the_other_task_and_gives_the_patcher_nothing(tmp_path, task):
     path = tmp_path / "shared.txt"
     path.write_text("left\nright\n")
@@ -302,7 +296,6 @@ def test_write_landing_before_the_patch_read_gives_no_baseline(tmp_path, task, m
     assert path.read_text() == "ONE\nUNSEEN\n"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_paged_read_carries_only_when_every_page_was_read(tmp_path, task):
     content = "".join(f"line {i}\n" for i in range(1, 2501))
     complete, missing = tmp_path / "complete.txt", tmp_path / "missing.txt"
@@ -320,7 +313,6 @@ def test_paged_read_carries_only_when_every_page_was_read(tmp_path, task):
 
 
 @pytest.mark.parametrize("reread", [False, True], ids=["no-reread", "reread"])
-@pytest.mark.xfail(reason='PRODUCTION GAP: own patch does not refresh the write_file baseline (tools/file_operations.py)', strict=False)
 def test_own_patch_after_compaction_keeps_the_baseline(tmp_path, task, reread):
     path = tmp_path / "compacted.txt"
     path.write_text("one\ntwo\n")
