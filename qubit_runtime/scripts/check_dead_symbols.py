@@ -37,13 +37,10 @@ recorded), so "uses > 0" means something other than the definition refers to it.
 
 STILL-REPORTED, NOT EXCUSED: TEST-RELEASE SEAMS
 -----------------------------------------------
-Two classes of definition have zero name-level call sites because pytest or the
-stdlib binds them BY NAME. They stay in the dead list, tagged `seam_class`,
-because they are exactly the wiring a port drops silently: nothing imports them
-and no call exists to grep for.
-  * `fixture`      -- `@pytest.fixture` / `@pytest_asyncio.fixture`, or an
-    undecorated same-named def in a file where a function requests that name as
-    a parameter (the repo ships both spellings; pytest collects either).
+One class of definition has zero name-level call sites because the stdlib binds
+it BY NAME. It stays in the dead list, tagged `seam_class`, because it is
+exactly the wiring a port drops silently: nothing imports it and no call exists
+to grep for.
   * `http-handler` -- `do_GET`/`do_POST`/.../`log_message` on an
     `http.server.BaseHTTPRequestHandler` subclass with no `super().name(...)`.
 
@@ -60,6 +57,13 @@ EXCLUDED BENIGN (each printed with its reason; nothing is silently dropped)
     manifest wires these by name.
   * `superclass` -- called as `super().name(...)` in the same file: we hold an
     override of a framework method upstream also defines.
+  * `pytest-fixture` -- `@pytest.fixture` / `@pytest_asyncio.fixture`, or an
+    undecorated same-named def in a test file where a function requests that name
+    as a parameter. pytest binds it; no Python call site exists.
+  * `pytest-class` -- a `Test*` class in a test module with no `__init__`, or a
+    `unittest.TestCase` subclass: pytest collects and instantiates it.
+  * `route`      -- a function decorated with a route verb AND a path string
+    (`@router.post("/api/...")`): the framework invokes the handler.
 
 UPSTREAM RESOLUTION
 -------------------
@@ -267,7 +271,7 @@ def main() -> int:
     ap.add_argument("--rev", default=None, help="upstream pin (default: FROZEN_REV)")
     ap.add_argument("--json", dest="json_path", default=None, help="JSON report path ('-' = stdout)")
     ap.add_argument("--seams", choices=("report", "exclude"), default="report",
-                    help="'report' keeps test-release seams in the dead list (default)")
+                    help="'report' keeps http-handler seams in the dead list (default)")
     ap.add_argument("-v", "--verbose", action="store_true", help="list exclusions with reasons")
     ap.add_argument("--no-cache", action="store_true",
                     help="ignore and refresh the per-file fact cache")
@@ -314,11 +318,15 @@ def main() -> int:
     param_names: set[str] = set()
     fixture_defs: set[tuple[str, str]] = set()
     handler_defs: set[tuple[str, str]] = set()
+    route_defs: set[tuple[str, str]] = set()
+    pytest_classes: set[tuple[str, str]] = set()
     super_calls: dict[str, set[str]] = defaultdict(set)
     for mod in sorted(facts):
         f = facts[mod]
         for name, lines in f.uses.items():
             total_uses[name] += len(lines)
+        for name in f.dispatch_refs:
+            total_uses[name] += 1
         assigned_by_mod[mod] |= {u for u, ls in f.uses.items() if len(ls) > 1}
         star_imported_by.add(mod[:-3].replace("/", ".") if mod.endswith(".py") else mod)
         all_exported |= f.all_names
@@ -326,6 +334,8 @@ def main() -> int:
         param_names |= f.param_names
         fixture_defs |= {(mod, n) for n in f.fixture_defs}
         handler_defs |= {(mod, n) for n in f.http_handler_defs}
+        route_defs |= {(mod, n) for n in f.route_defs}
+        pytest_classes |= {(mod, n) for n in f.pytest_classes}
         super_calls[mod] |= f.super_calls
 
     # Names ASSIGNED without a module-level `def` -- `X = ...`, `X: T = ...`,
@@ -365,7 +375,13 @@ def main() -> int:
         for d in defs_by_name[name]:
             hit = Hit(name, d.module, d.kind, d.lineno,
                       upstream_uses=entry["uses"], upstream_files=sorted(entry["files"]))
-            hit.seam_class = _seam(d, fixture_defs, handler_defs, param_names)
+            reason = _framework_exclusion(d, fixture_defs, pytest_classes, route_defs,
+                                           param_names)
+            if reason:
+                hit.reason = reason
+                excluded.append(hit)
+                continue
+            hit.seam_class = _seam(d, handler_defs)
             if hit.seam_class and args.seams == "exclude":
                 hit.reason = f"seam:{hit.seam_class}"
                 excluded.append(hit)
@@ -448,20 +464,33 @@ def main() -> int:
     return 1 if dead else 0
 
 
-def _seam(d: Definition, fixtures: set[tuple[str, str]], handlers: set[tuple[str, str]],
-          params: set[str]) -> str | None:
+def _seam(d: Definition, handlers: set[tuple[str, str]]) -> str | None:
     """Test-release seam class for a dead definition, or None.
 
-    Both classes are wired by name only, so a static call counter always shows
-    zero -- which is exactly why they must be REPORTED, not silently excused.
+    The stdlib binds an HTTP handler method by name only, so a static call
+    counter always shows zero -- which is exactly why it must be REPORTED, not
+    silently excused. pytest-bound definitions are different: they are
+    EXCLUDED by `_framework_exclusion`, because pytest's collection/fixture
+    binding is a real consumer, not a seam a port can silently drop.
     """
-    key = (d.module, d.name)
-    if key in handlers:
+    if (d.module, d.name) in handlers:
         return "http-handler"
+    return None
+
+
+def _framework_exclusion(d: Definition, fixtures: set[tuple[str, str]],
+                         pytest_classes: set[tuple[str, str]],
+                         routes: set[tuple[str, str]], params: set[str]) -> str | None:
+    """Framework-bound definitions: real consumers with no Name/Attribute call."""
+    key = (d.module, d.name)
+    if key in routes:
+        return "route: registered by a framework decorator"
     if key in fixtures:
-        return "fixture"
+        return "pytest-fixture: bound by pytest, not by a Python call"
     if d.kind == "function" and d.name in params and _in_tests(d.module):
-        return "fixture (undecorated; requested as a parameter)"
+        return "pytest-fixture: requested as a test parameter (undecorated)"
+    if d.kind == "class" and key in pytest_classes:
+        return "pytest-class: collected and instantiated by pytest"
     return None
 
 
