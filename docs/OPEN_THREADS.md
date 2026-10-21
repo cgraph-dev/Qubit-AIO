@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 21 — 2026-10-22 (83 defects fixed)
+
+- ✅ Fixed 83 of the 255 wave-20 defects across gateway, CLI/agent, and TUI/hosted/ACP; wave-20 xfails **255 → 172**, 0 new.
+- ✅ Regression set (notifications/local automation/completion delivery): **94 passed, 1 xfailed**. Dead **0**; production **1** (declared B1); total missing **309**; absent **286**.
+- 🔴 Remaining: 172 wave-20 xfails (daemon/native-HTTP groups, plugin admission FIFO, kanban timestamps, relay subprocess↔authority conflict, release/source-channel R2 divergence); 286 absent + 309 short-port test symbols.
+- ✅ Live: production fixes applied (restart + identify/chat verification). No global E2E/release verdict.
+
 ## Wave 20 — 2026-10-21 (309 missing; 0 dead)
 
 - ✅ Ported ~280 upstream test files across 8 disjoint lanes (gateway A/B/C, qubit_cli A/B, agent, tools, tui/acp/rest).
