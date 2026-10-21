@@ -440,16 +440,18 @@ def _audit_one(npm_bin: str, npm_dir, label: str, audit_extra: list[str], issues
         if total == 0:
             check_ok(f"{label} deps", "(no known vulnerabilities)")
         elif critical > 0 or high > 0:
-            detail = "build-time tooling" if workspace_scoped else "runtime dependency tree"
             remedy = ("fix is an upstream lockfile bump — a local manual fix does not persist"
                       " (the next `qubit update` reinstalls from the committed lockfile)")
             check_warn(f"{label} deps", f"({critical} critical, {high} high, {moderate} moderate — {remedy})")
             if workspace_scoped:
-                check_info("  ^ build-time tooling (not runtime); if manual npm remediation "
+                check_info("  ^ workspace audit includes runtime and build dependencies; if manual npm remediation "
                            "errors with an arborist crash it's a known npm bug — clears via a lockfile bump")
             else:
-                check_info(f"  ^ {detail}; report/pin the fix in package-lock.json — see #116774")
-            issues.append(f"{label} has {total} npm {_plural(total)}")
+                check_info("  ^ runtime dependency tree; report/pin the fix in package-lock.json — see #116774")
+            issues.append(
+                f"{label} has {total} npm {_plural(total)}; wait for an upstream lockfile fix, then update "
+                "your installation (Docker: pull a rebuilt image; recreating the same image restores the same dependencies)"
+            )
         else:
             check_ok(f"{label} deps", f"({moderate} moderate {_plural(moderate)})")
     except Exception:

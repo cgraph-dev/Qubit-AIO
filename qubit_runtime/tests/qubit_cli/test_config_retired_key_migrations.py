@@ -42,7 +42,6 @@ class TestCuratorFasterPrune:
 
 
 class TestRetiredBotChatDeliveryTimeout:
-    @pytest.mark.xfail(strict=True, reason="wave-18 parity defect: config migration keeps the retired cron.bot_chat_delivery_timeout_seconds key")
     def test_v51_drops_bot_chat_delivery_timeout_with_a_note(self, tmp_path, monkeypatch):
         """The removed cron knob is dropped from existing configs with a one-time note;
         sibling cron settings and the rest of the file survive untouched."""
@@ -69,7 +68,6 @@ class TestRetiredKeysWhateverTheStamp:
     file (seeded from an older template) and a home an unreleased branch build stamped with its
     own step numbers both still carry keys nothing reads."""
 
-    @pytest.mark.xfail(strict=True, reason="wave-18 parity defect: config migration keeps the retired cron.bot_chat_delivery_timeout_seconds key")
     def test_unversioned_config_drops_the_retired_bot_chat_timeout(self, tmp_path, monkeypatch):
         from qubit_cli.config import migrate_config
 
