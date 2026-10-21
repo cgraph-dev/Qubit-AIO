@@ -49,7 +49,6 @@ def _idle(fanout):
     "action",
     ["detach", "reattach", "close", "overflow", "overflow-reattach", "overflow-detach"],
 )
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: fanout detach/close delivers the batch already waiting on the send lock instead of discarding it")
 async def test_detach_discards_batch_waiting_for_send_lock(monkeypatch, action):
     socket = _Socket()
     transport = WSTransport(socket, asyncio.get_running_loop())
