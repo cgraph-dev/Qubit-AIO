@@ -425,10 +425,20 @@ class HostedRoomService:
                 return
             decision = discussion.plan_next_task(
                 room, list(snapshot.events), local_profiles=self.room_profiles(room),
-                initial_watermarks=snapshot.watermarks)
+                initial_watermarks=snapshot.watermarks, freeze_input_context=True)
             if decision.status == "task" and decision.task is not None:
                 existing = driver.get_task_for_turn(self.db_path, decision.task.identity)
-                if existing is not None and existing["payload"] == decision.task.payload:
+                legacy_payload = dict(decision.task.payload)
+                legacy_payload.pop("input_context", None)
+                if existing is not None and "input_context" in existing["payload"]:
+                    # A rebuilt cache may add older committed context. The slot
+                    # already belongs to its original, frozen admission.
+                    prior_events = self.policy_checkpoint.events_for_task(
+                        room_id=binding.room_id, source_event_seq=existing["payload"]["source_event_seq"],
+                        input_context=existing["payload"]["input_context"], task_id=existing["identity"].task_id)
+                    discussion.reconstruct_task_plan(room, prior_events, existing, local_profiles=self.room_profiles(room))
+                    admitted = existing
+                elif existing is not None and existing["payload"] == legacy_payload:
                     # A rebuilt cache re-planned the same coordinates: verify the committed
                     # admission reconstructs from the log and keep it instead of re-admitting.
                     discussion.reconstruct_task_plan(

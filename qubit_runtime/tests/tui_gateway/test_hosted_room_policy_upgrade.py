@@ -58,7 +58,6 @@ def legacy_cache(db, cache_version):
 
 
 @pytest.mark.parametrize("cache_version", [2, 3])
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: hosted room policy checkpoint rebuild does not readmit late receipts")
 def test_old_cache_rebuilds_late_receipts_and_context_without_changing_history(tmp_path, cache_version):
     db = tmp_path / "state.db"
     room, original, old_plan = legacy_cache(db, cache_version)
@@ -75,11 +74,7 @@ def test_old_cache_rebuilds_late_receipts_and_context_without_changing_history(t
     assert HostedRoomPolicyCheckpoint(db).snapshot(room_id="upgrade-room", latest_seq=history[-1]["seq"]) == updated
 
 
-@pytest.mark.parametrize("status", [
-    pytest.param(st, marks=pytest.mark.xfail(strict=True, reason="wave-18 parity defect: hosted room upgrade drops an already-admitted frozen turn"))
-    if st == "indeterminate" else st
-    for st in ["queued", "running", "indeterminate"]
-])
+@pytest.mark.parametrize("status", ["queued", "running", "indeterminate"])
 @pytest.mark.parametrize("cache_version", [2, 3])
 def test_upgrade_preserves_an_already_admitted_frozen_turn(tmp_path, monkeypatch, status, cache_version):
     monkeypatch.setattr(rooms, "local_authority_gateway_id", lambda: "home")
