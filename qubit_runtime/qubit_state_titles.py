@@ -121,21 +121,23 @@ class SessionTitlesMixin:
 
         return self._execute_write(_do) > 0
 
-    def _resolve_title_conflict(self, conn, session_id: str, title: str) -> None:
+    def _resolve_title_conflict(self, conn, session_id: str, title: str) -> Optional[str]:
         """Free ``title`` for ``session_id`` inside the caller's write transaction, or raise
         ValueError when another session legitimately holds it. The one place the uniqueness
-        rule lives, shared by renames and the API server's create-with-title."""
+        rule lives, shared by renames and the API server's create-with-title. Returns the id
+        whose title was cleared (an affected row for mutation receipts), else None."""
         conflict = conn.execute(
             f"SELECT id, archived, hidden, {self._EMPTY_SESSION_WHERE} AS ghost "
             "FROM sessions WHERE title = ? AND id != ?", (title, session_id),
         ).fetchone()
         if not conflict:
-            return
+            return None
         conflict_id = conflict["id"]
         # A hidden compressed ancestor holding the title cannot be freed by the
         # user, so transfer it onto the tip (uniqueness + lineage kept).
         if self._is_compression_ancestor(conn, ancestor_id=conflict_id, descendant_id=session_id):
             conn.execute("UPDATE sessions SET title = NULL WHERE id = ?", (conflict_id,))
+            return conflict_id
         # A deliberately archived hidden Bot Chat is a retired registry
         # entry, not a live identity. Retire its name in the same title
         # transaction so a replacement can become the sole canonical row;
@@ -150,6 +152,7 @@ class SessionTitlesMixin:
                 "UPDATE sessions SET title = NULL, title_source = NULL WHERE id = ?",
                 (conflict_id,),
             )
+            return conflict_id
         else:
             raise ValueError(f"Title '{title}' is already in use by session {conflict_id}")
 
@@ -166,6 +169,7 @@ class SessionTitlesMixin:
         title = self.sanitize_title(title)
         is_user = source == self.TITLE_SOURCE_USER
         new_rank = None if is_user else self._title_rank(source)
+        affected = []
         current = conn.execute(
             "SELECT title, title_source, hidden FROM sessions WHERE id = ?", (session_id,),
         ).fetchone()
@@ -181,12 +185,14 @@ class SessionTitlesMixin:
         if not is_user and current["title"] is not None and self._title_rank(current["title_source"]) >= new_rank:
             return []
         if title:
-            self._resolve_title_conflict(conn, session_id, title)
+            cleared = self._resolve_title_conflict(conn, session_id, title)
+            if cleared:
+                affected.append(cleared)
         changed = conn.execute(
             "UPDATE sessions SET title = ?, title_source = ? WHERE id = ? AND title IS ? AND title_source IS ?",
             (title, source if title else None, session_id, current["title"], current["title_source"]),
         ).rowcount
-        return [session_id] if changed else []
+        return [*affected, session_id] if changed else affected
 
     def set_session_title(self, session_id: str, title: str) -> bool:
         """Set a title on the user's behalf (``user`` provenance). Empty clears it. Raises

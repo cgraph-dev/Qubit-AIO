@@ -1327,7 +1327,19 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         pending: list[str] = []
         pending_lock = threading.Lock()
 
+        owner = self._approval_owner
+        local_viewer = owner is not None and getattr(ctx.source, "platform", None) == Platform.LOCAL
+
         def deliver(message: str) -> None:
+            if local_viewer and owner is not None:
+                # LocalSessionAdapter.send publishes nothing, so a local viewer only sees the
+                # summary as the in-process TUI's review.summary frame. Not generation-fenced:
+                # the review fork finishes after this turn's running claim has settled.
+                authority, session_id, _generation = owner
+                live = authority.sessions.get(session_id)
+                if live is not None:
+                    live.event_stream.publish(session_id, {"text": str(message)}, event_type="review.summary")
+                return
             if self._status_live():
                 self._send_status_text(
                     message,
@@ -1344,6 +1356,19 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 deliver(message)
 
         def send(message: str) -> None:
+            if local_viewer and owner is not None:
+                # The review fork reports from its own thread while the drain may still be
+                # settling this turn. Hold the row until the authority published the turn's
+                # message.complete (it clears the execution stamp only after that), the order
+                # the in-process TUI produced. Never fenced: a late summary still reaches viewers.
+                authority, session_id, generation = owner
+                live = authority.sessions.get(session_id)
+                deadline = time.monotonic() + 120
+                while (live is not None and time.monotonic() < deadline
+                       and live.event_stream.execution.get("execution_generation") == generation):
+                    time.sleep(0.05)
+                deliver(message)
+                return
             if not self._status_live():
                 return
             if not release_evt.is_set():
