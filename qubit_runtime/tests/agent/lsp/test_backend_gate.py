@@ -71,3 +71,22 @@ def test_edit_check_started_for_local_env(tmp_path, monkeypatch):
 
     assert fops._maybe_lsp_diagnostics(str(tmp_path / "x.py"), pre_content="x = 1\n", post_content="x = 2\n") == ""
     assert started == [(str(tmp_path / "x.py"), "x = 1\n", "x = 2\n")]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: local LSP backend has no snapshot_baseline hook (only start_edit_check)")
+def test_snapshot_baseline_called_for_local_env(tmp_path, monkeypatch):
+    from tools.environments.local import LocalEnvironment
+    from tools.file_operations import ShellFileOperations
+
+    fops = ShellFileOperations(LocalEnvironment(cwd=str(tmp_path)))
+
+    snapshot_called = []
+
+    class FakeService:
+        def snapshot_baseline(self, path):
+            snapshot_called.append(path)
+
+    monkeypatch.setattr("agent.lsp.get_service", lambda: FakeService())
+
+    fops._snapshot_lsp_baseline(str(tmp_path / "x.py"))
+    assert snapshot_called == [str(tmp_path / "x.py")]
