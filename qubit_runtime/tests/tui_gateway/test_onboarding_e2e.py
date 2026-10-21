@@ -112,7 +112,6 @@ def test_a_message_written_while_a_card_waits_ends_the_turn_and_the_next_turn_br
     assert '"layout":"sidebar-left" or "terminal-deck"' in note
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: skipping setup on the card does not end onboarding")
 def test_skip_setup_on_the_card_ends_onboarding(chat, monkeypatch):
     def skip_on_show(frame):
         chat.desktop.cards.append(frame["params"])
