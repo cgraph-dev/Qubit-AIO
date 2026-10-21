@@ -31,6 +31,7 @@ from qubit_cli.copilot_auth import _try_gh_cli_token
 # missing HF_TOKEN/DEEPINFRA_API_KEY, which made the auto-detection tests
 # env-dependent (they failed on any machine with HF_TOKEN exported).
 from qubit_cli.auth import PROVIDER_REGISTRY as _REGISTRY
+import os
 
 _EXTRA_ENV_VARS = (
     # Checked directly in resolve_provider("auto"), not via the registry.
@@ -1038,3 +1039,99 @@ class TestRuntimeAlibabaRegionalAndTokenPlan:
         assert result["api_mode"] == "chat_completions"
         assert result["api_key"] == "atp-key"
         assert result["base_url"] == "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+
+
+@pytest.fixture
+def _kilo_pricing_isolation(monkeypatch):
+    """Reset the shared pricing caches around each Kilo pricing test.
+
+    The Kilo fetcher keys the shared pricing cache by its catalog URL; without
+    a reset, one test's payload (or its negative cache entry) would answer
+    the next test's read.
+    """
+    import qubit_cli.models_pricing as _mp
+    monkeypatch.setattr(_mp, "_pricing_cache", {})
+    monkeypatch.setattr(_mp, "_pricing_cache_retry_after", {})
+    monkeypatch.setattr(_mp, "_pricing_provider_cache_keys", {})
+
+@pytest.mark.usefixtures("_kilo_pricing_isolation")
+class TestKilocodePricingFetcher:
+    """_fetch_kilocode_pricing maps the Kilo Gateway's OpenRouter-shaped catalog
+    (per-token pricing + explicit isFree + ``-1`` rate sentinels) into picker
+    pricing, and is wired into the get_pricing_for_provider dispatch."""
+
+    def test_pricing_shape_and_dispatch(self, monkeypatch):
+        payload = {"data": [
+            {
+                "id": "vendor/paid",
+                "pricing": {
+                    "prompt": "0.000004",
+                    "completion": "0.00002",
+                    "input_cache_read": "0.0000004",
+                },
+            },
+            # Free router with non-zero underlying rates — the explicit isFree
+            # flag is authoritative and must win (the kilo-auto/free case).
+            {"id": "kilo-auto/free", "isFree": True,
+             "pricing": {"prompt": "0.000002", "completion": "0.00001"}},
+            # Sentinel pricing ("rate varies per request") — no price is better
+            # than a fabricated one, so the row is skipped.
+            {"id": "kilo-auto/efficient",
+             "pricing": {"prompt": "-1", "completion": "-1"}},
+            # Malformed records must be skipped, not crash the parser.
+            {"id": "vendor/no-pricing"},
+            {"id": ""},
+            "not-a-dict",
+        ]}
+        from qubit_cli import models
+        monkeypatch.setattr(
+            models,
+            "_urlopen_model_catalog_request",
+            _make_urlopen_returning(payload),
+        )
+        from qubit_cli.models_pricing import get_pricing_for_provider
+
+        # get_pricing_for_provider → _fetch_kilocode_pricing dispatch path
+        result = get_pricing_for_provider("kilocode")
+        assert set(result) == {"vendor/paid", "kilo-auto/free"}
+        # Paid: per-token strings pass through, cache-read when the source had it.
+        assert result["vendor/paid"] == {
+            "prompt": "0.000004", "completion": "0.00002",
+            "input_cache_read": "0.0000004",
+        }
+        # Free: explicit zero mapping, ignoring the non-zero underlying rates.
+        assert result["kilo-auto/free"] == {"prompt": "0", "completion": "0"}
+
+    def test_endpoint_comes_from_profile_base_url_and_is_public(self, monkeypatch):
+        """Default endpoint is the kilocode provider profile's base_url + /models
+        (no second hardcode); KILOCODE_BASE_URL overrides it; the catalog is
+        fetched without a key; a failing endpoint yields {} without raising."""
+        from qubit_cli import models
+        from qubit_cli.models_pricing import get_pricing_for_provider
+
+        seen = []
+
+        def fake_urlopen(req, timeout=None):
+            seen.append((req.full_url, req.get_header("Authorization")))
+            return _make_urlopen_returning(
+                {"data": [{"id": "a/b", "pricing": {"prompt": "0.1", "completion": "0.2"}}]}
+            )(req, timeout=timeout)
+
+        monkeypatch.delenv("KILOCODE_API_KEY", raising=False)
+        monkeypatch.delenv("KILOCODE_BASE_URL", raising=False)
+        monkeypatch.setattr(models, "_urlopen_model_catalog_request", fake_urlopen)
+
+        expected = {"a/b": {"prompt": "0.1", "completion": "0.2"}}
+        assert get_pricing_for_provider("kilocode", force_refresh=True) == expected
+        assert seen == [("https://api.kilo.ai/api/gateway/models", None)]
+
+        monkeypatch.setenv("KILOCODE_BASE_URL", "https://proxy.example.com/kilo")
+        assert get_pricing_for_provider("kilocode", force_refresh=True) == expected
+        assert seen[-1][0] == "https://proxy.example.com/kilo/models"
+
+        monkeypatch.setattr(
+            models,
+            "_urlopen_model_catalog_request",
+            lambda *a, **kw: (_ for _ in ()).throw(OSError("endpoint down")),
+        )
+        assert get_pricing_for_provider("kilocode", force_refresh=True) == {}

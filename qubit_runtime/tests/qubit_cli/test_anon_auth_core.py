@@ -17,6 +17,7 @@ import pytest
 from qubit_cli import anon_auth
 from qubit_cli.auth import _load_auth_store, resolve_provider
 from tests.qubit_cli.anon_portal import PORTAL, WELCOME, install_portal, make_jwt as _jwt  # noqa: F401
+from tests.qubit_cli.anon_portal import claimed_trial
 
 
 @pytest.fixture
@@ -446,3 +447,56 @@ class TestConnectorTokenPath:
         assert token and token != _jwt(exp=1)
         assert _load_auth_store()["providers"]["nous"]["anon_token"] != first["anon_token"]
         assert portal.minted == 2
+
+
+class TestBootstrapNeverCreates:
+    """``free_tier_bootstrap.run_bootstrap`` only records who carries inference: it never mints.
+    The welcome-trial claim and the connectors path are the creators; every other site is a read."""
+
+    def _fresh(self):
+        from qubit_cli import free_tier_bootstrap as fb
+        fb.reset_for_tests()
+        return fb
+
+    def test_bootstrap_on_a_fresh_machine_mints_nothing(self, portal, monkeypatch):
+        monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
+        from tests.qubit_cli.anon_portal import as_local_desktop_backend
+        as_local_desktop_backend(monkeypatch)              # the trial is claimable here; boot still never claims it
+        record = self._fresh().run_bootstrap(announce=False)
+        assert record.has_identity is False and record.free_tier_account is False
+        assert portal.calls == [], "boot never reaches the portal"
+
+    def test_bootstrap_records_a_claimed_trial_and_a_second_run_is_free(self, portal, monkeypatch):
+        claimed_trial(monkeypatch)
+        fb = self._fresh()
+        record = fb.run_bootstrap(announce=False)
+        assert record.free_tier_account and record.has_identity and record.provider_configured
+        assert record.inference_provider == "nous" and record.other_providers is False
+        again = fb.run_bootstrap(announce=False)
+        assert again is record and portal.minted == 1
+        assert fb.wait_for_record(timeout=0) is record
+
+    def test_own_key_keeps_inference_and_a_connector_guest_stays_off_active_provider(self, portal, monkeypatch):
+        anon_auth.ensure_portal_identity(explicit=True)
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-own-key")
+        record = self._fresh().run_bootstrap(announce=False)
+        assert record.other_providers is True and record.has_identity is True
+        assert record.free_tier_account is False, "a connector guest does not carry inference"
+        assert record.inference_provider == "openrouter"
+        assert _load_auth_store().get("active_provider") != "nous"
+        assert portal.minted == 1
+
+    def test_reads_never_mint(self, portal, monkeypatch):
+        """status, provider resolution and the connector bearer are reads: with no identity they
+        answer 'nothing' and touch no network."""
+        monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
+        from tools.managed_tool_gateway import read_nous_access_token
+        assert read_nous_access_token() is None
+        with pytest.raises(anon_auth.AuthError):
+            resolve_provider("auto")
+        from qubit_cli.main import _has_any_provider_configured
+        _has_any_provider_configured()
+        assert not anon_auth.has_guest()
+        assert portal.calls == [], "no read path may reach the portal"
+        with pytest.raises(ValueError):
+            anon_auth.ensure_portal_identity(explicit=False)

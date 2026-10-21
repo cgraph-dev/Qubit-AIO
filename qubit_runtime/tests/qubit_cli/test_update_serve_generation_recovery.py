@@ -29,6 +29,7 @@ import pytest
 from qubit_cli import update_abort_recovery as abort_recovery
 from qubit_cli import update_cmd
 from qubit_cli import update_restart_recovery as recovery
+import os
 
 
 class _Completed:
@@ -1138,3 +1139,47 @@ def test_missing_incarnation_on_either_side_fails_closed(monkeypatch):
             "supervisor": "manual-serve",
         }
     ]
+
+
+def _fake_systemctl_path(tmp_path):
+    """A ``PATH`` whose first ``systemctl`` is a recording fake, plus its argv log.
+
+    The child interpreter is outside the in-process live-system guard and resolves
+    ``systemctl`` through ``shutil.which``; without this it restarted the developer's
+    real qubit-serve / qubit-dashboard units. The fake lists one active user-scope
+    ``qubit-serve.service`` whose ``MainPID`` changes once it is restarted.
+    """
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log = tmp_path / "systemctl.log"
+    marker = tmp_path / "restarted"
+    fake = bin_dir / "systemctl"
+    fake.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' \"$*\" >> '{log}'\n"
+        'case " $* " in\n'
+        '  *" --user list-units qubit-serve* "*) echo "qubit-serve.service loaded active running Qubit" ;;\n'
+        '  *" is-active "*) echo active ;;\n'
+        f"  *\" show \"*) if [ -e '{marker}' ]; then echo 200; else echo 100; fi ;;\n"
+        f"  *\" restart \"*) : > '{marker}' ;;\n"
+        "esac\n"
+    )
+    fake.chmod(0o755)
+    return f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", log
+
+@pytest.mark.platforms("not linux")
+def test_recovery_module_reports_empty_serve_coverage_off_linux_in_a_real_process():
+    """Off Linux there is no systemd serve pass, but the protocol still round-trips."""
+    result = subprocess.run(
+        [sys.executable, "-m", "qubit_cli.update_restart_recovery", "--stdin"],
+        input=json.dumps(
+            {"profiles": [], "serve_units": {"recover": True, "skip": []}}
+        ),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["serve_units"] == {"verified": [], "failed": []}

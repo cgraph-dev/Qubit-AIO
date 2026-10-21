@@ -18,6 +18,7 @@ from qubit_cli.auth import _load_auth_store
 from qubit_cli.web_server import _SESSION_TOKEN, app
 from tests.qubit_cli.test_anon_upgrade import (
     EMAIL, FREE_PICK, INFERENCE, PORTAL, WELCOME, _model_config, _write_model_config, free_account, portal)
+from tests.qubit_cli.anon_portal import as_local_desktop_backend, claimed_trial
 
 client = TestClient(app)
 HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
@@ -107,3 +108,13 @@ def test_a_sign_in_cancelled_while_waiting_never_persists_the_account(portal, fr
     state = _load_auth_store()["providers"]["nous"]
     assert state["anon_token"] == guest["anon_token"] and anon_auth.is_guest_state(state)
     assert web_server_oauth._oauth_sessions.get(start["session_id"]) is None
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: /api/portal reports a connector-only guest as free tier")
+def test_a_connector_only_guest_is_not_reported_as_the_free_tier(portal, monkeypatch):
+    as_local_desktop_backend(monkeypatch)
+    anon_auth.ensure_portal_identity(explicit=True)
+    assert client.get("/api/portal", headers=HEADERS).json()["free_tier"] is False
+    providers = client.get("/api/providers/oauth", headers=HEADERS).json()["providers"]
+    nous = next(p for p in providers if p["id"] == "nous")
+    assert not nous["status"].get("free_tier")
