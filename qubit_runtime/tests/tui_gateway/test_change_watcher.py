@@ -445,3 +445,40 @@ def test_broken_probe_never_kills_the_pass(watcher_home, monkeypatch):
 
     # The broken cron probe is skipped; sessions still broadcasts.
     assert ("sessions.changed", {}) in events
+
+
+def test_second_ledger_with_the_same_mtime_still_broadcasts_pairing_changed(watcher_home):
+    """Coarse-timestamp filesystems give two ledgers written in one tick the same mtime; a
+    newest-mtime signature cannot see the second one, so the badge for it never appears."""
+    home, events = watcher_home
+    store = home / "platforms" / "pairing"
+    store.mkdir(parents=True)
+    first = store / "telegram-pending.json"
+    first.write_text("{}", encoding="utf-8")
+    server._broadcast_watched_changes(now=0.0)
+
+    second = store / "discord-pending.json"
+    second.write_text("{}", encoding="utf-8")
+    pinned = first.stat().st_mtime_ns
+    os.utime(second, ns=(pinned, pinned))
+    server._broadcast_watched_changes(now=10.0)
+
+    assert events == [("pairing.changed", {})]
+
+
+def test_sibling_projects_db_write_in_the_same_mtime_tick_broadcasts(watcher_home, monkeypatch):
+    """One served profile's projects.db write that lands in the same timestamp tick as
+    another's must not be masked by a newest-mtime-across-homes signature."""
+    home, events = watcher_home
+    coder_home = home / "profiles" / "coder"
+    coder_home.mkdir(parents=True)
+    monkeypatch.setattr(server, "_served_profile_homes", {coder_home})
+    (home / "projects.db").write_text("x", encoding="utf-8")
+    server._broadcast_watched_changes(now=0.0)
+
+    (coder_home / "projects.db").write_text("x", encoding="utf-8")
+    pinned = (home / "projects.db").stat().st_mtime_ns
+    os.utime(coder_home / "projects.db", ns=(pinned, pinned))
+    server._broadcast_watched_changes(now=10.0)
+
+    assert ("projects.changed", {}) in events

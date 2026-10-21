@@ -154,3 +154,16 @@ def test_the_task_chat_setup_hands_off_to_gets_no_note(monkeypatch, onboarding_h
 
     assert getattr(agent, "_gateway_turn_context_notes", None) is None
     assert PROFILE_BUILD_FLAG not in (onboarding_home / "config.yaml").read_text()
+
+
+def test_stages_profile_build_directive_on_first_contact(monkeypatch, onboarding_home):
+    """Fresh install + empty history: the opt-in directive is staged on the agent
+    and the offered flag is persisted before the turn runs."""
+    monkeypatch.setattr(server, "_install_has_prior_sessions", lambda _s: False)
+
+    agent = types.SimpleNamespace()
+    _stage(_session(agent), agent, history_empty=True)
+
+    assert agent._gateway_turn_context_notes == profile_build_directive().strip()
+    loaded = safe_load((onboarding_home / "config.yaml").read_text())
+    assert loaded["onboarding"]["seen"][PROFILE_BUILD_FLAG] is True

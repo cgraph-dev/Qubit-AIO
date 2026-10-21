@@ -151,3 +151,30 @@ def test_a_human_prompt_after_a_relayed_dm_runs_without_an_author(turn_env, monk
 
     assert seen == [("ping", AUTHOR), ("human note", "not passed")]
     assert "turn_author" not in session and not session.get("queued_prompt")
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: bot_relay.deliver still runs the subprocess transport instead of forwarding to the canonical authority")
+def test_live_relay_forwards_sender_to_canonical_authority(tmp_path, monkeypatch):
+    from tools import bot_live_delivery
+
+    home = tmp_path / ".qubit"
+    (home / "profiles" / "ops").mkdir(parents=True)
+    (home / "profiles" / "ops" / "config.yaml").touch()  # identity marker: bare dirs are not profiles
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    submitted = []
+    receipt = {"status": "queued", "delivery_id": "a" * 32, "admission_id": "admission"}
+    monkeypatch.setattr(bot_live_delivery, "authority_delivery",
+                        lambda target, params: submitted.append((target, params)) or receipt)
+    monkeypatch.setitem(srv._methods, "prompt.submit",
+                        lambda *a: pytest.fail("relay must not execute through the UI"))
+    monkeypatch.setattr(srv, "current_transport", lambda: None)
+
+    response = srv._methods["bot_relay.deliver"](1, {
+        "id": "a" * 32, "profile": "ops", "message": "ping",
+        "from_profile": "coder", "from_handle": "coder",
+    })
+
+    assert _result(response) == receipt
+    assert submitted == [(home / "profiles" / "ops", {
+        "id": "a" * 32, "profile": "ops", "message": "ping", "author": AUTHOR,
+    })]

@@ -1,3 +1,4 @@
+import pytest
 import io
 import json
 import os
@@ -319,3 +320,33 @@ def test_shutdown_drain_sleep_never_overshoots_the_reserve(monkeypatch):
     assert events == ["finalize:idle:compute_host_sigterm"]
     assert slept, "the drain loop should have ticked at least once"
     assert sum(slept) <= drain_budget + 1e-6
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a relayed cancel does not withdraw the compute host's open server request")
+def test_compute_host_withdraws_its_open_request_when_the_parent_relays_a_cancel(monkeypatch):
+    """Skip setup in the parent withdraws the card the child waits on: the wait returns and every
+    renderer gets the ``request.cancel``."""
+    from tui_gateway import server_requests
+    out = io.StringIO()
+    host = ComputeHost(stdout=out, heartbeat_secs=0)
+    sid = "host-setup"
+    server._sessions[sid] = {"history_lock": threading.Lock()}
+    events = []
+    monkeypatch.setattr(server_requests, "_emit", lambda kind, _sid, payload: events.append((kind, _sid, payload)))
+    beat = server_requests.ServerRequest(sid, "setup_beat", {"beat": "theme"})
+    other = server_requests.ServerRequest(sid, "clarify", {"question": "?"})
+    with server_requests._lock:
+        server_requests._open.update({beat.id: beat, other.id: other})
+
+    try:
+        host._handle_respond({"sid": sid, "request_id": "relay-cancel",
+                              "params": {"cancel": {"method": "setup_beat", "reason": "resolved"}}})
+        assert beat.event.is_set() and not beat.answered
+        assert not other.event.is_set()
+        assert events == [("request.cancel", sid, {"id": beat.id, "method": "setup_beat", "reason": "resolved"})]
+        frame = _json_lines(out)[-1]
+        assert frame["type"] == "respond.ack" and frame["response"]["result"] == {"cancelled": 1}
+    finally:
+        server._sessions.pop(sid, None)
+        server_requests.reset_for_tests()
+        host.close()

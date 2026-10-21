@@ -8,6 +8,7 @@ definition is already in the profile — writing it after the pin never ran (#10
 
 from __future__ import annotations
 
+import pytest
 import qubit_yaml as yaml
 
 import tui_gateway.server as srv
@@ -51,3 +52,42 @@ def test_inherit_launch_model_carries_a_custom_providers_endpoint(monkeypatch, t
     assert cfg["custom_providers"] == [
         {"name": "lab", "base_url": "https://lab.internal.example.com/v1"}
     ]
+
+
+@pytest.mark.parametrize("written", ["http://127.0.0.1:11434/v1", "${LAB_URL}"])
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: profile inheritance drops a bare custom endpoint base_url and the pin rejects the provider")
+def test_inherit_launch_model_pins_a_bare_custom_endpoint(monkeypatch, tmp_path, written):
+    home = tmp_path / ".qubit"
+    home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    for var in ("CUSTOM_BASE_URL", "OPENAI_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LAB_URL", "http://127.0.0.1:11434/v1")
+    # Hermetic: the pin probes the endpoint's /models.
+    monkeypatch.setattr("qubit_cli.models.probe_api_models", lambda *a, **k: {"models": ["llama3"]})
+    (home / "config.yaml").write_text(
+        "model:\n  provider: custom\n  default: llama3\n  base_url: '" + written + "'\n")
+    profile = home / "profiles" / "scout"
+    profile.mkdir(parents=True)
+    # Voice mirroring writes config.yaml before inheritance runs (#85755).
+    (profile / "config.yaml").write_text("tts:\n  provider: edge\n")
+
+    assert srv._inherit_launch_model(profile) is True
+
+    model = yaml.safe_load((profile / "config.yaml").read_text())["model"]
+    # The launch file's spelling travels: a ${VAR} URL stays a ref, never the launch value.
+    assert (model["provider"], model["default"], model["base_url"]) == ("custom", "llama3", written)
+
+
+def test_inherit_launch_model_preserves_explicit_profile_selection(monkeypatch, tmp_path):
+    home = tmp_path / ".qubit"
+    home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    (home / "config.yaml").write_text("model:\n  provider: nous\n  default: launch-model\n")
+    profile = home / "profiles" / "scout"
+    profile.mkdir(parents=True)
+    selected = "model:\n  provider: openrouter\n  default: profile-model\n"
+    (profile / "config.yaml").write_text(selected)
+
+    assert srv._inherit_launch_model(profile) is False
+    assert (profile / "config.yaml").read_text() == selected

@@ -171,3 +171,33 @@ def test_mailbox_poll_delivers_past_a_schema_damaged_ticket(monkeypatch, tmp_pat
     assert poll("live", session) is True
     assert submitted == ["healthy"]
     assert mailbox.read_delivery_result(tmp_path, queued["delivery_id"])["status"] == "settled"
+
+
+def test_viewer_poller_never_discovers_or_claims_bot_execution(monkeypatch, tmp_path):
+    import contextlib
+    import queue
+    import time
+    import tools.bot_live_delivery as mailbox
+    from tools.process_registry import process_registry
+    calls = []
+    monkeypatch.setattr(mailbox, 'find_canonical_live_owner', lambda home: calls.append(home))
+    stop = threading.Event()
+    events = queue.Queue()
+    events.put({'type': 'owned-completion'})
+    monkeypatch.setattr(process_registry, 'completion_queue', events)
+    delivered = []
+    poll = rebind(session_notifications._notification_poller_scoped_loop, {
+        'time': time, '_LOOP_POLL_SECONDS': 0, '_KANBAN_POLL_SECONDS': 0, '_BOT_DELIVERY_POLL_SECONDS': 0,
+        '_poll_bot_live_delivery_once': lambda *a: calls.append('legacy-claim'),
+        '_poll_bot_live_delivery_guarded': lambda *a: None,
+        '_maybe_fire_tui_loop_tick': lambda *a: None,
+        '_maybe_fire_tui_heartbeat_tick': lambda *a: None,
+        '_notif_poll_kanban': lambda *a: None,
+        '_session_profile_runtime_scope': lambda session: contextlib.nullcontext(),
+        '_session_home': lambda session: tmp_path,
+        '_notif_handle_ready': lambda sid, session, ready, *a, **kw: (delivered.extend(ready), stop.set()),
+    })
+    poll(stop, 'live', {'agent': object(), 'history_lock': threading.RLock(), 'session_key': 'chat',
+                      'active_session_lease': SimpleNamespace(lease_id='lease', released=False)})
+    assert delivered == [{'type': 'owned-completion'}]
+    assert calls == []
