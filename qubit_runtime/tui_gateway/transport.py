@@ -197,9 +197,10 @@ class FanoutTransport:
     def detach(self, transport: Transport) -> bool:
         with self._lock:
             for peer in self._peers:
-                if peer.attached and peer.transport is transport:
+                if peer.transport is transport:
+                    attached = peer.attached
                     self._remove(peer)
-                    return True
+                    return attached
         return False
 
     def contains(self, transport: Transport) -> bool:

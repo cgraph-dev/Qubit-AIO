@@ -45,7 +45,6 @@ def interrupt(sid: str) -> dict:
     return server._methods["session.interrupt"](1, {"session_id": sid})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: stop waits on / reports the agent build failure instead of interrupting and releasing the session")
 def test_stop_succeeds_after_the_agent_build_failed(sid):
     """The reported case: the build failed, and Stop must still succeed so the session can be deleted."""
     session = record(sid, agent_build_started=True, agent_error=REMOVED_PROVIDER)
@@ -56,7 +55,6 @@ def test_stop_succeeds_after_the_agent_build_failed(sid):
     assert response.get("result", {}).get("status") == "interrupted", response
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: stop waits on / reports the agent build failure instead of interrupting and releasing the session")
 def test_stop_frees_a_running_session_whose_build_failed(sid):
     """A failed build with no run thread left must not stay busy: every later submit would queue (#82603)."""
     session = record(sid, agent_build_started=True, agent_error=REMOVED_PROVIDER, running=True)
@@ -68,7 +66,6 @@ def test_stop_frees_a_running_session_whose_build_failed(sid):
     assert session["running"] is False
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: stop waits on / reports the agent build failure instead of interrupting and releasing the session")
 def test_stop_cancels_a_turn_parked_on_an_unfinished_build(sid):
     """The handler returns while the build event is still unset, and the parked turn sees the cancel."""
     session = record(sid, agent_build_started=True, running=True,
@@ -81,7 +78,6 @@ def test_stop_cancels_a_turn_parked_on_an_unfinished_build(sid):
     assert not session["agent_ready"].is_set()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: stop waits on / reports the agent build failure instead of interrupting and releasing the session")
 def test_stop_does_not_build_an_agent_for_a_resumed_session(sid, monkeypatch):
     """A resumed session has no agent yet; Stop must not build one (provider resolution, MCP servers)."""
     builds = []
