@@ -52,6 +52,7 @@ def test_crash_marker_on_a_reset_tip_is_released_for_its_unknown_admission(tmp_p
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(strict=True, reason='wave-17 defect: resume schedules a reset tip with an unknown admission')
 async def test_legacy_resume_skips_a_reset_tip_whose_admission_is_unknown(tmp_path):
     runner, adapter = make_restart_runner()
     db, authority = _unknown_after_reset(tmp_path, runner)

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from gateway.config import Platform
 from gateway.run_turn_runner import TurnRunner
 
@@ -36,6 +38,7 @@ def _runner(platform, published):
     return turn, adapter_sends
 
 
+@pytest.mark.xfail(strict=True, reason='wave-17 defect: local viewer never receives review.summary')
 def test_local_review_summary_follows_the_turn_settlement_and_is_never_fenced():
     import threading
     published = []

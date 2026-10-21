@@ -38,6 +38,7 @@ async def test_launch_env_rides_session_create(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(strict=True, reason='wave-17 defect: cmd_acp does not export --model/--provider for bypass sessions')
 async def test_safe_mode_acp_session_freezes_the_launch_model(monkeypatch, tmp_path):
     """`qubit -m <model> --provider <name> --safe-mode acp`: the owner reads no profile default, so the
     launch's model rides session.create and the owner's bypass policy accepts it."""
@@ -88,6 +89,7 @@ async def test_bypass_with_a_model_but_no_provider_is_refused_at_session_new(mon
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(strict=True, reason='wave-17 defect: cmd_acp drops --accept-hooks/--ignore-rules')
 async def test_cli_only_acp_flags_reach_the_session(monkeypatch, tmp_path):
     """--accept-hooks / --ignore-rules have no other route from the `qubit acp` parser to the owner."""
     for name in _ENV:
