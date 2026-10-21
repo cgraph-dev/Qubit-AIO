@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 18 — 2026-10-21 (0 dead)
+
+- ✅ Landed: bot-chat authority FIFO + cron parking, hot-serve reserve/serve + single-application `one_turn_route`, local `review.summary` + reset-tip barrier + title parent revision, non-mutating export + duck-typed fanout drain, ACP launch flags + `gpt-6.1-sol`, detector FP classes, 58 parity files.
+- ✅ Measured: dead **17 → 0** (13 benign exclusions); production **1** (declared B1); total missing **642 → 638**; absent **420 → 361**; wave-17 xfails **0**; brand guard OK.
+- 🟡 119 parity-exposed defects are strict xfails (signed-thinking replay, compression telemetry/rollback, Gemini decode ceiling, MCP deadline, safe-worker policy, onboarding half-rebrand, queue/stop/settlement races, connector identity/files, session ledger/compaction, TUI onboarding/fanout).
+- 🔴 Remaining: 361 absent + 638 short-port test symbols; 119 xfailed defects.
+- ✅ Live: four units restarted; identify ready/epoch 7; `/chat` 200; orb waiter ready. No global E2E/release verdict.
+
 ## Wave 17 — 2026-10-21 (17 dead)
 
 - ✅ Landed: write-file baseline (9 xfails→pass), shared metrics connector/tool_search + recommendation floor (7 xfails→pass), compaction events + auxiliary relay (call_role split fixed), inline bootstrap shape + left-core, agent plugins + skills-guard v10/plugin-guard v11, release admission (10 dead resolved) + `select_apply_target`, 28 test files ported.
