@@ -1,5 +1,6 @@
-"""Gateway housekeeping chores that keep the data disk healthy: stale media-cache cleanup and the
-home-channel prompt for the low-disk auto-prune decision (see ``qubit_cli/prune_advisor.py``).
+"""Gateway housekeeping chores that keep the data disk healthy: the home-channel prompt for the
+low-disk auto-prune decision (see ``qubit_cli/prune_advisor.py``). Media-cache cleanup lives in
+``gateway.run._housekeeping_media_caches`` (the registered chore).
 
 A headless gateway on a small VPS is where a disk fills up, and its owner may never open the CLI,
 so the question goes to each served profile's home channel; Desktop and Ink TUI viewers of local
@@ -15,31 +16,6 @@ import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-
-def housekeeping_media_caches() -> None:
-    """Hourly media-cache prune (24h max age); spillover (None) keeps the session retention window."""
-    from gateway.platforms.base import (
-        cleanup_audio_cache, cleanup_document_cache, cleanup_image_cache, cleanup_screenshot_cache,
-        cleanup_video_cache)
-    from tools.tool_result_storage import cleanup_spillover_cache
-    from tools.environments.local import cleanup_terminal_temp_cache
-    from tools.bot_mode_dm import cleanup_bot_dm_cache
-    from tools.bot_relay import cleanup_bot_relay_artifacts
-    from agent.provider_media import MEDIA_CACHE_MAX_AGE_HOURS
-    from gateway.run import _housekeeping_chore
-
-    for cache_name, cleanup_fn in (
-        ("Image", cleanup_image_cache), ("Document", cleanup_document_cache),
-        ("Audio", cleanup_audio_cache), ("Video", cleanup_video_cache),
-        ("Screenshot", cleanup_screenshot_cache), ("Spillover", cleanup_spillover_cache),
-        ("Terminal temp", cleanup_terminal_temp_cache), ("Bot DM", cleanup_bot_dm_cache),
-        ("Bot relay", cleanup_bot_relay_artifacts)):
-        def _one(name=cache_name, fn=cleanup_fn):
-            removed = fn(max_age_hours=None if fn is cleanup_spillover_cache else MEDIA_CACHE_MAX_AGE_HOURS)
-            if removed:
-                logger.info("%s cache cleanup: removed %d stale file(s)", name, removed)
-        _housekeeping_chore(f"{cache_name} cache cleanup", _one)
 
 
 def maybe_post_auto_prune_prompt(runner, loop) -> None:
