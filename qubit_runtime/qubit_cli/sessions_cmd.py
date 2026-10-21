@@ -1245,7 +1245,13 @@ def cmd_sessions(args, sessions_parser=None):
     pre = _PRE_DB_HANDLERS.get(action)
     if pre is not None:
         return pre(args)
-    observational = action in _OBSERVATIONAL_DB_ACTIONS
+    # Verified deletion is an explicit mutation, not a read-only export.
+    deleting_export = (
+        action == "export" and getattr(args, "delete_after_verified", False)
+        and getattr(args, "yes", False) and getattr(args, "session_id", None)
+        and getattr(args, "format", None) in ("md", "qmd")
+    )
+    observational = action in _OBSERVATIONAL_DB_ACTIONS or (action == "export" and not deleting_export)
     if action == "prune":
         # The always-on gateway owns the store: this process only reads the preview, the owner
         # deletes. No gateway: the local prune below, behind the holder scan, as before.

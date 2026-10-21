@@ -6,8 +6,6 @@ only records frames and holds its first send until the test has queued a backlog
 import asyncio
 import threading
 
-import pytest
-
 from tests.waiting import wait_until
 from tui_gateway.transport import FanoutTransport
 
@@ -50,7 +48,6 @@ def _delta(index):
         'type': 'message.delta', 'session_id': 's', 'payload': {'text': str(index)}}}
 
 
-@pytest.mark.xfail(strict=True, reason='wave-17 defect: drain only awaits a concrete WSTransport')
 def test_the_drain_sends_a_queued_backlog_as_one_batch():
     loop = asyncio.new_event_loop()
     runner = threading.Thread(target=loop.run_forever, daemon=True)
