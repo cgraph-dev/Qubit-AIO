@@ -252,6 +252,19 @@ def _start_gateway_claim_pid_file(force: bool = False) -> bool:
     return True
 
 
+def _require_gateway_control_listener(control_server):
+    """The bootstrap control listener is NOT optional.
+
+    Local clients attach only with tickets minted on this listener (``session-ticket`` bypasses
+    the scan wrapper), so a gateway that starts without it can serve no local session. The
+    control-socket server itself reports a bind failure as ``None``; the bootstrap escalates
+    that to a fatal startup error, matching the frozen pin (``gateway/run_bootstrap.py``).
+    """
+    if control_server is None:
+        raise RuntimeError("gateway session bootstrap control listener unavailable")
+    return control_server
+
+
 async def _start_gateway_start_control_socket(runner):
     """Start the gateway control socket (identify/status/pause-for-update); None when unavailable."""
     from gateway.run import (asyncio, logger, os, threading)
@@ -852,9 +865,8 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
 
         # Right after the PID claim (which makes us authoritative). Fatal: local clients attach only
         # with tickets minted on this listener, so startup aborts without it.
-        _control_server = await _start_gateway_start_control_socket(runner)
-        if _control_server is None:
-            raise RuntimeError("gateway session bootstrap control listener unavailable")
+        _control_server = _require_gateway_control_listener(
+            await _start_gateway_start_control_socket(runner))
         # Now the attach channel answers: republish the host record with the settled served set.
         _refresh_host_gateway_record(runner)
         _log_standalone_profiles_at_boot(runner)

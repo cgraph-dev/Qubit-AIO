@@ -188,8 +188,10 @@ def build_status_payload() -> dict[str, Any]:
 
 class GatewayControlServer:
     """Gateway-owned control socket server (identify/status, v1): ``start()`` after the PID-file claim,
-    ``stop()`` on shutdown. All failures are non-fatal — the gateway never refuses to serve messaging
-    because its control socket couldn't bind; consumers fall back to the scan layer."""
+    ``stop()`` on shutdown. ``start()`` returning ``None`` (a bind failure) is reported, not raised:
+    verb/identify consumers fall back to the scan layer. The gateway bootstrap deliberately
+    escalates a missing listener to a fatal startup error, because ``session-ticket`` attach has
+    no scan fallback and a gateway without this listener cannot serve a local session."""
 
     def __init__(self, home: Optional[Path] = None, *,
                  verb_handlers: Optional[dict[str, Callable[..., dict[str, Any]]]] = None) -> None:
