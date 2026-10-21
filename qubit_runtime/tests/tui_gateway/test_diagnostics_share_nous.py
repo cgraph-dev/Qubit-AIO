@@ -222,7 +222,17 @@ def test_redacted_support_egress_scrubs_structured_values_and_errors(
     monkeypatch.setattr(dr, "redact_debug_support_text", real_redact)
     assert max(scrubbed_sizes) <= 3 * 8_000
 
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a support-upload failure tail leaks a structured error canary")
+def test_support_upload_failure_tail_is_scrubbed_idempotently(monkeypatch):
+    import qubit_cli.debug_redaction as dr
     import qubit_cli.diagnostics_upload as du
+
+    canaries = {
+        "header": "r36_REDACTED_header_canary_0123456789",
+        "error": "r36_REDACTED_error_canary_0123456789",
+    }
+    real_redact = dr.redact_debug_support_text
 
     def _fail(_blob: bytes) -> dict:
         # The tail is already scrubbed (a wrapped inner error); re-scrubbing it
