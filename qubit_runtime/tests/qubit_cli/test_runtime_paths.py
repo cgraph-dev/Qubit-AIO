@@ -97,3 +97,13 @@ def test_venv_python_version_falls_back_to_the_lib_directory(tmp_path):
 
 def test_venv_python_version_is_none_without_evidence(tmp_path):
     assert venv_python_version(tmp_path / "absent") is None
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: venv_python_version reads only 'version', not uv's 'version_info'")
+def test_venv_python_version_reads_uv_version_info(tmp_path):
+    # uv and virtualenv record ``version_info``; Windows has no lib/python3.X to fall back to.
+    venv = tmp_path / "venv"
+    venv.mkdir()
+    (venv / "pyvenv.cfg").write_text("home = C:\\Python311\nversion_info = 3.11.9\n", encoding="utf-8")
+
+    assert venv_python_version(venv) == (3, 11)

@@ -19,6 +19,7 @@ appear in ``/model`` without a Hermes release.
 
 from unittest.mock import patch
 
+import pytest
 
 from qubit_cli.models import (
     _PROVIDER_MODELS,
@@ -140,3 +141,11 @@ class TestProviderModelIdsPreferred:
             _model_flow_kimi({}, current_model="")
 
         assert captured["models"] == _PROVIDER_MODELS["kimi-coding"]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: setup merge always leads with models.dev instead of curated for non-live-first providers")
+def test_setup_menu_merge_leads_with_curated_in_full():
+    from qubit_cli.model_setup_flows_common import _models_dev_merged
+    with patch("agent.models_dev.list_agentic_models", return_value=["a/x", "b/Y", "c/z"]):
+        assert _models_dev_merged("nvidia", ["B/y", "d/w"]) == ["b/Y", "d/w", "a/x", "c/z"]
+        assert _models_dev_merged("opencode-zen", ["B/y", "d/w"]) == ["a/x", "b/Y", "c/z", "d/w"]

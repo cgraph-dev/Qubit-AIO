@@ -139,3 +139,21 @@ def test_a_failed_relay_probe_never_falls_back_to_the_vendor_host(monkeypatch, p
 
     # Degrades locally to the curated list, with no vendor egress at all.
     assert models.provider_model_ids("deepseek") == ["curated-local"]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an empty provider-profile base_url is treated as the relay instead of the registry canonical endpoint")
+def test_registry_endpoint_is_canonical_when_the_profile_leaves_base_url_empty(monkeypatch):
+    """TokenHub's profile leaves ``base_url`` to its auth-registry row. A ``model.base_url`` that
+    ``qubit model`` saved as that endpoint is not a relay: the picker keeps the curated Hy list
+    instead of replacing it with a live probe of the same host."""
+    from qubit_cli.auth import PROVIDER_REGISTRY
+    from providers import get_provider_profile
+
+    assert get_provider_profile("tencent-tokenhub").base_url == ""
+    endpoint = PROVIDER_REGISTRY["tencent-tokenhub"].inference_base_url
+    monkeypatch.setattr(models, "_get_model_config_dict",
+                        lambda: {"provider": "tencent-tokenhub", "base_url": endpoint + "/"})
+    assert models._configured_relay_base_url("tencent-tokenhub") == ""
+    monkeypatch.setattr(models, "_get_model_config_dict",
+                        lambda: {"provider": "tencent-tokenhub", "base_url": endpoint + "/relay"})
+    assert models._configured_relay_base_url("tencent-tokenhub") == endpoint + "/relay"
