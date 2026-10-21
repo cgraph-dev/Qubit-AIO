@@ -113,10 +113,10 @@ def connectors_available(
 def guest_identity_pending() -> bool:
     """No Qubit identity or bearer yet, and a guest one may be created (``nous.guest`` is not false
     and no earlier mint was refused for good). No network: this feeds the ``check_fn``."""
-    from qubit_cli.anon_auth import guest_enabled, last_mint_failure
+    from qubit_cli.anon_auth import guest_allowed, last_mint_failure
     from tools.managed_tool_gateway import _read_nous_provider_state, peek_nous_access_token
 
-    if not guest_enabled() or _read_nous_provider_state() is not None or peek_nous_access_token():
+    if not guest_allowed() or _read_nous_provider_state() is not None or peek_nous_access_token():
         return False
     failure = last_mint_failure()
     return not failure or bool(failure["retryable"])
@@ -141,7 +141,11 @@ def ensure_guest_identity() -> Optional[str]:
     a refusal, a rate limit or an unreachable portal, with the wait when there is one."""
     if not guest_identity_pending():
         return None
-    from qubit_cli.anon_auth import ensure_portal_identity
+    from qubit_cli.anon_auth import ensure_portal_identity, guest_enabled
+    if not guest_enabled():
+        # No identity may be created on this process (the launch gate is off): nothing to set up,
+        # and no failure to report — connectors remain usable only if an identity already exists.
+        return None
     from qubit_cli.auth_constants import AuthError
 
     try:

@@ -223,7 +223,10 @@ def guest_carries_inference() -> bool:
     request may carry) must use :func:`route_is_welcome_host` on the SELECTED runtime instead: a
     credential-pool entry can pick a paid Qubit key while the profile singleton is still a guest.
     """
-    return guest_enabled() and has_guest()
+    state = current_nous_state()
+    # A connectors-only guest holds its grant in ``connectors_token`` and carries no inference token,
+    # so it is not a free-tier account (and its surfaces stay off).
+    return guest_enabled() and is_guest_state(state) and bool(state.get("access_token"))
 
 
 def has_free_tier_account() -> bool:
@@ -233,7 +236,10 @@ def has_free_tier_account() -> bool:
     request may carry) must use :func:`route_is_welcome_host` on the SELECTED runtime instead: a
     credential-pool entry can pick a paid Nous key while the profile singleton is still a guest.
     """
-    return guest_enabled() and has_guest()
+    state = current_nous_state()
+    # A connectors-only guest holds its grant in ``connectors_token`` and carries no inference token,
+    # so it is not a free-tier account (and its surfaces stay off).
+    return guest_enabled() and is_guest_state(state) and bool(state.get("access_token"))
 
 
 def free_tier_route() -> bool:
@@ -405,6 +411,7 @@ def mint_guest(client: httpx.Client, portal_base_url: str) -> Dict[str, Any]:
 
 def exchange_anon_jwt(
     client: httpx.Client, portal_base_url: str, anon_token: str, *, auth_state: Dict[str, Any],
+    purpose: str,
 ) -> Dict[str, Any]:
     """``POST /api/anonymous/token {token}`` -> ``{access_token, expires_in, inference_base_url, ...}``.
 
@@ -415,7 +422,7 @@ def exchange_anon_jwt(
     from qubit_cli import anon_challenge
     response = client.post(
         f"{portal_base_url.rstrip('/')}/api/anonymous/token", headers=_anon_headers(),
-        json={"token": anon_token, "client": anon_challenge.client_info()})
+        json={"token": anon_token, "client": anon_challenge.client_info(), "purpose": purpose})
 
     def challenge(body: Dict[str, Any]) -> AuthError:
         return anon_challenge.challenge_error(
@@ -519,10 +526,12 @@ def guest_without_free_tier(state: Any) -> bool:
     return is_guest_state(state) and not free_inference_active(state)
 
 
-def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any]) -> Dict[str, Any]:
+def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any], *,
+                 welcome_claim: bool = False) -> Dict[str, Any]:
     """Mint under the caller's locks. The identity is persisted as soon as ``create`` succeeds, BEFORE
     the exchange: a 429 or timeout on the exchange must not lose a credential NAS still honours (the
-    next attempt exchanges the stored one instead of minting again)."""
+    next attempt exchanges the stored one instead of minting again). *welcome_claim* is written in
+    that same save, so a claimed guest is never left unstamped."""
     from qubit_cli.auth import _store_provider_state, _save_auth_store
     from qubit_cli.auth_nous import _write_shared_nous_state
     minted = mint_guest(client, portal)
@@ -532,6 +541,8 @@ def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any]) 
         "portal_base_url": portal.rstrip("/"),
         "user_id": minted.get("user_id"), "org_id": minted.get("org_id"),
         "idle_ttl_days": minted.get("idle_ttl_days"),
+        # Always present: an absent key marks a guest minted before the claim existed (grandfathering).
+        WELCOME_CLAIM_FLAG: welcome_claim,
     }
     _store_provider_state(auth_store, "nous", state, set_active=False)
     _save_auth_store(auth_store)
@@ -638,7 +649,8 @@ def _note_mint_failure(err: AuthError) -> MintFailure:
     return failure
 
 
-def _reconcile_and_provision(*, timeout_seconds: float) -> Optional[Dict[str, Any]]:
+def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
+                             welcome_claim: bool = False) -> Optional[Dict[str, Any]]:
     """The lifecycle body, run under profile lock THEN shared lock (the documented order).
 
     1. The shared store is the identity of record for this Qubit root. If it holds an identity
@@ -668,13 +680,26 @@ def _reconcile_and_provision(*, timeout_seconds: float) -> Optional[Dict[str, An
                 if not shared:
                     _write_shared_nous_state(profile_state)
                 return profile_state
+            # A caller queued on these locks behind a mint that just failed waits out its cooldown.
+            failure = _mint_failure_for_profile()
+            if failure and not force and time.monotonic() < failure.not_before:
+                return None
             verify = _resolve_verify(insecure=None, ca_bundle=None, auth_state=None)
-            with _nous_http_client(timeout_seconds, verify) as client:
-                return _mint_locked(client, portal, auth_store)
+            try:
+                with _nous_http_client(timeout_seconds, verify) as client:
+                    return _mint_locked(client, portal, auth_store, welcome_claim=welcome_claim)
+            except Exception as exc:
+                # Noted before the locks are released, so a caller queued on them sees the cooldown.
+                err = classify_mint_exception(exc)
+                err.mint_failure = _note_mint_failure(err)
+                if err is exc:
+                    raise
+                raise err from exc
 
 
 def ensure_portal_identity(
     *, explicit: bool, timeout_seconds: float = GUEST_MINT_TIMEOUT_SECONDS, force: bool = False,
+    welcome_claim: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Make sure this profile has a Qubit identity (guest or account); mint a guest only if the shared
     store has none. Returns the ``providers.qubit`` state, or None (disabled / failed once already).
@@ -702,33 +727,43 @@ def ensure_portal_identity(
     if failure and not force and not current_nous_state() and time.monotonic() < failure.not_before:
         return None  # in cooldown (or terminal) for this profile; do not hammer the portal
     try:
-        state = _reconcile_and_provision(timeout_seconds=timeout_seconds)
+        state = _reconcile_and_provision(timeout_seconds=timeout_seconds, force=force,
+                                         welcome_claim=welcome_claim)
     except Exception as exc:
         err = classify_mint_exception(exc)
-        noted = _note_mint_failure(err)
+        noted = getattr(err, "mint_failure", None) or _note_mint_failure(err)
         logger.info("Qubit free tier not set up (%s, attempt %d%s)", noted.code, noted.attempts,
                     f", next try in {noted.retry_after:.0f}s" if noted.retryable else ", not retried")
         if err is exc:
             raise
         raise err from exc
-    _clear_mint_failure()
+    if state is not None:
+        _clear_mint_failure()
     return state
 
 
-def refresh_guest_state(state: Dict[str, Any], client: httpx.Client) -> None:
-    """Token-acquisition seam for a guest: re-exchange the ``anon_`` credential in place.
+def refresh_guest_state(state: Dict[str, Any], client: httpx.Client, *, purpose: str) -> str:
+    """Token-acquisition seam for a guest: re-exchange the ``anon_`` credential in place and return
+    the minted token. Every caller names its *purpose*: ``"connectors"`` for connector and managed-tool
+    bearers, ``"inference"`` only for a guest that carries the welcome trial.
 
     The portal URL is the resolver's canonical one (env override, else the validated stored URL,
     else the default), never a raw stored value on its own.
     Raises :class:`AnonCredentialDead` when NAS no longer knows the credential; the caller owns
     re-minting (:func:`ensure_portal_identity` after :func:`clear_dead_guest`).
     """
+    if purpose == "inference" and not free_inference_active(state):
+        # The one place a guest's inference token is minted: only the welcome trial on the desktop's
+        # local backend carries one. Not terminal: the guest stays for connectors.
+        raise AuthError("Qubit is not logged into the Qubit Labs.", provider="nous", code="nous_auth_missing")
     anon_token = state.get("anon_token")
     if not isinstance(anon_token, str) or not anon_token:
         raise AnonCredentialDead(ANON_FAILURE_COPY[ANON_CREDENTIAL_DEAD], code=ANON_CREDENTIAL_DEAD)
     from qubit_cli.auth import _nous_portal_base_url
-    apply_exchange_to_state(state, exchange_anon_jwt(
-        client, _nous_portal_base_url(state), anon_token, auth_state=state))
+    exchanged = exchange_anon_jwt(
+        client, _nous_portal_base_url(state), anon_token, auth_state=state, purpose=purpose)
+    apply_exchange_to_state(state, exchanged)
+    return exchanged["access_token"]
 
 
 def clear_dead_guest(reason: str, *, dead_token: Optional[str] = None) -> None:
@@ -966,7 +1001,8 @@ FREE_TIER_AVAILABLE_NOTICE = (
 def guest_notice_pending() -> bool:
     """True when a guest identity exists and the one-time availability notice has not been shown."""
     state = current_nous_state()
-    return is_guest_state(state) and not bool(state.get(GUEST_NOTICE_FLAG))
+    return (is_guest_state(state) and bool(state.get("access_token"))
+            and not bool(state.get(GUEST_NOTICE_FLAG)))
 
 
 def mark_guest_notice_shown() -> bool:

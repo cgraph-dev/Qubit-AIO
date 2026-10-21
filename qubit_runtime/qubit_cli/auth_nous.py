@@ -1018,7 +1018,7 @@ class _NousRuntimeResolve:
             # Guest seam: the anon_ credential is the refresh material; re-exchange instead of
             # redeeming a rotating refresh token. Quarantine never applies to a guest.
             if self.force_refresh or self.invoke_jwt_status() is not None:
-                refresh_guest_state(self.state, client)
+                refresh_guest_state(self.state, client, purpose="inference")
                 self.access_token = self.state["access_token"]
                 self.stored_inference_base_url = self.state.get("inference_base_url") or self.stored_inference_base_url
                 self.inference_base_url = _nous_inference_env_override() or self.stored_inference_base_url
@@ -1092,6 +1092,10 @@ def _resolve_nous_runtime_credentials(
     with _provider_state_transaction("nous") as (auth_store, state, state_source_path):
         if not state:
             raise _nous_err("Qubit is not logged into Qubit Labs.", "nous_auth_missing", relogin=True)
+        from qubit_cli.anon_auth import guest_without_free_tier
+        if guest_without_free_tier(state):
+            # Not terminal (no relogin): the identity stays for connectors.
+            raise _nous_err("Qubit is not logged into Qubit Labs.", "nous_auth_missing")
         run = _NousRuntimeResolve(
             auth_store, state, state_source_path, force_refresh=force_refresh,
             stale_access_token=stale_access_token, timeout_seconds=timeout_seconds)
@@ -1146,7 +1150,9 @@ def _snapshot_nous_pool_status() -> Dict[str, Any]:
     try:
         from agent.credential_pool import load_pool
         pool = load_pool("nous")
-        entries = list(pool.entries()) if pool and pool.has_credentials() else []
+        # A guest's row is not a Portal login: without its trial stamp in auth.json it runs nothing.
+        entries = [e for e in pool.entries() if getattr(e, "auth_method", None) != "anonymous"] if (
+            pool and pool.has_credentials()) else []
         if not entries:
             return _empty_nous_auth_status()
         entry = max(entries, key=lambda e: (
