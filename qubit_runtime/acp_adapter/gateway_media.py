@@ -96,16 +96,3 @@ async def stage_user_content(content, home=None):
             continue
         attachments.append({'path': path, 'mime': mime})
     return "\n".join(texts), attachments
-
-
-def submit_fingerprint(session_id, content):
-    """Identity of one logical prompt as the editor sent it (text, image ``data:`` bytes, remote image
-    URLs), taken before staging: a retry of the same prompt matches without re-fetching a remote image,
-    whose second download could fail or return other bytes and so change what is submitted."""
-    import hashlib
-    digest = hashlib.sha256()
-    for part in [content] if isinstance(content, str) else content:
-        kind, value = ('text', part) if isinstance(part, str) else \
-            ('text', part['text']) if part.get('type') == 'text' else ('image', part['image_url']['url'])
-        digest.update(kind.encode() + len(value).to_bytes(8, 'big') + value.encode())
-    return session_id, digest.hexdigest()

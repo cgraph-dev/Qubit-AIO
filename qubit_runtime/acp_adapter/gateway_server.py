@@ -85,6 +85,17 @@ def _slash_command(text):
     return command.name if command is not None else None
 
 
+def _submit_fingerprint(session_id, text, attachments):
+    """Content identity of one logical prompt: its text and the staged image bytes (staging names
+    are disposable; the authority reconciles a retry by the same digests)."""
+    import hashlib
+    digest = hashlib.sha256(text.encode())
+    for item in attachments:
+        with open(item['path'], 'rb') as staged:
+            digest.update(item['mime'].encode() + b'\0' + hashlib.sha256(staged.read()).digest())
+    return session_id, digest.hexdigest()
+
+
 def _bypass_route():
     """--safe-mode / --ignore-user-config read no profile default route, so the session freezes the
     launch's explicit one (``qubit -m <model> --provider <name> --safe-mode acp``). Both, refused at
@@ -132,9 +143,9 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         self._permissions = {}
         self._admissions = {}
         self._submitting = set()
-        # Session -> (content fingerprint, input_id, staged (text, attachments)) of a submit whose ack
-        # never arrived. The editor's retry (that session's next prompt, same content) reuses it, so the authority
-        # returns the same admission.
+        # Session -> (content fingerprint, input_id) of a submit whose ack never arrived. The
+        # editor's retry (that session's next prompt, same content) reuses the input_id, so the
+        # authority returns the same admission.
         self._unacked = {}
         # Admissions whose terminal reply one path (the pump's message.complete or a retry's
         # terminal receipt) is delivering right now; the other path yields to the claim.
@@ -637,7 +648,7 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
             if not isinstance(exc, GatewayRPCError):
                 # Transport loss, timeout or cancel before the ack: the owner may hold this admission.
                 # Keep its identity for the editor's retry of the same prompt (latest 64 sessions).
-                self._unacked[session_id] = (retry_key, input_id, staged)
+                self._unacked[session_id] = (retry_key, input_id)
                 while len(self._unacked) > 64:
                     self._unacked.pop(next(iter(self._unacked)))
             self._pending_cancels.discard(session_id)
@@ -709,16 +720,11 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         """``(retry_key, input_id, (text, attachments))`` for one ACP prompt, or None when the editor's Stop
         arrived while it was staged."""
         from acp_adapter.content import _content_blocks_to_openai_user_content
-        from acp_adapter.gateway_media import stage_user_content, submit_fingerprint
+        from acp_adapter.gateway_media import stage_user_content
         content = _content_blocks_to_openai_user_content(prompt)
-        retry_key = submit_fingerprint(session_id, content)
         # Only this session's very next prompt may be the editor's retry of an un-acked submit; any
         # prompt (slash work included) retires the retained identity, so a later repeat is new work.
         retained = self._unacked.pop(session_id, None)
-        if retained is not None and retained[0] == retry_key:
-            # The retry resends what the owner may already hold: the staged content and input_id are
-            # reused, never prepared (a remote image fetched) a second time.
-            return retained
         # The editor's Stop during staging (a remote image download) is held like one during the
         # submit itself, and the prompt then ends without being sent.
         self._submitting.add(session_id)
@@ -729,7 +735,10 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         if session_id in self._pending_cancels:
             self._pending_cancels.discard(session_id)
             return None
-        return retry_key, uuid.uuid4().hex, staged
+        text, attachments = staged
+        retry_key = _submit_fingerprint(session_id, text, attachments)
+        input_id = retained[1] if retained is not None and retained[0] == retry_key else uuid.uuid4().hex
+        return retry_key, input_id, staged
 
     async def _settled_receipt(self, client, held_id, session_id, receipt):
         admission_id = receipt["admission_id"]

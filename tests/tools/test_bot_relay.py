@@ -108,7 +108,7 @@ def test_resolve_ambiguous_handle_across_connections(root):
 # ── outbox / replies ─────────────────────────────────────────────────────────
 
 
-def test_enqueue_claim_is_atomic_and_single_shot(root):
+def test_enqueue_claim_replays_exact_identity_until_reply(root):
     bot_relay.write_remote_roster(root, _rows())
     roster = bot_relay.read_remote_roster(root)
     target = bot_relay.resolve_remote_target("researcher", roster)
@@ -120,8 +120,39 @@ def test_enqueue_claim_is_atomic_and_single_shot(root):
     assert [e["id"] for e in claimed] == [env["id"]]
     assert claimed[0]["target_connection"] == "ssh-vps"
     assert claimed[0]["message"] == "hi"
-    # second drain: nothing (no double delivery)
+    # Reconnect replays the same admission identity, never a fresh turn, and the pin's single
+    # replay path never stamps a bounded re-offer beside it.
+    assert bot_relay.claim_pending_envelopes(root) == claimed
+    claimed_path = bot_relay.relay_root(root) / bot_relay.CLAIMED_DIR / f"{env['id']}.json"
+    assert "reoffered_at" not in json.loads(claimed_path.read_text(encoding="utf-8"))
+    bot_relay.write_reply(root, env["id"], reply="done")
     assert bot_relay.claim_pending_envelopes(root) == []
+
+
+def test_pre_upgrade_claim_settles_unknown_instead_of_stranding_its_waiter(root):
+    """A claimed envelope from the old lane (no ``canonical_delivery_v1``) is never replayed into the
+    authority, but its waiter must still resolve: once the old drain's re-offer point passes it gets
+    a terminal ``unknown`` reply (not auto-retryable) and is never handed out again."""
+    from tools.bot_failure_reasons import UNKNOWN, is_auto_retryable
+
+    base = bot_relay._ensure_dirs(root)
+    legacy = {"id": "a" * 32, "created_at": int(_time2.time()) - 60, "from_profile": "default",
+              "from_handle": "hermes", "target_connection": "cloud-1", "target_profile": "default",
+              "target_handle": "hermes", "message": "legacy"}
+    path = base / bot_relay.CLAIMED_DIR / f"{legacy['id']}.json"
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+    reply_path = base / bot_relay.REPLIES_DIR / f"{legacy['id']}.json"
+    claimed_at = _time2.time() - 60
+    _os2.utime(path, (claimed_at, claimed_at))
+    assert bot_relay.claim_pending_envelopes(root) == []
+    assert not reply_path.exists()  # inside the old lane's in-flight window: no verdict yet
+
+    claimed_at = _time2.time() - bot_relay.REOFFER_AFTER_SECONDS - 10
+    _os2.utime(path, (claimed_at, claimed_at))
+    assert bot_relay.claim_pending_envelopes(root) == []
+    reply = json.loads(reply_path.read_text(encoding="utf-8"))
+    assert reply["reason"] == UNKNOWN and not is_auto_retryable(reply["reason"])
+    assert reply["error"] and not reply["reply"]
 
 
 def test_claim_skips_non_dict_envelope(root):

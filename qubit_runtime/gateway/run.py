@@ -4622,6 +4622,30 @@ def _housekeeping_channel_directory(adapters, loop) -> None:
             fut.result(timeout=30)
 
 
+def _housekeeping_media_caches() -> None:
+    """Every platform media cache prunes on the same hourly cadence (24h max age)."""
+    from gateway.platforms.base import (
+        cleanup_audio_cache, cleanup_document_cache, cleanup_image_cache, cleanup_screenshot_cache,
+        cleanup_video_cache)
+    from tools.tool_result_storage import cleanup_spillover_cache
+    from tools.environments.local import cleanup_terminal_temp_cache
+    from tools.bot_mode_dm import cleanup_bot_dm_cache
+    from tools.bot_relay import cleanup_bot_relay_artifacts
+    from agent.provider_media import MEDIA_CACHE_MAX_AGE_HOURS
+
+    for cache_name, cleanup_fn in (
+        ("Image", cleanup_image_cache), ("Document", cleanup_document_cache),
+        ("Audio", cleanup_audio_cache), ("Video", cleanup_video_cache),
+        ("Screenshot", cleanup_screenshot_cache), ("Spillover", cleanup_spillover_cache),
+        ("Terminal temp", cleanup_terminal_temp_cache), ("Bot DM", cleanup_bot_dm_cache),
+        ("Bot relay", cleanup_bot_relay_artifacts)):
+        def _one(name=cache_name, fn=cleanup_fn):
+            removed = fn(max_age_hours=MEDIA_CACHE_MAX_AGE_HOURS)
+            if removed:
+                logger.info("%s cache cleanup: removed %d stale file(s)", name, removed)
+        _housekeeping_chore(f"{cache_name} cache cleanup", _one)
+
+
 def _housekeeping_paste_sweep() -> None:
     from qubit_cli.debug import _sweep_expired_pastes
     deleted, remaining = _sweep_expired_pastes()
@@ -4800,14 +4824,9 @@ def _start_gateway_housekeeping(
         # whichever gateway is live; drained here (not the scheduler tick) so external providers get it too.
         chores.append((1, DRAIN_LABEL, lambda: _drain_restart_safe_cron_deliveries(adapters, loop, runner)))
 
-    def _media_cache_chore():
-        # Function-local import: ``run_housekeeping_disk`` imports from this module,
-        # so a module-level import here would be circular.
-        from gateway.run_housekeeping_disk import housekeeping_media_caches
-        return housekeeping_media_caches()
     chores += [
         (5, "Channel directory refresh", lambda: adapters and _housekeeping_channel_directory(adapters, loop)),
-        (60, "Media cache cleanup", _media_cache_chore),
+        (60, "Media cache cleanup", _housekeeping_media_caches),
         (60, "Paste sweep", _housekeeping_paste_sweep)]
     # Low disk + auto-prune undecided: ask on the home channel (two syscalls; snoozed per post).
     def _post_auto_prune_prompt():
