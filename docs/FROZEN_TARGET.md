@@ -62,14 +62,14 @@ Baseline at the re-freeze (2026-10-17, first complete-blob read of the pin):
 | metric | at freeze | now (2026-10-21) |
 |---|---|---|
 | upstream `.py` files | 9,503 | 9,503 |
-| absent files | 974 | 286 |
-| short_port files / symbols | 610 / 1,649 | 155 / 309 |
+| absent files | 974 | 283 |
+| short_port files / symbols | 610 / 1,649 | 116 / 253 |
 | behind_head files / symbols | 0 / 0 | 0 / 0 |
-| **total missing symbols** | **2,623** | **309** |
+| **total missing symbols** | **2,623** | **253** |
 | — production | — | **1** (declared exclusion) |
-| — tests (non-blocking) | — | 594 |
+| — tests (non-blocking) | — | 535 |
 
-Closed since the freeze: **2,314 symbols** (~88% of the gap). The verdict is driven by
+Closed since the freeze: **2,370 symbols** (~90% of the gap). The verdict is driven by
 PRODUCTION only — tests cannot block retiring hermes. The one remaining production symbol
 is `gateway/status.py::_gateway_lock_handle`, declared by owner sign-off (see the table
 above); the audit does not subtract declared exclusions, so it still prints `NOT AT TARGET

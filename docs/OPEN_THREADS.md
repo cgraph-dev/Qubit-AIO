@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 22 — 2026-10-22 (253 missing; 103 wave-20 xfails)
+
+- ✅ 4 continuation lanes: 69 more wave-20 defects fixed (172 → 103), 40 more test files (27 new wave-22 xfails), shared/relay metrics, plugin FIFO, legacy routes, update stop reasons, TUI model/profile scope.
+- ✅ EG2 voice benchmark: EG2 q4 94.5% top-1 vs EG1 93.2%, nomic 90.4%, deterministic 92.5%; `det→EG2 on UNKNOWN` 97.3%. Not safe as a replacement (1 high-risk misroute, missed e-stop). Opt-in L1.5 only, with risk veto.
+- ✅ Measured: absent **286 → 283**; short-port **155/309 → 116/253**; total **309 → 253**; production **1** (declared B1); dead **0**.
+- 🔴 Remaining: 103 wave-20 + 27 wave-22 xfails; 283 absent + 253 short-port test symbols.
+- ✅ Live applied. No global E2E/release verdict.
+
 ## Wave 21 — 2026-10-22 (83 defects fixed)
 
 - ✅ Fixed 83 of the 255 wave-20 defects across gateway, CLI/agent, and TUI/hosted/ACP; wave-20 xfails **255 → 172**, 0 new.
