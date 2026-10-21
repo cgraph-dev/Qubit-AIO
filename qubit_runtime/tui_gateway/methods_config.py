@@ -507,6 +507,9 @@ def _(rid, params: dict) -> dict:
     and consent lives with the CALLER (privacy notice first). Structured ``ok``/``error`` envelope so
     upload failures render inline. Optional: ``error_context`` (-> ``error-context.txt``),
     ``extra_files`` ({label -> text}), ``log_lines`` (default 200); all force-redacted."""
+    # Outside the try: the except path needs it, and agent.redact is a hard dependency.
+    from qubit_cli.debug_redaction import redact_debug_support_text
+
     try:
         from qubit_cli.debug import build_nous_bundle, collect_share_bundle
         from qubit_cli.diagnostics_upload import share_to_nous
@@ -532,7 +535,7 @@ def _(rid, params: dict) -> dict:
         return _ok(rid, {"ok": True, "view_url": view_url, "upload_id": upload_id,
                          "expires_at": res.get("expiresAt") or res.get("expires_at")})
     except Exception as e:
-        return _ok(rid, {"ok": False, "error": str(e)})
+        return _ok(rid, {"ok": False, "error": redact_debug_support_text(e)})
 
 
 def register(server) -> None:

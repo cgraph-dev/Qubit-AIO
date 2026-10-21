@@ -223,7 +223,6 @@ def test_redacted_support_egress_scrubs_structured_values_and_errors(
     assert max(scrubbed_sizes) <= 3 * 8_000
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a support-upload failure tail leaks a structured error canary")
 def test_support_upload_failure_tail_is_scrubbed_idempotently(monkeypatch):
     import qubit_cli.debug_redaction as dr
     import qubit_cli.diagnostics_upload as du

@@ -175,7 +175,6 @@ def test_session_redirect_queues_while_compressing(monkeypatch):
     assert seen == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a Stop during manual compaction interrupts the compressor instead of holding the busy claim")
 def test_submit_during_manual_compress_is_queued_and_reply_persists(monkeypatch):
     """A prompt sent while session.compress runs its LLM summary used to be admitted on the idle
     session, snapshot history_version N, and lose its reply when the compaction committed N+1."""

@@ -41,7 +41,6 @@ def _windows(home: Path) -> list[tuple]:
         return conn.execute("SELECT opened_at, closed_at FROM send_consent_windows ORDER BY rowid").fetchall()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared_metrics.set reports the fork reask flag instead of the pin decided-only contract")
 def test_send_without_collection_is_normalized_off_and_closes_the_consent_window(tmp_path, monkeypatch):
     launch, worker = _bind_homes(monkeypatch, tmp_path)
 
@@ -61,7 +60,6 @@ def test_send_without_collection_is_normalized_off_and_closes_the_consent_window
     assert not (launch / "telemetry").exists()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared_metrics.status keeps reask true after an enabled:false setup answer instead of marking it decided")
 def test_status_is_undecided_until_a_key_is_written(tmp_path, monkeypatch):
     _launch, worker = _bind_homes(monkeypatch, tmp_path)
 
@@ -86,7 +84,6 @@ def test_only_the_first_run_answer_records_desktop_setup_completed(tmp_path, mon
     assert calls == [{"surface": "desktop", "provider": "nous"}]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: opting out does not purge pending installer/update receipts")
 def test_an_opt_out_purges_receipts_kept_for_a_later_start(tmp_path, monkeypatch):
     """A Desktop "No" must not leave an installer receipt or a parked update receipt for a later opt-in
     to count; only the named profile is touched."""

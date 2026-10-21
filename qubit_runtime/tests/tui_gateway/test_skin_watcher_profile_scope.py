@@ -76,7 +76,6 @@ def test_watcher_never_pushes_the_launch_home_skin_onto_a_profile_tui(homes):
     assert _skins(peer) == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a profile skin switch does not repaint that profile's TUI")
 def test_profile_skin_switch_repaints_only_that_profiles_tui(homes):
     server, default, work = homes
     work_peer, default_peer = _Peer(skin_home=str(work)), _Peer()

@@ -55,7 +55,6 @@ def test_inherit_launch_model_carries_a_custom_providers_endpoint(monkeypatch, t
 
 
 @pytest.mark.parametrize("written", ["http://127.0.0.1:11434/v1", "${LAB_URL}"])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: profile inheritance drops a bare custom endpoint base_url and the pin rejects the provider")
 def test_inherit_launch_model_pins_a_bare_custom_endpoint(monkeypatch, tmp_path, written):
     home = tmp_path / ".qubit"
     home.mkdir()

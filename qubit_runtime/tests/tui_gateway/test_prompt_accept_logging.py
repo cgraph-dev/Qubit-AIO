@@ -120,7 +120,6 @@ def turn_stubs(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("settle_info_raises", [False, True])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: post-turn trim runs before the turn settles and its finished bookend")
 def test_turn_settles_before_post_turn_trim(turn_stubs, monkeypatch, caplog, settle_info_raises):
     """A blocked post-turn trim must not hold the session running or its bookend (#131740);
     turn audio still ends BEFORE settlement, so a next turn admitted during the trim keeps its own."""

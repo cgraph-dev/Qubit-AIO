@@ -86,7 +86,6 @@ def resume_path(monkeypatch):
     pytest.param({}, id="cold"),
     pytest.param({"defer_history": True}, id="deferred"),
 ])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: resume does not repair the persisted profile workspace cwd")
 def test_every_resume_path_repairs_the_saved_workspace(resume_path, flags):
     run, home = resume_path
     assert run(flags) == str(home)

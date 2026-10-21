@@ -85,7 +85,6 @@ def _store_files(profile_dir, mtime_ns: int) -> None:
         os.utime(profile_dir / name, ns=(mtime_ns, mtime_ns))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: profile roster memo masks a same-tick same-size WAL rewrite")
 def test_a_same_tick_same_size_wal_rewrite_is_not_masked(tmp_path):
     """A commit in the mtime tick the memo was filled in, rewriting the WAL in place at the same
     size (after a restart checkpoint), leaves every ``(mtime_ns, size)`` unchanged: a store that

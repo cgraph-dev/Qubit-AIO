@@ -23,6 +23,5 @@ def test_local_completion_joins_fifo_without_an_observer(tmp_path, source):
     _probe(tmp_path, source)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a crash-recovered local automation turn replays its committed input (duplicate model request)")
 def test_local_completion_survives_owner_kill_without_duplicate(tmp_path):
     _probe(tmp_path, 'restart')

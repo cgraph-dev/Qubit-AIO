@@ -19352,7 +19352,6 @@ def test_notification_poller_requeues_when_busy(monkeypatch):
             process_registry.completion_queue.get_nowait()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: session.save omits the importable id/started_at/system_prompt fields")
 def test_session_save_writes_under_qubit_home_with_system_prompt(monkeypatch, tmp_path):
     """TUI /save (session.save RPC) must snapshot under the Hermes profile
     home — not the project/workspace CWD — and include the system prompt,

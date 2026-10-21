@@ -163,7 +163,6 @@ def _live_agent(session, tokens, model="deepseek/deepseek-v4.1-flash"):
 
 
 class TestLargeContextPickAsksBeforeStashing:
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the large-context guard is not evaluated at pick time")
     def test_session_at_the_threshold_is_asked_at_pick_time(self, running_session, threshold):
         _live_agent(running_session, threshold)
 
@@ -210,7 +209,6 @@ class TestLargeContextPickAsksBeforeStashing:
         assert running_session["pending_model_switch"]["raw"] == UNGUARDED_MODEL
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a bare pick is not price-guarded against the live provider")
 def test_bare_pick_is_guarded_against_the_live_provider(running_session, monkeypatch):
     """A pick without --provider resolves against the live provider at turn start, so a
     provider-keyed price check must see that provider at pick time or it drops the pick later."""
@@ -227,7 +225,6 @@ def test_bare_pick_is_guarded_against_the_live_provider(running_session, monkeyp
 
 
 class TestDroppedQueuedPickIsLogged:
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a dropped queued pick leaves no server log line")
     def test_turn_start_drop_leaves_a_server_log_line(self, monkeypatch, caplog):
         import logging
         session = _session(pending_model_switch={
@@ -263,7 +260,6 @@ class TestDroppedQueuedPickIsNotATurnError:
         server._apply_pending_model_switch("sid", session)
         return [a[0] for a in emitted], emitted
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a guarded dropped pick emits an error frame instead of a warning")
     def test_guarded_drop_is_a_warning_and_resyncs_the_pill(self, monkeypatch):
         kinds, emitted = self._run(
             monkeypatch, lambda *_a, **_kw: {"confirm_required": True, "confirm_message": "guarded"})
@@ -274,7 +270,6 @@ class TestDroppedQueuedPickIsNotATurnError:
         assert "\n" not in notice["text"], "the guard banner belongs in the re-pick confirm, not the toast"
         assert "session.info" in kinds
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a failed queued switch emits an error frame instead of a warning")
     def test_failed_switch_is_a_warning(self, monkeypatch):
         def _boom(*_a, **_kw):
             raise ValueError("no credentials")
