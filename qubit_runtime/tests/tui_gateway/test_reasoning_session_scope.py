@@ -56,7 +56,6 @@ class TestSessionInfoReasoningEffort:
         assert info["reasoning_effort"] == ""
         assert info["reasoning_effort_wire"] == ""
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: codex app-server ultra effort is not sent verbatim")
     def test_wire_level_is_what_the_route_actually_sends(self) -> None:
         """`ultra` is a Hermes-internal step (#61634): the route clamps it, and the Desktop must be able to
         say so ("ultra sends max on this route") instead of presenting Ultra as a distinct wire level."""
@@ -146,7 +145,6 @@ class TestSessionNoneReachesDeepSeekWire:
         kw = server._deferred_build_agent_kwargs(session, session_db=None)
         assert kw["reasoning_config_override"] == {"enabled": False}
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: reasoning effort none still emits thinking enabled")
     def test_effort_none_override_emits_thinking_disabled(self) -> None:
         import model_tools
         import providers

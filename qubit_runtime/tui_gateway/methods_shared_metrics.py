@@ -21,7 +21,10 @@ def _shared_metrics_consent(cfg) -> dict:
     """The one ``{enabled, send, decided}`` reading every surface shares (CLI offer included)."""
     from qubit_cli.observability.shared_metrics_consent import consent_state
 
-    return consent_state(cfg)
+    state = consent_state(cfg)
+    # The RPC contract is decided-only: any recorded answer settles the Desktop strip, whose own
+    # first-run gate is the question. The CLI's pre-version re-ask stays in ``consent_state``.
+    return {**state, "decided": state["decided"] or state["reask"], "reask": False}
 
 
 def _shared_metrics_record_setup_completed(cfg) -> None:
@@ -71,8 +74,11 @@ def _(rid, params: dict) -> dict:
     _record_send_consent_change(enabled=send)
     if not enabled:
         from qubit_cli.observability.shared_metrics_desktop import purge_onboarding_latches
+        from qubit_cli.observability.shared_metrics_process import purge_pending_receipts
+        from qubit_constants import get_qubit_home
 
         purge_onboarding_latches()
+        purge_pending_receipts(get_qubit_home())
     if params.get("first_run") is True:
         _shared_metrics_record_setup_completed(cfg)
     return _ok(rid, _shared_metrics_consent(cfg))

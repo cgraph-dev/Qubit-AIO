@@ -67,7 +67,7 @@ def bootstrap(start: bool, recover: bool = False) -> dict:
                 "QUBIT_INFERENCE_PROVIDER", "QUBIT_TUI_TOOLSETS", "QUBIT_TUI_SKILLS",
                 "QUBIT_CWD", "TERMINAL_CWD", "QUBIT_YOLO", "QUBIT_ACCEPT_HOOKS",
                 "QUBIT_TUI_CHECKPOINTS", "QUBIT_TUI_PASS_SESSION_ID", "QUBIT_KANBAN_BOARD",
-                "QUBIT_TUI_CLIENT_ENV"):
+                "HERMES_KANBAN_BOARD", "QUBIT_TUI_CLIENT_ENV"):
         os.environ.pop(key, None)
     receipt = (ensure_gateway_runtime(home, timeout=30, idle_exit=True) if start
                else discover_gateway_endpoint(home, timeout=5))
