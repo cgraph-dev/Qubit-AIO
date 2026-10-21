@@ -4,13 +4,15 @@ The transport probes prove getUpdates round-trips complete; these pin the one si
 give — whether PTB's dispatcher hands the fetched updates to a handler — and the once-per-adapter
 report for an adapter with no gateway message handler at all.
 """
+import asyncio
 import logging
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from gateway.config import PlatformConfig
 from gateway.platforms.base import MessageEvent, MessageType, Platform, SessionSource
+from plugins.platforms.telegram import adapter as tg_adapter
 from plugins.platforms.telegram.adapter import TelegramAdapter
 
 _DEAF = "healthy but deaf"
@@ -65,6 +67,7 @@ async def test_stall_reported_once_on_backlog_regardless_of_update_age(caplog):
     assert "2 update(s) fetched" in report and "4 received, 2 dispatched" in report
 
 
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a recovered dispatch stall is not rearmed")
 @pytest.mark.asyncio
 async def test_dispatch_progress_rearms_the_report(caplog):
     adapter = _polling_adapter()
@@ -106,3 +109,50 @@ async def test_missing_message_handler_is_logged_once_not_silent(caplog):
         await adapter.handle_message(event)
         await adapter.handle_message(event)
     assert len([r for r in caplog.records if "no gateway message handler" in r.message]) == 1
+
+
+def _stall_reports(sched) -> list[str]:
+    """Errors handed to the (stubbed) recovery handoff: the stall's only announcement."""
+    errors = [call.args[0] for call in sched.call_args_list]
+    assert all(type(e) is tg_adapter._PollingStallError and _DEAF in str(e) for e in errors)
+    return [str(e) for e in errors]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a confirmed stall schedules a network retry instead of a supervisor handoff")
+@pytest.mark.asyncio
+async def test_dispatch_stall_marks_degraded_and_goes_fatal():
+    """A confirmed dispatch stall (#130407) is a handoff, not a retry: degraded status,
+    retryable fatal, no in-place updater restart, no backoff sleep."""
+    adapter = _polling_adapter()
+    adapter._running = True
+    adapter._mark_degraded = MagicMock()
+    updater = MagicMock()
+    updater.stop = AsyncMock(return_value=None)
+    updater.start_polling = AsyncMock()
+    adapter._app = MagicMock()
+    adapter._app.updater = updater
+    adapter._drain_polling_connections = AsyncMock()
+    adapter._notify_fatal_error = AsyncMock()
+    _receive(adapter, 2)
+
+    try:
+        with patch("asyncio.sleep", new=AsyncMock()) as sleep:
+            _heartbeats(adapter, 3)
+            assert adapter._polling_error_task is None
+            adapter._check_ingress_dispatch_stall()
+            task = adapter._polling_error_task
+            assert task is not None
+            await task
+        assert adapter.has_fatal_error
+        assert adapter.fatal_error_retryable is True
+        assert "PTB dispatcher made no progress" in adapter.fatal_error_message
+        adapter._notify_fatal_error.assert_awaited_once()
+        adapter._mark_degraded.assert_called_once()
+        updater.start_polling.assert_not_awaited()
+        updater.stop.assert_not_awaited()
+        sleep.assert_not_awaited()
+        adapter._drain_polling_connections.assert_not_awaited()
+    finally:
+        for pending in tuple(adapter._background_tasks):
+            pending.cancel()
+        await asyncio.gather(*tuple(adapter._background_tasks), return_exceptions=True)

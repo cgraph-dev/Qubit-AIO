@@ -323,3 +323,36 @@ def test_multiplexed_plugin_update_check_visits_every_served_profiles_plugins(tw
     assert checked == [(a / "plugins", False), (b / "plugins", True)]
     assert (a / "plugin-update-checks" / "last-run").exists()
     assert (b / "plugin-update-checks" / "last-run").exists()
+
+
+def test_multiplexed_credential_chores_run_once_per_profile_in_its_own_scope(two_homes, monkeypatch, caplog):
+    """Under multiplex every credential-reading chore visits each served profile inside ITS scope:
+    A's tick reads A's override, B's reads B's (B never sees A's), and no fail-closed credential
+    read fires the ``no profile secret scope`` warning. The ambient home is untouched afterwards."""
+    from agent.secret_scope import set_multiplex_active
+    from qubit_constants import get_qubit_home
+
+    a, b = two_homes
+    seen = _record_credential_chores(monkeypatch)
+    set_multiplex_active(True)
+    try:
+        with caplog.at_level(logging.WARNING):
+            _run_60_ticks(SimpleNamespace(config=SimpleNamespace(multiplex_profiles=True)))
+    finally:
+        set_multiplex_active(False)
+
+    expected = [(a.name, "https://a.example/v1"), (b.name, "https://b.example/v1")]
+    assert seen == {"sync": expected, "org": expected, "curator": expected}
+    assert not [r for r in caplog.records if "no profile secret scope" in r.getMessage()]
+    assert get_qubit_home() == a
+
+
+def test_single_profile_credential_chores_run_once_against_the_process_home(two_homes, monkeypatch):
+    """Control: a single-profile gateway (multiplex off) still runs each chore exactly once against
+    the process home — the named profile directory on disk is not visited."""
+    a, _b = two_homes
+    seen = _record_credential_chores(monkeypatch)
+
+    _run_60_ticks(SimpleNamespace(config=SimpleNamespace(multiplex_profiles=False)))
+
+    assert {k: [h for h, _ in v] for k, v in seen.items()} == {"sync": [a.name], "org": [a.name], "curator": [a.name]}
