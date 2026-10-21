@@ -45,7 +45,6 @@ def test_untoggled_entry_keeps_launch_yolo_after_restart_but_explicit_off_stays_
     assert restarted(revoked.session_key) == 'ENABLED False', 'owner /yolo OFF revived by the launch policy'
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: launch --yolo is not re-seeded after a session boundary")
 def test_launch_yolo_reseeds_after_a_session_boundary(tmp_path):
     """``apply_launch_yolo``: seeded once per session boundary; /new clears the toggle, not the launch."""
     import gateway.run as gateway_run

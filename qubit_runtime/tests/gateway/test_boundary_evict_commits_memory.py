@@ -30,7 +30,6 @@ def _agent(calls):
     return agent
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: GatewayRunner has no _evict_cached_agent_at_boundary")
 def test_boundary_evict_commits_the_transcript_before_releasing(monkeypatch):
     runner = _runner(monkeypatch)
     calls = []
@@ -40,7 +39,6 @@ def test_boundary_evict_commits_the_transcript_before_releasing(monkeypatch):
     assert 'route' not in runner._agent_cache
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: GatewayRunner has no _evict_cached_agent_at_boundary")
 def test_boundary_evict_commits_for_a_context_engine_without_a_provider(monkeypatch):
     """``commit_memory_session`` also ends the context engine's session; that engine runs without any
     external memory provider, so ``_memory_manager`` alone must not gate the boundary commit."""
@@ -54,7 +52,6 @@ def test_boundary_evict_commits_for_a_context_engine_without_a_provider(monkeypa
     assert calls == [('commit', [{'role': 'user', 'content': 'hi'}]), ('release', None)]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: GatewayRunner has no _evict_cached_agent_at_boundary")
 def test_evicts_with_nothing_to_notify_only_release(monkeypatch):
     """No provider and no engine: neither kind of evict has anything to commit. A resource evict with
     only an engine keeps the conversation open and does not end the engine's session either."""
