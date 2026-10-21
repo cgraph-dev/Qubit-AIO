@@ -120,7 +120,7 @@ DURATION_BUCKETS = frozenset({
 })
 COUNT_BUCKETS = frozenset({"0", "1", "2", "3_to_5", "6_to_10", "gte_11"})
 TOOL_CATEGORIES = frozenset({
-    "browser", "code_execution", "communication", "computer_use", "delegation", "file",
+    "browser", "code_execution", "communication", "computer_use", "connector", "delegation", "file",
     "home_automation", "mcp", "media", "memory", "other", "planning", "project", "scheduler",
     "skill", "terminal", "unknown", "web",
 })
@@ -1677,6 +1677,13 @@ _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
         "event": FEATURE_DISABLED_EVENTS, "kind": FEATURE_DISABLED_KINDS, "surface": FEATURE_DISABLED_SURFACES,
     },
     # ---- end v5 signals ----
+    # ---- v4 connectors ----
+    TOOL_SEARCH_METRIC: {"hits_bucket": COUNT_BUCKETS, "outcome": TOOL_SEARCH_OUTCOMES, "scope": TOOL_SEARCH_SCOPES},
+    TOOL_BATCH_METRIC: {"connector_share": CONNECTOR_SHARES, "size_bucket": COUNT_BUCKETS},
+    CONNECTOR_CHAIN_METRIC: {
+        "described_first": YES_NO, "outcome": TOOL_OUTCOMES, "searches_before_bucket": COUNT_BUCKETS,
+    },
+    # ---- end v4 connectors ----
 }
 _MODEL_ROUTE_MAX_LENGTHS = {
     "model": MODEL_IDENTIFIER_MAX_LENGTH, "provider": PROVIDER_IDENTIFIER_MAX_LENGTH,
@@ -1718,6 +1725,7 @@ _IDENTIFIER_FIELDS: dict[str, dict[str, int]] = {
     PROVIDER_SETUP_METRIC: {"provider": PROVIDER_IDENTIFIER_MAX_LENGTH},
     FEATURE_DISABLED_METRIC: {"name": FEATURE_DISABLED_NAME_MAX_LENGTH},
     # ---- end v5 signals ----
+    TOOL_BATCH_METRIC: _MODEL_ROUTE_MAX_LENGTHS,
 }
 # ---- v5 engagement ----
 # Conversation volume on the session row: new fields, so rows recorded before them still package.
@@ -1842,6 +1850,8 @@ _DECISION_MARK_METRICS = {
     # ---- iuf c2 ----
     INSTALL_RUN_MARK: INSTALL_RUN_METRIC,
     # ---- end iuf c2 ----
+    TOOL_SEARCH_MARK: TOOL_SEARCH_METRIC, TOOL_BATCH_MARK: TOOL_BATCH_METRIC,
+    CONNECTOR_CHAIN_MARK: CONNECTOR_CHAIN_METRIC,
 }
 
 
@@ -2366,6 +2376,8 @@ _TOOL_CATEGORY_PREFIXES = (
 
 def tool_category(kwargs: dict[str, Any]) -> str:
     """Map Qubit registry toolset metadata to a low-cardinality category."""
+    if _norm(kwargs.get("tool_name")).startswith(CONNECTOR_NAME_PREFIX):
+        return "connector"
     toolset = _norm(kwargs.get("toolset"))
     if not toolset:
         return "unknown"
@@ -2424,12 +2436,14 @@ def tool_terminal_fields(
 
 
 def tool_metric_name(kwargs: dict[str, Any]) -> str:
-    """A built-in tool's own name; MCP and plugin tools collapse to their source kind."""
+    """A built-in or bridge tool's own name; connector, MCP and plugin tools collapse to their kind."""
     name = _norm(kwargs.get("tool_name"))
-    if name in BUILTIN_TOOL_NAMES:
+    if name in BUILTIN_TOOL_NAMES or name in BRIDGE_TOOL_NAMES:
         return name
     if not name:
         return "unknown"
+    if name.startswith(CONNECTOR_NAME_PREFIX):
+        return "connector"
     return "mcp" if name.startswith("mcp_") or tool_category(kwargs) == "mcp" else "plugin"
 
 
