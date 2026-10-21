@@ -65,7 +65,6 @@ def test_lost_ack_reconciles_frozen_delivery_once(tmp_path, monkeypatch):
             db.close()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: test_cron_recovery.py test_failed_manual_run_exits_nonzero")
 def test_failed_manual_run_exits_nonzero(monkeypatch):
     from qubit_cli import cron
     monkeypatch.setattr(cron, '_cron_api', lambda **kw: {'success': True, 'job': {'executed': True, 'execution_success': False}})
