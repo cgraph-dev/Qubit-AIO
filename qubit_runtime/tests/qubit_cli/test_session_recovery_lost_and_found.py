@@ -1218,3 +1218,39 @@ def test_recover_attempts_survive_dump_stderr_beyond_pipe_buffer(tmp_path: Path)
     # The stderr tail is load-bearing: the caller keys the header-zeroing retry
     # on "not a database" appearing in it, so the drain must preserve it.
     assert "file is not a database" in attempts[-1]["dump_stderr_tail"]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the lost-and-found mapper counts a runtime-schema sessions row unrecognized")
+def test_store_created_at_runtime_schema_maps_source_by_name(tmp_path: Path) -> None:
+    """A store CREATED at the runtime-authority schema carries runtime_revision /
+    runtime_generation right after ``id`` (declared order), so its source cell sits
+    at index 3, not 1. The classifier must still see a sessions record and the
+    mapper must land ``source`` by name rather than reject the population."""
+    output = tmp_path / "mapped.db"
+    SessionDB(db_path=output).close()
+    dest = sqlite3.connect(str(output), isolation_level=None)
+    lf = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        columns = [str(r[1]) for r in dest.execute("PRAGMA table_info(sessions)")]
+        assert columns[:4] == ["id", "runtime_revision", "runtime_generation", "source"]
+        row = {"id": "20260909_090909_fff006", "runtime_revision": 0, "runtime_generation": 0,
+               "source": "telegram", "started_at": 1_754_000_000.0, "title": "fresh runtime store"}
+        cells = tuple(row.get(c) for c in columns)
+        assert classify_lost_and_found_row(len(cells), cells) == "sessions"
+        lf.execute(
+            "CREATE TABLE lost_and_found (rootpgno INTEGER, pgno INTEGER, nfield INTEGER, id INTEGER, "
+            + ", ".join(f"c{i}" for i in range(len(cells))) + ")"
+        )
+        lf.execute(
+            f"INSERT INTO lost_and_found VALUES ({', '.join('?' for _ in range(4 + len(cells)))})",
+            [2, 5, len(cells), 1, *cells],
+        )
+        dest.execute("PRAGMA foreign_keys=OFF")
+        report = map_lost_and_found_rows(lf, dest)
+        assert report["mapped"]["sessions"] == 1
+        assert report["unrecognized_layout_rows"] == 0
+        assert dest.execute("SELECT source, title FROM sessions WHERE id = ?", (row["id"],)).fetchone() == (
+            "telegram", "fresh runtime store")
+    finally:
+        lf.close()
+        dest.close()
