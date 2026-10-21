@@ -11,6 +11,8 @@ reaches ``_run_agent`` is byte-identical on all three turns.
 
 from __future__ import annotations
 
+import sys
+import types
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -423,13 +425,41 @@ async def test_internal_event_never_reuses_prompt_pin_from_another_privacy_polic
     assert calls[0]["channel_prompt"] == "Channel hint."
 
 
+class _TurnAgent:
+    """AIAgent stand-in: keeps the resolved route, answers without an API call."""
+
+    instances = 0
+
+    def __init__(self, *args, **kwargs):
+        type(self).instances += 1
+        self.model = kwargs.get("model")
+        self.provider = kwargs.get("provider")
+        self.base_url = kwargs.get("base_url")
+        self.session_id = kwargs.get("session_id")
+        self.tools = []
+        self.request_overrides = dict(kwargs.get("request_overrides") or {})
+        # Mirror AIAgent.__init__: the welcome host pins its one model, and the primary
+        # route is snapshotted for the post-turn fallback classifier.
+        from qubit_cli.anon_auth import pin_model_for_route
+        self.model = pin_model_for_route(self.provider, self.base_url, self.model)
+        self._primary_runtime = {"model": self.model, "provider": self.provider, "base_url": self.base_url}
+
+    def run_conversation(self, user_message, conversation_history=None, task_id=None, **kwargs):
+        return {
+            "final_response": "ok",
+            "messages": (conversation_history or []) + [
+                {"role": "user", "content": user_message},
+                {"role": "assistant", "content": "ok"},
+            ],
+            "api_calls": 1,
+        }
+
+
 @pytest.mark.parametrize(
     "runtime, global_model, expected_model",
     [
-        pytest.param({"api_key": "fake", "provider": "openrouter"}, "default/model", "chan/model",
-                     marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: channel model overrides the session pin")),
-        pytest.param({"api_key": "fake", "provider": "nous", "base_url": _WELCOME}, "nous/welcome", "nous/welcome",
-                     marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: welcome host does not pin its model")),
+        ({"api_key": "fake", "provider": "openrouter"}, "default/model", "chan/model"),
+        ({"api_key": "fake", "provider": "nous", "base_url": _WELCOME}, "qubit/welcome", "qubit/welcome"),
     ],
     ids=["named-channel-model", "welcome-host-pins-over-channel-model"],
 )

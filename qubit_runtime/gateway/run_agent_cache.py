@@ -257,11 +257,13 @@ class GatewayAgentCacheMixin:
         # ordinary drift and still evicts.
         return getattr(agent, "_nous_model_switch", None) == (config_model, agent.model)
 
-    def _fallback_baseline_model(self, session_key: str, source: Optional[SessionSource], agent: Any) -> str:
+    def _fallback_baseline_model(self, session_key: str, source: Optional[SessionSource], agent: Any,
+                                 *, policy_model: Optional[str] = None) -> str:
         """The model *agent* was built to run, for the post-turn fallback check: what
-        ``_resolve_session_agent_runtime`` chose (session /model, then channel_overrides on the chat,
-        thread or parent, then the global model), canonicalized as ``AIAgent.__init__`` did on the
-        agent's PRIMARY route. The route a fallback moved it to would make that fallback look primary."""
+        ``_resolve_session_agent_runtime`` chose (session /model, then a LOCAL session's frozen launch
+        policy model, then channel_overrides on the chat, thread or parent, then the global model),
+        canonicalized as ``AIAgent.__init__`` did on the agent's PRIMARY route. The route a fallback
+        moved it to would make that fallback look primary."""
         from gateway.run import _resolve_gateway_model
         primary = getattr(agent, "_primary_runtime", None) or {}
         provider = primary.get("provider", getattr(agent, "provider", "")) or ""
@@ -269,6 +271,8 @@ class GatewayAgentCacheMixin:
         override = self._session_model_override(session_key) or {}
         if override.get("model") and override.get("provider") in (None, "", provider):
             model = override["model"]
+        elif policy_model:
+            model = policy_model
         elif source is not None:
             model = self._resolve_model_for_channel(
                 source.platform, str(source.chat_id) if source.chat_id else "",

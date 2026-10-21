@@ -172,8 +172,7 @@ def test_clarify_tool_batch_route_answers_and_stops_together(adapter_cls, outcom
 
 
 @pytest.mark.parametrize(("platform", "hinted"), [
-    pytest.param("local", False, marks=pytest.mark.xfail(strict=True,
-        reason="wave-20 parity defect: the skip hint is appended on LOCAL viewers too")),
+    pytest.param("local", False),
     ("telegram", True),
 ])
 def test_skip_hint_only_on_messaging_platforms(platform, hinted):
