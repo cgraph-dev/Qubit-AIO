@@ -115,7 +115,7 @@ class TestDiscordTokenCheckedWithDiscord:
 
     @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the wizard does not validate a pasted token against Discord")
     def test_rejected_token_never_written_and_owner_added_to_allowlist(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
         standin = DiscordStandin().start()
         try:
             monkeypatch.setattr(discord_tool, "DISCORD_API_BASE", standin.api_base)
