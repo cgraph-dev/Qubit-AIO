@@ -1,3 +1,4 @@
+import pytest
 """Durable session activity projection from AIAgent._touch_activity (#72016)."""
 
 from types import SimpleNamespace
@@ -69,6 +70,25 @@ def test_touch_activity_accepts_named_provenance(monkeypatch):
     agent._session_activity_last_persist_mono = 0.0
     agent._touch_activity("starting API call #1")
     assert agent._last_activity_provenance is ActivityProvenance.UNKNOWN
+    agent._session_db.touch_session_activity.assert_called_once_with(
+        "sess-1",
+        1_700_000_000.0,
+        description="starting API call #1",
+        provenance=ActivityProvenance.UNKNOWN,
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: first activity stamp is dropped when monotonic clock is below the persist interval")
+def test_first_stamp_persists_while_monotonic_clock_is_below_interval(monkeypatch):
+    """CLOCK_MONOTONIC is roughly host uptime: on a freshly booted VM it can sit below the 60s
+    persist interval. The never-persisted / reset sentinel (0.0) must still write through."""
+    agent = _agent_with_db()
+    monkeypatch.setattr(run_agent.time, "time", lambda: 1_700_000_000.0)
+    monkeypatch.setattr(run_agent.time, "monotonic", lambda: 5.0)
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    agent._touch_activity("starting API call #1")
+
     agent._session_db.touch_session_activity.assert_called_once_with(
         "sess-1",
         1_700_000_000.0,

@@ -3,6 +3,8 @@ builder (what a fresh desktop/TUI session gets), not just the system prompt."""
 
 from __future__ import annotations
 
+import pytest
+
 from unittest.mock import MagicMock, patch
 
 from agent.conversation_loop import _restore_or_build_system_prompt
@@ -74,3 +76,20 @@ def test_stale_epoch_leaves_a_per_process_surface_alone():
 
     builder.assert_not_called()
     refresh.assert_not_called()
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: frozen gateway session policy is not consulted on toolset refresh")
+def test_frozen_session_policy_wins_over_live_surface_config():
+    """A gateway-owned session runs under its frozen launch policy: the refresh re-pins the
+    policy's toolsets and never consults the live-config surface builder."""
+    from gateway.session_policy import _ACTIVE_POLICY
+    agent, _db = _stale_bot_chat_agent("desktop")
+    token = _ACTIVE_POLICY.set(MagicMock(toolsets=("file", "web")))
+    try:
+        builder, refresh = _run_stale_refresh(agent)
+    finally:
+        _ACTIVE_POLICY.reset(token)
+
+    builder.assert_not_called()
+    assert refresh.call_args.kwargs["enabled_override"] == ["file", "web"]
+    assert refresh.call_args.kwargs.get("disabled_override") is None

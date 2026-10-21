@@ -33,6 +33,8 @@ These tests pin the floor's behavior:
 
 from __future__ import annotations
 
+import pytest
+
 from pathlib import Path
 
 
@@ -45,6 +47,13 @@ from pathlib import Path
 
 
 
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: missing Nemotron 3.5-super reasoning stale-timeout floor")
+def test_nemotron_super_reasoning_floor_matches_existing_super_family():
+    from agent.reasoning_timeouts import get_reasoning_stale_timeout_floor as floor
+
+    assert floor("nvidia/nemotron-3.5-super-vl-120b-a12b") == floor("nvidia/nemotron-3-super-120b-a12b") is not None
 
 
 def test_floor_matching_is_vendor_prefix_and_variant_suffix_transparent():
