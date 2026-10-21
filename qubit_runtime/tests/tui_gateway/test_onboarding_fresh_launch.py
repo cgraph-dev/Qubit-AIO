@@ -65,7 +65,6 @@ def _run_flag(root: Path) -> bool:
     return read_user_config_raw(root / "config.yaml")["onboarding"]["run"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_new_launch_deletes_the_unfinished_chat_and_starts_over_at_the_name_beat(root, client, ended):
     first = _start({"fresh_launch": True})
     old = first["stored_session_id"]
@@ -90,7 +89,6 @@ def test_a_new_launch_deletes_the_unfinished_chat_and_starts_over_at_the_name_be
     assert _run_flag(root) is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_second_window_or_a_reconnect_keeps_the_run(root, client, ended):
     first = _start({"fresh_launch": True})
 
@@ -100,7 +98,6 @@ def test_a_second_window_or_a_reconnect_keeps_the_run(root, client, ended):
     assert again["run_id"] == first["run_id"] and ended == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_new_launch_closes_the_unfinished_chat_still_live_here_before_deleting_it(root, client, ended, monkeypatch):
     old = _start({"fresh_launch": True})["stored_session_id"]
     closed = []

@@ -33,7 +33,6 @@ def _onboarding(home: Path) -> dict:
     return read_user_config_raw(home / "config.yaml").get("onboarding") or {}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_state_answers_run_and_eligible(launched_under_work, monkeypatch):
     root, _work = launched_under_work
     # The user's own "work" profile is install history, so an unset flag is not due, and on the
@@ -48,7 +47,6 @@ def test_state_answers_run_and_eligible(launched_under_work, monkeypatch):
     assert _call("onboarding.state")["result"]["eligible"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_set_run_writes_the_root_config(launched_under_work):
     root, work = launched_under_work
 
@@ -58,7 +56,6 @@ def test_set_run_writes_the_root_config(launched_under_work):
     assert _call("onboarding.state")["result"]["run"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_start_marks_the_first_chat_offer_in_the_root_config(launched_under_work):
     root, work = launched_under_work
 
@@ -69,7 +66,6 @@ def test_start_marks_the_first_chat_offer_in_the_root_config(launched_under_work
     assert PROFILE_BUILD_FLAG not in (_onboarding(work).get("seen") or {})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_skip_leaves_the_first_chat_offer_alone(launched_under_work):
     root, _work = launched_under_work
 

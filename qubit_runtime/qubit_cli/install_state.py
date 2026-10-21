@@ -226,7 +226,7 @@ def _active_root() -> Iterable[Path]:
 def _home_globs() -> Iterable[Path]:
     from qubit_platform.resolver import known_dirs
 
-    return _expand_all(known_dirs.hermes_home_globs())
+    return _expand_all(known_dirs.qubit_home_globs())
 
 
 def _shared_auth_dir() -> Iterable[Path]:

@@ -243,15 +243,10 @@ def free_tier_route() -> bool:
 
 def on_local_desktop_backend() -> bool:
     """This process is the backend the desktop app spawned on this machine: never an SSH, URL or
-    cloud backend, and never a gateway or shell the desktop merely launched.
-
-    Owner ruling 2026-10-19: Qubit does not offer the upstream welcome trial. This is pinned to
-    ``False`` so the trial is structurally unreachable — ``free_inference_active`` and every
-    ``welcome_trial._CLAIM_BLOCKERS`` entry key off this one predicate, so no guest is ever minted
-    and no claim is ever made. The machinery is deliberately KEPT, not deleted: ``nous_*`` and
-    ``free_tier_bootstrap`` are the design to rebrand if Qubit ever ships its own sign-in. Revert
-    this to the computed form to restore upstream behaviour."""
-    return False
+    cloud backend, and never a gateway or shell the desktop merely launched."""
+    from qubit_cli.anon_challenge import client_surface
+    from qubit_cli.process_identity import is_local_desktop_backend
+    return client_surface() == "desktop" and is_local_desktop_backend()
 
 
 def _on_local_desktop_backend_uncapped() -> bool:
@@ -519,10 +514,12 @@ def guest_without_free_tier(state: Any) -> bool:
     return is_guest_state(state) and not free_inference_active(state)
 
 
-def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any]) -> Dict[str, Any]:
+def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any], *,
+                 welcome_claim: bool) -> Dict[str, Any]:
     """Mint under the caller's locks. The identity is persisted as soon as ``create`` succeeds, BEFORE
     the exchange: a 429 or timeout on the exchange must not lose a credential NAS still honours (the
-    next attempt exchanges the stored one instead of minting again)."""
+    next attempt exchanges the stored one instead of minting again). *welcome_claim* is written in
+    that same save, so a claimed guest is never left unstamped."""
     from qubit_cli.auth import _store_provider_state, _save_auth_store
     from qubit_cli.auth_nous import _write_shared_nous_state
     minted = mint_guest(client, portal)
@@ -532,6 +529,8 @@ def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any]) 
         "portal_base_url": portal.rstrip("/"),
         "user_id": minted.get("user_id"), "org_id": minted.get("org_id"),
         "idle_ttl_days": minted.get("idle_ttl_days"),
+        # Always present: an absent key marks a guest minted before the claim existed (grandfathering).
+        WELCOME_CLAIM_FLAG: welcome_claim,
     }
     _store_provider_state(auth_store, "nous", state, set_active=False)
     _save_auth_store(auth_store)
@@ -638,7 +637,8 @@ def _note_mint_failure(err: AuthError) -> MintFailure:
     return failure
 
 
-def _reconcile_and_provision(*, timeout_seconds: float) -> Optional[Dict[str, Any]]:
+def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
+                             welcome_claim: bool = False) -> Optional[Dict[str, Any]]:
     """The lifecycle body, run under profile lock THEN shared lock (the documented order).
 
     1. The shared store is the identity of record for this Qubit root. If it holds an identity
@@ -668,13 +668,18 @@ def _reconcile_and_provision(*, timeout_seconds: float) -> Optional[Dict[str, An
                 if not shared:
                     _write_shared_nous_state(profile_state)
                 return profile_state
+            # A caller queued on these locks behind a mint that just failed waits out its cooldown.
+            failure = _mint_failure_for_profile()
+            if failure and not force and time.monotonic() < failure.not_before:
+                return None
             verify = _resolve_verify(insecure=None, ca_bundle=None, auth_state=None)
             with _nous_http_client(timeout_seconds, verify) as client:
-                return _mint_locked(client, portal, auth_store)
+                return _mint_locked(client, portal, auth_store, welcome_claim=welcome_claim)
 
 
 def ensure_portal_identity(
     *, explicit: bool, timeout_seconds: float = GUEST_MINT_TIMEOUT_SECONDS, force: bool = False,
+    welcome_claim: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Make sure this profile has a Qubit identity (guest or account); mint a guest only if the shared
     store has none. Returns the ``providers.qubit`` state, or None (disabled / failed once already).
@@ -702,7 +707,8 @@ def ensure_portal_identity(
     if failure and not force and not current_nous_state() and time.monotonic() < failure.not_before:
         return None  # in cooldown (or terminal) for this profile; do not hammer the portal
     try:
-        state = _reconcile_and_provision(timeout_seconds=timeout_seconds)
+        state = _reconcile_and_provision(timeout_seconds=timeout_seconds, force=force,
+                                         welcome_claim=welcome_claim)
     except Exception as exc:
         err = classify_mint_exception(exc)
         noted = _note_mint_failure(err)

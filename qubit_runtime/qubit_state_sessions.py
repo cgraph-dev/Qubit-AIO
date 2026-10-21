@@ -780,6 +780,17 @@ class SessionSessionsMixin:
         session = self.get_session(session_id) or {}
         return _parse_model_config(session.get("model_config")).get(key, default)
 
+    def update_conversation_model_config_value(self, session_id: str, key: str,
+                                               update: Callable[[Any], Any]) -> Optional[str]:
+        """Write ``update(value)`` of a conversation-wide key at the compression tip (one transaction)."""
+        from qubit_state_sessions_model_config import update_conversation_model_config_value
+        return update_conversation_model_config_value(self, session_id, key, update)
+
+    def session_ids_with_model_config_key(self, key: str) -> List[str]:
+        """Ids of the sessions whose model_config carries ``key``, newest first."""
+        from qubit_state_sessions_model_config import session_ids_with_model_config_key
+        return session_ids_with_model_config_key(self, key)
+
     def update_session_runtime_lock(
         self, session_id: str, *, model: Optional[str] = None, provider: Optional[str] = None,
         model_options: Optional[Dict[str, Any]] = None, route_source: Optional[str] = None,
