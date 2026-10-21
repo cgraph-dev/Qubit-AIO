@@ -379,3 +379,15 @@ def test_lsp_node_server_inherits_pm_runtime_and_preserves_overrides(node_store,
     ctx.env_overrides["typescript"]["PATH"] = "/explicit/project/tools"
     spec = server.build_spawn(str(tmp_path), ctx)
     assert spec is not None and spec.env["PATH"] == "/explicit/project/tools"
+
+
+@pytest.mark.platforms("windows")
+def test_windows_path_prefers_launchable_cmd_but_never_for_pm_tools(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "absent-store"))
+    monkeypatch.setenv("PATH", str(tmp_path))
+    for tool in ("npm", "pnpm"):
+        for name in (tool, f"{tool}.ps1", f"{tool}.cmd"):
+            (tmp_path / name).write_text("@exit /b 0\n", encoding="utf-8")
+    # pnpm is an explicit user choice (lsp.package_manager); npm is only ever PM's.
+    assert qubit_constants.find_node_executable("pnpm") == str(tmp_path / "pnpm.cmd")
+    assert qubit_constants.find_node_executable("npm") is None

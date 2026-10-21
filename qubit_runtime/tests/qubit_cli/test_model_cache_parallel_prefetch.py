@@ -10,6 +10,8 @@ concurrently via ThreadPoolExecutor before the serial picker loop starts.
 from __future__ import annotations
 
 import time
+
+import pytest
 from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
@@ -227,3 +229,110 @@ class TestPrefetchProviderModelsParallel:
             _prefetch_provider_models_parallel(["openrouter"])
 
         assert fetched == ["openrouter"]
+
+
+class TestStoreCacheEntry:
+    """Verify ``_store_cache_entry`` writes safely under concurrency."""
+
+    def test_writes_new_entry(self, tmp_path, monkeypatch):
+        """A new entry is persisted to the cache file."""
+        import qubit_cli.models as mod
+
+        cache_path = tmp_path / "provider_models_cache.json"
+        monkeypatch.setattr(mod, "_provider_models_cache_path", lambda: cache_path)
+
+        mod._store_cache_entry("openrouter", mod._cache_entry("fp1", ["m1", "m2"]))
+
+        cache = mod._load_provider_models_cache()
+        assert "openrouter" in cache
+        assert cache["openrouter"]["models"] == ["m1", "m2"]
+        assert cache["openrouter"]["fp"] == "fp1"
+
+    def test_does_not_clobber_other_entries(self, tmp_path, monkeypatch):
+        """Concurrent writes to different providers don't lose entries."""
+        import qubit_cli.models as mod
+
+        cache_path = tmp_path / "provider_models_cache.json"
+        monkeypatch.setattr(mod, "_provider_models_cache_path", lambda: cache_path)
+
+        # Seed with one entry
+        mod._store_cache_entry("provider_a", mod._cache_entry("fp_a", ["a1"]))
+
+        # Write a second entry
+        mod._store_cache_entry("provider_b", mod._cache_entry("fp_b", ["b1"]))
+
+        cache = mod._load_provider_models_cache()
+        assert "provider_a" in cache
+        assert cache["provider_a"]["models"] == ["a1"]
+        assert "provider_b" in cache
+        assert cache["provider_b"]["models"] == ["b1"]
+
+    def test_concurrent_writes_no_lost_entries(self, tmp_path, monkeypatch):
+        """Multiple threads writing different providers concurrently — all land."""
+        import qubit_cli.models as mod
+        import concurrent.futures
+
+        cache_path = tmp_path / "provider_models_cache.json"
+        monkeypatch.setattr(mod, "_provider_models_cache_path", lambda: cache_path)
+
+        providers = [f"prov_{i}" for i in range(10)]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            list(executor.map(
+                lambda p: mod._store_cache_entry(p, mod._cache_entry(f"fp_{p}", [f"model_{p}"])),
+                providers,
+            ))
+
+        cache = mod._load_provider_models_cache()
+        for p in providers:
+            assert p in cache, f"{p} was lost in concurrent write"
+            assert cache[p]["models"] == [f"model_{p}"]
+
+    @pytest.mark.parametrize("cleared", [
+        pytest.param("openrouter", marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a clear is undone by a concurrent locked write")),
+        pytest.param(None, marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a clear is undone by a concurrent locked write")),
+    ])
+    def test_clear_is_not_undone_by_a_concurrent_locked_write(self, tmp_path, monkeypatch, cleared):
+        """``--refresh`` clears under the same lock: a writer that loaded the cache before the clear
+        must not save its snapshot afterwards and bring the cleared row back."""
+        import threading
+
+        import qubit_cli.models as mod
+        from qubit_cli.models_cache_lock import write_under_cache_lock
+
+        import qubit_cli.models_cache_lock as cache_lock_module
+        from tests.lock_contention import ContentionObservedLock, watch_file_lock_contention
+        from tests.waiting import wait_until
+
+        cache_path = tmp_path / "provider_models_cache.json"
+        monkeypatch.setattr(mod, "_provider_models_cache_path", lambda: cache_path)
+        contended = watch_file_lock_contention(monkeypatch)
+        # In-process writers meet the thread lock first, other processes the file lock.
+        thread_lock = ContentionObservedLock()
+        monkeypatch.setattr(cache_lock_module, "_thread_lock", thread_lock)
+        mod._save_provider_models_cache({
+            "openrouter": mod._cache_entry("fp", ["or/model"]),
+            "anthropic": mod._cache_entry("fp", ["claude"]),
+        })
+        loaded = threading.Event()
+        release = threading.Event()
+
+        def slow_write():  # _store_cache_entry's write, paused between its read and its save
+            cache = mod._load_provider_models_cache()
+            loaded.set()
+            release.wait(5)
+            cache["anthropic"] = mod._cache_entry("fp", ["claude-new"])
+            mod._save_provider_models_cache(cache)
+
+        writer = threading.Thread(target=write_under_cache_lock, args=(cache_path, slow_write))
+        writer.start()
+        assert loaded.wait(5)
+        clearer = threading.Thread(target=mod.clear_provider_models_cache, args=(cleared,))
+        clearer.start()
+        wait_until(lambda: not clearer.is_alive() or contended.is_set() or thread_lock.contended.is_set(),
+                   what="the clear finished or blocked on the cache lock")
+        release.set()
+        writer.join(5)
+        clearer.join(5)
+
+        assert "openrouter" not in mod._load_provider_models_cache()

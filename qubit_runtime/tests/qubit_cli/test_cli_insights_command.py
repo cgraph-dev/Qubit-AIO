@@ -94,3 +94,11 @@ def test_subcommand_insights_closes_database_when_generation_fails(capsys):
 
     db.close.assert_called_once()
     assert "Error generating insights: boom" in capsys.readouterr().out
+
+
+@pytest.fixture(autouse=True)
+def existing_store(tmp_path, monkeypatch):
+    # insights short-circuits before opening when state.db is absent (fresh install).
+    monkeypatch.setattr("qubit_cli.config.get_qubit_home", lambda: tmp_path)
+    (tmp_path / "state.db").touch()
+    return tmp_path / "state.db"

@@ -236,3 +236,20 @@ def test_merge_skips_commands_recipe_already_has(qubit_home, capsys):
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["recipe"]["test"].count("npm run test") == 1
+
+
+def test_cli_verify_clears_stale_on_editing_session(qubit_home, capsys):
+    """Standalone ``qubit verify`` records under default; the editing session
+    must still see a pass (#103271)."""
+    project = _workspace(qubit_home, manifest_recipe={"name": "Fake", "test": ["echo ok"]})
+    changed = str(project / "src" / "app.ts")
+    edit_session = "20260717_230325_f2d00d"
+    mark_workspace_edited(session_id=edit_session, cwd=project, paths=[changed])
+    assert verification_status(session_id=edit_session, cwd=project)["status"] == "unverified"
+    assert build_verify_on_stop_nudge(session_id=edit_session, changed_paths=[changed]) is not None
+
+    assert run_verify_command(make_args(project)) == 0
+
+    assert verification_status(session_id=edit_session, cwd=project)["status"] == "passed"
+    assert verification_status(session_id="default", cwd=project)["status"] == "passed"
+    assert build_verify_on_stop_nudge(session_id=edit_session, changed_paths=[changed]) is None

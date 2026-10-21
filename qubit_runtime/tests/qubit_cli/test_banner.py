@@ -90,3 +90,19 @@ def test_baked_banner_uses_live_identity(monkeypatch):
 
     monkeypatch.setattr(version_info, "get_code_identity", lambda: {"short_sha": "a1b2c3d4"})
     assert banner._baked_banner_state() == {"upstream": "a1b2c3d4", "local": "a1b2c3d4", "ahead": 0}
+
+
+def test_empty_model_shows_no_model_configured(tmp_path, monkeypatch):
+    """The banner prints before credentials resolve; with no model it says so rather than guessing."""
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+    (tmp_path / ".qubit").mkdir()
+    with (
+        patch.object(model_tools, "check_tool_availability", return_value=([], [])),
+        patch.object(banner, "get_available_skills", return_value={}),
+        patch.object(banner, "get_update_result", return_value=None),
+        patch.object(tools.mcp_tool_discovery, "get_mcp_status", return_value=[]),
+    ):
+        console = Console(record=True, force_terminal=False, color_system=None, width=160)
+        banner.build_welcome_banner(console=console, model="", cwd="/tmp/project", tools=[],
+                                    enabled_toolsets=[], provider="auto")
+    assert "no model configured" in console.export_text()

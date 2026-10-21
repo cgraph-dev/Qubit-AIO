@@ -9,9 +9,11 @@ PATCH/bulk/model-options surfaces.
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -312,3 +314,82 @@ def test_bulk_reasoning_effort(client):
     for tid in (t1["id"], t2["id"]):
         got = client.get(f"/api/plugins/kanban/tasks/{tid}").json()["task"]
         assert got["reasoning_effort"] == "max"
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: kanban default spawn does not build the pinned claimed-task policy from SQLite")
+@pytest.mark.parametrize(
+    "overrides, expected_model, expected_provider, expected_reasoning",
+    [
+        ({"model_override": "glm-5", "provider_override": "openrouter",
+          "reasoning_effort": "high"}, "glm-5", "openrouter", "high"),
+        ({"reasoning_effort": "high"}, "profile-model", "custom", "high"),
+        ({"reasoning_effort": "none"}, "profile-model", "custom", None),
+        ({}, "profile-model", "custom", "low"),
+    ],
+)
+def test_spawn_resolves_claimed_task_policy(
+    monkeypatch, tmp_path, conn, kanban_home, overrides,
+    expected_model, expected_provider, expected_reasoning,
+):
+    """The worker passes identity, while the owner reads overrides from SQLite."""
+    from gateway.session_contract import Principal
+    from gateway.session_kanban import build_kanban_policy
+    from qubit_cli import kanban_worker_client
+    from qubit_state_runtime import RuntimeStoreError
+
+    profile = kanban_home / "profiles" / "elias"
+    profile.mkdir(parents=True)
+    (profile / "config.yaml").write_text("{}\n")  # identity marker: a bare dir is not a live profile
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    tid = kb.create_task(conn, title="t", assignee="elias",
+                         workspace_kind="dir", workspace_path=str(workspace), **overrides)
+    task = kb.claim_task(conn, tid)
+    assert task is not None
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured.update(cmd=list(cmd), env=kwargs["env"])
+        kwargs["stdout"].close()
+        return SimpleNamespace(pid=4245)
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    kbd._default_spawn(task, str(workspace))
+    assert captured["cmd"] == [sys.executable, "-m", "qubit_cli.kanban_worker_client"]
+    assert captured["env"]["QUBIT_HOME"] == str(profile)
+    actor = Principal("owner", str(profile), frozenset({"session:create"}), "transport")
+    connection = SimpleNamespace(
+        authority=SimpleNamespace(profile_id=str(profile)), actor=actor, native_owner=True)
+    config = {"model": {"default": "profile-model", "provider": "custom"},
+              "agent": {"reasoning_effort": "medium",
+                        "reasoning_overrides": {"profile-model": "low", "glm-5": "low"}},
+              "platform_toolsets": {"cli": ["terminal"]}}
+    original_config = json.dumps(config, sort_keys=True)
+
+    async def resolve_at_owner(params, board_db):
+        params = dict(params, db=board_db)
+        policy, _ = build_kanban_policy(connection, params, config)
+        assert policy.model == expected_model
+        assert policy.provider == expected_provider
+        expected = ({"enabled": False} if expected_reasoning is None else
+                    {"enabled": True, "effort": expected_reasoning})
+        assert policy.reasoning_config == expected
+        assert policy.cwd == str(workspace) and "kanban" in policy.toolsets
+        context = json.loads(policy.kanban_json)
+        assert (context["task_id"], context["run_id"], context["claim_lock"]) == (
+            task.id, task.current_run_id, task.claim_lock)
+        # A worker cannot replace trusted settings or reuse another claim.
+        with pytest.raises(RuntimeStoreError, match="invalid_params"):
+            build_kanban_policy(connection, params | {"model": "forged"}, config)
+        with pytest.raises(RuntimeStoreError, match="invalid_kanban_claim"):
+            build_kanban_policy(connection, params | {"claim_lock": "forged"}, config)
+        assert json.dumps(config, sort_keys=True) == original_config
+        captured["resolved"] = True
+        return 0
+
+    monkeypatch.setattr(kanban_worker_client, "run", resolve_at_owner)
+    with monkeypatch.context() as child:
+        for key, value in captured["env"].items():
+            child.setenv(key, value)
+        assert kanban_worker_client.main() == 0
+    assert captured["resolved"]

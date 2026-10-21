@@ -216,3 +216,14 @@ def test_full_checkout_refreshes_release_tags_before_publishing_identity(tmp_pat
     assert stamp is not None
     assert (stamp["baseVersion"], stamp["distance"]) == (versions[1][1], 1)
     assert stamp["commit"] == commit == git(checkout, "rev-parse", "HEAD")
+
+
+def test_unsafe_sqlite_withholds_success_but_not_the_finished_tail(tmp_path, monkeypatch):
+    # Was: an unsafe SQLite verdict also withheld the stamp, so the tail stayed owed forever
+    # (re-running it cannot fix the interpreter, codemap §8 V1). The install still reports failure.
+    root = _repo(tmp_path)
+    _completion_dependencies(monkeypatch, lambda **_kwargs: False)
+    owed: list = []
+    assert not complete_source_checkout(root, desktop=False, assume_yes=True, followups=owed)
+    assert owed == []
+    assert (root / "install-stamp.json").is_file()
