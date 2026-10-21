@@ -5,6 +5,7 @@ the _send_update_notification startup hook (sends results after restart).
 """
 
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -195,6 +196,34 @@ class TestHandleUpdateCommand:
         # start_new_session=True should be in kwargs
         call_kwargs = mock_popen.call_args[1]
         assert call_kwargs.get("start_new_session") is True
+
+    @pytest.mark.asyncio
+    async def test_resolve_qubit_bin_falls_back_to_path_then_none(self):
+        """Without an importable hermes_cli the argv degrades to PATH, then to None — never a
+        bare ``hermes`` string that a hostile PATH entry could shadow."""
+        from gateway.run import _resolve_qubit_bin
+
+        with patch("shutil.which", return_value="/usr/local/bin/hermes"), \
+             patch("importlib.util.find_spec", return_value=None):
+            assert _resolve_qubit_bin() == ["/usr/local/bin/hermes"]
+
+        with patch("shutil.which", return_value=None), \
+             patch("importlib.util.find_spec", side_effect=ImportError):
+            assert _resolve_qubit_bin() is None
+    @pytest.mark.asyncio
+    async def test_resolve_qubit_bin_module_argv(self):
+        """_resolve_qubit_bin uses the running interpreter's module argv when hermes_cli is
+        importable, even when PATH also offers a ``hermes`` binary (#111569: a PATH-first
+        lookup would re-exec an attacker-planted executable on /update and /restart)."""
+        import sys
+        from gateway.run import _resolve_qubit_bin
+
+        fake_spec = MagicMock()
+        with patch("shutil.which", return_value="/tmp/attacker/hermes"), \
+             patch("importlib.util.find_spec", return_value=fake_spec):
+            result = _resolve_qubit_bin()
+
+        assert result == [sys.executable, "-m", "qubit_cli.main"]
 
 
 # ---------------------------------------------------------------------------
@@ -632,3 +661,41 @@ class TestUpdateCommandInstallMethodRefusal:
         # No update attempt: nothing spawned, no pending marker written.
         mock_popen.assert_not_called()
         assert not (qubit_home / ".update_pending.json").exists()
+
+
+class TestDetachedUpdateExitCodePublication:
+        @pytest.mark.platforms("linux", "macos")
+        @pytest.mark.live_system_guard_bypass  # runs the wrapper around `sh -c 'exit 3'`, never hermes
+        @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the detached update wrapper can expose an empty marker")
+        def test_bash_wrapper_never_exposes_an_empty_exit_code(self, tmp_path, monkeypatch):
+            import subprocess
+            from gateway.slash_commands import _spawn_detached_update
+
+            output, marker, seen = tmp_path / "out.log", tmp_path / ".update_exit_code", tmp_path / "seen.log"
+            spawned = MagicMock()
+            with patch("shutil.which", return_value=None), patch("subprocess.Popen", spawned):
+                _spawn_detached_update(["sh", "-c", "exit 3"], output, marker)
+            # Poll the marker at the instant the wrapper's printf runs: a `printf > marker` redirect has
+            # already truncated it by then (bash applies redirections before running the command).
+            hook = tmp_path / "bash_env.sh"
+            hook.write_text('printf() { [ -e "$MARKER" ] && echo "exists:$(cat "$MARKER")" >> "$SEEN"; '
+                            'builtin printf "$@"; }\n', encoding="utf-8")
+            env = {**os.environ, "BASH_ENV": str(hook), "MARKER": str(marker), "SEEN": str(seen)}
+            subprocess.run(spawned.call_args[0][0], env=env, check=True, timeout=60)
+            assert not seen.exists() or "exists:\n" not in seen.read_text(encoding="utf-8")
+            assert marker.read_text(encoding="utf-8") == "3"
+
+        @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the windows update helper can expose an empty marker")
+        def test_windows_helper_never_exposes_an_empty_exit_code(self, tmp_path, monkeypatch):
+            import sys
+            from gateway.slash_commands import _WINDOWS_UPDATE_HELPER
+            from tests.file_write_observer import observe_file_writes
+
+            output, marker = tmp_path / "out.log", tmp_path / ".update_exit_code"
+            seen = []
+            monkeypatch.setattr(sys, "argv", ["-c", str(output), str(marker),
+                                              sys.executable, "-c", "raise SystemExit(4)"])
+            with observe_file_writes(lambda: seen.append(marker.read_text() if marker.exists() else None)):
+                exec(compile(_WINDOWS_UPDATE_HELPER, "<update-helper>", "exec"), {"__name__": "__main__"})
+            assert "" not in seen
+            assert marker.read_text(encoding="utf-8") == "4"

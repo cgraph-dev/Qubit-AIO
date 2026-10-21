@@ -30,9 +30,9 @@ def _runner():
     return runner
 
 
-def _install_secondary(monkeypatch, runner, stamps):
+def _install_secondary(monkeypatch, runner, stamps, platform=Platform.WHATSAPP):
     @contextmanager
-    def fake_scope(profile_home, *, hydrate_secrets=True):
+    def fake_scope(profile_home, *a, **k):
         yield
 
     monkeypatch.setattr(gateway_run, "_profile_runtime_scope", fake_scope)
@@ -43,7 +43,7 @@ def _install_secondary(monkeypatch, runner, stamps):
         "gateway.config.load_gateway_config",
         lambda: GatewayConfig(
             multiplex_profiles=True,
-            platforms={Platform.WHATSAPP: PlatformConfig(enabled=True)},
+            platforms={platform: PlatformConfig(enabled=True)},
         ),
     )
     monkeypatch.setattr(
@@ -97,7 +97,9 @@ async def test_secondary_whatsapp_served_by_default_is_not_warned(monkeypatch, c
         await runner._start_one_profile_adapters("work", Path("/profiles/work"), {})
         await runner._start_secondary_profiles(1, [])
 
-    assert not [r for r in caplog.records if r.levelno == logging.WARNING and "not being served" in r.getMessage()]
+    assert not [r for r in caplog.records
+                if r.levelno == logging.WARNING and "relay" in r.getMessage()
+                and "not being served" in r.getMessage()]
     assert [r for r in caplog.records if r.levelno == logging.INFO and "not served" in r.getMessage()]
 
 
@@ -122,3 +124,51 @@ async def test_boot_replays_the_launch_ledger_before_secondaries_and_watchers(mo
     runner._unserved_shared_ingress_warnings = lambda: []
     assert await runner._start_secondary_profiles(0, []) == (False, 0)
     assert order == [("restore", tmp_path / "launch" / "state.db"), ("secondaries", None)]
+
+
+@pytest.mark.asyncio
+async def test_secondary_relay_without_primary_is_reported_unserved(monkeypatch, caplog):
+    runner = _runner()
+    stamps = []
+    _install_secondary(monkeypatch, runner, stamps, Platform.RELAY)
+
+    with caplog.at_level(logging.INFO, logger="gateway.run"):
+        assert await runner._start_one_profile_adapters("work", Path("/profiles/work"), {}) == 0
+        # The secondary was skipped: the startup phase folds it into the loud warning.
+        aborted, _count = await runner._start_secondary_profiles(0, [])
+
+    assert aborted is False
+    infos = [r for r in caplog.records if r.levelno == logging.INFO and "not served" in r.getMessage()]
+    assert infos and "'work'" in infos[0].getMessage() and "default profile" in infos[0].getMessage()
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("relay" in w and "not being served" in w and "work" in w for w in warnings), warnings
+    # Stamped so `hermes gateway status --profile work` / the dashboard can show the reason.
+    assert ("work:relay", {
+        "platform_state": "disabled", "error_code": "multiplex_shared_ingress",
+        "error_message": "not served under multiplex (shared ingress owned by default)",
+    }) in stamps
+    # ...and the CLI reader turns that stamp into the status line.
+    from gateway.status import write_runtime_status
+    from qubit_cli import gateway_multiplex_served as served
+    key, kw = next(s for s in stamps if s[0] == "work:relay")
+    write_runtime_status(platform=key, **kw)
+    monkeypatch.setattr(served, "live_default_gateway_pid", lambda: 4242)
+    assert served.served_profile_unserved_platforms("work") == {
+        "relay": "not served under multiplex (shared ingress owned by default)"}
+    assert served.served_profile_unserved_platforms("other") == {}
+
+
+@pytest.mark.asyncio
+async def test_secondary_relay_served_by_default_is_not_warned(monkeypatch, caplog):
+    """The default owns Relay: the secondary IS served through the shared adapter — no WARNING,
+    the INFO line still explains where the channel lives."""
+    runner = _runner()
+    runner.adapters[Platform.RELAY] = object()
+    _install_secondary(monkeypatch, runner, [], Platform.RELAY)
+
+    with caplog.at_level(logging.INFO, logger="gateway.run"):
+        await runner._start_one_profile_adapters("work", Path("/profiles/work"), {})
+        await runner._start_secondary_profiles(1, [])
+
+    assert not [r for r in caplog.records if r.levelno == logging.WARNING and "not being served" in r.getMessage()]
+    assert [r for r in caplog.records if r.levelno == logging.INFO and "not served" in r.getMessage()]

@@ -22,6 +22,8 @@ from gateway.run_turn_runner import TurnRunner
 from gateway.session import SessionEntry, SessionSource
 from gateway.turn_context import TurnContext
 
+_WELCOME = "https://welcome-api.nousresearch.com/v1"
+
 KEY = "agent:main:discord:group:1513247605675790346:117431298246705156"
 _ORIGIN = dict(
     platform=Platform.DISCORD,
@@ -419,3 +421,43 @@ async def test_internal_event_never_reuses_prompt_pin_from_another_privacy_polic
 
     assert calls[0]["context_prompt"] != "UNREDACTED CONTEXT"
     assert calls[0]["channel_prompt"] == "Channel hint."
+
+
+@pytest.mark.parametrize(
+    "runtime, global_model, expected_model",
+    [
+        pytest.param({"api_key": "fake", "provider": "openrouter"}, "default/model", "chan/model",
+                     marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: channel model overrides the session pin")),
+        pytest.param({"api_key": "fake", "provider": "nous", "base_url": _WELCOME}, "nous/welcome", "nous/welcome",
+                     marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: welcome host does not pin its model")),
+    ],
+    ids=["named-channel-model", "welcome-host-pins-over-channel-model"],
+)
+@pytest.mark.asyncio
+async def test_channel_override_turns_keep_one_cached_agent_and_the_pin(
+    monkeypatch, runtime, global_model, expected_model,
+):
+    import gateway.run as gr
+
+    config = GatewayConfig()
+    config.platforms[Platform.DISCORD] = PlatformConfig(
+        enabled=True, channel_overrides={_ORIGIN["chat_id"]: ChannelOverride(model="chan/model")},
+    )
+    monkeypatch.setattr(gr, "_load_gateway_config", lambda: {"model": {"default": global_model}})
+    monkeypatch.setattr(gr, "_resolve_gateway_model", lambda config=None: global_model)
+    fake_run_agent = types.ModuleType("run_agent")
+    fake_run_agent.AIAgent = _TurnAgent
+    monkeypatch.setitem(sys.modules, "run_agent", fake_run_agent)
+    _TurnAgent.instances = 0
+
+    runner = _make_runner(monkeypatch, config)
+    monkeypatch.setattr(gr, "_resolve_runtime_agent_kwargs", lambda: dict(runtime))
+    runner.session_store._entries = {}
+
+    await _drive(runner, ((False, _human_source()), (True, _wake_source()), (False, _human_source())))
+
+    entry = runner._agent_cache.get(KEY)
+    assert entry is not None, "channel-override turn evicted the session's cached agent"
+    assert entry[0].model == expected_model
+    assert _TurnAgent.instances == 1, f"agent rebuilt {_TurnAgent.instances - 1}x across 3 turns"
+    assert runner._peek_session_state(KEY).conversation.ephemeral_pin is not None, "context pin cleared"

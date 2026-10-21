@@ -289,3 +289,38 @@ def test_other_views_not_admin_gated():
     )
     assert sc._check_auth(_interaction(11111)) is True
 
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: approval buttons do not follow a post-connect revoke")
+@pytest.mark.asyncio
+async def test_approval_buttons_follow_a_revoke_made_after_connect():
+    # `hermes pairing revoke` in another process rewrites .env and the pairing store, never the
+    # adapter's snapshot; the card's buttons must follow the gateway's per-call check instead.
+    adapter = DiscordAdapter(PlatformConfig(enabled=True, token="***"))
+    adapter._allowed_user_ids = {"11111"}
+    live = {"11111": True}
+    adapter.set_authorization_check(lambda user_id, chat_type=None, chat_id=None, **_: live.get(user_id, False))
+    channel = SimpleNamespace(send=AsyncMock(return_value=SimpleNamespace(id=1)))
+    adapter._client = SimpleNamespace(get_channel=lambda _chat_id: channel, fetch_channel=AsyncMock())
+
+    result = await adapter.send_exec_approval(chat_id="555", command="make deploy", session_key="discord:555")
+    assert result.success is True
+    view = channel.send.call_args.kwargs["view"]
+    assert view._check_auth(_interaction(11111)) is True
+    live["11111"] = False
+    assert view._check_auth(_interaction(11111)) is False
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _component_check_auth has no live re-check seam")
+@pytest.mark.parametrize("snapshot", [{"11111"}, {"*"}])
+@pytest.mark.parametrize(("verdict", "expected"), [(None, True), (True, True), (False, False)])
+def test_snapshot_user_is_confirmed_with_the_live_check(snapshot, verdict, expected):
+    # The user set is the adapter's connect-time snapshot; None means no live check is wired.
+    seen = []
+
+    def live_auth(interaction):
+        seen.append(interaction.user.id)
+        return verdict
+
+    assert _component_check_auth(_interaction(11111), snapshot, set(), live_auth=live_auth) is expected
+    assert seen == [11111]
