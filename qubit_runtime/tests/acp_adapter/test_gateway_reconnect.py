@@ -53,7 +53,6 @@ class Owner:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("die", ["before_ack", "after_ack"])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an editor reconnect to a restarted gateway resends the prompt")
 async def test_editor_reconnects_to_a_restarted_gateway_without_resending(monkeypatch, die):
     agent = GatewayACPAgent()
     agent._conn = AsyncMock()

@@ -5,9 +5,9 @@ Main served these in-process (``acp_adapter/commands.py``). The reports are the 
 controls, ``/steer`` the owner's ``session.steer``; ``/queue`` and an idle ``/steer`` become the
 next prompt, which the session's FIFO runs after any turn in flight. ``/title <name>`` is the
 ``rename`` mutation and ``/undo`` / ``/retry`` the ``rewind`` one, as in the classic transport
-client (``qubit_cli/gateway_chat_commands.py``). Every other registry command goes to the owner's
-``slash.exec`` like there: it runs what it serves for this session and refuses the rest, and that
-refusal reaches the editor as a reply naming the command, never a failed prompt.
+client (``qubit_cli/gateway_chat_commands.py``). The read reports go to the owner's ``slash.exec``; a
+registered command this surface does not carry is refused locally (``unsupported_command``) and is
+never forwarded as text the owner might execute as a control.
 """
 from __future__ import annotations
 
@@ -31,6 +31,8 @@ async def run_command(agent, session_id, command, arg):
     the reads included, is the owner's ``slash.exec`` answer (``_forward``)."""
     route = ROUTES.get(command)
     if route is None:
+        if command not in _READS:
+            raise GatewayClientError('unsupported_command')
         return await _forward(agent, await agent._client(), session_id, command, arg)
     return await route[1](agent, session_id, command, arg)
 

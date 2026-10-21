@@ -53,7 +53,6 @@ async def test_editor_refuses_new_prompt_until_lost_turn_is_resolved():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a resumed unknown turn does not name the existing discard recovery")
 async def test_resumed_unknown_turn_names_the_existing_discard_recovery():
     # ACP has no discard affordance: the resume notice and the refusal must name the exact
     # admission and the classic chat control (``/discard`` -> prompt.resolve_unknown) that clears it.

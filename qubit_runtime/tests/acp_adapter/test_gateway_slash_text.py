@@ -29,7 +29,6 @@ async def test_path_and_unknown_slash_text_is_submitted_as_the_prompt(text):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an un-carried registered slash command is forwarded as text instead of refused")
 async def test_registered_command_this_surface_does_not_carry_is_still_refused_locally():
     # A Hermes command is never forwarded as text the owner might execute as a control.
     agent = GatewayACPAgent()
