@@ -655,3 +655,74 @@ def test_stable_requests_name_the_attempt_archive_only_when_given():
         assert pub.request(bare["buildId"]) == bare
         with pytest.raises(ChannelError, match="(?i)archive ref"):
             allocate("c" * 40, "2.2.0", "rc.2-v2.9.9")
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: retire does not refuse a stable head without previews targets")
+def test_retire_refuses_a_stable_head_without_the_previews_targets():
+    """An Intel preview cannot be pinned to an arm64-only stable head it has no package in."""
+    from qubit_cli.release_channels import ChannelError, canonical_json
+
+    def with_arches(manifest, arches):
+        row = manifest["packages"][0]
+        return dict(manifest, packages=[dict(row, arch=arch) for arch in arches])
+
+    with object_server() as (url, objects, _headers, _requests, _faults):
+        pub = publisher(url, verify_build=lambda request, manifest: True)
+        pub.create("intel-preview")
+        pub.create("stable")
+        build = pub.allocate("intel-preview", "a" * 40, "1.0.0")
+        key = "releases/channel-builds/" + build["buildId"] + "/build.json"
+        objects[key] = canonical_json(with_arches(put_build(objects, build), ("x64",)))
+        pub.promote(build["buildId"])
+        target = pub._read("stable")[0]
+        target["policy"] = "stable-release"
+        stable = dict(build, channel="stable", identity=target["identity"], releaseTag="v2.0.0", version="2.0.0",
+                      windowsVersion="2.0.0.0", sourceVersion="2.0.0", buildId="d" * 32)
+        stable_manifest = put_build(objects, stable)
+        stable_key = "releases/channel-builds/" + stable["buildId"] + "/build.json"
+
+        def publish_stable(arches):
+            raw = canonical_json(with_arches(stable_manifest, arches))
+            objects[stable_key] = raw
+            target.update(nextSequence=stable["sequence"] + 1, head={
+                "buildId": stable["buildId"], "sequence": stable["sequence"], "manifestKey": stable_key,
+                "sha256": hashlib.sha256(raw).hexdigest()})
+            objects["releases/channels/stable.json"] = canonical_json(target)
+
+        publish_stable(("arm64",))
+        with pytest.raises(ChannelError, match="lacks a package"):
+            pub.retire("intel-preview", "stable", "2.0.0")
+        assert pub._read("intel-preview")[0]["state"] == "active"
+        publish_stable(("arm64", "x64"))
+        assert pub.retire("intel-preview", "stable", "2.0.0")["destinationHead"] == target["head"]
+
+
+def test_stable_receipts_bind_the_attempt_ref_while_metadata_binds_the_payload_tag(tmp_path):
+    """Stable stages handoffs under rc.N-vX.Y.Z but record() stamps vX.Y.Z."""
+    from scripts.releases import channel_releases
+    from scripts.releases.handoff import receipt_name
+    from qubit_cli.release_channels import ChannelError, canonical_json
+    attempt, payload, commit = "rc.15-v2.0.0", "v2.0.0", "e" * 40
+    legs = ("darwin-arm64", "win32-arm64", "win32-x64")
+
+    def stage(metadata_tag):
+        for leg in legs:
+            platform, arch = leg.split("-")
+            native = "macos" if platform == "darwin" else "windows"
+            name = f"metadata-{native}-{arch}.json"
+            body = canonical_json({"platform": native, "arch": arch, "tag": metadata_tag, "commit": commit})
+            (tmp_path / name).write_bytes(body)
+            rows = [{"path": name, "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}]
+            receipt = {"schema": 1, "tag": attempt, "commit": commit, "name": leg, "files": rows}
+            (tmp_path / receipt_name(leg)).write_bytes(canonical_json(receipt))
+
+    stage(payload)
+    native = channel_releases.read_native_receipts(tmp_path, attempt, commit, legs, payload_tag=payload)
+    assert {row["tag"] for row in native["packages"]} == {payload}
+    # Without the payload tag the rows are held to the attempt ref and refused.
+    with pytest.raises(ChannelError, match="identity mismatch"):
+        channel_releases.read_native_receipts(tmp_path, attempt, commit, legs)
+    # A row stamped with the attempt ref is not the published payload.
+    stage(attempt)
+    with pytest.raises(ChannelError, match="identity mismatch"):
+        channel_releases.read_native_receipts(tmp_path, attempt, commit, legs, payload_tag=payload)
