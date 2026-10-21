@@ -97,7 +97,6 @@ def test_legacy_delete_publishes_the_full_retirement_fence(tmp_path, delete):
         assert db.get_session('s') is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: legacy delete refuses a session with gateway runtime history instead of fencing cascaded delegate children")
 def test_legacy_delete_fences_cascaded_delegate_children(tmp_path):
     from qubit_state_mutation_retirement import retired_session
     with closing(SessionDB(tmp_path / 'state.db')) as db:
@@ -143,7 +142,6 @@ def test_sweeps_skip_sessions_with_live_work_and_retire_the_rest(tmp_path):
             assert not c.execute('PRAGMA foreign_key_check').fetchall()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: startup repair does not latch after a refusal nor warn once at WARNING")
 def test_startup_repair_latches_after_a_refusal_and_warns_once(monkeypatch, caplog, tmp_path):
     import cli
     import qubit_cli.config
@@ -243,7 +241,6 @@ def test_local_reset_refuses_over_live_compute_worker_but_not_a_queued_follower(
         assert claimed is not None and claimed['admission_id'] == follower['admission_id']
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.discard_unadmitted_session is absent")
 def test_discarding_an_unadmitted_row_leaves_no_fence_but_an_admitted_row_is_fenced(tmp_path):
     """Seed-copy compensation removes a row nobody was admitted against WITHOUT the retirement
     marker (the lazy first-prompt path must be able to recreate the id); once any receipt

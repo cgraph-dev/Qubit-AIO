@@ -47,11 +47,7 @@ def _state(db, s0, s1):
     return {'s0': db.get_session(s0) is not None, 's1': db.get_session(s1) is not None, 'policy': policy}
 
 
-@pytest.mark.parametrize('operation', [
-    pytest.param(op, marks=pytest.mark.xfail(strict=True, reason='wave-18 parity defect: bulk/never-active sweep retires the reset owner policy'))
-    if op in {'bulk', 'never-active'} else op
-    for op in sorted(OPERATIONS)
-])
+@pytest.mark.parametrize('operation', sorted(OPERATIONS))
 def test_segment_delete_or_sweep_keeps_a_conversation_with_queued_work(tmp_path, operation):
     db, s0, s1, admission = _conversation(tmp_path, operation, queued=True)
     with closing(db):
@@ -65,11 +61,7 @@ def test_segment_delete_or_sweep_keeps_a_conversation_with_queued_work(tmp_path,
         assert rt.get_session_admission(db, admission_id=admission['admission_id'])['status'] == 'queued'
 
 
-@pytest.mark.parametrize('operation', [
-    pytest.param(op, marks=pytest.mark.xfail(strict=True, reason='wave-18 parity defect: bulk delete leaves the reset lineage behind'))
-    if op == 'bulk' else op
-    for op in ['single', 'bulk', 'prune-all']
-])
+@pytest.mark.parametrize('operation', ['single', 'bulk', 'prune-all'])
 def test_idle_conversation_deletes_whole_from_its_current_segment(tmp_path, operation):
     db, s0, s1, _ = _conversation(tmp_path, operation, queued=False)
     with closing(db):

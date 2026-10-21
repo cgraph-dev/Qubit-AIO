@@ -431,9 +431,13 @@ class SessionGatewayMixin:
         nonexistent id. The row sweep is one transaction; routing entries are dropped in a
         second write after it commits. ``sessions_skipped`` counts only the guarded rows."""
         candidates = self.list_never_active_keyed_sessions(older_than_days=older_than_days)
-        if not candidates:
+        # A fresh local reset tip is its conversation's current target, not a never-active chat:
+        # the conversation holds the earlier segments' history and the owner's queued work.
+        from qubit_state_local import owned_lineage_ids
+        with self._read_ctx() as conn:
+            ids = {str(row["id"]) for row in candidates if owned_lineage_ids(conn, str(row["id"])) == [str(row["id"])]}
+        if not ids:
             return (0, 0, 0)
-        ids = {str(row["id"]) for row in candidates}
         skipped: List[str] = []
         deleted = self.delete_sessions(
             list(ids), sessions_dir=sessions_dir, exclude_active_write_guards=True, skipped_ids=skipped)
