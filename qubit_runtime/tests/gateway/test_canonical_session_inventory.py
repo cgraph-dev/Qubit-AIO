@@ -119,7 +119,6 @@ async def test_cli_surface_snapshot_carries_main_cli_toolsets_and_startup_warnin
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="blocked: the fork resolves the process home from QUBIT_HOME (the conftest sandbox) and does not read HERMES_HOME, so the final process-wide catalog assertion reads the wrong home; the session snapshot's kanban inventory assertions pass")
 async def test_cli_surface_counts_kanban_skills_like_main_cli_without_leaking(tmp_path, monkeypatch, repo):
     """Main's ``cmd_chat`` pins ``HERMES_KANBAN_BOARD`` before HermesCLI starts, so its banner lists
     ``environments: [kanban]`` skills. A CLI-surface snapshot counts them; other surfaces and the
@@ -140,6 +139,9 @@ async def test_cli_surface_counts_kanban_skills_like_main_cli_without_leaking(tm
     (home / 'config.yaml').write_text(
         'model: {default: gpt-5.4, provider: custom, base_url: "http://127.0.0.1:9/v1"}\n')
     monkeypatch.setenv('HERMES_HOME', str(home))
+    # The local resolver reads QUBIT_HOME; keep it on this test's home so the
+    # process-wide catalog assertion scans the same sandbox as the snapshot.
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.delenv('HERMES_KANBAN_BOARD', raising=False)
     monkeypatch.delenv('HERMES_KANBAN_TASK', raising=False)
     monkeypatch.setattr(run, '_qubit_home', home)

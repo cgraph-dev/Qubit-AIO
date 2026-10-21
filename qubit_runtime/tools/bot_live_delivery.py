@@ -356,10 +356,12 @@ def _door(call: Callable[[Path, dict], dict], profile_home, owner, message, *, d
                   **({"author": dict(author)} if author else {}), **category)
     try:
         return call(home, params)
-    except ValueError:
-        # No reachable authority. Keep the legacy mailbox queue only for a profile that still
-        # advertises a live owner (its poller consumes it); an unadvertised owner is a refusal.
-        if find_canonical_live_owner(profile_home) is None:
+    except ValueError as exc:
+        # A store refusal (RuntimeStoreError is a ValueError) is the authority answering: propagate
+        # it. Only an unreachable authority keeps the legacy mailbox queue, and only for a profile
+        # that still advertises a live owner (its poller consumes it); an unadvertised owner is a refusal.
+        from qubit_state_runtime import RuntimeStoreError
+        if isinstance(exc, RuntimeStoreError) or find_canonical_live_owner(profile_home) is None:
             raise
     with _locked(profile_home) as root:
         path = root / f"{key}.json"
