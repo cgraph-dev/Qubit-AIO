@@ -91,7 +91,6 @@ def test_every_host_shows_results_in_the_preview_pane_and_never_opens_a_browser(
     assert ("open it again after each change" in text) is (facts.facts_source == "remote")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: _PAGE_TASKS was rebranded to 'qubit' while the task id stayed 'hermes', so build_hermes loses page guidance")
 def test_the_page_guidance_rides_only_the_tasks_that_make_a_page():
     assert "When you make a page:" in reminder("build_hermes", new_record(MAC), MAC)
     assert "When you make a page:" in reminder("build_explain", new_record(MAC), MAC)

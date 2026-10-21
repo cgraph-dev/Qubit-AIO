@@ -208,7 +208,7 @@ _PAGE = (
     '3D: three@0.170.0 is ES modules only. Use an import map: "three" to its build/three.module.js, '
     '"three/addons/" to its examples/jsm/.',
 )
-_PAGE_TASKS = ("qubit", "explain", "brief", "week", "youtube", "site", "repo", "own")
+_PAGE_TASKS = ("hermes", "explain", "brief", "week", "youtube", "site", "repo", "own")
 
 _CONNECTORS = (
     "Never route around a connector. "

@@ -58,7 +58,6 @@ def call(db, desktop, call_id="call_1", **args):
     return json.loads(INLINE_TOOL_EXECUTORS["setup_beat"](agent, args, InlineToolContext("task", call_id)))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_a_card_answer_settles_the_beat_and_names_the_next(db, desktop):
     onboarding_record.start(db, SID, FACTS)
     desktop.replies.append({"answer": {"accent": "Ultraviolet"}})
@@ -72,7 +71,6 @@ def test_a_card_answer_settles_the_beat_and_names_the_next(db, desktop):
     assert onboarding_record.load(db, SID)["beats"]["theme"] == "done"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_next_shows_the_first_open_beat_and_the_name_card_offers_the_account_name(db, desktop, monkeypatch):
     monkeypatch.setattr("agent.onboarding_facts.suggested_name", lambda: "Ada Lovelace")
     onboarding_record.start(db, SID, FACTS)
@@ -87,7 +85,6 @@ def test_next_shows_the_first_open_beat_and_the_name_card_offers_the_account_nam
     assert desktop.ended == []  # the name answered the card: the turn goes on
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_a_message_sent_while_a_card_waits_closes_it_unanswered_and_ends_the_turn(db, desktop):
     onboarding_record.start(db, SID, FACTS)
     timed_out = call(db, desktop, beat="layout")
@@ -103,7 +100,6 @@ def test_a_message_sent_while_a_card_waits_closes_it_unanswered_and_ends_the_tur
     assert record["waiting"] is None and record["beats"]["layout"] == "shown"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_a_card_closed_by_words_a_value_or_the_deadline_reports_what_is_connected_and_installed(db, desktop):
     onboarding_record.start(db, SID, FACTS)
     timed_out = call(db, desktop, beat="plugins")
@@ -117,7 +113,6 @@ def test_a_card_closed_by_words_a_value_or_the_deadline_reports_what_is_connecte
     assert onboarding_record.load(db, SID)["picks"]["installed"] == ["blender"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_suggest_pins_connectors_and_value_or_skip_records_without_a_card(db, desktop):
     onboarding_record.start(db, SID, FACTS)
     desktop.replies.append({"answer": {"connected": ["slack"], "newly_connected": ["slack"]}})
@@ -130,7 +125,6 @@ def test_suggest_pins_connectors_and_value_or_skip_records_without_a_card(db, de
     assert skipped["skipped"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_the_offer_lists_the_real_connectors_and_an_unlisted_suggestion_shows_no_card(db, desktop, monkeypatch):
     # The model guessed GitHub from the gh CLI; this account cannot connect it, and the card showed nothing.
     monkeypatch.setattr("tools.setup_beat_tool._connector_slugs", lambda: {"slack", "linear"})
@@ -148,7 +142,6 @@ def test_the_offer_lists_the_real_connectors_and_an_unlisted_suggestion_shows_no
     assert [card["card"] for card in desktop.shown] == [{"suggested": ["slack"]}]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_next_to_the_connectors_card_before_the_offer_is_refused_without_a_card(db, desktop):
     onboarding_record.start(db, SID, FACTS)
     for beat in ("name", "theme", "layout"):
@@ -164,7 +157,6 @@ def test_next_to_the_connectors_card_before_the_offer_is_refused_without_a_card(
     assert shown["answer"] == {"connected": [], "newly_connected": []} and shown["next"] == "plugins"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_skip_setup_during_a_card_returns_skipped_all(db, desktop):
     onboarding_record.start(db, SID, FACTS)
 
@@ -178,7 +170,6 @@ def test_skip_setup_during_a_card_returns_skipped_all(db, desktop):
     assert "error" in call(db, desktop, beat="next")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_done_ends_the_run_only_after_the_build_card(db, desktop):
     onboarding_record.start(db, SID, FACTS)
     refused = call(db, desktop, beat="done")
@@ -190,7 +181,7 @@ def test_done_ends_the_run_only_after_the_build_card(db, desktop):
     assert "notes" in no_picks["error"] and desktop.shown == []
     desktop.replies.append({"answer": {"build": "notes"}})
     build = call(db, desktop, beat="build", options=[{"id": "notes", "label": "Notes to wiki"}])
-    assert desktop.shown[-1]["card"]["options"][-1] == {"id": "hermes", "label": "Explain how Hermes works"}
+    assert desktop.shown[-1]["card"]["options"][-1] == {"id": "hermes", "label": "Explain how Qubit works"}
     done = call(db, desktop, beat="done")
 
     assert "error" in refused
@@ -199,7 +190,6 @@ def test_done_ends_the_run_only_after_the_build_card(db, desktop):
     assert onboarding_record.load(db, SID)["phase"] == "complete"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: setup_beat onboarding tool is not registered in the local inline executor registry")
 def test_outside_an_onboarding_chat_the_tool_refuses(db, desktop):
     assert "not running" in call(db, desktop, beat="next")["error"]
     # A bare registry dispatch has no session store or card callback.

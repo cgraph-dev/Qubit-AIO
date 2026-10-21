@@ -76,7 +76,6 @@ def _loop_agent(db):
     return agent
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: closing a setup card by message issues another model call")
 def test_a_card_closed_by_a_message_ends_the_turn_without_another_model_call(tmp_path, monkeypatch):
     """The message runs as the user's own next turn, so the old turn must not go on to answer it."""
     monkeypatch.setattr("qubit_cli.onboarding_run.set_run", lambda *a, **k: None)
