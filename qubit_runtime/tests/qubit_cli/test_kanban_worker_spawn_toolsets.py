@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import pytest
 
 
 def _make_task(kb, *, assignee: str):
@@ -217,3 +218,82 @@ toolsets:
     assert "kanban_complete" in names
     assert "kanban_list" not in names
     assert resolved != ["kanban"]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: default kanban spawn passes mutable launch overrides")
+def test_default_spawn_does_not_pass_mutable_launch_overrides(monkeypatch, tmp_path):
+    """Owner policy reads overrides from the claimed card, not executable argv."""
+    root = tmp_path / ".qubit"
+    (root / "profiles" / "elias").mkdir(parents=True)
+    root.joinpath("config.yaml").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+
+    from qubit_cli import kanban_db as kb
+    from qubit_cli import kanban_db_dispatch as kbd
+
+    monkeypatch.setattr(kbd, "_resolve_qubit_argv", lambda: ["qubit"])
+    captured = {}
+
+    class FakeProc:
+        pid = 4244
+
+    def fake_popen(cmd, *args, **kwargs):
+        captured["cmd"] = list(cmd)
+        return FakeProc()
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    task = _make_task(kb, assignee="elias")
+    task.model_override = "gpt-5.6-sol"
+    kbd._default_spawn(task, str(workspace))
+
+    # Mutable model strings are not launch authority; the owner reads the claimed card.
+    assert captured["cmd"][-2:] == ["-m", "qubit_cli.kanban_worker_client"]
+    assert task.model_override not in captured["cmd"]
+
+def test_worker_toolsets_come_from_the_assignee_profile_not_the_parent_config(tmp_path, monkeypatch):
+    """The worker's toolsets are frozen by the assignee profile's own gateway (its config), never
+    by the dispatcher's root/active profile: a root config that only lists ``kanban`` must not
+    reach a worker whose profile grants ``terminal`` and ``web``."""
+    import json
+    from contextlib import closing
+    from types import SimpleNamespace
+
+    from qubit_cli import kanban_db as kb
+    from qubit_cli.kanban_db_connect import connect
+    from gateway.session_contract import Principal
+    from gateway.session_kanban import build_kanban_policy
+
+    profile = tmp_path / "profiles" / "elias"
+    profile.mkdir(parents=True)
+    monkeypatch.setenv("QUBIT_KANBAN_HOME", str(tmp_path))
+    monkeypatch.setenv("QUBIT_HOME", str(profile))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("QUBIT_KANBAN_DB", raising=False)
+    monkeypatch.setattr("qubit_cli.profiles.resolve_profile_env", lambda name: str(profile))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    kb.create_board("owned")  # explicit creation; connect() never creates a board (#43243)
+    with closing(connect(board="owned")) as conn:
+        task_id = kb.create_task(conn, title="t", body="b", assignee="elias",
+                                 workspace_kind="dir", workspace_path=str(workspace))
+        kb.recompute_ready(conn)
+        task = kb.claim_task(conn, task_id)
+    actor = Principal("owner", str(profile), frozenset({"session:create"}), "transport")
+    connection = SimpleNamespace(authority=SimpleNamespace(profile_id=str(profile)), actor=actor, native_owner=True)
+    params = dict(board="owned", task_id=task.id, run_id=task.current_run_id, claim_lock=task.claim_lock)
+
+    assignee_config = {"model": {"default": "m", "provider": "custom"},
+                       "platform_toolsets": {"cli": ["terminal", "web"]}, "toolsets": ["qubit-cli"]}
+    policy, _ = build_kanban_policy(connection, params, assignee_config)
+    assert {"terminal", "web", "kanban"} <= set(policy.toolsets)
+
+    root_only_kanban = {"model": {"default": "m", "provider": "custom"}, "platform_toolsets": {"cli": ["kanban"]}}
+    other_profile = tmp_path
+    with pytest.raises(Exception):
+        # A dispatcher acting for another profile cannot mint this worker's policy at all.
+        build_kanban_policy(SimpleNamespace(authority=SimpleNamespace(profile_id=str(other_profile)),
+                                            actor=actor, native_owner=True), params, root_only_kanban)
+    assert json.loads(policy.kanban_json)["profile"] == "elias"

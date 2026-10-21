@@ -500,3 +500,78 @@ def test_server_added_after_discovery_is_connected_by_the_next_agent_build(monke
     configured["linear"] = {"url": "https://mcp.example.test/linear"}  # qubit mcp add linear
     build_agent()
     assert len(runs) == 2
+
+
+def test_prepare_agent_startup_backgrounds_blocking_mcp_for_rl(monkeypatch):
+    """``qubit rl`` builds its agent in this process: discovery runs off-thread, never blocking.
+    (Chat turns run in the gateway; see the next test.)"""
+    stop = threading.Event()
+    calls = {"mcp": 0}
+
+    def _blocking_discover():
+        calls["mcp"] += 1
+        stop.wait()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "qubit_cli.plugins",
+        types.SimpleNamespace(discover_plugins=lambda: None),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "qubit_cli.config",
+        types.SimpleNamespace(
+            read_raw_config=lambda: {"mcp_servers": {"demo": {"transport": "stdio"}}},
+            load_config=dict,
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "agent.shell_hooks",
+        types.SimpleNamespace(register_from_config=lambda *_a, **_k: None),
+    )
+    # Stub mcp_oauth so the background thread doesn't pay the real (cold,
+    # ~0.75s) ``tools.mcp_oauth`` import before calling discovery. This test
+    # asserts the *backgrounding contract* (main thread returns fast, discovery
+    # runs off-thread), not OAuth suppression — the unrelated import latency
+    # would otherwise blow the polling deadline on a loaded CI runner.
+    monkeypatch.setitem(
+        sys.modules,
+        "tools.mcp_oauth",
+        types.SimpleNamespace(suppress_interactive_oauth=lambda: nullcontext()),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "tools.mcp_tool_discovery",
+        types.SimpleNamespace(discover_mcp_tools=_blocking_discover),
+    )
+
+    try:
+        start = time.monotonic()
+        main_mod._prepare_agent_startup(_agent_args(command="rl"))
+        elapsed = time.monotonic() - start
+        assert elapsed < 2.0
+        deadline = time.monotonic() + 3.0
+        while calls["mcp"] == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert calls["mcp"] == 1
+        thread = mcp_startup._current_home_thread()
+        assert thread is not None
+        assert thread.is_alive()
+    finally:
+        stop.set()
+
+@pytest.mark.parametrize("command", [None, "chat"])
+def test_chat_client_never_spawns_mcp_servers_the_gateway_owns(monkeypatch, command):
+    """A chat/`-q` client only proxies turns to the gateway: spawning every MCP server here doubled
+    them and held the discovery lock the cold-starting gateway waited on before READY."""
+    calls = {"background": 0, "inline": 0}
+    monkeypatch.setattr(main_mod, "_resolve_use_tui", lambda _args: False)
+    monkeypatch.setattr(mcp_startup, "start_background_mcp_discovery",
+                        lambda **_kwargs: calls.__setitem__("background", calls["background"] + 1))
+    monkeypatch.setitem(sys.modules, "qubit_cli.plugins", types.SimpleNamespace(
+        discover_plugins=lambda: None, start_background_plugin_discovery=lambda: None))
+    monkeypatch.setitem(sys.modules, "tools.mcp_tool_discovery", types.SimpleNamespace(
+        discover_mcp_tools=lambda **_k: calls.__setitem__("inline", calls["inline"] + 1)))
+    main_mod._prepare_agent_startup(_agent_args(command=command))
+    assert calls == {"background": 0, "inline": 0}

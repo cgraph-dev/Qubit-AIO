@@ -11,6 +11,7 @@ import pytest
 import qubit_cli.gateway as gateway
 import qubit_cli.gateway_windows as gateway_windows
 import qubit_cli.setup as setup
+from qubit_cli import gateway, gateway_windows, setup
 
 
 _BREAKAWAY_MARKER = "_QUBIT_GATEWAY_BREAKAWAY"
@@ -844,3 +845,29 @@ def test_wizard_install_service_asks_once_and_never_starts_after_windows_install
 
     assert installs == [{"force": False, "start_now": True, "start_on_login": True}]
     assert starts == []
+
+
+@pytest.mark.platforms("windows")
+def test_registered_task_launchers_reads_each_qubit_task_action(monkeypatch):
+    """The install probe's view of the Scheduled Tasks: the launcher each ``Qubit_Gateway*`` task
+    starts, as the task XML this module writes names it, and a pre-``wscript`` task's ``.cmd``."""
+    launcher = r"C:\Users\Ann Lee\custom qubit\gateway-service\Qubit_Gateway_work.vbs"
+    legacy = r"C:\Users\ann\h2\gateway-service\Qubit_Gateway.cmd"
+    current = gateway_windows._build_scheduled_task_xml("Qubit_Gateway_work", Path(launcher), "PC\\ann")
+    older = current.replace("<Command>wscript.exe</Command>", f"<Command>{legacy}</Command>").replace(
+        f'//B //Nologo "{launcher}"', "")
+    listing = ('\r\n"\\Microsoft\\Windows\\Defrag\\ScheduledDefrag","N/A","Ready"\r\n'
+               '"\\Qubit_Gateway_work","N/A","Ready"\r\n"\\Qubit_Gateway","N/A","Running"\r\n')
+    xml = {"Qubit_Gateway_work": current, "Qubit_Gateway": older}
+    monkeypatch.setattr(gateway_windows, "_exec_schtasks",
+                        lambda args, timeout=None: (0, listing if "/FO" in args else xml[args[2]], ""))
+
+    assert gateway_windows.registered_task_launchers() == [launcher, legacy]
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: schtasks UTF-16 BOM output is not decoded")
+def test_decode_schtasks_output_honours_a_utf16_bom():
+    """A genuine UTF-16 write (BOM) decodes as UTF-16, never as a code page; a malformed one falls
+    back like any other bytes instead of raising past callers that catch only timeout/OS errors."""
+    text = "Herm\u00e9s"
+    assert gateway_windows._decode_schtasks_output(text.encode("utf-16")) == text
+    assert gateway_windows._decode_schtasks_output(b"\xff\xfe<\x00?")
