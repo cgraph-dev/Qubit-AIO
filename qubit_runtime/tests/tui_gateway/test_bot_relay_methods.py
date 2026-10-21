@@ -628,3 +628,120 @@ def test_turn_that_never_ends_is_still_a_delivery_timeout(tmp_path, monkeypatch)
     with pytest.raises(subprocess.TimeoutExpired):
         methods_bot_relay._run_delivery("ops", str(tmp), env, timeout=1)
     assert time.monotonic() - started < 8
+
+
+def test_outbox_drain_replays_canonical_envelope_until_reply_acknowledged(home):
+    """A drained envelope is not "delivered" — its stable id is replayed on every
+    drain until the target's terminal reply is written under that id, so a
+    Desktop that lost the first drain result cannot drop the DM."""
+    target = {"profile": "scout", "handle": "scout", "connection_id": "cloud-1",
+              "connection_label": "", "title": "", "description": ""}
+    env = bot_relay.enqueue_envelope(
+        home, target=target, message="m", sender_profile="default", sender_handle="qubit"
+    )
+    first = _result(srv._methods["bot_relay.outbox.drain"](1, {}))
+    assert [e["id"] for e in first["envelopes"]] == [env["id"]]
+    second = _result(srv._methods["bot_relay.outbox.drain"](2, {}))
+    assert [e["id"] for e in second["envelopes"]] == [env["id"]], "same id, never a duplicate envelope"
+    assert second["envelopes"][0]["message"] == "m"
+    _result(srv._methods["bot_relay.reply"](3, {"id": env["id"], "reply": "done"}))
+    assert _result(srv._methods["bot_relay.outbox.drain"](4, {}))["envelopes"] == []
+
+
+def test_outbox_drain_settles_a_claimed_envelope_nobody_answered_with_a_typed_timeout(home):
+    """A Desktop that disconnects between ``outbox.drain`` and ``bot_relay.deliver`` leaves the envelope in
+    ``claimed/`` with no reply (#111021, #111207). It is replayed on every drain — same id, so the target
+    authority admits one turn — until the waiter's ``REPLY_WAIT_SECONDS`` run out; then the drain writes a
+    ``delivery_timeout`` reply so the sender learns, and never hands the envelope out again."""
+    import time
+
+    target = {"profile": "scout", "handle": "scout", "connection_id": "cloud-1",
+              "connection_label": "", "title": "", "description": ""}
+    lost = bot_relay.enqueue_envelope(home, target=target, message="lost", sender_profile="w", sender_handle="w")
+    done = bot_relay.enqueue_envelope(home, target=target, message="done", sender_profile="w", sender_handle="w")
+    drain = srv._methods["bot_relay.outbox.drain"]
+    assert sorted(e["id"] for e in _result(drain(1, {}))["envelopes"]) == sorted([lost["id"], done["id"]])
+    bot_relay.write_reply(home, done["id"], reply="answered")
+    # An answered envelope is never re-offered; the unanswered one rides every drain.
+    assert [e["id"] for e in _result(drain(2, {}))["envelopes"]] == [lost["id"]]
+    lost_path = bot_relay.relay_root(home) / bot_relay.CLAIMED_DIR / f"{lost['id']}.json"
+    stale = json.loads(lost_path.read_text(encoding="utf-8"))
+    stale["created_at"] = int(time.time()) - bot_relay.REPLY_WAIT_SECONDS - 1
+    lost_path.write_text(json.dumps(stale), encoding="utf-8")
+    assert _result(drain(3, {}))["envelopes"] == []
+    reply = json.loads((bot_relay.relay_root(home) / bot_relay.REPLIES_DIR / f"{lost['id']}.json").read_text(encoding="utf-8"))
+    assert reply["reason"] == "delivery_timeout" and reply["error"]
+    assert _result(drain(4, {}))["envelopes"] == []
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: relay deliver still runs the subprocess transport instead of forwarding to the target authority")
+def test_deliver_forwards_stable_id_to_target_profile_authority(home, monkeypatch):
+    """The relay door is a transport bridge: it resolves the target profile's
+    own home and forwards the envelope id + message to THAT authority. It
+    never runs a CLI turn of its own."""
+    from tools import bot_live_delivery as live
+
+    forwarded = []
+    spawned = []
+
+    def _fake_run(argv, *a, **k):
+        # The server module's import-time update prefetch runs `git ...`; only
+        # a `qubit` spawn would be a delivery attempt.
+        if argv and argv[0] != "git":
+            spawned.append(argv)
+        return type("P", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    def _fake_authority(target_home, params):
+        forwarded.append((target_home, dict(params)))
+        return {"status": "queued", "delivery_id": params["id"], "reply": ""}
+
+    monkeypatch.setattr("subprocess.run", _fake_run)
+    monkeypatch.setattr(live, "authority_delivery", _fake_authority)
+    envelope_id = "b" * 32
+    out = _result(srv._methods["bot_relay.deliver"](1, {"id": envelope_id, "profile": "ops", "message": "ping"}))
+    assert out["status"] == "queued" and out["delivery_id"] == envelope_id
+    assert forwarded[-1][0] == home / "profiles" / "ops"
+    assert forwarded[-1][1]["id"] == envelope_id and forwarded[-1][1]["profile"] == "ops"
+
+    # Exact retry carries the SAME id to the same authority — no second envelope.
+    _result(srv._methods["bot_relay.deliver"](2, {"id": envelope_id, "profile": "ops", "message": "ping"}))
+    assert [p["id"] for _h, p in forwarded] == [envelope_id, envelope_id]
+
+    # 'qubit' alias resolves to the default profile's home.
+    _result(srv._methods["bot_relay.deliver"](3, {"id": "c" * 32, "profile": "qubit", "message": "x"}))
+    assert forwarded[-1][0] == home and forwarded[-1][1]["profile"] == "default"
+    assert not spawned
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: relay deliver does not map an unreachable authority to runtime_unavailable")
+def test_deliver_unreachable_authority_is_a_typed_refusal(home, monkeypatch):
+    from tools import bot_live_delivery as live
+
+    def _down(target_home, params):
+        raise ValueError("profile authority is not ready")
+
+    monkeypatch.setattr(live, "authority_delivery", _down)
+    err = srv._methods["bot_relay.deliver"](1, {"id": "d" * 32, "profile": "ops", "message": "x"})
+    assert err["error"]["data"]["reason"] == "runtime_unavailable"
+    assert "not ready" in err["error"]["message"]
+    # A name that is not a live profile (#99392: infra dirs and bare shells are not teammates)
+    # is refused before any authority is consulted.
+    (home / "profiles" / "sessions").mkdir()
+    for ghost in ("ghost", "sessions"):
+        err = srv._methods["bot_relay.deliver"](2, {"id": "e" * 32, "profile": ghost, "message": "x"})
+        assert err["error"]["data"]["reason"] == "unknown_profile", ghost
+
+
+@pytest.mark.parametrize("params", [
+    {"profile": "", "message": ""},
+    {"profile": "ops", "message": "no envelope id"},
+    {"id": "../evil", "profile": "ops", "message": "x"},
+    {"id": "e" * 32, "profile": "../ops", "message": "x"},
+])
+def test_deliver_requires_stable_id_and_valid_profile(home, monkeypatch, params):
+    from tools import bot_live_delivery as live
+
+    monkeypatch.setattr(live, "authority_delivery",
+                        lambda *a, **k: pytest.fail("malformed requests never reach an authority"))
+    err = srv._methods["bot_relay.deliver"](1, params)
+    assert err["error"]["data"]["reason"] == "invalid_params"

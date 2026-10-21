@@ -176,3 +176,104 @@ def test_provision_sets_the_free_tier_up_through_the_lifecycle_primitive(tmp_pat
     _set_guest_off(monkeypatch)
     monkeypatch.setattr(anon_auth, "ensure_portal_identity", lambda **kw: (_ for _ in ()).throw(AssertionError("must not run")))
     assert _call("free_tier.provision") == {"has_guest": False, "enabled": False}
+
+
+@pytest.fixture
+def nas(tmp_path, monkeypatch):
+    """The fake account service, read on the desktop's local backend of a first install."""
+    from tests.qubit_cli.anon_portal import as_local_desktop_backend, install_portal
+    fake = install_portal(monkeypatch, tmp_path)
+    as_local_desktop_backend(monkeypatch)
+    return fake
+
+
+def test_status_carries_the_pending_browser_challenge_and_drops_it_once_cleared(guest):
+    """A client that connects after the ``free_tier.challenge`` event still learns there is a
+    window to open; once the challenge is worked, the field is gone."""
+    from qubit_cli import anon_challenge
+    assert "challenge" not in _call("free_tier.status")
+
+    challenge = anon_challenge.BrowserChallenge(
+        "https://portal.example.test/challenge?code=t", True, 600, 2, "A quick check first.")
+    anon_challenge._record(challenge, new_attempt=False)
+    try:
+        assert _call("free_tier.status")["challenge"] == challenge.as_payload()
+    finally:
+        anon_challenge._clear_pending()
+    assert "challenge" not in _call("free_tier.status")
+
+
+def test_window_outcomes_are_scoped_and_do_not_grant_auth(guest, tmp_path):
+    from qubit_cli import anon_challenge
+    from qubit_constants import set_qubit_home_override, reset_qubit_home_override
+    a = anon_challenge.BrowserChallenge("https://portal.example.test/challenge?code=a", True, 600, 2, "check")
+    b = anon_challenge.BrowserChallenge("https://portal.example.test/challenge?code=b", False, 600, 2, "check")
+    anon_challenge._record(a, new_attempt=False)
+    scope = set_qubit_home_override(tmp_path / "secondary")
+    try:
+        anon_challenge._record(b, new_attempt=False)
+        assert not anon_challenge.record_host_outcome(a.url, 0, "done")
+        assert anon_challenge.pending_challenge()["url"] == b.url
+    finally:
+        reset_qubit_home_override(scope)
+    assert _call("free_tier.status")["challenge"]["url"] == a.url
+    assert _call("free_tier.challenge_result", {"url": a.url, "outcome": "error"}) == {"accepted": True}
+    assert _call("free_tier.status")["challenge"]["url"] == a.url
+
+
+def test_provision_claims_the_trial_once_while_it_is_claimable(nas):
+    """``free_tier.provision`` is the desktop's explicit retry: it claims the welcome trial while
+    nothing blocks the claim here, and reports the outcome."""
+    assert _call("free_tier.provision") == {"has_guest": True, "enabled": True}
+    assert nas.creates() == 1 and anon_auth.free_inference_active()
+
+    assert _call("free_tier.provision") == {"has_guest": True, "enabled": True}
+    assert nas.creates() == 1                    # claimed already: nothing is minted again
+
+
+def test_provision_reports_a_refused_claim_and_the_users_retry_skips_the_cooldown(nas):
+    nas.gate_closed = True
+    result = _call("free_tier.provision")
+    assert result["has_guest"] is False and result["enabled"] is True
+    assert result["error_code"] == "anon_gate_closed" and result["retryable"] is False, result
+
+    nas.gate_closed = False                      # still inside the refusal's cooldown
+    assert _call("free_tier.provision") == {"has_guest": True, "enabled": True}
+    assert anon_auth.free_inference_active()
+
+
+def test_provision_does_nothing_with_guests_switched_off(nas):
+    from qubit_constants import get_qubit_home
+    (get_qubit_home() / "config.yaml").write_text("nous:\n  guest: false\n", encoding="utf-8")
+    assert _call("free_tier.provision") == {"has_guest": False, "enabled": False}
+    assert nas.calls == []
+
+
+def test_sign_in_offer_is_reported_then_claimed_once(guest, monkeypatch):
+    from qubit_cli import free_tier_offer
+    now = [10_000.0]
+    monkeypatch.setattr(free_tier_offer, "_clock", lambda: now[0])
+    assert "nudge_due_in" not in _call("free_tier.status")
+    assert _call("free_tier.claim_nudge") == {"claimed": False}
+
+    free_tier_offer.record_task_done()
+    assert _call("free_tier.status")["nudge_due_in"] == free_tier_offer.OFFER_DELAY_S
+    assert _call("free_tier.claim_nudge") == {"claimed": False}  # not due yet
+
+    now[0] += free_tier_offer.OFFER_DELAY_S
+    assert _call("free_tier.status")["nudge_due_in"] == 0
+    assert _call("free_tier.claim_nudge") == {"claimed": True}
+    assert _call("free_tier.claim_nudge") == {"claimed": False}
+    assert "nudge_due_in" not in _call("free_tier.status")  # nothing finished since the offer
+
+
+def test_sign_in_offer_is_moot_once_signed_in(guest, monkeypatch):
+    from qubit_cli import free_tier_offer
+    monkeypatch.setattr(free_tier_offer, "_clock", lambda: 10_000.0)
+    free_tier_offer.record_task_done()
+    with _auth_store_lock():   # the user signed in: the profile's Nous identity is an account now
+        store = _load_auth_store()
+        store["providers"]["nous"] = {"auth_method": "oauth", "access_token": "acct-token"}
+        _save_auth_store(store)
+    assert "nudge_due_in" not in _call("free_tier.status")
+    assert _call("free_tier.claim_nudge") == {"claimed": False}

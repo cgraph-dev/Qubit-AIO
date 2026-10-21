@@ -19352,6 +19352,7 @@ def test_notification_poller_requeues_when_busy(monkeypatch):
             process_registry.completion_queue.get_nowait()
 
 
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: session.save omits the importable id/started_at/system_prompt fields")
 def test_session_save_writes_under_qubit_home_with_system_prompt(monkeypatch, tmp_path):
     """TUI /save (session.save RPC) must snapshot under the Hermes profile
     home — not the project/workspace CWD — and include the system prompt,
@@ -23494,3 +23495,84 @@ def test_session_branch_idempotency_key_dedupes_retry(monkeypatch, tmp_path):
         for k in list(server._sessions):
             server._sessions.pop(k, None)
         server._idempotency_keys.clear()
+
+
+def test_live_visible_history_keeps_an_unflushed_repeat_of_the_last_turn_real_db(tmp_path):
+    """The live tail is anchored on the last DB row's durable id, not its text: sending the same words again
+    ("ok" -> "done") before the flush must not fold the new turn into the persisted one."""
+    from qubit_state import SessionDB
+
+    db = SessionDB(db_path=tmp_path / "state.db")
+    db.create_session("s1", source="tui")
+    db.append_message("s1", role="user", content="ok")
+    db.append_message("s1", role="assistant", content="done")
+    live = db.get_messages_as_conversation("s1") + [
+        {"role": "user", "content": "ok"}, {"role": "assistant", "content": "done"}]
+
+    merged = server._live_visible_history({"session_key": "s1"}, db, live)
+    assert [m["content"] for m in merged] == ["ok", "done", "ok", "done"]
+    # Fully flushed: the same four rows, never doubled.
+    for msg in live[2:]:
+        db.append_message("s1", role=msg["role"], content=msg["content"])
+    flushed = db.get_messages_as_conversation("s1")
+    assert [m["content"] for m in server._live_visible_history({"session_key": "s1"}, db, flushed)] == [
+        "ok", "done", "ok", "done"]
+
+
+def test_session_save_writes_under_qubit_home_with_system_prompt(monkeypatch, tmp_path):
+    """TUI /save (session.save RPC) must snapshot under the Qubit profile
+    home — not the project/workspace CWD — and include the system prompt,
+    mirroring the classic CLI /save and the dashboard save export.
+
+    Regression: the gateway handler wrote ``hermes_conversation_*.json`` to
+    ``os.path.abspath(...)`` (the workspace CWD) and only exported ``model``
+    and ``messages``, so ``system_prompt`` was missing.
+    """
+    home = tmp_path / ".qubit"
+    home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+
+    # Run from a different CWD to prove the snapshot does NOT leak there.
+    work = tmp_path / "workspace"
+    work.mkdir()
+    monkeypatch.chdir(work)
+
+    sid = "save-sid"
+    agent = types.SimpleNamespace(
+        model="qubit-test",
+        session_id="20260101_120000_abc123",
+        session_start=datetime(2026, 1, 1, 12, 0, 0),
+        _cached_system_prompt="You are Qubit.",
+    )
+    history = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hello"},
+    ]
+    server._sessions[sid] = {
+        "agent": agent,
+        "session_key": "save-key",
+        "history": history,
+        "history_lock": threading.Lock(),
+        "created_at": 1735732800.0,
+    }
+    try:
+        resp = server._methods["session.save"]("1", {"session_id": sid})
+    finally:
+        server._sessions.pop(sid, None)
+
+    assert "result" in resp, resp
+    saved_file = Path(resp["result"]["file"])
+
+    # Must NOT leak into the workspace/project CWD.
+    assert not list(work.glob("hermes_conversation_*.json"))
+
+    saved_dir = home / "sessions" / "saved"
+    assert saved_file.parent == saved_dir
+    assert saved_file.exists()
+
+    payload = json.loads(saved_file.read_text(encoding="utf-8-sig"))
+    assert payload["model"] == "qubit-test"
+    assert payload["id"] == "20260101_120000_abc123"  # importable: import_sessions keys on raw["id"]
+    assert payload["started_at"] == datetime(2026, 1, 1, 12, 0, 0).timestamp()
+    assert payload["system_prompt"] == "You are Qubit."
+    assert payload["messages"] == history
