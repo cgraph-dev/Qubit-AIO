@@ -96,5 +96,3 @@ async def stage_user_content(content, home=None):
             continue
         attachments.append({'path': path, 'mime': mime})
     return "\n".join(texts), attachments
-
-
