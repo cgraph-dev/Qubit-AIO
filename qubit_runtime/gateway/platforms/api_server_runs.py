@@ -90,10 +90,15 @@ _USAGE_FIELDS = (
     ("total_tokens", "session_total_tokens"), ("cache_read_tokens", "session_cache_read_tokens"),
     ("cache_write_tokens", "session_cache_write_tokens"))
 # Tool-progress event -> SSE payload fields (tool_name, preview, kwargs); key order is wire format.
+def _call_id(kw: dict[str, Any]) -> dict[str, Any]:
+    return {"tool_call_id": kw["tool_call_id"]} if kw.get("tool_call_id") else {}
+
+
 _FIXED_EVENT_FIELDS = {
-    "tool.started": lambda tool, preview, kw: {"tool": tool, "preview": preview},
+    "tool.started": lambda tool, preview, kw: {"tool": tool, "preview": preview, **_call_id(kw)},
     "tool.completed": lambda tool, preview, kw: {
-        "tool": tool, "duration": round(kw.get("duration", 0), 3), "error": kw.get("is_error", False)},
+        "tool": tool, "duration": round(kw.get("duration", 0), 3), "error": kw.get("is_error", False),
+        **_call_id(kw)},
     "reasoning.available": lambda tool, preview, kw: {"text": preview or ""}}
 _TOOL_COMPLETED_PREVIEW_MAX_CHARS = 500
 
@@ -238,7 +243,9 @@ def _http_routes(self) -> list[tuple[str, str, Any]]:
         ("POST", "/v1/runs", self._handle_runs), ("GET", "/v1/runs/{run_id}", self._handle_get_run),
         ("GET", "/v1/runs/{run_id}/events", self._handle_run_events),
         ("POST", "/v1/runs/{run_id}/approval", self._handle_run_approval),
+        ("POST", "/v1/runs/{run_id}/clarify", self._handle_run_clarify),
         ("POST", "/v1/runs/{run_id}/steer", self._handle_steer_run),
+        ("POST", "/v1/runs/{run_id}/resolve-unknown", self._handle_resolve_unknown_run),
         ("POST", "/v1/runs/{run_id}/stop", self._handle_stop_run)]
 
 
@@ -1032,18 +1039,48 @@ async def _execute_run(self, run: _RunLaunch, *, _api_server) -> None:
         if run_id in self._stopping_run_ids:
             _finish("cancelled")
             return
-        with self._profile_scope(run.request_profile):
-            agent = self._create_agent(
-                stream_delta_callback=_text_cb, tool_progress_callback=self._make_run_event_callback(run_id, loop),
-                interim_assistant_callback=_interim_cb, **run.agent_kwargs)
-        self._active_run_agents[run_id] = agent
-        approval_notify = _make_approval_notify(self, run, _api_server=_api_server)
-        result, usage, served_runtime = await _submit_api_worker(
-            loop, lambda: _run_agent_sync(self, run, agent, approval_notify, _api_server=_api_server))
+        if run.admission is not None:
+            from gateway.session_api_turn import observe_api_controls, observe_api_turn
+            tool_cb = self._make_run_event_callback(run_id, loop)
+
+            def _control_cb(event_type, prompt):
+                # Same authority prompt the WS viewer and GET pending_controls expose, on the
+                # run's own stream so a streaming-only client learns it must respond.
+                with suppress(Exception):
+                    loop.call_soon_threadsafe(run.put_event, _run_event(run_id, event_type, **prompt))
+
+            def _tool_start(call_id, name, args):
+                from agent.display import build_tool_preview
+                tool_cb("tool.started", name, build_tool_preview(name, args or {}) or "", args, tool_call_id=call_id)
+
+            def _tool_complete(call_id, name, args, result):
+                from agent.display import _detect_tool_failure
+                is_error, _ = _detect_tool_failure(name, result)
+                tool_cb("tool.completed", name, None, args, tool_call_id=call_id, is_error=bool(is_error))
+
+            with observe_api_controls(run.admission, _control_cb):
+                result, usage = await observe_api_turn(
+                    run.admission, stream_delta_callback=_text_cb,
+                    tool_start_callback=_tool_start, tool_complete_callback=_tool_complete)
+            # The canonical turn has no agent object here; the served pair rides on the
+            # committed usage/result runtime metadata when the turn recorded one.
+            served_runtime = ((usage or {}).get("runtime") if isinstance(usage, dict) else None) or (
+                result.get("runtime") if isinstance(result, dict) else None) or {}
+        else:
+            with self._profile_scope(run.request_profile):
+                agent = self._create_agent(
+                    stream_delta_callback=_text_cb, tool_progress_callback=self._make_run_event_callback(run_id, loop),
+                    interim_assistant_callback=_interim_cb, **run.agent_kwargs)
+            self._active_run_agents[run_id] = agent
+            approval_notify = _make_approval_notify(self, run, _api_server=_api_server)
+            result, usage, served_runtime = await _submit_api_worker(
+                loop, lambda: _run_agent_sync(self, run, agent, approval_notify, _api_server=_api_server))
         # Publish request metrics (daily counters + latency) with each completed run (#52323).
         self._record_api_metrics(usage, time.perf_counter() - _run_started_at)
         if not isinstance(result, dict):
             result = {}
+        # The committed outcome decides: a stop issued over WS by another viewer interrupts
+        # this run just as much as one issued through this adapter's own /stop.
         status, fields = terminal_run_status(result)
         if status == "cancelled":
             _finish("cancelled", fields)
@@ -1067,6 +1104,13 @@ async def _execute_run(self, run: _RunLaunch, *, _api_server) -> None:
         logger.warning("Provider resolution failed for run=%s: %s", run_id, exc)
         _finish("failed", error=exc.user_text())
     except Exception as exc:
+        if getattr(exc, "reason", None) == "admission_queued":
+            # Still queued at a retiring owner: the next owner runs it once, and GET /v1/runs/{id}
+            # reads that row. A run.failed here would invite a poller to resubmit it.
+            self._set_run_status(run_id, "queued", last_event="run.queued")
+            with suppress(Exception):
+                loop.call_soon(run.put_event, _run_event(run_id, "run.queued", message=str(exc)))
+            return
         logger.exception("[api_server] run %s failed", run_id)
         _finish("failed", error=_redact_api_error_text(exc))
     finally:
@@ -1105,7 +1149,10 @@ def _request_owns_run(self, request: "web.Request", run_id: str) -> bool:
     # Run state that exists without an owner stamp is an unanswered authorization question, not a run anyone
     # may control — under gateway.multiplex_profiles every served profile holds a valid key, so admitting it
     # would make the boundary allow-all (#93689).
-    return self._run_idempotency_store.owns_run(scope, run_id)
+    if self._run_idempotency_store.owns_run(scope, run_id):
+        return True
+    from gateway.session_api_turn import owns_api_run
+    return owns_api_run(self, run_id, scope)
 
 
 def _load_owned_run(self, request, *, _api_server, permission: Optional[str], active_fallback: bool):
