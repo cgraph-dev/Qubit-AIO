@@ -265,7 +265,6 @@ def test_kanban_show_text_renders_legacy_iso_completed_at(kanban_home):
 
     assert "completed: 2026-09-30 14:22" in " ".join(output.split())
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: kanban CLI does not parse ISO text in integer timestamp columns")
 def test_show_survives_iso_strings_in_integer_timestamp_columns(kanban_home):
     """`kanban show` must not crash on ISO-8601 strings written into the
     INTEGER timestamp columns of tasks / task_runs / task_events by raw SQL

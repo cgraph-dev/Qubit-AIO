@@ -4016,7 +4016,6 @@ def _begin_compression_attempt(
         from qubit_cli.observability.shared_metrics_events import begin_compression_attempt
 
         begin_compression_attempt(trigger, approx_tokens or getattr(agent.context_compressor, "last_prompt_tokens", None))
-        agent.context_compressor._compression_telemetry_seed = dict(seed)
     return _Attempt(snapshot, generation, started_at, seed)
 
 

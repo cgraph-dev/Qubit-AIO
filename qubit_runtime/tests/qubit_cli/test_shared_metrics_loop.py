@@ -60,11 +60,12 @@ def test_memory_tool_counts_each_operation_with_its_outcome_and_origin(home):
     rows = {tuple(sorted(d.items())): v for d, v in _rows(home, "qubit.memory.op.count")}
     base = {"provider": "builtin", "origin": "foreground"}
     assert rows == {
-        tuple(sorted({**base, "op": "add", "outcome": "success"}.items())): 1,
-        tuple(sorted({**base, "op": "replace", "outcome": "rejected"}.items())): 1,
-        tuple(sorted({**base, "op": "replace", "outcome": "failed"}.items())): 1,
-        tuple(sorted({**base, "op": "other", "outcome": "rejected"}.items())): 1,
-        tuple(sorted({**base, "origin": "background_review", "op": "add", "outcome": "success"}.items())): 2,
+        tuple(sorted({**base, "op": "add", "outcome": "success", "failure_class": "none"}.items())): 1,
+        tuple(sorted({**base, "op": "replace", "outcome": "rejected", "failure_class": "missing_old_text"}.items())): 1,
+        tuple(sorted({**base, "op": "replace", "outcome": "failed", "failure_class": "no_match"}.items())): 1,
+        tuple(sorted({**base, "op": "other", "outcome": "rejected", "failure_class": "other"}.items())): 1,
+        tuple(sorted({**base, "origin": "background_review", "op": "add", "outcome": "success",
+                      "failure_class": "none"}.items())): 2,
     }
 
 
@@ -289,7 +290,6 @@ def _raise():
     raise RuntimeError("boom")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: qubit.memory.op.count rows carry no failure_class dimension")
 def test_memory_failure_class_names_each_store_refusal_and_never_its_text(home):
     """Each built-in refusal/failure return reports its own closed class; the row carries no memory text."""
     from tools.memory_tool import memory_tool

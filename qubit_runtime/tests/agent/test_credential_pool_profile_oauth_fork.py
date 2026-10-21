@@ -238,7 +238,6 @@ def test_strip_helper_leaves_shared_root_auth_store_unchanged(fleet, link):
     assert (root / "auth.json").read_text() == before
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: profile strip helper does not fail closed on an unresolvable root store")
 def test_strip_helper_fails_closed_when_root_store_cannot_be_resolved(fleet, monkeypatch):
     """Credential hygiene must not mutate auth when store identity is unknown."""
     from qubit_cli.auth import strip_cloned_single_use_oauth_grants
@@ -250,7 +249,7 @@ def test_strip_helper_fails_closed_when_root_store_cannot_be_resolved(fleet, mon
     shared = _shared_profile(
         fleet, "shared", link=lambda target, alias: alias.symlink_to(target))
     monkeypatch.setattr(
-        qubit_constants, "get_default_hermes_root",
+        qubit_constants, "get_default_qubit_root",
         lambda: (_ for _ in ()).throw(OSError("root unavailable")))
 
     assert strip_cloned_single_use_oauth_grants(shared) == {
@@ -459,7 +458,6 @@ def test_profile_auth_add_never_copies_roots_provider_login(fleet: dict, provide
     assert "rt-root" not in (kid / "auth.json").read_text(encoding="utf-8")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: auth add reports success for a row the store did not keep")
 def test_auth_add_never_reports_added_for_a_row_the_store_did_not_keep(fleet, monkeypatch, capsys):
     """"Added" is printed only for a credential the store holds afterwards."""
     from argparse import Namespace

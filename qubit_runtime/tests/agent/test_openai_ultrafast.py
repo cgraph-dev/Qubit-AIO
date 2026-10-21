@@ -19,7 +19,6 @@ ASTRA_SPELLINGS = ("gpt-6-astra", "openai/gpt-6-astra", "gpt-6-astra-900k", "ope
 SOL_SPELLINGS = ("gpt-6.1-sol", "openai/gpt-6.1-sol", "gpt-6.1-sol-900k", "openai/gpt-6.1-sol-900k")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: tui tier loader does not read the patched config")
 def test_every_config_loader_parses_tiers_through_the_same_table(monkeypatch):
     from gateway.run import GatewayRunner
     from qubit_cli.cli_config_load import _parse_service_tier_config

@@ -1,10 +1,11 @@
 import pytest
 import json
 import logging
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from agent.conversation_compression import compress_context
+from agent.conversation_compression import _emit_aborted_attempt_telemetry, compress_context
 from agent.context_compressor import ContextCompressor
 
 
@@ -288,7 +289,6 @@ def test_structural_no_op_is_counted_skipped_with_the_compressors_class(caplog, 
         (("no_compressible_window", "previous-attempt"), "no_progress", "no_progress"),
     ],
 )
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: caller verdicts do not defer to the recorded failure class")
 def test_generic_caller_verdicts_defer_to_the_recorded_failure_class(caplog, monkeypatch, recorded, caller, expected):
     from qubit_cli.observability import shared_metrics_events
 
@@ -365,7 +365,6 @@ def test_in_place_commit_preserves_seeded_telemetry_fields(caplog):
         assert key in payload, f"seeded field lost: {key}"
     assert payload["middle_window_tokens"] is not None
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an overlapping blocked call loses the running attempt telemetry")
 def test_an_overlapping_blocked_call_keeps_the_running_attempts_telemetry():
     """A call that stops at the automatic gate must not erase the record of an attempt still summarizing: the
     previous-attempt clear (#118580) happens only once an attempt owns the lease and dispatches its summary."""

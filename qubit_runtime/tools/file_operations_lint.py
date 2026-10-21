@@ -327,6 +327,10 @@ class LintMixin:
         False so the shell linter still runs."""
         return bool(self._lsp_call("enabled_for", path, False))
 
+    def _snapshot_lsp_baseline(self, path: str) -> None:
+        """Capture pre-edit LSP diagnostics so the post-write delta is correct. Silent on failure."""
+        self._lsp_call("snapshot_baseline", path, None)
+
     def _maybe_lsp_diagnostics(self, path: str, *, pre_content: Optional[str] = None,
                                post_content: Optional[str] = None, started: Optional[float] = None) -> str:
         """Formatted LSP diagnostics this edit introduced, or "" when LSP is unavailable/disabled/clean

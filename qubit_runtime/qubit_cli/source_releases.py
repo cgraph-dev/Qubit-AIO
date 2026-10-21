@@ -186,11 +186,12 @@ def _resolve_source_target(channel: str, git_cmd=None, cwd=None, *, repository=N
         return _resolve_stable(repository, git_cmd, cwd)
     try:
         resolved = _resolve_channel(channel, repository)
-    except ChannelNotFound:
+    except Exception:
         if channel != "main":
             raise
         # main IS the source branch; its record can only add a retirement.
-        # Until one is published, a checkout keeps following the branch via git.
+        # A missing or unreadable record (a regional WAF, a dropped connection)
+        # must never stop a checkout from following the branch via git.
         return SourceTarget(channel, channel, repository, branch="main")
     return _target_from_channel_record(channel, resolved, repository, git_cmd, cwd)
 

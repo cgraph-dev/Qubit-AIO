@@ -254,7 +254,6 @@ def test_the_bare_bootstrap_interpreter_parks_and_the_next_start_applies_the_gat
         assert list(pending.glob("*.json")) == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: update stop/refusal classification not recorded")
 def test_a_lock_refusal_of_the_hand_offs_own_update_child_is_a_failed_run(rows, monkeypatch):
     """Invariant: when the lock refuses the claim whose delegate line names this very process, the
     Desktop quit to run this update and reports the refusal as a failed update, so the row reads
@@ -282,7 +281,7 @@ def test_a_lock_refusal_of_the_hand_offs_own_update_child_is_a_failed_run(rows, 
 
 @pytest.mark.parametrize(("site", "raised", "expected"), [
     ("channel", ValueError("Invalid channel name"), "channel_unresolved"),
-    pytest.param("pause", RuntimeError("Could not stop Windows gateway service x"), "gateway_pause_failed", marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: pause exception exits as exception, not gateway_pause_failed")),
+    ("pause", RuntimeError("Could not stop Windows gateway service x"), "gateway_pause_failed"),
 ])
 def test_an_exception_before_the_apply_names_its_exit_through_the_command_boundary(
         rows, monkeypatch, site, raised, expected):
@@ -334,7 +333,6 @@ def test_an_exception_before_the_apply_names_its_exit_through_the_command_bounda
     assert (run["failure_class"], run["outcome"], run["apply_mode"]) == (expected, "failed", "unknown")
     assert contract.counter_dimensions_are_valid(contract.UPDATE_RUN_METRIC, run)
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: update stop/refusal classification not recorded")
 def test_a_timed_out_target_read_skips_the_preflight_instead_of_failing_the_update(monkeypatch, capsys):
     """Invariant: the startup-syntax preflight reads the target from git's object store; a read that
     times out (a blobless install lazily fetches each blob) is an unread file, never an exception

@@ -266,7 +266,6 @@ def fake_op_service_account(tmp_path):
         yield (lambda: OnePasswordLoginBackend({"binary_path": str(exe)})), tmp_path / "op.log"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: service-account reads do not name the item's own vault")
 def test_onepassword_service_account_reads_name_the_items_own_vault(fake_op_service_account):
     """#108335: a service account can list logins but every fill/OTP read failed because
     `op item get` never named a vault. Each read now carries the vault its listing reported."""
@@ -280,7 +279,6 @@ def test_onepassword_service_account_reads_name_the_items_own_vault(fake_op_serv
                      ["item", "list"], ["item", "get", "item-a", "--vault", "vault-a", "--otp"]]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: service-account refusals surface the wrong cause")
 def test_onepassword_service_account_refusals_name_the_real_cause(fake_op_service_account):
     """A handle no listing returned is refused before any secret read, and a token op rejects
     surfaces op's error rather than an unlock prompt a service account can never satisfy."""

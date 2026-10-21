@@ -417,8 +417,10 @@ UPDATE_STOP_CLASSES = frozenset({
     "commit_point_refused",   # the commit point could not be armed durably; nothing moved
     "detached_head",          # a detached checkout stayed put, or its commits could not be backed up
     "disk_full",              # (see above)
+    "downgrade_refused",      # the target predates the gateway runtime a state.db already uses
     "download_failed",        # the ZIP fallback download failed
     "fetch_failed",           # git fetch failed
+    "gateway_pause_failed",   # Windows: the gateways could not be paused safely before the venv moves
     "git_in_progress",        # a merge/rebase/cherry-pick/... was already in progress
     "git_index_locked",       # git refused: another git process's .git/index.lock exists
     "git_timeout",            # a network git call hit the updater's time limit
@@ -637,7 +639,7 @@ TOOL_SCHEMA_TOKEN_BUCKETS = frozenset({
     "0", "lt_2k", "2k_to_5k", "5k_to_10k", "10k_to_20k", "20k_to_40k", "gte_40k",
 })
 # Toolsets Qubit ships; MCP servers and plugin toolsets collapse to custom.
-TOOLSET_NAMES = BUILTIN_TOOLSET_NAMES | {"custom"}
+TOOLSET_NAMES = BUILTIN_TOOLSET_NAMES | RETIRED_TOOLSET_NAMES | {"custom"}
 # compression is the expected cause; the rest are Qubit invalidating a warm prefix (bugs or
 # user-driven), or the provider reporting a cold read Qubit did not cause.
 CACHE_BREAK_CAUSES = frozenset({
@@ -1044,8 +1046,10 @@ UPDATE_STOP_CLASSES = frozenset({
     "commit_point_refused",   # the commit point could not be armed durably; nothing moved
     "detached_head",          # a detached checkout stayed put, or its commits could not be backed up
     "disk_full",              # (see above)
+    "downgrade_refused",      # the target predates the gateway runtime a state.db already uses
     "download_failed",        # the ZIP fallback download failed
     "fetch_failed",           # git fetch failed
+    "gateway_pause_failed",   # Windows: the gateways could not be paused safely before the venv moves
     "git_in_progress",        # a merge/rebase/cherry-pick/... was already in progress
     "git_index_locked",       # git refused: another git process's .git/index.lock exists
     "git_timeout",            # a network git call hit the updater's time limit
@@ -1264,7 +1268,7 @@ TOOL_SCHEMA_TOKEN_BUCKETS = frozenset({
     "0", "lt_2k", "2k_to_5k", "5k_to_10k", "10k_to_20k", "20k_to_40k", "gte_40k",
 })
 # Toolsets Hermes ships; MCP servers and plugin toolsets collapse to custom.
-TOOLSET_NAMES = BUILTIN_TOOLSET_NAMES | {"custom"}
+TOOLSET_NAMES = BUILTIN_TOOLSET_NAMES | RETIRED_TOOLSET_NAMES | {"custom"}
 # compression is the expected cause; the rest are Hermes invalidating a warm prefix (bugs or
 # user-driven), or the provider reporting a cold read Hermes did not cause.
 CACHE_BREAK_CAUSES = frozenset({
@@ -1562,8 +1566,8 @@ _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
     },
     # ---- v4 loop ----
     MEMORY_OP_METRIC: {
-        "op": MEMORY_OPS, "origin": MEMORY_OP_ORIGINS, "outcome": MEMORY_OP_OUTCOMES,
-        "provider": MEMORY_PROVIDERS,
+        "failure_class": MEMORY_OP_FAILURE_CLASSES, "op": MEMORY_OPS, "origin": MEMORY_OP_ORIGINS,
+        "outcome": MEMORY_OP_OUTCOMES, "provider": MEMORY_PROVIDERS,
     },
     CURATOR_RUN_METRIC: {
         "archived_bucket": COUNT_BUCKETS, "created_bucket": COUNT_BUCKETS, "merged_bucket": COUNT_BUCKETS,
@@ -1757,6 +1761,9 @@ _LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
     TASK_STARTED_METRIC: (_METRIC_FIELDS[TASK_STARTED_METRIC] - {"platform"},),
     TASK_FINISHED_METRIC: (frozenset(_COUNTER_DIMENSION_VALUES[TASK_FINISHED_METRIC]) - {"failure_class", "platform"},),
     TOOL_CALL_METRIC: (frozenset(_COUNTER_DIMENSION_VALUES[TOOL_CALL_METRIC]),),
+    # v3 rows, recorded before the failure_class split, drain as they were counted.
+    COMPRESSION_METRIC: (_METRIC_FIELDS[COMPRESSION_METRIC] - {"failure_class"},),
+    MEMORY_OP_METRIC: (_METRIC_FIELDS[MEMORY_OP_METRIC] - {"failure_class"},),
     SKILL_LOAD_METRIC: (_METRIC_FIELDS[SKILL_LOAD_METRIC] - {"skill_name"},),
     INSTALL_SNAPSHOT_METRIC: (_METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - {
         "display_language", "install_age_bucket", "main_provider", "messaging_platform_count_bucket",
@@ -1784,6 +1791,9 @@ _LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
     TASK_STARTED_METRIC: (_METRIC_FIELDS[TASK_STARTED_METRIC] - {"platform"},),
     TASK_FINISHED_METRIC: (frozenset(_COUNTER_DIMENSION_VALUES[TASK_FINISHED_METRIC]) - {"failure_class", "platform"},),
     TOOL_CALL_METRIC: (frozenset(_COUNTER_DIMENSION_VALUES[TOOL_CALL_METRIC]),),
+    # v3 rows, recorded before the failure_class split, drain as they were counted.
+    COMPRESSION_METRIC: (_METRIC_FIELDS[COMPRESSION_METRIC] - {"failure_class"},),
+    MEMORY_OP_METRIC: (_METRIC_FIELDS[MEMORY_OP_METRIC] - {"failure_class"},),
     SKILL_LOAD_METRIC: (_METRIC_FIELDS[SKILL_LOAD_METRIC] - {"skill_name"},),
     INSTALL_SNAPSHOT_METRIC: (_METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - {
         "display_language", "install_age_bucket", "main_provider", "messaging_platform_count_bucket",
@@ -1796,6 +1806,13 @@ _LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
 # ---- v5 engagement ----
 _LEGACY_METRIC_FIELDS[SESSION_METRIC] = (_METRIC_FIELDS[SESSION_METRIC] - set(SESSION_VOLUME_DIMENSIONS),)
 # ---- end v5 engagement ----
+# ---- iuf c1 ----
+# Rows recorded before the failure_class / registry split drain as they were counted.
+_LEGACY_METRIC_FIELDS[EXTENSION_INSTALL_METRIC] = (
+    _METRIC_FIELDS[EXTENSION_INSTALL_METRIC] - {"failure_class", "registry"},
+)
+_LEGACY_METRIC_FIELDS[UPDATE_RUN_METRIC] = (_METRIC_FIELDS[UPDATE_RUN_METRIC] - {"failure_class"},)
+# ---- end iuf c1 ----
 COUNTER_METRICS = frozenset(_METRIC_FIELDS) - {LEGACY_MODEL_CALL_METRIC}
 # Counters whose value is a summed quantity rather than an event count.
 SUM_METRICS = frozenset({MODEL_TOKENS_METRIC})

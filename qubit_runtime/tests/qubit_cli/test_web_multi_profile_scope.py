@@ -105,7 +105,6 @@ def _native_ticket(home):
     from types import SimpleNamespace
     return SimpleNamespace(state=SimpleNamespace(native_http_principal={"profile_id": str(home.resolve())}))
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: native ticket leaves ${ENV} secret references unexpanded")
 @pytest.mark.parametrize("selector", [None, "", "current"])
 def test_secondary_native_ticket_implicit_selector_expands_only_the_ticket_profiles_secrets(two_homes, selector):
     """R16: under a secondary-profile native ticket, a nested ``_config_profile_scope(None/''/current)``
@@ -122,7 +121,6 @@ def test_secondary_native_ticket_implicit_selector_expands_only_the_ticket_profi
     assert probe["a_ref"] == "${A_ONLY_TOKEN}"  # missing in B: never borrowed from the launch profile
     assert dict(os.environ) == environ_before
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: native ticket leaves ${ENV} secret references unexpanded")
 def test_concurrent_launch_and_secondary_native_requests_keep_their_own_secrets(two_homes):
     import threading
 

@@ -1514,6 +1514,40 @@
                 "unknown"
               ]
             },
+            "failure_class": {
+              "enum": [
+                "attempt_superseded",
+                "aux_model_fallback",
+                "commit_fence_cancelled",
+                "empty_post_handoff_window",
+                "empty_transcript",
+                "exception",
+                "explicit_interrupt",
+                "feasibility_skip",
+                "insufficient_messages",
+                "lock_contended",
+                "no_compressible_window",
+                "no_progress",
+                "none",
+                "other",
+                "pool_saturated",
+                "rollback",
+                "session_split_failed",
+                "snapshot_stale",
+                "stall_deterministic_fallback",
+                "stall_interrupted",
+                "summary_auth_failure",
+                "summary_empty_content_failure",
+                "summary_generation_aborted",
+                "summary_generation_failed",
+                "summary_network_failure",
+                "summary_overload_degraded",
+                "summary_overload_failure",
+                "summary_truncated_failure",
+                "unknown",
+                "would_grow"
+              ]
+            },
             "outcome": {
               "enum": [
                 "failed",
@@ -1745,6 +1779,30 @@
             "provider"
           ],
           "properties": {
+            "failure_class": {
+              "enum": [
+                "ambiguous",
+                "disabled",
+                "drift",
+                "exception",
+                "gate_refused",
+                "invalid_args",
+                "missing_content",
+                "missing_old_text",
+                "no_match",
+                "none",
+                "other",
+                "over_budget",
+                "provider_error",
+                "read_failed",
+                "retry_cap",
+                "scan_blocked",
+                "staged",
+                "stale_entry",
+                "unknown",
+                "would_empty"
+              ]
+            },
             "op": {
               "enum": [
                 "add",
@@ -3239,6 +3297,8 @@
             "toolset": {
               "enum": [
                 "bot_room",
+                "setup",
+                "start_chat",
                 "browser",
                 "clarify",
                 "code_execution",

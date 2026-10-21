@@ -1659,7 +1659,6 @@ def test_stream_current_inside_managed_callback_returns_raw(relay_turn):
     assert stream.final_response.choices[0].message.content == "done"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: anthropic stream accumulator drops message-start counts on a null-delta usage chunk")
 def test_anthropic_stream_accumulator_null_delta_usage_keeps_message_start_counts():
     """The SDK's ``MessageDeltaUsage`` serializes the fields message_delta omits as null; they
     must not erase the input / cache counts message_start reported (span token counts went null)."""
