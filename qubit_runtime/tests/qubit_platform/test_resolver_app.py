@@ -224,3 +224,26 @@ def test_network_probe_honors_one_absolute_deadline(tmp_path):
         assert pr.answering.state is CheckState.PRESENT
     finally:
         srv.shutdown()
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: AppLocation / multi-location AppDef is absent from qubit_platform.resolver.app")
+def test_star_segment_tries_the_highest_version_first(tmp_path):
+    for version in ("2.9", "2.10", "10.0b"):
+        folder = tmp_path / f"Thing {version}"
+        folder.mkdir()
+        (folder / "thing").write_text("", encoding="utf-8")
+    location = AppLocation("path", str(tmp_path / "Thing *" / "thing"))
+    res = AppResolver(AppDef("thing", sys.platform, "executable", (location,))).locate()
+    assert res.kind == "known_path"
+    assert [os.path.basename(os.path.dirname(c.value)) for c in res.candidates] == ["Thing 10.0b", "Thing 2.10", "Thing 2.9"]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: AppLocation / multi-location AppDef is absent from qubit_platform.resolver.app")
+def test_first_present_location_sets_the_resolution(tmp_path):
+    exe = tmp_path / "later" / "thing"
+    exe.parent.mkdir()
+    exe.write_text("", encoding="utf-8")
+    locations = (AppLocation("path", str(tmp_path / "absent" / "thing")), AppLocation("path", str(exe)))
+    res = AppResolver(AppDef("thing", sys.platform, "executable", locations)).locate()
+    assert res.kind == "known_path" and res.command == (str(exe),)
+    assert [c.present for c in res.candidates] == [False, True]
