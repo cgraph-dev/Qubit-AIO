@@ -316,6 +316,16 @@ _OPENAI_ULTRAFAST_PRICING: Dict[str, PricingEntry] = {
         cache_read_cost_per_million_above=Decimal("12.00"),
         cache_write_cost_per_million_above=Decimal("150.00"),
     ),
+    "gpt-6.1-sol": _snap(
+        "12.00", "60.00", "0.60", "15.00",
+        url="https://developers.openai.com/api/docs/pricing?latest-pricing=ultrafast",
+        version="openai-ultrafast-2026-10-08",
+        tier_threshold_tokens=272_000,
+        input_cost_per_million_above=Decimal("24.00"),
+        output_cost_per_million_above=Decimal("90.00"),
+        cache_read_cost_per_million_above=Decimal("1.20"),
+        cache_write_cost_per_million_above=Decimal("30.00"),
+    ),
 }
 
 # Context-tiered Gemini Pro: above 200k prompt tokens the *_above rates apply to
@@ -490,9 +500,16 @@ def _lookup_official_docs_pricing(route: BillingRoute) -> Optional[PricingEntry]
     entry = _OFFICIAL_DOCS_PRICING.get((route.provider, model))
     if entry:
         return entry
+    if (route.provider == "openai" and model in ("gpt-6-astra-900k", "gpt-6-astra-pro")
+            and (not route.base_url or base_url_host_matches(route.base_url, "api.openai.com"))):
+        return _OFFICIAL_DOCS_PRICING.get(("openai", "gpt-6-astra"))
     normalize = _MODEL_NORMALIZERS.get(route.provider)
     normalized = normalize(model) if normalize else model
-    return _OFFICIAL_DOCS_PRICING.get((route.provider, normalized)) if normalized != model else None
+    if normalized == model:
+        return None
+    # Context/picker aliases are the vendor's own ids: on a custom endpoint the
+    # endpoint's published rates are the truth, not the native snapshot alias.
+    return _OFFICIAL_DOCS_PRICING.get((route.provider, normalized))
 
 
 def with_served_service_tier(usage: CanonicalUsage, response: Any) -> CanonicalUsage:

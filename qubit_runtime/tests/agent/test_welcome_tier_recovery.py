@@ -118,7 +118,6 @@ class TestOneShotRecoveries:
         assert calls == [{"force": True}]
         assert _recover_welcome_tier(agent, classified, retry) is False
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: named welcome-host account does not re-read the route")
     def test_a_named_account_on_the_welcome_host_re_reads_the_route_once(self):
         from agent.turn_recovery import _recover_welcome_tier
         calls = []
@@ -184,13 +183,11 @@ _ANON = SimpleNamespace(provider="nous", api_key=make_jwt())
 class TestOutageCopy:
     @pytest.mark.parametrize("reason", [FailoverReason.timeout, FailoverReason.overloaded,
                                         FailoverReason.server_error])
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: welcome-host transport outage copy is missing")
     def test_a_spent_transport_failure_on_the_welcome_host_reads_as_one_sentence(self, reason):
         from agent.turn_recovery import _welcome_outage_copy
         from qubit_cli.anon_auth import FREE_TIER_OUTAGE_COPY
         assert _welcome_outage_copy(_ANON, WELCOME, SimpleNamespace(reason=reason)) == FREE_TIER_OUTAGE_COPY
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: welcome outage copy signature does not accept the host")
     def test_other_routes_and_other_reasons_keep_the_technical_summary(self):
         from agent.turn_recovery import _welcome_outage_copy
         assert _welcome_outage_copy(_ANON, PAID, SimpleNamespace(reason=FailoverReason.timeout)) == ""
@@ -308,7 +305,6 @@ class TestFreeTierCooldownCutoff:
         finally:
             clear_session_vars(tokens)
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: gateway-admitted finite CLI turn does not keep waiting")
     def test_a_gateway_admitted_finite_cli_turn_keeps_waiting(self):
         """``hermes chat -q`` over the daemon carries its one-shot fact on the admission, not in env."""
         from agent.turn_recovery import free_tier_cooldown_ends_turn

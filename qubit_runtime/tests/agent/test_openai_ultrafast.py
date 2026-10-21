@@ -134,12 +134,10 @@ def test_desktop_surfaces_carry_the_exact_tier_ultrafast_is_never_plain_fast():
     with pytest.raises(ValueError):
         create_overrides({"service_tier": "turbo"})
 
-_XF = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: static context-alias pricing snapshot is missing gpt-6-astra")
-
 
 @pytest.mark.parametrize("provider", ["openai", "openai-api"])
 @pytest.mark.parametrize("base_url,amount,source", [
-    pytest.param("https://api.openai.com/v1", "0.06", "official_docs_snapshot", marks=_XF),
+    ("https://api.openai.com/v1", "0.06", "official_docs_snapshot"),
     ("https://proxy.example/v1", "0.007", "provider_models_api"),
     ("https://api.openai.com.proxy.example/v1", "0.007", "provider_models_api"),
 ])

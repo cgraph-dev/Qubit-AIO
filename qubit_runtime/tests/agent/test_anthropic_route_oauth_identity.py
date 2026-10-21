@@ -19,7 +19,6 @@ CONSOLE = "sk-ant-api03-console-key"
 USER_KEY = "sk-ant-usr01-user-scoped-key"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: user-scoped sk-ant-usr01 keys are classified as OAuth")
 def test_route_identity_requires_native_host_and_oauth_shape():
     calls = []
 
