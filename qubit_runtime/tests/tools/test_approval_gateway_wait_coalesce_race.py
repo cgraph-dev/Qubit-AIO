@@ -7,8 +7,6 @@ where the leader's prompt goes away without an answer and where two identical re
 
 import threading
 
-import pytest
-
 from tools import approval as mod
 from tools import approval_gateway_wait as wait_mod
 
@@ -70,7 +68,6 @@ def _run_leader_then_follower(monkeypatch, notify_cb, *, leader_poll=_leader_nev
     return results, follower, release
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: approval gateway waits do not coalesce followers onto one leader prompt")
 def test_follower_adopts_the_leaders_timeout_instead_of_hanging(monkeypatch):
     _clear()
 
@@ -90,7 +87,6 @@ def test_follower_adopts_the_leaders_timeout_instead_of_hanging(monkeypatch):
     assert mod.resolve_gateway_approval(SESSION_KEY, "once") == 0
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: approval gateway waits do not coalesce followers onto one leader prompt")
 def test_follower_wakes_when_the_leaders_notify_fails(monkeypatch):
     _clear()
 
@@ -110,7 +106,6 @@ def test_follower_wakes_when_the_leaders_notify_fails(monkeypatch):
     assert decision["cancelled"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: approval gateway waits do not coalesce followers onto one leader prompt")
 def test_identical_requests_racing_to_lead_send_one_prompt(monkeypatch):
     """Two identical approvals that both reach the leader lookup before either is enqueued must still
     coalesce: the lookup and the enqueue are one critical section, so the second sees the first."""
@@ -166,7 +161,6 @@ def test_identical_requests_racing_to_lead_send_one_prompt(monkeypatch):
         (True, "session", False), (True, "session", True)]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: approval gateway waits do not coalesce followers onto one leader prompt")
 def test_followers_released_by_once_share_one_fresh_prompt(monkeypatch):
     """``once`` covers only the leader's execution, so each follower still needs consent of its own —
     but one prompt at a time: released followers coalesce again behind the first to re-prompt instead
