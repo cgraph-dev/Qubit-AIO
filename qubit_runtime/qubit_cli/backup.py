@@ -832,7 +832,7 @@ def run_import(args) -> Optional[int]:
             # The backup predates work that is now overwritten. Say so: the
             # reported incident was twelve sessions disappearing with nothing
             # logged anywhere (issue #100960).
-            print("\n  \u26a0 Session data replaced by older backup contents:")
+            print("\n  ⚠ Session data replaced by older backup contents:")
             for rel, before, after in db_shrunk:
                 print(
                     f"    {rel}: {before[0]} session(s) / {before[1]} message(s)"
