@@ -666,7 +666,6 @@ class TestUpdateCommandInstallMethodRefusal:
 class TestDetachedUpdateExitCodePublication:
         @pytest.mark.platforms("linux", "macos")
         @pytest.mark.live_system_guard_bypass  # runs the wrapper around `sh -c 'exit 3'`, never hermes
-        @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the detached update wrapper can expose an empty marker")
         def test_bash_wrapper_never_exposes_an_empty_exit_code(self, tmp_path, monkeypatch):
             import subprocess
             from gateway.slash_commands import _spawn_detached_update
@@ -685,7 +684,6 @@ class TestDetachedUpdateExitCodePublication:
             assert not seen.exists() or "exists:\n" not in seen.read_text(encoding="utf-8")
             assert marker.read_text(encoding="utf-8") == "3"
 
-        @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the windows update helper can expose an empty marker")
         def test_windows_helper_never_exposes_an_empty_exit_code(self, tmp_path, monkeypatch):
             import sys
             from gateway.slash_commands import _WINDOWS_UPDATE_HELPER
