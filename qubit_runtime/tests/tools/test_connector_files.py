@@ -234,7 +234,6 @@ def test_a_replayed_file_without_a_link_passes_through():
     assert entry["response"] == replay and storage.requests == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector file strict mode, search paths, task-relative dispatch and remote-backend refusal are absent locally")
 def test_strict_mode_refuses_a_fresh_file_but_resends_a_downloaded_one(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "1")
     monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
@@ -250,7 +249,6 @@ def test_strict_mode_refuses_a_fresh_file_but_resends_a_downloaded_one(tmp_path,
     assert [put["data"] for put in storage.requests] == [b"%PDF received"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector file strict mode, search paths, task-relative dispatch and remote-backend refusal are absent locally")
 def test_a_search_hit_shows_paths_so_execute_needs_no_schema_lookup(tmp_path):
     from tools.connectors.gateway.bridge import ConnectorLeg
     from tools.connectors.search import connector_entries_by_group
@@ -277,7 +275,6 @@ def test_a_relative_path_resolves_against_the_session_working_directory(tmp_path
     assert [put["data"] for put in storage.requests] == [b"from the workspace"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector file strict mode, search paths, task-relative dispatch and remote-backend refusal are absent locally")
 def test_dispatch_resolves_a_relative_path_in_the_calling_task_s_directory(tmp_path, monkeypatch):
     import model_tools
     from tools.connectors.gateway import bridge, config
@@ -319,7 +316,6 @@ def test_a_docker_path_is_read_through_its_volume_mount(tmp_path, monkeypatch):
     assert [put["data"] for put in storage.requests] == [b"from the container mount"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector file strict mode, search paths, task-relative dispatch and remote-backend refusal are absent locally")
 def test_a_remote_terminal_backend_is_refused_like_media_delivery(tmp_path, monkeypatch):
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
     gateway, storage = Gateway(), Storage()

@@ -435,7 +435,7 @@ from gateway.warning_notifications import diagnostic_wake_muted
 from qubit_cli.observability.shared_metrics_gateway import records_delivery, stop_reply_clock
 from gateway.session import SessionSource, build_session_key
 from gateway.session_transcript import TranscriptReadError
-from qubit_constants import get_default_qubit_root, get_qubit_dir, get_qubit_home
+from qubit_constants import CONNECTOR_DOWNLOADS_SUBDIR, get_default_qubit_root, get_qubit_dir, get_qubit_home
 from agent.provider_media import GENERATED_SUBDIR, MEDIA_CACHE_MAX_AGE_HOURS
 
 if TYPE_CHECKING:
@@ -845,7 +845,8 @@ def _profile_cache_roots() -> List[Path]:
     profile path is allowlisted *before* the ``/root`` system denylist is consulted (which otherwise wins
     when QUBIT_HOME is symlinked under a denied prefix and $HOME is not that prefix). See issue #31733.
     """
-    return [p / "cache" / subdir for p in _profile_dirs() for subdir in _MEDIA_DELIVERY_CACHE_SUBDIRS]
+    return [*(p / "cache" / subdir for p in _profile_dirs() for subdir in _MEDIA_DELIVERY_CACHE_SUBDIRS),
+            *(p / CONNECTOR_DOWNLOADS_SUBDIR for p in (get_qubit_home(), *_profile_dirs()))]
 
 
 def _profile_dirs() -> List[Path]:
