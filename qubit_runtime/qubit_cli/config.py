@@ -1924,6 +1924,10 @@ def _raw_config_cache_hit(path_key: str, cache_key: Tuple[Any, ...]) -> Optional
 
 
 def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
+    snapshot = _worker_config_snapshot()
+    if snapshot is not None:
+        return snapshot
+
     # Lock-free fast path for cache hits — same shape as `_load_config_impl`. `_RAW_CONFIG_CACHE`
     # publishes each entry as ONE `(*sig, data)` tuple replaced wholesale, so a reader sees either
     # the complete old entry or the complete new one; `_CONFIG_LOCK` only serializes the re-parse
@@ -2003,6 +2007,10 @@ def require_readable_config_before_write(config_path: Optional[Path] = None) -> 
     non-mapping root — bare-``except`` loaders treat both as ``{}``, so a subsequent write would
     replace the recoverable file with only the caller's partial dict. Fails closed."""
     if config_path is None:
+        snapshot = _worker_config_snapshot()
+        if snapshot is not None:
+            # A bypass worker's config IS its frozen snapshot; it never reads the profile file.
+            return copy.deepcopy(snapshot)
         config_path = get_config_path()
     try:
         config_path.stat()
@@ -2341,6 +2349,10 @@ def _load_config_cache_hit(path_key: str, cache_sig: Any) -> Optional[Dict[str, 
 
 
 def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
+    snapshot = _worker_config_snapshot()
+    if snapshot is not None:
+        return _deep_merge(copy.deepcopy(DEFAULT_CONFIG), snapshot)
+
     # Lock-free fast path for cache hits — same publication contract as `_read_raw_config_impl`
     # above (whole-tuple replace, `_CONFIG_LOCK` only serializes rebuilds and writers). A hit costs
     # ~0.024ms; behind a lock held by `save_config()` the same read measured 10010ms, and on a
@@ -2545,6 +2557,10 @@ def load_env() -> Dict[str, str]:
     """Load ~/.hermes/.env as a dict. Memoised inside ``load_env_file`` (``get_env_value()`` runs
     hundreds of times per interactive menu render). Each assignment's value is opaque data for
     boundary discovery."""
+    # A frozen-policy worker never opens the profile's files; its secrets arrive
+    # through the owner-installed scope, so the .env layer is empty here.
+    if _worker_config_snapshot() is not None:
+        return {}
     from agent.secret_scope import load_env_file  # the one .env tokenizer; also installs profile scopes
 
     return load_env_file(get_env_path())
@@ -4171,7 +4187,12 @@ def _platform_plugin_manifests(home: Optional[Path] = None, source: PlatformMani
     flat ``plugins/*`` manifest proves it is one only by its content, so an unreadable one is
     skipped with a warning, as is an unsearchable plugin directory. A manifest that does not
     parse declares nothing (its adapter cannot load either) and is skipped. Every skip is appended
-    to ``skipped``, so a caller can tell a complete scan from a partial one."""
+    to ``skipped``, so a caller can tell a complete scan from a partial one. A safe worker reads
+    no plugin manifest at all."""
+    from agent.safe_worker_policy import safe_worker_enabled
+
+    if safe_worker_enabled():
+        return
     for dir_name, manifest_path, require_kind, st in _platform_manifest_paths(home, source):
         if manifest_path is None:
             logger.warning("Skipping unreadable plugin directory %s: %s", dir_name, st)
