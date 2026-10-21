@@ -615,10 +615,13 @@ def _usage_from_metadata(usage_meta: Dict[str, Any]) -> SimpleNamespace:
     them. Absent on non-thinking/older responses, which keeps their numbers as-is."""
     count = lambda key: int(usage_meta.get(key) or 0)  # noqa: E731
     reasoning_tokens = count("thoughtsTokenCount")
+    # Multi-hop long decode: the counts are summed over hops (billing); the context size is hop 1's prompt.
+    initial = {"initial_prompt_tokens": count("initialPromptTokenCount"),
+               "initial_cached_tokens": count("initialCachedContentTokenCount")} if "initialPromptTokenCount" in usage_meta else {}
     return SimpleNamespace(
         prompt_tokens=count("promptTokenCount"), completion_tokens=count("candidatesTokenCount") + reasoning_tokens,
         total_tokens=count("totalTokenCount"), prompt_tokens_details=SimpleNamespace(cached_tokens=count("cachedContentTokenCount")),
-        completion_tokens_details=SimpleNamespace(reasoning_tokens=reasoning_tokens),
+        completion_tokens_details=SimpleNamespace(reasoning_tokens=reasoning_tokens), **initial,
     )
 
 
