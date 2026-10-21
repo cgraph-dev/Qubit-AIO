@@ -210,6 +210,7 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
     assert env["NODE_ENV"] == "production"
 
 
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: _launch_tui lets an inherited QUBIT_CWD outrank the launch directory")
 def test_launch_tui_prefers_launch_cwd_over_inherited_qubit_cwd(monkeypatch, main_mod, tmp_path):
     """The directory `qubit --tui` was run from outranks an inherited QUBIT_CWD.
 
@@ -361,3 +362,56 @@ def test_oneshot_closes_its_relay_root_before_agent_teardown(monkeypatch, run_fa
         assert _run_agent("finish this")[0] == "ok"
     assert events == [("finalize", {"session_id": "entry-id", "platform": "cli", "reason": "shutdown"}),
                       "memory", "agent_close"]
+
+
+def test_launch_tui_prefers_launch_cwd_over_inherited_hermes_cwd(monkeypatch, main_mod, tmp_path):
+    """The directory `qubit --tui` was run from outranks an inherited QUBIT_CWD.
+
+    A shell export - or an outer `qubit --tui` - leaves QUBIT_CWD naming a real but stale
+    directory, and ui-tui/src/gatewayClient.ts:478 starts the gateway in whatever it names,
+    so the session reads files and completions from the wrong project (#49637).
+    """
+    stale = tmp_path / "stale-project"
+    launch = tmp_path / "launch-project"
+    stale.mkdir()
+    launch.mkdir()
+    monkeypatch.setenv("QUBIT_PYTHON", sys.executable)
+    monkeypatch.setenv("QUBIT_CWD", str(stale))
+    monkeypatch.chdir(launch)
+
+    captured = {}
+    monkeypatch.setattr(main_tui_launch, "_make_tui_argv",
+        lambda tui_dir, tui_dev: (["node", "dist/entry.js"], Path(".")),
+    )
+    monkeypatch.setattr(main_mod.subprocess, "call",
+        lambda argv, cwd=None, env=None: captured.update({"env": env}) or 1,
+    )
+
+    with pytest.raises(SystemExit):
+        main_mod._launch_tui()
+
+    handed_to_tui = Path(captured["env"]["QUBIT_CWD"]).resolve()
+    assert handed_to_tui == launch.resolve(), "the TUI gateway must start where the user launched"
+    assert handed_to_tui != stale.resolve()
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: --tui with a config bypass and no model does not refuse before spawning")
+@pytest.mark.parametrize("flag", ["QUBIT_SAFE_MODE", "QUBIT_IGNORE_USER_CONFIG"])
+def test_launch_tui_bypass_without_model_refuses_before_the_tui_starts(monkeypatch, main_mod, capsys, flag):
+    """`qubit --tui --safe-mode` (or an exported QUBIT_IGNORE_USER_CONFIG=1) reads no profile
+    default model: the owner refuses session.create with bare invalid_params, so the launcher must
+    say "pass --model" before spawning the TUI, as classic chat does."""
+    monkeypatch.setenv(flag, "1")
+    monkeypatch.delenv("QUBIT_MODEL", raising=False)
+    monkeypatch.setenv("QUBIT_PYTHON", sys.executable)  # never resolve a python over the real PATH
+    monkeypatch.setattr(main_tui_launch, "_make_tui_argv",
+                        lambda tui_dir, tui_dev: (["node", "dist/entry.js"], Path(".")))
+    spawned = []
+    monkeypatch.setattr(main_mod.subprocess, "call", lambda argv, cwd=None, env=None: spawned.append(env) or 0)
+    with pytest.raises(SystemExit) as exc:
+        main_mod._launch_tui()
+    assert exc.value.code == 1 and spawned == []
+    assert "pass --model explicitly" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        main_mod._launch_tui(model="stub-model")
+    assert spawned and spawned[-1][flag] == "1" and spawned[-1]["QUBIT_MODEL"] == "stub-model"

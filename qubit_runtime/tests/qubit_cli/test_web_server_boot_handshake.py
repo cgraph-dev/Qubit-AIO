@@ -181,3 +181,28 @@ def test_get_status_does_not_block_event_loop():
 # ---------------------------------------------------------------------------
 # Test 3 — no orphan accumulation: concurrent probes all receive 200
 # ---------------------------------------------------------------------------
+
+
+def test_lifespan_enters_and_exits_as_an_async_context_manager(monkeypatch):
+    """FastAPI gets ``app_lifespan`` as an async context manager, never a bare async generator
+    (Starlette's deprecated path), and entering it runs the desktop's first-install check."""
+    from qubit_cli import anon_auth, install_state
+
+    probed: list[bool] = []
+    monkeypatch.setattr(web_server_mod, "_warm_gateway_module", lambda: None)
+    monkeypatch.setattr(web_server_mod, "_eager_reconcile_own_session_db", lambda: None)
+    monkeypatch.setattr(anon_auth, "on_local_desktop_backend", lambda: True)
+    import functools
+
+    @functools.lru_cache(maxsize=1)
+    def _probe():
+        probed.append(True)
+        return type("Probe", (), {"fresh": False, "existing": False})()
+
+    monkeypatch.setattr(install_state, "probe", _probe)
+
+    async def _run() -> None:
+        async with web_server_mod.app_lifespan(web_server_mod.app):
+            assert probed == [True]
+
+    asyncio.run(_run())

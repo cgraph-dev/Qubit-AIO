@@ -1,10 +1,12 @@
 import json
+import os
 from pathlib import Path
 import subprocess
 
 from qubit_cli.version_info import (
     VersionInfo,
     _derived_version,
+    _git_version_info,
     _reset_version_info_cache,
     _resolve_stamp_file,
     _stamp_version_info,

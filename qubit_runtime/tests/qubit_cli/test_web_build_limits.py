@@ -115,3 +115,18 @@ class TestBuildSourceWebPropagatesLimits:
         # original env keys untouched
         assert captured["env"]["PATH"] == "/bin"
         assert captured["label"] == "Building the web UI"
+
+
+class TestPackageJsonBuildScriptCapped:
+    """``scripts/build/web.mjs`` must carry the caps for direct npm runs."""
+
+    @pytest.mark.xfail(strict=True, reason="wave-22 parity defect: scripts/build/web.mjs carries no heap/thread caps")
+    def test_build_script_has_heap_and_thread_caps(self):
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[2]
+        build_script = (repo_root / "scripts/build/web.mjs").read_text(encoding="utf-8")
+        assert "--max-old-space-size=" in build_script
+        assert "RAYON_NUM_THREADS" in build_script
+        # caps apply on direct invocation before vite is imported
+        assert "isMain(import.meta.url)" in build_script

@@ -1093,3 +1093,61 @@ class TestLightpandaPostSetup:
         # Not in the forced-setup gate: a missing binary must not nag every
         # user who toggles the browser toolset.
         assert "lightpanda" not in _POST_SETUP_INSTALLED
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: the legacy hermes toolset alias no longer expands to hermes-cli/hermes-api-server")
+def test_get_platform_tools_legacy_hermes_alias_expands():
+    """Legacy ``"hermes"`` toolset name must expand to ``"hermes-cli"`` and
+    ``"hermes-api-server"`` so that tools are not silently dropped.
+
+    Regression test for issue #41579.
+    """
+    config = {"platform_toolsets": {"cli": ["hermes", "kanban"]}}
+
+    enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
+
+    # Must resolve to the same toolset as a plain "hermes-cli" config.
+    reference = _get_platform_tools(
+        {"platform_toolsets": {"cli": ["hermes-cli", "kanban"]}},
+        "cli",
+        include_default_mcp_servers=False,
+    )
+    assert enabled == reference
+    # Sanity: something was actually enabled. ``kanban`` IS in _DEFAULT_OFF_TOOLSETS
+    # on current main (#3d7f773bb4) but an explicitly listed name is an opt-in that
+    # survives the subtraction, so disjointness no longer holds here.
+    assert enabled
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a lone legacy hermes toolset alias enables nothing")
+def test_get_platform_tools_legacy_hermes_alias_alone():
+    """``"hermes"`` alone (no other toolsets) must still produce tools."""
+    config = {"platform_toolsets": {"cli": ["hermes"]}}
+
+    enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
+    reference = _get_platform_tools(
+        {"platform_toolsets": {"cli": ["hermes-cli", "hermes-api-server"]}},
+        "cli",
+        include_default_mcp_servers=False,
+    )
+    assert enabled == reference
+    assert enabled
+
+
+@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a saved disabled MCP server falls through to every enabled server")
+@pytest.mark.parametrize("listed", ["dead", "mcp-dead"])
+def test_a_saved_disabled_mcp_server_does_not_enable_every_other_server(listed):
+    """A disabled server in a saved list matched nothing and fell through to ALL enabled servers.
+    It is still the user's explicit server selection: it stays off, and no other server is added."""
+    config = {
+        "platform_toolsets": {"cli": ["terminal", listed]},
+        "mcp_servers": {
+            "dead": {"url": "https://example.com/dead", "enabled": False},
+            "live": {"url": "https://example.com/live"},
+        },
+    }
+
+    enabled = _get_platform_tools(config, "cli")
+
+    assert "terminal" in enabled
+    assert not {"dead", "mcp-dead", "live"} & enabled, enabled

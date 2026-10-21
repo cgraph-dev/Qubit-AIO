@@ -7,6 +7,8 @@ not a client-local list.
 """
 
 import json
+
+import pytest
 import sys
 
 class _FakeDB:
@@ -122,3 +124,9 @@ def test_pinned_json_output(monkeypatch, capsys):
             "message_count": 3,
         }
     ]
+
+
+@pytest.fixture(autouse=True)
+def existing_store(tmp_path, monkeypatch):
+    monkeypatch.setattr("qubit_constants.get_qubit_home", lambda: tmp_path)
+    (tmp_path / "state.db").touch()
