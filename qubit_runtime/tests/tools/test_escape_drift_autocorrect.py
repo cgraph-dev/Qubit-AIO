@@ -67,10 +67,6 @@ _SHARED_PARAMS = [
     pytest.param(
         engine, *case,
         id=f"{case_id}-{engine}",
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="wave-18 parity defect: skill engine does not share the quote/backslash correction policy",
-        ) if engine == "skill" and case_id in {"backslash_free", "quote"} else (),
     )
     for case_id, case in zip(["backslash_free", "quote", "ambiguous"], _SHARED_CASES)
     for engine in ["replace", "v4a", "skill"]
