@@ -742,3 +742,16 @@ def test_download_failure_releases_resume_handle(client, monkeypatch):
     status = _poll_job(client, job_id)
     assert status["status"] == "error", status
     assert job_id not in lm._RUNNING
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: status sizes a split model by part 1 only")
+def test_status_sizes_a_split_model_by_all_its_parts(client):
+    """A split's first file can be a metadata stub of a few MB. The row reports the model the user
+    has on disk, so a side-loaded split outside the catalog is every part, not part 1."""
+    from qubit_cli.local_runtime.bootstrap import models_dir
+
+    _write_fake_gguf(models_dir() / "Side-Split-00001-of-00002.gguf", size=1024)
+    _write_fake_gguf(models_dir() / "Side-Split-00002-of-00002.gguf", size=8192)
+    rows = {m["id"]: m for m in client.get("/api/local-models/status").json()["models"]}
+
+    assert rows["Side-Split"]["size_bytes"] == (4 + 1024) + (4 + 8192)

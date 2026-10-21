@@ -673,3 +673,16 @@ class TestSlashCronRunSkipped:
         out = capsys.readouterr().out
         assert "Job is paused/disabled; resume it before running." in out
         assert "Triggered" not in out and "next scheduler tick" not in out
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: cron_tick calls tick(verbose=True) without headless=True")
+def test_cron_tick_invokes_scheduler_tick_verbose_and_headless(monkeypatch):
+    """The CLI tick runs outside any gateway: it must declare itself headless so agent jobs are
+    refused, never spawned for."""
+    calls = []
+    monkeypatch.setattr("cron.scheduler.tick",
+                        lambda verbose=False, headless=False: calls.append((verbose, headless)))
+
+    cron_cli.cron_tick()
+
+    assert calls == [(True, True)]

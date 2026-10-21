@@ -291,3 +291,26 @@ def test_startup_recovery_never_asks_a_dependency_question(tmp_path, monkeypatch
     mig.recover_at_startup(name, say=said.append)
     assert [kw["assume_deps_consent"] for kw in seen] == ([True] if installs else [])
     assert installs or f"`qubit plugins install {name}`" in said[-1]
+
+
+def test_startup_recovery_backs_off_after_a_failed_install(tmp_path, monkeypatch):
+    """A failed agent-start install is not retried by every following process start (each `qubit chat`,
+    cron run, Desktop restart): one failure, then a quiet hour; `qubit update` still retries."""
+    from pm import install as pm_install
+
+    (tmp_path / "config.yaml").write_text("memory:\n  provider: hindsight\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    monkeypatch.setattr(mig, "catalog_source", lambda n: n)
+    monkeypatch.setattr(pm_install, "lazy_installs_allowed", lambda: True)
+    attempts: list[str] = []
+    monkeypatch.setattr(mig, "_install_into", lambda home, **_kw: (lambda n: attempts.append(n) or {"ok": False, "error": "uv lock exited 1"}))
+    said: list[str] = []
+    for _process in range(3):
+        monkeypatch.setattr(mig, "_attempted", set())  # a fresh process each time
+        assert mig.recover_at_startup("hindsight", say=said.append) is False
+    assert attempts == ["hindsight"]
+    assert "`qubit plugins install hindsight`" in said[-1]  # still told memory is off, and the fix
+    monkeypatch.setattr(mig, "STARTUP_RETRY_SECONDS", 0.0)
+    monkeypatch.setattr(mig, "_attempted", set())
+    mig.recover_at_startup("hindsight")
+    assert attempts == ["hindsight", "hindsight"]
