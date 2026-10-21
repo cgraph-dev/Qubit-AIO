@@ -11,7 +11,6 @@ from gateway.session_results import execution_result
 from tests.waiting import async_wait_until
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a valid relay frame is refused with permission_denied and never runs")
 @pytest.mark.asyncio
 async def test_refused_relay_frame_is_acked_and_the_reader_keeps_serving(tmp_path, monkeypatch):
     websockets = pytest.importorskip('websockets')

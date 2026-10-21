@@ -8,7 +8,7 @@ import itertools
 import threading
 from collections.abc import Mapping, Sequence
 from types import ModuleType
-from typing import Any, Callable
+from typing import Any, Callable, Mapping, Sequence
 
 from gateway import hosted_room_driver as state
 
@@ -68,7 +68,10 @@ class HostedRoomServerRPC:
     def submit(
         self, *, profile: str, session_id: str, prompt: str, source: str, task: state.TaskIdentity,
         execution_generation: int, on_terminal: Callable[[Mapping[str, Any]], None], member_id: str,
+        attachments: Sequence[Mapping[str, Any]] | None = None,
     ) -> Mapping[str, Any]:
+        if attachments:  # the driver refuses files before submit on this route
+            raise ValueError("attachments_unsupported_on_route: in-process route cannot carry files")
         try:
             return self._call("prompt.submit", {
                 "profile": profile, "session_id": session_id, "text": prompt, "source": source,

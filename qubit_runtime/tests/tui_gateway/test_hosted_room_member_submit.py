@@ -99,7 +99,6 @@ def test_submit_carries_the_target_member_id_the_transport_requires(db: Path):
     assert state.get_task(db, identity)["result"]["text"] == "Finished once."
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a driver submit through the in-process RPC never settles")
 def test_driver_submit_settles_through_the_real_in_process_rpc(db: Path):
     from tests.tui_gateway.test_hosted_room_server_rpc import _server
     from tui_gateway.hosted_room_server_rpc import HostedRoomServerRPC

@@ -188,11 +188,10 @@ def _notif_submit(rid: str, sid: str, session: dict, text: str, what: str, **kwa
     (#redelivery-loop, 2026-10-17). Exceptions still propagate; the caller releases.
     """
     try:
-        from gateway.warning_notifications import render_notification
-        with _session_profile_runtime_scope(session):
-            render_notification(lambda: _emit("message.start", sid), platform="tui",
-                                diagnostic=(kwargs.get("display_metadata") or {}).get("notification_category") == "diagnostic")
-        return bool(_run_prompt_submit(rid, sid, session, text, **kwargs))
+        accepted = bool(_run_prompt_submit(rid, sid, session, text, **kwargs))
+        if not accepted:
+            _notif_release_turn(session)
+        return accepted
     except Exception as exc:
         _notif_log_failure(what, exc)
         _notif_release_turn(session)

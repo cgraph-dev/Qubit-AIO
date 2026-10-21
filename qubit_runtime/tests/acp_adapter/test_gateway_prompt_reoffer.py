@@ -59,7 +59,6 @@ async def _settle(agent):
     (CLARIFY, AllowedOutcome(outcome="selected", option_id="choice-0"), True, ("choice-1", "clarify.respond", "green")),
 ], ids=["approval-editor-cancel", "approval-transport-loss", "approval-lost-respond",
         "clarify-transport-loss", "clarify-lost-respond"])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an unaccepted approval/clarify card is not reoffered on reattach")
 async def test_unaccepted_card_is_reoffered_on_reattach_without_replaying_its_answer(
         prompt, first, lose_first_respond, accept):
     option, method, value = accept

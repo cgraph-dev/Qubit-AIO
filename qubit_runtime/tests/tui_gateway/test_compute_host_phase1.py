@@ -322,7 +322,6 @@ def test_shutdown_drain_sleep_never_overshoots_the_reserve(monkeypatch):
     assert sum(slept) <= drain_budget + 1e-6
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a relayed cancel does not withdraw the compute host's open server request")
 def test_compute_host_withdraws_its_open_request_when_the_parent_relays_a_cancel(monkeypatch):
     """Skip setup in the parent withdraws the card the child waits on: the wait returns and every
     renderer gets the ``request.cancel``."""

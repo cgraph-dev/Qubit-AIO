@@ -1298,6 +1298,10 @@ async def _handle_run_approval(self, request: "web.Request", *, _api_server) -> 
         body = await request.json()
     except Exception:
         return _json_error(_openai_error, "Invalid JSON", status=400)
+    if getattr(self.gateway_runner, 'session_authority', None) is not None:
+        if self._room_grant_token(request) and body.get('choice') not in {'once', 'deny'}:
+            return _json_error(_openai_error, 'Room approvals require once or deny', status=400)
+        return await _respond_authority_run(self, run_id, body, kind='approval', _api_server=_api_server)
     raw_choice = str(body.get("choice", "")).strip().lower()
     choice = _APPROVAL_CHOICE_ALIASES.get(raw_choice, raw_choice)
     room_scoped = bool(self._room_grant_token(request))

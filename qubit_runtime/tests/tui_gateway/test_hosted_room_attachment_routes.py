@@ -172,7 +172,6 @@ def test_legacy_route_refuses_a_turn_with_a_file_before_submitting(db: Path):
     assert submits == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the hosted submit RPC does not accept the attachments kwarg")
 def test_legacy_route_still_runs_a_turn_without_a_file(db: Path):
     identity = _admit(db)
     server, submits = _server_module()
@@ -196,7 +195,6 @@ def test_peer_route_refuses_a_turn_with_a_file_before_dispatching(db: Path):
     assert client.dispatches == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the hosted submit RPC does not accept the attachments kwarg")
 def test_peer_route_still_runs_a_turn_without_a_file(db: Path):
     identity = _admit(db)
     client = DispatchingPeerClient()

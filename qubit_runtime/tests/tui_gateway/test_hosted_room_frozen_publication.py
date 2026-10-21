@@ -19,11 +19,7 @@ def service(db):
     return instance
 
 
-@pytest.mark.parametrize("partial", [
-    False,
-    pytest.param(True, marks=pytest.mark.xfail(
-        strict=True, reason="wave-20 parity defect: a terminal reopen loses the frozen input after cache loss")),
-])
+@pytest.mark.parametrize("partial", [False, True])
 def test_terminal_reopen_uses_frozen_input_after_cache_loss(tmp_path, monkeypatch, partial):
     monkeypatch.setattr(rooms, "local_authority_gateway_id", lambda: "home")
     db = tmp_path / "room.db"

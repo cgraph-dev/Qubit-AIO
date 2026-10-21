@@ -181,7 +181,6 @@ def test_the_turn_note_rides_a_user_turn_only_while_the_run_is_open(root):
     assert 'setup_beat(beat="name")' in agent._gateway_turn_context_notes
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: skipping setup does not end the onboarding run")
 def test_skip_setup_ends_the_run_and_closes_the_waiting_card(root, monkeypatch):
     db = server._get_db()
     db.create_session("onb", "desktop")
@@ -208,7 +207,6 @@ def test_skip_setup_ends_the_run_and_closes_the_waiting_card(root, monkeypatch):
     assert onboarding["run"] is False and onboarding["seen"]["profile_build_offered"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: skip does not withdraw a compute-host waiting card")
 def test_skip_withdraws_the_card_a_compute_host_child_waits_on(root, monkeypatch):
     """dashboard.turn_isolation: the opening ran in the child, which owns the setup_beat wait; the
     parent holds only a mirror, so a local cancel never reaches it."""
@@ -258,7 +256,6 @@ def test_a_compression_rotation_carries_the_run_record(root):
     assert onboarding_record.active_session_id(db) is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: skip after a session rotation does not end the run at the tip")
 def test_skip_that_read_the_id_before_a_rotation_ends_the_run_at_the_tip(root, monkeypatch):
     """Compression published a child between Skip reading the agent's id and writing the record."""
     from qubit_cli.config import read_user_config_raw
@@ -351,7 +348,6 @@ def test_a_rerun_never_writes_the_install_flag_off_and_heals_leftover_open_runs(
     assert (phase("crash-b"), phase(new)) == ("skipped", "onboarding") and False not in writes
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a rerun does not close the card in the replaced chat")
 def test_a_rerun_closes_the_card_waiting_in_the_chat_it_replaces(client, monkeypatch):
     old = _call("onboarding.start")["result"]["stored_session_id"]
     db = server._get_db()
@@ -372,7 +368,6 @@ def test_a_rerun_closes_the_card_waiting_in_the_chat_it_replaces(client, monkeyp
     assert reply == [None] and events[0][0] == "request.cancel"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: deleting the onboarding chat leaves its run open")
 def test_deleting_the_onboarding_chat_ends_its_run_and_closes_the_flag(root):
     db = server._get_db()
     db.create_session("onb", "desktop")

@@ -88,7 +88,6 @@ async def _sse_event(resp, name):
     return None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: stale approval generation is reported as approval_not_pending")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("surface", ["chat_completions", "session_stream"])
 async def test_canonical_streamed_approval_reaches_sse_and_resolves_via_runs_endpoint(api, owner, monkeypatch, surface):
@@ -126,7 +125,6 @@ async def test_canonical_streamed_approval_reaches_sse_and_resolves_via_runs_end
     assert decisions and decisions[0]["choice"] == "once"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an exact streamed retry does not replay the pending approval")
 @pytest.mark.asyncio
 async def test_exact_streamed_retry_replays_the_already_pending_approval(api, owner, monkeypatch):
     """A client that disconnects while an approval is pending and retries the unchanged request

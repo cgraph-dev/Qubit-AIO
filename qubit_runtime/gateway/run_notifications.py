@@ -2006,10 +2006,10 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                     turn_busy = await self._launching_turn_active(platform_name, watcher)
                     delivered = await self._enqueue_process_completion_notification(synth_text, completion_evt)
                     if delivered is not False:
-                        # The agent normally reports the result itself, so the chat gets no separate
-                        # receipt. While the launching turn is still running the injection only queues a
-                        # follow-up, and the chat would stay mute for as long as that turn lasts
-                        # (#112033): send the concise receipt now.
+                        # The agent normally reports the result itself, so the chat gets no separate receipt.
+                        # While the launching turn is still running the injection only queues a follow-up, and
+                        # the chat would stay mute for as long as that turn lasts (#112033): send the concise
+                        # receipt now.
                         if turn_busy and (notify_mode in {"concise", "all", "result"} or (
                             notify_mode == "error" and session.exit_code not in {0, None}
                         )):
@@ -2018,9 +2018,9 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                         break
                     # A refusal may clear (adapter reconnecting, store draining), so retry with backoff
                     # for a few minutes, then fall through to the plain notice instead of dropping it.
-                    from agent.retry_utils import jittered_backoff
                     completion_attempts += 1
                     if completion_attempts < _MAX_COMPLETION_INJECTION_ATTEMPTS:
+                        from agent.retry_utils import jittered_backoff
                         retry_interval = jittered_backoff(
                             completion_attempts, base_delay=max(interval, 1) * 2,
                             max_delay=_COMPLETION_INJECTION_RETRY_MAX_DELAY, jitter_ratio=0.0)

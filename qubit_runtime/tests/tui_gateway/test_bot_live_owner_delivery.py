@@ -10,7 +10,6 @@ from tui_gateway import session_notifications, session_auto_continue
 from tui_gateway.turn_marker import record_turn_start, read_turn_marker
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the local delivery path requires a live profile authority instead of committing a failed mailbox receipt")
 def test_refused_input_commits_failed_mailbox_receipt(tmp_path):
     import contextlib
     import contextvars
@@ -22,8 +21,10 @@ def test_refused_input_commits_failed_mailbox_receipt(tmp_path):
 
     owner = dict(profile_home=str(tmp_path.resolve()), session_id="chat",
                  lease_id="lease", live_session_id="live")
-    queued = mailbox.deliver_to_live_owner(tmp_path, owner, "refused input")
-    mailbox.claim_pending_delivery(tmp_path, owner)
+    queued = dict(id='a' * 32, delivery_id='a' * 32, owner=owner, **owner,
+                  status='claimed', message='refused input', created_at=1)
+    with mailbox._locked(tmp_path) as root:
+        mailbox._write(root / (queued['id'] + '.json'), queued)
     agent = SimpleNamespace(session_id="chat")
     session = dict(agent=agent, session_key="chat", history_lock=threading.RLock(), running=True)
     retired = []
@@ -151,13 +152,16 @@ def test_failing_mailbox_poll_warns_once_per_window():
     assert all(r.exc_info for r in warnings)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the local mailbox poll still requires a live profile authority")
 def test_mailbox_poll_delivers_past_a_schema_damaged_ticket(monkeypatch, tmp_path):
     """A `{}` ticket beside a healthy envelope must not wedge the live poller's claim (real mailbox on disk)."""
     import tools.bot_live_delivery as mailbox
     owner = dict(profile_home=str(tmp_path.resolve()), session_id="chat", lease_id="lease", live_session_id="live")
-    queued = mailbox.deliver_to_live_owner(tmp_path, owner, "healthy", delivery_id="d" * 32)
+    queued = dict(id='d' * 32, delivery_id='d' * 32, owner=owner, **owner,
+                  status='queued', message='healthy', created_at=1)
+    (mailbox._root(tmp_path)).mkdir(parents=True)
     (mailbox._root(tmp_path) / f"{'a' * 32}.json").write_text("{}", encoding="utf-8")
+    with mailbox._locked(tmp_path) as root:
+        mailbox._write(root / (queued['id'] + '.json'), queued)
     monkeypatch.setattr(mailbox, "find_canonical_live_owner", lambda home: owner)
     submitted = []
     def submit(rid, sid, session, text, **kwargs):
