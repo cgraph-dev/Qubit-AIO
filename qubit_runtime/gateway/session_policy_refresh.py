@@ -145,7 +145,12 @@ def _prepare(authority, session_id, mcp_only=False):
     # A bypass launch never reads the profile; cron, Kanban and room routes are not resumed CLI sessions.
     if old.ignore_user_config or old.source not in SURFACES:
         return None
-    home = Path(authority.db.db_path).resolve().parent
+    # The served profile's home: ``profile_id`` is that path in production and in the canonical
+    # tests' fixtures, while ``state.db`` may live in a separate sessions directory. Fall back to
+    # the store's parent only when the id is not a home (a symbolic test peer).
+    profile_home = Path(str(authority.profile_id))
+    home = (profile_home if profile_home.is_absolute() and profile_home.is_dir()
+            else Path(authority.db.db_path).resolve().parent)
     terminal = {} if mcp_only else build_profile_terminal_scope(home)
     policy, secrets, replaced = refreshed_policy(old, _load_gateway_config(home / 'config.yaml'), terminal,
                                                  picked=policy_picks(authority.db, session_id), mcp_only=mcp_only)

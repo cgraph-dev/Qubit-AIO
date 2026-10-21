@@ -20,7 +20,6 @@ def repo(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: session snapshot skill inventory omits the expected toolset rows")
 async def test_created_session_snapshot_carries_inventory_for_frozen_toolsets(tmp_path, monkeypatch, repo):
     from gateway import run
     from gateway.config import GatewayConfig
@@ -120,7 +119,7 @@ async def test_cli_surface_snapshot_carries_main_cli_toolsets_and_startup_warnin
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: session snapshot skill inventory omits the expected toolset rows")
+@pytest.mark.xfail(strict=True, reason="blocked: the fork resolves the process home from QUBIT_HOME (the conftest sandbox) and does not read HERMES_HOME, so the final process-wide catalog assertion reads the wrong home; the session snapshot's kanban inventory assertions pass")
 async def test_cli_surface_counts_kanban_skills_like_main_cli_without_leaking(tmp_path, monkeypatch, repo):
     """Main's ``cmd_chat`` pins ``HERMES_KANBAN_BOARD`` before HermesCLI starts, so its banner lists
     ``environments: [kanban]`` skills. A CLI-surface snapshot counts them; other surfaces and the
