@@ -21,9 +21,9 @@ def test_kanban_tools_hidden_without_env_var(monkeypatch, tmp_path):
     """Normal `hermes chat` sessions (no HERMES_KANBAN_TASK) must have
     zero kanban_* tools in their schema."""
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
 
     from tools.registry import invalidate_check_fn_cache, registry
     from toolsets import resolve_toolset
@@ -45,9 +45,9 @@ def test_kanban_tools_hidden_without_env_var(monkeypatch, tmp_path):
 def worker_env(monkeypatch, tmp_path):
     """Simulate being a worker: HERMES_HOME isolated, HERMES_KANBAN_TASK set
     after we've created the task."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_PROFILE", "test-worker")
     monkeypatch.delenv("HERMES_SESSION_ID", raising=False)
     from pathlib import Path as _Path
@@ -255,7 +255,6 @@ def test_complete_reports_registered_attachments(worker_env):
     assert readback["attachments"] == d["attachments"]
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: kanban review/schedule/auto-subscribe behaviour not ported', strict=False)
 def test_request_review_rejects_unknown_reviewer_without_mutation(monkeypatch, worker_env, tmp_path):
     """#106163: a non-profile ``reviewer`` (e.g. the literal "reviewer") must be
     refused with an error the model sees, leaving the task running under the
@@ -264,8 +263,8 @@ def test_request_review_rejects_unknown_reviewer_without_mutation(monkeypatch, w
     from qubit_cli import kanban_db_connect as kbc
     from tools import kanban_tools as kt
 
-    (tmp_path / ".hermes" / "profiles" / "verifier").mkdir(parents=True)
-    (tmp_path / ".hermes" / "profiles" / "verifier" / "config.yaml").write_text("{}\n", encoding="utf-8")  # identity marker
+    (tmp_path / ".qubit" / "profiles" / "verifier").mkdir(parents=True)
+    (tmp_path / ".qubit" / "profiles" / "verifier" / "config.yaml").write_text("{}\n", encoding="utf-8")  # identity marker
     with kbc.connect() as conn:
         before = kb.get_task(conn, worker_env)
         before_events = kb.list_events(conn, worker_env)
@@ -280,14 +279,13 @@ def test_request_review_rejects_unknown_reviewer_without_mutation(monkeypatch, w
         assert kb.list_events(conn, worker_env) == before_events
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: kanban review/schedule/auto-subscribe behaviour not ported', strict=False)
 def test_request_review_accepts_installed_profile(monkeypatch, worker_env, tmp_path):
     from qubit_cli import kanban_db as kb
     from qubit_cli import kanban_db_connect as kbc
     from tools import kanban_tools as kt
 
-    (tmp_path / ".hermes" / "profiles" / "verifier").mkdir(parents=True)
-    (tmp_path / ".hermes" / "profiles" / "verifier" / "config.yaml").write_text("{}\n", encoding="utf-8")  # identity marker
+    (tmp_path / ".qubit" / "profiles" / "verifier").mkdir(parents=True)
+    (tmp_path / ".qubit" / "profiles" / "verifier" / "config.yaml").write_text("{}\n", encoding="utf-8")  # identity marker
     with kbc.connect() as conn:
         monkeypatch.setenv("HERMES_KANBAN_RUN_ID", str(kb.get_task(conn, worker_env).current_run_id))
 
@@ -371,9 +369,9 @@ def test_complete_goal_mode_rejected_by_judge(monkeypatch, tmp_path):
     from tools import kanban_tools as kt
 
     # Set up isolated HERMES_HOME
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_PROFILE", "test-worker")
     monkeypatch.delenv("HERMES_SESSION_ID", raising=False)
     monkeypatch.setattr(_Path, "home", lambda: tmp_path)
@@ -490,9 +488,9 @@ def _make_goal_mode_worker_env(monkeypatch, tmp_path):
     from qubit_cli import kanban_db as kb
     from qubit_cli import kanban_db_connect as kbc
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_PROFILE", "test-worker")
     monkeypatch.delenv("HERMES_SESSION_ID", raising=False)
     monkeypatch.setattr(_Path, "home", lambda: tmp_path)
@@ -573,10 +571,9 @@ def test_schedule_goal_mode_refused(monkeypatch, tmp_path):
         conn.close()
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: kanban review/schedule/auto-subscribe behaviour not ported', strict=False)
 def test_schedule_exposed_to_codex_runtime_workers():
     """Codex app-server workers only reach Hermes tools named in EXPOSED_TOOLS."""
-    from agent.transports.hermes_tools_mcp_server import EXPOSED_TOOLS
+    from agent.transports.qubit_tools_mcp_server import EXPOSED_TOOLS
 
     assert "kanban_schedule" in EXPOSED_TOOLS
 
@@ -825,9 +822,9 @@ def test_unblock_happy_path(monkeypatch, worker_env):
 
 def test_unblock_with_pending_parents_returns_todo(monkeypatch, tmp_path):
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_PROFILE", "orchestrator")
     from pathlib import Path as _Path
     monkeypatch.setattr(_Path, "home", lambda: tmp_path)
@@ -1039,9 +1036,9 @@ def test_orchestrator_complete_any_task_allowed(monkeypatch, tmp_path):
     """Orchestrator profiles (no HERMES_KANBAN_TASK) can still complete
     any task via explicit task_id. The check only applies to workers."""
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     from pathlib import Path as _P
     monkeypatch.setattr(_P, "home", lambda: tmp_path)
 
@@ -1267,7 +1264,6 @@ def test_live_tui_session_key_fails_open_to_original_key(monkeypatch):
     assert kt._live_tui_session_key("stale-key", "ghost-profile") == "stale-key"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: kanban review/schedule/auto-subscribe behaviour not ported', strict=False)
 def test_create_respects_auto_subscribe_on_create_false(monkeypatch, worker_env, tmp_path):
     """The config gate kanban.auto_subscribe_on_create=false must
     suppress auto-subscription even when the session has a delivery
@@ -1276,12 +1272,12 @@ def test_create_respects_auto_subscribe_on_create_false(monkeypatch, worker_env,
     explicit kanban_notify-subscribe calls per task get that."""
     # worker_env already created <tmp>/.hermes; use a fresh sibling
     # home to avoid mkdir() colliding with the worker's directory.
-    home = tmp_path / "gate-home" / ".hermes"
+    home = tmp_path / "gate-home" / ".qubit"
     home.mkdir(parents=True)
     (home / "config.yaml").write_text(
         "kanban:\n  auto_subscribe_on_create: false\n"
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_SESSION_PLATFORM", "discord")
     monkeypatch.setenv("HERMES_SESSION_CHAT_ID", "channel-1")
 

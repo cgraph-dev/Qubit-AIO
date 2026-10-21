@@ -42,7 +42,7 @@ def _python_project(root: Path) -> None:
 
 
 def test_lint_and_typecheck_are_not_reported_as_full_tests(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _node_project(tmp_path)
 
     lint = classify_verification_command(
@@ -69,7 +69,7 @@ def test_lint_and_typecheck_are_not_reported_as_full_tests(tmp_path, monkeypatch
 
 
 def test_shell_wrappers_match_but_echo_does_not(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _node_project(tmp_path)
 
     wrapped = classify_verification_command(
@@ -103,7 +103,7 @@ def test_shell_wrappers_match_but_echo_does_not(tmp_path, monkeypatch):
 def test_masking_shell_control_is_not_verification_evidence(
     tmp_path, monkeypatch, command
 ):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
 
     evidence = classify_verification_command(
@@ -120,7 +120,7 @@ def test_masking_shell_control_is_not_verification_evidence(
 def test_successful_and_chain_preserves_passing_evidence(
     tmp_path, monkeypatch, command
 ):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
 
     evidence = classify_verification_command(
@@ -138,7 +138,7 @@ def test_successful_and_chain_preserves_passing_evidence(
 def test_final_verifier_after_sequence_owns_shell_exit_status(
     tmp_path, monkeypatch, exit_code, expected
 ):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
 
     evidence = classify_verification_command(
@@ -153,7 +153,7 @@ def test_final_verifier_after_sequence_owns_shell_exit_status(
 
 
 def test_quoted_shell_operator_remains_a_verifier_argument(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
 
     evidence = classify_verification_command(
@@ -169,7 +169,7 @@ def test_quoted_shell_operator_remains_a_verifier_argument(tmp_path, monkeypatch
 
 @pytest.mark.parametrize("redirect", ["2>&1", "&> test.log"])
 def test_shell_redirection_does_not_hide_simple_verifier(tmp_path, monkeypatch, redirect):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
 
     evidence = classify_verification_command(
@@ -184,7 +184,7 @@ def test_shell_redirection_does_not_hide_simple_verifier(tmp_path, monkeypatch, 
 
 
 def test_masked_ad_hoc_script_is_not_verification_evidence(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     script = Path(tempfile.gettempdir()) / f"hermes-ad-hoc-{tmp_path.name}.py"
     script.write_text("raise SystemExit(1)\n", encoding="utf-8")
@@ -202,7 +202,7 @@ def test_masked_ad_hoc_script_is_not_verification_evidence(tmp_path, monkeypatch
 
 
 def test_masked_verifier_does_not_clear_edited_ledger_state(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
     record_terminal_result(
         command="pytest",
@@ -232,7 +232,7 @@ def test_masked_verifier_does_not_clear_edited_ledger_state(tmp_path, monkeypatc
 
 
 def test_temp_script_records_ad_hoc_evidence_without_canonical_suite(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     script = Path(tempfile.gettempdir()) / f"hermes-ad-hoc-{tmp_path.name}.py"
     script.write_text("print('ok')\n", encoding="utf-8")
@@ -270,7 +270,7 @@ def test_versioned_or_absolute_interpreter_records_ad_hoc_evidence(tmp_path, mon
     the verify-on-stop nudge itself hands the agent, so a passing run recorded no evidence and
     every later turn re-nudged the same workspace as unverified.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     script = Path(tempfile.gettempdir()) / f"hermes-verify-{tmp_path.name}.py"
     script.write_text("print('ok')\n", encoding="utf-8")
@@ -294,7 +294,7 @@ def test_non_interpreter_command_touching_the_temp_script_is_not_evidence(tmp_pa
     """The nudge also tells the agent to clean the temp script up. A command that merely names
     the script — `rm`, `chmod`, `cat` — runs no verification and must not satisfy the gate.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
     script = Path(tempfile.gettempdir()) / f"hermes-verify-{tmp_path.name}.py"
 
@@ -314,7 +314,7 @@ def test_non_interpreter_command_touching_the_temp_script_is_not_evidence(tmp_pa
 
 
 def test_file_tool_stales_evidence_by_session_id_for_absolute_edit(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _node_project(tmp_path)
     target = tmp_path / "src" / "app.ts"
     target.parent.mkdir()
@@ -347,11 +347,10 @@ def test_file_tool_stales_evidence_by_session_id_for_absolute_edit(tmp_path, mon
 
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: verification evidence is not scoped per session (agent/verification_evidence.py)', strict=False)
 def test_workspace_verify_clears_stale_on_other_session(tmp_path, monkeypatch):
-    """A hermes verify pass is a property of the workspace, not the session
+    """A qubit verify pass is a property of the workspace, not the session
     that ran the CLI (#103271)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
     changed = str(tmp_path / "changed.py")
     mark_workspace_edited(session_id="s-edit", cwd=tmp_path, paths=[changed])
@@ -361,11 +360,11 @@ def test_workspace_verify_clears_stale_on_other_session(tmp_path, monkeypatch):
     assert event is not None
     status = verification_status(session_id="s-edit", cwd=tmp_path)
     assert status["status"] == "passed"
-    assert status["evidence"]["canonical_command"] == "hermes verify"
+    assert status["evidence"]["canonical_command"] == "qubit verify"
 
 
 def test_targeted_partial_verify_does_not_clear_other_session(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
     record_verify_run(root=tmp_path, session_id="s-edit", ok=True)
     mark_workspace_edited(session_id="s-edit", cwd=tmp_path, paths=[str(tmp_path / "a.py")])
@@ -377,10 +376,9 @@ def test_targeted_partial_verify_does_not_clear_other_session(tmp_path, monkeypa
     assert status["status"] == "stale"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: verification evidence is not scoped per session (agent/verification_evidence.py)', strict=False)
 def test_failed_verify_does_not_erase_other_session_edit_record(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    home = tmp_path / ".qubit"
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     _python_project(tmp_path)
     mark_workspace_edited(session_id="s-edit", cwd=tmp_path, paths=[str(tmp_path / "a.py")])
 
@@ -395,7 +393,7 @@ def test_failed_verify_does_not_erase_other_session_edit_record(tmp_path, monkey
 
 
 def test_older_workspace_verify_does_not_clear_later_edit(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     _python_project(tmp_path)
     record_verify_run(root=tmp_path, session_id="default", ok=True, output="old pass")
     mark_workspace_edited(
@@ -406,10 +404,9 @@ def test_older_workspace_verify_does_not_clear_later_edit(tmp_path, monkeypatch)
     assert verification_status(session_id="s-edit", cwd=tmp_path)["status"] == "unverified"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: verification evidence is not scoped per session (agent/verification_evidence.py)', strict=False)
 def test_recording_expires_old_edit_only_state(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    home = tmp_path / ".qubit"
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     _node_project(tmp_path)
 
     mark_workspace_edited(
@@ -464,7 +461,7 @@ def test_windows_backslash_ad_hoc_script_path_is_matched(tmp_path, monkeypatch):
     """
     from agent.verification_evidence import _find_ad_hoc_match
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     (tmp_path / "package.json").write_text("{}", encoding="utf-8")
 
     # On Windows, shlex.split(posix=True) eats backslashes as escape chars;
