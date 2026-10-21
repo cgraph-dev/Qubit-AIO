@@ -796,194 +796,62 @@ def run_import(args) -> Optional[int]:
         print(f"\nImporting {file_count} files ...")
         hermes_root.mkdir(parents=True, exist_ok=True)
 
-        errors = []
-        restored = 0
-        restored_external = 0
-        skipped_runtime: list[str] = []
-        # (rel, live_counts, imported_counts) for every session database the
-        # import replaced with one holding fewer rows. A restore is allowed to
-        # do that — it just must not do it silently (issue #100960).
-        db_shrunk: list[tuple[str, tuple[int, int], tuple[int, int]]] = []
-
-
-        home_dir = Path.home().resolve()
-        # Resolved once: every member is published via a temp file, and mkstemp
-        # would otherwise create newly restored files as 0600.
-        new_file_mode = _default_new_file_mode()
         t0 = time.monotonic()
-
-        # Reserve every affected runtime (the profiles the archive names, plus each
-        # restored ``.db`` parent) for the whole publish phase. Upstream held this
-        # inside ``_import_members``; this loop never did, so a live gateway could
-        # still write the store the import replaces.
-        from gateway.runtime_ownership import exclusive_maintenance
-        root_res = hermes_root.resolve()
-        import_homes = {hermes_root}
-        for _member in members:
-            if _member.startswith(_EXTERNAL_PREFIX):
-                continue  # restored under $HOME, outside every runtime authority
-            _rel = _member[len(prefix):] if prefix and _member.startswith(prefix) else _member
-            _parts = Path(_rel).parts
-            if len(_parts) >= 3 and _parts[0] == "profiles":
-                _home = hermes_root / _parts[0] / _parts[1]
-                if _home.resolve().is_relative_to(root_res):
-                    import_homes.add(_home)
-            _target = hermes_root / _rel
-            if _target.suffix == ".db" and _target.resolve().is_relative_to(root_res):
-                import_homes.update([_target.absolute().parent, _target.resolve().parent])
         # A lock this reservation creates for a home that had no live lock is transaction
         # debris, not state: drop it after publication so the import leaves no seeded lock.
+        import_homes = _import_homes(hermes_root, members, prefix)
         created_locks = {h / "gateway.lock" for h in import_homes if not (h / "gateway.lock").exists()}
-        # ``purpose`` marks the reservation as maintenance, not a runtime owner, so a
-        # contender can tell this short publication window from a live gateway.
-        with exclusive_maintenance(import_homes, purpose="import"):
-            for member in members:
-                # External memory-provider state captured under the reserved
-                # ``_external/`` arc prefix restores to its original home-relative
-                # location (e.g. ~/.honcho/config.json), NOT under QUBIT_HOME.
-                if member.startswith(_EXTERNAL_PREFIX):
-                    ext_rel = member[len(_EXTERNAL_PREFIX):]
-                    if not ext_rel:
-                        continue
-                    target = home_dir / ext_rel
-                    # Security: the resolved target must stay under the home dir.
-                    try:
-                        target.resolve().relative_to(home_dir)
-                    except ValueError:
-                        errors.append(f"  {member}: path traversal blocked")
-                        continue
-                    try:
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        _extract_member_atomically(zf, member, target, new_file_mode)
-                        # External provider configs commonly hold credentials.
-                        if target.suffix in {".json", ".env", ".conf"} or target.name in _SECRET_FILE_NAMES:
-                            try:
-                                os.chmod(target, 0o600)
-                            except OSError:
-                                pass
-                        restored += 1
-                        restored_external += 1
-                    except (OSError, *_ZIP_MEMBER_READ_ERRORS) as exc:
-                        errors.append(f"  {member}: {exc}")
-                    if restored % 500 == 0:
-                        print(f"  {restored}/{file_count} files ...")
-                    continue
+        from gateway.runtime_ownership import OwnershipConflict
+        try:
+            restored, restored_external, errors, skipped_runtime, db_shrunk = _import_members(
+                zf, members, prefix, hermes_root, file_count)
+        except OwnershipConflict as exc:
+            print(f"\nImport refused; no files restored: {exc}")
+            sys.exit(1)
+        elapsed = time.monotonic() - t0
 
-                # Strip prefix if detected
-                if prefix and member.startswith(prefix):
-                    rel = member[len(prefix):]
-                else:
-                    rel = member
+        # Summary
+        print()
+        print(f"Import {'incomplete' if errors else 'complete'}: {restored} files restored in {elapsed:.1f}s")
+        print(f"  Target: {display_qubit_home()}")
 
-                if not rel:
-                    continue
+        if restored_external:
+            print(
+                f"\n  Restored {restored_external} memory-provider file(s) to "
+                f"their original location(s) outside {display_qubit_home()}."
+            )
 
-                try:
-                    parts = tuple(normalize_archive_parts(rel))
-                except ValueError:
-                    errors.append(f"  {rel}: path traversal blocked")
-                    continue
+        if errors:
+            print(f"\n  Warnings ({len(errors)} files skipped):")
+            for e in errors[:10]:
+                print(e)
+            if len(errors) > 10:
+                print(f"  ... and {len(errors) - 10} more")
 
-                # Never overwrite volatile gateway/process runtime state. These are
-                # namespaced to the machine/container the backup was taken on;
-                # clobbering them (especially gateway_state.json) breaks the gateway
-                # reconciler on the target and disconnects hosted instances from the
-                # Qubit portal. Matched by basename so both the root profile and
-                # named profiles (profiles/<name>/gateway_state.json) are covered.
-                if parts[-1] in _IMPORT_SKIP_NAMES:
-                    skipped_runtime.append(rel)
-                    continue
-
-                # Older archives may contain PM selections pointing at another machine.
-                # Match their home-root paths; a plugin's own facts.json is user data.
-                if profile_root_entry(parts) in PM_RUNTIME_ROOT_DIRS:
-                    skipped_runtime.append(rel)
-                    continue
-
-                # A ``.db`` member is page-restored into the live file below; a
-                # WAL/SHM/journal member from the archive describes a different
-                # database image, and installing it beside the restored file (over
-                # a live sidecar, via os.replace) would replay a foreign WAL on
-                # the next open. Current backups never ship these
-                # (_EXCLUDED_SUFFIXES); older or hand-built archives might.
-                if rel.endswith(_SQLITE_SIDECAR_SUFFIXES):
-                    skipped_runtime.append(rel)
-                    continue
-
-                target = hermes_root.joinpath(*parts)
-
-                # Security: reject absolute paths and traversals
-                try:
-                    target.resolve().relative_to(hermes_root.resolve())
-                except ValueError:
-                    errors.append(f"  {rel}: path traversal blocked")
-                    continue
-
-                try:
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    if target.suffix == ".db":
-                        # Count before the write: afterwards the rows this import
-                        # drops are gone and there is nothing left to compare.
-                        before = _count_session_rows(target)
-                        _import_db_member(zf, member, target, new_file_mode)
-                        after = _count_session_rows(target)
-                        if before and after and after[1] < before[1]:
-                            db_shrunk.append((rel, before, after))
-                    else:
-                        _extract_member_atomically(zf, member, target, new_file_mode)
-                    if target.name in _SECRET_FILE_NAMES:
-                        os.chmod(target, 0o600)
-                    restored += 1
-                except (OSError, *_ZIP_MEMBER_READ_ERRORS) as exc:
-                    errors.append(f"  {rel}: {exc}")
-
-                if restored % 500 == 0:
-                    print(f"  {restored}/{file_count} files ...")
-
-            elapsed = time.monotonic() - t0
-
-            # Summary
-            print()
-            print(f"Import {'incomplete' if errors else 'complete'}: {restored} files restored in {elapsed:.1f}s")
-            print(f"  Target: {display_qubit_home()}")
-
-            if restored_external:
+        if db_shrunk:
+            # The backup predates work that is now overwritten. Say so: the
+            # reported incident was twelve sessions disappearing with nothing
+            # logged anywhere (issue #100960).
+            print("\n  \u26a0 Session data replaced by older backup contents:")
+            for rel, before, after in db_shrunk:
                 print(
-                    f"\n  Restored {restored_external} memory-provider file(s) to "
-                    f"their original location(s) outside {display_qubit_home()}."
+                    f"    {rel}: {before[0]} session(s) / {before[1]} message(s)"
+                    f" -> {after[0]} / {after[1]}"
                 )
+            print(
+                "    Anything recorded after the backup was taken is not in it. "
+                f"{_snapshot_recovery_hint()}"
+            )
 
-            if errors:
-                print(f"\n  Warnings ({len(errors)} files skipped):")
-                for e in errors[:10]:
-                    print(e)
-                if len(errors) > 10:
-                    print(f"  ... and {len(errors) - 10} more")
-
-            if db_shrunk:
-                # The backup predates work that is now overwritten. Say so: the
-                # reported incident was twelve sessions disappearing with nothing
-                # logged anywhere (issue #100960).
-                print("\n  ⚠ Session data replaced by older backup contents:")
-                for rel, before, after in db_shrunk:
-                    print(
-                        f"    {rel}: {before[0]} session(s) / {before[1]} message(s)"
-                        f" -> {after[0]} / {after[1]}"
-                    )
-                print(
-                    "    Anything recorded after the backup was taken is not in it. "
-                    f"{_snapshot_recovery_hint()}"
-                )
-
-            if skipped_runtime:
-                print(
-                    f"\n  Preserved {len(skipped_runtime)} runtime state "
-                    f"file(s) (kept this machine's, not the backup's):"
-                )
-                for rel in sorted(skipped_runtime)[:10]:
-                    print(f"    {rel}")
-                if len(skipped_runtime) > 10:
-                    print(f"    ... and {len(skipped_runtime) - 10} more")
+        if skipped_runtime:
+            print(
+                f"\n  Preserved {len(skipped_runtime)} runtime state "
+                f"file(s) (kept this machine's, not the backup's):"
+            )
+            for rel in sorted(skipped_runtime)[:10]:
+                print(f"    {rel}")
+            if len(skipped_runtime) > 10:
+                print(f"    ... and {len(skipped_runtime) - 10} more")
 
         for _lock in created_locks:
             try:
@@ -1460,6 +1328,169 @@ def _create_quick_snapshot_locked(
         sum(manifest.values()),
     )
     return snap_id
+
+
+def _import_homes(hermes_root: Path, members: list[str], prefix: str) -> set[Path]:
+    """Every runtime authority the archive touches: the profiles it names and each ``.db`` parent."""
+    root_res = hermes_root.resolve()
+    homes = {hermes_root}
+    for member in members:
+        if member.startswith(_EXTERNAL_PREFIX):
+            continue  # restored under $HOME, outside every runtime authority
+        rel = member[len(prefix):] if prefix and member.startswith(prefix) else member
+        parts = Path(rel).parts
+        if len(parts) >= 3 and parts[0] == "profiles":
+            home = hermes_root / parts[0] / parts[1]
+            if home.resolve().is_relative_to(root_res):
+                homes.add(home)
+        target = hermes_root / rel
+        if target.suffix == ".db" and target.resolve().is_relative_to(root_res):
+            homes.update([target.absolute().parent, target.resolve().parent])
+    return homes
+
+
+def _import_members(
+    zf: zipfile.ZipFile, members: list[str], prefix: str, hermes_root: Path, file_count: int
+) -> tuple[int, int, list[str], list[str], list[tuple[str, tuple[int, int], tuple[int, int]]]]:
+    """Reserve all affected profiles before publishing even the first config file."""
+    from gateway.runtime_ownership import exclusive_maintenance
+    # ``purpose`` marks the reservation as maintenance, not a runtime owner, so a
+    # contender can tell this short publication window from a live gateway.
+    with exclusive_maintenance(_import_homes(hermes_root, members, prefix), purpose="import"):
+        return _import_members_exclusive(zf, members, prefix, hermes_root, file_count)
+
+
+def _import_external_member(
+    zf: zipfile.ZipFile, member: str, home_dir: Path, new_file_mode: int, errors: list[str]
+) -> bool:
+    """Publish one ``_external/`` member under the user's home; False (with ``errors`` appended)
+    when it is a traversal or cannot be written."""
+    target = home_dir / member[len(_EXTERNAL_PREFIX):]
+    # Security: the resolved target must stay under the home dir.
+    try:
+        target.resolve().relative_to(home_dir)
+    except ValueError:
+        errors.append(f"  {member}: path traversal blocked")
+        return False
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _extract_member_atomically(zf, member, target, new_file_mode)
+        # External provider configs commonly hold credentials.
+        if target.suffix in {".json", ".env", ".conf"} or target.name in _SECRET_FILE_NAMES:
+            try:
+                os.chmod(target, 0o600)
+            except OSError:
+                pass
+        return True
+    except (OSError, *_ZIP_MEMBER_READ_ERRORS) as exc:
+        errors.append(f"  {member}: {exc}")
+        return False
+
+
+def _import_members_exclusive(
+    zf: zipfile.ZipFile, members: list[str], prefix: str, hermes_root: Path, file_count: int
+) -> tuple[int, int, list[str], list[str], list[tuple[str, tuple[int, int], tuple[int, int]]]]:
+    """Publish every member; return ``(restored, restored_external, errors, skipped_runtime, db_shrunk)``.
+
+    ``db_shrunk`` holds ``(rel, live_counts, imported_counts)`` for every session database the
+    import replaced with one holding fewer rows — allowed, but never silently (#100960).
+    """
+    errors = []
+    restored = 0
+    restored_external = 0
+    skipped_runtime: list[str] = []
+    db_shrunk: list[tuple[str, tuple[int, int], tuple[int, int]]] = []
+    home_dir = Path.home().resolve()
+    # Resolved once: every member is published via a temp file, and mkstemp
+    # would otherwise create newly restored files as 0600.
+    new_file_mode = _default_new_file_mode()
+
+    for member in members:
+        # External memory-provider state captured under the reserved
+        # ``_external/`` arc prefix restores to its original home-relative
+        # location (e.g. ~/.honcho/config.json), NOT under QUBIT_HOME.
+        if member.startswith(_EXTERNAL_PREFIX):
+            if not member[len(_EXTERNAL_PREFIX):]:
+                continue
+            if _import_external_member(zf, member, home_dir, new_file_mode, errors):
+                restored += 1
+                restored_external += 1
+            if restored % 500 == 0:
+                print(f"  {restored}/{file_count} files ...")
+            continue
+
+        # Strip prefix if detected
+        if prefix and member.startswith(prefix):
+            rel = member[len(prefix):]
+        else:
+            rel = member
+
+        if not rel:
+            continue
+
+        try:
+            parts = tuple(normalize_archive_parts(rel))
+        except ValueError:
+            errors.append(f"  {rel}: path traversal blocked")
+            continue
+
+        # Never overwrite volatile gateway/process runtime state. These are
+        # namespaced to the machine/container the backup was taken on;
+        # clobbering them (especially gateway_state.json) breaks the gateway
+        # reconciler on the target and disconnects hosted instances from the
+        # Qubit portal. Matched by basename so both the root profile and
+        # named profiles (profiles/<name>/gateway_state.json) are covered.
+        if parts[-1] in _IMPORT_SKIP_NAMES:
+            skipped_runtime.append(rel)
+            continue
+
+        # Older archives may contain PM selections pointing at another machine.
+        # Match their home-root paths; a plugin's own facts.json is user data.
+        if profile_root_entry(parts) in PM_RUNTIME_ROOT_DIRS:
+            skipped_runtime.append(rel)
+            continue
+
+        # A ``.db`` member is page-restored into the live file below; a
+        # WAL/SHM/journal member from the archive describes a different
+        # database image, and installing it beside the restored file (over
+        # a live sidecar, via os.replace) would replay a foreign WAL on
+        # the next open. Current backups never ship these
+        # (_EXCLUDED_SUFFIXES); older or hand-built archives might.
+        if rel.endswith(_SQLITE_SIDECAR_SUFFIXES):
+            skipped_runtime.append(rel)
+            continue
+
+        target = hermes_root.joinpath(*parts)
+
+        # Security: reject absolute paths and traversals
+        try:
+            target.resolve().relative_to(hermes_root.resolve())
+        except ValueError:
+            errors.append(f"  {rel}: path traversal blocked")
+            continue
+
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.suffix == ".db":
+                # Count before the write: afterwards the rows this import
+                # drops are gone and there is nothing left to compare.
+                before = _count_session_rows(target)
+                _import_db_member(zf, member, target, new_file_mode)
+                after = _count_session_rows(target)
+                if before and after and after[1] < before[1]:
+                    db_shrunk.append((rel, before, after))
+            else:
+                _extract_member_atomically(zf, member, target, new_file_mode)
+            if target.name in _SECRET_FILE_NAMES:
+                os.chmod(target, 0o600)
+            restored += 1
+        except (OSError, *_ZIP_MEMBER_READ_ERRORS) as exc:
+            errors.append(f"  {rel}: {exc}")
+
+        if restored % 500 == 0:
+            print(f"  {restored}/{file_count} files ...")
+
+    return restored, restored_external, errors, skipped_runtime, db_shrunk
 
 
 def _revive_gateway_after_import(qubit_root: Path) -> None:
