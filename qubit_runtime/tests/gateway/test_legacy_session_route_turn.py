@@ -59,7 +59,6 @@ def _write_profile(home, profile_url, extra=''):
 
 
 @pytest.mark.parametrize('shape', ['tui-custom', 'tui-named', 'tui-provider-only', 'cli-billing'])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an adopted legacy row resolves its route through the profile instead of the row's frozen endpoint/key")
 def test_adopted_legacy_session_turn_goes_to_its_route_with_its_own_key(monkeypatch, shape):
     from run_agent import AIAgent
     with FakeLLMServer([Text('profile')]) as profile, FakeLLMServer([Text('legacy ok')]) as legacy:
@@ -94,7 +93,6 @@ def test_adopted_legacy_session_turn_goes_to_its_route_with_its_own_key(monkeypa
         assert {r['auth'] for r in legacy.requests} == {'Bearer sk-legacy-own'}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an adopted legacy row resolves its route through the profile instead of the row's frozen endpoint/key")
 def test_adopted_cli_custom_session_keeps_custom_route_when_profile_moved_to_another_provider(monkeypatch):
     """A v0.21 CLI row's route is ``billing_provider='custom'`` + ``billing_base_url``. With the profile now
     on Anthropic, adoption must not pair ``anthropic`` (its wire mode and key) with the legacy endpoint."""
@@ -120,7 +118,6 @@ def test_adopted_cli_custom_session_keeps_custom_route_when_profile_moved_to_ano
         assert {r['auth'] for r in legacy.requests} == {'Bearer sk-legacy-own'}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an adopted legacy row resolves its route through the profile instead of the row's frozen endpoint/key")
 def test_adopted_legacy_session_whose_provider_lost_credentials_is_refused_by_name(monkeypatch):
     with FakeLLMServer([Text('profile')]) as profile:
         home = Path(os.environ['QUBIT_HOME'])
@@ -141,7 +138,6 @@ def _run_turn(policy, model, runtime):
 
 
 @pytest.mark.parametrize('owner', ['recovered', 'gone'])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an adopted legacy row resolves its route through the profile instead of the row's frozen endpoint/key")
 def test_named_provider_moved_never_sends_its_new_key_to_the_saved_endpoint(monkeypatch, owner):
     """The session saved ``custom:legacy-box`` at B; ``legacy-box`` now serves A with A's key. A's key
     belongs to A: B gets the credential of the entry that still serves B, or adoption is refused."""
@@ -197,7 +193,6 @@ def test_unchanged_route_keeps_the_profile_credential_for_that_endpoint(monkeypa
 
 
 @pytest.mark.parametrize('shape', ['desktop-custom', 'auto-base-url', 'stored-api-key', 'cli-billing-auto'])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: an adopted legacy row resolves its route through the profile instead of the row's frozen endpoint/key")
 def test_v0_21_19_row_shapes_go_to_their_own_endpoint_with_its_own_key(monkeypatch, shape):
     """v0.21.19 row shapes beyond the TUI/CLI ones: a Desktop chat (tui_gateway with ``source='desktop'``,
     same ``model_config`` writer), a route whose provider is ``auto`` with a base_url (in model_config,

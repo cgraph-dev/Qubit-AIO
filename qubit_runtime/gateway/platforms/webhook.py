@@ -24,6 +24,7 @@ import uuid
 from collections import deque
 from contextlib import nullcontext, suppress
 from dataclasses import dataclass
+from datetime import datetime, timezone, UTC
 from typing import Any, Deque, Dict, List, Optional
 
 try:
@@ -92,6 +93,17 @@ class _WebhookDeliveryIdentity:
         ).encode("utf-8")
         token = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
         return f"webhook:v2:{token}"
+
+    @staticmethod
+    def route_from_chat_id(chat_id: str) -> str:
+        """The route a delivery chat id names: decoded from a ``webhook:v2:`` token, else the legacy
+        ``webhook:{route}:{delivery}`` spelling that admissions queued before the upgrade still carry."""
+        prefix = "webhook:v2:"
+        if chat_id.startswith(prefix):
+            token = chat_id[len(prefix):]
+            _profile, route, _delivery = json.loads(base64.urlsafe_b64decode(token + "=" * (-len(token) % 4)))
+            return str(route)
+        return chat_id.split(":", 2)[1]
 
 
 def _is_loopback_host(host: Optional[str]) -> bool:
@@ -313,6 +325,9 @@ class WebhookAdapter(BasePlatformAdapter):
         except Exception:
             logger.warning("[webhook] Destination unavailable for %s", chat_id, exc_info=True)
             return SendResult(success=False, error="Webhook destination unavailable or unauthorized")
+        return await self._deliver_to(delivery, chat_id, content)
+
+    async def _deliver_to(self, delivery: dict[str, Any], chat_id: str, content: str) -> SendResult:
         deliver_type = delivery["deliver"]
         if deliver_type == "log":
             logger.info("[webhook] Response for %s: %s", chat_id, content[:200])
@@ -689,7 +704,17 @@ class WebhookAdapter(BasePlatformAdapter):
             "webhook-id", headers.get("X-Request-ID", uuid.uuid4().hex))))
         now = time.time()  # idempotency: skip duplicate deliveries (webhook retries)
         delivery_identity = _WebhookDeliveryIdentity.from_parts(profile, route_name, delivery_id)
-        if not self._record_delivery_id(delivery_identity, now):
+        coalesce = route_config.get("coalesce")
+        # deliver_only, cron_job and coalesced events act before (or without) a durable admission, so
+        # the ledger cannot dedupe a provider retry or a replayed signed delivery; the route-scoped
+        # in-memory guard is their only replay defence (main dedupes every route here).
+        # deliver_only, cron_job and coalesced events act before (or without) a durable admission, so
+        # the ledger cannot dedupe a provider retry or a replayed signed delivery; the route-scoped
+        # in-memory guard is their only replay defence. A standalone adapter (no authority bound)
+        # has no ledger either, so it keeps the in-memory guard for every route.
+        non_durable = bool(route_config.get("deliver_only") or route_config.get("cron_job")
+                           or isinstance(coalesce, dict) or not self._producer_authority())
+        if non_durable and not self._record_delivery_id(delivery_identity, now):
             logger.info("[webhook] Skipping duplicate delivery %s on route %s", delivery_id, route_name)
             return web.json_response({"status": "duplicate", "delivery_id": delivery_id}, status=200)
         if route_config.get("cron_job"):
@@ -697,28 +722,55 @@ class WebhookAdapter(BasePlatformAdapter):
         if route_config.get("deliver_only"):
             return await self._handle_deliver_only(prompt, payload, route_config, route_name, event_type, delivery_id,
                                                    profile)
-        coalesce = route_config.get("coalesce")
         if isinstance(coalesce, dict) and self._coalescer.enqueue(
                 route_name=route_name, coalesce=coalesce, payload=payload, event_type=event_type, prompt=prompt,
                 delivery_id=delivery_id, now=now, route_config=route_config, profile=profile):
             return web.json_response({"status": "coalesced", "route": route_name, "event": event_type,
                                       "delivery_id": delivery_id}, status=202)
-        return self._dispatch_agent_run(request, route_config, route_name, profile, payload, prompt, event_type,
-                                        delivery_id, now)
+        return await self._dispatch_agent_run(request, route_config, route_name, profile, payload, prompt, event_type,
+                                              delivery_id, now)
 
-    def _dispatch_agent_run(self, request, route_config: dict, route_name: str, profile, payload: Any, prompt: str,
-                            event_type: str, delivery_id: str, now: float) -> "web.Response":
-        """Spawn the agent run for one POST and return 202 immediately."""
+    async def _dispatch_agent_run(self, request, route_config: dict, route_name: str, profile, payload: Any, prompt: str,
+                                  event_type: str, delivery_id: str, now: float) -> "web.Response":
+        """Acknowledge only after the authority commits the immutable delivery."""
         logger.info("[webhook] %s event=%s route=%s prompt_len=%d delivery=%s", request.method, event_type, route_name,
                     len(prompt), delivery_id)
-        self._spawn_agent_run(payload, prompt, delivery_id, now, route_config=route_config, route_name=route_name,
-                              profile=profile, event_type=event_type)
+        outcome = await self._admit_agent_run(payload, prompt, delivery_id, now, route_config=route_config,
+                                              route_name=route_name, profile=profile, event_type=event_type)
+        if outcome is None:
+            return _json_error("Admission unavailable; retry this delivery", 503)
+        if outcome == "duplicate":
+            return web.json_response({"status": "duplicate", "delivery_id": delivery_id}, status=200)
         return web.json_response({"status": "accepted", "route": route_name, "event": event_type,
                                   "delivery_id": delivery_id}, status=202)
 
     def _spawn_agent_run(self, payload: Any, prompt: str, delivery_id: str, now: float, *, route_config: dict,
                          route_name: str, profile, event_type: str) -> "asyncio.Task":
-        """Record delivery info and fire the agent run (shared by the immediate and coalesced paths)."""
+        """Coalesced-path dispatch (settled timer / disconnect flush): admit the merged event as a task
+        so ``WebhookCoalescer.flush`` can await the hand-off. The HTTP ack for these deliveries was
+        already ``coalesced``; an admission failure is logged, never retried by the producer."""
+        async def _admit_or_log():
+            outcome = await self._admit_agent_run(payload, prompt, delivery_id, now, route_config=route_config,
+                                                  route_name=route_name, profile=profile, event_type=event_type)
+            if outcome is None:
+                logger.error("[webhook] Coalesced delivery %s on route %s was not admitted", delivery_id, route_name)
+        task = asyncio.create_task(_admit_or_log())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
+    def _producer_authority(self):
+        """The session authority a live gateway bound to this adapter serves, or ``None`` (a
+        standalone adapter with no runner/authority keeps the adapter's own message lane)."""
+        from gateway.session_authorities import active_authority
+        runner = getattr(self._message_handler, "__self__", None)
+        return None if runner is None else active_authority(runner)
+
+    async def _admit_agent_run(self, payload: Any, prompt: str, delivery_id: str, now: float, *, route_config: dict,
+                               route_name: str, profile, event_type: str) -> Optional[str]:
+        """Record delivery info and admit the run through the durable producer (shared by the immediate
+        and coalesced paths). ``"accepted"`` / ``"duplicate"``, or None when admission failed."""
+        # (profile, route, delivery_id) in the session key → concurrent webhooks get independent runs.
         identity = _WebhookDeliveryIdentity.from_parts(profile, route_name, delivery_id)
         session_chat_id = identity.session_chat_id
         # ``profile`` rides along so the reply leg (``send`` → ``_deliver_cross_platform``) egresses through
@@ -736,13 +788,50 @@ class WebhookAdapter(BasePlatformAdapter):
         if profile and isinstance(profile, str):
             source.profile = profile
         event = MessageEvent(text=prompt, message_type=MessageType.TEXT, source=source, raw_message=payload,
-                             message_id=delivery_id)
-        # The per-delivery session is closed by ``on_processing_complete`` once the run finishes
-        # (``handle_message`` is fire-and-forget, so nothing can be closed here).
-        task = asyncio.create_task(self.handle_message(event))
+                             message_id=delivery_id, timestamp=datetime.fromtimestamp(0, UTC))
+        # A standalone adapter (no runner/authority bound: unit tests, an unwired route) keeps the
+        # adapter's own message lane; a live gateway always has an authority and admits durably.
+        if self._producer_authority() is None:
+            await self.handle_message(event)
+            return "accepted"
+        from gateway.platforms.webhook_ingress import admit_producer
+        try:
+            receipt = await admit_producer(self, event)
+        except Exception:
+            logger.exception("[webhook] Durable admission failed for %s", delivery_id)
+            return None
+        if getattr(event, '_webhook_duplicate', False):
+            return "duplicate"
+        if receipt is None:
+            # A post_gateway_admission plugin consumed the delivery: nothing was committed, so the
+            # reply goes to the destination this request just validated, not a retained row.
+            reply = getattr(event, '_consumer_reply', None)
+            if reply:
+                from gateway.platforms.webhook_delivery import snapshot_destination
+                await self._deliver_to(snapshot_destination(self, self._delivery_info.get(session_chat_id)),
+                                       session_chat_id, reply)
+            return "accepted"
+        from gateway.session_authorities import active_authority, authority_for_profile_id
+        runner = self._message_handler.__self__
+        authority = authority_for_profile_id(runner, receipt.ref.profile_id) or active_authority(runner)
+        task = asyncio.create_task(self._finalize_delivery(event, authority, receipt))
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
-        return task
+        return "accepted"
+
+    async def _finalize_delivery(self, event, authority, receipt):
+        from qubit_state_runtime import get_session_admission
+        try:
+            row = get_session_admission(authority.db, admission_id=receipt.admission_id)
+            if row['status'] in {'queued', 'started'}:
+                waiter = authority.waiters.setdefault(receipt.admission_id,
+                    asyncio.get_running_loop().create_future())
+                await asyncio.shield(waiter)
+                row = get_session_admission(authority.db, admission_id=receipt.admission_id)
+            event._webhook_receipt = (authority, authority._receipt(row))
+            await self._end_webhook_session(event, event.source.chat_id)
+        except Exception:
+            logger.exception("[webhook] Could not finalize admitted delivery %s", receipt.admission_id)
 
     async def on_processing_complete(self, event: "MessageEvent", outcome: Any) -> None:
         """Close the one-shot per-delivery session: ``prune_sessions`` only reaps rows with ``ended_at`` set, so

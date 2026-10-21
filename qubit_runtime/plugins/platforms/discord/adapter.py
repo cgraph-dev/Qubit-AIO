@@ -4975,6 +4975,7 @@ class DiscordAdapter(DiscordAuthorizationMixin, DiscordMediaMixin, DiscordThread
             user_id=str(interaction.user.id), user_name=interaction.user.display_name,
             thread_id=thread_id, chat_topic=chat_topic,
             guild_id=self._interaction_guild_id(interaction), parent_chat_id=parent_id or None,
+            role_authorized=self._slash_role_grant(interaction),
         )
         msg_type = MessageType.COMMAND if text.startswith("/") else MessageType.TEXT
         channel_id = str(interaction.channel_id)
@@ -5015,26 +5016,19 @@ class DiscordAdapter(DiscordAuthorizationMixin, DiscordMediaMixin, DiscordThread
             await self._threads.mark_async(thread_id)
         starter = (message or "").strip()
         if starter and thread_id:
-            await self._dispatch_thread_session(interaction, thread_id, thread_name, starter)
+            await self._dispatch_thread_session(interaction, result["thread"], starter)
 
-    async def _dispatch_thread_session(
-        self, interaction: discord.Interaction, thread_id: str, thread_name: str, text: str,
-    ) -> None:
+    async def _dispatch_thread_session(self, interaction: discord.Interaction, thread: Any, text: str) -> None:
         """Build a MessageEvent pointing at a thread and send it through handle_message."""
-        guild_name = ""
-        if hasattr(interaction, "guild") and interaction.guild:
-            guild_name = interaction.guild.name
-        chat_name = f"{guild_name} / {thread_name}" if guild_name else thread_name
-        # Inherit forum topic when the thread was created inside a forum channel.
-        _chan = getattr(interaction, "channel", None)
-        chat_topic = self._get_effective_topic(_chan, is_thread=True) if _chan else None
-        _parent_channel = self._thread_parent_channel(getattr(interaction, "channel", None))
-        _parent_id = str(getattr(_parent_channel, "id", "") or "")
+        # Name, topic and parent come from the thread, as for a message posted in it (same pinned prompt).
+        thread_id = str(thread.id)
+        _parent_id = self._get_parent_channel_id(thread) or ""
         source = self.build_source(
-            chat_id=thread_id, chat_name=chat_name, chat_type="thread",
+            chat_id=thread_id, chat_name=self._format_thread_chat_name(thread), chat_type="thread",
             user_id=str(interaction.user.id), user_name=interaction.user.display_name,
-            thread_id=thread_id, chat_topic=chat_topic,
+            thread_id=thread_id, chat_topic=self._get_effective_topic(thread, is_thread=True),
             guild_id=self._interaction_guild_id(interaction), parent_chat_id=_parent_id or None,
+            role_authorized=self._slash_role_grant(interaction),
         )
         _skills = self._resolve_channel_skills(thread_id, _parent_id or None)
         _channel_prompt = self._resolve_channel_prompt(thread_id, _parent_id or None)
@@ -5587,7 +5581,8 @@ class DiscordAdapter(DiscordAuthorizationMixin, DiscordMediaMixin, DiscordThread
 
     @staticmethod
     def _thread_created(thread: Any, name: str) -> Dict[str, Any]:
-        return {"success": True, "thread_id": str(thread.id), "thread_name": getattr(thread, "name", None) or name}
+        return {"success": True, "thread_id": str(thread.id), "thread_name": getattr(thread, "name", None) or name,
+                "thread": thread}
 
     # ------------------------------------------------------------------
     # Auto-thread helpers
@@ -6492,63 +6487,7 @@ class DiscordAdapter(DiscordAuthorizationMixin, DiscordMediaMixin, DiscordThread
 # ---------------------------------------------------------------------------
 
 
-def _component_check_auth(
-    interaction, allowed_user_ids: Optional[set], allowed_role_ids: Optional[set],
-) -> bool:
-    """Shared user-or-role OR authorization for component button clicks.
-    Allow on: DISCORD/GATEWAY_ALLOW_ALL_USERS, user in DISCORD/GATEWAY_ALLOWED_USERS, a role in the
-    role allowlist, or pairing-store approval. Role allowlist with no ``roles`` (DM) rejects (fail closed).
-    """
-    user = getattr(interaction, "user", None)
-    if user is None or getattr(user, "id", None) is None:
-        return False
-    # Scope-aware reads: interaction tasks inherit the owning profile's secret-scope contextvar;
-    # under multiplex a raw os.getenv could return ANOTHER profile's allow-all flag.
-    # Scope-aware reads (issue #72348): component interactions are dispatched from discord.py tasks
-    # descended from the task created inside the owning profile's runtime scope, so the profile's
-    # secret-scope contextvar is inherited here.
-    if _scoped_gate_env("DISCORD_ALLOW_ALL_USERS").strip().lower() in {"true", "1", "yes"}:
-        return True
-    if _scoped_gate_env("GATEWAY_ALLOW_ALL_USERS").strip().lower() in {"true", "1", "yes"}:
-        return True
-    user_set = {str(uid).strip() for uid in (allowed_user_ids or set()) if str(uid).strip()}
-    global_allowed = {
-        uid.strip()
-        for uid in _scoped_gate_env("GATEWAY_ALLOWED_USERS").split(",")
-        if uid.strip()
-    }
-    user_set.update(global_allowed)
-    role_set = set(allowed_role_ids or set())
-    has_users = bool(user_set)
-    has_roles = bool(role_set)
-    try:
-        uid = str(user.id)
-    except AttributeError:
-        uid = ""
-    if has_users:
-        if "*" in user_set or (uid and uid in user_set):
-            return True
-    if has_roles:
-        roles_attr = getattr(user, "roles", None)
-        if roles_attr is None:
-            # Role policy configured but no role data (DM Member, raw User): fail closed.
-            return False
-        try:
-            user_role_ids = {getattr(r, "id", None) for r in roles_attr}
-        except TypeError:
-            return False
-        if user_role_ids & role_set:
-            return True
-    # Pairing store (mirrors ``authz_mixin._check_authorization``): paired users click without allowlist.
-    if uid:
-        try:
-            from gateway.pairing import PairingStore
-            store = PairingStore()
-            if store.is_approved("discord", uid):
-                return True
-        except Exception:
-            pass
-    return False
+from plugins.platforms.discord.adapter_component_auth import _component_check_auth  # noqa: E402
 
 
 def _resolve_exec_approval_admin_gate(config_extra: Optional[dict]) -> Tuple[bool, set]:
@@ -7490,110 +7429,7 @@ def _clean_discord_user_ids(raw: str) -> list:
     return cleaned
 
 
-def _discord_token_shape_error(token: str) -> Optional[str]:
-    """Reject a Discord bot token that is really the numeric application ID.
-
-    Users routinely paste the application ID from the Developer Portal's General
-    Information page instead of the bot token (Bot page); the gateway then fails
-    at runtime with an opaque 401. A real bot token is dot-separated base64 and
-    never purely numeric, so this is a safe, narrow shape check (port of
-    openclaw/openclaw#140531).
-    """
-    if token and token.strip().isdigit():
-        return ("That looks like a numeric application ID, not a bot token. "
-                "Paste the bot token from the Discord Developer Portal (Bot page), "
-                "not the application ID (General Information page).")
-    return None
-
-
-def _prompt_discord_bot_token(prompt) -> str:
-    """Prompt for the bot token, re-prompting once when the answer is a numeric app ID."""
-    from qubit_cli.cli_output import print_error
-    token = ""
-    for _attempt in range(2):
-        token = prompt("Discord bot token", password=True)
-        if not token:
-            return ""
-        error = _discord_token_shape_error(token)
-        if error is None:
-            return token
-        print_error(error)
-    # Second consecutive numeric answer: trust the user, keep the value.
-    return token
-
-
-def interactive_setup() -> None:
-    """Guide the user through Discord bot setup: token, allowlist, home channel (lazy CLI imports)."""
-    from qubit_cli.config import get_env_value, remove_env_value, save_env_value
-    from qubit_cli.cli_output import (
-        prompt, prompt_yes_no, print_header, print_info, print_success,
-    )
-    from qubit_cli.setup_platforms import declines_reconfigure
-    def _info_lines(*lines: str) -> None:
-        for line in lines:
-            print_info(line)
-
-    def _save_allowlist(allowed_users: str) -> None:
-        save_env_value("DISCORD_ALLOWED_USERS", ",".join(_clean_discord_user_ids(allowed_users)))
-        print_success("Discord allowlist configured")
-
-    print_header("Discord")
-    if declines_reconfigure("Discord", "Reconfigure Discord?", "DISCORD_BOT_TOKEN"):
-        if not get_env_value("DISCORD_ALLOWED_USERS"):
-            print_info(
-                "⚠️  Discord has no user allowlist. With the fail-closed default, "
-                "messages are denied unless you configure allowed users, roles, "
-                "or channels, or set DISCORD_ALLOW_ALL_USERS=true."
-            )
-            if prompt_yes_no("Add allowed users now?", True):
-                print_info("   To find Discord ID: Enable Developer Mode, right-click name → Copy ID")
-                allowed_users = prompt("Allowed user IDs (comma-separated)")
-                if allowed_users:
-                    _save_allowlist(allowed_users)
-        return
-    _info_lines(
-        "Create a bot at https://discord.com/developers/applications",
-        "On Bot → Privileged Gateway Intents, enable:",
-        "  - Message Content Intent (required — without it Discord rejects the connection)",
-        "  - Server Members Intent (required if you use usernames or role allowlists)",
-        "Save Changes in the Developer Portal before starting the gateway.",
-        "Docs: https://qubit.nousresearch.com/docs/user-guide/messaging/discord",
-    )
-    token = _prompt_discord_bot_token(prompt)
-    if not token:
-        return
-    save_env_value("DISCORD_BOT_TOKEN", token)
-    print_success("Discord token saved")
-    print()
-    _info_lines(
-        "🔒 Security: Restrict who can use your bot", "   To find your Discord user ID:",
-        "   1. Enable Developer Mode in Discord settings", "   2. Right-click your name → Copy ID",
-    )
-    print()
-    print_info("   You can also use Discord usernames (resolved on gateway start).")
-    print()
-    allowed_users = prompt("Allowed user IDs or usernames (comma-separated, leave empty for open access)")
-    if allowed_users:
-        _save_allowlist(allowed_users)
-    else:
-        print_info(
-            "⚠️  No allowlist set. Discord will deny messages until you set "
-            "DISCORD_ALLOWED_USERS, DISCORD_ALLOWED_ROLES, DISCORD_ALLOWED_CHANNELS, "
-            "or DISCORD_ALLOW_ALL_USERS=true for open access."
-        )
-    print()
-    _info_lines(
-        "📬 Home Channel: where Qubit delivers cron job results,",
-        "   cross-platform messages, and notifications.",
-        "   To get a channel ID: right-click a channel → Copy Channel ID",
-        "   (requires Developer Mode in Discord settings)",
-        "   You can also set this later by typing /set-home in a Discord channel.",
-    )
-    home_channel = prompt("Home channel ID (leave empty to set later with /set-home)").strip()
-    if home_channel:
-        save_env_value("DISCORD_HOME_CHANNEL", home_channel)
-    elif remove_env_value("DISCORD_HOME_CHANNEL"):
-        print_info("Home channel cleared.")
+from plugins.platforms.discord.onboarding import interactive_setup  # noqa: E402,F401
 
 
 _YAML_BOOL_ENV_KEYS = (

@@ -85,7 +85,6 @@ async def test_real_whatsapp_bridge_events_run_a_turn_through_native_admission(t
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the fork's slack adapter also stamps MessageEvent.metadata, so the pin's closed producer matrix is not the fork's")
 async def test_native_codec_closed_metadata_contract_and_reply_expected(tmp_path, monkeypatch):
     from plugins.platforms.whatsapp.adapter import WhatsAppAdapter
     monkeypatch.setenv('WHATSAPP_ALLOWED_USERS', '15551234567')

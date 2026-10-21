@@ -585,7 +585,6 @@ class TestNamedConnectFailures:
         assert adapter.fatal_error_retryable is retryable
         assert cause in adapter.fatal_error_message
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a bridge health timeout sets no fatal error code")
     @pytest.mark.asyncio
     async def test_bridge_http_timeout_is_a_named_retryable_failure(self):
         adapter = _make_adapter()

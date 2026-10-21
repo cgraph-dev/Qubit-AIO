@@ -161,7 +161,6 @@ async def test_under_an_authority_the_hook_fires_once_at_ingress_never_at_execut
     assert fired == ["eat me", "keep me"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a plugin-consumed webhook reply is not delivered to the route destination")
 @pytest.mark.asyncio
 async def test_webhook_deliveries_fire_the_hook_once_per_admission_never_on_a_provider_retry():
     """Webhook/relay traffic enters through ``webhook_ingress.admit_producer``, not

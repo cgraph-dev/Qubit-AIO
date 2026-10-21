@@ -1385,7 +1385,6 @@ async def test_interim_commentary_reaches_session_sse_and_responses_stream(adapt
     assert captured["interim_assistant_callback"] is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: worker commentary never reaches the session stream")
 @pytest.mark.asyncio
 async def test_worker_events_reach_the_session_stream_before_its_terminal_frames(adapter, session_db, monkeypatch):
     """A commentary the agent's worker thread hands to the loop before returning is delivered

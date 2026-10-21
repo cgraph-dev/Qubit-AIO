@@ -457,14 +457,13 @@ def test_install_and_clear_gateway_injector_preserves_newer_owner():
     newer_injector.assert_called_once_with(value="kept")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: plugin injection bypasses the session authority FIFO")
 @pytest.mark.asyncio
 async def test_under_a_session_authority_injection_enters_the_durable_fifo(monkeypatch):
     """With an authority serving the scope, a plugin turn is committed as a trusted producer
     admission into the session's FIFO; it never runs on the in-process adapter lane, and a
     refused admission is reported as not routed instead of falling back to that lane."""
     import gateway.session_authorities as authorities
-    from hermes_state_runtime import RuntimeStoreError
+    from qubit_state_runtime import RuntimeStoreError
 
     adapter = SimpleNamespace(handle_message=AsyncMock())
     entry = _entry()
