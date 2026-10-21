@@ -13,7 +13,6 @@ from tui_gateway.session_lifecycle import _session_turn_admission
 
 
 @pytest.mark.parametrize('kind', ['async_delegation', 'completion'])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: notification completion dispatch raises NameError on the dedup key")
 def test_refused_notification_retains_result_without_spending_attempts(tmp_path, kind):
     from tests.gateway.test_completion_admission import pending
     from tools import async_delegation as delegation
@@ -30,7 +29,8 @@ def test_refused_notification_retains_result_without_spending_attempts(tmp_path,
         _notif_log_failure=lambda *args: None)
     for module, names in [(prompt_turn, ('_admit_prompt_turn', '_run_prompt_submit')),
                           (session_notifications, ('_notif_submit', '_notif_claim_turn', '_notif_release_turn',
-                           '_notif_dispatch_event', '_notif_dispatch_completions', '_async_delegation_display_metadata'))]:
+                           '_notif_dispatch_event', '_notif_dispatch_completions', '_async_delegation_display_metadata',
+                           '_notification_event_dedup_key'))]:
         for name in names:
             namespace[name] = rebind(getattr(module, name), namespace)
     # Also bind the retry helper when present; old code must fail on the receipt, not an absent test import.
@@ -38,6 +38,11 @@ def test_refused_notification_retains_result_without_spending_attempts(tmp_path,
         namespace['_notif_defer_event'] = rebind(session_notifications._notif_defer_event, namespace)
     # The dispatcher binds the session's DB row before admission; this session has no store.
     namespace['_ensure_session_db_row'] = lambda _session: True
+    # Fork-only completion dedup: the key helper and its extra-fields table.
+    namespace['_notification_event_dedup_key'] = rebind(session_notifications._notification_event_dedup_key, namespace)
+    namespace['_DEDUP_EXTRA_FIELDS'] = session_notifications._DEDUP_EXTRA_FIELDS
+    import contextlib
+    namespace['_session_profile_runtime_scope'] = lambda session, **kw: contextlib.nullcontext()
     original_queue = process_registry.completion_queue
     process_registry.completion_queue = queue.Queue()
     try:
