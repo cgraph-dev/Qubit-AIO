@@ -115,7 +115,6 @@ def test_a_plugin_installed_during_a_tool_is_told_in_its_result_and_not_again_ne
     assert json.dumps(next_turn).count(NOTE.replace('"', '\\"')) == 1
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: a plugin notice not carried by a tool result is not attached to the next user message")
 def test_a_notice_no_tool_result_carried_rides_the_next_user_message_once():
     agent = _agent()
     requests = _script(agent, _response("hi"), _response("still here"))
