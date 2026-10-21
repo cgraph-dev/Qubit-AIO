@@ -186,6 +186,8 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
         metavar="SESSION_NAME", help="Resume a session by name, or the most recent if no name given")
     add("--worktree", "-w", action="store_true", default=False,
         help="Run in an isolated git worktree (for parallel agents)")
+    inherited(parser, "--checkpoints", action="store_true", default=False,
+              help="Enable filesystem checkpoints before destructive file operations (use /rollback to restore)")
     inherited(parser, "--accept-hooks", action="store_true", default=False, help=(
         "Auto-approve any unseen shell hooks declared in config.yaml "
         "without a TTY prompt.  Equivalent to HERMES_ACCEPT_HOOKS=1 or "
@@ -285,8 +287,8 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
         "Auto-approve any unseen shell hooks declared in config.yaml "
         "without a TTY prompt (see also HERMES_ACCEPT_HOOKS env var and "
         "hooks_auto_accept: in config.yaml)."))
-    add("--checkpoints", action="store_true", default=False,
-        help="Enable filesystem checkpoints before destructive file operations (use /rollback to restore)")
+    inherited(chat_parser, "--checkpoints", action="store_true", default=SUPPRESS,
+              help="Enable filesystem checkpoints before destructive file operations (use /rollback to restore)")
     add("--max-turns", type=int, default=None, metavar="N",
         help="Maximum tool-calling iterations per conversation turn (default: 500, or agent.max_turns in config)")
     add("--run-budget", type=float, default=None, metavar="SECONDS", dest="run_budget", help=(

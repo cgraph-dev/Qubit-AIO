@@ -67,8 +67,7 @@ def test_third_party_request_on_the_wire_carries_no_foreign_bearer(monkeypatch):
     assert "authorization" not in captured["headers"]
 
 
-_XF_FAMILY = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: Console key families usr01/svc01/admin01 are misclassified as OAuth")
-@pytest.mark.parametrize(("family", "oauth"), [("api03", False), pytest.param("usr01", False, marks=_XF_FAMILY), pytest.param("svc01", False, marks=_XF_FAMILY), pytest.param("admin01", False, marks=_XF_FAMILY), ("oat01", True)])
+@pytest.mark.parametrize(("family", "oauth"), [("api03", False), ("usr01", False), ("svc01", False), ("admin01", False), ("oat01", True)])
 def test_console_key_families_carry_x_api_key_without_claude_code_identity(monkeypatch, family, oauth):
     """#133856: Console key families must not ride Bearer + the Claude Code beta/user-agent (that request
     shape bills the subscription bucket: 400 "credit balance too low"); OAuth setup tokens still do."""
@@ -82,9 +81,9 @@ def test_console_key_families_carry_x_api_key_without_claude_code_identity(monke
     assert ("claude-code/" in headers.get("user-agent", "")) is oauth
 
 @pytest.mark.parametrize(("base_url", "family", "expect"), [
-    pytest.param("https://api.anthropic.com", "usr01", "x-api-key", marks=_XF_FAMILY), ("https://api.anthropic.com", "api03", "x-api-key"),
+    ("https://api.anthropic.com", "usr01", "x-api-key"), ("https://api.anthropic.com", "api03", "x-api-key"),
     ("https://api.anthropic.com", "oat01", "bearer"), ("https://gateway.invalid/anthropic", "usr01", "bearer"),
-    pytest.param(None, "svc01", "x-api-key", marks=_XF_FAMILY),  # an empty base_url is the native default
+    (None, "svc01", "x-api-key"),  # an empty base_url is the native default
 ])
 def test_key_cmd_token_lands_in_the_header_its_family_needs(monkeypatch, base_url, family, expect):
     """A key_cmd (callable) credential takes the per-request hook path: on the native host a Console key it

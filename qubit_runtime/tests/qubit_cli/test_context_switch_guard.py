@@ -210,7 +210,6 @@ def test_custom_provider_context_avoids_false_shrink_warning(monkeypatch):
     assert "1,048,576" not in result3.warning_message
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _estimate_tokens falls back to the lifetime session_prompt_tokens sum")
 def test_lifetime_prompt_counter_is_not_a_size_estimate():
     """``session_prompt_tokens`` sums every call; without a measured size the guard stays silent (#126343)."""
     from qubit_cli.context_switch_guard import _estimate_tokens

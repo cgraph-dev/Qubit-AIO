@@ -18,7 +18,7 @@ _T = TypeVar("_T")
 _ATTEMPTS = 4
 _MAX_DELAY = 30.0
 _HTTP_RETRY = frozenset({408, 429, 500, 502, 503, 504})
-_R2_HOSTS = frozenset({"hermes-assets.nousresearch.com"})
+_R2_HOSTS = frozenset({"hermes-assets.nousresearch.com", "qubit-assets.nousresearch.com"})
 _NETWORK_ERRNOS = frozenset({
     errno.ECONNABORTED, errno.ECONNREFUSED, errno.ECONNRESET,
     errno.ENETDOWN, errno.ENETRESET, errno.ENETUNREACH,

@@ -603,6 +603,7 @@ def _recover_format_errors(
 _WELCOME_ROUTE_HEAL_COPY = {
     "anon_on_paid_host": "Reconnected to the free model's own route.",
     "named_on_welcome_host": "Reconnected to your Qubit account's own route.",
+    "session_expired": "Renewed the connection to the free model.",
 }
 
 
@@ -997,21 +998,16 @@ def _stamp_free_tier(result: Dict[str, Any], kind: str, message: str) -> Dict[st
     return result
 
 
-def _welcome_outage_copy(base_url: Any, classified: Any, *, anonymous: bool = False) -> str:
+def _welcome_outage_copy(agent: Any, base_url: Any, classified: Any) -> str:
     """On the Qubit free tier, a transport / server failure that outlived every retry reads as one
     plain sentence (the free model is having trouble) rather than the technical summary. Empty
     for every other route and for rate limits / billing, which have their own copy."""
-    try:
-        from qubit_cli.anon_auth import FREE_TIER_OUTAGE_COPY, route_is_welcome_host
-        # Both: an anonymous JWT sent to a user-overridden paid host never reached the free model.
-        if not anonymous or not route_is_welcome_host(base_url):
-            return ""
-        # Not ``unknown``: that is the classifier's catch-all for status-less local failures, which
-        # are not the free model's trouble.
-        if classified.reason in (FailoverReason.timeout, FailoverReason.overloaded, FailoverReason.server_error):
-            return FREE_TIER_OUTAGE_COPY
-    except Exception:
-        pass
+    from qubit_cli.anon_auth import FREE_TIER_OUTAGE_COPY, on_free_model
+    # Not ``unknown``: that is the classifier's catch-all for status-less local failures, which
+    # are not the free model's trouble.
+    if on_free_model(agent, base_url) and classified.reason in (
+            FailoverReason.timeout, FailoverReason.overloaded, FailoverReason.server_error):
+        return FREE_TIER_OUTAGE_COPY
     return ""
 
 
@@ -1273,7 +1269,7 @@ def max_retries_exhausted_result(
         if _welcome_hint:
             _final_response = _welcome_tier_guidance(classified, model=model, in_chat=True)
             _free_tier_kind = _welcome_surface_kind(classified)
-        elif _outage := _welcome_outage_copy(base_url, classified, anonymous=is_anonymous_agent(agent)):
+        elif _outage := _welcome_outage_copy(agent, base_url, classified):
             _final_response, _free_tier_kind = _outage, "outage"
     if _is_thinking_timeout:
         # Thinking-timeout guidance overrides stream-drop guidance, which would wrongly

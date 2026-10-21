@@ -232,7 +232,6 @@ def test_every_log_file_writes_a_stamp_qubit_logs_since_can_read():
     assert _parse_line_timestamp(stamp_line("raw gateway stderr")) is not None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: logs list scans only the profile home, so root update/handoff logs are not listed")
 def test_update_logs_are_read_from_the_root_home_under_a_profile(tmp_path, monkeypatch, capsys):
     # ``qubit update`` mirrors to <root>/logs/update.log and the hand-off scripts write the root
     # too; `qubit logs update` under a sticky profile read the profile's (absent) copy.

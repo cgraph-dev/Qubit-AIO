@@ -22,13 +22,11 @@ def chain(monkeypatch):
     return walks
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: has_aws_credentials walks boto3's chain more than once")
 def test_no_credentials_walks_the_chain_once(chain):
     assert bedrock_adapter.has_aws_credentials() is False
     assert len(chain) == 1
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: desktop auto-detect does not skip instance metadata")
 def test_the_desktop_backends_auto_detect_skips_instance_metadata(chain, monkeypatch):
     from qubit_cli.auth import resolve_provider
     from qubit_cli.auth_constants import AuthError

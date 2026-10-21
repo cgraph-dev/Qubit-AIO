@@ -78,7 +78,6 @@ def test_touch_activity_accepts_named_provenance(monkeypatch):
     )
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: first activity stamp is dropped when monotonic clock is below the persist interval")
 def test_first_stamp_persists_while_monotonic_clock_is_below_interval(monkeypatch):
     """CLOCK_MONOTONIC is roughly host uptime: on a freshly booted VM it can sit below the 60s
     persist interval. The never-persisted / reset sentinel (0.0) must still write through."""

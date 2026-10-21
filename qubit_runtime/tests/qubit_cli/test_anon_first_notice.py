@@ -97,7 +97,6 @@ def test_signed_in_account_is_never_told_about_the_free_tier():
 def portal(monkeypatch, tmp_path):
     return install_portal(monkeypatch, tmp_path)
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: guest_notice_pending ignores a claimed welcome trial")
 def test_a_claimed_trial_has_the_notice_pending_once_and_the_flag_persists(portal, monkeypatch):
     claimed_trial(monkeypatch)
     assert anon_auth.guest_notice_pending()

@@ -1759,13 +1759,14 @@ def _configured_relay_base_url(provider: str) -> str:
     # (OpenRouter).
     try:
         from providers import get_provider_profile
+        from qubit_cli.auth import PROVIDER_REGISTRY
 
-        canonical = getattr(get_provider_profile(normalized), "base_url", "") or ""
+        profile_url = getattr(get_provider_profile(normalized), "base_url", "")
+        registry_url = getattr(PROVIDER_REGISTRY.get(normalized), "inference_base_url", "")
+        canonical = {normalize_route_base_url(u) for u in (profile_url, registry_url) if u}
     except Exception:
         return base_url  # lookup failed: stay a relay, never widening where credentials go
-    if canonical and normalize_route_base_url(base_url) == normalize_route_base_url(canonical):
-        return ""
-    return base_url
+    return "" if normalize_route_base_url(base_url) in canonical else base_url
 
 
 def _relay_model_catalog(normalized: str, relay: str) -> Optional[list[str]]:

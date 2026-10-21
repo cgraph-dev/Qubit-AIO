@@ -35,6 +35,7 @@ from qubit_cli.local_runtime import (
     binaries, bootstrap, catalog, context_policy, estimator, growth, hardware, hf_browse,
     load_progress, presets, supervisor,
 )
+from qubit_cli.local_runtime.gguf import split_parts
 from agent.memory_provider import spawn_context_thread
 from pm.downloader import Download, DownloadPaused, Source
 
@@ -513,9 +514,8 @@ def _loaded_models(running: Dict[str, Any]) -> "tuple[Dict[str, str], Dict[str, 
 
 def _staged_row(gguf: Path) -> Dict[str, Any]:
     model_id = _model_id_for(gguf)
-    # Split models: report the whole variant's bytes, not one part's.
-    hit = catalog.find_entry_for_model(model_id)
-    size = hit[1].size_bytes if hit is not None else gguf.stat().st_size
+    # A split model is every part on disk; its first file can be a metadata stub of a few MB.
+    size = sum(p.stat().st_size for p in split_parts(gguf) or [gguf])
     return {"id": model_id, "size_bytes": size, "size_label": _human_gb(size)}
 
 

@@ -332,8 +332,7 @@ def test_non_attempt_ref_shapes_are_rejected_as_archive_refs(ref):
 
 
 @pytest.mark.parametrize(("base", "headers", "blocked"), [
-    pytest.param("https://qubit-assets.nousresearch.com", {"Server": "cloudflare", "Content-Type": "text/html"}, True,
-                 marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a Cloudflare 403 is reported as a bare HTTP 403, not a CDN-firewall refusal")),
+    ("https://qubit-assets.nousresearch.com", {"Server": "cloudflare", "Content-Type": "text/html"}, True),
     ("https://qubit-assets.nousresearch.com", {"Server": "cloudflare", "cf-cache-status": "DYNAMIC"}, False),
     ("https://other-r2.example", {"Server": "cloudflare", "Content-Type": "text/html"}, False),
 ])

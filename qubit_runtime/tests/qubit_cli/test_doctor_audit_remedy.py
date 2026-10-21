@@ -57,7 +57,6 @@ def test_clean_tree_reports_no_known_vulnerabilities(capsys):
     assert issues == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: audit rows are mislabeled and offer an unrelated doctor fix")
 def test_npm_audit_only_finding_does_not_offer_doctor_fix(capsys):
     """npm lockfile findings need an upstream image or lockfile update (#136806)."""
     from qubit_cli import doctor
@@ -68,7 +67,6 @@ def test_npm_audit_only_finding_does_not_offer_doctor_fix(capsys):
     assert "web workspace has 1 npm vulnerability" in out
     assert "qubit doctor --fix" not in out
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: audit rows are mislabeled and offer an unrelated doctor fix")
 def test_root_audit_row_is_not_mislabeled_as_agent_browser(monkeypatch, tmp_path, capsys):
     """agent-browser is a pm-managed precompiled binary (pm/packages.py::AgentBrowser,
     staged via BinaryPackage.stage()) with no node_modules/lockfile of its own left after

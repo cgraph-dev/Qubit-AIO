@@ -99,7 +99,6 @@ def test_venv_python_version_is_none_without_evidence(tmp_path):
     assert venv_python_version(tmp_path / "absent") is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: venv_python_version reads only 'version', not uv's 'version_info'")
 def test_venv_python_version_reads_uv_version_info(tmp_path):
     # uv and virtualenv record ``version_info``; Windows has no lib/python3.X to fall back to.
     venv = tmp_path / "venv"

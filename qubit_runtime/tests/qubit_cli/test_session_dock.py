@@ -76,7 +76,6 @@ def test_dock_ignores_a_goal_manager_left_over_from_another_session(qubit_home):
     assert goal_line(SimpleNamespace(session_id="new-sid")) == ""
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: dock queue/wakeup accounting drops or miscounts prompts")
 def test_dock_drops_the_prompt_a_turn_takes_from_the_queue_before_the_turn_runs(qubit_home):
     """A seeded ``-q`` prompt (or any queued input) leaves ``_pending_input`` when its turn starts;
     the dock must stop listing it then, not up to a second later on the spinner thread's poll,
@@ -107,7 +106,6 @@ def test_dock_drops_the_prompt_a_turn_takes_from_the_queue_before_the_turn_runs(
     assert seen == [[]]
     assert not monitor.has_rows
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: dock queue/wakeup accounting drops or miscounts prompts")
 def test_dock_loop_row_counts_down_to_the_next_wakeup(qubit_home):
     """A standing /loop gets a dock row whose countdown moves with the clock (it used to be a
     one-shot ``next in 45m`` transcript line that never changed)."""

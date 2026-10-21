@@ -594,7 +594,6 @@ def test_managed_write_result_rejects_vanished_file(tmp_path):
         _rt_files._managed_write_result(policy, missing, str(missing))
     assert exc_info.value.status_code == 500
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _managed_file_entry has no skip_missing/broken_link handling")
 def test_broken_symlink_placeholder_requires_entry_inside_root(tmp_path):
     from fastapi import HTTPException
 
@@ -610,7 +609,6 @@ def test_broken_symlink_placeholder_requires_entry_inside_root(tmp_path):
         web_server_files._managed_file_entry(policy, outside, skip_missing=True)
     assert exc_info.value.status_code == 403
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _managed_file_entry has no skip_missing/broken_link handling")
 @pytest.mark.require_symlinks
 def test_dangling_symlink_does_not_break_directory_listing(forced_files_client):
     """Regression: a dangling symlink in a directory must not 500 the listing.

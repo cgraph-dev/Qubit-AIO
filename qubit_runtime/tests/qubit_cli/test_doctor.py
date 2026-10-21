@@ -1698,7 +1698,6 @@ def test_run_doctor_accepts_qubit_provider_ids_that_catalog_aliases(
 
 
 @pytest.mark.platforms("any")  # the wrapper name differs per host (.bat on Windows)
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: doctor reports no alias for a custom alias name and a bare wrapper")
 def test_profile_alias_status_follows_the_wrapper_the_profile_really_has(monkeypatch, tmp_path):
     """#131753: doctor said "no alias" for every Windows profile (``.bat`` wrapper) and for any
     profile reachable only through a custom alias name; a bare (pre-``.bat`` on Windows) wrapper counts."""
