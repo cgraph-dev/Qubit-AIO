@@ -189,14 +189,39 @@ def session_inventory(authority, policy, agent, cwd):
     return info
 
 
+def _profile_home_scope(authority):
+    """Bind the served profile's home for the inventory builders.
+
+    ``profile_id`` is the profile home in production; the skills/config builders read
+    ``get_qubit_home()``, which otherwise resolves the launch process's home (a different
+    profile under multiplex, and a test sandbox home in the canonical fixtures)."""
+    from contextlib import contextmanager
+    from pathlib import Path
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+    @contextmanager
+    def scope():
+        home = Path(str(getattr(authority, 'profile_id', '') or ''))
+        if not (home.is_absolute() and home.is_dir()):
+            yield
+            return
+        token = set_qubit_home_override(str(home))
+        try:
+            yield
+        finally:
+            reset_qubit_home_override(token)
+    return scope()
+
+
 async def snapshot_info(authority, ref):
     """``local_session_info`` plus main's inventory, the builders run off the owner loop."""
     from gateway.session_local import local_session_info
     from gateway.session_policy import policy_for_source
-    info = local_session_info(authority, ref)
     policy = policy_for_source(authority.runner, authority.sessions[ref.session_id].source)
     agent = authority.agent(ref)
-    inventory = await asyncio.to_thread(session_inventory, authority, policy, agent, info.get("cwd"))
+    with _profile_home_scope(authority):
+        info = local_session_info(authority, ref)
+        inventory = await asyncio.to_thread(session_inventory, authority, policy, agent, info.get("cwd"))
     if info.get('tool_count') is None:
         # A lazy session: the tools its first turn loads (the banner's own count).
         info['tool_count'] = sum(len(names) for names in (inventory.get('tools') or {}).values())

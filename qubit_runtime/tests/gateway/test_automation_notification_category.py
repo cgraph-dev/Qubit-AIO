@@ -25,7 +25,6 @@ async def _authority(tmp_path, monkeypatch):
     return runner, authority
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: live delivery refuses with 'profile authority is not ready'")
 def test_live_delivery_forwards_diagnostic_category(tmp_path, monkeypatch):
     from tools import bot_live_delivery as live
     calls = []

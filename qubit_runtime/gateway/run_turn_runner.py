@@ -1868,6 +1868,10 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         _prepare_inbound_message_text buffered image paths; consume-and-clear so later turns on the
         same runner never re-attach stale images. Falls back to plain text when nothing is readable."""
         ctx = self._ctx
+        from gateway.session_api_turn import api_execution
+        api = api_execution.get()
+        if api is not None and isinstance(api.get('content'), list):
+            return api['content']
         native_imgs = self._runner._consume_pending_native_image_paths(ctx.session_key)
         if not native_imgs:
             return ctx.message
@@ -1902,8 +1906,10 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 kwargs["relay_metadata"] = api['relay_metadata']  # upstream: api_server forwards body.metadata
             if _accepts_keyword(agent.run_conversation, "turn_author"):
                 # Sent on every transport: a provider gating durable writes needs the bot flag in a DM too.
-                kwargs["turn_author"] = {"id": ctx.source.user_id or None, "name": ctx.source.user_name or None,
-                                         "is_bot": bool(getattr(ctx.source, "is_bot", False))}
+                from gateway.session_ingress import admission_author
+                kwargs["turn_author"] = (api.get('turn_author') if api is not None else
+                    admission_author.get() or {"id": ctx.source.user_id or None, "name": ctx.source.user_name or None,
+                                               "is_bot": bool(getattr(ctx.source, "is_bot", False))})
             if ctx.title_user_message is not None:
                 kwargs["title_user_message"] = ctx.title_user_message
             if persist_user_message_override is not None:

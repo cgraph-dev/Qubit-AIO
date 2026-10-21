@@ -20,7 +20,6 @@ def repo(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: session snapshot skill inventory omits the expected toolset rows")
 async def test_created_session_snapshot_carries_inventory_for_frozen_toolsets(tmp_path, monkeypatch, repo):
     from gateway import run
     from gateway.config import GatewayConfig
@@ -120,7 +119,6 @@ async def test_cli_surface_snapshot_carries_main_cli_toolsets_and_startup_warnin
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: session snapshot skill inventory omits the expected toolset rows")
 async def test_cli_surface_counts_kanban_skills_like_main_cli_without_leaking(tmp_path, monkeypatch, repo):
     """Main's ``cmd_chat`` pins ``HERMES_KANBAN_BOARD`` before HermesCLI starts, so its banner lists
     ``environments: [kanban]`` skills. A CLI-surface snapshot counts them; other surfaces and the
@@ -141,6 +139,9 @@ async def test_cli_surface_counts_kanban_skills_like_main_cli_without_leaking(tm
     (home / 'config.yaml').write_text(
         'model: {default: gpt-5.4, provider: custom, base_url: "http://127.0.0.1:9/v1"}\n')
     monkeypatch.setenv('HERMES_HOME', str(home))
+    # The local resolver reads QUBIT_HOME; keep it on this test's home so the
+    # process-wide catalog assertion scans the same sandbox as the snapshot.
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.delenv('HERMES_KANBAN_BOARD', raising=False)
     monkeypatch.delenv('HERMES_KANBAN_TASK', raising=False)
     monkeypatch.setattr(run, '_qubit_home', home)

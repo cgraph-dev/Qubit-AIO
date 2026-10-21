@@ -1684,6 +1684,9 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         db = self._ensure_session_db() if key else None
         if db is None:
             return None
+        if getattr(self.gateway_runner, 'session_authority', None) is not None:
+            from gateway.session_api import declared_api_session
+            return declared_api_session(db, key)
         try:
             row = db.find_latest_gateway_session_for_peer(
                 source=self._SESSION_SOURCE, session_key=key)

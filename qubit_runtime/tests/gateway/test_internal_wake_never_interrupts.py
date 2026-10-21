@@ -15,7 +15,6 @@ from tests.waiting import async_wait_until
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: a kanban wake during an admitted turn is not accepted by the adapter")
 async def test_kanban_wake_during_an_admitted_turn_queues_without_interrupting(monkeypatch):
     from gateway.config import GatewayConfig, Platform, PlatformConfig
     from gateway.platforms.base import SendResult
