@@ -10,7 +10,6 @@ class _Staged(Exception):
     pass
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: client expands @file: references (and warns file not found) before staging the turn")
 def test_chat_submits_at_references_unexpanded(tmp_path, monkeypatch):
     from cli import HermesCLI
 
