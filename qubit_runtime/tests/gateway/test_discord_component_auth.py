@@ -13,20 +13,24 @@ handling, and fail-closed behavior so the parity cannot regress.
 """
 
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
+
+from gateway.config import PlatformConfig
 
 # Trigger the shared discord mock from tests/gateway/conftest.py before
 # importing the production module.
 from plugins.platforms.discord.adapter import (  # noqa: E402
     ClarifyChoiceView,
+    DiscordAdapter,
     ExecApprovalView,
     ModelPickerView,
     SlashConfirmView,
     UpdatePromptView,
-    _component_check_auth,
     _resolve_exec_approval_admin_gate,
 )
+from plugins.platforms.discord.adapter_component_auth import _component_check_auth  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -291,7 +295,6 @@ def test_other_views_not_admin_gated():
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: approval buttons do not follow a post-connect revoke")
 @pytest.mark.asyncio
 async def test_approval_buttons_follow_a_revoke_made_after_connect():
     # `hermes pairing revoke` in another process rewrites .env and the pairing store, never the
@@ -311,7 +314,6 @@ async def test_approval_buttons_follow_a_revoke_made_after_connect():
     assert view._check_auth(_interaction(11111)) is False
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _component_check_auth has no live re-check seam")
 @pytest.mark.parametrize("snapshot", [{"11111"}, {"*"}])
 @pytest.mark.parametrize(("verdict", "expected"), [(None, True), (True, True), (False, False)])
 def test_snapshot_user_is_confirmed_with_the_live_check(snapshot, verdict, expected):

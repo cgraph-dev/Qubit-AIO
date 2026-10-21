@@ -566,8 +566,6 @@ def _gateway_authorizes(source):
     ([7], False),     # unrelated role: the builder must not mint a grant for this actor
 ])
 async def test_native_event_carries_this_actors_role_grant(adapter, builder, actor_roles, gateway_admits):
-    if not (gateway_admits is False and builder == "slash"):
-        pytest.xfail("wave-20 parity defect: native builders do not carry the actor role grant")
     """Regression for #118958: a role-only member passes the slash gate, and the event a native
     builder dispatches must carry that verdict, or the gateway answers with a pairing code."""
     adapter._allowed_role_ids = {1234}

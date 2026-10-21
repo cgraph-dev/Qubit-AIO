@@ -267,9 +267,9 @@ async def test_telegram_video_size_gate_rejects_oversized_media_before_download(
     assert "exceeds" in handled[0].text
 
 
-def _voice_event(source, urls):
+def _voice_event(source, urls, text=""):
     return MessageEvent(
-        text="",
+        text=text,
         message_type=MessageType.VOICE,
         source=source,
         media_urls=list(urls),
@@ -279,7 +279,6 @@ def _voice_event(source, urls):
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a voice note merged during pending STT is not transcribed")
 @pytest.mark.asyncio
 async def test_voice_note_merged_during_pending_stt_is_transcribed():
     """A 2nd voice note merged into the pending event while the interrupt monitor's STT is in
@@ -314,7 +313,6 @@ async def test_voice_note_merged_during_pending_stt_is_transcribed():
     assert "<B.ogg>" in drain_text
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a merged caption is dropped by the cached STT drain")
 @pytest.mark.asyncio
 async def test_caption_of_voice_note_merged_during_pending_stt_is_kept():
     """The interrupt path hands over a snapshot of the caption; the merged note's caption lands on
@@ -355,7 +353,6 @@ async def test_caption_of_voice_note_merged_during_pending_stt_is_kept():
         assert "second caption" in text
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a merged voice burst is not transcribed clip-by-clip")
 @pytest.mark.asyncio
 async def test_burst_of_merged_voice_notes_transcribes_each_clip_once():
     """STT is paid and delays the interrupt: a re-run after a merge must transcribe only the new

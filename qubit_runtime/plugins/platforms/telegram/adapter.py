@@ -475,7 +475,7 @@ _POLLING_STALL_TIMEOUT = 150.0
 # Ingress dispatch stall (#102260): the transport probes prove getUpdates round-trips complete, not
 # that PTB's dispatcher ever handed the fetched updates to a handler. Two heartbeats (180s) with a
 # backlog and no dispatch progress: diagnostic only, never drives recovery (#71240 owns that).
-_INGRESS_DISPATCH_STALL_HEARTBEATS = 2
+_INGRESS_DISPATCH_STALL_HEARTBEATS = 4
 # sendVideo transcodes before answering, outlasting the 20s read timeout; also how long a user waits
 # to hear the attachment failed, so kept modest.
 _MEDIA_SEND_READ_TIMEOUT = 60.0
@@ -2254,7 +2254,7 @@ class TelegramAdapter(TelegramHeldInboundMixin, BasePlatformAdapter):
         so a backlog with no dispatch progress across ``_INGRESS_DISPATCH_STALL_HEARTBEATS`` heartbeats
         is a wedged dispatcher at any traffic rate. Reports once per stall, re-arms on progress.
         """
-        if self._webhook_mode or self._teardown_started or self.has_fatal_error:
+        if self._webhook_mode or self._teardown_started or self.has_fatal_error or self._recovery_in_flight():
             return
         received = getattr(self, "_updates_received_total", 0)
         dispatched = getattr(self, "_updates_dispatched_total", 0)

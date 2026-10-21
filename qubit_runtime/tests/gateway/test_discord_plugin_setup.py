@@ -52,9 +52,9 @@ def _patch_setup_io(monkeypatch, prompts, saved, removed, existing, infos=None, 
 
 
 # Discord prompts: bot_token (password), allowed_users, home_channel.
-_PROMPTS_NONEMPTY = ["«redacted:discord-bot-token»", "", "123456789012345678"]
-_PROMPTS_BLANK = ["«redacted:discord-bot-token»", "", ""]
-_PROMPTS_WHITESPACE = ["«redacted:discord-bot-token»", "", "   "]
+_PROMPTS_NONEMPTY = ["fake-bot-token.part2.part3", "", "123456789012345678"]
+_PROMPTS_BLANK = ["fake-bot-token.part2.part3", "", ""]
+_PROMPTS_WHITESPACE = ["fake-bot-token.part2.part3", "", "   "]
 
 
 class TestDiscordHomeChannelClear:
@@ -86,7 +86,7 @@ class TestDiscordTokenShapeGuard:
     def test_numeric_app_id_reprompts_then_accepts_real_token(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
         saved, removed, errors = {}, [], []
-        real_token = "«redacted»." + "part2.part3"
+        real_token = "fake-bot-token." + "part2.part3"
         _patch_setup_io(
             monkeypatch,
             ["1234567890123456789", real_token, "", ""],
@@ -113,7 +113,6 @@ class TestDiscordTokenCheckedWithDiscord:
     """The wizard asks Discord about the pasted token: a rejected token is never written, and an
     accepted one yields the invite link and adds the bot's owner to whoever is already allowed."""
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the wizard does not validate a pasted token against Discord")
     def test_rejected_token_never_written_and_owner_added_to_allowlist(self, monkeypatch, tmp_path):
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
         standin = DiscordStandin().start()

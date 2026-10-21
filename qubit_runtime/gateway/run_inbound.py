@@ -2049,7 +2049,7 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin):
         return transcript, f'"{transcript}"'
 
     async def _enrich_message_with_transcription(
-        self, user_text: str, audio_paths: List[str]
+        self, user_text: str, audio_paths: List[str], clip_memo: Optional[dict] = None
     ) -> tuple[str, List[str]]:
         """Transcribe voice clips with the configured STT provider and prepend the transcripts →
         ``(enriched_text, successful_transcripts)``; the transcripts (input order; empty if every clip
@@ -2077,10 +2077,15 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin):
         successful_transcripts: List[str] = []
         for path in audio_paths:
             try:
-                logger.debug("Transcribing user voice: %s", path)
-                transcript, note = await self._transcribe_one_clip(
-                    path, transcribe_audio, transcribe_audio_local_fallback,
-                )
+                if clip_memo is not None and path in clip_memo:
+                    transcript, note = clip_memo[path]
+                else:
+                    logger.debug("Transcribing user voice: %s", path)
+                    transcript, note = await self._transcribe_one_clip(
+                        path, transcribe_audio, transcribe_audio_local_fallback,
+                    )
+                    if clip_memo is not None:
+                        clip_memo[path] = (transcript, note)
                 if transcript is not None:
                     successful_transcripts.append(transcript)
                 enriched_parts.append(note)
@@ -2111,7 +2116,21 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin):
         if not audio_paths:
             return user_text if user_text is not None else (getattr(event, "text", None) or None), []
         text = user_text if user_text is not None else (getattr(event, "text", "") or "")
-        enriched_text, successful_transcripts = await self._enrich_message_with_transcription(text, audio_paths)
+        # Per-clip results outlive the merged-event cache below (a merge drops only that), so every
+        # re-run — this loop's or the drain path's — transcribes just the newly merged clips.
+        clip_memo = getattr(event, "_gateway_pending_stt_clips", None)
+        if clip_memo is None:
+            clip_memo = {}
+            event._gateway_pending_stt_clips = clip_memo
+        enriched_text, successful_transcripts = await self._enrich_message_with_transcription(text, audio_paths, clip_memo)
+        # A voice note merged in during the await dropped a cache that did not exist yet; re-run on
+        # the merged media rather than publish a transcript that silently omits the new note.
+        while self._pending_event_audio_paths(event) != audio_paths:
+            audio_paths = self._pending_event_audio_paths(event)
+            text = user_text if user_text is not None else (getattr(event, "text", "") or "")
+            enriched_text, successful_transcripts = await self._enrich_message_with_transcription(
+                text, audio_paths, clip_memo,
+            )
         event._gateway_pending_stt_text = enriched_text
         event._gateway_pending_stt_transcripts = list(successful_transcripts)
         return enriched_text, successful_transcripts
@@ -2141,7 +2160,7 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin):
         if not self._pending_event_audio_paths(event):
             return text, []
         try:
-            enriched_text, transcripts = await self._transcribe_pending_audio_event_once(event, text)
+            enriched_text, transcripts = await self._transcribe_pending_audio_event_once(event)
             if metadata is _UNSET:
                 metadata = self._thread_metadata_for_source(source, self._reply_anchor_for_event(event))
             await self._echo_pending_stt_transcripts_once(

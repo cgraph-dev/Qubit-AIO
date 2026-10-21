@@ -11,7 +11,6 @@ import sys
 import pytest
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the webhook ingress acknowledges 202 even when the admission storage trigger should fail it (503), so the retry contract is not honored")
 def test_signed_webhook_storage_failure_is_retryable(tmp_path):
     result = subprocess.run([sys.executable, __file__],
         env=dict(os.environ, QUBIT_HOME=str(tmp_path)), capture_output=True, text=True, timeout=90, check=False)

@@ -50,37 +50,45 @@ def _deaf_reports(caplog) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_stall_reported_once_on_backlog_regardless_of_update_age(caplog):
-    """Healthy dispatch never reports; a wedged dispatcher is reported after two heartbeats even
+async def test_stall_reported_once_on_backlog_regardless_of_update_age():
+    """Healthy dispatch never reports; a wedged dispatcher is reported after four heartbeats even
     while new updates keep arriving, and only once per stall."""
     adapter = _polling_adapter()
-    caplog.set_level(logging.WARNING)
     _receive(adapter, 2)
     await _dispatch(adapter, 2)
-    _heartbeats(adapter, 3)
-    assert _deaf_reports(caplog) == []
+    with patch.object(adapter, "_schedule_polling_recovery") as sched:
+        _heartbeats(adapter, 2 * tg_adapter._INGRESS_DISPATCH_STALL_HEARTBEATS)  # outlast the first-heartbeat re-arm
+        assert sched.call_count == 0
 
-    for _ in range(3):  # a fresh update lands before every heartbeat, none dispatched
-        _receive(adapter, 1)
-        adapter._check_ingress_dispatch_stall()
-    (report,) = _deaf_reports(caplog)
-    assert "2 update(s) fetched" in report and "4 received, 2 dispatched" in report
+        for _ in range(5):  # a fresh update lands before every heartbeat, none dispatched
+            _receive(adapter, 1)
+            adapter._check_ingress_dispatch_stall()
+    (report,) = _stall_reports(sched)
+    assert "4 update(s) fetched" in report and "6 received, 2 dispatched" in report
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a recovered dispatch stall is not rearmed")
 @pytest.mark.asyncio
 async def test_dispatch_progress_rearms_the_report(caplog):
     adapter = _polling_adapter()
     caplog.set_level(logging.WARNING)
-    _receive(adapter, 3)
-    _heartbeats(adapter, 3)
-    assert len(_deaf_reports(caplog)) == 1
+    with patch.object(adapter, "_schedule_polling_recovery") as sched:
+        _receive(adapter, 3)
+        recovery = asyncio.get_running_loop().create_future()  # unrelated recovery in flight
+        adapter._polling_error_task = recovery
+        _heartbeats(adapter, tg_adapter._INGRESS_DISPATCH_STALL_HEARTBEATS + 1)
+        assert sched.call_count == 0  # deferred: a report now would be swallowed by the in-flight guard
+        recovery.set_result(None)
+        _heartbeats(adapter, 3)  # 270s: a slow-but-bounded (<=300s) sequential handler is not a wedge
+        assert sched.call_count == 0
+        _heartbeats(adapter, 2)
+        assert len(_stall_reports(sched)) == 1
 
-    await _dispatch(adapter, 1)  # partial drain: progress, backlog remains
-    adapter._check_ingress_dispatch_stall()
-    assert len(_deaf_reports(caplog)) == 1
-    _heartbeats(adapter, 2)
-    assert len(_deaf_reports(caplog)) == 2
+        await _dispatch(adapter, 1)  # partial drain: progress, backlog remains
+        adapter._check_ingress_dispatch_stall()
+        assert len(_stall_reports(sched)) == 1
+        _heartbeats(adapter, 4)
+        assert len(_stall_reports(sched)) == 2
+    assert _deaf_reports(caplog) == []  # stubbed handoff: no separate pre-log announces the stall
 
 
 def test_new_generation_restarts_backlog_and_ignores_fenced_polls(caplog):
@@ -118,7 +126,6 @@ def _stall_reports(sched) -> list[str]:
     return [str(e) for e in errors]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a confirmed stall schedules a network retry instead of a supervisor handoff")
 @pytest.mark.asyncio
 async def test_dispatch_stall_marks_degraded_and_goes_fatal():
     """A confirmed dispatch stall (#130407) is a handoff, not a retry: degraded status,
