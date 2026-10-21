@@ -5,8 +5,6 @@ anchor can still name the wrong, stale row)."""
 import threading
 import types
 
-import pytest
-
 from tui_gateway import server
 
 
@@ -20,7 +18,6 @@ def _session(agent=None, **extra):
     }
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: prompt.submit schema rejects confirm_deep_truncate")
 def test_prompt_submit_refuses_deep_truncation_without_confirm(monkeypatch):
     # register() rebinds the handlers onto the server namespace, so the flag is read there.
     monkeypatch.setattr(server, "DEEP_TRUNCATE_ENFORCED", True)  # the next release's behaviour
@@ -106,7 +103,6 @@ def test_deep_truncate_counts_every_durable_row_a_merged_carrier_holds(monkeypat
         server._sessions.pop("deep-carrier-sid", None)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: prompt.submit schema rejects confirm_deep_truncate")
 def test_prompt_submit_empty_truncation_allowed_with_confirm(monkeypatch):
     """Intentional restore/regenerate of the first user turn may wipe history."""
 
