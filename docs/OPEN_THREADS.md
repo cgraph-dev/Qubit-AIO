@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 19 — 2026-10-21 (0 dead; 0 wave-18 xfails)
+
+- ✅ Fixed 118 parity-exposed defects across reasoning, compression, safe-worker/MCP, gateway lifecycle, state/session, connectors/files, onboarding/config, TUI/hosted/approval/browser; the last (cron manual-run exit code) fixed separately.
+- ✅ Measured: dead **0** (12 benign exclusions); production **1** (declared B1); total missing **638**; absent **361**; wave-18 xfails **0**; 43-file consolidated run **349 passed**; brand guard OK.
+- ✅ Live: four units restarted; identify ready; `/chat` 200; orb waiter ready. No global E2E/release verdict.
+- 🔴 Remaining: 361 absent + 638 short-port test symbols.
+
 ## Wave 18 — 2026-10-21 (0 dead)
 
 - ✅ Landed: bot-chat authority FIFO + cron parking, hot-serve reserve/serve + single-application `one_turn_route`, local `review.summary` + reset-tip barrier + title parent revision, non-mutating export + duck-typed fanout drain, ACP launch flags + `gpt-6.1-sol`, detector FP classes, 58 parity files.
