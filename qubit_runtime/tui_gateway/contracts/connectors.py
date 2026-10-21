@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base import Result, WireEnum
 from .common import ConnectorOwner, ProfileParams
@@ -72,6 +72,18 @@ class ConnectorsConnectParams(ProfileParams):
     owner: ConnectorOwner
     connectors: list[ConnectorSlug] = Field(min_length=1)
     reconnect: bool = False
+    # Connects (or, with ``reconnect``, repairs) the account of that name; one connector per call.
+    alias: ConnectorAlias | None = None
+    # With ``reconnect``: repairs this existing account, the only way to address an unnamed one.
+    connection_id: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _one_connector_per_alias(self):
+        if self.alias is not None and len(self.connectors) != 1:
+            raise ValueError("alias names one account, so it takes exactly one connector")
+        if self.connection_id is not None and (not self.reconnect or len(self.connectors) != 1 or self.alias):
+            raise ValueError("connection_id repairs one account: it needs reconnect, one connector and no alias")
+        return self
 
 
 class ConnectorsConnectResult(ConnectionOperationStatus):

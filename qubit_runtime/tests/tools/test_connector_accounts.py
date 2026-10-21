@@ -49,7 +49,6 @@ class _ExecuteTransport:
                           "totalCount": len(results)})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector account identity/rename/repair metadata is not carried on the local dispatch path")
 def test_the_account_a_call_ran_under_reaches_the_model_on_both_dispatch_paths(monkeypatch):
     import model_tools
     from tools.connectors.gateway import bridge, config
@@ -145,7 +144,6 @@ def test_reconnect_of_a_healthy_unnamed_account_by_label_mints_nothing_unless_fo
                               "connection_id": "ca_gmail_old-label"}]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector account identity/rename/repair metadata is not carried on the local dispatch path")
 def test_an_open_repair_of_one_account_is_not_reused_for_another():
     repair = op.ConnectionOperation([op.Target("gmail", "connector", "reconnect", repair_id="ca_a")], session_key="s1")
     live.open(repair)
@@ -200,7 +198,6 @@ def test_reconnect_with_an_alias_mints_nothing_when_the_account_list_cannot_be_r
     assert "error" in out
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector account identity/rename/repair metadata is not carried on the local dispatch path")
 def test_rename_sends_the_new_name_for_the_resolved_account():
     from tools.connectors.portal.client import PortalConnectorClient
 
@@ -221,7 +218,6 @@ def test_rename_sends_the_new_name_for_the_resolved_account():
     assert out["renamed"] == {"connector": "gmail", "alias": "office", "label": "me@corp.example"}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector account identity/rename/repair metadata is not carried on the local dispatch path")
 def test_rename_of_an_unknown_name_lists_the_names_that_exist():
     accounts = [_account("home", "me@example.com"), _account(None, "me@corp.example")]
     with patch("tools.connectors.portal.client.PortalConnectorClient.rename_account") as rename:
@@ -231,7 +227,6 @@ def test_rename_of_an_unknown_name_lists_the_names_that_exist():
     assert "home" in out["error"] and "me@corp.example" in out["error"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connector account identity/rename/repair metadata is not carried on the local dispatch path")
 def test_an_open_operation_for_one_account_is_not_reused_for_another():
     plain = op.ConnectionOperation([op.Target("gmail", "connector", "connect")], session_key="s1")
     live.open(plain)

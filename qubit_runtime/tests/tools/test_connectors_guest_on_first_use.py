@@ -22,7 +22,6 @@ def nas(monkeypatch, tmp_path):
     return install_portal(monkeypatch, tmp_path)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connectors-only guest identity is not created on first hosted action; tool_search sends without identity")
 def test_first_hosted_action_creates_one_connectors_only_guest(nas, monkeypatch):
     from tools.connectors.gateway import client
     from tools.connectors.gateway.config import connectors_available
@@ -66,7 +65,6 @@ def test_first_hosted_action_creates_one_connectors_only_guest(nas, monkeypatch)
     assert [r["body"].get("purpose") for r in nas.token_requests] == ["connectors"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: connectors-only guest identity is not created on first hosted action; tool_search sends without identity")
 def test_tool_search_without_an_identity_sends_nothing(nas, monkeypatch):
     from tools.connectors.tool import MANAGE_CONNECTIONS_SCHEMA
     from tools.tool_search import dispatch_tool_search
