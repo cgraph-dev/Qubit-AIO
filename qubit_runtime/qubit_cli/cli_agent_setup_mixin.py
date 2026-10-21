@@ -662,6 +662,14 @@ class CLIAgentSetupMixin:
                 self._session_db = acquire()
             except Exception as e:
                 logger.warning("SQLite session store not available — session will NOT be indexed: %s", e)
+        try:
+            self._ensure_gateway_session()
+        except Exception as e:  # health: allow BLE001 -- any session.create/resume failure is main's agent-init failure copy, never a traceback
+            from qubit_cli.cli_chat_error_copy import agent_init_failure_message
+            from qubit_cli.gateway_chat import exit_on_resume_refusal
+            exit_on_resume_refusal(e)  # -q: a changed flag on --resume is interactive startup's `Error:` + exit 2
+            ChatConsole().print(f"[bold red]{_escape(agent_init_failure_message(e))}[/]")
+            return False
         if (
             self._resumed and self._session_db and not self.conversation_history
             and not self._load_resumed_history_late()):
