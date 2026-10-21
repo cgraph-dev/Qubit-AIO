@@ -103,3 +103,17 @@ async def test_do_reconnect_does_not_set_active_on_failure():
 
         # get_active() should still be None
         assert YuanbaoAdapter.get_active() is None
+
+
+def test_active_singleton_uses_the_canonical_home_override():
+    """The profile-scoped path must read the canonical override, not the compat alias."""
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+
+    adapter = _make_adapter()
+    token = set_qubit_home_override("/tmp/qubit-yuanbao-profile-a")
+    try:
+        YuanbaoAdapter.set_active(adapter)
+        assert YuanbaoAdapter.get_active() is adapter
+    finally:
+        YuanbaoAdapter.set_active(None)
+        reset_qubit_home_override(token)

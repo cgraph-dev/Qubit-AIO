@@ -2610,7 +2610,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
     def get_active(cls) -> Optional[YuanbaoAdapter]:
         from qubit_constants import get_qubit_home_override, hermes_home_key
 
-        if get_hermes_home_override() is None:
+        if get_qubit_home_override() is None:
             return cls._active_instance
         return cls._active_instances.get(hermes_home_key())
 
@@ -2618,7 +2618,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
     def set_active(cls, adapter: Optional[YuanbaoAdapter]) -> None:
         from qubit_constants import get_qubit_home_override, hermes_home_key
 
-        if get_hermes_home_override() is None:
+        if get_qubit_home_override() is None:
             cls._active_instance = adapter
         elif adapter is None:
             cls._active_instances.pop(hermes_home_key(), None)
