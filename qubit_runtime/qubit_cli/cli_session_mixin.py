@@ -529,7 +529,7 @@ class CLISessionMixin:
             self._discard_session_if_empty(old_session_id)
 
         self.session_start = datetime.now()
-        self.session_id = new_session_id(self.session_start)
+        self.session_id = getattr(self, "_new_session_id", lambda now: new_session_id(now))(self.session_start)
         # getattr: tests drive new_session unbound against a SimpleNamespace stand-in.
         getattr(self, "_write_terminal_breadcrumb", lambda: None)()
         self.conversation_history = []
