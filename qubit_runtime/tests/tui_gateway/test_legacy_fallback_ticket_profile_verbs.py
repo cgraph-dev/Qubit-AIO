@@ -19,6 +19,7 @@ def homes(tmp_path, monkeypatch):
     bee = launch / 'profiles' / 'bee'
     bee.mkdir(parents=True)
     monkeypatch.setenv('HERMES_HOME', str(launch))
+    monkeypatch.setenv('QUBIT_HOME', str(launch))
     monkeypatch.setattr(server, '_qubit_home', launch)
     return server, launch, bee
 
