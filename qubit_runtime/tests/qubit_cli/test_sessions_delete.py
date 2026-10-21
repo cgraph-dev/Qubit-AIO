@@ -107,3 +107,33 @@ def test_sessions_prune_bare_keeps_90_day_default(monkeypatch, capsys):
     assert filters["last_active_before"] == pytest.approx(
         _time.time() - 90 * 86400, abs=60
     )
+
+
+@pytest.mark.parametrize("status", ["queued", "unknown"])
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: sessions delete ignores a queued/unknown runtime admission")
+def test_sessions_delete_with_unfinished_turn_points_to_discard(tmp_path, monkeypatch, capsys, status):
+    """P3: the ledger's session_busy / unknown_execution refusal is a user-facing answer (exit 1
+    with what to do), not an uncaught RuntimeStoreError traceback."""
+    import qubit_cli.main as main_mod
+    import qubit_state
+    import qubit_state_runtime as rt
+    from qubit_state import SessionDB
+
+    db = SessionDB(tmp_path / "state.db")
+    db.create_session("s1", source="cli")
+    epoch = rt.begin_runtime_epoch(db, instance_id="a")
+    rt.admit_session_input(db, epoch=epoch, principal_id="p", session_id="s1", request_id="r", payload={"text": "x"})
+    if status == "unknown":
+        rt.claim_session_input(db, epoch=epoch, session_id="s1")
+        rt.recover_session_inputs(db, epoch=rt.begin_runtime_epoch(db, instance_id="b"))
+    monkeypatch.setattr(qubit_state, "SessionDB", lambda *args, **kwargs: db)
+    monkeypatch.setattr(sys, "argv", ["qubit", "sessions", "delete", "s1", "--yes"])
+    with pytest.raises(SystemExit) as exited:
+        main_mod.main()
+    output = capsys.readouterr().out
+    assert exited.value.code == 1
+    assert ("qubit sessions discard s1" in output) == (status == "unknown"), output
+    assert "queued or running turn" in output or status == "unknown", output
+    reopened = SessionDB(tmp_path / "state.db")
+    assert reopened.get_session("s1") is not None
+    reopened.close()
