@@ -8,7 +8,6 @@ import pytest
 
 
 @pytest.mark.parametrize('populated', [False, True])
-@pytest.mark.xfail(strict=True, reason='wave-17 defect: read-only export mutates state.db')
 def test_session_observation_preserves_storage(tmp_path, populated):
     repo = Path(__file__).resolve().parents[2]
     env = {k: os.environ[k] for k in ('PATH', 'SYSTEMROOT', 'LANG', 'TZ') if k in os.environ}

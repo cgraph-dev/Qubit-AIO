@@ -185,9 +185,10 @@ class FanoutTransport:
             return True
 
     def _remove(self, peer: _FanoutPeer) -> None:
-        # Membership lock held; identity fences a stale writer from removing
-        # a later attachment of the same transport.
+        # Revoke captured batches as well as the queue. Failure cleanup must not
+        # remove a later attachment of this same transport.
         peer.attached = False
+        peer.generation += 1
         peer.pending.clear()
         peer.pending_bytes = 0
         if not peer.writing and peer in self._peers:
@@ -212,32 +213,53 @@ class FanoutTransport:
     def has_transports(self, *, excluding: Transport | None = None) -> bool:
         return any(peer is not excluding for peer in self.transports())
 
+    def _is_current(self, peer: _FanoutPeer, generation: int) -> bool:
+        # Overflow notices may send while detached, but only for their own generation.
+        with self._lock:
+            return peer.generation == generation
+
     def _drain(self, peer: _FanoutPeer) -> None:
         while True:
             with self._lock:
-                # A detached peer's mailbox is empty except for the one overflow notice
-                # ``write`` leaves behind; deliver it, then let go. A reattach clears the
-                # pending notice, so it can never reach a live subscription.
+                # A detached peer's mailbox is empty except for the one overflow
+                # notice ``write`` leaves behind; deliver it, then let go.
                 if not peer.pending:
                     peer.writing = False
                     if not peer.attached:
                         self._remove(peer)
                     return
                 generation = peer.generation
-                frame, size = peer.pending.popleft()
-                peer.pending_bytes -= size
+                # Everything queued so far goes out as ONE batch: a producer with no per-frame I/O
+                # (an in-process turn streaming tokens) otherwise outruns one cross-thread round trip
+                # per frame and overflows a healthy socket's mailbox. In flight stays bounded: the
+                # next batch is taken only after this one is on the wire.
+                batch = list(peer.pending)
+                peer.pending.clear()
+                peer.pending_bytes = 0
             try:
-                from tui_gateway.ws import WSTransport
-                if isinstance(peer.transport, WSTransport):
+                # Duck-typed on purpose: importing ``tui_gateway.ws`` here would pull
+                # ``tui_gateway.server`` in on this drain thread, racing any concurrent
+                # importer with a partially initialized module.
+                write_current = getattr(peer.transport, "write_many_if_current_async", None)
+                write_many = write_current or getattr(peer.transport, "write_many_async", None)
+                loop = getattr(peer.transport, "_loop", None)
+                if write_many is not None and loop is not None:
                     # write() acknowledges buffered tokens/timeouts, not socket
                     # progress. Await the real send so WS cannot move an
                     # unbounded backlog underneath this bounded mailbox.
                     from agent.async_utils import safe_schedule_threadsafe
-                    future = safe_schedule_threadsafe(
-                        peer.transport.write_async(frame), peer.transport._loop)
+                    frames = [frame for frame, _size in batch]
+                    if write_current is not None:
+                        send = write_current(frames, lambda generation=generation: self._is_current(peer, generation))
+                    elif self._is_current(peer, generation):
+                        send = write_many(frames)
+                    else:
+                        continue
+                    future = safe_schedule_threadsafe(send, loop)
                     ok = future is not None and future.result()
                 else:
-                    ok = peer.transport.write(frame)
+                    ok = all(not self._is_current(peer, generation) or peer.transport.write(frame)
+                             for frame, _size in batch)
             except Exception:
                 logger.debug("fanout write failed; pruning peer", exc_info=True)
                 ok = False
