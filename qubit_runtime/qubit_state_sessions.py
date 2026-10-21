@@ -220,6 +220,8 @@ def _collect_delegate_child_ids(conn, parent_ids: List[str]) -> List[str]:
 
 def _delete_delegate_children(conn, parent_ids: List[str]) -> List[str]:
     ids = _collect_delegate_child_ids(conn, parent_ids)
+    from qubit_state_mutation_retirement import retire_sessions
+    retire_sessions(conn, ids)
     for chunk in _id_chunks(ids):
         ph = _session_ids_placeholders(chunk)
         conn.execute(f"DELETE FROM messages WHERE session_id IN ({ph})", chunk)
@@ -779,6 +781,17 @@ class SessionSessionsMixin:
         """Read one key out of a session's model_config JSON (tolerant parse)."""
         session = self.get_session(session_id) or {}
         return _parse_model_config(session.get("model_config")).get(key, default)
+
+    def update_conversation_model_config_value(self, session_id: str, key: str,
+                                               update: Callable[[Any], Any]) -> Optional[str]:
+        """Write ``update(value)`` of a conversation-wide key at the compression tip (one transaction)."""
+        from qubit_state_sessions_model_config import update_conversation_model_config_value
+        return update_conversation_model_config_value(self, session_id, key, update)
+
+    def session_ids_with_model_config_key(self, key: str) -> List[str]:
+        """Ids of the sessions whose model_config carries ``key``, newest first."""
+        from qubit_state_sessions_model_config import session_ids_with_model_config_key
+        return session_ids_with_model_config_key(self, key)
 
     def update_session_runtime_lock(
         self, session_id: str, *, model: Optional[str] = None, provider: Optional[str] = None,
@@ -1681,6 +1694,11 @@ class SessionSessionsMixin:
             targets = _expand_compression_lineage_ids(conn, frontier)
             frontier = [sid for sid in targets if sid not in seen]
             seen.update(frontier)
+        # A local reset lineage (creation id + every segment, compression children included) is one
+        # listed conversation: deleting any segment must not strand the others without an owner.
+        from qubit_state_local import local_conversation_ids
+        for sid in list(seen):
+            seen.update(local_conversation_ids(conn, sid))
         return list(seen)
 
     def delete_session(
@@ -1752,6 +1770,24 @@ class SessionSessionsMixin:
             self._remove_session_files(sessions_dir, sid)
         return bool(deleted)
 
+    def discard_unadmitted_session(self, session_id: str) -> bool:
+        """Abort a row this same flow just created and nobody has been admitted against (seed-copy
+        compensation): remove it WITHOUT the retirement fence so the id can be lazily recreated.
+        A row with any admission or worker receipt is a real session and takes the fenced
+        :meth:`delete_session` path instead."""
+        def _do(conn):
+            if conn.execute(
+                "SELECT 1 FROM session_admissions WHERE target_session_id=? UNION ALL "
+                "SELECT 1 FROM worker_executions WHERE session_id=? LIMIT 1", (session_id, session_id)).fetchone():
+                return None
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            cur = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            return cur.rowcount > 0
+        result = self._execute_write(_do)
+        if result is None:
+            return self.delete_session(session_id)
+        return bool(result)
+
     def delete_session_if_empty(self, session_id: str, sessions_dir: Optional[Path] = None) -> bool:
         """Delete *session_id* only if it has no messages, no title and no children; check and delete
         share one transaction so a concurrent flush can't be lost. A row under an active turn lease
@@ -1820,12 +1856,16 @@ class SessionSessionsMixin:
             ).fetchall()]
             if not existing:
                 return 0
-            if include_compression_chain:
-                # Expand BEFORE the guard pass so a guarded chain member (active turn lease /
-                # compression lock anywhere in the lineage) keeps its selected root listed too.
-                expanded = self._expand_compression_lineage(conn, existing)
-            else:
-                expanded = existing
+            from qubit_state_local import owned_lineage_ids
+
+            def expand(ids):
+                # A local reset/compression segment deletes as its whole conversation (delete_session).
+                if include_compression_chain:
+                    return self._expand_compression_lineage(conn, ids)
+                return list(dict.fromkeys(x for sid in ids for x in owned_lineage_ids(conn, sid)))
+            # Expand BEFORE the guard pass so a guarded lineage member (active turn lease /
+            # compression lock anywhere in it) keeps its selected root listed too.
+            expanded = expand(existing)
             guard_pool = [*expanded, *_collect_delegate_child_ids(conn, expanded)]
             if exclude_active_write_guards:
                 # A root is skipped when it or any delegate child it would cascade is guarded, so the
@@ -1845,17 +1885,15 @@ class SessionSessionsMixin:
                     else:
                         active_ids = {
                             sid for sid in existing
-                            if self._guarded_ids(conn, [sid, *_collect_delegate_child_ids(conn, [sid])])
+                            if self._guarded_ids(conn, [*(members := expand([sid])),
+                                                        *_collect_delegate_child_ids(conn, members)])
                         }
                 existing = [sid for sid in existing if sid not in active_ids]
                 if skipped_ids is not None:
                     skipped_ids.extend(sorted(active_ids))
                 if not existing:
                     return 0
-                if include_compression_chain:
-                    expanded = self._expand_compression_lineage(conn, existing)
-                else:
-                    expanded = existing
+                expanded = expand(existing)
             from qubit_state_mutation_retirement import retire_sessions
             retire_sessions(conn, expanded)
             removed_ids.extend(_delete_delegate_children(conn, expanded))

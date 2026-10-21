@@ -91,7 +91,6 @@ def test_worker_route_and_api_content_preserve_exact_usage_and_target_fences(tmp
         db.close()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: test_runtime_worker_metadata.py test_turn_prologue_row_backfills_land_through_the_worker_like_direct")
 def test_turn_prologue_row_backfills_land_through_the_worker_like_direct(worker):
     """The real prologue (agent/turn_context.py) updates an already-materialized user row by ``_row_id``:
     the api_content sidecar after in-place preflight compaction, and the multimodal context part. The
