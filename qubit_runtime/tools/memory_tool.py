@@ -145,8 +145,10 @@ def _validate_single_op(store, action, target, content, old_text) -> Optional[st
     Missing ``old_text`` is recoverable (it can't be schema-required — needs a combinator
     the Codex backend rejects): return the inventory plus a retry instruction."""
     if action == "add" and not content:
+        FAILURE_CLASS.set("missing_content")
         return tool_error("Content is required for 'add' action.", success=False)
     if action in ("replace", "remove", "patch") and not old_text:
+        FAILURE_CLASS.set("missing_old_text")
         replace_hint = (" For 'replace', content is the COMPLETE new entry -- the whole "
                         "matched entry is overwritten, not just the old_text span."
                         if action == "replace" else "")
@@ -157,8 +159,10 @@ def _validate_single_op(store, action, target, content, old_text) -> Optional[st
                       f"set to part of one of the current_entries below.{replace_hint}"),
             "current_entries": store._entries_for(target), "usage": store._usage(target)}, ensure_ascii=False)
     if action == "replace" and not content:
+        FAILURE_CLASS.set("missing_content")
         return tool_error("content is required for 'replace' action.", success=False)
     if action == "patch" and not content:
+        FAILURE_CLASS.set("missing_content")
         return tool_error(f"content (the new text for the old_text span) is required for 'patch' action. "
                           f"{PATCH_DROP_HINT}", success=False)
     return None
@@ -228,9 +232,14 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
     whole matched entry is overwritten; old_text only locates it)."""
     if store is None:
         return tool_error("Memory is not available. It may be disabled in config or this environment.", success=False)
-    outcome, result = _memory_tool(action, target, content, old_text, new_text, operations, store)
+    token = FAILURE_CLASS.set("other")
+    try:
+        outcome, result = _memory_tool(action, target, content, old_text, new_text, operations, store)
+        failure_class = "none" if outcome == "success" else FAILURE_CLASS.get()
+    finally:
+        FAILURE_CLASS.reset(token)
     from qubit_cli.observability.shared_metrics_loop import record_builtin_memory_call
-    record_builtin_memory_call(action, operations, outcome=outcome)
+    record_builtin_memory_call(action, operations, outcome=outcome, failure_class=failure_class)
     return result
 
 

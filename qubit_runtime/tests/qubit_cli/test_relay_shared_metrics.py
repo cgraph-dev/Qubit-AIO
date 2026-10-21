@@ -1607,7 +1607,6 @@ def test_store_and_export_are_owner_only(tmp_path):
     assert stat.S_IMODE(package_path.stat().st_mode) == 0o600
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared-metrics dimension catalog rejects retired/bucketed rows")
 def test_failure_class_rows_validate_and_v3_rows_still_drain(tmp_path, monkeypatch):
     """v4 adds failure_class to compression and memory rows: a free-form compressor class collapses to
     a closed name before it is stored, and rows counted before the upgrade (v3 shape) still package."""
@@ -1645,7 +1644,6 @@ def test_failure_class_rows_validate_and_v3_rows_still_drain(tmp_path, monkeypat
     assert "Acme" not in package_path.read_text(encoding="utf-8")
     assert sum(1 for m in package["metrics"] if "failure_class" not in m["dimensions"]) == 2
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared-metrics dimension catalog rejects retired/bucketed rows")
 @pytest.mark.parametrize(("metric_name", "dimensions"), [
     ("qubit.tool_enabled_unused.count", {"toolset": "start_chat", "used": "yes"}),
     ("qubit.tool.usage.count", {"error_class": "none", "outcome": "success", "tool_name": "setup_choose"}),
@@ -1668,7 +1666,6 @@ def test_a_saved_row_naming_a_retired_setup_tool_or_toolset_still_packages(tmp_p
     assert (metric["name"], metric["dimensions"]) == (metric_name, dimensions)
     _schema_validator().validate(package)
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared-metrics dimension catalog rejects retired/bucketed rows")
 def test_package_builder_buckets_values_that_drifted_out_of_the_catalog(tmp_path, monkeypatch):
     """A catalog-backed value that left the catalog between the recording and packaging
     processes re-buckets to ``custom`` instead of aborting the whole period's package, and
@@ -1702,7 +1699,6 @@ def test_package_builder_buckets_values_that_drifted_out_of_the_catalog(tmp_path
     # The drifted row settles like any other instead of wedging the period forever.
     assert store._create_package() is None
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared-metrics dimension catalog rejects retired/bucketed rows")
 def test_package_builder_settles_rows_an_earlier_build_stored_with_retired_values(tmp_path):
     """A built-in toolset or tool an earlier build shipped (Spotify, Home Assistant) is no longer in
     the contract: rows holding it re-bucket (merged with their siblings) or, when the field has no

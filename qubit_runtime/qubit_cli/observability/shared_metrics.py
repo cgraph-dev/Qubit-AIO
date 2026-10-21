@@ -606,6 +606,10 @@ class SharedMetricsStore:
         period_start = datetime.fromisoformat(str(period_value)).replace(tzinfo=timezone.utc)
         if not client_resource_is_valid(resource):
             raise ValueError("Unsupported shared-metrics client resource")
+        metrics = self._package_metrics(rows)
+        if not metrics:  # every row was a retired value with no bucket: settle them, try the next period
+            self._mark_packaged(connection, rows, period_value, resource_values)
+            return self._create_package_in_transaction(connection, now)
         payload = {
             "schema_version": _PACKAGE_SCHEMA_VERSION,
             "package_id": str(uuid.uuid4()),
@@ -614,7 +618,7 @@ class SharedMetricsStore:
             "period_end": _isoformat(period_start + timedelta(days=1)),
             "generated_at": _isoformat(now),
             "resource": resource,
-            "metrics": [self._package_metric(row) for row in rows],
+            "metrics": metrics,
         }
         connection.execute(
             "INSERT INTO package_outbox( package_id, period_start, period_end, payload_json,"
@@ -632,6 +636,13 @@ class SharedMetricsStore:
             " ON CONFLICT(name) DO UPDATE SET stamp = MAX(stamp, excluded.stamp)",
             (payload["period_end"],),
         )
+        self._mark_packaged(connection, rows, period_value, resource_values)
+        return payload
+
+    @staticmethod
+    def _mark_packaged(
+        connection: sqlite3.Connection, rows: list[sqlite3.Row], period_value: str, resource_values: tuple,
+    ) -> None:
         for row in rows:
             connection.execute(
                 """
@@ -642,10 +653,24 @@ class SharedMetricsStore:
                     """,
                 (period_value, row["metric_name"], *resource_values, row["dimensions_json"]),
             )
-        return payload
+
+    @classmethod
+    def _package_metrics(cls, rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
+        """Package rows, merging rows a re-bucket folded onto the same dimensions into one metric."""
+        merged: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in rows:
+            metric = cls._package_metric(row)
+            if metric is None:
+                continue
+            key = (metric["name"], _compact_json(metric["dimensions"]))
+            if key in merged:
+                merged[key]["value"] += metric["value"]
+            else:
+                merged[key] = metric
+        return list(merged.values())
 
     @staticmethod
-    def _package_metric(row: sqlite3.Row) -> dict[str, Any]:
+    def _package_metric(row: sqlite3.Row) -> dict[str, Any] | None:
         metric_name = str(row["metric_name"])
         # Pre-v2 pending rows carry the frozen v1 name; the v3 package names the current counter.
         if metric_name == LEGACY_MODEL_CALL_METRIC:

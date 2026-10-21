@@ -100,7 +100,6 @@ def test_gateway_lifecycle_producers_name_a_system_issuer():
         set_interrupt(False)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: tool-reason soft interrupt is not attributed to the system")
 def test_soft_interrupt_with_tool_reason_is_attributed_to_the_system():
     """A system producer that must stop the turn SOFTLY labels itself via ``tool_reason``. The
     message-carrying soft path used to hardcode ``user sent a new message``, so a batch-guard abort

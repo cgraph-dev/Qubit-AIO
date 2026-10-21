@@ -176,7 +176,6 @@ def test_previous_content_cannot_come_from_uncommitted_arguments():
 
 
 @pytest.mark.parametrize('batch', [False, True])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: memory patch is not mirrored as a whole-entry replace")
 def test_patch_mirrors_as_a_replace_of_the_whole_entry(tmp_path, monkeypatch, batch):
     from tools.memory_tool import MemoryStore, memory_tool
 

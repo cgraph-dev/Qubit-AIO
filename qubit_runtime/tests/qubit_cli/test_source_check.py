@@ -544,7 +544,6 @@ def test_branch_tip_failure_names_the_cause(installation):
     assert "HTTP 503" in status["message"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: source-check git batch/read path returns no commits")
 def test_bare_git_off_path_reads_through_the_updaters_git(installation, monkeypatch, tmp_path):
     """Desktop passes a bare ``git`` when it found none; a Windows install's only git is PM's
     store copy, off PATH outside ``qubit update``. The check must read HEAD through that git."""

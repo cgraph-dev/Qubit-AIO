@@ -190,11 +190,17 @@ def reset_session_vars() -> None:
 
 def get_session_env(name: str, default: str = "") -> str:
     """Read a session var by legacy ``HERMES_SESSION_*`` name; drop-in for os.getenv.  The
-    ContextVar wins if ever set here (even to ``""``); else ``os.environ``; else *default*."""
+    ContextVar wins if ever set here (even to ``""``); else ``os.environ``; else *default*.
+    The canonical ``QUBIT_*`` spelling is accepted when the legacy name is unset."""
     var = _VAR_MAP.get(name)
     if var is not None and (value := var.get()) is not _UNSET:
         return value
-    return os.getenv(name, default)
+    value = os.getenv(name)
+    if value is not None:
+        return value
+    if name.startswith("HERMES_"):
+        return os.getenv("QUBIT_" + name[len("HERMES_"):], default)
+    return default
 
 
 # Surfaces that are not a human chat channel (gateway binds HERMES_SESSION_PLATFORM, CLI/TUI/

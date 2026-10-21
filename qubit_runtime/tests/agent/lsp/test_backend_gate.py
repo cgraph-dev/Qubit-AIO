@@ -73,7 +73,6 @@ def test_edit_check_started_for_local_env(tmp_path, monkeypatch):
     assert started == [(str(tmp_path / "x.py"), "x = 1\n", "x = 2\n")]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: local LSP backend has no snapshot_baseline hook (only start_edit_check)")
 def test_snapshot_baseline_called_for_local_env(tmp_path, monkeypatch):
     from tools.environments.local import LocalEnvironment
     from tools.file_operations import ShellFileOperations

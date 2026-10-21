@@ -3006,7 +3006,6 @@ def _cli_turn(session_id: str, parent_session_id: str = "") -> None:
     lifecycle.invoke_hook("pre_llm_call", **hook, parent_session_id=parent_session_id)
     relay_shared_metrics.finish_task_run(**hook, result={"completed": True})
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: CLI run entrypoint/summary rows are not recorded")
 def test_finite_cli_runs_report_their_own_entrypoint(direct_runtime, tmp_path, monkeypatch):
     """`qubit -z` / `chat -q` / `-Q` runs (QUBIT_SINGLE_QUERY_SESSION) report `one_shot`, a
     dispatcher-spawned one (kanban worker, A2A forward) `background`; the REPL stays `interactive`,
@@ -3040,7 +3039,6 @@ def test_finite_cli_runs_report_their_own_entrypoint(direct_runtime, tmp_path, m
         ("one_shot", "cli", "1"),
     ]
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: CLI run entrypoint/summary rows are not recorded")
 def test_oneshot_hard_exit_cleanup_records_the_session_summary(direct_runtime, tmp_path, monkeypatch):
     """`qubit -z` leaves through os._exit, past the atexit hook that closes the metrics session; its
     pre-exit cleanup must write the run's session.count itself."""

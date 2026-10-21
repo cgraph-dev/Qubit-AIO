@@ -49,7 +49,6 @@ from pathlib import Path
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: missing Nemotron 3.5-super reasoning stale-timeout floor")
 def test_nemotron_super_reasoning_floor_matches_existing_super_family():
     from agent.reasoning_timeouts import get_reasoning_stale_timeout_floor as floor
 

@@ -282,7 +282,6 @@ def test_hosted_memory_provider_stays_live_across_a_host_crash(tmp_path, monkeyp
 
 
 @pytest.mark.platforms("any")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: host SubagentLifecycleService has no steer()")
 def test_host_plugin_can_launch_status_and_steer_subagent(tmp_path, monkeypatch):
     import threading
     from types import SimpleNamespace

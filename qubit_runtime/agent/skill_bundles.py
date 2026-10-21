@@ -86,6 +86,8 @@ def scan_bundles() -> Dict[str, Dict[str, Any]]:
     """Rebuild the ``"/slug"`` -> bundle info cache; duplicate slugs keep the first (alphabetical)."""
     global _bundles_cache, _bundles_cache_mtime
     files = _iter_bundle_files()
+    # Stamp BEFORE parsing: a write landing mid-scan must leave the stamp stale, not match it.
+    sig = _bundles_sig(files)
     out: Dict[str, Dict[str, Any]] = {}
     for f in files:
         info = _load_bundle_file(f)
@@ -97,7 +99,7 @@ def scan_bundles() -> Dict[str, Dict[str, Any]]:
             continue
         out[key] = info
     _bundles_cache = out
-    _bundles_cache_mtime = _bundles_sig(files)
+    _bundles_cache_mtime = sig
     return out
 
 
@@ -189,7 +191,10 @@ def save_bundle(name: str, skills: List[str], description: str = "", instruction
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: Dict[str, Any] = {"name": name, "skills": cleaned_skills}
     payload.update({k: v for k, v in (("description", description), ("instruction", instruction)) if v})
-    path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    # Atomic: a gateway process scanning mid-write must never parse a truncated bundle.
+    from utils import atomic_write_text
+
+    atomic_write_text(path, yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), preserve_mode=True)
     scan_bundles()
     return path
 

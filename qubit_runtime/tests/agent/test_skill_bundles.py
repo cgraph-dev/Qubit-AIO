@@ -298,7 +298,6 @@ class TestBundleCacheRaces:
         self._pin(alpha)
         assert get_skill_bundles()["/alpha"]["skills"] == ["changed"]
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a write landing during a bundle scan is not picked up on the next call")
     def test_write_landing_during_scan_is_picked_up_next_call(self, bundles_env, monkeypatch):
         import agent.skill_bundles as mod
 
@@ -342,7 +341,6 @@ class TestBundleCacheRaces:
 
         assert get_skill_bundles()["/alpha"]["skills"] == ["bb"]
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: bundle overwrite can expose a partial file")
     def test_overwrite_never_exposes_a_partial_file(self, bundles_env):
         import agent.skill_bundles as mod
         from tests.file_write_observer import observe_file_writes

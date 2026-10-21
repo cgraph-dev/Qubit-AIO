@@ -329,7 +329,8 @@ def _handoff_pid() -> int | None:
     """Pid of the orchestrating updater that spawned us (:data:`HANDOFF_PID_ENV`); malformed
     values count as absent so a broken handoff falls back to the normal refusal."""
     try:
-        pid = int(os.environ.get(HANDOFF_PID_ENV, "").strip())
+        raw = os.environ.get(HANDOFF_PID_ENV) or os.environ.get("QUBIT_UPDATE_HANDOFF_PID", "")
+        pid = int(raw.strip())
     except ValueError:
         return None
     return pid if pid > 0 else None

@@ -355,6 +355,17 @@ class SubagentLifecycleService:
         with _REGISTRY.lock:
             return record.result or SubagentResult(record.handle, record.state, False, error_classification="NOT_READY")
 
+    def steer(self, handle: Any, text: str) -> bool:
+        """Queue text for the child's next iteration boundary while it accepts steering."""
+        record = self._record(handle)
+        if record is None or not isinstance(text, str) or not text.strip():
+            return False
+        with _REGISTRY.lock:
+            if record.result is not None:
+                return False
+        from tools.delegate_tool_registry import steer_subagent
+        return steer_subagent(record.handle.subagent_id, text.strip())
+
     def reconnect(self, handle: Any) -> SubagentReconnectResult:
         record = self._record(handle)
         if record is None:
