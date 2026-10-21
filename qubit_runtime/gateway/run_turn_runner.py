@@ -2030,7 +2030,11 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 ):
                     self._restore_telegram_thread_id_after_split(agent_session_id)
                 runner._sync_telegram_topic_binding(src, entry, reason="agent-run-compression")
-        runner._sync_session_model_from_agent(agent_session_id, agent)
+        from gateway.session_cli_turn import cli_turn
+        if not cli_turn(ctx.inbound_message_id).get("model_override"):
+            # A `/model --once` / `/moa` turn ran another route for this admission only: the row keeps
+            # the session's model, or a /resume would come back on the one-turn model.
+            runner._sync_session_model_from_agent(agent_session_id, agent)
         # history_offset=0 whenever the agent's message list lost the original history prefix
         # (split OR in-place compaction): the returned `messages` is the compacted set, persist all
         # of it; slicing past the pre-compaction length would drop everything.
@@ -2157,6 +2161,16 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             # (upstream :1171-1172).
             from gateway.session_api_turn import prepare_api_runtime
             model, runtime_kwargs = prepare_api_runtime(model, runtime_kwargs)
+            # The classic CLI's `/model --once` / `/moa`: this admission only, nothing persisted.
+            # The route resolution above already applied the session's own route (and its
+            # ``_apply_session_model_override``), so only the committed per-turn override is layered
+            # here — one application per turn, never the pin's ``policy.current_model`` re-application.
+            from gateway.session_cli_turn import cli_turn, one_turn_route
+            policy = None
+            if cli_turn(getattr(ctx, 'inbound_message_id', None)).get('model_override'):
+                from gateway.session_policy import policy_for_source
+                policy = policy_for_source(runner, ctx.source)
+            model, runtime_kwargs = one_turn_route(self, policy, model, runtime_kwargs)
             logger.debug(
                 "run_agent resolved: model=%s provider=%s session=%s",
                 model, runtime_kwargs.get("provider"), ctx.session_key or "",
