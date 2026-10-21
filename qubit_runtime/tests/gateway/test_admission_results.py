@@ -57,7 +57,7 @@ def test_stale_result_cannot_overwrite_settled_or_unknown_claim(tmp_path):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('fails', [
-    pytest.param(True, id='agent-raised', marks=pytest.mark.xfail(strict=True, reason="wave-18 parity defect: a turn that raised before running settles completed rather than failed")),
+    pytest.param(True, id='agent-raised'),
     pytest.param(False, id='plain-reply'),
 ])
 async def test_a_turn_that_failed_before_running_settles_failed_on_every_surface(tmp_path, monkeypatch, fails):
