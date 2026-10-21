@@ -174,7 +174,6 @@ def test_managed_turn_sends_configured_instruction_and_prefill(tmp_path):
         assert found == {'system_mark': [True], 'prefill': ['PREFILL_Q_MARK', 'PREFILL_A_MARK'], 'stored': False}, (name, results)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: construct_inputs drops the session prefill_messages (None instead of the configured prefill)")
 def test_construct_inputs_follow_the_session_mode(tmp_path, monkeypatch):
     """Ordinary: the owner's per-turn profile refresh, configured prompt and prefill; config-only:
     the frozen snapshot's chain and launch skills only, never the profile; safe mode: nothing.
