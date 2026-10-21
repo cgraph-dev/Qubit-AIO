@@ -74,11 +74,19 @@ def _validated_runtime_venv(env: dict) -> Path | None:
     """Producer-owned runtime venv identified by VIRTUAL_ENV, or None. The variable
     alone is not provenance (users carry unrelated venvs): require the legacy Windows
     base-Python producer's exact ``<repo>/venv`` layout AND a real ``pyvenv.cfg``."""
-    from pm.environments import runtime_facts_path, selected_venv
+    from pm.environments import payload_venv, runtime_facts_path, selected_venv
 
     root = Path(__file__).resolve().parents[2]
     if runtime_facts_path(root).is_file():
         return selected_venv(root)
+    try:
+        shipped = payload_venv(root)
+    except (RuntimeError, OSError):  # a manifest that escapes its root reads as "not a payload"
+        shipped = None
+    # Require the real venv, as the VIRTUAL_ENV branch does: a stray manifest.json beside a
+    # checkout must not hand back a phantom path that shadows the user's own venv.
+    if shipped is not None and (shipped / "pyvenv.cfg").is_file():
+        return shipped
     candidate = Path(env.get("VIRTUAL_ENV") or "")
     if not env.get("VIRTUAL_ENV") or not any(
             _same_path(candidate, root / "venv") for root in _state()._qubit_repo_root_aliases):
