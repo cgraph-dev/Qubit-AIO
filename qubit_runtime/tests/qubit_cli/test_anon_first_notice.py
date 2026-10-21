@@ -9,6 +9,7 @@ import pytest
 from qubit_cli import anon_auth
 from qubit_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
 from qubit_cli.cli_agent_setup_mixin import CLIAgentSetupMixin
+from tests.qubit_cli.anon_portal import as_local_desktop_backend, claimed_trial, install_portal
 
 
 def _jwt(**claims) -> str:
@@ -90,3 +91,24 @@ def test_signed_in_account_is_never_told_about_the_free_tier():
     assert cli.console.lines == []
     assert anon_auth.mark_guest_notice_shown() is False
     assert anon_auth.GUEST_NOTICE_FLAG not in _load_auth_store()["providers"]["nous"]
+
+
+@pytest.fixture
+def portal(monkeypatch, tmp_path):
+    return install_portal(monkeypatch, tmp_path)
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: guest_notice_pending ignores a claimed welcome trial")
+def test_a_claimed_trial_has_the_notice_pending_once_and_the_flag_persists(portal, monkeypatch):
+    claimed_trial(monkeypatch)
+    assert anon_auth.guest_notice_pending()
+
+    assert anon_auth.mark_guest_notice_shown() is True
+
+    assert _load_auth_store()["providers"]["nous"][anon_auth.GUEST_NOTICE_FLAG] is True
+    assert not anon_auth.guest_notice_pending()
+
+def test_a_connector_only_guest_has_no_notice_pending(portal, monkeypatch):
+    as_local_desktop_backend(monkeypatch)
+    anon_auth.ensure_portal_identity(explicit=True)
+
+    assert anon_auth.has_guest() and not anon_auth.guest_notice_pending()

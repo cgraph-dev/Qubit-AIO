@@ -12,6 +12,7 @@ import pytest
 from qubit_cli import anon_auth, anon_challenge
 
 from tests.qubit_cli.anon_portal import PORTAL, install_portal  # noqa: F401
+from tests.qubit_cli.anon_portal import claimed_trial
 
 
 @pytest.fixture
@@ -419,3 +420,10 @@ class TestPresenting:
         anon_challenge.present(challenge)
         err = capsys.readouterr().err
         assert "A quick check." in err and f"{PORTAL}/challenge?code=t" in err
+
+
+def _connectors_token():
+    """A connectors / managed-tool token read: the one exchange a terminal guest makes."""
+    from qubit_cli.auth import resolve_nous_access_token
+    assert anon_auth.is_guest_state(anon_auth.ensure_portal_identity(explicit=True))
+    return resolve_nous_access_token()

@@ -14,6 +14,7 @@ import urllib.request
 import pytest
 
 import qubit_cli.local_runtime.catalog as cat
+from types import SimpleNamespace
 
 
 @pytest.fixture(autouse=True)
@@ -119,3 +120,29 @@ def test_min_engine_gate(monkeypatch):
     assert _engine_too_old("") is False, "no requirement, no gate"
     assert _engine_too_old("b10000") is False, "installed engine suffices"
     assert _engine_too_old("b10363") is True, "newer requirement gates"
+
+
+_NEVER_REFRESHED = cat._last_refresh_attempt
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: catalog refresh is not scheduled after boot")
+def test_first_refresh_is_due_shortly_after_boot(monkeypatch):
+    """time.monotonic() counts from boot: a backend started a minute after boot must still fetch
+    on first use instead of treating "never refreshed" as refreshed at boot."""
+    monkeypatch.setattr(cat, "time", SimpleNamespace(monotonic=lambda: 60.0))
+    started = []
+
+    class _Thread:
+        def __init__(self, target, **_kw):
+            self._target = target
+
+        def start(self):
+            started.append(self._target)
+
+    monkeypatch.setattr(cat, "threading", SimpleNamespace(Thread=_Thread))
+    cat.refresh_catalog_soon()
+    assert started == [cat.refresh_catalog]
+
+    _fetch_returns(monkeypatch, _doc_from(lambda m: m))
+    assert cat.refresh_catalog() is True
+    # The attempt is now stamped, so the TTL gate holds for the next six hours.
+    assert cat.refresh_catalog() is False

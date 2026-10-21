@@ -37,6 +37,7 @@ from qubit_cli._install_repair import (
     ensure_windows_bin_launchers,
     migrate_windows_bin_path,
 )
+from qubit_cli import _launchers
 
 
 def _make_managed(tmp_path, monkeypatch):
@@ -436,3 +437,32 @@ def test_repo_gitignores_the_legacy_bin_dir():
         "bin/hermes.exe is not gitignored — hermes update's autostash "
         "(--include-untracked) would sweep pre-migration launchers off disk"
     )
+
+
+def test_migration_leaves_path_when_new_consoles_use_another_home(managed_install, tmp_path, monkeypatch):
+    """A sandbox's managed clone stages its own launchers but never edits the User PATH."""
+    home, root = managed_install
+    monkeypatch.setattr(_launchers, "new_console_qubit_root", lambda: tmp_path / "real-home")
+    state, read, write = _fake_registry([str(root / "bin"), r"C:\Windows\system32"])
+
+    ok = migrate_windows_bin_path(
+        root, windows=True, read_user_path=read, write_user_path=write
+    )
+
+    assert not ok
+    assert state["writes"] == 0
+    for name in _WINDOWS_BIN_LAUNCHERS:
+        assert _launcher_files(home / "bin", name)
+
+def test_migration_fails_closed_when_the_console_check_raises(managed_install, monkeypatch):
+    """The migration promises never to raise, so a failing console check leaves the PATH alone."""
+    _home, root = managed_install
+
+    def broken():
+        raise OSError("CreateEnvironmentBlock failed")
+
+    monkeypatch.setattr(_launchers, "new_console_qubit_root", broken)
+    state, read, write = _fake_registry([str(root / "bin")])
+
+    assert not migrate_windows_bin_path(root, windows=True, read_user_path=read, write_user_path=write)
+    assert state["writes"] == 0

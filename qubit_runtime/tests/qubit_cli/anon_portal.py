@@ -135,7 +135,7 @@ def install_portal(monkeypatch, tmp_path, fake: FakePortal | None = None) -> Fak
             kw["transport"] = httpx.MockTransport(fake.handler)
             super().__init__(*a, **kw)
     monkeypatch.setattr(httpx, "Client", _RoutedClient)
-    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
+    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
     anon_auth.reset_mint_memo_for_tests()
     free_tier_bootstrap.reset_for_tests()
     from qubit_cli import anon_challenge
@@ -152,3 +152,14 @@ def as_local_desktop_backend(monkeypatch) -> None:
     """This process is the backend the desktop spawned on this machine (the local spawn's credential)."""
     monkeypatch.setenv("HERMES_DESKTOP", "1")
     monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "test-spawn-token")
+
+
+def claimed_trial(monkeypatch) -> dict:
+    """A guest that claimed the welcome trial, read on the desktop's local backend: the state every
+    free-model surface needs. Mints through the fake portal installed by ``install_portal``."""
+    from qubit_cli import welcome_trial
+
+    as_local_desktop_backend(monkeypatch)
+    state = welcome_trial.claim_desktop_free_tier()
+    assert state is not None, welcome_trial.claim_blocker()
+    return state

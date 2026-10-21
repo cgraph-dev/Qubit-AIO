@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import argparse
 
 from qubit_cli.config import DEFAULT_CONFIG
@@ -126,3 +127,41 @@ def test_offer_drops_keys_typed_before_it_appeared(monkeypatch):
     consent.offer_consent()
 
     assert events == ["flush", "ask"]
+
+
+def test_unseen_no_thanks_is_asked_once_more_and_then_settled(monkeypatch):
+    """A pre-fix "No thanks" is re-offered with the reason; Esc on the re-ask keeps it for good,
+    while a pre-fix opt-in was a deliberate pick and is never re-asked."""
+    from qubit_cli.config import read_raw_config, save_config
+    from qubit_cli.observability import shared_metrics_consent as consent
+
+    shown = []
+    monkeypatch.setattr("qubit_cli.curses_ui.curses_radiolist", lambda *a, **k: shown.append(k["description"]) or -1)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.delenv("QUBIT_DESKTOP", raising=False)
+    monkeypatch.delenv("QUBIT_NONINTERACTIVE", raising=False)
+
+    save_config({"telemetry": {"shared_metrics": {"enabled": True, "send": False}}}, strip_defaults=False)
+    consent.offer_consent_before_chat(argparse.Namespace())
+    assert shown == []
+
+    save_config({"telemetry": {"shared_metrics": {"enabled": False, "send": False}}}, strip_defaults=False)
+    consent.offer_consent_before_chat(argparse.Namespace())
+    consent.offer_consent_before_chat(argparse.Namespace())
+
+    assert len(shown) == 1 and shown[0].startswith(consent._REASK_NOTE)
+    assert consent.consent_state(read_raw_config()) == {"enabled": False, "send": False, "decided": True, "reask": False}
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: telemetry notice omits the install note")
+def test_every_cli_promise_that_pre_opt_in_data_stays_local_names_the_install_note():
+    """Invariant: the fresh-install note is the one record kept from before the consent answer and
+    counted after it, so each CLI surface stating the pre-opt-in promise names that exception, and
+    the explainer still fits an 80-column terminal (print_info indents by two)."""
+    from qubit_cli.observability.shared_metrics_consent import _OFFER_DESCRIPTION
+    from qubit_cli.setup import _SEND_CONSENT_EXPLAINER
+
+    explainer = " ".join(_SEND_CONSENT_EXPLAINER)
+    for text in (explainer, " ".join(_OFFER_DESCRIPTION.split())):
+        assert "before you opt in" in text and "install note" in text.split("before you opt in")[0], text
+    assert max(len(line) for line in _SEND_CONSENT_EXPLAINER) + 2 <= 80

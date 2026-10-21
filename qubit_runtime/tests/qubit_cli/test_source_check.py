@@ -542,3 +542,70 @@ def test_branch_tip_failure_names_the_cause(installation):
     status = check_for_updates(install_root=root, home=home, force=True)
     assert status["error"] == "fetch-failed"
     assert "HTTP 503" in status["message"]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: source-check git batch/read path returns no commits")
+def test_bare_git_off_path_reads_through_the_updaters_git(installation, monkeypatch, tmp_path):
+    """Desktop passes a bare ``git`` when it found none; a Windows install's only git is PM's
+    store copy, off PATH outside ``qubit update``. The check must read HEAD through that git."""
+    import shutil
+
+    from qubit_cli import update_pause_record
+    from qubit_cli.source_check import check_for_updates
+
+    root, _linked, home, _base, head, responses, _requests, _git = installation
+    responses["/repos/fixture/fork/commits/main"] = (200, head)
+    store_git = shutil.which("git")
+    empty = tmp_path / "no-git-on-path"
+    empty.mkdir()
+    monkeypatch.setenv("PATH", str(empty))
+    monkeypatch.setattr(update_pause_record, "_git_executable", lambda: store_git)
+    status = check_for_updates(install_root=root, home=home, git="git", force=True)
+    assert status.get("error") is None, status
+    assert status["currentSha"] == head
+    assert status["behind"] == 0
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: source-check git batch/read path returns no commits")
+def test_main_follows_the_branch_without_reading_a_channel_record(installation):
+    """main IS the git branch: no R2 record is requested (a regional WAF can answer
+    it 403), the configured branch is probed, and the Desktop branch setting is left alone."""
+    from qubit_cli.source_check import check_for_updates
+
+    _root, linked, home, _base, head, responses, requests, _git = installation
+    # Even a record that would answer is never read.
+    responses[MAIN_CHANNEL] = (403, {"message": "blocked by WAF"})
+    branch_path = "/repos/fixture/fork/commits/desktop-choice"
+    responses[branch_path] = (200, head)
+    branch_file = home / "desktop-update.json"
+    branch_file.write_text(json.dumps({"branch": "desktop-choice"}))
+    status = check_for_updates(install_root=linked, home=home, channel="main",
+                               branch_config_path=branch_file)
+    assert "error" not in status, status
+    assert status.get("branch") == "desktop-choice", status
+    assert status.get("targetSha") == head, status
+    assert status["behind"] == 0
+    assert requests == [branch_path]
+    assert json.loads(branch_file.read_text())["branch"] == "desktop-choice"
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: source-check git batch/read path returns no commits")
+@pytest.mark.parametrize("on,release,rollback", [("head", "base", True), ("base", "head", False)])
+def test_stable_release_the_checkout_already_contains_is_a_rollback(installation, tmp_path, on, release, rollback):
+    """A release HEAD contains is a move back (#137714); an older checkout is a real update."""
+    from qubit_cli.source_check import check_for_updates
+
+    root, _linked, home, base, head, responses, _requests, git = installation
+    shas = {"base": base, "head": head}
+    bare = tmp_path / "origin.git"
+    git("clone", "-q", "--bare", str(root), str(bare), cwd=tmp_path)
+    git("tag", "v1.2.3", shas[release], cwd=bare)
+    git("remote", "set-url", "origin", str(bare))
+    git("checkout", "-q", "--detach", shas[on])
+    api = "/repos/NousResearch/qubit-agent"
+    responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
+    responses[f"{api}/commits/v1.2.3"] = (200, {"sha": shas[release]})
+
+    status = check_for_updates(install_root=root, home=home, channel="stable", force=True)
+
+    assert status.get("targetSha") == shas[release], status
+    assert status["updateAvailable"] is True
+    assert status["rollback"] is rollback
