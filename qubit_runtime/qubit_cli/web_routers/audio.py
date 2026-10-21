@@ -72,7 +72,10 @@ async def _run_config_scoped(profile: Optional[str], fn):
         with _config_profile_scope(profile):
             return fn()
 
-    return await asyncio.get_running_loop().run_in_executor(None, _scoped)
+    # to_thread copies the request context: a secondary-profile native ticket's implicit
+    # scope (native_profile_scope's home override) must reach the worker, which
+    # run_in_executor drops, silently resolving the LAUNCH profile's config and keys.
+    return await asyncio.to_thread(_scoped)
 
 
 def _audio_extension_for_mime(mime_type: str) -> str:

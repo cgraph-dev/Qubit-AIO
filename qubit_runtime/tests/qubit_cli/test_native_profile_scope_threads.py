@@ -6,7 +6,6 @@ import pytest
 from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: config/oauth worker threads do not carry the request QUBIT_HOME override")
 def test_config_scoped_worker_keeps_the_request_home_override(tmp_path):
     from qubit_cli.web_routers.audio import _run_config_scoped
 
@@ -24,7 +23,6 @@ def test_config_scoped_worker_keeps_the_request_home_override(tmp_path):
     assert asyncio.run(run()) == secondary
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: config/oauth worker threads do not carry the request QUBIT_HOME override")
 def test_oauth_poller_thread_keeps_the_request_home_override(tmp_path):
     import threading
 

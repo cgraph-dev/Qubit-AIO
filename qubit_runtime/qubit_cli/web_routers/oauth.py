@@ -5,6 +5,7 @@ Extracted from ``qubit_cli.web_server``; helpers/state that tests monkeypatch on
 """
 
 import asyncio
+import contextvars
 import contextlib
 import logging
 import os
@@ -118,7 +119,11 @@ def _start_poller(target, sid: str, prefix: str = "oauth-poll") -> None:
             from qubit_cli.observability.shared_metrics_setup import settle_oauth_setup
             settle_oauth_setup(sess)
 
-    threading.Thread(target=run, daemon=True, name=f"{prefix}-{sid[:6]}").start()
+    # The poller saves credentials under ``_profile_scope(sess['profile'])``; an implicit
+    # selector (None) must resolve in the REQUEST's home (a secondary-profile native ticket's
+    # override), so the thread runs in a copy of the starting request's context.
+    context = contextvars.copy_context()
+    threading.Thread(target=context.run, args=(run,), daemon=True, name=f"{prefix}-{sid[:6]}").start()
 
 
 def _track_oauth_setup(flow, session_id: str) -> None:

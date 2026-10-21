@@ -41,7 +41,6 @@ def _call(method: str, params: dict | None = None) -> dict:
     return server.handle_request({"jsonrpc": "2.0", "id": 9, "method": method, "params": params or {}})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_new_run_on_a_first_install_claims_the_trial_once(portal, monkeypatch):
     as_local_desktop_backend(monkeypatch)
 
@@ -63,7 +62,6 @@ def test_a_rerun_on_a_first_install_never_claims(portal, monkeypatch):
     assert portal.creates() == 0
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_failed_claim_opens_nothing_and_the_next_launch_tries_again(portal, monkeypatch):
     from qubit_cli import free_tier_bootstrap
 
@@ -84,7 +82,6 @@ def test_a_failed_claim_opens_nothing_and_the_next_launch_tries_again(portal, mo
     assert anon_auth.free_inference_active()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_trial_another_install_took_first_opens_no_chat_it_cannot_run(portal, root, monkeypatch):
     """Two installs answered "due" before either claimed. The first takes the trial; the second start
     opens no chat with no model behind it, so the desktop lands on provider setup and sign-in. The
@@ -106,7 +103,6 @@ def test_a_trial_another_install_took_first_opens_no_chat_it_cannot_run(portal, 
     assert "result" in _call("onboarding.start", {"fresh_launch": True})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_crash_right_after_the_claim_keeps_onboarding_due(portal, monkeypatch):
     as_local_desktop_backend(monkeypatch)
 
@@ -125,7 +121,6 @@ def test_a_crash_right_after_the_claim_keeps_onboarding_due(portal, monkeypatch)
     assert portal.creates() == 1
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_only_the_local_desktop_backend_opens_onboarding_by_itself(portal, root, monkeypatch):
     assert _call("onboarding.state")["result"]["eligible"] is False   # CLI / SSH / URL backend
 
@@ -137,7 +132,6 @@ def test_only_the_local_desktop_backend_opens_onboarding_by_itself(portal, root,
     assert _call("onboarding.state")["result"]["eligible"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_eligible_follows_the_default_profile_not_the_launch_profile(portal, root, monkeypatch):
     from qubit_cli import profiles
     work = profiles.create_profile("work", no_alias=True)
@@ -151,7 +145,6 @@ def test_eligible_follows_the_default_profile_not_the_launch_profile(portal, roo
     assert _call("onboarding.state")["result"]["eligible"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_claim_refreshes_the_setup_record(portal, monkeypatch):
     from qubit_cli import free_tier_bootstrap
     as_local_desktop_backend(monkeypatch)
@@ -163,7 +156,6 @@ def test_a_claim_refreshes_the_setup_record(portal, monkeypatch):
     assert record is not None and record.free_tier_account is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_the_dev_fresh_install_switch_treats_a_used_machine_as_new(portal, monkeypatch):
     as_local_desktop_backend(monkeypatch)
     install_state.mark_machine_used()
@@ -173,7 +165,6 @@ def test_the_dev_fresh_install_switch_treats_a_used_machine_as_new(portal, monke
     assert portal.creates() == 1
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_the_due_answer_is_worked_out_at_boot_and_served_from_there(portal, monkeypatch):
     from qubit_cli import auth, free_tier_bootstrap
 
@@ -207,7 +198,6 @@ ELSEWHERE = {
 
 
 @pytest.mark.parametrize("change", list(ELSEWHERE))
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_the_cached_due_answer_follows_shared_auth_and_the_managed_layer(portal, monkeypatch, tmp_path, change):
     from qubit_cli import free_tier_bootstrap
 

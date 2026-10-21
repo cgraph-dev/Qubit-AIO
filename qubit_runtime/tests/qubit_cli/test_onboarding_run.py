@@ -39,14 +39,12 @@ def _launch_under(monkeypatch, root: Path, name: str) -> Path:
     return home
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: install_state.probe() treats a fresh/empty home or an empty session row as prior use, so onboarding never runs")
 def test_fresh_install_runs(root):
     SessionDB(root / "state.db").close()  # a boot leaves an empty state.db behind
 
     assert onboarding_run.should_run() is True
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: install_state.probe() treats a fresh/empty home or an empty session row as prior use, so onboarding never runs")
 def test_an_empty_session_row_is_not_use(root):
     # Desktop resume and onboarding.start both write a session row before any message.
     db = SessionDB(root / "state.db")

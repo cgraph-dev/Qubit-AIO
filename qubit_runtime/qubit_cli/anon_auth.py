@@ -249,15 +249,10 @@ def free_tier_route() -> bool:
 
 def on_local_desktop_backend() -> bool:
     """This process is the backend the desktop app spawned on this machine: never an SSH, URL or
-    cloud backend, and never a gateway or shell the desktop merely launched.
-
-    Owner ruling 2026-10-19: Qubit does not offer the upstream welcome trial. This is pinned to
-    ``False`` so the trial is structurally unreachable — ``free_inference_active`` and every
-    ``welcome_trial._CLAIM_BLOCKERS`` entry key off this one predicate, so no guest is ever minted
-    and no claim is ever made. The machinery is deliberately KEPT, not deleted: ``nous_*`` and
-    ``free_tier_bootstrap`` are the design to rebrand if Qubit ever ships its own sign-in. Revert
-    this to the computed form to restore upstream behaviour."""
-    return False
+    cloud backend, and never a gateway or shell the desktop merely launched."""
+    from qubit_cli.anon_challenge import client_surface
+    from qubit_cli.process_identity import is_local_desktop_backend
+    return client_surface() == "desktop" and is_local_desktop_backend()
 
 
 def _on_local_desktop_backend_uncapped() -> bool:

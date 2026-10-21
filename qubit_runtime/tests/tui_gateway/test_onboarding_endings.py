@@ -39,14 +39,12 @@ def _flag(db) -> bool:
     return read_user_config_raw(Path(server._qubit_home) / "config.yaml")["onboarding"]["run"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_refused_delete_leaves_the_run_going(db, ended):
     assert onboarding_record.delete_chat(db, "onb", lambda: False) is False
 
     assert onboarding_record.active_session_id(db) == "onb" and _flag(db) is True and ended == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_deleting_the_newest_copy_ends_the_run_on_every_copy(db, ended):
     for parent, child in (("onb", "mid"), ("mid", "tip")):
         db.publish_compression_child(parent_session_id=parent, child_session_id=child, source="desktop",
@@ -69,7 +67,6 @@ def _failing_flag_write(monkeypatch):
     monkeypatch.setattr(onboarding_run, "set_run", disk_full)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_delete_whose_flag_write_fails_keeps_the_chat_for_a_retry(db, ended, monkeypatch):
     with monkeypatch.context() as failing:
         _failing_flag_write(failing)
@@ -81,7 +78,6 @@ def test_a_delete_whose_flag_write_fails_keeps_the_chat_for_a_retry(db, ended, m
     assert _flag(db) is False and [e["outcome"] for e in ended] == ["deleted"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: SessionDB.session_ids_with_model_config_key is absent, so onboarding record scans fail")
 def test_a_delete_refused_by_the_write_guard_leaves_the_flag_set(db, ended):
     from qubit_state_errors import SessionActiveWriteGuardError
 

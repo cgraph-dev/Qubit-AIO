@@ -168,15 +168,18 @@ def _resolve_inference() -> str:
         return ""
 
 
-def _build_record(*, other: bool, force: bool) -> SetupRecord:
-    """One inventory-then-mint pass into a record. ``force`` is the user's own retry: it makes one
-    attempt even inside the mint memo's cooldown (``anon_auth.ensure_portal_identity``)."""
+def _build_record(*, other: bool, mint: bool = False, force: bool = False) -> SetupRecord:
+    """One inventory pass into a record.
+
+    Reads only unless *mint* is true: the boot bootstrap and a refresh never create an identity;
+    the desktop's ``free_tier.provision`` retry (``retry_bootstrap_mint``) is the only mint here.
+    *force* is that retry's bypass of the mint memo's cooldown."""
     from qubit_cli import anon_auth
 
     error = ""
     failure: Dict[str, Any] = {}
     state: Optional[Dict[str, Any]] = anon_auth.current_nous_state()
-    if anon_auth.guest_enabled():
+    if mint and anon_auth.guest_enabled():
         try:
             state = anon_auth.ensure_portal_identity(explicit=True, force=force)
         except Exception as exc:
@@ -187,7 +190,10 @@ def _build_record(*, other: bool, force: bool) -> SetupRecord:
             # cooldown still runs: the record carries that verdict either way.
             failure = anon_auth.last_mint_failure() or {}
             error = error or str(failure.get("error") or "")
-    free_tier_account = bool(state) and anon_auth.is_guest_state(state) and anon_auth.guest_enabled()
+    elif state is None:
+        failure = anon_auth.last_mint_failure() or {}
+        error = str(failure.get("error") or "")
+    free_tier_account = bool(state) and anon_auth.free_inference_active(state)
     return SetupRecord(
         provider_configured=other or free_tier_account or (bool(state) and not anon_auth.is_guest_state(state)),
         inference_provider=_resolve_inference(),
@@ -200,11 +206,12 @@ def _build_record(*, other: bool, force: bool) -> SetupRecord:
 
 
 def run_bootstrap(*, announce: bool = True) -> SetupRecord:
-    """Inventory -> ensure identity (gate permitting) -> resolve inference -> record -> broadcast.
+    """Grandfather an existing free-model guest -> inventory -> resolve inference -> record -> broadcast.
 
-    Runs every boot; only the mint is gated. Idempotent per process: a second call returns the
-    existing record without touching the portal. Never raises. ``announce=False`` skips the
-    ``setup.ready`` event: the plain CLI has no client to tell and its stdout is the user's terminal.
+    Never creates an identity: the desktop's welcome-trial claim (``welcome_trial``) and the
+    explicit ``retry_bootstrap_mint`` are the creators. Idempotent per process: a second call
+    returns the existing record. Never raises. ``announce=False`` skips the ``setup.ready`` event:
+    the plain CLI has no client to tell and its stdout is the user's terminal.
     """
     global _record, _started
     with _lock:
@@ -229,7 +236,7 @@ def run_bootstrap(*, announce: bool = True) -> SetupRecord:
         grandfather_existing_guest()
     except Exception:  # the record still says who carries inference without it
         logger.warning("free tier: could not check for an existing free-model guest", exc_info=True)
-    record = _build_record(other=_inventory_other_providers(), force=False)
+    record = _build_record(other=_inventory_other_providers())
     with _lock:
         _record = record
         _done.set()
@@ -260,7 +267,7 @@ def retry_bootstrap_mint(*, force: bool = False, announce: bool = True) -> Setup
         return current
     # Re-inventory: a provider the user connected during the cooldown must keep inference; the
     # boot-time answer is stale by now.
-    record = _build_record(other=_inventory_other_providers(), force=force)
+    record = _build_record(other=_inventory_other_providers(), mint=True, force=force)
     with _lock:
         # Two retries can race (the background loop and the user's click): a build that found no
         # identity must not overwrite one that did.
@@ -314,7 +321,7 @@ def refresh_record(*, announce: bool = True) -> Optional[SetupRecord]:
     global _record
     if _record is None:
         return None
-    record = _build_record(other=_inventory_other_providers(), force=False)
+    record = _build_record(other=_inventory_other_providers())
     with _lock:
         _record = record
     _due_changed()
