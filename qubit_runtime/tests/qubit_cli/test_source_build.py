@@ -399,3 +399,22 @@ def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypat
     receipt_current["value"] = True
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "two"], check=True)
     assert not reused()
+
+
+@pytest.mark.platforms("linux")
+def test_desktop_dependency_failure_still_builds_the_tui_and_web_ui(source_products, capsys):
+    # A host whose compiler rejects a Desktop-only native addon (node-pty on g++ 9) used to lose
+    # every frontend with it: the union npm ci failed and nothing was built.
+    from qubit_cli.source_build import ProductBuildError, build_update_products
+
+    root, _ = source_products
+    manifest = root / "apps/desktop/package.json"
+    manifest.write_text(json.dumps({**json.loads(manifest.read_text()), "scripts": {"postinstall": "exit 1"}}))
+    with pytest.raises(ProductBuildError) as failure:
+        build_update_products(root, desktop=True)
+    assert [name for name, _ in failure.value.failures] == ["desktop dependencies"]
+    assert [event["step"] for event in _events(root)] == ["deps", "tui", "web"]
+    assert not (root / "node_modules/apps-desktop").exists()
+    out = capsys.readouterr().out
+    assert "Desktop app build owed: desktop dependencies failed" in out
+    assert "qubit uninstall --gui" in out

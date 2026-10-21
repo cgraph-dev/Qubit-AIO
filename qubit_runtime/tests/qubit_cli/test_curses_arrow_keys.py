@@ -356,3 +356,15 @@ def test_enter_variants_select():
     assert read_menu_key(FakeStdscr([10])) == NAV_SELECT
     assert read_menu_key(FakeStdscr([13])) == NAV_SELECT
     assert read_menu_key(FakeStdscr([curses.KEY_ENTER])) == NAV_SELECT
+
+
+@pytest.mark.parametrize("keys", [
+    [4],  # raw/cbreak Ctrl+D
+    [27, ord("["), ord("1"), ord("0"), ord("0"), ord(";"), ord("5"), ord("u")],  # CSI-u Ctrl+d
+    [27, ord("["), ord("2"), ord("7"), ord(";"), ord("5"), ord(";"), ord("1"), ord("0"), ord("0"), ord("~")],
+])
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: Ctrl+D decodes to NAV_NONE instead of NAV_CANCEL")
+def test_ctrl_d_leaves_a_menu_like_esc(keys):
+    """Ctrl+D is EOF: before raw mode it already aborts a menu, so once raw mode is on it must too.
+    It used to decode to nothing, and a menu (the shared-metrics offer) redrew on every press."""
+    assert read_menu_key(FakeStdscr(keys)) == NAV_CANCEL

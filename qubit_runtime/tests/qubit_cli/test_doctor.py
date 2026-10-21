@@ -1639,3 +1639,92 @@ def test_cron_store_check_reports_writability_and_low_space(
     finding = doctor_state._check_cron_store(False)
     assert expected in capsys.readouterr().out
     assert len(finding.issues) == len(issues) and all(any(s in i for i in finding.issues) for s in issues)
+
+
+@pytest.mark.parametrize(
+    ("provider", "default_model"),
+    [
+        ("ai-gateway", "anthropic/claude-sonnet-4.6"),
+        ("opencode-zen", "anthropic/claude-sonnet-4.6"),
+        ("kilocode", "anthropic/claude-sonnet-4.6"),
+        ("kimi-coding", "kimi-k2"),
+        ("nvidia", "qwen/qwen3.5-122b-a10b"),
+        ("moa", "anthropic/claude-sonnet-4.6"),
+    ],
+)
+def test_run_doctor_accepts_qubit_provider_ids_that_catalog_aliases(
+    monkeypatch, tmp_path, provider, default_model
+):
+    home = tmp_path / ".qubit"
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "config.yaml").write_text(
+        "model:\n"
+        f"  provider: {provider}\n"
+        f"  default: {default_model}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(doctor_mod, "QUBIT_HOME", home)
+    monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
+    monkeypatch.setattr(doctor_mod, "_DHH", str(home))
+    (tmp_path / "project").mkdir(exist_ok=True)
+
+    fake_model_tools = types.SimpleNamespace(
+        check_tool_availability=lambda *a, **kw: ([], []),
+        TOOLSET_REQUIREMENTS={},
+    )
+    monkeypatch.setitem(sys.modules, "model_tools", fake_model_tools)
+
+    try:
+        from qubit_cli import auth as _auth_mod
+        monkeypatch.setattr(_auth_mod, "get_nous_auth_status_local", dict)
+        monkeypatch.setattr(_auth_mod, "get_codex_auth_status", dict)
+        monkeypatch.setattr(_auth_mod, "get_xai_oauth_auth_status", dict)
+    except Exception:
+        pass
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        doctor_mod.run_doctor(Namespace(fix=False))
+
+    out = buf.getvalue()
+    assert f"model.provider '{provider}' is not a recognised provider" not in out
+    assert f"model.provider '{provider}' is unknown" not in out
+    if provider in {"ai-gateway", "opencode-zen", "kilocode", "nvidia"}:
+        assert (
+            f"model.default '{default_model}' uses a vendor/model slug but provider is '{provider}'"
+            not in out
+        )
+
+
+@pytest.mark.platforms("any")  # the wrapper name differs per host (.bat on Windows)
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: doctor reports no alias for a custom alias name and a bare wrapper")
+def test_profile_alias_status_follows_the_wrapper_the_profile_really_has(monkeypatch, tmp_path):
+    """#131753: doctor said "no alias" for every Windows profile (``.bat`` wrapper) and for any
+    profile reachable only through a custom alias name; a bare (pre-``.bat`` on Windows) wrapper counts."""
+    import qubit_cli.gateway_migrate as gm
+    from qubit_cli import profiles
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
+    monkeypatch.setattr(gm, "duplicate_credential_findings", list)
+    for name in ("dev", "ops", "work", "old"):
+        (tmp_path / ".qubit" / "profiles" / name).mkdir(parents=True)
+        (tmp_path / ".qubit" / "profiles" / name / "config.yaml").write_text("model: m\n", encoding="utf-8")
+    profiles.create_wrapper_script("dev")
+    profiles.create_wrapper_script("w", target="work")
+    (tmp_path / ".local" / "bin" / "old").write_text('#!/bin/sh\nexec qubit -p old "$@"\n', encoding="utf-8")
+    for foreign in ("ops.bat", "old.bat"):  # same-named non-Qubit commands
+        (tmp_path / ".local" / "bin" / foreign).write_text("@echo off\r\nnotepad %*\r\n", encoding="utf-8")
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        doctor_state._check_profiles(False)
+    lines = out.getvalue().splitlines()
+    status = {name: next(ln for ln in lines if f" {name}:" in ln) for name in ("dev", "ops", "work", "old")}
+
+    assert not any("no alias" in status[n] for n in ("dev", "work", "old"))
+    assert "no alias" in status["ops"]  # a foreign ops.bat is not ops's alias
+    old = next(p for p in profiles.list_profiles() if p.name == "old")
+    assert old.alias_path == tmp_path / ".local" / "bin" / "old"  # never the foreign old.bat (uninstall unlinks it)

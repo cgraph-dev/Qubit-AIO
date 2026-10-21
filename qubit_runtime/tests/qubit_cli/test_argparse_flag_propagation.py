@@ -206,3 +206,17 @@ class TestChatSubparserInheritedValueFlags:
             + "\n  ".join(f"{opts} dest={dest} default={d!r}"
                           for opts, dest, d in offenders)
         )
+
+
+@pytest.mark.parametrize("argv", [
+    pytest.param(["--tui", "--checkpoints"], marks=pytest.mark.xfail(
+        strict=True, reason="wave-20 parity defect: --checkpoints is declared only on the chat subparser")),
+    pytest.param(["--checkpoints", "chat"], marks=pytest.mark.xfail(
+        strict=True, reason="wave-20 parity defect: --checkpoints is declared only on the chat subparser")),
+    ["chat", "--tui", "--checkpoints"],
+])
+def test_checkpoints_parses_at_the_top_level_and_survives_chat(argv):
+    """`qubit --tui --checkpoints` is the TUI launch the docs and gateway refusals name; it was
+    declared only on `chat`, so the top-level form failed with "unrecognized arguments"."""
+    from qubit_cli._parser import build_top_level_parser
+    assert build_top_level_parser()[0].parse_args(argv).checkpoints is True

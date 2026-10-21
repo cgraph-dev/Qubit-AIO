@@ -252,3 +252,28 @@ def test_parked_status_still_reports_a_forced_gateway(homes, monkeypatch, capsys
     output = capsys.readouterr().out
     assert 'parked (qubit -p worker gateway start)' in output
     assert 'Gateway is running (PID: 4242)' in output
+
+
+@pytest.mark.parametrize('verdict, healthy', [
+    pytest.param(('incompatible', 'runtime_protocol'), False, marks=pytest.mark.xfail(
+        strict=True, reason="wave-20 parity defect: status prints the legacy 'hermes gateway restart' on the incompatible-gateway surface")),
+    (('ready', None), True),
+])
+def test_status_flags_a_gateway_this_qubit_cannot_attach(homes, monkeypatch, capsys, verdict, healthy):
+    """Upgrade with the old daemon up: every client refuses it, so status must not say ✓."""
+    from qubit_cli import gateway as gw, gateway_runtime, profiles
+    root, _secondary = homes
+    monkeypatch.setenv('QUBIT_HOME', str(root))
+    monkeypatch.setattr(gw, '_current_profile_name', lambda: 'default')
+    monkeypatch.setattr(profiles, 'get_active_profile_name', lambda: 'default')
+    monkeypatch.setattr(gw, 'get_gateway_runtime_snapshot', lambda system=False: gw.GatewayRuntimeSnapshot(
+        manager='manual', gateway_pids=(4242,)))
+    monkeypatch.setattr(gw, 'named_profile_served_by_running_multiplexer', lambda: False)
+    monkeypatch.setattr(gw, '_installed_service_kind_for', lambda _check: None)
+    monkeypatch.setattr(gateway_runtime, 'discover_gateway_endpoint', lambda home, timeout=2.0: (
+        gateway_runtime.GatewayDiscovery(verdict[0], reason_code=verdict[1])))
+    gw._cmd_status(SimpleNamespace())
+    output = capsys.readouterr().out
+    assert ('✓ Gateway is running (PID: 4242)' in output) is healthy
+    assert ('incompatible: runtime_protocol' in output) is not healthy
+    assert ('qubit gateway restart' in output) is not healthy

@@ -505,3 +505,36 @@ def test_source_retirement_rejects_invalid_archive_constraints(source, retired_c
     (fixture.archive / f"releases/channels/{fixture.name}.json").write_bytes(canonical_json(fixture.retired))
     with pytest.raises(ValueError):
         source_releases.resolve_source_target(fixture.name, ["git"], source.root)
+
+
+@pytest.mark.parametrize("failure", ["not-found", "forbidden", "timeout"])
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: resolve_source_target reads the channel record for main instead of following the git branch")
+def test_main_follows_the_git_branch_without_reading_a_channel_record(source, monkeypatch, failure):
+    """main IS the source branch, so its R2 record is never read: a 403 from a regional
+    WAF or a timeout cannot stop an install following main. Preview channels still read theirs."""
+    import urllib.error
+
+    from qubit_cli import source_check
+    from qubit_cli.release_channels import ChannelNotFound
+
+    set_install_channel("main", source.root)
+    reads = []
+
+    def record(name, repository):
+        reads.append(name)
+        if failure == "forbidden":
+            raise urllib.error.HTTPError(f"https://x/releases/channels/{name}.json", 403, "Forbidden", {}, None)
+        if failure == "timeout":
+            raise TimeoutError("timed out")
+        raise ChannelNotFound(f"Channel object not found: releases/channels/{name}.json")
+
+    monkeypatch.setattr(source_releases, "_resolve_channel", record)
+    target = source_releases.resolve_source_target("main", ["git"], source.root)
+    assert target.branch == "main" and target.commit is None
+    status = source_check.check_for_updates(install_root=source.root, home=source.home, force=True)
+    assert "error" not in status, status
+    assert status["targetSha"] == source.commits[2]
+    assert reads == []
+    with pytest.raises((ChannelNotFound, urllib.error.HTTPError, TimeoutError)):
+        source_releases.resolve_source_target("canary", ["git"], source.root)
+    assert reads == ["canary"]

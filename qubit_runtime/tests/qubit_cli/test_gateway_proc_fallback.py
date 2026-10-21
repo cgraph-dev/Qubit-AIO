@@ -262,3 +262,19 @@ class TestGetServicePidsAllProfiles:
             pids = gateway_mod._get_service_pids(all_profiles=True)
 
         assert pids == {123}
+
+
+@pytest.mark.platforms("linux", "macos")
+@pytest.mark.parametrize(("euid", "expected"), [(1000, [111]), (0, [111, 222])])
+def test_other_users_gateways_are_not_ours_unless_root(euid, expected):
+    """A non-root caller never counts (or signals) another uid's gateway; root keeps the host-wide scan."""
+    owners = {111: 1000, 222: 2000}
+    ps_out = f"111 {_GATEWAY_CMD}\n222 {_GATEWAY_CMD}\n"
+    with (
+        patch("os.path.isdir", side_effect=lambda p: p != "/proc"),
+        patch("os.geteuid", return_value=euid),  # windows-footgun: ok — POSIX-only test (platforms marker)
+        patch("qubit_cli.gateway_migrate_guards._pid_uid", side_effect=owners.get),
+        patch("qubit_cli.gateway._get_ancestor_pids", return_value=set()),
+        patch("subprocess.run", return_value=MagicMock(returncode=0, stdout=ps_out, stderr="")),
+    ):
+        assert gateway_mod._scan_gateway_pids(set(), all_profiles=True) == expected

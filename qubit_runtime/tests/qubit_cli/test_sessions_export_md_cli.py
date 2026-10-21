@@ -194,3 +194,33 @@ def test_delete_after_verified_rejects_same_count_content_change(monkeypatch, tm
         assert db.get_messages("s1")[0]["content"] == "changed after export"
     finally:
         db.close()
+
+
+def test_sessions_export_verified_delete_keeps_file(monkeypatch, tmp_path, capsys):
+    import qubit_cli.main as main_mod
+    from qubit_cli.session_export_md import verify_export_file
+
+    open_db = _real_store(monkeypatch, tmp_path)
+    db = open_db()
+    db.create_session("delete-me", "cli")
+    db.append_message("delete-me", "user", "retain this exported payload")
+    original = db.export_session("delete-me")
+    assert original is not None
+    db.close()
+    monkeypatch.setattr(sys, "argv", [
+        "qubit", "sessions", "export", "--format", "md",
+        "--session-id", "delete-me", "--delete-after-verified", "--yes",
+        str(tmp_path / "exports"),
+    ])
+
+    main_mod.main()
+
+    files = list((tmp_path / "exports").glob("*.md"))
+    assert len(files) == 1
+    assert verify_export_file(files[0], original)[0]
+    db = open_db()
+    try:
+        assert db.get_session("delete-me") is None
+    finally:
+        db.close()
+    assert "Deleted exported session" in capsys.readouterr().out

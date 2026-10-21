@@ -528,3 +528,35 @@ def test_a_failed_retry_never_erases_the_killed_updates_claim(repo: Path) -> Non
 
     assert release_dead_index_lock(repo) is True
     assert not lock.exists()
+
+
+@pytest.mark.skipif(not Path("/proc/self/fd").is_dir(), reason="ownership proof via /proc (Linux)")
+def test_a_git_elsewhere_exiting_mid_scan_is_gone_not_a_hidden_holder(repo: Path, tmp_path: Path, monkeypatch) -> None:
+    """A git in ANOTHER repository that exits between the scan reading its argv and its cwd/environ
+    (unreadable once it has released its memory) is gone: it holds nothing and takes no lock. Read
+    as a hidden git that may work here, any busy machine's git churn postponed the launch repair
+    ("a running git holds the index after an interrupted `qubit update`")."""
+    from qubit_cli import _early_recovery as er
+    from tests.waiting import wait_until
+
+    other = tmp_path / "other"
+    shutil.copytree(repo, other)
+    lock = repo / ".git" / "index.lock"
+    lock.write_bytes(b"")  # a killed git's: nothing holds it
+    marker = "qubit.test=exits-mid-scan"
+    proc = _git_in_the_editor(other, tmp_path, ["git", "-c", marker, "commit", "-a"])
+    real = er._counts_as_holder
+
+    def exits_after_its_argv_was_read(args: list[str], any_git: bool) -> bool:
+        if marker in args and proc.returncode is None:
+            Path(f"{other / '.git' / 'COMMIT_EDITMSG'}.go").write_text("", encoding="utf-8")
+            wait_until(lambda: Path(f"/proc/{proc.pid}/stat").read_bytes().rsplit(b") ", 1)[1][:1] == b"Z",
+                       what="the other repository's git to exit (unreaped)")
+        return real(args, any_git)
+
+    monkeypatch.setattr(er, "_counts_as_holder", exits_after_its_argv_was_read)
+    try:
+        assert er._held_open(lock, repo) is False
+    finally:
+        Path(f"{other / '.git' / 'COMMIT_EDITMSG'}.go").write_text("", encoding="utf-8")
+        proc.wait(timeout=20)
