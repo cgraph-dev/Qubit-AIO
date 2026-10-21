@@ -22,7 +22,6 @@ from tests.gateway.fixtures.local_recovery_probe import daemon, rpc, websocket
 from tests.waiting import async_wait_until
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: async_delivery_supported() is True inside a registered managed-worker process")
 def test_registered_worker_process_cannot_receive_async_completions(monkeypatch):
     from agent import runtime_session_store
     from gateway.session_context import async_delivery_supported

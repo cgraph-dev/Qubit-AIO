@@ -73,8 +73,9 @@ output_path, exit_code_path, cmd = sys.argv[1], sys.argv[2], sys.argv[3:]
 env = dict(os.environ, PYTHONUNBUFFERED="1")
 with open(output_path, "wb") as f:
     rc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, env=env).wait(timeout=3600)
-with open(exit_code_path, "w", encoding="utf-8") as f:
+with open(exit_code_path + ".tmp", "w", encoding="utf-8") as f:
     f.write(str(rc))
+os.replace(exit_code_path + ".tmp", exit_code_path)
 """.strip()
 
 
@@ -145,7 +146,9 @@ def _spawn_detached_update(qubit_cmd, output_path, exit_code_path) -> None:
         f" > {shlex.quote(str(output_path))} 2>&1; "
         # Avoid `status=$?`: `status` is read-only in zsh and this template is reused in
         # macOS/zsh operator wrappers, so keep it zsh-safe even though bash runs it here.
-        f"rc=$?; printf '%s' \"$rc\" > {shlex.quote(str(exit_code_path))}")
+        # Temp + mv: the gateway watcher polls the exit code and reads an empty file as failure.
+        f"rc=$?; printf '%s' \"$rc\" > {shlex.quote(str(exit_code_path) + '.tmp')}"
+        f" && mv -f {shlex.quote(str(exit_code_path) + '.tmp')} {shlex.quote(str(exit_code_path))}")
     # Preferred: setsid creates a new session, fully detached; fallback start_new_session=True
     # calls os.setsid() in the child.
     setsid_bin = shutil.which("setsid")
@@ -949,14 +952,18 @@ class GatewaySlashCommandsMixin(
         return run_approval_mode_command(requested).message
 
     async def _handle_yolo_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
-        """Handle /yolo — toggle dangerous command approval bypass for this session only."""
-        from tools.approval import disable_session_yolo, enable_session_yolo, is_session_yolo_enabled
+        """Handle /yolo — toggle dangerous command approval bypass for this session only. The flag is
+        persisted on the routing entry so it survives a gateway restart."""
+        from tools.approval_yolo import toggle_session_yolo
         session_key = self._session_key_for_source(event.source)
-        if is_session_yolo_enabled(session_key):
-            disable_session_yolo(session_key)
-            return EphemeralReply(t("gateway.yolo.disabled"))
-        enable_session_yolo(session_key)
-        return EphemeralReply(t("gateway.yolo.enabled"))
+        persisted, persist = False, None
+        if (store := self.session_store) is not None:
+            # A first-message /yolo has no routing entry yet; materialize it so the flag has a home.
+            persisted = (await self.async_session_store.get_or_create_session(event.source)).yolo is True
+            persist = lambda on: store.set_session_yolo(session_key, on)
+        # Off the loop: the persist is a routing-store write (thread-safe, like AsyncSessionStore's calls).
+        enable = await asyncio.to_thread(toggle_session_yolo, session_key, persisted=persisted, persist=persist)
+        return EphemeralReply(t("gateway.yolo.enabled" if enable else "gateway.yolo.disabled"))
 
     async def _handle_verbose_command(self, event: MessageEvent) -> str:
         """Handle /verbose — cycle tool progress display mode (off → new → all → verbose → log) per

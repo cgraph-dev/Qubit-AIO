@@ -156,7 +156,6 @@ async def test_completed_webhook_delivery_closes_its_session(tmp_path):
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a reopened webhook session does not advance its execution generation")
 @pytest.mark.asyncio
 async def test_webhook_finalization_is_exact_session_and_generation(tmp_path):
     runner = GatewayRunner()

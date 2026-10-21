@@ -16,7 +16,6 @@ from tests.waiting import async_wait_until
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _drain_active_agents' early idle check ignores managed_turn_count, so a managed-worker-only drain returns timed_out=False and skips the Stop")
 @pytest.mark.asyncio
 async def test_drain_counts_managed_turns_and_the_timeout_path_stops_them(tmp_path):
     from gateway.session_managed_worker import ManagedWorker

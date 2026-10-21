@@ -29,7 +29,6 @@ def _agent():
         _session_messages=[], _turn_base_usage_anchor=None)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: SessionUsagePayload rejects the dual-view session.usage frame's own counters")
 def test_usage_stats_is_exactly_the_frozen_field_list():
     from gateway.session_usage import usage_stats
     stats = usage_stats(_agent())

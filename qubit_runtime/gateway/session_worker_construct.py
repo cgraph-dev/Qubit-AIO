@@ -127,6 +127,10 @@ def _read_prefill(authority, policy):
         home = get_qubit_home()
     with policy.client_env_scope():  # HERMES_PREFILL_MESSAGES_FILE: a local session's client's
         path = _resolve_prefill_messages_file(policy.config(authority, secrets=False))
+    if not path:
+        # No explicit per-session prefill file: the runner's startup prefill is exactly what the
+        # in-process constructor passes (and what a pin-era managed worker received).
+        return getattr(authority.runner, '_prefill_messages', None) or None
     return _load_prefill_messages(path, home) or None
 
 

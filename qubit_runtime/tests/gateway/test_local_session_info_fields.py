@@ -33,7 +33,6 @@ async def test_session_info_carries_the_classic_cli_fields(tmp_path, monkeypatch
         {**info, 'profile_name': 'default', 'desktop_protocol': 'hermes-gateway-v1', 'lazy': False})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the stale duplicate _attach_session_title_callback in run_turn_runner.py overrides the mixin and drops the local-viewer republish")
 def test_local_viewer_title_republishes_session_info(monkeypatch):
     from gateway.run_turn_runner import TurnRunner
     published = []

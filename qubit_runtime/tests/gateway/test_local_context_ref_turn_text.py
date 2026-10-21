@@ -52,7 +52,6 @@ async def _prepare(runner, event):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: expand_references passes plugins= to preprocess_context_references_async (TypeError), so @file references are not expanded and refusals are not returned")
 async def test_cli_api_text_reaches_the_model_expanded_and_the_stored_row_stays_as_typed(project, monkeypatch):
     from gateway.session_cli_turn import cli_turn_scope
     from gateway.run_turn_runner import TurnRunner
@@ -78,7 +77,6 @@ async def test_cli_api_text_reaches_the_model_expanded_and_the_stored_row_stays_
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: expand_references passes plugins= to preprocess_context_references_async (TypeError), so @file references are not expanded and refusals are not returned")
 async def test_a_refused_local_turn_answers_with_its_refusal(project, monkeypatch):
     event = _event('compare @file:a.txt @file:b.txt @file:c.txt')
     assert await _prepare(_runner(monkeypatch, 1000), event) is None
@@ -169,7 +167,6 @@ def _managed(tmp_path, monkeypatch, text):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: expand_references passes plugins= to preprocess_context_references_async (TypeError), so @file references are not expanded and refusals are not returned")
 async def test_a_managed_worker_runs_the_expanded_text(tmp_path, monkeypatch):
     from gateway.session_managed_worker import ManagedExecutionUnknown
     (tmp_path / 'notes.txt').write_text('PROJECT-NOTES', encoding='utf-8')
@@ -181,7 +178,6 @@ async def test_a_managed_worker_runs_the_expanded_text(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: expand_references passes plugins= to preprocess_context_references_async (TypeError), so @file references are not expanded and refusals are not returned")
 async def test_a_managed_turn_with_refused_references_answers_without_spawning(tmp_path, monkeypatch):
     for name in ('a', 'b', 'c'):
         (tmp_path / f'{name}.txt').write_text(name * 1800, encoding='utf-8')
@@ -192,7 +188,6 @@ async def test_a_managed_turn_with_refused_references_answers_without_spawning(t
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: expand_references passes plugins= to preprocess_context_references_async (TypeError), so @file references are not expanded and refusals are not returned")
 async def test_a_bypass_session_expands_built_in_references_only(tmp_path, monkeypatch):
     from agent.context_references import (ContextCompletionItem, ContextReferenceProvider,
                                           _context_reference_providers, register_context_reference_provider)

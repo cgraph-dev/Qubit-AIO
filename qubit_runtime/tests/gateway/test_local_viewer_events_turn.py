@@ -128,7 +128,6 @@ def test_thinking_and_reaction_publish_and_reasoning_waits_for_the_session_flag(
 
 
 @pytest.mark.parametrize('classic', [True, False])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: local_viewer_events.show_reasoning raises when the live session has no flag and no active policy, so publish_progress swallows MoA/reasoning events")
 def test_progress_projects_reasoning_available_and_moa(monkeypatch, classic):
     from gateway import session_cli_turn
     monkeypatch.setattr(session_cli_turn, 'classic_cli_turn', lambda turn: classic)

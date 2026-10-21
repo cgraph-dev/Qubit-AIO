@@ -751,8 +751,17 @@ class WebhookAdapter(BasePlatformAdapter):
         await self._end_webhook_session(event, event.source.chat_id)
 
     async def _end_webhook_session(self, event: "MessageEvent", session_chat_id: str) -> None:
-        """Mark the per-delivery session ended via ``SessionDB.end_session`` (never a hand-written UPDATE),
-        resolving session_id from the SAME source the run was keyed on."""
+        """End only the settled admitted generation the delivery's receipt names.
+
+        The old authority receipt, not the current route, is the admissible finalization target: a
+        delayed callback after route publication must not close a successor session."""
+        from gateway.platforms.webhook_ingress import finalize_webhook
+        binding = getattr(event, '_webhook_receipt', None)
+        if binding is not None:
+            authority, receipt = binding
+            finalize_webhook(authority, receipt)
+            return
+        # Legacy/no-receipt fallback: resolve the session the same source was keyed on.
         runner = self.gateway_runner
         session_db, store = getattr(runner, "_session_db", None), getattr(runner, "session_store", None)
         key_fn = getattr(runner, "_session_key_for_source", None)

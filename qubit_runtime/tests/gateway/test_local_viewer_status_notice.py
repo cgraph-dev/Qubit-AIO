@@ -19,7 +19,6 @@ SHOWN = [['status.update', {'kind': 'warn', 'text': 'PROBE_WARNING_STATUS'}],
 CLEARED = ['notification.clear', {'key': 'probe'}]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the stale duplicate _status_callback_sync in run_turn_runner.py overrides the mixin and never publishes status.update/notification.show for local viewers")
 @pytest.mark.parametrize('mode', ['default', 'suppress'])
 def test_local_viewer_receives_agent_status_and_notices(tmp_path, mode):
     repo = Path(__file__).resolve().parents[2]

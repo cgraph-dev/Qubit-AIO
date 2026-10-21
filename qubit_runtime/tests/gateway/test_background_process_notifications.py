@@ -874,7 +874,6 @@ async def test_raw_output_modes_are_human_facing(monkeypatch, tmp_path):
         assert "make -j8 all" in text
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a refused completion injection is not bounded/backed off")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("committed", [False, True, "recheck_fails"])
 async def test_agent_notify_refused_completion_backs_off_then_sends_plain_notice(monkeypatch, tmp_path, committed):

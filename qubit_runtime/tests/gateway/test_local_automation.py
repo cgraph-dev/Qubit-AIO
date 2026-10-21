@@ -18,11 +18,7 @@ def _probe(tmp_path, source):
     print(result.stdout)
 
 
-@pytest.mark.parametrize('source', [
-    pytest.param('cli', marks=pytest.mark.xfail(strict=True, reason='wave-20 parity defect: the background-process completion notice loses display_text in the recovered/automation path')),
-    pytest.param('tui', marks=pytest.mark.xfail(strict=True, reason='wave-20 parity defect: the background-process completion notice loses display_text in the recovered/automation path')),
-    pytest.param('gui', marks=pytest.mark.xfail(strict=True, reason='wave-20 parity defect: the background-process completion notice loses display_text in the recovered/automation path')),
-    'watch'])
+@pytest.mark.parametrize('source', ['cli', 'tui', 'gui', 'watch'])
 def test_local_completion_joins_fifo_without_an_observer(tmp_path, source):
     _probe(tmp_path, source)
 

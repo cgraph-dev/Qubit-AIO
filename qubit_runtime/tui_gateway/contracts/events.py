@@ -282,6 +282,20 @@ class SessionUsagePayload(Payload):
     total_tokens: int | None = None
     reasoning_tokens: int | None = None
     api_calls: int | None = None
+    last_prompt_tokens: int | None = None
+    context_tokens: int | None = None
+    context_length: int | None = None
+    config_context_length: int | None = None
+    context_source: str | None = None
+    compression_count: int | None = None
+    avg_latency_s: float | None = None
+    tokens_per_s: float | None = None
+    last_turn_tokens: int | None = None
+    rate_limit: dict[str, JsonValue] | None = None
+    active_subagents: int | None = None
+    model: str | None = None
+    provider: str | None = None
+    fallback_model: str | None = None
 
 
 event("session.usage", SessionUsagePayload, doc="Mid-turn usage tick; message.complete carries the authoritative final usage.")

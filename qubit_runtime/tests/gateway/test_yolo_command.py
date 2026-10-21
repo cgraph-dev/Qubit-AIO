@@ -60,7 +60,6 @@ async def test_yolo_command_toggles_only_current_session(monkeypatch):
     assert os.environ.get("HERMES_YOLO_MODE") is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: launch yolo is not seeded into the turn")
 def test_launch_yolo_revocation_survives_the_next_turn(monkeypatch):
     """`hermes chat --yolo` seeds the bypass once; a later `/yolo` off is not re-enabled per turn."""
     from types import SimpleNamespace
@@ -95,7 +94,6 @@ def test_launch_yolo_revocation_survives_the_next_turn(monkeypatch):
         clear_session(key)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: /yolo is not persisted on the routing entry")
 @pytest.mark.asyncio
 async def test_yolo_survives_gateway_restart_and_dies_at_session_boundary(tmp_path):
     """/yolo is persisted on the routing entry: a fresh process re-arms it on the next turn, and a

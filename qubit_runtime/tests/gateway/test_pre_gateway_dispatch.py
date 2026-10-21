@@ -173,7 +173,6 @@ def test_relay_binding_moves_to_a_text_rewrite_but_never_to_a_new_source():
     assert _relay_callback.get() is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a rewritten message loses callback provenance and is refused")
 @pytest.mark.asyncio
 async def test_rewritten_message_keeps_its_callback_provenance_and_is_admitted(monkeypatch):
     """A rewrite builds a new event. Under ``gateway.multiplex_profiles`` an event without its
