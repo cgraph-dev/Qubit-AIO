@@ -744,7 +744,6 @@ def test_download_failure_releases_resume_handle(client, monkeypatch):
     assert job_id not in lm._RUNNING
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: status sizes a split model by part 1 only")
 def test_status_sizes_a_split_model_by_all_its_parts(client):
     """A split's first file can be a metadata stub of a few MB. The row reports the model the user
     has on disk, so a side-loaded split outside the catalog is every part, not part 1."""

@@ -43,7 +43,6 @@ def test_legacy_siblings_move_but_user_named_copies_stay(tmp_path: Path):
     assert not list(tmp_path.glob("config.yaml.bak.*")) and not list(tmp_path.glob("config.yaml.corrupt.*"))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: backup dedupe trusts filecmp's (size, mtime) cache")
 def test_same_size_edit_within_one_mtime_tick_is_still_backed_up(tmp_path: Path, monkeypatch):
     # Coarse-timestamp filesystems leave an immediate rewrite with the old mtime; dedupe must
     # compare content, not trust a (size, mtime) signature.

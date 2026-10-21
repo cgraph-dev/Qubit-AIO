@@ -187,7 +187,7 @@ def tail_log(
         print(f"Unknown log: {log_name!r}. Available: {', '.join(sorted(LOG_FILES))}")
         sys.exit(1)
 
-    log_path = get_qubit_home() / "logs" / filename
+    log_path = log_file_path(log_name)
     if not log_path.exists():
         print(f"Log file not found: {log_path}")
         print("(Logs are created when Qubit runs — try 'qubit chat' first)")
@@ -326,19 +326,23 @@ def _age_label(mtime: datetime) -> str:
 
 
 def list_logs() -> None:
-    """Print available log files with sizes."""
+    """Print available log files with sizes (plus the root home's update logs under a profile)."""
     log_dir = get_qubit_home() / "logs"
-    if not log_dir.exists():
+    root_logs = [path for name in sorted(ROOT_HOME_LOGS)
+                 if (path := log_file_path(name)).parent != log_dir and path.is_file()]
+    if not log_dir.exists() and not root_logs:
         print(f"No logs directory at {display_qubit_home()}/logs/")
         return
 
     print(f"Log files in {display_qubit_home()}/logs/:\n")
     found = False
-    for entry in sorted(log_dir.iterdir()):
+    entries = sorted(log_dir.iterdir()) if log_dir.exists() else []
+    for entry in [*entries, *root_logs]:
         if entry.is_file() and entry.suffix == ".log":
             st = entry.stat()
             age_str = _age_label(datetime.fromtimestamp(st.st_mtime))
-            print(f"  {entry.name:<25} {_size_label(st.st_size):>8}   {age_str}")
+            label = entry.name if entry.parent == log_dir else f"{entry.name} (root)"
+            print(f"  {label:<25} {_size_label(st.st_size):>8}   {age_str}")
             found = True
 
     if not found:

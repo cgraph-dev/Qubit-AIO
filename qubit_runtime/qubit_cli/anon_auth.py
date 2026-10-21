@@ -996,8 +996,10 @@ FREE_TIER_AVAILABLE_NOTICE = (
 def guest_notice_pending() -> bool:
     """True when a guest identity exists and the one-time availability notice has not been shown."""
     state = current_nous_state()
-    return (is_guest_state(state) and bool(state.get("access_token"))
-            and not bool(state.get(GUEST_NOTICE_FLAG)))
+    # A guest carrying inference (the minted access token) or a claimed welcome trial gets the
+    # one-time notice; a connectors-only guest holds no inference token and does not.
+    carries = is_guest_state(state) and (bool(state.get("access_token")) or free_inference_active(state))
+    return carries and not bool(state.get(GUEST_NOTICE_FLAG))
 
 
 def mark_guest_notice_shown() -> bool:

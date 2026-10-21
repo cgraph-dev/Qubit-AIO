@@ -153,7 +153,6 @@ def test_unseen_no_thanks_is_asked_once_more_and_then_settled(monkeypatch):
     assert len(shown) == 1 and shown[0].startswith(consent._REASK_NOTE)
     assert consent.consent_state(read_raw_config()) == {"enabled": False, "send": False, "decided": True, "reask": False}
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: telemetry notice omits the install note")
 def test_every_cli_promise_that_pre_opt_in_data_stays_local_names_the_install_note():
     """Invariant: the fresh-install note is the one record kept from before the consent answer and
     counted after it, so each CLI surface stating the pre-opt-in promise names that exception, and

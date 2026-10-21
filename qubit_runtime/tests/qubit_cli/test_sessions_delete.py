@@ -110,7 +110,6 @@ def test_sessions_prune_bare_keeps_90_day_default(monkeypatch, capsys):
 
 
 @pytest.mark.parametrize("status", ["queued", "unknown"])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: sessions delete ignores a queued/unknown runtime admission")
 def test_sessions_delete_with_unfinished_turn_points_to_discard(tmp_path, monkeypatch, capsys, status):
     """P3: the ledger's session_busy / unknown_execution refusal is a user-facing answer (exit 1
     with what to do), not an uncaught RuntimeStoreError traceback."""
