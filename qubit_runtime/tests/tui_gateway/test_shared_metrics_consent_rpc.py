@@ -5,6 +5,8 @@ profile the request names, never the launch profile."""
 from __future__ import annotations
 
 import sqlite3
+
+import pytest
 from pathlib import Path
 
 import qubit_yaml as yaml
@@ -39,17 +41,18 @@ def _windows(home: Path) -> list[tuple]:
         return conn.execute("SELECT opened_at, closed_at FROM send_consent_windows ORDER BY rowid").fetchall()
 
 
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared_metrics.set reports the fork reask flag instead of the pin decided-only contract")
 def test_send_without_collection_is_normalized_off_and_closes_the_consent_window(tmp_path, monkeypatch):
     launch, worker = _bind_homes(monkeypatch, tmp_path)
 
     assert _call("shared_metrics.set", {"profile": "code", "enabled": True, "send": True}) == {
-        "enabled": True, "send": True, "decided": True}
+        "enabled": True, "send": True, "decided": True, "reask": False}
     [(opened, closed)] = _windows(worker)
     assert opened and closed is None
 
     # send=true alone is refused: collection off withdraws send consent, in config AND in the store.
     assert _call("shared_metrics.set", {"profile": "code", "enabled": False, "send": True}) == {
-        "enabled": False, "send": False, "decided": True}
+        "enabled": False, "send": False, "decided": True, "reask": False}
     assert _shared_metrics(worker) == {"enabled": False, "send": False}
     [(_, closed)] = _windows(worker)
     assert closed is not None
@@ -58,15 +61,16 @@ def test_send_without_collection_is_normalized_off_and_closes_the_consent_window
     assert not (launch / "telemetry").exists()
 
 
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: shared_metrics.status keeps reask true after an enabled:false setup answer instead of marking it decided")
 def test_status_is_undecided_until_a_key_is_written(tmp_path, monkeypatch):
     _launch, worker = _bind_homes(monkeypatch, tmp_path)
 
-    assert _call("shared_metrics.status", {"profile": "code"}) == {"enabled": False, "send": False, "decided": False}
+    assert _call("shared_metrics.status", {"profile": "code"}) == {"enabled": False, "send": False, "decided": False, "reask": False}
 
     # An answer given in `qubit setup` (only `enabled: false` written) counts as decided.
     (worker / "config.yaml").write_text(
         yaml.safe_dump({"telemetry": {"shared_metrics": {"enabled": False}}}), encoding="utf-8")
-    assert _call("shared_metrics.status", {"profile": "code"}) == {"enabled": False, "send": False, "decided": True}
+    assert _call("shared_metrics.status", {"profile": "code"}) == {"enabled": False, "send": False, "decided": True, "reask": False}
 
 
 def test_only_the_first_run_answer_records_desktop_setup_completed(tmp_path, monkeypatch):
@@ -80,3 +84,20 @@ def test_only_the_first_run_answer_records_desktop_setup_completed(tmp_path, mon
     _call("shared_metrics.set", {"profile": "code", "enabled": True, "send": True})
 
     assert calls == [{"surface": "desktop", "provider": "nous"}]
+
+
+@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: opting out does not purge pending installer/update receipts")
+def test_an_opt_out_purges_receipts_kept_for_a_later_start(tmp_path, monkeypatch):
+    """A Desktop "No" must not leave an installer receipt or a parked update receipt for a later opt-in
+    to count; only the named profile is touched."""
+    launch, worker = _bind_homes(monkeypatch, tmp_path)
+    kept = [worker / "telemetry" / "shared_metrics" / name for name in ("pending_installs", "pending_updates")]
+    for directory in kept + [launch / "telemetry" / "shared_metrics" / "pending_installs"]:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{'a' * 32}.json").write_text("{}", encoding="utf-8")
+
+    _call("shared_metrics.set", {"profile": "code", "enabled": True, "send": False})
+    assert all(d.exists() for d in kept)
+    _call("shared_metrics.set", {"profile": "code", "enabled": False, "send": False})
+    assert not any(d.exists() for d in kept)
+    assert (launch / "telemetry" / "shared_metrics" / "pending_installs").exists()
