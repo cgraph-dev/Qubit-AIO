@@ -224,15 +224,7 @@ def test_unified_never_recommends_a_below_floor_dense_model():
 
 @pytest.mark.parametrize("budget", [
     *(_unified(gb) for gb in (16, 24, 32, 48, 64, 96, 128, 256)),
-    pytest.param(
-        _unified(31.5),
-        marks=pytest.mark.xfail(
-            reason="PRODUCTION GAP: derived local recommendation does not clear the floor "
-            "(qubit_cli/local_runtime/catalog.py)",
-            strict=False,
-        ),
-        id="unified-31.5",
-    ),
+    _unified(31.5),
     *(_discrete(gb) for gb in (8, 12, 16, 24, 32, 48, 96)),
 ], ids=lambda b: f"{'unified' if b.uma else 'discrete'}-{b.total_device_bytes / _GIB:g}")
 def test_a_derived_recommendation_always_clears_the_floor(budget):

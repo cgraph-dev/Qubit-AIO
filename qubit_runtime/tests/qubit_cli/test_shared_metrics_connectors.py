@@ -22,7 +22,7 @@ from qubit_cli.observability.shared_metrics_connectors import (
 from tests.qubit_cli.test_relay_shared_metrics import _schema_validator
 from tests.qubit_cli import test_relay_shared_metrics_runtime as runtime_tests
 
-_RESOURCE = {"architecture": "x86_64", "hermes_version": "0.0.0", "install_method": "git", "os_family": "linux"}
+_RESOURCE = {"architecture": "x86_64", "qubit_version": "0.0.0", "install_method": "git", "os_family": "linux"}
 _ROUTE = {"model": "m", "provider": "openrouter"}
 @pytest.fixture
 def fake_relay(tmp_path, monkeypatch):
@@ -65,7 +65,6 @@ def test_every_classed_code_is_a_known_product_code():
     assert all(families[code] == "product" for code in contract._CONNECTOR_CODE_CLASSES)
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: shared metrics reject connector/tool_search metric names (qubit_cli/observability/shared_metrics.py:384)', strict=False)
 def test_connector_and_bridge_calls_are_named_without_a_slug():
     connector = {"tool_name": "connectors__gmail__SEND_EMAIL", "toolset": "other"}
     assert contract.tool_metric_name(connector) == "connector"
@@ -115,7 +114,6 @@ def _end_turn():
     lifecycle.finalize_session(session_id="s1")
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: shared metrics reject connector/tool_search metric names (qubit_cli/observability/shared_metrics.py:384)', strict=False)
 def test_a_connector_batch_counts_each_entry_once_and_not_the_wrapper(fake_relay):
     lifecycle.invoke_hook("pre_llm_call", **_BASE)
     _connector_batch_hooks([
@@ -130,11 +128,10 @@ def test_a_connector_batch_counts_each_entry_once_and_not_the_wrapper(fake_relay
         ("connector", "connector", "failed", "connection_required"),
     ]
     [task_end] = [event[2]["output"] for event in fake_relay.events
-                  if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"]
+                  if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"]
     assert task_end["tool_call_count_bucket"] == "2"
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: shared metrics reject connector/tool_search metric names (qubit_cli/observability/shared_metrics.py:384)', strict=False)
 def test_a_batch_rejected_before_any_entry_still_counts_as_tool_call(fake_relay):
     lifecycle.invoke_hook("pre_llm_call", **_BASE)
     lifecycle.invoke_hook(
@@ -146,7 +143,6 @@ def test_a_batch_rejected_before_any_entry_still_counts_as_tool_call(fake_relay)
     assert (end["tool_name"], end["outcome"]) == ("tool_call", "failed")
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: shared metrics reject connector/tool_search metric names (qubit_cli/observability/shared_metrics.py:384)', strict=False)
 def test_a_batch_the_executor_abandons_mid_entry_counts_that_entry_once(fake_relay):
     """The executor times out during entry 0: the entry never posts, the wrapper posts the timeout.
     The open entry takes the wrapper's outcome; the wrapper is not a second call."""
@@ -161,7 +157,7 @@ def test_a_batch_the_executor_abandons_mid_entry_counts_that_entry_once(fake_rel
     [end] = [event[2] for event in fake_relay.events if event[0] == "tool.call_end"]
     assert (end["tool_name"], end["tool_category"], end["outcome"]) == ("connector", "connector", "timed_out")
     [task_end] = [event[2]["output"] for event in fake_relay.events
-                  if event[0] == "scope.pop" and event[1][1] == "hermes.task_run"]
+                  if event[0] == "scope.pop" and event[1][1] == "qubit.task_run"]
     assert task_end["tool_call_count_bucket"] == "1"
 
 
@@ -224,7 +220,6 @@ def test_the_chain_survives_a_compression_rotation(fake_relay):
     assert chain == {"described_first": "yes", "outcome": "success", "searches_before_bucket": "1"}
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: shared metrics reject connector/tool_search metric names (qubit_cli/observability/shared_metrics.py:384)', strict=False)
 def test_entries_report_their_own_post_even_under_the_executor_suppression(monkeypatch):
     """The sequential executor suppresses the inner post_tool_call for the call it owns; connector
     entries are their own calls and must still report, or each entry's lifecycle never closes."""
@@ -257,7 +252,6 @@ def test_entries_report_their_own_post_even_under_the_executor_suppression(monke
     assert gateway_ids == ["tc1#0", "tc1#1"]
 
 
-@pytest.mark.xfail(reason='PRODUCTION GAP: shared metrics reject connector/tool_search metric names (qubit_cli/observability/shared_metrics.py:384)', strict=False)
 def test_a_package_with_each_new_row_validates_against_the_v4_schema(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
     store = SharedMetricsStore()
