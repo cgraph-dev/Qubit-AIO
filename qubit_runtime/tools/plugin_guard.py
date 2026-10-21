@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Iterator, List, Optional, Tuple
 
 from tools.plugin_guard_context import (
-    STEP_DOWN, catalog_cap, is_agent_facing, is_base64_archive_roundtrip,
-    is_base64_media, is_benign_lazy_os_import, is_ci_workflow, is_coin_name_only, is_data_decode,
+    STEP_DOWN, catalog_cap, is_agent_facing, is_authorized_keys_prose, is_base64_archive_roundtrip,
+    is_base64_media, is_benign_lazy_os_import, is_ci_workflow, is_coin_name_only,
     is_disclosed_config_note, is_doc_prose, is_env_dump_in_safety_clause, is_google_installed_app_secret,
     is_hex_in_char_class, is_inert_fixture_line, is_json_prose_value, is_locale_catalog,
     is_loopback_continuation, is_loopback_only, is_pip_install_in_prose_literal, is_quoted_injection_phrase,
@@ -27,7 +27,7 @@ from tools.skills_guard import (
     Finding, ScanResult, SUSPICIOUS_BINARY_EXTENSIONS, _determine_verdict, format_scan_report,
     scan_file)
 
-PLUGIN_SCANNER_VERSION = "plugin-guard-v9"
+PLUGIN_SCANNER_VERSION = "plugin-guard-v11"
 
 # Never scanned: VCS internals, caches, vendored envs.
 EXCLUDED_DIRS = {
@@ -260,8 +260,6 @@ def _inert_context_cap(f: Finding, rel_path: str, line: str, joined: str, is_cod
     )
     if to_low:
         return "low"
-    if f.pattern_id == "base64_decode_pipe" and is_data_decode(line):
-        sev = STEP_DOWN.get(sev, sev)     # `base64 -d | grep`: decode to a text filter, not execution
     # Each predicate recognises a disclosed/inert shape that lands at a note (medium), never a block.
     to_medium = (
         is_base64_archive_roundtrip(f, line)      # `tar c… | base64 | base64 -d | tar x`: transport
@@ -272,6 +270,7 @@ def _inert_context_cap(f: Finding, rel_path: str, line: str, joined: str, is_cod
         or is_repo_root_traversal(f, line)        # `../../..` to the repo root, no sensitive leaf
         or is_benign_lazy_os_import(f, line)      # `__import__("os").environ.get(...)` one member
         or is_disclosed_config_note(f, rel_path)  # disclosed scoped config-write in install docs
+        or is_authorized_keys_prose(f, line, doc_prose)  # `authorized_keys` in a UI string, no write
     )
     if to_medium:
         return _at_most(sev, "medium")

