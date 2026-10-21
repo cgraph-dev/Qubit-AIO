@@ -9,7 +9,6 @@ from openai.types.chat import ChatCompletionMessage, ChatCompletionMessageToolCa
 from tools.registry import registry
 
 
-@pytest.mark.xfail(strict=True, reason="wave-18 parity defect: registered tool deadline is not enforced through the sequential bridge")
 def test_registered_deadline_survives_sequential_execution_and_bridge(tmp_path):
     from agent.tool_executor import execute_tool_calls_sequential
     from qubit_cli.config import atomic_config_write, get_config_path

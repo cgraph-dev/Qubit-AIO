@@ -2106,6 +2106,10 @@ def _bridge_config_to_env(_cfg: dict) -> None:
 def _load_bridge_config(config_path: Path) -> dict:
     """Effective USER config (no defaults) for the presence-sensitive env bridge: only keys the user
     or the managed layer wrote get bridged, else all of DEFAULT_CONFIG would be exported."""
+    from agent.safe_worker_policy import worker_config_snapshot
+    snapshot = worker_config_snapshot()
+    if snapshot is not None:
+        return snapshot
     from qubit_cli.config_effective import load_user_config_effective
     return load_user_config_effective(config_path)
 
