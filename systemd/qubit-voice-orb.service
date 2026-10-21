@@ -22,6 +22,15 @@ Type=simple
 #   systemctl --user daemon-reload
 # With no DISPLAY the process exits 0 by itself (ORB_NO_DISPLAY), so the
 # unit fails gracefully on a headless host instead of restart-storming.
+#
+# BOOT-RACE FIX 2026-10-21: on reboot this unit can be started before the
+# graphical session has exported DISPLAY or opened its X socket. The orb
+# then saw no usable display, exited 0 (ORB_NO_DISPLAY) and never came up.
+# The waiter below polls xdpyinfo (inherited DISPLAY/XAUTHORITY, ~45 s bound,
+# no hardcoded display index) and returns as soon as the socket answers. It
+# exits 0 on timeout as well, so a genuinely headless host keeps today's
+# graceful ORB_NO_DISPLAY exit rather than turning into a restart storm.
+ExecStartPre=%h/Projects/Repos/qubit-voicebridge/.venv/bin/python %h/Projects/Repos/qubit-voicebridge/scripts/wait_for_display.py --timeout 45
 ExecStart=%h/Projects/Repos/qubit-voicebridge/.venv/bin/python -m voicebridge.orb
 WorkingDirectory=%h/Projects/Repos/qubit-voicebridge
 Restart=on-failure
