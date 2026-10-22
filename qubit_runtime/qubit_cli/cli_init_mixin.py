@@ -282,7 +282,7 @@ class CLIInitMixin:
         self._explicit_max_turns = max_turns
 
     def _init_toolsets(self, toolsets):
-        from cli import CLI_CONFIG
+        from cli import CLI_CONFIG, validate_toolset
         self.enabled_toolsets = toolsets
         # Only a picked list rides session.create; the gateway resolves the profile default and
         # coding posture itself, and a stale explicit name is refused there (#138670).
@@ -291,9 +291,21 @@ class CLIInitMixin:
 
         self.disabled_toolsets = parse_config_string_list(CLI_CONFIG["agent"].get("disabled_toolsets"))
 
-        # No local "Unknown toolsets" check: plugin toolsets are only known where plugins load. The gateway
-        # refuses an unknown picked name at session.create and reports a stale profile one with the session
-        # (``_adopt_gateway_toolsets``), so this process never discovers plugins to tell them apart (PLG-7).
+        if toolsets and "all" not in toolsets and "*" not in toolsets:
+            # MCP server names only resolve after discover_mcp_tools runs; skip them here.
+            mcp_names = set((CLI_CONFIG.get("mcp_servers") or {}).keys())
+            # Plugin toolsets register during plugin discovery, which startup runs on a background thread
+            # that has not necessarily landed yet; names it declared are not typos (#71650).
+            try:
+                from qubit_cli.plugins import get_plugin_toolset_keys_nowait
+                plugin_ts_names = get_plugin_toolset_keys_nowait()
+            except Exception:
+                plugin_ts_names = set()
+            invalid = [t for t in toolsets
+                       if not validate_toolset(t) and t not in mcp_names and t not in plugin_ts_names]
+            if invalid:
+                from agent.i18n import t as _t
+                self._console_print(f"[bold red]{_t('cli.startup.unknown_toolsets', names=', '.join(invalid))}[/]")
 
     def _init_checkpoints_and_rules(self, checkpoints, pass_session_id, ignore_rules):
         from cli import CLI_CONFIG
