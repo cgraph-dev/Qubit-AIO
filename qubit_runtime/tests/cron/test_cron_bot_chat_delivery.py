@@ -26,6 +26,108 @@ from cron.scheduler_delivery import (
 )
 from cron.scheduler_preflight import _preflight_check_delivery
 from qubit_cli.quiet_single_query import TURN_REPORT_FILE_ENV
+def test_failure_notice_reaches_the_owner_as_a_diagnostic(tmp_path, monkeypatch):
+    """A delivered ``for_failure`` notice keeps ``notification_category="diagnostic"`` through
+    the owner transport (R1/R2 minor: the category was accepted but dropped)."""
+    from tools import bot_live_delivery as mailbox
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    seen = []
+
+    def fake_deliver(home, owner, message, *, delivery_id, notification_category="result"):
+        seen.append(notification_category)
+        return {"status": "settled", "message": message, "delivery_id": delivery_id,
+                "notification_category": notification_category}
+
+    monkeypatch.setattr(mailbox, "find_canonical_live_owner", lambda home: {"session_id": "local-bot"})
+    monkeypatch.setattr(mailbox, "deliver_to_live_owner", fake_deliver)
+    monkeypatch.setattr("gateway.warning_notifications.warning_notifications_enabled", lambda *a, **k: True)
+    job = {"id": "j1", "name": "n", "execution_id": "r1"}
+    assert _deliver_to_bot_chat(job, "boom", "", for_failure=True) is None
+    assert _deliver_to_bot_chat(dict(job, execution_id="r2"), "ok", "") is None
+    assert seen == ["diagnostic", "result"]
+def test_deliver_without_authority_is_parked_not_a_second_writer(tmp_path, monkeypatch):
+    """No running authority → parked for a later tick (explicit queued status); never a local CLI turn."""
+    import subprocess
+    from tools import bot_live_delivery as mailbox
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    monkeypatch.setattr(subprocess, "run", mock.Mock(side_effect=AssertionError("no local inference fallback")))
+    monkeypatch.setattr(mailbox, "find_canonical_live_owner",
+                        mock.Mock(side_effect=ValueError("profile authority is not ready")))
+    err = _deliver_to_bot_chat({"id": "j1", "name": "n", "execution_id": "r1"}, "out", "")
+    assert err is not None and "queued" in err and "not running" in err
+def test_failure_notice_to_a_profile_hiding_warnings_is_suppressed_not_sent(tmp_path, monkeypatch):
+    """A ``for_failure`` notice whose TARGET profile hides warning notifications is booked as a
+    durable ``suppressed`` disposition (flagged on the job), never admitted to the owner; a
+    requested (non-failure) result is never gated."""
+    from tools import bot_live_delivery as mailbox
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text("display: {suppress_warning_notifications: true}\n")
+    admitted = []
+
+    def fake_deliver(home, owner, message, *, delivery_id, notification_category="result"):
+        admitted.append(message)
+        return {"status": "queued", "message": message, "delivery_id": delivery_id}
+
+    monkeypatch.setattr(mailbox, "find_canonical_live_owner", lambda home: {"session_id": "bot"})
+    monkeypatch.setattr(mailbox, "deliver_to_live_owner", fake_deliver)
+
+    failure = {"id": "j1", "name": "n", "execution_id": "r1"}
+    assert _deliver_to_bot_chat(failure, "diagnostic", "", for_failure=True) is None
+    assert failure["_notification_all_targets_suppressed"] is True
+    assert failure["_bot_chat_delivery_receipts"]["bot-chat:(own)"]["status"] == "suppressed"
+    assert admitted == []
+
+    result = {"id": "j1", "name": "n", "execution_id": "r2"}
+    outcome = _deliver_to_bot_chat(result, "the report", "")
+    assert outcome and "queued" in outcome
+    assert not result.get("_notification_all_targets_suppressed")
+    assert len(admitted) == 1
+def test_tick_hands_legacy_pending_records_to_the_live_owner_once(tmp_path, monkeypatch):
+    """Records the retired CLI lane left in cron/bot_chat_pending are never orphaned: a queued
+    (never-started) record is admitted to the live owner under its own id; a claimed one (an
+    uncertain CLI turn) is never resent; the files stay as evidence."""
+    import json
+
+    import cron.jobs as J
+    import cron.scheduler as S
+    from cron import scheduler_authority
+    from tools import bot_live_delivery as mailbox
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    monkeypatch.setattr(J, "HERMES_DIR", tmp_path)
+    monkeypatch.setattr(J, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(J, "JOBS_FILE", tmp_path / "cron" / "jobs.json")
+    monkeypatch.setattr(J, "OUTPUT_DIR", tmp_path / "cron" / "output")
+    monkeypatch.setattr(S, "_qubit_home", tmp_path)
+    monkeypatch.setattr(S, "_sweep_mcp_orphans", lambda: None)
+    monkeypatch.setattr(scheduler_authority, "reconcile_pending", lambda *, allow_connect=True: None)
+    (tmp_path / "state.db").write_text("")
+    root = tmp_path / "cron" / "bot_chat_pending"
+    root.mkdir(parents=True)
+    queued, claimed = "a" * 64, "b" * 64
+    for key, status in ((queued, "queued"), (claimed, "claimed")):
+        (root / f"{key}.json").write_text(json.dumps(dict(
+            id=key, status=status, job={"id": "j1", "name": "Digest"}, content="the report",
+            profile="", home=str(tmp_path), sequence=1, for_failure=True)))
+    admitted = []
+
+    def fake_deliver(home, owner, message, *, delivery_id, notification_category="result"):
+        admitted.append((delivery_id, message, notification_category))
+        return {"status": "queued", "message": message, "delivery_id": delivery_id}
+
+    monkeypatch.setattr(mailbox, "find_canonical_live_owner", lambda home: {"session_id": "bot"})
+    monkeypatch.setattr(mailbox, "deliver_to_live_owner", fake_deliver)
+
+    S.tick(verbose=False)
+    S.tick(verbose=False)
+
+    assert [(key, category) for key, _, category in admitted] == [(queued, "diagnostic")]
+    assert 'Cronjob "Digest" output' in admitted[0][1] and "the report" in admitted[0][1]
+    assert json.loads((root / f"{queued}.json").read_text())["status"] == "transferred"
+    assert json.loads((root / f"{claimed}.json").read_text())["status"] == "claimed"
 
 
 # ── token parsing ────────────────────────────────────────────────────────────
