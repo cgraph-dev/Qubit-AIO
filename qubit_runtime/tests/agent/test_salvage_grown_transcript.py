@@ -179,7 +179,6 @@ def test_salvage_never_caps_unmarked_summary_shaped_live_user_text():
     assert out[0]["content"] == live_user_text
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: salvage strips reasoning carriers from retained assistant turns")
 def test_salvage_never_strips_reasoning_from_retained_turns():
     """The salvaged list is committed as canonical history and replayed by default, so older assistant
     turns must keep every reasoning carrier; only tool output and summaries are shrink targets."""

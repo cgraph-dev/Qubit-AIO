@@ -778,7 +778,7 @@ def _record_skill_install(identifier: str, bundle, outcome: str, attempt: Option
     its type inside the metrics guard."""
     from qubit_cli.observability.shared_metrics_events import record_extension_install
     attempt = attempt or {}
-    origin = getattr(bundle, "source", None) or (
+    origin = getattr(bundle, "source", None) or attempt.get("origin") or (
         "official" if identifier.startswith("official/")
         else "url" if identifier.startswith(("http://", "https://")) else "hub")
     source = _SKILL_METRIC_SOURCES.get(origin, "hub")
@@ -835,7 +835,7 @@ def _install_skill(identifier: str, category: str, force: bool, c: Console, skip
     ensure_hub_dirs()
     from tools.skills_sync_bundled_ops import bundled_skill_for_install
     if not source_id and not name_override and (builtin := bundled_skill_for_install(identifier)):
-        attempt["failure_class"] = "filesystem_error"  # read only when the restore fails
+        attempt.update(failure_class="filesystem_error", origin="bundled")  # read only when the restore fails
         return _install_bundled(c, builtin, invalidate_cache)
     attempt["registry"] = "unresolved"
     sources = _pinned_sources(c, _sources(), source_id, identifier)

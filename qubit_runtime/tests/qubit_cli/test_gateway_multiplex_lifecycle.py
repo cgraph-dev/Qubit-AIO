@@ -255,8 +255,7 @@ def test_parked_status_still_reports_a_forced_gateway(homes, monkeypatch, capsys
 
 
 @pytest.mark.parametrize('verdict, healthy', [
-    pytest.param(('incompatible', 'runtime_protocol'), False, marks=pytest.mark.xfail(
-        strict=True, reason="wave-20 parity defect: status prints the legacy 'hermes gateway restart' on the incompatible-gateway surface")),
+    (('incompatible', 'runtime_protocol'), False),
     (('ready', None), True),
 ])
 def test_status_flags_a_gateway_this_qubit_cannot_attach(homes, monkeypatch, capsys, verdict, healthy):

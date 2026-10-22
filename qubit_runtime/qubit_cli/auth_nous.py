@@ -1258,12 +1258,13 @@ def get_nous_auth_status_local() -> Dict[str, Any]:
     ``logged_in`` = usable invoke JWT, or a refresh token not terminally quarantined — not proof
     the server still accepts it.
     """
+    from qubit_cli.anon_auth import guest_without_free_tier
     from qubit_cli.auth import get_provider_auth_state
     try:
         state = get_provider_auth_state("nous")
     except Exception:
         state = None
-    if not state:
+    if not state or guest_without_free_tier(state):
         return _snapshot_nous_pool_status()
     jwt_reason = _state_invoke_jwt_status(state, state.get("access_token"))
     last_err = _terminal_quarantine_marker(state)

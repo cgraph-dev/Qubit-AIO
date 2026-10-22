@@ -6,7 +6,9 @@ abort remaining cleanup steps.  These tests exercise the actual production
 code paths — not a copy of the try/except pattern.
 """
 
-from unittest.mock import MagicMock, patch
+import json
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -29,47 +31,12 @@ def _mock_runtime_provider(monkeypatch):
     monkeypatch.setattr(rp, "resolve_runtime_provider", _fake_resolve)
 
 
-class TestCronJobCleanup:
-    """cron/scheduler.py — end_session + close in the finally block."""
-
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: KeyboardInterrupt in end_session skips close")
-    def test_keyboard_interrupt_in_end_session_does_not_skip_close(self):
-        """If end_session raises KeyboardInterrupt, close() must still run."""
-        mock_db = MagicMock()
-        mock_db.end_session.side_effect = KeyboardInterrupt
-
-        from cron import scheduler
-        from cron import scheduler_delivery as sched_delivery
-
-        job = {
-            "id": "test-job-1",
-            "name": "test cleanup",
-            "prompt": "hello",
-            "schedule": "0 9 * * *",
-            "model": "test/model",
-        }
-
-        with patch("qubit_state_registry.acquire", return_value=mock_db), \
-             patch.object(scheduler, "_build_job_prompt", return_value="hello"), \
-             patch.object(sched_delivery, "_resolve_origin", return_value=None), \
-             patch.object(scheduler, "_resolve_delivery_target", return_value=None), \
-             patch("dotenv.load_dotenv", return_value=None), \
-             patch("run_agent.AIAgent") as MockAgent:
-            # Make the agent raise immediately so we hit the finally block
-            MockAgent.return_value.run_conversation.side_effect = RuntimeError("boom")
-            scheduler.run_job(job)
-
-        mock_db.end_session.assert_called_once()
-        mock_db.close.assert_called_once()
-
-
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: KeyboardInterrupt in end_session skips close")
 async def test_keyboard_interrupt_in_end_session_does_not_skip_close(tmp_path, monkeypatch):
     """Exercise owner execution and release its borrowed store despite Ctrl+C."""
     from gateway.session_contract import SessionRef
     from gateway.session_cron import current_execution, execute
-    from hermes_state_registry import acquire, release
+    from qubit_state_registry import acquire, release
 
     home = tmp_path / "owner"
     home.mkdir()

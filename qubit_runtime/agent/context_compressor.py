@@ -559,7 +559,8 @@ def _salvage_reduce_todo_snapshot(out: List[Dict[str, Any]]) -> None:
 def salvage_grown_transcript(
     original: List[Dict[str, Any]], candidate: List[Dict[str, Any]], budget: Optional[int] = None,
 ) -> Optional[List[Dict[str, Any]]]:
-    """Mechanically shrink a compression candidate (copies, cheapest loss first); ``None`` unless strictly smaller."""
+    """Mechanically shrink a compression candidate (copies, cheapest loss first); ``None`` unless strictly smaller.
+    Never strips reasoning (text or encrypted items): the result becomes canonical history replay reads."""
     if not candidate or not original:
         return None
     if budget is None:
@@ -570,14 +571,10 @@ def salvage_grown_transcript(
     out = [dict(msg) if isinstance(msg, dict) else msg for msg in candidate]
     tool_indices = [i for i, msg in enumerate(out) if isinstance(msg, dict) and msg.get("role") == "tool"]
     last_assistant_idx = _last_index_with_role(out, "assistant")
-    salvage_reasoning_keys = _NEWEST_TURN_ONLY_BUDGET_KEYS + ("reasoning_details",)
     keep_tools = set(tool_indices[-_SALVAGE_KEEP_RECENT_TOOLS:])
     for index, msg in enumerate(out):
         if not isinstance(msg, dict):
             continue
-        if msg.get("role") == "assistant" and index != last_assistant_idx:
-            for key in salvage_reasoning_keys:
-                msg.pop(key, None)
         if msg.get("role") == "tool" and index not in keep_tools:
             content = msg.get("content")
             if isinstance(content, str) and len(content) > _PRUNE_MIN_CHARS:

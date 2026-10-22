@@ -1220,7 +1220,6 @@ def test_recover_attempts_survive_dump_stderr_beyond_pipe_buffer(tmp_path: Path)
     assert "file is not a database" in attempts[-1]["dump_stderr_tail"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the lost-and-found mapper counts a runtime-schema sessions row unrecognized")
 def test_store_created_at_runtime_schema_maps_source_by_name(tmp_path: Path) -> None:
     """A store CREATED at the runtime-authority schema carries runtime_revision /
     runtime_generation right after ``id`` (declared order), so its source cell sits

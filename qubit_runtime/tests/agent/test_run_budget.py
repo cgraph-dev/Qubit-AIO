@@ -360,7 +360,6 @@ def test_wrapup_lands_in_the_persisted_row_via_pre_flush_hook(monkeypatch, tmp_p
 
 # ── turn clock stamping ────────────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: gemini long-decode does not scale the implicit stale timeout by hops")
 def test_gemini_long_decode_scales_implicit_stale_timeout_by_hops(monkeypatch, tmp_path):
     """One non-streaming stale timer spans every unary long-decode hop: an xhigh budget (262,144 tokens,
     8 hops of 32,768) gets 8x the 600s gemini-4 floor, not 600s for the whole answer. Explicit config

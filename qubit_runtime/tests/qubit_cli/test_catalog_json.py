@@ -16,11 +16,14 @@ import pytest
 import qubit_cli.local_runtime.catalog as cat
 from types import SimpleNamespace
 
+# The never-refreshed state a freshly started backend has (nothing calls refresh at import).
+_NEVER_REFRESHED = cat._last_refresh_attempt
+
 
 @pytest.fixture(autouse=True)
 def _reset_refresh_state(monkeypatch):
-    """Each test starts outside the TTL window with the packaged catalog."""
-    monkeypatch.setattr(cat, "_last_refresh_attempt", 0.0)
+    """Each test starts never-refreshed with the packaged catalog."""
+    monkeypatch.setattr(cat, "_last_refresh_attempt", _NEVER_REFRESHED)
     packaged = cat._packaged_catalog()
     monkeypatch.setattr(cat, "CATALOG", packaged)
     yield
@@ -122,9 +125,7 @@ def test_min_engine_gate(monkeypatch):
     assert _engine_too_old("b10363") is True, "newer requirement gates"
 
 
-_NEVER_REFRESHED = cat._last_refresh_attempt
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: catalog refresh is not scheduled after boot")
 def test_first_refresh_is_due_shortly_after_boot(monkeypatch):
     """time.monotonic() counts from boot: a backend started a minute after boot must still fetch
     on first use instead of treating "never refreshed" as refreshed at boot."""

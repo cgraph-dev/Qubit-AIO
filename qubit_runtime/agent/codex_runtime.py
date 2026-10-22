@@ -1256,6 +1256,18 @@ def run_codex_stream(agent, api_kwargs: dict, client: Any = None, on_first_delta
         # Claim the delta sink for THIS attempt; a newer attempt supersedes this token.
         writer_token["value"] = claim_stream_writer(agent)
         writer_token["raw_stream"] = _raw_stream
+        writer_token["raw_closed"] = False
+        # Track whether the provider stream has already been closed (a managed wrapper may close it
+        # before its own close() raises), so the finally below never double-closes it.
+        _original_close = getattr(_raw_stream, "close", None)
+        if callable(_original_close):
+            def _tracked_close(*_a, **_kw):
+                writer_token["raw_closed"] = True
+                return _original_close(*_a, **_kw)
+            try:
+                _raw_stream.close = _tracked_close
+            except Exception:
+                pass
         logger.debug("Codex stream opened (attempt=%s/%s, model=%s)",
             attempt + 1, max_stream_retries + 1, model)
 
@@ -1325,17 +1337,19 @@ def run_codex_stream(agent, api_kwargs: dict, client: Any = None, on_first_delta
                 budget, agent._client_log_context(),
             )
 
-    def _close_event_stream(event_stream: Any) -> None:
+    def _close_event_stream(event_stream: Any) -> bool:
         close_fn = getattr(event_stream, "close", None)  # None while connect never succeeded
         try:
             if callable(close_fn):
                 close_fn()
+            return True
         except Exception:
             # A failed close can leave this connection checked out of the httpx pool while the caller
             # reuse-caches the client; poison the slot so close really closes the pool. ``client is None``
             # is the shared primary client — never force-shut.
             if client is not None:
                 agent._abort_request_openai_client(active_client, reason="codex_stream_close_failed")
+            return False
     show_commentary = getattr(agent, "show_commentary", True)
     wants_commentary = getattr(agent, "interim_assistant_callback", None) is not None and show_commentary
     on_commentary_message = _live(agent._fire_streamed_codex_commentary) if wants_commentary else None
@@ -1423,7 +1437,13 @@ def run_codex_stream(agent, api_kwargs: dict, client: Any = None, on_first_delta
             if event_stream is None:
                 _close_event_stream(writer_token.get("raw_stream"))
             else:
-                _close_event_stream(event_stream)
+                # A Relay-managed wrapper whose close() raises (for example "Cannot close a running
+                # event loop") must not leak the provider stream it wraps: fall back to closing it.
+                if not _close_event_stream(event_stream):
+                    raw_stream = writer_token.get("raw_stream")
+                    if (raw_stream is not None and raw_stream is not event_stream
+                            and not writer_token.get("raw_closed")):
+                        _close_event_stream(raw_stream)
 
 
 __all__ = [

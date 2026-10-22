@@ -741,7 +741,6 @@ def test_install_by_name_resolves_to_the_skill_it_names(monkeypatch, tmp_path, i
     assert (stranger / "SKILL.md").read_text().endswith("stranger\n")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: built-in skill restore does not restore from leftovers")
 def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundled(monkeypatch, tmp_path):
     """Post-fix telemetry still showed `llm-wiki` failing as source=hub, filesystem_error: the
     restore copied with copytree onto a dest dir left behind without its SKILL.md (EEXIST on every
@@ -775,7 +774,6 @@ def test_built_in_restore_survives_leftovers_and_records_every_outcome_as_bundle
     assert cli_hub.do_install("llm-wiki", console=console, skip_confirm=True) is False
     assert rows == [("bundled", "success"), ("bundled", "failed")]
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: built-in skill restore does not restore from leftovers")
 def test_built_in_restore_into_a_leftover_dir_never_writes_through_links_or_over_user_files(tmp_path):
     """The leftover-tolerant restore copied with dirs_exist_ok: it followed a symlinked file out of
     skills/ (clobbering the target), overwrote a user-edited file, and called a dir holding another

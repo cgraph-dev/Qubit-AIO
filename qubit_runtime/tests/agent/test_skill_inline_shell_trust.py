@@ -94,13 +94,12 @@ def _community_bundle_home(home, lock_text=None):
         "outer": {"trust_level": "community", "install_path": "outer"}}}), encoding="utf-8")
     return skills
 
-_XF = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: community bundle provenance does not follow the owning lock")
 @pytest.mark.parametrize("lock_text, viewer, rel, expands", [
-    pytest.param(None, "owner", "outer/agents/inner", False, marks=_XF),  # nested SKILL.md inside a community bundle
-    pytest.param(None, "other", "outer", False, marks=_XF),  # another profile reaching it through external_dirs
-    pytest.param(None, "other", "outer/agents/inner", False, marks=_XF),
-    pytest.param('{"version": 1, "inst', "owner", "outer", False, marks=_XF),  # truncated lock fails closed
-    pytest.param('{"version": 1, "installed": []}', "other", "outer", False, marks=_XF),  # wrong shape fails closed
+    pytest.param(None, "owner", "outer/agents/inner", False),  # nested SKILL.md inside a community bundle
+    pytest.param(None, "other", "outer", False),  # another profile reaching it through external_dirs
+    pytest.param(None, "other", "outer/agents/inner", False),
+    pytest.param('{"version": 1, "inst', "owner", "outer", False),  # truncated lock fails closed
+    pytest.param('{"version": 1, "installed": []}', "other", "outer", False),  # wrong shape fails closed
     (None, "owner", "mine", True),  # user-created skill beside the install keeps the opt-in
     (None, "other", "mine", True),
 ])

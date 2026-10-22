@@ -67,7 +67,6 @@ def test_forensics_parser_reads_the_new_fields(tmp_path):
     assert "write" not in calls[1] and "id" not in calls[1]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: long-decode usage buckets do not use the first hop")
 def test_long_decode_context_buckets_use_the_first_hop(tmp_path, monkeypatch, caplog):
     """A multi-hop Gemini long decode sums every hop's re-sent prefix for billing; the context engine's
     prompt AND canonical input/cache buckets carry hop 1, so cache_read never exceeds prompt there."""

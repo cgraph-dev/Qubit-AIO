@@ -74,8 +74,8 @@ def test_a_transfer_the_user_declined_is_reported_with_its_reason_and_keeps_the_
     assert _load_auth_store()["providers"]["nous"]["anon_token"] == guest["anon_token"]
 
 
-def test_status_routes_report_the_free_tier(portal):
-    anon_auth.ensure_portal_identity(explicit=True)
+def test_status_routes_report_the_free_tier(portal, monkeypatch):
+    claimed_trial(monkeypatch)
     portal_status = client.get("/api/portal", headers=HEADERS).json()
     assert portal_status["free_tier"] is True
     assert portal_status["account_tier"] == "anonymous"
@@ -110,7 +110,6 @@ def test_a_sign_in_cancelled_while_waiting_never_persists_the_account(portal, fr
     assert web_server_oauth._oauth_sessions.get(start["session_id"]) is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: /api/portal reports a connector-only guest as free tier")
 def test_a_connector_only_guest_is_not_reported_as_the_free_tier(portal, monkeypatch):
     as_local_desktop_backend(monkeypatch)
     anon_auth.ensure_portal_identity(explicit=True)

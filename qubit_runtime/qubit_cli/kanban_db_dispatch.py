@@ -674,7 +674,7 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
             continue
         # Runtime is per attempt: ``tasks.started_at`` records the FIRST start,
         # so retries must be measured from the active task_runs row.
-        elapsed = now - int(row["active_started_at"])
+        elapsed = now - (_kb._to_epoch(row["active_started_at"]) or now)  # unreadable clock: never kill
         limit = int(row["max_runtime_seconds"])
         if elapsed < limit:
             continue
@@ -779,12 +779,12 @@ def detect_stale_running(
     for row in rows:
         if row["active_started_at"] is None:
             continue
-        elapsed = now - int(row["active_started_at"])
+        elapsed = now - (_kb._to_epoch(row["active_started_at"]) or now)  # unreadable clock: never reclaim
         if elapsed < stale_timeout_seconds:
             continue
 
-        last_hb = row["last_heartbeat_at"]
-        hb_age = (now - int(last_hb)) if last_hb is not None else None
+        last_hb = _kb._to_epoch(row["last_heartbeat_at"])
+        hb_age = (now - last_hb) if last_hb is not None else None
         if hb_age is not None and hb_age < _STALE_HEARTBEAT_GAP_SECONDS:
             continue
 
@@ -2751,40 +2751,9 @@ def _retag_legacy_worker_sessions(workspaces_root_path: str) -> None:
 
 
 def _worker_argv(task: Task, profile_arg: str, qubit_home: Optional[str]) -> list[str]:
-    """Build the ``qubit -p <profile> --cli ... chat -q ...`` worker command."""
-    cmd = [
-        *_resolve_qubit_argv(),
-        "-p", profile_arg,
-        # A worker must NEVER boot the interactive TUI: its no-TTY bail-out
-        # exits 0 without doing the task → "protocol violation" every attempt.
-        "--cli",
-        # Workers run under a profile-scoped QUBIT_HOME and so see that
-        # profile's shell-hook allowlist; pass --accept-hooks explicitly so
-        # configured hooks still register.
-        "--accept-hooks",
-    ]
-    # One `--skills X` pair per name: easier to read in `ps` and avoids quoting
-    # ambiguity if a skill name contains unusual chars.
-    for sk in task.skills or ():
-        if sk:
-            cmd.extend(["--skills", sk])
-    if task.model_override:
-        cmd.extend(["-m", task.model_override])
-        # Pin the provider too so the worker resolves the model against the
-        # intended backend (model X with provider Y is the classic board-stall).
-        if task.provider_override:
-            cmd.extend(["--provider", task.provider_override])
-    # Independent of the model override — a task can run the profile's own
-    # model at a different depth.
-    if task.reasoning_effort:
-        cmd.extend(["--reasoning", task.reasoning_effort])
-    worker_toolsets = _resolve_worker_cli_toolsets(qubit_home)
-    if worker_toolsets:
-        cmd.extend(["--toolsets", ",".join(worker_toolsets)])
-    cmd.extend(["chat", "-q", f"work kanban task {task.id}"])
-    # goal_mode rides the same `-q` path: cli.py runs the judge loop there too, so the
-    # worker log keeps its live tool feed (forcing -Q blanked it).
-    return cmd
+    """The profile owner executes; this subprocess only waits for its receipt."""
+    import sys
+    return [sys.executable, "-m", "qubit_cli.kanban_worker_client"]
 
 
 def _open_worker_log(task: Task, board: Optional[str]):
