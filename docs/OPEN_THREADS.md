@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 28 — 2026-10-22 (148 missing; 88 markers)
+
+- ✅ 4 lanes: 24 more markers fixed, 30 absent files ported into the audit-visible tree, stale bot-delivery test reconciled.
+- ✅ Measured: markers **112 → 88**; absent **178 → 148**; short-port **1** (B1); total **1**; production **1**; 0 production dead (33 test-side).
+- ✅ Crash follow-up: new report was a combined orb test run (known Qt teardown), removed; notifier masked; managed-worker fix remains.
+- 🔴 Remaining: 88 xfail markers; 148 absent test files; orb inactive pending WIP; no E2E/release verdict.
+
 ## Wave 27 — 2026-10-22 (crash fix; 112 markers)
 
 - ✅ 4 lanes: 14 gateway defect cases, 23 absent gateway files, profile/CI fixes; markers 126 → 112.
