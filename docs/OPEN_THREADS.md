@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 29 — 2026-10-22 (87 absent; 77 markers)
+
+- ✅ 4 lanes: 52 cases fixed, 29 absent files + 26 fixtures ported into the audit-visible tree.
+- ✅ Measured: markers **88 → 77**; absent **148 → 87**; short-port **1** (B1); total **1**; production **1**; 0 production dead (34 test-side).
+- ✅ Performance: stray orb at ~78% CPU for 2h41m killed; load ~16 → ~1.3. Possible manual orb killed by lane cleanup; orb unit inactive pending WIP.
+- 🔴 Remaining: 77 xfail markers; 87 absent test files; orb WIP; no E2E/release verdict.
+
 ## Wave 28 — 2026-10-22 (148 missing; 88 markers)
 
 - ✅ 4 lanes: 24 more markers fixed, 30 absent files ported into the audit-visible tree, stale bot-delivery test reconciled.
