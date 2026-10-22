@@ -84,7 +84,6 @@ async def reject_ws(origin, token):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a native-http grant for the root profile is refused 401 (profile not resolved to its served authority)")
 def test_native_http_grants_are_single_use_and_bound_to_daemon(tmp_path):
     with daemon(tmp_path) as (home, descriptor), httpx.Client(
             base_url=descriptor['api_origin'], trust_env=False) as client:
@@ -168,7 +167,6 @@ def test_native_http_grants_are_single_use_and_bound_to_daemon(tmp_path):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a native-http grant for the root profile is refused 401 (profile not resolved to its served authority)")
 async def test_native_http_preserves_gated_auth_and_actual_socket_boundary(tmp_path):
     import socket
     from gateway.config import GatewayConfig
@@ -248,7 +246,6 @@ async def test_native_http_preserves_gated_auth_and_actual_socket_boundary(tmp_p
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a native-http grant for the root profile is refused 401 (profile not resolved to its served authority)")
 def test_native_http_principal_satisfies_route_local_token_policy(tmp_path):
     """Routes that call ``_require_token`` honor the verified native owner (F16).
 

@@ -131,7 +131,6 @@ async def test_local_lineage_transitions_preserve_owner_or_roll_back(tmp_path, m
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: reset/compression lineage publications never land before the crash barrier times out")
 def test_real_local_lineage_survives_cold_daemon(tmp_path):
     from tests.gateway.fixtures.local_lineage_probe import probe
     print(json.dumps(probe(tmp_path)))

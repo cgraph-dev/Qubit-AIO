@@ -65,7 +65,6 @@ class Model(BaseHTTPRequestHandler):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a managed turn leaves its detachable delegation running (orphan) instead of running it inline")
 def test_managed_turn_runs_detachable_work_inline_and_leaves_no_orphan(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -88,8 +87,13 @@ def test_managed_turn_runs_detachable_work_inline_and_leaves_no_orphan(tmp_path)
     peer.job_id = json.loads(created.stdout.strip().splitlines()[-1])
 
     def rows(sql):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
-            return db.execute(sql).fetchall()
+        # A DELETE-journal daemon can hold the write lock past the reader's busy window while the
+        # inline cron turn runs; polling treats that transient as "no row yet", the wait still bounds.
+        try:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=1)) as db:
+                return db.execute(sql).fetchall()
+        except sqlite3.OperationalError:
+            return []
 
     async def exercise(desc):
         async with websocket(home, desc) as ws:

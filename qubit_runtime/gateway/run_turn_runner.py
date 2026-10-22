@@ -2039,9 +2039,12 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         ``turn._cli_result_fields``; the gateway's own result stays what the caller delivers
         (upstream :1119-1124).
         """
+        from gateway.session_policy import policy_for_source, policy_scope
         from gateway.session_api_turn import api_policy_scope
+        from gateway.session_authorities import active_authority
         from gateway.session_results import execution_result
-        with api_policy_scope():
+        with policy_scope(policy_for_source(self._runner, self._ctx.source),
+                          authority=active_authority(self._runner)), api_policy_scope():
             result = self._run_sync_scoped()
             captured = execution_result.get()
             if captured is not None:

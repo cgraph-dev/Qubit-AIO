@@ -37,7 +37,6 @@ def _seed(home, rows):
 
 
 @pytest.mark.platforms('linux')
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: native-http grants are refused 401, so per-profile sidebar PATCH cannot run")
 def test_per_profile_grants_edit_old_local_rows_of_their_own_profile(tmp_path):
     home, user = tmp_path / 'state', tmp_path / 'user'
     home.mkdir(mode=0o700)

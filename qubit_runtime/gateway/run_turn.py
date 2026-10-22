@@ -171,147 +171,10 @@ def hygiene_no_commit_reason(agent) -> str:
 class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin):
     """Agent-turn execution for GatewayRunner (see module docstring).
 
-    The hygiene phase lives in ``gateway/run_turn_hygiene.py`` (split out upstream); the
-    three methods defined below stay here because this fork's versions are newer than the
-    mixin's and win on the MRO.
+    The hygiene phase lives in ``gateway/run_turn_hygiene.py`` (split out upstream); methods
+    defined below stay here where this fork's versions are newer than the mixin's and win on
+    the MRO.
     """
-
-    def _resolve_session_agent_runtime(
-        self, *, source: Optional[SessionSource] = None, session_key: Optional[str] = None,
-        user_config: Optional[dict] = None,
-    ) -> tuple[str, dict]:
-        """Resolve model/runtime for a session.
-
-        Priority (highest first): session ``/model`` → ``channel_overrides`` → global config/env
-        (``_resolve_gateway_model(user_config)`` and default provider resolution)."""
-        from gateway.run import (
-            _credential_pool_for_provider, _get_channel_override, _resolve_gateway_model,
-            _resolve_runtime_agent_kwargs, _resolve_runtime_agent_kwargs_for_provider,
-        )
-        skey = self._resolve_session_key_or_none(source, session_key)
-        # Every exit path starts clean: the /model-override fast path returns before the pop below,
-        # and hygiene/inbound callers resolve without a turn runner consuming the stash — a stale
-        # notice must never attach to another session's next turn (#74349).
-        self._pre_agent_fallback_notice = None
-
-        model = _resolve_gateway_model(user_config)
-        if skey:
-            self._rehydrate_session_model_override(skey)
-        _override_state = self._peek_session_state(skey) if skey else None
-        override = _override_state.conversation.model_override if _override_state else None
-        if override:
-            override_model = override.get("model", model)
-            override_runtime = {
-                k: override.get(k) for k in (
-                    "provider", "requested_provider", "api_key", "base_url", "api_mode",
-                    "max_tokens", "credential_pool", "request_overrides", "capabilities",
-                )
-            }
-            override_runtime["capabilities"] = dict(override_runtime["capabilities"] or {})
-            if override_runtime.get("api_key"):
-                if override_runtime.get("credential_pool") is None:
-                    override_runtime["credential_pool"] = _credential_pool_for_provider(override.get("provider"))
-                logger.debug(
-                    "Session model override (fast): session=%s config_model=%s -> override_model=%s provider=%s",
-                    skey or "", model, override_model, override_runtime.get("provider"),
-                )
-                return override_model, override_runtime
-            # No api_key on the override (credentials failed to re-resolve at rehydrate): resolve them
-            # for the override's own provider below, never layer it over the default provider's runtime.
-            logger.debug(
-                "Session model override (no api_key, fallback): session=%s config_model=%s override_model=%s",
-                skey or "", model, override_model,
-            )
-        elif logger.isEnabledFor(logging.DEBUG):
-            # The override_keys scan walks every session; only pay for it when DEBUG is on.
-            logger.debug(
-                "No session model override: session=%s config_model=%s override_keys=%s",
-                skey or "", model,
-                [
-                    _key for _key, _st in list(self._sessions_map().items())
-                    if _st.conversation.model_override is not None
-                ][:5] or "[]",
-            )
-
-        runtime_kwargs, unavailable_override = None, None
-        if override and override.get("provider"):
-            try:
-                runtime_kwargs = _resolve_runtime_agent_kwargs_for_provider(
-                    override["provider"], target_model=override.get("model") or None)
-            except Exception as exc:
-                # Layering the override on the default runtime sent its model to the default provider's
-                # endpoint (openai-codex on the Qubit URL). Run this turn on the whole default route and say
-                # so; the persisted override is kept, so the next turn retries it.
-                logger.warning("Session /model override provider %s unavailable: %s", override["provider"], exc)
-                unavailable_override, override = override, None
-        if runtime_kwargs is None:
-            runtime_kwargs = _resolve_runtime_agent_kwargs()
-        # Private notice metadata must never reach an ``AIAgent(**runtime_kwargs)`` spread; the turn
-        # runner surfaces it through the agent's one-shot fallback notice (#74349).
-        self._pre_agent_fallback_notice = runtime_kwargs.pop("_fallback_notice", None)
-        runtime_model = runtime_kwargs.pop("model", None)
-        if runtime_model:
-            logger.info("Runtime provider supplied explicit model override: %s -> %s", model, runtime_model)
-            model = runtime_model
-        if unavailable_override and not self._pre_agent_fallback_notice:
-            from qubit_cli.fallback_config import pre_agent_fallback_notice
-            self._pre_agent_fallback_notice = pre_agent_fallback_notice(
-                unavailable_override["provider"], unavailable_override.get("model"), runtime_kwargs.get("provider"), model)
-
-        cfg = getattr(self, "config", None)  # getattr: bare object.__new__ test runners
-        if cfg and source is not None:
-            ch = _get_channel_override(
-                cfg, source.platform, str(source.chat_id) if source.chat_id else "",
-                thread_id=str(source.thread_id) if getattr(source, "thread_id", None) else None,
-                parent_id=str(source.parent_chat_id) if getattr(source, "parent_chat_id", None) else None,
-            )
-            if ch:
-                if ch.model:
-                    model = ch.model
-                if ch.provider:
-                    runtime_kwargs = _resolve_runtime_agent_kwargs_for_provider(ch.provider, target_model=model or None)
-                    ch_runtime_model = runtime_kwargs.pop("model", None)
-                    # Adopt the provider's bundled model only when the override named none.
-                    if ch_runtime_model and not ch.model:
-                        model = ch_runtime_model
-
-        if override and skey:
-            model, runtime_kwargs = self._apply_session_model_override(skey, model, runtime_kwargs)
-
-        # Provider resolved but no model.default (`qubit auth add` without `qubit model`): use the
-        # provider's first catalog model.
-        if not model and runtime_kwargs.get("provider"):
-            with suppress(Exception):
-                from qubit_cli.models import get_default_model_for_provider
-                model = get_default_model_for_provider(runtime_kwargs["provider"])
-                if model:
-                    logger.info(
-                        "No model configured — defaulting to %s for provider %s", model, runtime_kwargs["provider"],
-                    )
-
-        # Final safety net: an empty model (transient config-cache miss) makes every API call 400 and
-        # the session goes silent — reuse the last model resolved for this session, else process-wide.
-        if not model:
-            _lr_state = self._peek_session_state(skey) if skey else None
-            _lr_star = self._peek_session_state("*")
-            _recovered = (
-                (_lr_state.conversation.last_resolved_model if _lr_state else "")
-                or (_lr_star.conversation.last_resolved_model if _lr_star else "")
-            )
-            if _recovered:
-                logger.warning(
-                    "Empty model resolved for session=%s — recovering "
-                    "last-known-good model %s (config read likely returned "
-                    "empty; see #35314)", skey or "", _recovered,
-                )
-                model = _recovered
-        else:
-            # Cache the good resolution for future recovery turns.
-            if skey:
-                self._session_state(skey).conversation.last_resolved_model = model
-            self._session_state("*").conversation.last_resolved_model = model
-
-        return model, runtime_kwargs
 
     def _resolve_turn_agent_config(self, user_message: str, model: str, runtime_kwargs: dict) -> dict:
         """Effective model/runtime config for one turn. With `/fast` priority on, fast-mode
@@ -2299,9 +2162,14 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin):
         from agent.secret_scope import get_secret
         from gateway.display_config import resolve_display_setting, resolve_tool_progress
         from gateway.status_phrases import choose_status_phrase, resolve_status_phrase_catalog
-        user_config = _load_gateway_config()
-        platform_key = _platform_config_key(source.platform)
+        from gateway.session_policy import policy_for_source
+        policy = policy_for_source(self, source)
+        from gateway.session_authorities import active_authority
+        user_config = policy.config(active_authority(self), secrets=False) if policy else _load_gateway_config()
+        platform_key = policy.platform if policy else _platform_config_key(source.platform)
         enabled_toolsets, disabled_toolsets = self._resolve_turn_toolsets(user_config, source, platform_key)
+        if policy:
+            enabled_toolsets = list(policy.current_toolsets(user_config))
         adapter = self._delivery_adapter_for(source)
         # Tool preview length (0 = no limit) and friendly tool labels (default on), per-platform.
         for _setter, _setting, _default, _cast in (

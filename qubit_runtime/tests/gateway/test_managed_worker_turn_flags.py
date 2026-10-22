@@ -67,8 +67,12 @@ def _run(tmp_path, scenario):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def status(request_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
-            return db.execute('SELECT status FROM session_admissions WHERE request_id=?', (request_id,)).fetchall()
+        try:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=1)) as db:
+                return db.execute('SELECT status FROM session_admissions WHERE request_id=?',
+                                  (request_id,)).fetchall()
+        except sqlite3.OperationalError:
+            return []
 
     async def turn(ws, sid, request_id, **flags):
         """Submit one turn; returns 'prompted' if it parked an approval, else 'settled'."""
@@ -106,7 +110,6 @@ def _run(tmp_path, scenario):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a one-shot managed turn parks an approval (prompted) instead of settling")
 def test_one_shot_managed_turns_never_park_an_approval(tmp_path):
     async def scenario(ws, sid, turn, target):
         # `-z`: nobody can answer, so the classic one-shot contract auto-approves.

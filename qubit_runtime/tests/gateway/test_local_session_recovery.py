@@ -67,7 +67,6 @@ async def test_local_create_receipt_survives_cold_authority_atomically(tmp_path,
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a recovered local session.create reports a different source/model than the frozen admission")
 def test_real_daemon_recovers_only_authorized_never_started_local_work(tmp_path):
     from tests.gateway.fixtures.local_recovery_probe import probe
     print(json.dumps(probe(tmp_path)))
