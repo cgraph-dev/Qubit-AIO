@@ -34,7 +34,7 @@ def test_ordinary_daemon_api_ws_fifo_retry(tmp_path):
            'auxiliary': {'title_generation': {'enabled': False}}, 'terminal': {'cwd': str(home)}}
     (home / 'config.yaml').write_text(json.dumps(cfg))
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, API_SERVER_KEY='ordinary-daemon-owned-secret',
                API_SERVER_ENABLED='true', API_SERVER_PORT=str(api_port), PYTHONUNBUFFERED='1')
 

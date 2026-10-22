@@ -41,7 +41,7 @@ def test_ordinary_daemon_slash_skill_uses_durable_fifo(tmp_path):
         '---\nname: probe-skill\ndescription: Disposable slash fixture\n---\n'
         '# Probe\nSLASH_SKILL_BODY: follow this owned fixture instruction.\n')
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
                PYTHONPATH=str(root), PYTHONUNBUFFERED='1',
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url,
                HERMES_DASHBOARD_SESSION_TOKEN='owned-slash-negative')
@@ -171,4 +171,3 @@ async def test_command_authority_precedes_resolution_and_mutation(tmp_path, monk
         await connection.close()
 
 
-pytestmark = pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")

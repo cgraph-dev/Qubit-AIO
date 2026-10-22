@@ -73,7 +73,6 @@ async def test_upload_is_authorized_private_staging_not_legacy_execution(tmp_pat
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_authenticated_daemon_upload_retains_exact_admitted_bytes")
 def test_authenticated_daemon_upload_retains_exact_admitted_bytes(tmp_path):
     import asyncio
     from contextlib import closing
@@ -92,7 +91,7 @@ def test_authenticated_daemon_upload_retains_exact_admitted_bytes(tmp_path):
               'auxiliary': {'title_generation': {'enabled': False}}, 'platform_toolsets': {'cli': []}}
     (home / 'config.yaml').write_text(json.dumps(config))
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', PYTHONUNBUFFERED='1')
 
     async def exercise(desc):

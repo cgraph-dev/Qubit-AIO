@@ -78,7 +78,6 @@ async def test_a2a_forward_creation_commits_off_the_owner_loop(tmp_path, monkeyp
         authority.db.close()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 def test_hosted_member_creation_commits_off_the_owner_loop(hosted_owner):
     from gateway.session_hosted_rpc import HostedRoomAuthorityRPC
 

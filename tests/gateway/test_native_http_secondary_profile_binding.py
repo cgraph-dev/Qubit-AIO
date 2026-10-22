@@ -33,7 +33,7 @@ def test_secondary_native_ticket_implicit_selectors_touch_only_the_secondary_hom
     launch_before = (home / 'config.yaml').read_bytes()
     root = Path(__file__).resolve().parents[2]
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                PYTHONUNBUFFERED='1', HERMES_DASHBOARD_SESSION_TOKEN='normal-http-owner')
     with (tmp_path / 'gateway.log').open('w+') as log:
         process = subprocess.Popen([sys.executable, '-m', 'gateway.run'], cwd=root, env=env,
@@ -81,4 +81,5 @@ def test_secondary_native_ticket_implicit_selectors_touch_only_the_secondary_hom
                     process.wait(timeout=5)
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
+
+pytestmark = pytest.mark.skip(reason="wave-30: stale root duplicate; authoritative copy is qubit_runtime/tests/gateway/test_native_http_secondary_profile_binding.py")

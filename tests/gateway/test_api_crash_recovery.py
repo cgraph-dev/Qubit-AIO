@@ -32,7 +32,7 @@ def test_api_crash_queue_and_identified_result_retry(tmp_path):
            'auxiliary': {'title_generation': {'enabled': False}}, 'terminal': {'cwd': str(home)}}
     (home / 'config.yaml').write_text(json.dumps(cfg))
     env = {**child_env(), **{k: os.environ[k] for k in ('TIRITH_ENABLED',) if k in os.environ}}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, API_SERVER_KEY='ordinary-daemon-owned-secret',
                API_SERVER_ENABLED='true', API_SERVER_PORT=str(port), PYTHONUNBUFFERED='1')
     url = f'http://127.0.0.1:{port}/v1'

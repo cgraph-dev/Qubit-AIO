@@ -171,4 +171,3 @@ async def test_duplicate_request_finalizes_settled_webhook_without_reexecution()
         assert len(authority.db._read_all("SELECT * FROM session_admissions")) == 1
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

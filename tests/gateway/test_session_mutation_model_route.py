@@ -50,7 +50,7 @@ def home(monkeypatch):
     home = get_hermes_home()
     home.mkdir(parents=True, exist_ok=True)
     # gateway.run binds its home at first import; the loader itself is real.
-    monkeypatch.setattr(run, '_hermes_home', home)
+    monkeypatch.setattr(run, '_qubit_home', home)
     catalog = {'custom': {'id': 'custom', 'models': {
         name: {'id': name, 'name': name, 'tool_call': True, 'cost': {'input': 0, 'output': 0},
                'limit': {'context': 100000, 'output': 4000}} for name in MODELS}}}
@@ -361,4 +361,3 @@ async def test_a_named_entry_that_moves_never_sends_its_old_launch_key_to_the_ne
         store.close_all_db_handles()
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

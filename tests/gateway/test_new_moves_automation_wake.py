@@ -67,4 +67,3 @@ async def test_new_moves_a_queued_wake_to_the_fresh_session(monkeypatch):
     assert [sid for text, sid in executed if text == 'WAKE'] == [new], 'the wake must run once, on the fresh session'
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

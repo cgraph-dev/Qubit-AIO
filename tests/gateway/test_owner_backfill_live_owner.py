@@ -31,7 +31,7 @@ def test_owner_backfill_runs_on_the_live_owner(tmp_path):
     (work / 'config.yaml').write_text(json.dumps(model))
     root = Path(__file__).resolve().parents[2]
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                PYTHONUNBUFFERED='1')
     with (tmp_path / 'gateway.log').open('w+') as log:
         process = subprocess.Popen([sys.executable, '-m', 'gateway.run'], cwd=root, env=env,
@@ -72,4 +72,5 @@ def test_owner_backfill_runs_on_the_live_owner(tmp_path):
                     process.wait(timeout=5)
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
+
+pytestmark = pytest.mark.skip(reason="wave-30: stale root duplicate; authoritative copy is qubit_runtime/tests/gateway/test_owner_backfill_live_owner.py")

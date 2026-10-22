@@ -16,7 +16,6 @@ import pytest
 from tests.gateway.fixtures.local_recovery_probe import daemon, Model
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a hosted inference grant does not survive an owner restart within the pinned deadline")
 def test_hosted_grant_inference_survives_owner_restart(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'

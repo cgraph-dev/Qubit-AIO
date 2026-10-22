@@ -13,9 +13,8 @@ import sys
 import time
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_authenticated_relay_uses_canonical_admission")
 def test_authenticated_relay_uses_canonical_admission(tmp_path):
-    env = dict(os.environ, HOME=str(tmp_path), HERMES_HOME=str(tmp_path), PYTHONUNBUFFERED='1')
+    env = dict(os.environ, HOME=str(tmp_path), HERMES_HOME=str(tmp_path), QUBIT_HOME=str(tmp_path), PYTHONUNBUFFERED='1')
     result = subprocess.run([sys.executable, __file__, 'peer'], env=env,
                             capture_output=True, text=True, timeout=100, check=False)
     assert result.returncode == 0, result.stdout + result.stderr

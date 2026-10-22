@@ -55,7 +55,6 @@ def test_claim_freezes_task_policy_and_rejects_forgery(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('mode', ['complete', 'timeout', 'rate_limit', 'billing', 'crash'])
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_real_dispatcher_lifecycle")
 def test_real_dispatcher_lifecycle(tmp_path, mode):
     import os
     import subprocess
@@ -63,7 +62,7 @@ def test_real_dispatcher_lifecycle(tmp_path, mode):
     repo = Path(__file__).resolve().parents[2]
     from tests.gateway.fixtures.local_recovery_probe import child_env
     env = child_env()
-    env.update(HOME=str(tmp_path / 'home'), USERPROFILE=str(tmp_path / 'home'), HERMES_HOME=str(tmp_path / 'state'), PYTHONPATH=str(repo), KANBAN_PROBE_MODE=mode)
+    env.update(HOME=str(tmp_path / 'home'), USERPROFILE=str(tmp_path / 'home'), HERMES_HOME=str(tmp_path / 'state'), QUBIT_HOME=str(tmp_path / 'state'), PYTHONPATH=str(repo), KANBAN_PROBE_MODE=mode)
     result = subprocess.run([sys.executable, str(Path(__file__).parent / 'fixtures' / 'kanban_owner_probe.py')],
         env=env, cwd=repo, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=150, check=False)
     assert result.returncode == 0, result.stdout + result.stderr

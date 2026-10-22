@@ -67,7 +67,6 @@ def _authority(tmp_path, agent):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('honours_stop', [True, False])
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 async def test_unserve_stops_and_joins_the_running_turn_before_release(tmp_path, monkeypatch, honours_stop):
     from gateway import session_finite
     agent = _Agent(honours_stop=honours_stop)

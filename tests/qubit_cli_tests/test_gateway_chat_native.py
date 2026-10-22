@@ -33,7 +33,7 @@ def test_native_classic_fresh_resume_and_oneshot(tmp_path, model_peer, request):
     cwd = tmp_path / "caller"
     cwd.mkdir()
     root = Path(__file__).resolve().parents[2]
-    gateway_root = Path(request.config.getoption("--client-test-runtime-root", default=None) or root).resolve()
+    gateway_root = Path(request.config.getoption("--client-test-runtime-root", default=None) or (root / "qubit_runtime" if (root / "qubit_runtime/gateway").is_dir() else root)).resolve()
     model_url = f"http://127.0.0.1:{model_peer.server_port}/v1"
     (home / "config.yaml").write_text(json.dumps({
         "gateway": {"multiplex_profiles": False},
@@ -45,8 +45,8 @@ def test_native_classic_fresh_resume_and_oneshot(tmp_path, model_peer, request):
         "telemetry": {"shared_metrics": {"enabled": False, "send": False, "offer_version": OFFER_VERSION}},
     }))
     env = {k: os.environ[k] for k in ("PATH", "LANG", "TZ") if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
-               PYTHONPATH=str(root), PYTHONUNBUFFERED="1",
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
+               PYTHONPATH=os.pathsep.join([str(root / "qubit_runtime"), str(root)]), PYTHONUNBUFFERED="1",
                OPENAI_API_KEY="loopback-only", OPENAI_BASE_URL=model_url)
     # Instrument constructor calls without replacing runtime predicates or behavior.
     wrapper = tmp_path / "client.py"
@@ -126,7 +126,7 @@ finally:
                 tmux("send-keys", "-t", "chat", "Enter")
 
             launch("--cli", "chat")
-            first = until("Welcome to Hermes Agent")
+            first = until("Welcome to Qubit Agent")
             until("❯ ")  # the banner prints before the prompt accepts input
             type_line("WS_SHARED")
             fresh = until("LOCAL_ACK_WS_SHARED")

@@ -8,7 +8,6 @@ import sys
 
 from tests.gateway.fixtures.local_recovery_probe import child_env
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-29 parity defect: process-scope peer RPC lacks result")
 
 
 
@@ -22,7 +21,7 @@ def test_stop_is_session_scoped_and_global_verbs_keep_the_owner_refusal(tmp_path
     home.mkdir()
     user.mkdir()
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
                PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
     result = subprocess.run([sys.executable, str(root / 'tests/gateway/fixtures/process_scope_peer.py')],
                             cwd=root, env=env, capture_output=True, text=True, timeout=90, check=False)

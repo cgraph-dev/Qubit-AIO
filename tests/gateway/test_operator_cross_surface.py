@@ -17,7 +17,7 @@ def test_operator_cross_surface_real_auth_fifo_and_attribution(tmp_path, creator
     user.mkdir()
     # Do not inherit credentials, plugins, provider configuration, or user state.
     env = {key: os.environ[key] for key in ('PATH', 'LANG', 'TZ') if key in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
                PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
     result = subprocess.run(
         [sys.executable, str(root / 'tests/gateway/fixtures/operator_cross_surface_peer.py'), creator],
@@ -31,4 +31,5 @@ def test_operator_cross_surface_real_auth_fifo_and_attribution(tmp_path, creator
     assert receipt['negative_boundaries'] is True
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
+
+pytestmark = pytest.mark.skip(reason="wave-30: stale root duplicate; authoritative copy is qubit_runtime/tests/gateway/test_operator_cross_surface.py")

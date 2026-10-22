@@ -9,7 +9,6 @@ import sys
 from tests.gateway.fixtures.local_recovery_probe import child_env
 
 
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: desktop subagent control routing")
 def test_desktop_subagent_steer_and_stop_reach_only_this_sessions_children(tmp_path):
     """Before: the owner answered -32601 and the legacy fallback ran the sidecar handler, which
     never holds an authority session, so Steer/Stop always read as rejected."""
@@ -18,7 +17,7 @@ def test_desktop_subagent_steer_and_stop_reach_only_this_sessions_children(tmp_p
     home.mkdir()
     user.mkdir()
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
                PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
     result = subprocess.run([sys.executable, str(root / 'tests/gateway/fixtures/subagent_controls_peer.py')],
                             cwd=root, env=env, capture_output=True, text=True, timeout=90, check=False)
