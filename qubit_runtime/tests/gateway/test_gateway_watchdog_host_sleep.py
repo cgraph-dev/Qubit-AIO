@@ -69,7 +69,6 @@ def _resume_then_idle_steps():
     return [lambda c: c.awake(1.0), lambda c: c.sleep(SLEEP_S), lambda c: c.awake(TIMEOUT_S)]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: watchdog host-sleep credit")
 def test_turn_watchdog_thread_ignores_host_sleep(clock, monkeypatch):
     agent = _ScriptedAgent(clock, _resume_then_idle_steps())
     fired_at_read = []
@@ -85,7 +84,6 @@ def test_turn_watchdog_thread_ignores_host_sleep(clock, monkeypatch):
     assert fired_at_read == [3]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: watchdog host-sleep credit")
 @pytest.mark.asyncio
 async def test_turn_poll_loop_ignores_host_sleep(clock, monkeypatch):
     turn_ctx = TurnContext()
@@ -125,8 +123,6 @@ async def test_turn_poll_loop_ignores_host_sleep(clock, monkeypatch):
     assert agent.reads == 2
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_stale_agent_eviction_ignores_host_sleep")
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: watchdog host-sleep credit")
 def test_stale_agent_eviction_ignores_host_sleep(clock, monkeypatch):
     monkeypatch.setenv("HERMES_AGENT_TIMEOUT", str(TIMEOUT_S))
     turn = TurnState(ctx=TurnContext(), started_ts=clock.wall)
@@ -144,8 +140,6 @@ def test_stale_agent_eviction_ignores_host_sleep(clock, monkeypatch):
     assert evicted_at_read == [2]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_stale_agent_eviction_drops_sleep_credit_once_the_agent_was_active_again")
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: watchdog host-sleep credit")
 def test_stale_agent_eviction_drops_sleep_credit_once_the_agent_was_active_again(clock, monkeypatch):
     """Eviction samples the meter only when a message arrives. Sleep before the agent's
     post-resume activity must not keep discounting the idle time that followed that activity."""

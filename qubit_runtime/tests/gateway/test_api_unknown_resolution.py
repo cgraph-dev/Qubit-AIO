@@ -51,7 +51,7 @@ def _adapter(runner, db):
 
 
 async def _restarted_api_runs(tmp_path, monkeypatch, *, idempotent=True):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     store = SessionStore(tmp_path / "sessions", GatewayConfig())
     db = SessionDB(tmp_path / "state.db")
     executed = []
@@ -143,7 +143,6 @@ async def _close_fixture(client, adapters, store, tasks):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_http_resolve_unknown_releases_follower_once_without_replaying_head")
 async def test_http_resolve_unknown_releases_follower_once_without_replaying_head(
     tmp_path, monkeypatch
 ):
@@ -195,7 +194,6 @@ async def test_http_resolve_unknown_releases_follower_once_without_replaying_hea
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_http_resolve_unknown_refuses_stale_or_foreign_admission")
 async def test_http_resolve_unknown_refuses_stale_or_foreign_admission(
     tmp_path, monkeypatch
 ):
@@ -254,7 +252,6 @@ async def test_http_resolve_unknown_refuses_stale_or_foreign_admission(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_fresh_adapter_recovers_non_idempotent_owner_but_refuses_other_credential")
 async def test_fresh_adapter_recovers_non_idempotent_owner_but_refuses_other_credential(
     tmp_path, monkeypatch
 ):
@@ -280,7 +277,6 @@ async def test_fresh_adapter_recovers_non_idempotent_owner_but_refuses_other_cre
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_http_poll_reports_unknown_head_as_non_terminal_until_resolved")
 async def test_http_poll_reports_unknown_head_as_non_terminal_until_resolved(
     tmp_path, monkeypatch
 ):

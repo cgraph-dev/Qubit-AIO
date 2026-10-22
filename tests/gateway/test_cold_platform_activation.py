@@ -58,8 +58,7 @@ def test_unconfigured_profile_imports_no_platform_adapter(tmp_path):
 
 @pytest.mark.parametrize("case", [
     "env", "dotenv", "manifest_env",
-    pytest.param("yaml_sibling", marks=pytest.mark.xfail(
-        strict=True, reason="wave-20 parity defect: a yaml-configured sibling platform materializes every deferred bundled adapter instead of only the configured one")),
+    "yaml_sibling",
 ])
 def test_configured_platform_still_enabled_and_only_it_is_imported(tmp_path, case):
     kwargs, want, module = {

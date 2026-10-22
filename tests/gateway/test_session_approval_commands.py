@@ -104,6 +104,3 @@ def test_typed_approve_and_deny_resolve_the_waiter_approval_respond_answers(tmp_
     tools = [m for req in peer.requests for m in req.get('messages', []) if m['role'] == 'tool']
     assert any('not this one' in str(m['content']) for m in tools), tools
     assert os.path.exists(home / 'config.yaml')
-
-
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

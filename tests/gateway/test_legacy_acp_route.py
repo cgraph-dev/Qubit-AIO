@@ -52,7 +52,6 @@ async def test_adopted_acp_thread_keeps_its_saved_route_and_workspace(tmp_path, 
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: legacy_launch_params returns early for non-ACP rows, so a pre-authority TUI session inherits the profile route instead of its saved model_config")
 async def test_adopted_legacy_tui_session_keeps_saved_route_and_runtime_settings(tmp_path, monkeypatch):
     """Regression for #138912: pre-authority TUI rows must not inherit a new profile route."""
     from gateway import run
