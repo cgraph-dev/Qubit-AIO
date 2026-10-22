@@ -1511,7 +1511,8 @@ def _revive_gateway_after_import(qubit_root: Path) -> None:
               "To start a gateway for this home, run:  qubit gateway run")
         return
     try:
-        from qubit_cli.gateway import ensure_gateway_service, _is_service_running
+        from qubit_cli.gateway import _is_service_running
+        from qubit_cli.gateway_setup_service import ensure_gateway_service
         if not _is_service_running():
             print()
             ensure_gateway_service(context="import")

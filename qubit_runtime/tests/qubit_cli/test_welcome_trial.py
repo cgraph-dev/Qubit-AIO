@@ -172,7 +172,7 @@ LOSSES = {
 }
 
 
-@pytest.mark.parametrize("loss", [pytest.param(l, marks=pytest.mark.xfail(strict=True, reason="wave-28 parity defect: a connector-replaced lost trial still resolves an inference provider")) if l == "replaced_by_connector" else l for l in LOSSES])
+@pytest.mark.parametrize("loss", list(LOSSES))
 def test_a_lost_trial_is_never_claimed_again_after_a_relaunch(portal, monkeypatch, loss):
     from qubit_cli import free_tier_bootstrap
     from qubit_cli.auth import resolve_provider

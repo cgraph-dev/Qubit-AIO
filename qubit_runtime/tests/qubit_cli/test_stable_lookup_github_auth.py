@@ -1,106 +1,63 @@
-"""The stable lookup spends the user's GitHub credential, not the shared anonymous budget."""
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import json
-import threading
-import urllib.request
+"""The stable lookup is this fork's R2 ``ChannelRecord``, never a GitHub release query.
+
+Upstream resolves ``stable`` from the repository's latest published GitHub release and spends the
+user's GitHub credential there. This fork's release source is the R2 channel protocol, so the
+record is authoritative: the lookup makes no GitHub request, asks for no token, and reports a
+missing record versus a transport failure the way the R2 reader does.
+"""
+from types import SimpleNamespace
+import urllib.error
 
 import pytest
 
 pytestmark = pytest.mark.real_release_channels
 
-from qubit_cli import github_api, source_releases
+from qubit_cli import source_releases
+from qubit_cli.release_channels import ChannelNotFound
 
 SHA = "818c13be1dc4fd28987e1e881a9408224afd4535"
 
 
-@pytest.fixture
-def github(monkeypatch):
-    """A local api.github.com: answers releases/latest + commits/<tag>, or 403s the quota."""
-    seen: list[tuple[str, str | None]] = []
-    state = {"limited": False, "reject_token": False}
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            auth = self.headers.get("Authorization")
-            seen.append((self.path, auth))
-            if state["reject_token"] and auth:
-                body = b'{"message":"Bad credentials"}'
-                self.send_response(401)
-            elif state["limited"]:
-                body = b'{"message":"API rate limit exceeded"}'
-                self.send_response(403)
-                self.send_header("x-ratelimit-remaining", "0")
-                self.send_header("x-ratelimit-reset", "9999999999")
-            elif self.path.endswith("/releases/latest"):
-                body = json.dumps({"tag_name": "v0.21.6", "draft": False, "prerelease": False}).encode()
-                self.send_response(200)
-            elif self.path.endswith("/commits/v0.21.6"):
-                body = json.dumps({"sha": SHA}).encode()
-                self.send_response(200)
-            else:
-                body = b"{}"
-                self.send_response(404)
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, *args):
-            pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    real = urllib.request.urlopen
-
-    def local(request, *args, **kwargs):
-        url = request.full_url if isinstance(request, urllib.request.Request) else request
-        assert url.startswith("https://api.github.com/"), url  # the token must never leave GitHub
-        rerouted = urllib.request.Request(
-            url.replace("https://api.github.com", f"http://127.0.0.1:{server.server_port}"),
-            headers=dict(request.header_items()) if isinstance(request, urllib.request.Request) else {})
-        return real(rerouted, *args, **kwargs)
-
-    monkeypatch.setattr(urllib.request, "urlopen", local)
-    monkeypatch.setattr(github_api, "_gh_cli_token", lambda: None)
-    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    yield seen, state
-    server.shutdown()
-    server.server_close()
-    thread.join()
+def _record(name="stable", *, policy="pinned", commit=SHA, version="0.21.6",
+            state="active", manifest=True):
+    record = {"name": name, "repository": "NousResearch/hermes-agent", "state": state,
+              "policy": policy}
+    if policy == "source-branch":
+        record["delivery"] = {"kind": "source-branch", "branch": name}
+    resolved = SimpleNamespace(requested=record, terminal=record, manifest=None)
+    if manifest:
+        resolved.manifest = {"request": {"commit": commit, "sourceVersion": version,
+                                        "buildId": "build-1"}}
+    return resolved
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: source_releases stable lookup does not spend the configured GitHub credential")
-def test_stable_lookup_sends_the_configured_token(github, monkeypatch):
-    seen, _ = github
+def test_stable_lookup_reads_the_r2_record_without_a_github_request(monkeypatch):
     monkeypatch.setenv("GH_TOKEN", "ghp_user")
+    monkeypatch.setattr(source_releases, "_resolve_channel", lambda name, repository: _record(name))
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *a, **k: pytest.fail("the stable lookup must not query GitHub"))
+
     target = source_releases._resolve_stable("NousResearch/hermes-agent")
+
     assert (target.commit, target.version) == (SHA, "0.21.6")
-    assert seen and all(auth == "Bearer ghp_user" for _, auth in seen)
 
 
-@pytest.mark.parametrize("token", [None, "ghp_user"])
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: source_releases stable lookup does not spend the configured GitHub credential")
-def test_a_rate_limit_is_reported_as_one_not_as_a_missing_release(github, monkeypatch, token):
-    _, state = github
-    state["limited"] = True
-    if token:
-        monkeypatch.setenv("GH_TOKEN", token)
-    else:
-        monkeypatch.delenv("GH_TOKEN", raising=False)
+def test_a_missing_stable_record_is_a_missing_channel_not_a_github_failure(monkeypatch):
+    def missing(name, repository):
+        raise ChannelNotFound("Channel object not found")
+    monkeypatch.setattr(source_releases, "_resolve_channel", missing)
+
+    with pytest.raises(ChannelNotFound):
+        source_releases._resolve_stable("NousResearch/hermes-agent")
+
+
+def test_an_r2_transport_failure_is_reported_as_one_not_as_a_missing_release(monkeypatch):
+    def broken(name, repository):
+        raise urllib.error.URLError("rate limit exceeded")
+    monkeypatch.setattr(source_releases, "_resolve_channel", broken)
+
     with pytest.raises(ValueError) as caught:
         source_releases._resolve_stable("NousResearch/hermes-agent")
     message = str(caught.value)
     assert "rate limit" in message and "No published stable release" not in message
-    assert ("GITHUB_TOKEN in the environment" in message) is (token is None)
-
-
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: source_releases stable lookup does not spend the configured GitHub credential")
-def test_a_rejected_token_then_anonymous_limit_names_the_anonymous_quota(github, monkeypatch):
-    seen, state = github
-    state["limited"] = state["reject_token"] = True
-    monkeypatch.setenv("GH_TOKEN", "ghp_revoked")
-    with pytest.raises(ValueError) as caught:
-        source_releases._resolve_stable("NousResearch/hermes-agent")
-    # The 403 came from the anonymous retry, so the user's token quota is not the one to wait on.
-    assert [auth for _, auth in seen] == ["Bearer ghp_revoked", None]
-    assert "anonymous requests are limited" in str(caught.value)
-    assert "for your GITHUB_TOKEN" not in str(caught.value)
