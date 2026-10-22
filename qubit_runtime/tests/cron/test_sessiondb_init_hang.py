@@ -23,9 +23,46 @@ suite stays free of timing flakes under parallel load.
 import concurrent.futures
 import threading
 import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from cron import scheduler
 from cron.scheduler import run_job
+from gateway import session_cron
+@pytest.fixture
+def owner_run(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    db = MagicMock(db_path=tmp_path / "state.db")
+    db.get_compression_tip.return_value = None
+    owner = SimpleNamespace(db=db)
+    job = {"id": "owner-db", "name": "test", "prompt": "hello"}
+    execution_id = "owner-fire"
+    token = session_cron._execution.set((owner, "owner-session", job["id"], execution_id))
+    monkeypatch.setattr(scheduler, "_qubit_home", tmp_path)
+    monkeypatch.setattr(scheduler, "_reload_dotenv_and_publish_delivery_target", lambda *_: None)
+    monkeypatch.setattr(scheduler, "_resolve_cron_agent_setup", lambda *_: scheduler._CronAgentSetup(
+        model="test", runtime={"provider": "test"}))
+    with patch("run_agent.AIAgent") as agent_cls:
+        agent_cls.return_value.run_conversation.return_value = {"final_response": "ok"}
+        try:
+            yield owner, job, execution_id, agent_cls
+        finally:
+            session_cron._execution.reset(token)
+@pytest.mark.parametrize("failure", ["wrong-store", "acquire-error"])
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local run_job does not reject a foreign/unacquirable owner store")
+def test_owner_store_failure_never_runs_unpersisted_agent(owner_run, failure):
+    owner, job, execution_id, agent_cls = owner_run
+    wrong_db = MagicMock()
+    with patch("qubit_state_registry.acquire", return_value=wrong_db,
+               side_effect=OSError("store unavailable") if failure == "acquire-error" else None):
+        success, _, response, error = scheduler.run_job(job, execution_id=execution_id)
+    assert not success and response == ""
+    assert error and ("canonical owner store" if failure == "wrong-store" else "store unavailable") in error
+    agent_cls.assert_not_called()
+    owner.db.close.assert_not_called()
+    assert wrong_db.close.call_count == (1 if failure == "wrong-store" else 0)
 
 # Hold the real class: patching cron.scheduler.concurrent.futures.ThreadPoolExecutor
 # also replaces concurrent.futures.ThreadPoolExecutor (same module object).

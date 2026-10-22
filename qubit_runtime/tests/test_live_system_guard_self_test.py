@@ -24,6 +24,75 @@ import sys
 import types
 
 import pytest
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        ["systemctl", "--user", "restart", "hermes-dashboard.service"],
+        ["systemctl", "--user", "restart", "hermes-dashboard-work.service"],
+        ["systemctl", "--user", "stop", "hermes-serve"],
+        ["/usr/bin/systemctl", "--user", "--no-ask-password", "restart", "hermes-serve-work.service"],
+        ["bash", "-c", "systemctl --user restart hermes-dashboard.service"],
+        "systemctl --user restart hermes-dashboard-work.service",
+        'bash -c "systemctl --user restart hermes-serve.service"',
+    ],
+)
+@pytest.mark.xfail(reason="wave-23 short-port: local live-system guard verb/unit coverage diverges from the pin")
+def test_subprocess_run_systemctl_mutating_any_hermes_unit_blocked(cmd):
+    """Not just the gateway: a test that forgot to stub the runner restarted the developer's
+    real hermes-dashboard / hermes-serve units, which the gateway-only tokens let through."""
+    with pytest.raises(RuntimeError, match="live-system guard"):
+        subprocess.run(cmd, shell=isinstance(cmd, str), check=False)
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        ["systemctl", "--user", "show", "hermes-dashboard.service", "--property=MainPID"],
+        ["systemctl", "--user", "status", "hermes-dashboard"],
+        ["systemctl", "--user", "is-active", "hermes-serve.service"],
+        ["systemctl", "--user", "restart", "nginx.service"],
+        ["systemctl", "--user", "restart", "myhermes-dashboard.service"],
+    ],
+)
+@pytest.mark.xfail(reason="wave-23 short-port: local live-system guard verb/unit coverage diverges from the pin")
+def test_subprocess_run_systemctl_read_only_or_foreign_unit_passes_guard(cmd):
+    """Read-only verbs on Hermes units and mutating verbs on other units reach the real
+    ``subprocess.run``; an empty PATH turns that into FileNotFoundError, never a real systemctl."""
+    with pytest.raises(FileNotFoundError):
+        subprocess.run(cmd, env={"PATH": "/nonexistent"}, check=False)
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        ["bash", "-c", r"systemctl st\op hermes.service"],
+        ["bash", "-c", r"systemctl --user rest\art hermes-dashboard"],
+        r"systemctl --user re\start hermes-serve.service",
+        ["bash", "-c", "sh -c 'systemctl --user restart hermes-dashboard'"],
+    ],
+)
+@pytest.mark.xfail(reason="wave-23 short-port: local live-system guard verb/unit coverage diverges from the pin")
+def test_subprocess_run_shell_escaped_or_nested_verb_blocked(cmd):
+    """The shell runs ``rest\\art`` as ``restart``; the guard must read it the same way."""
+    with pytest.raises(RuntimeError, match="live-system guard"):
+        subprocess.run(cmd, shell=isinstance(cmd, str), check=False)
+@pytest.mark.xfail(reason="wave-23 short-port: local live-system guard verb/unit coverage diverges from the pin")
+def test_a_test_owned_unit_can_be_cleaned_up_but_no_other(request):
+    """A unit the test created under its own name may be stopped; every other Hermes unit stays refused."""
+    owned = "hermes-worker-kanban-t_selftest-run-1.scope"
+    request.node.live_system_guard_owned_units = {owned}
+    with pytest.raises(FileNotFoundError):
+        subprocess.run(["systemctl", "--user", "stop", owned], env={"PATH": "/nonexistent"}, check=False)
+    with pytest.raises(RuntimeError, match="live-system guard"):
+        subprocess.run(["systemctl", "--user", "stop", owned, "hermes-dashboard.service"], check=False)
+    with pytest.raises(RuntimeError, match="live-system guard"):
+        subprocess.run(["systemctl", "--user", "stop", "hermes-worker-kanban-other-run-1.scope"], check=False)
+@pytest.mark.xfail(reason="wave-23 short-port: local live-system guard verb/unit coverage diverges from the pin")
+def test_host_gateway_start_blocked_but_container_exec_allowed():
+    """A host-side ``hermes gateway start`` spawns a real runtime; the same words addressed to
+    a container via ``docker exec`` stay inside it and are the Docker harness's business."""
+    with pytest.raises(RuntimeError, match="REAL hermes gateway runtime"):
+        subprocess.run(["hermes", "-p", "p", "gateway", "start"], check=False)
+    argv = ["docker", "exec", "-u", "hermes", "hermes-test-x", "sh", "-c", "hermes -p p gateway start"]
+    # Past the guard the call reaches the real subprocess.run; a missing binary is fine here.
+    with pytest.raises(FileNotFoundError):
+        subprocess.run(argv, env={"PATH": "/nonexistent"}, check=False)
 
 # A guaranteed-foreign PID: PID 1 (init).  Owned by root, not us, and
 # always exists. A sane guard refuses to signal it.
