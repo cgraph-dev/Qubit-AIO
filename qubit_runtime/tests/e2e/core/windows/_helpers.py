@@ -343,3 +343,5 @@ class KnownBugSymptom(Exception):
 def expect(ok: bool, message: str) -> None:
     if not ok:
         raise KnownBugSymptom(message)
+
+MADE_HOMES: list[tuple[WinHome, float]] = []

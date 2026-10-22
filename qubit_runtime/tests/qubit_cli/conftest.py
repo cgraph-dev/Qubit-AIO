@@ -154,3 +154,24 @@ def probe_root(tmp_path):
     """
     (tmp_path / "qubit_bootstrap.py").write_text("", encoding="utf-8")
     return tmp_path
+
+@pytest.fixture(autouse=True)
+def _private_repo_checkout_lock(monkeypatch, tmp_path_factory):
+    """``cmd_update`` locks the checkout it runs from: in tests, this repository, whose git
+    common dir every parallel test process (and, from a linked worktree, the live install's
+    ``qubit update``) shares. Give each test its own lock file for THIS repo; lock tests on
+    fixture checkouts are unaffected."""
+    from pathlib import Path
+
+    from qubit_cli import update_lock
+
+    repo = Path(update_lock.__file__).resolve().parents[1]
+    real = update_lock.checkout_lock_path
+    private = tmp_path_factory.mktemp("checkout-lock") / "qubit-update.lock"
+
+    def checkout_lock_path(install_root=None):
+        root = Path(install_root) if install_root else repo
+        return private if root.resolve() == repo else real(install_root)
+
+    monkeypatch.setattr(update_lock, "checkout_lock_path", checkout_lock_path)
+

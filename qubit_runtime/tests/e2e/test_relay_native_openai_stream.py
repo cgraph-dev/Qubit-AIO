@@ -157,3 +157,11 @@ def test_openai_stream_final_tool_call_delta_reaches_relay_parent_event(tmp_path
     (relay_call,) = llm_end.annotated_response.tool_calls
     assert (relay_call["name"], relay_call["arguments"]) == ("read_file", {"path": "/tmp/x"})
     assert llm_end.annotated_response.finish_reason == "tool_use"
+
+def _running_on(loop) -> bool:
+    import asyncio
+
+    try:
+        return asyncio.get_running_loop() is loop
+    except RuntimeError:
+        return False

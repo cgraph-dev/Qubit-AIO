@@ -287,3 +287,22 @@ def test_downloadable_native_builds_refuse_to_ship_unsigned(tmp_path: Path):
         assert run(**{name: "x" for name in names}).returncode == 0
         partial = run(**{name: "x" for name in names if name != "AZURE_CLIENT_ID"})
         assert partial.returncode != 0 and "AZURE_CLIENT_ID" in partial.stdout
+
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: stable admission requires the default-branch controller workflow")
+def test_claim_on_a_release_branch_is_admitted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    origin, clone = _seed_repo(tmp_path)
+    # A hotfix lands on origin's release/0.1.2 only; main never sees it.
+    _git("checkout", "-b", "release/0.1.2", cwd=origin)
+    (origin / "fix.txt").write_text("hotfix\n", encoding="utf-8")
+    _git("add", "-A", cwd=origin)
+    _git("commit", "-m", "hotfix", cwd=origin)
+    _git("checkout", "main", cwd=origin)
+    _git("fetch", "origin", cwd=clone)
+    _git("checkout", "--detach", "origin/release/0.1.2", cwd=clone)
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "@1790000000 +0000")
+    _git("tag", "-a", "rc.1-v0.1.2", "-m", _claim_message(clone), cwd=clone)
+    _git("push", "origin", "refs/tags/rc.1-v0.1.2", cwd=clone)
+
+    proc = _run_admission(clone, "v0.1.2", "rc.1-v0.1.2")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert f"sha={_git('rev-parse', 'HEAD', cwd=clone)}" in (clone / "github_output.txt").read_text(encoding="utf-8")

@@ -36,6 +36,18 @@ def strict_acceptance(reason: str) -> bool:
     return any(reason.startswith(f"{owner}:") for owner in owners)
 
 
+STRICT_ACCEPTANCE_ENV = "HERMES_E2E_STRICT_ACCEPTANCE"
+
+
+def strict_acceptance(reason: str) -> bool:
+    """True when this acceptance run refuses to excuse the gap ``reason`` describes."""
+    value = os.environ.get(STRICT_ACCEPTANCE_ENV, "").strip()
+    if value == "1":
+        return True
+    owners = [o.strip() for o in value.split(",") if o.strip() and o.strip() != "0"]
+    return any(reason.startswith(f"{owner}:") for owner in owners)
+
+
 @contextlib.contextmanager
 def known_failure(pattern: str, reason: str,
                   raises: Type[BaseException] | Tuple[Type[BaseException], ...] = AssertionError) -> Iterator[None]:

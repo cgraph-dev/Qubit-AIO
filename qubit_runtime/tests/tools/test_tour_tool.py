@@ -3,6 +3,7 @@
 import json
 
 from tools import tour_tool as tt
+from tools.registry import registry
 
 
 def _run(**kwargs):
@@ -71,3 +72,21 @@ def test_callback_failure_is_reported():
         raise RuntimeError("renderer went away")
 
     assert "renderer went away" in _run(action="stop", callback=_boom)["error"]
+
+def test_preset_is_validated_and_reaches_the_request_through_the_handler():
+    seen = {}
+
+    def cb(payload):
+        seen.update(payload)
+        return json.dumps({"success": True})
+
+    entry = registry.get_entry("gui_tour")
+    assert entry is not None
+    handler = entry.handler
+    assert "preset must be one of" in json.loads(handler({"action": "start", "preset": "medium"}, callback=cb))["error"]
+    assert not seen
+    assert "not both" in json.loads(
+        handler({"action": "start", "preset": "quick", "steps": [{"text": "hi"}]}, callback=cb))["error"]
+    assert not seen
+    assert "error" not in json.loads(handler({"action": "start", "preset": "quick"}, callback=cb))
+    assert seen == {"action": "start", "surface": "app", "preset": "quick"}

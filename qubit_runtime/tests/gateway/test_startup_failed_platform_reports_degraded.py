@@ -8,13 +8,14 @@ gate — every platform, not just api_server — so the same failure on any othe
 the same way.
 """
 import logging
+import time
 
 import pytest
 
 from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.platforms.base import BasePlatformAdapter
 from gateway.run import GatewayRunner
-from gateway.status import read_runtime_status
+from gateway.status import flush_runtime_status_async, read_runtime_status
 
 
 class _PortTakenAdapter(BasePlatformAdapter):
@@ -137,3 +138,95 @@ async def test_every_platform_connected_still_reports_a_normal_run(monkeypatch, 
         )
     finally:
         await runner.stop()
+
+def _runner(monkeypatch, tmp_path, platforms, create_adapter) -> GatewayRunner:
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    # No plugin registers any platform here, so a None adapter is the "plugin never registered" case.
+    monkeypatch.setattr("gateway.platform_registry.platform_registry.is_registered", lambda name: False)
+    runner = GatewayRunner(GatewayConfig(platforms=platforms, sessions_dir=tmp_path / "sessions"))
+    monkeypatch.setattr(runner, "_create_adapter", create_adapter)
+
+    async def _no_secondary_profiles():
+        return 0
+
+    monkeypatch.setattr(runner, "_start_secondary_profile_adapters", _no_secondary_profiles)
+    return runner
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: missing-adapter degradation status is not reported")
+async def test_missing_adapter_degrades_only_the_unserved_enabled_platform(monkeypatch, tmp_path):
+    """An enabled missing plugin must appear in status even when a sibling connects."""
+    runner = _runner(
+        monkeypatch, tmp_path,
+        {
+            Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
+            Platform.DISCORD: PlatformConfig(enabled=True, token="***"),
+            Platform.SLACK: PlatformConfig(enabled=False, token="***"),
+            Platform.BLUEBUBBLES: PlatformConfig(enabled=True),
+        },
+        lambda platform, platform_config: _HealthyAdapter() if platform is Platform.TELEGRAM else None,
+    )
+    try:
+        assert await runner.start() is True
+        state = read_runtime_status()
+        assert state["platforms"]["telegram"]["state"] == "connected"
+        assert state["platforms"]["discord"]["state"] == "retrying"
+        assert state["platforms"]["discord"]["error_code"] == "adapter_unavailable"
+        assert state["platforms"]["discord"]["needs_attention"] is True
+        assert "slack" not in state["platforms"]
+        bluebubbles = state["platforms"]["bluebubbles"]
+        assert (bluebubbles["state"], bluebubbles["error_code"]) == ("fatal", "adapter_unavailable")
+        assert bluebubbles["needs_attention"] is True
+        assert "Retrying" not in bluebubbles["error_message"]
+        assert list(runner._failed_platforms) == [Platform.DISCORD]  # the reconnect watcher owns it
+    finally:
+        await runner.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: reconnect watcher does not heal an adapterless platform")
+async def test_adapterless_platform_heals_once_its_adapter_appears(monkeypatch, tmp_path):
+    """A plugin that registers late: the queued platform stays queued, then connects."""
+    platform = Platform.DISCORD
+    adapters = {}
+    runner = _runner(
+        monkeypatch, tmp_path, {platform: PlatformConfig(enabled=True, token="***")},
+        lambda platform, platform_config: adapters.get(platform),
+    )
+    try:
+        assert await runner.start() is True
+        status = read_runtime_status()["platforms"][platform.value]
+        assert status["error_code"] == "adapter_unavailable"
+        assert status["needs_attention"] is True
+        await runner._reconnect_failed_platform(platform, time.monotonic() + 60)
+        assert runner._failed_platforms[platform]["attempts"] == 2  # still missing: kept queued
+        assert await flush_runtime_status_async()
+        assert "check the plugin" in read_runtime_status()["platforms"][platform.value]["error_message"]
+
+        healthy = _HealthyAdapter()
+        healthy.platform = platform
+        adapters[platform] = healthy
+        await runner._reconnect_failed_platform(platform, time.monotonic() + 3600)
+        assert runner.adapters[platform] is healthy
+        assert runner._failed_platforms == {}
+        assert await flush_runtime_status_async()
+        status = read_runtime_status()["platforms"][platform.value]
+        assert status["state"] == "connected"
+        assert status["needs_attention"] is False
+
+        # Registered plugin whose factory returns None: the watcher marks it fatal and stops retrying.
+        slack = Platform.SLACK
+        runner._failed_platforms[slack] = runner._startup_retry_entry(
+            slack, None, PlatformConfig(enabled=True, token="***"),
+        )
+        monkeypatch.setattr("gateway.platform_registry.platform_registry.is_registered", lambda name: True)
+        await runner._reconnect_failed_platform(slack, time.monotonic() + 3600)
+        assert slack not in runner._failed_platforms
+        assert await flush_runtime_status_async()
+        status = read_runtime_status()["platforms"][slack.value]
+        assert (status["state"], status["error_code"]) == ("fatal", "adapter_unavailable")
+        assert "Retrying" not in status["error_message"]
+    finally:
+        await runner.stop()
+
