@@ -34,7 +34,6 @@ def gateway_cli(monkeypatch):
     return make
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway CLI diff/reload interleaves command.observe and _print_diff_body lacks total")
 def test_diff_session_renders_the_gateway_sessions_checkpoint_diff(gateway_cli, capsys):
     """The gateway session's checkpoint diff comes back as data and gets main's terminal renderer:
     400 body lines, not the chat handler's 60 lines / 3000 chars (Greptile 4277259989)."""
@@ -57,7 +56,6 @@ def test_diff_session_reports_a_session_without_checkpoints(gateway_cli, capsys)
     assert "Checkpoints are not enabled" in capsys.readouterr().out
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway CLI diff/reload interleaves command.observe and _print_diff_body lacks total")
 def test_diff_of_the_working_tree_stays_a_local_git_read(gateway_cli, monkeypatch):
     cli, conn = gateway_cli()
     seen = []
@@ -67,7 +65,6 @@ def test_diff_of_the_working_tree_stays_a_local_git_read(gateway_cli, monkeypatc
     assert seen == ["staged"] and conn.calls == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway CLI diff/reload interleaves command.observe and _print_diff_body lacks total")
 def test_reload_rereads_env_in_the_gateway_and_reports_its_count(gateway_cli, monkeypatch, capsys):
     cli, conn = gateway_cli(**{"reload.env": {"updated": 3}})
     monkeypatch.setattr("qubit_cli.config.reload_env", lambda: 0)

@@ -56,7 +56,6 @@ def test_non_chat_agent_command_still_registers_hooks(monkeypatch):
     assert calls == ["hooks", "webhooks"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: classic CLI startup/exit still owns MCP discovery, hooks, state maintenance and teardown")
 def test_deferred_startup_spawns_no_mcp_and_registers_no_hooks(monkeypatch):
     import cli as cli_mod
     calls = []
@@ -74,7 +73,6 @@ def test_deferred_startup_spawns_no_mcp_and_registers_no_hooks(monkeypatch):
     assert calls == ["plugins"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: classic CLI startup/exit still owns MCP discovery, hooks, state maintenance and teardown")
 def test_init_agent_runs_no_mcp_discovery(monkeypatch):
     import cli as cli_mod
     from qubit_cli import gateway_agent
@@ -94,7 +92,6 @@ def test_init_agent_runs_no_mcp_discovery(monkeypatch):
     assert calls == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: classic CLI startup/exit still owns MCP discovery, hooks, state maintenance and teardown")
 def test_session_store_open_runs_no_state_db_or_checkpoint_maintenance(monkeypatch):
     import cli as cli_mod
     from cli import QubitCLI
@@ -108,7 +105,6 @@ def test_session_store_open_runs_no_state_db_or_checkpoint_maintenance(monkeypat
     assert calls == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: classic CLI startup/exit still owns MCP discovery, hooks, state maintenance and teardown")
 def test_exit_cleanup_leaves_gateway_owned_mcp_and_delegations_alone():
     from qubit_cli.cli_shutdown import _CLEANUP_STEPS
     names = {name for name, _exc in _CLEANUP_STEPS}

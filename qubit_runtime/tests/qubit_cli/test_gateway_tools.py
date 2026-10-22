@@ -69,7 +69,6 @@ def gateway():
     gateway_tools._view = None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway process dock/agents/kill do not read or stop gateway session processes")
 def test_dock_rows_come_from_the_gateway_session(gateway):
     from qubit_cli import cli_process_dock as dock
     _agent, client = gateway
@@ -98,7 +97,6 @@ def test_stop_kills_the_session_processes_through_the_gateway(gateway, capsys):
     assert any(method == "process.stop" for method, _ in client.calls)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway process dock/agents/kill do not read or stop gateway session processes")
 def test_agents_lists_the_gateway_sessions_processes_and_subagents(gateway, capsys):
     """/agents reads where the work runs (tracker #134889 CLI-7): the session's processes and its
     running background subagents, not this process's empty registries."""
@@ -112,7 +110,6 @@ def test_agents_lists_the_gateway_sessions_processes_and_subagents(gateway, caps
     assert ("process.list", {"session_id": SID}) in client.calls
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway process dock/agents/kill do not read or stop gateway session processes")
 def test_agents_before_the_first_turn_reads_the_opened_sessions_processes(gateway, capsys):
     """A resumed session's background work runs on the gateway before this CLI's first turn builds
     its chat agent: opening the session binds the view, so /agents never reads the empty local
@@ -136,7 +133,6 @@ def test_agents_before_the_first_turn_reads_the_opened_sessions_processes(gatewa
     assert ("process.list", {"session_id": SID}) in client.calls
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway process dock/agents/kill do not read or stop gateway session processes")
 def test_stop_typed_mid_turn_interrupts_the_turn_then_stops_processes(gateway, monkeypatch, capsys):
     """/stop typed while a turn runs is dispatched inline and interrupts it like Ctrl+C (tracker
     #134889 N4), instead of being queued until the turn it should stop has finished. Only the
@@ -177,7 +173,6 @@ def test_stop_typed_mid_turn_interrupts_the_turn_then_stops_processes(gateway, m
     assert any(method == "process.stop" for method, _ in client.calls)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: gateway process dock/agents/kill do not read or stop gateway session processes")
 def test_dock_stop_kills_one_process_through_the_gateway(gateway):
     from qubit_cli import cli_process_dock as dock
     _agent, client = gateway

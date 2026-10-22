@@ -16,7 +16,6 @@ _REPO = Path(__file__).resolve().parents[2]
 _SDK_PROBE = re.compile(r"PathFinder\.find_spec\(\s*[\"'](discord|telegram|slack_bolt|slack_sdk)[\"']\s*\)")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_every_messaging_gated_gateway_file_runs_in_the_messaging_job")
 def test_every_messaging_gated_gateway_file_runs_in_the_messaging_job():
     gated = sorted(str(path.relative_to(_REPO)) for path in (_REPO / "tests" / "gateway").glob("test_*.py")
                    if _SDK_PROBE.search(path.read_text(encoding="utf-8")))

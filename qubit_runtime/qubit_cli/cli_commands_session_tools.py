@@ -183,8 +183,13 @@ class CLICommandsSessionToolsMixin:
         spawn_context_thread(_stop_background_work, name="cli-stop").start()
 
     def _handle_agents_command(self):
-        """Handle /agents — show background processes and agent status."""
-        from tools.process_registry import format_uptime_short, process_registry
+        """Handle /agents — show background processes and agent status. On the gateway both run there:
+        the session's ``process.list`` and its usage's running-subagent count (no per-delegation rows)."""
+        from qubit_cli.gateway_tools import process_registry as _registry, process_view
+        from tools.process_registry import format_uptime_short
+        process_registry, view = _registry(), process_view()
+        if view is not None:
+            view.refresh(force=True)
         processes = process_registry.list_sessions()
         running = [p for p in processes if p.get("status") == "running"]
         finished = [p for p in processes if p.get("status") != "running"]
@@ -194,7 +199,10 @@ class CLICommandsSessionToolsMixin:
             _cp(f"    {p.get('session_id', '?')} · {up} · {p.get('command', '')[:80]}")
         if finished:
             _cp(f"  {_t('agents.recently_finished', count=len(finished))}")
-        _print_local_delegations()
+        if view is None:
+            _print_local_delegations()
+        elif n_async := view.active_delegations():
+            _cp(f"  {_t('agents.background_delegations', count=n_async)}")
         agent_running = getattr(self, "_agent_running", False)
         _cp(f"  {_t('agents.agent_running') if agent_running else _t('agents.agent_idle')}")
 
