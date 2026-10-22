@@ -8,10 +8,9 @@ from qubit_state_runtime import begin_runtime_epoch, RuntimeStoreError
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_room_owner_survives_service_restart_and_foreign_actor_cannot_claim")
 async def test_room_owner_survives_service_restart_and_foreign_actor_cannot_claim(tmp_path, monkeypatch):
     from gateway.session_hosted_service import CanonicalHostedRoomService
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     db = SessionDB(tmp_path / 'state.db')
     authority = SimpleNamespace(db=db, profile_id=str(tmp_path), epoch=begin_runtime_epoch(db, instance_id='test'))
     try:
@@ -64,7 +63,7 @@ def test_hosted_dequeue_checks_exact_task_member_and_frozen_input(tmp_path, monk
     from gateway import hosted_room_driver as tasks
     from gateway.hosted_rooms import create_room, local_authority_gateway_id
     from tui_gateway.hosted_room_driver import HostedRoomBinding
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     with SessionDB(tmp_path / 'state.db') as db:
         authority = SimpleNamespace(db=db, profile_id=str(tmp_path), epoch=begin_runtime_epoch(db, instance_id='test'))
         service = CanonicalHostedRoomService(authority, None)
@@ -102,7 +101,7 @@ def test_hosted_dequeue_checks_exact_task_member_and_frozen_input(tmp_path, monk
 async def test_service_does_not_plan_or_run_historical_unowned_rooms(tmp_path, monkeypatch):
     from gateway.session_hosted_service import CanonicalHostedRoomService
     from gateway.hosted_rooms import create_room, local_authority_gateway_id
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     with SessionDB(tmp_path / 'state.db') as db:
         authority = SimpleNamespace(db=db, profile_id=str(tmp_path), epoch=begin_runtime_epoch(db, instance_id='test'))
         service = CanonicalHostedRoomService(authority, asyncio.get_running_loop())
@@ -117,15 +116,14 @@ async def test_service_does_not_plan_or_run_historical_unowned_rooms(tmp_path, m
 
 
 
-@pytest.mark.parametrize('driver', [False, pytest.param(True, marks=pytest.mark.xfail(
-    strict=True, reason='wave-24 parity defect: rejected create leaves an owner-only reservation'))])
+@pytest.mark.parametrize('driver', [False, True])
 def test_rejected_create_never_leaves_owner_only_reservation(tmp_path, monkeypatch, driver):
     """Owner and room commit together: no failed create may fence a later valid creator."""
     import sqlite3
     from gateway import hosted_rooms
     from gateway.session_controls import AuthorityConnection
     from gateway.session_hosted_service import CanonicalHostedRoomService
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     (tmp_path / 'profiles' / 'two').mkdir(parents=True)
     (tmp_path / 'config.yaml').write_text(
         'hosted_rooms:\n  profiles:\n    two: ' + str((tmp_path / 'profiles' / 'two').resolve()) + '\n')
