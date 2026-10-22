@@ -1164,7 +1164,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin):
         if is_context_overflow_failure:
             pass  # Skip all transcript writes — don't grow a broken session
         else:
-            if not history:
+            if not history and source.platform != Platform.LOCAL:
                 # Fresh session: the tool definitions (as sent in the API request) make the transcript
                 # self-describing.
                 await store.append_to_transcript(sid, {

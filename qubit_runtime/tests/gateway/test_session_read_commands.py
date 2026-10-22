@@ -15,7 +15,6 @@ from tests.gateway.fixtures.local_recovery_probe import Model, child_env, daemon
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: local read slash command (diff) does not answer within the rpc bound")
 def test_local_session_reads_report_this_session_and_refuse_their_write_forms(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user, work = tmp_path / 'state', tmp_path / 'user', tmp_path / 'work'
@@ -37,7 +36,8 @@ def test_local_session_reads_report_this_session_and_refuse_their_write_forms(tm
     (home / 'config.yaml').write_text(config)
     env = child_env()
     env.update(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home), PYTHONPATH=str(root),
-               OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
+               OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1',
+               HERMES_DISABLE_LAZY_INSTALLS='1')
     out = {}
 
     async def probe(desc):
