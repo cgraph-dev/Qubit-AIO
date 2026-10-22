@@ -416,4 +416,3 @@ async def test_a_deferred_model_and_reasoning_pick_commits_both_together(tmp_pat
         store.close_all_db_handles()
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

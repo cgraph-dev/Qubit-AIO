@@ -345,6 +345,10 @@ class SessionPersistenceMixin:
                         type(entry_data).__name__)
                     continue
                 try:
+                    from qubit_state_mutation_retirement import retired_session
+                    db = self._routing_db
+                    if db is not None and retired_session(db, entry_data['session_id']):
+                        continue
                     self._entries[key] = SessionEntry.from_dict(entry_data)
                     imported += 1
                 except (ValueError, KeyError, TypeError) as e:

@@ -4,7 +4,6 @@ from copy import deepcopy
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: coalesced durable producer retries duplicate/conflict admissions across an owner restart")
 
 
 @pytest.mark.asyncio

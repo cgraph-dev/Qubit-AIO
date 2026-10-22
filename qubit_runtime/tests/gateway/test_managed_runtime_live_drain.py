@@ -14,7 +14,6 @@ import time
 import pytest
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the managed drain turn never reaches the fixture's blocked model request")
 def test_managed_turn_finishes_inside_configured_restart_drain(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'

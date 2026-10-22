@@ -15,7 +15,6 @@ import pytest
 from tests.waiting import wait_until
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the canonical hosted-room submit retry hits admission_conflict instead of replaying the committed route")
 def test_authority_route_admits_a_member_turn_with_its_file(hosted_owner, tmp_path):
     authority, loop, principal, _ = hosted_owner
     binding = HostedRoomBinding(room_id="room", gateway_id="gateway-a", authority_epoch=1)

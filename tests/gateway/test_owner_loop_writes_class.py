@@ -137,7 +137,6 @@ CASES = [
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('case,module,name,drive', CASES, ids=[c[0] for c in CASES])
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 async def test_in_class_write_never_runs_on_the_owner_loop_thread(tmp_path, monkeypatch, case, module, name, drive):
     """Each in-class write is wrapped where it is called; the wrapper records the thread it ran on.
     On the owner-loop thread, a contended writer lock (up to _WRITE_PATIENCE_S) freezes every session."""
