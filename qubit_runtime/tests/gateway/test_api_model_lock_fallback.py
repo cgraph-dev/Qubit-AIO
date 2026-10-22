@@ -18,7 +18,6 @@ from tests.gateway.test_managed_worker_construct import Backup, Primary, _serve
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 def test_locked_session_chat_does_not_fall_back_to_the_profile_chain(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
