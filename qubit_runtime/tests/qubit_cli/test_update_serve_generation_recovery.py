@@ -368,6 +368,18 @@ def linux_systemctl(monkeypatch):
     monkeypatch.setattr(recovery.shutil, "which", lambda name: "/usr/bin/systemctl")
 
 
+def test_unrelated_hermes_server_service_is_never_touched(linux_systemctl):
+    """``qubit-serve*`` is a systemd glob, not a name gate (review on #83595)."""
+    fake = _Systemctl(
+        listed=["qubit-server.service", "qubit-serve.service"],
+        active={"qubit-server.service": True, "qubit-serve.service": True},
+        main_pids={"qubit-server.service": 7, "qubit-serve.service": 8},
+    )
+    out = recovery.restart_serve_units(run=fake, sleep=lambda _: None)
+    assert fake.restarted == ["qubit-serve.service"]
+    assert out["verified"] == ["user/qubit-serve"]
+
+
 def test_serve_unit_verified_when_main_pid_changes(linux_systemctl):
     fake = _Systemctl(
         listed=["qubit-serve.service"],
