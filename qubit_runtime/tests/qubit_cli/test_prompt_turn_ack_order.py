@@ -15,7 +15,6 @@ import pytest
     ("_handle_learn_command", "/learn the deploy flow", None),
     ("_handle_init_command", "/init", None),
 ])
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: /plan /learn /init acknowledge through print instead of the turn paint channel")
 def test_prompt_turn_ack_paints_through_cprint_before_the_turn_is_queued(handler, arg, needle, monkeypatch, capsys):
     import cli
     from qubit_cli.cli_commands_mixin import CLICommandsMixin

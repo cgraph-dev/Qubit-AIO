@@ -38,7 +38,6 @@ def test_exit_cleanup_does_not_finalize_a_gateway_session(mock_finalize, cli_mod
 
 @patch("qubit_cli.lifecycle.invoke_hook")
 @patch("qubit_cli.lifecycle.finalize_session")
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI new_session fires on_session_reset locally instead of leaving it to the gateway")
 def test_new_does_not_finalize_a_gateway_session_in_the_cli(mock_finalize, mock_invoke_hook, cli_mod):
     cli = cli_mod.QubitCLI()
     cli.agent = _gateway_agent("gw-session")
@@ -48,7 +47,6 @@ def test_new_does_not_finalize_a_gateway_session_in_the_cli(mock_finalize, mock_
 
 @patch("qubit_cli.lifecycle.invoke_hook")
 @patch("qubit_cli.lifecycle.finalize_session")
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI new_session fires on_session_reset locally instead of leaving it to the gateway")
 def test_new_leaves_on_session_reset_to_the_gateway(mock_finalize, mock_invoke_hook, cli_mod):
     cli = cli_mod.QubitCLI()
     cli.agent = _gateway_agent("gw-session")

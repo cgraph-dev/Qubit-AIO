@@ -38,7 +38,6 @@ def cli(tmp_path, monkeypatch):
     db.close()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: /goal and /loop managers do not proxy over session.automation")
 def test_goal_manager_is_the_gateways(cli):
     mgr = cli.cli._get_goal_manager()
     assert type(mgr).__name__ == 'GatewayGoalManager'
@@ -52,13 +51,11 @@ def test_goal_manager_is_the_gateways(cli):
     assert cli.cli._get_goal_manager() is mgr  # cached per session id, like main
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: /goal and /loop managers do not proxy over session.automation")
 def test_no_manager_before_the_gateway_session_is_open(cli):
     cli.cli._gateway_session_open = False
     assert cli.cli._get_goal_manager() is None and cli.conn.calls == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: /goal and /loop managers do not proxy over session.automation")
 def test_judge_decision_comes_from_the_gateway(cli, monkeypatch):
     from qubit_cli import goals
     monkeypatch.setattr(goals, 'judge_goal', lambda *a, **k: ('done', 'the report is written', False, None, False))
@@ -84,7 +81,6 @@ def test_idle_polls_cost_no_round_trip(cli):
     assert loop.complete_tick('done')['message'] == '✓ Loop finished — ran 1/1 times.'
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: /goal and /loop managers do not proxy over session.automation")
 def test_goal_draft_drafts_on_the_gateway(cli, monkeypatch):
     from qubit_cli import goals
     from qubit_cli.gateway_automation import dispatch_goal_command

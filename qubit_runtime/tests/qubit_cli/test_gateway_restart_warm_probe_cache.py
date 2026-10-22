@@ -62,7 +62,6 @@ def manual_host_gateway(tmp_path, monkeypatch):
         child.wait(timeout=10)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: host_gateway probe returns None for a warm manual gateway")
 def test_restart_with_a_warm_probe_does_not_attach_to_the_stopped_gateway(manual_host_gateway, monkeypatch):
     child = manual_host_gateway
     profile = host_attach.profile_name_for_home(get_qubit_home())

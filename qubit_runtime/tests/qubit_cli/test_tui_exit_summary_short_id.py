@@ -25,7 +25,6 @@ def home(tmp_path, monkeypatch):
     return home
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: TUI epilogue prints hermes and cannot resolve a canonical session short id")
 def test_epilogue_prints_short_resume_id_for_canonical_session(home, capsys):
     from qubit_cli.main_tui_launch import _print_tui_exit_summary
     sid = 'local-' + 'ab12cd34ef56a7b8' + '0' * 48
@@ -38,7 +37,6 @@ def test_epilogue_prints_short_resume_id_for_canonical_session(home, capsys):
     assert 'Tokens:         360 (in 300, out 60' in out
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: TUI epilogue prints hermes and cannot resolve a canonical session short id")
 def test_short_id_resumes_the_session(home):
     from qubit_cli.main import _resolve_session_by_name_or_id
     sid = 'local-' + 'ab12cd34ef56a7b8' + '0' * 48
@@ -46,7 +44,6 @@ def test_short_id_resumes_the_session(home):
     assert _resolve_session_by_name_or_id(sid[:22]) == sid
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: TUI epilogue prints hermes and cannot resolve a canonical session short id")
 def test_ambiguous_prefix_falls_back_to_full_id(home, capsys):
     from qubit_cli.main import _resolve_session_by_name_or_id
     from qubit_cli.main_tui_launch import _print_tui_exit_summary
@@ -59,7 +56,6 @@ def test_ambiguous_prefix_falls_back_to_full_id(home, capsys):
     assert _resolve_session_by_name_or_id(a[:22]) is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: TUI epilogue prints hermes and cannot resolve a canonical session short id")
 def test_stored_ids_print_unchanged(home, capsys):
     from qubit_cli.main_tui_launch import _print_tui_exit_summary
     _seed(home, '20261012_185208_a67483')

@@ -1597,6 +1597,10 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
         if emit_partial_update_hint(e):
             sys.exit(1)
         raise
+    if not toolsets:
+        cli._explicit_toolsets = False  # the gateway resolves the default and coding posture itself
+    # Only a typed -t is checked against a resumed session's frozen toolsets.
+    cli._typed_toolsets = toolsets_list if toolsets else None
 
     # skills.auto_load rides the same background preload as -s; --ignore-rules skips it with
     # the rest of the auto-injected context. Resolved here (not lazily in the agent) so the

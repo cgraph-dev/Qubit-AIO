@@ -67,7 +67,6 @@ def _ids(reader, method: str, **kwargs) -> list[str]:
     return [row["id"] for row in getattr(reader, method)(**kwargs)]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI session lookups page by a fixed local window and miss older CLI sessions")
 def test_continue_and_sessions_find_cli_session_behind_newer_desktop_rows(tmp_path, monkeypatch):
     """Bare ``qubit -c``, ``/sessions`` and ``/resume`` reach the CLI session behind 200 newer rows."""
     db = SessionDB(db_path=tmp_path / "state.db")
@@ -141,7 +140,6 @@ def _columns(db: SessionDB) -> set[str]:
     return {row[1] for row in db._conn.execute("PRAGMA table_info(sessions)")}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI session lookups page by a fixed local window and miss older CLI sessions")
 def test_readonly_pre_column_store_finds_legacy_cli_session(tmp_path, monkeypatch):
     """A missing ``created_source`` column must not read as "no previous session", and the
     lookups must not migrate the file."""

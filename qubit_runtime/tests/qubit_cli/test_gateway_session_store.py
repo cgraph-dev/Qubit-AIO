@@ -160,7 +160,6 @@ def test_banner_session_label_is_mains_eight_characters_for_a_canonical_id():
     assert session_label(None) is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI session store drops startup notices, bare continue, and closing_session_id")
 def test_cli_startup_notices_render_from_the_snapshot(store, monkeypatch):
     """Main's tool-availability warning and browser notice print from the gateway snapshot (the
     gateway resolved the session's tools); the CLI process enumerates nothing."""
@@ -347,7 +346,6 @@ def test_create_if_missing_titles_a_gateway_created_session(store, monkeypatch):
     assert params["title"] == "Fresh Named" and params["source"] and params["cwd"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI session store drops startup notices, bare continue, and closing_session_id")
 def test_bare_continue_finds_the_last_session_the_cli_created(tmp_path, monkeypatch):
     """Bare ``-c`` (main.py ``_resolve_last_session``) reads main's labels too: a gateway row labelled
     ``local`` that the CLI created is CLI history."""
@@ -370,7 +368,6 @@ def test_bare_continue_finds_the_last_session_the_cli_created(tmp_path, monkeypa
     assert _resolve_last_session("tui") == "local-tui"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI session store drops startup notices, bare continue, and closing_session_id")
 def test_start_and_quit_closes_the_gateway_session_with_no_agent():
     """The gateway session exists from the banner on, before any agent is built (main created its row
     lazily at the first turn): quit-immediately still ends and discards it, as main leaves no row."""

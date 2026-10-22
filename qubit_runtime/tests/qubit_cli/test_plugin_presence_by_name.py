@@ -65,7 +65,6 @@ def test_rows_in_the_order_asked_without_removed_or_other_os_names(catalog):
     assert [row["name"] for row in rows] == ["broken", "app", "dashed"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: plugins.manage presence over the wire returns no result")
 def test_row_shape_state_and_disclosure(catalog):
     rows = {row["name"]: row for row in presence_mod.presence_for(["app", "dashed", "broken"])}
 
@@ -78,7 +77,6 @@ def test_row_shape_state_and_disclosure(catalog):
     assert rows["broken"]["disclosure"] == ""
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: plugins.manage presence over the wire returns no result")
 def test_plugins_manage_presence_over_the_wire(catalog):
     from tui_gateway import server
 

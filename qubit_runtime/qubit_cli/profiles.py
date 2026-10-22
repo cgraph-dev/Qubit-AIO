@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Tuple
 
 from agent.file_safety import HOME_CREDENTIAL_DIRS
 from qubit_cli.archive_safe import archive_root_dirs, make_targz, normalize_archive_parts, safe_extract_targz
+from qubit_cli.profiles_remove import _rmtree_make_writable, _rmtree_with_retry, wait_profile_unowned
 from qubit_cli.home_data_layout import PM_RUNTIME_ROOT_DIRS
 from qubit_constants import (
     LOCAL_RUNTIME_ROOT_DIRS, PROFILE_ID_RE, clear_named_profile_deleted, mark_named_profile_deleted,
@@ -1469,7 +1470,10 @@ def create_profile(
     profile_dir = get_profile_dir(canon)
     if profile_dir.exists() and not named_profile_has_identity(profile_dir):
         if named_profile_is_deleted(profile_dir):
-            # Empty shell left by a post-delete mkdir: invisible to ``profile list``, safe to replace.
+            # Empty shell left by a post-delete mkdir: invisible to ``profile list``, safe to replace
+            # unless a gateway still tearing the deleted profile down holds its gateway.lock in it.
+            if not wait_profile_unowned(profile_dir, timeout=0):
+                raise FileExistsError(f"Cannot create profile '{canon}': a running gateway still owns {profile_dir}")
             shutil.rmtree(profile_dir)
         else:
             # A live marker-less dir is invisible to ``profile list`` but may still hold user
@@ -1926,6 +1930,10 @@ def delete_profile(name: str, yes: bool = False) -> Path:
     # 4. Remove profile directory
     remove_error: Exception | None = None
     try:
+        # A multiplexer still tearing the profile down holds its gateway.lock: never remove a home
+        # a live runtime owns (its writers would recreate the tree under the tombstone).
+        if not wait_profile_unowned(profile_dir):
+            raise RuntimeError("a running gateway still owns this profile; retry the delete once it settles")
         _rmtree_with_retry(profile_dir, _rmtree_make_writable)
         print(f"✓ Removed {profile_dir}")
     except Exception as e:
@@ -2461,6 +2469,8 @@ def rename_profile(old_name: str, new_name: str) -> Path:
     # 2. Rename directory. If the move fails (cross-device EXDEV, permissions, a racing writer),
     # undo the unroute so the profile is never stranded tombstoned-but-present.
     try:
+        if live_mux and not wait_profile_unowned(old_dir):  # same owner wait as delete_profile
+            raise RuntimeError("a running gateway still owns this profile; retry the rename once it settles")
         old_dir.rename(new_dir)
     except Exception:
         if live_mux:

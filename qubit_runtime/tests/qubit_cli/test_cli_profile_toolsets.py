@@ -53,7 +53,6 @@ def _created(client):
     return dict([c for c in client.calls if c[0] == "session.create"][-1][1])
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI sends the stale toolsets and coding posture to session.create instead of leaving them to the gateway")
 def test_stale_profile_toolset_warns_and_the_session_is_created(store, monkeypatch):
     from gateway.session_local_inventory import _policy_tools
     from gateway.session_policy import build_policy
@@ -82,7 +81,6 @@ def test_explicit_unknown_toolset_is_still_refused(store, monkeypatch):
         build_policy(params, CONFIG)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI sends the stale toolsets and coding posture to session.create instead of leaving them to the gateway")
 def test_coding_posture_is_left_to_the_gateway(store, monkeypatch):
     db, client = store
     host, _printed = _launch(monkeypatch, db, coding=["terminal"])

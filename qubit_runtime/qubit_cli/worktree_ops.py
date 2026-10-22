@@ -416,12 +416,13 @@ def _worktree_add(repo_root: str, wt_path: Path, branch_name: str, base_ref: str
 
 
 def _setup_worktree(repo_root: str = None, sync_base: bool = True,
-                    name: Optional[str] = None) -> Optional[Dict[str, str]]:
+                    name: Optional[str] = None, retain_db=None) -> Optional[Dict[str, str]]:
     """Create an isolated git worktree -> ``{path, branch, repo_root, base}``, or None on failure.
 
     *sync_base* branches from the fetched remote tip (``_resolve_worktree_base``), else local
     HEAD. *name* replaces the random ``qubit-<id>``; named trees lack the ``qubit-`` prefix so
-    the pruner ages them on its slower schedule.
+    the pruner ages them on its slower schedule. *retain_db* (``--tui -w``) names the profile
+    store in the lock: the tree outlives its launcher while a session there can resume in it.
 
     Set ``worktree_sync: false`` in config to branch from local ``HEAD`` (the pre-#10760-followup behavior).
     """
@@ -459,7 +460,8 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True,
 
     # Lock so other processes (and `git worktree remove`) see it is in use; fail-soft.
     try:
-        _git(["worktree", "lock", "--reason", f"qubit pid={os.getpid()}", str(wt_path)], repo_root)
+        reason = f"qubit pid={os.getpid()}" + (f" db={retain_db}" if retain_db is not None else "")
+        _git(["worktree", "lock", "--reason", reason, str(wt_path)], repo_root)
         logger.debug("Worktree locked: %s (pid=%s)", wt_path, os.getpid())
     except Exception as e:
         logger.debug("git worktree lock failed (non-fatal): %s", e)

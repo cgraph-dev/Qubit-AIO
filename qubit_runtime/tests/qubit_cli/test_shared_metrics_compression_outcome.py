@@ -57,7 +57,6 @@ def test_benched_attempt_when_aborted_keeps_failed_other_class(monkeypatch):
     assert _finish(monkeypatch, "aborted", "summary_model_benched") == [("failed", "other")]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: shared_metrics v4 schema is absent (local ships hermes v1-v3)")
 def test_committed_fallback_row_validates_against_the_package_schema(tmp_path):
     jsonschema = pytest.importorskip("jsonschema")
     store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")

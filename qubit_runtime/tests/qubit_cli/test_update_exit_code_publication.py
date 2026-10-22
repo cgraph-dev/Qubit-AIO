@@ -42,7 +42,6 @@ def quiet_receipt(monkeypatch):
     monkeypatch.setattr(update_receipt, "finalize_pending_update_receipt", lambda *a, **k: None)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: .update_exit_code writers truncate in place and expose an empty value")
 def test_fleet_writer_never_exposes_an_empty_exit_code(home):
     from qubit_cli.update_cmd_fleet import _write_gateway_update_exit_code
 
@@ -54,7 +53,6 @@ def test_fleet_writer_never_exposes_an_empty_exit_code(home):
     assert marker.read_text(encoding="utf-8").strip() == "0"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: .update_exit_code writers truncate in place and expose an empty value")
 def test_completion_success_never_exposes_an_empty_exit_code(home):
     from qubit_cli.update_completion import _publish_gateway_success
 

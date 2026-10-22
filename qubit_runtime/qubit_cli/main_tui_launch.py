@@ -111,9 +111,9 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
     from qubit_cli.profiles import get_active_profile_name
     active_profile = get_active_profile_name()
     profile_flag = "" if active_profile in ("default", "custom") else f" -p {active_profile}"
-    print(f"\n{t('cli.session.exit_resume_hint')}\n  hermes --tui --resume {resume_id}{profile_flag}")
+    print(f"\n{t('cli.session.exit_resume_hint')}\n  qubit --tui --resume {resume_id}{profile_flag}")
     if title:
-        print(f'  hermes --tui -c "{title}"{profile_flag}')
+        print(f'  qubit --tui -c "{title}"{profile_flag}')
     print(f"\nSession:        {resume_id}")
     if title:
         print(f"Title:          {title}")
