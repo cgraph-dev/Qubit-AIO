@@ -173,7 +173,8 @@ class Hit:
     def as_dict(self) -> dict:
         d = {"name": self.name, "module": self.module, "kind": self.kind,
              "line": self.lineno, "upstream_uses": self.upstream_uses,
-             "upstream_files": sorted(self.upstream_files)}
+             "upstream_files": sorted(self.upstream_files),
+             "side": "test" if _is_test_side(self.module) else "production"}
         if self.seam_class:
             d["seam_class"] = self.seam_class
         if self.reason:
@@ -396,6 +397,8 @@ def main() -> int:
     dead.sort(key=lambda h: h.sort_key())
     excluded.sort(key=lambda h: h.sort_key())
     seams = sum(1 for h in dead if h.seam_class)
+    test_dead = sum(1 for h in dead if _is_test_side(h.module))
+    production_dead = len(dead) - test_dead
 
     report = {
         "tool": "check_dead_symbols",
@@ -409,7 +412,12 @@ def main() -> int:
         "upstream_files_unreadable": sorted(getattr(read_pin, "last_missing", [])),
         "definitions_examined": sum(len(v) for v in defs_by_name.values()),
         "defs_upstream_never_reads": no_upstream,
+        # dead_count is the historical total (kept for compatibility);
+        # production_dead_count is the milestone metric: dead definitions in
+        # production files only. A definition under tests/ is test-side.
         "dead_count": len(dead),
+        "production_dead_count": production_dead,
+        "test_dead_count": test_dead,
         "dead_of_which_test_seams": seams,
         "dead_symbols": [h.as_dict() for h in dead],
         "excluded_count": len(excluded),
@@ -442,7 +450,9 @@ def main() -> int:
              if report["upstream_files_unreadable"] else ""))
     print(f"  defs examined        : {report['definitions_examined']}")
     print(f"  defs upstream never  : {no_upstream}  (invented here / renamed -- out of scope)")
-    print(f"  DEAD (upstream reads): {len(dead)}  ({seams} are test-release seams)")
+    print(f"  DEAD (upstream reads): {len(dead)}  "
+          f"({production_dead} production, {test_dead} test-side; "
+          f"{seams} are test-release seams)")
     if dead:
         print()
         print(f"  {'symbol':38} {'module':44} reads  line")
@@ -497,6 +507,11 @@ def _framework_exclusion(d: Definition, fixtures: set[tuple[str, str]],
 def _in_tests(module: str) -> bool:
     segs = module.split("/")
     return "tests" in segs or segs[-1].startswith("test_") or segs[-1] == "conftest.py"
+
+
+def _is_test_side(module: str) -> bool:
+    """A dead definition under ``tests/`` is test-side, not production."""
+    return module.startswith("tests/")
 
 
 def _exclusion(d: Definition, exported: set[str], compat: set[tuple[str, str]],
