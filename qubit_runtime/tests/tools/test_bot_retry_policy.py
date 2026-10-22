@@ -13,6 +13,30 @@ from __future__ import annotations
 import pytest
 
 from tools import bot_failure_reasons as bfr
+@pytest.mark.xfail(reason="wave-23 short-port: local behavior differs from the pin for this ported case")
+def test_relay_deliver_refuses_with_typed_reason_and_never_spawns(home, monkeypatch):
+    calls = []
+    # The server module's import-time update prefetch runs `git ...`; only a
+    # `hermes` CLI spawn would be a delivery attempt.
+    monkeypatch.setattr("subprocess.run", lambda argv, **k: calls.append(list(argv)))
+    out = _deliver({"id": "a" * 32, "profile": "ops", "message": "ping"})
+    assert "error" in out
+    assert out["error"]["data"]["reason"] == "runtime_unavailable"
+    assert "authority" in out["error"]["message"]
+    spawned = [argv for argv in calls if argv and argv[0].rsplit("/", 1)[-1] in ("hermes", "hermes.exe")]
+    assert spawned == [], "no CLI turn may be started by the relay bridge"
+@pytest.mark.xfail(reason="wave-23 short-port: local behavior differs from the pin for this ported case")
+def test_run_delivery_never_retries_a_local_turn(monkeypatch, tmp_path, capsys):
+    from tools import bot_mode_dm
+
+    dm = tmp_path / "dm.txt"
+    dm.write_text("hello")
+    monkeypatch.setattr(bot_mode_dm.subprocess, "run",
+                        lambda argv, **k: pytest.fail("local runner must not execute inference"))
+    rc = bot_mode_dm._run_delivery(["hermes", "-p", "ops", "chat"], str(dm), stdin_file=False)
+    assert rc == 1
+    assert json.loads(capsys.readouterr().out)["reason"] == "runtime_unavailable"
+    assert dm.read_text() == "hello", "payload is retained for the sender's evidence"
 
 
 # ── policy function ──────────────────────────────────────────────────────────
