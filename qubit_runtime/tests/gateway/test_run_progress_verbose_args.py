@@ -40,7 +40,6 @@ async def _progress_text(monkeypatch, tmp_path, adapter_cls) -> str:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 async def test_verbose_args_render_in_a_code_block_on_markdown_platforms(monkeypatch, tmp_path):
     """Markdown platforms get a code block with real line breaks (else a_b / **kw** render as
     markup and JSON newlines show as a literal \\n); plain platforms keep the JSON line."""
@@ -50,7 +49,6 @@ async def test_verbose_args_render_in_a_code_block_on_markdown_platforms(monkeyp
     assert '{"code": "x = a_b\\nprint(**kw)"}' in plain_text and "```" not in plain_text, plain_text
 
 
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 def test_streamed_verbose_args_share_the_code_block_and_skip_it_for_embedded_fences():
     """format_tool_event (streamed tool chrome) renders the same block; args holding ``` anywhere
     stay plain JSON, since Slack/Discord would end the block there and render the rest as markup."""

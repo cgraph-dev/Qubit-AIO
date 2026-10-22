@@ -84,7 +84,15 @@ async def dispatch_group_control(connection, method, params):
     return await asyncio.to_thread(invoke)
 
 
-def _group(authority, actor, method, params, *, host_scope=False):
+def _group(authority, actor, *args, host_scope=False, home=None):
+    # The pin's signature carried ``home`` before the caller default: accept both shapes so an
+    # upstream-shaped call and the composed-authority call drive the same listing.
+    if len(args) == 3:
+        home, method, params = args
+    elif len(args) == 2:
+        method, params = args
+    else:
+        raise TypeError('_group expects (method, params) or (home, method, params)')
     from gateway import hosted_rooms as rooms
     db_path = authority.db.db_path
     gateway_id = rooms.local_authority_gateway_id()

@@ -113,7 +113,6 @@ def test_profile_discovery_and_group_controls_enforce_actor_scope(tmp_path, monk
         asyncio.run(probe())
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_groups_list_pages_the_actor_visible_rooms(tmp_path):
     """keeltrace: pagination is applied to the rooms the actor may see, not to the room table
     before the authorization filter (which returned empty/short pages ahead of visible rooms)."""
