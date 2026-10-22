@@ -83,4 +83,3 @@ def test_managed_worker_turn_does_not_offer_delegate_task(tmp_path):
     assert not any('delegate_task' in tools for tools in peer.offered), peer.offered
 
 
-pytestmark = pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")

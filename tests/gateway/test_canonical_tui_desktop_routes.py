@@ -34,6 +34,5 @@ def test_session_control_buttons_run_the_typed_command_handlers(tmp_path):
 
 
 @pytest.mark.platforms("posix")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: GatewayInboundMixin._hm_run_exec_quick_command drops the cwd argument session_commands.py passes")
 def test_exec_quick_and_plugin_commands_run_for_a_controlling_viewer(tmp_path):
     assert probe(tmp_path, 'commands')['commands']
