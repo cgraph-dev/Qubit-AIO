@@ -521,19 +521,22 @@ class CLILoopsMixin:
 
     def _get_goal_manager(self):
         """GoalManager bound to the current session_id (see ``_session_bound_manager``)."""
+        def max_turns():
+            from qubit_cli.config import load_config
+            try:
+                goals_cfg = (load_config() or {}).get("goals") or {}
+                return int(goals_cfg.get("max_turns", 20) or 20)
+            except Exception:
+                return 20
+
         def load():
             from qubit_cli.goals import GoalManager
-            from qubit_cli.config import load_config
+            return lambda sid: GoalManager(session_id=sid, default_max_turns=max_turns())
 
-            def make(sid):
-                try:
-                    goals_cfg = (load_config() or {}).get("goals") or {}
-                    max_turns = int(goals_cfg.get("max_turns", 20) or 20)
-                except Exception:
-                    max_turns = 20
-                return GoalManager(session_id=sid, default_max_turns=max_turns)
-            return make
-        return self._session_bound_manager("_goal_manager", "goal manager", load)
+        def remote(sid, connection):
+            from qubit_cli.gateway_automation import GatewayGoalManager
+            return GatewayGoalManager(sid, connection)
+        return self._automation_manager("_goal_manager", "goal manager", load, remote)
 
     def _get_heartbeat_manager(self):
         """HeartbeatManager bound to the current session_id (see ``_session_bound_manager``)."""
