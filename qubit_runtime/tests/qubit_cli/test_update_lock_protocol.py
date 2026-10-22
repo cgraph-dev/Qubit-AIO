@@ -45,6 +45,16 @@ def _wait_for(path: Path, proc: subprocess.Popen | None = None, timeout: float =
     return path.read_text(encoding="utf-8")
 
 
+def _wait_for_pid(path: Path, proc: subprocess.Popen | None = None, timeout: float = 30.0) -> int:
+    """A child's ``write_text(str(pid))`` creates the file before it writes the pid: under load
+    the file can exist and still be empty, so wait for the digits, not just the path."""
+    end = time.monotonic() + timeout
+    while not (text := _wait_for(path, proc, timeout).strip()):
+        assert time.monotonic() < end, f"timed out waiting for a pid in {path}"
+        time.sleep(0.02)
+    return int(text)
+
+
 def _alive(pid: int) -> bool:
     from qubit_cli.update_lock import _pid_alive
 

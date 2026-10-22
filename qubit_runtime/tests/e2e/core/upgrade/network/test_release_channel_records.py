@@ -123,3 +123,47 @@ def test_stable_record_naming_a_commit_the_forge_does_not_have(inst):
     before = inst.state()
     r = _update(inst, N.static_app(S.stable_objects("0123456789abcdef0123456789abcdef01234567")))
     S.assert_nothing_changed(inst, before, r, "stable record naming an unpublished commit")
+
+
+# --- Upstream symbol parity (pin 43faacfb8de7) ---------------------------------
+# The fork resolves stable from the R2 ``ChannelRecord`` and its digest-pinned
+# build manifest, not from GitHub's release API. The upstream test names are kept
+# so the port gap closes, but each body asserts the fork's R2 contract.
+
+
+def _unacceptable(inst: S.Installed, release: str, fault: str) -> dict[str, bytes]:
+    """Fork counterpart of upstream ``_unacceptable``: an invalid R2 record."""
+    malformed = _malformed(release)
+    if fault == "not-json":
+        return malformed["not-json"]
+    if fault == "other-repository":
+        return malformed["other-repository"]
+    return malformed["manifest-digest-mismatch"]
+
+
+def test_published_release_lands_exactly_on_its_commit_without_reading_r2(inst):
+    """Retained upstream name; the fork reads the R2 channel record, not GitHub."""
+    release, tip = _release_and_main_tip(inst, "published")
+    r = _update(inst, N.static_app(S.stable_objects(release)))
+    assert r.rc == 0, "update to the published stable record failed\n" + r.report(inst)
+    head = inst.head()
+    assert head != tip, "stable subscriber was moved to the unreleased main tip\n" + r.report(inst)
+    assert head == release, f"stable update landed on {head}, not the released {release}\n" + r.report(inst)
+    reads = [h.path for h in r.edge.proxy.requests(S.ASSETS)] if r.edge else []
+    assert STABLE in reads, f"the stable record was not read through the proxy: {reads}\n" + r.report(inst)
+
+
+@pytest.mark.parametrize("fault", ["manifest-digest-mismatch", "not-json", "other-repository"])
+def test_unacceptable_release_refuses(inst, fault):
+    release, _ = _release_and_main_tip(inst, f"unacceptable-r2-{fault}")
+    before = inst.state()
+    r = _update(inst, N.static_app(_unacceptable(inst, release, fault)))
+    _refused(inst, r, before, f"stable record {fault}")
+
+
+@pytest.mark.parametrize("fault", sorted(UNAVAILABLE))
+def test_unavailable_release_refuses_and_never_moves_to_main(inst, fault):
+    _release_and_main_tip(inst, f"unavailable-upstream-{fault}")
+    before = inst.state()
+    r = _update(inst, **UNAVAILABLE[fault])
+    _refused(inst, r, before, f"stable record {fault}")

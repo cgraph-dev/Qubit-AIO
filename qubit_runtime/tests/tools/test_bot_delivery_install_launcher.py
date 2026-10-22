@@ -7,6 +7,12 @@ import pytest
 from tools import bot_relay
 
 
+def _delivery_argv(profile, query_file):
+    # Bot-chat delivery runs over the gateway here; the DM path (tools/bot_mode_dm.py) still spawns
+    # ``_qubit_cli() -p <profile> ...``, so the launcher it picks is the invariant under test.
+    return [bot_relay._hermes_cli(), "-p", profile, "--query-file", query_file]
+
+
 @pytest.fixture
 def launchers(tmp_path, monkeypatch):
     root = tmp_path / "source install"
