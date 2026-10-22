@@ -502,6 +502,13 @@ DEFAULTS: Dict[str, Any] = {
             "enabled": False,       # true = L0 deterministic rules run first
             "l1_enabled": False,    # true = also try CPU semantic matching
             "embed_model": "nomic-embed-text",
+            # L1.5 EmbeddingGemma-2 registry augmenter (default OFF). Only
+            # consulted after L0 declined AND resolve() returned UNKNOWN; it
+            # can never decide a confirmation-gated/high-risk entry.
+            "l1_5_enabled": False,
+            "l1_5_threshold": 0.87,
+            "l1_5_margin": 0.002,
+            "l1_5_model_dir": "~/.local/share/qubit-voicebridge/models/embeddinggemma-2-onnx",
         },
         # Packet 5A opt-in Q5 canary (reversible; default OFF).
         "canary": {
