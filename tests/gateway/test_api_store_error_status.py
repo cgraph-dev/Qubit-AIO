@@ -7,7 +7,6 @@ from tests.gateway.test_api_unknown_resolution import _AUTH_HEADERS, _close_fixt
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: api_server_runs calls RunIdempotencyStore.forget on the draining refusal path but the local store does not define it (500 instead of 503)")
 async def test_store_refusal_reasons_map_to_retryable_or_client_status(tmp_path, monkeypatch):
     client, adapters, store, owner, unknown, _follower, _executed, tasks = (
         await _restarted_api_runs(tmp_path, monkeypatch))

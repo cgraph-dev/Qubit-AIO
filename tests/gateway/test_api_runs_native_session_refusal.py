@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the native-session refusal probe hangs (>90s) on the local tree")
 def test_runs_refuse_native_session_without_phantom_run(tmp_path):
     result = subprocess.run([sys.executable, __file__], cwd=Path(__file__).resolve().parents[2],
         env=dict(os.environ, HERMES_HOME=str(tmp_path), QUBIT_HOME=str(tmp_path)), capture_output=True, text=True, timeout=90, check=False)

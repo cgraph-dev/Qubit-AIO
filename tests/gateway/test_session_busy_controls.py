@@ -144,7 +144,6 @@ def test_busy_policy_is_authorized_session_scoped_and_not_inference(tmp_path):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_corrections_are_generation_fenced_and_consumed_by_same_provider_loop(tmp_path):
     with owner(tmp_path) as (home, peer, desc):
         async def probe():

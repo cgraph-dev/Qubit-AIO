@@ -13,7 +13,6 @@ from qubit_state import SessionDB
 from tests.gateway.fixtures.local_recovery_probe import child_env, daemon, rpc, websocket
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_group_management_on_ordinary_authenticated_socket(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -66,7 +65,6 @@ def test_group_management_on_ordinary_authenticated_socket(tmp_path):
         asyncio.run(probe(desc))
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_profile_discovery_and_group_controls_enforce_actor_scope(tmp_path, monkeypatch):
     home = tmp_path / 'state'
     home.mkdir()

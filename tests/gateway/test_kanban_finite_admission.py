@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import pytest
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a dispatched kanban card does not enter the single-query approval context")
 def test_kanban_submission_enters_single_query_approval_context(tmp_path, monkeypatch):
     from gateway.session_contract import AdmissionReceipt, Principal, SessionRef
     from gateway.session_finite import execute_finite_admission, finite_turn_required, unattended_turn
@@ -112,7 +111,6 @@ _CONFIG = {'model': {'default': 'loop-model', 'provider': 'custom'}, 'platform_t
 
 
 @pytest.mark.parametrize('mode', ['deny', 'approve'])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a persisted kanban card does not reach the worker as single-query approval context")
 def test_durable_kanban_admission_preserves_headless_policy_in_worker(kanban_owner, mode):
     from gateway.session_contract import SessionRef
     from gateway.session_kanban import run_task
