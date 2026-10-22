@@ -50,3 +50,25 @@ def test_mapped_dll_in_replaced_entry_does_not_fail_reinstall(pm_env):  # noqa: 
         kernel32.FreeLibrary(handle)
     cmd_gc(None)
     assert not list(runtime.glob(".reclaim-*"))
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+@pytest.mark.platforms("windows")
+def test_read_only_file_in_replaced_entry_is_removed_on_reinstall(pm_env):
+    import os
+    import stat
+
+    from pm.install import ensure
+
+    _, runtime, *_ = pm_env
+    ensure("faketool", base_env={})
+    entry = runtime / Facts(runtime / "facts.json").get("faketool")["entry"]
+    hosts = entry / "etc" / "hosts"
+    hosts.parent.mkdir()
+    hosts.write_bytes(b"127.0.0.1 localhost")
+    os.chmod(hosts, stat.S_IREAD)
+    (entry / "bin/faketool").unlink()
+    ensure("faketool", base_env={})
+    assert not (runtime / f".previous-{entry.name}").exists()
+    assert not list(runtime.glob(".reclaim-*")), "a read-only file must not strand the replaced tree"
+

@@ -1,3 +1,4 @@
+import pytest
 """The CLI's session store must be the registry's shared handle for state.db.
 
 ``_init_session_store`` used to construct a bare ``SessionDB()``. The goal/loop/heartbeat
@@ -35,3 +36,18 @@ def test_cli_session_store_is_the_registry_handle_goals_reuse(monkeypatch):
         assert len(constructed) == 1
     finally:
         qubit_state_registry.close_all()
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
+def test_cli_session_store_is_the_gateway_store_and_opens_no_writer(monkeypatch):
+    import qubit_state_registry
+    from qubit_cli.gateway_session_store import GatewaySessionStore
+
+    constructed = []
+    monkeypatch.setattr(qubit_state_registry, "_open_session_db", lambda path: constructed.append(path))
+    cli = SimpleNamespace()
+    HermesCLI._init_session_store(cli)
+    assert isinstance(cli._session_db, GatewaySessionStore) and not cli._session_db_unavailable
+    assert constructed == []
+

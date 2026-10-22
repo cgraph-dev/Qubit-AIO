@@ -332,3 +332,17 @@ class TestWrapCommandWindowsNativeCwd:
         script = captured["script"]
         assert "/c/Users/Alexander/AppData/Local/Temp/hermes-snap-deadbeef.sh" in script
         assert r"C:\Users\Alexander\AppData" not in script
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def test_git_bash_dirs_stay_first_when_hermes_tools_move_behind_the_users(monkeypatch):
+    """Git Bash's coreutils are store dirs too, but bash must find them before System32's."""
+    import pm.install
+    from tools.environments import local as local_mod
+
+    bash_dir, node_dir, system32 = "/store/git/usr/bin", "/store/node", "/windows/system32"
+    monkeypatch.setattr(pm.install, "_store_path_dirs", lambda: [bash_dir, node_dir])
+    monkeypatch.setattr(local_mod, "_git_bash_bin_dirs", lambda: [bash_dir])
+    path = os.pathsep.join([bash_dir, node_dir, system32])
+    assert local_mod._user_tools_first(path).split(os.pathsep) == [bash_dir, system32, node_dir]
+

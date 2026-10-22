@@ -414,3 +414,21 @@ def test_the_scope_is_entered_for_the_preconditions_and_the_persist_but_never_ar
         assert not (first[1] <= wait_start and wait_end <= second[1])
         # and never held across a yield, which would hand the scope to the consumer's thread
         assert not any(first[1] <= at <= second[1] for at in yields)
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def test_guests_switched_off_yields_unavailable(portal):
+    _seed_free_tier()
+    from qubit_cli.config import load_config, save_config
+    config = load_config()
+    config["nous"] = {"guest": False}
+    save_config(config)
+    portal.calls.clear()
+
+    states = _drain()
+
+    assert [s.kind for s in states] == ["unavailable"]
+    assert states[0].copy == anon_auth.UPGRADE_UNAVAILABLE_CHAT
+    assert states[0].copy_terminal == anon_auth.UPGRADE_UNAVAILABLE
+    assert portal.calls == []
+

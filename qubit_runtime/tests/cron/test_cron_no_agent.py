@@ -422,3 +422,21 @@ def test_a_routed_profile_script_keeps_administrator_managed_values_over_its_own
     assert ok, output
     assert output.strip() == "managed-value"
     assert os.environ["ORG_POLICY_FLAG"] == "managed-value"  # parent untouched
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
+def test_script_must_be_a_file_under_scripts_dir_not_a_shell_command(hermes_env):
+    """``script`` names a file under HERMES_HOME/scripts/. A command line (``echo hi``) is
+    refused at creation instead of firing every tick as "Script not found" delivered as the
+    payload; a real file whose name contains a space is still a path."""
+    from cron.jobs import create_job, update_job
+
+    with pytest.raises(ValueError, match="scripts"):
+        create_job(prompt=None, schedule="every 5m", script="echo CRON_PAYLOAD", no_agent=True, deliver="local")
+
+    (hermes_env / "scripts" / "my watchdog.sh").write_text("echo hi\n", encoding="utf-8")
+    job = create_job(prompt=None, schedule="every 5m", script="my watchdog.sh", no_agent=True, deliver="local")
+    with pytest.raises(ValueError, match="scripts"):
+        update_job(job["id"], {"script": "echo CRON_PAYLOAD"})
+

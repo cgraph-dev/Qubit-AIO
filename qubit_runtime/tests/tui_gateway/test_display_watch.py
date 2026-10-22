@@ -180,3 +180,22 @@ def test_screen_start_and_stop_reach_the_models_turn_notes(tmp_path, monkeypatch
         if launcher.poll() is None:
             launcher.kill()
             launcher.wait(5)
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+import threading
+
+
+def _serialize_polls(server, monkeypatch) -> None:
+    """The process-wide watcher thread runs the same poll passes every 0.5 s that these tests drive by
+    hand. A pass is check-mark → snapshot → broadcast, so a watcher pass that claims a transition first
+    broadcasts it only after its (slow, under load) snapshot — past the test's assert, which saw an
+    unchanged mark and no event. One lock around every pass (the thread resolves these names from the
+    server globals on each tick) makes a hand-driven poll return only once any claimed transition is out."""
+    lock = threading.Lock()
+    for name in ("_poll_lease_files", "_poll_runtime_files"):
+        def locked(real=getattr(server, name)) -> None:
+            with lock:
+                real()
+        monkeypatch.setattr(server, name, locked)
+

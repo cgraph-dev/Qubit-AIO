@@ -41,3 +41,18 @@ def drive_chat_q(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult
     proc = _run_cli(ph, "chat", "-q", prompt, "-Q")
     assert proc.returncode == 0, f"hermes chat -q exited {proc.returncode}: {proc.stderr[-2000:]}"
     return DriveResult(final_text=proc.stdout.strip(), toolset="hermes-cli")
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def _client_turn(ph: ParityHome, label: str, *args: str) -> DriveResult:
+    proc = _run_cli(ph, *args)
+    try:
+        assert proc.returncode == 0, f"{label} exited {proc.returncode}: {proc.stderr[-2000:]}"
+    finally:
+        # The daemon is the surface's process; a failed client still leaves it to stop.
+        stopped = stop_profile_gateway(ph)
+    return DriveResult(
+        final_text=proc.stdout.strip(), toolset="hermes-cli", graceful_exit=stopped,
+        extra={"exit_code": proc.returncode, "stderr_tail": proc.stderr[-2000:], "gateway_stopped": stopped},
+    )
+
