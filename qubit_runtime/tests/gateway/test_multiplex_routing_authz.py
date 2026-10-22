@@ -155,8 +155,7 @@ def test_completion_preflight_runs_in_target_profile_scope(mux):
 
 @pytest.mark.parametrize(("launch_policy", "served_policy"), [
     (False, True),
-    pytest.param(True, False, marks=pytest.mark.xfail(strict=True,
-        reason="wave-20 parity defect: a served profile's notice policy is not honored over the launch profile's")),
+    (True, False),
 ])
 def test_raw_api_server_child_notice_follows_the_served_profile_policy(
     tmp_path, monkeypatch, private_db_probe_cleanup, launch_policy, served_policy,
