@@ -17,7 +17,6 @@ from tests.gateway.fixtures.local_recovery_probe import Model, child_env, daemon
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: cron own-profile delivery lacks a live-owner consumer registration, so it falls through to the legacy CLI lane and records no receipt")
 def test_cron_bot_chat_delivery_creates_the_missing_bot_chat_and_admits(tmp_path, monkeypatch):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'

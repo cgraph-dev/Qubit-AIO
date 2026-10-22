@@ -24,8 +24,7 @@ def _git(cwd, *args):
 
 
 @pytest.mark.parametrize("channel,moves", [
-    pytest.param("stable", False, marks=pytest.mark.xfail(
-        strict=True, reason="wave-24 parity defect: rerun does not keep the chosen stable channel")),
+    ("stable", False),
     ("main", True),
 ])
 def test_rerun_keeps_a_chosen_channel_checkout(tmp_path, monkeypatch, channel, moves):
@@ -41,7 +40,7 @@ def test_rerun_keeps_a_chosen_channel_checkout(tmp_path, monkeypatch, channel, m
     release, tip = _git(origin, "rev-parse", "HEAD~1"), _git(origin, "rev-parse", "HEAD")
     _git(tmp_path, "clone", "-q", str(origin), str(install))
     _git(install, "checkout", "-q", "--detach", release)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     set_install_channel(channel, install)
 
     result = subprocess.run(
