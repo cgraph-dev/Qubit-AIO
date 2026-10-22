@@ -41,7 +41,7 @@ def _load(tmp_path, *, config_yaml="", env=None, dotenv=""):
     # may carry platform env vars that are genuine activation evidence.
     child_env = {k: v for k, v in os.environ.items()
                  if k in {"PATH", "LANG", "TZ", "HERMES_RUNTIME_DIR", "TMPDIR", "SYSTEMROOT"}}
-    child_env.update(HOME=str(tmp_path), HERMES_HOME=str(home), PYTHONPATH=str(REPO), **(env or {}))
+    child_env.update(HOME=str(tmp_path), QUBIT_HOME=str(home), PYTHONPATH=str(REPO), **(env or {}))
     out = subprocess.run([sys.executable, "-c", _PROBE], cwd=str(REPO), env=child_env,
                          capture_output=True, text=True, timeout=120, check=False)
     assert out.returncode == 0, out.stderr[-2000:]
@@ -56,12 +56,11 @@ def test_unconfigured_profile_imports_no_platform_adapter(tmp_path):
     assert {"discord", "telegram", "google_chat", "slack"} <= set(result["registered"])
 
 
-XFAIL = pytest.mark.xfail(strict=True, reason="wave-24 parity defect: cold platform activation")
 @pytest.mark.parametrize("case", [
     "env",
-    pytest.param("dotenv", marks=XFAIL),
+    "dotenv",
     "manifest_env",
-    pytest.param("yaml_sibling", marks=XFAIL),
+    "yaml_sibling",
 ])
 def test_configured_platform_still_enabled_and_only_it_is_imported(tmp_path, case):
     kwargs, want, module = {

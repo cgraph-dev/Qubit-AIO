@@ -60,7 +60,6 @@ class RoomService:
         return {'resolved': request_id}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_execution_controls_preserve_native_wire_and_exact_task_identity")
 def test_execution_controls_preserve_native_wire_and_exact_task_identity(tmp_path, monkeypatch):
     monkeypatch.setenv('HERMES_HOME', str(tmp_path))
     with SessionDB(tmp_path / 'state.db') as db:
