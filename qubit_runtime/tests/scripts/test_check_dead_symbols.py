@@ -195,11 +195,15 @@ def probe():
     rc = mod.main()
     assert rc == 1, "a true dead symbol must fail the gate"
     report = json.loads(capsys.readouterr().out)
-    for key in ("dead_count", "dead_symbols", "excluded_benign", "excluded_count",
+    for key in ("dead_count", "production_dead_count", "test_dead_count",
+                "dead_symbols", "excluded_benign", "excluded_count",
                 "definitions_examined", "dead_of_which_test_seams"):
         assert key in report
     assert report["dead_count"] == 1
+    assert report["production_dead_count"] == 0
+    assert report["test_dead_count"] == 1
     assert [h["name"] for h in report["dead_symbols"]] == ["truly_dead"]
+    assert report["dead_symbols"][0]["side"] == "test"
     reasons = {h["name"]: h["exclusion"] for h in report["excluded_benign"]}
     assert reasons["explicit_static_config"].startswith("pytest-fixture")
     assert reasons["TestPasswordLoginRoute"].startswith("pytest-class")
@@ -207,3 +211,34 @@ def probe():
     # String-bound helpers have a real use site, so they are neither dead nor excluded.
     assert "drop_completion_delivery" not in reasons
     assert "merge_endpoint_seed" not in reasons
+
+
+def test_report_splits_production_and_test_dead_symbols(tmp_path, monkeypatch, capsys):
+    mod = _load()
+    root = tmp_path / "checkout"
+    pkg = root / "qubit_runtime"
+    tests = pkg / "tests"
+    tests.mkdir(parents=True)
+    (pkg / "widget.py").write_text("def orphaned_prod_helper():\n    return None\n")
+    (tests / "test_widget.py").write_text("def orphaned_test_helper():\n    return None\n")
+
+    upstream = """
+def probe():
+    orphaned_prod_helper
+    orphaned_test_helper
+"""
+    monkeypatch.setattr(mod, "find_upstream", lambda *_: None)
+    monkeypatch.setattr(mod, "read_pin", lambda *_: {"upstream.py": upstream})
+    monkeypatch.setattr(sys, "argv", ["check_dead_symbols.py",
+                                      "--root", str(root), "--rev", "deadbeef",
+                                      "--json", "-", "--no-cache"])
+
+    rc = mod.main()
+    assert rc == 1
+    report = json.loads(capsys.readouterr().out)
+    sides = {h["name"]: h["side"] for h in report["dead_symbols"]}
+    assert sides == {"orphaned_prod_helper": "production",
+                     "orphaned_test_helper": "test"}
+    assert report["dead_count"] == 2
+    assert report["production_dead_count"] == 1
+    assert report["test_dead_count"] == 1

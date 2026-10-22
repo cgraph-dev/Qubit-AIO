@@ -109,6 +109,13 @@ intent:
     # are never injected. Legacy inject_memory key is no longer read.
     num_ctx: 4096         # canonical runner contract (Packet 4B): compiled context + dialogs + history + output reserve fit with headroom
 
+  # EG2 L1.5 augmenter (template: OFF): UNKNOWN-only, with a hard high-risk veto.
+  router:
+    l1_5_enabled: false    # keep false in this template; opt in only after benchmarking
+    l1_5_threshold: 0.87   # minimum max-similarity for an EG2 candidate
+    l1_5_margin: 0.002     # required lead over the runner-up
+    l1_5_model_dir: ~/.local/share/qubit-voicebridge/models/embeddinggemma-2-onnx  # placeholder: text-only EG2 ONNX model dir
+
   conversation_backend: local      # bridge answers ALL chat (<0.5s); only tasks -> worker sessions
   templates_path: ~/.config/qubit-voicebridge/task-templates.yaml  # daily-task templates
   deepseek_url: https://api.deepseek.com/chat/completions
