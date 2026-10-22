@@ -133,6 +133,9 @@ from .mark_field import (
     palette_hue,
     ring_geometry,
     ring_path,
+    ring_disc_points,
+    RING_DISC_EDGE_WIDTH_GAIN,
+    RING_DISC_EDGE_ALPHA_FLOOR,
     ring_alpha,
     ring_intensity,
     ring_shimmer,
@@ -1235,7 +1238,17 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
             if spec.get("echo"):
                 base_tilt = echo_follower_tilt(
                     tt, str(spec.get("orbit") or "a"))
-            draw_spec["tilt"] = base_tilt + _num(spec.get("tilt_spin_deg"))
+            # ``spec["tilt"]`` is the DECLARED plane angle and the field already
+            # folds the full-turn phase into it (``ring_geometry`` publishes
+            # ``tilt_spin_deg`` equal to that same turn) — adding it again would
+            # double the turn, and a doubled full turn aliases the 3-D sweep
+            # back onto its own silhouette. The disc's sweep rides ``spin_deg``
+            # alone; for an echo follower the LAGGED tilt replaces the base.
+            if spec.get("echo"):
+                draw_spec["tilt"] = base_tilt
+            else:
+                draw_spec["tilt"] = _num(spec.get("tilt"), 0.0)
+            draw_spec["spin_deg"] = _num(spec.get("spin_deg"))
             try:
                 rscale = _num(ring_radius_scale(tt, spec), 1.0)
             except Exception:  # noqa: BLE001 - a field fault keeps the base radii
@@ -1250,28 +1263,23 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 pass
             draw_spec["rx_frac"] = _num(spec.get("rx_frac"), RX_FRAC) * rscale
             draw_spec["ry_frac"] = _num(spec.get("ry_frac"), RY_FRAC) * rscale
-            # ``ring_path`` carries the field's camera sway. The BODY does not
-            # sway, so a circle drawn around it must not either: leaving the
-            # sway in slides the mark's visual centre off its own core.
-            raw = [(px - sway_dx, py - sway_dy)
-                   for px, py in ring_path(tt, r, draw_spec)]
-            # A circle is a STROKED PATH, not a set of field points, so each
-            # vertex's depth comes from where it sits on the circle. The
-            # field's convention is ``0.5 + 0.5*cos(orbital angle)`` — the same
-            # one it gives every particle — and ``ring_path`` samples at
-            # ``360*i/n``, so the orbital angle is recoverable EXACTLY from the
-            # index. The closing vertex repeats vertex 0, and ``cos(360 deg)``
-            # is ``cos(0)``, so the join matches too.
-            n = max(1, len(raw) - 1)
-            rphase = (2.0 * math.pi
-                      * hash01(_num(spec.get("seed"), 0.0),
-                              TURN_RING_SALT))
-            pts = [_place(px, py,
-                           min(1.0, max(0.0,
-                               0.5 + TURN_RING_TILT * math.sin(
-                                   2.0 * math.pi * float(i) / float(n)
-                                   + rphase))))
-                for i, (px, py) in enumerate(raw)]
+            # TRUE 3-D DISC — identical to the Qt lane. The circle is a flat
+            # disc whose plane turns through a full 360 on the ring's own
+            # period, so it opens face-on, collapses to a line at edge-on and
+            # opens again. A fixed 2-D ellipse can only redraw itself, which is
+            # what made the mark read as "rotating like a circle". The field
+            # owns the projection; this lane only consumes it.
+            disc = ring_disc_points(tt, r, draw_spec)
+            edge_on = 0.0
+            pts = []
+            for pt in disc:
+                # No camera sway on a disc: the BODY does not sway, so a circle
+                # drawn around it must not either.
+                pts.append(_place(_num(pt.get("x")), _num(pt.get("y")),
+                                  _num(pt.get("depth"), 0.5)))
+                edge_on = max(edge_on, _num(pt.get("flat"), 0.0))
+            if len(pts) < 3:
+                continue
             if layer == "main":
                 scale = (RING_ALPHA_SCALE["near_main"] if near
                          else RING_ALPHA_SCALE["far_main"])
@@ -1298,10 +1306,19 @@ def render(canvas: Any, cx: float, cy: float, radius: float, t: float,
                 streamers = int(_num(spec.get("streamers"), 3.0))
             except Exception:  # noqa: BLE001
                 streamers = 3
+            # EDGE-ON PASS — mirrors the Qt lane: at the thin phase the disc
+            # collapses to a line, so the stroke widens and keeps an alpha
+            # floor exactly when it is most edge-on. The owner asked that it
+            # never fully disappear. The compensation is a DIVIDE (see the Qt
+            # lane): a multiply would darken every circle whenever one of them
+            # is thin.
+            thin_w = 1.0 + (RING_DISC_EDGE_WIDTH_GAIN - 1.0) * edge_on
+            thin_a = 1.0 + (1.0 / RING_DISC_EDGE_ALPHA_FLOOR - 1.0) * edge_on
             _ring_stroke(pts,
-                         ring_alpha(tt, spec) * scale * intensity * bright,
+                         ring_alpha(tt, spec) * scale * intensity * bright
+                         * thin_a,
                          ring_w * _num(spec.get("width"), 1.0)
-                         * (1.15 if layer == "main" else 1.0),
+                         * (1.15 if layer == "main" else 1.0) * thin_w,
                          tint=tint,
                          spline_steps=RING_SPLINE_STEPS
                          + 3 * max(0, min(8, streamers)))

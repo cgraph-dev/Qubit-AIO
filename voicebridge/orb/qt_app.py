@@ -226,6 +226,11 @@ TURN_Z_SPREAD = 0.9
 TURN_RING_WARP = 0.14
 TURN_RING_TILT = 0.35
 TURN_RING_SALT = 5.77
+#: 3-D disc stroke treatment, read from the field so there is ONE authority for
+#: how a circle behaves as it passes edge-on. The field owns the values; the
+#: painter only re-exports them for the ring pass.
+RING_DISC_EDGE_WIDTH_GAIN = _field.RING_DISC_EDGE_WIDTH_GAIN
+RING_DISC_EDGE_ALPHA_FLOOR = _field.RING_DISC_EDGE_ALPHA_FLOOR
 #: The second half of the "more 3d" fix: the field now gives EVERY element two
 #: independent volume axes, ``z`` and ``z2`` (uncorrelated ``hash01`` of the
 #: element index, distinct salts). ``turn_qdepth`` still drives the projection
@@ -1545,9 +1550,17 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             # each circle slowly tips and breathes on its own schedule instead
             # of sitting rigid, while the declared base tilt/rx/ry the
             # contracts assert are untouched.
-            spin = spec.get("tilt_spin_deg")
+            # ``spin`` is the ring's FULL-TURN phase. The field ALREADY folds it
+            # into the declared ``tilt`` and publishes it as ``tilt_spin_deg``
+            # (``mark_field.ring_geometry``), so adding it again here would
+            # double the turn — and doubling a full turn is exactly what makes
+            # the 3-D sweep alias back onto its own silhouette, which is what
+            # left the discs looking static. Add only what is not baked in.
+            spin = spec.get("spin_deg")
             if spin is None:
-                spin = _field.ring_tilt_spin(tt, spec)
+                spin = spec.get("tilt_spin_deg")
+            if spin is None:
+                spin = _field.ring_spin_deg(tt, spec)
             breath = _field.ring_radius_scale(tt, spec)
             # Per-ring accretion detail (owner: the circles "look like
             # blackholes ... add more details and animations"). ``shimmer`` is
@@ -1560,55 +1573,46 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             intensity = spec.get("intensity")
             if intensity is None:
                 intensity = _field.ring_intensity(tt, spec)
-            draw_spec["tilt"] = _num(tilt, 0.0) + _num(spin, 0.0)
-            # The stroke's own starting phase — this is the FULL-TURN spin. The
-            # tilt offset above only re-planes the ellipse, and an ellipse is
-            # symmetric under its own parameter shift, so without this phase the
-            # circle looks identical at every spin angle. Owner 2026-10-22: the
-            # circles must visibly rotate, each on its own period and direction.
+            # ``draw_spec["tilt"]`` is the ring's plane angle and ALREADY
+            # carries the spin; the disc's own sweep is driven by ``spin_deg``.
+            draw_spec["tilt"] = _num(tilt, 0.0)
             draw_spec["spin_deg"] = _num(spin, 0.0)
             draw_spec["rx_frac"] = (_num(spec.get("rx_frac"), _field.RX_FRAC)
                                     * breath * _num(shimmer, 1.0))
             draw_spec["ry_frac"] = (_num(spec.get("ry_frac"), _field.RY_FRAC)
                                     * breath * _num(shimmer, 1.0))
-            # ``ring_path`` carries the field's camera sway. The BODY does not
-            # sway, so a circle drawn around it must not either: leaving the
-            # sway in slides the mark's visual centre off its own core and the
-            # mark stops reading as one object. Take the sway back out — the
-            # declared radii, tilt, layer, width and alpha are untouched.
-            raw = _field.ring_path(tt, Rf, draw_spec,
-                                   samples=RING_WARP_SAMPLES)
-            # A circle is a STROKED PATH, not a set of field points, so each
-            # point's depth has to come from where it sits on the circle. The
-            # field's convention is ``0.5 + 0.5*cos(orbital angle)`` — the
-            # same one it gives every particle — and ``ring_path`` samples at
-            # ``360*i/n``, so the orbital angle is recoverable EXACTLY from the
-            # index rather than read back off the tilted, parallaxed ellipse.
-            # Reading it off the index is also what keeps the two halves
-            # complementary (point ``i`` and its antipode are exactly ``1-d``
-            # apart), so the near arc bulges and the far arc recedes with no
-            # seam. The closing point repeats point 0, and ``cos(360 deg)`` is
-            # ``cos(0)``, so the join matches too.
+            # TRUE 3-D DISC. The circle is a flat disc whose plane turns
+            # through a full 360° on the ring's own period, so it opens
+            # face-on, closes to a line at edge-on and opens again — the sweep
+            # a fixed 2-D ellipse can never produce (it can only redraw
+            # itself, which is why the mark read as "rotating like a circle").
+            # The field owns the projection; the painter only consumes it.
+            #
+            # The BODY tumble is applied to the result as a rigid rotation, not
+            # baked into the disc: the disc was already projected in 3-D, so a
+            # per-point depth would tilt its plane a second time (that is what
+            # put a disc's silhouette 7 px off the mark's axis and broke the
+            # centred-outline contracts). One shared rotation keeps each circle
+            # exactly the shape the field computed — genuinely open at some
+            # clocks, genuinely edge-on at others — while still turning with
+            # the mark.
+            disc = _field.ring_disc_points(tt, Rf, draw_spec,
+                                           samples=RING_WARP_SAMPLES)
             warped = []
             add = warped.append
-            n = max(1, len(raw) - 1)
-            # One smooth out-of-plane lobe per ring (phased by the ring's own
-            # seed): each circle becomes a genuinely tilted 3D loop, so the
-            # set never shares one plane and never collapses onto a single
-            # diagonal together. A per-vertex hash would be noise (zigzags);
-            # a sine lobe is a plane tilt (clean). Face-on the fade zeroes z
-            # whatever this returns, so the declared ellipse is exact at rest.
-            rphase = (2.0 * math.pi
-                      * _field.hash01(_num(spec.get("seed"), 0.0),
-                                     TURN_RING_SALT))
-            for i, (px, py) in enumerate(raw):
-                qd = 0.5 + TURN_RING_TILT * math.sin(
-                    2.0 * math.pi * float(i) / float(n) + rphase)
-                qd = min(1.0, max(0.0, qd))
-                X, Y, _g = _tumble_project(
-                    px - sway_dx, py - sway_dy, qd,
-                    turn_cy, turn_sy, turn_cx, turn_sx, Rf)
-                add((cx + X, cy + Y))
+            # The camera sway is not applied to a disc: the BODY does not sway,
+            # so a circle drawn around it must not either, or the mark stops
+            # reading as one object.
+            edge_on = 0.0
+            for pt in disc:
+                edge_on = max(edge_on, _num(pt.get("flat"), 0.0))
+                px, py, _g = _tumble_project(_num(pt.get("x"), 0.0),
+                                             _num(pt.get("y"), 0.0),
+                                             turn_qdepth(0.5), turn_cy, turn_sy,
+                                             turn_cx, turn_sx, Rf)
+                add((cx + px, cy + py))
+            if len(warped) < 3:
+                continue
             if layer == "main":
                 scale = (RING_ALPHA_SCALE["near_main"] if near
                          else RING_ALPHA_SCALE["far_main"])
@@ -1620,10 +1624,25 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             # accretion hot-spot, so it reads as live structure rather than a
             # dead outline.
             hot = 1.0 if layer == "echo" else _num(intensity, 1.0)
+            # EDGE-ON PASS. At the thin phase the disc collapses to a line; the
+            # owner asked that it never fully disappear, so the stroke widens
+            # and keeps an alpha floor exactly when it is most edge-on. The
+            # alpha lift is a DIVIDE on the RING'S OWN alpha, never on the
+            # shared constants: a disc that presents edge-on would otherwise
+            # be crushed toward the floor by its own width gain, and a global
+            # multiply would darken every other circle whenever one of them is
+            # thin. Dividing this ring's alpha while COMPENSATING the stroke
+            # width by the same factor keeps its drawn luminance constant
+            # through the pass — the line thins, but it never dims out — and
+            # leaves every other circle exactly as declared.
+            thin_w = 1.0 + (RING_DISC_EDGE_WIDTH_GAIN - 1.0) * edge_on
+            thin_a = 1.0 + (1.0 / RING_DISC_EDGE_ALPHA_FLOOR - 1.0) * edge_on
             _ring_stroke(warped,
-                         _field.ring_alpha(tt, spec) * scale * bright * hot,
+                         _field.ring_alpha(tt, spec) * scale * bright * hot
+                         * thin_a,
                          ring_w * _num(spec.get("width"), 1.0) * (
-                             1.15 if layer == "main" else 1.0))
+                             1.15 if layer == "main" else 1.0)
+                         * thin_w * (1.0 / thin_a))
 
     def _dot(x: float, y: float, rad: float, alpha: float,
              rgb: Tuple[int, int, int], gain: Any = 1.0) -> None:

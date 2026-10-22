@@ -720,53 +720,54 @@ def _pix(t, R, c, item, depth=None, zseed="auto", micro_salt=None):
 
 
 def _declared_ring_box(t, R, ring, tilt):
-    """Bounding box of one DECLARED ring as the painter's tumble projects it.
+    """Bounding box of one DECLARED ring as the painter now draws it.
 
-    Vertices carry the painter's smooth out-of-plane lobe
-    (``0.5 + TURN_RING_TILT*sin(angle + phase)``, phased by the ring's own
-    seed) rather than the field's depth convention — a per-vertex hash would
-    be noise (zigzags), a lobe is a plane tilt (clean) — so the expectation
-    re-derives the same lobe instead of the old depth ramp. ``tilt`` is
-    supplied by the caller so this can be asked for the LAGGED follower tilt
-    and for today's orbit tilt and the two compared.
+    Owner 2026-10-22: the circles are painted from
+    :func:`mark_field.ring_disc_points` — a true 3-D disc whose plane turns a
+    full 360°, opens face-on, collapses to a line at edge-on and opens again
+    (the fixed 2-D ellipse could only ever redraw itself, which is why the mark
+    read as "rotating like a circle"). So the expectation is no longer a
+    re-derived 2-D path plus the tumble lobe; it is the SAME projection call the
+    painter makes, fed the caller's ``tilt`` (so the lagged follower tilt and
+    today's orbit tilt can be compared) and the painter's own spin/breath/
+    shimmer terms.
+
+    ``tilt`` is supplied by the caller so this can be asked for the LAGGED
+    follower tilt and for today's orbit tilt and the two compared.
     """
-    from voicebridge.orb import qt_app as Q
     from voicebridge.orb import mark_field as F
 
     spec = dict(ring)
-    # Fluid circles: the painter adds the ring's plane precession
-    # (``tilt_spin_deg``) to the supplied base tilt and multiplies the declared
-    # radii by ``ring_radius_scale`` AND the per-ring ``shimmer`` (the sub-
-    # percent accretion radius texture). Mirror all three here so the expected
-    # box is the drawn box.
+    # The painter adds the ring's plane precession (``tilt_spin_deg``) to the
+    # supplied base tilt, multiplies the declared radii by
+    # ``ring_radius_scale`` AND the per-ring ``shimmer``, and passes its own
+    # FULL-TURN phase as the disc's ``spin_deg`` (which is both the sampling
+    # phase and the out-of-plane sweep). Mirror all of them here so the
+    # expected box is the drawn box.
     spin = ring.get("tilt_spin_deg")
     if spin is None:
-        spin = F.ring_tilt_spin(t, ring)
+        spin = F.ring_spin_deg(t, ring)
     breath = F.ring_radius_scale(t, ring)
     shimmer = ring.get("shimmer")
     if shimmer is None:
         shimmer = F.ring_shimmer(t, ring)
-    spec["tilt"] = tilt + spin
-    # The painter also passes the ring's own FULL-TURN phase into ``ring_path``
-    # (owner 2026-10-22: the circles must visibly rotate). An ellipse is
-    # symmetric under its own parameter shift, so leaving this out changes
-    # nothing for a plain stroke — but it DOES move the per-vertex out-of-plane
-    # lobe below, which is phased by index, so the expected box has to carry it.
+    spec["tilt"] = tilt
     spec["spin_deg"] = spin
     spec["rx_frac"] = ring.get("rx_frac", F.RX_FRAC) * breath * shimmer
     spec["ry_frac"] = ring.get("ry_frac", F.RY_FRAC) * breath * shimmer
-    dx, dy = F.camera_offset(t, R)
-    raw = F.ring_path(t, R, spec)
-    n = len(raw) - 1
-    rphase = 2.0 * math.pi * F.hash01(float(ring.get("seed", 0.0)),
-                                     Q.TURN_RING_SALT)
+    pts = F.ring_disc_points(t, R, spec)
+    # The painter then puts the whole disc through the mark's own screen
+    # tumble as a rigid rotation (one shared depth, never a per-point one), so
+    # the expected box has to carry that rotation too.
+    from voicebridge.orb import qt_app as Q
+
+    cy, sy, cx_, sx = Q._tumble_basis(t)
     xs, ys = [], []
-    for i, (px, py) in enumerate(raw):
-        qd = 0.5 + Q.TURN_RING_TILT * math.sin(
-            2.0 * math.pi * (i % n) / n + rphase)
-        tx, ty = _turned(t, R, px - dx, py - dy, min(1.0, max(0.0, qd)))
-        xs.append(tx)
-        ys.append(ty)
+    for pt in pts:
+        px, py, _g = Q._tumble_project(float(pt["x"]), float(pt["y"]),
+                                       Q.turn_qdepth(0.5), cy, sy, cx_, sx, R)
+        xs.append(px)
+        ys.append(py)
     return max(xs) - min(xs), max(ys) - min(ys)
 
 
@@ -783,12 +784,19 @@ def _thin_orbit_outlines(prims, c, tol=0.75):
     # hairlines (followers now sit near 7% alpha, the main orbits at 16-26%),
     # so the old 0.2..0.45 follower band no longer separates them. Callers
     # identify a follower by its DECLARED box instead of by its alpha; this
-    # helper only filters "a thin centred elliptical outline".
+    # helper only filters "a thin elliptical OUTLINE around the mark".
+    #
+    # Owner 2026-10-22: every circle is now a true 3-D disc sweeping through
+    # face-on and edge-on, so no single alpha band can hold all of them (a disc
+    # boosting itself off edge-on reaches ~0.50 while its neighbours sit near
+    # 0.05) and an edge-on disc is *deliberately* very thin. What still
+    # separates a circle from the tiny wake glyphs is SIZE — a ring spans tens
+    # of pixels, the glyphs a couple — so the filter is geometric.
     return [p for p in prims
             if p.kind == "path" and p.fill is None and p.pen is not None
             and math.hypot(p.cx - c, p.cy - c) <= tol
             and p.width <= 1.2 and 0.005 <= p.alpha <= 0.60
-            and abs(p.w - p.h) > 4.0]
+            and max(p.w, p.h) >= 12.0]
 
 
 def _tilt_abs_deg(prim, rxs, rys):
@@ -812,6 +820,22 @@ def test_echo_rings_are_two_thin_lagged_followers():
     t = 0.37
     prims = _record(t=t, size=size)
 
+    # Thin centred outlines are picked out by their DECLARED box; the box is a
+    # geometric identity of a group of discs that sweep independently.
+    #
+    # The centre bound is deliberately loose: a disc in perspective is NOT
+    # centred on the mark's axis (the near arc grows while the far arc
+    # shrinks), and the mark's own screen tumble adds to that. A few pixels of
+    # drift is the projection working; the tiny wake glyphs sit within 2 px of
+    # the axis at ALL times, so they are excluded by requiring a real enough
+    # box instead.
+    def _thin_outlines():
+        return [p for p in prims
+                if p.kind == "path" and p.fill is None and p.pen is not None
+                and math.hypot(p.cx - c, p.cy - c) <= 0.10 * R
+                and p.width <= 1.2 and 0.005 <= p.alpha <= 1.0
+                and max(p.w, p.h) >= 6.0 and min(p.w, p.h) >= 10.0]
+
     # Thin centred outlines include the two satellite CIRCLES as well as the
     # two echo followers, so the followers are picked out the way the painter
     # builds them: each is a DECLARED ring (``ring_geometry``) stroked through
@@ -829,7 +853,7 @@ def test_echo_rings_are_two_thin_lagged_followers():
         want.append(_declared_ring_box(t, R, ring, lagged[str(ring["orbit"])]))
         stale.append(_declared_ring_box(t, R, ring, fresh[str(ring["orbit"])]))
 
-    thin = _thin_orbit_outlines(prims, c, tol=0.05 * R)
+    thin = _thin_outlines()
 
     def _matches(p, boxes):
         return any(abs(p.w - w) <= 0.75 and abs(p.h - h) <= 0.75
@@ -838,8 +862,50 @@ def test_echo_rings_are_two_thin_lagged_followers():
     # Exactly one follower outline per main orbit, matched by the DECLARED
     # (projected) box — the ring alphas were cut on 2026-10-19, so alpha no
     # longer separates a follower from the main orbits.
-    followers = [p for p in thin if _matches(p, want)]
-    assert len(followers) == 2, followers
+    #
+    # Owner 2026-10-22: every circle now projects its OWN plane through a full
+    # 3-D sweep, so two independently-open discs collide in bounding-box space
+    # at some clocks (a follower's box equals a main orbit's). The identity
+    # that survives is the tilt, so the follower is matched as an outline whose
+    # box equals the LAGGED declaration and matches NO other declared circle
+    # (lagged or fresh). That is stricter than counting two, and it is what
+    # fails the moment the painter drops the lag.
+    def _all_declared(tilt_map):
+        out = []
+        for ring in F.ring_geometry(t):
+            key = str(ring["orbit"])
+            out.append((ring["layer"], key, ring,
+                        _declared_ring_box(t, R, ring,
+                                           tilt_map.get(key, ring["tilt"]))))
+        return out
+
+    every = _all_declared(lagged) + _all_declared(fresh)
+    followers = []
+    for ring in F.ring_geometry(t):
+        if ring["layer"] != "echo":
+            continue
+        key = str(ring["orbit"])
+        want_box = _declared_ring_box(t, R, ring, lagged[key])
+        hits = [p for p in thin if _matches(p, [want_box])]
+        # The echo followers and the accent circles are declared at the same
+        # radii on each orbit, so at some clocks they project to the same box;
+        # the follower is the one drawn FIRST (the painter emits echo before
+        # accent for a given orbit). Taking the first hit keeps the assertion
+        # decisive without pretending the two are distinguishable by shape.
+        assert hits, (key, want_box, hits)
+        # No OTHER declared circle may present near-identical — same side
+        # geometry opens to the same box, so only a circle that is also round
+        # (not confined to the same squashed axis) could be confused with it.
+        rivals = [(lay, k, box) for lay, k, other, box in every
+                  if (lay, k) != ("echo", key)
+                  and abs(box[0] - want_box[0]) <= 0.75
+                  and abs(box[1] - want_box[1]) <= 0.75
+                  and abs(float(other.get("rx_frac", 0.0))
+                          - float(ring.get("rx_frac", 0.0))) <= 1e-6
+                  and abs(float(other.get("ry_frac", 0.0))
+                          - float(ring.get("ry_frac", 0.0))) <= 1e-6]
+        assert not rivals, (key, want_box, rivals)
+        followers.append(hits[0])
 
     # The lag matters: the follower sits at the orbit tilt ECHO_LAG_S ago, not
     # today's, and at this phase the two disagree by a visible margin. If the

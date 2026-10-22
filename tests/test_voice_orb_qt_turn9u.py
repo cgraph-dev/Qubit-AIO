@@ -437,43 +437,43 @@ def _boom(*_a, **_k):
 
 
 def _projected_ring_box(t, R, spec):
-    """Box of one declared ring's path AFTER the mark's X+Y tumble.
+    """Box of one declared circle as the painter NOW draws it.
 
-    Mirrors the painter exactly: sample :func:`mark_field.ring_path` (with
-    the painter's sample count), take the camera sway back out, give each
-    point the painter's smooth out-of-plane lobe
-    (``0.5 + TURN_RING_TILT*sin(angle + phase)``, phased by the ring's own
-    seed — never the field depth, which would lock every ring onto one
-    diagonal), and project through :func:`qt_app.tumble_point` (Y first,
-    then X — the painter's order).
+    Owner 2026-10-22: the circles are stroked from
+    :func:`mark_field.ring_disc_points` — a true 3-D disc whose plane turns a
+    full 360°, opening face-on and collapsing to a line at edge-on — and the
+    mark's own tumble is then applied to the whole disc as ONE rigid rotation
+    (a per-point depth would tilt an already-projected disc a second time).
+    So the expectation is the same two steps the painter makes: the field's
+    projection, then :func:`qt_app._tumble_project` with a single shared depth.
     """
     from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
     spec = dict(spec)
     # Fluid circles: mirror the painter's added plane precession, shared radius
-    # breath AND per-ring shimmer so the expected box is the drawn box.
+    # breath AND per-ring shimmer so the expected box is the drawn box. The
+    # FULL-TURN ``spin_deg`` is both the disc's sampling phase and its
+    # out-of-plane sweep, so it has to be carried exactly as the painter does.
     spin = spec.get("tilt_spin_deg")
     if spin is None:
-        spin = F.ring_tilt_spin(t, spec)
+        spin = F.ring_spin_deg(t, spec)
     breath = F.ring_radius_scale(t, spec)
     shimmer = spec.get("shimmer")
     if shimmer is None:
         shimmer = F.ring_shimmer(t, spec)
-    spec["tilt"] = float(spec.get("tilt") or 0.0) + spin
+    spec["tilt"] = float(spec.get("tilt") or 0.0)
+    spec["spin_deg"] = spin
     spec["rx_frac"] = float(spec.get("rx_frac") or F.RX_FRAC) * breath * shimmer
     spec["ry_frac"] = float(spec.get("ry_frac") or F.RY_FRAC) * breath * shimmer
-    dx, dy = F.camera_offset(t, R)
-    pts = F.ring_path(t, R, spec, samples=Q.RING_WARP_SAMPLES)
-    n = max(1, len(pts) - 1)
-    rphase = 2.0 * math.pi * F.hash01(float(spec.get("seed", 0.0)),
-                                     Q.TURN_RING_SALT)
+    pts = F.ring_disc_points(t, R, spec, samples=Q.RING_WARP_SAMPLES)
+    cy, sy, cx, sx = Q._tumble_basis(t)
     xs, ys = [], []
-    for i, (px, py) in enumerate(pts):
-        qd = 0.5 + Q.TURN_RING_TILT * math.sin(
-            2.0 * math.pi * (i % n) / n + rphase)
-        X, Y, _g = Q.tumble_point(t, R, px - dx, py - dy,
-                                 min(1.0, max(0.0, qd)))
+    for pt in pts:
+        X, Y, _g = Q._tumble_project(float(pt.get("x", 0.0)),
+                                     float(pt.get("y", 0.0)),
+                                     Q.turn_qdepth(0.5),
+                                     cy, sy, cx, sx, R)
         xs.append(X)
         ys.append(Y)
     return (max(xs) - min(xs), max(ys) - min(ys))
@@ -544,8 +544,15 @@ def test_ring_strokes_are_translucent_and_near_monochrome():
     # accent. Owner 2026-10-19 added the two accent circles at 60% MORE
     # opacity than the main orbits, so the ceiling is the accent target.
     assert len(strokes) == len(F.ring_geometry(t))
+    # Owner 2026-10-22: a circle that presents EDGE-ON sweeps to a thin line,
+    # so its stroke lifts its own alpha toward 1/EDGE_ALPHA_FLOOR x its
+    # declared value — otherwise the most foreshortened circle would be the
+    # faintest thing in the mark. That lift is a fact of the sweep, and it is
+    # bounded by the floor constant, so the ceiling carries it once.
+    ceiling = (max(Q.RING_DRAW_ALPHA.values())
+               / Q.RING_DISC_EDGE_ALPHA_FLOOR + 0.02)
     for p in strokes:
-        assert p.alpha <= Q.RING_DRAW_ALPHA["accent"] + 0.02, p.alpha
+        assert p.alpha <= ceiling, p.alpha
         # Near-monochrome: the red/blue chromatic fringe is gone, so no ring
         # stroke wears either of its literal colours (the mark's own warm ring
         # tint is red-dominant by design, so test the fringe colours exactly).

@@ -693,11 +693,25 @@ def test_every_circle_is_stroked_from_the_declared_ring_set(monkeypatch):
     # drawn radii carry the field's gentle shared radius breath AND the per-ring
     # shimmer detail, so the expectation reads the same additive scale the
     # renderer applies.
+    #
+    # Owner 2026-10-22: each circle is now a TRUE 3-D disc whose plane turns a
+    # full 360° (``ring_disc_points``), so it opens face-on and foreshortens
+    # toward a line at edge-on. At t=0 the spin phase is zero, so the disc's
+    # silhouette is the ring's own ellipse turned by the plane tilt it declares
+    # — measure the drawn extent with that same projection rather than from
+    # the raw declared radii, which would be the flat, never-rotating circle.
     rscale = F.ring_radius_scale(0.0, probe) * F.ring_shimmer(0.0, probe)
+    spec = dict(probe)
+    spec["rx_frac"] = probe["rx_frac"] * rscale
+    spec["ry_frac"] = probe["ry_frac"] * rscale
+    spec["spin_deg"] = 0.0
+    disc = F.ring_disc_points(0.0, R, spec)
+    want_x = max(abs(float(pt["x"])) for pt in disc)
+    want_y = max(abs(float(pt["y"])) for pt in disc)
     assert max(abs(p - CX) for p in pts[0::2]) == pytest.approx(
-        R * probe["rx_frac"] * rscale, abs=1e-6)
+        want_x, abs=1e-6)
     assert max(abs(p - CY) for p in pts[1::2]) == pytest.approx(
-        R * probe["ry_frac"] * rscale, abs=1e-6)
+        want_y, abs=1e-6)
 
 
 def test_every_circle_is_one_plain_translucent_stroke(monkeypatch):

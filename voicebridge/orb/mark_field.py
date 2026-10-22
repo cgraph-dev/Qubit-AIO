@@ -1892,6 +1892,37 @@ RING_SPIN_PERIODS_S = (6.9, 8.8, 10.1, 11.5, 14.55, 16.15, 18.6, 21.15,
 #: Fallback period for an undeclared entry.
 RING_SPIN_PERIOD_BASE = 12.0
 
+# ------------------------------------------------------- 3-D disc projection
+#: The disc's resting opening angle in DEGREES: how far the ring's plane is
+#: tipped away from the screen. The per-ring sweep rides on top of this, so a
+#: ring runs face-on  ->  oblique  ->  edge-on  ->  oblique  ->  face-on once
+#: per period. 90° would put the ring exactly edge-on at rest, so this is well
+#: clear of it — the composition still reads as an atom at any instant.
+RING_DISC_TILT_DEG = 58.0
+#: The plane also turns IN the screen at this ratio of the sweep. Non-integer on
+#: purpose: consecutive laps never retrace the same silhouette, which is what
+#: makes the cages look like they are tumbling through many rotations instead
+#: of repeating one orbit.
+RING_DISC_PLANE_RATIO = 0.37
+#: Second out-of-plane term, so the EDGE-ON instant itself precesses: the disc's
+#: opening wobbles by +/- this many degrees on a ratio of the same turn, and the
+#: ratios are incommensurate so laps never align. 0.0 = the plain single sweep.
+RING_DISC_WOBBLE_DEG = 14.0
+RING_DISC_WOBBLE_RATIO = 0.61
+#: Perspective strength: the near half of a disc grows and the far half shrinks
+#: by this much at the extremes of the sweep. Real foreshortening is the single
+#: strongest 3-D cue, so it is deliberately obvious rather than subtle.
+RING_DISC_PERSP = 0.22
+#: Clamps so a disc can never blow up or invert at the extremes.
+RING_DISC_PERSP_MIN = 0.72
+RING_DISC_PERSP_MAX = 1.30
+#: Extra stroke width a ring gains as it reaches edge-on, so the line never
+#: fully disappears at the thin phase (owner: "keep a faint glow so it never
+#: fully disappears"). Multiplies the base width; 1.0 = no widening.
+RING_DISC_EDGE_WIDTH_GAIN = 1.9
+#: Alpha floor at the exact edge-on instant, as a fraction of the ring's alpha.
+RING_DISC_EDGE_ALPHA_FLOOR = 0.55
+
 
 def _rigid_phase_vector(t: Any) -> Tuple[float, float, float]:
     """The three shared phases the rigid ring motion is built from."""
@@ -1952,15 +1983,122 @@ def ring_spin_dir(ring: Any = None) -> int:
 def ring_spin_deg(t: Any, ring: Any = None) -> float:
     """Accumulated FULL-TURN rotation of one circle in DEGREES at clock ``t``.
 
-    LINEAR in ``t`` and unbounded (it wraps through many full circles), which is
-    what makes a circle visibly ROTATE rather than sway: a point on the stroke
-    travels all the way round the nucleus on :func:`ring_spin_period`, in the
-    direction :func:`ring_spin_dir` gives. ADDITIVE — a renderer adds it to the
-    entry's ``tilt``. Never raises.
+    LINEAR in ``t`` and unbounded (it wraps through many full circles). This is
+    the angle the ring's DISC spins about its own axis — see
+    :func:`ring_disc_points`, which is where the 3-D read actually comes from.
+    ADDITIVE — a renderer adds it to the entry's ``tilt``. Never raises.
     """
     period = max(0.5, ring_spin_period(ring))
     turn = 360.0 * _finite(t) / period * float(ring_spin_dir(ring))
     return turn if math.isfinite(turn) else 0.0
+
+
+def ring_disc_points(t: Any, R: Any, ring: Any,
+                     samples: int = RING_PATH_SAMPLES) -> List[Dict[str, float]]:
+    """One circle as a TRUE 3-D disc, sampled and perspective-projected.
+
+    This is what makes the circles read as 3-D rather than as flat ellipses.
+    A ring is a flat disc of radius ``rx`` lying in a plane, and the disc SPINS
+    about its own normal in two coupled rotations, so its projected silhouette
+    sweeps continuously through
+
+        face-on (a full circle)  ->  oblique (an ellipse)  ->  EDGE-ON (a line)
+        ->  oblique (mirrored)   ->  face-on
+
+    which is the whole 3-D illusion: a fixed ellipse can only ever be redrawn
+    as itself, so no amount of sliding a parameter along it looks like
+    rotation. Here the foreshortening is derived per point from the real 3-D
+    rotation, so the ellipse genuinely opens and closes.
+
+    TWO turns, both genuine 360° rotations (owner 2026-10-22: "rotate 360°,
+    multiple rotations, 3D effect"):
+
+    * ``spin`` (``ring["spin_deg"]``, the declared per-ring turn) drives the
+      disc about its own axis — it is BOTH the sampling phase (so the bright
+      hot-spot crown, which is phased by sample index, travels round the
+      circle) and the OUT-OF-PLANE angle (``tip``), so the disc opens and
+      closes.
+    * ``tilt`` (the ring's plane angle) turns the disc IN the screen at
+      :data:`RING_DISC_PLANE_RATIO` of the same turn, so consecutive laps
+      never retrace one silhouette.
+    * :data:`RING_DISC_WOBBLE_RATIO` adds a second, incommensurate out-of-plane
+      term, so the edge-on instant itself precesses instead of repeating on a
+      fixed lattice.
+
+    Each returned sample carries:
+        ``x``, ``y``    projected offset from the mark centre, in field units
+        ``depth``       0..1, 0 = far side of the disc, 1 = near side. A
+                        renderer splits on this to paint the far arc behind the
+                        nucleus and the near arc in front of it.
+        ``scale``       perspective scale (>1 near, <1 far)
+        ``flat``        0..1, how edge-on the disc is at this instant (1 = the
+                        disc is exactly edge-on). Lets a renderer thicken the
+                        stroke so the line never fully disappears.
+        ``spin_deg``    the sampling phase this sample was taken at, so a
+                        renderer drawing per-sample material can follow the
+                        same rotation.
+
+    Never raises.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    r = _finite(R, 32.0) or 32.0
+    n = max(3, int(samples))
+    rx = r * _finite(ring.get("rx_frac"), RX_FRAC)
+    plane = math.radians(_finite(ring.get("tilt"), 0.0))
+    spin = math.radians(_finite(ring.get("spin_deg"), 0.0))
+    # THE 3-D SWEEP. The disc's opening angle is not fixed: it turns through a
+    # FULL 360° on the ring's own period, so the silhouette goes
+    #   face-on -> oblique -> EDGE-ON -> oblique (mirrored) -> face-on
+    # once per period. That continuous open/close IS the 3-D read; a fixed
+    # ellipse can only ever redraw itself, which is why sliding a parameter
+    # along it looked like "rotating like a circle". ``RING_DISC_TILT_DEG`` is
+    # the plane's resting opening, and the sweep rides on top of it. A second,
+    # incommensurate term (``RING_DISC_WOBBLE_RATIO``) means the edge-on
+    # instant itself precesses, so no two laps repeat.
+    tip = (math.radians(RING_DISC_TILT_DEG) + spin
+           + math.radians(RING_DISC_WOBBLE_DEG)
+           * math.sin(spin * RING_DISC_WOBBLE_RATIO))
+    ct, st = math.cos(tip), math.sin(tip)
+    # Second axis: the whole plane also turns in the screen, at a NON-integer
+    # ratio of the sweep, so consecutive laps never retrace the same
+    # silhouette (the owner's "multiple rotations").
+    plane_turn = plane + spin * RING_DISC_PLANE_RATIO
+    cos_p, sin_p = math.cos(plane_turn), math.sin(plane_turn)
+
+    out: List[Dict[str, float]] = []
+    for i in range(n + 1):
+        # The SAMPLING phase carries the same turn, so the material ON the
+        # circle (the travelling hot-spot crown, phased by sample index by
+        # every renderer) travels round with it instead of sitting still while
+        # the ellipse redraws itself.
+        ang = 2.0 * math.pi * float(i % n) / float(n) + spin
+        # Disc-local coordinates: the disc is flat in its own z=0 plane.
+        u = math.cos(ang) * rx
+        v = math.sin(ang) * rx
+        # Tip the disc out of the screen plane about its local X axis. ``v`` is
+        # the axis that goes INTO the screen, so ``v*st`` is real depth.
+        depth_3d = v * st
+        v_proj = v * ct
+        # Turn the tipped disc in the screen plane to its current angle.
+        x = u * cos_p - v_proj * sin_p
+        y = u * sin_p + v_proj * cos_p
+        # Perspective: the near half grows, the far half shrinks.
+        persp = 1.0 + RING_DISC_PERSP * (depth_3d / max(1e-6, rx))
+        persp = min(RING_DISC_PERSP_MAX, max(RING_DISC_PERSP_MIN, persp))
+        # ``depth`` follows the shared 0..1 convention: 0 far, 1 near.
+        depth = 0.5 + 0.5 * (depth_3d / max(1e-6, rx))
+        depth = min(1.0, max(0.0, depth))
+        out.append({
+            "x": x * persp, "y": y * persp,
+            "depth": depth,
+            "scale": persp,
+            # How edge-on the disc is at THIS instant: |cos(tip)| is 1 face-on
+            # and 0 exactly edge-on, so ``flat`` = 1 - |cos(tip)| peaks at the
+            # edge-on pass. A renderer widens the stroke as this rises so the
+            # line never fully disappears.
+            "flat": 1.0 - abs(ct),
+        })
+    return out
 
 
 def ring_tilt_spin(t: Any, ring: Any = None) -> float:
