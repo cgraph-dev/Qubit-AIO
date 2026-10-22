@@ -21,9 +21,6 @@ from gateway.turn_context import TurnContext
 TIMEOUT_S = 1800.0
 SLEEP_S = 2000.0
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: gateway/run.py never consults AwakeIdleMeter, so watchdog/poll/eviction charge host sleep as turn idleness")
-
-
 class _Clock:
     def __init__(self):
         self.wall = 1_000_000.0
