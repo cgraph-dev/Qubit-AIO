@@ -81,7 +81,7 @@ SCHEMA_PATH = (
     / "qubit_cli"
     / "observability"
     / "schemas"
-    / "hermes.shared_metrics.v3.schema.json"
+    / "hermes.shared_metrics.v4.schema.json"
 )
 LEGACY_SCHEMA_PATH = SCHEMA_PATH.with_name("hermes.shared_metrics.v1.schema.json")
 
@@ -181,7 +181,7 @@ def test_model_call_counter_survives_restart_and_exports_only_new_deltas(tmp_pat
     _schema_validator().validate(first_package)
     uuid.UUID(first_package["package_id"])
     uuid.UUID(first_package["install_id"])
-    assert first_package["schema_version"] == "qubit.shared_metrics.v3"
+    assert first_package["schema_version"] == "qubit.shared_metrics.v4"
     assert first_package["resource"] == _resource()
     assert first_package["metrics"] == [
         {
@@ -259,7 +259,7 @@ def test_v2_package_preserves_pending_v1_model_counters(tmp_path):
     package = json.loads(package_path.read_text(encoding="utf-8"))
     _schema_validator().validate(package)
 
-    assert package["schema_version"] == "qubit.shared_metrics.v3"
+    assert package["schema_version"] == "qubit.shared_metrics.v4"
     assert package["metrics"] == [
         {
             "name": MODEL_CALL_METRIC,
@@ -505,7 +505,7 @@ def test_package_schema_matches_the_model_call_contract():
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     properties = _package_dimension_schema()["properties"]
 
-    assert schema["properties"]["schema_version"]["const"] == "qubit.shared_metrics.v3"
+    assert schema["properties"]["schema_version"]["const"] == "qubit.shared_metrics.v4"
     assert set(properties) == {"call_role", "error_class", "model", "outcome", "provider", "ttft_bucket"}
     # Rows counted before the v3 upgrade carry only model/provider and must still drain.
     assert set(_package_dimension_schema()["required"]) == {"model", "provider"}

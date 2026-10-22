@@ -34,7 +34,7 @@ from .shared_metrics_contract import (
 from .shared_metrics_drift import conform_counter_dimensions, counter_dimensions_shape_is_known
 
 
-_PACKAGE_SCHEMA_VERSION = "qubit.shared_metrics.v3"
+_PACKAGE_SCHEMA_VERSION = "qubit.shared_metrics.v4"
 _STORE_SCHEMA_VERSION = "2"
 _BUSY_TIMEOUT_MS = 250
 _SCHEMA_BUSY_TIMEOUT_MS = 5_000
