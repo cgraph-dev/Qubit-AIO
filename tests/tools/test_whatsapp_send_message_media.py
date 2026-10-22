@@ -132,13 +132,14 @@ def test_text_plus_mixed_media_routes_native_types():
                 )
             )
         assert res["success"] is True
-        # text first, then three media uploads in order
-        assert calls[0][0].endswith("/send")
-        assert calls[0][1]["message"] == "hello"
+        # health check, text first, then three media uploads in order
+        assert calls[0][0].endswith("/health")
+        assert calls[1][0].endswith("/send")
+        assert calls[1][1]["message"] == "hello"
         media_types = [c[1]["mediaType"] for c in calls if c[0].endswith("/send-media")]
         assert media_types == ["image", "video", "audio"]
         # chat id normalized to a WhatsApp JID
-        assert "@" in calls[0][1]["chatId"]
+        assert "@" in calls[1][1]["chatId"]
     finally:
         for p in (img, vid, voice):
             os.unlink(p)
@@ -162,14 +163,13 @@ def test_missing_captioned_file_falls_back_to_text():
     assert "error" in res
     assert "not found" in res["error"]
     # ...but the caption text was delivered on its own first.
-    assert len(calls) == 1
-    assert calls[0][0].endswith("/send")
-    assert calls[0][1]["message"] == "floor plan"
+    assert [url for url, _ in calls] == ["http://localhost:3000/health", "http://localhost:3000/send"]
+    assert calls[1][1]["message"] == "floor plan"
 
 
 @pytest.mark.parametrize(
     "persisted_port,extra,expected_port",
-    [pytest.param(3057, {}, 3057, marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: standalone send ignores the persisted profile bridge port")),
+    [(3057, {}, 3057),
      (3057, {"bridge_port": 3061}, 3061), (None, {}, 3000)],
     ids=["persisted", "explicit-wins", "unallocated-default"],
 )
@@ -220,11 +220,7 @@ def test_secondary_standalone_sends_use_active_profile_port_for_text_media_and_m
         assert record.read_text(encoding="utf-8") == str(persisted_port)
 
 
-@pytest.mark.parametrize("reported", ["own",
-                                     pytest.param("other", marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: standalone send does not reject another profile's bridge session")),
-                                     None,
-                                     pytest.param("unhealthy", marks=pytest.mark.xfail(strict=True, reason="wave-20 parity defect: standalone send ignores bridge health")),
-                                     ],
+@pytest.mark.parametrize("reported", ["own", "other", None, "unhealthy"],
                          ids=["own-session", "other-profile-session", "pre-session-bridge", "health-503"])
 def test_standalone_send_posts_only_through_this_profiles_bridge(tmp_path, reported):
     """Profiles sharing a bridge_port must not send from each other's WhatsApp account, text or media."""

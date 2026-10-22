@@ -1027,7 +1027,12 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
     except ImportError:
         return send_error("aiohttp not installed. Run: pip install aiohttp")
     try:
-        bridge_port = (getattr(pconfig, "extra", {}) or {}).get("bridge_port", 3000)
+        from qubit_constants import get_qubit_home
+        from .bridge_ownership import standalone_bridge_port
+        bridge_port = standalone_bridge_port(
+            get_qubit_home(), (getattr(pconfig, "extra", {}) or {}).get("bridge_port")
+        )
+        own_session = str(_session_dir(getattr(pconfig, "extra", {}) or {}))
         normalized_chat_id = to_whatsapp_jid(chat_id)
         media = media_files or []
         # A caption only applies to a single media file — never repeat it across a multi-file send.
@@ -1043,12 +1048,22 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
 
         last_message_id = None
         async with aiohttp.ClientSession() as session:
+            # Whose bridge holds the port is checked before anything is posted: on a shared port another profile's
+            # bridge would deliver from that profile's WhatsApp account. A bridge without ``session`` predates the field.
+            async with session.get(
+                f"http://localhost:{bridge_port}/health",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status != 200:
+                    return send_error(
+                        f"WhatsApp bridge on port {bridge_port} answered /health with HTTP {resp.status}; nothing was sent.")
+                health = await resp.json()
+            reported_session = health.get("session")
+            if reported_session and reported_session != own_session:
+                return send_error(
+                    f"WhatsApp bridge on port {bridge_port} serves another profile's session ({reported_session}); "
+                    "nothing was sent. Give each profile its own platforms.whatsapp.extra.bridge_port.")
             if pending_mentions:
-                async with session.get(
-                    f"http://localhost:{bridge_port}/health",
-                    timeout=aiohttp.ClientTimeout(total=5),
-                ) as resp:
-                    health = await resp.json() if resp.status == 200 else {}
                 if not (health.get("capabilities") or {}).get("outboundMentions"):
                     return {"error": (
                         "WhatsApp bridge does not support native mentions; "
