@@ -26,7 +26,6 @@ def test_slash_mutation_parses_compress_through_the_shared_parser():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_preview_mutation_reports_without_summarizing_or_writing(tmp_path, monkeypatch):
     from gateway import run
     from gateway.config import GatewayConfig
@@ -34,6 +33,7 @@ async def test_preview_mutation_reports_without_summarizing_or_writing(tmp_path,
     from agent.context_compressor import ContextCompressor
 
     monkeypatch.setattr(run, '_load_gateway_config', dict)
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     store = SessionStore(tmp_path / 'sessions', GatewayConfig())
     db = store._db
     epoch = rt.begin_runtime_epoch(db, instance_id='owner')
@@ -77,7 +77,6 @@ async def test_preview_mutation_reports_without_summarizing_or_writing(tmp_path,
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_canonical_compress_runs_the_live_agents_pre_compress_memory_hook(tmp_path, monkeypatch):
     """Canonical ``/compress`` gives the session's memory providers the same ``on_pre_compress``
     turn the in-process compressor does, and their insight reaches the summarizer."""
@@ -87,6 +86,7 @@ async def test_canonical_compress_runs_the_live_agents_pre_compress_memory_hook(
     from agent.context_compressor import ContextCompressor
 
     monkeypatch.setattr(run, '_load_gateway_config', dict)
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     store = SessionStore(tmp_path / 'sessions', GatewayConfig())
     db = store._db
     epoch = rt.begin_runtime_epoch(db, instance_id='owner')
@@ -126,7 +126,6 @@ async def test_canonical_compress_runs_the_live_agents_pre_compress_memory_hook(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_input_is_admitted_while_compress_summarizes_but_not_claimed_until_it_commits(tmp_path, monkeypatch):
     """The summarization runs outside the session mutation lock: a submit on the session being
     compressed is admitted at once (a 30 s client RPC timeout must not report it lost), while the
@@ -140,6 +139,7 @@ async def test_input_is_admitted_while_compress_summarizes_but_not_claimed_until
     from agent.context_compressor import ContextCompressor
 
     monkeypatch.setattr(run, '_load_gateway_config', dict)
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     store = SessionStore(tmp_path / 'sessions', GatewayConfig())
     db = store._db
     epoch = rt.begin_runtime_epoch(db, instance_id='owner')
@@ -186,7 +186,6 @@ async def test_input_is_admitted_while_compress_summarizes_but_not_claimed_until
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_a_compress_that_removes_nothing_reports_mains_no_changes_without_writing(tmp_path, monkeypatch):
     """A short session's ``/compress`` (the summarizer protects every message) is main's
     ``No changes from compression: N messages`` report, read-only like a preview: no receipt, no
@@ -197,6 +196,7 @@ async def test_a_compress_that_removes_nothing_reports_mains_no_changes_without_
     from agent.context_compressor import ContextCompressor
 
     monkeypatch.setattr(run, '_load_gateway_config', dict)
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     store = SessionStore(tmp_path / 'sessions', GatewayConfig())
     db = store._db
     epoch = rt.begin_runtime_epoch(db, instance_id='owner')

@@ -11,9 +11,6 @@ from gateway.run import GatewayRunner, _profile_runtime_scope
 from gateway.session import SessionSource
 from tools import async_delegation as ad
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a queued completion's metadata keeps parent_session_id ('worker') instead of the settled owner session id")
-
-
 class _QueuedTransport(BasePlatformAdapter):
     """Use the production adapter's admission and busy queue, without external I/O."""
 

@@ -218,6 +218,9 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
         claim_id: str = ""
         proceed: bool = True
         early_result: Optional[bool] = None
+        defer: bool = False  # transient pre-flight uncertainty: re-poll without spending an attempt
+        owner_session_id: str = ""  # owning session the pre-flight proved for the completion's pin
+        proven_session_id: str = ""  # session the pre-flight proved delivery reaches (a compression tip included)
 
     async def _deliver_platform_notice(self, source, content: str) -> None:
         """Deliver a setup/operational notice using platform-specific privacy rules."""
@@ -1359,6 +1362,39 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             return "retry"
         return "deliver"
 
+    async def _classify_completion_owner(self, parent_session_id: str, session_key: str = "") -> tuple[str, str, str]:
+        """``_classify_completion_target``'s verdict and, on ``"deliver"``, the owning session it proved
+        (a delegate child's pin resolved through ``model_config._delegate_from``) and the session delivery
+        reaches (the owner, or its compression tip)."""
+        from gateway.run import _USER_BOUNDARY_END_REASONS
+        session_db = getattr(self, "_session_db", None)
+        if session_db is None:
+            return "retry", "", ""
+        entry = None
+        if session_key:
+            try:
+                session_store = self.session_store
+                await asyncio.to_thread(session_store._ensure_loaded)
+                entry = session_store._entries.get(session_key)
+            except Exception:
+                logger.debug("Completion route lookup failed for %s", session_key, exc_info=True)
+                return "retry", "", ""
+        verdict, parent_session_id, parent = await self._lookup_completion_owner(
+            parent_session_id, entry.session_id if entry else "",
+        )
+        target_session_id = parent_session_id
+        if verdict == "deliver" and parent is not None and parent.get("ended_at"):
+            end_reason = str(parent.get("end_reason") or "")
+            if end_reason != "compression":
+                verdict = "terminal" if end_reason in _USER_BOUNDARY_END_REASONS else "deliver"
+            else:
+                verdict, target_session_id = await self._resolve_compression_lineage_target(
+                    session_db, entry, parent_session_id,
+                )
+        if verdict != "deliver":
+            return verdict, "", ""
+        return verdict, parent_session_id, target_session_id or parent_session_id
+
     @staticmethod
     def _settle_durable_claim(kind: str, delegation_id: str, claim_id: str) -> None:
         """Best-effort ``drop``/``release`` of a durable completion claim."""
@@ -1438,7 +1474,8 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
         # can still fail closed inside the message pipeline AFTER the adapter accepted, which would falsely
         # acknowledge the durable row as delivered. Verify the target here, before acceptance, and give
         # drops an honest durable disposition.
-        verdict = await self._classify_completion_target(parent_session_id)
+        verdict, claim.owner_session_id, claim.proven_session_id = await self._classify_completion_owner(
+            parent_session_id, str(evt.get("session_key") or ""))
         if verdict == "terminal":
             if evt_type == "async_delegation":
                 logger.warning(
@@ -1460,7 +1497,7 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             # Transient uncertainty: tell the watcher to re-poll rather than drop or misroute.
             if claim.claim_id:
                 self._settle_durable_claim("release", claim.delegation_id, claim.claim_id)
-            claim.proceed, claim.early_result = False, False
+            claim.proceed, claim.early_result, claim.defer = False, False, True
         return claim
 
     def _completion_event_scope(self, evt: dict):
@@ -1536,6 +1573,14 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                 if self._completion_identity_seen(identity, claim=True):
                     return None
                 identity_claimed = True
+            if claim.owner_session_id:
+                # Admission settles the durable claim, so the resolver starts from the owner proven here.
+                evt = {**evt, "parent_session_id": claim.owner_session_id,
+                       "proven_session_id": claim.proven_session_id}
+            # The rows this admission settles: a turn that cannot confirm the owner offers them again.
+            completion_ids = [claim.delegation_id] if claim.claim_id else []
+            completion_ids += [sibling["delegation_id"] for sibling, claim_id in sibling_claims if claim_id]
+            evt = {**evt, "completion_ids": completion_ids}
             injection_result = await self._inject_watch_notification(synth_text, evt, raise_not_accepted=True)
             if injection_result is not True:
                 return injection_result
@@ -1551,7 +1596,7 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             if identity_claimed and not accepted:
                 with self._completion_delivery_lock:
                     self._completion_deliveries_inflight.discard(identity)
-            operation = "complete" if accepted else "defer" if refused else "release"
+            operation = "complete" if accepted else "defer" if refused or claim.defer else "release"
             if claim.claim_id:
                 self._settle_durable_claim(operation, claim.delegation_id, claim.claim_id)
             for sibling, claim_id in sibling_claims:
