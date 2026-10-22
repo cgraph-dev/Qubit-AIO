@@ -23,7 +23,6 @@ class Agent(InterruptControlMixin):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _handle_steer_run lacks the authority steer_agent latch, so steer before the claimed turn adopts its agent returns 409")
 async def test_run_steer_before_adoption_reaches_the_turns_agent_not_the_cached_one(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     store = SessionStore(tmp_path / "sessions", GatewayConfig())
