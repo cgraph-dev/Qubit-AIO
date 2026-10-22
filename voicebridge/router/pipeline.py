@@ -20,6 +20,11 @@ class RouterPipeline:
         self.enabled = bool(cfg.get("intent", "router", "enabled", default=False))
         self.l1_enabled = self.enabled and bool(
             cfg.get("intent", "router", "l1_enabled", default=False))
+        # L1.5 is a registry augmenter (voicebridge/router/l1_5.py) consulted
+        # by voice_commands.resolve() after UNKNOWN; it is not run here so
+        # the classifier cannot turn a semantic hint into an executable entry.
+        self.l1_5_enabled = bool(
+            cfg.get("intent", "router", "l1_5_enabled", default=False))
         self._l1 = None
         self.last_l0_ms: Optional[float] = None
         self.last_stage: Optional[str] = None

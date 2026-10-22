@@ -474,8 +474,16 @@ def voice_backend_coverage() -> Dict[str, Any]:
     }
 
 
-def resolve(text: str) -> Resolution:
-    """Match text to at most one command (pure; no side effects)."""
+def resolve(text: str, *, pending_confirmation: bool = False,
+            cfg: Any = None) -> Resolution:
+    """Match text to at most one command (pure; no side effects).
+
+    The deterministic registry always wins. Only when it returns UNKNOWN may
+    the opt-in L1.5 augmenter propose one low-risk entry; that layer is gated
+    by ``intent.router.l1_5_enabled`` (default OFF), requires L0 to have
+    declined, refuses pending confirmations, and can never return a
+    high-risk/confirmation-gated entry.
+    """
     norm = _norm(text)
     if not norm:
         return Resolution(UNKNOWN, speech="I didn't catch that.")
@@ -511,7 +519,9 @@ def resolve(text: str) -> Resolution:
                 remainder = _clean_remainder(remainder)
                 hits.append((weight, entry, remainder, alias_text))
     if not hits:
-        return Resolution(UNKNOWN)
+        augmented = _l1_5_resolution(
+            text, pending_confirmation=pending_confirmation, cfg=cfg)
+        return augmented if augmented is not None else Resolution(UNKNOWN)
     hits.sort(key=lambda h: -h[0])
     best_len = hits[0][0]
     tied = [h for h in hits if h[0] == best_len]
@@ -547,6 +557,50 @@ def resolve(text: str) -> Resolution:
     if missing:
         first = missing[0]
         question = first.clarifier or f"What {first.name.replace('_', ' ')}?"
+        return Resolution(CLARIFY, entry=entry, args=args,
+                          missing=tuple(missing),
+                          speech=f"{entry.title}: {question}")
+    return Resolution(MATCH, entry=entry, args=args)
+
+
+def _l1_5_resolution(text: str, *, pending_confirmation: bool = False,
+                     cfg: Any = None) -> Optional[Resolution]:
+    """Opt-in L1.5 augmentation for a deterministic UNKNOWN (fail closed)."""
+    try:
+        from .router import l1_5
+        decision = l1_5.augment_unknown(
+            text, cfg=cfg, pending_confirmation=pending_confirmation)
+    except Exception:
+        return None
+    if decision is None:
+        return None
+    entry = _lookup_entry(decision.entry_id)
+    if entry is None:
+        return None
+    # Defence in depth: the augmenter already vetoes risk, but nobody else
+    # gets to turn a semantic hint into a high-risk executable route.
+    try:
+        if l1_5.entry_is_high_risk(entry):
+            return None
+    except Exception:
+        return None
+    return _resolution_from_l1_5(text, entry, decision.prototype)
+
+
+def _resolution_from_l1_5(text: str, entry: VoiceCommand,
+                          prototype: str) -> Resolution:
+    norm = _norm(text)
+    proto = _norm(prototype)
+    remainder = norm
+    alias_text = ""
+    if proto and len(proto) >= 3 and proto in norm:
+        alias_text = proto
+        remainder = _clean_remainder(norm.replace(proto, " ", 1))
+    args, missing = _extract(entry, remainder, alias_text)
+    if missing:
+        first = missing[0]
+        question = first.clarifier or \
+            f"What {first.name.replace('_', ' ')}?"
         return Resolution(CLARIFY, entry=entry, args=args,
                           missing=tuple(missing),
                           speech=f"{entry.title}: {question}")
@@ -13245,8 +13299,10 @@ def handle_turn(orch: Any, intent_kind: str, text: str) -> bool:
     """
     if intent_kind in ("system", "confirm", "cancel"):
         return False
+    pending = bool(getattr(getattr(orch, "confirmations", None), "pending",
+                           False))
     try:
-        resolution = resolve(text)
+        resolution = resolve(text, pending_confirmation=pending)
     except Exception:
         return False
     if resolution.kind == UNKNOWN:
