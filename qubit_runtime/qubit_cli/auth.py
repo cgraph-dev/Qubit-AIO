@@ -1702,8 +1702,8 @@ def resolve_provider(
     # network and a fresh install without the bootstrap resolves exactly as upstream does.
     if not skip_free_tier:
         try:
-            from qubit_cli.anon_auth import guest_enabled, has_guest
-            if guest_enabled() and has_guest():
+            from qubit_cli.anon_auth import free_inference_active
+            if free_inference_active():
                 return "nous"
         except Exception as exc:
             logger.debug("free tier check during provider resolution skipped: %s", exc)
