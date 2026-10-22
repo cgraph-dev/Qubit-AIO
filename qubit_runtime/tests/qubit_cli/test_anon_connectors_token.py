@@ -119,7 +119,6 @@ class TestConnectorsCallers:
         assert auth_mod.resolve_nous_access_token() == token
         assert len(nas.token_requests) == 1
 
-    @pytest.mark.xfail(strict=True, reason="wave-23 parity defect: account reads do not use the connectors-only guest token")
     def test_account_reads_use_the_connectors_token(self, trial, presented):
         from qubit_cli.nous_account import get_nous_portal_account_info, reset_nous_portal_account_info_cache
         nas = trial

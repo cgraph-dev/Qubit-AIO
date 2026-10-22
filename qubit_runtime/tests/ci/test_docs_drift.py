@@ -29,7 +29,6 @@ def gaps(drift):
     return drift.find_gaps()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_no_new_undocumented_config_keys_or_slash_commands")
 def test_no_new_undocumented_config_keys_or_slash_commands(drift, gaps):
     new, _ = drift.compare(gaps, drift._load_baseline())
     assert not any(new.values()), drift.failure_message(new)

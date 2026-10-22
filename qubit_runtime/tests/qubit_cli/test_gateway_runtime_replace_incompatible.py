@@ -85,7 +85,6 @@ def test_ensure_replaces_at_most_once_then_reports(home, monkeypatch):
     assert calls == [home]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: incompatible-owner replacement reports foreign_install and never performs the planned stop")
 def test_a_refused_replacement_is_reported_with_its_reason(home, monkeypatch):
     _script(monkeypatch, [GatewayDiscovery("incompatible", reason_code="runtime_protocol")])
     monkeypatch.setattr(replace, "replace_incompatible_owner",
@@ -121,7 +120,6 @@ def owner(home, monkeypatch):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: incompatible-owner replacement reports foreign_install and never performs the planned stop")
 def test_replacement_stops_the_verified_old_owner_with_a_planned_stop(home, owner, monkeypatch):
     import time
     monkeypatch.setattr(replace, "_install_root", lambda: home)
@@ -134,7 +132,6 @@ def test_replacement_stops_the_verified_old_owner_with_a_planned_stop(home, owne
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: incompatible-owner replacement reports foreign_install and never performs the planned stop")
 def test_replacement_refuses_a_recycled_pid(home, owner, monkeypatch):
     import time
     monkeypatch.setattr(replace, "_install_root", lambda: home)
@@ -167,7 +164,6 @@ def test_replacement_refuses_an_owner_serving_another_home(tmp_path, home, owner
     assert owner.poll() is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: incompatible-owner replacement reports foreign_install and never performs the planned stop")
 def test_replacement_never_targets_itself(home, monkeypatch):
     import time
     monkeypatch.setattr(replace, "_install_root", lambda: home)

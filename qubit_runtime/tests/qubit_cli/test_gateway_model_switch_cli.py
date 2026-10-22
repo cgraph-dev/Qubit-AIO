@@ -55,7 +55,6 @@ def _answering(cli, *answers):
     return shown
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI model switch mutates the ended session and bypasses the gateway model guard")
 def test_new_after_a_model_switch_leaves_the_ended_session_alone(gateway):
     """Review item 1: /new reset the model to the config default through the stand-in before it was
     rebound, so ``session.mutate model`` rewrote the session just ended (a later /resume of it came back
@@ -91,7 +90,6 @@ def test_new_after_a_model_switch_leaves_the_ended_session_alone(gateway):
     assert (cli.model, agent.model) == ("config-default-model", "config-default-model")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI model switch mutates the ended session and bypasses the gateway model guard")
 def test_model_before_the_first_turn_commits_on_the_session_that_turn_runs(gateway, monkeypatch):
     """Review item 3: before the first turn there is no stand-in, and the one built for that turn read
     the session's (old) model: "Model switched" was printed and the turn ran the old model. The switch
@@ -115,7 +113,6 @@ def test_model_before_the_first_turn_commits_on_the_session_that_turn_runs(gatew
     assert first_turn.model == "new-model"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI model switch mutates the ended session and bypasses the gateway model guard")
 def test_the_owners_refusal_is_asked_in_the_clis_model_guard_prompt():
     """Review item 2: the owner's warning is the prompt's title and body, as Ink/Desktop/ACP show it."""
     from cli import QubitCLI
@@ -126,7 +123,6 @@ def test_the_owners_refusal_is_asked_in_the_clis_model_guard_prompt():
     assert shown == [("!!! Large Context Switch Warning !!!", REFUSAL["confirm_message"], ["once", "cancel"])] * 2
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI model switch mutates the ended session and bypasses the gateway model guard")
 def test_a_declined_owner_warning_switches_nothing(gateway, monkeypatch):
     from cli import QubitCLI
     conn, client = gateway
@@ -146,7 +142,6 @@ def test_a_declined_owner_warning_switches_nothing(gateway, monkeypatch):
     assert any("Model switch cancelled." in line for line in printed)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: CLI model switch mutates the ended session and bypasses the gateway model guard")
 def test_a_once_restore_nobody_can_confirm_is_not_committed(gateway, monkeypatch):
     """``/model big --once`` then the restore to the smaller model: the owner can refuse it (large
     context). Without a prompt (-q) the token is never sent: the session stays on the one-turn model,

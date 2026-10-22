@@ -629,10 +629,8 @@ class CLIAgentSetupMixin:
     def _init_agent(self, *, model_override: str | None = None, runtime_override: dict | None = None, request_overrides: dict | None = None) -> bool:
         """Build the agent on first use; when resuming, restore history from SQLite.
         Returns True on success."""
-        from cli import (
-            ChatConsole, _cprint, _prepare_deferred_agent_startup, logger)
-        from qubit_cli.cli_init_mixin import _record_shell_hook_consent
-        from run_agent import AIAgent
+        from cli import ChatConsole, _cprint, _prepare_deferred_agent_startup, logger
+        from qubit_cli.gateway_agent import GatewayAgent as AIAgent  # the gateway runs the turn
         if self.agent is not None:
             return True
 
@@ -640,23 +638,10 @@ class CLIAgentSetupMixin:
         # snapshots self.system_prompt below. No-op when nothing was requested.
         self.finalize_preloaded_skills()
         _prepare_deferred_agent_startup()
-        # First-use shell-hook consent on this terminal; the startup registration skipped any
-        # hook not yet allowlisted, so wire the ones just approved before the first turn.
-        _record_shell_hook_consent()
-        try:
-            from agent.shell_hooks import register_from_config
-            from qubit_cli.config import load_config
-
-            register_from_config(load_config())
-        except Exception:
-            logger.debug("shell-hook registration after consent failed", exc_info=True)
         self._install_tool_callbacks()
-        self._ensure_tirith_security()
         if not self._ensure_runtime_credentials():
             return False
-        from qubit_cli.mcp_startup import ensure_mcp_discovery_before_agent_build
-        ensure_mcp_discovery_before_agent_build(
-            logger=logger, single_query=getattr(self, "_single_query_mode", False))
+        # No MCP discovery here: the gateway session that runs the turn owns its MCP servers.
         if self._session_db is None:
             try:
                 from qubit_state_registry import acquire

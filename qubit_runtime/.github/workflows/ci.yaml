@@ -103,7 +103,7 @@ jobs:
               for lane, value in values.items():
                   if os.environ['RELEASE'] == 'true' and value in ('true', 'false'):
                       value = 'true'
-                  if '\n' in value or '\r' in value:
+                  if not isinstance(value, str) or '\n' in value or '\r' in value:
                       continue
                   output.write(f'{lane}={value}\n')
           PY

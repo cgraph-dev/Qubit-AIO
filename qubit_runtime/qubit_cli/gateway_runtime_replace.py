@@ -27,11 +27,11 @@ _FORCED_STOP_SECONDS = 5.0
 
 # One line each, short enough for the TUI's activity row after its "gateway incompatible: " prefix.
 REFUSAL_DETAIL = {
-    "owner_newer": "a newer Hermes's gateway owns this profile; update Hermes or run: hermes gateway stop",
-    "foreign_install": "another Hermes install's gateway owns this profile; stop it there: hermes gateway stop",
-    "owner_unverified": "an older Hermes gateway owns this profile and was not verified; run: hermes gateway stop",
-    "owner_did_not_exit": "an older Hermes gateway owns this profile and did not stop; run: hermes gateway stop",
-    "owner_unreachable": "an older Hermes gateway owns this profile; run: hermes gateway stop",
+    "owner_newer": "a newer Qubit's gateway owns this profile; update Qubit or run: qubit gateway stop",
+    "foreign_install": "another Qubit install's gateway owns this profile; stop it there: qubit gateway stop",
+    "owner_unverified": "an older Qubit gateway owns this profile and was not verified; run: qubit gateway stop",
+    "owner_did_not_exit": "an older Qubit gateway owns this profile and did not stop; run: qubit gateway stop",
+    "owner_unreachable": "an older Qubit gateway owns this profile; run: qubit gateway stop",
 }
 
 
@@ -72,7 +72,7 @@ def _verified_owner(control: Path, payload: dict) -> tuple[int, Any] | str:
     protocol = payload.get("runtime_protocol")
     if type(protocol) is int and protocol > 1:
         return "owner_newer"
-    if not _within_install(control, _install_root()) or not _same(payload.get("hermes_home"), control):
+    if not _within_install(control, _install_root()) or not _same(payload.get("qubit_home") or payload.get("hermes_home"), control):
         return "foreign_install"
     pid, recorded = payload.get("pid"), payload.get("start_time")
     if (payload.get("kind") != _GATEWAY_KIND or type(pid) is not int or pid <= 1

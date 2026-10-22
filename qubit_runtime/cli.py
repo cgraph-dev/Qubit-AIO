@@ -439,36 +439,20 @@ def _mark_tui_input_modes_active() -> None:
 
 
 def _prepare_deferred_agent_startup() -> None:
-    """Run Termux-deferred agent discovery before the first real agent turn."""
+    """Run Termux-deferred plugin discovery before the first real agent turn. MCP servers, shell
+    hooks and outbound webhooks belong to the gateway that runs the turn (session policy)."""
     global _deferred_agent_startup_done
     if _deferred_agent_startup_done:
         return
     if os.environ.get("HERMES_DEFER_AGENT_STARTUP") != "1":
         return
     _deferred_agent_startup_done = True
-    _accept_hooks = os.environ.get("HERMES_ACCEPT_HOOKS", "").lower() in {"1", "true", "yes", "on"}
     try:
         from qubit_cli.plugins import discover_plugins
 
         discover_plugins()
     except Exception:
         logger.warning("plugin discovery failed at deferred CLI startup", exc_info=True)
-    try:
-        from qubit_cli.mcp_startup import start_background_mcp_discovery
-
-        start_background_mcp_discovery(logger=logger, thread_name="termux-cli-mcp-discovery")
-    except Exception:
-        logger.debug("MCP tool discovery failed at deferred CLI startup", exc_info=True)
-    try:
-        from agent.shell_hooks import register_from_config
-        from agent.outbound_webhooks import register_from_config as register_outbound_webhooks
-        from qubit_cli.config import load_config
-
-        _hooks_cfg = load_config()
-        register_from_config(_hooks_cfg, accept_hooks=_accept_hooks)
-        register_outbound_webhooks(_hooks_cfg)
-    except Exception:
-        logger.debug("shell-hook registration failed at deferred CLI startup", exc_info=True)
 
 
 _signal_watchdog_armed = False
@@ -1224,22 +1208,24 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
             self._pending_resume_sessions = None
 
         entry = self._slash_handler(canonical)
+        if entry is None:
+            return self._process_unregistered_slash(cmd_original, cmd_lower)
+        from qubit_cli.gateway_cli_commands import REFUSED
+        from qubit_cli.gateway_cli_commands import run as run_gateway_command
+        if run_gateway_command(self, canonical, cmd_original):
+            return True  # state the gateway session owns (checkpoints, .env, handoff)
         # Observer-only pre_command plugin hook (return values ignored; never raises), fired by the gateway
         # for a command this process runs (not a named refusal, not a command with no handler here).
-        from qubit_cli.gateway_cli_commands import REFUSED
         from qubit_cli.gateway_plugin_commands import observe
         runs = entry is not None and canonical not in REFUSED
-        if _cmd_def is not None and not observe(self, _base_word, _slash_args(cmd_original), runs=runs):
+        if canonical in {"diff", "reload", "handoff"}:
+            pass
+        elif _cmd_def is not None and not observe(self, _base_word, _slash_args(cmd_original), runs=runs):
             from qubit_cli.plugins import fire_pre_command_hook
             fire_pre_command_hook(
                 surface="cli", command=canonical, alias_used=_base_word, args_raw=_slash_args(cmd_original),
                 session_key=getattr(self, "session_id", None), platform="cli",
             )
-        if entry is None:
-            return self._process_unregistered_slash(cmd_original, cmd_lower)
-        from qubit_cli.gateway_cli_commands import run as run_gateway_command
-        if run_gateway_command(self, canonical, cmd_original):
-            return True  # state the gateway session owns (checkpoints, .env, handoff)
         method_name, pass_arg = entry
         handler = getattr(self, method_name)
         result = handler(cmd_original) if pass_arg else handler()

@@ -654,13 +654,13 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         if diff and not stat_only:
             self._print_diff_body(diff, _t("diff.stat_hint"))
 
-    def _print_diff_body(self, diff: str, stat_hint: str, limit: int = 400) -> None:
-        """Print a diff, capped at ``limit`` lines with a pointer to the --stat form."""
-        print("")
+    def _print_diff_body(self, diff: str, stat_hint: str, limit: int = 400, total: int = 0) -> None:
+        """Print a diff, capped at ``limit`` lines (of ``total`` when its sender cut it) with a pointer to the --stat form."""
+        print()
         diff_lines = diff.splitlines()
-        if len(diff_lines) > limit:
+        if (total := max(total, len(diff_lines))) > limit:
             self._print_diff_text("\n".join(diff_lines[:limit]))
-            print(f"\n  {_t('diff.more_lines', count=len(diff_lines) - limit, hint=stat_hint)}")
+            print(f"\n  {_t('diff.more_lines', count=total - limit, hint=stat_hint)}")
         else:
             self._print_diff_text(diff)
 
