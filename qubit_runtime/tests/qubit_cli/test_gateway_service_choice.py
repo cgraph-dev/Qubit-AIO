@@ -66,7 +66,7 @@ def _operations(calls):
 
 @pytest.mark.platforms("linux")
 @pytest.mark.parametrize("choice", [None, "decline", "install"])
-@pytest.mark.parametrize("installed", [pytest.param(False, marks=pytest.mark.xfail(strict=True, reason="wave-28 parity defect: gateway service consent/install admission diverges from the pin")), True])
+@pytest.mark.parametrize("installed", [False, True])
 def test_import_and_ordinary_setup_never_authorize_install(supervisor, choice, installed):
     profile, calls = supervisor
     config_api.save_config({"gateway": {"service_install_choice": choice}})
@@ -89,7 +89,7 @@ def test_import_and_ordinary_setup_never_authorize_install(supervisor, choice, i
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.parametrize("answer, fail", [(False, False), (True, False), pytest.param(True, True, marks=pytest.mark.xfail(strict=True, reason="wave-28 parity defect: gateway service consent/install admission diverges from the pin"))])
+@pytest.mark.parametrize("answer, fail", [(False, False), (True, False), (True, True)])
 def test_explicit_setup_consent_is_durable_only_after_success(supervisor, monkeypatch, answer, fail):
     _profile, calls = supervisor
     config_api.save_config({"gateway": {"service_install_choice": None}, "custom": "keep"})
@@ -148,7 +148,7 @@ def test_wizard_service_choice_controls_installation(supervisor, monkeypatch, st
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.parametrize("fail", [pytest.param(False, marks=pytest.mark.xfail(strict=True, reason="wave-28 parity defect: gateway service consent/install admission diverges from the pin")), True])
+@pytest.mark.parametrize("fail", [False, True])
 def test_explicit_install_records_only_completed_install(supervisor, monkeypatch, fail):
     from argparse import Namespace
     import subprocess
