@@ -448,9 +448,3 @@ def test_update_syntax_failure_restores_pre_update_head(update_tree, monkeypatch
 
 
 
-def _publish_stable(monkeypatch, t):
-    """stable = the latest published GitHub release; its resolver pins t.wanted (v1.1.0)."""
-    from qubit_cli import source_releases
-
-    monkeypatch.setattr(source_releases, '_resolve_stable', lambda repository, *_: source_releases.SourceTarget(
-        'stable', 'stable', repository, commit=t.wanted, version='1.1.0'))

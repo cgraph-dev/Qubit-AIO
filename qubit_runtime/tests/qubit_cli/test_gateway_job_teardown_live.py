@@ -373,29 +373,6 @@ def _kernel32():
     k.CloseHandle.restype = wintypes.BOOL
     return k
 
-def _start_driver_in_job(k, job: int, argv: list[str]) -> subprocess.Popen:
-    """Start ``argv`` inside ``job`` before it runs a single instruction.
-
-    The process is created suspended, assigned, then resumed — the same seam
-    the updater uses (``update_lock.bind_child_to_update_tree`` +
-    ``resume_suspended_child``). Assigning a RUNNING process is racy: a venv's
-    ``Scripts\\python.exe`` is a redirector that starts the real interpreter as
-    its own child, and a child created before ``AssignProcessToJobObject``
-    lands stays outside the job. That interpreter is the one that spawns the
-    grandchild, so the grandchild escaped the job and survived the teardown
-    (~6% of CI runs before this).
-    """
-    from qubit_cli.update_lock import resume_suspended_child
-
-    driver = subprocess.Popen(argv, cwd=str(_REPO_ROOT), creationflags=CREATE_SUSPENDED)
-    if not k.AssignProcessToJobObject(job, int(driver._handle)):
-        error = ctypes.get_last_error()
-        driver.kill()
-        driver.wait(timeout=30)
-        pytest.fail(f"AssignProcessToJobObject failed (winerror={error})")
-    resume_suspended_child(driver)
-    return driver
-
 def _read_pid(path: Path) -> int | None:
     try:
         text = path.read_text(encoding="utf-8-sig").strip()

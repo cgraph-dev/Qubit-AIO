@@ -164,28 +164,3 @@ async def test_non_corruption_database_error_is_not_swallowed(monkeypatch):
         await sessions_router.get_session_detail("20260830_180820_744f05")
 
 
-class _CorruptAuthorityDB:
-    """Authority store whose first write fails the way a corrupt file really fails."""
-
-    db_path = "/nonexistent/state.db"
-
-    def _validate_import_payload(self, sessions):  # pragma: no cover - import only
-        return sessions, []
-
-def _mutation_request(monkeypatch):
-    """Delete/rename never open a SessionDB in the handler: they admit through the session
-    authority, so corruption surfaces from the authority write, not from a handler-opened store."""
-    import sqlite3
-    from types import SimpleNamespace
-
-    import gateway.session_mutations as _mutations
-
-    authority = SimpleNamespace(db=_CorruptAuthorityDB(), profile_id="p", epoch=1)
-    principal = object()
-    monkeypatch.setattr(_web_server_sessions, "_session_mutation_context", lambda request, profile: (authority, principal))
-
-    async def _mutate(*_args, **_kwargs):
-        raise sqlite3.DatabaseError("database disk image is malformed")
-
-    monkeypatch.setattr(_mutations, "mutate_session", _mutate)
-    return SimpleNamespace()

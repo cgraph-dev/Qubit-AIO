@@ -31,9 +31,6 @@ def _pin_fixture(tmp_path: Path) -> tuple[Path, str, str]:
     off_branch = _git(origin, "rev-parse", "HEAD")
     _git(origin, "checkout", "-q", "main")
     return origin, pin, off_branch
-def _clone_argv(trace: Path) -> list[str]:
-    [line] = [line for line in trace.read_text(encoding="utf-8-sig", errors="replace").splitlines() if "built-in: git clone " in line]
-    return line.split("built-in: git clone ", 1)[1].split()
 def test_pinned_fresh_clone_publishes_nothing_when_the_pin_is_refused(tmp_path):
     origin, _, off_branch = _pin_fixture(tmp_path)
     home = tmp_path / "home"
