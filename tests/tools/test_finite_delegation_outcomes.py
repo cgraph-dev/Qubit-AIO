@@ -241,7 +241,6 @@ def test_nonfinite_marker_preserves_background_dispatch(harness, monkeypatch, ma
     assert all(child.closed.wait(2) for child in children)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: finite scope does not suppress history wake sid")
 def test_owner_finite_scope_overrides_history_without_leaking(harness, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from gateway.session_finite import finite_turn_scope, finite_turn_required
