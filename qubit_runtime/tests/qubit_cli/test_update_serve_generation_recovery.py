@@ -1157,3 +1157,32 @@ def test_recovery_module_reports_empty_serve_coverage_off_linux_in_a_real_proces
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["serve_units"] == {"verified": [], "failed": []}
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def _fake_systemctl_path(tmp_path):
+    """A ``PATH`` whose first ``systemctl`` is a recording fake, plus its argv log.
+
+    The child interpreter is outside the in-process live-system guard and resolves
+    ``systemctl`` through ``shutil.which``; without this it restarted the developer's
+    real hermes-serve / hermes-dashboard units. The fake lists one active user-scope
+    ``hermes-serve.service`` whose ``MainPID`` changes once it is restarted.
+    """
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log = tmp_path / "systemctl.log"
+    marker = tmp_path / "restarted"
+    fake = bin_dir / "systemctl"
+    fake.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s\\n' \"$*\" >> '{log}'\n"
+        'case " $* " in\n'
+        '  *" --user list-units hermes-serve* "*) echo "hermes-serve.service loaded active running Hermes" ;;\n'
+        '  *" is-active "*) echo active ;;\n'
+        f"  *\" show \"*) if [ -e '{marker}' ]; then echo 200; else echo 100; fi ;;\n"
+        f"  *\" restart \"*) : > '{marker}' ;;\n"
+        "esac\n"
+    )
+    fake.chmod(0o755)
+    return f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", log
+

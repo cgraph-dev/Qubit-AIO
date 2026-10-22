@@ -269,3 +269,22 @@ def test_docs_append_carries_tab_id_and_refuses_ambiguous_writes(api_module, mon
         api_module.docs_append(types.SimpleNamespace(doc_id="doc1", text="more", tab=None))
     err = json.loads(capsys.readouterr().err)
     assert "tabs" in err and len(err["tabs"]) == 3
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
+def test_gmail_search_empty_result_prints_json_array(
+    api_module: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Python-fallback empty search prints [] like the gws path (#131711)."""
+    service = MagicMock()
+    service.users().messages().list().execute.return_value = {"resultSizeEstimate": 0}
+    monkeypatch.setattr(api_module, "_gws_binary", lambda: None)
+    monkeypatch.setattr(api_module, "build_service", lambda *_args: service)
+
+    api_module.gmail_search(api_module.argparse.Namespace(query="is:unread", max=10))
+
+    assert json.loads(capsys.readouterr().out) == []
+

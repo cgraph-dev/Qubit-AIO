@@ -943,3 +943,18 @@ class TestEscapeNativeToolArg:
         assert node_cmds, f"no node command captured in: {commands}"
         assert "'C:/Users/alice/app/main.js'" in node_cmds[0]
         assert "/c/Users" not in node_cmds[0]
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def _fenced_base64_reply(command: str, payload: bytes, rc: int = 0) -> str:
+    """The reply shape ``_read_exact_bytes`` asks for: its per-call sentinel around the base64
+    payload (and the file's ``wc -c`` when the command asks for it), then the read's exit status.
+    Mirrors what the real shell emits, so a double stays honest about the fence the transport
+    relies on."""
+    import base64 as _b64
+    import re as _re
+    sentinel = _re.search(r"__HERMES_RB_[0-9a-f]+__", command).group(0)
+    body = _b64.b64encode(payload).decode() if rc == 0 else ""
+    size = f"{len(payload)}\n{sentinel}\n" if "wc -c <" in command else ""
+    return f"{sentinel}\n{body}\n{sentinel}\n{size}{rc}\n"
+

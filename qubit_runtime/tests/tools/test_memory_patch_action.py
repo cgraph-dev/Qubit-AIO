@@ -126,3 +126,37 @@ def test_patch_op_counts_as_destructive_for_staging(packed_store):
     ops = destructive_ops({"action": "batch", "operations": [
         {"action": "patch", "old_text": "item B", "new_text": "x"}]})
     assert [op["action"] for op in ops] == ["patch"]
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+class TestPatchBatch:
+    def test_batch_reports_the_entry_each_patch_produced(self, packed_store):
+        result = packed_store.apply_batch("memory", [
+            {"action": "patch", "old_text": "item B", "content": "item B done"},
+            {"action": "patch", "old_text": "item C", "content": "item C done"},
+        ])
+        assert result["patched_entries"] == {1: PACKED, 2: "todo: item A; item B done; item C"}
+        assert result["patched_entries_after"] == {
+            1: "todo: item A; item B done; item C", 2: "todo: item A; item B done; item C done"}
+
+    def test_patch_op_in_batch(self, packed_store):
+        result = packed_store.apply_batch("memory", [
+            {"action": "patch", "old_text": "item B", "new_text": "item B done"},
+        ])
+        assert result["success"] is True
+        assert packed_store._entries_for("memory") == ["todo: item A; item B done; item C"]
+
+    def test_patch_op_without_content_points_at_a_longer_span(self, packed_store):
+        result = packed_store.apply_batch("memory", [{"action": "patch", "old_text": "item B", "content": ""}])
+        assert result["success"] is False
+        assert "patch a longer span" in result["error"]
+        assert packed_store._entries_for("memory") == [PACKED]
+
+    def test_patch_op_counts_as_destructive_for_staging(self, packed_store):
+        # patch rewrites part of an entry: it must be staged (matched_entry pinned)
+        # exactly like replace, never replayed against a newer entry.
+        from tools.memory_tool import destructive_ops
+        ops = destructive_ops({"action": "batch", "operations": [
+            {"action": "patch", "old_text": "item B", "new_text": "x"}]})
+        assert [op["action"] for op in ops] == ["patch"]
+

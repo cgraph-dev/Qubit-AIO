@@ -168,3 +168,21 @@ def test_dispatch_guard_releases_after_sessiondb_finalization_hang(tmp_path):
         release.set()
         sched._running_job_ids.discard(sched._inflight_key("cleanup-guard-hang"))
         sched._shutdown_parallel_pool()
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+from contextlib import contextmanager
+
+from types import SimpleNamespace
+
+
+@contextmanager
+def _owner_execution(db, job, execution_id=None):
+    from gateway import session_cron
+    owner = SimpleNamespace(db=db)
+    token = session_cron._execution.set((owner, "cleanup-session", job["id"], execution_id))
+    try:
+        yield
+    finally:
+        session_cron._execution.reset(token)
+

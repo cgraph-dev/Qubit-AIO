@@ -366,3 +366,64 @@ class TestPersistentSSH:
         assert len(lines) == 1000
         assert lines[0] == "1"
         assert lines[-1] == "1000"
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+import shlex
+
+
+@requires_ssh
+class TestRealSSHBackend:
+    """terminal_tool and the file tools over a real sshd, with the default (persistent) config."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, monkeypatch):
+        _setup_ssh_env(monkeypatch, persistent=True)
+        yield
+        _cleanup()
+
+    def test_exit_code_and_stderr_come_back(self):
+        r = _run("echo out; echo err >&2; exit 3")
+        assert r["exit_code"] == 3
+        assert "out" in r["output"] and "err" in r["output"]
+
+    def test_cwd_persists_and_workdir_does_not(self):
+        home = _run("pwd")["output"].strip()
+        assert home.startswith("/")
+        _run("mkdir -p 'proj/with space' && cd 'proj/with space'")
+        assert _run("pwd")["output"].strip() == f"{home}/proj/with space"
+        assert _run("pwd", workdir="/usr")["output"].strip() == "/usr"
+        assert _run("pwd")["output"].strip() == f"{home}/proj/with space"
+
+    def test_quoting_survives_the_ssh_hop(self):
+        # One quoting layer for bash -c, one for the remote login shell sshd runs it under.
+        payload = "it's \"quoted\" $HOME `tick` \\back; echo injected"
+        r = _run(f"printf '%s\\n' {shlex.quote(payload)}")
+        assert r["output"].rstrip("\n") == payload
+
+    def test_passthrough_env_reaches_remote_via_sendenv(self, monkeypatch):
+        """#14091 end to end: the name rides SendEnv, the value the ssh client env, and the
+        test sshd's ``AcceptEnv HERMES_RB_*`` hands it to the remote shell."""
+        from tools import env_passthrough
+
+        monkeypatch.setenv("HERMES_RB_PASS", "through-sendenv")
+        monkeypatch.setenv("HERMES_RB_PRIVATE", "stays-local")
+        env_passthrough.register_env_passthrough(["HERMES_RB_PASS"])
+        try:
+            r = _run('echo "p=$HERMES_RB_PASS q=${HERMES_RB_PRIVATE:-unset}"')
+        finally:
+            env_passthrough.clear_env_passthrough()
+        assert r["output"].strip() == "p=through-sendenv q=unset"
+
+    def test_file_tools_write_and_read_on_the_remote(self):
+        from tools.file_tools import read_file_tool, write_file_tool
+
+        home = _run("pwd")["output"].strip()
+        path = f"{home}/notes/remote.txt"
+        content = "alpha\nbeta: ünïcödé ✓\n"
+        wrote = json.loads(write_file_tool(path, content, task_id="ssh_test"))
+        assert "error" not in wrote, wrote
+        assert _run(f"wc -c < {shlex.quote(path)}")["output"].strip() == str(len(content.encode()))
+        read = json.loads(read_file_tool(path, task_id="ssh_test"))
+        assert "beta: ünïcödé ✓" in read["content"], read
+

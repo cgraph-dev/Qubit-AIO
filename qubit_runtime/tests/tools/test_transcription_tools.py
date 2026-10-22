@@ -1666,3 +1666,40 @@ class TestTranscribeOpenaiFiveXxRetry:
         assert result["success"] is False
         assert "503" in result["error"] and "ffmpeg" not in result["error"]
         assert mock_client.audio.transcriptions.create.call_count == 1
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+class TestTranscribeAudioXAIDispatch:
+    def test_model_default_is_voice_transcribe_2(self, sample_ogg, monkeypatch):
+        monkeypatch.delenv("STT_XAI_MODEL", raising=False)
+        with patch("tools.transcription_tools._load_stt_config", return_value={"provider": "xai"}), \
+             patch("tools.transcription_tools._get_provider", return_value="xai"), \
+             patch("tools.transcription_tools._transcribe_xai",
+                   return_value={"success": True, "transcript": "hi"}) as mock_xai:
+            from tools.transcription_tools import transcribe_audio
+            transcribe_audio(sample_ogg, model=None)
+
+        assert mock_xai.call_args[0][1] == "grok-voice-transcribe-2.0"
+
+    def test_config_model_overrides_default(self, sample_ogg):
+        config = {"provider": "xai", "xai": {"model": "grok-voice-transcribe-1.0"}}
+        with patch("tools.transcription_tools._load_stt_config", return_value=config), \
+             patch("tools.transcription_tools._get_provider", return_value="xai"), \
+             patch("tools.transcription_tools._transcribe_xai",
+                   return_value={"success": True, "transcript": "hi"}) as mock_xai:
+            from tools.transcription_tools import transcribe_audio
+            transcribe_audio(sample_ogg, model=None)
+
+        assert mock_xai.call_args[0][1] == "grok-voice-transcribe-1.0"
+
+    def test_legacy_grok_stt_alias_uses_current_default(self, sample_ogg):
+        config = {"provider": "xai", "xai": {"model": "grok-stt"}}
+        with patch("tools.transcription_tools._load_stt_config", return_value=config), \
+             patch("tools.transcription_tools._get_provider", return_value="xai"), \
+             patch("tools.transcription_tools._transcribe_xai",
+                   return_value={"success": True, "transcript": "hi"}) as mock_xai:
+            from tools.transcription_tools import transcribe_audio
+            transcribe_audio(sample_ogg, model=None)
+
+        assert mock_xai.call_args[0][1] == "grok-voice-transcribe-2.0"
+

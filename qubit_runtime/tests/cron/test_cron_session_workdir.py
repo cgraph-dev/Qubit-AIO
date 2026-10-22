@@ -86,3 +86,16 @@ def test_run_job_without_workdir_leaves_cron_session_cwd_null(tmp_path):
         assert rows[0]["cwd"] is None
     finally:
         db.close()
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def _run_job_in_owner(job, db, tmp_path):
+    with patch("cron.scheduler._hermes_home", tmp_path), \
+         patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
+         patch("qubit_cli.env_loader.load_hermes_dotenv"), \
+         patch("qubit_cli.env_loader.reset_secret_source_cache"), \
+         patch("qubit_state_registry.acquire", return_value=db), \
+         patch("qubit_cli.runtime_provider.resolve_runtime_provider", return_value=_RUNTIME), \
+         patch("run_agent.AIAgent", _FakeCronAgent):
+        return run_job(job)
+

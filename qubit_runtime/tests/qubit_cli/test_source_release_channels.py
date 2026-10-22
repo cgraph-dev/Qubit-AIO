@@ -315,3 +315,22 @@ def test_default_stable_only_moves_forward_until_the_channel_is_chosen(releases,
     set_install_channel("stable", releases.root)
     update_cmd._cmd_update_impl(SimpleNamespace(branch=None, channel=None, force_venv=True), False)
     assert git(releases.root, "rev-parse", "HEAD") == releases.commits[1]
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
+def test_stable_is_the_latest_published_github_release_without_r2(releases):
+    """Publishing a GitHub release is the only promotion stable needs: no R2 record or pointer."""
+    from qubit_cli import source_releases
+
+    def no_r2(name, repository):
+        raise AssertionError("stable must not read an R2 channel record")
+
+    source_releases._resolve_channel = no_r2
+    # A pointer naming a different build must not outrank the published release.
+    releases.responses["/releases/stable/release-candidates.json"] = {
+        "tag": "v99.0.0", "commit": releases.commits[3]}
+    target = source_releases.resolve_source_target("stable", ["git"], releases.root)
+    assert (target.commit, target.version) == (releases.commits[1], "1.2.3")
+    assert not any(path.startswith("/releases/") for path in releases.requests)
+

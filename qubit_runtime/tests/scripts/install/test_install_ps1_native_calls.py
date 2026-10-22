@@ -115,3 +115,10 @@ def test_rerun_parks_local_work_and_pins_only_branch_commits(tmp_path):
     result, frame = _stage(origin, home, "-Commit", off_branch)
     assert frame["ok"] is False
     assert "is not on branch main" in frame["reason"]
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def _clone_argv(trace: Path) -> list[str]:
+    [line] = [line for line in trace.read_text(encoding="utf-8-sig", errors="replace").splitlines() if "built-in: git clone " in line]
+    return line.split("built-in: git clone ", 1)[1].split()
+

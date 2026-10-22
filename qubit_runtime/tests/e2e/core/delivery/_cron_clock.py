@@ -645,3 +645,28 @@ if __name__ == "__main__":  # child ticker (or replica) process
         _replica_main(Control(Path(sys.argv[1])))
     else:
         _child_main(sys.argv[1])
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+def drain_deliveries() -> int:
+    """The live gateway's housekeeping drain of the durable delivery queue. No live adapters
+    exist in the soak, so every send takes the standalone wire (``FakeSink``). Returns how many
+    queued sends were performed."""
+    from cron import scheduler
+
+    total = 0
+    while True:
+        n = scheduler.drain_delivery_queue({}, None)
+        if not n:
+            return total
+        total += n
+
+
+def effective_outcome(row: dict, deliveries: dict[str, str]) -> Optional[str]:
+    """The ledger's delivery outcome, resolved through the durable queue when the run only
+    booked the handoff (``queued``): the queue's verdict is the delivery's truth."""
+    outcome = row["delivery_outcome"]
+    if outcome != "queued":
+        return outcome
+    return deliveries.get(row["id"], "queued")
+
