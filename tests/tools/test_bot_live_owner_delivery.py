@@ -63,7 +63,6 @@ def test_same_envelope_id_admits_once_and_conflicts_on_changed_payload(tmp_path,
             assert path.stat().st_mode & 0o077 == 0
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: cancel fence cancels an authority-admitted receipt")
 def test_cancel_queued_delivery_cancels_only_an_unadmitted_receipt(tmp_path, monkeypatch):
     """main's cancel fence on the owner seam: a legacy unadmitted queued receipt is cancelled
     once (idempotent); an authority admission is never cancelled from the mailbox."""
@@ -84,7 +83,6 @@ def test_cancel_queued_delivery_cancels_only_an_unadmitted_receipt(tmp_path, mon
     assert mailbox.read_delivery_result(tmp_path, admitted["delivery_id"])["status"] == "queued"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: canonical owner discovery requires metadata instead of the Bot Chat title")
 @pytest.mark.parametrize("intent_state", ["new", "existing", "raced"])
 def test_live_dm_bom_readers_preserve_pinned_intent(tmp_path, monkeypatch, intent_state):
     """Main 61dc26cd7d9 on the canonical door: a BOM-prefixed DM payload and a BOM-prefixed pinned
@@ -183,7 +181,6 @@ def _ready(instance_id):
     return lambda home, timeout: SimpleNamespace(state="ready", endpoint=SimpleNamespace(instance_id=instance_id))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: discovery without a live authority does not refuse")
 def test_canonical_owner_is_the_authority_and_follows_compression(tmp_path, monkeypatch):
     from qubit_state import SessionDB
     import qubit_cli.gateway_runtime as runtime
