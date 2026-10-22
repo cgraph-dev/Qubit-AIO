@@ -977,7 +977,6 @@ def test_run_codex_stream_bounds_post_terminal_drain(monkeypatch):
     assert closed.wait(1.0)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: post-terminal drain timeout does not close the raw stream")
 def test_run_codex_stream_drain_timeout_closes_raw_stream_when_managed_close_raises(monkeypatch):
     """A Relay-managed wrapper whose close() raises (running loop) must not leak the provider stream."""
     import threading

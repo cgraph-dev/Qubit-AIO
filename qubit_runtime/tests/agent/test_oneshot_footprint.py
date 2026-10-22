@@ -65,7 +65,6 @@ def test_oneshot_delegation_budget_charges_total_children_then_refuses(oneshot, 
     assert delegate_tool._oneshot_spawn_budget(parent, 50) is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: gateway-owned oneshot session ignores its frozen policy")
 def test_gateway_owned_oneshot_session_takes_its_footprint_from_the_frozen_policy(tmp_path, monkeypatch):
     """The gateway daemon never has the client's HERMES_SINGLE_QUERY_SESSION: a `chat -q` session it owns is
     one-shot by its frozen ``oneshot`` source, so it gets main's in-process -q shape (no skill_manage, no

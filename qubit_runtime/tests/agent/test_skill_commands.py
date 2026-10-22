@@ -549,7 +549,6 @@ class TestBuildPreloadedSkillsPrompt:
 
 
 class TestDuplicateNamesAgreeAcrossSurfaces:
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: duplicate skill names do not resolve identically across surfaces")
     def test_every_surface_resolves_duplicates_like_skill_view(self, tmp_path, monkeypatch, caplog):
         """#64392: list, prompt index, slash commands, skill_view, -s preload and cron agree. A same-tier
         duplicate is advertised only by its exact path and every loader names those paths; a cross-tier

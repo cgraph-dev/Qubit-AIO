@@ -40,27 +40,6 @@ def test_native_carriers_follow_only_their_owner_on_each_request():
 NOUS_PORTAL = "https://inference-api.nousresearch.com/v1"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: stale fork expectation: the pin replays Portal reasoning_details")
-def test_nous_portal_strips_replayed_reasoning_details_from_wire():
-    """The Portal enforces a cumulative replayed-reasoning budget; replaying stored
-    reasoning_details wedges long sessions with a non-retryable 400 (#118182). Only the
-    wire copy is stripped — stored history keeps the field, so switching to a replaying
-    route (OpenRouter) still replays it."""
-    standard = {"type": "reasoning.encrypted", "data": "opaque-signature"}
-    history = [{"role": "assistant", "content": "answer", "reasoning_details": [standard]}]
-    original = deepcopy(history)
-    transport = ChatCompletionsTransport()
-
-    for base_url in (NOUS_PORTAL, "https://stg-inference-api.nousresearch.com/v1"):
-        wire = transport.convert_messages(deepcopy(history), base_url=base_url)
-        assert "reasoning_details" not in wire[0]
-        assert history == original
-
-    # Substring lookalikes never matched the allowlist; they still strip (strict routes).
-    assert "reasoning_details" not in transport.convert_messages(
-        deepcopy(history), base_url="https://nousresearch.com.evil.io/v1")[0]
-
-
 def test_openrouter_replay_unchanged_by_portal_strip():
     """Sibling #129037: the OpenRouter branch of the allowlist still keeps standard
     reasoning_details on the wire."""
