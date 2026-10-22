@@ -237,7 +237,8 @@ class GatewayProfileReconcileMixin:
         self._served_profile_signatures = sigs
         # A profile deleted while an adapter above was still connecting must not be recorded back
         # (the deleter's signal timed out against this lock and rmtree already ran).
-        live_now = {str(name) for name, _home in _multiplex_profile_homes(self.config)}
+        from qubit_cli.profiles import profiles_to_serve
+        live_now = {str(name) for name, _home in profiles_to_serve(multiplex=True)}
         for name in [n for n in current if n not in live_now and n != active]:
             await self._unserve_profile(name, current.pop(name))
             result["removed"].append(name)

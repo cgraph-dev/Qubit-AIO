@@ -27,7 +27,6 @@ class _Registry:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_failed_hot_serve_retires_session_and_bot_recovery_tasks")
 async def test_failed_hot_serve_retires_session_and_bot_recovery_tasks(monkeypatch, tmp_path):
     home = tmp_path.resolve()
     registry = _Registry()

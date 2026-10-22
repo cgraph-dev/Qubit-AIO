@@ -64,7 +64,9 @@ def _record_shell_hook_consent():
     so nothing is asked for either."""
     from qubit_cli.gateway_chat import env_launch_flags
     flags = env_launch_flags()
-    if os.environ.get("QUBIT_TUI_GATEWAY_URL", "").strip() or flags.get("safe_mode") or flags.get("ignore_user_config"):
+    remote = (os.environ.get("QUBIT_TUI_GATEWAY_URL", "").strip()
+              or os.environ.get("HERMES_TUI_GATEWAY_URL", "").strip())
+    if remote or flags.get("safe_mode") or flags.get("ignore_user_config"):
         return
     try:
         from agent.shell_hooks import record_consent_from_config
@@ -78,7 +80,8 @@ def _adopt_gateway_toolsets(cli, store):
     """The profile default the gateway resolved for the opened session, when this process has no list to
     show (display only), and the "Unknown toolsets" warning as the gateway judged it against its own
     plugins."""
-    info = (store.current or {}).get("info") or {}
+    current = getattr(store, "current", None)
+    info = (current if isinstance(current, dict) else {}).get("info") or {}
     if getattr(cli, "enabled_toolsets", None) is None and isinstance(info.get("enabled_toolsets"), list):
         cli.enabled_toolsets = list(info["enabled_toolsets"])
     if info.get("unknown_toolsets"):

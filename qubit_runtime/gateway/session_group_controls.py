@@ -171,12 +171,12 @@ def _group(authority, actor, method, params, *, host_scope=False):
         # (``AuthorityConnection._sibling_for``), seats served siblings with no entry; a
         # profile-bound one seats its own profile plus its hosted_rooms.profiles entries, as
         # before. Both create paths validate here, by the driver's rule.
+        if service is not None:
+            return {'room': service.create_room(**params, admit=admit)}
         homes, refused = member_roster(authority, siblings=host_scope)
         refuse_unseatable(params.get('members'), refused)
         try:
             members = validate_roster(params.get('members'), local_profiles=homes)
-            if service is not None:
-                return {'room': service.create_room(**params, admit=admit)}
         except DiscussionValidationError as exc:
             # Name the refused member; the bare code left Desktop and gateway.log silent (#139002).
             raise RuntimeStoreError('invalid_params', field='members', detail=str(exc)) from exc

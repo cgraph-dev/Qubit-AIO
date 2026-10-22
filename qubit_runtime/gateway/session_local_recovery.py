@@ -16,9 +16,12 @@ def local_adapter_map(authority):
     ``_adapter_for_source`` / ``_adapters_for_profile`` resolve the right transport)."""
     runner = authority.runner
     registry = getattr(runner, 'session_authorities', None)
-    name = registry.profile_name(authority) if registry is not None else None
+    name = registry.profile_name(authority) if registry is not None and hasattr(registry, 'profile_name') else None
     if name is None:
-        return runner.adapters
+        adapters = getattr(runner, 'adapters', None)
+        if adapters is None:
+            adapters = runner.adapters = {}
+        return adapters
     profile_adapters = getattr(runner, '_profile_adapters', None)
     if profile_adapters is None:
         profile_adapters = runner._profile_adapters = {}
@@ -31,7 +34,7 @@ def local_source(authority, chat_id, user_id):
     SessionStore writes their rows to that profile's ``state.db``, not the launch store."""
     source = SessionSource(platform=Platform.LOCAL, chat_id=chat_id, user_id=user_id, chat_type='dm')
     registry = getattr(authority.runner, 'session_authorities', None)
-    name = registry.profile_name(authority) if registry is not None else None
+    name = registry.profile_name(authority) if registry is not None and hasattr(registry, 'profile_name') else None
     if name is not None:
         source.profile = name
     return source

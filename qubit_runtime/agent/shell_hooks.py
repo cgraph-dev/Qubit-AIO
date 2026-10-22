@@ -790,8 +790,9 @@ def _command_script_path(command: str) -> str:
 
 
 def _resolve_effective_accept(cfg: Dict[str, Any], accept_hooks_arg: bool) -> bool:
-    """Any truthy opt-in channel wins: explicit arg, HERMES_ACCEPT_HOOKS, hooks_auto_accept."""
-    if accept_hooks_arg or os.environ.get("HERMES_ACCEPT_HOOKS", "").strip().lower() in _TRUTHY:
+    """Any truthy opt-in channel wins: explicit arg, this process's --accept-hooks, HERMES_ACCEPT_HOOKS,
+    hooks_auto_accept."""
+    if accept_hooks_arg or _process_accept or os.environ.get("HERMES_ACCEPT_HOOKS", "").strip().lower() in _TRUTHY:
         return True
     cfg_val = cfg.get("hooks_auto_accept", False)
     return cfg_val if isinstance(cfg_val, bool) else isinstance(cfg_val, str) and cfg_val.strip().lower() in _TRUTHY

@@ -18,7 +18,7 @@ from agent import shell_hooks
 def home(tmp_path, monkeypatch):
     h = tmp_path / "home"
     h.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("QUBIT_HOME", str(h))
     for name in ("HERMES_ACCEPT_HOOKS", "HERMES_TUI_GATEWAY_URL", "HERMES_SAFE_MODE", "HERMES_IGNORE_USER_CONFIG"):
         monkeypatch.delenv(name, raising=False)
     from qubit_cli import plugins
@@ -44,7 +44,6 @@ def _wired(event="pre_tool_call"):
     return sorted(cb.__name__ for cb in get_plugin_manager()._hooks.get(event, []))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: gateway shell-hook resync")
 def test_gateway_resync_follows_config_and_allowlist_without_prompting(home, tmp_path, monkeypatch):
     from gateway import run
     from gateway.session_policy import accept_launch_hooks, build_policy, refresh_profile_hooks
@@ -104,7 +103,6 @@ def test_gateway_resync_follows_config_and_allowlist_without_prompting(home, tmp
     assert _wired() == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_resync_keeps_in_memory_consent_and_never_disarms_on_bad_input")
 def test_resync_keeps_in_memory_consent_and_never_disarms_on_bad_input(home, tmp_path, monkeypatch):
     """Review of #139067: a launch's --accept-hooks survives a failed allowlist write; the gateway's
     own --accept-hooks covers hooks added later; a malformed hooks: entry never disarms a guard and
@@ -167,7 +165,6 @@ def test_resync_keeps_in_memory_consent_and_never_disarms_on_bad_input(home, tmp
     assert _wired() == [f"shell_hook[pre_tool_call:{b}]"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_saved_launch_approval_stays_revocable_and_bad_records_are_skipped")
 def test_saved_launch_approval_stays_revocable_and_bad_records_are_skipped(home, tmp_path):
     a, b = _script(tmp_path, "a.sh"), _script(tmp_path, "b.sh")
     shell_hooks.accept_for_launch(_cfg(a))  # saved, so not held in memory
@@ -211,7 +208,6 @@ def test_register_never_reasks_for_a_wired_hook(home, tmp_path, monkeypatch):
     assert shell_hooks.register_from_config(_cfg(a)) == []
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_classic_cli_asks_on_its_terminal_before_opening_the_session")
 def test_classic_cli_asks_on_its_terminal_before_opening_the_session(home, tmp_path, monkeypatch):
     from qubit_cli import cli_init_mixin
     from qubit_cli.gateway_session_store import GatewaySessionStore
