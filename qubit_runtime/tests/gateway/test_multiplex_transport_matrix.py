@@ -156,7 +156,6 @@ def test_restored_rows_fail_closed_on_intake_and_deliver_only_via_a_unique_owner
     assert solo.runner._intake_adapter_for(None) is None and solo.runner._delivery_adapter_for(None) is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the inferred primary transport hides a secondary local session policy")
 def test_inferred_primary_transport_does_not_hide_a_secondary_local_session_policy(mux):
     """A LOCAL source belongs to its session authority, not the inferred primary transport (#139060)."""
     from gateway.session_local import LocalSessionAdapter
