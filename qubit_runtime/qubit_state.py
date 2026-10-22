@@ -1068,7 +1068,19 @@ class SessionDB(
                     self._raise_if_db_replaced()
                     if self._conn is None:  # close() raced this writer
                         self._reopen_after_close_locked(context="write")
-                    self._conn.execute("BEGIN IMMEDIATE")
+                    # DELETE-mode readers share this connection under the same lock (no WAL read
+                    # pool), so a BEGIN IMMEDIATE that waits out a foreign writer inside SQLite
+                    # would freeze the owner loop behind that read. Fail fast instead and let the
+                    # jittered retry below (outside the lock) wait: the loop keeps serving reads.
+                    busy_ms = None
+                    if not self._wal_active:
+                        busy_ms = self._conn.execute("PRAGMA busy_timeout").fetchone()[0]
+                        self._conn.execute("PRAGMA busy_timeout=0")
+                    try:
+                        self._conn.execute("BEGIN IMMEDIATE")
+                    finally:
+                        if busy_ms is not None:
+                            self._conn.execute(f"PRAGMA busy_timeout={int(busy_ms)}")
                     try:
                         fn_started = True
                         result = fn(self._conn)

@@ -10,7 +10,6 @@ from tests.waiting import async_wait_until
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: the claim-phase reopen of a finalized local row runs on the owner event loop and stalls it behind a contended writer")
 async def test_reopening_a_finalized_local_row_behind_a_contended_writer_keeps_the_loop_live(tmp_path, monkeypatch):
     """The first turn of a finalized local session reopens its row inside the claim. With another
     writer holding state.db's lock at that moment, the reopen waits for it; the loop must not."""
