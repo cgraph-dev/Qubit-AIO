@@ -16,6 +16,7 @@ from agent.skill_utils import yaml_load
 from qubit_platform.declaration import Declaration, parse_declaration
 
 _HERMES_EXTENSION = "com.nousresearch.hermes"
+_QUBIT_EXTENSION = "com.nousresearch.qubit"
 _LIVENESS: dict[str, dict] = {}
 
 
@@ -97,7 +98,8 @@ def _server_declarations(
     manifest: Mapping[str, Any], mcp_servers: Mapping[str, dict[str, Any]],
     diagnostics: list[AgentPluginDiagnostic] | None = None,
 ) -> dict[str, AgentPluginServerDeclaration]:
-    namespace = manifest.get("extensions", {}).get(_HERMES_EXTENSION, {})
+    extensions = manifest.get("extensions", {}) or {}
+    namespace = extensions.get(_QUBIT_EXTENSION) or extensions.get(_HERMES_EXTENSION, {})
     raw_servers = namespace.get("servers", {})
     if not isinstance(raw_servers, dict):
         raise AgentPluginError(f"extension '{_HERMES_EXTENSION}'.servers must be an object")

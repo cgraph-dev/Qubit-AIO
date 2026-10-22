@@ -617,13 +617,15 @@ class PluginsAction(WireEnum):
     remove = "remove"
     settings = "settings"
     onboarding = "onboarding"
+    presence = "presence"
 
 
 class PluginsManageParams(ProfileParams):
     """``toggle``: ``key``/``name`` + ``enable``; ``install``: ``identifier``/``repo`` or ``catalog_name``
     (+ ``force``, ``enable``, ``ref``); ``update``: ``name`` (+ ``accept_capabilities`` to apply a re-pin
     that widened the plugin after the user confirmed the ``delta``); ``remove``: ``name`` (user installs only);
-    ``settings``: ``key`` + ``values`` (``{setting_key: value}``, non-secret schema keys only)."""
+    ``settings``: ``key`` + ``values`` (``{setting_key: value}``, non-secret schema keys only);
+    ``presence``: ``names`` (catalog names, answered in that order)."""
 
     action: PluginsAction = PluginsAction.list
     key: str | None = None
@@ -636,6 +638,7 @@ class PluginsManageParams(ProfileParams):
     ref: str | None = None
     accept_capabilities: bool | None = None
     values: dict[str, JsonValue] | None = None
+    names: list[str] | None = None
 
 
 class PluginSettingFieldType(WireEnum):

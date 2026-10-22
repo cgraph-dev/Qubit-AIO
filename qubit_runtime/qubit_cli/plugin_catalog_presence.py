@@ -110,7 +110,9 @@ def presence(entry: Any) -> Presence:
     manifest = _pinned_manifest(entry.repo, entry.sha, entry.subdir)
     if not manifest:
         return UNKNOWN
-    raw_servers = (manifest.get("extensions") or {}).get("com.nousresearch.hermes", {}).get("servers") or {}
+    extensions = manifest.get("extensions") or {}
+    namespace = extensions.get("com.nousresearch.qubit") or extensions.get("com.nousresearch.hermes") or {}
+    raw_servers = namespace.get("servers") or {}
     if not isinstance(raw_servers, dict) or not raw_servers:
         return UNKNOWN
     try:
