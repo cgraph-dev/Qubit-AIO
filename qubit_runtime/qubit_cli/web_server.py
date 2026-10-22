@@ -347,7 +347,12 @@ def _require_token(request: Request) -> None:
     ``gated_auth_middleware`` already 401'd anything without a verified
     ``request.state.session`` — requiring the absent token here would make every
     ``_require_token`` endpoint unreachable behind the gate, so defer to it.
+    A verified native owner (``authenticate_native_http``) is the same-user
+    principal the outer seams already accepted; local Desktop runs with no
+    static token, so that principal must satisfy route-local policy too.
     """
+    if getattr(request.state, "native_http_principal", None):
+        return
     if getattr(request.app.state, "auth_required", False):
         ok = getattr(request.state, "session", None) is not None
     else:
@@ -531,6 +536,7 @@ async def _plugin_api_runtime_gate(request: Request, call_next):
     # be used as a plugin-name oracle. Desktop authenticates with a native ticket.
     if plugin_name and (
         getattr(request.state, "token_authenticated", False)
+        or getattr(request.state, "native_http_principal", None)
         or getattr(request.app.state, "auth_required", False)
         or _has_valid_session_token(request)
         or _has_valid_query_token(request, path)
@@ -569,6 +575,7 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     if (
         not getattr(request.state, "token_authenticated", False)
+        and not getattr(request.state, "native_http_principal", None)
         and not getattr(request.app.state, "auth_required", False)
         and path.startswith("/api/")
         and path not in _PUBLIC_API_PATHS

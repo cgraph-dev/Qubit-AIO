@@ -1,6 +1,6 @@
 """Real daemon restart driver; model and preclaim crash barriers are owned fixtures."""
 import asyncio
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -115,7 +115,7 @@ def probe(tmp_path):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
     sessions, params, pids, epochs = {}, {}, [], []
     def rows():
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
             return dict(db.execute('SELECT request_id,status FROM session_admissions'))
     async def first(desc, proc):
         async with websocket(home, desc) as ws:
