@@ -24,5 +24,3 @@ def test_guest_pool_row_is_dropped_outside_the_desktop_backend(monkeypatch, tmp_
     assert not any(e.source == "device_code" for e in load_pool("nous").entries())
     assert anon_auth.has_guest()
 
-
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

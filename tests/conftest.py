@@ -204,3 +204,31 @@ def _reset_broker_forkserver():
     except Exception:  # pragma: no cover - best-effort teardown
         pass
 
+
+
+@pytest.fixture(autouse=True)
+def _isolate_install_state(tmp_path, monkeypatch):
+    """Keep ``install_state.probe()`` inside this test's machine (ported from the pin).
+
+    The machine marker is per OS user and the home globs expand the real ``~``, so without
+    this a developer machine that has ever run Qubit reads as "used" and the welcome trial
+    (or a freshly isolated home) is refused. Tests of the reader itself replace
+    ``machine_places`` directly.
+    """
+    try:
+        from qubit_cli import install_state
+    except Exception:
+        return
+    import qubit_constants
+
+    def active_root():
+        return (qubit_constants.get_default_qubit_root(),)
+
+    places = install_state.Places(
+        markers=(tmp_path / "machine" / ".machine",),
+        sources=(active_root, install_state._shared_auth_dir),
+    )
+    monkeypatch.setattr(install_state, "machine_places", lambda: places)
+    install_state.probe.cache_clear()
+    yield
+    install_state.probe.cache_clear()
