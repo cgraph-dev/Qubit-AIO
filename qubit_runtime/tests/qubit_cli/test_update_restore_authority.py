@@ -14,7 +14,6 @@ from tests.gateway.fixtures.local_recovery_probe import Model, daemon, rpc, webs
 from tests.waiting import async_wait_until
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: update/restore does not fence a live authority or corrupt epoch as the pin does")
 def test_restore_refuses_live_authority_without_changing_data(tmp_path):
     from qubit_cli.backup import create_quick_snapshot
     from qubit_cli.update_cmd_maint import _restore_state_db_from_snapshot
@@ -92,7 +91,6 @@ def test_restore_refuses_live_authority_without_changing_data(tmp_path):
         thread.join(timeout=5)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: update/restore does not fence a live authority or corrupt epoch as the pin does")
 def test_corrupt_epoch_refuses_profile_sweep_with_separate_recovery(tmp_path, monkeypatch, capsys):
     from qubit_cli import backup, update_cmd
     from qubit_cli.session_recovery import recover_session_database
@@ -110,14 +108,14 @@ def test_corrupt_epoch_refuses_profile_sweep_with_separate_recovery(tmp_path, mo
         snapshots[home] = home / 'state-snapshots' / snapshot / 'state.db'
         (home / 'state.db').write_bytes(b'unreadable canonical runtime epoch')
         originals[home] = (home / 'state.db').read_bytes(), snapshots[home].read_bytes()
-    monkeypatch.setattr(update_cmd, 'get_hermes_home', lambda: homes[0])
+    monkeypatch.setattr(update_cmd, 'get_qubit_home', lambda: homes[0])
     monkeypatch.setattr(backup, '_sibling_profile_homes', lambda home: [('work', homes[1])])
     update_cmd._verify_and_restore_state_dbs_post_update()
     output = capsys.readouterr().out
     for home in homes:
         assert ((home / 'state.db').read_bytes(), snapshots[home].read_bytes()) == originals[home]
     assert 'Auto-restored' not in output
-    assert 'separate' in output and 'hermes sessions recover' in output
+    assert 'separate' in output and 'qubit sessions recover' in output
     assert 'restored copy also failed integrity' not in output
     for home in homes:
         report = recover_session_database(snapshots[home], home / 'recovered.db')
@@ -127,7 +125,6 @@ def test_corrupt_epoch_refuses_profile_sweep_with_separate_recovery(tmp_path, mo
         assert (home / 'state.db').read_bytes() == originals[home][0]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: update/restore does not fence a live authority or corrupt epoch as the pin does")
 def test_update_restore_excludes_startup_until_publication(tmp_path, monkeypatch):
     import subprocess
     import sys
