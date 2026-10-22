@@ -52,7 +52,6 @@ CASES = [("delete", True), ("delete", False), ("rename", False), ("recreate", Fa
 
 @pytest.mark.parametrize(("op", "released"), CASES, ids=["delete-owner-releases", "delete-owner-keeps-it",
                                                        "rename-owner-keeps-it", "recreate-over-owned-shell"])
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: profile delete/rename does not wait for a live gateway.lock owner and reports no error")
 def test_profile_home_waits_for_the_live_owner_to_release_it(profile, monkeypatch, op, released):
     monkeypatch.setattr(profiles_remove, "OWNER_RELEASE_WAIT_SECONDS", 30.0 if released else 1.5)
     monkeypatch.setattr(profiles, "_live_default_multiplexer", lambda: op == "rename")  # rename's unroute arm
