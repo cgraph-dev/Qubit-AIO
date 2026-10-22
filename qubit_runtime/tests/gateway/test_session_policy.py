@@ -40,7 +40,6 @@ def test_policy_selects_surface_and_isolates_cwd(tmp_path):
             build_policy(params, {})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: launch options frozen/hooks consent")
 @pytest.mark.asyncio
 async def test_launch_options_reach_the_owner_frozen_and_hooks_consented(tmp_path, monkeypatch):
     """`-s/--skills`, `--checkpoints`, `--pass-session-id`, `--accept-hooks` (and an exported
@@ -62,6 +61,7 @@ async def test_launch_options_reach_the_owner_frozen_and_hooks_consented(tmp_pat
     (home / 'skills' / 'launch-fixture').mkdir(parents=True)
     (home / 'skills' / 'launch-fixture' / 'SKILL.md').write_text(
         '---\nname: launch-fixture\ndescription: fixture\n---\n\nLAUNCH_SKILL_BODY\n')
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.setenv('HERMES_HOME', str(home))
     monkeypatch.delenv('HERMES_ACCEPT_HOOKS', raising=False)
     hook = tmp_path / 'hook.sh'
@@ -349,6 +349,7 @@ def test_frozen_route_keeps_its_endpoint_after_live_config_edit(tmp_path, monkey
     from qubit_cli.config_effective import load_user_config_effective
     home = tmp_path / 'home'
     home.mkdir()
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.setenv('HERMES_HOME', str(home))
 
     def write(url, key):
@@ -377,6 +378,7 @@ def test_frozen_bare_custom_route_keeps_its_endpoint_pool_and_launch_key_wins(tm
     from qubit_cli.config_effective import load_user_config_effective
     home = tmp_path / 'home'
     home.mkdir()
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.setenv('HERMES_HOME', str(home))
     url = 'http://127.0.0.1:1/v1'
     (home / 'config.yaml').write_text(json.dumps(
@@ -409,6 +411,7 @@ def _frozen_fixture_routes(tmp_path, monkeypatch, *launches):
     from qubit_cli.config_effective import load_user_config_effective
     home = tmp_path / 'home'
     home.mkdir()
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.setenv('HERMES_HOME', str(home))
 
     def write(url):
@@ -434,7 +437,6 @@ def _frozen_fixture_routes(tmp_path, monkeypatch, *launches):
     return runtimes
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_frozen_named_route_keeps_its_pool_after_live_endpoint_edit")
 def test_frozen_named_route_keeps_its_pool_after_live_endpoint_edit(tmp_path, monkeypatch):
     """A frozen named route stays on endpoint A after the live entry moves to B; A's pool key goes
     with it (the pool-key lookup reads the FROZEN entry, not live config) instead of no-key-required."""
