@@ -48,7 +48,6 @@ def _seed(lock: HubLockFile, names: list[str]) -> None:
     }})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: skills-hub lock does not keep installs and taps consistent")
 def test_concurrent_processes_keep_every_install_and_tap(tmp_path):
     hub = tmp_path / "skills" / ".hub"
     hub.mkdir(parents=True)
@@ -70,7 +69,6 @@ def test_concurrent_processes_keep_every_install_and_tap(tmp_path):
     assert sorted(t["repo"] for t in TapsManager(hub / "taps.json").load()) == [f"o/{name}" for name in expected]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: skills-hub lock does not keep installs and taps consistent")
 def test_reader_mid_save_sees_complete_hub_state(tmp_path):
     lock_path = tmp_path / "lock.json"
     taps_path = tmp_path / "taps.json"
