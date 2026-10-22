@@ -492,4 +492,18 @@ def main():
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    _exit_code = main()
+    # A managed worker exits with live daemon threads (the controls reader, title upgrades,
+    # provider pools). Python 3.12's interpreter finalization can abort in that state
+    # (``Py_FinalizeEx`` -> finalizer -> ``PyEval_RestoreThread`` fatal, SIGABRT), which
+    # apport reports as a crash even though the turn completed. Flush what the owner may
+    # still read, then leave without running finalizers; the parent owns the outcome and
+    # this subprocess holds no durable state that an atexit hook must commit.
+    with contextlib.suppress(Exception):
+        sys.stdout.flush()
+    with contextlib.suppress(Exception):
+        sys.stderr.flush()
+    with contextlib.suppress(Exception):
+        for _handler in logger.handlers:
+            _handler.flush()
+    os._exit(_exit_code)
