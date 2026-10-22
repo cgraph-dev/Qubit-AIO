@@ -117,7 +117,6 @@ async def test_whole_runtime_settle_logs_late_work_and_finishes_shutdown(monkeyp
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_unserve_keeps_ownership_without_aborting_the_reconcile")
 async def test_unserve_keeps_ownership_without_aborting_the_reconcile(tmp_path, monkeypatch):
     """A profile whose writer outlived its Stop is unrouted but keeps its reservation and store
     handles; the reconcile is not aborted, so the other removed profile is still unserved."""
