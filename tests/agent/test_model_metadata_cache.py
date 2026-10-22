@@ -15,7 +15,6 @@ from tests.waiting import wait_until
 
 
 @pytest.mark.parametrize("first_writer", ["save", "invalidate"])
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 def test_concurrent_cache_writers_keep_each_others_entries(monkeypatch, first_writer):
     contended = watch_file_lock_contention(monkeypatch)
     mm.save_context_length("model-a", "https://a.example/v1", 200_000)
