@@ -76,7 +76,6 @@ def _deliver(params):
     return srv._methods["bot_relay.deliver"](1, params)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: bot_relay.deliver reports unknown instead of typed runtime_unavailable")
 def test_relay_deliver_refuses_with_typed_reason_and_never_spawns(home, monkeypatch):
     calls = []
     # The server module's import-time update prefetch runs `git ...`; only a

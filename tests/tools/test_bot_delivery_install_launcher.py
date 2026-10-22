@@ -132,7 +132,6 @@ def test_real_delivery_launcher_imports_new_generation(tmp_path, monkeypatch):
     assert "old-generation" not in result.stdout
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: _local_delivery_home only accepts the legacy launcher name")
 @pytest.mark.parametrize("name", ["qubit", "qubit.exe"])
 def test_launcher_shape_preserves_profile_and_lock(tmp_path, monkeypatch, name):
     import contextlib
