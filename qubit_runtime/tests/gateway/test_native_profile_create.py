@@ -8,7 +8,6 @@ from tests.gateway.test_native_http_auth import daemon, headers, reject_ws, tick
 
 
 @pytest.mark.platforms('linux')
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 def test_native_profile_create_grant_is_route_bound_and_single_use(tmp_path):
     with daemon(tmp_path) as (home, descriptor), httpx.Client(
             base_url=descriptor['api_origin'], trust_env=False, timeout=20) as client:
