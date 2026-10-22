@@ -1075,9 +1075,11 @@ def create_quick_snapshot(
     qubit_home: Optional[Path] = None,
     keep: Optional[int] = None,
     max_file_size: Optional[int] = None,
+    *,
+    hermes_home: Optional[Path] = None,
 ) -> Optional[str]:
     """Create one atomic quick snapshot while holding the shared backup slot."""
-    home = qubit_home or get_qubit_home()
+    home = qubit_home or hermes_home or get_qubit_home()
     with _backup_operation_lock(home):
         return _create_quick_snapshot_locked(
             label=label,
@@ -1688,6 +1690,8 @@ def _restore_quick_snapshot_exclusive(snapshot_id: str, home: Path) -> bool:
 def restore_quick_snapshot(
     snapshot_id: str,
     qubit_home: Optional[Path] = None,
+    *,
+    hermes_home: Optional[Path] = None,
 ) -> bool:
     """Restore the whole snapshot offline, or refuse before changing any file.
 
@@ -1696,7 +1700,7 @@ def restore_quick_snapshot(
     was not refused or skipped.
     """
     from gateway.runtime_ownership import OwnershipConflict, exclusive_maintenance
-    home = qubit_home or get_qubit_home()
+    home = qubit_home or hermes_home or get_qubit_home()
     try:
         with exclusive_maintenance([home]):
             return _restore_quick_snapshot_exclusive(snapshot_id, home)

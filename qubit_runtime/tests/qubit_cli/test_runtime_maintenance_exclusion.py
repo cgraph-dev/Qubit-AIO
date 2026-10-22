@@ -13,7 +13,6 @@ from tests.gateway.fixtures.local_recovery_probe import Model, daemon, rpc, webs
 from tests.waiting import async_wait_until
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: create_quick_snapshot does not accept the hermes_home keyword the recovery path passes")
 def test_restore_refuses_live_authority_without_changing_data(tmp_path):
     from qubit_cli.backup import create_quick_snapshot, restore_quick_snapshot
 

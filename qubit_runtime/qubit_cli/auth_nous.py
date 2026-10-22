@@ -24,7 +24,7 @@ from qubit_cli.auth_constants import (
     DEFAULT_NOUS_INFERENCE_URL, DEFAULT_NOUS_PORTAL_URL, DEFAULT_NOUS_SCOPE, DEFAULT_NOUS_WELCOME_URL,
     DEVICE_AUTH_POLL_INTERVAL_CAP_SECONDS, NOUS_AUTH_PATH_INVOKE_JWT, NOUS_BILLING_MANAGE_SCOPE,
     NOUS_DEVICE_CODE_SOURCE, NOUS_INFERENCE_INVOKE_SCOPE, NOUS_INVOKE_JWT_MIN_TTL_SECONDS,
-    _nous_err, httpx)
+    WELCOME_CLAIM_FLAG, _nous_err, httpx)
 
 if TYPE_CHECKING:  # annotation-only; the runtime import would be a cycle
     from qubit_cli.auth import ProviderConfig
@@ -423,7 +423,9 @@ def _nous_shared_shape(src: Dict[str, Any]) -> Dict[str, Any]:
         "inference_base_url": src.get("inference_base_url") or (
             DEFAULT_NOUS_WELCOME_URL if src.get("auth_method") == "anonymous" else DEFAULT_NOUS_INFERENCE_URL),
         "obtained_at": src.get("obtained_at"), "expires_at": src.get("expires_at"),
-        **{k: src[k] for k in ("auth_method", "account_tier", "anon_token", "user_id", "org_id")
+        # WELCOME_CLAIM_FLAG travels too: an adopted connector guest that lost it would read as pre-trial.
+        **{k: src[k] for k in ("auth_method", "account_tier", "anon_token", "user_id", "org_id", "connectors_token",
+                               WELCOME_CLAIM_FLAG)
            if src.get(k) not in (None, "")}}
 
 
