@@ -25,8 +25,6 @@ _WRITES_PER_PROCESS = 150
 _WRITER = textwrap.dedent("""
     import sys, time
     from pathlib import Path
-
-import pytest
     from tools.skills_hub import HubLockFile, TapsManager
 
     hub, tag, count, go = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3]), Path(sys.argv[4])
@@ -50,7 +48,6 @@ def _seed(lock: HubLockFile, names: list[str]) -> None:
     }})
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: skills hub lock.json/taps.json rewrites are not atomic or locked")
 def test_concurrent_processes_keep_every_install_and_tap(tmp_path):
     hub = tmp_path / "skills" / ".hub"
     hub.mkdir(parents=True)
@@ -72,7 +69,6 @@ def test_concurrent_processes_keep_every_install_and_tap(tmp_path):
     assert sorted(t["repo"] for t in TapsManager(hub / "taps.json").load()) == [f"o/{name}" for name in expected]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: skills hub rewrites are not atomic or locked")
 def test_reader_mid_save_sees_complete_hub_state(tmp_path):
     lock_path = tmp_path / "lock.json"
     taps_path = tmp_path / "taps.json"
