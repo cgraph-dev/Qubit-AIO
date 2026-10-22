@@ -225,7 +225,6 @@ def test_describe_prefers_the_plugin_title_over_the_server_slug(tmp_path):
     assert "MCP connection is missing" in sentence
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: declared app offer ignores requires.gpu")
 def test_gpu_requirement_hides_a_connected_server_and_says_which_gpu(monkeypatch):
     """A connected server whose `requires.gpu` the host misses is not offered, and its status is a
     state the Plugins tab can carry, with a sentence that names the GPU instead of "Install <app>"."""
