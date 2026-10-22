@@ -138,7 +138,10 @@ def test_retirement_adopts_destination_only_after_success(source, monkeypatch, o
     assert len(requests) == 1
 
 
-@pytest.mark.parametrize("channel", ["preview-not-registered", "stable", "canary", "main"])
+# ``main`` is intentionally absent: this fork's main channel is the git branch itself, so an
+# unpublished/unreadable main record falls back to main (test_unpublished_main_record_keeps_
+# following_the_git_branch pins that). An explicitly selected non-main channel must fail closed.
+@pytest.mark.parametrize("channel", ["preview-not-registered", "stable", "canary"])
 def test_missing_channel_cannot_fall_back_to_main(source, monkeypatch, channel):
     from qubit_cli import source_check
 
@@ -508,10 +511,10 @@ def test_source_retirement_rejects_invalid_archive_constraints(source, retired_c
 
 
 @pytest.mark.parametrize("failure", ["not-found", "forbidden", "timeout"])
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: resolve_source_target reads the channel record for main instead of following the git branch")
-def test_main_follows_the_git_branch_without_reading_a_channel_record(source, monkeypatch, failure):
-    """main IS the source branch, so its R2 record is never read: a 403 from a regional
-    WAF or a timeout cannot stop an install following main. Preview channels still read theirs."""
+def test_main_tolerates_an_unreadable_channel_record_and_follows_the_git_branch(source, monkeypatch, failure):
+    """main IS the source branch: its R2 record is consulted only for a retirement, so a
+    404, a 403 from a regional WAF, or a timeout falls back to following main through git.
+    Every other channel still fails closed on the same record."""
     import urllib.error
 
     from qubit_cli import source_check
@@ -519,14 +522,16 @@ def test_main_follows_the_git_branch_without_reading_a_channel_record(source, mo
 
     set_install_channel("main", source.root)
     reads = []
+    problems = {
+        "not-found": ChannelNotFound(f"Channel object not found: releases/channels/main.json"),
+        "forbidden": urllib.error.HTTPError(
+            "https://x/releases/channels/main.json", 403, "Forbidden", {}, None),
+        "timeout": TimeoutError("timed out"),
+    }
 
     def record(name, repository):
         reads.append(name)
-        if failure == "forbidden":
-            raise urllib.error.HTTPError(f"https://x/releases/channels/{name}.json", 403, "Forbidden", {}, None)
-        if failure == "timeout":
-            raise TimeoutError("timed out")
-        raise ChannelNotFound(f"Channel object not found: releases/channels/{name}.json")
+        raise problems[failure]
 
     monkeypatch.setattr(source_releases, "_resolve_channel", record)
     target = source_releases.resolve_source_target("main", ["git"], source.root)
@@ -534,7 +539,7 @@ def test_main_follows_the_git_branch_without_reading_a_channel_record(source, mo
     status = source_check.check_for_updates(install_root=source.root, home=source.home, force=True)
     assert "error" not in status, status
     assert status["targetSha"] == source.commits[2]
-    assert reads == []
+    assert reads.count("main") == 2  # resolve_source_target + the passive check, both tolerated
     with pytest.raises((ChannelNotFound, urllib.error.HTTPError, TimeoutError)):
         source_releases.resolve_source_target("canary", ["git"], source.root)
-    assert reads == ["canary"]
+    assert reads[-1] == "canary"

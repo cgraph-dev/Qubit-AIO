@@ -141,15 +141,3 @@ def portal(monkeypatch, tmp_path):
     from tests.qubit_cli.anon_portal import install_portal
     return install_portal(monkeypatch, tmp_path)
 
-def _never_mint(monkeypatch):
-    """The resolver is a READ: any call into the creator from inside it is a bug."""
-    monkeypatch.setattr("qubit_cli.anon_auth.ensure_portal_identity",
-                        lambda **kw: (_ for _ in ()).throw(AssertionError("resolve_provider must not mint")))
-
-def _claimed_trial_with_aws(monkeypatch):
-    """A claimed welcome trial on the desktop's local backend, then a leftover ~/.aws profile."""
-    from tests.qubit_cli.anon_portal import claimed_trial
-    _clear_provider_env(monkeypatch)
-    claimed_trial(monkeypatch)
-    _never_mint(monkeypatch)
-    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: True)

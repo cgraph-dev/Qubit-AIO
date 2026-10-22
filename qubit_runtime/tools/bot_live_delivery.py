@@ -367,7 +367,7 @@ def _door(call: Callable[[Path, dict], dict], profile_home, owner, message, *, d
         path = root / f"{key}.json"
         existing = _read(path)
         if existing is not None:
-            if (existing["owner"] != pinned or existing["message"] != message or existing.get("author") != author
+            if (existing.get("owner") != pinned or existing["message"] != message or existing.get("author") != author
                     or existing.get("notification_category", "result") != notification_category):
                 raise ValueError("delivery id already belongs to a different payload")
             return existing
@@ -462,7 +462,8 @@ def cancel_queued_delivery(
     with _locked(profile_home) as root:
         path = root / f"{key}.json"
         record = _read(path)
-        if record is None or record["status"] != "queued":
+        # An authority admission lives in its FIFO: only the authority may settle it.
+        if record is None or record["status"] != "queued" or record.get("admission_id"):
             return record
         record.update(status="cancelled", reply="", error=error, reason=reason,
                       completed_at=time.time_ns())

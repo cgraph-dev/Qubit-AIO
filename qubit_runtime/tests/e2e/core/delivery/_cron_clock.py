@@ -42,18 +42,6 @@ import threading
 import time as _real_time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
-def drain_deliveries() -> int:
-    """The live gateway's housekeeping drain of the durable delivery queue. No live adapters
-    exist in the soak, so every send takes the standalone wire (``FakeSink``). Returns how many
-    queued sends were performed."""
-    from cron import scheduler
-
-    total = 0
-    while True:
-        n = scheduler.drain_delivery_queue({}, None)
-        if not n:
-            return total
-        total += n
 def delivery_status(home: Path) -> dict[str, str]:
     """execution id -> durable queue status (``pending``/``delivering``/``delivered``/``failed``/
     ``unknown``/``suppressed``), including tombstoned rows."""
@@ -68,14 +56,6 @@ def delivery_status(home: Path) -> dict[str, str]:
         return out
     finally:
         conn.close()
-def effective_outcome(row: dict, deliveries: dict[str, str]) -> Optional[str]:
-    """The ledger's delivery outcome, resolved through the durable queue when the run only
-    booked the handoff (``queued``): the queue's verdict is the delivery's truth."""
-    outcome = row["delivery_outcome"]
-    if outcome != "queued":
-        return outcome
-    return deliveries.get(row["id"], "queued")
-
 REAL_DATETIME = _dt.datetime
 HEARTBEAT_REAL_SECONDS = 0.05
 POLL_SECONDS = 0.005

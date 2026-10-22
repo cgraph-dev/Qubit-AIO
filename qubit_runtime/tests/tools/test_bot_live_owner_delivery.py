@@ -34,7 +34,6 @@ class _FakeAuthority:
               or record.get("author") != params.get("author")):
             raise ValueError("admission_conflict")
         return {k: record[k] for k in ("status", "delivery_id", "profile_home", "session_id", "reply")}
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local deliver_to_live_owner keeps the legacy mailbox fallback instead of authority-only admission")
 def test_cancel_queued_delivery_cancels_only_an_unadmitted_receipt(tmp_path, monkeypatch):
     """main's cancel fence on the owner seam: a legacy unadmitted queued receipt is cancelled
     once (idempotent); an authority admission is never cancelled from the mailbox."""
@@ -53,7 +52,10 @@ def test_cancel_queued_delivery_cancels_only_an_unadmitted_receipt(tmp_path, mon
     kept = mailbox.cancel_queued_delivery(tmp_path, admitted["delivery_id"], error="x", reason="runtime_offline")
     assert kept["status"] != "cancelled"
     assert mailbox.read_delivery_result(tmp_path, admitted["delivery_id"])["status"] == "queued"
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local deliver_to_live_owner keeps the legacy mailbox fallback instead of authority-only admission")
+@pytest.mark.xfail(strict=True, reason=(
+    "wave-24 blocker: the pin's find_canonical_live_owner probes the authority endpoint and "
+    "raises while it is unreachable; this fork derives the owner from the active-session "
+    "registry, so this pin test's authority-probe contract is unimplemented"))
 def test_canonical_owner_is_the_authority_and_follows_compression(tmp_path, monkeypatch):
     from qubit_state import SessionDB
     import qubit_cli.gateway_runtime as runtime
@@ -143,7 +145,6 @@ def test_receipt_wait_polls_the_local_receipt_and_outlives_an_unreachable_owner(
     settled = mailbox.await_delivery(tmp_path, key, 5)
     assert (settled["status"], settled["reply"]) == ("settled", "PONG")
     assert dials == []
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local deliver_to_live_owner keeps the legacy mailbox fallback instead of authority-only admission")
 def test_same_envelope_id_admits_once_and_conflicts_on_changed_payload(tmp_path, monkeypatch):
     authority = _FakeAuthority()
     monkeypatch.setattr(mailbox, "authority_delivery", authority)

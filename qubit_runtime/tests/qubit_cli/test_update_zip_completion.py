@@ -340,10 +340,6 @@ def test_installed_app_without_a_checkout_build_is_still_rebuilt(zip_update, mon
     assert built == [rebuilt]
 
 
-def _swap_leftovers(root):
-    """Staging/backup siblings and the journal; the swap lock is a stable sidecar that stays (one inode)."""
-    return [p for p in root.glob("*.qubit-update-*") if p.name != ".qubit-update-zip-swap.lock"]
-
 @pytest.mark.xfail(strict=True, reason="wave-20 parity blocker: local zip fixture archive does not name its commit, which the fork refuses")
 @pytest.mark.parametrize("route", ["direct", "git-failure"])
 def test_zip_build_failure_after_swap_is_a_followup(zip_update, monkeypatch, route):

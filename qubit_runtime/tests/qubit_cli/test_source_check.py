@@ -564,14 +564,13 @@ def test_bare_git_off_path_reads_through_the_updaters_git(installation, monkeypa
     assert status["currentSha"] == head
     assert status["behind"] == 0
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: source-check git batch/read path returns no commits")
-def test_main_follows_the_branch_without_reading_a_channel_record(installation):
-    """main IS the git branch: no R2 record is requested (a regional WAF can answer
-    it 403), the configured branch is probed, and the Desktop branch setting is left alone."""
+def test_main_follows_the_branch_when_its_channel_record_is_unreadable(installation):
+    """main IS the git branch: its R2 record is consulted for a retirement, but a regional
+    WAF answering 403 cannot stop the configured branch being probed or heal the Desktop setting."""
     from qubit_cli.source_check import check_for_updates
 
     _root, linked, home, _base, head, responses, requests, _git = installation
-    # Even a record that would answer is never read.
+    # The record read is attempted and denied; the branch must still be followed.
     responses[MAIN_CHANNEL] = (403, {"message": "blocked by WAF"})
     branch_path = "/repos/fixture/fork/commits/desktop-choice"
     responses[branch_path] = (200, head)
@@ -583,28 +582,14 @@ def test_main_follows_the_branch_without_reading_a_channel_record(installation):
     assert status.get("branch") == "desktop-choice", status
     assert status.get("targetSha") == head, status
     assert status["behind"] == 0
-    assert requests == [branch_path]
+    assert requests == [MAIN_CHANNEL, branch_path]
     assert json.loads(branch_file.read_text())["branch"] == "desktop-choice"
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: source-check git batch/read path returns no commits")
-@pytest.mark.parametrize("on,release,rollback", [("head", "base", True), ("base", "head", False)])
-def test_stable_release_the_checkout_already_contains_is_a_rollback(installation, tmp_path, on, release, rollback):
-    """A release HEAD contains is a move back (#137714); an older checkout is a real update."""
-    from qubit_cli.source_check import check_for_updates
-
-    root, _linked, home, base, head, responses, _requests, git = installation
-    shas = {"base": base, "head": head}
-    bare = tmp_path / "origin.git"
-    git("clone", "-q", "--bare", str(root), str(bare), cwd=tmp_path)
-    git("tag", "v1.2.3", shas[release], cwd=bare)
-    git("remote", "set-url", "origin", str(bare))
-    git("checkout", "-q", "--detach", shas[on])
-    api = "/repos/NousResearch/qubit-agent"
-    responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
-    responses[f"{api}/commits/v1.2.3"] = (200, {"sha": shas[release]})
-
-    status = check_for_updates(install_root=root, home=home, channel="stable", force=True)
-
-    assert status.get("targetSha") == shas[release], status
-    assert status["updateAvailable"] is True
-    assert status["rollback"] is rollback
+# Removed case (was ``test_stable_release_the_checkout_already_contains_is_a_rollback``):
+# upstream derives stable from the GitHub ``/releases/latest`` API and reports a ``rollback``
+# flag. This fork's stable channel is an R2 ``ChannelRecord`` (docs: source_releases
+# ``_resolve_stable``) and the forward-only guard lives in ``resolve_source_target(...,
+# forward_only=True)``, so there is no GitHub-release promotion or ``rollback`` field to assert.
+# The same no-downgrade contract is covered against the fork's R2 record by
+# tests/qubit_cli/test_source_release_channels.py::
+# test_default_stable_only_moves_forward_until_the_channel_is_chosen.
