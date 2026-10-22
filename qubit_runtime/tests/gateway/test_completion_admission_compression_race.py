@@ -43,7 +43,6 @@ class _QueuedTransport(BasePlatformAdapter):
         ("unchanged", False, "owner"),
     ],
 )
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: queued completion after admission loses the result across compression/new/resume")
 async def test_queued_completion_after_admission_preserves_result_or_user_boundary(
     tmp_path, monkeypatch, private_db_probe_cleanup, route_change, transient_read, expected,
 ):

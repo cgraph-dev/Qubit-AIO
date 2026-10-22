@@ -9,7 +9,6 @@ from tests.waiting import async_wait_until
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: messaging /new strands a queued automation wake on the abandoned session")
 async def test_new_moves_a_queued_wake_to_the_fresh_session(monkeypatch):
     from gateway.config import GatewayConfig, Platform, PlatformConfig
     from gateway.platforms.base import SendResult

@@ -11,7 +11,6 @@ from tui_gateway.hosted_room_peer_http import PeerRunsHTTPClient, PeerRunsHTTPEr
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 async def test_peer_poll_resolves_unknown_member_run(tmp_path, monkeypatch):
     client, adapters, store, owner, unknown, _follower, executed, tasks = (
         await _restarted_api_runs(tmp_path, monkeypatch))
