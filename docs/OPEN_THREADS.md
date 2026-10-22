@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 23 — 2026-10-22 (117 missing; EG2 augmenter live)
+
+- ✅ EG2 L1.5 voice augmenter added (`b27d555bc`), flag enabled live: max-sim, UNKNOWN-only, pending/risk veto; 26 tests, real-model probe; 0 executable high-risk routes across 39 probes + 710 utterances.
+- ✅ 3 defect lanes fixed 78 cases; short-port lane closed ~137 symbols in 27 files; absent lane ported 39 files (72 new strict xfails).
+- ✅ Measured: absent **283 → 243**; short-port **253 → 117**; total **253 → 117**; production **1** (declared B1); **0 production dead** (13 test helpers).
+- 🔴 Remaining: 120 xfail markers; 359 test symbols; no global E2E/release verdict.
+- ✅ Live: bridge/orb restarted, `/chat` 200, augmenter active.
+
 ## Wave 22 — 2026-10-22 (253 missing; 103 wave-20 xfails)
 
 - ✅ 4 continuation lanes: 69 more wave-20 defects fixed (172 → 103), 40 more test files (27 new wave-22 xfails), shared/relay metrics, plugin FIFO, legacy routes, update stop reasons, TUI model/profile scope.
