@@ -176,17 +176,22 @@ X_SPIN_PERIOD_S = 27.0
 
 
 def spin_angles(t: Any) -> Tuple[float, float]:
-    """(theta_y, phi_x) whole-mark turns in RADIANS at clock ``t``.
+    """``(theta_y, phi_x)`` whole-mark turn in RADIANS — RETIRED, now zero.
 
-    ``theta_y = 2*pi*t/20.5`` about the vertical axis FIRST, then
-    ``phi_x = 2*pi*t/27.0`` about the horizontal one. Both are linear ramps
-    from zero, so the tumble is continuous and deterministic — and never a
-    thin line, because neither axis holds the edge-on pose: the two turns
-    keep pulling each other off it.
+    Owner 2026-10-22: "not the whole voice orb is a single image that rotates,
+    each element should be alive and rotate". The combined X+Y tumble rotated
+    the ENTIRE assembly as one rigid picture, which is what made the mark read
+    as a single spinning image instead of a system of living parts. It is
+    switched off: each circle spins about the nucleus on its own period
+    (:func:`ring_spin_deg`), particles carry their own orbits and spins, and the
+    body no longer turns. The function stays (returning zeros) because the Qt
+    and Tk lanes and the contracts call it, and a zero turn makes their
+    projection an exact identity — nothing else has to change.
+
+    The periods are kept as constants for the record and for any caller that
+    reports them. Never raises.
     """
-    tt = _finite(t)
-    return (2.0 * math.pi * tt / Y_SPIN_PERIOD_S,
-            2.0 * math.pi * tt / X_SPIN_PERIOD_S)
+    return (0.0, 0.0)
 #: Per-particle wobble: a bounded PHASE offset in degrees, never a clock
 #: multiplier (a multiplier makes the field accelerate with uptime).
 SPEED_MOD_AMP = 0.10
@@ -233,6 +238,27 @@ PARTICLES: Tuple[Tuple[str, float, float, float], ...] = (
     ("b", 212.0, 0.80, 18.9),
     ("b", 291.0, 0.95, 16.3),
 )
+
+# --------------------------------------------------------- particle spins
+#: Owner 2026-10-22: "particles should have multiple spin animations, random
+#: particles, spiral spin, reverse spin against each other". Every logo bead
+#: carries FOUR independent motions instead of one orbit:
+#:   * orbit      around the nucleus (the ``PARTICLES`` periods above)
+#:   * spin       about its OWN centre, per-bead period, alternating direction
+#:   * spiral     radial in/out play, phased per bead, on its own period
+#:   * wobble     the existing sub-pixel micro-dance
+#: Each period below is drawn from a non-harmonic family so no two beads (and no
+#: bead against any circle) ever move in lock-step — that independence is what
+#: makes the field read as many living bodies rather than one rotating image.
+PARTICLE_SPIN_PERIODS_S = (1.6, 1.95, 2.2, 2.55, 2.85, 3.1, 4.0, 4.15, 5.25)
+#: How much SHORTER the spiral's period is than the bead's spin period. A
+#: non-integer ratio means the spiral never repeats the same pose as the spin.
+PARTICLE_SPIRAL_RATIO = 1.7
+#: Spiral amplitude as a fraction of ``0.05 * R`` — the in/out play is small
+#: enough to stay on its orbit, large enough to see.
+PARTICLE_SPIRAL_AMP = 1.0
+#: Phase salt so the spiral's phase is uncorrelated with the bead's seed angle.
+SPIRAL_PHASE_SALT = 0.37
 
 #: Dust motes: a denser, slower field so the orbits are never bare. Owner
 #: 2026-10-19: "add more particles ... small ones". The count is up and every
@@ -765,7 +791,7 @@ def dof(depth: Any) -> float:
     return DOF_NEAR + (DOF_FAR - DOF_NEAR) * (1.0 - d) ** DOF_GAMMA
 
 
-def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
+def particle_state(t: Any, R: float) -> List[Dict[str, Any]]:
     """The nine logo particles: position, depth, size, alpha, white-lift."""
     tt = _finite(t)
     r = _finite(R, 32.0) or 32.0
@@ -792,10 +818,28 @@ def particle_state(t: Any, R: float) -> List[Dict[str, float]]:
         tw = glint(tt, seed)
         wx, wy = micro_offset(tt, idx, r, 17.1)
         pz, pz2 = _volume_axes(tt, idx, 17.1)
+        # Per-particle SPIN (owner 2026-10-22: "particles should have multiple
+        # spin animations, random particles, spiral spin, reverse spin against
+        # each other"). Each bead carries its own rotation about its own centre
+        # AND a spiral radius modulation, so the field reads as many independent
+        # spinning bodies rather than one rotating plate:
+        #   ``spin``      accumulated degrees, per-bead period and direction
+        #   ``spin_dir``  +1 / -1, so neighbouring beads counter-rotate
+        #   ``spiral``    radial play around the orbit, phased per bead
+        #   ``wobble_r``  the spiral's live offset in px
+        psp = PARTICLE_SPIN_PERIODS_S[idx % len(PARTICLE_SPIN_PERIODS_S)]
+        pdir = 1.0 if hash01(idx, 41.9) >= 0.5 else -1.0
+        spin = pdir * 360.0 * tt / max(0.2, psp)
+        spiral = math.sin(2.0 * math.pi * tt
+                          / max(0.2, psp * PARTICLE_SPIRAL_RATIO)
+                          + seed * SPIRAL_PHASE_SALT)
+        wobble_r = spiral * PARTICLE_SPIRAL_AMP * r * 0.05
         out.append({
             "index": float(idx), "orbit": orbit, "angle": ang, "depth": depth,
-            "x": x + nx * par + dx + wx,
-            "y": y + ny * par * 0.35 + dy + wy,
+            "x": x + nx * par + dx + wx + nx * wobble_r,
+            "y": y + ny * par * 0.35 + dy + wy + ny * wobble_r,
+            "spin": spin, "spin_dir": pdir, "spin_period_s": psp,
+            "spiral": spiral, "wobble_r": wobble_r,
             "z": pz, "z2": pz2,
             "wobble": math.hypot(wx, wy),
             "size": _depth_size(depth, size96 * scale) * tw["scale"],
@@ -1811,14 +1855,21 @@ RING_PATH_SAMPLES = 72
 #: ``tilt`` stays the base tilt the contracts assert; ``tilt_spin_deg`` is the
 #: offset a renderer ADDS to it, and :func:`ring_radius_scale` multiplies the
 #: radii.
+#: Owner 2026-10-22: "the circles should spin ... reverse spin against each
+#: other to create illusion". The rigid SHARED sway is gone — a bounded ±7°
+#: wobble moved a circle by <8 px on a 100 px radius over 40 s, which read as a
+#: frozen ring. Each circle now makes FULL 360° turns about the nucleus on its
+#: OWN period, and each entry declares which WAY it goes: the two halves of
+#: every orbit pair counter-rotate (``orbit=a`` +1, ``orbit=b`` -1), the
+#: satellite shells alternate, and every period in :data:`RING_SPIN_PERIODS_S`
+#: is non-harmonic against the others, so the set never locks into one rigid
+#: gyroscope turn. ``tilt`` stays the base tilt the contracts assert;
+#: ``spin_deg`` is the accumulated turn a renderer ADDS to it, and
+#: :func:`ring_radius_scale` still multiplies the radii.
 RING_MOTION_PERIOD_S = 23.3
 RING_MOTION_PHASE = 0.0
-#: Owner 2026-10-19: "refine circles animation more". The shared rigid motion
-#: is no longer one bare sine (which read as a mechanical sway): it is a SUM of
-#: three sines on non-harmonic periods, so the plane precesses and the set
-#: breathes fluidly, like a body settling rather than a metronome. The weights
-#: sum to 1.0, so the total amplitude stays EXACTLY :data:`RING_PRECESS_AMP_DEG`
-#: for the whole rigid set — every ring still shares one offset.
+#: Retained for API compatibility only — the rigid precession these described
+#: is retired. Kept so older renderers and tests that read them still resolve.
 RING_MOTION_PERIOD_2_S = 8.5
 RING_MOTION_PERIOD_3_S = 31.7
 RING_PRECESS_AMP_DEG = 7.0
@@ -1830,6 +1881,16 @@ RING_PRECESS_WEIGHTS = (0.62, 0.24, 0.14)
 RING_RADIUS_BREATH_SPAN = 0.040
 RING_RADIUS_BREATH_PHASE = 1.9
 RING_RADIUS_WEIGHTS = (0.68, 0.32)
+
+#: Full-turn periods for the spinning circles, indexed by a ring's ``seed``.
+#: Every pair here is non-harmonic against the others AND against the logo
+#: particles (6.4-18.9 s), so no circle can ever lock onto another or onto the
+#: beads. Owner 2026-10-22: the circles must visibly ROTATE, so these are full
+#: 360s — the fastest complete in ~7 s, the slowest in ~26 s.
+RING_SPIN_PERIODS_S = (6.9, 8.8, 10.1, 11.5, 14.55, 16.15, 18.6, 21.15,
+                       23.5, 25.45)
+#: Fallback period for an undeclared entry.
+RING_SPIN_PERIOD_BASE = 12.0
 
 
 def _rigid_phase_vector(t: Any) -> Tuple[float, float, float]:
@@ -1853,20 +1914,66 @@ def ring_precess_period(ring: Any = None) -> float:
     return RING_MOTION_PERIOD_S
 
 
-def ring_tilt_spin(t: Any, ring: Any = None) -> float:
-    """The shared plane-sway offset in DEGREES at clock ``t``.
+def ring_spin_period(ring: Any = None) -> float:
+    """Full-turn period in SECONDS for one circle (deterministic per ring).
 
-    ADDITIVE: a renderer adds this to the entry's ``tilt``. Identical for every
-    ring, so the set sways as one rigid body and each ring keeps its declared
-    tilt RELATIVE to the others. A sum of three weighted sines on non-harmonic
-    periods — smooth and bounded, so the plane evolves fluidly instead of
-    snapping, and richer than a single sway. ``|result| <= RING_PRECESS_AMP_DEG``
-    always (the weights sum to 1.0).
+    Each declared circle draws its own period from
+    :data:`RING_SPIN_PERIODS_S` — a family that is non-harmonic against itself
+    and against everything else the field animates. Every ring therefore turns
+    at its own rate and the set never locks into one rigid turn. Falls back to
+    :data:`RING_SPIN_PERIOD_BASE` for an unknown entry. Never raises.
     """
-    p1, p2, p3 = _rigid_phase_vector(t)
-    w0, w1, w2 = RING_PRECESS_WEIGHTS
-    return RING_PRECESS_AMP_DEG * (
-        w0 * math.sin(p1) + w1 * math.sin(p2) + w2 * math.sin(p3))
+    ring = ring if isinstance(ring, dict) else {}
+    try:
+        idx = int(_finite(ring.get("seed"))) % len(RING_SPIN_PERIODS_S)
+        return float(RING_SPIN_PERIODS_S[idx])
+    except Exception:  # noqa: BLE001
+        return float(RING_SPIN_PERIOD_BASE)
+
+
+def ring_spin_dir(ring: Any = None) -> int:
+    """``+1`` or ``-1`` — which way this circle turns about the nucleus.
+
+    The counter-rotation is the illusion the owner asked for: the two halves of
+    each orbit pair (``orbit=a`` near, ``orbit=b`` far) turn opposite ways, so
+    where they cross the motion doubles and cancels instead of reading as one
+    plate. Never raises.
+    """
+    ring = ring if isinstance(ring, dict) else {}
+    direction = ring.get("spin_dir")
+    try:
+        return -1 if int(direction) < 0 else 1
+    except (TypeError, ValueError):
+        pass
+    # Fall back to the orbit letter: b (far) -1, a (near) +1.
+    return -1 if str(ring.get("orbit") or "") == "b" else 1
+
+
+def ring_spin_deg(t: Any, ring: Any = None) -> float:
+    """Accumulated FULL-TURN rotation of one circle in DEGREES at clock ``t``.
+
+    LINEAR in ``t`` and unbounded (it wraps through many full circles), which is
+    what makes a circle visibly ROTATE rather than sway: a point on the stroke
+    travels all the way round the nucleus on :func:`ring_spin_period`, in the
+    direction :func:`ring_spin_dir` gives. ADDITIVE — a renderer adds it to the
+    entry's ``tilt``. Never raises.
+    """
+    period = max(0.5, ring_spin_period(ring))
+    turn = 360.0 * _finite(t) / period * float(ring_spin_dir(ring))
+    return turn if math.isfinite(turn) else 0.0
+
+
+def ring_tilt_spin(t: Any, ring: Any = None) -> float:
+    """Per-ring plane offset in DEGREES at clock ``t``.
+
+    RETIRED CONTRACT: this used to return one shared bounded sine (a ±7° sway
+    for every ring). It now returns :func:`ring_spin_deg` — each circle's own
+    full turn — so every existing consumer of this name keeps working while the
+    circles actually spin. Kept under the old name because the renderers,
+    ``ring_geometry`` entries and the contracts all read it. Never raises.
+    """
+    return ring_spin_deg(t, ring)
+
 
 
 def ring_radius_scale(t: Any, ring: Any = None) -> float:
@@ -1982,7 +2089,20 @@ def _ring_specs(tt: float, near_tilt: float, far_tilt: float,
     # circle reads as a live accretion structure instead of a dead outline.
     for entry in out:
         entry["precess_period_s"] = ring_precess_period(entry)
-        entry["tilt_spin_deg"] = ring_tilt_spin(tt, entry)
+        # Counter-rotation: the near half of every orbit pair turns one way and
+        # the far half the other, so crossing circles move against each other
+        # instead of reading as one rotating plate. The satellite shells
+        # alternate too, and the inner core ring turns opposite its neighbours.
+        entry["spin_dir"] = (-1 if str(entry.get("orbit") or "") == "b"
+                             else 1)
+        if str(entry.get("id") or "") == "inner":
+            entry["spin_dir"] = -1
+        elif str(entry.get("layer") or "") == "satellite":
+            entry["spin_dir"] = (-1 if int(_finite(entry.get("seed"))) % 2
+                                 else 1)
+        entry["spin_period_s"] = ring_spin_period(entry)
+        entry["spin_deg"] = ring_spin_deg(tt, entry)
+        entry["tilt_spin_deg"] = entry["spin_deg"]
         entry["intensity_period_s"] = _ring_detail_period(
             entry, "intensity_period_s", RING_INTENSITY_PERIOD_BASE,
             RING_INTENSITY_PERIOD_SPAN, 601.1)
@@ -2012,7 +2132,14 @@ def ring_path(t: Any, R: Any, ring: Dict[str, Any],
     rx = r * _finite(ring.get("rx_frac"), RX_FRAC)
     ry = r * _finite(ring.get("ry_frac"), RY_FRAC)
     tilt = _finite(ring.get("tilt"), 0.0)
-    pts = [orbit_point(dx, dy, rx, ry, tilt, 360.0 * i / float(n))
+    # FULL-TURN SPIN: the stroke's starting phase walks round the ellipse, so a
+    # point on the ring travels all the way around the nucleus instead of the
+    # whole ellipse merely re-tilting. Without this the circle would look
+    # identical at every spin phase (an ellipse is symmetric under its own
+    # parameter shift), which is exactly the "the circles are not moving"
+    # report. ``spin_deg`` is the accumulated turn declared per ring.
+    spin = _finite(ring.get("spin_deg"), 0.0)
+    pts = [orbit_point(dx, dy, rx, ry, tilt, 360.0 * i / float(n) + spin)
            for i in range(n)]
     pts.append(pts[0])  # exactly closed, not closed to within a float epsilon
     return pts

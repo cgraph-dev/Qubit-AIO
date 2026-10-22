@@ -1561,6 +1561,12 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             if intensity is None:
                 intensity = _field.ring_intensity(tt, spec)
             draw_spec["tilt"] = _num(tilt, 0.0) + _num(spin, 0.0)
+            # The stroke's own starting phase — this is the FULL-TURN spin. The
+            # tilt offset above only re-planes the ellipse, and an ellipse is
+            # symmetric under its own parameter shift, so without this phase the
+            # circle looks identical at every spin angle. Owner 2026-10-22: the
+            # circles must visibly rotate, each on its own period and direction.
+            draw_spec["spin_deg"] = _num(spin, 0.0)
             draw_spec["rx_frac"] = (_num(spec.get("rx_frac"), _field.RX_FRAC)
                                     * breath * _num(shimmer, 1.0))
             draw_spec["ry_frac"] = (_num(spec.get("ry_frac"), _field.RY_FRAC)

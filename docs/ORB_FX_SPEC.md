@@ -14,6 +14,38 @@ Geometry constants are owned by `mark.py` (`RX_FRAC=0.72`, `RY_FRAC=0.28`,
 `PARTICLES`). Qt translates those constants to `QPainter`; it must not invent
 its own.
 
+## v3 — per-element spin (owner 2026-10-22)
+
+> "the circles should spin, particles should have multiple spin animations,
+> random particles, spiral spin, reverse spin against each other to create
+> illusion, not the whole voice orb is a single image that rotates, each element
+> should be alive and rotate"
+
+The whole-mark X+Y **tumble is retired** (`spin_angles()` returns `(0.0, 0.0)`),
+because rotating the entire assembly as one rigid picture is exactly the
+"single image that rotates" reading. Motion now comes from independent
+per-element sources:
+
+| Layer | Motion | Periods |
+|---|---|---|
+| Circles | full 360° turn about the nucleus, per-ring | `RING_SPIN_PERIODS_S` 6.9–25.45 s |
+| Circle direction | counter-rotating pairs (`orbit=a` +1 / `orbit=b` −1), satellites alternating, inner reversed | — |
+| Logo beads | orbit + own-axis spin + spiral radial play + micro-wobble | orbit 6.4–18.9 s, spin `PARTICLE_SPIN_PERIODS_S` 1.6–5.25 s |
+
+**The mechanism that matters.** An ellipse is symmetric under its own parameter
+shift, so re-tilting a ring never looks like rotation. A circle only visibly
+spins when the **starting phase of the stroke walks round the ellipse** —
+`ring_path` samples `orbit_point(..., 360*i/n + spin_deg)`. Implementing "spin"
+as a tilt offset produces animation that measures as motion and looks frozen.
+
+All declared spin periods are checked non-harmonic against each other, against
+the ring/shell/inner periods and across the two tables, so nothing beats in
+lock-step. Radius scaling stays SHARED across all rings (the 2026-10-18
+"same axis / proportional" ruling survives); only the rotation is per-ring.
+
+Measured at R=100: ring point travel went from **7.5 px over 40 s** (the old
+±7° sway) to **125–186 px**.
+
 ## v2 — the dense field (owner 2026-10-17: "more particles, more 3D")
 
 All motion now comes from ONE module, `voicebridge/orb/mark_field.py`, consumed

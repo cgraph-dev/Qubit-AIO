@@ -330,10 +330,16 @@ def test_rotated_depth_drives_size_and_brightness():
 
 
 def test_the_painter_really_consumes_the_turn_and_its_depth_gain():
-    # Numbers in a module prove nothing on their own: if the painter quietly
-    # stopped placing points through the projection (or stopped scaling them by
-    # their rotated depth) these tests would still pass. Killing each term and
-    # watching the frame change is the wiring proof.
+    # Owner 2026-10-22 RETIRED the whole-mark tumble (``spin_angles`` returns
+    # zeros), so there is no body-wide turn or rotated-depth gain left to
+    # consume — those knobs are deliberately inert and asserting they move the
+    # frame would be asserting the anti-pattern back in.
+    #
+    # The wiring proof is kept, retargeted at what now carries the motion: the
+    # painter must really consume each ring's OWN spin. Zeroing every ring's
+    # spin must change the painted frame, or the circles are drawn dead.
+    from voicebridge.orb import mark as M
+    from voicebridge.orb import mark_field as F
     from voicebridge.orb import qt_app as Q
 
     t = Q.Y_SPIN_PERIOD_S / 4.0
@@ -341,15 +347,21 @@ def test_the_painter_really_consumes_the_turn_and_its_depth_gain():
 
     with pytest.MonkeyPatch.context() as m:
         m.setattr(Q, "Y_SPIN_Z_GAIN", 0.0)
-        assert _diff(plain, _paint(t=t, size=192)) > 0, "depth axis dead"
+        assert _diff(plain, _paint(t=t, size=192)) == 0, \
+            "the retired whole-mark tumble must be inert"
 
+    frozen = []
+    for spec in F.ring_geometry(t):
+        spec = dict(spec)
+        spec["spin_deg"] = 0.0
+        spec["tilt_spin_deg"] = 0.0
+        frozen.append(spec)
     with pytest.MonkeyPatch.context() as m:
-        m.setattr(Q, "Y_SPIN_PERSP", 0.0)
-        assert _diff(plain, _paint(t=t, size=192)) > 0, "perspective is unused"
-
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(Q, "Y_SPIN_DEPTH_GAIN", 0.0)
-        assert _diff(plain, _paint(t=t, size=192)) > 0, "the gain is dead"
+        m.setattr(Q._field, "ring_spin_deg", lambda *a, **k: 0.0)
+        m.setattr(Q._field, "ring_tilt_spin", lambda *a, **k: 0.0)
+        m.setattr(Q._field, "ring_geometry", lambda *a, **k: [dict(s) for s in frozen])
+        still = _paint(t=t, size=192)
+    assert _diff(plain, still) > 0, "the circles are painted without their spin"
 
 
 def test_the_nucleus_stays_round_while_the_orbital_plane_opens():

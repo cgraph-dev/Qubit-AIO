@@ -1059,19 +1059,20 @@ def test_blink_dots_materialise_in_place_and_vanish():
 # The field publishes the angles; renderers apply Y first, then X.
 # --------------------------------------------------------------------------- #
 def test_spin_angles_turn_full_circles_on_non_harmonic_periods():
+    # Owner 2026-10-22: "not the whole voice orb is a single image that
+    # rotates, each element should be alive and rotate". The combined X+Y
+    # whole-mark tumble is RETIRED — it rotated the entire assembly as one
+    # rigid picture. ``spin_angles`` is kept (both renderers and the contract
+    # call it) but must now be a neutral identity at EVERY clock, and the
+    # periods are kept only as the record of what used to drive it.
     from voicebridge.orb import mark_field as F
     assert F.X_SPIN_PERIOD_S == pytest.approx(27.0)
     assert F.Y_SPIN_PERIOD_S == pytest.approx(20.5)
-    assert F.spin_angles(0.0) == (pytest.approx(0.0), pytest.approx(0.0))
-    ty, px = F.spin_angles(F.Y_SPIN_PERIOD_S)
-    assert ty == pytest.approx(2.0 * math.pi)
-    assert 0.0 < px < 2.0 * math.pi  # Y's turn is not X's turn
-    ty2, px2 = F.spin_angles(F.X_SPIN_PERIOD_S)
-    assert px2 == pytest.approx(2.0 * math.pi)
-    assert 0.0 < (ty2 % (2.0 * math.pi)) < 2.0 * math.pi
-    # Linear ramps, deterministic, finite on junk.
-    assert F.spin_angles(3.0) == F.spin_angles(3.0)
-    assert all(math.isfinite(a) for a in F.spin_angles("bad"))
+    for t in (0.0, 1.0, 3.0, F.Y_SPIN_PERIOD_S, F.X_SPIN_PERIOD_S, 123.4):
+        assert F.spin_angles(t) == (0.0, 0.0), t
+    # Neutral, not broken: junk input still resolves to the same identity.
+    assert F.spin_angles("bad") == (0.0, 0.0)
+    assert F.spin_angles(None) == (0.0, 0.0)
 
 
 def test_circles_stay_outside_with_the_orb_in_the_middle():
@@ -1253,26 +1254,31 @@ def _harmonically_locked(a, b, rel=0.02, max_den=3):
 
 def test_ring_set_moves_as_one_rigid_body():
     # Owner 2026-10-18: "shouldn't they all be on same axis, sometime one
-    # becomes smaller or bigger than the other". The rings must stay ONE
-    # concentric set: at any instant every ring shares the SAME radius scale
-    # and the SAME tilt offset, so each circle keeps its declared size and
-    # plane RELATIVE to the others. (The old per-ring periods made one ring
-    # drift to +1.7% while another sat at -1.7%.)
+    # becomes smaller or bigger than the other". The RADIUS half of that ruling
+    # still holds: at any instant every ring shares the SAME radius scale, so
+    # each circle keeps its declared size RELATIVE to the others.
+    #
+    # Owner 2026-10-22 REVERSED the tilt half: "the circles should spin ...
+    # reverse spin against each other to create illusion". Each circle now turns
+    # on its OWN period and direction, so the offsets are deliberately NOT
+    # shared — that independence IS the effect. What still holds is that each
+    # ring keeps its declared base tilt and that its turn is a continuous ramp.
     from voicebridge.orb import mark_field as F
     for t in (0.0, 1.3, 5.0, 7.7, 13.7, 31.0):
         rings = F.ring_geometry(t)
         scales = {round(F.ring_radius_scale(t, r), 12) for r in rings}
-        spins = {round(F.ring_tilt_spin(t, r), 12) for r in rings}
         assert len(scales) == 1, (t, scales)
-        assert len(spins) == 1, (t, spins)
-        # The rigid offset reaches the geometry entries too, so a renderer that
-        # reads ``tilt_spin_deg`` straight off an entry moves with the set.
-        assert {round(r["tilt_spin_deg"], 12) for r in rings} == {*spins}, t
-        assert {r["precess_period_s"] for r in rings} == {F.RING_MOTION_PERIOD_S}
-    # Bounded, and always positive (a ring never inverts or vanishes).
+        # The turn reaches the geometry entries too, so a renderer reading
+        # ``tilt_spin_deg`` straight off an entry moves with its own ring.
+        assert {round(r["tilt_spin_deg"], 12) for r in rings} == {
+            round(F.ring_spin_deg(t, r), 12) for r in rings}, t
+        # Base tilts are untouched and the set never collapses onto one plane.
+        assert len({round(r["tilt"], 9) for r in rings}) >= 2
+        # Counter-rotation is the illusion: both directions always present.
+        assert {F.ring_spin_dir(r) for r in rings} == {1, -1}, t
+    # Radius breath stays bounded, and always positive.
     for t in (0.0, 2.0, 9.0, 20.0):
         ring = F.ring_geometry(t)[0]
-        assert abs(F.ring_tilt_spin(t, ring)) <= F.RING_PRECESS_AMP_DEG + 1e-9
         scale = F.ring_radius_scale(t, ring)
         assert 1.0 - F.RING_RADIUS_BREATH_SPAN <= scale <= \
             1.0 + F.RING_RADIUS_BREATH_SPAN
@@ -1293,33 +1299,33 @@ def test_ring_set_moves_as_one_rigid_body():
     for t in (3.3, 12.1, 40.0):
         assert _ratios(t) == pytest.approx(base_ratios), t
 
-    # Continuous: the shared motion never jumps between adjacent frames.
-    prev = F.ring_tilt_spin(0.0)
-    for k in range(1, 241):
-        val = F.ring_tilt_spin(k / 60.0)
-        assert abs(val - prev) < 1.0
-        prev = val
+    # Continuous AND a full turn: the spin never jumps between adjacent frames,
+    # and over one declared period a ring completes exactly 360°.
+    for ring in F.ring_geometry(0.0):
+        assert ring["spin_period_s"] == pytest.approx(
+            F.ring_spin_period(ring))
+        prev = F.ring_spin_deg(0.0, ring)
+        for k in range(1, 241):
+            val = F.ring_spin_deg(k / 60.0, ring)
+            assert abs(val - prev) < 1.0, (ring["id"], k, val, prev)
+            prev = val
+        turned = F.ring_spin_deg(ring["spin_period_s"], ring) \
+            - F.ring_spin_deg(0.0, ring)
+        assert abs(abs(turned) - 360.0) < 1e-6, (ring["id"], turned)
 
-    # New contract (owner 2026-10-19 "refine circles animation more"): the
-    # rigid set is no longer one bare sine but a SUM of three weighted sines on
-    # a non-harmonic period FAMILY — fluid, but still ONE shared offset. The
-    # family must be non-harmonic against itself, the ring turns (9.5/13.5) and
-    # the whole-mark spins (20.5/27), or the set could pulse in lock-step with a
-    # spin. Rigidity (above) is unchanged and is the property under test.
-    periods = list(F.RING_MOTION_PERIODS_S)
-    assert periods == [F.RING_MOTION_PERIOD_S, F.RING_MOTION_PERIOD_2_S,
-                       F.RING_MOTION_PERIOD_3_S]
+    # Every declared full-turn period is non-harmonic against the others and
+    # against the rest of the field, so no circle can lock onto another.
+    periods = list(F.RING_SPIN_PERIODS_S)
     assert len(set(periods)) == len(periods)
-    assert len(periods) == len(F.RING_PRECESS_WEIGHTS)
-    fixed = ([F.RING_PERIOD_NEAR, F.RING_PERIOD_FAR, F.Y_SPIN_PERIOD_S,
-              F.X_SPIN_PERIOD_S, F.INNER_RING_PERIOD_S]
-             + [sh[2] for sh in F.SATELLITE_SHELLS])
+    fixed = ([F.RING_PERIOD_NEAR, F.RING_PERIOD_FAR,
+              F.INNER_RING_PERIOD_S]
+             + [sh[2] for sh in F.SATELLITE_SHELLS]
+             + list(F.PARTICLE_SPIN_PERIODS_S))
     for i, a in enumerate(periods):
         for b in periods[i + 1:]:
             assert not _harmonically_locked(a, b), (a, b)
         for b in fixed:
             assert not _harmonically_locked(a, b), (a, b)
-
 
 # --------------------------------------------------------------------------- #
 # RING PARTICLES + CYLINDER — owner 2026-10-18: "check particles cos they spin

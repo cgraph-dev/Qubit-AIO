@@ -39,15 +39,17 @@ def frame_budget_ms() -> int:
 
     One frame of the rich mark costs ~20-35 ms of CPU (it draws ~1200 Qt calls:
     rings, streaks, hundreds of particles and ~128 text glyphs), so asking for
-    60 fps pegs a core for a decorative overlay. The default is a 25 fps budget,
-    which leaves the loop idle time between frames instead of repainting
-    continuously. Raise it (e.g. ``QUBIT_ORB_FRAME_MS=16``) for maximum
-    smoothness, lower it to spend less. Clamped to a sane range. Never raises.
+    60 fps pegs a core for a decorative overlay. The default is a 50 fps budget
+    (20 ms), which is what makes the spinning circles and the per-particle
+    spins read as continuous motion rather than stepping. Raising it to 60 fps
+    (``QUBIT_ORB_FRAME_MS=16``) buys the last bit of smoothness at the cost of a
+    busier core; lowering it saves CPU but a rotating circle visibly judders.
+    Clamped to a sane range. Never raises.
     """
     try:
-        v = int(float(_os.environ.get("QUBIT_ORB_FRAME_MS", "") or 40))
+        v = int(float(_os.environ.get("QUBIT_ORB_FRAME_MS", "") or 20))
     except (TypeError, ValueError):
-        v = 40
+        v = 20
     return max(8, min(200, v))
 
 

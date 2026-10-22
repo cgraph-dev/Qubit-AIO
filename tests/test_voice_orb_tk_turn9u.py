@@ -178,34 +178,17 @@ def test_turn_reads_the_field_phase_y_first_then_x():
 
 
 def test_turn_point_applies_y_before_x():
-    # Manual Y-then-X composition of one point, against the helper — and
-    # against the swapped order, which must differ (otherwise the order
-    # contract proves nothing).
+    # Owner 2026-10-22 RETIRED the whole-mark tumble (``spin_angles`` returns
+    # zeros): there is no Y-then-X composition left to order, so the projection
+    # is an exact identity at every clock and every depth. The order contract is
+    # kept as a live read of the field so that if a real turn is ever
+    # reinstated, the identity below fails and forces the order to be re-pinned.
     t, R = 3.1, 90.0
     theta, phi = F.spin_angles(t)
-    ct, st, cp, sp = math.cos(theta), math.sin(theta), math.cos(phi), math.sin(phi)
+    assert (theta, phi) == (0.0, 0.0)
     for x, y, d in ((63.0, -21.0, 1.0), (-63.0, 21.0, 0.0), (12.5, 30.0, 0.7)):
-        # The depth offset is faded by the COMBINED turn (sin²θ+sin²φ−sin²θsin²φ),
-        # the Qt painter's polynomial — a Y-only fade collapses at an X edge-on.
-        fade = st * st + sp * sp - st * st * sp * sp
-        z = (d - 0.5) * M.Y_SPIN_Z_GAIN * R * fade
-        xr = x * ct + z * st
-        zr0 = -x * st + z * ct
-        yr = y * cp - zr0 * sp
-        zr = y * sp + zr0 * cp
-        persp = 1.0 + M.Y_SPIN_PERSP * zr / R
-        want = (xr * persp, yr * persp)
         got = M.turn_point(t, R, x, y, d)
-        assert got[:2] == pytest.approx(want, abs=1e-9)
-        # Swapped order (X first, then Y) lands elsewhere.
-        zx = (d - 0.5) * M.Y_SPIN_Z_GAIN * R * sp * sp
-        xx = x * cp + zx * sp
-        xz0 = -x * sp + zx * cp
-        yx = y * ct - xz0 * st
-        xz = y * st + xz0 * ct
-        px = 1.0 + M.Y_SPIN_PERSP * xz / R
-        swapped = (xx * px, yx * px)
-        assert got[:2] != pytest.approx(swapped, abs=1e-6)
+        assert got[:2] == pytest.approx((x, y), abs=1e-9)
 
 
 def test_turn_is_the_identity_face_on():
@@ -219,11 +202,12 @@ def test_turn_is_the_identity_face_on():
 
 
 def test_turn_opens_the_mark_instead_of_flattening_it():
-    # The owner's complaint, pinned at the numbers: a flat ``cos`` projection
-    # degenerates to a line at a quarter turn. Here the depth axis carries the
-    # quarter phases, so one declared orbit stays open.
+    # Owner 2026-10-22 RETIRED the whole-mark tumble. The old risk was a flat
+    # projection thinning the mark to a line at a quarter turn; with the turn
+    # gone the mark keeps its FULL width at every clock, which is the strongest
+    # form of the "never thin" guarantee. The circles' own spin supplies the
+    # motion instead of a body-wide rotation.
     R = 90.0
-    quarter = M.Y_SPIN_PERIOD_S / 4.0
     spec = [rg for rg in F.ring_geometry(0.0) if rg["id"] == "orbit_a"][0]
     pts = F.ring_path(0.0, R, spec)
     n = len(pts) - 1
@@ -235,17 +219,13 @@ def test_turn_opens_the_mark_instead_of_flattening_it():
         return max(xs) - min(xs)
 
     face = width_at(0.0)
-    assert width_at(quarter) >= 0.45 * face, (width_at(quarter), face)
-    assert width_at(M.Y_SPIN_PERIOD_S / 2.0) >= 0.45 * face
+    assert face > 0
+    for probe in (M.Y_SPIN_PERIOD_S / 4.0, M.Y_SPIN_PERIOD_S / 2.0,
+                  M.X_SPIN_PERIOD_S / 4.0, 123.4):
+        assert width_at(probe) == pytest.approx(face, rel=1e-9)
 
-    # ...and the halves have really parted: two elements stacked in x
-    # face-on — one at the very front, one at the very back — end up half a
-    # mark radius apart instead of on one line.
-    def front_back_gap(t):
-        return (M.turn_point(t, R, 0.0, 0.0, 1.0)[0]
-                - M.turn_point(t, R, 0.0, 0.0, 0.0)[0])
-    assert front_back_gap(0.0) == pytest.approx(0.0, abs=1e-9)
-    assert front_back_gap(quarter) >= 0.50 * face, front_back_gap(quarter)
+    # The mark is never thinner than its own face-on width.
+    assert width_at(M.Y_SPIN_PERIOD_S / 4.0) >= 0.45 * face
 
 
 def test_horizontal_turn_is_additive_to_the_master_spin():
@@ -383,34 +363,59 @@ def test_tumble_never_thins_to_a_line(monkeypatch):
 
 
 def test_rotated_depth_drives_size_and_brightness():
-    # A body swinging toward the viewer gets BIGGER and BRIGHTER; one tucking
-    # away gets smaller and dimmer — the cue that makes the turn read as a
-    # rotation rather than a wobble. Pinned on the projection, then on the
-    # frame: killing the depth axis must change what is drawn.
+    # Owner 2026-10-22 RETIRED the whole-mark tumble: the mark must no longer
+    # rotate as one image, so the projection is an exact identity at EVERY
+    # clock and it can no longer drive size/brightness. What still has to be
+    # true — and is what makes the orb read as alive — is that the per-ELEMENT
+    # motion is real: the circles turn on their own periods and directions, and
+    # the projection never distorts a still frame.
     Rq = 90.0
     X, Y, g = M.turn_point(0.0, Rq, 10.0, 5.0, 0.9)
     assert (X, Y, g) == pytest.approx((10.0, 5.0, 1.0), abs=1e-9)
-    quarter = M.Y_SPIN_PERIOD_S / 4.0
-    assert M.turn_point(quarter, Rq, -60.0, 0.0, 1.0)[2] > 1.0
-    assert M.turn_point(quarter, Rq, 60.0, 0.0, 1.0)[2] < 1.0
-    # Clamped, so no field value outside its nominal depth range can blow a
-    # body up or invert it.
+    # No clock introduces a body-wide turn any more.
+    for t in (0.0, M.Y_SPIN_PERIOD_S / 4.0, 17.3, 123.4):
+        assert M.turn_point(t, Rq, -60.0, 0.0, 1.0) == pytest.approx(
+            (-60.0, 0.0, 1.0), abs=1e-9)
+        assert M.turn_point(t, Rq, 60.0, 0.0, 1.0) == pytest.approx(
+            (60.0, 0.0, 1.0), abs=1e-9)
+    # Depth is still clamped, so no field value can blow a body up or invert it.
     for depth in (-2.0, 3.0):
-        _x, _y, gg = M.turn_point(quarter, Rq, 10.0, 5.0, depth)
+        _x, _y, gg = M.turn_point(0.0, Rq, 10.0, 5.0, depth)
         assert M.Y_SPIN_GAIN_MIN <= gg <= M.Y_SPIN_GAIN_MAX
-    # ...and the painter really consumes it: freezing the depth axis changes
-    # the painted frame at the quarter turn.
-    plain, _ = render(quarter)
+
+    # The circles genuinely rotate: a point on a ring travels a long way round
+    # the nucleus, far more than the retired ±7° sway ever moved it.
+    from voicebridge.orb import mark_field as F
+
+    ring = F.ring_geometry(0.0)[0]
+    base = F.ring_path(0.0, Rq, dict(ring, spin_deg=0.0), samples=64)
+    moved = []
+    for t in (2.0, 4.0):
+        spec = dict(ring)
+        spec["spin_deg"] = F.ring_spin_deg(t, ring)
+        path = F.ring_path(t, Rq, spec, samples=64)
+        moved.append(max(math.dist(path[i], base[i]) for i in range(len(path))))
+    assert max(moved) > 0.5 * Rq, moved
+    # And neighbouring rings turn OPPOSITE ways (the counter-rotation illusion).
+    dirs = {F.ring_spin_dir(r) for r in F.ring_geometry(0.0)}
+    assert dirs == {1, -1}
+    # ...and the painter really consumes the ring spin: zeroing every ring's
+    # spin must change the painted frame, or the circles are drawn dead.
+    probe = M.Y_SPIN_PERIOD_S / 4.0
+    plain, _ = render(probe)
     with pytest.MonkeyPatch.context() as m:
-        m.setattr(M, "Y_SPIN_Z_GAIN", 0.0)
-        c, _ = render(quarter)
-        assert (c.lines != plain.lines
-                or c.ovals != plain.ovals), "depth axis dead"
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(M, "Y_SPIN_PERSP", 0.0)
-        c, _ = render(quarter)
-        assert (c.lines != plain.lines
-                or c.ovals != plain.ovals), "perspective is unused"
+        m.setattr(F, "ring_spin_deg", lambda t, ring=None: 0.0)
+        m.setattr(F, "ring_tilt_spin", lambda t, ring=None: 0.0)
+        frozen_specs = []
+        for spec in F.ring_geometry(probe):
+            spec = dict(spec)
+            spec["spin_deg"] = 0.0
+            spec["tilt_spin_deg"] = 0.0
+            frozen_specs.append(spec)
+        m.setattr(F, "ring_geometry", lambda t: [dict(s) for s in frozen_specs])
+        c, _ = render(probe)
+    assert (c.lines != plain.lines or c.ovals != plain.ovals), \
+        "the circles are painted without their spin"
 
 
 # --------------------------------------------------------------------------- #

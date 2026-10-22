@@ -677,22 +677,19 @@ def _turned(t, R, x, y, depth=0.5):
     nothing" any more — the two axes only complete together every 1107 s —
     so box-based assertions below always expect the PROJECTED box, never the
     flat one.
-    """
-    from voicebridge.orb import qt_app as Q
 
-    ty = math.radians(Q.mark_horizontal_spin_deg(t))
-    px = math.radians(Q.mark_vertical_spin_deg(t))
-    cy, sy, cx, sx = math.cos(ty), math.sin(ty), math.cos(px), math.sin(px)
+    Owner 2026-10-22 RETIRED THE TUMBLE (``spin_angles`` now returns zeros):
+    the whole mark no longer rotates as one image. The projection is therefore
+    the identity at EVERY clock, and this helper must stay a live read of the
+    renderer rather than a re-implementation — so a future reinstatement of a
+    real turn is picked up automatically instead of the tests silently
+    asserting a formula the painter has stopped using.
+    """
+    from voicebridge.orb import mark as M
+
     d = min(1.0, max(0.0, float(depth)))
-    fade = sy * sy + sx * sx - sy * sy * sx * sx
-    z = (d - 0.5) * Q.Y_SPIN_Z_GAIN * R * fade
-    xr = x * cy + z * sy
-    zr = -x * sy + z * cy
-    yr = y * cx - zr * sx
-    zr2 = y * sx + zr * cx
-    persp = 1.0 + Q.Y_SPIN_PERSP * zr2 / R
-    persp = min(Q.Y_SPIN_PERSP_MAX, max(Q.Y_SPIN_PERSP_MIN, persp))
-    return xr * persp, yr * persp
+    X, Y, _g = M.turn_point(t, R, x, y, d)
+    return X, Y
 
 
 def _pix(t, R, c, item, depth=None, zseed="auto", micro_salt=None):
@@ -750,6 +747,12 @@ def _declared_ring_box(t, R, ring, tilt):
     if shimmer is None:
         shimmer = F.ring_shimmer(t, ring)
     spec["tilt"] = tilt + spin
+    # The painter also passes the ring's own FULL-TURN phase into ``ring_path``
+    # (owner 2026-10-22: the circles must visibly rotate). An ellipse is
+    # symmetric under its own parameter shift, so leaving this out changes
+    # nothing for a plain stroke — but it DOES move the per-vertex out-of-plane
+    # lobe below, which is phased by index, so the expected box has to carry it.
+    spec["spin_deg"] = spin
     spec["rx_frac"] = ring.get("rx_frac", F.RX_FRAC) * breath * shimmer
     spec["ry_frac"] = ring.get("ry_frac", F.RY_FRAC) * breath * shimmer
     dx, dy = F.camera_offset(t, R)
