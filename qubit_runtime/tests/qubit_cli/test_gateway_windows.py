@@ -864,7 +864,6 @@ def test_registered_task_launchers_reads_each_qubit_task_action(monkeypatch):
 
     assert gateway_windows.registered_task_launchers() == [launcher, legacy]
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: schtasks UTF-16 BOM output is not decoded")
 def test_decode_schtasks_output_honours_a_utf16_bom():
     """A genuine UTF-16 write (BOM) decodes as UTF-16, never as a code page; a malformed one falls
     back like any other bytes instead of raising past callers that catch only timeout/OS errors."""

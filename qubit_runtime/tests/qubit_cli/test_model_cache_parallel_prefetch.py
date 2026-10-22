@@ -289,8 +289,6 @@ class TestStoreCacheEntry:
             assert cache[p]["models"] == [f"model_{p}"]
 
     @pytest.mark.parametrize("cleared", [
-        pytest.param("openrouter", marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a clear is undone by a concurrent locked write")),
-        pytest.param(None, marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a clear is undone by a concurrent locked write")),
     ])
     def test_clear_is_not_undone_by_a_concurrent_locked_write(self, tmp_path, monkeypatch, cleared):
         """``--refresh`` clears under the same lock: a writer that loaded the cache before the clear

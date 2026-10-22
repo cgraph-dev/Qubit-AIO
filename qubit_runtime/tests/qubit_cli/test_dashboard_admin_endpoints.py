@@ -1221,7 +1221,6 @@ def test_spawn_qubit_action_retries_without_breakaway_when_job_denies(monkeypatc
     log = (tmp_path / _web_server_gateway._ACTION_LOG_FILES["gateway-restart"]).read_text()
     assert "retrying without CREATE_BREAKAWAY_FROM_JOB" in log
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a failed spawn is not logged")
 def test_spawn_qubit_action_records_a_failed_spawn_and_reraises(monkeypatch, tmp_path):
     """A spawn that never happened leaves the reason in the action log (previously a bare
     started-header) and still raises to the endpoint (#139592)."""

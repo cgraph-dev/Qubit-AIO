@@ -228,7 +228,6 @@ def test_launchd_serve_row_never_pessimize_gateway_coverage():
     assert fleet._receipt_owed_gateways(receipt, []) == {("gateway", "default")}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: retain_receipt_manual_serves ignores carried_manual_serves on a running record")
 def test_unsaved_manual_restart_warning_survives_a_running_and_a_killed_update(monkeypatch, capsys):
     """The durable running latest.json holds the prior rows as ``carried_manual_serves`` (no plan
     yet): the startup warning must read them while an update runs, after one is killed before its

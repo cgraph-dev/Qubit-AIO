@@ -120,7 +120,6 @@ class TestBuildSourceWebPropagatesLimits:
 class TestPackageJsonBuildScriptCapped:
     """``scripts/build/web.mjs`` must carry the caps for direct npm runs."""
 
-    @pytest.mark.xfail(strict=True, reason="wave-22 parity defect: scripts/build/web.mjs carries no heap/thread caps")
     def test_build_script_has_heap_and_thread_caps(self):
         from pathlib import Path
 

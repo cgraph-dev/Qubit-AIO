@@ -1095,7 +1095,6 @@ class TestLightpandaPostSetup:
         assert "lightpanda" not in _POST_SETUP_INSTALLED
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: the legacy hermes toolset alias no longer expands to hermes-cli/hermes-api-server")
 def test_get_platform_tools_legacy_hermes_alias_expands():
     """Legacy ``"hermes"`` toolset name must expand to ``"hermes-cli"`` and
     ``"hermes-api-server"`` so that tools are not silently dropped.
@@ -1119,7 +1118,6 @@ def test_get_platform_tools_legacy_hermes_alias_expands():
     assert enabled
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a lone legacy hermes toolset alias enables nothing")
 def test_get_platform_tools_legacy_hermes_alias_alone():
     """``"hermes"`` alone (no other toolsets) must still produce tools."""
     config = {"platform_toolsets": {"cli": ["hermes"]}}
@@ -1134,7 +1132,6 @@ def test_get_platform_tools_legacy_hermes_alias_alone():
     assert enabled
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a saved disabled MCP server falls through to every enabled server")
 @pytest.mark.parametrize("listed", ["dead", "mcp-dead"])
 def test_a_saved_disabled_mcp_server_does_not_enable_every_other_server(listed):
     """A disabled server in a saved list matched nothing and fell through to ALL enabled servers.

@@ -720,7 +720,6 @@ def test_review_transitions_preserve_consecutive_failures(conn) -> None:
 def _iso(ago: int) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(int(time.time()) - ago))
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: kanban sweep int()-casts ISO text timestamps")
 def test_dispatcher_sweeps_survive_iso_text_timestamps(conn, monkeypatch) -> None:
     """ISO text in the start/heartbeat columns (written outside the mutators,
     #97455) must not abort the per-tick dispatcher sweeps, and a READABLE stamp
