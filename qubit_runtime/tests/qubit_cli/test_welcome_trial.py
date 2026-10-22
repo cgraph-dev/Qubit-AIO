@@ -147,7 +147,6 @@ def test_a_reaped_claimant_replaced_by_a_connector_guest_is_not_grandfathered(po
     assert not anon_auth.free_inference_active()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: welcome-trial grandfathering diverges from the pin")
 def test_a_connector_guest_adopted_from_the_shared_store_is_not_grandfathered(portal, monkeypatch):
     from qubit_cli.auth import _load_auth_store, _save_auth_store
     from qubit_constants import get_hermes_home
@@ -173,7 +172,7 @@ LOSSES = {
 }
 
 
-@pytest.mark.parametrize("loss", [pytest.param(l, marks=pytest.mark.xfail(strict=True, reason="wave-28 parity defect: welcome-trial relaunch does not keep a lost trial lost")) if l == "replaced_by_connector" else l for l in LOSSES])
+@pytest.mark.parametrize("loss", [pytest.param(l, marks=pytest.mark.xfail(strict=True, reason="wave-28 parity defect: a connector-replaced lost trial still resolves an inference provider")) if l == "replaced_by_connector" else l for l in LOSSES])
 def test_a_lost_trial_is_never_claimed_again_after_a_relaunch(portal, monkeypatch, loss):
     from qubit_cli import free_tier_bootstrap
     from qubit_cli.auth import resolve_provider
@@ -245,9 +244,9 @@ def test_the_token_seam_refuses_an_inference_token_to_a_guest_without_the_trial(
 
 def _root_run():
     from qubit_cli.config_effective import load_user_config_effective
-    from qubit_constants import get_default_hermes_root
+    from qubit_constants import get_default_qubit_root
 
-    section = load_user_config_effective(get_default_hermes_root() / "config.yaml").get("onboarding") or {}
+    section = load_user_config_effective(get_default_qubit_root() / "config.yaml").get("onboarding") or {}
     return section.get("run")
 
 
@@ -260,7 +259,6 @@ def _relaunch():
 
 
 @pytest.mark.parametrize("used", [False, True], ids=["fresh", "used"])
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: welcome-trial onboarding-due record diverges from the pin")
 def test_the_first_desktop_boot_records_that_onboarding_is_due(portal, monkeypatch, used):
     from qubit_cli.onboarding_run import set_run
 
