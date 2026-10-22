@@ -295,6 +295,10 @@ def verify_jwt(
             options={"require": ["exp", "iat", "aud", "iss", "sub"]})
     except jwt.ExpiredSignatureError as exc:
         raise InvalidCodeError(f"{label} expired: {exc}") from exc
+    except jwt.InvalidSignatureError as exc:
+        # A forged/tampered bearer is "not my token", never an IDP outage: a 503 here would let a
+        # remote caller with garbage credentials look like a provider incident (and keep cookies).
+        raise InvalidCodeError(f"{label} signature invalid: {exc}") from exc
     except jwt.ImmatureSignatureError as exc:
         # iat/nbf ahead of now beyond the leeway = clock skew or a bad token — the
         # provider is *reachable*, so this must NOT surface as ProviderError/503

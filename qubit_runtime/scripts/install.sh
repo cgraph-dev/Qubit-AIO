@@ -443,6 +443,7 @@ stage_prerequisites() {
 }
 
 stage_repository() {
+    local pinned=false
     # An interrupted clone from an older installer can leave a .git with no
     # initial commit, where stash/checkout abort ("You do not have the
     # initial commit yet", #40998). Move it aside -- never delete it, it may
@@ -551,7 +552,8 @@ stage_repository() {
             fi
         fi
         mkdir -p "$(dirname "$INSTALL_DIR")"
-        local staged attempt label cloned=false progress=()
+        local staged attempt label cloned=false progress=() no_checkout=""
+        [ -z "$INSTALL_COMMIT" ] || no_checkout=--no-checkout
         # Phase lines ("Receiving objects: 42%") feed the status line; git
         # prints none to a pipe unless asked.
         if quiet_output; then progress=(--progress); fi
@@ -564,7 +566,7 @@ stage_repository() {
             label="Cloning $REPO_URL ($BRANCH) into $INSTALL_DIR"
             [ "$attempt" = 1 ] || label="$label (attempt $attempt of 3)"
             if run_logged "$label" git clone ${progress[@]+"${progress[@]}"} \
-                --filter=tree:0 --branch "$BRANCH" "$REPO_URL" "$staged/tree"; then
+                --filter=tree:0 ${no_checkout:+"$no_checkout"} --branch "$BRANCH" "$REPO_URL" "$staged/tree"; then
                 cloned=true
                 break
             fi
@@ -591,6 +593,26 @@ stage_repository() {
             rm -rf "$staged"
             fail "git clone failed; no checkout published"
         fi
+        if [ -n "$INSTALL_COMMIT" ]; then
+            # Pin before publishing: a pinned clone has no files yet, and an
+            # unpublished tree never leaves an empty checkout behind.
+            git -C "$staged/tree" merge-base --is-ancestor "$INSTALL_COMMIT" "origin/$BRANCH" 2>/dev/null \
+                || { rm -rf "$staged"; fail "commit $INSTALL_COMMIT is not on branch $BRANCH"; }
+            cloned=false
+            for attempt in 1 2; do
+                if run_logged "Checking out $INSTALL_COMMIT (attempt $attempt of 2)" \
+                    git -C "$staged/tree" checkout --force --detach "$INSTALL_COMMIT"; then
+                    cloned=true
+                    pinned=true
+                    break
+                fi
+                [ "$attempt" = 2 ] || sleep 5
+            done
+            if [ "$cloned" = false ]; then
+                rm -rf "$staged"
+                fail "could not check out $INSTALL_COMMIT; no checkout published"
+            fi
+        fi
         if ! mv "$staged/tree" "$INSTALL_DIR"; then
             rm -rf "$staged"
             fail "cannot publish cloned checkout"
@@ -608,7 +630,7 @@ stage_repository() {
             || log_warn "could not disable fetch.writeCommitGraph in $INSTALL_DIR"
         log_success "Qubit Agent cloned"
     fi
-    if [ -n "$INSTALL_COMMIT" ]; then
+    if [ -n "$INSTALL_COMMIT" ] && [ "$pinned" = false ]; then
         # A pin must come from the branch being installed: the complete
         # marker records both, and a commit off that branch would make the
         # next plain rerun "update" onto a different line.

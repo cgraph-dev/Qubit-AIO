@@ -66,7 +66,6 @@ def test_unreadable_profiles_dir_fails_closed_and_says_so(two_profile_host, monk
     assert secret_scope.is_multiplex_active()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: eager multi-profile activation does not route secondary profile logs")
 def test_activation_routes_logs_per_profile_home(two_profile_host, monkeypatch):
     """The secondary's records must reach its own logs/ even when no cron ticker starts (a live
     gateway owns cron), else its model/cwd lines land in the launch profile's agent.log."""

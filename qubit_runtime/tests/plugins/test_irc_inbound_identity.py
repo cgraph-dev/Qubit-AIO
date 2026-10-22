@@ -17,10 +17,7 @@ from tests.gateway._plugin_adapter_loader import load_plugin_adapter
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("texts", [
-    pytest.param(("first", "second"), marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: same-millisecond IRC lines collide with admission_conflict")),
-    pytest.param(("same", "same"), marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: same-millisecond IRC lines collide with admission_conflict")),
-])
+@pytest.mark.parametrize("texts", [("first", "second"), ("same", "same")])
 async def test_same_millisecond_irc_lines_get_separate_admissions(monkeypatch, texts):
     home = get_qubit_home()
     monkeypatch.setenv("IRC_ALLOWED_USERS", "sender")

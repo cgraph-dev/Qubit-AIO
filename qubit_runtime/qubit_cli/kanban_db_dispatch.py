@@ -2751,41 +2751,9 @@ def _retag_legacy_worker_sessions(workspaces_root_path: str) -> None:
 
 
 def _worker_argv(task: Task, profile_arg: str, qubit_home: Optional[str]) -> list[str]:
-    """Build the ``qubit -p <profile> --cli ... chat -q ...`` worker command."""
-    cmd = [
-        *_resolve_qubit_argv(),
-        "-p", profile_arg,
-        # A worker must NEVER boot the interactive TUI: its no-TTY bail-out
-        # exits 0 without doing the task → "protocol violation" every attempt.
-        "--cli",
-        # Workers run under a profile-scoped QUBIT_HOME and so see that
-        # profile's shell-hook allowlist; pass --accept-hooks explicitly so
-        # configured hooks still register.
-        "--accept-hooks",
-    ]
-    # One `--skills X` pair per name: easier to read in `ps` and avoids quoting
-    # ambiguity if a skill name contains unusual chars.
-    for sk in task.skills or ():
-        if sk:
-            cmd.extend(["--skills", sk])
-    if task.model_override:
-        cmd.extend(["-m", task.model_override])
-        # Pin the provider too so the worker resolves the model against the
-        # intended backend (model X with provider Y is the classic board-stall).
-        if task.provider_override:
-            cmd.extend(["--provider", task.provider_override])
-    # Independent of the model override — a task can run the profile's own
-    # model at a different depth.
-    if task.reasoning_effort:
-        cmd.extend(["--reasoning", task.reasoning_effort])
-    worker_toolsets = _resolve_worker_cli_toolsets(qubit_home)
-    if worker_toolsets:
-        cmd.extend(["--toolsets", ",".join(worker_toolsets)])
-    cmd.extend(["chat", "-q", f"work kanban task {task.id}"])
-    # goal_mode rides the same `-q` path: cli.py runs the judge loop there too, so the
-    # worker log keeps its live tool feed (forcing -Q blanked it).
-    return cmd
-
+    """The profile owner executes; this subprocess only waits for its receipt."""
+    import sys
+    return [sys.executable, "-m", "qubit_cli.kanban_worker_client"]
 
 def _open_worker_log(task: Task, board: Optional[str]):
     """Append-mode per-task log (a re-run on unblock appends, never overwrites),
@@ -2948,9 +2916,13 @@ def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -
     env.pop("HERMES_TUI", None)
 
     cmd = _worker_argv(task, profile_arg, env.get("QUBIT_HOME"))
-    # The module argv must carry the import context that made it resolvable:
-    # the shim's in-process path injection is invisible to the bare child.
-    _propagate_module_import_root(cmd, env)
+    # The worker is `-m qubit_cli.kanban_worker_client`: Qubit itself, with no console-script
+    # bootstrap. The routed-profile scrub above strips Qubit-owned PYTHONPATH entries (user
+    # children must not see our tree), so a PYTHONPATH-launched dispatcher spawned a child that
+    # died on `No module named 'qubit_cli'` before it ever reached the owner. Same pin as cron's
+    # external worker (#112729): applied to the sanitized env, after every other decision stands.
+    from cron.scheduler_worker_env import pin_qubit_tree_on_pythonpath
+    env = pin_qubit_tree_on_pythonpath(env, Path(__file__).resolve().parent.parent)
     # A worker spawned by a managed systemd gateway must leave the gateway's
     # cgroup before startup; otherwise restarting the service kills the worker
     # that is performing the handoff.
