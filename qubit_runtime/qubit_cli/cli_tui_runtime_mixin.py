@@ -243,6 +243,25 @@ class CLITuiRuntimeMixin:
             pass
         raise KeyboardInterrupt()  # fallback for non-prompt_toolkit contexts
 
+    def _show_startup_browser_notice(self):
+        """Main's ``_show_browser_backend_notice``; on a gateway session the gateway computed the notice
+        (and its once-per-24h stamp) with the session's tools, so it is printed from the snapshot."""
+        inventory = getattr(getattr(self, "_session_db", None), "banner_inventory", lambda: None)()
+        if inventory is None or "browser_backend_notice" not in inventory:
+            self._show_startup_browser_notice()
+            return
+        notice = inventory.get("browser_backend_notice")
+        if notice:
+            from gateway.warning_notifications import render_notification
+            render_notification(lambda: self._console_print(f"[yellow]⚠ {notice}[/yellow]"), platform="cli")
+
+    def _closing_session_id(self):
+        """The session quit closes: the agent's, or (gateway) the session opened at the banner before
+        any agent was built. Main created its row lazily at the first turn, so with no agent it had none."""
+        if self.agent:
+            return self.agent.session_id
+        return self.session_id if getattr(self, "_gateway_session_open", False) else None
+
     def _tui_print_startup(self):
         """Startup output: light-mode probe, banner, advisories, resume/welcome lines, tips."""
         from cli import _accent_hex, _detect_light_mode

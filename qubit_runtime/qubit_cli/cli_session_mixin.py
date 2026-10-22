@@ -509,7 +509,9 @@ class CLISessionMixin:
                 # rotation) so /new never blocks on the LLM-bound call.
                 _boundary_snapshot = self._launch_session_boundary_memory_flush(
                     list(self.conversation_history), session_id=old_session_id)
-            self._notify_session_boundary("on_session_finalize")
+            from qubit_cli.cli_shutdown import _gateway_owns_session_end
+            if not _gateway_owns_session_end(self.agent):  # the gateway finalizes at end_session below
+                self._notify_session_boundary("on_session_finalize")
 
         if self._session_db and old_session_id:
             # /new can arrive mid-turn before _flush_messages_to_session_db() ran — flush
@@ -589,7 +591,9 @@ class CLISessionMixin:
                     _mm.on_session_switch(
                         self.session_id, parent_session_id=old_session_id or "",
                         reset=True, reason="new_session")
-            self._notify_session_boundary("on_session_reset")
+            from qubit_cli.cli_shutdown import _gateway_owns_session_end
+            if not _gateway_owns_session_end(self.agent):  # the gateway resets when end_session closes it
+                self._notify_session_boundary("on_session_reset")
 
         if not silent:
             if title:
