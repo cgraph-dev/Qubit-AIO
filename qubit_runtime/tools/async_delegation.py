@@ -161,6 +161,8 @@ def _capture_routing_origin() -> Dict[str, Any]:
 
 
 def _persist_dispatch(record: Dict[str, Any]) -> None:
+    if remote := worker_ledger():
+        return remote.dispatch(record)
     now = time.time()
     try:
         from gateway.status import get_process_start_time
@@ -340,6 +342,11 @@ def restore_undelivered_completions(target_queue) -> int:
     ownership, otherwise a brand-new session adopts a dead session's delegation results seconds after boot
     (#64484).
     """
+    from agent.runtime_session_store import is_worker_process
+    if is_worker_process():
+        # The ordinary owner restores delivery-only results; a compute import
+        # must neither reap that owner's ledger nor steal its delivery queue.
+        return 0
     if not _db_path().exists():
         return 0  # nothing to replay; a replay must not create (or migrate) the ledger (#123265)
     recover_abandoned_delegations()
@@ -464,6 +471,8 @@ def mark_completion_delivered(delegation_id: str) -> bool:
 
 def claim_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Claim one pending completion across competing consumers/processes."""
+    if remote := worker_ledger():
+        return remote.claim(delegation_id, claim_id)
     now = time.time()
     with _DB_LOCK, _transaction() as conn:
         row = conn.execute(
@@ -500,6 +509,8 @@ def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Release a failed delivery claim so another consumer may retry. Attempts are
     counted at claim time; once the budget is exhausted the row converges to
     terminal ``dropped`` (only pending rows replay on restart)."""
+    if remote := worker_ledger():
+        return remote.release(delegation_id, claim_id)
     now = time.time()
     with _DB_LOCK, _transaction() as conn:
         capped = conn.execute("""UPDATE async_delegations SET delivery_state='dropped',
@@ -521,6 +532,8 @@ def release_completion_delivery(delegation_id: str, claim_id: str) -> bool:
 
 def defer_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Return an unadmitted completion to pending without spending a delivery attempt."""
+    if remote := worker_ledger():
+        return remote.defer(delegation_id, claim_id)
     return _update_delivery("""UPDATE async_delegations SET delivery_claim=NULL,
                   delivery_claimed_at=NULL, delivery_attempts=MAX(0, delivery_attempts-1),
                   updated_at=?
@@ -533,6 +546,8 @@ def drop_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     spawning session ended at an explicit user boundary such as /new or reset).
     ``dropped`` — not ``delivered`` — keeps the ack honest; not ``pending`` keeps
     restart recovery from replaying it into a fail-closed drop forever."""
+    if remote := worker_ledger():
+        return remote.drop(delegation_id, claim_id)
     return _update_delivery("""UPDATE async_delegations SET delivery_state='dropped',
                   updated_at=?, delivery_claim=NULL,
                   delivery_claimed_at=NULL
@@ -542,6 +557,8 @@ def drop_completion_delivery(delegation_id: str, claim_id: str) -> bool:
 
 def complete_completion_delivery(delegation_id: str, claim_id: str) -> bool:
     """Acknowledge acceptance for the consumer holding this claim."""
+    if remote := worker_ledger():
+        return remote.ack(delegation_id, claim_id)
     now = time.time()
     return _update_delivery("""UPDATE async_delegations SET delivery_state='delivered',
                   delivered_at=?, updated_at=?, delivery_claim=NULL,
@@ -610,7 +627,7 @@ def requeue_admitted_completion(delegation_id: str, target_queue) -> bool:
 def get_durable_delegation(delegation_id: str) -> Optional[Dict[str, Any]]:
     if remote := worker_ledger():
         saved = remote.read(delegation_id)
-        if saved is not None and saved.get("result") is not None:
+        if isinstance(saved, dict) and saved.get("result") is not None:
             return {**saved, "result": redact_child_result(saved["result"])}
         return saved
     with _DB_LOCK, _transaction() as conn:
@@ -798,6 +815,7 @@ def _dispatch_admitted(
     can't pile up unbounded background work. ``slot_key`` names the pool slot the unit occupies
     (default: its own id); the units of one delegate_task call share the first unit's id so
     splitting a call into per-group completions never consumes more capacity than the call did."""
+    worker_ledger()  # refuse unbound workers before publishing a live record
     is_batch = goals is not None
     label = " batch" if is_batch else ""
     classify = _batch_status if is_batch else (lambda r: r.get("status") or "completed")

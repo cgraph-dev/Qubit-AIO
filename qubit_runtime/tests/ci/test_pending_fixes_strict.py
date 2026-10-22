@@ -81,7 +81,6 @@ def test_default_run_xfails_only_the_known_gap(tmp_path, strict):
 
 
 @pytest.mark.parametrize("strict", ["upd-txn", "other-batch, upd-txn"])
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: local known_failure XFAILs strict-acceptance gaps instead of failing them")
 def test_strict_acceptance_fails_the_batch_owned_gaps_only(tmp_path, strict):
     assert _run(tmp_path, strict) == {
         "test_gap_still_open": "FAILED",
@@ -92,7 +91,6 @@ def test_strict_acceptance_fails_the_batch_owned_gaps_only(tmp_path, strict):
     }
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: local known_failure XFAILs strict-acceptance gaps instead of failing them")
 def test_strict_acceptance_1_fails_every_known_gap(tmp_path):
     outcomes = _run(tmp_path, "1")
     assert outcomes.pop("test_fixed_gap_passes") == "PASSED"

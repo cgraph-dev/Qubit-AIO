@@ -630,7 +630,8 @@ class CLIAgentSetupMixin:
         """Build the agent on first use; when resuming, restore history from SQLite.
         Returns True on success."""
         from cli import (
-            ChatConsole, _cprint, _prepare_deferred_agent_startup, _record_shell_hook_consent, logger)
+            ChatConsole, _cprint, _prepare_deferred_agent_startup, logger)
+        from qubit_cli.cli_init_mixin import _record_shell_hook_consent
         from run_agent import AIAgent
         if self.agent is not None:
             return True
