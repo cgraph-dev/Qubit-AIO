@@ -21,7 +21,6 @@ class Store:
         return {'value': True}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: async_delegation ledger paths still open canonical SQLite in a worker")
 def test_worker_ledger_paths_are_closed_and_process_scoped(monkeypatch):
     from tools import async_delegation_worker as worker
     monkeypatch.setattr(runtime_session_store, '_worker_process', True)
@@ -56,7 +55,6 @@ def test_worker_ledger_paths_are_closed_and_process_scoped(monkeypatch):
     assert store.calls[0][1]['task'] == {'goal': 'inert'}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: unbound worker raises owner_only before ledger_unbound")
 def test_unbound_worker_refuses_before_persistence_and_dispatch_state(monkeypatch):
     from tools import async_delegation_worker as worker
     monkeypatch.setattr(runtime_session_store, '_worker_process', True)
