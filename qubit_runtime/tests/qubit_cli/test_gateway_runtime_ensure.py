@@ -341,7 +341,6 @@ def test_native_launchd_ambiguous_domains_cannot_start(tmp_path, monkeypatch):
 
 @pytest.mark.platforms("linux")
 @pytest.mark.spawns_gateway_lookalike  # stub interpreter records the resolved home then exits; reaped below
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: runtime ensure contract differs")
 def test_unmanaged_root_home_child_ignores_sticky_active_profile(tmp_path, monkeypatch):
     """Explicit default selection survives the CLI child's own profile bootstrap (F15): with
     active_profile=other sticky, the spawned `gateway run` must still resolve the root home."""
