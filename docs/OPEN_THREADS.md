@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 27 — 2026-10-22 (crash fix; 112 markers)
+
+- ✅ 4 lanes: 14 gateway defect cases, 23 absent gateway files, profile/CI fixes; markers 126 → 112.
+- ✅ Crash investigation: test-induced `agent.managed_worker` SIGABRT at Python finalization; fixed with flush + `os._exit`; 11 worker tests pass; crash file removed.
+- ✅ Notifier: `update-notifier-crash.path` masked (GUI notifier failed without DBUS); reversible.
+- ✅ Measured: absent **201 → 178**; short-port **1** (B1); total **1**; production **1**; 0 production dead (33 test-side).
+- 🔴 Remaining: 112 xfail markers; 178 absent test files; orb inactive pending its uncommitted WIP; no E2E/release verdict.
+
 ## Wave 25 — 2026-10-22 (short-port 1; code parity at pin)
 
 - ✅ 8 lanes: 50+ defect cases fixed, **92/101 short-port symbols closed**, 38 absent files ported, release/install long tail, detector split, EG2 template docs.

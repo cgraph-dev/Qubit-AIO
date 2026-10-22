@@ -62,12 +62,12 @@ Baseline at the re-freeze (2026-10-17, first complete-blob read of the pin):
 | metric | at freeze | now (2026-10-21) |
 |---|---|---|
 | upstream `.py` files | 9,503 | 9,503 |
-| absent files | 974 | 201 |
+| absent files | 974 | 178 |
 | short_port files / symbols | 610 / 1,649 | 1 / 1 |
 | behind_head files / symbols | 0 / 0 | 0 / 0 |
 | **total missing symbols** | **2,623** | **1** |
 | — production | — | **1** (declared exclusion) |
-| — tests (non-blocking) | — | 201 |
+| — tests (non-blocking) | — | 178 |
 
 Closed since the freeze: **2,622 symbols** (~99.96% of the gap). The one
 remaining symbol is the owner-declared B1 exclusion; the short-port column has
