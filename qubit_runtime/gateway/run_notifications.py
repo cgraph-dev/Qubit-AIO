@@ -1527,6 +1527,11 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             claim = await self._preflight_completion_delivery(evt)
             if not claim.proceed:
                 return claim.early_result
+            if getattr(self, 'session_authority', None) is not None:
+                from gateway.session_automation import completion_admission
+                if completion_admission(self, evt) is not None:
+                    accepted = True  # Lost ACK: finish durable claims, never infer again.
+                    return True
             if identity is not None:
                 if self._completion_identity_seen(identity, claim=True):
                     return None
@@ -1725,16 +1730,22 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                     outcomes.append(await self._deliver_completion_notification(text, evt))
             return False if False in outcomes else True
         deliverable: list[tuple[dict, str]] = []
+        acknowledged = False
         for evt in group:
             synth_text = _format_gateway_process_notification(evt)
             if not synth_text:
                 continue
+            if getattr(self, 'session_authority', None) is not None:
+                from gateway.session_automation import completion_admission
+                if completion_admission(self, evt) is not None:
+                    acknowledged = await self._deliver_completion_notification(synth_text, evt) is True or acknowledged
+                    continue
             identity = self._completion_delivery_identity(evt)
             if identity is not None and self._completion_identity_seen(identity):
                 continue
             deliverable.append((evt, synth_text))
         if not deliverable:
-            return None
+            return True if acknowledged else None
         if len(deliverable) == 1:
             evt, synth_text = deliverable[0]
             return await self._deliver_completion_notification(synth_text, evt)
@@ -1763,6 +1774,10 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             "response. If a result does not change the current conclusion, absorb it silently.]"
         )
         consolidated = "\n\n".join([header, *blocks])
+        if getattr(self, 'session_authority', None) is not None:
+            from gateway.session_automation import producer_identity
+            primary_evt = dict(primary_evt, _automation_identities=[
+                producer_identity(self, event) for event in [primary_evt, *(e for e, _ in siblings)]])
         delivered = await self._deliver_completion_notification(
             consolidated, primary_evt, sibling_claims=siblings,
         )

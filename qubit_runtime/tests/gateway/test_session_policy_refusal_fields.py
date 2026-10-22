@@ -216,8 +216,7 @@ def test_a_bypass_launch_without_a_model_names_the_model():
 @pytest.mark.parametrize('name', ['deadserver', 'mcp-deadserver'])
 @pytest.mark.parametrize('entry, why', [
     ({'enabled': False}, 'is disabled in config'),
-    pytest.param(None, 'has no usable config entry',  # `mcp_servers: {deadserver: null}` is not a disabled server
-                 marks=pytest.mark.xfail(strict=True, reason='wave-24 parity defect: null MCP entry not refused by name')),
+    pytest.param(None, 'has no usable config entry'),  # `mcp_servers: {deadserver: null}` is not a disabled server
 ])
 def test_an_explicit_pick_of_a_disabled_mcp_server_is_refused_by_name(tmp_path, name, entry, why):
     """A disabled server matched no allowlist entry and fell through to every enabled server; main

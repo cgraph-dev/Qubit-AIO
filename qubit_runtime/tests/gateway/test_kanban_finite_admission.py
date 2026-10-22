@@ -14,7 +14,7 @@ def test_kanban_submission_enters_single_query_approval_context(tmp_path, monkey
     from qubit_cli.kanban_db_connect import connect
     from tools.approval_context import _is_single_query_approval_context
 
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     monkeypatch.setenv('HERMES_KANBAN_HOME', str(tmp_path))
     for name in ('HERMES_KANBAN_DB', 'HERMES_DELEGATED_CHILD', 'HERMES_SINGLE_QUERY_SESSION'):
         monkeypatch.delenv(name, raising=False)
@@ -74,7 +74,7 @@ def kanban_owner(tmp_path, monkeypatch):
     from qubit_cli.kanban_db_connect import connect
     from tests.gateway.test_session_follow_profile_config import _owner
 
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     monkeypatch.setenv('HERMES_KANBAN_HOME', str(tmp_path))
     for name in ('HERMES_KANBAN_DB', 'HERMES_DELEGATED_CHILD', 'HERMES_SINGLE_QUERY_SESSION', 'HERMES_YOLO_MODE'):
         monkeypatch.delenv(name, raising=False)
@@ -111,9 +111,7 @@ _CONFIG = {'model': {'default': 'loop-model', 'provider': 'custom'}, 'platform_t
 
 
 @pytest.mark.parametrize('mode', [
-    'deny',
-    pytest.param('approve', marks=pytest.mark.xfail(
-        strict=True, reason='wave-24 parity defect: approve-mode headless kanban policy')),
+    'deny', 'approve',
 ])
 def test_durable_kanban_admission_preserves_headless_policy_in_worker(kanban_owner, mode):
     from gateway.session_contract import SessionRef

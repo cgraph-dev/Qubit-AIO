@@ -79,7 +79,6 @@ def test_real_dispatcher_lifecycle(tmp_path, mode):
     print(json.dumps(receipt))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_late_launcher_cannot_stamp_replacement_claim")
 def test_late_launcher_cannot_stamp_replacement_claim(tmp_path, monkeypatch):
     from contextlib import closing
     from qubit_cli import kanban_db as kb, kanban_db_dispatch as dispatch

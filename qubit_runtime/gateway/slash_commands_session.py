@@ -20,6 +20,7 @@ from gateway.config import Platform
 from gateway.platforms.base import EphemeralReply
 from gateway.platforms.event import MessageEvent, MessageType
 from gateway.session import SessionSource, build_session_key, is_shared_multi_user_session
+from gateway.session_ingress_context import carry_callback
 from gateway.session_transcript import TranscriptReadError
 from gateway.slash_commands_branch_thread import (
     BRANCH_THREAD_PLATFORMS, branch_dest_source, branch_thread_parent, format_thread_ref, parse_branch_args,
@@ -185,9 +186,11 @@ class GatewaySessionCommandsMixin:
         )
         token = sra.bind(rewrite)
         try:
-            return await self._handle_message(MessageEvent(
+            retry_event = MessageEvent(
                 text=last_user_msg, message_type=MessageType.TEXT, source=event.source,
-                raw_message=event.raw_message, channel_prompt=event.channel_prompt))
+                raw_message=event.raw_message, channel_prompt=event.channel_prompt)
+            carry_callback(event, retry_event)
+            return await self._handle_message(retry_event)
         finally:
             sra.unbind(token)
 
@@ -519,9 +522,11 @@ class GatewaySessionCommandsMixin:
             return t("gateway.retry.failed_unchanged")
         session_entry.last_prompt_tokens = 0  # transcript was truncated
         self._record_model_friction("retry", source, session_entry.session_id)
-        return await self._handle_message(MessageEvent(
+        retry_event = MessageEvent(
             text=last_user_msg, message_type=MessageType.TEXT, source=source,
-            raw_message=event.raw_message, channel_prompt=event.channel_prompt))
+            raw_message=event.raw_message, channel_prompt=event.channel_prompt)
+        carry_callback(event, retry_event)
+        return await self._handle_message(retry_event)
 
     def _record_model_friction(self, signal: str, source, session_id: str, turns: int = 1) -> None:
         """Slash dispatch does not install the routed profile's scope, so a multiplexed runner
