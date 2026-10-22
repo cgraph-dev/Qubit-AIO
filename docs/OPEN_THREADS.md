@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 24 — 2026-10-22 (101 missing; 50 defects fixed)
+
+- ✅ 50 more cases fixed (gateway/CLI/tools), 42 absent + 23 short-port files ported, source R2 tests adapted to the fork's contract, relay admission guard fixed, 15 dead test helpers removed.
+- ✅ Measured: absent **243 → 201**; short-port **117 → 101**; total **117 → 101**; production **1** (declared B1); **0 production dead** (5 test-side).
+- 🔴 Remaining: 122 xfail markers; 301 test symbols (201 absent + 100 short-port); no E2E/release verdict.
+- ✅ Live: applied; bridge/gateway/orb verified.
+
 ## Wave 23 — 2026-10-22 (117 missing; EG2 augmenter live)
 
 - ✅ EG2 L1.5 voice augmenter added (`b27d555bc`), flag enabled live: max-sim, UNKNOWN-only, pending/risk veto; 26 tests, real-model probe; 0 executable high-risk routes across 39 probes + 710 utterances.
