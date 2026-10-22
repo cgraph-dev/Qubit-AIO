@@ -18,10 +18,10 @@ from qubit_cli import runtime_provider
 @pytest.fixture
 def create_from_launch(tmp_path, monkeypatch):
     """Write *source* as the launch config, create a fresh profile, return its raw config."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
 
     def _create(source: dict) -> dict:
         atomic_config_write(
@@ -42,7 +42,6 @@ def create_from_launch(tmp_path, monkeypatch):
         ("custom_providers", "custom:display-name", "base_url"),
     ],
 )
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_fresh_profile_retains_resolvable_custom_endpoint(
     create_from_launch, monkeypatch, schema, provider, url_key
 ):
@@ -78,7 +77,6 @@ def test_fresh_profile_retains_resolvable_custom_endpoint(
         ("custom_providers", "custom:openrouter", True),
     ],
 )
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_builtin_name_collision_only_copies_explicit_custom_selection(
     create_from_launch, schema, provider, copied
 ):
@@ -103,7 +101,6 @@ def test_builtin_name_collision_only_copies_explicit_custom_selection(
         },
     ],
 )
-@pytest.mark.xfail(strict=False, reason="wave-25 parity defect (intermittent): ported from the frozen pin; the fork does not satisfy this contract on every run")
 def test_fresh_profile_keeps_exact_key_provider_tuning(create_from_launch, model):
     selected = {model["provider"]: {"request_timeout_seconds": 150}}
     neighbor = {"neighbor": {"request_timeout_seconds": 5}}

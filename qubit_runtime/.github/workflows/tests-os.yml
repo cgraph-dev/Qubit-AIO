@@ -29,6 +29,16 @@ name: OS-specific tests
 on:
   workflow_call:
     inputs:
+      e2e:
+        description: Run the Windows E2E (real processes) lane.
+        type: boolean
+        required: false
+        default: true
+      e2e_upgrade:
+        description: Run the Windows install + update E2E journey.
+        type: boolean
+        required: false
+        default: true
       desktop_updater:
         description: >-
           Run the Windows desktop-update hand-off integration tests
@@ -168,6 +178,7 @@ jobs:
           NOUS_API_KEY: ''
 
   e2e-windows:
+    if: inputs.e2e
     # Real Qubit processes on a real Windows host (tests/e2e/core/windows): hermes.exe,
     # `qubit serve`, `qubit gateway run/stop`, the tui_gateway stdio process, cron script
     # jobs, the terminal tool's Git Bash / PowerShell / cmd children and a ConPTY console,
@@ -230,3 +241,13 @@ jobs:
             "::error::leftover pid=$($p.ProcessId) ppid=$($p.ParentProcessId): $($p.CommandLine)"
           }
           exit 1
+
+  install-update-e2e:
+    if: inputs.e2e_upgrade
+    # The real scripts/install.ps1 -> `qubit update` HEAD -> NEXT journey on a
+    # real Windows host (tests/e2e/core/windows_update): fresh install, gateway
+    # across the update, interpreter selection, non-ASCII profile paths and tool
+    # ACLs, partial-clone fetch and venv holders. Its own workflow so
+    # wine2e-install/** pushes can run it alone.
+    name: Windows install + update E2E
+    uses: ./.github/workflows/windows-install-update-e2e.yml

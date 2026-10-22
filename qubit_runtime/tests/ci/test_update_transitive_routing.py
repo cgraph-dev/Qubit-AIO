@@ -26,7 +26,6 @@ from tests.ci.test_update_ci_routing import _REPO, _ci_run, _consumers_reached, 
     "pm/install.py",
     "qubit_cli/backup.py",
 ])
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_second_hop_update_change_dispatches_real_update_consumers")
 def test_second_hop_update_change_dispatches_real_update_consumers(path):
     lanes = _real_classifier([path])
     for lane in ("e2e_upgrade", "e2e_desktop_update"):
