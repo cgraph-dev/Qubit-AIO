@@ -6,7 +6,6 @@ import pytest
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_coalesced_siblings_survive_lost_ack_and_owner_restart")
 async def test_coalesced_siblings_survive_lost_ack_and_owner_restart(tmp_path, monkeypatch):
     from gateway.config import GatewayConfig, Platform, PlatformConfig
     from gateway.platforms.event import MessageEvent

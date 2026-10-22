@@ -42,7 +42,7 @@ def _reserve_homes(tmp_path, monkeypatch, names=('beta',)):
     root = tmp_path / '.hermes'
     root.mkdir(mode=0o700)
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
-    monkeypatch.setenv('HERMES_HOME', str(root))
+    monkeypatch.setenv('QUBIT_HOME', str(root))
     import qubit_state
     monkeypatch.setattr(
         qubit_state, 'DEFAULT_DB_PATH', qubit_state._IMPORT_DEFAULT_DB_PATH)
@@ -63,7 +63,6 @@ def _runner(root, homes):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_retry_redispatch_admits_natively_under_session_authority")
 async def test_retry_redispatch_admits_natively_under_session_authority(
         tmp_path, monkeypatch):
     root, homes = _reserve_homes(tmp_path, monkeypatch)

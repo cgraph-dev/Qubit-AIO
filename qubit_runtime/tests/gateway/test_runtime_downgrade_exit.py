@@ -58,7 +58,6 @@ def test_a_confirmed_move_to_a_pre_runtime_tree_stops_without_a_restart(tmp_path
     assert exits == [1]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_the_tree_probe_reads_the_checkout_on_disk")
 def test_the_tree_probe_reads_the_checkout_on_disk(tmp_path):
     def git(*args):
         subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
