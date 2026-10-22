@@ -78,7 +78,6 @@ def test_stale_epoch_leaves_a_per_process_surface_alone():
     refresh.assert_not_called()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: frozen gateway session policy is not consulted on toolset refresh")
 def test_frozen_session_policy_wins_over_live_surface_config():
     """A gateway-owned session runs under its frozen launch policy: the refresh re-pins the
     policy's toolsets and never consults the live-config surface builder."""

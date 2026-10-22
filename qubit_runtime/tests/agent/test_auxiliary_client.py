@@ -252,7 +252,7 @@ class TestMoaAggregatorSharedResolution:
 
     @staticmethod
     def _write_moa_config(tmp_path, monkeypatch, default_preset="opus-gpt"):
-        import hermes_yaml as yaml
+        import qubit_yaml as yaml
 
         home = tmp_path / ".hermes"
         home.mkdir(exist_ok=True)
@@ -290,11 +290,10 @@ class TestMoaAggregatorSharedResolution:
         monkeypatch.setenv("QUBIT_HOME", str(home))
         return home
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: explicit task-provider MoA resolution does not match the pin")
     def test_real_config_explicit_task_provider_moa(self, tmp_path, monkeypatch):
         """auxiliary.<task>.provider: moa in a REAL config.yaml resolves to the
         aggregator through the genuine load_config()/resolve_moa_preset() path."""
-        import hermes_yaml as yaml
+        import qubit_yaml as yaml
 
         home = self._write_moa_config(tmp_path, monkeypatch)
         cfg = yaml.safe_load((home / "config.yaml").read_text())
@@ -315,7 +314,6 @@ class TestMoaAggregatorSharedResolution:
 
 
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: MoA main fallback does not use the aggregator")
     def test_main_agent_fallback_uses_aggregator_for_moa_main(self, tmp_path, monkeypatch):
         """_try_main_agent_model_fallback with a moa main resolves the
         aggregator instead of asking for a literal "moa" client."""
@@ -4276,7 +4274,6 @@ class TestBuildCallKwargsToolDedup:
 class TestNvidiaBillingHeaders:
     """NVIDIA NIM billing-origin headers are scoped to NVIDIA cloud."""
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: cloud provider client omits the billing-origin header")
     def test_resolve_provider_client_cloud_adds_billing_origin_header(self, monkeypatch):
         monkeypatch.setenv("NVIDIA_API_KEY", "nvidia-key")
         monkeypatch.delenv("NVIDIA_BASE_URL", raising=False)
@@ -4293,7 +4290,7 @@ class TestNvidiaBillingHeaders:
         assert model == "nvidia/test-model"
         call_kwargs = mock_openai.call_args[1]
         headers = call_kwargs["default_headers"]
-        assert headers["X-BILLING-INVOKE-ORIGIN"] == "HermesAgent"
+        assert headers["X-BILLING-INVOKE-ORIGIN"] == "QubitAgent"
 
     def test_resolve_provider_client_local_nim_skips_billing_origin_header(self, monkeypatch):
         monkeypatch.setenv("NVIDIA_API_KEY", "nvidia-key")
@@ -4900,14 +4897,13 @@ class TestCustomEndpointApiKeyInheritance:
         ("http://127.0.0.1:8080/v1", "", False),
         ("http://127.0.0.1:8080/v1", lambda: "sk-live-cmd-key", False),
     ], ids=["same-origin", "http-downgrade", "other-port", "live-keyless", "live-key_cmd"])
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: main credential is not scoped to its own origin")
     def test_main_key_goes_only_to_its_own_origin(self, tmp_path, monkeypatch, aux_base_url, live_key, inherits):
         """Same hostname is not the same endpoint: a different scheme or port must not receive
         the main key; the identical origin (default port spelled out) still does. A live main
         runtime (a /model switch to a keyless local server, a key_cmd) is the anchor, and
         config.yaml's key belongs to config.yaml's base_url, never to the live endpoint.
         Real config.yaml under a temp QUBIT_HOME, resolved through the task route."""
-        import hermes_yaml as yaml
+        import qubit_yaml as yaml
         from agent.auxiliary_client import reset_runtime_main, set_runtime_main
 
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -4990,14 +4986,13 @@ class TestNoProgressTimeoutTaskConfigGating:
 
         assert "no_progress_timeout" not in client.chat.completions.create.call_args.kwargs
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: per-task stream-guard config value is not honored")
     def test_real_config_value_reaches_the_stream_guard_per_task(self, tmp_path, monkeypatch, caplog):
         """#108104: a REAL config.yaml ``auxiliary.compression.no_progress_timeout`` must set the
         guard's substantive-progress window through the genuine call_llm -> _prepare_aux_request ->
         CodexAuxiliaryClient path (both the first-output and between-output deadlines derive from
         ``guard.no_progress_timeout``); other tasks keep the 60s default; a non-positive value
         is rejected with a warning and falls back to the default."""
-        import hermes_yaml as yaml
+        import qubit_yaml as yaml
         from agent import auxiliary_client as aux
 
         home = tmp_path / ".hermes"
@@ -5474,7 +5469,6 @@ class TestFastModelTier:
         )
         assert base_url == "https://api.agnes-ai.cn/v1"
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: vision provider resolution drops the named provider")
     def test_resolve_vision_provider_client_preserves_named_provider_via_config(self, tmp_path):
         """#76602 (review feedback) — integration test through the real
         ``resolve_vision_provider_client`` entry point with a real
@@ -5486,7 +5480,7 @@ class TestFastModelTier:
         after the fix the named provider is preserved and the inline
         ``api_key`` from the providers: entry reaches the client.
         """
-        import hermes_yaml as yaml
+        import qubit_yaml as yaml
 
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
