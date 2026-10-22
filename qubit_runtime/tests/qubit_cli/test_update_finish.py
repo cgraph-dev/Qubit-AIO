@@ -154,6 +154,8 @@ def completion(tmp_path, monkeypatch):
                     from qubit_cli import update_cmd as update
                     from qubit_cli import update_cmd_maint as maint
                     from qubit_cli import update_cmd_fleet as fleet
+                    from qubit_cli import update_cmd_fleet_verify as fleet_verify
+                    from qubit_cli import update_cmd_windows
                     from qubit_cli import gateway_migrate
                     from qubit_cli import macos_tcc_anchor
                     from qubit_cli import source_build
@@ -196,12 +198,14 @@ def completion(tmp_path, monkeypatch):
                     maint._print_post_update_notices_and_self_heals = lambda: None
                     maint._sync_profiles_after_update = lambda: None
                     maint._print_bundled_skills_sync_report = lambda: None
-                    fleet._print_legacy_units_warning = lambda: None
+                    fleet_verify._print_legacy_units_warning = lambda: None
                     maint._refresh_dashboard_after_update = lambda **kwargs: None
                     gateway_migrate.maybe_auto_migrate_after_update = lambda: None
                     update._surviving_pre_update_serve_runtimes = lambda plan: []
-                    fleet._collect_fleet_snapshot = lambda *args: []
+                    fleet_verify._collect_fleet_snapshot = lambda *args: []
                     def restart(plan, gateway_mode):
+                        if fault == 'restart':
+                            raise RuntimeError('systemctl restart timed out')
                         assert isinstance(plan, UpdatePlan)
                         assert isinstance(plan.runtimes[0], RuntimeRecord)
                         assert plan.to_dict() == request['plan'] | {
@@ -212,12 +216,26 @@ def completion(tmp_path, monkeypatch):
                             restarted_services=[], failed_or_stale_units=[], relaunched_profiles=[],
                             externally_supervised_profiles=[], killed_pids=set())
                     update._restart_gateway_fleet_after_update = restart
+                    if fault == 'interrupt':
+                        verify = update._verify_fleet_after_update
+                        def verify_then_interrupt(*args, **kwargs):
+                            verify(*args, **kwargs)  # closes the run as a success
+                            raise KeyboardInterrupt()
+                        update._verify_fleet_after_update = verify_then_interrupt
                     merge = update._resume_windows_gateways_and_merge_outcome
                     def resume(outcome, token, gateway_mode):
                         assert token == request['windows_resume']
                         (root / 'resumed-token.json').write_text(json.dumps(token))
                         return merge(outcome, token, gateway_mode)
                     update._resume_windows_gateways_and_merge_outcome = resume
+                    if fault == 'scm':
+                        # The Windows service manager refuses the paused gateway's restart.
+                        def scm(token):
+                            if token and token.get('resume_needed'):
+                                raise RuntimeError(
+                                    'Could not restart Windows gateway service(s): QubitGatewayProbe')
+                        module._resume_windows_gateways_after_update = scm
+                        update_cmd_windows._resume_windows_gateways_after_update = scm
                 spec.loader.exec_module = execute
                 return spec
         sys.meta_path.insert(0, CompletionImports())
@@ -439,4 +457,95 @@ def test_pre_pull_restart_enters_current_cli_with_original_arguments(completion,
     output = child.stdout + child.stderr
     assert "usage:" in output and "update" in output
     assert not (source / "build-environment.json").exists()
+    assert json.loads(result.read_text()) == {"resume_handled": True, "receipt_handled": True}
+
+@pytest.mark.platforms("posix")
+@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: Windows gateway resume refusal is not recorded as a follow-up")
+def test_refused_gateway_resume_after_commit_is_a_followup_not_exit_1(completion):
+    """C3 for the historical takeover child: the code is committed, so a Windows gateway resume
+    that the service manager refuses is an owed ``windows_resume`` follow-up, never exit 1."""
+    _source, home, request, context, result, run = completion
+    request["gateway_mode"] = True
+    request["receipt"]["started_at"] = "2026-10-04T12:00:00+00:00"
+    request["windows_resume"] = {"resume_needed": True, "profiles": {}, "unmapped": [],
+                                 "services": ["QubitGatewayProbe"],
+                                 "service_profiles": {"QubitGatewayProbe": "default"}}
+    context.write_text(json.dumps(request), encoding="utf-8")
+    child = run("scm")
+    assert child.returncode == 0, child.stdout + child.stderr
+    receipt = json.loads((home / "logs/update_receipts/latest.json").read_text())
+    assert receipt["update_id"] == request["update_id"]
+    assert receipt["outcome"] == "success"
+    assert "windows_resume" in [row["step"] for row in receipt["followups"]], child.stdout + child.stderr
+    assert (home / ".update_exit_code").read_text().strip() == "0"
+    assert json.loads(result.read_text())["resume_handled"] is True
+
+
+@pytest.mark.platforms("posix")
+@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: a raising fleet restart after commit reports exit 1 instead of an owed follow-up")
+def test_raising_fleet_restart_after_commit_is_a_followup_not_exit_1(completion):
+    """Review P3 (invariant 3): the takeover child's restart/verify run after the commit point, so
+    a raising fleet restart is an owed ``gateway_restart`` follow-up and exit 0, never exit 1."""
+    _source, home, request, context, _result, run = completion
+    request["gateway_mode"] = True
+    request["receipt"]["started_at"] = "2026-10-04T12:00:00+00:00"
+    context.write_text(json.dumps(request), encoding="utf-8")
+    child = run("restart")
+    assert child.returncode == 0, child.stdout + child.stderr
+    receipt = json.loads((home / "logs/update_receipts/latest.json").read_text(encoding="utf-8-sig"))
+    assert receipt["update_id"] == request["update_id"]
+    assert receipt["outcome"] == "success"
+    owed = {row["step"]: row["reason"] for row in receipt["followups"]}
+    assert "systemctl restart timed out" in owed.get("gateway_restart", ""), child.stdout + child.stderr
+    assert (home / ".update_exit_code").read_text(encoding="utf-8-sig").strip() == "0"
+
+
+@pytest.mark.platforms("posix")
+@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: an interrupt after verification rewrites the gateway status to 1")
+def test_interrupt_after_verification_closed_the_run_keeps_gateway_status_0(completion):
+    """Review regression 3: verification already finalized the takeover's run as ``success``; an
+    interrupt landing after it must not rewrite the gateway /update status to 1."""
+    _source, home, request, context, _result, run = completion
+    request["gateway_mode"] = True
+    request["receipt"]["started_at"] = "2026-10-04T12:00:00+00:00"
+    context.write_text(json.dumps(request), encoding="utf-8")
+    child = run("interrupt")
+    receipt = json.loads((home / "logs/update_receipts/latest.json").read_text(encoding="utf-8-sig"))
+    assert receipt["update_id"] == request["update_id"]
+    assert receipt["outcome"] == "success", child.stdout + child.stderr
+    assert (home / ".update_exit_code").read_text(encoding="utf-8-sig").strip() == "0", child.stdout + child.stderr
+
+
+@pytest.mark.platforms("posix")
+@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: a failed product build fails the update instead of owing a build follow-up")
+def test_real_compiler_failure_is_owed_build_and_completion_continues(completion):
+    """Contract C3 for the historical takeover child: the code is committed, so a failed product
+    build is an owed ``build`` follow-up, never a failed update. Maintenance (config migration)
+    and the fleet restart still run, the exit is 0, and the tail stays pending until it builds."""
+    from qubit_cli.config_defaults import DEFAULT_CONFIG
+    from qubit_cli.venv_sync import completion_pending_path
+    import qubit_yaml
+
+    source, home, request, context, result, run = completion
+    _npm_graph(source)
+    _put(source, "web/src/main.ts", "const broken: string = 42; document.body.textContent = broken;\n")
+    context_before = context.read_bytes()
+    child = run()
+    assert child.returncode == 0, child.stdout + child.stderr
+    assert "TypeScript build failed" in child.stdout + child.stderr
+    assert (source / "npm-python.json").is_file()
+    assert (source / "ui-tui/dist/entry.js").is_file()
+    assert not (source / "qubit_cli/web_dist/index.html").exists()
+    config = qubit_yaml.safe_load((home / "config.yaml").read_text())
+    assert config["_config_version"] == DEFAULT_CONFIG["_config_version"]
+    assert config["model"]["default"] == "retained-model"
+    assert (source / "restarted-plan.json").is_file()
+    assert context.read_bytes() == context_before
+    receipt = json.loads((home / "logs/update_receipts/latest.json").read_text())
+    assert receipt["outcome"] == "success"
+    assert [row["step"] for row in receipt["followups"]] == ["build"]
+    assert {mark["name"]: mark["outcome"] for mark in receipt["stages"]}.get("build") == "failed"
+    assert receipt["update_id"] == request["update_id"]
+    assert completion_pending_path(source).is_file()
+    assert not (source / "install-stamp.json").exists()
     assert json.loads(result.read_text()) == {"resume_handled": True, "receipt_handled": True}
