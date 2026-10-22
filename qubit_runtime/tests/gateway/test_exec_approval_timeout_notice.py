@@ -113,3 +113,8 @@ def test_other_settle_reasons_post_nothing(pending_entry, reason):
     pending_entry.settle(reason)
 
     assert adapter.edits == [] and adapter.sends == []
+
+class _PlainAdapter(_ButtonAdapter):
+    """No native buttons (``send_exec_approval is None`` per-class): plain-text fallback."""
+
+    send_exec_approval = None

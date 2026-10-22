@@ -156,6 +156,18 @@ def _self_updater_in_spaced_dir(tp, origin, sha):
     return _entry(tp, "evil.yaml", _commit(origin)), "self-updating code"
 
 
+def _bundled_native_binary(tp, origin, sha):
+    # A PE binary committed in the plugin tree (README rule 17). Header, not ext.
+    (origin / "plugin" / "runtime").mkdir()
+    (origin / "plugin" / "runtime" / "host.exe").write_bytes(b"MZ\x90\x00" + b"\x00" * 64)
+    return _entry(tp, "evil.yaml", _commit(origin)), "unscannable executable payload"
+
+
+def _committed_bytecode(tp, origin, sha):
+    (origin / "plugin" / "mod.pyc").write_bytes(b"\x00" * 16)
+    return _entry(tp, "evil.yaml", _commit(origin)), "unscannable executable payload"
+
+
 def _log_forging_filename(tp, origin, sha):
     (origin / "plugin" / "evil\n::error::forged.js").write_text(
         "releases/latest writeFile(", encoding="utf-8")
@@ -176,6 +188,10 @@ def _shadowed_parser_import(tp, origin, sha):
 @pytest.mark.parametrize("case", [
     _traversal_subdir, _symlinked_subdir, _symlink_behind_in_clone_link, _tag_object_sha,
     _newline_sha, _log_forging_repo, _symlinked_entry_file, _self_updater_in_spaced_dir,
+    pytest.param(_bundled_native_binary, marks=pytest.mark.xfail(
+        strict=True, reason="wave-24 short-port: gate does not refuse a native binary payload")),
+    pytest.param(_committed_bytecode, marks=pytest.mark.xfail(
+        strict=True, reason="wave-24 short-port: gate does not refuse committed bytecode")),
     _log_forging_filename, _shadowed_parser_import,
 ], ids=lambda f: f.__name__.lstrip("_"))
 def test_bypass_fails_the_gate(tmp_path, origin, case):

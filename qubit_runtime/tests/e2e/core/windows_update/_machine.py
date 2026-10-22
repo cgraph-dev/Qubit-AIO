@@ -577,3 +577,12 @@ SOURCE_COMPLETION_MARKERS = ("completing source-update", "Preparing Node depende
 
 def source_completion_detour(run: Run) -> str | None:
     return next((m for m in SOURCE_COMPLETION_MARKERS if m in run.stdout), None)
+
+def descendants(proc: subprocess.Popen) -> list[Any]:
+    """The live process tree under ``proc`` (empty once it exited)."""
+    import psutil
+
+    try:
+        return psutil.Process(proc.pid).children(recursive=True)
+    except psutil.Error:
+        return []

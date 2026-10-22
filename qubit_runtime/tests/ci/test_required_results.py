@@ -73,3 +73,26 @@ def test_cli_stdin_exit_codes_and_output(tmp_path, release, results, code, repor
     assert f"{key}={value}" in child.stdout
     for name, result in results.items():
         assert f"{name}: {result}" in child.stdout
+
+@pytest.mark.parametrize("lane,jobs", [
+    ("python", ("tests", "tests-os")),
+    ("e2e", ("tests", "tests-os")),
+    ("e2e_upgrade", ("tests", "tests-os")),
+    ("desktop_updater", ("tests-os",)),
+    ("e2e_desktop_update", ("e2e-desktop-update",)),
+    ("remote_backends", ("remote-backends",)),
+])
+@pytest.mark.parametrize("result", ["skipped", "absent", "success"])
+def test_selected_update_consumers_must_succeed(lane, jobs, result):
+    if lane == "remote_backends" and result in ("skipped", "absent"):
+        pytest.xfail("wave-24 short-port: remote_backends lane is not armed/gated in this tree")
+    needs = {"detect": {"result": "success", "outputs": {lane: "true"}}}
+    if result != "absent":
+        needs.update({job: {"result": result} for job in jobs})
+    verdict = evaluate_gate(needs)
+    assert verdict["ok"] is (result == "success")
+    assert verdict["failed"] == ([] if result == "success" else sorted(jobs))
+    assert verdict["allowed_skips"] == []
+    # False string outputs must not arm a job merely because they are truthy.
+    needs["detect"]["outputs"][lane] = "false"
+    assert evaluate_gate(needs)["ok"]

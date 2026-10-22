@@ -1656,3 +1656,14 @@ class TestPcmToWav:
             assert w.getframerate() == 16000
             # 48kHz -> 16kHz is a 3x decimation of a 1s clip.
             assert w.getnframes() == 16000
+
+def _unbound_voice_adapter() -> AsyncMock:
+    """A Discord adapter bound to text channel 123 with no join source (a programmatic join)."""
+    from gateway.config import Platform
+    adapter = AsyncMock()
+    adapter._voice_text_channels, adapter._voice_sources = {111: 123}, {}
+    adapter._client = MagicMock()
+    adapter.handle_message = AsyncMock()
+    adapter._thread_id_and_chat_for_channel = MagicMock(return_value=(None, "123"))
+    adapter.build_source = MagicMock(side_effect=lambda **kw: SessionSource(platform=Platform.DISCORD, **kw))
+    return adapter

@@ -246,6 +246,22 @@ def _identity(name: str, token: str) -> dict:
             "windowsExecutableName": pascal, "msixAppIdWithOrg": f"NousResearch.{pascal}"}
 
 
+GITHUB_API = "api.github.com"
+
+
+def stable_release(inst: Installed, commit: str, *, tag: str = "v99.1.1", draft: bool = False,
+                   prerelease: bool = False, api_commit: str | None = None) -> dict[str, bytes]:
+    """A published GitHub release ``tag`` at ``commit``: the tag on origin plus the API objects.
+
+    ``api_commit`` makes GitHub report a different commit than the tag on origin points at.
+    """
+    I.git("tag", "-f", tag, commit, cwd=inst.origin)
+    release = {"tag_name": tag, "draft": draft, "prerelease": prerelease}
+    base = f"/repos/{REPOSITORY}"
+    return {f"{base}/releases/latest": canonical(release), f"{base}/releases/tags/{tag}": canonical(release),
+            f"{base}/commits/{tag}": canonical({"sha": api_commit or commit})}
+
+
 def stable_objects(commit: str, *, version: str = "2099.1.1", build_id: str = "c" * 32,
                    repository: str = REPOSITORY) -> dict[str, bytes]:
     """A published stable release pinned at ``commit``: the channel record and its build manifest."""

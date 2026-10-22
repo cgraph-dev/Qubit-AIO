@@ -15,7 +15,7 @@ import pytest
 
 pytestmark = pytest.mark.platforms("posix")
 INSTALL_SH = Path(__file__).resolve().parents[3] / "scripts" / "install.sh"
-MARKER = "# Hermes Agent command"
+MARKER = "# Qubit Agent command"
 
 # Fedora /etc/skel (bash-5.2): ~/.bashrc guards and prepends with a bare assignment.
 FEDORA_BASHRC = """\
@@ -96,3 +96,5 @@ def test_bash_login_only_user_gets_local_bin(tmp_path):
     home = _home(tmp_path, **{".bash_login": "# mine\n"})
     _wire(home)
     assert str(home / ".local" / "bin") in _login_path(home)
+
+_LOGIN_FILES = 'for f in ~/.bash_profile ~/.bash_login ~/.profile; do if [ -r "$f" ]; then . "$f"; break; fi; done'

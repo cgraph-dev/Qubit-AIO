@@ -709,3 +709,17 @@ def test_pull_request_labels_prefers_the_live_labels_over_the_replayed_event(tmp
     monkeypatch.setattr(_mod.subprocess, "run", lambda *a, **k: failed)
     event.write_text(json.dumps({"pull_request": {"number": 7, "labels": [{"name": "run-e2e"}]}}), encoding="utf-8")
     assert pull_request_labels() == ["run-e2e"]
+
+def test_remote_backends_lane_runs_test_files_that_exist_and_start_it():
+    """The lane's test list and its path gate must agree: a renamed test file would
+    otherwise drop silently out of the run (run_tests.sh skips a missing path) or stop
+    starting the lane on the PR that edits it."""
+    workflow = _REPO / ".github/workflows/remote-backends.yml"
+    if not workflow.is_file():
+        pytest.skip("remote-backends workflow is absent in this tree")
+    text = workflow.read_text(encoding="utf-8-sig")
+    paths = sorted(set(re.findall(r"(tests/[\w/.-]+\.py)", text)))
+    assert paths
+    assert [p for p in paths if not (_REPO / p).is_file()] == []
+    assert [p for p in paths if not classify([p])["remote_backends"]] == []
+    assert "scripts/run_tests.sh --fail-on-skip" in text

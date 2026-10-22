@@ -11,10 +11,23 @@ Probe-gated gaps live in ``tests/e2e/core/delivery/_pending_fixes.py``.
 from __future__ import annotations
 
 import contextlib
+import os
 import re
 from typing import ContextManager, Iterator, Mapping, Tuple, Type
 
 import pytest
+
+
+STRICT_ACCEPTANCE_ENV = "HERMES_E2E_STRICT_ACCEPTANCE"
+
+
+def strict_acceptance(reason: str) -> bool:
+    """True when this acceptance run refuses to excuse the gap ``reason`` describes."""
+    value = os.environ.get(STRICT_ACCEPTANCE_ENV, "").strip()
+    if value == "1":
+        return True
+    owners = [o.strip() for o in value.split(",") if o.strip() and o.strip() != "0"]
+    return any(reason.startswith(f"{owner}:") for owner in owners)
 
 
 @contextlib.contextmanager
@@ -28,6 +41,10 @@ def known_failure(pattern: str, reason: str,
         yield
     except raises as exc:
         if not re.search(pattern, str(exc)):
+            raise
+        if strict_acceptance(reason):
+            exc.add_note(f"{STRICT_ACCEPTANCE_ENV}={os.environ.get(STRICT_ACCEPTANCE_ENV, '').strip()}: "
+                         f"the known gap is not excused in this acceptance run ({reason})")
             raise
         pytest.xfail(f"{reason} [observed: {str(exc).splitlines()[0][:240]}]")
 

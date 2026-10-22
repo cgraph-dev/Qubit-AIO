@@ -186,3 +186,5 @@ def run(tmp_path_factory):
 @pytest.mark.parametrize("cell", cell_params(CELLS))
 def test_modals_and_tool_output_survive_resize(run, cell: str) -> None:
     run.check(cell, KNOWN)
+
+DETACHED_RE = re.compile(r"no\s+longer\s+attached\s+to\s+the\s+backend")

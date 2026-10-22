@@ -19,7 +19,7 @@ BOOT_FILES = (
     "qubit_cli/_early_recovery.py", "qubit_cli/_parser.py",
     "qubit_cli/venv_sync.py", "qubit_cli/steward.py",
     "qubit_cli/stderr_timestamp.py",
-    "scripts/qubit-gateway",
+    "scripts/hermes-gateway",
 )
 
 
@@ -48,7 +48,7 @@ def fixture_tree(tmp_path, monkeypatch):
     home = tmp_path / ("qubit" if os.name == "nt" else ".qubit")
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("QUBIT_RUNTIME_DIR", raising=False)
+    monkeypatch.delenv("HERMES_RUNTIME_DIR", raising=False)
     store = home / "tools"
     store.mkdir(parents=True)
     interpreter = Path(sys._base_executable).resolve()
@@ -91,7 +91,7 @@ def test_source_launchers_boot_selected_generation_from_custom_home(tmp_path, mo
         select_generation(repo, number, number)
         env = dict(os.environ)
         env.pop("QUBIT_HOME", None)
-        env.pop("QUBIT_RUNTIME_DIR", None)
+        env.pop("HERMES_RUNTIME_DIR", None)
         env["PYTHONHOME"] = str(tmp_path / "foreign-python")
         env["PYTHONPATH"] = str(tmp_path / "foreign-deps")
         for launcher in launchers:
@@ -291,7 +291,7 @@ def _command_survives_generation_collection(tmp_path, monkeypatch, surface):
         (selected.parent / ".lease-managed").touch()
         if value == "old":
             if surface == "legacy":
-                command = [sys.executable, "-I", str(repo / "scripts/qubit-gateway"), "--help"]
+                command = [sys.executable, "-I", str(repo / "scripts/hermes-gateway"), "--help"]
                 args = ["gateway", "--help"]
             elif surface == "ssh":
                 from qubit_cli.windows_ssh_runtime import _resolve_direct_command
@@ -459,7 +459,7 @@ def test_pre_pm_base_dependencies_activate_only_at_boot(tmp_path, monkeypatch):
 
 def test_external_interpreter_keeps_its_owned_dependencies(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("QUBIT_RUNTIME_DIR", str(tmp_path / "empty-store"))
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "empty-store"))
     command = _launchers.runtime_command(ROOT, code="import ruamel.yaml; print('external-runtime-ready')")
     result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=30, encoding="utf-8")
     assert result.returncode == 0, result.stderr
@@ -550,3 +550,194 @@ def test_update_import_probe_uses_selected_dependencies(tmp_path, monkeypatch):
     (repo / "qubit_integrity_probe.py").write_text("import selected_probe\n", encoding="utf-8")
     monkeypatch.setattr(update_cmd, "_UPDATE_CRITICAL_MODULES", ("qubit_integrity_probe",))
     assert update_cmd_validation._critical_module_import_failures(repo, report_runtime_errors=True) == {}
+
+
+def _torn_by_a_killed_merge(tmp_path, monkeypatch):
+    """A git install whose update was killed mid-merge while git rewrote ``qubit_constants.py``.
+
+    Git rewrites a file as unlink, create, write: the kill left HEAD at the old commit, the
+    interrupted-pull marker of a dead updater, ``.git/index.lock`` and no ``qubit_constants.py``.
+    """
+    repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
+    for relative in ("qubit_cli/update_lock.py", "qubit_cli/update_custody.py"):
+        shutil.copy2(ROOT / relative, repo / relative)
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
+                              text=True, encoding="utf-8").stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "t@example.invalid")
+    git("config", "user.name", "t")
+    git("add", "-A")
+    git("commit", "-qm", "pre")
+    pre = git("rev-parse", "HEAD")
+    constants = repo / "qubit_constants.py"
+    original = constants.read_bytes()
+    constants.write_bytes(original + b"\nTARGET_ONLY = 1\n")
+    git("commit", "-qam", "target")
+    target = git("rev-parse", "HEAD")
+    git("reset", "-q", "--hard", pre)
+    from qubit_cli import _early_recovery
+
+    marker = _early_recovery.interrupted_pull_marker(repo)
+    marker.write_text(f"pid=0\npre={pre}\ntarget={target}\nstash=\ngit={shutil.which('git')}\n",
+                      encoding="utf-8", newline="")
+    constants.unlink()
+    (repo / ".git" / "index.lock").touch()
+    select_generation(repo, "one", "repaired")
+    return repo, home, interpreter, pre, original, marker
+
+
+@pytest.mark.parametrize("surface", ["launcher", "runtime"])
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
+def test_a_merge_killed_writing_hermes_constants_is_repaired_by_the_next_launch(tmp_path, monkeypatch, surface):
+    """C1 recovery reachability: the launcher reaches the repair before importing any other
+    checkout module, so a torn ``qubit_constants.py`` is put back instead of killing every launch."""
+    repo, home, interpreter, pre, original, marker = _torn_by_a_killed_merge(tmp_path, monkeypatch)
+    env = dict(os.environ)
+    env.pop("QUBIT_HOME", None)  # the default-home pin itself needs qubit_constants
+    env.pop("HERMES_RUNTIME_DIR", None)
+    env.pop("PYTEST_CURRENT_TEST", None)  # the repair stands down in a checkout pytest itself runs from
+    no_git = tmp_path / "path-without-git"
+    no_git.mkdir()
+    env["PATH"] = str(no_git)  # as on that Windows install: no git on PATH outside the updater
+    if surface == "launcher":
+        out = tmp_path / "commands"
+        out.mkdir()
+        command = [str(_launchers._mint_shell_launcher("qubit", out, interpreter,
+                                                       _launchers._launcher_script("qubit", repo, None)))]
+    else:
+        command = _launchers.runtime_command(repo, python=interpreter)
+    result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True,
+                            text=True, encoding="utf-8", errors="replace", timeout=60)
+    assert "No module named 'qubit_constants'" not in result.stderr, result.stderr
+    assert result.returncode == 7, result.stdout + result.stderr
+    receipt = json.loads(result.stdout.strip().splitlines()[-1])
+    assert receipt["value"] == "repaired"
+    assert Path(receipt["home"]) == home, "the default home is still pinned, after the repair"
+    assert (repo / "qubit_constants.py").read_bytes() == original
+    assert not marker.exists() and not (repo / ".git" / "index.lock").exists()
+    head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True,
+                          text=True, encoding="utf-8", check=True).stdout.strip()
+    assert head == pre
+
+
+def test_stage_launcher_ignores_an_inherited_runtime_directory(tmp_path, monkeypatch):
+    # #131745: a persisted launcher must boot the install's own store python.
+    repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
+    store = home / "tools"
+    tree_python = store / "python-A" / "bin" / "python3"
+    tree_python.parent.mkdir(parents=True)
+    tree_python.symlink_to(interpreter)
+    (store / "facts.json").write_text(
+        json.dumps({"packages": {"python": {"entry": "python-A"}}}), encoding="utf-8")
+    foreign_store = tmp_path / "foreign" / "tools"
+    foreign_store.mkdir(parents=True)
+    foreign_python = foreign_store / "python-foreign" / "bin" / "python3"
+    foreign_python.parent.mkdir(parents=True)
+    foreign_python.symlink_to(interpreter)
+    (foreign_store / "facts.json").write_text(
+        json.dumps({"packages": {"python": {"entry": "python-foreign"}}}), encoding="utf-8")
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(foreign_store))
+
+    out = repo / ".qubit" / "bin"
+    out.mkdir(parents=True, exist_ok=True)
+    published = _launchers.stage_launcher("qubit", repo, out)
+
+    assert published is not None
+    wrapper = published.read_text(encoding="utf-8-sig")
+    assert "python-A" in wrapper
+    assert "python-foreign" not in wrapper
+
+
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
+def test_service_launcher_binds_the_tree_store_despite_inherited_runtime_override(tmp_path, monkeypatch):
+    from qubit_cli import gateway
+
+    repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
+    monkeypatch.setattr(gateway, "PROJECT_ROOT", repo)
+    store = home / "tools"
+    tree_python = store / "python-A" / "bin" / "python3"
+    tree_python.parent.mkdir(parents=True)
+    tree_python.symlink_to(interpreter)
+    (store / "facts.json").write_text(
+        json.dumps({"packages": {"python": {"entry": "python-A"}}}), encoding="utf-8")
+    foreign_store = tmp_path / "foreign" / "tools"
+    foreign_store.mkdir(parents=True)
+    foreign_python = foreign_store / "python-foreign" / "bin" / "python3"
+    foreign_python.parent.mkdir(parents=True)
+    foreign_python.symlink_to(interpreter)
+    (foreign_store / "facts.json").write_text(
+        json.dumps({"packages": {"python": {"entry": "python-foreign"}}}), encoding="utf-8")
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(foreign_store))
+
+    gateway._prepare_service_launcher()
+
+    wrapper = (repo / ".qubit" / "bin" / "qubit").read_text(encoding="utf-8-sig")
+    assert "python-A" in wrapper
+    assert "python-foreign" not in wrapper
+
+
+def test_runtime_override_still_selects_the_runtime_python(tmp_path, monkeypatch):
+    # The publication split must not mute the override for execution paths:
+    # resolving a python to RUN still honors HERMES_RUNTIME_DIR by default.
+    repo, _home, interpreter = fixture_tree(tmp_path, monkeypatch)
+    foreign_store = tmp_path / "foreign" / "tools"
+    foreign_store.mkdir(parents=True)
+    foreign_python = foreign_store / "python-foreign" / "bin" / "python3"
+    foreign_python.parent.mkdir(parents=True)
+    foreign_python.symlink_to(interpreter)
+    (foreign_store / "facts.json").write_text(
+        json.dumps({"packages": {"python": {"entry": "python-foreign"}}}), encoding="utf-8")
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(foreign_store))
+
+    selected = _launchers.resolve_store_python(repo)
+
+    assert selected == foreign_store / "python-foreign" / "bin" / "python3"
+
+
+def _record_store_python(store: Path, interpreter: Path) -> Path:
+    python = store / "python-fixture" / "bin" / "python3"
+    python.parent.mkdir(parents=True)
+    python.symlink_to(interpreter)
+    (store / "facts.json").write_text(
+        json.dumps({"packages": {"python": {"entry": "python-fixture"}}}), encoding="utf-8")
+    return python
+
+
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
+def test_install_launchers_never_bind_a_fixture_store_under_scratch(tmp_path, monkeypatch):
+    # #131745's layout: a process aimed at an e2e fixture home under the
+    # install's own cache/scratch republishes the real install's launchers.
+    repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
+    own = _launchers.resolve_store_python(repo)
+    fixture = home / "cache" / "scratch" / "qubit-e2e-media-overlap-run" / "qubit-home" / "tools"
+    _record_store_python(fixture, interpreter)
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(fixture))
+
+    written = _launchers.ensure_install_launchers(repo, repo / ".qubit" / "bin")
+
+    assert len(written) == len(_launchers.WINDOWS_BIN_LAUNCHERS)
+    for path in written:
+        wrapper = Path(path).read_text(encoding="utf-8-sig")
+        assert "qubit-e2e-media-overlap-run" not in wrapper
+        assert shlex.quote(str(own)) in wrapper
+
+
+@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
+def test_publication_uses_the_runtime_store_when_the_tree_records_none(tmp_path, monkeypatch):
+    # The desktop source-backend contract keeps its store beside QUBIT_HOME
+    # and names it through HERMES_RUNTIME_DIR. A tree with no store of its own
+    # still publishes from that one.
+    repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
+    (home / "tools" / "facts.json").unlink()
+    runtime = tmp_path / "runtime-tools"
+    python = _record_store_python(runtime, interpreter)
+    monkeypatch.setenv("HERMES_RUNTIME_DIR", str(runtime))
+
+    written = _launchers.ensure_install_launchers(repo, repo / ".qubit" / "bin")
+
+    assert len(written) == len(_launchers.WINDOWS_BIN_LAUNCHERS)
+    for path in written:
+        assert shlex.quote(str(python)) in Path(path).read_text(encoding="utf-8-sig")
