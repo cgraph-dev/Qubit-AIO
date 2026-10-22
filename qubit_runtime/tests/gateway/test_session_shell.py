@@ -10,7 +10,6 @@ from tests.gateway.fixtures.local_recovery_probe import child_env
 
 
 @pytest.mark.platforms("posix")
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: session cwd shell gate")
 def test_shell_exec_runs_in_the_session_cwd_behind_the_safety_gates(tmp_path):
     """The owner serves ``shell.exec`` with the ``session_id`` Ink sends: the command runs in the
     session's frozen launch cwd (not the daemon's), its exit code and output come back, the
@@ -21,7 +20,7 @@ def test_shell_exec_runs_in_the_session_cwd_behind_the_safety_gates(tmp_path):
     home.mkdir()
     user.mkdir()
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
                PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
     result = subprocess.run([sys.executable, str(root / 'tests/gateway/fixtures/shell_exec_peer.py')],
                             cwd=root, env=env, capture_output=True, text=True, timeout=90, check=False)

@@ -1424,7 +1424,7 @@ def _bootstrap_profile_dir(profile_dir: Path, source_dir: Optional[Path],
 def create_profile(
     name: str, clone_from: Optional[str] = None, clone_all: bool = False, clone_config: bool = False,
     no_alias: bool = False, no_skills: bool = False, description: Optional[str] = None,
-    clone_channels: bool = False, sync_imports: bool = False,
+    clone_channels: bool = False, sync_imports: bool = False, soul: Optional[str] = None,
 ) -> Path:
     """Create a new profile directory and return its path.
 
@@ -1492,7 +1492,7 @@ def create_profile(
             if stripped:
                 logger.info("profile %s: cloned without messaging channels %s", canon, stripped)
         from qubit_cli.profiles_initialization import finish_profile_layout
-        finish_profile_layout(staging, no_skills=no_skills, clone_all=clone_all, description=description)
+        finish_profile_layout(staging, no_skills=no_skills, clone_all=clone_all, description=description, soul=soul)
         os.rename(staging, profile_dir)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
