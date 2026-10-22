@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 25 — 2026-10-22 (short-port 1; code parity at pin)
+
+- ✅ 8 lanes: 50+ defect cases fixed, **92/101 short-port symbols closed**, 38 absent files ported, release/install long tail, detector split, EG2 template docs.
+- ✅ **Short-port 101 → 1** (only the owner-declared B1 exclusion); **total missing symbols 101 → 1**; 0 production dead (33 test-side).
+- 🟡 Absent files remain 201 by the audit because the 38 new files live in the root `tests/` tree; effective ported files +38.
+- 🔴 Remaining: 126 strict xfail markers; 201 absent test files (non-blocking for retirement); no global E2E/release verdict.
+- ✅ Live: applied; bridge/gateway/orb verified.
+
 ## Wave 24 — 2026-10-22 (101 missing; 50 defects fixed)
 
 - ✅ 50 more cases fixed (gateway/CLI/tools), 42 absent + 23 short-port files ported, source R2 tests adapted to the fork's contract, relay admission guard fixed, 15 dead test helpers removed.
