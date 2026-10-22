@@ -34,9 +34,21 @@ per-element sources:
 
 **The mechanism that matters.** An ellipse is symmetric under its own parameter
 shift, so re-tilting a ring never looks like rotation. A circle only visibly
-spins when the **starting phase of the stroke walks round the ellipse** —
-`ring_path` samples `orbit_point(..., 360*i/n + spin_deg)`. Implementing "spin"
-as a tilt offset produces animation that measures as motion and looks frozen.
+spins when it is projected from 3-D: `ring_disc_points` turns the disc's plane
+through a full 360° so the silhouette sweeps **face-on → oblique → edge-on (a
+line) → oblique → face-on** (`mark_field.RING_DISC_*`). Implementing "spin" as a
+tilt offset, or walking the stroke phase round a FIXED ellipse, produces
+animation that measures as motion and looks frozen.
+
+The turn is folded into the declared `tilt` ONCE, by `ring_geometry` (which also
+publishes it as `tilt_spin_deg`). A painter that adds it again doubles the angle,
+and a doubled full turn is periodic at half a turn — the sweep aliases back onto
+its own silhouette and the discs render static.
+
+Measured at R=90 on a 6.9 s ring: the projected box runs
+**115.9×86.3 (open) → 27.5×126.1 (edge-on) → 123.0×104.2 (open again)**. At
+R=100 the earlier single-axis phase walk moved a ring point **7.5 px over 40 s**
+(±7° sway) → **125–186 px**.
 
 All declared spin periods are checked non-harmonic against each other, against
 the ring/shell/inner periods and across the two tables, so nothing beats in
