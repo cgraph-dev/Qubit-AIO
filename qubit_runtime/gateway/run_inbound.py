@@ -570,6 +570,10 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin):
                 )
                 if _resolved_idle is not None:
                     _stale_idle = _resolved_idle
+                    # Host sleep is not idleness: share the turn poll loop's meter (same event loop).
+                    _awake_idle = getattr(_quick_state.turn.ctx, "awake_idle", None)
+                    if _awake_idle is not None:
+                        _stale_idle = _awake_idle.measure(_stale_idle)
                     _activity_summary_valid = True
                 _stale_detail = (
                     f" | last_activity={_sa_d.get('last_activity_desc', 'unknown')} "

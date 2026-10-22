@@ -76,6 +76,3 @@ def test_unprovable_claim_denies_retry_and_goal_continuation(tmp_path, monkeypat
 
     assert result["failed"] and len(agent.calls) == 1 and goal_calls == []
     assert session_kanban.worker_exit_code(path, context) == kb.KANBAN_RATE_LIMIT_EXIT_CODE
-
-
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

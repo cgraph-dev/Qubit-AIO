@@ -14,7 +14,6 @@ from tests.gateway.test_api_unknown_resolution import _AUTH_HEADERS, _adapter, _
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: api_server_runs calls RunIdempotencyStore.forget on the admission-error path but the local store does not define it (500 instead of 503)")
 async def test_locked_admission_write_is_503_and_exact_retry_runs(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     store = SessionStore(tmp_path / "sessions", GatewayConfig())
