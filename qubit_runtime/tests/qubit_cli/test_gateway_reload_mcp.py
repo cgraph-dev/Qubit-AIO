@@ -21,7 +21,6 @@ class _Client:
         return {"revision": 2, "execution_generation": 1, "messages": [], "info": {"tool_count": 20}}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: QubitCLI has no _reload_gateway_mcp gateway route")
 def test_reload_mcp_runs_on_the_gateway(capsys):
     client = _Client()
 

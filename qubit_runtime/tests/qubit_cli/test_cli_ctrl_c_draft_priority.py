@@ -36,7 +36,6 @@ class _Cli(mixin_mod.CLITuiMixin):
 
 
 @pytest.mark.parametrize("handler", ["_tui_handle_ctrl_c", "_tui_handle_ctrl_q"])
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: Ctrl+C/Q interrupts the running turn instead of clearing a typed draft first")
 def test_draft_is_cleared_before_a_running_turn_is_interrupted(monkeypatch, handler):
     interrupts = []
     monkeypatch.setattr(mixin_mod, "request_hard_interrupt", interrupts.append)

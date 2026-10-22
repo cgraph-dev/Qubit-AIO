@@ -80,7 +80,6 @@ def test_retained_tui_worktree_survives_stale_prune_while_its_session_resumes(tm
 
 
 @pytest.mark.parametrize('case', ['quoted_home', 'after_new', 'terminal_closed'])
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: _setup_worktree does not accept retain_db, so retained TUI worktrees never lock")
 def test_retained_tui_worktree_kept_while_any_session_in_it_resumes(tmp_path, monkeypatch, case):
     """N5: liveness comes from the store, for every way the lock used to read as dead — a home
     git C-quotes (non-ASCII / quote / backslash, every Windows path), ``/new`` leaving the older
