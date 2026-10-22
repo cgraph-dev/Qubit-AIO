@@ -1958,6 +1958,8 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             "type": "completion",
             "session_id": session_id,
             **{k: watcher.get(k, "") for k in _WATCHER_ROUTE_FIELDS},
+            "owner_task_id": getattr(session, "owner_task_id", "") or "",
+            "task_id": getattr(session, "task_id", "") or "",
             "message_id": str(watcher.get("message_id") or "").strip() or None,
             "started_at": getattr(session, "started_at", None),
             "command": _redact_gateway_user_facing_secrets(_command),
@@ -2015,7 +2017,7 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
         the output tail) / all (running updates + final raw) / result (final raw) / error (final raw
         if exit != 0) / off."""
         from tools.process_registry import process_registry
-        from tools.process_registry_notifications import format_process_notification
+        from tools.process_registry_notifications import format_process_notification, should_surface_notification
         session_id = watcher["session_id"]
         interval = watcher["check_interval"]
         platform_name = watcher.get("platform", "")
@@ -2037,6 +2039,16 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
             session = process_registry.get(session_id)
             if session is None:
                 break
+            async with self._completion_event_scope(watcher):
+                surface = should_surface_notification({
+                    "owner_task_id": getattr(session, "owner_task_id", ""),
+                    "task_id": getattr(session, "task_id", ""),
+                })
+            if not surface:
+                # Recheck live ownership next tick: handoff retains notification intent.
+                if session.exited:
+                    break
+                continue
             if silent:
                 # Still wait for the process to exit so we can log it, but don't push any messages.
                 if session.exited:

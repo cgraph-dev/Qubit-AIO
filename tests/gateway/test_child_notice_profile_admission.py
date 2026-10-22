@@ -33,7 +33,7 @@ def _build_rig(monkeypatch, tmp_path, request, surface_a, mode):
     # within these explicitly private homes instead of sharing its root handle.
     monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", qubit_state._IMPORT_DEFAULT_DB_PATH)
     import gateway.run as gw
-    monkeypatch.setattr(gw, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gw, "_qubit_home", tmp_path)
     registry = ProcessRegistry()
     monkeypatch.setattr(pr_module, "process_registry", registry)
     runner = GatewayRunner(GatewayConfig(multiplex_profiles=True, sessions_dir=tmp_path / "sessions"))
