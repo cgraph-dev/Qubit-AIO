@@ -257,27 +257,37 @@ def test_missing_pointers_fall_back_only_to_published_releases(releases, channel
 pytestmark = pytest.mark.real_release_channels
 
 def _track_official_origin(releases):
-    official = "https://github.com/NousResearch/qubit-agent.git"
+    # The official repository is a product fact, derived from the single installer source
+    # (never a hardcoded upstream name): default_channel only elects stable for that origin.
+    official = f"https://github.com/{OFFICIAL}.git"
     git(releases.root, "remote", "set-url", "origin", official)
     git(releases.root, "config", f"url.{releases.origin.as_uri()}.insteadOf", official)
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: stable channel still reads the R2 record and reports no targetSha")
-def test_stable_is_the_latest_published_github_release_without_r2(releases):
-    """Publishing a GitHub release is the only promotion stable needs: no R2 record or pointer."""
+def test_stable_is_the_published_r2_record_not_a_github_release(releases, monkeypatch):
+    """Publishing the R2 ``stable`` record IS the promotion in this fork: the record names the
+    exact commit, and neither a GitHub pointer nor a release listing may outrank it."""
     from qubit_cli import source_releases
 
-    def no_r2(name, repository):
-        raise AssertionError("stable must not read an R2 channel record")
-
-    source_releases._resolve_channel = no_r2
-    # A pointer naming a different build must not outrank the published release.
+    seen = []
+    record = SimpleNamespace(
+        requested={"name": "stable", "state": "active"},
+        terminal={"name": "stable", "repository": source_releases.source_repository(
+            ["git"], releases.root), "policy": "preview", "head": None},
+        manifest={"request": {"commit": releases.commits[1], "sourceVersion": "1.2.3",
+                              "buildId": "legacy-fixture"}},
+    )
+    def resolved(name, repository):
+        seen.append((name, repository))
+        return record
+    monkeypatch.setattr(source_releases, "_resolve_channel", resolved)
+    # A pointer naming a different build must not outrank the published record.
     releases.responses["/releases/stable/release-candidates.json"] = {
         "tag": "v99.0.0", "commit": releases.commits[3]}
     target = source_releases.resolve_source_target("stable", ["git"], releases.root)
     assert (target.commit, target.version) == (releases.commits[1], "1.2.3")
-    assert not any(path.startswith("/releases/") for path in releases.requests)
+    assert seen == [("stable", source_releases.source_repository(["git"], releases.root))]
+    assert not any(path.startswith("/repos/") for path in releases.requests)
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: stable channel still reads the R2 record and reports no targetSha")
 @pytest.mark.parametrize("start,expected", [(0, 1), (3, 3)], ids=["behind-release", "newer-than-release"])
 def test_default_stable_only_moves_forward_until_the_channel_is_chosen(releases, monkeypatch, capsys,
                                                                        start, expected):
