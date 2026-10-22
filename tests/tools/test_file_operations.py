@@ -823,7 +823,6 @@ class TestSearchFilesIncludesDirectories:
     list matching directories, not just files — empty directories included (#54347)."""
 
     @pytest.mark.skipif(shutil.which("rg") is None, reason="ripgrep not installed")
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_rg_target_files_includes_matching_empty_directory(self, tmp_path):
         root = tmp_path / "repo"
         empty_dir = root / "vault"
@@ -837,7 +836,6 @@ class TestSearchFilesIncludesDirectories:
 
     @pytest.mark.skipif(shutil.which("rg") is None, reason="ripgrep not installed")
     @pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_rg_target_files_excludes_gitignored_empty_directory(self, tmp_path):
         root = tmp_path / "repo"
         ignored_dir = root / "ignored_dir"
@@ -855,7 +853,6 @@ class TestSearchFilesIncludesDirectories:
         assert str(ignored_dir) not in result.files
 
     @pytest.mark.skipif(shutil.which("rg") is None, reason="ripgrep not installed")
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_rg_sorts_files_and_directories_before_pagination(self, tmp_path):
         """A newer directory must page ahead of older files and dirs (globally
         merged mtime order before offset/limit, not dirs appended after)."""
@@ -880,7 +877,6 @@ class TestSearchFilesIncludesDirectories:
         assert result.files == [str(newer_dir)]
         assert result.truncated is True
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_find_target_files_includes_matching_empty_directory(self, tmp_path, monkeypatch):
         root = tmp_path / "repo"
         empty_dir = root / "vault"
@@ -895,7 +891,6 @@ class TestSearchFilesIncludesDirectories:
         assert result.error is None
         assert {str(empty_dir), str(regular_file)}.issubset(set(result.files))
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_target_files_still_excludes_hidden_matching_directories(self, tmp_path, monkeypatch):
         root = tmp_path / "repo"
         visible_dir = root / "visible" / "cache"
@@ -911,7 +906,6 @@ class TestSearchFilesIncludesDirectories:
         assert str(visible_dir) in result.files
         assert str(hidden_dir) not in result.files
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_find_lane_never_returns_the_search_root_itself(self, tmp_path, monkeypatch):
         """The root is excluded by path identity — not by ``-mindepth 1``, which
         would also exclude the depth-0 operand match a symlinked root depends on
@@ -928,7 +922,6 @@ class TestSearchFilesIncludesDirectories:
         assert str(child) in result.files
         assert str(root) not in result.files
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: search(target=\"files\") does not list matching directories in pin order")
     def test_target_files_paginates_combined_files_and_directories(self, tmp_path, monkeypatch):
         """Files and directories share one ordering: page slices must compose."""
         root = tmp_path / "repo"

@@ -61,14 +61,22 @@ def find_canonical_owner(profile_home: Path | str) -> dict[str, Any] | None:
 
 
 def find_canonical_live_owner(profile_home: Path | str) -> dict[str, Any] | None:
-    """Only advertised consumers may receive owner-pinned mailbox deliveries."""
-    entry = find_canonical_owner(profile_home)
-    meta = (entry or {}).get("metadata") or {}
-    if entry and meta.get("bot_live_delivery_consumer") is True and meta.get("live_session_id"):
-        return {key: entry[key] for key in ("profile_home", "session_id", "lease_id")} | {
-            "live_session_id": meta["live_session_id"]}
-    return None
+    """Discover the profile authority and its exact Bot Chat without acquiring a lease.
 
+    ``session_id`` is the current Bot Chat tip, or ``''`` when the profile has none yet: the
+    authority's deliver door creates it on first delivery (main's ``--create-if-missing``),
+    so a missing chat is not a refusal. None only when the profile has no store at all."""
+    from qubit_cli.gateway_runtime import discover_gateway_endpoint
+
+    home = Path(profile_home).resolve()
+    discovery = discover_gateway_endpoint(home, timeout=5)
+    if discovery.state != 'ready' or discovery.endpoint is None:
+        raise ValueError('profile authority is not ready')
+    if not (home / 'state.db').is_file():
+        return None
+    tip = _bot_chat_tip(home)
+    return dict(profile_home=str(home), session_id=tip or '', canonical=True,
+                lease_id=discovery.endpoint.instance_id, live_session_id=tip or '')
 
 def find_create_missing_owner(profile_home: Path | str) -> dict[str, Any] | None:
     """The authority's owner for a profile with no Bot Chat yet, or None.

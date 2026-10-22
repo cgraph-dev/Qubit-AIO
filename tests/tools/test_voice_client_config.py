@@ -183,7 +183,6 @@ def test_xai_oauth_without_api_key_relays(voice_home):
     assert stt["mode"] == "relay"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: xai stt model is never resolved for the client")
 def test_xai_env_key_goes_direct(voice_home, monkeypatch):
     voice_home({"stt": {"provider": "xai"}})
     monkeypatch.setenv("XAI_API_KEY", "xai_key1")
@@ -195,7 +194,6 @@ def test_xai_env_key_goes_direct(voice_home, monkeypatch):
     assert stt["model"] == "grok-voice-transcribe-2.0"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: xai stt model is never resolved for the client")
 def test_xai_config_model_reaches_client(voice_home, monkeypatch):
     voice_home({"stt": {"provider": "xai", "xai": {"model": "grok-voice-transcribe-1.0"}}})
     monkeypatch.setenv("XAI_API_KEY", "xai_key1")

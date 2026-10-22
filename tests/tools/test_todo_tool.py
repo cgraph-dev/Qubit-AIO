@@ -207,7 +207,6 @@ class TestRejectEmptyContent:
     """Empty or missing content must fail the call instead of substituting
     '(no description)'. See #44496."""
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_write_rejects_empty_content(self):
         store = TodoStore()
         try:
@@ -216,7 +215,6 @@ class TestRejectEmptyContent:
         except ValueError as e:
             assert "empty or missing content" in str(e)
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_write_rejects_missing_content_key(self):
         store = TodoStore()
         try:
@@ -225,7 +223,6 @@ class TestRejectEmptyContent:
         except ValueError as e:
             assert "empty or missing content" in str(e)
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_write_rejects_whitespace_content(self):
         store = TodoStore()
         try:
@@ -234,7 +231,6 @@ class TestRejectEmptyContent:
         except ValueError as e:
             assert "empty or missing content" in str(e)
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_partial_write_does_not_mutate_existing_list(self):
         """A failed write with mixed valid/invalid items leaves the prior list
         untouched (acceptance criterion #3 from #44496)."""
@@ -254,7 +250,6 @@ class TestRejectEmptyContent:
         assert [i["content"] for i in items] == ["Keep me", "Also keep me"]
         assert [i["status"]  for i in items] == ["pending", "completed"]
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_todo_tool_returns_error_on_empty_content(self):
         result = json.loads(todo_tool(
             todos=[{"id": "1", "content": "", "status": "pending"}],
@@ -263,7 +258,6 @@ class TestRejectEmptyContent:
         assert "error" in result
         assert "empty or missing content" in result["error"]
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_merge_new_item_rejects_empty_content(self):
         """Merge mode: new items with empty content are rejected."""
         store = TodoStore()
@@ -274,7 +268,6 @@ class TestRejectEmptyContent:
         except ValueError as e:
             assert "empty or missing content" in str(e)
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: todo store does not reject empty/missing content")
     def test_merge_new_item_rejects_whitespace_content(self):
         """Merge mode: new items with whitespace-only content are rejected."""
         store = TodoStore()

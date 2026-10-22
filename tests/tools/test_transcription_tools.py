@@ -219,12 +219,11 @@ class TestOpenAIClientConfig:
         ("openai_config", "expected_timeout", "expected_retries"),
         [({"timeout": 95, "max_retries": 3}, 95, 3)],
     )
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: STT SDK client ignores the configured request timeout")
     def test_stt_openai_config_controls_sdk_client(
         self, monkeypatch, tmp_path, sample_wav, openai_config, expected_timeout, expected_retries
     ):
         monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
         config_lines = ["stt:", "  openai:"]
         config_lines.extend(f"    {key}: {value}" for key, value in openai_config.items())
         (tmp_path / "config.yaml").write_text("\n".join(config_lines) + "\n", encoding="utf-8")
@@ -915,7 +914,6 @@ class TestTranscribeXAI:
         ]
 
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: xAI transcription omits language/format")
     def test_sends_language_and_format(self, monkeypatch, sample_ogg, mock_xai_http_module):
         monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
         # Explicitly set language via env to exercise the override chain
@@ -937,7 +935,6 @@ class TestTranscribeXAI:
         assert data.get("format") == "true"
         assert data.get("model") == "grok-voice-transcribe-2.0"
 
-    @pytest.mark.xfail(strict=True, reason="wave-20 parity defect: xAI transcription does not default its model")
     def test_omitted_model_pins_transcribe_2(self, monkeypatch, sample_ogg, mock_xai_http_module):
         """xAI still defaults an omitted model to transcribe-1.0. Always send one."""
         monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
