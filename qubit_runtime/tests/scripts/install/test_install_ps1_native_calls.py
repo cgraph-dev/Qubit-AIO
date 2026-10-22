@@ -13,6 +13,35 @@ import shutil
 import subprocess
 
 import pytest
+def _pin_fixture(tmp_path: Path) -> tuple[Path, str, str]:
+    """main: pin <- tip; side: a commit off main."""
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    _git(origin, "init", "-q", "-b", "main")
+    (origin / "README").write_text("one", encoding="utf-8")
+    _git(origin, "add", "README")
+    _git(origin, "commit", "-qm", "one")
+    pin = _git(origin, "rev-parse", "HEAD")
+    (origin / "README").write_text("tip", encoding="utf-8")
+    _git(origin, "commit", "-qam", "tip")
+    _git(origin, "config", "uploadpack.allowFilter", "true")
+    _git(origin, "checkout", "-qb", "side")
+    (origin / "README").write_text("side", encoding="utf-8")
+    _git(origin, "commit", "-qam", "side")
+    off_branch = _git(origin, "rev-parse", "HEAD")
+    _git(origin, "checkout", "-q", "main")
+    return origin, pin, off_branch
+def _clone_argv(trace: Path) -> list[str]:
+    [line] = [line for line in trace.read_text(encoding="utf-8-sig", errors="replace").splitlines() if "built-in: git clone " in line]
+    return line.split("built-in: git clone ", 1)[1].split()
+def test_pinned_fresh_clone_publishes_nothing_when_the_pin_is_refused(tmp_path):
+    origin, _, off_branch = _pin_fixture(tmp_path)
+    home = tmp_path / "home"
+    _, frame = _stage(origin, home, "-Commit", off_branch)
+    assert frame["ok"] is False
+    assert "is not on branch main" in frame["reason"]
+    assert not (home / "hermes-agent").exists()
+    assert not list(home.glob(".hermes-clone-*"))
 
 pytestmark = pytest.mark.platforms("windows")
 INSTALLER = Path(__file__).resolve().parents[3] / "scripts" / "install.ps1"

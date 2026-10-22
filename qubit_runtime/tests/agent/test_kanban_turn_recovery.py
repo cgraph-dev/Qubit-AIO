@@ -12,6 +12,7 @@ worker predicate this PR adds to it is pinned here.
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from pathlib import Path
@@ -32,6 +33,166 @@ from agent.kanban_turn_recovery import (
     worker_claim_is_live,
 )
 from qubit_cli.kanban_db import KANBAN_RATE_LIMIT_EXIT_CODE
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local recover_failed_kanban_turns lacks the pin's task_id/claim_check contract")
+def test_explicit_blank_carrier_never_falls_back_to_the_env_pin(clear_kanban_env):
+    """Owner-side workers pass the bound frame's task id explicitly; a blank explicit id is
+    not a worker and must not be rescued by whatever ``HERMES_KANBAN_TASK`` the owner
+    process happens to carry."""
+    clear_kanban_env.setenv("HERMES_KANBAN_TASK", "t_foreign")
+    assert should_recover_turn(_failed(), attempt=0, task_id="   ") is False
+    assert should_recover_turn(_failed(), attempt=0, task_id="  t_bound  ") is True
+@pytest.fixture
+def owner_worker(tmp_path, clear_kanban_env, monkeypatch):
+    """Run the real owner-side worker turns for one claimed task on a real board.
+
+    ``install(script, ...)`` claims a task, records this interpreter's ``worker_bound``
+    event (what ``bind_worker_context`` writes), and returns ``(run, entered, context)``:
+    ``run()`` executes ``session_kanban.run_worker_turns`` and returns the exit code the
+    dispatcher books (``worker_exit_code``); ``entered`` records every model entry's user
+    message. ``script`` is a list of settled turn results or a callable returning one.
+    The owner process deliberately carries a FOREIGN env carrier: the proof must come
+    from the frame, never from the owner's environment.
+    """
+    import agent.kanban_turn_recovery as rec
+    from gateway import session_kanban
+    from qubit_cli import kanban_db as kb
+    from qubit_cli.kanban_db_connect import connect_closing
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    for key, value in (("HERMES_KANBAN_TASK", "t_foreign"), ("HERMES_KANBAN_DB", str(tmp_path / "nope.db")),
+                       ("HERMES_KANBAN_RUN_ID", "999"), ("HERMES_KANBAN_CLAIM_LOCK", "foreign")):
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(rec, "RECOVERY_DELAYS_SECONDS", (0.0,))
+    monkeypatch.setattr("agent.skill_commands.build_preloaded_skills_prompt", lambda *a, **k: ("", [], []))
+
+    def install(script, *, goal_mode=False, expires=None, recovery=None):
+        if recovery is not None:
+            monkeypatch.setenv("HERMES_KANBAN_TURN_RECOVERY", str(recovery))
+        kb.init_db()
+        path = kb.kanban_db_path()
+        with connect_closing(path) as conn:
+            task_id = kb.create_task(conn, title="recover", assignee="default")
+            task = kb.claim_task(conn, task_id, claimer="private-host:owner")
+            assert task is not None
+            with kb.write_txn(conn):
+                kb._append_event(conn, task_id, "worker_bound",
+                                 {"pid": os.getpid(), "claim_lock": task.claim_lock}, run_id=task.current_run_id)
+                if expires is not None:  # status/run/lock all still match: only the lease moves
+                    conn.execute("UPDATE tasks SET claim_expires = ? WHERE id = ?", (expires, task_id))
+                    conn.execute("UPDATE task_runs SET claim_expires = ? WHERE id = ?",
+                                 (expires, task.current_run_id))
+        context = {"db": str(path), "task_id": task_id, "run_id": task.current_run_id,
+                   "claim_lock": task.claim_lock, "skills": [], "context": "", "goal_mode": goal_mode,
+                   "goal_text": "g", "goal_max_turns": 2}
+        entered: list[str] = []
+        seen = {"n": 0}
+
+        class _Agent:
+            session_id = "s1"
+
+            def __init__(self):
+                self._session_db = self
+
+            def get_messages_as_conversation(self, _sid):
+                return [{"role": "user", "content": "from-store"}]
+
+            def run_conversation(self, message, conversation_history=None):
+                entered.append(message)
+                result = script() if callable(script) else script[seen["n"]]
+                seen["n"] += 1
+                return result
+
+        frame = {"text": "work", "policy": {"kanban_json": json.dumps(context)}}
+
+        def run() -> int:
+            session_kanban.run_worker_turns(_Agent(), frame, [])
+            return session_kanban.worker_exit_code(path, context)
+
+        return run, entered, context
+
+    return install
+def test_non_worker_frame_is_never_recovered(clear_kanban_env, monkeypatch):
+    """A turn whose frame carries no kanban claim is not a worker, even inside an owner
+    process whose environment names a task: one model entry, result returned untouched."""
+    from gateway import session_kanban
+
+    clear_kanban_env.setenv("HERMES_KANBAN_TASK", "t_foreign")
+    entered: list[str] = []
+    failed = _failed()
+
+    class _Agent:
+        def run_conversation(self, message, conversation_history=None):
+            entered.append(message)
+            return failed
+
+    frame = {"text": "hello", "policy": {}}
+    assert session_kanban.run_worker_turns(_Agent(), frame, []) is failed
+    assert entered == ["hello"]
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local recover_failed_kanban_turns lacks the pin's task_id/claim_check contract")
+def test_worker_client_reports_the_owner_exit_and_reply(owner_worker, monkeypatch, capsys):
+    """The dispatcher-spawned process is the client half: it exits with the code the owner
+    booked for this exact attempt, ends its log with the attempt's reply, and writes the
+    exit trailer the dead-worker sweep reads — so an exhausted wall still releases as 75."""
+    from contextlib import asynccontextmanager
+
+    from qubit_cli import gateway_client, kanban_worker_client
+    from qubit_cli.quiet_single_query import KANBAN_WORKER_EXIT_TRAILER
+
+    run, _entered, context = owner_worker(_failed, recovery=1)
+    assert run() == KANBAN_RATE_LIMIT_EXIT_CODE
+    submitted = []
+
+    class _Owner:
+        async def rpc(self, method, **params):
+            submitted.append(method)
+            assert method == "kanban.run" and params["task_id"] == context["task_id"]
+            return {"session_id": "s1", "receipt": {"status": "terminal", "admission_id": "a1"}}
+
+    @asynccontextmanager
+    async def _connect():
+        yield _Owner()
+
+    monkeypatch.setattr(gateway_client, "connect_gateway", _connect)
+    monkeypatch.delenv("HERMES_TUI_GATEWAY_URL", raising=False)
+    for key, value in (("HERMES_KANBAN_BOARD", "default"), ("HERMES_KANBAN_TASK", context["task_id"]),
+                       ("HERMES_KANBAN_RUN_ID", str(context["run_id"])),
+                       ("HERMES_KANBAN_CLAIM_LOCK", context["claim_lock"]),
+                       ("HERMES_KANBAN_DB", context["db"])):
+        monkeypatch.setenv(key, value)
+    capsys.readouterr()
+
+    assert kanban_worker_client.main() == KANBAN_RATE_LIMIT_EXIT_CODE
+    out, err = capsys.readouterr()
+    assert submitted == ["kanban.run"]  # the client never re-enters the model itself
+    assert "API call failed" in out
+    assert f"{KANBAN_WORKER_EXIT_TRAILER}{KANBAN_RATE_LIMIT_EXIT_CODE}" in err
+@pytest.mark.asyncio
+async def test_non_worker_one_shot_prints_its_exit_summary(capsys):
+    """Smoke pin kept from the pre-gateway file: a plain failed ``chat -q`` run exits 1 after
+    printing the turn's text and its stderr ``session_id`` summary, and takes exactly one
+    admission — recovery is never a client-side resubmit."""
+    import asyncio
+
+    from qubit_cli.gateway_chat_view import GatewayChatView
+
+    submitted = []
+
+    class _Owner:
+        events: asyncio.Queue = asyncio.Queue()
+
+        async def rpc(self, method, **params):
+            submitted.append(method)
+            self.events.put_nowait({"method": "event", "params": {
+                "type": "message.complete", "session_id": "stored", "admission_id": "mine",
+                "payload": {"text": "API call failed after 3 retries", "outcome": "failed"}}})
+            return {"admission_id": "mine"}
+
+    view = GatewayChatView(_Owner(), {"stored_session_id": "stored"}, quiet=True)
+    assert await asyncio.wait_for(view.run("hello", oneshot=True), 2) == 1
+    out, err = capsys.readouterr()
+    # One admission, never a resubmit; the settled-result read (prompt.receipt) is read-only.
+    assert submitted.count("prompt.submit") == 1 and set(submitted) <= {"prompt.submit", "prompt.receipt"}
+    assert "API call failed" in out and "session_id: stored" in err
 
 KANBAN_ENV = (
     "HERMES_KANBAN_TASK",

@@ -12,6 +12,474 @@ from typing import Any
 import pytest
 
 from agent import relay_runtime
+EMPTY_ACTIVATION_REPORT = {
+    "config": {"diagnostics": []},
+    "config_paths": [],
+    "dynamic_plugins": [],
+    "resolved_config": {"components": []},
+}
+ACTIVE_ACTIVATION_REPORT = {
+    **EMPTY_ACTIVATION_REPORT,
+    "resolved_config": {"components": [{"kind": "observability", "enabled": True}]},
+}
+HOST_CONFLICT = RuntimeError(
+    "conflict: a static plugin configuration is already active; to combine static and dynamic plugins, "
+    "provide the static components as the base configuration to dynamic plugin activation before calling "
+    "plugin initialization"
+)
+@pytest.mark.parametrize(
+    ("report", "expected"),
+    [
+        (EMPTY_ACTIVATION_REPORT, False),
+        (ACTIVE_ACTIVATION_REPORT, True),
+        (
+            {
+                **EMPTY_ACTIVATION_REPORT,
+                "resolved_config": {
+                    "components": [{"kind": "observability", "enabled": False}],
+                },
+            },
+            False,
+        ),
+        (
+            {
+                **EMPTY_ACTIVATION_REPORT,
+                "resolved_config": {"components": [{"kind": "observability"}]},
+            },
+            True,
+        ),
+        (
+            {
+                **EMPTY_ACTIVATION_REPORT,
+                "dynamic_plugins": [{"id": "selected", "selected": True}],
+            },
+            True,
+        ),
+        (
+            {
+                **EMPTY_ACTIVATION_REPORT,
+                "dynamic_plugins": [{"id": "disabled", "selected": False}],
+            },
+            False,
+        ),
+        ({"config": {"diagnostics": []}}, True),
+    ],
+)
+def test_activation_report_controls_managed_execution(report, expected):
+    activation = SimpleNamespace(report=report)
+    assert relay_runtime._activation_requires_managed_execution(activation) is expected
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_active_log_names_every_loaded_configuration_file(explicit_static_config, caplog):
+    report = {
+        **ACTIVE_ACTIVATION_REPORT,
+        "config_paths": [str(explicit_static_config), "/etc/nemo-relay/plugins.toml"],
+    }
+    relay = _FakeRelay(activation_report=report)
+
+    with caplog.at_level("INFO"):
+        host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        [line] = [r.getMessage() for r in caplog.records if "active process-wide" in r.getMessage()]
+        assert all(path in line for path in report["config_paths"])
+    finally:
+        host.shutdown()
+def test_dynamic_host_conflict_is_foreign_too(explicit_static_config, caplog):
+    relay = _FakeRelay(
+        initialize_error=RuntimeError(
+            "conflict: plugin configuration is owned by an active dynamic plugin host"
+        )
+    )
+
+    with caplog.at_level("WARNING"):
+        host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.FOREIGN
+        )
+        assert relay.events == [("plugin.initialize", {})]
+        assert any(r.levelname == "WARNING" for r in caplog.records)
+    finally:
+        host.shutdown()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_dynamic_records_are_handed_to_relay_unparsed(
+    tmp_path,
+    monkeypatch,
+):
+    config = tmp_path / "plugins.toml"
+    config.write_text(
+        """
+[[plugins.dynamic]]
+manifest = "relay-plugin.toml"
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, str(config))
+    relay = _FakeRelay()
+
+    host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        assert host.managed_execution_enabled()
+        assert relay.events == [("plugin.initialize", {})]
+        assert relay.initialized_from == [str(config)]
+    finally:
+        host.shutdown()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_empty_ambient_discovery_does_not_enable_managed_execution(monkeypatch):
+    monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
+    relay = _FakeRelay(activation_report=EMPTY_ACTIVATION_REPORT)
+    host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+
+    try:
+        assert not host.managed_execution_enabled()
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.DISABLED
+        )
+        assert relay.initialized_from == [None]
+        assert relay.events == [("plugin.initialize", {})]
+    finally:
+        host.shutdown()
+
+    assert relay.events[-2:] == [
+        ("subscribers.flush_async",),
+        ("plugin.activation.close",),
+    ]
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_first_profile_ambient_plugin_decision_applies_to_later_profile(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
+    relay = _FakeRelay()
+    host_a = relay_runtime.RelayRuntime(relay=relay, profile_key="profile-a")
+
+    config = tmp_path / "plugins.toml"
+    config.write_text("", encoding="utf-8")
+    monkeypatch.setenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, str(config))
+    host_b = relay_runtime.RelayRuntime(relay=relay, profile_key="profile-b")
+
+    try:
+        assert host_a.managed_execution_enabled()
+        assert host_b.managed_execution_enabled()
+        assert (
+            host_a._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.ACTIVE
+        )
+        assert (
+            host_b._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.ACTIVE
+        )
+        assert relay.events == [("plugin.initialize", {})]
+        assert relay.initialized_from == [None]
+    finally:
+        host_a.shutdown()
+        host_b.shutdown()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_legacy_exporter_env_warns_without_disabling_ambient_discovery(
+    monkeypatch,
+    caplog,
+):
+    monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
+    monkeypatch.setenv("HERMES_NEMO_RELAY_ATOF_ENABLED", "1")
+    monkeypatch.setenv("HERMES_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S", "30")
+    relay = _FakeRelay()
+
+    with caplog.at_level("WARNING"):
+        host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+
+    try:
+        assert host.managed_execution_enabled()
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.ACTIVE
+        )
+        assert relay.events == [("plugin.initialize", {})]
+        assert relay.initialized_from == [None]
+        assert "HERMES_NEMO_RELAY_ATOF_ENABLED" in caplog.text
+        assert "HERMES_NEMO_RELAY_ATIF_EXPORT_TIMEOUT_S" in caplog.text
+        assert "standard user or system plugins.toml still applies" in caplog.text
+    finally:
+        host.shutdown()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_plugin_error_containing_conflict_text_is_not_misclassified(
+    explicit_static_config,
+    caplog,
+):
+    relay = _FakeRelay(
+        initialize_error=RuntimeError(
+            "registration failed: plugin configuration is owned by an active dynamic plugin host"
+        )
+    )
+
+    with caplog.at_level("WARNING"):
+        host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.FAILED
+        )
+        assert "Hermes Relay plugin initialization failed" in caplog.text
+        assert "already active outside Hermes native ownership" not in caplog.text
+    finally:
+        host.shutdown()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_real_binding_discovers_user_and_ignores_project_config(
+    tmp_path,
+    monkeypatch,
+):
+    relay = pytest.importorskip("nemo_relay")
+    if getattr(relay, "_native", None) is None:
+        pytest.skip("NeMo Relay native binding is unavailable on this platform")
+
+    project_root = tmp_path / "project"
+    working_directory = project_root / "workspace"
+    config_directory = project_root / ".nemo-relay"
+    atof_dir = tmp_path / "atof"
+    working_directory.mkdir(parents=True)
+    config_directory.mkdir()
+    project_config = config_directory / "plugins.toml"
+    project_config.write_text(
+        f"""
+version = 1
+
+[[components]]
+kind = "observability"
+enabled = true
+
+[components.config]
+version = 4
+
+[components.config.atof]
+enabled = true
+
+[[components.config.atof.sinks]]
+type = "file"
+output_directory = "{atof_dir.as_posix()}"
+filename = "events.jsonl"
+mode = "overwrite"
+""".strip(),
+        encoding="utf-8",
+    )
+    xdg_config_home = tmp_path / "xdg"
+    user_config = xdg_config_home / "nemo-relay" / "plugins.toml"
+    user_config.parent.mkdir(parents=True)
+    user_config.write_text("", encoding="utf-8")
+    monkeypatch.chdir(working_directory)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
+    monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
+
+    host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        assert not host.managed_execution_enabled()
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.DISABLED
+        )
+        report = relay_runtime._PLUGIN_CONFIGURATION._activation.report
+        config_paths = set(report["config_paths"])
+        assert str(user_config) in config_paths
+        assert str(project_config) not in config_paths
+    finally:
+        host.shutdown()
+        relay_runtime._reset_for_tests()
+
+    assert not (atof_dir / "events.jsonl").exists()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_real_binding_explicit_config_replaces_user_and_ignores_project(
+    tmp_path,
+    monkeypatch,
+):
+    relay = pytest.importorskip("nemo_relay")
+    if getattr(relay, "_native", None) is None:
+        pytest.skip("NeMo Relay native binding is unavailable on this platform")
+
+    project_root = tmp_path / "project"
+    working_directory = project_root / "workspace"
+    config_directory = project_root / ".nemo-relay"
+    selected_directory = tmp_path / "selected-config"
+    project_atof_dir = tmp_path / "project-atof"
+    selected_atof_dir = tmp_path / "selected-atof"
+    working_directory.mkdir(parents=True)
+    config_directory.mkdir()
+    selected_directory.mkdir()
+    project_config = config_directory / "plugins.toml"
+    project_config.write_text(
+        f"""
+version = 1
+
+[[components]]
+kind = "observability"
+enabled = true
+
+[components.config]
+version = 4
+
+[components.config.atof]
+enabled = true
+
+[[components.config.atof.sinks]]
+type = "file"
+output_directory = "{project_atof_dir.as_posix()}"
+filename = "events.jsonl"
+mode = "overwrite"
+""".strip(),
+        encoding="utf-8",
+    )
+    selected_config = selected_directory / "plugins.toml"
+    selected_config.write_text(
+        f"""
+version = 1
+
+[[components]]
+kind = "observability"
+enabled = true
+
+[components.config]
+version = 4
+
+[components.config.atof]
+enabled = true
+
+[[components.config.atof.sinks]]
+type = "file"
+output_directory = "{selected_atof_dir.as_posix()}"
+filename = "events.jsonl"
+mode = "overwrite"
+""".strip(),
+        encoding="utf-8",
+    )
+    xdg_config_home = tmp_path / "xdg"
+    user_config = xdg_config_home / "nemo-relay" / "plugins.toml"
+    user_config.parent.mkdir(parents=True)
+    user_config.write_text("", encoding="utf-8")
+    monkeypatch.chdir(working_directory)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
+    monkeypatch.setenv(
+        relay_runtime.RELAY_PLUGINS_CONFIG_ENV,
+        str(selected_config),
+    )
+
+    host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        assert host.managed_execution_enabled()
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.ACTIVE
+        )
+        report = relay_runtime._PLUGIN_CONFIGURATION._activation.report
+        config_paths = set(report["config_paths"])
+        assert str(selected_config) in config_paths
+        assert str(user_config) not in config_paths
+        assert str(project_config) not in config_paths
+        host.ensure_session({"session_id": "native-explicit-plugins"})
+    finally:
+        host.shutdown()
+        relay_runtime._reset_for_tests()
+
+    assert (selected_atof_dir / "events.jsonl").is_file()
+    assert not (project_atof_dir / "events.jsonl").exists()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_real_binding_hands_dynamic_records_to_relay_and_fails_open_on_rejection(
+    tmp_path,
+    monkeypatch,
+    caplog,
+):
+    relay = pytest.importorskip("nemo_relay")
+    if getattr(relay, "_native", None) is None:
+        pytest.skip("NeMo Relay native binding is unavailable on this platform")
+    manifest = tmp_path / "plugins" / "relay-plugin.toml"
+    manifest.parent.mkdir()
+    manifest.write_text(
+        """
+manifest_version = 1
+
+[plugin]
+id = "fixture.native"
+kind = "rust_dynamic"
+""".strip(),
+        encoding="utf-8",
+    )
+    config = tmp_path / "plugins.toml"
+    config.write_text(
+        """
+version = 1
+
+[[plugins.dynamic]]
+manifest = "plugins/relay-plugin.toml"
+
+[plugins.dynamic.config]
+mode = "strict"
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, str(config))
+
+    assert relay_runtime._configured_plugin_inputs() == config
+
+    with caplog.at_level("WARNING"):
+        host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+    try:
+        assert not host.managed_execution_enabled()
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.FAILED
+        )
+        assert "Hermes Relay plugin initialization failed" in caplog.text
+        assert "relay-plugin.toml" in caplog.text
+    finally:
+        host.shutdown()
+        relay_runtime._reset_for_tests()
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_real_binding_leaves_foreign_plugin_host_unchanged(
+    explicit_static_config,
+):
+    relay = pytest.importorskip("nemo_relay")
+    if getattr(relay, "_native", None) is None:
+        pytest.skip("NeMo Relay native binding is unavailable on this platform")
+    activation = relay_runtime._resolve_plugin_awaitable(
+        relay.plugin.initialize(
+            {},
+            additional_plugins_toml=explicit_static_config,
+        )
+    )
+
+    try:
+        host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+        try:
+            assert (
+                host._plugin_configuration_state
+                is relay_runtime._RelayPluginConfigurationState.FOREIGN
+            )
+            assert activation.is_active
+        finally:
+            host.shutdown()
+        assert activation.is_active
+    finally:
+        relay_runtime._resolve_plugin_awaitable(activation.close())
+@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local relay_runtime discovery/activation semantics diverge from the pin")
+def test_unset_config_uses_relay_discovery(monkeypatch):
+    monkeypatch.delenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, raising=False)
+    relay = _FakeRelay()
+    host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
+
+    try:
+        assert host.managed_execution_enabled()
+        assert (
+            host._plugin_configuration_state
+            is relay_runtime._RelayPluginConfigurationState.ACTIVE
+        )
+        assert relay.initialized_from == [None]
+        host.ensure_session({"session_id": "session"})
+        assert relay.events[0] == ("plugin.initialize", {})
+        assert relay.events[1][0:2] == ("scope.push", relay_runtime.SESSION_SCOPE)
+    finally:
+        host.shutdown()
+
+    assert relay.events[-2:] == [
+        ("subscribers.flush_async",),
+        ("plugin.activation.close",),
+    ]
 
 
 class _FakeRelay:
