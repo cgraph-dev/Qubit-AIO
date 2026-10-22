@@ -20,6 +20,7 @@ import qubit_yaml as yaml
 from agent import model_metadata_http
 
 from utils import atomic_json_write, atomic_yaml_write, base_url_host_matches, base_url_hostname
+from agent.model_metadata_cache import locked_context_cache
 
 from qubit_constants import OPENROUTER_MODELS_URL, openrouter_variant_base
 from agent.message_metadata import PERSISTENCE_ONLY_MESSAGE_FIELDS, without_persistence_fields
@@ -1174,6 +1175,7 @@ def _context_cache_key(model: str, base_url: str) -> str:
     return f"{model}@{(base_url or '').rstrip('/')}"
 
 
+@locked_context_cache
 def save_context_length(model: str, base_url: str, length: int, *, source: str = "") -> None:
     """Persist a discovered context length under ``model@base_url`` (same model, different providers, different limits)."""
     # 0/negative is always a bug and would make get_model_context_length() return 0 (`0 is not None`).
