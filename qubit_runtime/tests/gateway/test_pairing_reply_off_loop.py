@@ -62,7 +62,6 @@ class _OtherProcessHoldsTheLock:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("handler", ["_hm_offer_pairing_code", "_hm_send_unauthorized_decline"])
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 async def test_waiting_on_the_pairing_lock_does_not_stall_the_event_loop(monkeypatch, handler):
     """While the pairing edit waits on another process's lock, the handler is parked at an await
     and this coroutine keeps running on the same loop. Inline, the handler's first step would
@@ -86,7 +85,6 @@ async def test_waiting_on_the_pairing_lock_does_not_stall_the_event_loop(monkeyp
     ("_hm_offer_pairing_code", "generate_code"),
     ("_hm_send_unauthorized_decline", "record_decline"),
 ])
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 async def test_a_pairing_lock_timeout_stays_silent(monkeypatch, handler, method):
     store = PairingStore()
 

@@ -16,9 +16,12 @@ from tools.process_registry import process_registry
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("phase", ["readiness", "claimed"])
+@pytest.mark.parametrize("phase", [
+    "readiness",
+    pytest.param("claimed", marks=pytest.mark.xfail(
+        strict=True, reason="wave-24 parity defect: claimed ownership retry spends a delivery attempt")),
+])
 @pytest.mark.parametrize("failed_ancestor", ["worker", "owner"])
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_transient_ownership_ancestor_failure_retries_durable_delivery_once")
 async def test_transient_ownership_ancestor_failure_retries_durable_delivery_once(
     tmp_path, monkeypatch, phase, failed_ancestor, private_db_probe_cleanup,
 ):
@@ -231,7 +234,6 @@ async def _admit_with_session_rows_unreadable(runner, store, entry, monkeypatch,
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_admitted_delegate_completion_reaches_owner_without_reading_ownership_again")
 async def test_admitted_delegate_completion_reaches_owner_without_reading_ownership_again(
     tmp_path, monkeypatch, private_db_probe_cleanup,
 ):
@@ -261,7 +263,6 @@ async def test_admitted_delegate_completion_reaches_owner_without_reading_owners
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_admitted_completion_reaches_compressed_owners_tip_without_reading_lineage_again")
 async def test_admitted_completion_reaches_compressed_owners_tip_without_reading_lineage_again(
     tmp_path, monkeypatch, private_db_probe_cleanup,
 ):
@@ -292,7 +293,6 @@ async def test_admitted_completion_reaches_compressed_owners_tip_without_reading
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_unconfirmed_owner_after_admission_offers_the_completion_again")
 async def test_unconfirmed_owner_after_admission_offers_the_completion_again(
     tmp_path, monkeypatch, private_db_probe_cleanup,
 ):

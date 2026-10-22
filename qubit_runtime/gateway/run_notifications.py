@@ -1326,41 +1326,12 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                 self._completion_deliveries_inflight.add(identity)
             return seen
 
-    async def _classify_completion_target(self, parent_session_id: str) -> str:
+    async def _classify_completion_target(self, parent_session_id: str, session_key: str = "") -> str:
         """Classify an async-completion target before adapter acceptance: ``"deliver"`` (spawning
         session live or compression-rotated with a live continuation; the resolver still retargets),
         ``"terminal"`` (parent gone for good — unknown / user boundary like /new; drop the durable row
-        rather than falsely ack), ``"retry"`` (DB unavailable / rotation mid-flight; release the claim)."""
-        from gateway.run import _USER_BOUNDARY_END_REASONS
-        session_db = getattr(self, "_session_db", None)
-        if session_db is None:
-            return "retry"
-        try:
-            parent = await session_db.get_session(parent_session_id)
-        except Exception:
-            logger.debug("Async-completion pre-flight parent lookup failed for %s", parent_session_id, exc_info=True)
-            return "retry"
-        if parent is None:
-            return "terminal"
-        if not parent.get("ended_at"):
-            return "deliver"
-        end_reason = str(parent.get("end_reason") or "")
-        if end_reason != "compression":
-            # Only a USER-closed session (/new, user_exit, session_switch) is unreachable; idle/timeout
-            # ends stay routable and the resolver retargets. Boundary set shared with the resolver.
-            return "terminal" if end_reason in _USER_BOUNDARY_END_REASONS else "deliver"
-        try:
-            tip_session_id = await session_db.get_compression_tip(parent_session_id)
-            if not tip_session_id or tip_session_id == parent_session_id:
-                # Rotation mid-flight: continuation not visible yet. Retry, don't drop.
-                return "retry"
-            tip = await session_db.get_session(tip_session_id)
-        except Exception:
-            logger.debug("Async-completion pre-flight tip lookup failed for %s", parent_session_id, exc_info=True)
-            return "retry"
-        if tip is None or tip.get("ended_at"):
-            return "retry"
-        return "deliver"
+        rather than falsely ack), ``"retry"`` (DB unavailable / rotation mid-flight; defer the claim)."""
+        return (await self._classify_completion_owner(parent_session_id, session_key))[0]
 
     async def _classify_completion_owner(self, parent_session_id: str, session_key: str = "") -> tuple[str, str, str]:
         """``_classify_completion_target``'s verdict and, on ``"deliver"``, the owning session it proved
@@ -1411,7 +1382,7 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
 
         parent_session_id = str(evt.get("parent_session_id") or "").strip()
         if parent_session_id:
-            verdict = await self._classify_completion_target(parent_session_id)
+            verdict = await self._classify_completion_target(parent_session_id, str(evt.get("session_key") or ""))
             if verdict != "deliver":
                 # Definitively closed targets still need the normal terminal disposition.
                 return verdict == "terminal"

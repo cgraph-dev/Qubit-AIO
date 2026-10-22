@@ -52,7 +52,6 @@ def test_native_delete_exact_retry_survives_owner_restart(tmp_path):
                       'fresh_request_status': fresh.status_code, 'foreign_status': foreign.status_code}))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 def test_route_retirement_rolls_back_with_receipt_and_rejects_stale_mirror(tmp_path):
     from gateway.config import GatewayConfig, Platform
     from gateway.session import SessionStore, SessionSource

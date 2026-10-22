@@ -148,7 +148,7 @@ def _isolate_qubit_runtime(tmp_path, monkeypatch):  # noqa: D103
     # resolve an external or operator home. A test that needs an explicit home
     # sets it after this fixture (monkeypatch restores the original at teardown,
     # including a value assigned directly by runtime code during the test).
-    monkeypatch.delenv("QUBIT_HOME", raising=False)
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit-home"))
     # Also clear HERMES_HOME, the foreign alias of QUBIT_HOME declared in
     # agent_compat's env_aliases. EnvAliaser mirrors an unset QUBIT_HOME from a
     # set HERMES_HOME (framework.py `EnvAliaser.apply`), so a process launched by

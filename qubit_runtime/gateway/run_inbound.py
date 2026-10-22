@@ -162,7 +162,14 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         # Rate-limit ALL pairing responses (code or rejection) so a burst of DMs doesn't spam.
         if pairing_store._is_rate_limited(platform_name, source.user_id):
             return
-        code = pairing_store.generate_code(platform_name, source.user_id, source.user_name or "")
+        # Off the event loop: the store edit waits on a cross-process lock (dashboard, CLI).
+        try:
+            code = await asyncio.to_thread(
+                pairing_store.generate_code, platform_name, source.user_id, source.user_name or "",
+            )
+        except (OSError, TimeoutError):
+            logger.warning("Could not record a pairing code on %s", platform_name, exc_info=True)
+            return
         adapter = self._delivery_adapter_for(source)
         if code:
             reply = pairing_code_reply(platform_name, code, pairing_profile_arg(pairing_store))
@@ -183,7 +190,12 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         pairing_store = self._pairing_store_for(source)
         if pairing_store is None or pairing_store.has_recent_decline(platform_name, source.user_id):
             return
-        pairing_store.record_decline(platform_name, source.user_id)
+        # Off the event loop (the stamp waits on a cross-process lock); no stamp → no dedupe → silent.
+        try:
+            await asyncio.to_thread(pairing_store.record_decline, platform_name, source.user_id)
+        except (OSError, TimeoutError):
+            logger.warning("Could not record an unauthorized-DM decline on %s", platform_name, exc_info=True)
+            return
         adapter = self._delivery_adapter_for(source)
         if not adapter:
             return

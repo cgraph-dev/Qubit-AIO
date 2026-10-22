@@ -14,7 +14,7 @@ def probe(tmp_path, mode):
     home.mkdir()
     user.mkdir()
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env.update(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home),
                PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
     result = subprocess.run([sys.executable, str(root / 'tests/gateway/fixtures/ancillary_reads_peer.py'), mode],
                             cwd=root, env=env, capture_output=True, text=True, timeout=90, check=False)
@@ -32,4 +32,3 @@ def test_activity_snapshot_requires_current_owner_objects(tmp_path):
     probe(tmp_path, 'activity')
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
