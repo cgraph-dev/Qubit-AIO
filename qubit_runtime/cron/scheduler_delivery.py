@@ -812,7 +812,8 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
     from qubit_constants import get_qubit_home
     from qubit_cli.profiles import get_profile_dir
     from tools.bot_live_delivery import (
-        deliver_to_live_owner, find_canonical_live_owner, read_delivery_result,
+        deliver_to_live_owner, find_canonical_live_owner, find_create_missing_owner,
+        read_delivery_result,
     )
 
     job_id = job.get("id", "?")
@@ -882,6 +883,8 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         if receipt is None:
             try:
                 owner = find_canonical_live_owner(home)
+                if owner is None and deferred is None:
+                    owner = find_create_missing_owner(home)
             except ValueError:
                 # Discovery uncertainty is never a failed delivery: park it, never book it.
                 if deferred is None:

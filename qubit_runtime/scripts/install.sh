@@ -97,6 +97,36 @@ log_warn() { printf '%s⚠%s %s\n' "$C_YELLOW" "$C_NC" "$1"; }
 log_error() { printf '%s✗%s %s\n' "$C_RED" "$C_NC" "$1" >&2; }
 fail() { STAGE_REASON="$1"; log_error "$1"; exit 1; }
 
+
+# The update channel this install chose (config.yaml update.installs.<id>.channel,
+# id = sha16 of the canonical install path, as qubit_cli.update_channel keys it).
+# Pre-Python reader of the block YAML Qubit writes; anything it cannot read
+# prints nothing, which keeps the plain branch behaviour.
+chosen_channel() {
+    local config="$QUBIT_HOME/config.yaml" root id
+    [ -f "$config" ] || return 0
+    root="$(cd "$INSTALL_DIR" 2>/dev/null && pwd -P)" || return 0
+    if command -v sha256sum >/dev/null 2>&1; then id="$(printf '%s' "$root" | sha256sum)"
+    elif command -v shasum >/dev/null 2>&1; then id="$(printf '%s' "$root" | shasum -a 256)"
+    else return 0; fi
+    awk -v id="${id:0:16}" -v q="'" '
+        function bare(s,  f) {
+            sub(/^[ \t]+/, "", s); sub(/[ \t]+#.*$/, "", s); sub(/[ \t\r]+$/, "", s)
+            f = substr(s, 1, 1)
+            if (length(s) > 1 && (f == "\"" || f == q) && substr(s, length(s), 1) == f) s = substr(s, 2, length(s) - 2)
+            return s
+        }
+        /^[ \t]*(#|\r?$)/ { next }
+        {
+            match($0, /^ */); indent = RLENGTH; line = substr($0, indent + 1)
+            colon = index(line, ":"); if (!colon) next
+            while (depth && at[depth] >= indent) depth--
+            at[++depth] = indent; key[depth] = bare(substr(line, 1, colon - 1))
+            if (depth == 4 && key[1] == "update" && key[2] == "installs" && key[3] == id \
+                && key[4] == "channel") { print bare(substr(line, colon + 1)); exit }
+        }' "$config" | grep -E '^[a-z0-9]+(-[a-z0-9]+)*$' || :
+}
+
 print_banner() {
     printf '\n%s%s' "$C_MAGENTA" "$C_BOLD"
     printf '%s\n' "┌─────────────────────────────────────────────────────────┐"
@@ -455,6 +485,17 @@ stage_repository() {
         mv "$INSTALL_DIR" "$broken" || fail "cannot move $INSTALL_DIR aside"
     fi
     if [ -d "$INSTALL_DIR/.git" ]; then
+        # A chosen channel (stable, a preview) owns where this checkout sits:
+        # `qubit update` moves it. Switching it to the installer's branch would
+        # leave it on main while its channel still says otherwise, and the next
+        # check would offer the release as an update. An explicit --commit pin
+        # outranks the choice.
+        local channel=""
+        [ -n "$INSTALL_COMMIT" ] || channel="$(chosen_channel)"
+        if [ -n "$channel" ] && [ "$channel" != main ]; then
+            log "Keeping its checkout: \`qubit update\` moves it (\`qubit update --set-channel main\` follows main)"
+            return 0
+        fi
         log "Updating $INSTALL_DIR ($BRANCH)"
         # An explicit HERMES_REPO_URL names the source for reruns too, not
         # just the first clone.

@@ -70,6 +70,28 @@ def find_canonical_live_owner(profile_home: Path | str) -> dict[str, Any] | None
     return None
 
 
+def find_create_missing_owner(profile_home: Path | str) -> dict[str, Any] | None:
+    """The authority's owner for a profile with no Bot Chat yet, or None.
+
+    The deliver door creates the canonical Bot Chat on first delivery (main's
+    ``--create-if-missing``). This is narrower than ``find_canonical_live_owner``: it answers
+    only the empty-tip state, and only while the authority is ready; an existing chat without
+    a registered consumer stays unowned.
+    """
+    home = Path(profile_home).resolve()
+    if not (home / "state.db").is_file():
+        return None
+    from qubit_cli.gateway_runtime import discover_gateway_endpoint
+
+    discovery = discover_gateway_endpoint(home, timeout=5)
+    if discovery.state != "ready" or discovery.endpoint is None:
+        return None
+    if _bot_chat_tip(home) is not None:
+        return None
+    return dict(profile_home=str(home), session_id="", canonical=True,
+                lease_id=discovery.endpoint.instance_id, live_session_id="")
+
+
 def _owner(home: Path | str, owner: dict[str, Any]) -> dict[str, str]:
     pinned = {key: owner.get(key) for key in _OWNER_KEYS}
     # An empty session_id is the discovered "no Bot Chat yet" state; the door creates it.
