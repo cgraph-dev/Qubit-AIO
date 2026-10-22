@@ -932,7 +932,6 @@ class TestPluginRegister:
 
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: a forged bearer signature is reported as a provider outage")
 class TestForgedSignature:
     """A bearer whose signature does not verify is an invalid token, never a provider outage.
 

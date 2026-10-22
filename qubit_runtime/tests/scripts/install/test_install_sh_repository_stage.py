@@ -192,7 +192,6 @@ def test_rerun_marks_partial_clone_packs_when_the_fetch_crashes(tmp_path):
     assert all(p.with_suffix(".promisor").exists() for p in packs)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: the pinned fresh clone materializes the branch tip and publishes on pin failure")
 def test_pinned_fresh_clone_never_materializes_the_branch_tip(tmp_path):
     """A pinned install (the desktop bootstrap passes --commit) checks out only the pin.
 
@@ -222,7 +221,6 @@ def test_pinned_fresh_clone_never_materializes_the_branch_tip(tmp_path):
     assert "--no-checkout" not in clone.split()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: the pinned fresh clone materializes the branch tip and publishes on pin failure")
 def test_pinned_fresh_clone_publishes_nothing_when_the_pin_fails(tmp_path):
     """A pinned fresh clone pins before it publishes: a refused or failed pin leaves no empty checkout."""
     origin = _origin(tmp_path / "origin")

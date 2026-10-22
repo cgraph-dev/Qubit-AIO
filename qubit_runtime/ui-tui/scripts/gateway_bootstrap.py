@@ -16,7 +16,9 @@ import sys
 # dist/scripts/ (a separate Nix store path), so parents[2] is only right in a source tree.
 # gatewayClient.ts passes the root it put on PYTHONPATH.
 def python_root() -> Path:
-    return Path(os.environ.get("QUBIT_PYTHON_SRC_ROOT") or Path(__file__).resolve().parents[2])
+    return Path(os.environ.get("QUBIT_PYTHON_SRC_ROOT")
+                or os.environ.get("HERMES_PYTHON_SRC_ROOT")
+                or Path(__file__).resolve().parents[2])
 
 
 sys.path.insert(0, str(python_root()))

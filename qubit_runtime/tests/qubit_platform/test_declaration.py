@@ -63,6 +63,7 @@ def test_app_block_parses_into_one_appdef_per_os():
     ({"darwin": {"presence": "bundle", "location": "Relative/Thing.app"}}, None, "must be absolute"),
     ({"darwin": {"presence": "bundle", "location": "https://example.test/Thing.app"}}, None, "must be absolute"),
     ({"win32": {"presence": "executable", "location": "Thing/thing.exe"}}, None, "must be absolute"),
+    (None, {"gpu": "amd"}, "requires.gpu must be one of"),
     ({"darwin": {"presence": "bundle", "location": "/Applications/Thing */**/Thing.app"}}, None, "must be absolute"),
     ({"linux": {"presence": "executable", "location": []}}, None, "location is required"),
     ({"linux": {"presence": "executable", "location": [{"kind": "registry", "name": "thing"}]}}, None,
@@ -87,6 +88,28 @@ def test_availability_no_requirements_does_no_io():
     decl = parse_declaration("thing-mcp", None, None, where=WHERE)
     result = availability(decl, os_family="freebsd")
     assert result.state == "no_requirements" and result.offerable
+
+
+@pytest.mark.parametrize("gpu_class, state", [
+    ("nvidia", "no_requirements"),
+    ("unknown", "no_requirements"),
+    ("intel", "unsupported_gpu"),
+    ("apple_silicon", "unsupported_gpu"),
+    ("none", "unsupported_gpu"),
+])
+def test_requires_gpu_gates_on_the_host_gpu_class(monkeypatch, gpu_class, state):
+    """No `app:` block is needed; an unreadable GPU passes; the OS gate runs first and reads no GPU."""
+    from qubit_platform.host import facts
+
+    monkeypatch.setattr(facts, "gpu_class", lambda: gpu_class)
+    decl = parse_declaration("thing-mcp", None, {"gpu": "nvidia"}, where=WHERE)
+    result = availability(decl, os_family="win32")
+    assert result.state == state and result.offerable == (state == "no_requirements")
+
+    monkeypatch.setattr(facts, "gpu_class", lambda: pytest.fail("the OS gate must not read the GPU"))
+    both = parse_declaration("thing-mcp", {"win32": {"presence": "executable", "location": "C:/x/y.exe"}},
+                             {"app": True, "gpu": "nvidia"}, where=WHERE)
+    assert availability(both, os_family="darwin").state == "unsupported_os"
 
 
 def test_availability_unsupported_os_when_no_block_for_host():
@@ -228,25 +251,3 @@ def test_skill_requires_apps_gate(tmp_path, monkeypatch):
         assert skill_utils.skill_matches_apps({"requires_apps": ["thing-mcp"]}) is True
     finally:
         declaration.clear()
-
-
-@pytest.mark.parametrize("gpu_class, state", [
-    ("nvidia", "no_requirements"),
-    ("unknown", "no_requirements"),
-    pytest.param("intel", "unsupported_gpu", marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: availability() ignores the host GPU class")),
-    pytest.param("apple_silicon", "unsupported_gpu", marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: availability() ignores the host GPU class")),
-    pytest.param("none", "unsupported_gpu", marks=pytest.mark.xfail(strict=True, reason="wave-22 parity defect: availability() ignores the host GPU class")),
-])
-def test_requires_gpu_gates_on_the_host_gpu_class(monkeypatch, gpu_class, state):
-    """No `app:` block is needed; an unreadable GPU passes; the OS gate runs first and reads no GPU."""
-    from qubit_platform.host import facts
-
-    monkeypatch.setattr(facts, "gpu_class", lambda: gpu_class)
-    decl = parse_declaration("thing-mcp", None, {"gpu": "nvidia"}, where=WHERE)
-    result = availability(decl, os_family="win32")
-    assert result.state == state and result.offerable == (state == "no_requirements")
-
-    monkeypatch.setattr(facts, "gpu_class", lambda: pytest.fail("the OS gate must not read the GPU"))
-    both = parse_declaration("thing-mcp", {"win32": {"presence": "executable", "location": "C:/x/y.exe"}},
-                             {"app": True, "gpu": "nvidia"}, where=WHERE)
-    assert availability(both, os_family="darwin").state == "unsupported_os"

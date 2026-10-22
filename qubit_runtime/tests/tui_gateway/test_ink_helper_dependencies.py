@@ -62,7 +62,6 @@ def test_gateway_bootstrap_reaches_a_verdict_on_the_store_python():
     assert child.stderr.strip().splitlines()[0].startswith("gateway "), child.stderr
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: packaged gateway bootstrap cannot load ruamel under the -S store-python generation in this environment")
 def test_packaged_gateway_bootstrap_boots_the_root_it_is_given_or_names_why_it_cannot(tmp_path):
     """The TUI product ships the helper in its own dist/scripts/ (a separate Nix store path, #139208),
     where parents[2] is not the Python root: the helper must boot the generation of the root Ink

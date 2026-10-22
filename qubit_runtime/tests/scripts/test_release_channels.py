@@ -657,7 +657,6 @@ def test_stable_requests_name_the_attempt_archive_only_when_given():
             allocate("c" * 40, "2.2.0", "rc.2-v2.9.9")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: retire does not refuse a stable head without previews targets")
 def test_retire_refuses_a_stable_head_without_the_previews_targets():
     """An Intel preview cannot be pinned to an arm64-only stable head it has no package in."""
     from qubit_cli.release_channels import ChannelError, canonical_json

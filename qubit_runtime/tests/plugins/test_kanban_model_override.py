@@ -113,40 +113,8 @@ def test_create_task_with_model_and_provider(conn):
 
 
 # ---------------------------------------------------------------------------
-# Worker spawn — argv carries -m and --provider
+# Worker spawn — task identity resolves trusted owner policy
 # ---------------------------------------------------------------------------
-
-
-def _spawn_and_capture(monkeypatch, tmp_path, task):
-    monkeypatch.setattr(kbd, "_resolve_qubit_argv", lambda: ["hermes"])
-    captured = {}
-
-    class FakeProc:
-        pid = 4245
-
-    def fake_popen(cmd, *args, **kwargs):
-        captured["cmd"] = list(cmd)
-        return FakeProc()
-
-    monkeypatch.setattr(subprocess, "Popen", fake_popen)
-    workspace = tmp_path / "ws"
-    workspace.mkdir(exist_ok=True)
-    kbd._default_spawn(task, str(workspace))
-    return captured["cmd"]
-
-
-def test_spawn_passes_model_and_provider(monkeypatch, tmp_path, conn):
-    tid = kb.create_task(
-        conn, title="t", assignee="elias",
-        model_override="glm-5", provider_override="openrouter",
-    )
-    task = kb.get_task(conn, tid)
-    cmd = _spawn_and_capture(monkeypatch, tmp_path, task)
-    i = cmd.index("-m")
-    assert cmd[i + 1] == "glm-5"
-    j = cmd.index("--provider")
-    assert j == i + 2
-    assert cmd[j + 1] == "openrouter"
 
 
 # ---------------------------------------------------------------------------
@@ -245,22 +213,6 @@ def test_reasoning_effort_survives_clearing_the_model(conn):
 
 
 
-def test_spawn_passes_reasoning_without_a_model(monkeypatch, tmp_path, conn):
-    tid = kb.create_task(conn, title="t", assignee="elias", reasoning_effort="high")
-    task = kb.get_task(conn, tid)
-    cmd = _spawn_and_capture(monkeypatch, tmp_path, task)
-    assert "-m" not in cmd
-    i = cmd.index("--reasoning")
-    assert cmd[i + 1] == "high"
-
-
-def test_spawn_omits_reasoning_when_unset(monkeypatch, tmp_path, conn):
-    tid = kb.create_task(conn, title="t", assignee="elias")
-    task = kb.get_task(conn, tid)
-    cmd = _spawn_and_capture(monkeypatch, tmp_path, task)
-    assert "--reasoning" not in cmd
-
-
 def test_worker_cli_accepts_the_reasoning_flag():
     """The dispatcher's --reasoning must be a real flag on the worker's CLI —
     a spawn arg no parser accepts fails every dispatch."""
@@ -316,7 +268,6 @@ def test_bulk_reasoning_effort(client):
         assert got["reasoning_effort"] == "max"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-22 parity defect: kanban default spawn does not build the pinned claimed-task policy from SQLite")
 @pytest.mark.parametrize(
     "overrides, expected_model, expected_provider, expected_reasoning",
     [
