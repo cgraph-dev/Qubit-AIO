@@ -11,6 +11,7 @@ from qubit_cli.doctor_report import (
     warn_on_error,
 )
 from qubit_cli.sizefmt import format_bytes as _human_bytes
+from qubit_constants import PROFILE_ID_RE as _PROFILE_ID_RE
 from qubit_state_common import FTS_STORAGE_VERSION
 from qubit_state_holders import read_only_db_uri
 
@@ -695,7 +696,9 @@ def _check_profiles(should_fix: bool, f: Finding) -> None:
             with warn_on_error(""):
                 _m = _re.search(r"qubit -p (\S+)", wrapper.read_text(encoding="utf-8-sig"))
                 if _m and not profile_exists(_m.group(1)):
-                    check_warn(f"Orphan alias: {wrapper.name} → profile '{_m.group(1)}' no longer exists")
+                    alias = wrapper.stem if wrapper.suffix in (".sh", ".bat", "") else wrapper.name
+                    fix = f"qubit profile alias {alias} --remove" if _PROFILE_ID_RE.match(alias) else f"delete {wrapper}"
+                    check_warn(f"Orphan alias: {alias} → profile '{_m.group(1)}' no longer exists", f"(remove with: {fix})")
     # Same helper as the multiplex migration preflight, so doctor names the duplicates that make
     # `qubit gateway migrate --multiplex` refuse (and made pre-multiplex standalone gateways race).
     from qubit_cli.gateway_migrate import duplicate_credential_findings

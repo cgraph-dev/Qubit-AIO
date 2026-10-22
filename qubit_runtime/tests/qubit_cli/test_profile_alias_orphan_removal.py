@@ -33,7 +33,6 @@ def _alias(profile, *, remove, name=None):
 
 
 @pytest.mark.platforms("any")  # the wrapper name differs per host (.bat on Windows)
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: doctor reports an orphan alias without naming the remove command")
 def test_doctor_names_the_command_that_removes_an_orphan_alias(isolated_home, capsys):
     keep = isolated_home / ".qubit" / "profiles" / "keep"  # doctor's section needs one live profile
     keep.mkdir(parents=True)
