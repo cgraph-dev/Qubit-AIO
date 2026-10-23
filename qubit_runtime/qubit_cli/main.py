@@ -3545,13 +3545,21 @@ def _parse_cli_args(parser, subparsers, argv):
 
     subparsers.required = True
     _saved_stderr = sys.stderr
+    _err_buf = _io.StringIO()
     try:
-        sys.stderr = _io.StringIO()
+        sys.stderr = _err_buf
         args = parser.parse_args(_processed_argv)
         sys.stderr = _saved_stderr
     except SystemExit as exc:
         sys.stderr = _saved_stderr
         if exc.code == 0:  # help/version already printed; don't print twice
+            raise
+        if "the following arguments are required" not in _err_buf.getvalue():
+            # The subcommand parsed and rejected the invocation itself (e.g. a
+            # machine-readable ensure error printed its JSON to stdout). Retrying
+            # would run the same rejection twice and duplicate that protocol
+            # output; replay the captured message and let the exit stand.
+            sys.stderr.write(_err_buf.getvalue())
             raise
         # Subcommand consumed as a flag value (e.g. -c model): normal parse.
         subparsers.required = False
