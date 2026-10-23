@@ -1794,15 +1794,16 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         offset = 0 if (session_was_split or compacted_in_place) else len(agent_history)
         return compacted_in_place, agent_session_id, offset
 
-    def _combined_ephemeral_prompt(self) -> str:
+    def _combined_ephemeral_prompt(self, policy=None) -> str:
         """Platform context + YAML channel_prompts hint + channel_overrides system_prompt (or global
         ephemeral) + the gateway ephemeral prompt."""
         ctx = self._ctx
         from gateway.session_api_turn import api_execution
         api = api_execution.get()
         if api is not None:
-            return api['settings'].get('ephemeral_system_prompt') or ''
-        combined = ctx.context_prompt or ""
+            combined = api['settings'].get('ephemeral_system_prompt') or ''
+        else:
+            combined = ctx.context_prompt or ""
         for extra in (
             (ctx.channel_prompt or "").strip(),
             self._runner._get_system_prompt_for_channel(
@@ -1812,6 +1813,11 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         ):
             if extra:
                 combined = (combined + "\n\n" + extra).strip()
+        # A local session's frozen launch skills (``-s``) ride the API-time ephemeral prompt,
+        # exactly as the managed-worker construction path does. They are not part of the
+        # persisted system prefix.
+        if policy is not None and getattr(policy, 'skills_prompt', None):
+            combined = (combined + "\n\n" + policy.skills_prompt).strip()
         return combined
 
     def _append_auto_media_tags(self, final_response: str, result, agent_history, history_media_paths) -> str:
@@ -1896,8 +1902,12 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         # session via contextvars (set_current_session_key / session context), and only the TUI slash-worker
         # *subprocess* exports HERMES_SESSION_KEY (from its own --session-key argv, a separate process) — so
         # removing this in-process gateway write does not affect any of them.
-        platform_key = "cli" if ctx.source.platform == Platform.LOCAL else ctx.source.platform.value
-        combined_ephemeral = self._combined_ephemeral_prompt()
+        # A local session's frozen policy carries the surface it was created from ("cli",
+        # "tui", "desktop"); the bare Platform.LOCAL value would flatten every one of them
+        # to "cli" and seed the agent with the wrong platform hint.
+        platform_key = policy.platform if policy else (
+            "cli" if ctx.source.platform == Platform.LOCAL else ctx.source.platform.value)
+        combined_ephemeral = self._combined_ephemeral_prompt(policy)
         max_iterations = _current_max_iterations()
         # A RoomLink member turn runs under the authority its target advertised: the room's iteration
         # cap and toolset ceiling replace the gateway's, and both have to be fixed BEFORE the agent is
