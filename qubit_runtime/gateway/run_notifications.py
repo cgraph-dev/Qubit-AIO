@@ -1465,9 +1465,7 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                 )
             claim.proceed = False
         elif verdict == "retry":
-            # Transient uncertainty: tell the watcher to re-poll rather than drop or misroute.
-            if claim.claim_id:
-                self._settle_durable_claim("release", claim.delegation_id, claim.claim_id)
+            # Transient uncertainty before admission: re-poll without spending a delivery attempt.
             claim.proceed, claim.early_result, claim.defer = False, False, True
         return claim
 
