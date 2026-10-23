@@ -87,4 +87,3 @@ def test_ordinary_daemon_api_ws_fifo_retry(tmp_path):
         peer.server_close()
 
 
-pytestmark = pytest.mark.skip(reason="wave-31: fixture tests/gateway/fixtures/api_daemon_witness.py is absent from the tree; daemon() fails with can't open file")
