@@ -14,6 +14,8 @@ default is transparent to them.
 
 import pytest
 
+from tests._fixtures.model_peer import model_peer  # noqa: F401 — fixture used by the wire tests
+
 
 @pytest.fixture(autouse=True)
 def _offline_model_inventory(monkeypatch):
@@ -30,6 +32,80 @@ def _offline_model_inventory(monkeypatch):
         "build_models_payload",
         lambda *_args, **_kwargs: {"providers": []},
     )
+
+
+@pytest.fixture
+def daemon(tmp_path, model_peer, request):
+    """An ordinary isolated ``gateway.run`` process: ``(home, descriptor, env, root)``."""
+    import json
+    import os
+    from pathlib import Path
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    from tests.gateway.test_normal_runtime_boot import control
+
+    home = tmp_path / "state"
+    home.mkdir(mode=0o700)
+    user = tmp_path / "user"
+    user.mkdir()
+    root = Path(__file__).resolve().parents[2]
+    model_url = f"http://127.0.0.1:{model_peer.server_port}/v1"
+    config = {
+        "gateway": {"multiplex_profiles": False},
+        "approvals": {"mode": "manual", "timeout": 60},
+        "model": {"provider": "custom", "default": "local-wire-stub", "base_url": model_url},
+        "auxiliary": {"title_generation": {"enabled": False}},
+    }
+    for key, value in (request.param.items() if isinstance(getattr(request, 'param', None), dict) else ()):
+        config.setdefault(key, {}).update(value)
+    (home / "config.yaml").write_text(json.dumps(config))
+    env = {k: os.environ[k] for k in ("PATH", "LANG", "TZ") if k in os.environ}
+    env.update(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home), HERMES_HOME=str(home),
+               PYTHONPATH=str(root), PYTHONUNBUFFERED="1",
+               OPENAI_API_KEY="loopback-only", OPENAI_BASE_URL=model_url,
+               HERMES_ACP_SKIP_CONFIGURED_MCP="1")
+    command = [sys.executable, "-m", "gateway.run"]
+    if getattr(request, 'param', None) == 'proposed-acp-descriptor':
+        command = [sys.executable, '-c', '''
+from gateway.session_controls import AuthorityConnection
+original = AuthorityConnection.describe
+async def describe(self, ref, params):
+    result = await original(self, ref, params)
+    result['session_create']['sources'].append('acp')
+    result['capabilities'].append('acp-editor-policy-v1')
+    return result
+AuthorityConnection.describe = describe
+import runpy
+runpy.run_module('gateway.run', run_name='__main__')
+''']
+    log_path = tmp_path / "gateway.log"
+    with log_path.open("w") as log:
+        process = subprocess.Popen(command, cwd=root, env=env,
+                                   stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            deadline = time.monotonic() + 40
+            descriptor = {}
+            while process.poll() is None and time.monotonic() < deadline:
+                try:
+                    descriptor = control(home, "identify")
+                    if descriptor.get("state") == "ready":
+                        break
+                except (OSError, ValueError):
+                    pass
+                time.sleep(.1)
+            assert descriptor.get("state") == "ready", log_path.read_text()
+            yield home, descriptor, env, root
+        finally:
+            if process.poll() is None:
+                process.send_signal(signal.SIGINT)
+                try:
+                    process.wait(timeout=20)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
 
 
 @pytest.fixture
