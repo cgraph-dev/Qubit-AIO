@@ -128,7 +128,7 @@ def desktop_sidebar_patch(client, endpoint, profile, sid, payload, request_id):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.skip(reason="wave-30: multiplex live harness (cold-profile sidebar mutation)")
+@pytest.mark.skip(reason="wave-31: session.create on a cold secondary through the multiplexer root is refused profile_mismatch; the desktop ensure/_session_ticket path mints scope=profile and no caller requests scope=host")
 def test_cold_profile_archive_unarchive_while_another_profile_is_attached(tmp_path):
     with multiplex_daemon(tmp_path) as (home, descriptor, env), \
             httpx.Client(base_url=descriptor['api_origin'], trust_env=False, timeout=30) as client:
