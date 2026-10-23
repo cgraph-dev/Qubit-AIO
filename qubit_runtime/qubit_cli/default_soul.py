@@ -20,6 +20,12 @@ _SCAFFOLD_HEAD = (
     "# Qubit Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\n"
     "The agent will embody whatever you write here.\nEdit this to customize how Qubit communicates with you.\n\n"
 )
+# The pre-rebrand scaffold wording; installers of that era seeded this exact text, so it must keep
+# matching after the rename or those users are left on the old brand with no persona.
+_HERMES_SCAFFOLD_HEAD = (
+    "# Hermes Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\n"
+    "The agent will embody whatever you write here.\nEdit this to customize how Hermes communicates with you.\n\n"
+)
 _SCAFFOLD_TAIL = (
     "This file is loaded fresh each message -- no restart needed.\n"
     "Delete the contents (or this file) to use the default personality.\n-->"
@@ -39,7 +45,26 @@ _LEGACY_TEMPLATE_SOULS = (
     ) + _SCAFFOLD_TAIL,
     # Bare scaffold without the "Examples" block, shipped briefly.
     _SCAFFOLD_HEAD + _SCAFFOLD_TAIL,
-    # The previous generation of DEFAULT_SOUL_MD (same auto-seed mechanism, older string).
+    # The same two scaffolds as seeded before the rebrand. Upgrading these also removes the old
+    # brand from the user's SOUL.md, which the Qubit-worded variants above cannot match.
+    _HERMES_SCAFFOLD_HEAD + (
+        "Examples:\n"
+        '  - "You are a warm, playful assistant who uses kaomoji occasionally."\n'
+        '  - "You are a concise technical expert. No fluff, just facts."\n'
+        '  - "You speak like a friendly coworker who happens to know everything."\n\n'
+    ) + _SCAFFOLD_TAIL,
+    _HERMES_SCAFFOLD_HEAD + _SCAFFOLD_TAIL,
+    # The previous generation of DEFAULT_SOUL_MD (same auto-seed mechanism, older string). Both the
+    # pre-rebrand text and the rebranded rewrite of it are listed: the rebrand replaced the entry
+    # instead of adding to it, so installs seeded before it were never upgraded (#95681).
+    (
+        "You are Hermes Agent, an intelligent AI assistant created by Nous Research. You are helpful, "
+        "knowledgeable, and direct. You assist users with a wide range of tasks including answering questions, "
+        "writing and editing code, analyzing information, creative work, and executing actions via your tools. "
+        "You communicate clearly, admit uncertainty when appropriate, and prioritize being genuinely useful over "
+        "being verbose unless otherwise directed below. Be targeted and efficient in your exploration and "
+        "investigations."
+    ),
     (
         "You are Qubit Agent, an intelligent AI assistant created by Qubit Labs. You are helpful, "
         "knowledgeable, and direct. You assist users with a wide range of tasks including answering questions, "
