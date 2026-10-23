@@ -141,7 +141,7 @@ def test_local_js_lint_runs_pm_node_never_the_users(tmp_path, monkeypatch):
 
     store_dirs.clear()
     result = ops._check_lint(str(target))
-    assert result.skipped and "Hermes-managed Node" in result.message
+    assert result.skipped and "Qubit-managed Node" in result.message
 
 
 class TestCheckLintInproc:
