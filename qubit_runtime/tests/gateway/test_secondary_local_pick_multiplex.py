@@ -20,6 +20,7 @@ def _reserve_homes(tmp_path, monkeypatch, names=('beta',)):
     root.mkdir(mode=0o700)
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
     monkeypatch.setenv('HERMES_HOME', str(root))
+    monkeypatch.setenv('QUBIT_HOME', str(root))
     import qubit_state
     monkeypatch.setattr(qubit_state, 'DEFAULT_DB_PATH', qubit_state._IMPORT_DEFAULT_DB_PATH)
     homes = [('default', root)]
@@ -32,7 +33,6 @@ def _reserve_homes(tmp_path, monkeypatch, names=('beta',)):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="wave-30: multiplex live harness (secondary local pick)")
 async def test_secondary_pick_reaches_next_turn_after_primary_local_session(tmp_path, monkeypatch):
     from gateway import run
     from gateway.session_authorities import owner_scope
