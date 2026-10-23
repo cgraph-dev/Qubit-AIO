@@ -1628,11 +1628,26 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                 self._completion_notification_batch_tasks.pop(key, None)
             if not entries:
                 return
-            synth_text = entries[0][0] if len(entries) == 1 else self._format_coalesced_process_completions(entries)
+            if getattr(self, 'session_authority', None) is not None:
+                from gateway.session_automation import completion_admission, producer_identity
+                entries_to_deliver = [item for item in entries if completion_admission(self, item[1]) is None]
+                if not entries_to_deliver:
+                    delivered = True
+                    return
+            else:
+                entries_to_deliver = entries
+            synth_text = (entries_to_deliver[0][0] if len(entries_to_deliver) == 1
+                          else self._format_coalesced_process_completions(entries_to_deliver))
+            from tools.process_registry_notifications import process_completion_display_text
+            display_text = process_completion_display_text([evt for _text, evt, _future in entries_to_deliver])
             # A duplicate primary returns None from the dedupe seam; try the next identity so a fresh
             # sibling is never discarded with it.
             delivered = None
-            for _text, candidate_evt, _future in entries:
+            for _text, candidate_evt, _future in entries_to_deliver:
+                candidate_evt = dict(candidate_evt, _display_text=display_text)
+                if getattr(self, 'session_authority', None) is not None:
+                    candidate_evt = dict(candidate_evt, _automation_identities=[
+                        producer_identity(self, evt) for _text, evt, _future in entries_to_deliver])
                 delivered = await self._deliver_completion_notification(synth_text, candidate_evt)
                 if delivered is not None:
                     break
@@ -1681,7 +1696,13 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
         getattr(self, "_completion_notification_batch_flush_tasks", set()).clear()
 
     async def _enqueue_process_completion_notification(self, synth_text: str, evt: dict) -> Optional[bool]:
-        """Fan in concurrent process completions that share one conversation."""
+        """Fan in policy-admitted process completions with compatible pinned owners."""
+        # Filter each event before it can contaminate (or suppress) a foreground batch.
+        # The shared queue may be drained outside the owning profile's runtime scope.
+        async with self._completion_event_scope(evt):
+            from tools.process_registry_notifications import should_surface_notification
+            if not should_surface_notification(evt):
+                return None
         # Lazy defaults: lifecycle tests build GatewayRunner via object.__new__.
         for attr, default in (
             ("_completion_notification_batches", dict), ("_completion_notification_batch_tasks", dict),
@@ -1693,7 +1714,11 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                 setattr(self, attr, default())
         if self._completion_notification_batches_stopping:
             return False
-        key = self._event_route_key(evt, self._COMPLETION_BATCH_KEY_FIELDS)
+        # A route key alone is not ownership: /new can leave old and new pins
+        # in the same queue. Never settle one pin on another pin's acceptance.
+        key = self._event_route_key(
+            evt, (*self._COMPLETION_BATCH_KEY_FIELDS, "parent_session_id", "origin_session_id"),
+        )
         future = asyncio.get_running_loop().create_future()
         self._completion_notification_batches.setdefault(key, []).append((synth_text, evt, future))
         if key not in self._completion_notification_batch_tasks:

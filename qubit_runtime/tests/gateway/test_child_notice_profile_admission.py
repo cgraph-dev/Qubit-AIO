@@ -10,8 +10,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-29 parity defect: batched completion admission not profile-scoped")
-
 from gateway.config import GatewayConfig, Platform
 from gateway.run import GatewayRunner
 
