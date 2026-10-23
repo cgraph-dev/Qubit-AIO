@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
+from qubit_cli import install_source, model_catalog
+
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
@@ -136,13 +138,26 @@ class TestFallbackChain:
     occasionally returns HTTP 403 + x-vercel-mitigated: challenge for urllib;
     without a fallback URL the user's disk cache freezes and new model
     releases (opus 4.8, etc.) never reach the picker.
+
+    The fallback resolves through :mod:`qubit_cli.install_source`, so it points
+    at the Qubit fork's raw copy (``cgraph-dev/Qubit-AIO``), never the upstream
+    Hermes repository — see ``docs/BRAND.md`` ("never point this at a
+    Hermes/OpenClaw URL: it is Qubit-owned product output") and the owner
+    decision recorded at the top of ``install_source.py``.
     """
 
-    PRIMARY = "https://qubit.nousresearch.com/docs/api/model-catalog.json"
-    FALLBACK = (
-        "https://raw.githubusercontent.com/NousResearch/qubit"
-        "/main/website/static/api/model-catalog.json"
-    )
+    # A non-raw operator-configured mirror; distinct from the raw fork fallback
+    # so the chain is actually exercised.
+    PRIMARY = "https://docs.example.invalid/api/model-catalog.json"
+    FALLBACK = install_source.raw_asset_url("website/static/api/model-catalog.json")
+
+    def test_fallback_url_is_the_qubit_fork_raw_copy(self):
+        """Pin the deliberate fork-org divergence: the fallback must not name
+        the upstream repository."""
+        from qubit_cli import install_source as source
+        expected = source.raw_asset_url("website/static/api/model-catalog.json")
+        assert model_catalog.DEFAULT_CATALOG_FALLBACK_URLS == (expected,)
+        assert "NousResearch" not in expected
 
     def test_uses_primary_when_it_succeeds(self, isolated_home):
         from qubit_cli import model_catalog
@@ -181,6 +196,7 @@ class TestFallbackChain:
         from qubit_cli import model_catalog
         manifest = _valid_manifest()
         calls: list[str] = []
+        config = {"enabled": True, "url": self.PRIMARY, "ttl_hours": 1 / 3, "providers": {}}
 
         def fake_fetch(url, timeout):
             calls.append(url)
@@ -188,11 +204,12 @@ class TestFallbackChain:
                 return None
             return manifest
 
-        with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
+        with patch.object(model_catalog, "_load_catalog_config", return_value=config), \
+             patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
             result = model_catalog.get_catalog(force_refresh=True)
 
         assert result == manifest
-        assert self.FALLBACK in calls
+        assert calls == [self.PRIMARY, self.FALLBACK]
 
 
 class TestCuratedAccessors:

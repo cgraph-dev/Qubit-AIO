@@ -3,17 +3,26 @@ the SAME provider universe as ``qubit model`` (the CLI/TUI picker).
 
 This is the single load-bearing invariant of the unified provider catalog:
 
-    keys(/api/env provider rows) ∪ ids(/api/providers/oauth) ⊇ CANONICAL_PROVIDERS
+    keys(/api/env provider rows) ∪ ids(/api/providers/oauth)
+        ⊇ listed_canonical_providers()
 
 i.e. every provider the CLI picker offers is configurable from the desktop app,
 on one of the two Providers sub-tabs (API keys or Accounts). It is asserted as
 an invariant against the real FastAPI endpoints (not a snapshot / count), so it
 can never silently drift again when a provider plugin is added.
+
+``listed_canonical_providers()`` — not the raw ``CANONICAL_PROVIDERS`` table — is
+the picker universe: a pre-release profile registered with ``hidden=True``
+(e.g. ``solstice``) stays off every discovery surface until the user signs in by
+name, and only then joins the lists. Requiring its desktop card up front would
+contradict that invariant (see
+``tests/plugins/model_providers/test_solstice_profile.py``), so hidden profiles
+are outside this contract by construction.
 """
 
 from fastapi.testclient import TestClient
 
-from qubit_cli.models import CANONICAL_PROVIDERS
+from qubit_cli.models_catalog_static import listed_canonical_providers
 from qubit_cli.provider_catalog import provider_catalog
 from qubit_cli.web_server import _SESSION_TOKEN, app
 
@@ -68,7 +77,7 @@ def test_every_qubit_model_provider_is_configurable_in_desktop():
     gui = _keys_tab_providers() | _accounts_tab_providers()
     missing = [
         e.slug
-        for e in CANONICAL_PROVIDERS
+        for e in listed_canonical_providers()
         if e.slug not in _EXEMPT and e.slug not in gui
     ]
     assert not missing, (
