@@ -19,7 +19,6 @@ from tests.gateway.fixtures.webhook_route_authority import mount_authority
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: startup restore admission gate")
 async def test_admitted_webhook_runs_through_startup_restore_gate(monkeypatch):
     from gateway.session_contract import SessionRef
     from gateway.session_ingress import execute_admission
