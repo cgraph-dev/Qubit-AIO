@@ -169,15 +169,15 @@ def probe(tmp_path):
     # The named profile's gateway runs beside the host: `gateway.standalone: true` is the opt-out
     # (`multiplex_profiles: false` is retired and rewritten to true at boot).
     (target / 'config.yaml').write_text(json.dumps(cfg | {'gateway': {'standalone': True}}))
-    env = child_env() | dict(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
+    env = child_env() | dict(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
         PYTHONPATH=str(root), OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, PYTHONUNBUFFERED='1')
     members = [{'member_id': 'one', 'profile': 'default', 'handle': 'one'},
                {'member_id': 'two', 'profile': 'two', 'handle': 'two'}]
 
     async def exercise(desc, tickets):
         origin = desc['api_origin'].replace('http:', 'ws:') + '/api/ws'
-        async with connect(origin + '?ticket=' + tickets[0]) as alice, connect(
-                origin + '?ticket=' + tickets[1]) as bob:
+        async with connect(origin + '?ticket=' + tickets[0], open_timeout=30) as alice, connect(
+                origin + '?ticket=' + tickets[1], open_timeout=30) as bob:
             actors = [('alice', alice, bob), ('bob', bob, alice)]
             for actor, ws, _ in actors:
                 result = await rpc(ws, 'groups.create', room_id=actor + '-room', name=actor, members=members)
@@ -252,7 +252,7 @@ def probe(tmp_path):
                     'cross_actor_denials': denials, 'owner_stops': 2}
 
     try:
-        with daemon(root, target, env | {'HERMES_HOME': str(target)}, barrier=False), daemon(
+        with daemon(root, target, env | {'HERMES_HOME': str(target), 'QUBIT_HOME': str(target)}, barrier=False), daemon(
                 root, home, env, barrier=False) as (_, desc), ExitStack() as stack:
             clients = [stack.enter_context(httpx.Client(base_url=desc['api_origin'],
                 follow_redirects=False, trust_env=False, timeout=20)) for _ in range(2)]

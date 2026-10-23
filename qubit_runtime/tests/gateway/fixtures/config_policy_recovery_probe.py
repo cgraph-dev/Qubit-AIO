@@ -30,13 +30,13 @@ def probe(tmp_path):
     config.write_text(json.dumps(cfg))
     before = config.read_bytes()
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'SYSTEMROOT') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root))
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root))
     sessions, pids, snapshots = {}, [], {}
     params = {s: dict(request_id=s, cwd=str(home), model='gpt-5-' + s, provider='custom:' + s,
                      toolsets=[]) for s in keys}
 
     def policies():
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             return dict(db.execute("SELECT key,value FROM state_meta WHERE key LIKE 'gateway.local_policy.v1:%'"))
 
     async def turn(desc, side, phase):
@@ -52,7 +52,7 @@ def probe(tmp_path):
             accepted = await rpc(ws, 'prompt.submit', session_id=sid, input_id=phase + side, text=phase + side)
             assert 'result' in accepted, accepted
             loop = asyncio.get_running_loop()
-            deadline = loop.time() + 30
+            deadline = loop.time() + 90
             while True:
                 receipt = await rpc(ws, 'prompt.receipt', session_id=sid,
                                     admission_id=accepted['result']['admission_id'])

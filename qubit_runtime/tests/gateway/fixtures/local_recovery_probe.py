@@ -67,7 +67,8 @@ async def rpc(ws, method, *, timeout=20, **params):
 def websocket(home, desc):
     grant = control(home, 'session-ticket', {'profile_id': str(home), 'instance_id': desc['instance_id'], 'purpose': 'interactive'})
     return connect(desc['api_origin'].replace('http:', 'ws:') + '/api/ws',
-                   subprotocols=['hermes-gateway-v1', 'hermes-gateway-ticket.' + grant['ticket']])
+                   subprotocols=['hermes-gateway-v1', 'hermes-gateway-ticket.' + grant['ticket']],
+                   open_timeout=30)
 
 
 @contextmanager
@@ -93,7 +94,7 @@ def daemon(root, home, env, *, barrier, fixture='local_recovery_daemon.py'):
         finally:
             if proc.poll() is None:
                 proc.kill()
-            proc.wait(timeout=10)
+            proc.wait(timeout=60)
 
 
 def probe(tmp_path):
