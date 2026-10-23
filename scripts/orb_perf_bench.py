@@ -74,6 +74,15 @@ def run(frames: int, radius: float, size: int, state: str,
 
     costs = [paint_one(run_offset + i / 30.0) for i in range(frames)]
 
+    # CPU time per frame: the same batch again, timed with process_time. On a
+    # loaded host (other agents building in parallel) wall time includes other
+    # people's work in our process's scheduling; process time does not, so this
+    # is the number to compare across commits.
+    c0 = time.process_time()
+    for i in range(frames):
+        paint_one(run_offset + 100.0 + i / 30.0)
+    cpu_ms = (time.process_time() - c0) * 1000.0 / frames
+
     img.fill(QColor(*BG))
     p = QPainter(img)
     p.setRenderHint(QPainter.Antialiasing, True)
@@ -82,12 +91,19 @@ def run(frames: int, radius: float, size: int, state: str,
     raw = bytes(img.constBits())
     if save_frame:
         img.save(save_frame)
-    return {
+    res = {
         "frames": frames, "radius": radius, "size": size, "state": state,
-        "ms": _quantiles(costs),
+        "ms": _quantiles(costs), "cpu_ms": cpu_ms,
         "sha256": __import__("hashlib").sha256(raw).hexdigest(),
         "raw_len": len(raw),
     }
+    stats = getattr(Q._paint_mark, "_frame_stats", None)
+    if stats is not None:
+        try:
+            res["lod"] = stats.as_dict()
+        except Exception:
+            pass
+    return res
 
 
 def main() -> int:
@@ -113,7 +129,8 @@ def main() -> int:
         print(f"frames={m['count']} R={res['radius']:.0f} size={res['size']} "
               f"state={res['state']}")
         print(f"  mean={m['mean']:.2f}ms p50={m['p50']:.2f}ms "
-              f"p95={m['p95']:.2f}ms max={m['max']:.2f}ms")
+              f"p95={m['p95']:.2f}ms max={m['max']:.2f}ms "
+              f"cpu={res['cpu_ms']:.2f}ms")
         print(f"  frame-sha256={res['sha256'][:16]}")
     return 0
 

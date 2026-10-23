@@ -2378,10 +2378,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     stroke.moveTo(px - arm, py + arm)
                     stroke.lineTo(px + arm, py - arm)
                 p.setBrush(Qt.NoBrush)
-                p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                                     _clamp8(255.0 * max(
-                                         a for _x, _y, _s, a, _h, _vx, _vy, _k
-                                         in pts))),
+                p.setPen(QPen(_color(rgb[0], rgb[1], rgb[2],
+                                     max(a for _x, _y, _s, a, _h, _vx, _vy, _k
+                                         in pts)),
                               GLINT_PEN_W))
                 p.drawPath(stroke)
                 p.setPen(Qt.NoPen)
@@ -2390,7 +2389,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             for px, py, size, _a, _h, vx, vy, sk in pts:
                 rr = size * (GLINT_CORE_SCALE if arm_frac > 0.0 else 1.0)
                 rr = max(GLINT_CORE_MIN, rr)
-                path.addEllipse(QRectF(px - rr, py - rr, rr * 2.0, rr * 2.0))
+                path.addEllipse(px - rr, py - rr, rr * 2.0, rr * 2.0)
                 if st > 0.0 and (abs(vx) + abs(vy)) > 1e-6:
                     # A tapering chain of discs behind the body, inside the
                     # same path: motion detail, zero extra primitives.
@@ -2398,11 +2397,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                         tx = px - vx * st * step * sk
                         ty = py - vy * st * step * sk
                         tr = max(GLINT_CORE_MIN, rr * scale)
-                        path.addEllipse(QRectF(tx - tr, ty - tr,
-                                               tr * 2.0, tr * 2.0))
+                        path.addEllipse(tx - tr, ty - tr, tr * 2.0, tr * 2.0)
             peak = max(a for _x, _y, _s, a, _h, _vx, _vy, _k in pts)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
+            p.setBrush(_color(rgb[0], rgb[1], rgb[2], peak))
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
@@ -2444,11 +2442,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _anchor(_spec_rgb(pts[0][4], BLINK_DOT_SAT))
             path = QPainterPath()
             for px, py, size, _a, _h in pts:
-                path.addEllipse(QRectF(px - size, py - size,
-                                       size * 2.0, size * 2.0))
+                path.addEllipse(px - size, py - size, size * 2.0, size * 2.0)
             peak = max(a for _x, _y, _s, a, _h in pts)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
+            p.setBrush(_color(rgb[0], rgb[1], rgb[2], peak))
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
@@ -2811,10 +2808,34 @@ def backend_wanted() -> str:
 
 
 def _reduced_motion() -> bool:
+    """True when the desktop asks for reduced motion (``QUBIT_REDUCED_MOTION``).
+
+    Deliberately NOT memoised. A memo was tried and measured: it bought no
+    wall time (the env read is a dict hit behind the C layer, and the frame is
+    dominated by the field's own math), while it would have made the answer
+    stale for up to a TTL when a profile flips the preference. Never raises.
+    """
     import os as _os
     try:
         return str(_os.environ.get("QUBIT_REDUCED_MOTION", "") or "").strip().lower() in (
             "1", "true", "yes", "on")
+    except Exception:
+        return False
+
+
+def _occluded(widget: Any) -> bool:
+    """True when Qt says nothing this widget paints can reach the screen.
+
+    Qt 6 exposes ``QWidget.visibleRegion()``: when another window (or the
+    compositor) fully covers the orb, the visible region is empty and every
+    frame we paint is discarded. That is the one occlusion signal available
+    without polling the window manager, and both of its answers are safe — a
+    wrong ``True`` merely stops an invisible animation until the next event,
+    a wrong ``False`` draws exactly as before. Never raises.
+    """
+    try:
+        region = widget.visibleRegion()
+        return bool(region.isEmpty())
     except Exception:
         return False
 
@@ -3810,23 +3831,65 @@ if QWidget is not None:
                 self._advance_anim(time.monotonic())
                 if self.visible and _ember.needs_frame(
                         True, self._pos.collapsed):
-                    # ADAPTIVE frame budget. One frame of this mark costs tens
-                    # of ms of CPU, so a fixed interval that is shorter than the
-                    # paint just makes the loop repaint back-to-back and peg a
-                    # core. Size the next interval from the last frame's real
-                    # paint cost, leaving slack, so the orb always yields CPU
-                    # between frames. On a fast host this is just FRAME_MS
-                    # (full smoothness); on a loaded one it stretches to keep
-                    # headroom instead of spinning. Never changes what is drawn.
-                    try:
-                        paint_ms = float(getattr(self, "_last_paint_ms", 0.0) or 0.0)
-                    except (TypeError, ValueError):
-                        paint_ms = 0.0
-                    want = int(paint_ms * _ember.FRAME_SLACK)
-                    interval = want if want > FRAME_MS else FRAME_MS
-                    if interval != self._frame_timer.interval():
-                        self._frame_timer.setInterval(interval)
+                    # HARD frame cap, no feedback. This used to size the next
+                    # interval from the last frame's real paint cost
+                    # (``max(FRAME_MS, last_paint_ms * FRAME_SLACK)``), which is
+                    # a feedback loop with no fixed point near the budget: a
+                    # 50 ms frame scheduled itself at 70 ms and the loop settled
+                    # there — 14 fps while burning ~70 % of a core. The interval
+                    # is now exactly FRAME_MS; if a frame overruns it, the
+                    # repaint simply lands late and the wall-time-driven render
+                    # clock keeps the motion correct (one frame, not a slowdown).
+                    if self._frame_timer.interval() != FRAME_MS:
+                        self._frame_timer.setInterval(FRAME_MS)
+                    if self._frame_timer.isActive():
+                        self.update()
+            except Exception:
+                pass
+
+        def _set_anim_running(self, running: bool) -> None:
+            """Start/stop the animation timer (idle suspension). Never raises.
+
+            Stopping the timer means the orb does no painting at all while it
+            cannot be seen (hidden, minimised, or the compositor repaints it
+            without our involvement). ``paintEvent``/``showEvent`` re-arm via
+            :meth:`_rearm_anim`, so the first reveal paints immediately.
+            """
+            try:
+                timer = self._frame_timer
+                if running and not timer.isActive():
+                    # Re-baseline the render clock: without this the first frame
+                    # back would advance by the whole suspended span (clamped to
+                    # MAX_DT, but still a visible jump). Holding the clock is
+                    # what makes suspension invisible instead of a skip.
+                    self._paint_last_mono = None
+                    timer.start(FRAME_MS)
+                elif not running and timer.isActive():
+                    timer.stop()
+            except Exception:
+                pass
+
+        def _rearm_anim(self) -> None:
+            """Re-arm after a visibility change; paint once if now visible."""
+            try:
+                want = bool(self.visible) and not bool(self._pos.collapsed)
+                if want and not self._frame_timer.isActive():
+                    self._set_anim_running(True)
                     self.update()
+            except Exception:
+                pass
+
+        def showEvent(self, ev: Any) -> None:
+            try:
+                super().showEvent(ev)
+            except Exception:
+                pass
+            self._rearm_anim()
+
+        def hideEvent(self, ev: Any) -> None:
+            self._set_anim_running(False)
+            try:
+                super().hideEvent(ev)
             except Exception:
                 pass
 
@@ -3881,6 +3944,21 @@ if QWidget is not None:
         def paintEvent(self, ev: Any) -> None:
             _paint_t0 = time.monotonic()
             try:
+                # SUSPENSION + RE-ARM. If the animation timer is stopped (the
+                # window was hidden) this paint is the reveal: restart the loop.
+                # If the compositor/Qt reports the widget as fully occluded,
+                # nothing this frame produces can be seen, so stop the loop
+                # until the next paint/visibility event re-arms it. Neither path
+                # changes a single drawn pixel — it only decides whether we
+                # keep doing the work.
+                try:
+                    if not self._frame_timer.isActive() and self.visible:
+                        self._rearm_anim()
+                    elif self.isVisible() and not self.isMinimized() and _occluded(
+                            self):
+                        self._set_anim_running(False)
+                except Exception:
+                    pass
                 now_mono = _paint_t0
                 try:
                     last = self._paint_last_mono
