@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 34 — 2026-10-23 (frontend green; live E2E chat)
+
+- ✅ Backend regression (read-only): 30 files → **166 passed, 0 failed, 5 skipped** across all wave-32 surfaces.
+- ✅ Frontend: **147 files / 1166 tests pass**, `tsc -b` clean, eslint 0 errors (108 warnings) after reconciling stale route/Kitchen assertions, using `lib/clipboard.ts` in OmniRoute, and typing two test mocks (`8d18d3c35`); served bundle rebuilt.
+- ✅ Live E2E through the real dashboard with the real model: New Chat → prompt → exact reply `E2E_OK_20261023`; session `20261023_194637_dd96c6` persisted (`state.db`, 2 messages, 0 tool calls), API + reload agree, status `ready`, 0 console errors; screenshots `/tmp/opencode/w34/`.
+- 🔴 Remaining: no `VERIFIED` (owner gate + full release matrix); B1 exclusion; live/Windows/e2e skips; retirement not executed.
+
 ## Wave 33 — 2026-10-23 (dashboard request storm fixed)
 
 - ✅ Root cause measured live: `/api/events/stream` replays ~1,913 historical journal frames on connect; each `session.updated`/`model.changed` frame fired `/api/model/info` + `/api/config`. Page load: 56 config + 67 model-info requests in 6 s (the wave-32 "idle polling" observation).
