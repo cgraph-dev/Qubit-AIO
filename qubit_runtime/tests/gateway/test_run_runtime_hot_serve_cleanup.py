@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -131,6 +132,38 @@ async def test_failed_hot_serve_retires_session_and_bot_recovery_tasks(monkeypat
         assert unbound == [authority]
     finally:
         db.close()
+
+@pytest.mark.asyncio
+async def test_launch_authority_startup_failure_reraises_the_original_cancellation(monkeypatch, tmp_path):
+    """A SIGINT during the launch profile's epoch open must surface as the cancellation it is.
+
+    The reserved launch slot is never removable; calling ``registry.remove`` on this path raised
+    ``the launch session authority cannot be removed`` and hid the real cause (measured when a
+    loaded host expired the live boot probe mid-initialization)."""
+    from gateway.session_authorities import SessionAuthorities
+
+    home = tmp_path.resolve()
+    home.mkdir(exist_ok=True)
+    registry = SessionAuthorities(home, multiplexed=True)
+    db = SimpleNamespace(db_path=home / "state.db")
+    runner = SimpleNamespace(
+        session_authorities=registry,
+        session_runtime_descriptor={"instance_id": "launch-startup"},
+        _session_db=SimpleNamespace(_db=db),
+    )
+
+    async def cancelled(*args, **kwargs):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(
+        "gateway.run._profile_runtime_scope", lambda *a, **k: contextlib.nullcontext())
+    monkeypatch.setattr(
+        "gateway.session_authority.initialize_session_authority", cancelled)
+    with pytest.raises(asyncio.CancelledError):
+        await run_runtime._build_profile_authority(runner, "default", home, register=True)
+    # The reserved launch slot stays in place; it is the process's own and is never removed.
+    assert registry.for_home(home) is None
+
 
 @pytest.mark.asyncio
 async def test_settle_gateway_runtime_waits_for_bot_receipt_tasks():

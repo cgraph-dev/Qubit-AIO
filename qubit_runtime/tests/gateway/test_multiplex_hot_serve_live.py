@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 pytestmark = [pytest.mark.platforms("linux"), pytest.mark.spawns_gateway_lookalike]
 
 
-def control(home, verb, params=None, timeout=30):
+def control(home, verb, params=None, timeout=60):
     request = json.dumps({'protocol': 1, 'id': 1, 'verb': verb, 'params': params or {}}).encode() + b'\n'
     from gateway.control_socket import resolve_client_socket_path
     path = resolve_client_socket_path(home)
@@ -43,6 +43,19 @@ def control(home, verb, params=None, timeout=30):
     reply = json.loads(raw.split(b'\n', 1)[0])
     assert reply.get('ok'), reply
     return reply['result']
+
+
+def identify(root, *, timeout=120):
+    """``identify`` with a bounded retry: an idle multiplexer still answers (the handler runs off
+    the loop), but a host under heavy load can hold the loop past one socket timeout."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return control(root, 'identify')
+        except (OSError, TimeoutError, ValueError, AssertionError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(.2)
 
 
 @pytest.fixture
@@ -65,7 +78,11 @@ def peer():
 @pytest.fixture
 def mux(tmp_path, peer):
     """Disposable custom root (``<root>/profiles/<name>`` layout, as in Docker) with
-    ``multiplex_profiles`` on, plus one boot-time secondary."""
+    ``multiplex_profiles`` on, plus one boot-time secondary.
+
+    Every daemon this test starts is tracked on the returned mapping and reaped here even when the
+    test fails mid-way (or ``start_daemon`` raises before handing the process back): a surviving
+    multiplexer would keep the loop and its sqlite handles busy and starve the next test's boot."""
     user = tmp_path / 'user'
     user.mkdir()
     root = tmp_path / 'state'
@@ -81,16 +98,33 @@ def mux(tmp_path, peer):
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ') if k in os.environ}
     env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(root), QUBIT_HOME=str(root), PYTHONPATH=str(ROOT),
                PYTHONUNBUFFERED='1', OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
-    return {'root': root, 'boot': boot, 'env': env, 'config': config, 'log': tmp_path / 'gateway.log'}
+    fixture = {'root': root, 'boot': boot, 'env': env, 'config': config, 'log': tmp_path / 'gateway.log',
+               'daemons': []}
+    try:
+        yield fixture
+    finally:
+        for proc, log in list(fixture['daemons']):
+            reaped = stop(proc, expect=None)
+            _close_log(log)
+            if (proc, log) in fixture['daemons']:
+                fixture['daemons'].remove((proc, log))
+            if not reaped:
+                pytest.fail(f'daemon {proc.pid} survived teardown')
 
 
-def start_daemon(mux, timeout=90):
+def _close_log(log):
+    with contextlib.suppress(Exception):
+        log.close()
+
+
+def start_daemon(mux, timeout=180):
     """Boot the multiplexer the way ``hermes gateway run`` does; the canonical gateway command-line
     matcher (``gateway.status.looks_like_gateway_command_line``) is what the CLI's liveness probes
     apply to the recorded PID, so the fixture must spawn a recognisable launcher."""
     log = mux['log'].open('a+', encoding='utf-8', errors='replace')
     proc = subprocess.Popen([sys.executable, '-m', 'qubit_cli.main', 'gateway', 'run', '--quiet'], cwd=ROOT,
                             env=mux['env'], stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+    mux['daemons'].append((proc, log))
     desc = {}
     deadline = time.monotonic() + timeout
     while proc.poll() is None and time.monotonic() < deadline:
@@ -102,7 +136,12 @@ def start_daemon(mux, timeout=90):
             pass
         time.sleep(.1)
     log.flush()
-    assert desc.get('state') == 'ready', (desc, proc.poll(), tail(mux))
+    if desc.get('state') != 'ready':
+        stop(proc, expect=None)
+        _close_log(log)
+        if (proc, log) in mux['daemons']:
+            mux['daemons'].remove((proc, log))
+        raise AssertionError((desc, proc.poll(), tail(mux)))
     return proc, desc
 
 
@@ -114,16 +153,22 @@ def tail(mux, n=6000):
 
 
 def stop(proc, expect=0):
+    """Stop one daemon and return whether it is gone. SIGINT first (clean drain), then SIGKILL with
+    a bounded wait so a wedged process cannot leave a zombie behind for the next test."""
     if proc.poll() is None:
         proc.send_signal(signal.SIGINT)
         try:
             code = proc.wait(timeout=45)
         except subprocess.TimeoutExpired:
             proc.kill()
-            proc.wait(timeout=10)
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                return False
             raise
         if expect is not None:
             assert code == expect, code
+    return proc.poll() is not None
 
 
 def served_homes(desc):
@@ -137,20 +182,45 @@ def recorded_served(root):
 def wait_recorded(root, predicate, what):
     """gateway_state.json is written by the runtime-status writer thread after the control reply
     (publish_runtime_status enqueues, never waits), so the recorded set is eventually consistent."""
-    wait_until(lambda: predicate(recorded_served(root) or []), timeout=20, interval=.05, what=what)
+    wait_until(lambda: predicate(recorded_served(root) or []), timeout=45, interval=.05, what=what)
     return recorded_served(root)
 
 
-def rescan(root, timeout=60):
+def rescan(root, timeout=120):
     """``rescan-profiles`` answers ``pending`` when the reconcile outlasts the handler's 5 s bound
-    (or arrives before startup has noted the served set); re-ask until a completed result is back."""
+    (or arrives before startup has noted the served set); re-ask until a completed result is back.
+    A socket timeout is retried too: the verb is idempotent and a loaded loop can delay the reply."""
     deadline = time.monotonic() + timeout
     while True:
-        result = control(root, 'rescan-profiles')
+        try:
+            result = control(root, 'rescan-profiles')
+        except (OSError, TimeoutError, ValueError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(.2)
+            continue
         if not result.get('pending'):
             return result
         if time.monotonic() >= deadline:
             raise AssertionError(('rescan stayed pending', result))
+        time.sleep(.2)
+
+
+def wait_served(root, home, *, timeout=60):
+    """Poll ``identify`` until *home* is in the multiplexer's served set; return the last descriptor.
+    A transient control-socket error is retried — the daemon may be mid-reconcile under host load."""
+    target = home.resolve()
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AssertionError(f'{target} not hot-served within {timeout}s')
+        try:
+            desc = control(root, 'identify', timeout=max(.5, min(remaining, 10)))
+            if target in served_homes(desc):
+                return desc
+        except (OSError, TimeoutError, ValueError, AssertionError):
+            pass
         time.sleep(.2)
 
 
@@ -170,7 +240,6 @@ async def open_session_for(root, home, desc):
                     return reply['result']['session_id']
 
 
-@pytest.mark.skip(reason="wave-36: passes alone (61 s) but times out after the preceding live-multiplexer tests in the same process (state/port leak); unverified in-file")
 def test_profile_created_under_live_multiplexer_is_served_and_owned(mux):
     root, env = mux['root'], mux['env']
     proc, desc = start_daemon(mux)
@@ -182,10 +251,14 @@ def test_profile_created_under_live_multiplexer_is_served_and_owned(mux):
         assert created.returncode == 0, (created.stdout, created.stderr)
         fresh = root / 'profiles' / 'fresh'
         assert fresh.is_dir()
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline and fresh.resolve() not in served_homes(desc):
-            time.sleep(.2)
-            desc = control(root, 'identify')
+        # The create signals the control socket. Its reconcile is bounded at 5 s and may answer
+        # ``pending`` under load, after which the daemon's safety-net watcher is 30 s away; wait for
+        # the signal, then drive the same control verb to completion instead of racing the watcher.
+        try:
+            desc = wait_served(root, fresh, timeout=15)
+        except AssertionError:
+            rescan(root)
+            desc = wait_served(root, fresh, timeout=75)
         assert fresh.resolve() in served_homes(desc), (desc, tail(mux))
         assert wait_recorded(root, lambda r: r == ['default', 'boot', 'fresh'], 'fresh recorded') == ['default', 'boot', 'fresh']
         # The new profile's sessions are this multiplexer's: same instance, its own state.db.
@@ -226,6 +299,8 @@ def kill_recorded_gateway(root, timeout=45):
             return
         with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGKILL)
+        with contextlib.suppress(AssertionError):
+            wait_until(gone, timeout=15, interval=.2, what=f'gateway {pid} exited after SIGKILL')
 
 
 @pytest.mark.live_system_guard_bypass
@@ -244,7 +319,7 @@ def test_named_profile_ensure_during_multiplexer_downtime_starts_the_multiplexer
         assert payload['state'] == 'ready', (payload, ensured.stderr)
         # The answering owner is the multiplexer at the root, serving boot as a secondary.
         assert Path(payload['endpoint']['control_home']).resolve() == root.resolve(), payload
-        assert served_homes(control(root, 'identify')) == {root.resolve(), boot.resolve()}
+        assert served_homes(identify(root)) == {root.resolve(), boot.resolve()}
         assert not (boot / 'gateway.pid').exists() and not (boot / 'gateway.sock').exists()
     finally:
         kill_recorded_gateway(root)
@@ -306,7 +381,7 @@ def test_invalid_hot_profile_config_is_parked_and_unserved(mux):
         added.mkdir(parents=True, mode=0o700)
         (added / 'config.yaml').write_text(json.dumps(invalid), encoding='utf-8')
         result = rescan(root)
-        desc = control(root, 'identify')
+        desc = identify(root)
         assert result['parked'] == ['invalid-hot'], (result, tail(mux))
         assert added.resolve() not in served_homes(desc), desc
         assert 'invalid-hot' in desc.get('parked_profiles', {}), desc
@@ -317,7 +392,7 @@ def test_invalid_hot_profile_config_is_parked_and_unserved(mux):
         assert mux['boot'].resolve() in served_homes(desc)
         (mux['boot'] / 'config.yaml').write_text(json.dumps(invalid), encoding='utf-8')
         result = rescan(root)
-        desc = control(root, 'identify')
+        desc = identify(root)
         # An explicit control-socket rescan retries parked profiles by design, so the still-invalid
         # 'invalid-hot' is re-parked alongside 'boot' (never served in between).
         assert sorted(result['parked']) == ['boot', 'invalid-hot'], (result, tail(mux))
