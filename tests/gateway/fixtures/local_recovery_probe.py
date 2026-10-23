@@ -55,9 +55,9 @@ def child_env():
     return {k: os.environ[k] for k in CHILD_ENV_KEYS if k in os.environ}
 
 
-async def rpc(ws, method, **params):
+async def rpc(ws, method, *, timeout=20, **params):
     await ws.send(json.dumps({'jsonrpc': '2.0', 'id': method, 'method': method, 'params': params}))
-    async with asyncio.timeout(20):
+    async with asyncio.timeout(timeout):
         while True:
             reply = json.loads(await ws.recv())
             if reply.get('id') == method:

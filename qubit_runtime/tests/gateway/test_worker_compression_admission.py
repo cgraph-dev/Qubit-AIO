@@ -72,7 +72,6 @@ class OverflowModel(BaseHTTPRequestHandler):
 
 
 @pytest.mark.parametrize('ending', ['finish', 'kill'])
-@pytest.mark.skip(reason="wave-30: live managed-worker rotation harness; state.db stays locked under the hermetic host, so the rotation retry FIFO identity cannot be observed (defect unverified, not fixed)")
 def test_automatic_worker_rotation_retains_retry_identity_and_fifo(tmp_path, ending):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -100,16 +99,27 @@ def test_automatic_worker_rotation_retains_retry_identity_and_fifo(tmp_path, end
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def rows(sql, args=()):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
-            db.row_factory = sqlite3.Row
-            return [dict(row) for row in db.execute(sql, args)]
+        # state.db is DELETE-mode whenever the linked SQLite carries the WAL-reset bug (this
+        # interpreter is 3.45.1), so a polling reader can be refused during the owner's commit.
+        # The product's own reader waits on the same budget; a fresh poll retries instead of
+        # failing the turn. On a WAL host this path is never taken.
+        deadline = time.monotonic() + 120
+        while True:
+            try:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
+                    db.row_factory = sqlite3.Row
+                    return [dict(row) for row in db.execute(sql, args)]
+            except sqlite3.OperationalError as exc:
+                if 'locked' not in str(exc).lower() or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.05)
 
     replay_params = {}
 
     async def exercise(desc, owner):
         async with websocket(home, desc) as ws:
             async def call(method, **params):
-                result = await rpc(ws, method, **params)
+                result = await rpc(ws, method, timeout=120, **params)
                 assert 'result' in result, result
                 return result['result']
 
@@ -118,19 +128,19 @@ def test_automatic_worker_rotation_retains_retry_identity_and_fifo(tmp_path, end
             for i in range(12):
                 params = dict(session_id=sid, input_id=f'pressure-{i}', text='HISTORY_' + str(i) + ' preserve these facts ' * 100)
                 accepted = await call('prompt.submit', **params)
-                deadline = time.monotonic() + 40
+                deadline = time.monotonic() + 120
                 while True:
                     admission = rows('SELECT * FROM session_admissions WHERE admission_id=?', (accepted['admission_id'],))[0]
                     children = rows('SELECT id FROM sessions WHERE parent_session_id=?', (sid,))
                     if children or admission['status'] in ('terminal', 'unknown'):
                         break
                     assert time.monotonic() < deadline, dict(admission)
-                    await asyncio.sleep(.03)
+                    await asyncio.sleep(.1)
                 if not children:
                     assert admission['status'] == 'terminal', admission
                     continue
                 try:
-                    assert await asyncio.to_thread(peer.blocked.wait, 20), 'no post-summary inference'
+                    assert await asyncio.to_thread(peer.blocked.wait, 90), 'no post-summary inference'
                     retried = await call('prompt.submit', **params)
                     assert retried['admission_id'] == accepted['admission_id']
                     follower = await call('prompt.submit', session_id=sid, input_id='follower', text='FOLLOWER')
@@ -151,7 +161,7 @@ def test_automatic_worker_rotation_retains_retry_identity_and_fifo(tmp_path, end
                     # Follower turn = a fresh worker process + one inference; on a loaded runner
                     # (40 parallel test files) that has taken >45 s.
                     await async_wait_until(lambda: rows("SELECT status FROM session_admissions WHERE request_id='follower'")[0][
-                        'status'] == 'terminal', timeout=120, interval=.03, what='follower terminal')
+                        'status'] == 'terminal', timeout=120, interval=.1, what='follower terminal')
                     assert rows("SELECT status FROM session_admissions WHERE status!='terminal'") == []
                     assert rows("SELECT status FROM worker_executions WHERE status!='terminal'") == []
                     snapshot = await call('session.resume', session_id=sid)
