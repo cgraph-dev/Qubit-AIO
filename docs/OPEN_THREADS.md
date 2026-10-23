@@ -21,8 +21,8 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 - ✅ Telegram is configured and connected in polling mode (`@hermes_2ilminaltdmccwkh_bot`, owner chat); `getMe`/`getChat` OK.
 - ✅ The two "live Telegram" tests are hermetic (fixture BotAPI). Their blocker was the DELETE-mode `state.db` read lock (5 s default). Bound at 30 s, no assertion change: startup/SIGKILL recovery 1 passed; pause notice 2 passed (`deaed99e7`, re-run on merged `main`).
-- 🟡 Real round-trip: bot sent message_id 241 asking the owner to reply `TG_E2E_OK_20261023`; awaiting the reply, then verify the gateway session/response.
-- 🔴 Remaining: the real round-trip acceptance; no `VERIFIED`; B1 exclusion; remaining Windows/daemon/e2e skips; retirement not executed.
+- ✅ Real round-trip PASS: message 241 → owner replied `TG_E2E_OK_20261023` at 20:40:39 → assistant replied exactly at 20:40:46 (7 s), in the long-lived Telegram session `20261002_073827_abd0a053` (verified in `runtime/state.db`).
+- 🔴 Remaining: no `VERIFIED`; B1 exclusion; remaining Windows/daemon/e2e skips; retirement not executed.
 
 ## Wave 34 — 2026-10-23 (frontend green; live E2E chat)
 
