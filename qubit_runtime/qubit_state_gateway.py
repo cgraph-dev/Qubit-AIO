@@ -380,19 +380,24 @@ class SessionGatewayMixin:
                 return entry
         return None
 
-    def _delete_routing_entries_for_sessions(self, session_ids: Set[str]) -> int:
-        """Drop ``gateway_routing`` rows pointing at any of *session_ids*; the target id
-        lives only inside ``entry_json``, so matching is done in Python over all scopes."""
+    def _routing_entries_for_sessions(self, session_ids: Set[str]) -> List[Tuple[str, str, str]]:
+        """``(scope, session_key, session_id)`` of ``gateway_routing`` rows pointing at any of
+        *session_ids*; the target id lives only inside ``entry_json``, so matching is in Python."""
+        found: List[Tuple[str, str, str]] = []
         if not session_ids:
-            return 0
-        doomed: List[Tuple[str, str]] = []
+            return found
         for row in self._read_all("SELECT scope, session_key, entry_json FROM gateway_routing"):
             try:
                 entry = json.loads(row["entry_json"] or "{}")
-            except Exception:
+            except (ValueError, TypeError, RecursionError):
                 continue
             if isinstance(entry, dict) and entry.get("session_id") in session_ids:
-                doomed.append((row["scope"], row["session_key"]))
+                found.append((row["scope"], row["session_key"], entry["session_id"]))
+        return found
+
+    def _delete_routing_entries_for_sessions(self, session_ids: Set[str]) -> int:
+        """Drop ``gateway_routing`` rows pointing at any of *session_ids*."""
+        doomed = [(scope, key) for scope, key, _ in self._routing_entries_for_sessions(session_ids)]
         if not doomed:
             return 0
         self._write_sql("DELETE FROM gateway_routing WHERE scope = ? AND session_key = ?", doomed, many=True)
@@ -420,7 +425,8 @@ class SessionGatewayMixin:
         self._execute_write(_do)
 
     def prune_never_active_keyed_sessions(
-        self, *, older_than_days: float, sessions_dir: Optional[Path] = None) -> Tuple[int, int, int]:
+        self, *, older_than_days: float, sessions_dir: Optional[Path] = None,
+        deleted_ids: Optional[list] = None) -> Tuple[int, int, int]:
         """Delete never-active keyed rows and the routing entries naming them; returns
         ``(sessions_deleted, routing_entries_deleted, sessions_skipped)``. Deletion goes through
         :meth:`delete_sessions` (one transaction; delegate cascade, FTS, transcripts).
@@ -431,7 +437,8 @@ class SessionGatewayMixin:
         candidate except the guarded ones: rows that vanished concurrently are gone too,
         and a stale entry outliving its target would have the gateway resume a
         nonexistent id. The row sweep is one transaction; routing entries are dropped in a
-        second write after it commits. ``sessions_skipped`` counts only the guarded rows."""
+        second write after it commits. ``sessions_skipped`` counts only the guarded rows.
+        ``deleted_ids`` (the owning gateway) receives every candidate id that was not kept."""
         candidates = self.list_never_active_keyed_sessions(older_than_days=older_than_days)
         # A fresh local reset tip is its conversation's current target, not a never-active chat:
         # the conversation holds the earlier segments' history and the owner's queued work.
@@ -441,9 +448,17 @@ class SessionGatewayMixin:
         if not ids:
             return (0, 0, 0)
         skipped: List[str] = []
+        # ``delete_sessions`` retires the deleted rows' routing entries inside its own transaction
+        # (``retire_routes``), so count what pointed at the candidates before it commits; the
+        # follow-up sweep then only catches entries a concurrent writer re-added.
+        routed_before = self._routing_entries_for_sessions(ids)
         deleted = self.delete_sessions(
             list(ids), sessions_dir=sessions_dir, exclude_active_write_guards=True, skipped_ids=skipped)
-        routing_deleted = self._delete_routing_entries_for_sessions(ids - set(skipped))
+        kept = set(skipped)
+        self._delete_routing_entries_for_sessions(ids - kept)
+        routing_deleted = sum(1 for _, _, sid in routed_before if sid not in kept)
+        if deleted_ids is not None:
+            deleted_ids.extend(sorted(ids - kept))
         return (deleted, routing_deleted, len(skipped))
 
     def list_gateway_sessions(

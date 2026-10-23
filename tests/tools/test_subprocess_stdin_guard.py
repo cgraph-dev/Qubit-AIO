@@ -24,7 +24,6 @@ def _load_guard():
     return mod
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: 30 TUI-context subprocess calls lack stdin=")
 def test_all_tui_subprocess_calls_have_stdin():
     """Every subprocess.run/Popen in TUI-context code must set stdin=."""
     result = subprocess.run(

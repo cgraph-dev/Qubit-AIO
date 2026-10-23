@@ -47,8 +47,12 @@ def _connection(authority, *, operator, native=True):
 
 @pytest.fixture
 def owned_store(monkeypatch, tmp_path):
-    monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
-    db = SessionDB(db_path=tmp_path / 'state.db')
+    # The hermetic conftest pins qubit_state.DEFAULT_DB_PATH to its own per-test home; the CLI's
+    # argless SessionDB follows that pin, not QUBIT_HOME. Build the store where the CLI will look.
+    import qubit_state
+    home = qubit_state._default_db_path().parent
+    monkeypatch.setenv('QUBIT_HOME', str(home))
+    db = SessionDB(db_path=home / 'state.db')
     epoch = rt.begin_runtime_epoch(db, instance_id='owner')
     retired = []
     runner = SimpleNamespace(_draining=False, session_store=SimpleNamespace(retire_runtime_sessions=retired.extend))
@@ -64,10 +68,9 @@ def owned_store(monkeypatch, tmp_path):
     authority.sessions['old-cli'] = LiveSession(None, 'route-old-cli')  # resident in owner memory
     with closing(db):
         yield SimpleNamespace(db=db, authority=authority, owner=owner, child=child, retired=retired,
-                              path=tmp_path / 'state.db')
+                              path=home / 'state.db')
 
 
-@pytest.mark.xfail(strict=True, reason="wave-28 parity defect: sessions prune is refused instead of applied by the live owner")
 def test_prune_under_the_live_owner_is_applied_by_the_owner_not_refused(owned_store, monkeypatch, capsys):
     from qubit_cli import gateway_client
     from qubit_cli import gateway_runtime
