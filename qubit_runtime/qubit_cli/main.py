@@ -3134,6 +3134,14 @@ def _run_oneshot_from_args(args) -> None:
     # oneshot exit path takes over, else the flags parse fine but silently do nothing
     # and the turn starts a fresh session (every wire request loses all history).
     _resolve_chat_session_args(args, use_tui=False)
+    # Same first-run contract as classic chat and gateway chat: a top-level one-shot run must
+    # not start a turn (or reach a gateway) before a provider exists. Headless runs print the
+    # non-interactive setup guidance and exit 1 from the guard itself; an interactive guard may
+    # run `qubit setup` and then return, so exit 0 here just like the gateway launcher does.
+    from qubit_cli.gateway_chat_startup import ensure_launch_provider
+
+    if not ensure_launch_provider(args):
+        sys.exit(0)
     _run_and_exit_oneshot(
         args.oneshot,
         model=getattr(args, "model", None),
