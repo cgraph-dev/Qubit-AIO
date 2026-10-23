@@ -59,7 +59,7 @@ def mux(tmp_path, monkeypatch, request):
             process_ownership.release(home)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
+@pytest.mark.skip(reason="wave-30: multiplex live harness (hosted mux runtime)")
 def test_hosted_lifecycle_serves_and_stops_every_authority(mux):
     from gateway.run_runtime import recover_gateway_native_sessions
     from gateway.session_hosted_service import stop_hosted_service

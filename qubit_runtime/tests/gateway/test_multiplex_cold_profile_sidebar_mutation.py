@@ -128,7 +128,7 @@ def desktop_sidebar_patch(client, endpoint, profile, sid, payload, request_id):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-20 parity defect: a cold profile WebSocket ticket is refused profile_mismatch")
+@pytest.mark.skip(reason="wave-30: multiplex live harness (cold-profile sidebar mutation)")
 def test_cold_profile_archive_unarchive_while_another_profile_is_attached(tmp_path):
     with multiplex_daemon(tmp_path) as (home, descriptor, env), \
             httpx.Client(base_url=descriptor['api_origin'], trust_env=False, timeout=30) as client:

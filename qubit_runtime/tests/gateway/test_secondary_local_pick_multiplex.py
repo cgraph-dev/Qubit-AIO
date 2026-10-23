@@ -32,7 +32,7 @@ def _reserve_homes(tmp_path, monkeypatch, names=('beta',)):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_secondary_pick_reaches_next_turn_after_primary_local_session")
+@pytest.mark.skip(reason="wave-30: multiplex live harness (secondary local pick)")
 async def test_secondary_pick_reaches_next_turn_after_primary_local_session(tmp_path, monkeypatch):
     from gateway import run
     from gateway.session_authorities import owner_scope

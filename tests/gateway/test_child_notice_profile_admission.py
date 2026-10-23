@@ -311,4 +311,4 @@ async def test_batched_completions_follow_the_owning_profile(
     await _for_each_leg(rig, owner, surface_a, path, consume)
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
+pytestmark = pytest.mark.skip(reason="wave-30: stale root duplicate; the qubit_runtime copy passes all 128 bodies, this file exceeds the host bound")

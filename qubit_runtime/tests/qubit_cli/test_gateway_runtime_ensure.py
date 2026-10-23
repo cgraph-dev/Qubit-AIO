@@ -75,7 +75,6 @@ def test_ensure_waits_for_real_control_owner_without_claiming_pending_is_ready(t
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: runtime ensure contract differs")
 def test_installed_service_start_is_nonmutating_and_failed_manager_never_spawns(tmp_path, monkeypatch):
     from qubit_cli import gateway as gw, gateway_runtime as runtime
 
@@ -85,6 +84,7 @@ def test_installed_service_start_is_nonmutating_and_failed_manager_never_spawns(
     home = tmp_path / "profile"
     home.mkdir(mode=0o700)
     monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     unit = tmp_path / ".config/systemd/user" / f"hermes-gateway-{service_suffix(home)}.service"
     unit.parent.mkdir(parents=True)
     unit.write_text("[Service]\nExecStart=/owned/inert/gateway\n", encoding="utf-8")
@@ -94,7 +94,7 @@ def test_installed_service_start_is_nonmutating_and_failed_manager_never_spawns(
     from qubit_cli.gateway_runtime_service_identity import SYSTEMD_IDENTITY_PROPERTIES
     identity = {key: "" for key in SYSTEMD_IDENTITY_PROPERTIES}
     identity.update(User=str(os.getuid()), DynamicUser="no",
-                    Environment=f'"HERMES_HOME={home}"',
+                    Environment=f'"HERMES_HOME={home}" "QUBIT_HOME={home}"',
                     ExecStart=f'{{ path={sys.executable} ; argv[]={sys.executable} -m qubit_cli.main gateway run ; ignore_errors=no ; }}')
     effective = "\n".join(f"{key}={value}" for key, value in identity.items())
     helper.write_text('#!' + sys.executable + '\nimport json,sys,time\nfrom pathlib import Path\n'
@@ -136,7 +136,6 @@ def test_installed_service_start_is_nonmutating_and_failed_manager_never_spawns(
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: runtime ensure contract differs")
 def test_public_ensure_json_deadline_and_invalid_invocation(tmp_path):
     from qubit_cli import gateway_runtime as runtime
     assert callable(getattr(runtime, "ensure_gateway_runtime", None))
@@ -147,7 +146,7 @@ def test_public_ensure_json_deadline_and_invalid_invocation(tmp_path):
     (home / ".hermes-update-in-progress").write_text(
         f"{os.getpid()}\n{int(time.time())}\nct:{process_create_time():.3f}\nrun:private-token-not-for-stdout\n",
         encoding="utf-8")
-    env = {**os.environ, "HERMES_HOME": str(home)}
+    env = {**os.environ, "HERMES_HOME": str(home), "QUBIT_HOME": str(home)}
     result = subprocess.run([sys.executable, "-m", "qubit_cli.main", "gateway", "ensure", "--json"],
                             env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15, check=False)
     assert result.returncode == 6, result.stderr
@@ -189,7 +188,6 @@ def test_update_fence_follows_update_lock_judgement(tmp_path, monkeypatch):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: runtime ensure contract differs")
 def test_unmanaged_child_uses_explicit_home_and_survives_launcher_exit(tmp_path, monkeypatch):
     from qubit_cli import gateway_runtime_start as start
     assert callable(getattr(start, "spawn_unmanaged_gateway", None))
@@ -214,7 +212,7 @@ def test_unmanaged_child_uses_explicit_home_and_survives_launcher_exit(tmp_path,
         "start.subprocess.Popen=boundary\n"
         "child=spawn_unmanaged_gateway(home, deadline=time.monotonic()+5)\n"
         "print(child.pid, flush=True)\n", encoding="utf-8")
-    env = {**os.environ, "PYTHONPATH": str(Path.cwd()), "HERMES_HOME": str(tmp_path / "wrong")}
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[2]), "HERMES_HOME": str(tmp_path / "wrong")}
     result = subprocess.run([sys.executable, str(launcher)], env=env, stdin=subprocess.DEVNULL,
                             capture_output=True, text=True, timeout=10, check=False)
     try:

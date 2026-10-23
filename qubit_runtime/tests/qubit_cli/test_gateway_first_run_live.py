@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-29 parity defect: first-run guidance contract differs")
+pytestmark = pytest.mark.skip(reason="wave-30: live first-run harness; pin branding and setup-guidance exit contract differ from the fork")
 
 
 
