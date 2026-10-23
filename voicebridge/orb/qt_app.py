@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from . import client as _client
 from . import activity as _activity
 from . import ember as _ember
+from . import frame_budget as _budget
 from . import mark as _mark
 from . import mark_field as _field
 from . import fullscreen as _fs
@@ -1283,6 +1284,43 @@ def _finite(v: Any, default: float = 0.0) -> float:
     return f if math.isfinite(f) else default
 
 
+def _color(r: Any, g: Any, b: Any, alpha_unit: Any) -> Any:
+    """A QColor from a 0..1 alpha, cached per quantised channel + alpha.
+
+    This function is called hundreds of times per frame, and a fresh QColor per
+    primitive was measurable churn (see the perf section of ORB_FX_SPEC.md).
+    Alpha is quantised in exactly the steps the previous callers kept —
+    ``int(255.0 * a)`` — so a cache hit returns a colour with the SAME byte
+    values: the look is unchanged, only the allocation is gone.
+    """
+    from PySide6.QtGui import QColor
+    try:
+        a = float(alpha_unit)
+    except (TypeError, ValueError):
+        a = 0.0
+    if a >= 1.0:
+        a8 = 255
+    elif a <= 0.0:
+        a8 = 0
+    else:
+        a8 = int(255.0 * a)
+    key = (r, g, b, a8)
+    got = _COLOR_CACHE.get(key)
+    if got is None:
+        got = QColor(r, g, b, a8)
+        if len(_COLOR_CACHE) > _COLOR_CACHE_MAX:
+            _COLOR_CACHE.clear()
+        _COLOR_CACHE[key] = got
+    return got
+
+
+#: Bounded cache of ``(r, g, b, a8) -> QColor``. Keyed on quantised bytes, so
+#: entries are few (the mark's palette is small) and a hit is byte-identical to
+#: constructing the colour.
+_COLOR_CACHE: Dict[Any, Any] = {}
+_COLOR_CACHE_MAX = 2048
+
+
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 state: Any, brightness: float, family: Any) -> None:
     """Paint the Qubit mark from the shared rich animation field.
@@ -1324,8 +1362,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _draw_glyph(gx: float, gy: float, ch: str, rgb: Any,
                     alpha: float, px: int) -> None:
         """One text glyph, no per-call state push (brush is set by the caller)."""
-        p.setPen(QColor(rgb[0], rgb[1], rgb[2],
-                        _clamp8(255.0 * min(1.0, alpha))))
+        if not _lod.visible(px, alpha):
+            return
+        p.setPen(_color(rgb[0], rgb[1], rgb[2], alpha))
         p.setFont(_glyph_font(px))
         p.drawText(QPointF(gx, gy), ch)
 
@@ -1362,6 +1401,19 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # hint, not a dim state tint: lift luminance hard and use the state hue
     # only as the tint. Idle must never read as "almost off".
     bright = max(_field.MIN_MARK_BRIGHTNESS, _num(brightness, 1.0))
+
+    # The frame's shared LOD ledger (``voicebridge.orb.frame_budget``). It is
+    # the SAME rule set the Tk renderer uses, bound to this frame's radius, so
+    # a primitive that is sub-pixel here is sub-pixel there too. It only
+    # refuses elements that cannot be resolved on screen (see MIN_DIM_PX /
+    # MIN_ALPHA); at the shipped 168 px orb nothing in the mark qualifies.
+    # Accumulated on ``_frame_stats`` so a test can prove the cull fires at
+    # small radii and is empty at the default one.
+    _lod = _budget.FrameStats(Rf)
+    _lod_acc = getattr(_paint_mark, "_frame_stats", None)
+    if _lod_acc is None:
+        _lod_acc = _budget.FrameStats(Rf)
+        _paint_mark._frame_stats = _lod_acc
 
     def _lift(amount: float) -> Tuple[int, int, int]:
         a = max(0.0, min(1.0, _num(amount, 0.0)))
@@ -1499,14 +1551,17 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         a = _shade(alpha)
         if a <= ALPHA_EPS or len(points) < 3:
             return
+        pen_w = width if width > 0.6 else 0.6
+        if not _lod.ring(_lod.visible(0.0, a, pen_w, min_dim=0.0)):
+            return
         path = QPainterPath()
         path.moveTo(points[0][0], points[0][1])
+        _line = path.lineTo
         for px, py in points[1:]:
-            path.lineTo(px, py)
+            _line(px, py)
         p.setBrush(Qt.NoBrush)
-        pen = QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
-                          _clamp8(255.0 * min(1.0, a))),
-                   max(0.6, width))
+        pen = QPen(_color(ring_rgb[0], ring_rgb[1], ring_rgb[2], a),
+                   pen_w)
         p.setPen(pen)
         p.drawPath(path)
         p.setPen(Qt.NoPen)
@@ -1650,10 +1705,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         r = _num(rad, 0.0)
         if a <= ALPHA_EPS or r <= 0.0:
             return
+        # Shared LOD: a dot smaller than MIN_DIM_PX across, or fainter than
+        # MIN_ALPHA, is not resolvable on screen — skip the primitive without
+        # touching the painter state at all. Counted so the cull is provable.
+        if not _lod.dot(_lod.visible(r * 2.0, a)):
+            return
         tint = _tone(rgb, gain)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(tint[0], tint[1], tint[2],
-                          _clamp8(255.0 * min(1.0, a))))
+        p.setBrush(_color(tint[0], tint[1], tint[2], a))
         p.drawEllipse(x - r, y - r, r * 2.0, r * 2.0)
 
     def _outline(radius: float, rgb: Tuple[int, int, int], alpha: float,
@@ -1661,12 +1720,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         a = _num(alpha, 0.0)
         if a <= ALPHA_EPS or radius <= 0.0:
             return
+        if not _lod.ring(_lod.visible(radius * 2.0, a, width)):
+            return
         path = QPainterPath()
         path.addEllipse(QRectF(cx - radius, cy - radius,
                                radius * 2.0, radius * 2.0))
         p.setBrush(Qt.NoBrush)
-        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                             _clamp8(255.0 * min(1.0, a))), width))
+        p.setPen(QPen(_color(rgb[0], rgb[1], rgb[2], a), width))
         p.drawPath(path)
         p.setPen(Qt.NoPen)
 
