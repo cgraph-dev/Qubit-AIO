@@ -306,7 +306,6 @@ def test_explicit_key_is_private_and_missing_after_restart_fails_closed(tmp_path
     assert dict(os.environ) == before
 
 
-@pytest.mark.skip(reason="wave-31: daemon reaches ready, but classic cli.main(query=...) cannot attach: GatewayAgent raises GatewayClientError 'Gateway session unavailable; no local fallback'")
 def test_ordinary_daemon_cli_launch_policy(tmp_path):
     import subprocess
     import sys

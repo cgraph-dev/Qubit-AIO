@@ -406,12 +406,12 @@ class CLIInitMixin:
         self._session_db = None
         self._session_db_unavailable = False
         try:
-            # Registry handle, not a bare SessionDB(): goals/loops/heartbeat acquire the same
-            # path a moment later from the REPL thread, and a second writer repeats the full
-            # open (the /proc-wide deleted-WAL scan, ~4k readlinks) while the render thread
-            # holds the GIL — that repeat was the post-banner freeze before the first prompt.
-            from qubit_state_registry import acquire
-            self._session_db = acquire()
+            # The gateway is the single writer; this process holds the read-only facade and sends
+            # every mutation through it. A bare SessionDB here is a local writer with no gateway
+            # connection, and ``GatewayAgent`` (the only agent this classic CLI builds) refuses
+            # with "Gateway session unavailable; no local fallback" on the first turn.
+            from qubit_cli.gateway_session_store import session_store
+            self._session_db = session_store()
         except Exception as e:
             # Without a store the transcript is NOT persisted while the chat looks healthy,
             # so surface it prominently rather than only logging.
