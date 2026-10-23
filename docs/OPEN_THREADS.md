@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 33 — 2026-10-23 (dashboard request storm fixed)
+
+- ✅ Root cause measured live: `/api/events/stream` replays ~1,913 historical journal frames on connect; each `session.updated`/`model.changed` frame fired `/api/model/info` + `/api/config`. Page load: 56 config + 67 model-info requests in 6 s (the wave-32 "idle polling" observation).
+- ✅ Fix (`b2ee20b3c`, `6231a81ca`): refresh only for our session or an id-less broadcast + 200 ms trailing coalescing; user actions stay immediate.
+- ✅ Verified: ChatSidebar 20/20, `tsc -b` clean, eslint 0 errors, build succeeded and the served bundle was rebuilt; live reload now **2 config + 3 model-info** in 6 s, 0 console errors, resumed transcript/status `ready` render. No service restart.
+- 🔴 Remaining: the server still replays the full journal on connect (cursor trimming is a separate change); no E2E/`VERIFIED`; B1 exclusion, documented live/Windows/e2e skips, and retirement are unchanged.
+
 ## Wave 32 — 2026-10-23 (seven skips closed; browser E2E PASS)
 
 - ✅ Six product gaps fixed and seven skips removed (all re-run on merged `main`): API authority fixture port; hosted-mux canonical single service; cold-profile WS scope key; classic one-shot gateway session store + frozen reasoning/`max_turns`; boot recovery of queued `/v1/runs` + API clarify ACK; top-level `-z` first-run guard.
