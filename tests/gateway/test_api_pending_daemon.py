@@ -48,7 +48,7 @@ class PromptPeer(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({'id': 'control', 'choices': [{'index': 0, 'message': message, 'finish_reason': finish}]}).encode())
 
 
-@pytest.mark.skip(reason="wave-30: live daemon harness (API/WS pending identity)")
+@pytest.mark.skip(reason="wave-31: the clarify pending control is absent from canonical session.resume prompts after /v1/runs (approval arm passes); AssertionError: ('no pending clarify', ...) (reproduced twice)")
 def test_api_and_ws_pending_controls_share_identity(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'

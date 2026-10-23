@@ -15,7 +15,7 @@ import pytest
 from tests.waiting import async_wait_until
 
 
-@pytest.mark.skip(reason="wave-30: live daemon harness (SIGKILL API recovery)")
+@pytest.mark.skip(reason="wave-31: after SIGKILL restart the queued /v1/runs admission never settles; AssertionError: timed out after 20s waiting for the recovered safe run to settle (reproduced twice)")
 def test_api_crash_queue_and_identified_result_retry(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
