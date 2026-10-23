@@ -7,7 +7,9 @@ falling back to SSE, and a stdio server whose ``${env:PIXELLAB_API_TOKEN}`` was 
 """
 
 import asyncio
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
@@ -179,6 +181,246 @@ def test_discovery_does_not_nudge_a_non_oauth_auth_park(monkeypatch):
     finally:
         mcp_tool._servers.clear()
         mcp_tool._server_scope_keys.clear()
+
+
+# ── the REAL SDK shape: a ConnectionError whose cause holds the HTTP 401 ──────
+#
+# mcp 2.0 raises the transport failure as a plain ConnectionError and keeps the
+# httpx2.HTTPStatusError (with the 401 response) on ``__cause__``; wave 36 inspected only the
+# outermost ``response``, so a real 401 took the generic path (300 s self-probes forever).
+
+def _http_status_error(status: int):
+    httpx = pytest.importorskip("httpx")
+    request = httpx.Request("POST", "https://mcp.example.test/mcp")
+    response = httpx.Response(status, request=request)
+    return httpx.HTTPStatusError(f"Client error '{status}'", request=request, response=response)
+
+
+def _sdk_shaped_auth_error(status: int = 401, link: str = "cause"):
+    """The measured production shape: ConnectionError wrapping HTTPStatusError."""
+    inner = _http_status_error(status)
+    outer = ConnectionError(
+        "MCP server 'wrapped': both Streamable HTTP and SSE transports failed "
+        f"(Streamable HTTP: Server returned an error response; SSE: {inner})")
+    if link == "cause":
+        outer.__cause__ = inner
+    else:
+        outer.__context__ = inner
+    return outer
+
+
+@pytest.mark.parametrize("link", ["cause", "context"])
+@pytest.mark.parametrize("status", [401, 403])
+def test_auth_rejection_walks_wrapped_sdk_causes(link, status):
+    from tools.mcp_tool_errors import _classify_mcp_failure, _is_auth_rejection
+
+    exc = _sdk_shaped_auth_error(status, link)
+    assert _is_auth_rejection(exc) is True
+    assert _classify_mcp_failure(exc) == "permanent"
+
+
+def test_auth_rejection_finds_wrapped_error_inside_group():
+    from tools.mcp_tool_errors import _classify_mcp_failure, _is_auth_rejection
+
+    group = BaseExceptionGroup(
+        "unhandled errors in a TaskGroup",
+        [ConnectionError("connection refused"), _sdk_shaped_auth_error(401)])
+    assert _is_auth_rejection(group) is True
+    assert _classify_mcp_failure(group) == "permanent"
+
+
+@pytest.mark.parametrize("message", [
+    "HTTP 401 Unauthorized",
+    "HTTP/1.1 403 Forbidden",
+    "status 401",
+    "status_code: 403",
+    "401 Client Error for url 'https://host/mcp'",
+    "Unauthorized (401)",
+])
+def test_auth_rejection_recognizes_status_in_message(message):
+    from tools.mcp_tool_errors import _classify_mcp_failure, _is_auth_rejection
+
+    exc = ConnectionError(message)
+    assert _is_auth_rejection(exc) is True
+    assert _classify_mcp_failure(exc) == "permanent"
+
+
+@pytest.mark.parametrize("message", [
+    "connection refused",
+    "Connection reset by peer",
+    "timed out",
+    "Name or service not known",
+    "failed to connect to 127.0.0.1:4010",
+    "HTTP 500 Server Error",
+    "server returned status 404",
+])
+def test_generic_connection_failures_stay_transient(message):
+    """A URL/port/body that merely contains 401/403 must not look like an auth rejection."""
+    from tools.mcp_tool_errors import _classify_mcp_failure, _is_auth_rejection
+
+    exc = ConnectionError(message)
+    assert _is_auth_rejection(exc) is False
+    assert _classify_mcp_failure(exc) == "transient"
+
+
+@pytest.mark.no_isolate
+def test_wrapped_auth_rejection_engages_bounded_budget_then_terminal(monkeypatch, tmp_path):
+    """The SDK-wrapped 401 must park on the AUTH schedule: 5 probes, growing backoff capped at
+    ``_AUTH_PARK_MAX_BACKOFF_SEC``, then terminal ``unavailable``; discovery must not nudge it and
+    an explicit reconnect must start a fresh budget."""
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    from tools import mcp_tool, mcp_tool_config, mcp_tool_discovery, mcp_tool_loop
+    from tools.mcp_tool import MCPServerTask
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(mcp_tool, "_PARKED_RETRY_INTERVAL", 0.02)
+    monkeypatch.setattr(mcp_tool, "_AUTH_PARK_MAX_SELF_PROBES", 5)
+    monkeypatch.setattr(mcp_tool, "_AUTH_PARK_MAX_BACKOFF_SEC", 0.1)
+    monkeypatch.setattr(mcp_tool_config, "_load_mcp_config",
+                        lambda: {"wrapped": {"command": "x"}})
+    mcp_tool._server_unavailable.clear()
+    mcp_tool._servers.clear()
+    mcp_tool._server_scope_keys.clear()
+
+    class _Task(MCPServerTask):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.calls = 0
+            self.wait_timeouts = []
+
+        def _is_http(self):
+            return False
+
+        def _deregister_tools(self):
+            self._registered_tool_names = []
+
+        async def _run_stdio(self, config):
+            self.calls += 1
+            raise _sdk_shaped_auth_error()
+
+        async def _wait_for_reconnect_or_shutdown(self, timeout=None):
+            self.wait_timeouts.append(timeout)
+            if self._auth_park_terminal:
+                # Stay parked (as production does) until an explicit reconnect/shutdown.
+                while not (self._reconnect_event.is_set() or self._shutdown_event.is_set()):
+                    await real_sleep(0.005)
+                if self._shutdown_event.is_set():
+                    return "shutdown"
+                self._reconnect_event.clear()
+                return "reconnect"
+            return "self-probe"
+
+    task = _Task("wrapped")
+    nudged = []
+    monkeypatch.setattr(mcp_tool_loop, "_signal_reconnect", lambda srv: nudged.append(srv.name))
+
+    async def _scenario():
+        run_task = asyncio.ensure_future(task.run({"command": "x"}))
+        try:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and not task._auth_park_terminal:
+                await real_sleep(0.01)
+            assert task._auth_park_terminal, "wrapped 401 never reached the terminal latch"
+            # one initial connect + exactly the bounded five self-probes
+            assert task.calls == 1 + 5, task.calls
+            assert task._auth_self_probes == 5
+            assert "authentication rejected" in mcp_tool._server_unavailable["wrapped"]
+            # 0.02, then 0.02/0.04/0.08 doubling, capped at 0.1 — never the generic 0.02 forever
+            assert task.wait_timeouts[:6] == [0.02, 0.02, 0.04, 0.08, 0.1, 0.1], task.wait_timeouts
+            assert task.wait_timeouts[6] is None
+
+            # No unattended probe once terminal, even as time passes.
+            calls_at_terminal = task.calls
+            await real_sleep(0.15)
+            assert task.calls == calls_at_terminal
+
+            # Discovery must not wake a terminal auth park (budget bypass).
+            mcp_tool._servers["wrapped"] = task
+            mcp_tool._server_scope_keys["wrapped"] = None
+            try:
+                mcp_tool_discovery._select_new_servers({"wrapped": {"command": "x"}})
+                assert nudged == [], nudged
+            finally:
+                mcp_tool._servers.pop("wrapped", None)
+                mcp_tool._server_scope_keys.pop("wrapped", None)
+
+            # An explicit reconnect (/reload-mcp, `qubit mcp login`) still revives and resets.
+            task._reconnect_event.set()
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and task.calls == calls_at_terminal:
+                await real_sleep(0.01)
+            assert task.calls > calls_at_terminal, "explicit reconnect did not revive the server"
+            # ...and the revived run starts a FRESH bounded budget (first wait 0.02 again).
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and len(task.wait_timeouts) < 8:
+                await real_sleep(0.01)
+            assert task.wait_timeouts[7] == 0.02, task.wait_timeouts
+        finally:
+            task._shutdown_event.set()
+            task._reconnect_event.set()
+            try:
+                await asyncio.wait_for(run_task, timeout=5)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                run_task.cancel()
+
+    try:
+        asyncio.run(_scenario())
+    finally:
+        mcp_tool._server_unavailable.clear()
+        mcp_tool._servers.clear()
+        mcp_tool._server_scope_keys.clear()
+
+
+@pytest.mark.no_isolate
+def test_loopback_http_401_is_classified_as_auth_rejection(monkeypatch, tmp_path):
+    """End-to-end against a real loopback 401: the fork's transport wraps the SDK failure in
+    ``ConnectionError`` (cause = httpx2.HTTPStatusError), which must classify as auth-rejected."""
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    pytest.importorskip("mcp.client.streamable_http")
+
+    class _Handler(BaseHTTPRequestHandler):
+        def _reject(self):
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"unauthorized"}')
+
+        do_POST = _reject
+        do_GET = _reject
+
+        def do_HEAD(self):
+            self.send_response(401)
+            self.end_headers()
+
+        def log_message(self, *args):  # keep pytest output clean
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), _Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        from tools import mcp_tool
+        from tools.mcp_tool import MCPServerTask
+        from tools.mcp_tool_errors import _classify_mcp_failure, _is_auth_rejection
+
+        task = MCPServerTask("loopback401")
+        url = f"http://127.0.0.1:{server.server_address[1]}/mcp"
+
+        async def _run():
+            with pytest.raises(ConnectionError) as caught:
+                await task._run_http({"url": url})
+            return caught.value
+
+        async def _connect():
+            return await asyncio.wait_for(_run(), timeout=30)
+
+        exc = asyncio.run(_connect())
+        assert _is_auth_rejection(exc) is True, (type(exc).__name__, str(exc))
+        assert _classify_mcp_failure(exc) == "permanent"
+    finally:
+        server.shutdown()
+        server.server_close()
+        from tools import mcp_tool
+        mcp_tool._server_unavailable.clear()
 
 
 # ── child stderr log cap ─────────────────────────────────────────────────────

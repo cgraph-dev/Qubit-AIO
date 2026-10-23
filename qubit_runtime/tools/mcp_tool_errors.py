@@ -154,14 +154,39 @@ def _contains_only_cancellation(exc: BaseException) -> bool:
     return isinstance(exc, asyncio.CancelledError)
 
 
+# An HTTP rejection can arrive without an ``HTTPStatusError`` object: the SDK wraps the transport
+# failure in a plain ``ConnectionError`` (the status lives on its ``__cause__``) and some proxies
+# only name the status in the message. Anchoring on an explicit status marker or the standard
+# reason phrase keeps a URL/port/body that merely contains "401"/"403" from misclassifying a
+# generic connection failure (refused/reset/timeout/DNS) as an auth rejection.
+_AUTH_STATUS_RE = re.compile(
+    r"\bhttp(?:/\d(?:\.\d)?)?(?:\s+(?:response\s+)?status(?:\s*code)?)?\s*[:=]?\s*(?:401|403)\b"
+    r"|\bstatus(?:[\s_]*code)?\b\s*[:=]?\s*(?:401|403)\b"
+    r"|\bcode\b\s*[:=]?\s*(?:401|403)\b"
+    r"|\b(?:401|403)\s+(?:unauthorized|forbidden|client\s+error)\b"
+    r"|\b(?:unauthorized|forbidden)\b\s*\(\s*(?:401|403)\s*\)",
+    re.IGNORECASE,
+)
+
+
 def _is_auth_rejection(exc: BaseException) -> bool:
     """True for an authentication/authorization REJECTION (401 or 403), including the
     HTTPStatusError shape _is_auth_error's type gate can miss when the auth classes are not
-    importable yet. Used to bound self-probing of an endpoint that keeps refusing us."""
-    root = _unwrap_exception_group(exc)
-    if _is_auth_error(root):
-        return True
-    return getattr(getattr(root, "response", None), "status_code", None) in (401, 403)
+    importable yet. Used to bound self-probing of an endpoint that keeps refusing us.
+
+    Walks the WHOLE exception tree (``__cause__``/``__context__`` and groups) because the MCP
+    SDK surfaces a real 401 as a plain ``ConnectionError`` whose cause is the
+    ``httpx2.HTTPStatusError`` holding the response — the outer class tells us nothing, and only
+    inspecting the outermost node sent those servers down the generic retry path (300 s
+    self-probes forever instead of the bounded auth budget)."""
+    for node in _iter_exception_nodes(exc):
+        if _is_auth_error(node):
+            return True
+        if getattr(getattr(node, "response", None), "status_code", None) in (401, 403):
+            return True
+        if _AUTH_STATUS_RE.search(str(node)):
+            return True
+    return False
 
 
 def _auth_error_detail(exc: BaseException) -> str:
@@ -187,13 +212,15 @@ def _mcp_call_failed_message(exc: BaseException) -> str:
 def _classify_mcp_failure(exc: BaseException) -> str:
     """``'permanent'`` (``run()`` parks instead of burning the retry ladder: auth 401/403,
     NonMcpEndpointError, InvalidMcpUrlError, missing stdio command, native addon built for another
-    Node) or ``'transient'`` (backoff retry)."""
+    Node) or ``'transient'`` (backoff retry).
+
+    Auth is judged over the whole cause chain, not just the group root: a real 401 reaches us as
+    an SDK ``ConnectionError`` wrapping the ``HTTPStatusError``, and treating only the outer node
+    as auth-free kept parking it on the generic 300 s schedule."""
     root = _unwrap_exception_group(exc)
-    permanent = (_is_auth_error(root)
+    permanent = (_is_auth_rejection(exc)
                  or isinstance(root, (NonMcpEndpointError, InvalidMcpUrlError, FileNotFoundError, NodeAbiMismatchError))
-                 or (isinstance(root, OSError) and getattr(root, "errno", None) == errno.ENOENT)
-                 # 401/403 HTTPStatusError that _is_auth_error's type-gate missed (auth types not importable here)
-                 or getattr(getattr(root, "response", None), "status_code", None) in (401, 403))
+                 or (isinstance(root, OSError) and getattr(root, "errno", None) == errno.ENOENT))
     return "permanent" if permanent else "transient"
 
 
