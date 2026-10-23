@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 32 — 2026-10-23 (seven skips closed; browser E2E PASS)
+
+- ✅ Six product gaps fixed and seven skips removed (all re-run on merged `main`): API authority fixture port; hosted-mux canonical single service; cold-profile WS scope key; classic one-shot gateway session store + frozen reasoning/`max_turns`; boot recovery of queued `/v1/runs` + API clarify ACK; top-level `-z` first-run guard.
+- ✅ Focused verification: api authority 1+1, crash recovery 1, pending daemon 1, hosted mux 5, cold multiplex 1, secondary local 1, session policy 22, first-run live 3, hosted attachments 24+16, session-store 1, TUI first-run 2, oneshot 2+14, main lifecycle 5 — all passed.
+- ✅ Browser E2E (read-only Playwright): 12 checks PASS; resumed 691-message transcript renders, status `ready`, reload rehydrates, responsive/sidebar/search pass, 0 console errors, 0 failed requests; screenshots in `/tmp/opencode/w32-e2e/`. Destructive controls and error states not exercised → no `VERIFIED`.
+- 🟡 New observation: idle dashboard polling is heavy (73 config + 102 model-info calls in 59 s). Next investigation.
+- 🔴 Remaining: 1 production symbol = declared B1 exclusion; Windows/e2e/live harnesses are documented skips; no E2E release verdict; retirement not executed. Measured absent 0, short-port 1/1, total 1, markers 0, 0 production dead / 32 test-side.
+
 ## Wave 31 — 2026-10-23 (absent 0; total missing 1 declared)
 
 - ✅ 7 lanes (4 implementation + 3 read-only) off `369be9e6a`: the last 25 absent files ported (`012af7548`, `4676abfcd`, `e196866df`); live/Windows/e2e harnesses are documented module skips naming the missing subsystem.
