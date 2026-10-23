@@ -17,6 +17,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 30 — 2026-10-23 (25 absent; 0 markers)
+
+- ✅ 7 lanes: strict `wave-2x parity defect` markers **77 → 0**; absent files **87 → 25**; 8 production defects fixed.
+- ✅ Root cause of most markers: ported peers set only `HERMES_HOME` (fork resolves `QUBIT_HOME`) → `session.create` refused `storage_unavailable`; setting both homes cleared 17 markers without touching assertions (`984c5119a`).
+- ✅ Production: profile-scoped child notices, fail-fast DELETE claim writes, `soul` profile create, service consent admission, free-inference eligibility, HERMES_HOME+QUBIT_HOME child publication, model lock in TurnRunner build, prune `deleted_ids`, explicit `stdin=` on 30 children, completion retry refund, webhook signing provenance, startup-restore author admissions, batched completion scope, local read/setting commands, single-line ensure JSON, and LOCAL `policy.platform` + frozen skills prompt.
+- ✅ Measured: markers **0**; absent **25**; total missing **4** = production **1** (declared B1 `_gateway_lock_handle`) + tests **3** (deliberate R2 stable-lookup adaptation); 0 production dead / 34 test-side.
+- 🟡 Documented non-strict intermittent under host load (load reached ~16 during the wave): `test_session_kanban` real dispatcher, `test_session_setting_commands` config-set (each passes alone).
+- 🟡 Daemon/multiplex/live/Windows/e2e harnesses were skipped with exact reasons; `test_worker_compression_admission` rotation FIFO identity is **unverified, not fixed** (state.db locked under the hermetic host).
+- 🔴 Remaining: 25 absent files (mostly live/daemon/Windows/e2e and asset-dependent CLI suites); no service restart (running services still serve pre-wave code); no E2E/`VERIFIED`; retirement checklist not executed.
+
 ## Wave 29 — 2026-10-22 (87 absent; 77 markers)
 
 - ✅ 4 lanes: 52 cases fixed, 29 absent files + 26 fixtures ported into the audit-visible tree.
