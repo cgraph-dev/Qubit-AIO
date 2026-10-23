@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 36 — 2026-10-24 (MCP storm fixed; 10 skips closed; regressions green)
+
+- ✅ MCP: unresolved env refs fail closed; auth-rejected servers bounded (5 probes, 300→3600 s backoff, latch) with explicit revival; discovery cannot bypass; stderr capped at 16 MiB. 7 new tests, 143 focused passed.
+- ✅ 10 more hermetic skip removals after pinning `QUBIT_HOME` + bounding reads/WS opens; one re-skipped for in-file state leakage; `test_config_policy_daemon` remains with production evidence.
+- 🔁 Dead-symbol cleanup attempted then reverted: it regressed short-port 1→30 by deleting upstream-defined test symbols.
+- ✅ Regressions: gateway 41/44 clean, non-gateway 37/41 (1190 passed), voice 455/455, browser 12/12 with 0 idle polling. All deterministic failures found were fixed (turn-runner fakes, write-safety env gate, SOUL migration, Node brand, ACP xfail).
+- 🟡 MCP fix is not live (gateway restart needed); `mcp-stderr.log` truncated 214 MiB→0 manually.
+- 🔴 Remaining: no `VERIFIED`; B1 exclusion; remaining Windows/daemon/e2e skips; retirement not executed; no service restart.
+
 ## Wave 35 — 2026-10-23 (Telegram live; two skips closed)
 
 - ✅ Telegram is configured and connected in polling mode (`@hermes_2ilminaltdmccwkh_bot`, owner chat); `getMe`/`getChat` OK.
