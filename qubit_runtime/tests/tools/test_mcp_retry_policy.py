@@ -150,6 +150,37 @@ def test_auth_rejection_self_probes_are_bounded_then_terminal(monkeypatch, tmp_p
         mcp_tool._server_unavailable.clear()
 
 
+def test_discovery_does_not_nudge_a_non_oauth_auth_park(monkeypatch):
+    """Discovery runs on every agent build. Waking a non-OAuth 401 park from there would
+    bypass the parked task's bounded self-probe budget and retry the endpoint forever."""
+    from tools import mcp_tool, mcp_tool_discovery, mcp_tool_loop
+    from tools.mcp_tool import MCPServerTask
+
+    nudged = []
+    monkeypatch.setattr(mcp_tool_loop, "_signal_reconnect", lambda srv: nudged.append(srv.name))
+    mcp_tool._servers.clear()
+    mcp_tool._server_scope_keys.clear()
+    mcp_tool._server_unavailable.clear()
+
+    task = MCPServerTask("authy")
+    task._was_parked = True
+    task._park_reason = "after permanent initial failure"
+    task._auth_park_rejection = True
+    monkeypatch.setitem(mcp_tool._servers, "authy", task)
+    monkeypatch.setitem(mcp_tool._server_scope_keys, "authy", None)
+    try:
+        mcp_tool_discovery._select_new_servers({"authy": {"command": "x"}})
+        assert nudged == []
+
+        # A transient park still gets the normal discovery nudge.
+        task._auth_park_rejection = False
+        mcp_tool_discovery._select_new_servers({"authy": {"command": "x"}})
+        assert nudged == ["authy"]
+    finally:
+        mcp_tool._servers.clear()
+        mcp_tool._server_scope_keys.clear()
+
+
 # ── child stderr log cap ─────────────────────────────────────────────────────
 
 def test_stderr_log_is_size_bounded(monkeypatch, tmp_path):

@@ -460,12 +460,20 @@ def _select_new_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
                 _core._parallel_safe_servers.discard(own_key)
     for srv in stale_cached:
         auth_park = _arm_auth_park(srv)
+        credentials_changed = False
         # Parked on an OAuth failure and not re-authorized since: leave it to its timed self-probe.
         if auth_park is not None:
             current = _oauth_credential_stamp(getattr(srv, "name", ""))
             if current is None or current == auth_park:
                 continue
             srv._auth_park = None
+            credentials_changed = True
+        # A non-OAuth 401/403 park runs its OWN bounded, backed-off self-probe schedule. A
+        # discovery nudge would wake it on every pass (bypassing that budget) and hammer the
+        # endpoint forever; an explicit reload/login still tears it down and reconnects. An
+        # OAuth park whose credential files just changed is the login landing: nudge it.
+        if getattr(srv, "_auth_park_rejection", False) and not credentials_changed:
+            continue
         _loop._signal_reconnect(srv)
     return new_servers
 
