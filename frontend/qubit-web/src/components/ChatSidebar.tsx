@@ -207,6 +207,10 @@ export function ChatSidebar({
       refreshEffectiveModelRef.current();
     }, 200);
   }, []);
+  const scheduleEffectiveModelRefreshRef = useRef(
+    scheduleEffectiveModelRefresh,
+  );
+  scheduleEffectiveModelRefreshRef.current = scheduleEffectiveModelRefresh;
   useEffect(
     () => () => {
       if (effectiveRefreshTimerRef.current) {
@@ -356,7 +360,7 @@ export function ChatSidebar({
       const live = chatLiveFrame(frame as unknown as Record<string, unknown>);
       if (!live) return;
       if (live.isModelChange) {
-        scheduleEffectiveModelRefresh();
+        scheduleEffectiveModelRefreshRef.current();
         return;
       }
       if (live.isSession) {
@@ -379,7 +383,7 @@ export function ChatSidebar({
         // the model card. The journal replay is mostly other sessions; reading
         // config/model for each of those is the page-load request storm.
         if (!live.sessionId || isOurs) {
-          scheduleEffectiveModelRefresh();
+          scheduleEffectiveModelRefreshRef.current();
         }
       }
     };
