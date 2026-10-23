@@ -159,7 +159,7 @@ async def open_session_for(root, home, desc):
     grant = control(root, 'session-ticket', {'profile_id': str(home.resolve()),
                                              'instance_id': desc['instance_id'], 'purpose': 'interactive'})
     url = desc['api_origin'].replace('http:', 'ws:') + '/api/ws'
-    async with connect(url, subprotocols=['hermes-gateway-v1', 'hermes-gateway-ticket.' + grant['ticket']]) as ws:
+    async with connect(url, subprotocols=['hermes-gateway-v1', 'hermes-gateway-ticket.' + grant['ticket']], open_timeout=30) as ws:
         await ws.send(json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'session.create',
                                   'params': {'request_id': 'hot-served', 'source': 'cli'}}))
         async with asyncio.timeout(20):

@@ -176,8 +176,8 @@ def probe(tmp_path):
 
     async def exercise(desc, tickets):
         origin = desc['api_origin'].replace('http:', 'ws:') + '/api/ws'
-        async with connect(origin + '?ticket=' + tickets[0]) as alice, connect(
-                origin + '?ticket=' + tickets[1]) as bob:
+        async with connect(origin + '?ticket=' + tickets[0], open_timeout=30) as alice, connect(
+                origin + '?ticket=' + tickets[1], open_timeout=30) as bob:
             actors = [('alice', alice, bob), ('bob', bob, alice)]
             for actor, ws, _ in actors:
                 result = await rpc(ws, 'groups.create', room_id=actor + '-room', name=actor, members=members)
