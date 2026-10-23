@@ -58,6 +58,10 @@ def daemon(tmp_path, model_peer, request):
         "approvals": {"mode": "manual", "timeout": 60},
         "model": {"provider": "custom", "default": "local-wire-stub", "base_url": model_url},
         "auxiliary": {"title_generation": {"enabled": False}},
+        # The in-process _offline_model_inventory fixture cannot reach the gateway/ACP
+        # subprocesses. Without this they fetch the live catalog from GitHub while answering
+        # session/load, which can exceed the ACP RPC timeout on a slow/locked-down host.
+        "model_catalog": {"enabled": False},
     }
     for key, value in (request.param.items() if isinstance(getattr(request, 'param', None), dict) else ()):
         config.setdefault(key, {}).update(value)

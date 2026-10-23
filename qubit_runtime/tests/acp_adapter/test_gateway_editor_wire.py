@@ -6,8 +6,6 @@ import json
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-30 parity defect: ACP stdio session/load|session/resume round trip never answers on the pinned tree")
-
 from tests.acp_adapter.test_gateway_sessions import editor, viewer
 from tests.waiting import async_wait_until
 
