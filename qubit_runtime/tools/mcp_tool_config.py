@@ -22,6 +22,76 @@ logger = logging.getLogger("tools.mcp_tool")
 _mcp_stderr_log_fh: dict[str, Any] = {}  # profile home key -> handle
 _mcp_stderr_log_lock = threading.Lock()
 
+# A per-profile child-stderr log is a debugging aid, not an unbounded append sink: a server
+# that 401s or dies on every retry cycle filled one to 206 MB. Writes beyond the cap truncate
+# the log in place (cheap, and safe for an fd inherited by a spawned supervisor); one write
+# never exceeds the cap either.
+_MCP_STDERR_LOG_MAX_BYTES = 16 * 1024 * 1024
+
+
+class _BoundedLogFile:
+    """Append-mode file surrogate that keeps its log at or below ``max_bytes``.
+
+    Exposes the small file surface MCP callers use (``write``/``flush``/``fileno``/``name``/
+    ``closed``/``close``) so it can stand in for the real handle and as a child's ``stderr=``.
+    Truncation is in place, so an fd another process inherited keeps referring to the same
+    inode instead of writing to a rotated-away file.
+    """
+
+    def __init__(self, path: Path, fh: Any, max_bytes: int):
+        self._path = path
+        self._fh = fh
+        self._max_bytes = max(1, int(max_bytes))
+        self._lock = threading.Lock()
+        try:
+            self._size = os.fstat(fh.fileno()).st_size
+        except (OSError, ValueError, AttributeError):
+            self._size = 0
+        self._truncate_if_needed(0)
+
+    @property
+    def name(self) -> str:
+        return str(self._path)
+
+    @property
+    def closed(self) -> bool:
+        return self._fh.closed
+
+    def fileno(self) -> int:
+        return self._fh.fileno()
+
+    def _truncate_if_needed(self, extra: int) -> None:
+        if self._size + extra <= self._max_bytes:
+            return
+        try:
+            self._fh.flush()
+            self._fh.seek(0)
+            self._fh.truncate(0)
+        except (OSError, ValueError):
+            pass
+        self._size = 0
+
+    def write(self, data: Any) -> int:
+        text = str(data)
+        encoded_len = len(text.encode("utf-8", errors="replace"))
+        with self._lock:
+            if encoded_len > self._max_bytes:
+                # ``ignore`` keeps a byte-sliced tail from expanding past the cap on decode.
+                text = text.encode("utf-8", errors="replace")[-self._max_bytes:].decode("utf-8", errors="ignore")
+                encoded_len = len(text.encode("utf-8", errors="replace"))
+            self._truncate_if_needed(encoded_len)
+            written = self._fh.write(text)
+            self._size += encoded_len
+            return written
+
+    def flush(self) -> None:
+        with self._lock:
+            self._fh.flush()
+
+    def close(self) -> None:
+        with self._lock:
+            self._fh.close()
+
 
 def _get_mcp_stderr_log() -> Any:
     """Shared append-mode handle for MCP subprocess stderr, cached until shutdown PER PROFILE HOME (a
@@ -36,8 +106,10 @@ def _get_mcp_stderr_log() -> Any:
                 log_dir = get_qubit_home() / "logs"
                 mkdir_under_qubit_home(log_dir)
                 # Line-buffered so output lands promptly; errors="replace" tolerates garbled binary.
-                fh = open(log_dir / "mcp-stderr.log", "a", encoding="utf-8", errors="replace", buffering=1)
-                fh.fileno()  # confirm a real fd before committing
+                path = log_dir / "mcp-stderr.log"
+                raw = open(path, "a", encoding="utf-8", errors="replace", buffering=1)
+                raw.fileno()  # confirm a real fd before committing
+                fh = _BoundedLogFile(path, raw, _MCP_STDERR_LOG_MAX_BYTES)
             except Exception as exc:  # pragma: no cover — best-effort fallback
                 logger.debug("Failed to open MCP stderr log, using devnull: %s", exc)
                 try:
@@ -547,17 +619,31 @@ def _interpolate_env_vars(value):
     return value
 
 
+def _unresolved_env_refs(config: dict) -> list[str]:
+    """Literal ``${VAR}`` references still present after interpolation, in the places a server
+    actually needs them: a remote ``url``/``headers`` (sending one is a guaranteed 401 that
+    reads as a bad credential, #119092) or a stdio command/``env`` (the child would otherwise
+    be spawned with a literal placeholder that can only fail). ``args`` are deliberately not
+    scanned: a server may legitimately receive a template string there."""
+    values: list[Any] = [config.get("command") or ""]
+    if "url" in config:
+        values.extend([config.get("url") or "", *(config.get("headers") or {}).values()])
+    env = config.get("env")
+    if isinstance(env, dict):
+        values.extend(env.values())
+    return sorted({m.group(1) for value in values for m in _ENV_VAR_PATTERN.finditer(str(value))})
+
+
 def _require_rendered_remote(server_name: str, config: dict) -> dict:
-    """*config* back, unless it is a remote server whose ``url`` / ``headers`` still carry a literal
-    ``${VAR}`` after rendering: sending that is a guaranteed 401 that reads as a bad credential
-    (#119092), so fail closed naming the variable instead."""
-    if "url" not in config:
-        return config
-    values = [config.get("url") or "", *(config.get("headers") or {}).values()]
-    unresolved = sorted({m.group(1) for value in values for m in _ENV_VAR_PATTERN.finditer(str(value))})
+    """*config* back, unless it still carries a literal ``${VAR}`` in a required place after
+    rendering (remote ``url``/``headers``, or stdio ``command``/``env``): sending or spawning
+    that can only fail, so fail closed naming the variable instead. The error is tagged
+    ``missing_credentials`` so discovery records the server unavailable for the process
+    rather than retrying an unresolved reference forever."""
+    unresolved = _unresolved_env_refs(config)
     if unresolved:
         refs = ", ".join(f"${{{ref}}}" for ref in unresolved)
-        unset = ValueError(f"MCP server '{server_name}': {refs} in url/headers is not set in this profile's "
+        unset = ValueError(f"MCP server '{server_name}': {refs} is not set in this profile's "
                            ".env or secret source")
         unset.failure_class = "missing_credentials"  # type: ignore[attr-defined]
         raise unset

@@ -107,15 +107,18 @@ def _filter_mcp_children(pids: set) -> set:
 
 
 def _clear_connect_cooldowns(keys=None) -> None:
-    """Drop connect-retry cooldowns: a restart must re-attempt every server immediately, not
-    honour a stale per-server backoff. Caller holds ``_core._lock``."""
+    """Drop connect-retry cooldowns and terminal-unavailable records: a restart/reload must
+    re-attempt every server immediately, not honour a stale per-server backoff or a
+    process-lifetime disable. Caller holds ``_core._lock``."""
     if keys is None:
         _core._server_connect_retry_after.clear()
         _core._server_connect_failures.clear()
+        _core._server_unavailable.clear()
     else:
         for key in keys:
             _core._server_connect_retry_after.pop(key, None)
             _core._server_connect_failures.pop(key, None)
+            _core._server_unavailable.pop(key, None)
 
 
 def _reregister_orphaned_adopters() -> None:
@@ -166,7 +169,7 @@ def shutdown_mcp_servers(*, scope: Optional[str] = None, names: Optional[set] = 
     the wait for the close to land on the MCP loop — a caller running one pass per served
     profile under a total budget divides it, or N profiles × 15s starve the wildcard pass that
     actually stops the loop."""
-    from tools.mcp_tool_scope import _key_name
+    from tools.mcp_tool_scope import _key_name, _key_scope
     wildcard = scope is None and names is None
     with _core._lock:
         selected = [key for key in _core._servers if wildcard or _core._server_scope_keys.get(key) == scope]
@@ -182,6 +185,17 @@ def shutdown_mcp_servers(*, scope: Optional[str] = None, names: Optional[set] = 
                 | set(_core._server_connecting) | set(_core._server_connect_errors))
         else:
             selected_status = {key for key, owner in _core._server_scope_keys.items() if owner == scope}
+        # A server that never reached ``_servers`` (unresolved env/terminal auth) only has an
+        # unavailable record, so collect it for this scope/name selection or a reload would
+        # leave it disabled for the rest of the process.
+        if names is not None:
+            selected_status |= {key for key in _core._server_unavailable
+                                if _key_name(key) in names
+                                and (wildcard or _key_scope(key) == scope)}
+        elif wildcard:
+            selected_status |= set(_core._server_unavailable)
+        else:
+            selected_status |= {key for key in _core._server_unavailable if _key_scope(key) == scope}
         # Adopters of the connections being torn down lose their overlays with the tasks' own
         # ``_deregister_tools``; remember them so the next discovery pass re-registers them
         # (``_reregister_orphaned_adopters``).

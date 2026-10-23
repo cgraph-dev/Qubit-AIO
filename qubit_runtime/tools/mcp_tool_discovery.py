@@ -43,6 +43,32 @@ def _discovery_connect_concurrency() -> int:
     return raw
 
 
+def _mark_server_unavailable(key: Any, reason: str) -> None:
+    """Record a server as terminal for this process (under ``_lock``). Discovery must not
+    re-attempt it; an explicit reload/revival clears the record."""
+    with _core._lock:
+        _core._server_unavailable[key] = reason
+
+
+def _clear_server_unavailable(key: Any = None) -> None:
+    """Forget terminal availability records: one key, or every key when None (under ``_lock``)."""
+    with _core._lock:
+        if key is None:
+            _core._server_unavailable.clear()
+        else:
+            _core._server_unavailable.pop(key, None)
+
+
+def _server_unavailable_reason(key: Any) -> Optional[str]:
+    return _core._server_unavailable.get(key)
+
+
+def _is_terminal_connect_failure(exc: BaseException) -> bool:
+    """A connect error that cannot heal without a process restart / explicit reload: an
+    unresolved required ``${VAR}`` reference (``missing_credentials``) is the clear case."""
+    return getattr(exc, "failure_class", None) == "missing_credentials"
+
+
 def _record_connect_failure(server_name: str) -> None:
     """Stamp a geometric, capped retry cooldown after a failed connect (under ``_lock``)."""
     key = _server_key(server_name)
@@ -223,6 +249,8 @@ def _note_connect_failure(name: str, exc: BaseException) -> str:
         _core._server_connecting.discard(key)
         _core._server_connect_errors[key] = message
         _record_connect_failure(name)
+        if _is_terminal_connect_failure(exc):
+            _core._server_unavailable[key] = message
     return message
 
 
@@ -254,6 +282,7 @@ def _adopt_server(name: str, server: _core.MCPServerTask) -> None:
     with _core._lock:
         key = _server_key(name)
         _core._servers[key] = server
+        server._connection_key = key
         _core._server_scope_keys[key] = _core._mcp_registry_scope()
 
 
@@ -271,7 +300,7 @@ def _ensure_lazy_server_connected(server_name: str) -> bool:
             return True
         config = _core._lazy_server_configs.get(key)
         if (not config or _connect_cooldown_active(server_name)
-                or key in _core._server_connecting):
+                or key in _core._server_connecting or key in _core._server_unavailable):
             return False
         _core._server_connecting.add(key)
         _core._server_connect_errors.pop(key, None)
@@ -411,6 +440,7 @@ def _select_new_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
             k: v for k, v in servers.items()
             if keys[k] not in _core._servers and keys[k] not in _core._server_connecting
             and keys[k] not in _core._lazy_server_configs
+            and keys[k] not in _core._server_unavailable
             and mcp_server_enabled(v) and not _connect_cooldown_active(k)}
         stale_cached = [_core._servers[keys[k]] for k, v in servers.items()
                         if keys[k] in _core._servers and mcp_server_enabled(v)
@@ -556,7 +586,9 @@ def _connected_summary(names, *, lazy_tools: int = 0,
         connected = [n for n in names
                      if keys[n] in _core._servers and keys[n] not in _core._server_connect_errors]
         tool_count = sum(len(getattr(_core._servers[keys[n]], "_registered_tool_names", [])) for n in connected)
-        failed = [(n, _core._server_connect_errors.get(keys[n]) or "not attempted (in retry cooldown)")
+        failed = [(n, _core._server_unavailable.get(keys[n])
+                   or _core._server_connect_errors.get(keys[n])
+                   or "not attempted (in retry cooldown)")
                   for n in names if n not in connected]
     return tool_count + lazy_tools, len(connected) + lazy_servers, failed
 
@@ -679,6 +711,7 @@ def discover_mcp_tools(allowed_mcp_names: Optional[List[str]] = None) -> List[st
             keys = {name: _resolve_server_key(name) for name in servers}
             new_server_names = [name for name, cfg in servers.items()
                                 if keys[name] not in _core._servers and keys[name] not in _core._server_connecting
+                                and keys[name] not in _core._server_unavailable
                                 and mcp_server_enabled(cfg)]
             prior_lazy = set(_core._lazy_server_configs)
         tool_names = register_mcp_servers(servers)
@@ -749,7 +782,16 @@ def _awaiting_connect(wanted: Set[str], scope) -> List[str]:
     # failed comes back (#112445) — but only once its connect cooldown lapsed: ``discover_mcp_tools``
     # would skip it anyway, and entering it takes the cross-process discovery lock (up to 120 s of
     # waiting when another process holds it) and logs a failed pass, every call, for nothing.
-    return sorted(name for name in _unregistered(wanted, scope) if not _connect_cooldown_active(name))
+    return sorted(name for name in _unregistered(wanted, scope)
+                  if not _connect_cooldown_active(name) and name not in _unavailable_names(scope))
+
+
+def _unavailable_names(scope) -> Set[str]:
+    """Names terminal for *scope* (own connection key only; an adopted healthy server is not
+    masked by another profile's unavailable record)."""
+    with _core._lock:
+        return {_key_name(key) for key in _core._server_unavailable
+                if scope is None or _key_scope(key) == scope}
 
 
 def _enabled_config_names() -> Set[str]:
@@ -844,6 +886,10 @@ def get_mcp_status(configured: Optional[Dict[str, dict]] = None, *, include_runt
         active_servers = {_key_name(k): s for k, s in _core._servers.items() if visible(k)}
         connecting = {_key_name(k) for k in _core._server_connecting if visible(k)}
         connect_errors = {_key_name(k): e for k, e in _core._server_connect_errors.items() if visible(k)}
+        # Terminal availability is registration-level state: a server that never reached
+        # ``_servers`` has no adoption/teardown maps for ``visible`` to read.
+        unavailable = {_key_name(k): e for k, e in _core._server_unavailable.items()
+                       if include_runtime and _key_visible_in_scope(k, current_scope)}
         # A lazy registration is not a live connection: ``_server_visible_in_scope`` reads the
         # adoption/teardown maps a lazy server never populates, so use the registration-level
         # predicate ``_resolve_server_key`` already relies on for this state.
@@ -858,7 +904,9 @@ def get_mcp_status(configured: Optional[Dict[str, dict]] = None, *, include_runt
         live = server is not None and server.session is not None
         # An in-flight or failed first-use connect outranks "lazy": that server is no longer
         # merely waiting to be spawned, and the error is the actionable part.
-        status = ("connected" if live else "disabled" if not enabled else "connecting" if name in connecting
+        status = ("connected" if live else "disabled" if not enabled
+                  else "unavailable" if name in unavailable
+                  else "connecting" if name in connecting
                   else "failed" if name in connect_errors else "lazy" if name in lazy_tools else "configured")
         entry = {"name": name, "transport": cfg.get("transport", "http") if "url" in cfg else "stdio",
                  "tools": 0, "connected": False, "disabled": status == "disabled", "status": status}
@@ -868,6 +916,8 @@ def get_mcp_status(configured: Optional[Dict[str, dict]] = None, *, include_runt
                               else len(server._tools))
             if server._sampling:
                 entry["sampling"] = dict(server._sampling.metrics)
+        elif status == "unavailable":
+            entry["error"] = unavailable[name]
         elif status == "failed":
             entry["error"] = connect_errors[name]
         elif status == "lazy":
