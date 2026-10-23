@@ -970,20 +970,28 @@ class GatewaySlashCommandsMixin(
         *current platform*, saved to ``display.platforms.<platform>.tool_progress``. Gated by
         ``display.tool_progress_command`` (default off)."""
         from gateway.run import _load_gateway_config
+        from gateway.session_setting_commands import local_live
         config_path, platform_key = self._display_config_target(event)
+        live = local_live(self, event.source)
         try:
             user_config = _load_gateway_config()
             gate_enabled = is_truthy_value(cfg_get(user_config, "display", "tool_progress_command"),
                                            default=False)
         except Exception:
-            gate_enabled = False
-        if not gate_enabled:
+            user_config, gate_enabled = {}, False
+        # The opt-in gate is for messaging chats; a local session always owned /verbose.
+        if not gate_enabled and live is None:
             return t("gateway.verbose.not_enabled")
-        # Cycle mode (per-platform), reading the current effective mode via the resolver.
+        # Cycle mode (per-platform), reading the current effective mode via the resolver. ``log``
+        # (tool calls to a log file instead of the chat) is a messaging mode: a local client renders
+        # every tool event itself.
         from gateway.display_config import resolve_display_setting
-        cycle = ["off", "new", "all", "verbose", "log"]
-        current = resolve_display_setting(user_config, platform_key, "tool_progress", "all")
+        cycle = ["off", "new", "all", "verbose"] + ([] if live is not None else ["log"])
+        current = (getattr(live, "tool_progress_mode", None) if live is not None else None) or \
+            resolve_display_setting(user_config, platform_key, "tool_progress", "all")
         new_mode = cycle[(cycle.index(current if current in cycle else "all") + 1) % len(cycle)]
+        if live is not None:
+            live.tool_progress_mode = new_mode  # what ``config.get verbose`` and the next tool event read
         description = t(f"gateway.verbose.mode_{new_mode}")
         try:
             _write_raw_config_leaf(config_path, ("display", "platforms", platform_key, "tool_progress"), new_mode)
@@ -1030,14 +1038,7 @@ class GatewaySlashCommandsMixin(
         from gateway.run import _load_gateway_config, _resolve_gateway_model
         from gateway.runtime_footer import format_runtime_footer, resolve_footer_config
         config_path, platform_key = self._display_config_target(event)
-        arg = ""
-        try:
-            text = (getattr(event, "message", None) or "").strip()
-            if text.startswith("/"):
-                parts = text.split(None, 1)
-                arg = parts[1].strip().lower() if len(parts) > 1 else ""
-        except Exception:
-            arg = ""
+        arg = event.get_command_args().strip().lower()
         try:
             user_config: dict = _load_gateway_config()
         except Exception as e:
