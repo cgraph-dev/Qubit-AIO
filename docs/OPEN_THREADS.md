@@ -17,6 +17,18 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 31 — 2026-10-23 (absent 0; total missing 1 declared)
+
+- ✅ 7 lanes (4 implementation + 3 read-only) off `369be9e6a`: the last 25 absent files ported (`012af7548`, `4676abfcd`, `e196866df`); live/Windows/e2e harnesses are documented module skips naming the missing subsystem.
+- ✅ R2 divergence: the pin's three stable-lookup test names restored with R2 `ChannelRecord` bodies/docstrings; no GitHub resolution; test short-port symbols 3 → 0 (`d648edc9c`).
+- ✅ Worker rotation: the wave-30 FIFO skip was a harness misattribution (DELETE-mode read contention + receipt timeout); bounded retries/timeouts, no production change, 3 consecutive 2/2 passes (`82513bd33`).
+- ✅ Multiplex: secondary local pick unskipped via `QUBIT_HOME` (2× pass, `bb898b336`); six remaining live skips have precise evidence (`3050876cd`).
+- ✅ Measured: absent **25 → 0**; short-port **4 sym / 2 files → 1 sym / 1 file** (declared B1 `_gateway_lock_handle`); total missing **4 → 1**; markers **0**; 0 production dead / 32 test-side; brand OK (46).
+- ✅ Final focused matrix (read-only): 33 files → **208 passed, 7 skipped, 1 xfailed, 6 xpassed, 0 failed / 0 timeout** (load 6.3 → 4.3).
+- ✅ Live (read-only): four units active; identify ready/protocol 1/`authority_epoch=17`; `/chat` 200 SPA; `/qubit-chat` 200; `/api/health` 200; no voice tracebacks; EG2 enabled and model present. `/v1/models` absent because `platforms.api_server.enabled=false`; `/health` is the SPA catch-all (use `/api/health`).
+- ✅ Docs: `docs/FROZEN_TARGET.md` §Numbers updated to the measured state and the retirement gate reworded to "zero apart from declared exclusions".
+- 🔴 Remaining: **1 production symbol = the owner-declared B1 exclusion** (verdict `NOT AT TARGET -- 1 production missing`); six live harnesses are documented skips; no E2E/`VERIFIED`; retirement not executed (`~/.hermes`, `~/.hermes.pre-retirement` remain); no service restart (post-reboot units already run the wave-30 tree; orb active at ~one core).
+
 ## Wave 30 — 2026-10-23 (25 absent; 0 markers)
 
 - ✅ 7 lanes: strict `wave-2x parity defect` markers **77 → 0**; absent files **87 → 25**; 8 production defects fixed.

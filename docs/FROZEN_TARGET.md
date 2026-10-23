@@ -37,7 +37,10 @@ backlog is explicitly out of scope until retirement.
   dropped on purpose (owner ruling 2026-10-19): no symbol is skipped as "out of scope", and
   no typed refusal is written in a symbol's place. Exclusions are pruned by the owner after
   the gap is closed, not by an agent mid-port.
-- When the production gap for THIS revision reaches zero, verify, then retire hermes.
+- When the production gap for THIS revision reaches zero **apart from declared exclusions**
+  (currently exactly one, `_gateway_lock_handle`), verify, then retire hermes. The instrument
+  always prints that one row, so literal zero is not the gate; the owner may prune the row
+  instead of waiting for a zero it will never print.
 - Do not move this pin until hermes is gone.
 
 ## Declared exclusions (deliberate, do NOT re-port)
@@ -59,15 +62,15 @@ audit one symbol short of zero by design; the audit's job is to report that, not
 
 Baseline at the re-freeze (2026-10-17, first complete-blob read of the pin):
 
-| metric | at freeze | now (2026-10-21) |
+| metric | at freeze | now (2026-10-23, `8b76592fa`) |
 |---|---|---|
 | upstream `.py` files | 9,503 | 9,503 |
-| absent files | 974 | 87 |
+| absent files | 974 | 0 |
 | short_port files / symbols | 610 / 1,649 | 1 / 1 |
 | behind_head files / symbols | 0 / 0 | 0 / 0 |
 | **total missing symbols** | **2,623** | **1** |
 | — production | — | **1** (declared exclusion) |
-| — tests (non-blocking) | — | 87 |
+| — tests (non-blocking) | — | 0 |
 
 Closed since the freeze: **2,622 symbols** (~99.96% of the gap). The one
 remaining symbol is the owner-declared B1 exclusion; the short-port column has
