@@ -64,14 +64,14 @@ def _snapshot_recovery_hint() -> str:
     return ("To restore a newer snapshot, start `qubit` in a terminal and run `/snapshot list`, then "
             "`/snapshot restore <id>` (CLI only).")
 
-# Directory names to skip (matched against each path component). ``hermes-agent`` only matches at
-# the root (``_should_exclude``) so skill dirs like ``skills/.../hermes-agent/`` survive. The
+# Directory names to skip (matched against each path component). ``qubit`` only matches at
+# the root (``_should_exclude``) so skill dirs like ``skills/.../qubit/`` survive. The
 # dependency/cache entries matter: one plugin venv or pip/uv cache under QUBIT_HOME walked
 # file-by-file balloons a backup to hundreds of thousands of entries ("backup stuck for days").
 # Mostly mirrors ``agent.skill_utils.EXCLUDED_SKILL_DIRS``; ``.cache`` is backup-only. ``.archive``
 # is deliberately NOT excluded: the curator's ``skills/.archive/`` holds restorable user skills.
 _EXCLUDED_DIRS = {
-    "hermes-agent",     # the codebase repo — re-clone instead
+    "qubit",            # the codebase repo — re-clone instead
     "__pycache__",      # bytecode caches — regenerated on import
     ".git",             # nested git dirs (profiles shouldn't have these, but safety)
     "node_modules",     # js deps — reinstalled on demand
@@ -316,8 +316,8 @@ def _should_exclude(rel_path: Path) -> bool:
     parts = rel_path.parts
     if _in_excluded_root_dir(rel_path):
         return True
-    # ``hermes-agent`` only matches at the root level; nested same-named dirs are preserved.
-    if any(p in _EXCLUDED_DIRS and (p != "hermes-agent" or p == parts[0]) for p in parts):
+    # ``qubit`` only matches at the root level; nested same-named dirs are preserved.
+    if any(p in _EXCLUDED_DIRS and (p != "qubit" or p == parts[0]) for p in parts):
         return True
     name = rel_path.name
     return name in _EXCLUDED_NAMES or name.startswith(_EXCLUDED_PREFIXES) or name.endswith(_EXCLUDED_SUFFIXES)
@@ -327,7 +327,7 @@ def _iter_backup_files(hermes_root: Path, out_path: Path, skipped_dirs: Optional
     """Yield ``(abs_path, rel_path)`` for every file a full backup should hold.
 
     The one owner of the walk policy (directory pruning so os.walk never descends a multi-GB
-    excluded tree, the root-only ``hermes-agent`` carve-out, root runtime trees, per-file rules),
+    excluded tree, the root-only ``qubit`` carve-out, root runtime trees, per-file rules),
     shared by ``qubit backup`` and the pre-update path so they can never drift.
     """
     for dirpath, dirnames, filenames in os.walk(hermes_root, followlinks=False):
@@ -335,7 +335,7 @@ def _iter_backup_files(hermes_root: Path, out_path: Path, skipped_dirs: Optional
         is_root = rel_dir == Path(".")
         kept = [
             d for d in dirnames
-            if (d not in _EXCLUDED_DIRS or (d == "hermes-agent" and not is_root))
+            if (d not in _EXCLUDED_DIRS or (d == "qubit" and not is_root))
             and not _in_excluded_root_dir(rel_dir / d)]
         if skipped_dirs is not None:
             skipped_dirs.update(str(rel_dir / d) for d in set(dirnames) - set(kept))
@@ -544,7 +544,7 @@ def _print_capped(header: str, lines: List[str], indent: str) -> None:
 
 # --- Backup ---
 
-_RUN_BACKUP_PREFIX = "hermes-backup-"
+_RUN_BACKUP_PREFIX = "qubit-backup-"
 
 
 def _resolve_backup_output_path(output: Optional[str]) -> Path:
@@ -902,8 +902,8 @@ def run_import(args) -> Optional[int]:
 
         # Guidance
         print()
-        if not (hermes_root / "hermes-agent").is_dir():
-            print("Note: The hermes-agent codebase was not included in the backup.")
+        if not (hermes_root / "qubit").is_dir():
+            print("Note: The qubit codebase was not included in the backup.")
             print("  If this is a fresh install, run: qubit update")
 
         if restored_profiles:

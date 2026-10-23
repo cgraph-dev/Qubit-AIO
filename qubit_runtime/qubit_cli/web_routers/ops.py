@@ -579,7 +579,7 @@ async def run_backup(body: BackupRequest, profile: Optional[str] = None):
     output = (body.output or "").strip()
     if not output:
         stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        archive = _dashboard_backup_dir(profile) / f"hermes-backup-{stamp}-{secrets.token_hex(4)}.zip"
+        archive = _dashboard_backup_dir(profile) / f"qubit-backup-{stamp}-{secrets.token_hex(4)}.zip"
         try:
             archive.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
