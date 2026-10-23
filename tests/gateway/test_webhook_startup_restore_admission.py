@@ -60,4 +60,3 @@ async def test_admitted_webhook_runs_through_startup_restore_gate(monkeypatch):
         assert result == 'answered'
 
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")

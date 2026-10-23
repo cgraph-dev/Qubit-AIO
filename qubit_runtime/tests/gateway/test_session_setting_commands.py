@@ -95,7 +95,6 @@ def _yaml(home):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 def test_local_session_settings_run_the_messaging_handlers_and_read_back_through_config_get(tmp_path):
     steps = [
         _exec('reasoning', 'reasoning'), _exec('reasoning high', 'reasoning high'), _get('get high', 'reasoning'),
@@ -159,7 +158,6 @@ def _set(label, key, value, **extra):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-27 parity defect: ported upstream expectation not yet met")
 def test_config_set_serves_the_settings_desktop_and_ink_write_through_the_same_handlers(tmp_path):
     steps = [
         _set('global high', 'reasoning', 'high', scope='global'), _get('get global', 'reasoning'),

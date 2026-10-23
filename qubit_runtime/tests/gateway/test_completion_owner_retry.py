@@ -16,11 +16,7 @@ from tools.process_registry import process_registry
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("phase", [
-    "readiness",
-    pytest.param("claimed", marks=pytest.mark.xfail(
-        strict=True, reason="wave-24 parity defect: claimed ownership retry spends a delivery attempt")),
-])
+@pytest.mark.parametrize("phase", ["readiness", "claimed"])
 @pytest.mark.parametrize("failed_ancestor", ["worker", "owner"])
 async def test_transient_ownership_ancestor_failure_retries_durable_delivery_once(
     tmp_path, monkeypatch, phase, failed_ancestor, private_db_probe_cleanup,
@@ -132,7 +128,6 @@ async def test_transient_ownership_ancestor_failure_retries_durable_delivery_onc
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-24 parity defect: test_claimed_ownership_retries_do_not_spend_the_delivery_budget")
 async def test_claimed_ownership_retries_do_not_spend_the_delivery_budget(
     tmp_path, monkeypatch, private_db_probe_cleanup,
 ):

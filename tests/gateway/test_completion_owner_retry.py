@@ -14,8 +14,6 @@ from gateway.session import SessionSource
 from tools import async_delegation as ad
 from tools.process_registry import process_registry
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-20 parity defect: completion delivery does not retry/refund on unconfirmed or foreign ownership, and burns the delivery budget on claimed-ownership retries")
-
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("phase", ["readiness", "claimed"])
