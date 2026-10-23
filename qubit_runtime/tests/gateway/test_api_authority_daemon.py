@@ -87,4 +87,3 @@ def test_ordinary_daemon_api_ws_fifo_retry(tmp_path):
         peer.server_close()
 
 
-pytestmark = pytest.mark.skip(reason="wave-30: live daemon harness (API/WS FIFO retry)")
