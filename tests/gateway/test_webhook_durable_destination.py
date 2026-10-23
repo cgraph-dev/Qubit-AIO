@@ -13,7 +13,6 @@ from tests.gateway.fixtures.webhook_route_authority import mount_authority
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_destination_commits_with_input_and_survives_adapter_restart():
     config = PlatformConfig(enabled=True, extra={'secret': 'owned-secret', 'routes': {
         'fixture': {'prompt': '{text}', 'deliver': 'github_comment',
@@ -56,7 +55,6 @@ async def test_destination_commits_with_input_and_survives_adapter_restart():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_later_automation_completion_keeps_original_destination_resolvable():
     """F28: a process/watch completion admitted for the same webhook chat never competes with the signed origin."""
     config = PlatformConfig(enabled=True, extra={'secret': 'owned-secret', 'routes': {
@@ -117,7 +115,6 @@ def test_destination_retains_only_fields_consumed_by_sender():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_exact_legacy_webhook_retry_keeps_receipt_without_inference():
     config = PlatformConfig(enabled=True, extra={'secret': 'owned-secret', 'routes': {
         'fixture': {'prompt': '{text}', 'deliver': 'log'}}})
@@ -160,7 +157,6 @@ async def test_exact_legacy_webhook_retry_keeps_receipt_without_inference():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('fence', ['draining', 'epoch'])
-@pytest.mark.xfail(strict=True, reason="wave-25 parity defect: ported from the frozen pin; the fork does not satisfy this contract")
 async def test_fenced_webhook_retry_only_observes_existing_receipt(fence):
     config = PlatformConfig(enabled=True, extra={'secret': 'owned-secret', 'routes': {
         'fixture': {'prompt': '{text}', 'deliver': 'log'}}})

@@ -13,7 +13,6 @@ from tests.gateway.fixtures.webhook_route_authority import mount_authority
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-29 parity defect: destination commit not durable across adapter restart")
 async def test_destination_commits_with_input_and_survives_adapter_restart():
     config = PlatformConfig(enabled=True, extra={'secret': 'owned-secret', 'routes': {
         'fixture': {'prompt': '{text}', 'deliver': 'github_comment',

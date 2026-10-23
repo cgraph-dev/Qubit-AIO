@@ -246,6 +246,14 @@ class WebhookAdapter(BasePlatformAdapter):
         # Opt-in per-route debounce of rapid same-entity events (route ``coalesce`` block). #92066
         self._coalescer = WebhookCoalescer(dispatch=self._spawn_agent_run, render=self._render_prompt)
 
+    @property
+    def token(self):
+        # Bind native replay to the configured signing credentials. Static routes only: dynamic
+        # subscriptions hot-reload on every POST, and an unrelated ``webhook subscribe`` must not
+        # re-key the connector of already-admitted deliveries (their send() would see profile_mismatch).
+        return json.dumps([self._global_secret, {name: route.get("secret", self._global_secret)
+                           for name, route in self._static_routes.items()}], sort_keys=True)
+
     # --- Lifecycle ---
 
     def _validate_route(self, name: str, route: dict) -> None:
