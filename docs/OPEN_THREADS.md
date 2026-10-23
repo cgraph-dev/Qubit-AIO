@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 35 — 2026-10-23 (Telegram live; two skips closed)
+
+- ✅ Telegram is configured and connected in polling mode (`@hermes_2ilminaltdmccwkh_bot`, owner chat); `getMe`/`getChat` OK.
+- ✅ The two "live Telegram" tests are hermetic (fixture BotAPI). Their blocker was the DELETE-mode `state.db` read lock (5 s default). Bound at 30 s, no assertion change: startup/SIGKILL recovery 1 passed; pause notice 2 passed (`deaed99e7`, re-run on merged `main`).
+- 🟡 Real round-trip: bot sent message_id 241 asking the owner to reply `TG_E2E_OK_20261023`; awaiting the reply, then verify the gateway session/response.
+- 🔴 Remaining: the real round-trip acceptance; no `VERIFIED`; B1 exclusion; remaining Windows/daemon/e2e skips; retirement not executed.
+
 ## Wave 34 — 2026-10-23 (frontend green; live E2E chat)
 
 - ✅ Backend regression (read-only): 30 files → **166 passed, 0 failed, 5 skipped** across all wave-32 surfaces.
