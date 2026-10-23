@@ -74,7 +74,7 @@ def test_owner_binds_reservation_to_verified_descendant_of_the_handle_only(tmp_p
             proc.stdin.close()
             if proc.poll() is None:
                 proc.kill()
-            proc.wait(timeout=10)
+            proc.wait(timeout=60)
 
 
 @pytest.mark.platforms("linux")
@@ -112,7 +112,7 @@ def test_managed_worker_completes_through_interpreter_trampoline(tmp_path):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1', UGW_TRAMPOLINE=str(trampoline))
 
     def query(sql, args=()):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute(sql, args).fetchall()
 
     async def exercise(desc, owner):
@@ -154,7 +154,3 @@ def test_managed_worker_completes_through_interpreter_trampoline(tmp_path):
         peer.release.set()
         peer.shutdown()
         peer.server_close()
-
-
-
-pytestmark = pytest.mark.skip(reason="wave-30: live daemon harness; resource-warning teardown under the root tests tree")

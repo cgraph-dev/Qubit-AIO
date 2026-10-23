@@ -49,7 +49,7 @@ def _owner(tmp_path):
                TELEGRAM_BOT_TOKEN='987654321:owned-loopback-fixture', TELEGRAM_ALLOWED_USERS='202')
 
     def status():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return {json.loads(payload)['text']: state for state, payload in db.execute(
                 'SELECT status,payload_json FROM session_admissions')}
 
@@ -103,5 +103,3 @@ def test_reply_of_a_turn_lost_before_its_terminal_commit_is_never_delivered(tmp_
         crashed, delivered, inferences = probe.crash_then_restart('KILL_BEFORE_COMMIT')
         assert crashed == 'started' and probe.status()['KILL_BEFORE_COMMIT'] == 'unknown', probe.diagnostic()
         assert (delivered, inferences) == (0, 1), probe.diagnostic()
-
-pytestmark = pytest.mark.skip(reason="wave-31: live Telegram polling daemon + SIGKILL recovery harness unavailable in this hermetic tree")

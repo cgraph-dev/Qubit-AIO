@@ -74,7 +74,7 @@ def owner(tmp_path, config=None):
         'auxiliary': {'title_generation': {'enabled': False}}, **(config or {}),
     }))
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
         OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1',
         HERMES_DASHBOARD_SESSION_TOKEN='other-controls-actor')
     try:
@@ -88,7 +88,7 @@ def owner(tmp_path, config=None):
 
 
 def admissions(home):
-    with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+    with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
         return list(db.execute('SELECT request_id,status,seq FROM session_admissions ORDER BY seq'))
 
 

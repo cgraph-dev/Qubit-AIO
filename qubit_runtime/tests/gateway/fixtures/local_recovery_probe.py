@@ -93,7 +93,7 @@ def daemon(root, home, env, *, barrier, fixture='local_recovery_daemon.py'):
         finally:
             if proc.poll() is None:
                 proc.kill()
-            proc.wait(timeout=10)
+            proc.wait(timeout=60)
 
 
 def probe(tmp_path):

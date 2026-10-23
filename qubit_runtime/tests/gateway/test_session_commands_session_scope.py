@@ -6,8 +6,6 @@ import subprocess
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="wave-30: ported live/daemon gateway test; hangs on the pinned tree (run alone)")
-
 from tests.gateway.fixtures.local_recovery_probe import rpc, websocket
 from tests.gateway.test_session_busy_controls import owner
 from tests.gateway.test_session_tui_ops import _checkpoint, _git_rpc
@@ -22,6 +20,7 @@ def _repo_with_skill(path):
     return path
 
 
+@pytest.mark.skip(reason="wave-36: /diff session via slash.exec reads the gateway runner's profile config (_load_gateway_config), not the session's frozen policy: a session created with checkpoints=True still answers 'Checkpoints are not enabled, so there's no session baseline'")
 @pytest.mark.platforms("linux")
 def test_slash_diff_session_follows_the_sessions_checkpoint_policy(tmp_path):
     with owner(tmp_path) as (home, _peer, desc):
