@@ -39,7 +39,9 @@ class ACPPeer:
             frame = json.loads(line)
             self.frames.append(frame)
             future = self.requests.get(frame.get("id"))
-            if future and ("result" in frame or "error" in frame):
+            # A client-side timeout cancels the future; a late answer for it must not crash
+            # the reader (that surfaced as a teardown InvalidStateError, masking the timeout).
+            if future and not future.done() and ("result" in frame or "error" in frame):
                 future.set_result(frame)
 
     async def rpc(self, method, **params):
@@ -49,7 +51,9 @@ class ACPPeer:
         self.requests[rid] = future
         self.process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": rid, "method": method, "params": params}).encode() + b"\n")
         await self.process.stdin.drain()
-        return await asyncio.wait_for(future, 40)
+        # The adapter opens its own writer on the shared state.db; when the host cannot use WAL
+        # (DELETE journal mode) it can wait out SessionDB's 20s write patience before answering.
+        return await asyncio.wait_for(future, 90)
 
 
 @asynccontextmanager
