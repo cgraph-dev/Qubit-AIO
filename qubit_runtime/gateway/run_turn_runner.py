@@ -1908,7 +1908,9 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         platform_key = policy.platform if policy else (
             "cli" if ctx.source.platform == Platform.LOCAL else ctx.source.platform.value)
         combined_ephemeral = self._combined_ephemeral_prompt(policy)
-        max_iterations = _current_max_iterations()
+        # A local session runs the launch cap it was created with (the pin's ``policy.max_turns``),
+        # never the profile's current ``agent.max_turns``.
+        max_iterations = policy.max_turns if policy else _current_max_iterations()
         # A RoomLink member turn runs under the authority its target advertised: the room's iteration
         # cap and toolset ceiling replace the gateway's, and both have to be fixed BEFORE the agent is
         # resolved (upstream :1168-1172). ``run_sync`` already opened the scope that binds this policy.
