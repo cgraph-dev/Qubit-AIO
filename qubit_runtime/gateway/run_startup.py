@@ -1561,6 +1561,14 @@ class GatewayStartupMixin:
         await self._finish_startup_restore()
         from gateway.run_runtime import recover_gateway_native_sessions
         await recover_gateway_native_sessions(self)
+        # Queued API turns settle once the real API adapter is published: the launch profile here,
+        # a hot-served secondary in ``serve_profile_runtime``. Without this a committed /v1/runs
+        # admission stays queued forever across a restart.
+        from gateway.config import Platform
+        api = (getattr(self, 'adapters', None) or {}).get(Platform.API_SERVER)
+        if api is not None:
+            from gateway.session_api_turn import recover_api_turns
+            recover_api_turns(api)
         # Surface state.db init failures to messaging platforms before the user loses data.
         # See #88235.
         await self._send_session_db_warning_notifications()

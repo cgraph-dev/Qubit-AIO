@@ -15,7 +15,6 @@ import pytest
 from tests.waiting import async_wait_until
 
 
-@pytest.mark.skip(reason="wave-31: after SIGKILL restart the queued /v1/runs admission never settles; AssertionError: timed out after 20s waiting for the recovered safe run to settle (reproduced twice)")
 def test_api_crash_queue_and_identified_result_retry(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -43,7 +42,9 @@ def test_api_crash_queue_and_identified_result_retry(tmp_path):
     def rows():
         # Canonical OpenAI-compat identities are ``chat:<auth namespace>:<Idempotency-Key>``;
         # index them by the client key so the assertions stay about admission status.
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        # state.db falls back to rollback-journal mode on this host's linked SQLite; a reader
+        # then waits out the owner's commit instead of failing on SQLITE_BUSY immediately.
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             return {('chat:' + rid.rsplit(':', 1)[1] if rid.startswith('chat:') else rid): status
                     for rid, status in db.execute('SELECT request_id,status FROM session_admissions')}
 
