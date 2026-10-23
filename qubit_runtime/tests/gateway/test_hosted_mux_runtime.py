@@ -59,7 +59,6 @@ def mux(tmp_path, monkeypatch, request):
             process_ownership.release(home)
 
 
-@pytest.mark.skip(reason="wave-31: _ensure_hosted_room_worker() starts/returns tui_gateway.hosted_room_service.HostedRoomService, not the launch authority's gateway.session_hosted_service.CanonicalHostedRoomService (two services under multiplex)")
 def test_hosted_lifecycle_serves_and_stops_every_authority(mux):
     from gateway.run_runtime import recover_gateway_native_sessions
     from gateway.session_hosted_service import stop_hosted_service
