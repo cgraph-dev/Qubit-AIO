@@ -363,7 +363,7 @@ class GatewayRuntimeAPI:
             await ws.close(code=4403)
             return
         # The ticket names the served profile; this connection binds to that home's authority.
-        scope['hermes.session_authority'] = authority
+        scope['qubit.session_authority'] = authority
         from gateway.session_contract import CANONICAL_GATEWAY_PROTOCOL
         from tui_gateway.ws import handle_ws
         from gateway.session_authorities import owner_scope
