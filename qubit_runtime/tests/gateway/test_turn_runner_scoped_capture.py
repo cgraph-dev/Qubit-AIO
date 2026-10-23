@@ -22,6 +22,7 @@ from gateway.session import SessionSource
 from gateway.turn_context import TurnContext
 
 SEEN = {}
+ADOPTED = {}
 
 
 class _Agent:
@@ -55,6 +56,7 @@ def _isolated_home(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     SEEN.clear()
+    ADOPTED.clear()
 
 
 def _gateway_runner():
@@ -96,9 +98,16 @@ def _authority(session_id="c"):
     from gateway.session_events import SessionEvents
 
     return SimpleNamespace(
+        # Relative, like the gateway fixture: ``_read_prefill`` resolves it to ``QUBIT_HOME``.
+        profile_id="default",
+        runner=SimpleNamespace(_prefill_messages=None),
         sessions={session_id: SimpleNamespace(event_stream=SessionEvents())},
         db=SimpleNamespace(get_session=lambda sid: {"runtime_generation": 7}),
         logical_owner=lambda sid: "canonical-" + sid,
+        # The turn installs its agent for the running claim; the fake records the exact
+        # ``(session_id, generation, agent)`` contract the production path calls.
+        adopt_agent=lambda session_id, generation, agent: ADOPTED.update(
+            session_id=session_id, generation=generation, agent=agent),
         publish_execution=lambda *a, **k: True,
         check_approval_generation=lambda *a, **k: None,
         api_observers={},
@@ -163,7 +172,7 @@ def test_request_without_model_options_keeps_the_sessions_settings():
     assert SEEN["service_tier"] == "gateway-default-tier"
 
 
-def test_classic_cli_turn_fields_reach_the_settled_receipt():
+def test_classic_cli_turn_fields_reach_the_settled_receipt(tmp_path):
     """``run_classic_cli_turn`` stashes the receipt-only fields; the outer turn half must merge them.
 
     ``local_viewer_turn`` / ``policy_for_source`` are stubbed to *classify* this turn as a classic
@@ -177,7 +186,12 @@ def test_classic_cli_turn_fields_reach_the_settled_receipt():
 
     progress_local_viewer, policy_for_source = progress.local_viewer_turn, policy_mod.policy_for_source
     progress.local_viewer_turn = lambda runner: True
-    policy_mod.policy_for_source = lambda runner, source: SimpleNamespace(platform="cli")
+    # A real policy, not a bare namespace: ``policy_scope`` reads its frozen terminal,
+    # follows-profile record and client-env scope, so the turn exercises the live contract.
+    cli_policy = policy_mod.LocalSessionPolicy(
+        source="cli", platform="cli", cwd=str(tmp_path), model=None, toolsets=(),
+        config_json="{}", request_json="{}", terminal_json="{}")
+    policy_mod.policy_for_source = lambda runner, source: cli_policy
     captured = {}
     etok, atok = execution_result.set(captured), api_execution.set(None)
     try:
