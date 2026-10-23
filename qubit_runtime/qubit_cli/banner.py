@@ -493,6 +493,7 @@ def _mcp_server_line(srv: dict, *, dim: str, text: str) -> str:
                 f"[{text}]{srv['tools']} tool(s)[/] [dim {dim}](lazy, starts on first use)[/]")
     status = "disabled" if srv.get("disabled") else srv.get("status")
     suffix = {"disabled": f"[dim {dim}]— disabled[/]", "connecting": "[yellow]— connecting[/]",
+              "unavailable": f"[dim {dim}]— unavailable[/]",
               "configured": f"[dim {dim}]— configured[/]"}.get(status)
     if suffix is not None:
         return f"[dim {dim}]{name}[/] [dim]({transport})[/] {suffix}"

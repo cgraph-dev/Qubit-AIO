@@ -185,7 +185,21 @@ class MCPServerRunMixin:
             self._last_park_line = line
             logger.warning(msg, *args)
 
-    async def _park(self, revival_reason: str) -> bool:
+    @property
+    def _unavailable_key(self):
+        """Ledger key this task's availability record belongs to."""
+        return self._connection_key or self.name
+
+    def _record_unavailable(self, reason: str) -> None:
+        """Publish a terminal-for-process availability state discovery/status can read."""
+        from tools import mcp_tool_discovery as _discovery
+        _discovery._mark_server_unavailable(self._unavailable_key, reason)
+
+    def _clear_unavailable(self) -> None:
+        from tools import mcp_tool_discovery as _discovery
+        _discovery._clear_server_unavailable(self._unavailable_key)
+
+    async def _park(self, revival_reason: str, *, auth_rejection: bool = False) -> bool:
         """Drop this server's tools and wait for a reconnect request; True when shutdown came instead.
         The run task must NOT exit (it is the only ``_reconnect_event`` listener, so returning
         leaves the server unrevivable). With tools deregistered no call can reach the breaker
@@ -200,12 +214,23 @@ class MCPServerRunMixin:
         # immediately.
         self._was_parked = True
         self._park_reason = revival_reason
+        self._auth_park_rejection = bool(auth_rejection)
         self._deregister_tools()
         self._reconnect_event.clear()
         paused = False
+        # An auth-rejected endpoint is re-probed with exponential backoff and a bounded budget:
+        # an unbounded self-probe hammered a permanent 401 every _PARKED_RETRY_INTERVAL for the
+        # life of the process. After the budget the task waits for an explicit reconnect (manual
+        # /reload-mcp, `qubit mcp login`) and is recorded unavailable for discovery.
+        if self._auth_park_terminal:
+            timeout: Optional[float] = None
+        elif self._auth_park_rejection:
+            timeout = min(_core._PARKED_RETRY_INTERVAL * (2 ** max(0, self._auth_self_probes - 1)),
+                          _core._AUTH_PARK_MAX_BACKOFF_SEC)
+        else:
+            timeout = _core._PARKED_RETRY_INTERVAL
         while True:
-            outcome = await self._wait_for_reconnect_or_shutdown(
-                timeout=_core._PARKED_RETRY_INTERVAL)
+            outcome = await self._wait_for_reconnect_or_shutdown(timeout=timeout)
             if outcome == "shutdown":
                 return True
             # A disabled or deleted config entry must stop the self-probe here: the probe
@@ -222,6 +247,21 @@ class MCPServerRunMixin:
                     "self-probe until it is re-enabled", self.name)
                 paused = True
                 continue
+            if outcome == "self-probe" and self._auth_park_rejection:
+                if self._auth_self_probes >= _core._AUTH_PARK_MAX_SELF_PROBES:
+                    self._auth_park_terminal = True
+                    reason = (f"authentication rejected on {self._auth_self_probes} bounded revival "
+                              f"probe(s); not retried until an explicit reconnect or credential change")
+                    self._record_unavailable(reason)
+                    logger.warning(
+                        "MCP server '%s': %s (state: parked → unavailable for this process)",
+                        self.name, reason)
+                    timeout = None
+                    paused = True
+                    continue
+                self._auth_self_probes += 1
+                timeout = min(_core._PARKED_RETRY_INTERVAL * (2 ** (self._auth_self_probes - 1)),
+                              _core._AUTH_PARK_MAX_BACKOFF_SEC)
             # Nobody asked for this revival: a self-probe must never open a browser OAuth flow. The
             # OAuth provider runs inside THIS task (the SDK's auth flow sits in the transport), so a
             # task-local ContextVar reaches it; it stays set for the task's life — every later
@@ -231,6 +271,12 @@ class MCPServerRunMixin:
                 from tools.mcp_oauth import _oauth_interactive_enabled
 
                 _oauth_interactive_enabled.set(False)
+            else:
+                # An explicit reconnect (manual refresh / `qubit mcp login`) resets the bounded
+                # budget and clears the terminal record so a fixed credential can take effect.
+                self._auth_park_terminal = False
+                self._auth_self_probes = 0
+                self._clear_unavailable()
             logger.debug(
                 "MCP server '%s': attempting revival %s (%s); rebuilding transport.",
                 self.name,
@@ -415,18 +461,20 @@ class MCPServerRunMixin:
         self.session = None
         return True
 
-    async def _park_and_rearm(self, revival_reason: str, budget: _RetryBudget) -> bool:
+    async def _park_and_rearm(self, revival_reason: str, budget: _RetryBudget, *,
+                              auth_rejection: bool = False) -> bool:
         """Park; on revival leave ONE probe per wake so a still-dead server re-parks instead of
         burning 5 rapid retries. False on shutdown."""
-        if await self._park(revival_reason):
+        if await self._park(revival_reason, auth_rejection=auth_rejection):
             return False
         self._reconnect_retries, budget.backoff = _core._MAX_RECONNECT_RETRIES, 1.0
         return True
 
-    async def _park_initial_failure(self, exc: Exception, revival_reason: str, budget: _RetryBudget) -> bool:
+    async def _park_initial_failure(self, exc: Exception, revival_reason: str, budget: _RetryBudget, *,
+                                    auth_rejection: bool = False) -> bool:
         """Publish ``exc`` to ``start()``, park, and on revival reset every counter. False on shutdown."""
         self._publish_error(exc)
-        if await self._park(revival_reason):
+        if await self._park(revival_reason, auth_rejection=auth_rejection):
             return False
         budget.initial_retries = self._reconnect_retries = 0
         budget.backoff = 1.0
@@ -481,12 +529,14 @@ class MCPServerRunMixin:
         if failure_class == "permanent":
             # Deterministic failure (bad command, non-MCP URL, 401/403): park at once; auth
             # failures park (not return) so the task can pick up fresh tokens later.
+            auth_rejection = _errors._is_auth_rejection(root)
             detail = (f"authentication, parking until credentials change; re-authenticate with "
-                      f"`qubit mcp login {self.name}`" if _errors._is_auth_error(root)
+                      f"`qubit mcp login {self.name}`" if auth_rejection
                       else "connection with a permanent error, parking without retries")
             self._log_park("MCP server '%s' failed initial %s (state: connecting → parked): %s: %s",
                            self.name, detail, type(root).__name__, root)
-            return await self._park_initial_failure(exc, "after permanent initial failure", budget)
+            return await self._park_initial_failure(exc, "after permanent initial failure", budget,
+                                                    auth_rejection=auth_rejection)
         budget.initial_retries += 1
         if budget.initial_retries > _core._MAX_INITIAL_CONNECT_RETRIES:
             self._log_park(
@@ -520,7 +570,8 @@ class MCPServerRunMixin:
         self._log_park(
             "MCP server '%s' hit a permanent error, parking without retries; will self-probe every %ds "
             "(state: connected → parked): %s: %s", self.name, _core._PARKED_RETRY_INTERVAL, type(root).__name__, root)
-        return await self._park_and_rearm("from parked state (permanent error)", budget)
+        return await self._park_and_rearm("from parked state (permanent error)", budget,
+                                          auth_rejection=_errors._is_auth_rejection(root))
 
     async def start(self, config: dict):
         """Create the background Task and wait until ready (or failed)."""

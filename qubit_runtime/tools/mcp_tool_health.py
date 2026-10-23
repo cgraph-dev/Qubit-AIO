@@ -212,6 +212,16 @@ class MCPServerHealthMixin:
         self._session_proven = True
         self._reconnect_retries = 0
         self._park_reason = None
+        # A proven session clears the bounded auth-rejection budget and any terminal record:
+        # fresh credentials/endpoint work now, and a later outage gets its own budget.
+        self._auth_park_rejection = False
+        self._auth_self_probes = 0
+        self._auth_park_terminal = False
+        try:
+            from tools import mcp_tool_discovery as _discovery
+            _discovery._clear_server_unavailable(self._connection_key or self.name)
+        except Exception:
+            logger.debug("MCP server '%s': clearing availability record failed", self.name, exc_info=True)
         if self._was_parked:
             self._was_parked = False
             logger.warning("MCP server '%s': revived — session healthy again after "

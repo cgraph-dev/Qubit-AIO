@@ -242,6 +242,12 @@ _MAX_BACKOFF_SECONDS = 60
 _RECYCLED_RECONNECT_TIMEOUT = 15.0
 # Parked servers (tools deregistered) self-probe on this cadence: nothing else can revive them.
 _PARKED_RETRY_INTERVAL = 300
+# An auth-rejected (401/403) server is re-probed a bounded number of times with exponential
+# backoff, then recorded unavailable for the rest of the process. An explicit reconnect
+# (manual /reload-mcp or `qubit mcp login`) still revives it; unbounded self-probing is what
+# hammered a permanently-rejecting endpoint every 5 minutes forever.
+_AUTH_PARK_MAX_SELF_PROBES = 5
+_AUTH_PARK_MAX_BACKOFF_SEC = 3600.0
 # Bounded wait for a respawned stdio child when a call finds it dead (gateway restarts kill
 # every MCP child); bounded so a broken server still parks via run()'s rapid-drop budget.
 _STDIO_RESPAWN_WAIT_SEC = 15.0
@@ -322,7 +328,8 @@ class MCPServerTask(MCPServerRunMixin, MCPServerTransportMixin, MCPServerHealthM
         "_recycled_reason", "initialize_result", "_ping_unsupported", "_list_cache_meta",
         "_reconnect_retries", "_session_proven", "_was_parked", "_auth_park", "_inflight_tasks", "_reconnecting",
         "_suspect_reason", "_teardown_race", "_permanent_grace_used", "_stdio_child_pids",
-        "_ever_connected", "_sse_fallback", "_park_reason", "_last_park_line", "_resolved_identity")
+        "_ever_connected", "_sse_fallback", "_park_reason", "_last_park_line", "_resolved_identity",
+        "_connection_key", "_auth_park_rejection", "_auth_self_probes", "_auth_park_terminal")
 
     def __init__(self, name: str):
         self.name = name
@@ -370,6 +377,14 @@ class MCPServerTask(MCPServerRunMixin, MCPServerTransportMixin, MCPServerHealthM
         # Digest of the resolved inputs the transport last connected with; a cross-profile adopter
         # must resolve the same digest in its own scope. None until the transport publishes it.
         self._resolved_identity: Optional[str] = None
+        # Connection-ledger key this task was adopted under, so a terminal availability record
+        # lands in the same profile scope discovery/status read (None until adopted).
+        self._connection_key: Optional[Any] = None
+        # Bounded auth-rejection self-probe budget (401/403): after the budget the server is
+        # recorded unavailable for the process instead of probing every _PARKED_RETRY_INTERVAL.
+        self._auth_park_rejection: bool = False
+        self._auth_self_probes: int = 0
+        self._auth_park_terminal: bool = False
         # In-flight RPC tasks so a deliberate teardown fails them fast; _reconnecting is True
         # during that teardown so _track_inflight_rpc turns the cancel into a retryable error.
         # In-flight RPC bookkeeping (#48069 salvage): user-visible requests registered while running so a
@@ -434,6 +449,11 @@ _server_scope_keys: Dict[Any, Optional[str]] = {}
 _server_tool_scopes: Dict[Any, set] = {}
 _server_connecting: set = set()
 _server_connect_errors: Dict[Any, str] = {}
+# Servers that are terminal for THIS process: an unresolved required ${VAR} reference (never
+# spawnable without a restart that reloads the environment) or an auth-rejected endpoint that
+# exhausted its bounded self-probe budget. Keyed by connection key; cleared by an explicit
+# reload/revival, never retried by discovery on its own.
+_server_unavailable: Dict[Any, str] = {}
 # adopter scope -> server names whose shared connection an owner's scoped shutdown tore down;
 # drained by the next discovery pass so the adopter is re-registered (see mcp_tool_lifecycle).
 _orphaned_adopters: Dict[str, set] = {}

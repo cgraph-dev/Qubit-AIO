@@ -154,6 +154,16 @@ def _contains_only_cancellation(exc: BaseException) -> bool:
     return isinstance(exc, asyncio.CancelledError)
 
 
+def _is_auth_rejection(exc: BaseException) -> bool:
+    """True for an authentication/authorization REJECTION (401 or 403), including the
+    HTTPStatusError shape _is_auth_error's type gate can miss when the auth classes are not
+    importable yet. Used to bound self-probing of an endpoint that keeps refusing us."""
+    root = _unwrap_exception_group(exc)
+    if _is_auth_error(root):
+        return True
+    return getattr(getattr(root, "response", None), "status_code", None) in (401, 403)
+
+
 def _auth_error_detail(exc: BaseException) -> str:
     """`` <guidance>`` when *exc* (or its group root) is the SDK's ``OAuthRegistrationError``, else ``""``. The DCR
     guard in ``HermesMCPOAuthProvider`` raises one naming the next step (pre-register an OAuth client), and the
