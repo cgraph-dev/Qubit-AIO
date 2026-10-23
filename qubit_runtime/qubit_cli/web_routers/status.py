@@ -120,6 +120,7 @@ async def get_health():
     """Lightweight process liveness for desktop/backend readiness probes."""
     info = get_version_info()
     return {"ok": True, "version": info.base_version, "displayVersion": info.display_version,
+            "commit": info.commit,
             "auth_required": bool(getattr(app.state, "auth_required", False))}
 
 

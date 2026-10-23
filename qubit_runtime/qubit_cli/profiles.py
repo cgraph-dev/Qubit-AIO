@@ -924,7 +924,7 @@ def _cached_skill_count(profile_dir: Path) -> int:
             _SKILL_COUNT_NEXT_CHECK[key] = now + _SKILL_COUNT_RECHECK_SECONDS
     if due:
         threading.Thread(target=_count_skills, args=(profile_dir,),
-                         name="hermes-skill-count", daemon=True).start()
+                         name="qubit-skill-count", daemon=True).start()
     cached = _SKILL_COUNT_CACHE.get(key)
     return cached[2] if cached is not None else 0
 

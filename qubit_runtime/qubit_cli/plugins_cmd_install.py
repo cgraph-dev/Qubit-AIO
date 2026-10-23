@@ -757,7 +757,7 @@ def _resolve_source(identifier: str, catalog_name: Optional[str]) -> tuple:
     if catalog_name:
         entry = catalog.get_live_catalog_entry(catalog_name)
         if entry is None:
-            return None, identifier, warnings, {"ok": False, "error": f"'{catalog_name}' is not in the Hermes plugin catalog."}
+            return None, identifier, warnings, {"ok": False, "error": f"'{catalog_name}' is not in the Qubit plugin catalog."}
         warnings.extend(_known_issue_warnings(entry))
         identifier = entry.install_identifier
     else:
