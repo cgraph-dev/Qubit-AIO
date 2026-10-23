@@ -50,7 +50,11 @@ async def _build_profile_authority(runner, name, home, *, register):
             authority = await initialize_session_authority(
                 runner, profile_id=str(home), instance_id=instance_id, db=db, register=register)
         except BaseException:
-            registry.remove(home)
+            # The launch slot is reserved but is never removable: remove() deliberately refuses it,
+            # and calling it here masked a startup cancellation (SIGINT while the epoch was being
+            # opened) as a misleading ``the launch session authority cannot be removed`` crash.
+            if not register:
+                registry.remove(home)
             raise
     registry.replace(home, authority)
     return authority
