@@ -9,6 +9,8 @@
  */
 import { useEffect, useState } from "react";
 
+import { copyTextToClipboard } from "@/lib/clipboard";
+
 import {
   SettingsPage,
   SettingsPageHeader,
@@ -45,13 +47,9 @@ async function probeGateway(timeoutMs = 5000): Promise<Health> {
 }
 
 function copyText(value: string) {
-  const done = () => undefined;
-  try {
-    const p = navigator.clipboard?.writeText(value);
-    if (p && typeof p.then === "function") p.then(done, done);
-  } catch {
-    /* clipboard unavailable — the value is still shown as text */
-  }
+  // The one shared helper (lib/clipboard.ts): the guard forbids direct
+  // navigator.clipboard writes outside it.
+  void copyTextToClipboard(value);
 }
 
 export default function OmniRoutePage() {

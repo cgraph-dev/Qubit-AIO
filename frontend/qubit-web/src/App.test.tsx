@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { renderToStaticMarkup } from "react-dom/server";
 import App from "./App";
@@ -15,8 +15,8 @@ vi.mock("@/themes", () => ({ useTheme: () => ({ theme: {} }) }));
 vi.mock("@/hooks/useSidebarStatus", () => ({ useSidebarStatus: () => null }));
 vi.mock("@/contexts/useSystemActions", () => ({ useSystemActions: () => ({}) }));
 vi.mock("@/contexts/useProfileScope", () => ({ useProfileScope: () => ({}) }));
-vi.mock("@/contexts/ProfileProvider", () => ({ ProfileProvider: ({ children }: { children: any }) => children }));
-vi.mock("@/contexts/PageHeaderProvider", () => ({ PageHeaderProvider: ({ children }: { children: any }) => children }));
+vi.mock("@/contexts/ProfileProvider", () => ({ ProfileProvider: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/contexts/PageHeaderProvider", () => ({ PageHeaderProvider: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@/components/SidebarFooter", () => ({ SidebarFooter: () => null }));
 vi.mock("@/components/SidebarStatusStrip", () => ({ SidebarStatusStrip: () => null, gatewayLine: () => ({ tone: "text-success", label: "ok" }) }));
 vi.mock("@/components/AuthWidget", () => ({ AuthWidget: () => null }));

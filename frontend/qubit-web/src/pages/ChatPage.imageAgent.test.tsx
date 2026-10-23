@@ -55,17 +55,27 @@ const apiMocks = vi.hoisted(() => ({
   })),
   patchChatSession: vi.fn(async () => ({ ok: true })),
   // The fix: image -> one agent turn via the canonical vision + agent backend.
-  submitChatImage: vi.fn(
-    async (_dataUrl: string, _session: string, _prompt = "") => ({
-      ok: true,
-      reply: "The image shows a bar chart of quarterly revenue.",
-      description: "a bar chart",
-      vision_model: "qwen3-vl:4b",
-      receipt: { model: "qwen3-vl:4b" },
-    }),
-  ),
+  submitChatImage: vi.fn<
+    (
+      dataUrl: string,
+      session: string,
+      prompt?: string,
+    ) => Promise<{
+      ok: boolean;
+      reply: string;
+      description: string;
+      vision_model: string;
+      receipt: { model: string };
+    }>
+  >(async () => ({
+    ok: true,
+    reply: "The image shows a bar chart of quarterly revenue.",
+    description: "a bar chart",
+    vision_model: "qwen3-vl:4b",
+    receipt: { model: "qwen3-vl:4b" },
+  })),
   // Documents keep the extract-to-composer path.
-  extractChatFile: vi.fn(async (_dataUrl: string, _filename: string) => ({
+  extractChatFile: vi.fn(async () => ({
     text: "EXTRACTED DOCUMENT TEXT",
     kind: "pdf",
   })),

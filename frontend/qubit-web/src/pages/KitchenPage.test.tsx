@@ -65,7 +65,7 @@ describe("KitchenPage", () => {
     expect(container.textContent).toContain("Kitchen");
     expect(container.textContent).toContain("Nothing staged yet");
     // The page is honest that intake is not wired yet.
-    expect(container.textContent).toContain("not wired to a backend");
+    expect(container.textContent).toContain("Stages 3-4 remain unimplemented");
   });
 
   it("stages a repo and shows the integration pipeline", async () => {

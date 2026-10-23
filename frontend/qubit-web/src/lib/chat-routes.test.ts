@@ -83,6 +83,8 @@ describe("chat-routes", () => {
       "/webchat",
       "/qubit-bot",
       "/qubit-office",
+      "/qubit-office2",
+      "/qubit-office3",
     ]);
   });
 });
