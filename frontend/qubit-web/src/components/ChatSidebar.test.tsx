@@ -421,6 +421,50 @@ describe("ChatSidebar SSE event feed", () => {
     expect(onSessionModelChange).not.toHaveBeenCalled();
   });
 
+  it("does not re-read the model for a journal replay of other sessions", async () => {
+    // The durable journal replays thousands of historical frames on connect.
+    // Only OUR session (or an id-less broadcast) may refresh the model card;
+    // otherwise a page load fans out one config/model read per history frame.
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" sessionId="dashboard-mine" />);
+    await flushMicrotasks();
+    const before = apiMocks.getModelInfo.mock.calls.length;
+
+    for (let i = 0; i < 20; i += 1) {
+      stream.send(
+        `id: ${100 + i}\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-other","session":{"id":"dashboard-other","model":"x"}}}\n\n`,
+      );
+    }
+    await flushMicrotasks();
+
+    expect(apiMocks.getModelInfo.mock.calls.length).toBe(before);
+  });
+
+  it("coalesces a burst of our own session frames into one model read", async () => {
+    vi.useFakeTimers();
+    const { ChatSidebar } = await import("./ChatSidebar");
+
+    await render(<ChatSidebar channel="chat-1" sessionId="dashboard-mine" />);
+    await flushMicrotasks();
+    expect(apiMocks.getModelInfo).toHaveBeenCalled();
+    const before = apiMocks.getModelInfo.mock.calls.length;
+
+    for (let i = 0; i < 10; i += 1) {
+      stream.send(
+        `id: ${200 + i}\ndata: {"type":"CUSTOM","name":"session.updated","value":{"session_id":"dashboard-mine","session":{"id":"dashboard-mine","model":"deepseek-v4.1-flash"}}}\n\n`,
+      );
+    }
+    await flushMicrotasks();
+    expect(apiMocks.getModelInfo.mock.calls.length).toBe(before);
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+    await flushMicrotasks();
+
+    expect(apiMocks.getModelInfo.mock.calls.length).toBe(before + 1);
+  });
+
   it("re-reads the effective model on a live model.changed frame", async () => {
     const { ChatSidebar } = await import("./ChatSidebar");
 
@@ -431,6 +475,9 @@ describe("ChatSidebar SSE event feed", () => {
     stream.send(
       'id: 9\ndata: {"type":"CUSTOM","name":"model.changed","value":{"provider":"opencode-go","model":"deepseek-v4.1-flash","scope":"main"}}\n\n',
     );
+    // Live model events are coalesced with a short trailing window so a
+    // journal replay of many model.changed frames is one re-read, not one each.
+    await new Promise((resolve) => setTimeout(resolve, 250));
     await flushMicrotasks();
 
     expect(apiMocks.getModelInfo.mock.calls.length).toBeGreaterThan(before);

@@ -190,6 +190,32 @@ export function ChatSidebar({
   // session.updated / model.changed without re-dialing the stream.
   const refreshEffectiveModelRef = useRef(refreshEffectiveModel);
   refreshEffectiveModelRef.current = refreshEffectiveModel;
+  // The server replays the durable journal on connect (thousands of historical
+  // frames). A per-session frame used to fan out one model+config read EACH,
+  // turning a page load into a burst of hundreds of requests. Coalesce live
+  // frames into one refresh per short window; user actions and model.changed
+  // still refresh immediately.
+  const effectiveRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const scheduleEffectiveModelRefresh = useCallback(() => {
+    if (effectiveRefreshTimerRef.current) {
+      clearTimeout(effectiveRefreshTimerRef.current);
+    }
+    effectiveRefreshTimerRef.current = setTimeout(() => {
+      effectiveRefreshTimerRef.current = null;
+      refreshEffectiveModelRef.current();
+    }, 200);
+  }, []);
+  useEffect(
+    () => () => {
+      if (effectiveRefreshTimerRef.current) {
+        clearTimeout(effectiveRefreshTimerRef.current);
+        effectiveRefreshTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   // Profile or chat channel change tears down the stream. Bump `version` (same
   // path as the manual Reconnect button) so the SSE reader resubscribes —
@@ -330,14 +356,16 @@ export function ChatSidebar({
       const live = chatLiveFrame(frame as unknown as Record<string, unknown>);
       if (!live) return;
       if (live.isModelChange) {
-        refreshEffectiveModelRef.current();
+        scheduleEffectiveModelRefresh();
         return;
       }
       if (live.isSession) {
+        const isOurs =
+          !!live.sessionId && !!sessionId && live.sessionId === sessionId;
         // Our own session changed (a per-session model pick writes
         // session.updated): relay the new model to the host and re-read the
-        // effective model so the card repaints immediately.
-        if (live.sessionId && sessionId && live.sessionId === sessionId) {
+        // effective model so the card repaints.
+        if (isOurs) {
           const m = live.session ? String(live.session.model || "") : "";
           if (m) onSessionModelChange?.(m);
         }
@@ -347,7 +375,12 @@ export function ChatSidebar({
         if (title !== undefined) {
           onSessionTitleChange?.(title);
         }
-        refreshEffectiveModelRef.current();
+        // Only OUR session (or a broadcast without a session id) can change
+        // the model card. The journal replay is mostly other sessions; reading
+        // config/model for each of those is the page-load request storm.
+        if (!live.sessionId || isOurs) {
+          scheduleEffectiveModelRefresh();
+        }
       }
     };
 
