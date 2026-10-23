@@ -20,7 +20,6 @@ def _repo_with_skill(path):
     return path
 
 
-@pytest.mark.skip(reason="wave-36: /diff session via slash.exec reads the gateway runner's profile config (_load_gateway_config), not the session's frozen policy: a session created with checkpoints=True still answers 'Checkpoints are not enabled, so there's no session baseline'")
 @pytest.mark.platforms("linux")
 def test_slash_diff_session_follows_the_sessions_checkpoint_policy(tmp_path):
     with owner(tmp_path) as (home, _peer, desc):

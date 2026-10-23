@@ -103,7 +103,6 @@ class GatewayProfileReconcileMixin:
         Other profiles' adapters are never touched. A new profile whose home another gateway owns or
         whose store is unusable is parked (logged, not served) and left for an explicit rescan.
         Returns ``{"added", "removed", "rescanned", "parked", "served_profiles"}``."""
-        from gateway.run import _multiplex_profile_homes
         result: Dict[str, Any] = {"added": [], "removed": [], "rescanned": [], "parked": [], "reason": reason}
         if not self._multiplex_on():
             return {**result, "multiplex": False, "served_profiles": self.served_profile_names()}
@@ -112,7 +111,10 @@ class GatewayProfileReconcileMixin:
             return {**result, "pending": True, "served_profiles": self.served_profile_names()}
         async with self._reconcile_lock():
             active = getattr(self, "_primary_profile_name", None) or "default"
-            live = {str(name): Path(home) for name, home in _multiplex_profile_homes(self.config)}
+            # The candidates are what exists under ``profiles/`` NOW; the served set is the
+            # process reservation (``_multiplex_profile_homes``), diffed against them below.
+            from qubit_cli.profiles import profiles_to_serve
+            live = {str(name): Path(home) for name, home in profiles_to_serve(multiplex=True)}
             listed = set(live)  # a probe skip below is not a deletion: it never clears a parked verdict
             known = dict(self._served_profile_homes or {})
             from gateway.status import live_gateway_pid_for_home
