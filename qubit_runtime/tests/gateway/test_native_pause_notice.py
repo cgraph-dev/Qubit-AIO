@@ -72,7 +72,6 @@ async def test_paused_fifo_releases_the_messaging_waiter_with_one_notice_per_epi
 
 @pytest.mark.skipif(importlib.machinery.PathFinder.find_spec("telegram") is None, reason="python-telegram-bot not installed (on-demand extra)")
 @pytest.mark.platforms("linux")
-@pytest.mark.skip(reason="wave-31: live Telegram polling daemon harness; state.db writer lock contention in this hermetic tree")
 def test_crash_mid_turn_then_platform_message_gets_one_pause_notice_and_reset_unpauses(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -99,7 +98,7 @@ def test_crash_mid_turn_then_platform_message_gets_one_pause_notice_and_reset_un
                TELEGRAM_BOT_TOKEN='987654321:owned-loopback-fixture', TELEGRAM_ALLOWED_USERS='202')
 
     def rows():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return {json.loads(payload)['text']: {'session': sid, 'status': status}
                     for sid, status, payload in db.execute(
                         'SELECT target_session_id,status,payload_json FROM session_admissions')}

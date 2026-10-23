@@ -102,7 +102,7 @@ def test_telegram_fifo_unknown_and_current_authorization_survive_sigkill(tmp_pat
                TELEGRAM_BOT_TOKEN='987654321:owned-loopback-fixture', TELEGRAM_ALLOWED_USERS='101,202,303')
 
     def rows():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return {json.loads(payload)['text']: {'id': aid, 'request_id': rid, 'session': sid, 'status': status}
                     for aid, rid, sid, status, payload in db.execute(
                         'SELECT admission_id,request_id,target_session_id,status,payload_json FROM session_admissions')}
@@ -177,4 +177,3 @@ def test_telegram_fifo_unknown_and_current_authorization_survive_sigkill(tmp_pat
 
 
 
-pytestmark = pytest.mark.skip(reason="wave-30: live daemon fixture absent under the root tests tree; authoritative copy is qubit_runtime/tests/gateway/test_native_telegram_startup_recovery.py")
