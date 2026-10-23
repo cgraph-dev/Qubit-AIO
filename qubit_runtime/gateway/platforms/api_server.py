@@ -4598,6 +4598,15 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         """Not used — the HTTP request/response cycle handles delivery directly."""
         return SendResult(success=False, error="API server uses HTTP request/response, not send()")
 
+    async def send_clarify(
+        self, chat_id: str, question: str, choices: Optional[list], clarify_id: str,
+        session_key: str, metadata: Optional[Dict[str, Any]] = None) -> SendResult:
+        """Acknowledge the clarify prompt; the shared ``pending_controls`` projection is the card.
+        The base implementation sends text through ``send()``, which this transport refuses, so a
+        clarify would be cleared as undelivered and never reach ``session.resume`` prompts."""
+        from gateway.platforms.api_server_authority_runs import send_clarify
+        return await send_clarify(self, chat_id=chat_id, clarify_id=clarify_id, metadata=metadata)
+
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
         """Return basic info about the API server."""
         return {"name": "API Server", "type": "api", "host": self._host, "port": self._port}
