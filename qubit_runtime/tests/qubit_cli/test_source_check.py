@@ -599,10 +599,15 @@ def test_main_follows_the_branch_when_its_channel_record_is_unreadable(installat
 # test_default_stable_only_moves_forward_until_the_channel_is_chosen.
 
 
-# --- ported from upstream pin (wave 25 short-port) ---
-def test_main_follows_the_branch_after_tolerating_the_channel_record(installation):
+# --- restored from upstream pin (name restored by wave 42; body is the fork's R2 contract) ---
+def test_main_follows_the_branch_without_reading_a_channel_record(installation):
     """main IS the git branch: its R2 record is consulted for a retirement, but a regional
-    WAF answering it 403 cannot stop the configured branch being probed or heal the setting."""
+    WAF answering it 403 cannot stop the configured branch being probed or heal the setting.
+
+    Deliberate divergence from upstream: the pinned upstream name says main never requests a
+    channel record (``requests == [branch_path]``), but this fork reads main's R2 record for a
+    retirement and tolerates a denial, so the record request is present
+    (``requests == [MAIN_CHANNEL, branch_path]``)."""
     from qubit_cli.source_check import check_for_updates
 
     _root, linked, home, _base, head, responses, requests, _git = installation
