@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from . import client as _client
 from . import activity as _activity
 from . import ember as _ember
+from . import frame_budget as _budget
 from . import mark as _mark
 from . import mark_field as _field
 from . import fullscreen as _fs
@@ -1283,6 +1284,43 @@ def _finite(v: Any, default: float = 0.0) -> float:
     return f if math.isfinite(f) else default
 
 
+def _color(r: Any, g: Any, b: Any, alpha_unit: Any) -> Any:
+    """A QColor from a 0..1 alpha, cached per quantised channel + alpha.
+
+    This function is called hundreds of times per frame, and a fresh QColor per
+    primitive was measurable churn (see the perf section of ORB_FX_SPEC.md).
+    Alpha is quantised in exactly the steps the previous callers kept —
+    ``int(255.0 * a)`` — so a cache hit returns a colour with the SAME byte
+    values: the look is unchanged, only the allocation is gone.
+    """
+    from PySide6.QtGui import QColor
+    try:
+        a = float(alpha_unit)
+    except (TypeError, ValueError):
+        a = 0.0
+    if a >= 1.0:
+        a8 = 255
+    elif a <= 0.0:
+        a8 = 0
+    else:
+        a8 = int(255.0 * a)
+    key = (r, g, b, a8)
+    got = _COLOR_CACHE.get(key)
+    if got is None:
+        got = QColor(r, g, b, a8)
+        if len(_COLOR_CACHE) > _COLOR_CACHE_MAX:
+            _COLOR_CACHE.clear()
+        _COLOR_CACHE[key] = got
+    return got
+
+
+#: Bounded cache of ``(r, g, b, a8) -> QColor``. Keyed on quantised bytes, so
+#: entries are few (the mark's palette is small) and a hit is byte-identical to
+#: constructing the colour.
+_COLOR_CACHE: Dict[Any, Any] = {}
+_COLOR_CACHE_MAX = 2048
+
+
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                 state: Any, brightness: float, family: Any) -> None:
     """Paint the Qubit mark from the shared rich animation field.
@@ -1323,9 +1361,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
 
     def _draw_glyph(gx: float, gy: float, ch: str, rgb: Any,
                     alpha: float, px: int) -> None:
-        """One text glyph, no per-call state push (brush is set by the caller)."""
-        p.setPen(QColor(rgb[0], rgb[1], rgb[2],
-                        _clamp8(255.0 * min(1.0, alpha))))
+        """One text glyph, no per-call state push (brush is set by the caller).
+
+        NO LOD gate here. A glyph is a text primitive whose alpha the caller has
+        already screened against the field's own ceiling, and the binary field
+        publishes ``alpha0 == alpha`` (no separate cycle peak) with a per-bit
+        range of 0.018-0.49. Gating on this frame's alpha culled 33 of 168
+        fragments — the faint ones, which are the depth read of the layer.
+        """
+        p.setPen(_color(rgb[0], rgb[1], rgb[2], alpha))
         p.setFont(_glyph_font(px))
         p.drawText(QPointF(gx, gy), ch)
 
@@ -1362,6 +1406,19 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     # hint, not a dim state tint: lift luminance hard and use the state hue
     # only as the tint. Idle must never read as "almost off".
     bright = max(_field.MIN_MARK_BRIGHTNESS, _num(brightness, 1.0))
+
+    # The frame's shared LOD ledger (``voicebridge.orb.frame_budget``). It is
+    # the SAME rule set the Tk renderer uses, bound to this frame's radius, so
+    # a primitive that is sub-pixel here is sub-pixel there too. It only
+    # refuses elements that cannot be resolved on screen (see MIN_DIM_PX /
+    # MIN_ALPHA); at the shipped 168 px orb nothing in the mark qualifies.
+    # Accumulated on ``_frame_stats`` so a test can prove the cull fires at
+    # small radii and is empty at the default one.
+    _lod = _budget.FrameStats(Rf)
+    _lod_acc = getattr(_paint_mark, "_frame_stats", None)
+    if _lod_acc is None:
+        _lod_acc = _budget.FrameStats(Rf)
+        _paint_mark._frame_stats = _lod_acc
 
     def _lift(amount: float) -> Tuple[int, int, int]:
         a = max(0.0, min(1.0, _num(amount, 0.0)))
@@ -1499,14 +1556,18 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         a = _shade(alpha)
         if a <= ALPHA_EPS or len(points) < 3:
             return
+        pen_w = width if width > 0.6 else 0.6
+        if not _lod.ring(_lod.visible(0.0, a, pen_w, min_dim=0.0,
+                                   min_alpha=0.0)):
+            return
         path = QPainterPath()
         path.moveTo(points[0][0], points[0][1])
+        _line = path.lineTo
         for px, py in points[1:]:
-            path.lineTo(px, py)
+            _line(px, py)
         p.setBrush(Qt.NoBrush)
-        pen = QPen(QColor(ring_rgb[0], ring_rgb[1], ring_rgb[2],
-                          _clamp8(255.0 * min(1.0, a))),
-                   max(0.6, width))
+        pen = QPen(_color(ring_rgb[0], ring_rgb[1], ring_rgb[2], a),
+                   pen_w)
         p.setPen(pen)
         p.drawPath(path)
         p.setPen(Qt.NoPen)
@@ -1645,15 +1706,31 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                          * thin_w * (1.0 / thin_a))
 
     def _dot(x: float, y: float, rad: float, alpha: float,
-             rgb: Tuple[int, int, int], gain: Any = 1.0) -> None:
+             rgb: Tuple[int, int, int], gain: Any = 1.0,
+             peak: Any = None, soft: bool = False) -> None:
         a = _num(alpha, 0.0)
         r = _num(rad, 0.0)
         if a <= ALPHA_EPS or r <= 0.0:
             return
+        # Shared LOD. For a SOFT body (dust, binaries, glints, blinks — anything
+        # the field sizes in its own units) the size test must NOT run: those
+        # radii are ~0.09-0.33 px, so a 1.2 px diameter gate culls the whole
+        # family wholesale. A soft body is culled on alpha alone. A hard-edged
+        # body is drawn at a real pixel size, so its size test is meaningful.
+        # The alpha test is never judged on this frame alone: many dotted
+        # families pulse, and an element is legitimately faint at part of its
+        # cycle. ``peak`` carries the element's peak alpha over its cycle; only
+        # a body whose PEAK is under the gate is genuinely invisible at this R.
+        a_gate = a if peak is None else _num(peak, a)
+        if soft:
+            drawn = _lod.dot(a_gate >= _budget.MIN_ALPHA)
+        else:
+            drawn = _lod.dot(_lod.visible(r * 2.0, a_gate))
+        if not drawn:
+            return
         tint = _tone(rgb, gain)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(tint[0], tint[1], tint[2],
-                          _clamp8(255.0 * min(1.0, a))))
+        p.setBrush(_color(tint[0], tint[1], tint[2], a))
         p.drawEllipse(x - r, y - r, r * 2.0, r * 2.0)
 
     def _outline(radius: float, rgb: Tuple[int, int, int], alpha: float,
@@ -1661,12 +1738,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         a = _num(alpha, 0.0)
         if a <= ALPHA_EPS or radius <= 0.0:
             return
+        if not _lod.ring(_lod.visible(radius * 2.0, a, width,
+                                   min_dim=0.0, min_alpha=0.0)):
+            return
         path = QPainterPath()
         path.addEllipse(QRectF(cx - radius, cy - radius,
                                radius * 2.0, radius * 2.0))
         p.setBrush(Qt.NoBrush)
-        p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                             _clamp8(255.0 * min(1.0, a))), width))
+        p.setPen(QPen(_color(rgb[0], rgb[1], rgb[2], a), width))
         p.drawPath(path)
         p.setPen(Qt.NoPen)
 
@@ -1717,8 +1796,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # glint rendered as an "L" / "V" hook instead of a four-point star.
         # That was the owner's "you didnt replace the L and V's!!!!!".
         p.drawLine(QPointF(gx - ay, gy + ax), QPointF(gx + ay, gy - ax))
+        # ``a`` is already this glint's PEAK alpha for the frame (``_glint``
+        # resolves its envelope before drawing), so the core is judged on it.
+        # The core is NEVER alpha-culled: a nucleus spark's own peak can sit
+        # just under the shared 0.06 gate (measured 0.0526 at t=0.4, index 3)
+        # and the core is the thing that makes it read as a star rather than a
+        # bare cross. The arms above are drawn unconditionally for the same
+        # reason — culling one without the other produced a glint with no core.
         _dot(gx, gy, max(GLINT_CORE_MIN, sz * _field.GLINT_CORE_FRAC
-                         * GLINT_CORE_SCALE), a, rgb, g)
+                         * GLINT_CORE_SCALE), a, rgb, g, peak=1.0, soft=True)
 
     def _particle(part: Dict[str, Any]) -> None:
         # Owner 2026-10-19: no wake ribbon. The body is a glint only — the
@@ -1771,11 +1857,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         mx, my, g = _place(mote.get("x"), mote.get("y"), d,
                            zseed=_num(mote.get("index"), None),
                            zflat=True, z=mote.get("z"), z2=mote.get("z2"))
+        # The field's ``size`` is a RADIUS, and ``_dot`` takes a radius: the
+        # old 0.25 floor pushed every mote's drawn diameter under the 1.2 px
+        # LOD gate (measured 0.10-0.13 px), which culled the whole layer. Size
+        # no longer floors on the dot rule's assumption; see the _dot note.
         _dot(mx, my,
              max(0.25, _num(mote.get("size"), 0.0) * g),
              _shade(_num(mote.get("alpha"), 0.0) * bright, d, g,
                     _focus(mote, d)),
-             _lift(mote.get("lift")), g)
+             _lift(mote.get("lift")), g,
+             # Dust is a faint background field by design: motes peak at 0.02-
+             # 0.06 alpha, and the field publishes ``alpha0 == alpha`` for them
+             # (no separate cycle peak), so the shared 0.06 alpha gate culls
+             # ~20 of 110 motes for being exactly what they are. A soft body
+             # that carries no cycle peak is drawn at whatever alpha it has.
+             peak=1.0, soft=True)
 
     def _sparkle(glint: Dict[str, Any]) -> None:
         # The sparkle's DOT is not drawn here: the many field glints are
@@ -1815,7 +1911,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                  _num(smp.get("size"), 0.0) * bg,
                  _shade(_num(smp.get("alpha"), 0.0) * bright, depth, bg,
                         focus),
-                 _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg)
+                 _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg,
+                 # The comet's own declared ceiling: a trail sample is faintest
+                 # at the far end of its own tail, which is exactly where it
+                 # must still be drawn (it is the motion).
+                 peak=_shade(_num(smp.get("alpha0"),
+                                  _num(smp.get("alpha"), 0.0)) * bright,
+                             depth, bg, focus))
         hx, hy, hg = _place(traveller.get("x"), traveller.get("y"), depth,
                             zseed=tseed, zflat=True,
                             z=traveller.get("z"), z2=traveller.get("z2"))
@@ -1823,7 +1925,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              max(0.4, _num(traveller.get("size"), 0.0) * hg),
              _shade(_num(traveller.get("alpha"), 0.0) * bright, depth, hg,
                     focus),
-             _anchor(_spec_rgb(head_hue, COMET_BEAD_SAT)), hg)
+             _anchor(_spec_rgb(head_hue, COMET_BEAD_SAT)), hg,
+             peak=_shade(_num(traveller.get("alpha0"),
+                              _num(traveller.get("alpha"), 0.0)) * bright,
+                         depth, hg, focus))
 
     def _smoke(ox: float, oy: float, rad: float, rgb: Tuple[int, int, int],
                peak: float, power: float = NUCLEUS_AURA_POWER) -> None:
@@ -2081,7 +2186,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         rgb = (_anchor(_spec_rgb(hue, VOLUME_PARTICLE_SAT))
                if hue is not None
                else _lift(_num(body.get("lift"), 0.5)))
-        _dot(vx, vy, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+        _dot(vx, vy, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g,
+             peak=_num(body.get("alpha0"), alpha) * bright, soft=True)
 
     def _photon_dot(smp: Dict[str, Any]) -> None:
         """One bright sample of the lensed photon ring, a hot bead.
@@ -2121,7 +2227,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _anchor(base_rgb)
         else:
             rgb = _lift(_num(smp.get("lift"), 0.5))
-        _dot(px, py, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+        _dot(px, py, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g,
+             peak=_num(smp.get("alpha0"), alpha), soft=True)
 
     def _screen_break(body: Dict[str, Any]) -> None:
         """One body the field placed BEYOND the orb radius.
@@ -2174,7 +2281,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             return
         hue = _num(bl.get("hue"), 0.0)
         rgb = _anchor(_spec_rgb(hue, BLINK_DOT_SAT))
-        _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+        _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g,
+             peak=_num(bl.get("alpha0"), 0.0) * bright * g, soft=True)
 
     def _core_body(shell: Dict[str, Any], nuc_radius: float) -> None:
         """One nested interior body of the nucleus, as a tilted shaded disc.
@@ -2318,10 +2426,9 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                     stroke.moveTo(px - arm, py + arm)
                     stroke.lineTo(px + arm, py - arm)
                 p.setBrush(Qt.NoBrush)
-                p.setPen(QPen(QColor(rgb[0], rgb[1], rgb[2],
-                                     _clamp8(255.0 * max(
-                                         a for _x, _y, _s, a, _h, _vx, _vy, _k
-                                         in pts))),
+                p.setPen(QPen(_color(rgb[0], rgb[1], rgb[2],
+                                     max(a for _x, _y, _s, a, _h, _vx, _vy, _k
+                                         in pts)),
                               GLINT_PEN_W))
                 p.drawPath(stroke)
                 p.setPen(Qt.NoPen)
@@ -2330,7 +2437,7 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             for px, py, size, _a, _h, vx, vy, sk in pts:
                 rr = size * (GLINT_CORE_SCALE if arm_frac > 0.0 else 1.0)
                 rr = max(GLINT_CORE_MIN, rr)
-                path.addEllipse(QRectF(px - rr, py - rr, rr * 2.0, rr * 2.0))
+                path.addEllipse(px - rr, py - rr, rr * 2.0, rr * 2.0)
                 if st > 0.0 and (abs(vx) + abs(vy)) > 1e-6:
                     # A tapering chain of discs behind the body, inside the
                     # same path: motion detail, zero extra primitives.
@@ -2338,11 +2445,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                         tx = px - vx * st * step * sk
                         ty = py - vy * st * step * sk
                         tr = max(GLINT_CORE_MIN, rr * scale)
-                        path.addEllipse(QRectF(tx - tr, ty - tr,
-                                               tr * 2.0, tr * 2.0))
+                        path.addEllipse(tx - tr, ty - tr, tr * 2.0, tr * 2.0)
             peak = max(a for _x, _y, _s, a, _h, _vx, _vy, _k in pts)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
+            p.setBrush(_color(rgb[0], rgb[1], rgb[2], peak))
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
@@ -2384,11 +2490,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _anchor(_spec_rgb(pts[0][4], BLINK_DOT_SAT))
             path = QPainterPath()
             for px, py, size, _a, _h in pts:
-                path.addEllipse(QRectF(px - size, py - size,
-                                       size * 2.0, size * 2.0))
+                path.addEllipse(px - size, py - size, size * 2.0, size * 2.0)
             peak = max(a for _x, _y, _s, a, _h in pts)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(rgb[0], rgb[1], rgb[2], _clamp8(255.0 * peak)))
+            p.setBrush(_color(rgb[0], rgb[1], rgb[2], peak))
             p.drawPath(path)
             p.setBrush(Qt.NoBrush)
 
@@ -2448,7 +2553,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         rgb = _anchor(_spec_rgb(_num(smp.get("hue"), 0.0), BLINK_DOT_SAT))
-        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g)
+        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g,
+             peak=_num(smp.get("alpha0"), alpha) * bright * g, soft=True)
 
     tt = _mark_tt(t)
     reduced = _reduced_motion()
@@ -2751,10 +2857,34 @@ def backend_wanted() -> str:
 
 
 def _reduced_motion() -> bool:
+    """True when the desktop asks for reduced motion (``QUBIT_REDUCED_MOTION``).
+
+    Deliberately NOT memoised. A memo was tried and measured: it bought no
+    wall time (the env read is a dict hit behind the C layer, and the frame is
+    dominated by the field's own math), while it would have made the answer
+    stale for up to a TTL when a profile flips the preference. Never raises.
+    """
     import os as _os
     try:
         return str(_os.environ.get("QUBIT_REDUCED_MOTION", "") or "").strip().lower() in (
             "1", "true", "yes", "on")
+    except Exception:
+        return False
+
+
+def _occluded(widget: Any) -> bool:
+    """True when Qt says nothing this widget paints can reach the screen.
+
+    Qt 6 exposes ``QWidget.visibleRegion()``: when another window (or the
+    compositor) fully covers the orb, the visible region is empty and every
+    frame we paint is discarded. That is the one occlusion signal available
+    without polling the window manager, and both of its answers are safe — a
+    wrong ``True`` merely stops an invisible animation until the next event,
+    a wrong ``False`` draws exactly as before. Never raises.
+    """
+    try:
+        region = widget.visibleRegion()
+        return bool(region.isEmpty())
     except Exception:
         return False
 
@@ -3750,23 +3880,65 @@ if QWidget is not None:
                 self._advance_anim(time.monotonic())
                 if self.visible and _ember.needs_frame(
                         True, self._pos.collapsed):
-                    # ADAPTIVE frame budget. One frame of this mark costs tens
-                    # of ms of CPU, so a fixed interval that is shorter than the
-                    # paint just makes the loop repaint back-to-back and peg a
-                    # core. Size the next interval from the last frame's real
-                    # paint cost, leaving slack, so the orb always yields CPU
-                    # between frames. On a fast host this is just FRAME_MS
-                    # (full smoothness); on a loaded one it stretches to keep
-                    # headroom instead of spinning. Never changes what is drawn.
-                    try:
-                        paint_ms = float(getattr(self, "_last_paint_ms", 0.0) or 0.0)
-                    except (TypeError, ValueError):
-                        paint_ms = 0.0
-                    want = int(paint_ms * _ember.FRAME_SLACK)
-                    interval = want if want > FRAME_MS else FRAME_MS
-                    if interval != self._frame_timer.interval():
-                        self._frame_timer.setInterval(interval)
+                    # HARD frame cap, no feedback. This used to size the next
+                    # interval from the last frame's real paint cost
+                    # (``max(FRAME_MS, last_paint_ms * FRAME_SLACK)``), which is
+                    # a feedback loop with no fixed point near the budget: a
+                    # 50 ms frame scheduled itself at 70 ms and the loop settled
+                    # there — 14 fps while burning ~70 % of a core. The interval
+                    # is now exactly FRAME_MS; if a frame overruns it, the
+                    # repaint simply lands late and the wall-time-driven render
+                    # clock keeps the motion correct (one frame, not a slowdown).
+                    if self._frame_timer.interval() != FRAME_MS:
+                        self._frame_timer.setInterval(FRAME_MS)
+                    if self._frame_timer.isActive():
+                        self.update()
+            except Exception:
+                pass
+
+        def _set_anim_running(self, running: bool) -> None:
+            """Start/stop the animation timer (idle suspension). Never raises.
+
+            Stopping the timer means the orb does no painting at all while it
+            cannot be seen (hidden, minimised, or the compositor repaints it
+            without our involvement). ``paintEvent``/``showEvent`` re-arm via
+            :meth:`_rearm_anim`, so the first reveal paints immediately.
+            """
+            try:
+                timer = self._frame_timer
+                if running and not timer.isActive():
+                    # Re-baseline the render clock: without this the first frame
+                    # back would advance by the whole suspended span (clamped to
+                    # MAX_DT, but still a visible jump). Holding the clock is
+                    # what makes suspension invisible instead of a skip.
+                    self._paint_last_mono = None
+                    timer.start(FRAME_MS)
+                elif not running and timer.isActive():
+                    timer.stop()
+            except Exception:
+                pass
+
+        def _rearm_anim(self) -> None:
+            """Re-arm after a visibility change; paint once if now visible."""
+            try:
+                want = bool(self.visible) and not bool(self._pos.collapsed)
+                if want and not self._frame_timer.isActive():
+                    self._set_anim_running(True)
                     self.update()
+            except Exception:
+                pass
+
+        def showEvent(self, ev: Any) -> None:
+            try:
+                super().showEvent(ev)
+            except Exception:
+                pass
+            self._rearm_anim()
+
+        def hideEvent(self, ev: Any) -> None:
+            self._set_anim_running(False)
+            try:
+                super().hideEvent(ev)
             except Exception:
                 pass
 
@@ -3821,6 +3993,21 @@ if QWidget is not None:
         def paintEvent(self, ev: Any) -> None:
             _paint_t0 = time.monotonic()
             try:
+                # SUSPENSION + RE-ARM. If the animation timer is stopped (the
+                # window was hidden) this paint is the reveal: restart the loop.
+                # If the compositor/Qt reports the widget as fully occluded,
+                # nothing this frame produces can be seen, so stop the loop
+                # until the next paint/visibility event re-arms it. Neither path
+                # changes a single drawn pixel — it only decides whether we
+                # keep doing the work.
+                try:
+                    if not self._frame_timer.isActive() and self.visible:
+                        self._rearm_anim()
+                    elif self.isVisible() and not self.isMinimized() and _occluded(
+                            self):
+                        self._set_anim_running(False)
+                except Exception:
+                    pass
                 now_mono = _paint_t0
                 try:
                     last = self._paint_last_mono

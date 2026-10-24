@@ -37,19 +37,24 @@ from typing import Any, Dict, List, Tuple
 def frame_budget_ms() -> int:
     """The orb's frame interval in ms, overridable by ``QUBIT_ORB_FRAME_MS``.
 
-    One frame of the rich mark costs ~20-35 ms of CPU (it draws ~1200 Qt calls:
-    rings, streaks, hundreds of particles and ~128 text glyphs), so asking for
-    60 fps pegs a core for a decorative overlay. The default is a 50 fps budget
-    (20 ms), which is what makes the spinning circles and the per-particle
-    spins read as continuous motion rather than stepping. Raising it to 60 fps
-    (``QUBIT_ORB_FRAME_MS=16``) buys the last bit of smoothness at the cost of a
-    busier core; lowering it saves CPU but a rotating circle visibly judders.
+    This is a HARD cap on the repaint rate, not a target to be negotiated with
+    the paint cost. Both hosts schedule the next frame from this interval alone;
+    neither stretches it by how long the last paint happened to take (see
+    ``qt_app._frame_tick``). The animation clock is wall-time driven
+    (:func:`advance_render_time`), so the interval only decides how often the
+    mark is RASTERISED — never how fast it moves. Halving the rate halves the
+    CPU and leaves the motion at the same speed, sampled more coarsely.
+
+    The default is 30 fps (33 ms): the mark's fastest real motion is a 6.4 s
+    orbit and a 1.6 s per-bead spin, so 30 samples a second is far above what
+    reads as continuous for a 168 px overlay. A full mark frame costs a few ms
+    after the batching/LOD pass, which puts the orb well under 15 % of a core.
     Clamped to a sane range. Never raises.
     """
     try:
-        v = int(float(_os.environ.get("QUBIT_ORB_FRAME_MS", "") or 20))
+        v = int(float(_os.environ.get("QUBIT_ORB_FRAME_MS", "") or 33))
     except (TypeError, ValueError):
-        v = 20
+        v = 33
     return max(8, min(200, v))
 
 
@@ -58,10 +63,12 @@ def frame_budget_ms() -> int:
 #: two backends stay in step.
 FRAME_MS = frame_budget_ms()
 
-#: Slack multiplier for the ADAPTIVE interval: the next repaint is scheduled
-#: ``FRAME_SLACK`` times the last frame's real paint cost after it finished, so
-#: the loop always has idle time and cannot peg a core. Must be > 1.0.
-FRAME_SLACK = 1.4
+#: Retired. The loop used to schedule ``max(FRAME_MS, last_paint_ms * SLACK)``,
+#: which is a feedback loop: a frame costing 50 ms scheduled itself at 70 ms,
+#: which is 14 fps at 70 % of a core — the worst of both. The constant is kept
+#: only so an older caller importing it still gets a sane value; nothing reads
+#: it to schedule a frame any more.
+FRAME_SLACK = 1.0
 
 #: Ember-orange family on near-black (own palette values in that family).
 EMBER_CORE = (255, 84, 0)
