@@ -44,6 +44,9 @@ _LOCKS_DIRNAME = "gateway-locks"
 _IS_WINDOWS = sys.platform == "win32"
 _UNSET = object()
 _GATEWAY_LOCK_FILENAME = "gateway.lock"
+# The frozen pin defines this inert slot and never reads or writes it. Present for
+# literal parity; the live acquire/release machinery is runtime_ownership.
+_gateway_lock_handle = None
 # Windows byte-range locks are mandatory for other readers: lock a byte well past
 # the JSON payload so status/PID readers can read while another process holds it.
 _WINDOWS_LOCK_OFFSET = 1024 * 1024

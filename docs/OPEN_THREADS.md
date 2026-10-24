@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 43 — 2026-10-24 (B1 retired, AT TARGET)
+
+- ✅ Added the pin's inert `_gateway_lock_handle = None` (no readers/writers) and removed the exclusion; audit now **AT TARGET** (0 missing, 100%).
+- ✅ No runtime behavior change; runtime ownership remains `process_ownership`. `test_status.py` + `test_control_listener_fatal.py` 92 passed / 5 skipped.
+- ✅ Docs: FROZEN_TARGET numbers/exclusions, DECISIONS ruling 10, STATUS.
+- 🔴 Remaining: 22 e2e/upgrade probes; Windows/Docker skips; no `VERIFIED`; services not restarted (another agent owns the tree).
+
 ## Wave 42 — 2026-10-24 (all PRODUCT GAP groups closed)
 
 - ✅ Discord turn-prompt parity (14), Discord stale voice binding (11), WhatsApp multiplex (7) fixed and unxfailed; PRODUCT GAP mentions 6 → 0.

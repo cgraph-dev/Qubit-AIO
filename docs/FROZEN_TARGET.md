@@ -45,12 +45,16 @@ backlog is explicitly out of scope until retirement.
 
 ## Declared exclusions (deliberate, do NOT re-port)
 
+**None remain (owner ruling 2026-10-24).** The B1 row was retired by adding the pin's inert
+`_gateway_lock_handle = None` literally; no acquire/release machinery is ported, and runtime
+ownership stays with `gateway.runtime_ownership.process_ownership`. See `docs/DECISIONS.md`
+ruling 10.
+
 Recorded so a future port wave does not re-add these as "missing symbols". Each leaves the
 audit one symbol short of zero by design; the audit's job is to report that, not to erase it.
 
 | symbol | file | why it is gone |
 |---|---|---|
-| `_gateway_lock_handle` | `gateway/status.py` | Owner sign-off 2026-10-21. At the frozen pin this is only `_gateway_lock_handle = None` (`gateway/status.py:44`); the pin never reads or writes it. The acquire/release/owns machinery is post-freeze `69948c0057`, which this fork replaced with `gateway.runtime_ownership.process_ownership` (a second independent flock on an inode this process already holds is refused on POSIX and aborts our own boot). Porting the pin would add an inert, misleading global; porting the post-freeze behaviour would double-flock. |
 
 > **Owner ruling 2026-10-21 (F5):** the 21 rows previously in this table were REJECTED,
 > not re-affirmed. The 20 production symbols among them were ported literally and wired
@@ -62,23 +66,19 @@ audit one symbol short of zero by design; the audit's job is to report that, not
 
 Baseline at the re-freeze (2026-10-17, first complete-blob read of the pin):
 
-| metric | at freeze | now (2026-10-23, `8b76592fa`) |
+| metric | at freeze | now (2026-10-24, `1883818bd` + B1 retire) |
 |---|---|---|
 | upstream `.py` files | 9,503 | 9,503 |
 | absent files | 974 | 0 |
-| short_port files / symbols | 610 / 1,649 | 1 / 1 |
+| short_port files / symbols | 610 / 1,649 | 0 / 0 |
 | behind_head files / symbols | 0 / 0 | 0 / 0 |
-| **total missing symbols** | **2,623** | **1** |
-| — production | — | **1** (declared exclusion) |
+| **total missing symbols** | **2,623** | **0** |
+| — production | — | **0** |
 | — tests (non-blocking) | — | 0 |
 
-Closed since the freeze: **2,622 symbols** (~99.96% of the gap). The one
-remaining symbol is the owner-declared B1 exclusion; the short-port column has
-no test symbols left. The verdict is driven by
-PRODUCTION only — tests cannot block retiring hermes. The one remaining production symbol
-is `gateway/status.py::_gateway_lock_handle`, declared by owner sign-off (see the table
-above); the audit does not subtract declared exclusions, so it still prints `NOT AT TARGET
--- 1 production missing`.
+Closed since the freeze: **2,623 symbols (100% of the gap)**. The B1 exclusion was retired on
+2026-10-24 by adding the pin's inert literal; the short-port column is empty. The verdict is driven by
+PRODUCTION only — tests cannot block retiring hermes. There is no remaining production symbol; the audit prints `AT TARGET`.
 
 Read it in one command:
 

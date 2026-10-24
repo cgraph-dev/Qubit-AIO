@@ -50,8 +50,8 @@ does not add policy of its own.
    re-affirmed.** The 21 rows agents had added to `docs/FROZEN_TARGET.md` were ordered
    ported literally instead; wave 16 restored and wired the 20 production symbols,
    `_tool_prefix` was already live (stale row), and the `legacy_digests` test helper was
-   restored and used. Only `gateway/status.py::_gateway_lock_handle` remains excluded, by
-   explicit owner sign-off the same day (the pin defines it only as an unread `= None`;
+   restored and used. Only `gateway/status.py::_gateway_lock_handle` remained excluded, by
+   explicit owner sign-off the same day (retired 2026-10-24, ruling 10) (the pin defines it only as an unread `= None`;
    the live acquire/release machinery is post-freeze and would double-flock against
    `runtime_ownership`).
    → Provenance: owner session 2026-10-21; evidence in `docs/STATUS.md` (wave 16) and
@@ -90,3 +90,10 @@ for f in docs/IDENTITY.md docs/BRAND.md docs/FROZEN_TARGET.md AGENTS.md; do
   printf '%-28s %s\n' "$f" "$(test -f "$f" && echo present || echo MISSING)"
 done
 ```
+
+10. **The B1 exclusion is retired (owner ruling, 2026-10-24).** The frozen pin's
+    `gateway/status.py:44` defines `_gateway_lock_handle = None` and never reads or writes it;
+    that inert literal is now present. No acquire/release/owns machinery is ported — runtime
+    ownership remains `gateway.runtime_ownership.process_ownership`, so there is no behavior
+    change and no double-flock risk. This supersedes ruling 8 for the B1 row; the completeness
+    instrument now reports `AT TARGET`. Evidence: `docs/STATUS.md` wave 43.
