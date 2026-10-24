@@ -17,17 +17,61 @@ Every Hermes process these suites spawn runs:
 
 from __future__ import annotations
 
+import atexit
 import os
 import pwd
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Iterable, Sequence
 
-WORKTREE = Path(__file__).resolve().parents[4]
+_SOURCE_WORKTREE = Path(__file__).resolve().parents[4]
+
+
+def _runtime_repo(source: Path) -> Path:
+    """The checkout these suites clone, install and update.
+
+    Upstream's runtime tree IS its repository root. Qubit vendors it at
+    ``qubit_runtime/`` inside the product repository, so ``git clone
+    --bare --shared $WORKTREE`` cannot copy it (the path is not a repository
+    root). Build an equivalent checkout whose root IS the runtime tree: a
+    throwaway repository with the same working files, one commit. Everything
+    the suites read (``scripts/install.sh``, ``pyproject.toml``, ``uv.lock``,
+    the runtime packages) is byte-identical to the worktree, including
+    uncommitted edits under test. ``QUBIT_E2E_REPO`` overrides the path.
+    """
+    override = os.environ.get("QUBIT_E2E_REPO")
+    if override:
+        return Path(override)
+    if (source / ".git").exists():
+        return source
+    try:
+        top = subprocess.run(["git", "-C", str(source), "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, timeout=30, check=True).stdout.strip()
+        head = subprocess.run(["git", "-C", str(source), "rev-parse", "HEAD"],
+                              capture_output=True, text=True, timeout=30, check=True).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return source  # no repository: the suites fail honestly instead of cloning a non-repo
+    if not top or Path(top).resolve() == source.resolve():
+        return source
+    scratch = Path(tempfile.mkdtemp(prefix="qubit-e2e-runtime-"))
+    checkout = scratch / "repo"
+    shutil.copytree(source, checkout, symlinks=True, ignore=shutil.ignore_patterns(
+        "__pycache__", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache"))
+    git = ["git", "-C", str(checkout), "-c", "user.name=e2e", "-c", "user.email=e2e@example.invalid"]
+    subprocess.run([*git, "init", "-q"], check=True, timeout=120)
+    subprocess.run([*git, "add", "-A"], check=True, timeout=300)
+    subprocess.run([*git, "commit", "-q", "-m", f"Qubit e2e runtime mirror of {head}"],
+                   check=True, timeout=300)
+    atexit.register(shutil.rmtree, scratch, ignore_errors=True)
+    return checkout
+
+
+WORKTREE = _runtime_repo(_SOURCE_WORKTREE)
 REAL_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 UID = os.getuid()
 
