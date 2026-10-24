@@ -226,12 +226,11 @@ def test_describe_prefers_the_plugin_title_over_the_server_slug(tmp_path):
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_gpu_requirement_hides_a_connected_server_and_says_which_gpu(monkeypatch):
     """A connected server whose `requires.gpu` the host misses is not offered, and its status is a
     state the Plugins tab can carry, with a sentence that names the GPU instead of "Install <app>"."""
     from qubit_cli import agent_plugins
-    from hermes_platform.host import facts
+    from qubit_platform.host import facts
     from tools import mcp_liveness, mcp_tool_handlers
     from tui_gateway.contracts.tools_mcp_plugins import PluginServerState
 

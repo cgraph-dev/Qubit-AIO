@@ -14,7 +14,8 @@ import logging
 import pytest
 
 from tools.mcp_tool_errors import (
-    InvalidMcpUrlError, NonMcpEndpointError, _classify_mcp_failure, _unwrap_exception_group)
+    InvalidMcpUrlError, NonMcpEndpointError, _auth_error_detail, _classify_mcp_failure,
+    _mcp_call_failed_message, _unwrap_exception_group)
 from tools.mcp_tool import MCPServerTask
 
 
@@ -268,7 +269,6 @@ def test_initial_auth_failure_parks_and_revives_after_relogin(
 
 # --- ported from upstream pin (wave 25 short-port) ---
 class TestAuthErrorSurfacing:
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_registration_detail_surfaces(self):
         """The actionable registration guidance raised by the DCR guard must
         reach the needs_reauth tool error (GH#78190)."""
@@ -286,7 +286,6 @@ class TestAuthErrorSurfacing:
         assert "config.yaml" in detail
         assert "client_id" in detail
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_registration_detail_unwraps_group(self):
         """The transport raises the auth error inside a TaskGroup wrapper —
         the detail must still be found."""
@@ -296,12 +295,10 @@ class TestAuthErrorSurfacing:
         exc = OAuthRegistrationError("config.yaml guidance")
         assert "config.yaml" in _auth_error_detail(_group(exc))
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_non_registration_no_detail(self):
         assert _auth_error_detail(ValueError("nope")) == ""
         assert _auth_error_detail(_group(TimeoutError("t"))) == ""
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_mcp_call_failed_message_unwraps_group(self):
         """The generic error path must surface the group root cause instead
         of the opaque TaskGroup wrapper text."""

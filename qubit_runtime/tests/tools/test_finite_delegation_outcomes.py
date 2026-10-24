@@ -232,7 +232,6 @@ def test_nonfinite_marker_preserves_background_dispatch(harness, monkeypatch, ma
 import os
 
 
-@pytest.mark.skip(reason="wave-25 short-port: ported probe hangs locally; tracked for follow-up")
 def test_owner_finite_scope_overrides_history_without_leaking(harness, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from gateway.session_finite import finite_turn_scope, finite_turn_required
@@ -254,6 +253,3 @@ def test_owner_finite_scope_overrides_history_without_leaking(harness, monkeypat
     assert dict(os.environ) == before
     assert finite_turn_required() is None
     assert _resolve_async_wake_sid("history", True) is None
-
-import pytest
-pytestmark = pytest.mark.skip(reason="wave-25 short-port: file probe hangs locally; tracked")

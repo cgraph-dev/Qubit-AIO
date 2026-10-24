@@ -41,7 +41,7 @@ def test_background_notification_history_replay_is_not_new_delivery():
     assert _new_background_notifications([*shifted, first[1]], seen_counts) == [notice]
 
 
-def test_headless_terminal_result_survives_cli_exit(tmp_path):
+def test_headless_terminal_result_survives_cli_exit(tmp_path, request):
     """Real CLI, tool dispatch, shell child and fresh reader; only the LLM is local."""
     home = tmp_path / "profile"
     home.mkdir()
@@ -145,6 +145,12 @@ def test_headless_terminal_result_survives_cli_exit(tmp_path):
            "USERPROFILE": str(tmp_path), "TERMINAL_CWD": str(tmp_path),
            "OPENAI_BASE_URL": url, "OPENAI_API_KEY": "local-test-only",
            "PYTHONPATH": str(REPO_ROOT)}
+    # The canonical CLI detaches from a long-lived daemon. Own that daemon in
+    # the fixture so it cannot outlive the temporary profile/SQLite files.
+    from tests.gateway.fixtures.local_recovery_probe import daemon
+    owner = daemon(REPO_ROOT, home, env, barrier=False)
+    owner.__enter__()
+    request.addfinalizer(lambda: owner.__exit__(None, None, None))
     try:
         producer = subprocess.run([
             sys.executable, "-c",
@@ -152,7 +158,13 @@ def test_headless_terminal_result_survives_cli_exit(tmp_path):
             "oneshot=True, provider='custom', model='test-model', api_key='local-test-only', "
             f"base_url={url!r}, toolsets='terminal', max_turns=3, ignore_rules=True)",
         ], cwd=tmp_path, env=env, stdin=subprocess.DEVNULL,
-            capture_output=True, text=True, encoding="utf-8", timeout=60)
+            capture_output=True, text=True, encoding="utf-8", timeout=60, check=False)
+        # The canonical CLI is a finite client: it exits on its turn's terminal event while
+        # the daemon that owns the child keeps its watcher. The owned completion is admitted
+        # there as a follow-up turn, so the model must stay reachable until it arrives.
+        deadline = time.monotonic() + 30
+        while not follow_ups and time.monotonic() < deadline:
+            time.sleep(0.1)
     finally:
         release.touch()
         server.shutdown()
@@ -289,7 +301,6 @@ def test_receipts_are_bounded_redacted_and_session_scoped(tmp_path, monkeypatch)
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.skip(reason="wave-25 short-port: ported probe hangs locally; tracked for follow-up")
 def test_retained_result_lookup_does_not_initialize_session_store(tmp_path, monkeypatch):
     import qubit_state
     from gateway.session_context import scoped_current_session_id
@@ -297,7 +308,7 @@ def test_retained_result_lookup_does_not_initialize_session_store(tmp_path, monk
 
     db_path = tmp_path / "state.db"
     monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", db_path)
-    monkeypatch.setattr(receipts, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(receipts, "get_qubit_home", lambda: tmp_path)
     directory = tmp_path / "logs" / "process-results"
     directory.mkdir(parents=True)
     (directory / "proc_owned.json").write_text(json.dumps({

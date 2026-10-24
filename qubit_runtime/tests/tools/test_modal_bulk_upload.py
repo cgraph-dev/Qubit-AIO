@@ -59,6 +59,9 @@ def _wire_async_exec(env, exec_calls=None):
         proc.wait = MagicMock()
         proc.wait.aio = AsyncMock(return_value=0)
         proc.stdin = stdin_mock
+        proc.stdout = MagicMock()
+        proc.stdout.read = MagicMock()
+        proc.stdout.read.aio = AsyncMock(return_value="")
         proc.stderr = MagicMock()
         proc.stderr.read = MagicMock()
         proc.stderr.read.aio = AsyncMock(return_value="")
@@ -88,7 +91,6 @@ class TestModalBulkUpload:
         env._modal_bulk_upload([])
         env._worker.run_coroutine.assert_not_called()
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_tar_archive_contains_all_files(self, monkeypatch, tmp_path):
         """The tar archive sent via stdin should contain all files."""
         env = _make_mock_modal_env(monkeypatch, tmp_path)
@@ -113,7 +115,7 @@ class TestModalBulkUpload:
         assert args[1] == "-c"
 
         # Reassemble the base64 payload from stdin chunks and verify tar contents
-        payload = "".join(stdin_mock._written_chunks)
+        payload = b"".join(stdin_mock._written_chunks)
         tar_data = base64.b64decode(payload)
         buf = io.BytesIO(tar_data)
         with tarfile.open(fileobj=buf, mode="r:gz") as tar:
@@ -131,7 +133,6 @@ class TestModalBulkUpload:
         stdin_mock.write_eof.assert_called_once()
 
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_stdin_chunked_for_large_payloads(self, monkeypatch, tmp_path):
         """Payloads larger than _STDIN_CHUNK_SIZE should be split into multiple writes."""
         env = _make_mock_modal_env(monkeypatch, tmp_path)
@@ -143,14 +144,14 @@ class TestModalBulkUpload:
         src.write_bytes(_os.urandom(1024 * 1024 + 512 * 1024))
         files = [(str(src), "/root/.hermes/large.bin")]
 
-        exec_calls, _, stdin_mock = _wire_async_exec(env)
+        _exec_calls, _, stdin_mock = _wire_async_exec(env)
         env._modal_bulk_upload(files)
 
         # Should have multiple stdin write chunks
         assert len(stdin_mock._written_chunks) >= 2
 
         # Reassembled payload should still decode to valid tar
-        payload = "".join(stdin_mock._written_chunks)
+        payload = b"".join(stdin_mock._written_chunks)
         tar_data = base64.b64decode(payload)
         buf = io.BytesIO(tar_data)
         with tarfile.open(fileobj=buf, mode="r:gz") as tar:
@@ -160,7 +161,6 @@ class TestModalBulkUpload:
 
 # --- ported from upstream pin (wave 25 short-port) ---
 class TestModalCommandStdin:
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_large_payload_uses_sdk_stdin_not_bash_argv(self, monkeypatch, tmp_path):
         env = _make_mock_modal_env(monkeypatch, tmp_path)
         expected = (b"A" * (160 * 1024)) + b"\x00\xff\xfeTAIL"

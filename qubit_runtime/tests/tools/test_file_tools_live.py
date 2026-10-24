@@ -148,6 +148,10 @@ class TestPatchReplace:
         assert result.error is not None
         assert Path(path).read_text() == "hello world\n"
 
+    # Each case first pins which fuzzy strategy the inputs take, so the note assertion
+    # is about that strategy rather than about an accidental exact match.
+    FUNC = "def total(x):\n    y = x + 1\n    return y\n"
+
     def test_multiline_patch(self, ops, tmp_path):
         path = str(tmp_path / "multi.txt")
         Path(path).write_text("line1\nline2\nline3\n")
@@ -198,10 +202,9 @@ class TestExpandPath:
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.skip(reason="wave-25 short-port: ported class depends on local helper")
 class TestPatchV4A:
     """The V4A path runs the same fuzzy chain as patch_replace, so it gets the same boundary note."""
-    FUNC = getattr(TestPatchReplace, "FUNC", None)
+    FUNC = TestPatchReplace.FUNC
 
     @staticmethod
     def _patch(path, *hunk_lines):

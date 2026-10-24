@@ -529,7 +529,6 @@ class TestBackendCdpResolution:
         assert bu_cli._resolve_backend_cdp(env2, "task-B", session_name="research") is None
         assert seen == ["bu-named-research", "bu-named-research"]
 
-    @pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
     def test_named_session_direct_api_bu_cloud_still_skips_provider(
         self, tmp_path, monkeypatch
     ):
@@ -547,6 +546,7 @@ class TestBackendCdpResolution:
             lambda key: (_ for _ in ()).throw(AssertionError("must skip provider")),
         )
         monkeypatch.setattr(bu_cli, "_read_browser_cfg", lambda: {"cloud_provider": "browser-use"})
+        monkeypatch.setenv("BROWSER_USE_API_KEY", "bu-key")
         env = {}
         assert bu_cli._resolve_backend_cdp(env, "t1", session_name="r7k2") is None
         assert "BU_CDP_WS" not in env and "BU_CDP_URL" not in env
