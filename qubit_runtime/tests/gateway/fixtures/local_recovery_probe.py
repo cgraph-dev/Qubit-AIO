@@ -66,9 +66,11 @@ async def rpc(ws, method, *, timeout=20, **params):
 
 def websocket(home, desc):
     grant = control(home, 'session-ticket', {'profile_id': str(home), 'instance_id': desc['instance_id'], 'purpose': 'interactive'})
+    # Test client only: the library's 20 s pong deadline turns a loaded host's daemon loop into a
+    # spurious 1011 close. Liveness here is the explicit rpc bound and the readiness probe.
     return connect(desc['api_origin'].replace('http:', 'ws:') + '/api/ws',
                    subprotocols=['hermes-gateway-v1', 'hermes-gateway-ticket.' + grant['ticket']],
-                   open_timeout=30)
+                   open_timeout=30, ping_interval=None)
 
 
 @contextmanager
