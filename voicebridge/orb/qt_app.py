@@ -1062,9 +1062,16 @@ def turn_fade(t: Any) -> float:
     through it is an exact no-op at a still clock. Never raises.
     """
     global _TURN_FADE_CACHE
-    tt = _mark_tt(t)
+    # Fast path FIRST: the clock is identical for every element in a frame
+    # (500+ calls), so comparing the RAW argument against the memoised one
+    # avoids the float() + isfinite() + env-read that ``_mark_tt`` costs. That
+    # chain was ~586 calls/frame and showed up as 17.5k calls per 30 frames.
     cached_t, cached_f = _TURN_FADE_CACHE
-    if cached_t == tt:
+    if t == cached_t:
+        return cached_f
+    tt = _mark_tt(t)
+    if tt == cached_t:
+        _TURN_FADE_CACHE = (t, cached_f)
         return cached_f
     try:
         cy, sy, cx, sx = _tumble_basis(tt)
@@ -1382,6 +1389,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
     def _num(v: Any, default: float) -> float:
         # Fast path: the field hands us floats almost every call, so skip the
         # float()/try entirely for the common case. Behaviour is identical.
+        # ``isfinite`` is NOT optional here either: same contract as
+        # ``mark_field._finite`` — callers pass NaN/inf and expect the default.
         if type(v) is float:
             return v if math.isfinite(v) else default
         try:

@@ -398,6 +398,9 @@ PALETTE_HUES: Tuple[float, ...] = (0.54, 0.60)
 # ------------------------------------------------------------------ helpers
 def _finite(value: Any, default: float = 0.0) -> float:
     # Fast path: callers hand us floats almost every time; skip float()/try.
+    # ``isfinite`` is NOT optional: the tests feed NaN/inf knowingly and expect
+    # the default back ("cannot convert float NaN to integer" if it is dropped),
+    # so this guard is load-bearing, not defensive padding.
     if type(value) is float:
         return value if math.isfinite(value) else default
     try:
