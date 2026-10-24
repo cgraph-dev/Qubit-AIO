@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 42 — 2026-10-24 (all PRODUCT GAP groups closed)
+
+- ✅ Discord turn-prompt parity (14), Discord stale voice binding (11), WhatsApp multiplex (7) fixed and unxfailed; PRODUCT GAP mentions 6 → 0.
+- ✅ Focused: Discord slash 28, voice set 112, WhatsApp set 157 — green.
+- 🟡 22 e2e/upgrade `wave-25` probes remain the backlog (full managed-env update check hangs here); partial harness work discarded, no red.
+- 🔴 Remaining: 22 e2e probes; no `VERIFIED`; B1 exclusion; Windows/daemon/e2e skips; retirement; backend fixes need a gateway restart.
+
 ## Wave 41 — 2026-10-24 (149 wave-25 markers closed; parity restored)
 
 - ✅ 171 → 22 `wave-25` markers; 3 wave-20 and the last 2 wave-23 markers also removed.
