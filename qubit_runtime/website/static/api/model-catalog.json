@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updated_at": "2026-09-27T15:17:21Z",
+  "updated_at": "2026-10-23T22:39:36Z",
   "metadata": {
-    "source": "hermes-agent repo",
-    "docs": "https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/model-catalog"
+    "source": "qubit repo",
+    "docs": "https://qubit.nousresearch.com/docs/reference/model-catalog"
   },
   "providers": {
     "openrouter": {
@@ -41,6 +41,10 @@
           "description": "2x price, higher output speed"
         },
         {
+          "id": "anthropic/claude-sonnet-5.5",
+          "description": ""
+        },
+        {
           "id": "anthropic/claude-sonnet-5",
           "description": ""
         },
@@ -71,6 +75,14 @@
         {
           "id": "openai/gpt-6-astra-pro-flex",
           "description": "0.5x price, flex tier"
+        },
+        {
+          "id": "openai/gpt-6.1-sol",
+          "description": ""
+        },
+        {
+          "id": "openai/gpt-6.1-sol-pro",
+          "description": ""
         },
         {
           "id": "openai/gpt-6-sol",
@@ -131,6 +143,10 @@
         {
           "id": "deepseek/deepseek-v4.1-flash",
           "description": ""
+        },
+        {
+          "id": "deepseek/deepseek-v4.1-flash-1017",
+          "description": "dated snapshot of v4.1-flash"
         },
         {
           "id": "deepseek/deepseek-v4-flash-0731",
@@ -222,6 +238,14 @@
           "description": ""
         },
         {
+          "id": "upstage/solar-pro4",
+          "description": ""
+        },
+        {
+          "id": "upstage/solar-mini4",
+          "description": ""
+        },
+        {
           "id": "openrouter/pareto-code",
           "description": "auto-routes to cheapest coder meeting openrouter.min_coding_score"
         },
@@ -264,12 +288,16 @@
         {
           "id": "stealth/union-alpha",
           "description": "free, stealth model"
+        },
+        {
+          "id": "stealth/space-bunny-alpha",
+          "description": "free, stealth model"
         }
       ]
     },
     "nous": {
       "metadata": {
-        "display_name": "Qubit Labs",
+        "display_name": "Nous Portal",
         "note": "The entry labeled \"default\": true is the model Qubit silently lands on when the user never picked one."
       },
       "models": [
@@ -287,6 +315,9 @@
         },
         {
           "id": "anthropic/claude-opus-4.8"
+        },
+        {
+          "id": "anthropic/claude-sonnet-5.5"
         },
         {
           "id": "anthropic/claude-sonnet-5"
@@ -311,6 +342,12 @@
         },
         {
           "id": "openai/gpt-6-astra-pro-flex"
+        },
+        {
+          "id": "openai/gpt-6.1-sol"
+        },
+        {
+          "id": "openai/gpt-6.1-sol-pro"
         },
         {
           "id": "openai/gpt-6-sol"
@@ -356,6 +393,9 @@
         },
         {
           "id": "deepseek/deepseek-v4.1-flash"
+        },
+        {
+          "id": "deepseek/deepseek-v4.1-flash-1017"
         },
         {
           "id": "deepseek/deepseek-v4-flash-0731"
@@ -411,6 +451,15 @@
         },
         {
           "id": "sakana/fugu-ultra"
+        },
+        {
+          "id": "upstage/solar-pro4"
+        },
+        {
+          "id": "upstage/solar-mini4"
+        },
+        {
+          "id": "stealth/space-bunny-alpha"
         }
       ]
     }
