@@ -356,8 +356,19 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             from gateway.platforms.whatsapp_common import resolve_whatsapp_bridge_dir
             WhatsAppAdapter._DEFAULT_BRIDGE_DIR = resolve_whatsapp_bridge_dir()
         extra = config.extra
+        from qubit_constants import get_qubit_home
+        self._profile_home = get_qubit_home()
         self._bridge_process: Optional[subprocess.Popen] = None
-        self._bridge_port: int = extra.get("bridge_port", 3000)
+        self._foreign_bridge_session: Optional[str] = None  # set by _reuse_running_bridge when /health names another profile's session
+        self._bridge_probe_timed_out = False  # set by _reuse_running_bridge when the port's holder gave no /health answer
+        from .bridge_ownership import standalone_bridge_port
+        try:
+            # Same resolution as out-of-process sends, so a profile that recorded a port while serving as a
+            # secondary keeps it when it launches; a secondary re-resolves (and may allocate) in connect().
+            self._bridge_port: int = standalone_bridge_port(self._profile_home, extra.get("bridge_port"))
+        except ValueError as exc:
+            logger.warning("[whatsapp] %s; using port 3000", exc)
+            self._bridge_port = 3000
         self._bridge_script: str = extra.get("bridge_script", str(self._DEFAULT_BRIDGE_DIR / "bridge.js"))
         # One shared absolute session dir (see _session_dir): --session, bridge.pid
         # and every /health `session` comparison must agree, or a gateway restarted
@@ -392,13 +403,15 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         return getattr(self._http_session, method)(self._bridge_url(path), **kwargs, timeout=aiohttp.ClientTimeout(total=timeout))
 
     async def _probe_bridge_health(self) -> tuple[bool, Any]:
-        """GET /health with a fresh session → ``(http_200, json)``; unparseable 200 body → ``(True, None)``; connection errors propagate."""
+        """GET /health with a fresh session → ``(http_200, json)``; unparseable 200 body → ``(True, None)``; connection errors and timeouts propagate."""
         import aiohttp
         async with aiohttp.ClientSession() as session, session.get(self._bridge_url("health"), timeout=aiohttp.ClientTimeout(total=2)) as resp:
             if resp.status != 200:
                 return False, None
             try:
                 return True, await resp.json()
+            except TimeoutError:
+                raise  # a body that never arrives is no answer, the same as headers that never arrive
             except Exception:
                 return True, None
 
@@ -449,9 +462,19 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
 
     async def _reuse_running_bridge(self, bridge_path: Path) -> bool:
         """Adopt a connected bridge serving the on-disk bridge.js + same read-receipt config; else say why it restarts."""
+        self._foreign_bridge_session = None
+        self._bridge_probe_timed_out = False
         try:
             ok, data = await self._probe_bridge_health()
             if not ok or data is None:
+                return False
+            # Another profile's bridge (same default port) is neither adopted, which would answer as that
+            # profile's phone, nor killed: connect() reports it. Checked before status because a bridge in
+            # startup, reconnect or QR wait reports "disconnected". A bridge without ``session`` predates the
+            # field, so its scriptHash no longer matches bridge.js and it restarts as stale below.
+            reported_session = data.get("session")
+            if reported_session and reported_session != str(self._session_path):
+                self._foreign_bridge_session = reported_session
                 return False
             bridge_status = data.get("status", "unknown")
             if bridge_status != "connected":
@@ -466,6 +489,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 return True
             stale_reason = f"running={running_hash or 'unversioned'}, disk={disk_hash}" if running_hash != disk_hash else "send_read_receipts config changed"
             print(f"[{self.name}] Running bridge is stale ({stale_reason}), restarting")
+        except TimeoutError:
+            self._bridge_probe_timed_out = True  # something holds the port but gave no identity; connect() leaves it
         except Exception:
             pass  # Bridge not running, start a new one
         return False
@@ -590,7 +615,20 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             except pm.InstallError as exc:
                 self._set_fatal_error("whatsapp_node_missing", str(exc), retryable=False)
                 return False
-        if not self._preflight():
+        secondary = bool(getattr(self, "_runtime_status_platform_key", ""))
+        prior_bridge_is_ours = False
+        if secondary:
+            from .bridge_ownership import secondary_bridge_port, check_secondary_ownership
+            try:
+                self._bridge_port = secondary_bridge_port(self._profile_home, self.config.extra.get("bridge_port"))
+                prior_bridge_is_ours = check_secondary_ownership(self._session_path, self._bridge_port) == "ours"
+            except (OSError, ValueError) as exc:
+                self._set_fatal_error(
+                    "whatsapp_bridge_conflict",
+                    f"{exc}. Set platforms.whatsapp.extra.bridge_port to a distinct free port; "
+                    "or stop the process holding it.", retryable=False)
+                return False
+        if not await asyncio.to_thread(self._preflight):
             return False
         bridge_path = Path(self._bridge_script)
         lock_acquired = False
@@ -604,11 +642,46 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             if not self._ensure_bridge_deps(bridge_path.parent):
                 return False
             self._session_path.mkdir(parents=True, exist_ok=True)
-            if await self._reuse_running_bridge(bridge_path):
+            # A secondary adopts or reaps only a bridge its own pidfile identifies (crash restart);
+            # the default keeps its historical adopt-or-clear-the-port path.
+            if (not secondary or prior_bridge_is_ours) and await self._reuse_running_bridge(bridge_path):
                 return True
-            _kill_stale_bridge_by_pidfile(self._session_path)
-            _kill_port_process(self._bridge_port)
-            await asyncio.sleep(1)
+            if self._foreign_bridge_session:
+                # The port is served by another profile's bridge. Never adopt
+                # it and never kill it: it belongs to a live session.
+                foreign = self._foreign_bridge_session
+                self._set_fatal_error(
+                    "whatsapp_bridge_foreign_session",
+                    f"Port {self._bridge_port} is already served by a WhatsApp bridge for a different session "
+                    f"({foreign}). Give this profile its own port via platforms.whatsapp.extra.bridge_port "
+                    f"(one distinct bridge_port per profile); nothing on port {self._bridge_port} was stopped.",
+                    retryable=False,
+                )
+                return False
+            if not secondary or prior_bridge_is_ours:
+                _kill_stale_bridge_by_pidfile(self._session_path)
+            if not secondary:
+                if self._bridge_probe_timed_out:
+                    # No /health answer is no ownership evidence (another profile's busy bridge looks the same), and
+                    # our own stale bridge was just reaped by its pidfile: a holder that remains is left running.
+                    await asyncio.sleep(1)
+                    try:
+                        held = bool(_port_listener_pids(self._bridge_port))
+                    except Exception:
+                        held = True  # listeners could not be listed: still no evidence to kill on
+                    if held:
+                        self._set_fatal_error(
+                            "whatsapp_bridge_unresponsive",
+                            f"Port {self._bridge_port} is held by a process that did not answer /health in time, so "
+                            f"Qubit cannot tell whose WhatsApp bridge it is; nothing on port {self._bridge_port} was "
+                            "stopped. Stop that process, or give this profile its own port via "
+                            "platforms.whatsapp.extra.bridge_port.",
+                            retryable=True,
+                        )
+                        return False
+                _kill_port_process(self._bridge_port)
+            if not secondary or prior_bridge_is_ours:
+                await asyncio.sleep(1)
             # Bridge output goes to a log file so QR codes, errors, and reconnection messages survive for troubleshooting.
             self._bridge_log = self._session_path.parent / "bridge.log"
             self._bridge_log_fh = bridge_log_fh = open(self._bridge_log, "a", encoding="utf-8")
