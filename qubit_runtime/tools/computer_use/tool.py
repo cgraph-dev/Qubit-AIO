@@ -885,20 +885,19 @@ def _shrink_capture_for_vision(raw: bytes, ext: str, max_dim: int = _MAX_VISION_
 
 def _should_route_through_aux_vision() -> bool:
     """True when ``_capture_response`` should hand the PNG to aux vision. Any failure returns False (fail open) so a
-    broken config never silently drops the screenshot for vision-capable main models."""
+    broken config never silently drops the screenshot for vision-capable main models. Decided per capture (the
+    config read is the signature-cached ``load_config_readonly``), so ``/model``, a profile switch or an
+    ``image_input_mode`` edit applies to the next screenshot instead of a stale verdict."""
     stage = "import"
     try:
         from agent.auxiliary_client import _read_main_model, _read_main_provider
-        from qubit_cli.config import load_config
-        from qubit_constants import qubit_home_key
-        from tools.computer_use.vision_routing import should_route_capture_to_aux_vision
-        stage = "config read"
-        provider, model = _read_main_provider() or "", _read_main_model() or ""
-        if (cached := _AUX_VISION_ROUTE_CACHE.get(key := (qubit_home_key(), str(provider), str(model)))) is not None:
-            return cached
+        from qubit_cli.config import load_config_readonly
+        from tools.vision_tools import _native_tool_result_images
         stage = "decision"
-        _AUX_VISION_ROUTE_CACHE[key] = decision = bool(should_route_capture_to_aux_vision(provider, model, load_config()))
-        return decision
+        provider, model = _read_main_provider() or "", _read_main_model() or ""
+        # The shared native-tool-result gate (vision_analyze, browser screenshots, MCP images use it too), so a
+        # screenshot takes the same lane whichever tool produced it; anything it cannot vouch for goes to aux.
+        return not _native_tool_result_images(provider, model, load_config_readonly())
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("computer_use: aux-vision routing %s failed: %s", stage, exc)
         return False

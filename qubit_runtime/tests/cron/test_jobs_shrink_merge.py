@@ -167,19 +167,6 @@ def test_merge_does_not_mutate_caller_list(hermes_env):
     assert my_payload == [], "caller's list was mutated in place by the merge"
 
 
-def test_corrupt_disk_file_does_not_break_save(hermes_env):
-    """A corrupt jobs.json under a save must not recurse or crash: the
-    non-repairing peek returns None and the save overwrites cleanly."""
-    import cron.jobs as jobs
-    from cron.jobs import load_jobs, save_jobs
-
-    jobs.ensure_dirs()
-    jobs_file = jobs._current_cron_store().jobs_file
-    jobs_file.write_text('{"jobs": [{"id": "ccc', encoding="utf-8")
-    save_jobs([{"id": "aaaaaaaaaaaa", "name": "a"}])
-    assert [j["id"] for j in load_jobs()] == ["aaaaaaaaaaaa"]
-
-
 def test_nested_create_survives_outer_stale_save(hermes_env):
     """A save inside a critical section invalidates the section's stamp, so
     an outer caller's later save with a pre-create payload must re-merge and
@@ -209,7 +196,6 @@ import errno
 import os
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_save_over_corrupt_store_fails_closed(hermes_env):
     """A merging save over an unreadable jobs.json must refuse (the jobs in it
     are unknown, so overwriting would drop them) and leave the bytes intact;
@@ -229,7 +215,6 @@ def test_save_over_corrupt_store_fails_closed(hermes_env):
     assert [j["id"] for j in load_jobs()] == ["aaaaaaaaaaaa"]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_symlinked_store_saves_by_rename_not_in_place_copy(hermes_env, tmp_path, monkeypatch):
     """jobs.json symlinked into another dir (treated as another filesystem) must still be
     published by an atomic rename — never the EXDEV in-place copy fallback, which tears the

@@ -272,7 +272,6 @@ def test_docs_append_carries_tab_id_and_refuses_ambiguous_writes(api_module, mon
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_gmail_search_empty_result_prints_json_array(
     api_module: types.ModuleType,
     monkeypatch: pytest.MonkeyPatch,

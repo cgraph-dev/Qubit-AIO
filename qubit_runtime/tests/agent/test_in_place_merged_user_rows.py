@@ -36,21 +36,6 @@ KILLED_TURN_LEFT = {
 }
 
 
-# PRODUCT GAP (root-caused): the gateway surface reloads through
-# gateway.run._build_gateway_agent_history -> _build_replay_entry, and the product
-# omits the merge-witness stamp carry that upstream 38880bd2 has at the end of
-# _build_replay_entry:
-#     for stamp in (MERGED_DURABLE_ROWS, UNNAMED_DURABLE_ROWS, RETIRED_DURABLE_ROWS):
-#         if msg.get(stamp):
-#             entry[stamp] = msg[stamp]
-# Without it the merged user dict loses `_merged_durable_rows` on the reload, so
-# the compaction commit cannot name the two originals behind it: a summarized
-# reply (A4) is lost from both model and display history and the unanswered
-# prompt's original is left live beside its merged copy. Proven: patch the four
-# upstream lines onto _build_replay_entry and all 12 cases pass. cli/resume read
-# the durable rows directly and are unaffected. Do NOT fix product here.
-
-
 @pytest.mark.parametrize("left", list(KILLED_TURN_LEFT))
 @pytest.mark.parametrize("surface", ["cli", "resume", "gateway"])
 def test_compaction_over_an_unanswered_prompt_keeps_one_copy_of_every_row(session, surface, left):

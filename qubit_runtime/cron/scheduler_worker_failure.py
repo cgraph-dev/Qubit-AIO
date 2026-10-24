@@ -32,12 +32,16 @@ def record_unknown_worker_outcome(
             )
         finally:
             scheduler._reset_fire_secret_scope(scope_tokens)
+            from cron.unreachable_retry import is_retry_run
+
             scheduler.mark_job_run(
                 job["id"],
                 False,
                 error,
                 delivery_error=delivery_error,
                 expected_fire_owner=owner,
+                # A ladder re-run's occurrence already counted toward repeat.
+                **({"ladder_rung": True} if is_retry_run(job) else {}),
             )
     return True
 

@@ -13,17 +13,7 @@ from pathlib import Path
 import pytest
 
 from qubit_platform.declaration import DeclarationError, parse_declaration
-try:
-    from qubit_platform.resolver.app import AppDef, AppLocation, AppResolver
-except ImportError as _exc:  # pragma: no cover - product gap, see reason below
-    # PRODUCT GAP (not a test bug): the frozen upstream target ad12263a5ed4 has
-    # ``AppLocation`` and ``AppDef.locations: tuple[AppLocation, ...]`` in
-    # ``hermes_platform/resolver/app.py`` (439 lines); Qubit's ported
-    # ``qubit_platform/resolver/app.py`` (323 lines) still models
-    # ``AppDef.location: str`` with no ``AppLocation``. These declaration-app and
-    # resolver-app contracts therefore cannot import until the resolver package
-    # is brought up to the frozen API. Recorded for the product owner.
-    pytest.skip(f"product gap: {_exc}", allow_module_level=True)
+from qubit_platform.resolver.app import AppDef, AppLocation, AppResolver
 from qubit_platform.resolver.availability import Availability, availability, version_at_least
 
 WHERE = "test-plugin/plugin.yaml"

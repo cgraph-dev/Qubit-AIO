@@ -440,7 +440,6 @@ def test_cronjob_tool_update_clears_monitor_script(hermes_env):
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.skip(reason="wave-25 short-port: ported probe hangs locally; tracked for follow-up")
 def test_monitor_script_uses_configured_interpreter(hermes_env, monkeypatch):
     """A monitor script uses the same job-level interpreter as `script`."""
     import stat
@@ -480,5 +479,3 @@ def test_monitor_script_uses_configured_interpreter(hermes_env, monkeypatch):
     assert error is None
     assert "1" in observed["prompts"][0]
 
-import pytest
-pytestmark = pytest.mark.skip(reason="wave-25 short-port: file probe hangs locally; tracked")

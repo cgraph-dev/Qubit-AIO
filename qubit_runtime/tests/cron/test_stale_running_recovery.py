@@ -87,7 +87,6 @@ def test_live_owner_recent_claim_not_recovered(monkeypatch, timeout):
 import sqlite3
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_progress_stamped_during_the_sweep_keeps_the_run(monkeypatch):
     """A worker that stamps progress after the sweep read its silent row is not reclaimed: the
     reclaim UPDATE must not act on the stale snapshot (race audit threads-4: the live run would be
@@ -101,7 +100,7 @@ def test_progress_stamped_during_the_sweep_keeps_the_run(monkeypatch):
         # while this sweep is probing its liveness.
         worker = sqlite3.connect(executions_mod.EXECUTIONS_FILE)
         with worker:
-            worker.execute("UPDATE executions SET progress_at=? WHERE id=?", (_hermes_now().isoformat(), eid))
+            worker.execute("UPDATE executions SET progress_at=? WHERE id=?", (_qubit_now().isoformat(), eid))
         worker.close()
         return True
 
