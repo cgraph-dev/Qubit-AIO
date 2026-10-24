@@ -1386,6 +1386,7 @@ def load_jobs() -> List[Dict[str, Any]]:
     # Accept the canonical dict, or a bare list (auto-repair); any other top-level shape is
     # corruption.
     repair = "had invalid control characters" if _strict_retry else None
+    unmergeable = False  # disk shape _peek_jobs_unlocked cannot read: only a replace save fixes it
     if isinstance(data, dict):
         jobs = data.get("jobs", [])
         if isinstance(jobs, dict):
@@ -1399,6 +1400,7 @@ def load_jobs() -> List[Dict[str, Any]]:
                     ", ".join(map(repr, skipped)))
             jobs = [{**v, "id": v.get("id") or k} for k, v in jobs.items() if isinstance(v, dict)]
             repair = "id-keyed jobs map flattened to list"
+            unmergeable = True
     elif isinstance(data, list):
         jobs = data
         repair = "bare list wrapped as dict"
@@ -1406,8 +1408,10 @@ def load_jobs() -> List[Dict[str, Any]]:
         raise RuntimeError(
             f"Cron database corrupted: expected {{'jobs': [...]}}, got {type(data).__name__}")
     if jobs and repair:
+        # Keep the shrink-merge (a degraded-lock sibling's create may have landed since the read)
+        # unless disk is STILL a shape the merge would refuse: a sibling may have rewritten it.
         try:
-            save_jobs(jobs)
+            save_jobs(jobs, replace=unmergeable and _peek_jobs_unlocked() is None)
             logger.warning("Auto-repaired jobs.json (%s)", repair)
         except OSError as exc:  # repaired in memory; the next load retries the persist
             store_health.note_unwritable(exc, f"jobs.json repair ({repair}) not persisted", "load")

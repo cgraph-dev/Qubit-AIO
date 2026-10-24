@@ -12,17 +12,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from qubit_platform.resolver import CheckState, Effort
-try:
-    from qubit_platform.resolver.app import AppDef, AppLocation, AppResolver, Endpoint
-except ImportError as _exc:  # pragma: no cover - product gap, see reason below
-    # PRODUCT GAP (not a test bug): the frozen upstream target ad12263a5ed4 has
-    # ``AppLocation`` and ``AppDef.locations: tuple[AppLocation, ...]`` in
-    # ``hermes_platform/resolver/app.py``; Qubit's ported
-    # ``qubit_platform/resolver/app.py`` still models ``AppDef.location: str``
-    # with no ``AppLocation``. The app-resolver contract cannot import until the
-    # resolver package is brought up to the frozen API. Recorded for the product
-    # owner.
-    pytest.skip(f"product gap: {_exc}", allow_module_level=True)
+from qubit_platform.resolver.app import AppDef, AppLocation, AppResolver, Endpoint
 
 TOKEN = "tok-3e1f9c-unique-fixture-value"
 

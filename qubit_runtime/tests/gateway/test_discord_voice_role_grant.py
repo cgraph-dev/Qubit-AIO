@@ -17,14 +17,6 @@ from gateway.config import Platform, PlatformConfig
 from gateway.session import SessionSource
 from plugins.platforms.discord.adapter import DiscordAdapter
 
-# MIGRATION GAP (wave u4): this test is a faithful port of upstream's, and it FAILS ON
-# BEHAVIOUR, not on import -- so the product is behind, not the test. Reason: PRODUCT GAP: discord voice role grant (1 failed / 2 passed).
-# Marked xfail(strict=False) so the suite stays green AND the gap stays visible.
-import pytest as _pytest
-_UPSTREAM_GAP = _pytest.mark.xfail(strict=False, reason='PRODUCT GAP: discord voice role grant (1 failed / 2 passed).')
-
-pytestmark = _UPSTREAM_GAP
-
 _ROLE, _GUILD, _TEXT, _JOINER = 1234, 1, 700, 42
 
 

@@ -148,13 +148,6 @@ class TestParseMcpBody:
                 else:
                     keyless_mcp._keenable_request("get", "/v1/search/public")
 
-    @pytest.mark.xfail(
-        reason="PRODUCT GAP qubit_runtime/plugins/web/keyless_mcp.py:311 "
-        "_keenable_request raises KeylessMCPError(_response_text(...) or f'HTTP {code}'), "
-        "dropping the status prefix; the frozen target raises "
-        "'HTTP {code}: {text[:300]}'. The test expects 'HTTP 403: anonymous access disabled'.",
-        strict=False,
-    )
     def test_keenable_error_keeps_status_and_reason(self):
         import requests
 
@@ -564,21 +557,8 @@ class TestKeylessFailover:
             ("FORBIDDEN", False),
             ("extract failed for 'forbidden kingdom trailer': connection timeout", False),
             ("HTTP 400: malformed request", False),
-            pytest.param(
-                "HTTP 402: free credits exhausted", True,
-                marks=pytest.mark.xfail(
-                    reason="PRODUCT GAP qubit_runtime/plugins/web/keyless_mcp.py:50 "
-                    "_AUTH_STATUS_RE matches only 401|403; the frozen target's "
-                    "_VENDOR_REFUSAL_RE matches 40[123] and 5xx too, so HTTP 402 is "
-                    "failover-eligible upstream but not in Qubit."),
-            ),
-            pytest.param(
-                "HTTP 503: upstream unavailable", True,
-                marks=pytest.mark.xfail(
-                    reason="PRODUCT GAP qubit_runtime/plugins/web/keyless_mcp.py:50 "
-                    "_AUTH_STATUS_RE matches only 401|403 (no 5xx); upstream's "
-                    "_VENDOR_REFUSAL_RE matches 5xx, making HTTP 503 failover-eligible."),
-            ),
+            ("HTTP 402: free credits exhausted", True),
+            ("HTTP 503: upstream unavailable", True),
             ("HTTP 404: not found", False),
             ("Keyless Firecrawl search failed: HTTP 403: your IP address looks suspicious", True),
             # A terminal error that echoes the query is judged by the status it starts with.
@@ -586,15 +566,7 @@ class TestKeylessFailover:
             ("HTTP 422: query contains 'status=500'", False),
             ("search failed for 'HTTP 503 error codes': timeout", False),
             ("error: 500 results max exceeded", False),
-            pytest.param(
-                "Keyless Exa search failed: HTTP 400: invalid query 'http 403'", False,
-                marks=pytest.mark.xfail(
-                    reason="PRODUCT GAP qubit_runtime/plugins/web/keyless_mcp.py:50 "
-                    "_AUTH_STATUS_RE uses re.search (not match) with a leading \\b, so it "
-                    "matches an echoed '403' anywhere in a terminal error; upstream's "
-                    "_VENDOR_REFUSAL_RE anchors with re.match and a 'keyless X search "
-                    "failed:' optional prefix, so this message is NOT eligible."),
-            ),
+            ("Keyless Exa search failed: HTTP 400: invalid query 'http 403'", False),
             ("", False),
         ],
     )

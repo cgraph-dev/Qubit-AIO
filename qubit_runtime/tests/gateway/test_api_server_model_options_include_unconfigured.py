@@ -13,15 +13,6 @@ from aiohttp.test_utils import TestClient, TestServer
 from gateway.config import PlatformConfig
 from gateway.platforms.api_server import APIServerAdapter
 
-# MIGRATION GAP (wave u4): this test is a faithful port of upstream's, and it FAILS ON
-# BEHAVIOUR, not on import -- so the product is behind, not the test. Reason: PRODUCT GAP: include_unconfigured=false is not threaded into the model-options payload builder (1 failed / 1 passed).
-# Marked xfail(strict=False) so the suite stays green AND the gap stays visible.
-import pytest as _pytest
-_UPSTREAM_GAP = _pytest.mark.xfail(strict=False, reason='PRODUCT GAP: include_unconfigured=false is not threaded into the model-options payload builder (1 failed / 1 passed).')
-
-pytestmark = _UPSTREAM_GAP
-
-
 def _make_adapter() -> APIServerAdapter:
     return APIServerAdapter(PlatformConfig(enabled=True))
 
