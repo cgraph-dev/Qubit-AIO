@@ -10,10 +10,6 @@ import pytest
 
 from tests.gateway.fixtures.local_recovery_probe import child_env
 
-pytestmark = pytest.mark.xfail(
-    strict=True,
-    reason="wave-30 parity defect: the local recovery peer's session.create reply carries no result")
-
 _OTHER_CHAT = 'http://127.0.0.1:9333'
 
 
@@ -25,8 +21,8 @@ def receipt(tmp_path_factory):
     home.mkdir()
     user.mkdir()
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
-               PYTHONUNBUFFERED='1')
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home),
+               PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
     result = subprocess.run([sys.executable, str(root / 'tests/gateway/fixtures/browser_scope_peer.py')],
                             cwd=root, env=env, capture_output=True, text=True, timeout=90, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
