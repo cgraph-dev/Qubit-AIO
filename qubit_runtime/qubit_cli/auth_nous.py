@@ -1065,13 +1065,17 @@ def resolve_nous_runtime_credentials(
             force_refresh=force_refresh, stale_access_token=stale_access_token))
     except AnonCredentialDead as dead_exc:
         from qubit_cli.auth import get_provider_auth_state
-        from qubit_cli.anon_auth import ANON_ACCOUNT_LOCKED
+        from qubit_cli.anon_auth import ANON_ACCOUNT_LOCKED, WELCOME_CLAIM_FLAG
         dead = get_provider_auth_state("nous") or {}
+        # The replacement inherits the dead identity's trial stamp: a claimed guest whose credential
+        # was reaped keeps the inference it already claimed instead of quietly becoming connector-only.
+        claimed = dead.get(WELCOME_CLAIM_FLAG) is True
         clear_dead_guest(str(dead_exc.code or "anon_credential_dead"), dead_token=dead.get("anon_token"))
         # A locked account is retired but never silently replaced: the way forward is a sign-in.
         if dead_exc.code == ANON_ACCOUNT_LOCKED:
             raise
-        if ensure_portal_identity(explicit=True, timeout_seconds=timeout_seconds) is None:
+        if ensure_portal_identity(
+                explicit=True, timeout_seconds=timeout_seconds, welcome_claim=claimed) is None:
             raise
         return run_with_challenge(lambda: _resolve_nous_runtime_credentials(
             timeout_seconds=timeout_seconds, insecure=insecure, ca_bundle=ca_bundle))
@@ -1205,9 +1209,10 @@ def _nous_status_from_state(
 
 def _compute_nous_auth_status() -> Dict[str, Any]:
     """Uncached implementation of get_nous_auth_status(). See that function."""
+    from qubit_cli.anon_auth import guest_without_free_tier
     from qubit_cli.auth import get_provider_auth_state, resolve_nous_runtime_credentials
     state = get_provider_auth_state("nous")
-    if not state:
+    if not state or guest_without_free_tier(state):
         return _snapshot_nous_pool_status()
     base_status = _nous_status_from_state(
         state, logged_in=bool(state.get("access_token")), source="auth_store")

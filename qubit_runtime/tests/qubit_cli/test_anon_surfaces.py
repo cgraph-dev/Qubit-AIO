@@ -29,6 +29,7 @@ from qubit_cli import (
 )
 from qubit_cli.auth import _load_auth_store  # noqa: F401  (store import name kept for parity with core tests)
 from qubit_constants import get_qubit_home
+from tests.qubit_cli.anon_portal import as_local_desktop_backend
 
 WELCOME = "https://welcome-api.nousresearch.com/v1"
 # Words that must never appear on a user-facing free-tier surface.
@@ -54,6 +55,7 @@ def _guest_state() -> dict:
         "auth_method": "anonymous", "account_tier": "anonymous", "anon_token": "anon_t",
         "access_token": _jwt(), "expires_at": "2030-01-01T00:00:00+00:00",
         "inference_base_url": WELCOME, "user_id": "nas_user:abc", "org_id": "nas_organisation:def",
+        anon_auth.WELCOME_CLAIM_FLAG: True,
     }
 
 
@@ -70,6 +72,8 @@ def _account_state() -> dict:
 def isolated_store(monkeypatch, tmp_path):
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    # The welcome trial carries inference only on the desktop's local backend.
+    as_local_desktop_backend(monkeypatch)
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     # No network: the account lookup is derived from the JWT the store already holds.
@@ -97,7 +101,6 @@ def _render_all(capsys) -> dict[str, str]:
     return out
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_free_tier_renders_free_tier_copy_on_every_surface(isolated_store, capsys):
     _write_auth(_guest_state())
     rendered = _render_all(capsys)
@@ -236,7 +239,6 @@ def test_guest_whose_lookup_fails_still_gets_the_sign_in_copy(isolated_store, mo
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_a_claimed_guest_off_the_desktop_backend_is_not_the_free_tier(isolated_store, monkeypatch, capsys):
     """On the CLI surface the trial carries no inference: the guest reads as not signed in."""
     monkeypatch.delenv("HERMES_DESKTOP", raising=False)
