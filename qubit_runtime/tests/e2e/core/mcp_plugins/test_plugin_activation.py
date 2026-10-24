@@ -131,6 +131,10 @@ def _toggle_on(host, key: str) -> list[dict[str, Any]]:
     return ((result.get("activation") or {}).get("live_now") or {}).get("mcp_servers") or []
 
 
+@pytest.mark.skipif(
+    not (Path(sys.base_prefix).resolve().parent / "facts.json").is_file(),
+    reason="test interpreter is not from a PM store; the pinned toolchain cannot be resolved offline",
+)
 def test_plugin_sandbox_selects_real_pm_tools_offline(tmp_path: Path) -> None:
     """The same isolated home used by activation can resolve PM's pinned toolchain without downloads."""
     eh = build_home(tmp_path, "http://127.0.0.1:1")
@@ -176,7 +180,7 @@ def test_plugin_enabled_mid_chat_is_usable_in_that_chat_with_an_unchanged_tools_
             assert _canon(after["messages"][0]) == _canon(before["messages"][0]), (
                 "enabling a plugin mid-chat rewrote the open chat's system prompt (prompt-cache prefix)")
             # The open chat is told what just became usable (one-shot turn note), outside the prefix.
-            assert f"[plugin installed: {PLUGIN}]" in _canon(after["messages"][1:]), (
+            assert f"[System note: plugin {PLUGIN} was installed" in _canon(after["messages"][1:]), (
                 f"the open chat was never told the plugin went live; its turn ended with {after['messages'][-1]}")
 
             fresh = host.new_session()
@@ -327,7 +331,6 @@ def test_same_name_plugin_collision_is_reported(name_collision: dict[str, Any], 
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.skip(reason="wave-25 short-port: ported probe hangs locally; tracked for follow-up")
 @pytest.mark.parametrize("trust", ["untrusted", None])
 def test_portable_package_trust_request_gates_write_tools_before_the_rpc(tmp_path: Path, trust: str | None) -> None:
     """A package that marks its server ``trust: untrusted`` (plugin.json Hermes extension) gets the same gate as a
@@ -351,5 +354,3 @@ def test_portable_package_trust_request_gates_write_tools_before_the_rpc(tmp_pat
     else:
         assert calls_received(log, "rw_probe"), "default-trust package server never received the destructive call"
 
-import pytest
-pytestmark = pytest.mark.skip(reason="wave-25 short-port: file probe hangs locally; tracked")
