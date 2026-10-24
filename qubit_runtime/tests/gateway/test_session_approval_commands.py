@@ -10,8 +10,6 @@ import time
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-30 parity defect: isolated gateway daemon does not reach ready or exit within the harness deadline on the pinned tree")
-
 from tests.gateway.fixtures.local_recovery_probe import child_env, daemon, rpc, websocket
 from tests.gateway.test_api_pending_daemon import PromptPeer
 
@@ -58,7 +56,7 @@ def test_typed_approve_and_deny_resolve_the_waiter_approval_respond_answers(tmp_
         'model': {'provider': 'custom', 'default': 'approve-model', 'base_url': url},
         'auxiliary': {'title_generation': {'enabled': False}}}))
     env = child_env()
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
     out = {}
 
