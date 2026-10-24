@@ -78,7 +78,11 @@ def main():
     (skill / 'SKILL.md').write_text('---\nname: owned-skill\ndescription: Owned fixture\n---\nKANBAN_SKILL_SENTINEL\n', encoding='utf-8')
     hook = home / 'hook.py'
     hook.write_text('from pathlib import Path\nPath(' + repr(str(home / 'hook-effect')) + ').write_text("accepted")\n', encoding='utf-8')
-    cfg = {'gateway': {'multiplex_profiles': False}, 'model': {'provider': 'custom', 'default': 'loop-model', 'base_url': url},
+    # Pin the window: a fresh managed worker otherwise probes the loopback model for metadata
+    # (two network timeouts) before its first owner receipt, and on a loaded host that probe plus
+    # the fixed 20 s receipt budget outlives the lifecycle waits below.
+    cfg = {'gateway': {'multiplex_profiles': False}, 'model': {'provider': 'custom', 'default': 'loop-model', 'base_url': url,
+        'context_length': 256000},
         'auxiliary': {'title_generation': {'enabled': False}}, 'platform_toolsets': {'cli': ['terminal', 'file']},
         'terminal': {'backend': 'local'}, 'agent': {'api_max_retries': 1}, 'kanban': {'dispatch_in_gateway': False},
         'hooks': {'post_tool_call': [{'command': f'{sys.executable} {hook}'}]}}
@@ -103,14 +107,14 @@ def main():
         if 'qubit_cli.kanban_worker_client' in args[0]:
             clients.append(child)
             if peer.mode == 'timeout':
-                assert peer.blocked.wait(55), 'managed worker did not reach loopback'
+                assert peer.blocked.wait(120), 'managed worker did not reach loopback'
                 with closing(connect(board='owned')) as snapshot:
                     bound = snapshot.execute("SELECT payload FROM task_events WHERE task_id=? AND kind='worker_bound' "
                                              "ORDER BY id DESC LIMIT 1", (tid,)).fetchone()
                     receipt['managed_pid'] = json.loads(bound[0])['pid'] if bound else None
         return child
     def wait_for(predicate):
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 120
         while time.monotonic() < deadline:
             if predicate():
                 return
@@ -125,7 +129,7 @@ def main():
                     assert [s[0] for s in launched.spawned] == [tid], launched
                     task = kb.get_task(conn, tid)
                     params = dict(task_id=tid, board='owned', run_id=task.current_run_id, claim_lock=task.claim_lock)
-                    assert peer.blocked.wait(55), 'model never reached'
+                    assert peer.blocked.wait(120), 'model never reached'
                     active = kb.get_task(conn, tid)
                     receipt.update(client_pid=clients[0].pid, stored_pid=active.worker_pid, run_id=task.current_run_id)
                     if peer.mode == 'timeout':

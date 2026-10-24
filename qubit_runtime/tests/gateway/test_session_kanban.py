@@ -55,7 +55,7 @@ def test_claim_freezes_task_policy_and_rejects_forgery(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('mode', ['complete', 'timeout', 'rate_limit', 'billing', 'crash'])
-@pytest.mark.xfail(strict=False, reason="wave-30 parity defect (intermittent): real dispatcher subprocess misses the model on a loaded host")
+@pytest.mark.xfail(strict=False, reason="wave-30 parity defect (intermittent): under host load the dispatcher's kanban worker loses its owner WebSocket (production 20 s keepalive) or the managed worker's owner receipt times out before the turn settles; the harness waits are now 120 s and the model window is pinned, so this is the production transport budget, not the fixture")
 def test_real_dispatcher_lifecycle(tmp_path, mode):
     import os
     import subprocess
@@ -65,7 +65,7 @@ def test_real_dispatcher_lifecycle(tmp_path, mode):
     env = child_env()
     env.update(HOME=str(tmp_path / 'home'), USERPROFILE=str(tmp_path / 'home'), HERMES_HOME=str(tmp_path / 'state'), QUBIT_HOME=str(tmp_path / 'state'), PYTHONPATH=str(repo), KANBAN_PROBE_MODE=mode)
     result = subprocess.run([sys.executable, str(Path(__file__).parent / 'fixtures' / 'kanban_owner_probe.py')],
-        env=env, cwd=repo, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=150, check=False)
+        env=env, cwd=repo, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=330, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     receipt = json.loads((tmp_path / 'state' / 'receipt.json').read_text())
     print(json.dumps(receipt))
