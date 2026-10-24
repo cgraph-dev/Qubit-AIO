@@ -15,7 +15,13 @@ import pytest
 from qubit_cli import anon_auth, anon_sign_in, free_tier_bootstrap
 from qubit_cli.auth import _load_auth_store
 
-from tests.qubit_cli.anon_portal import PORTAL, WELCOME, install_portal  # noqa: F401
+from tests.qubit_cli.anon_portal import (
+    PORTAL,
+    WELCOME,
+    as_local_desktop_backend,
+    claimed_trial,
+    install_portal,  # noqa: F401
+)
 
 
 @pytest.fixture
@@ -29,10 +35,10 @@ def _mint_error(nas) -> anon_auth.AuthError:
     return exc.value
 
 
-def _exchange_error(nas) -> anon_auth.AuthError:
-    """Mint (the credential is persisted before any exchange), then exchange it at first use."""
+def _exchange_error(nas, monkeypatch) -> anon_auth.AuthError:
+    """Claim the trial (the credential is persisted before any exchange), then exchange it at first use."""
     from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-    assert anon_auth.is_guest_state(anon_auth.ensure_portal_identity(explicit=True))
+    assert anon_auth.is_guest_state(claimed_trial(monkeypatch))
     with pytest.raises(anon_auth.AuthError) as exc:
         resolve_nous_runtime_credentials()
     return exc.value
@@ -42,12 +48,11 @@ def _exchange_error(nas) -> anon_auth.AuthError:
 
 
 class TestNasRefusalCodes:
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_surface_not_enabled_is_a_terminal_gate(self, nas):
         nas.create_response = httpx.Response(404, json={"error": "not_found"})
         err = _mint_error(nas)
         assert err.code == anon_auth.ANON_GATE_CLOSED and err.retryable is False
-        assert "Nous account" in str(err) and "free" in str(err)
+        assert "Qubit account" in str(err) and "free" in str(err)
         # Terminal: no later attempt this process, whatever the clock says.
         assert anon_auth.ensure_portal_identity(explicit=True) is None
         assert nas.creates() == 1
@@ -71,10 +76,9 @@ class TestNasRefusalCodes:
         assert "about a minute" in str(err)
         assert anon_auth.last_mint_failure()["retry_after"] == 42
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    def test_proof_of_work_is_deferred_with_the_agreed_sentence(self, nas):
+    def test_proof_of_work_is_deferred_with_the_agreed_sentence(self, nas, monkeypatch):
         nas.token_response = httpx.Response(428, json={"error": "pow_required", "pow": {"bits": 31}})
-        err = _exchange_error(nas)
+        err = _exchange_error(nas, monkeypatch)
         assert err.code == anon_auth.ANON_POW_REQUIRED and err.retryable is False
         assert "proof of work" in str(err)
         # The credential from ``create`` is kept, so a later NAS without PoW exchanges it instead
@@ -82,10 +86,9 @@ class TestNasRefusalCodes:
         assert anon_auth.is_guest_state(_load_auth_store()["providers"]["nous"])
         assert nas.creates() == 1
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    def test_locked_account_is_dead_and_never_replaced(self, nas):
+    def test_locked_account_is_dead_and_never_replaced(self, nas, monkeypatch):
         nas.token_response = httpx.Response(403, json={"error": "account_locked"})
-        err = _exchange_error(nas)
+        err = _exchange_error(nas, monkeypatch)
         assert isinstance(err, anon_auth.AnonCredentialDead)
         assert err.code == anon_auth.ANON_ACCOUNT_LOCKED
         # Retired, and NOT replaced by a fresh identity: the way forward is a sign-in.
@@ -107,10 +110,9 @@ class TestNasRefusalCodes:
         assert "nous" not in _load_auth_store().get("providers", {})
         assert nas.creates() == 1
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    def test_unknown_token_is_replaced_once_at_first_use(self, nas):
+    def test_unknown_token_is_replaced_once_at_first_use(self, nas, monkeypatch):
         from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-        first = anon_auth.ensure_portal_identity(explicit=True)
+        first = claimed_trial(monkeypatch)
         original = nas.handler
 
         def _first_only(request):
@@ -198,10 +200,10 @@ class TestMintCooldown:
 
 
 class TestBootstrapRecord:
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    def test_the_record_carries_the_code_and_the_wait(self, nas):
+    def test_the_record_carries_the_code_and_the_wait(self, nas, monkeypatch):
         nas.create_response = httpx.Response(
             429, json={"error": "temporarily_unavailable"}, headers={"Retry-After": "30"})
+        _failed_claim(nas, monkeypatch)
         record = free_tier_bootstrap.run_bootstrap(announce=False)
         assert record.has_identity is False and record.free_tier_account is False
         assert record.failure["error_code"] == anon_auth.ANON_RATE_LIMITED
@@ -210,12 +212,11 @@ class TestBootstrapRecord:
             "error": record.error, "error_code": anon_auth.ANON_RATE_LIMITED, "retryable": True,
             "retry_after": record.failure["retry_after"]}
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    def test_a_clean_boot_carries_no_failure_block(self, nas):
+    def test_a_clean_boot_carries_no_failure_block(self, nas, monkeypatch):
+        claimed_trial(monkeypatch)
         record = free_tier_bootstrap.run_bootstrap(announce=False)
         assert record.free_tier_account is True and record.failure_fields() == {}
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_the_background_loop_retries_a_transient_failure_until_it_settles(self, nas, monkeypatch):
         nas.raise_transport = httpx.ConnectTimeout("no route")
         slept = []
@@ -228,21 +229,21 @@ class TestBootstrapRecord:
             if len(slept) == 2:
                 nas.raise_transport = None          # the network comes back on the second wait
         monkeypatch.setattr(free_tier_bootstrap, "_sleep", _sleep)
+        _failed_claim(nas, monkeypatch)
         free_tier_bootstrap._bootstrap_then_retry()
         record = free_tier_bootstrap.current_record()
         assert record.has_identity is True and record.free_tier_account is True
         assert slept == [int(w) for w in anon_auth._MINT_RETRY_LADDER[:2]]
         assert nas.creates() == 3
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_the_background_loop_never_retries_a_terminal_code(self, nas, monkeypatch):
         nas.create_response = httpx.Response(404, json={"error": "not_found"})
         monkeypatch.setattr(free_tier_bootstrap, "_sleep", lambda s: pytest.fail("must not sleep"))
+        _failed_claim(nas, monkeypatch)
         free_tier_bootstrap._bootstrap_then_retry()
         assert free_tier_bootstrap.current_record().failure["error_code"] == anon_auth.ANON_GATE_CLOSED
         assert nas.creates() == 1
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_the_background_loop_is_bounded(self, nas, monkeypatch):
         nas.raise_transport = httpx.ConnectTimeout("no route")
 
@@ -250,6 +251,7 @@ class TestBootstrapRecord:
             failure = anon_auth._mint_failure_for_profile()
             monkeypatch.setattr(anon_auth.time, "monotonic", lambda f=failure: f.not_before + 1)
         monkeypatch.setattr(free_tier_bootstrap, "_sleep", _sleep)
+        _failed_claim(nas, monkeypatch)
         free_tier_bootstrap._bootstrap_then_retry()
         assert nas.creates() == 1 + free_tier_bootstrap.BOOTSTRAP_RETRY_ATTEMPTS
         assert free_tier_bootstrap.current_record().failure["error_code"] == anon_auth.ANON_UNREACHABLE
@@ -282,9 +284,9 @@ class TestBootstrapRecord:
         assert record.has_identity is True
         assert free_tier_bootstrap.current_record().has_identity is True
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    def test_the_desktop_retry_refreshes_the_boot_record(self, nas):
+    def test_the_desktop_retry_refreshes_the_boot_record(self, nas, monkeypatch):
         nas.raise_transport = httpx.ConnectTimeout("no route")
+        _failed_claim(nas, monkeypatch)
         free_tier_bootstrap.run_bootstrap(announce=False)
         nas.raise_transport = None
         record = free_tier_bootstrap.retry_bootstrap_mint(force=True, announce=False)
@@ -296,16 +298,13 @@ class TestBootstrapRecord:
 
 
 class TestSignInFailures:
-    @pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.parametrize("code,retry_after,retryable,needle", [
         (anon_auth.ANON_RATE_LIMITED, 45, True, "busy"),
         (anon_auth.ANON_GATE_PAUSED, 0, True, "busy"),
         (anon_auth.ANON_UNREACHABLE, 0, True, "internet connection"),
-        (anon_auth.ANON_GATE_CLOSED, 0, False, "Nous account"),
+        (anon_auth.ANON_GATE_CLOSED, 0, False, "Qubit account"),
         (anon_auth.ANON_POW_REQUIRED, 0, False, "proof of work"),
     ])
-    @pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
     def test_a_service_verdict_keeps_its_code_wait_and_copy(self, code, retry_after, retryable, needle):
         state = anon_sign_in._failed_from_exception(
             anon_auth._anon_err("x", code, retry_after=retry_after or None))
@@ -332,13 +331,12 @@ class TestSignInFailures:
 # --- The dev-only host override ------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_extra_welcome_hosts_make_a_local_stand_in_the_welcome_host(monkeypatch):
-    """``QUBIT_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
+    """``HERMES_EXTRA_WELCOME_HOSTS`` (env-only) extends the ROUTE predicate so a rehearsal against a
     local stand-in gets the free tier's rules — including the route-keyed dark-tier 403."""
-    monkeypatch.delenv("QUBIT_EXTRA_WELCOME_HOSTS", raising=False)
+    monkeypatch.delenv("HERMES_EXTRA_WELCOME_HOSTS", raising=False)
     assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is False
-    monkeypatch.setenv("QUBIT_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
+    monkeypatch.setenv("HERMES_EXTRA_WELCOME_HOSTS", "127.0.0.1, localhost")
     assert anon_auth.route_is_welcome_host("http://127.0.0.1:8765/v1") is True
     assert anon_auth.route_is_welcome_host("http://localhost:9/v1") is True
     assert anon_auth.welcome_route_refusal(403, "You tried to access something", "http://127.0.0.1:8765/v1") == "tier_disabled"

@@ -181,7 +181,13 @@ def _build_record(*, other: bool, mint: bool = False, force: bool = False) -> Se
     state: Optional[Dict[str, Any]] = anon_auth.current_nous_state()
     if mint and anon_auth.guest_enabled():
         try:
-            state = anon_auth.ensure_portal_identity(explicit=True, force=force)
+            from qubit_cli import welcome_trial
+            if anon_auth.on_local_desktop_backend() and welcome_trial.claim_blocker() is None:
+                # A retry on the desktop's local backend is the trial's claim (the only creator
+                # that gives a guest inference here); elsewhere it is the connector identity.
+                state = welcome_trial.claim_desktop_free_tier(force=force)
+            else:
+                state = anon_auth.ensure_portal_identity(explicit=True, force=force)
         except Exception as exc:
             error = str(exc)
             logger.info("Qubit free tier not set up at boot: %s", exc)
