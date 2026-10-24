@@ -90,7 +90,9 @@ runpy.run_module('gateway.run', run_name='__main__')
         process = subprocess.Popen(command, cwd=root, env=env,
                                    stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         try:
-            deadline = time.monotonic() + 40
+            # A DELETE-mode state.db (linked SQLite without the WAL fix) plus a loaded host can
+            # take ~30s to reach ready, so allow the same 90s budget the ACP RPCs use.
+            deadline = time.monotonic() + 90
             descriptor = {}
             while process.poll() is None and time.monotonic() < deadline:
                 try:

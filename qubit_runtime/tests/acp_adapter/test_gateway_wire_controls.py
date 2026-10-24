@@ -29,7 +29,6 @@ async def test_profile_mismatch_refuses_before_creation(daemon, tmp_path, monkey
 
 @pytest.mark.platforms("linux")
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, reason="wave-30 parity defect: ACP stdio session/resume never answers the editor")
 async def test_real_acp_answer_resolves_the_exact_pending_control(daemon, tmp_path, model_peer):
     from tests.gateway.fixtures.authority_controls_peer import ModelPeer as ApprovalPeer
     target = tmp_path / "native-answer-owned"
