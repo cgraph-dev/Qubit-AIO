@@ -53,13 +53,12 @@ def _assert_failed_truthfully(w: G.World, cp, before: str, mark: int) -> None:
         f"install not runnable after the failed update:\n{w.diag(version, mark)}"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("fault", list(FAULTS))
 def test_transport_failure_is_reported_as_failure(w, fault):
     w.reset_clean()
     w.srv.clear_faults()
     before = w.head()
-    w.publish(f"release: e2e truthful {fault}", {f"e2e-truthful-{fault}.txt": "release\n"})
+    w.publish(f"release: e2e truthful {fault}", {f"e2e-truthful-{fault}.txt": _release_file()})
     armed = w.srv.arm(FAULTS[fault]())
     mark = w.srv.mark()
 
@@ -72,19 +71,18 @@ def test_transport_failure_is_reported_as_failure(w, fault):
         f"a transport failure claims local history diverged (and writes a rescue ref):\n{w.diag(cp, mark)}")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_retry_after_interrupted_fetches_heals_without_refetching_history(w):
     w.reset_clean()
     w.srv.clear_faults()
     # Baseline: a clean update of a one-file release, bytes as the server sent them.
-    clean_target = w.publish("release: e2e truthful baseline", {"e2e-truthful-baseline.txt": "release\n"})
+    clean_target = w.publish("release: e2e truthful baseline", {"e2e-truthful-baseline.txt": _release_file()})
     mark = w.srv.mark()
     cp = w.update()
     assert cp.returncode == 0 and w.head() == clean_target, f"baseline update failed:\n{w.diag(cp, mark)}"
     baseline = w.bytes_since(mark)
 
     before = w.head()
-    target = w.publish("release: e2e truthful after cuts", {"e2e-truthful-after-cuts.txt": "release\n"})
+    target = w.publish("release: e2e truthful after cuts", {"e2e-truthful-after-cuts.txt": _release_file()})
     # Every checkout lazy fetch is cut mid-pack, after ~20 KB of pack data in whole pkt-lines (so
     # index-pack has started and each cut leaves a dead temp pack); the commits arrive on the first attempt.
     w.srv.arm(Fault(cut_after=20000, command="fetch", skip=1, times=99))

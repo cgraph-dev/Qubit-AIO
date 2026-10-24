@@ -101,12 +101,19 @@ class Sandbox:
 
     @property
     def checkout(self) -> Path:
-        return self.qubit_home / "hermes-agent"
+        # install.sh's default INSTALL_DIR for this product ($QUBIT_HOME/qubit).
+        return self.qubit_home / "qubit"
 
     @property
     def hermes(self) -> str:
         """The command the installer put on PATH, as a user's shell resolves it."""
         return str(self.home / ".local" / "bin" / "hermes")
+
+    @property
+    def qubit(self) -> str:
+        """The same PATH command under its canonical name (the installer still publishes the
+        pre-rebrand alias; both exec the checkout's launcher)."""
+        return self.hermes
 
     @property
     def python(self) -> str:
@@ -184,6 +191,11 @@ def fresh_install_env(sb: Sandbox) -> dict[str, str]:
         extra.update({"UV_CACHE_DIR": str(host_cache), "UV_LINK_MODE": "copy", "UV_OFFLINE": "1"})
     if host_pythons.is_dir():
         extra["UV_PYTHON_INSTALL_DIR"] = str(host_pythons)
+    # Same reasoning for npm: the dashboard/TUI dependency fetch otherwise
+    # re-downloads the whole workspace for every scenario.
+    host_npm = Path.home() / ".npm"
+    if host_npm.is_dir():
+        extra["NPM_CONFIG_CACHE"] = str(host_npm)
     return {**sb.env, "HERMES_INSTALL_CHANNEL": "main", **extra}
 
 
