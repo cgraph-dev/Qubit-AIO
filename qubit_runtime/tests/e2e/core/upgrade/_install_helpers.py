@@ -171,7 +171,20 @@ def fresh_install_env(sb: Sandbox) -> dict[str, str]:
     commits on main and no release tags, so the stable default has nothing to install."""
     if sb.checkout.exists():
         return sb.env
-    return {**sb.env, "HERMES_INSTALL_CHANNEL": "main"}
+    # Reuse the host's pinned uv + populated cache so a probe does not re-download
+    # the toolchain and the whole wheel set for every scenario (the sandbox only
+    # needs read access; the venv itself is written under the sandbox root).
+    host_tools = Path.home() / ".local/state/qubit-voicebridge/runtime/tools"
+    host_cache = Path.home() / ".cache/uv"
+    extra = {}
+    if (host_tools / "uv-0.12.3-linux-x64/uv").is_file():
+        extra["HERMES_RUNTIME_DIR"] = str(host_tools)
+    host_pythons = Path.home() / ".local/share/uv/python"
+    if host_cache.is_dir():
+        extra.update({"UV_CACHE_DIR": str(host_cache), "UV_LINK_MODE": "copy", "UV_OFFLINE": "1"})
+    if host_pythons.is_dir():
+        extra["UV_PYTHON_INSTALL_DIR"] = str(host_pythons)
+    return {**sb.env, "HERMES_INSTALL_CHANNEL": "main", **extra}
 
 
 def pin_main_channel(sb: Sandbox) -> None:
