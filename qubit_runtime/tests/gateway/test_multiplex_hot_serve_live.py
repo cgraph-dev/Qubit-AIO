@@ -333,7 +333,6 @@ def test_named_profile_ensure_during_multiplexer_downtime_starts_the_multiplexer
         stop(proc, expect=None)
 
 
-@pytest.mark.skip(reason="wave-36: recorded served set (gateway_state.json/cron) still includes a profile parked at boot because its state.db is unusable; _multiplex_profile_homes re-reads profiles_to_serve() instead of the pin's reservation (config._runtime_profile_homes), so it returns ['default', 'boot', 'broken'] vs ['default', 'boot']")
 def test_broken_secondary_state_db_parks_only_that_profile(mux):
     root = mux['root']
     broken = root / 'profiles' / 'broken'

@@ -227,7 +227,8 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
             _emit_interrupted_session_end(cli, reason="keyboard_interrupt")
             if emitter is not None:
                 exit_single_query(emitter.emit_result({"failed": True, "error": "Interrupted"}, session_id=cli.session_id or "", exit_code=130))
-            print(f"\nsession_id: {cli.session_id}", file=sys.stderr)
+            print(f"\nSession: {cli.session_id}", file=sys.stderr)
+            print(f"session_id: {cli.session_id}", file=sys.stderr)
             exit_single_query(130)
         # The exit line below reports session_id to stderr for automation wrappers;
         # without this sync it would point at the ended parent after compression.
@@ -338,7 +339,10 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
             logger.debug("kanban goal loop failed: %s", _goal_exc)
 
     if emitter is None:
-        print(f"\nsession_id: {cli.session_id}", file=sys.stderr)
+        # The gateway transport client's channels: ``-Q`` writes the ``Session:`` line and the
+        # ``session_id:`` line automation wrappers parse. The classic path keeps both.
+        print(f"\nSession: {cli.session_id}", file=sys.stderr)
+        print(f"session_id: {cli.session_id}", file=sys.stderr)
 
     if emitter is not None:
         _exit_code = emitter.emit_result(result, session_id=cli.session_id or "", exit_code=_exit_code)

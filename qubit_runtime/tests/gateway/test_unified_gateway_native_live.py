@@ -475,7 +475,6 @@ def test_native_owner_hard_kill_recovers_queued_admission_once(harness):
     print(json.dumps({'pids': pids, 'epochs': epochs, 'inference_texts': texts, 'rows': admissions(home)}))
 
 
-@pytest.mark.skip(reason="wave-36: `qubit chat` rejects --base-url/--api-key (argparse exit 2: 'unrecognized arguments: --base-url ... --api-key ...'), so the safe-mode explicit-endpoint launch cannot start; the pinned chat subparser defines both flags")
 def test_native_safe_mode_cli_executes_in_managed_worker(harness):
     """`hermes chat --safe-mode -q` over subprocess pipes: the turn runs in an out-of-process
     managed worker (pid != owner) that opens no writable canonical sqlite."""
