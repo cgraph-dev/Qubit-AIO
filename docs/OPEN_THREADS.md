@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 40 — 2026-10-24 (17 wave-30 markers closed)
+
+- ✅ ACP cold/resume wire controls unxfail; frozen editor-MCP schema enforced in production (owner-scoped).
+- ✅ 8 daemon-readiness markers cleared by pinning QUBIT_HOME (+2 real TUI command-discovery delegations); 5 local-recovery peer markers cleared; hosted-room `/events` 401 fixed to share the room grant with status.
+- ✅ Settings config-set marker removed with harness keepalive/deadline fixes; kanban dispatcher retained non-strict with measured production transport-budget evidence.
+- ✅ Verified on merged main: ACP 7, daemon 11, peers 5, hosted room 15, settings 2, kanban 3+5 xpassed — all green.
+- 🔴 Remaining: broader xfail backlog outside this metric (155 wave-25 + 11 PRODUCT GAP); no `VERIFIED`; B1 exclusion; Windows/daemon/e2e skips; retirement; all backend fixes need a gateway restart (none done).
+
 ## Wave 39 — 2026-10-24 (real gaps from broader regressions fixed)
 
 - ✅ MCP wrapped-401 classification (27+67+20 passed), managed-dir env layering (107), backup suite (94), catalog/providers (27), web health/plugin brand/skill-count/FTS doctor (114), WAL contention + state-file hang (301; 289 twice), and the three wave-36 product gaps (/diff frozen policy, chat endpoint flags, parked served set).
