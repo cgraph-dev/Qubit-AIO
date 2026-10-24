@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import qubit_cli.gateway_setup_service as service_setup
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +26,7 @@ def _no_real_gateway_service(monkeypatch):
     assert the wiring."""
     import qubit_cli.gateway as gateway_mod
 
-    monkeypatch.setattr(gateway_mod, "ensure_gateway_service", lambda **kw: False)
+    monkeypatch.setattr(service_setup, "ensure_gateway_service", lambda **kw: False)
     monkeypatch.setattr(gateway_mod, "_is_service_running", lambda: False)
 
 
@@ -242,7 +243,7 @@ class TestIterBackupFiles:
         rel_nested = str(Path("skills/autonomous-ai-agents/qubit/SKILL.md"))
         assert rel_nested in selected
         assert str(Path("models/big.gguf")) not in selected
-        assert not any(s.startswith("qubit") for s in selected)
+        assert not any(s == "qubit" or s.startswith("qubit/") for s in selected)
 
     def test_prunes_browser_use_cli_profiles_at_home_roots_only(self, tmp_path):
         """The Browser Use CLI backend writes ``QUBIT_HOME/browser_profiles/`` (underscore) — a
@@ -496,7 +497,7 @@ class TestImport:
 
         calls = []
         monkeypatch.setattr(
-            gateway_mod, "ensure_gateway_service",
+            service_setup, "ensure_gateway_service",
             lambda **kw: calls.append(kw) or True,
         )
         monkeypatch.setattr(gateway_mod, "_is_service_running", lambda: False)
@@ -520,7 +521,7 @@ class TestImport:
 
         calls = []
         monkeypatch.setattr(
-            gateway_mod, "ensure_gateway_service",
+            service_setup, "ensure_gateway_service",
             lambda **kw: calls.append(kw) or True,
         )
         monkeypatch.setattr(gateway_mod, "_is_service_running", lambda: True)
@@ -728,7 +729,7 @@ class TestImport:
         assert cmd_import(args) is None
         out = capsys.readouterr().out
         assert "Preserved 1 runtime state file(s)" in out
-        assert "Done. Your Hermes configuration has been restored." in out
+        assert "Done. Your Qubit configuration has been restored." in out
 
 
 
@@ -2616,7 +2617,8 @@ class TestImportHonorsQubitHomeOverride:
 
         calls = []
         monkeypatch.setattr(
-            "qubit_cli.gateway.ensure_gateway_service",
+            service_setup,
+            "ensure_gateway_service",
             lambda *a, **kw: calls.append(kw),
         )
         monkeypatch.setattr(
@@ -2650,7 +2652,8 @@ class TestImportHonorsQubitHomeOverride:
 
         calls = []
         monkeypatch.setattr(
-            "qubit_cli.gateway.ensure_gateway_service",
+            service_setup,
+            "ensure_gateway_service",
             lambda *a, **kw: calls.append(kw),
         )
         monkeypatch.setattr(

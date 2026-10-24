@@ -1,4 +1,4 @@
-"""Tests for hermes backup retention (--keep) and the session-store import round trip."""
+"""Tests for Qubit backup retention (--keep) and the session-store import round trip."""
 
 from argparse import Namespace
 from pathlib import Path
@@ -20,24 +20,24 @@ def _no_real_gateway_service(monkeypatch):
 
 
 def test_run_backup_prunes_older_default_named_zips_but_not_others(tmp_path, monkeypatch):
-    """Hourly `hermes backup` callers accumulated 150+ zips; --keep bounds the default-named
+    """Hourly `qubit backup` callers accumulated 150+ zips; --keep bounds the default-named
     ones and leaves custom-named or foreign zips alone (#81317)."""
     from argparse import Namespace
     from qubit_cli import backup as backup_mod
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     home.mkdir()
     (home / "config.yaml").write_text("model: x\n")
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     for i in range(4):
-        (tmp_path / f"hermes-backup-2026-01-0{i + 1}-000000.zip").write_bytes(b"old")
+        (tmp_path / f"qubit-backup-2026-01-0{i + 1}-000000.zip").write_bytes(b"old")
     (tmp_path / "my-archive.zip").write_bytes(b"mine")
 
     backup_mod.run_backup(Namespace(output=None, keep=2))
 
-    kept = sorted(p.name for p in tmp_path.glob("hermes-backup-*.zip"))
-    assert len(kept) == 2 and kept[0] == "hermes-backup-2026-01-04-000000.zip"
+    kept = sorted(p.name for p in tmp_path.glob("qubit-backup-*.zip"))
+    assert len(kept) == 2 and kept[0] == "qubit-backup-2026-01-04-000000.zip"
     assert (tmp_path / "my-archive.zip").exists()
 
 
@@ -46,7 +46,7 @@ def test_import_restores_the_session_store_with_its_message_uids(tmp_path, monke
     message ids come back with the rows."""
     from qubit_state import SessionDB
 
-    qubit_home = tmp_path / ".hermes"
+    qubit_home = tmp_path / ".qubit"
     qubit_home.mkdir()
     _make_qubit_tree(qubit_home)
     db = SessionDB(db_path=qubit_home / "state.db")
