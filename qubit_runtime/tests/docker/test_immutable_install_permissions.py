@@ -10,7 +10,7 @@ def test_container_sets_hosted_write_policy_env(built_image: str) -> None:
         'test "$QUBIT_HOME" = "/opt/data" && '
         'test "$HERMES_WRITE_SAFE_ROOT" = "/opt/data" && '
         # Opt-in extras install into PM generations under $QUBIT_HOME, never
-        # the sealed /opt/hermes tree, so the image must not refuse them.
+        # the sealed /opt/qubit tree, so the image must not refuse them.
         'test -z "${HERMES_DISABLE_LAZY_INSTALLS:-}" && '
         'test "$PYTHONDONTWRITEBYTECODE" = "1"'
     )
@@ -27,10 +27,10 @@ def test_qubit_user_cannot_modify_install_but_can_write_data(built_image: str) -
     script = textwrap.dedent(
         r"""
         set -eu
-        /opt/hermes/.venv/bin/python - <<'PY'
+        /opt/qubit/.venv/bin/python - <<'PY'
         from pathlib import Path
 
-        install_file = Path("/opt/hermes/agent/message_sanitization.py")
+        install_file = Path("/opt/qubit/agent/message_sanitization.py")
         try:
             with install_file.open("a", encoding="utf-8") as handle:
                 handle.write("\n# unexpected hosted mutation\n")
@@ -56,7 +56,7 @@ def test_qubit_user_cannot_modify_install_but_can_write_data(built_image: str) -
             "--entrypoint",
             "su",
             built_image,
-            "hermes",
+            "qubit",
             "-s",
             "/bin/sh",
             "-c",

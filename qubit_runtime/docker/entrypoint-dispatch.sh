@@ -14,6 +14,17 @@
 
 set -e
 
+# Console ownership: s6-overlay defaults to console-only logging, which leaks
+# every supervised service's stdout/stderr onto an interactive terminal. When
+# the container has a real TTY, default to pipe logging (services keep their
+# own logs; only uncaught output reaches the catch-all) and let s6 rc.init
+# hand the CMD its controlling terminal. Explicit S6_LOGGING /
+# S6_CMD_USE_TERMINAL values always win, including 0.
+if [ -t 0 ] && [ -t 1 ]; then
+    : "${S6_LOGGING:=2}"; export S6_LOGGING
+    : "${S6_CMD_USE_TERMINAL:=1}"; export S6_CMD_USE_TERMINAL
+fi
+
 if [ "$$" -eq 1 ]; then
     exec /init /opt/qubit/docker/main-wrapper.sh "$@"
 fi

@@ -39,7 +39,7 @@ def test_arbitrary_user_uid_rejected(
 def test_user_pinned_to_qubit_uid_works(
     built_image: str,
 ) -> None:
-    """docker run --user 10000:10000 (the hermes UID) must be allowed.
+    """docker run --user 10000:10000 (the qubit UID) must be allowed.
 
     This is the supported non-root start from #34648 / #34837.
     """
@@ -49,6 +49,6 @@ def test_user_pinned_to_qubit_uid_works(
         capture_output=True, text=True, timeout=60,
     )
     assert r.returncode == 0, (
-        f"--user 10000:10000 (hermes UID) was rejected: {r.stderr[-500:]}"
+        f"--user 10000:10000 (qubit UID) was rejected: {r.stderr[-500:]}"
     )
     assert "OK" in r.stdout

@@ -23,7 +23,7 @@ def test_dashboard_not_running_by_default(
 ) -> None:
     """Without HERMES_DASHBOARD, no dashboard process should be running."""
     start_container(built_image, container_name, cmd="sleep 60")
-    r = docker_exec(container_name, "pgrep", "-f", "hermes dashboard")
+    r = docker_exec(container_name, "pgrep", "-f", "qubit dashboard")
     # pgrep exits non-zero when no match found
     assert r.returncode != 0, (
         "Dashboard should not be running without HERMES_DASHBOARD"
@@ -90,7 +90,7 @@ except urllib.error.HTTPError as h:
     # single bash string stays clean. The 'PY' delimiter is quoted to
     # disable shell expansion inside the heredoc body.
     probe = (
-        "/opt/hermes/.venv/bin/python - <<'PY'\n"
+        "/opt/qubit/.venv/bin/python - <<'PY'\n"
         f"{py_program}"
         "PY"
     )

@@ -1,11 +1,11 @@
 """Runtime smoke test for Docker $QUBIT_HOME/logs/gateways seeding.
 
 Build the real image and verify logs/ and logs/gateways/ exist and are
-owned by the hermes user after container boot.
+owned by the qubit user after container boot.
 
 Regression guard for #45258: if the first gateway log service runs in
 root context, logs/gateways/ is created root-owned; every profile
-registered later runs its log service as the dropped hermes user and
+registered later runs its log service as the dropped qubit user and
 s6-log crash-loops on mkdir: Permission denied.
 """
 from __future__ import annotations
@@ -42,10 +42,10 @@ def test_logs_gateways_seeded_and_qubit_owned(
         'echo "logs=$logs_owner gateways=$gateways_owner"',
         timeout=10,
     )
-    assert "logs=hermes" in r.stdout, (
+    assert "logs=qubit" in r.stdout, (
         f"logs/ not owned by hermes: {r.stdout}"
     )
-    assert "gateways=hermes" in r.stdout, (
+    assert "gateways=qubit" in r.stdout, (
         f"logs/gateways/ not owned by hermes: {r.stdout}"
     )
 

@@ -55,7 +55,7 @@ type ConsoleFrame =
 
 type ConnectionState = "connecting" | "ready" | "running" | "closed" | "error";
 
-interface HermesConsoleModalProps {
+interface QubitConsoleModalProps {
   open: boolean;
   onClose: () => void;
 }
@@ -103,7 +103,7 @@ function isPrintable(data: string): boolean {
   return data >= " " || data === "\t";
 }
 
-export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
+export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
   const modalRef = useModalBehavior({ open, onClose });
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XtermTerminal | null>(null);

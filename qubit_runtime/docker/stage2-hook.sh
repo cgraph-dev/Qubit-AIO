@@ -178,7 +178,7 @@ done
 # host-mounted bind containing unrelated user files; `chown -R` would
 # silently destroy host ownership of those (see issue #19788).
 #
-# The canonical list of hermes-owned subdirs is the same one the s6-setuidgid
+# The canonical list of qubit-owned subdirs is the same one the s6-setuidgid
 # mkdir -p block below seeds. Keep them in sync if the seed list changes.
 actual_qubit_uid=$(id -u qubit)
 
@@ -285,10 +285,10 @@ if [ -d "$QUBIT_HOME/cron" ] && tree_has_non_qubit_owner "$QUBIT_HOME/cron"; the
     chown_qubit_tree "$QUBIT_HOME/cron"
 fi
 
-# Always ensure logs/gateways is hermes-owned (#45258). Formerly healed by
+# Always ensure logs/gateways is qubit-owned (#45258). Formerly healed by
 # restartable gateway log/run chown — removed due to symlink TOCTOU
 # (CWE-59/367). The targeted data-volume chown above only runs when the
-# top-level $QUBIT_HOME is mis-owned, so a warm volume with hermes-owned
+# top-level $QUBIT_HOME is mis-owned, so a warm volume with qubit-owned
 # QUBIT_HOME but root-owned logs/gateways would otherwise leave
 # s6-setuidgid qubit mkdir failing with Permission denied. Non-recursive:
 # profile leaf dirs are each created/owned by their own log/run as qubit.
@@ -318,8 +318,8 @@ if [ -d "$QUBIT_HOME/pairing" ] && tree_has_non_qubit_owner "$QUBIT_HOME/pairing
     chown_qubit_tree "$QUBIT_HOME/pairing"
 fi
 
-# Reset ownership of hermes-owned top-level state files on every boot.
-# The targeted data-volume chown above only covers hermes-owned
+# Reset ownership of qubit-owned top-level state files on every boot.
+# The targeted data-volume chown above only covers qubit-owned
 # *subdirectories*; loose state files living directly under $QUBIT_HOME
 # are missed. When those files are created or rewritten by
 # `docker exec <container> qubit …` (root unless `-u` is passed) they
