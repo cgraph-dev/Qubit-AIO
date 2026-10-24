@@ -523,7 +523,6 @@ class TestHostedRoomRuns:
         assert repaired.status == 200
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(strict=True, reason="wave-30 parity defect: a room grant authorizes run status but the /events stream answers 401")
     async def test_status_room_grant_opens_the_run_event_stream(self, auth_adapter, tmp_path):
         """A grant that may poll a room-scoped run may also read its /events stream, with no
         gateway API key; revoking the grant closes that door again."""
