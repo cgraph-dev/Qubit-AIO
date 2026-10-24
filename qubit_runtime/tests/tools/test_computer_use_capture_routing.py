@@ -227,19 +227,19 @@ class TestRoutingDecisionWiring:
                    return_value="openrouter"), \
              patch("agent.auxiliary_client._read_main_model",
                    return_value="tencent/hy3-preview"), \
-             patch("qubit_cli.config.load_config", return_value=cfg):
+             patch("qubit_cli.config.load_config_readonly", return_value=cfg):
             assert cu_tool._should_route_through_aux_vision() is True
 
 
     def test_helper_decision_exception_is_swallowed(self):
         from tools.computer_use import tool as cu_tool
-        from tools.computer_use import vision_routing as vr_mod
+        from tools import vision_tools as vt_mod
 
         with patch("agent.auxiliary_client._read_main_provider",
                    return_value="openrouter"), \
              patch("agent.auxiliary_client._read_main_model",
                    return_value="x"), \
-             patch("qubit_cli.config.load_config", return_value={}), \
-             patch.object(vr_mod, "should_route_capture_to_aux_vision",
+             patch("qubit_cli.config.load_config_readonly", return_value={}), \
+             patch.object(vt_mod, "_native_tool_result_images",
                           side_effect=ValueError("policy bug")):
             assert cu_tool._should_route_through_aux_vision() is False
