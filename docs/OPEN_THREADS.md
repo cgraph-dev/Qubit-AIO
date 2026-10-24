@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 41 — 2026-10-24 (149 wave-25 markers closed; parity restored)
+
+- ✅ 171 → 22 `wave-25` markers; 3 wave-20 and the last 2 wave-23 markers also removed.
+- ✅ Real fixes: guest-free-tier/dead-claim stamp, desktop free-tier retry, owed-migration error, source `aheadOfRelease`/rollback, late browser-plugin import, async-delegation terminal target, plugin-guard GitLab/catalog cap, cron owner store/corrupt-store/ladder/script, computer-use per-capture vision, gmail `[]`, API `include_unconfigured`, voice role grant.
+- ✅ PRODUCT GAP 17 → 6 mentions; 3 real groups remain (Discord prompt parity 12, Discord stale voice binding 7, WhatsApp multiplex 4).
+- ✅ 5 upstream test symbols restored with R2/fork bodies; short-port back to 1 (B1), dead 25 test-side, 0 production.
+- 🟡 22 e2e/upgrade probes remain xfailed (full managed-env update check hangs on this host); runtime-mirror harness committed.
+- 🔴 Remaining: 22 e2e probes; 3 PRODUCT GAP groups; no `VERIFIED`; B1; Windows/daemon/e2e skips; retirement; all backend fixes need a gateway restart.
+
 ## Wave 40 — 2026-10-24 (17 wave-30 markers closed)
 
 - ✅ ACP cold/resume wire controls unxfail; frozen editor-MCP schema enforced in production (owner-scoped).
