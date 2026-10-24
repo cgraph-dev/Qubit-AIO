@@ -1081,6 +1081,11 @@ def dust_state(t: Any, R: float) -> List[Dict[str, float]]:
                     * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth),
             "alpha": _depth_alpha(depth, DUST_ALPHA_BASE + DUST_ALPHA_GAIN
                                   * hash01(i, 9.1)),
+            # Dust carries no envelope, so its peak IS its current alpha; the
+            # key exists so a renderer can judge every dotted family the same
+            # way (by the peak, never by the frame's phase).
+            "alpha0": _depth_alpha(depth, DUST_ALPHA_BASE + DUST_ALPHA_GAIN
+                                   * hash01(i, 9.1)),
             "lift": DUST_LIFT_BASE + DUST_LIFT_GAIN * hash01(i, 11.3),
         })
     return out
@@ -1124,6 +1129,10 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
                      "z": tz, "z2": tz2,
                      "size": COMET_SIZE * scale * 0.62 * (1.0 - k / 14.0),
                      "alpha": COMET_ALPHA * fade * (1.0 - k / (COMET_TRAIL_SAMPLES + 1.0)) ** 1.3,
+                     # Peak over the sample's own life: the head's ceiling at
+                     # full fade, so a renderer's LOD can tell "faint because
+                     # the comet is entering" from "never visible".
+                     "alpha0": COMET_ALPHA * (1.0 - k / (COMET_TRAIL_SAMPLES + 1.0)) ** 1.3,
                      "lift": COMET_LIFT})
     cvx, cvy = _orbit_velocity(rx * pull, ry * pull, near_tilt, ang)
     cz, cz2 = _volume_axes(tt, 0, 187.7)
@@ -1134,7 +1143,8 @@ def comet(t: Any, R: float) -> Dict[str, Any]:
             "vx": cvx * COMET_SPEED_MULT, "vy": cvy * COMET_SPEED_MULT,
             "dof": dof(depth), "skew": skew(depth),
             "size": COMET_SIZE * scale * (0.8 + 0.4 * depth),
-            "alpha": COMET_ALPHA * fade, "lift": COMET_LIFT, "trail": tail}
+            "alpha": COMET_ALPHA * fade, "lift": COMET_LIFT, "trail": tail,
+            "alpha0": COMET_ALPHA}
 
 
 def sparkles(t: Any, R: float) -> List[Dict[str, float]]:
@@ -1232,6 +1242,11 @@ def blink_dots(t: Any, R: float) -> List[Dict[str, float]]:
             "size": ((BLINK_SIZE_BASE + BLINK_SIZE_SPAN * hash01(i, 39.3))
                      * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
             "alpha": BLINK_ALPHA_PEAK * env * (0.35 + 0.65 * depth),
+            # Peak alpha over this element's whole life. A renderer's LOD must
+            # judge visibility by the PEAK, never the current phase: a blink is
+            # legitimately near-invisible just before it materialises, and
+            # culling it then would delete the effect it exists for.
+            "alpha0": BLINK_ALPHA_PEAK * (0.35 + 0.65 * depth),
             "lift": BLINK_LIFT,
         })
     return out
@@ -1289,6 +1304,7 @@ def flare_dots(t: Any, R: float) -> List[Dict[str, float]]:
             "size": ((FLARE_SIZE_BASE + FLARE_SIZE_SPAN * hash01(i, 49.1))
                      * scale * (DEPTH_RADIUS_BASE + DEPTH_RADIUS_GAIN * depth)),
             "alpha": FLARE_ALPHA_PEAK * env * (0.30 + 0.70 * depth),
+            "alpha0": FLARE_ALPHA_PEAK * (0.30 + 0.70 * depth),
             "lift": FLARE_LIFT,
         })
     return out
@@ -1531,6 +1547,9 @@ def volume_particles(t: Any, R: float) -> List[Dict[str, Any]]:
                 depth, VOLUME_ALPHA_BASE
                 + VOLUME_ALPHA_GAIN * hash01(idx, 737.1))
                 * (0.55 + 0.45 * pulse) * glow)),
+            "alpha0": min(1.0, _depth_alpha(
+                depth, VOLUME_ALPHA_BASE
+                + VOLUME_ALPHA_GAIN * hash01(idx, 737.1))),
             "lift": VOLUME_LIFT_BASE + VOLUME_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
@@ -2844,6 +2863,7 @@ def orbiter_particles(t: Any, R: float) -> List[Dict[str, Any]]:
                                 * (0.96 + 0.08 * drift)),
             "alpha": min(1.0, _depth_alpha(depth, ORBITER_ALPHA_BASE)
                          * glow),
+            "alpha0": min(1.0, _depth_alpha(depth, ORBITER_ALPHA_BASE)),
             "lift": ORBITER_LIFT_BASE + ORBITER_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),
@@ -2899,6 +2919,7 @@ def cylinder_particles(t: Any, R: float) -> List[Dict[str, Any]]:
             "size": _depth_size(depth, CYLINDER_SIZE_BASE * scale),
             "alpha": min(1.0, _depth_alpha(depth, CYLINDER_ALPHA_BASE)
                          * glow),
+            "alpha0": min(1.0, _depth_alpha(depth, CYLINDER_ALPHA_BASE)),
             "lift": CYLINDER_LIFT_BASE + CYLINDER_LIFT_GAIN * depth,
             "hue": hue, "hue2": _hue_pair(hue),
             "dof": dof(depth), "skew": skew(depth),

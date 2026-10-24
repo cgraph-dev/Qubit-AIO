@@ -1361,9 +1361,14 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
 
     def _draw_glyph(gx: float, gy: float, ch: str, rgb: Any,
                     alpha: float, px: int) -> None:
-        """One text glyph, no per-call state push (brush is set by the caller)."""
-        if not _lod.visible(px, alpha):
-            return
+        """One text glyph, no per-call state push (brush is set by the caller).
+
+        NO LOD gate here. A glyph is a text primitive whose alpha the caller has
+        already screened against the field's own ceiling, and the binary field
+        publishes ``alpha0 == alpha`` (no separate cycle peak) with a per-bit
+        range of 0.018-0.49. Gating on this frame's alpha culled 33 of 168
+        fragments — the faint ones, which are the depth read of the layer.
+        """
         p.setPen(_color(rgb[0], rgb[1], rgb[2], alpha))
         p.setFont(_glyph_font(px))
         p.drawText(QPointF(gx, gy), ch)
@@ -1552,7 +1557,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if a <= ALPHA_EPS or len(points) < 3:
             return
         pen_w = width if width > 0.6 else 0.6
-        if not _lod.ring(_lod.visible(0.0, a, pen_w, min_dim=0.0)):
+        if not _lod.ring(_lod.visible(0.0, a, pen_w, min_dim=0.0,
+                                   min_alpha=0.0)):
             return
         path = QPainterPath()
         path.moveTo(points[0][0], points[0][1])
@@ -1700,15 +1706,27 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                          * thin_w * (1.0 / thin_a))
 
     def _dot(x: float, y: float, rad: float, alpha: float,
-             rgb: Tuple[int, int, int], gain: Any = 1.0) -> None:
+             rgb: Tuple[int, int, int], gain: Any = 1.0,
+             peak: Any = None, soft: bool = False) -> None:
         a = _num(alpha, 0.0)
         r = _num(rad, 0.0)
         if a <= ALPHA_EPS or r <= 0.0:
             return
-        # Shared LOD: a dot smaller than MIN_DIM_PX across, or fainter than
-        # MIN_ALPHA, is not resolvable on screen — skip the primitive without
-        # touching the painter state at all. Counted so the cull is provable.
-        if not _lod.dot(_lod.visible(r * 2.0, a)):
+        # Shared LOD. For a SOFT body (dust, binaries, glints, blinks — anything
+        # the field sizes in its own units) the size test must NOT run: those
+        # radii are ~0.09-0.33 px, so a 1.2 px diameter gate culls the whole
+        # family wholesale. A soft body is culled on alpha alone. A hard-edged
+        # body is drawn at a real pixel size, so its size test is meaningful.
+        # The alpha test is never judged on this frame alone: many dotted
+        # families pulse, and an element is legitimately faint at part of its
+        # cycle. ``peak`` carries the element's peak alpha over its cycle; only
+        # a body whose PEAK is under the gate is genuinely invisible at this R.
+        a_gate = a if peak is None else _num(peak, a)
+        if soft:
+            drawn = _lod.dot(a_gate >= _budget.MIN_ALPHA)
+        else:
+            drawn = _lod.dot(_lod.visible(r * 2.0, a_gate))
+        if not drawn:
             return
         tint = _tone(rgb, gain)
         p.setPen(Qt.NoPen)
@@ -1720,7 +1738,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         a = _num(alpha, 0.0)
         if a <= ALPHA_EPS or radius <= 0.0:
             return
-        if not _lod.ring(_lod.visible(radius * 2.0, a, width)):
+        if not _lod.ring(_lod.visible(radius * 2.0, a, width,
+                                   min_dim=0.0, min_alpha=0.0)):
             return
         path = QPainterPath()
         path.addEllipse(QRectF(cx - radius, cy - radius,
@@ -1777,8 +1796,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         # glint rendered as an "L" / "V" hook instead of a four-point star.
         # That was the owner's "you didnt replace the L and V's!!!!!".
         p.drawLine(QPointF(gx - ay, gy + ax), QPointF(gx + ay, gy - ax))
+        # ``a`` is already this glint's PEAK alpha for the frame (``_glint``
+        # resolves its envelope before drawing), so the core is judged on it.
+        # The core is NEVER alpha-culled: a nucleus spark's own peak can sit
+        # just under the shared 0.06 gate (measured 0.0526 at t=0.4, index 3)
+        # and the core is the thing that makes it read as a star rather than a
+        # bare cross. The arms above are drawn unconditionally for the same
+        # reason — culling one without the other produced a glint with no core.
         _dot(gx, gy, max(GLINT_CORE_MIN, sz * _field.GLINT_CORE_FRAC
-                         * GLINT_CORE_SCALE), a, rgb, g)
+                         * GLINT_CORE_SCALE), a, rgb, g, peak=1.0, soft=True)
 
     def _particle(part: Dict[str, Any]) -> None:
         # Owner 2026-10-19: no wake ribbon. The body is a glint only — the
@@ -1831,11 +1857,21 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         mx, my, g = _place(mote.get("x"), mote.get("y"), d,
                            zseed=_num(mote.get("index"), None),
                            zflat=True, z=mote.get("z"), z2=mote.get("z2"))
+        # The field's ``size`` is a RADIUS, and ``_dot`` takes a radius: the
+        # old 0.25 floor pushed every mote's drawn diameter under the 1.2 px
+        # LOD gate (measured 0.10-0.13 px), which culled the whole layer. Size
+        # no longer floors on the dot rule's assumption; see the _dot note.
         _dot(mx, my,
              max(0.25, _num(mote.get("size"), 0.0) * g),
              _shade(_num(mote.get("alpha"), 0.0) * bright, d, g,
                     _focus(mote, d)),
-             _lift(mote.get("lift")), g)
+             _lift(mote.get("lift")), g,
+             # Dust is a faint background field by design: motes peak at 0.02-
+             # 0.06 alpha, and the field publishes ``alpha0 == alpha`` for them
+             # (no separate cycle peak), so the shared 0.06 alpha gate culls
+             # ~20 of 110 motes for being exactly what they are. A soft body
+             # that carries no cycle peak is drawn at whatever alpha it has.
+             peak=1.0, soft=True)
 
     def _sparkle(glint: Dict[str, Any]) -> None:
         # The sparkle's DOT is not drawn here: the many field glints are
@@ -1875,7 +1911,13 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
                  _num(smp.get("size"), 0.0) * bg,
                  _shade(_num(smp.get("alpha"), 0.0) * bright, depth, bg,
                         focus),
-                 _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg)
+                 _anchor(_spec_rgb(hue, COMET_BEAD_SAT)), bg,
+                 # The comet's own declared ceiling: a trail sample is faintest
+                 # at the far end of its own tail, which is exactly where it
+                 # must still be drawn (it is the motion).
+                 peak=_shade(_num(smp.get("alpha0"),
+                                  _num(smp.get("alpha"), 0.0)) * bright,
+                             depth, bg, focus))
         hx, hy, hg = _place(traveller.get("x"), traveller.get("y"), depth,
                             zseed=tseed, zflat=True,
                             z=traveller.get("z"), z2=traveller.get("z2"))
@@ -1883,7 +1925,10 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
              max(0.4, _num(traveller.get("size"), 0.0) * hg),
              _shade(_num(traveller.get("alpha"), 0.0) * bright, depth, hg,
                     focus),
-             _anchor(_spec_rgb(head_hue, COMET_BEAD_SAT)), hg)
+             _anchor(_spec_rgb(head_hue, COMET_BEAD_SAT)), hg,
+             peak=_shade(_num(traveller.get("alpha0"),
+                              _num(traveller.get("alpha"), 0.0)) * bright,
+                         depth, hg, focus))
 
     def _smoke(ox: float, oy: float, rad: float, rgb: Tuple[int, int, int],
                peak: float, power: float = NUCLEUS_AURA_POWER) -> None:
@@ -2141,7 +2186,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         rgb = (_anchor(_spec_rgb(hue, VOLUME_PARTICLE_SAT))
                if hue is not None
                else _lift(_num(body.get("lift"), 0.5)))
-        _dot(vx, vy, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+        _dot(vx, vy, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g,
+             peak=_num(body.get("alpha0"), alpha) * bright, soft=True)
 
     def _photon_dot(smp: Dict[str, Any]) -> None:
         """One bright sample of the lensed photon ring, a hot bead.
@@ -2181,7 +2227,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             rgb = _anchor(base_rgb)
         else:
             rgb = _lift(_num(smp.get("lift"), 0.5))
-        _dot(px, py, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+        _dot(px, py, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g,
+             peak=_num(smp.get("alpha0"), alpha), soft=True)
 
     def _screen_break(body: Dict[str, Any]) -> None:
         """One body the field placed BEYOND the orb radius.
@@ -2234,7 +2281,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             return
         hue = _num(bl.get("hue"), 0.0)
         rgb = _anchor(_spec_rgb(hue, BLINK_DOT_SAT))
-        _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g)
+        _dot(bx, by, max(BLINK_DOT_MIN_PX, size * g), alpha, rgb, g,
+             peak=_num(bl.get("alpha0"), 0.0) * bright * g, soft=True)
 
     def _core_body(shell: Dict[str, Any], nuc_radius: float) -> None:
         """One nested interior body of the nucleus, as a tilted shaded disc.
@@ -2505,7 +2553,8 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
         if alpha <= ALPHA_EPS or size <= 0.0:
             return
         rgb = _anchor(_spec_rgb(_num(smp.get("hue"), 0.0), BLINK_DOT_SAT))
-        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g)
+        _dot(fx, fy, max(BLINK_DOT_MIN_PX, size), alpha, rgb, g,
+             peak=_num(smp.get("alpha0"), alpha) * bright * g, soft=True)
 
     tt = _mark_tt(t)
     reduced = _reduced_motion()
