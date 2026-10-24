@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 45 — 2026-10-24 (CI runner online; GitHub billing gate)
+
+- ✅ `qubit-ci.yml` added (actionlint-clean); self-hosted runner `qubit-local` online.
+- ❌ Every run still `startup_failure` 0 s / no jobs / `path: BuildFailed`, even fresh filename and one-line echo; Actions enabled, repo healthy. Account's private-repo Actions minutes exhausted/spending limit — owner must raise billing or make the repo public.
+- 🟡 Docker daemon works; Dockerfile paths fixed; harness image build still heavy.
+- 🟡 `~/.hermes` moved to `~/.hermes.retired-20261024`; `.pre-retirement` kept.
+- 🔴 Remaining: 22 e2e probes; Docker image build; CI billing; `VERIFIED`; no service restart.
+
 ## Wave 44 — 2026-10-24 (Docker repaired; CI account-blocked; old home moved)
 
 - ✅ Docker daemon repaired (stale docker0 network DB/interface, buildx installed, enabled); `docker run` smoke passes. Dockerfile rebrand paths fixed; harness image build still heavy.
