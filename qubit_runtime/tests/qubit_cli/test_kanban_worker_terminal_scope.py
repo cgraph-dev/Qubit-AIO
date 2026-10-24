@@ -46,6 +46,10 @@ def _spawn_env_for_profile_b(monkeypatch, tmp_path):
     from qubit_cli.kanban_db import Task
     from tools import process_registry
 
+    # The host may itself run under a systemd unit; this fixture is about credential scope,
+    # not scope-wrapping, so make the spawn path deterministic.
+    monkeypatch.delenv("INVOCATION_ID", raising=False)
+
     captured: list[dict] = []
 
     def _capture(env):
@@ -65,7 +69,6 @@ def _spawn_env_for_profile_b(monkeypatch, tmp_path):
     return captured[0]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_worker_for_another_profile_never_inherits_the_dispatchers_credentials(
         profile_b, tmp_path, monkeypatch):
     """Single-profile host (multiplex OFF) — the case the gateway-wide flag left unprotected."""
@@ -75,7 +78,6 @@ def test_worker_for_another_profile_never_inherits_the_dispatchers_credentials(
         "B's worker inherited the dispatcher's provider credential")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_launch_profiles_own_worker_keeps_its_credentials(tmp_path, monkeypatch):
     """Control: a worker for the LAUNCH profile is not acting for another tenant."""
     launch = tmp_path / "fakehome" / ".hermes"
@@ -83,6 +85,7 @@ def test_launch_profiles_own_worker_keeps_its_credentials(tmp_path, monkeypatch)
     monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
     monkeypatch.setenv("QUBIT_HOME", str(launch))
     monkeypatch.setenv("OPENAI_API_KEY", "dispatcher-launch-key")
+    monkeypatch.delenv("INVOCATION_ID", raising=False)
 
     from qubit_cli.kanban_db import Task
     from tools import process_registry
@@ -111,7 +114,6 @@ import os
 from pathlib import Path
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_worker_for_another_profile_can_still_import_hermes(profile_b, tmp_path, monkeypatch):
     """The routed-profile scrub strips Hermes-owned PYTHONPATH entries, but the worker IS Hermes
     (`-m qubit_cli.kanban_worker_client`): a PYTHONPATH-launched dispatcher must hand it a tree

@@ -6162,29 +6162,3 @@ class TestNousRecommendedDefaultCostSafePolicy:
 
         result = get_recommended_default_model(provider="nous")
         assert result["model"] == "anthropic/claude-fable-5"
-
-
-# --- ported from upstream pin (wave 25 short-port) ---
-from types import SimpleNamespace
-
-
-@pytest.fixture
-def mutation_owner(monkeypatch, _isolate_hermes_home):
-    from gateway.session_authority import SessionAuthority
-    from hermes_constants import get_hermes_home
-    from qubit_cli.web_server import app
-    from qubit_state import SessionDB
-    from hermes_state_runtime import begin_runtime_epoch
-
-    home = get_hermes_home()
-    db = SessionDB(db_path=home / 'state.db')
-    authority = SessionAuthority(SimpleNamespace(_draining=False), profile_id=str(home),
-        instance_id='test-owner', db=db, epoch=begin_runtime_epoch(db, instance_id='test-owner'))
-    monkeypatch.setattr(app.state, 'session_authority', authority, raising=False)
-    try:
-        yield authority
-    finally:
-        db.close()
-
-import pytest
-pytestmark = pytest.mark.skip(reason="wave-25 short-port: file probe hangs locally; tracked")

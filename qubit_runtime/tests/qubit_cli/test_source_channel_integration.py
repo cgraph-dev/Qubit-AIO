@@ -546,11 +546,10 @@ def test_main_tolerates_an_unreadable_channel_record_and_follows_the_git_branch(
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
 @pytest.mark.parametrize("failure", ["not-found", "forbidden", "timeout"])
-def test_main_follows_the_git_branch_without_reading_a_channel_record(source, monkeypatch, failure):
-    """main IS the source branch, so its R2 record is never read: a 403 from a regional
-    WAF or a timeout cannot stop an install following main. Preview channels still read theirs."""
+def test_main_follows_the_git_branch_after_tolerating_the_channel_record(source, monkeypatch, failure):
+    """main IS the source branch: its R2 record is consulted for a retirement, but a 403 from a
+    regional WAF or a timeout cannot stop an install following main. Preview channels still read theirs."""
     import urllib.error
 
     from qubit_cli import source_check
@@ -573,8 +572,8 @@ def test_main_follows_the_git_branch_without_reading_a_channel_record(source, mo
     status = source_check.check_for_updates(install_root=source.root, home=source.home, force=True)
     assert "error" not in status, status
     assert status["targetSha"] == source.commits[2]
-    assert reads == []
+    assert reads == ["main", "main"]  # resolve_source_target + the passive check, both tolerated
     with pytest.raises((ChannelNotFound, urllib.error.HTTPError, TimeoutError)):
         source_releases.resolve_source_target("canary", ["git"], source.root)
-    assert reads == ["canary"]
+    assert reads == ["main", "main", "canary"]
 

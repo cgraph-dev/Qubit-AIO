@@ -318,19 +318,20 @@ def test_default_stable_only_moves_forward_until_the_channel_is_chosen(releases,
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
-def test_stable_is_the_latest_published_github_release_without_r2(releases):
-    """Publishing a GitHub release is the only promotion stable needs: no R2 record or pointer."""
+def test_stable_never_infers_a_github_release_without_an_r2_record(releases, monkeypatch):
+    """This fork's stable channel is the R2 record: a missing record is a missing channel,
+    never a Git-tag/GitHub-release inference (publishing the record IS the promotion)."""
     from qubit_cli import source_releases
+    from qubit_cli.release_channels import ChannelNotFound
 
     def no_r2(name, repository):
-        raise AssertionError("stable must not read an R2 channel record")
+        raise ChannelNotFound("no stable record")
 
-    source_releases._resolve_channel = no_r2
-    # A pointer naming a different build must not outrank the published release.
+    monkeypatch.setattr(source_releases, "_resolve_channel", no_r2)
+    # A pointer naming a build must not be mistaken for a release.
     releases.responses["/releases/stable/release-candidates.json"] = {
         "tag": "v99.0.0", "commit": releases.commits[3]}
-    target = source_releases.resolve_source_target("stable", ["git"], releases.root)
-    assert (target.commit, target.version) == (releases.commits[1], "1.2.3")
+    with pytest.raises(ChannelNotFound):
+        source_releases.resolve_source_target("stable", ["git"], releases.root)
     assert not any(path.startswith("/releases/") for path in releases.requests)
 

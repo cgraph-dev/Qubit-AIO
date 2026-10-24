@@ -91,22 +91,24 @@ async def test_messages_endpoint_reports_corruption(malformed_db):
     assert excinfo.value.status_code == 503
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.asyncio
-async def test_delete_does_not_claim_success_on_a_corrupt_store(malformed_db):
+async def test_delete_does_not_claim_success_on_a_corrupt_store(monkeypatch):
+    request = _mutation_request(monkeypatch)
     with pytest.raises(HTTPException) as excinfo:
-        await sessions_router.delete_session_endpoint("20260830_180820_744f05")
+        await sessions_router.delete_session_endpoint(
+            "20260830_180820_744f05", request, request_id="r1", expected_revision=1
+        )
     assert excinfo.value.status_code == 503
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.asyncio
-async def test_rename_endpoint_reports_corruption(malformed_db):
+async def test_rename_endpoint_reports_corruption(monkeypatch):
     from qubit_cli.web_models import SessionRename
 
+    request = _mutation_request(monkeypatch)
     with pytest.raises(HTTPException) as excinfo:
         await sessions_router.rename_session_endpoint(
-            "20260830_180820_744f05", SessionRename(title="neu")
+            "20260830_180820_744f05", SessionRename(title="neu", request_id="r1", expected_revision=1), request
         )
     assert excinfo.value.status_code == 503
 

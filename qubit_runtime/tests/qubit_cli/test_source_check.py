@@ -36,7 +36,7 @@ def installation(tmp_path, monkeypatch):
     home = tmp_path / "profile"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("QUBIT_REVISION", raising=False)
+    monkeypatch.delenv("HERMES_REVISION", raising=False)
     monkeypatch.delenv("QUBIT_MANAGED", raising=False)
     # Git probes may use real local remotes, never the external network.
     monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
@@ -307,18 +307,17 @@ def test_unpublished_main_record_follows_the_branch(installation):
     assert json.loads(branch_file.read_text())["branch"] == "desktop-choice"
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
 def test_running_revision_is_not_applied_to_an_explicit_target(installation, monkeypatch):
     from qubit_cli.source_check import check_for_updates
     root, linked, home, base, head, responses, requests, git = installation
-    monkeypatch.setenv("QUBIT_REVISION", "e" * 40)
-    monkeypatch.setenv("QUBIT_INSTALL_ROOT", str(root))
+    monkeypatch.setenv("HERMES_REVISION", "e" * 40)
+    monkeypatch.setenv("HERMES_INSTALL_ROOT", str(root))
     responses["/repos/fixture/fork/commits/feature%2Fgui"] = (200, head)
     assert check_for_updates(install_root=linked, home=home)["currentSha"] == head
     # Default invocation retains the Nix revision probe even without a Git checkout.
     monkeypatch.setattr("qubit_cli.config.get_project_root", lambda: home)
-    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/qubit"))
-    responses["/repos/NousResearch/qubit/commits/main"] = (200, "e" * 40)
+    responses[MAIN_CHANNEL] = (200, source_channel("main", __import__("qubit_cli.install_source", fromlist=["official_repository"]).official_repository()))
+    responses[f"/repos/{__import__('qubit_cli.install_source', fromlist=['official_repository']).official_repository()}/commits/main"] = (200, "e" * 40)
     assert check_for_updates(home=home)["behind"] == 0
 
 
@@ -445,14 +444,13 @@ def test_source_admission_is_stamp_owned_not_path_owned(installation, mechanism)
     assert check_for_updates(install_root=empty, home=home)["reason"] == "not-a-git-checkout"
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
 def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, monkeypatch):
     from qubit_cli.source_check import check_for_updates
     root, linked, home, base, head, responses, requests, git = installation
-    monkeypatch.setenv("QUBIT_REVISION", head)
+    monkeypatch.setenv("HERMES_REVISION", head)
     monkeypatch.setattr("qubit_cli.config.get_project_root", lambda: home)
     monkeypatch.setattr("qubit_cli.config.detect_install_method", lambda root: "nix")
-    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/qubit"))
+    responses[MAIN_CHANNEL] = (200, source_channel("main", __import__("qubit_cli.install_source", fromlist=["official_repository"]).official_repository()))
     original = subprocess.run
     probes = []
 
@@ -465,7 +463,7 @@ def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, 
     monkeypatch.setattr(subprocess, "run", advertise)
     assert check_for_updates(home=home)["behind"] == 0
     assert len(probes) == 1
-    assert "https://github.com/NousResearch/qubit.git" in probes[0][0]
+    assert f"https://github.com/{__import__('qubit_cli.install_source', fromlist=['official_repository']).official_repository()}.git" in probes[0][0]
     assert probes[0][1]["stdin"] == subprocess.DEVNULL
     assert probes[0][1]["env"]["GIT_TERMINAL_PROMPT"] == "0"
 
@@ -489,16 +487,19 @@ def test_malformed_optional_changelog_and_cache_do_not_hide_the_update(installat
                         f"/repos/fixture/fork/compare/{head}...{'a' * 40}"] * 2
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
-@pytest.mark.parametrize("repository,heals", [("NousResearch/qubit", True), ("fixture/fork", False)])
+@pytest.mark.parametrize("repository,heals", [(__import__("qubit_cli.install_source", fromlist=["official_repository"]).official_repository(), True), ("fixture/fork", False)])
 def test_official_ssh_healing_uses_public_https_without_retargeting_forks(installation, monkeypatch, repository, heals):
     from qubit_cli.source_check import check_for_updates
+    from qubit_cli.update_channel import set_install_channel
     root, linked, home, base, head, responses, requests, git = installation
+    # The branch heal is a main-channel concern; an official checkout's default is stable.
+    set_install_channel("main", linked)
     git("remote", "set-url", "origin", f"git@github.com:{repository}.git")
-    git("config", f"url.{root.as_uri()}.insteadOf", "https://github.com/NousResearch/qubit.git")
+    git("config", f"url.{root.as_uri()}.insteadOf", f"https://github.com/{__import__('qubit_cli.install_source', fromlist=['official_repository']).official_repository()}.git")
     monkeypatch.setenv("GIT_SSH_COMMAND", "false")
     branch_file = home / "desktop-update.json"
     branch_file.write_text(json.dumps({"branch": "deleted"}))
+    responses[MAIN_CHANNEL] = (200, source_channel("main", repository))
     responses[f"/repos/{repository}/commits/main"] = (200, head)
     status = check_for_updates(install_root=linked, home=home, branch_config_path=branch_file)
     assert status["branch"] == ("main" if heals else "deleted")
@@ -599,10 +600,9 @@ def test_main_follows_the_branch_when_its_channel_record_is_unreadable(installat
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
-def test_main_follows_the_branch_without_reading_a_channel_record(installation):
-    """main IS the git branch: no R2 record is requested (a regional WAF can answer
-    it 403), the configured branch is probed, and the Desktop branch setting is left alone."""
+def test_main_follows_the_branch_after_tolerating_the_channel_record(installation):
+    """main IS the git branch: its R2 record is consulted for a retirement, but a regional
+    WAF answering it 403 cannot stop the configured branch being probed or heal the setting."""
     from qubit_cli.source_check import check_for_updates
 
     _root, linked, home, _base, head, responses, requests, _git = installation
@@ -618,30 +618,37 @@ def test_main_follows_the_branch_without_reading_a_channel_record(installation):
     assert status.get("branch") == "desktop-choice", status
     assert status.get("targetSha") == head, status
     assert status["behind"] == 0
-    assert requests == [branch_path]
+    assert requests == [MAIN_CHANNEL, branch_path]
     assert json.loads(branch_file.read_text())["branch"] == "desktop-choice"
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
 @pytest.mark.parametrize("on,release,rollback", [("head", "base", True), ("base", "head", False)])
-def test_stable_release_the_checkout_already_contains_is_a_rollback(installation, tmp_path, on, release, rollback):
+def test_stable_release_the_checkout_already_contains_is_a_rollback(installation, tmp_path, monkeypatch, on, release, rollback):
     """A release HEAD contains is a move back (#137714); an older checkout is a real update."""
+    from qubit_cli import source_releases
+    from qubit_cli.release_channels import ChannelResolution
     from qubit_cli.source_check import check_for_updates
 
-    root, _linked, home, base, head, responses, _requests, git = installation
+    root, _linked, home, base, head, _responses, _requests, git = installation
     shas = {"base": base, "head": head}
     bare = tmp_path / "origin.git"
     git("clone", "-q", "--bare", str(root), str(bare), cwd=tmp_path)
     git("tag", "v1.2.3", shas[release], cwd=bare)
     git("remote", "set-url", "origin", str(bare))
     git("checkout", "-q", "--detach", shas[on])
-    api = "/repos/NousResearch/hermes-agent"
-    responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
-    responses[f"{api}/commits/v1.2.3"] = (200, {"sha": shas[release]})
+    # This fork's stable channel is the R2 record, not a GitHub release.
+    repository = source_releases.source_repository(["git"], root)
+    record = {"schema": 1, "name": "stable", "repository": repository,
+              "policy": "stable-release", "state": "active", "identity": {}, "nextSequence": 2,
+              "head": {"buildId": "build-fixture", "sequence": 1}}
+    manifest = {"schema": 1, "request": {"buildId": "build-fixture", "channel": "stable", "sequence": 1,
+                "repository": repository, "commit": shas[release], "sourceVersion": "1.2.3",
+                "version": "0.0.1", "identity": {}, "bundleEnv": {}}, "packages": []}
+    monkeypatch.setattr(source_releases, "_resolve_channel",
+                        lambda name, repo: ChannelResolution(record, record, manifest))
 
     status = check_for_updates(install_root=root, home=home, channel="stable", force=True)
 
     assert status.get("targetSha") == shas[release], status
     assert status["updateAvailable"] is True
     assert status["rollback"] is rollback
-

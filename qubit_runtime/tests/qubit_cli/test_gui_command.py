@@ -55,7 +55,7 @@ def _stable_keychain_detection(monkeypatch):
     """
     monkeypatch.delenv("KDE_SESSION_VERSION", raising=False)
     monkeypatch.delenv("KDE_FULL_SESSION", raising=False)
-    monkeypatch.delenv("QUBIT_DESKTOP_PASSWORD_STORE", raising=False)
+    monkeypatch.delenv("HERMES_DESKTOP_PASSWORD_STORE", raising=False)
     monkeypatch.setenv("GNOME_KEYRING_CONTROL", "/run/user/1000/keyring")
 
 
@@ -100,11 +100,11 @@ def _make_packaged_executable(root: Path, monkeypatch) -> Path:
     """
     desktop_dir = root / "apps" / "desktop"
     if sys.platform == "darwin":
-        exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
     elif sys.platform == "win32":
         exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
     else:
-        exe = desktop_dir / "release" / "linux-unpacked" / "qubit"
+        exe = desktop_dir / "release" / "linux-unpacked" / "Qubit"
     exe.parent.mkdir(parents=True, exist_ok=True)
     exe.write_text("", encoding="utf-8")
     if sys.platform not in ("darwin", "win32"):
@@ -124,10 +124,10 @@ def _staging_dir_from(cmd) -> Path:
 def _packaged_exe_rel() -> Path:
     """Packaged-exe path relative to electron-builder's output dir on THIS host."""
     if sys.platform == "darwin":
-        return Path("mac-arm64") / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        return Path("mac-arm64") / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
     if sys.platform == "win32":
         return Path("win-unpacked") / "Hermes.exe"
-    return Path("linux-unpacked") / "qubit"
+    return Path("linux-unpacked") / "Qubit"
 
 
 def _pack_into_staging(root: Path, content: str = "", returncode: int = 0):
@@ -295,7 +295,6 @@ def test_gui_brew_install_launches_installed_app_when_present(tmp_path, monkeypa
     assert launched == [1]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_gui_close_preview_flag_forwards_to_packaged_exe(tmp_path, monkeypatch):
     """`qubit desktop --close-preview` must reach the Electron binary so the
     running instance's single-instance handler can close a fullscreened
@@ -936,7 +935,6 @@ def test_relaunchable_fixup_legacy_adhoc_success_still_verifies_and_never_delete
     assert not any("delete-generic-password" in c for c in calls)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_relaunchable_fixup_failed_identity_uses_pinned_adhoc_before_legacy(tmp_path, monkeypatch):
     """A locked keychain must not skip identifier-pinned ad-hoc for cdhash-only.
 
@@ -947,7 +945,7 @@ def test_relaunchable_fixup_failed_identity_uses_pinned_adhoc_before_legacy(tmp_
     """
     root = _make_desktop_tree(tmp_path)
     desktop_dir = root / "apps" / "desktop"
-    exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+    exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
     exe.parent.mkdir(parents=True)
     exe.write_text("", encoding="utf-8")
 
@@ -985,12 +983,11 @@ def test_relaunchable_fixup_failed_identity_uses_pinned_adhoc_before_legacy(tmp_
     assert not any(cmd[:5] == ["/usr/bin/codesign", "--force", "--deep", "--sign", "-"] for cmd in calls)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_relaunchable_fixup_legacy_when_pinned_adhoc_also_fails(tmp_path, monkeypatch):
     """Legacy deep ad-hoc still runs when identifier-pinned signing fails too."""
     root = _make_desktop_tree(tmp_path)
     desktop_dir = root / "apps" / "desktop"
-    exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+    exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
     exe.parent.mkdir(parents=True)
     exe.write_text("", encoding="utf-8")
     app = exe.parents[2]
@@ -1033,7 +1030,6 @@ def test_relaunchable_fixup_legacy_when_pinned_adhoc_also_fails(tmp_path, monkey
 # --- Linux launcher entry registration ------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("linux")
 def test_gui_registers_linux_desktop_entry_before_launch(tmp_path, monkeypatch):
     """A terminal launch (no DESKTOP_STARTUP_ID) still installs the entry before spawning Electron."""
@@ -1060,12 +1056,11 @@ def test_gui_registers_linux_desktop_entry_before_launch(tmp_path, monkeypatch):
     assert registered == [root]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("linux")
 def test_gui_shell_launch_defers_desktop_entry_until_window_reveal(tmp_path, monkeypatch):
     """An app-grid launch (DESKTOP_STARTUP_ID set) writes the entry only after Electron reports
     its window on screen — never before the spawn, while gnome-shell has the app in STARTING
-    (#111906). Electron gets the pipe's write end via QUBIT_DESKTOP_READY_FD."""
+    (#111906). Electron gets the pipe's write end via HERMES_DESKTOP_READY_FD."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     monkeypatch.setenv("DESKTOP_STARTUP_ID", "gnome-shell/Hermes/1-0_TIME1")
@@ -1081,7 +1076,7 @@ def test_gui_shell_launch_defers_desktop_entry_until_window_reveal(tmp_path, mon
 
     def fake_electron(cmd, **kwargs):
         events.append("spawn")
-        fd = int(kwargs["env"]["QUBIT_DESKTOP_READY_FD"])
+        fd = int(kwargs["env"]["HERMES_DESKTOP_READY_FD"])
         assert fd in kwargs["pass_fds"]
         os.write(fd, b"r")  # main window revealed
         deadline = time.monotonic() + 10
@@ -1100,7 +1095,6 @@ def test_gui_shell_launch_defers_desktop_entry_until_window_reveal(tmp_path, mon
     assert packaged_exe.exists()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("linux")
 def test_gui_launches_even_when_desktop_entry_install_fails(tmp_path, monkeypatch):
     """Launcher plumbing is a convenience — it must never block the app."""
@@ -1239,7 +1233,7 @@ def _clear_keychain_env(monkeypatch):
         "KDE_SESSION_VERSION",
         "KDE_FULL_SESSION",
         "GNOME_KEYRING_CONTROL",
-        "QUBIT_DESKTOP_PASSWORD_STORE",
+        "HERMES_DESKTOP_PASSWORD_STORE",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -1287,7 +1281,6 @@ def test_detect_linux_password_store_none_when_no_keychain(monkeypatch):
         assert main_desktop._detect_linux_password_store() is None
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("linux")
 def test_gui_linux_packaged_launch_bridges_detected_password_store(tmp_path, monkeypatch):
     _clear_keychain_env(monkeypatch)
@@ -1310,18 +1303,15 @@ def test_gui_linux_packaged_launch_bridges_detected_password_store(tmp_path, mon
         cli_main.cmd_gui(_ns())
 
     launch_env = mock_run.call_args_list[-1].kwargs["env"]
-    assert launch_env["QUBIT_DESKTOP_PASSWORD_STORE"] == "gnome-libsecret"
+    assert launch_env["HERMES_DESKTOP_PASSWORD_STORE"] == "gnome-libsecret"
 
 
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("linux")
 @pytest.mark.parametrize("explicit,configured,detected,expected", [
     (None, "auto", "gnome-libsecret", "gnome-libsecret"),
     (None, "kwallet6", None, "kwallet6"),
     ("basic", "kwallet6", None, "basic"),
 ])
-@pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
 def test_desktop_environment_precedence(monkeypatch, explicit, configured, detected, expected):
     _clear_keychain_env(monkeypatch)
     monkeypatch.delenv('ELECTRON_OZONE_PLATFORM_HINT', raising=False)
@@ -1332,15 +1322,14 @@ def test_desktop_environment_precedence(monkeypatch, explicit, configured, detec
         return detected
     monkeypatch.setattr(main_desktop, '_detect_linux_password_store', detect)
     if explicit:
-        monkeypatch.setenv('QUBIT_DESKTOP_PASSWORD_STORE', explicit)
+        monkeypatch.setenv('HERMES_DESKTOP_PASSWORD_STORE', explicit)
     env, _ = main_desktop._desktop_launch_env(_ns())
-    assert env['QUBIT_DESKTOP_PASSWORD_STORE'] == expected
+    assert env['HERMES_DESKTOP_PASSWORD_STORE'] == expected
     assert env['ELECTRON_OZONE_PLATFORM_HINT'] == 'x11'
     monkeypatch.setenv('ELECTRON_OZONE_PLATFORM_HINT', 'wayland')
     assert main_desktop._desktop_launch_env(_ns())[0]['ELECTRON_OZONE_PLATFORM_HINT'] == 'wayland'
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("linux")
 def test_gui_linux_source_launch_bridges_detected_password_store(tmp_path, monkeypatch):
     _clear_keychain_env(monkeypatch)
@@ -1366,7 +1355,7 @@ def test_gui_linux_source_launch_bridges_detected_password_store(tmp_path, monke
 
     assert mock_run.call_args_list[-1].args[0] == [str(electron / "dist/electron"), "."]
     launch_env = mock_run.call_args_list[-1].kwargs["env"]
-    assert launch_env["QUBIT_DESKTOP_PASSWORD_STORE"] == "kwallet6"
+    assert launch_env["HERMES_DESKTOP_PASSWORD_STORE"] == "kwallet6"
 
 
 @pytest.mark.platforms("macos")
@@ -1391,7 +1380,7 @@ def test_gui_password_store_bridge_is_linux_only(tmp_path, monkeypatch):
 
     mock_detect.assert_not_called()
     launch_env = mock_run.call_args_list[-1].kwargs["env"]
-    assert "QUBIT_DESKTOP_PASSWORD_STORE" not in launch_env
+    assert "HERMES_DESKTOP_PASSWORD_STORE" not in launch_env
 
 
 # ---------------------------------------------------------------------------
@@ -1493,7 +1482,6 @@ def test_gui_win32_detach_reraises_non_breakaway_oserror(tmp_path, monkeypatch):
     assert mock_popen.call_count == 1
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.platforms("macos", "linux")
 def test_gui_foreground_launch_ctrl_c_exits_cleanly(tmp_path, monkeypatch, capsys):
     """Ctrl-C during the attached launch is a clean close, not a traceback (#59848).
@@ -1562,7 +1550,6 @@ def _gui_build_patches(root: Path, run_side_effect):
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_swap_staged_desktop_app_promotes_staged_tree_and_drops_previous(tmp_path):
     root = _make_desktop_tree(tmp_path)
     desktop_dir = root / "apps" / "desktop"
@@ -1623,7 +1610,6 @@ def test_swap_staged_desktop_app_rolls_back_when_second_rename_fails(tmp_path, m
     assert not (live_exe.parent.parent / (live_exe.parent.name + ".previous")).exists()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_swap_staged_desktop_app_stops_live_renderer_before_rename(tmp_path):
     """#109643: a renderer alive through the promotion rename keeps fetching its
     old hashed chunks from disk and dies on the next lazy import — the swap must
@@ -1810,7 +1796,6 @@ def test_gui_failed_pack_leaves_previous_app_untouched(tmp_path, monkeypatch, ca
     assert not list((desktop_dir / "release").glob("*.previous"))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_gui_successful_pack_swaps_new_app_into_release(tmp_path, monkeypatch):
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(main_desktop, "_desktop_exe_integrity_error", lambda exe: None)
