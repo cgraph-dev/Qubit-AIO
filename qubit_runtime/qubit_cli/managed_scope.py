@@ -38,18 +38,22 @@ _ENV_CACHE: Dict[str, tuple] = {}
 
 def _under_pytest() -> bool:
     """True inside the test suite: ignore the system ``/etc/qubit`` so a real managed scope on a
-    dev/CI box can't leak policy into the suite. An explicit ``HERMES_MANAGED_DIR`` still wins."""
+    dev/CI box can't leak policy into the suite. An explicit ``QUBIT_MANAGED_DIR`` (or the legacy
+    ``HERMES_MANAGED_DIR``) still wins."""
     return "PYTEST_CURRENT_TEST" in os.environ
 
 
 def get_managed_dir() -> Optional[Path]:
     """Resolve the managed-scope directory, or None when no scope is present.
 
-    Priority: ``$HERMES_MANAGED_DIR`` (IT-only bootstrap override; never persisted to any .env;
-    honored only when non-empty AND the directory exists), then ``/etc/qubit`` when it exists.
+    Priority: ``$QUBIT_MANAGED_DIR`` then the legacy ``$HERMES_MANAGED_DIR`` (IT-only bootstrap
+    overrides; never persisted to any .env; honored only when non-empty AND the directory exists),
+    then ``/etc/qubit`` when it exists. The legacy name is accepted so a fleet host that set it
+    before the rebrand keeps applying its policy after an upgrade (docs/BRAND.md §4.3).
     A missing directory resolves to None — the common case, so it must be cheap + side-effect-free.
     """
-    override = os.environ.get("HERMES_MANAGED_DIR", "").strip()
+    override = (os.environ.get("QUBIT_MANAGED_DIR", "").strip()
+                or os.environ.get("HERMES_MANAGED_DIR", "").strip())
     if override:
         p = Path(override)
     elif _under_pytest():
