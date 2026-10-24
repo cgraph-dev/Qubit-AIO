@@ -4958,8 +4958,13 @@ class DiscordAdapter(DiscordAuthorizationMixin, DiscordMediaMixin, DiscordThread
             thread_id = str(interaction.channel_id)
         else:
             chat_type = "group"
+        # Named as a message here is: the pinned session-context prompt renders and keys on it.
         chat_name = ""
-        if not is_dm and hasattr(interaction.channel, "name"):
+        if is_dm:
+            chat_name = interaction.user.name
+        elif is_thread:
+            chat_name = self._format_thread_chat_name(interaction.channel)
+        elif hasattr(interaction.channel, "name"):
             chat_name = interaction.channel.name
             if hasattr(interaction.channel, "guild") and interaction.channel.guild:
                 chat_name = f"{interaction.channel.guild.name} / #{chat_name}"
@@ -4982,6 +4987,8 @@ class DiscordAdapter(DiscordAuthorizationMixin, DiscordMediaMixin, DiscordThread
         return MessageEvent(
             text=text, message_type=msg_type, source=source, raw_message=interaction,
             channel_prompt=self._resolve_channel_prompt(channel_id, parent_id or None),
+            # Bound skills load only when a session starts, and "/skill x" or "/queue" can start one.
+            auto_skill=self._resolve_channel_skills(channel_id, parent_id or None),
         )
 
     # --- Thread creation helpers ---

@@ -25,14 +25,6 @@ from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.session import build_session_context, build_session_key
 from plugins.platforms.discord.adapter import DiscordAdapter
 
-# MIGRATION GAP (wave u4): this test is a faithful port of upstream's, and it FAILS ON
-# BEHAVIOUR, not on import -- so the product is behind, not the test. Reason: PRODUCT GAP: 14 param cases - discord turn prompt parity with upstream not ported.
-# Marked xfail(strict=False) so the suite stays green AND the gap stays visible.
-import pytest as _pytest
-_UPSTREAM_GAP = _pytest.mark.xfail(strict=False, reason='PRODUCT GAP: 14 param cases - discord turn prompt parity with upstream not ported.')
-
-pytestmark = _UPSTREAM_GAP
-
 
 class _DM:
     def __init__(self, channel_id: int) -> None:
