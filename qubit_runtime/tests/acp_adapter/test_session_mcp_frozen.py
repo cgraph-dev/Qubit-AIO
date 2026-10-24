@@ -10,7 +10,6 @@ from qubit_state_runtime import RuntimeStoreError
 from tests.acp_adapter.test_session_mcp_policy import owner, policy
 
 
-@pytest.mark.xfail(strict=True, reason="wave-30 parity defect: _register_server_tools republishes a changed editor schema instead of refusing it")
 def test_editor_manifest_stays_frozen_across_live_refresh(server_spec, tmp_path):
     from tools.registry import registry
     from tools.mcp_tool import _servers
@@ -39,7 +38,6 @@ def test_editor_manifest_stays_frozen_across_live_refresh(server_spec, tmp_path)
             pass
 
 
-@pytest.mark.xfail(strict=True, reason="wave-30 parity defect: a foreign multiplex caller can re-register a frozen editor schema")
 def test_editor_freeze_follows_the_connection_owner_not_the_callers_scope(server_spec, tmp_path):
     """Under a multiplexer the ledger key is ``(editor scope, name)``. A re-registration that runs
     outside the session's context still publishes into the editor scope the key names, so the
