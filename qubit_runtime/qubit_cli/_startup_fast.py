@@ -201,15 +201,25 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
         from qubit_cli.version_info import get_version_info
 
         print(f"Qubit Agent v{get_version_info().derived_version} ({__release_date__})")
-    print(f"Install directory: {project_root_str()}")
+    # A PM generation's console script imports the generation's workspace copy, which carries
+    # no install metadata. Report the checkout that owns this interpreter instead (#122425):
+    # `_pm_environment_owner` resolves it from the state the install wrote beside the venv.
+    from pathlib import Path
+
+    install_root = Path(project_root_str())
+    try:
+        from qubit_cli.update_owning_install import owning_install_root
+
+        install_root = owning_install_root(install_root) or install_root
+    except Exception:
+        pass
+    print(f"Install directory: {install_root}")
     # Authoritative resolver first (code-scoped stamp → managed → nix → git → pip; also self-heals
     # poisoned shared-home 'docker' stamps); cheap stdlib stamp probe only if it fails.
     try:
-        from pathlib import Path
-
         from qubit_cli.config import detect_install_method
 
-        install_method = detect_install_method(Path(project_root_str()))
+        install_method = detect_install_method(install_root)
     except Exception:
         install_method = read_install_method()
     if install_method:
