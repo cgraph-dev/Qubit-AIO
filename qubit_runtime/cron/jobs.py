@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 from qubit_time import now as _qubit_now
 from qubit_time import get_timezone
-from utils import atomic_replace, atomic_write_text
+from utils import atomic_replace, atomic_write_text, fsync_directory, mkstemp_beside
 
 # croniter is imported lazily (slow import, only needed for cron exprs). HAS_CRONITER stays a
 # module attribute: a monkeypatched value wins because _ensure_croniter only probes while None
@@ -1459,14 +1459,15 @@ def _unmerged_disk_jobs(
     jobs: List[Dict[str, Any]], removed_ids: Optional[Collection[str]]
 ) -> List[Dict[str, Any]]:
     """On-disk jobs missing from *jobs* and not intentionally removed. Stamp match => nothing
-    landed, return without parsing; unreadable store => ``[]`` (never merge against an unknown
-    baseline)."""
+    landed, return without parsing; unreadable store => raise RuntimeError (fail closed: writing
+    over an unknown baseline would silently drop every job in it)."""
     stamp = getattr(_jobs_lock_state, "load_stamp", None)
     if stamp is not None and _jobs_file_stamp(_current_cron_store().jobs_file) == stamp:
         return []
     disk_jobs = _peek_jobs_unlocked()
     if disk_jobs is None:
-        return []
+        raise RuntimeError(
+            f"Cron database corrupted; refusing to overwrite {_current_cron_store().jobs_file}")
     seen = {str(j["id"]) for j in jobs if isinstance(j, dict) and j.get("id")}
     seen |= {str(i) for i in (removed_ids or ()) if i}
     recovered: List[Dict[str, Any]] = []
@@ -1504,8 +1505,8 @@ def _unlink_quiet(path: Optional[str]) -> None:
 
 
 def _stage_jobs_payload(jobs_file: Path, jobs: List[Dict[str, Any]]) -> str:
-    """Serialize the store payload to a fsynced temp file next to *jobs_file*; return its path."""
-    fd, tmp_path = tempfile.mkstemp(dir=str(jobs_file.parent), suffix=".tmp", prefix=".jobs_")
+    """Serialize the store payload to a fsynced temp file beside the resolved *jobs_file*; return its path."""
+    fd, tmp_path = mkstemp_beside(jobs_file, suffix=".tmp", prefix=".jobs_")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(
@@ -1527,8 +1528,8 @@ def _save_jobs_unlocked(
     replace: bool = False,
 ):
     """Save all jobs; caller must hold _jobs_lock(). ``removed_ids`` = intentional deletes;
-    ``replace=True`` skips the shrink-merge guard (wholesale rewrite for tests/disaster
-    recovery)."""
+    ``replace=True`` skips the shrink-merge guard and the corrupt-store refusal (wholesale
+    rewrite for tests, disaster recovery and load_jobs' auto-repair of unmergeable shapes)."""
     jobs_file = _current_cron_store().jobs_file
     ensure_dirs()
     # Owner snapshot BEFORE replace so a root writer can hand the file back to the gateway user.
@@ -1554,8 +1555,10 @@ def _save_jobs_unlocked(
                 _unlink_quiet(tmp_path)
                 tmp_path = None
                 continue
-            atomic_replace(tmp_path, jobs_file)
+            # fsync the directory the rename actually landed in (atomic_replace resolves symlinks).
+            replaced = Path(atomic_replace(tmp_path, jobs_file))
             tmp_path = None
+            fsync_directory(replaced.parent)
             _secure_file(jobs_file)
             _preserve_file_ownership(jobs_file, _stat_before)
             # Invalidate (never refresh) the stamp: a refresh would let a nested save certify disk
