@@ -1,0 +1,27 @@
+name: ci
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  linux-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile the runtime
+        run: python -m compileall -q qubit_runtime/qubit_cli qubit_runtime/gateway qubit_runtime/tools
+      - name: Parse-check the test tree
+        run: python -m compileall -q qubit_runtime/tests
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Windows smoke
+        run: python -c "print('windows-ok')"
