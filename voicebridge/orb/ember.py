@@ -47,8 +47,11 @@ def frame_budget_ms() -> int:
 
     The default is 30 fps (33 ms): the mark's fastest real motion is a 6.4 s
     orbit and a 1.6 s per-bead spin, so 30 samples a second is far above what
-    reads as continuous for a 168 px overlay. A full mark frame costs a few ms
-    after the batching/LOD pass, which puts the orb well under 15 % of a core.
+    reads as continuous for a 168 px overlay. This is the FLOOR, not the
+    working rate — :data:`TARGET_DUTY` stretches the real interval from the
+    measured paint cost so the orb cannot exceed its CPU share. (Measured on
+    this host: one frame costs ~27 ms, so a bare 33 ms cap burned 82 % of a
+    core; the duty cap schedules that frame at ~108 ms instead.)
     Clamped to a sane range. Never raises.
     """
     try:
@@ -68,7 +71,18 @@ FRAME_MS = frame_budget_ms()
 #: which is 14 fps at 70 % of a core — the worst of both. The constant is kept
 #: only so an older caller importing it still gets a sane value; nothing reads
 #: it to schedule a frame any more.
-FRAME_SLACK = 1.0
+FRAME_SLACK = 1.4
+
+#: Target share of ONE CORE the orb may spend painting, as a fraction. The
+#: frame interval is sized as ``paint_ms / TARGET_DUTY`` so the orb cannot
+#: exceed this, whatever a frame costs. Lowering the repaint rate does NOT slow
+#: the animation — the render clock is advanced by WALL TIME — it only samples
+#: the motion more coarsely, so this is the honest knob for an always-on
+#: overlay. Measured: a 27 ms frame on a bare 33 ms cap still burned 82 % of a
+#: core; at 0.25 duty the same frame schedules itself at ~108 ms (9 fps), which
+#: for a 168 px mark whose fastest motion is a 6.4 s orbit still reads as
+#: continuous. Must be > 0.0 and <= 1.0.
+TARGET_DUTY = 0.25
 
 #: Ember-orange family on near-black (own palette values in that family).
 EMBER_CORE = (255, 84, 0)

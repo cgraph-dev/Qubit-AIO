@@ -3880,17 +3880,32 @@ if QWidget is not None:
                 self._advance_anim(time.monotonic())
                 if self.visible and _ember.needs_frame(
                         True, self._pos.collapsed):
-                    # HARD frame cap, no feedback. This used to size the next
-                    # interval from the last frame's real paint cost
-                    # (``max(FRAME_MS, last_paint_ms * FRAME_SLACK)``), which is
+                    # HARD frame cap sized from the MEASURED cost, so the CPU
+                    # share is bounded instead of merely the interval.
+                    #
+                    # This used to be ``max(FRAME_MS, paint_ms * FRAME_SLACK)``,
                     # a feedback loop with no fixed point near the budget: a
                     # 50 ms frame scheduled itself at 70 ms and the loop settled
-                    # there — 14 fps while burning ~70 % of a core. The interval
-                    # is now exactly FRAME_MS; if a frame overruns it, the
-                    # repaint simply lands late and the wall-time-driven render
-                    # clock keeps the motion correct (one frame, not a slowdown).
-                    if self._frame_timer.interval() != FRAME_MS:
-                        self._frame_timer.setInterval(FRAME_MS)
+                    # there — 14 fps while burning ~70 % of a core. A bare
+                    # FRAME_MS cap fixed the oscillation but not the cost: a
+                    # 27 ms frame on a 33 ms budget is still 82 % of a core
+                    # (measured). The interval is now
+                    # ``max(FRAME_MS, paint_ms / TARGET_DUTY)``, so the orb
+                    # never spends more than TARGET_DUTY of a core on painting
+                    # while still repainting as fast as that allows.
+                    #
+                    # Lowering the rate does NOT slow the animation: the render
+                    # clock is advanced by WALL TIME (``advance_render_time``),
+                    # so the same wall time reaches the same phase regardless of
+                    # frame count. It only samples the motion more coarsely.
+                    try:
+                        paint_ms = float(getattr(self, "_last_paint_ms", 0.0) or 0.0)
+                    except (TypeError, ValueError):
+                        paint_ms = 0.0
+                    want = int(paint_ms / _ember.TARGET_DUTY) if paint_ms > 0.0 else FRAME_MS
+                    interval = want if want > FRAME_MS else FRAME_MS
+                    if self._frame_timer.interval() != interval:
+                        self._frame_timer.setInterval(interval)
                     if self._frame_timer.isActive():
                         self.update()
             except Exception:
