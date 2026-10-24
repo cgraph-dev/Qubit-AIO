@@ -115,6 +115,39 @@ def _no_fts_rebuild_throttle(monkeypatch):
     monkeypatch.setattr(SessionDB, "_FTS_REBUILD_DUTY_FACTOR", 0.0)
 
 
+@pytest.fixture(autouse=True)
+def _release_stale_header_probe_fds(tmp_path):
+    """Release header-probe descriptors cached for *finished* tests in this file.
+
+    ``qubit_state_dbfile._pread_db_range`` deliberately keeps a never-closed O_RDONLY fd per
+    database path: closing one while SQLite still owns the inode cancels that process's POSIX
+    locks. Production paths are stable, but every test here opens ``tmp_path/test_state.db`` and
+    the cache therefore grew by one descriptor per test for the whole file. Under file I/O load
+    that accumulation turned ordinary schema/close work into multi-minute stalls. Closing the
+    finished tests' descriptors (only paths under this pytest session's tmp base, never the
+    current test's) is safe because the previous test's ``SessionDB`` handles are already closed
+    by its fixture teardown and the suite-level leak sweep.
+    """
+    import contextlib
+
+    import qubit_state_dbfile as dbfile
+
+    tmp_base = tmp_path.parent
+    with dbfile._HEADER_PROBE_LOCK:
+        for key in list(dbfile._HEADER_PROBE_FDS):
+            path = Path(key)
+            try:
+                stale = path.is_relative_to(tmp_base) and not path.is_relative_to(tmp_path)
+            except ValueError:
+                stale = False
+            if stale:
+                fd, _dev, _ino = dbfile._HEADER_PROBE_FDS.pop(key)
+                with contextlib.suppress(OSError):
+                    os.close(fd)
+    yield
+
+
+
 # =========================================================================
 # Connection lifecycle
 # =========================================================================
@@ -5068,7 +5101,7 @@ class TestListCronJobRuns:
     """
 
     def _seed_run(self, db, job_id: str, idx: int, started_at: float):
-        sid = f"cron_{job_id}_{idx:08d}"
+        sid = f"cron_{job_id}_20261011_{idx:06d}"  # the scheduler's cron_{job}_{YYYYmmdd_HHMMSS}
         db.create_session(session_id=sid, source="cron")
         db.append_message(sid, role="user", content=f"run {idx} for {job_id}")
         db.append_message(sid, role="assistant", content="done")
