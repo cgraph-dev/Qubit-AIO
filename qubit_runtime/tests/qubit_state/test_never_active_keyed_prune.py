@@ -109,7 +109,7 @@ class TestPrune:
         _insert(db, "keeper-young", age_days=1)
         _insert(db, "keeper-used", age_days=45, message_count=3)
 
-        deleted, _ = db.prune_never_active_keyed_sessions(older_than_days=30)
+        deleted, _, _ = db.prune_never_active_keyed_sessions(older_than_days=30)
 
         assert deleted == 2
         surviving = {
@@ -133,11 +133,9 @@ class TestPrune:
             scope="/home/dev/project",
         )
 
-        deleted, routing_deleted = db.prune_never_active_keyed_sessions(
-            older_than_days=30
-        )
+        result = db.prune_never_active_keyed_sessions(older_than_days=30)
 
-        assert (deleted, routing_deleted) == (1, 1)
+        assert result == (1, 1, 0)
         remaining = db._conn.execute(
             "SELECT session_key FROM gateway_routing"
         ).fetchall()
@@ -145,7 +143,7 @@ class TestPrune:
 
     def test_no_candidates_is_a_no_op(self, db):
         _insert(db, "keeper", age_days=1)
-        assert db.prune_never_active_keyed_sessions(older_than_days=30) == (0, 0)
+        assert db.prune_never_active_keyed_sessions(older_than_days=30) == (0, 0, 0)
         assert db._conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 1
 
 
@@ -195,5 +193,3 @@ class TestPruneSkipsLiveTurns:
         assert db.prune_never_active_keyed_sessions(older_than_days=30) == (1, 1, 0)
         assert db.get_session("live-junk") is None
 
-import pytest
-pytestmark = pytest.mark.skip(reason="wave-25 short-port: file probe hangs locally; tracked")
