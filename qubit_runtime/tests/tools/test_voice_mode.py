@@ -1430,7 +1430,6 @@ class TestWSL2PowerShellFallback:
             "Shell pipeline must preserve the real exit status past cleanup: " + sh_script
         )
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.platforms("linux")
     def test_wsl2_unique_temp_filename(self, monkeypatch, tmp_path, sample_wav):
         """Two concurrent calls must use different temp WAV filenames."""
@@ -1452,6 +1451,7 @@ class TestWSL2PowerShellFallback:
             return b""
 
         with patch("tools.voice_mode.is_wsl", return_value=True), \
+             patch("tools.voice_mode._import_audio", side_effect=ImportError), \
              patch("shutil.which", side_effect=lambda x: f"/bin/{x}" if x in ("powershell.exe", "ffmpeg", "ffplay") else None), \
              patch("subprocess.check_output", side_effect=_capture_check_output), \
              patch("subprocess.Popen", return_value=MagicMock(returncode=0, wait=lambda **k: 0)), \
