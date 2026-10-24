@@ -49,7 +49,12 @@ def test_migration_policy(monkeypatch, capsys, case, expected):
     monkeypatch.setattr('builtins.input', prompt)
     gateway_prompts = []
     monkeypatch.setattr(update_cmd, '_gateway_prompt', lambda text, default: gateway_prompts.append((text, default)) or 'y')
-    update_cmd._check_and_apply_config_migration(assume_yes=case == 'yes', gateway_mode=case == 'gateway')
+    if case == 'migration-error':
+        # A failed write is owed, not silently completed: the owed-step guard needs the raise.
+        with pytest.raises(RuntimeError, match=r'v2 → v3 was not written: cannot write config'):
+            update_cmd._check_and_apply_config_migration(assume_yes=False, gateway_mode=False)
+    else:
+        update_cmd._check_and_apply_config_migration(assume_yes=case == 'yes', gateway_mode=case == 'gateway')
     assert calls == expected
     assert bool(prompts) is (case in {'tty-yes', 'tty-decline', 'eof', 'unicode'})
     assert bool(gateway_prompts) is (case == 'gateway')
@@ -93,7 +98,6 @@ def test_update_copies_bundled_skill_bytes_to_default_active_and_sibling(tmp_pat
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_active_config_write_failure_still_migrates_siblings_and_restores_snapshots(tmp_path, monkeypatch):
     """A failed ACTIVE config write is owed debt, but the independent sibling migration and the
     pre-update snapshot safety nets (the only holders of this run's snapshot ids) still run."""
@@ -111,6 +115,7 @@ def test_active_config_write_failure_still_migrates_siblings_and_restores_snapsh
         (home / 'cron' / 'jobs.json').write_text(json.dumps(jobs), encoding='utf-8')
     monkeypatch.setattr(Path, 'home', lambda: tmp_path)
     monkeypatch.setenv('HERMES_HOME', str(root))
+    monkeypatch.setenv('QUBIT_HOME', str(root))
     active_snapshot = backup.create_quick_snapshot(label='pre-update', hermes_home=root)
     monkeypatch.setattr(update_cmd_config, '_LAST_SIBLING_SNAPSHOTS',
                         backup.create_pre_update_snapshots_all_profiles(root))
@@ -130,6 +135,7 @@ def test_active_config_write_failure_still_migrates_siblings_and_restores_snapsh
         assert json.loads((home / 'cron' / 'jobs.json').read_text(encoding='utf-8')) == jobs
     assert config.check_config_version()[0] == 48  # the active write stays owed
     monkeypatch.setenv('HERMES_HOME', str(sibling))
+    monkeypatch.setenv('QUBIT_HOME', str(sibling))
     sibling_version, latest = config.check_config_version()
     assert sibling_version == latest > 48
 

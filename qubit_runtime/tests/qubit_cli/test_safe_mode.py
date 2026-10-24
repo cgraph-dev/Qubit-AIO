@@ -152,7 +152,6 @@ def _pty_cli(argv, cwd, env, timeout=90):
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.skip(reason="wave-25 short-port: live PTY safe-launch probe hangs locally; subsystem exercised elsewhere")
 def test_canonical_safe_launch_is_frozen_policy_executed_in_isolated_worker(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user, work = tmp_path / 'state', tmp_path / 'user', tmp_path / 'work'
@@ -225,7 +224,7 @@ def test_canonical_safe_launch_is_frozen_policy_executed_in_isolated_worker(tmp_
         "        _busy.on = False\n"
         "sys.addaudithook(witness)\n", encoding='utf-8')
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), TERM='xterm',
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), TERM='xterm',
                PYTHONPATH=os.pathsep.join([str(site), str(root)]), OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def query(sql, args=()):

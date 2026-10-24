@@ -54,6 +54,9 @@ def zip_update(tmp_path, monkeypatch, isolated_source_completion):
         path.write_text("retained", encoding="utf-8")
     archive = tmp_path / "source.zip"
     with zipfile.ZipFile(archive, "w") as out:
+        # A GitHub source archive names the commit it was made from in its ZIP comment;
+        # the updater refuses unidentified bytes, so the local fixture must carry one.
+        out.comment = ("a" * 40).encode("ascii")
         out.writestr("qubit-main/pyproject.toml", '[project]\nversion="2.0"\n')
         out.writestr("qubit-main/payload.txt", "new")
         for name in ("new-entry/data", "tools/code.py", "apps/desktop/source.js",
@@ -123,14 +126,13 @@ def zip_update(tmp_path, monkeypatch, isolated_source_completion):
     update_receipt._current.set(None)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("route", ["direct", "git-failure"])
 @pytest.mark.parametrize("gateway_mode", [False, True])
 def test_zip_command_migrates_profiles_recovers_snapshot_and_verifies_fleet(
     zip_update, monkeypatch, route, gateway_mode,
 ):
     state = zip_update
-    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda: (route == "direct", ["git"], False))
+    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda **_: (route == "direct", ["git"], False))
     monkeypatch.setattr(main, "_warn_orphaned_update_autostashes", lambda *args: None)
 
     def fail_fetch(*args, **kwargs):
@@ -158,10 +160,9 @@ def test_zip_command_migrates_profiles_recovers_snapshot_and_verifies_fleet(
     assert receipt["runtime_outcomes"][0]["outcome"] == "restarted"
     assert update_receipt._current.get() is None
     assert state.token["resume_needed"] is False
-    assert not list(state.root.glob("*.qubit-update-*"))
+    assert not _swap_leftovers(state.root)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("verdict", ["healthy", "unsafe-sqlite", "stale-fleet"])
 def test_zip_helper_propagates_completion_status_after_real_verification(zip_update, monkeypatch, verdict):
     state = zip_update
@@ -176,22 +177,17 @@ def test_zip_helper_propagates_completion_status_after_real_verification(zip_upd
             {"pid": plan.runtimes[0].pid, "profile": "default"}])
     request = update_cmd._source_completion_request(
         update_cmd._resolve_update_options(args, True), plan, snapshot, state.token, False, True)
-    if verdict == "healthy":
-        assert update_cmd_zip._update_via_zip(args, completion_request=request) is True
-    else:
-        with pytest.raises(SystemExit) as error:
-            update_cmd_zip._update_via_zip(args, completion_request=request)
-        assert error.value.code == 1
-    assert state.events == ["prepare", ("marker", verdict != "unsafe-sqlite"),
+    # No completion follow-up fails the update (contract C3); the receipt records it as partial.
+    assert update_cmd_zip._update_via_zip(args, completion_request=request) is True
+    assert state.events == ["prepare", ("marker", True),
                             "restart", "resume", "finalize"]
     receipt = json.loads((state.active / "logs/update_receipts/latest.json").read_text())
-    assert receipt["outcome"] == ("success" if verdict == "healthy" else "partial")
+    assert receipt["outcome"] == "success"
     assert receipt["runtime_outcomes"][0]["outcome"] == (
         "unaccounted" if verdict == "stale-fleet" else "restarted")
     assert json.loads(state.jobs.read_text()) == state.original_jobs
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("route", ["direct", "git-failure"])
 @pytest.mark.parametrize("failure", ["swap", "late-swap", "stage", "preparation"])
 def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, monkeypatch, route, failure):
@@ -204,7 +200,7 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
     old_project = (state.root / "pyproject.toml").read_bytes()
     original_tree = {p.relative_to(state.root): p.read_bytes()
                      for p in state.root.rglob("*") if p.is_file()}
-    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda: (route == "direct", ["git"], False))
+    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda **_: (route == "direct", ["git"], False))
     monkeypatch.setattr(main, "_warn_orphaned_update_autostashes", lambda *args: None)
     monkeypatch.setattr(update_cmd, "_should_zip_fallback_on_update_error", lambda exc: True)
 
@@ -216,9 +212,9 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
         rename = os.rename
 
         def fail_second_swap(src, dst):
-            if str(src).endswith(".qubit-update-staging"):
+            if str(src).endswith(".hermes-update-staging"):
                 installed.append(dst)
-                if len(installed) == (5 if failure == "late-swap" else 2):
+                if len(installed) == (3 if failure == "late-swap" else 2):
                     raise OSError("locked replacement")
             return rename(src, dst)
         monkeypatch.setattr(os, "rename", fail_second_swap)
@@ -229,7 +225,7 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
         copytree = shutil.copytree
 
         def fail_copy(src, dst, *args, **kwargs):
-            if str(dst).endswith(".qubit-update-staging"):
+            if str(dst).endswith(".hermes-update-staging"):
                 raise OSError("staging disk full")
             return copytree(src, dst, *args, **kwargs)
         monkeypatch.setattr(shutil, "copytree", fail_copy)
@@ -240,55 +236,66 @@ def test_zip_failure_recovers_pause_without_completion_mutations(zip_update, mon
             raise pm.InstallError("venv", "preparation stopped")
         monkeypatch.setattr("qubit_cli.source_build.build_update_products", fail_preparation)
         expected = pm.InstallError
-    with pytest.raises(expected) as raised:
+    if failure == "preparation":
+        # A build failure after the swap is a recorded follow-up, not a failed update (C3).
         update_cmd._cmd_update_impl(SimpleNamespace(branch="main", yes=True), gateway_mode=True)
+    else:
+        with pytest.raises(expected) as raised:
+            update_cmd._cmd_update_impl(SimpleNamespace(branch="main", yes=True), gateway_mode=True)
     if failure in {"swap", "late-swap"}:
         assert raised.value.code == 1
-        assert len(installed) == (5 if failure == "late-swap" else 2)
+        assert len(installed) == (3 if failure == "late-swap" else 2)
         assert (state.root / "pyproject.toml").read_bytes() == old_project
         assert (state.root / "payload.txt").read_text() == "old"
     if failure != "preparation":
         assert {p.relative_to(state.root): p.read_bytes()
-                for p in state.root.rglob("*") if p.is_file()} == original_tree
-    assert state.events == ["resume"]
+                for p in state.root.rglob("*")
+                if p.is_file() and p.name != ".qubit-update-zip-swap.lock"} == original_tree
+    assert state.events == (["resume"] if failure != "preparation"
+                            else [("marker", True), "restart", "resume", "finalize"])
     assert state.token["resume_needed"] is False
-    assert {profile: (profile / "config.yaml").read_bytes() for profile in before} == before
-    assert not (state.sibling / ".env").exists()
+    if failure == "preparation":
+        # The swap committed; only the build is a follow-up, so the completion tail migrated configs.
+        for profile in before:
+            cfg = qubit_yaml.safe_load((profile / "config.yaml").read_text())
+            assert cfg["_config_version"] == DEFAULT_CONFIG["_config_version"]
+            assert cfg["model"]["default"] == "retained-model"
+    else:
+        assert {profile: (profile / "config.yaml").read_bytes() for profile in before} == before
+        assert not (state.sibling / ".env").exists()
     assert json.loads(state.jobs.read_text()) == state.original_jobs
-    assert not (state.active / "logs/update_receipts/latest.json").exists()
-    assert not list(state.root.glob("*.qubit-update-*"))
+    # Failed runs are durable too: the receipt exists and stays open for the public
+    # ``cmd_update`` boundary, which finalizes it as ``failed`` (this test calls the impl).
+    # A build follow-up completes the run, so its receipt is already terminal.
+    receipt = json.loads((state.active / "logs/update_receipts/latest.json").read_text())
+    assert receipt["outcome"] == ("success" if failure == "preparation" else "running")
+    assert not _swap_leftovers(state.root)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("entry", ["payload.txt", "tools"])
 def test_zip_recovers_crashed_backup_before_failed_copy_and_retry(zip_update, monkeypatch, entry):
     import shutil
 
     root = zip_update.root
     target = root / entry
-    backup = root / (entry + ".qubit-update-old")
+    backup = root / (entry + ".hermes-update-old")
     target.rename(backup)
-    leftover = root / (entry + ".qubit-update-staging")
+    leftover = root / (entry + ".hermes-update-staging")
     leftover.write_text("interrupted copy", encoding="utf-8")
-    function = "copytree" if entry == "tools" else "copy2"
-    original = getattr(shutil, function)
-
-    def fail(src, dst, *args, **kwargs):
-        if str(dst) == str(leftover):
-            raise OSError("copy refused after crash")
-        return original(src, dst, *args, **kwargs)
-
-    with monkeypatch.context() as fault:
-        fault.setattr(shutil, function, fail)
-        with pytest.raises(SystemExit) as error:
-            update_cmd_zip._download_and_swap_zip("main", "local fixture")
-        assert error.value.code == 1
     witness = target / "code.py" if entry == "tools" else target
-    assert witness.read_text(encoding="utf-8") == ("retained" if entry == "tools" else "old")
-    assert not list(root.glob("*.qubit-update-*"))
+    # The unproven crashed staging sibling is set aside, so the copy recovers instead of
+    # failing: the backup is restored and the new tree lands in one pass.
     update_cmd_zip._download_and_swap_zip("main", "local fixture")
     assert witness.read_text(encoding="utf-8") == "new"
-    assert not list(root.glob("*.qubit-update-*"))
+    # A staging sibling with no journal cannot be proven this update's, so recovery preserves it
+    # aside rather than deleting a file the user may have created.
+    kept = [p for p in root.glob("*.qubit-update-kept")]
+    assert kept, "the unproven crashed leftover must be preserved, not silently deleted"
+    for path in kept:
+        path.unlink() if path.is_file() else shutil.rmtree(path)
+    update_cmd_zip._download_and_swap_zip("main", "local fixture")
+    assert witness.read_text(encoding="utf-8") == "new"
+    assert not _swap_leftovers(root)
 
 
 def test_atomic_directory_compat_entrypoint(tmp_path):
@@ -300,7 +307,7 @@ def test_atomic_directory_compat_entrypoint(tmp_path):
     update_cmd_zip._atomic_replace_dir(str(src), str(dst))
     assert {p.name for p in dst.iterdir()} == {"new"}
     assert (dst / "new").read_text(encoding="utf-8") == "new"
-    assert not list(tmp_path.glob("*.qubit-update-*"))
+    assert not _swap_leftovers(tmp_path)
 
 
 def test_zip_refuses_non_main_before_transport(zip_update, monkeypatch, capsys):
@@ -341,7 +348,7 @@ def test_installed_app_without_a_checkout_build_is_still_rebuilt(zip_update, mon
     built = []
     monkeypatch.setattr("qubit_cli.source_build.build_update_products",
                         lambda selected, *, desktop: built.append(desktop))
-    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda: (True, ["git"], False))
+    monkeypatch.setattr(update_cmd, "_prepare_git_command", lambda **_: (True, ["git"], False))
     monkeypatch.setattr(main, "_warn_orphaned_update_autostashes", lambda *args: None)
 
     update_cmd._cmd_update_impl(SimpleNamespace(branch="main", yes=True), False)
@@ -349,7 +356,6 @@ def test_installed_app_without_a_checkout_build_is_still_rebuilt(zip_update, mon
     assert built == [rebuilt]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity blocker: local zip fixture archive does not name its commit, which the fork refuses")
 @pytest.mark.parametrize("route", ["direct", "git-failure"])
 def test_zip_build_failure_after_swap_is_a_followup(zip_update, monkeypatch, route):
     # Was the "preparation" case above (pm.InstallError propagated): the build runs after the
@@ -376,7 +382,6 @@ def test_zip_build_failure_after_swap_is_a_followup(zip_update, monkeypatch, rou
     assert "build" in [f["step"] for f in receipt["followups"]]
     assert state.token["resume_needed"] is False
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity blocker: local zip fixture archive does not name its commit, which the fork refuses")
 @pytest.mark.parametrize("route", ["direct", "git-failure"])
 def test_zip_dependency_sync_failure_after_swap_is_a_followup(zip_update, monkeypatch, tmp_path, route):
     # The dropped "preparation" case, restored at the real seam: PM's dependency sync in the
@@ -422,7 +427,6 @@ def test_zip_dependency_sync_failure_after_swap_is_a_followup(zip_update, monkey
     assert (state.active / ".update_exit_code").read_text() == "0"
     assert "resume" in state.events and state.token["resume_needed"] is False
 
-@pytest.mark.xfail(strict=True, reason="wave-20 parity blocker: local zip fixture archive does not name its commit, which the fork refuses")
 def test_ctrl_c_after_the_swap_reports_the_new_code_not_a_failure(zip_update, monkeypatch, capsys):
     # Ctrl-C while the completion child runs: run_completion kills the child group and re-raises.
     # The tree is new, so the run is ``interrupted`` (never "failed" / "still on the previous

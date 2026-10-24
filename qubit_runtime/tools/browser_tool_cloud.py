@@ -10,8 +10,6 @@ from typing import Callable, Optional
 from agent.browser_provider import BrowserProvider as CloudBrowserProvider
 from agent.browser_registry import get_provider as _registry_get_browser_provider
 from qubit_constants import get_qubit_home_override, qubit_home_key
-from plugins.browser.browser_use.provider import BrowserUseBrowserProvider
-from plugins.browser.browserbase.provider import BrowserbaseBrowserProvider
 from tools.tool_backend_helpers import normalize_browser_cloud_provider
 from utils import is_truthy_value
 from tools.browser_tool_origin import origin_module as _origin
@@ -103,6 +101,8 @@ def _autodetect_cloud_provider() -> Optional[CloudBrowserProvider]:
     Third-party plugins are only reachable via explicit ``browser.cloud_provider: <name>``.
     """
     _bt = _origin()
+    from plugins.browser.browser_use.provider import BrowserUseBrowserProvider
+    from plugins.browser.browserbase.provider import BrowserbaseBrowserProvider
     try:
         for cls in (BrowserUseBrowserProvider, BrowserbaseBrowserProvider):
             fallback_provider = cls()
