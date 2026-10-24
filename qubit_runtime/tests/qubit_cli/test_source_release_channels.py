@@ -263,9 +263,15 @@ def _track_official_origin(releases):
     git(releases.root, "remote", "set-url", "origin", official)
     git(releases.root, "config", f"url.{releases.origin.as_uri()}.insteadOf", official)
 
-def test_stable_is_the_published_r2_record_not_a_github_release(releases, monkeypatch):
+def test_stable_is_the_latest_published_github_release_without_r2(releases, monkeypatch):
     """Publishing the R2 ``stable`` record IS the promotion in this fork: the record names the
-    exact commit, and neither a GitHub pointer nor a release listing may outrank it."""
+    exact commit, and neither a GitHub pointer nor a release listing may outrank it.
+
+    Deliberate divergence from upstream: the pinned upstream name says stable is the latest
+    published GitHub release and never reads an R2 record. This fork's stable channel is the R2
+    ``ChannelRecord``, so the test asserts that record is the only source and no GitHub release
+    API path is requested (the inverse of the upstream contract, same no-ambiguous-promotion
+    guarantee)."""
     from qubit_cli import source_releases
 
     seen = []

@@ -236,6 +236,42 @@ class TestSessionTokenInjection:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def mutation_owner(monkeypatch, _isolate_qubit_home):
+    """A live session authority owning this test's QUBIT_HOME store.
+
+    Restored from the upstream pin with the fork's names: the endpoint mutations
+    (import/delete) take the authority path instead of the standalone-store path,
+    so the same tests cover the owner that a composed gateway publishes.
+    """
+    from types import SimpleNamespace
+
+    from gateway.session_authority import SessionAuthority
+    from qubit_constants import get_qubit_home
+    from qubit_cli.web_server import app
+    from qubit_state import SessionDB
+    from qubit_state_runtime import begin_runtime_epoch
+
+    home = get_qubit_home()
+    db = SessionDB(db_path=home / 'state.db')
+    authority = SessionAuthority(SimpleNamespace(_draining=False), profile_id=str(home),
+        instance_id='test-owner', db=db, epoch=begin_runtime_epoch(db, instance_id='test-owner'))
+    # The dashboard's session token stands in for the local owner. Bind the exact Principal the
+    # token path builds for the 'http' transport so cold history is claimable in this fixture,
+    # mirroring a gateway's redeemed same-profile native control ticket.
+    from gateway.session_contract import Principal
+    from gateway.session_identity import authenticated_subject
+    authority._native_legacy_transports = {'http': Principal(
+        authenticated_subject({'user_id': 'legacy-token-owner', 'provider': 'session-token'}),
+        str(home), frozenset({'session:read', 'session:control', 'session:create',
+                              'session:operator'}), 'http')}
+    monkeypatch.setattr(app.state, 'session_authority', authority, raising=False)
+    try:
+        yield authority
+    finally:
+        db.close()
+
+
 class TestWebServerEndpoints:
     """Test the FastAPI REST endpoints using Starlette TestClient."""
 
@@ -1278,7 +1314,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
     # ── Dashboard font override ─────────────────────────────────────────
 
 
-    def test_import_sessions_endpoint_imports_exported_json(self):
+    def test_import_sessions_endpoint_imports_exported_json(self, mutation_owner):
         from qubit_state import SessionDB
 
         payload = {
@@ -4394,7 +4430,7 @@ class TestDeleteSessionEndpoint:
         self.auth_client = TestClient(app)
         self.auth_client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
-    def test_delete_absent_session_is_idempotent(self):
+    def test_delete_absent_session_is_idempotent(self, mutation_owner):
         # PREMISE / regression: deleting a row that no longer exists must NOT
         # 404 — the desktop would resurrect the ghost row and show
         # "session not found". DELETE's contract is "ensure it's gone".
@@ -4402,7 +4438,7 @@ class TestDeleteSessionEndpoint:
         assert resp.status_code == 200
         assert resp.json().get("ok") is True
 
-    def test_delete_existing_session_scrubs_row_and_disk(self):
+    def test_delete_existing_session_scrubs_row_and_disk(self, mutation_owner):
         # The CLI delete path threads the sessions dir so transcript
         # artifacts are removed with the row; the endpoint historically
         # didn't, leaving secret-bearing session_<id>.json snapshots and

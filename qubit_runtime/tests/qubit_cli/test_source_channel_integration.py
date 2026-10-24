@@ -545,11 +545,15 @@ def test_main_tolerates_an_unreadable_channel_record_and_follows_the_git_branch(
     assert reads[-1] == "canary"
 
 
-# --- ported from upstream pin (wave 25 short-port) ---
+# --- restored from upstream pin (name restored by wave 42; body is the fork's R2 contract) ---
 @pytest.mark.parametrize("failure", ["not-found", "forbidden", "timeout"])
-def test_main_follows_the_git_branch_after_tolerating_the_channel_record(source, monkeypatch, failure):
+def test_main_follows_the_git_branch_without_reading_a_channel_record(source, monkeypatch, failure):
     """main IS the source branch: its R2 record is consulted for a retirement, but a 403 from a
-    regional WAF or a timeout cannot stop an install following main. Preview channels still read theirs."""
+    regional WAF or a timeout cannot stop an install following main. Preview channels still read theirs.
+
+    Deliberate divergence from upstream: the pinned upstream name says main never reads a channel
+    record, but this fork consults main's R2 record for a retirement and tolerates a failed read
+    (``reads == ["main", "main"]``) instead of asserting ``reads == []``."""
     import urllib.error
 
     from qubit_cli import source_check
