@@ -1,9 +1,16 @@
 name: ci
-"on":
-  workflow_dispatch:
+on:
   push:
+  workflow_dispatch:
 jobs:
-  ping:
-    runs-on: ubuntu-latest
+  linux:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 30
     steps:
-      - run: echo ci-ok
+      - uses: actions/checkout@v4
+      - name: Python version
+        run: python3 --version
+      - name: Compile the runtime
+        run: python3 -m compileall -q qubit_runtime/qubit_cli qubit_runtime/gateway qubit_runtime/tools
+      - name: Parse-check the test tree
+        run: python3 -m compileall -q qubit_runtime/tests
