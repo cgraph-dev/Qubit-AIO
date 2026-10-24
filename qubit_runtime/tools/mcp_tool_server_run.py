@@ -555,8 +555,9 @@ class MCPServerRunMixin:
 
     async def _on_permanent_error(self, root: BaseException, budget: _RetryBudget) -> bool:
         # Auth failure on a PROVEN session is often a raced-teardown OAuth lock, not revoked
-        # credentials: grant ONE suspect+reconnect cycle first.
-        if _errors._is_auth_error(root) and self._session_proven and not self._permanent_grace_used:
+        # credentials: grant ONE suspect+reconnect cycle first. Judge the whole cause chain —
+        # the SDK wraps a real 401 in a ConnectionError, so the outer node looks auth-free.
+        if _errors._is_auth_rejection(root) and self._session_proven and not self._permanent_grace_used:
             self._permanent_grace_used = True
             self.mark_suspect(f"auth error on proven session: {root}")
             logger.warning(
