@@ -51,7 +51,6 @@ def owner_run(tmp_path, monkeypatch):
         finally:
             session_cron._execution.reset(token)
 @pytest.mark.parametrize("failure", ["wrong-store", "acquire-error"])
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local run_job does not reject a foreign/unacquirable owner store")
 def test_owner_store_failure_never_runs_unpersisted_agent(owner_run, failure):
     owner, job, execution_id, agent_cls = owner_run
     wrong_db = MagicMock()
@@ -399,7 +398,6 @@ class TestSessionDbInitAfterEarlyReturns:
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_guard_is_released_and_job_refires_after_sessiondb_hang(owner_run, monkeypatch):
     owner, _job, _, agent_cls = owner_run
     monkeypatch.setenv("HERMES_CRON_SESSION_DB_TIMEOUT", "0.02")
@@ -447,7 +445,6 @@ def test_guard_is_released_and_job_refires_after_sessiondb_hang(owner_run, monke
             scheduler._shutdown_parallel_pool()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("setting", ["env", "config"])
 def test_run_job_does_not_hang_when_sessiondb_init_wedges(owner_run, tmp_path, monkeypatch, setting):
     owner, job, execution_id, agent_cls = owner_run
@@ -482,9 +479,8 @@ def test_run_job_does_not_hang_when_sessiondb_init_wedges(owner_run, tmp_path, m
         assert closed.wait(5)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_sessiondb_init_preserves_multiplex_profile_context(owner_run, tmp_path):
-    from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
 
     owner, job, execution_id, agent_cls = owner_run
     profile_home = tmp_path / "profiles" / "jobsearch"
@@ -492,15 +488,15 @@ def test_sessiondb_init_preserves_multiplex_profile_context(owner_run, tmp_path)
     observed = []
 
     def acquire(path):
-        observed.append((path, get_hermes_home()))
+        observed.append((path, get_qubit_home()))
         return owner.db
 
-    token = set_hermes_home_override(profile_home)
+    token = set_qubit_home_override(profile_home)
     try:
         with patch("qubit_state_registry.acquire", side_effect=acquire):
             success, _, response, error = scheduler.run_job(job, execution_id=execution_id)
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
     assert (success, response, error) == (True, "ok", None)
     assert observed == [(profile_home / "state.db", profile_home)]
     assert agent_cls.call_args.kwargs["session_db"] is owner.db
