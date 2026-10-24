@@ -329,7 +329,6 @@ def _build_delegate_chain(db, parent, case):
     return children, pinned
 
 
-@pytest.mark.skip(reason="wave-25 short-port: ported probe hangs locally; tracked for follow-up")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("phase", ["readiness", "claimed"])
 @pytest.mark.parametrize("fault", [
@@ -448,7 +447,6 @@ async def test_compression_uncertainty_keeps_durable_completion_retryable(
         assert resolved == ["tip"]
 
 
-@pytest.mark.skip(reason="wave-25 short-port: ported probe hangs locally; tracked for follow-up")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("delivery", ["single", "group"])
 @pytest.mark.parametrize("case", [
