@@ -84,6 +84,21 @@ FRAME_SLACK = 1.4
 #: continuous. Must be > 0.0 and <= 1.0.
 TARGET_DUTY = 0.25
 
+
+def target_duty() -> float:
+    """The orb's CPU-share budget, overridable by ``QUBIT_ORB_DUTY``.
+
+    Kept as a function (not a bare constant) so an operator can trade
+    smoothness against CPU without editing code: ``0.25`` = at most a quarter
+    of one core, ``0.10`` = a tenth. Clamped to ``(0.01, 1.0]``; anything
+    unparseable falls back to :data:`TARGET_DUTY`. Never raises.
+    """
+    try:
+        v = float(_os.environ.get("QUBIT_ORB_DUTY", "") or TARGET_DUTY)
+    except (TypeError, ValueError):
+        v = TARGET_DUTY
+    return v if 0.01 <= v <= 1.0 else TARGET_DUTY
+
 #: Ember-orange family on near-black (own palette values in that family).
 EMBER_CORE = (255, 84, 0)
 EMBER_MID = (255, 100, 30)

@@ -3911,7 +3911,7 @@ if QWidget is not None:
                         paint_ms = float(getattr(self, "_last_paint_ms", 0.0) or 0.0)
                     except (TypeError, ValueError):
                         paint_ms = 0.0
-                    want = int(paint_ms / _ember.TARGET_DUTY) if paint_ms > 0.0 else FRAME_MS
+                    want = int(paint_ms / _ember.target_duty()) if paint_ms > 0.0 else FRAME_MS
                     interval = want if want > FRAME_MS else FRAME_MS
                     if self._frame_timer.interval() != interval:
                         self._frame_timer.setInterval(interval)
