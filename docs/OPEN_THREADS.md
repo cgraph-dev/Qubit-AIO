@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 39 — 2026-10-24 (real gaps from broader regressions fixed)
+
+- ✅ MCP wrapped-401 classification (27+67+20 passed), managed-dir env layering (107), backup suite (94), catalog/providers (27), web health/plugin brand/skill-count/FTS doctor (114), WAL contention + state-file hang (301; 289 twice), and the three wave-36 product gaps (/diff frozen policy, chat endpoint flags, parked served set).
+- ✅ Complete-tree `wave-2x` markers are now **0**.
+- 🟡 **17 `wave-30` markers remain** in a separate class (ACP cold/resume, daemon readiness, frozen MCP schema, hosted-room events 401, plus two non-strict load flakes) — next wave targets them.
+- 🔴 Remaining: the 17 wave-30 markers; no `VERIFIED`; B1 exclusion; Windows/daemon/e2e skips; retirement not executed; no service restart (fixes are on disk only).
+
 ## Wave 36 — 2026-10-24 (MCP storm fixed; 10 skips closed; regressions green)
 
 - ✅ MCP: unresolved env refs fail closed; auth-rejected servers bounded (5 probes, 300→3600 s backoff, latch) with explicit revival; discovery cannot bypass; stderr capped at 16 MiB. 7 new tests, 143 focused passed.
