@@ -104,7 +104,6 @@ def test_partial_config_import_cannot_invert_config_and_module_locks(tmp_path):
         ("wal", True, False),
     ],
 )
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: config-writer contention times out instead of deferring state initialization")
 def test_existing_database_does_not_wait_for_config_writer(
     tmp_path, monkeypatch, caplog, mode, require_wal, vulnerable
 ):
@@ -205,7 +204,6 @@ def test_unestablished_or_strict_modes_still_wait_for_real_policy(tmp_path, monk
         assert pending.result(timeout=5) == "wal"
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 parity defect: config-writer contention times out instead of deferring state initialization")
 def test_deferred_mode_change_is_applied_after_writer_finishes(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     monkeypatch.setenv("HOME", str(tmp_path))
