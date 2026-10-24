@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 44 — 2026-10-24 (Docker repaired; CI account-blocked; old home moved)
+
+- ✅ Docker daemon repaired (stale docker0 network DB/interface, buildx installed, enabled); `docker run` smoke passes. Dockerfile rebrand paths fixed; harness image build still heavy.
+- ✅ CI workflow committed; GitHub Actions starts but every run is `startup_failure` 0 s/no jobs — account private-repo Actions billing/limit. Owner must raise the limit or add a self-hosted runner.
+- ✅ `~/.hermes` (stale lock only) moved to `~/.hermes.retired-20261024`; `.pre-retirement` kept; services/chat unaffected.
+- 🔴 Remaining: 22 e2e probes; Docker image build; CI billing; `VERIFIED`; no service restart (another agent owns the tree).
+
 ## Wave 43 — 2026-10-24 (B1 retired, AT TARGET)
 
 - ✅ Added the pin's inert `_gateway_lock_handle = None` (no readers/writers) and removed the exclusion; audit now **AT TARGET** (0 missing, 100%).
