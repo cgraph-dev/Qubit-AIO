@@ -425,7 +425,6 @@ def test_a_routed_profile_script_keeps_administrator_managed_values_over_its_own
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_script_must_be_a_file_under_scripts_dir_not_a_shell_command(hermes_env):
     """``script`` names a file under HERMES_HOME/scripts/. A command line (``echo hi``) is
     refused at creation instead of firing every tick as "Script not found" delivered as the

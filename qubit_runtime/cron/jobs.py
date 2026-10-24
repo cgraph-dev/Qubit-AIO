@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover - non-Windows
     msvcrt = None
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from qubit_constants import get_qubit_home
+from qubit_constants import display_qubit_home, get_qubit_home
 from cron.constants import CLAIM_TTL_INACTIVITY_HEADROOM, FIRE_CLAIM_SKEW_SECONDS, FIRE_CLAIM_TTL_SECONDS
 from cron.env_settings import cron_env_setting
 from cron import store_health
@@ -1759,6 +1759,23 @@ def _validate_job_mode_invariants(
             "based on source changes. Use a plain no_agent script job instead.")
     if no_agent and not script:
         raise ValueError(NO_AGENT_WITHOUT_SCRIPT_ERROR)
+    if script and _script_is_command_line(script):
+        raise ValueError(
+            "script must name a file under {scripts_dir} (e.g. 'watchdog.sh'), not a shell "
+            "command line: {script!r} has no such file. Write the command into a script there "
+            "and pass its filename.".format(
+                scripts_dir=display_qubit_home() + "/scripts/", script=script))
+
+
+def _script_is_command_line(script: str) -> bool:
+    """A ``script`` with whitespace that resolves to no file is a command line (``echo hi``),
+    not a path; run every tick it would deliver "Script not found" as the payload. A plain
+    missing filename stays creatable (``qubit cron doctor`` reports it)."""
+    if not any(ch.isspace() for ch in script.strip()):
+        return False
+    from cron.lifecycle_guard import _resolve_script_path
+    path = _resolve_script_path(script)
+    return path is None or not path.is_file()
 
 
 def _oneshot_past_grace_error(run_at: Any) -> ValueError:

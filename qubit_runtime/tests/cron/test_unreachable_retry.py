@@ -6,11 +6,13 @@ bounded ladder (5/15/30 min); a run that reaches the model resets the ladder, an
 ladder never fires past its last rung.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 
 import pytest
 
+import cron.scheduler as sched
 from cron import unreachable_retry as ur
+from cron.scheduler_bookkeeping import finish_completed_run
 from cron.jobs import create_job, get_due_jobs, get_job, load_jobs, mark_job_run, save_jobs
 
 
@@ -129,12 +131,6 @@ def test_reaching_the_model_resets_ladder_and_oneshots_never_retry(tmp_cron_home
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-import cron.scheduler as sched
-
-from cron.scheduler_bookkeeping import finish_completed_run
-
-
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("rung_tail", ["finish", "crash", "worker", "ownership_lost"])
 def test_ladder_reruns_do_not_spend_extra_repeat_budget(tmp_cron_home, monkeypatch, rung_tail):
     """A ladder re-run repeats an occurrence that already counted toward ``repeat``, so it must
@@ -143,8 +139,8 @@ def test_ladder_reruns_do_not_spend_extra_repeat_budget(tmp_cron_home, monkeypat
     the final-run notice). Drives the tick's claim hand-off and bookkeeping tail: the claimed
     snapshot's ``next_run_at`` has already moved to the natural slot when the run is recorded."""
     clock = [datetime.now(UTC)]
-    monkeypatch.setattr("cron.jobs._hermes_now", lambda: clock[0])
-    monkeypatch.setattr(ur, "_hermes_now", lambda: clock[0])
+    monkeypatch.setattr("cron.jobs._qubit_now", lambda: clock[0])
+    monkeypatch.setattr(ur, "_qubit_now", lambda: clock[0])
     monkeypatch.setattr(sched, "finish_execution", lambda *_a, **_kw: None)
     runs = []
     monkeypatch.setattr(sched, "run_one_job", lambda job, **_kw: runs.append(job) or True)
