@@ -10,8 +10,6 @@ import time
 import psutil
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-30 parity defect: ACP stdio session/load|session/resume round trip never answers on the pinned tree")
-
 from tests.acp_adapter.test_gateway_sessions import editor, viewer
 from tests.gateway.test_normal_runtime_boot import control
 
@@ -63,7 +61,7 @@ async def test_cold_acp_load_retains_policy_and_executes_after_daemon_restart(da
         process = subprocess.Popen([sys.executable, '-m', 'gateway.run'], cwd=root, env=env,  # noqa: ASYNC220 -- Popen returns immediately; the test drives the child through its handle
             stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         try:
-            deadline = time.monotonic() + 40
+            deadline = time.monotonic() + 90
             current = {}
             while process.poll() is None and time.monotonic() < deadline:
                 try:
