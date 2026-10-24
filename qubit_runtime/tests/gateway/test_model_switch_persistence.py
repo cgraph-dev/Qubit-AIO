@@ -17,7 +17,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from gateway.config import GatewayConfig, Platform, PlatformConfig
+from gateway.config import ChannelOverride, GatewayConfig, Platform, PlatformConfig
+from qubit_cli.anon_auth import GUEST_MODEL
 from gateway.session import SessionEntry, SessionSource, build_session_key
 
 
@@ -326,7 +327,6 @@ class TestFallbackEvictionHonorsChannelOverrides:
         runner._run_agent_evict_on_fallback(ctx)
         return runner._evict_cached_agent.called
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.parametrize("thread_of_the_channel", [False, True])
     def test_channel_override_model_keeps_the_cached_agent(self, monkeypatch, thread_of_the_channel):
         source = _make_source()
@@ -335,43 +335,38 @@ class TestFallbackEvictionHonorsChannelOverrides:
                                    user_name="tester", chat_type="thread")
         assert self._evicted_after_turn(monkeypatch, source, "chan/model") is False
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_fallback_off_the_channel_model_still_evicts(self, monkeypatch):
         assert self._evicted_after_turn(monkeypatch, _make_source(), "fallback/model") is True
 
     _WELCOME = "https://welcome-api.nousresearch.com/v1"
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-    @pytest.mark.parametrize("global_model", ["nous/welcome", "default/model"])
+    @pytest.mark.parametrize("global_model", [GUEST_MODEL, "default/model"])
     def test_the_welcome_host_pins_its_model_over_the_channel_model(self, monkeypatch, global_model):
-        """AIAgent.__init__ runs a welcome-host agent on ``nous/welcome`` whatever the chat configured."""
+        """AIAgent.__init__ runs a welcome-host agent on the guest model whatever the chat configured."""
         from qubit_cli.anon_auth import pin_model_for_route
 
         agent_model = pin_model_for_route("nous", self._WELCOME, "chan/model")
-        assert agent_model == "nous/welcome"
+        assert agent_model == GUEST_MODEL
         assert self._evicted_after_turn(
             monkeypatch, _make_source(), agent_model, global_model=global_model,
             provider="nous", base_url=self._WELCOME,
         ) is False
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_the_recorded_welcome_alias_switch_keeps_the_cached_agent(self, monkeypatch):
         assert self._evicted_after_turn(
             monkeypatch, _make_source(), "backing/model", provider="nous", base_url=self._WELCOME,
-            _nous_model_switch=("nous/welcome", "backing/model"),
+            _nous_model_switch=(GUEST_MODEL, "backing/model"),
         ) is False
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_a_fallback_onto_the_welcome_host_still_evicts(self, monkeypatch):
         """The pin applies to the agent's primary route, not the fallback route it is on now."""
         assert self._evicted_after_turn(
-            monkeypatch, _make_source(), "nous/welcome", provider="nous", base_url=self._WELCOME,
+            monkeypatch, _make_source(), GUEST_MODEL, provider="nous", base_url=self._WELCOME,
             _primary_runtime={"provider": "openrouter", "base_url": "https://openrouter.ai/api/v1"},
         ) is True
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.parametrize("agent_model, session_provider, switch, evicted", [
-        ("backing/model", "nous", ("nous/welcome", "backing/model"), False),  # the server's recorded move
+        ("backing/model", "nous", (GUEST_MODEL, "backing/model"), False),  # the server's recorded move
         ("chan/model", "nous", None, True),  # a fallback that happens to land on the channel's model
         # The override's provider was unavailable, so this turn ran on the channel's model.
         ("chan/model", "openai-codex", None, False),
@@ -381,12 +376,11 @@ class TestFallbackEvictionHonorsChannelOverrides:
     ):
         """The agent was built on the session's /model choice, so drift is measured from it."""
         assert self._evicted_after_turn(
-            monkeypatch, _make_source(), agent_model, global_model="backing/model", session_model="nous/welcome",
+            monkeypatch, _make_source(), agent_model, global_model="backing/model", session_model=GUEST_MODEL,
             session_provider=session_provider, provider="nous", base_url="https://inference-api.nousresearch.com/v1",
             **({"_nous_model_switch": switch} if switch else {}),
         ) is evicted
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.parametrize("session_model", [None, "chan/model"], ids=["channel-model", "session-model"])
     def test_a_provider_fallback_serving_the_configured_model_still_evicts(self, monkeypatch, session_model):
         """Same model name, different endpoint: the model strings match, but the turn ran on a fallback."""
@@ -397,7 +391,6 @@ class TestFallbackEvictionHonorsChannelOverrides:
             _provider_fallback_active=True,
         ) is True
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.parametrize("primary_provider, evicted", [
         ("anthropic", False),  # native primary: the agent runs the prefix-stripped channel model
         ("openrouter", True),  # OpenRouter primary that fell back to native Anthropic

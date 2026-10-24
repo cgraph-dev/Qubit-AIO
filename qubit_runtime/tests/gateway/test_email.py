@@ -635,9 +635,12 @@ class TestPollLoop(unittest.TestCase):
         }):
             from plugins.platforms.email.adapter import EmailAdapter
             adapter = EmailAdapter(PlatformConfig(enabled=True))
+        # _check_inbox gates every UID on _sender_accepted before the RFC822 fetch; authorize the
+        # unauthenticated test senders so these tests exercise the fetch/dispatch loop itself.
+        adapter._is_sender_authorized = lambda *a, **k: True
+        adapter._require_authenticated_sender = False
         return adapter
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_check_inbox_dispatches_messages(self):
         """_check_inbox should fetch and dispatch new messages."""
         import asyncio
@@ -696,7 +699,6 @@ class TestPollLoop(unittest.TestCase):
         self.assertTrue(adapter.fatal_error_retryable)
         self.assertIn("read operation timed out", adapter.fatal_error_message)
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_partial_batch_dispatched_before_escalation(self):
         """A mid-batch IMAP failure must dispatch the messages already
         fetched BEFORE escalating — dropping them would lose mail, since
@@ -727,7 +729,7 @@ class TestPollLoop(unittest.TestCase):
                 return ("OK", [b"1 2"])
             if command == "fetch":
                 fetches.append(args)
-                if len(fetches) == 1:
+                if args[0] == b"1":
                     return ("OK", [(b"1", raw_email.as_bytes())])
                 raise OSError("connection dropped mid-batch")
             return ("NO", [])
@@ -744,7 +746,6 @@ class TestPollLoop(unittest.TestCase):
         self.assertEqual(len(notified), 1)
         self.assertEqual(adapter.fatal_error_code, "email_imap_fetch_failed")
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_mid_batch_failure_leaves_unfetched_uids_eligible(self):
         """UIDs are marked seen only after their fetch returns — a
         connection failure mid-batch must leave the remaining UIDs eligible
@@ -764,7 +765,7 @@ class TestPollLoop(unittest.TestCase):
                 return ("OK", [b"1 2 3"])
             if command == "fetch":
                 fetches.append(args)
-                if len(fetches) == 1:
+                if args[0] == b"1":
                     return ("OK", [(b"1", raw_email.as_bytes())])
                 raise OSError("connection dropped")
             return ("NO", [])
@@ -780,7 +781,6 @@ class TestPollLoop(unittest.TestCase):
         self.assertNotIn(b"3", adapter._seen_uids)  # never reached → retry next poll
         self.assertTrue(adapter._last_fetch_failed)
 
-    @pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
     def test_poison_message_skipped_once_without_escalation(self):
         """A message whose processing raises is marked seen and skipped —
         it must not abort the batch, escalate to a reconnect, or be
@@ -799,6 +799,8 @@ class TestPollLoop(unittest.TestCase):
                 return ("OK", [b"1 2"])
             if command == "fetch":
                 uid = args[0]
+                if "BODY.PEEK" in args[1]:
+                    return ("OK", [(uid, good_email.as_bytes())])
                 if uid == b"1":
                     return ("OK", [(b"1", b"poison")])
                 return ("OK", [(b"2", good_email.as_bytes())])
@@ -1026,7 +1028,6 @@ class TestImapIdExtensionForNetEase(unittest.TestCase):
             adapter = EmailAdapter(PlatformConfig(enabled=True))
         return adapter
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_connect_sends_imap_id_after_login(self):
         """connect() must call xatom('ID', ...) after LOGIN for 163 support."""
         import asyncio
@@ -1051,7 +1052,7 @@ class TestImapIdExtensionForNetEase(unittest.TestCase):
             "LOGIN so 163/NetEase mailbox does not return 'Unsafe Login'.",
         )
         payload = id_calls[0].args[1]
-        self.assertIn("hermes-agent", payload)
+        self.assertIn("qubit", payload)
 
         names = [c[0] for c in mock_imap.method_calls]
         self.assertIn("login", names)

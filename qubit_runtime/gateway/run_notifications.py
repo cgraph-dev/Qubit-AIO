@@ -1779,6 +1779,13 @@ class GatewayNotificationsMixin(GatewayNotificationOwnershipMixin):
                 if completion_admission(self, evt) is not None:
                     acknowledged = await self._deliver_completion_notification(synth_text, evt) is True or acknowledged
                     continue
+            # A permanently-gone target has to take the single-delivery terminal path: batching it
+            # would claim its siblings and then release them, stranding their rows pending forever.
+            parent = str(evt.get("parent_session_id") or "")
+            if parent and await self._classify_completion_target(
+                    parent, str(evt.get("session_key") or "")) == "terminal":
+                await self._deliver_completion_notification(synth_text, evt)
+                continue
             identity = self._completion_delivery_identity(evt)
             if identity is not None and self._completion_identity_seen(identity):
                 continue
