@@ -13,7 +13,6 @@ from qubit_state import SessionDB
 from tests.gateway.fixtures.local_recovery_probe import child_env, daemon, rpc, websocket
 
 
-@pytest.mark.xfail(strict=True, reason="wave-30 parity defect: gateway daemon bootstrap re-installs the isolated runtime and never reaches ready in 120 s")
 def test_group_management_on_ordinary_authenticated_socket(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -28,7 +27,7 @@ def test_group_management_on_ordinary_authenticated_socket(tmp_path):
         'auxiliary': {'title_generation': {'enabled': False}},
     }))
     env = child_env() | dict(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home),
-                             PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
+                             QUBIT_HOME=str(home), PYTHONPATH=str(root), PYTHONUNBUFFERED='1')
 
     async def probe(desc):
         with pytest.raises(InvalidStatus):

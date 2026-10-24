@@ -17,7 +17,6 @@ from tests.gateway.test_worker_agent_execution import Model
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-30 parity defect: gateway daemon bootstrap re-installs the isolated runtime and never reaches ready in 120 s")
 def test_rotated_agent_survives_owner_kill_and_explicit_adoption(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -34,7 +33,7 @@ def test_rotated_agent_survives_owner_kill_and_explicit_adoption(tmp_path):
                       'compression': {'provider': 'custom', 'model': 'worker-model', 'base_url': url}},
         'platform_toolsets': {'cli': []}}))
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
     async def create(desc, key):
         async with websocket(home, desc) as ws:

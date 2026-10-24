@@ -5,8 +5,6 @@ import asyncio
 
 import pytest
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wave-30 parity defect: isolated gateway daemon does not reach ready or exit within the harness deadline on the pinned tree")
-
 from tests.gateway.fixtures.local_recovery_probe import rpc, websocket
 from tests.gateway.test_session_busy_controls import owner
 from tests.gateway.test_session_tui_ops import _checkpoint, _git_rpc

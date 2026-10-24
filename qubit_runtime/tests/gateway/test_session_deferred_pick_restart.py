@@ -72,7 +72,6 @@ class _Client:
 
 
 @pytest.mark.platforms("linux")
-@pytest.mark.xfail(strict=True, reason="wave-30 parity defect: gateway daemon bootstrap re-installs the isolated runtime and never reaches ready in 120 s")
 def test_a_guarded_deferred_pick_is_asked_again_after_an_owner_restart(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
@@ -94,7 +93,7 @@ def test_a_guarded_deferred_pick_is_asked_again_after_an_owner_restart(tmp_path)
         name: {'id': name, 'name': name, 'limit': {'context': 1000000, 'output': 4000}}
         for name in ('original', 'switched')}}}))
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ', 'TIRITH_ENABLED') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
 
     def terminal(name):
