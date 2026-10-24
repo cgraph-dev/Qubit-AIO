@@ -64,8 +64,13 @@ _CI_WORKFLOW_SUFFIXES = {".yml", ".yaml"}
 
 
 def is_ci_workflow(rel_path: str) -> bool:
-    """A forge CI workflow definition (``.github/workflows/<name>.yml``)."""
+    """A forge CI workflow definition: ``.github/workflows/<name>.yml`` or a GitLab ``.gitlab-ci.yml``.
+    Both run on the forge's runner, never on the host that installs the plugin, and the agent never
+    reads them as instructions, so they take the README prose cap (``os.environ`` reads, ``pip install``
+    steps and ``curl | sh`` of a CI tool are the pipeline's own plumbing)."""
     p = Path(rel_path)
+    if p.name.lower() == ".gitlab-ci.yml":
+        return True
     return (len(p.parts) == 3 and p.parts[0].lower() == ".github" and p.parts[1].lower() == "workflows"
             and p.suffix.lower() in _CI_WORKFLOW_SUFFIXES)
 
@@ -136,9 +141,12 @@ def is_locale_catalog(rel_path: str) -> bool:
 
 
 def catalog_cap(finding: Finding) -> Optional[str]:
-    """Stepped-down severity for a finding inside a locale catalog, else None."""
+    """Stepped-down severity for a finding inside a locale catalog, else None. The agent-config family
+    is a translated UI STATUS STRING there (``updating: "… AGENTS.md …"``) — the pack cannot write a
+    file — so it caps to a note (medium), not merely one step; other shapes take the one-step prose cap."""
     if finding.pattern_id in _CATALOG_STEPS_DOWN_IDS:
-        return STEP_DOWN.get(finding.severity)
+        rank = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+        return finding.severity if rank.get(finding.severity, 0) <= rank["medium"] else "medium"
     return prose_cap(finding)
 
 

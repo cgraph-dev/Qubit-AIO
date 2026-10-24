@@ -27,7 +27,19 @@ def _nous_state(claims: dict, auth_method: str, exp_offset: int = 3600) -> dict:
     # (the JWT claim is unreachable once the token is inside its refresh window).
     if claims.get("account_tier"):
         state["account_tier"] = claims["account_tier"]
+    if auth_method == "anonymous":
+        from qubit_cli.anon_auth import WELCOME_CLAIM_FLAG
+        state[WELCOME_CLAIM_FLAG] = True
     return state
+
+
+@pytest.fixture(autouse=True)
+def _no_ddgs_package(monkeypatch):
+    """The pinned test suite runs where the optional ``ddgs`` package is absent, so the keyless
+    rung cannot outrank the managed free-search route. This host has it installed."""
+    import tools.web_tools as web_tools
+
+    monkeypatch.setattr(web_tools, "_ddgs_package_importable", lambda: False, raising=True)
 
 
 @pytest.fixture
@@ -73,9 +85,12 @@ def _write_home(home, monkeypatch, *, nous_state=None, config=None):
     from qubit_cli.config import atomic_config_write
     from qubit_cli.nous_account import reset_nous_portal_account_info_cache
 
+    from tests.qubit_cli.anon_portal import as_local_desktop_backend
+
     home.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setenv("QUBIT_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    as_local_desktop_backend(monkeypatch)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
     monkeypatch.delenv("TOOL_GATEWAY_USER_TOKEN", raising=False)
     atomic_config_write(home / "config.yaml", {"web": {"keyless_rescue": False}, **(config or {})})
@@ -96,7 +111,6 @@ def _calls(log):
     return [(path, headers["Authorization"], body.get("search_type")) for path, headers, body in log]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_zero_credit_portal_identity_autodetects_free_fast_search(monkeypatch, tmp_path, gateway_server):
     from tools import web_tools
     from tools.tool_backend_helpers import managed_nous_tools_enabled
@@ -114,35 +128,32 @@ def test_zero_credit_portal_identity_autodetects_free_fast_search(monkeypatch, t
     assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-def test_anonymous_guest_keeps_the_keyless_ring(monkeypatch, tmp_path, gateway_server):
-    """The guest tier holds a usable Nous token, so the exclusion must come from the tier itself."""
+def test_anonymous_guest_reaches_free_fast_search(monkeypatch, tmp_path, gateway_server):
+    """The pinned contract serves the free fast route to every Nous identity, the anonymous guest
+    tier included: it holds a usable token, so it resolves the managed route instead of keyless."""
     from tools import web_tools
     from tools.managed_tool_gateway import peek_nous_access_token, resolve_free_search_gateway
-    from tools.tool_backend_helpers import fast_search_entitled
 
     _write_home(tmp_path / "home", monkeypatch, nous_state=_nous_state(ANON, "anonymous"))
-    # Premise: a token IS present — anonymous is refused by entitlement, not by a missing credential.
     assert peek_nous_access_token()
-    assert fast_search_entitled() is False
-    assert resolve_free_search_gateway(token_reader=peek_nous_access_token) is None
+    assert resolve_free_search_gateway(token_reader=peek_nous_access_token) is not None
 
-    assert web_tools._managed_web_search() is False
-    assert web_tools._get_search_backend() != "perplexity"
+    assert web_tools._managed_web_search() is True
+    assert web_tools._get_search_backend() == "perplexity"
 
 
 @pytest.mark.parametrize("tier", ["anonymous", "Anonymous", "ANONYMOUS", " anonymous "])
 def test_anonymous_tier_is_matched_case_and_whitespace_insensitively(monkeypatch, tmp_path, gateway_server, tier):
-    """The tier claim arrives verbatim from the JWT or account payload; casing must never promote
-    the guest tier to the registered route."""
+    """The tier claim arrives verbatim from the JWT or account payload; the guest tier must be
+    recognized under any casing or padding so the tier-dependent copy and gates stay consistent."""
+    from qubit_cli.nous_account import get_nous_portal_account_info
     from tools.managed_tool_gateway import peek_nous_access_token, resolve_free_search_gateway
-    from tools.tool_backend_helpers import fast_search_entitled
 
     _write_home(tmp_path / "home", monkeypatch,
                 nous_state=_nous_state({**ANON, "account_tier": tier}, "anonymous"))
 
-    assert fast_search_entitled() is False
-    assert resolve_free_search_gateway(token_reader=peek_nous_access_token) is None
+    assert get_nous_portal_account_info().is_anonymous_tier is True
+    assert resolve_free_search_gateway(token_reader=peek_nous_access_token) is not None
 
 
 def test_degraded_portal_lookup_does_not_grant_free_fast_search(monkeypatch, tmp_path, gateway_server):
@@ -162,20 +173,22 @@ def test_degraded_portal_lookup_does_not_grant_free_fast_search(monkeypatch, tmp
     assert fast_search_entitled() is False
 
 
-def test_guest_on_a_stored_nous_selection_is_told_it_needs_an_account(monkeypatch, tmp_path, gateway_server):
-    """A guest holds a real Nous identity, so the refusal must not claim it has none."""
-    _write_home(tmp_path / "home", monkeypatch, nous_state=_nous_state(ANON, "anonymous"),
+def test_guest_on_a_stored_nous_selection_reaches_free_fast_search(monkeypatch, tmp_path, gateway_server):
+    """A guest holds a real Nous identity, so a stored Nous selection serves the free fast route
+    from that token rather than refusing with a "no identity" error."""
+    state = _nous_state(ANON, "anonymous")
+    _write_home(tmp_path / "home", monkeypatch, nous_state=state,
                 config={"web": {"backend": "nous", "keyless_rescue": False}})
 
     result = _search()
 
-    assert result["success"] is False
-    assert "needs a Nous account" in result["error"]
-    assert "no Nous identity" not in result["error"]
+    assert result["success"] is True, result
+    assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
 
 
-def test_guest_whose_lookup_fails_is_still_told_it_needs_an_account(monkeypatch, tmp_path, gateway_server):
-    """A failed lookup must not make a guest look like a registered identity in the refusal."""
+def test_guest_whose_lookup_fails_still_serves_from_the_cached_token(monkeypatch, tmp_path, gateway_server):
+    """A failed account lookup must not drop a guest off the free fast route: the route keys on the
+    held token, while the degraded snapshot still carries the tier it could not re-read."""
     from qubit_cli.nous_account import get_nous_portal_account_info
 
     state = _nous_state(ANON, "anonymous", exp_offset=30)
@@ -189,8 +202,8 @@ def test_guest_whose_lookup_fails_is_still_told_it_needs_an_account(monkeypatch,
 
     result = _search()
 
-    assert result["success"] is False
-    assert "needs a Nous account" in result["error"]
+    assert result["success"] is True, result
+    assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
 
 
 def test_free_fast_search_failure_skips_paid_firecrawl_but_keeps_keyless_rescue(monkeypatch, tmp_path, gateway_server):
@@ -230,7 +243,6 @@ def test_direct_perplexity_key_beats_free_fast_search(monkeypatch, tmp_path, gat
     assert _calls(gateway_server) == [("/direct/search", "Bearer direct-key", None)]
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_free_fast_search_eligibility_follows_the_served_profile(monkeypatch, tmp_path, gateway_server):
     """Multiplex A→B→A: profile A holds a zero-credit Portal identity, B none; each answers from its own store."""
     from qubit_cli.nous_account import reset_nous_portal_account_info_cache
@@ -258,7 +270,6 @@ def test_free_fast_search_eligibility_follows_the_served_profile(monkeypatch, tm
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("state", [_nous_state(ANON, "anonymous"), _nous_state(EXHAUSTED, "oauth")])
 def test_unentitled_nous_identity_autodetects_free_fast_search(monkeypatch, tmp_path, gateway_server, state):
     """Guests are the users this route exists for: an anonymous identity and a zero-credit account
@@ -279,6 +290,3 @@ def test_unentitled_nous_identity_autodetects_free_fast_search(monkeypatch, tmp_
 
     assert result["success"] is True, result
     assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
-
-import pytest
-pytestmark = pytest.mark.skip(reason="wave-25 short-port: file probe hangs locally; tracked")

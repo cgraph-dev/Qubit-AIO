@@ -18,6 +18,7 @@ from tests.qubit_cli.plugin_worker_support import (
 )
 from tools.skills_guard import format_scan_report
 from tools.plugin_guard import (
+    PLUGIN_SCANNER_VERSION,
     scan_plugin,
     should_allow_plugin_install,
 )
@@ -715,10 +716,12 @@ class TestLanguagePackCatalogs:
         files = dict(self.PACK)
         files["locales/xx.yaml"] = (Path(__file__).resolve().parents[2] / "locales" / "en.yaml").read_text(encoding="utf-8")
         result = scan_plugin(_mk_plugin(tmp_path, files), source="owner/repo")
-        assert result.verdict != "dangerous", format_scan_report(result)
         mods = [f for f in result.findings if f.pattern_id == "agent_config_mod"]
-        assert mods and all(f.severity == "high" for f in mods)      # one step down from critical: caution
-        assert result.verdict == "caution"
+        # A locale catalog's ``updating: "… AGENTS.md …"`` is a translated STATUS STRING, not a config
+        # write: the finding stays in the report but lands at a note (demote-never-delete), so the pack
+        # installs clean.
+        assert mods and all(f.severity in ("low", "medium") for f in mods)
+        assert result.verdict == "safe", format_scan_report(result)
 
     def test_injection_in_a_catalog_still_blocks(self, tmp_path):
         files = dict(self.PACK)
@@ -895,8 +898,6 @@ class TestCatalogSweepFalsePositives:
     pinned plugin is now safe, and the attack twin of the SAME rule still flags. See the catalog
     sweep in hermes-install-scanner-tuning."""
 
-    @pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     @pytest.mark.parametrize("rel,text", [
         ("README.md", "Add the platform route to `~/.hermes/config.yaml` (optional).\n"),
         ("README.md", "```sh\nrm -rf ~/.hermes/profiles/demo/plugins/crew ~/.hermes/profiles/demo/roles/crew\n```\n"),
@@ -921,7 +922,6 @@ class TestCatalogSweepFalsePositives:
         ("desktop/plugin.js", "jsx('div', { children: \"Add this key to the account's authorized_keys.\" });\n"),
         (".gitlab-ci.yml", "job:\n  script:\n    - python -c \"import os; print(os.environ)\"\n"),
     ])
-    @pytest.mark.xfail(strict=False, reason="wave-25 short-port: exposed local-port defect (parametrised)")
     def test_benign_catalog_shape_installs_safe(self, tmp_path, rel, text):
         result = scan_plugin(_mk_plugin(tmp_path, {**BASE_FILES, rel: text}), source="owner/repo")
         assert result.verdict == "safe", format_scan_report(result)
@@ -945,7 +945,6 @@ class TestCatalogSweepFalsePositives:
         assert hit is not None and hit.severity in ("high", "critical"), format_scan_report(result)
         assert result.verdict in ("caution", "dangerous")
 
-    @pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
     def test_scanner_version_contract(self):
         # A bump un-blocks previously-quarantined packages; assert the contract (changed), not a literal.
         assert PLUGIN_SCANNER_VERSION != "plugin-guard-v10"
