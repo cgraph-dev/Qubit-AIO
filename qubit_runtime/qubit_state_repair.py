@@ -705,6 +705,28 @@ _FTS_OBJECT_RE = re.compile(
 )
 _INTEGRITY_TREE_RE = re.compile(r"\bTree (\d+)\b")
 _INTEGRITY_MISSING_INDEX_RE = re.compile(r"missing from index (\S+)")
+_FTS_CONSTRUCTOR_ERROR_RE = re.compile(r"vtable constructor failed:\s*(\S+)", re.IGNORECASE)
+
+
+def _integrity_error_is_fts_only(conn, master_rows, exc: sqlite3.DatabaseError) -> bool:
+    """True when an ``integrity_check`` DatabaseError is an FTS5 vtable-constructor failure and
+    every canonical table still checks clean. Corrupted FTS shadow data makes the virtual table
+    fail to open, aborting the whole check; that is recoverable by the FTS rebuild ladder, while
+    any canonical failure (or an error that does not name an FTS object) stays structural."""
+    match = _FTS_CONSTRUCTOR_ERROR_RE.search(str(exc))
+    if not match or not _FTS_OBJECT_RE.fullmatch(match.group(1)):
+        return False
+    for _rootpage, type_, name in master_rows:
+        if type_ != "table" or _FTS_OBJECT_RE.fullmatch(name):
+            continue
+        quoted = '"%s"' % str(name).replace('"', '""')
+        try:
+            rows = conn.execute(f"PRAGMA integrity_check({quoted})").fetchall()
+        except sqlite3.DatabaseError:
+            return False
+        if any(str(row[0]).lower() != "ok" for row in rows):
+            return False
+    return True
 
 
 def integrity_damage_is_structural(integrity_lines, master_rows) -> bool:
@@ -733,9 +755,11 @@ def integrity_damage_is_structural(integrity_lines, master_rows) -> bool:
 def state_db_has_structural_damage(db_path: Path) -> bool:
     """Read-only ``integrity_check`` + ``sqlite_master`` rootpage map on a fresh connection;
     ``integrity_damage_is_structural`` over the result. A check that RAISES instead of
-    reporting (a torn page under the walk) is structural too: no FTS-only fixture does that
-    while ``messages``/``sessions`` read cleanly, and the FTS rebuild ladder cannot help.
+    reporting (a torn page under the walk) is structural too, unless the raise is an FTS5
+    vtable-constructor failure and the canonical tables check clean: corrupt FTS shadow data
+    aborts the whole walk even though the FTS rebuild ladder is the correct repair.
     Cannot-open / locked stays False so the caller keeps the FTS path."""
+    master_rows: list[tuple] = []
     try:
         conn = sqlite3.connect(read_only_db_uri(db_path), uri=True, timeout=1.0)
     except sqlite3.Error:
@@ -746,8 +770,8 @@ def state_db_has_structural_damage(db_path: Path) -> bool:
         lines = [str(r[0]) for r in conn.execute("PRAGMA integrity_check").fetchall()]
     except sqlite3.OperationalError:
         return False
-    except sqlite3.DatabaseError:
-        return True
+    except sqlite3.DatabaseError as exc:
+        return not _integrity_error_is_fts_only(conn, master_rows, exc)
     finally:
         conn.close()
     return integrity_damage_is_structural(
