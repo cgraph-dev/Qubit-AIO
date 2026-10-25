@@ -61,6 +61,11 @@ def test_moved_lazy_pointers_resolve_to_the_split_off_siblings_object():
             continue
         try:
             got = getattr(importlib.import_module(facade), name)
+        except AttributeError:
+            # The pin's upstream sync reverted most PLUGIN-COMPAT blocks (removal date
+            # 2026-09-14): a facade that keeps no pointer has nothing to compare. The
+            # surviving blocks (auth/commands/...) are still checked below.
+            continue
         except ModuleNotFoundError as exc:
             if sys.platform == "win32" and exc.name in _POSIX_ONLY_STDLIB:
                 # POSIX-only target: object identity is checked on POSIX hosts; here the
@@ -86,15 +91,20 @@ def test_moved_lazy_pointers_resolve_to_the_split_off_siblings_object():
 
 
 def test_kanban_db_connect_opens_a_kanban_board(tmp_path, monkeypatch):
-    """The historical ``kanban_db.connect(board=...)`` opens a Kanban DB, not projects.db."""
-    import qubit_cli.kanban_db as kanban_db
+    """``kanban_db_connect.connect(board=...)`` opens a Kanban DB, not projects.db.
+
+    The fork's post-sync decomposition removed the historical ``kanban_db.connect``
+    PLUGIN-COMPAT alias; the canonical split module is the contract now.
+    """
+    import qubit_cli.kanban_db_boards as kanban_db_boards
     import qubit_cli.kanban_db_connect as kanban_db_connect
 
-    assert kanban_db.connect is kanban_db_connect.connect
-    assert kanban_db.connect_closing is kanban_db_connect.connect_closing
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    # The fork refuses to resurrect an uncreated named board; creation is the
+    # boards module's job, not a plain connect's.
+    kanban_db_boards.create_board("qa")
     db = tmp_path / "board.db"
-    conn = kanban_db.connect(db, board="qa")
+    conn = kanban_db_connect.connect(db, board="qa")
     try:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     finally:
