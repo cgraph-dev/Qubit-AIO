@@ -1252,11 +1252,6 @@ def cmd_migrate(args) -> None:
     _print(format_plan(plan, dry_run=dry_run))
     if dry_run:
         return
-    # Applying the migration is operator-owned (one gateway per host): print the
-    # typed refusal and never mutate the host from this surface.
-    print()
-    _print([f"\u2717 {APPLY_REFUSAL}", f"  (code: {APPLY_REFUSAL_CODE})"])
-    raise SystemExit(3)
     if plan.already_multiplexed:
         return
     # A manifest means this host is already mid-migration with units removed: the blocked/too-few-
@@ -1264,6 +1259,13 @@ def cmd_migrate(args) -> None:
     # left a stranded host refusing its own documented recovery forever.
     if plan.manifest is None and (plan.blocked or len(plan.profiles) < 2):
         sys.exit(1 if plan.blocked else 0)
+    # Applying the migration is operator-owned (one gateway per host): print the
+    # typed refusal and never mutate the host from this surface. An already-converged host
+    # returned above (nothing to apply); a genuinely mid-migration host reaches here and the
+    # operator console performs the mutating step.
+    print()
+    _print([f"\u2717 {APPLY_REFUSAL}", f"  (code: {APPLY_REFUSAL_CODE})"])
+    raise SystemExit(3)
     # Zero standalone secondaries is still a migration when the user asks for it explicitly: the flag
     # goes on and the default gateway restarts (the update hook keeps treating that case as a no-op).
     if not getattr(args, "yes", False) and sys.stdin.isatty():
