@@ -6090,7 +6090,7 @@
    "extra_body": {
     "thinking_config": {
      "includeThoughts": false,
-     "thinkingBudget": 0
+     "thinkingLevel": "low"
     }
    },
    "messages": [
@@ -7125,6 +7125,12 @@
   "api_mode": "chat_completions",
   "base_url": "http://127.0.0.1:1234/v1",
   "high": {
+   "extra_body": {
+    "reasoning": {
+     "effort": "high",
+     "enabled": true
+    }
+   },
    "messages": [
     {
      "content": "You are a test agent.",
@@ -7183,6 +7189,11 @@
   },
   "model": "qwen/qwen3-8b",
   "off": {
+   "extra_body": {
+    "reasoning": {
+     "enabled": false
+    }
+   },
    "messages": [
     {
      "content": "You are a test agent.",
@@ -9076,6 +9087,7 @@
    "parallel_tool_calls": true,
    "prompt_cache_key": "pck_f6d11aab44ec88459ba6fe2e",
    "reasoning": {
+    "context": "all_turns",
     "effort": "high",
     "summary": "auto"
    },
@@ -9190,6 +9202,7 @@
    "parallel_tool_calls": true,
    "prompt_cache_key": "pck_f6d11aab44ec88459ba6fe2e",
    "reasoning": {
+    "context": "all_turns",
     "effort": "medium",
     "summary": "auto"
    },
@@ -11522,7 +11535,7 @@
      "google": {
       "thinking_config": {
        "include_thoughts": false,
-       "thinking_budget": 0
+       "thinking_level": "low"
       }
      }
     }

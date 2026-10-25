@@ -246,10 +246,12 @@ auxiliary:
     def test_browser_vision_true_when_both_available(self, isolated_home, monkeypatch):
         from unittest.mock import patch
 
+        # Fork gates native vision on an explicit model capability (no provider-wide fallback).
         _write_config(isolated_home, """
 model:
   provider: openrouter
   default: anthropic/claude-sonnet-4
+  supports_vision: true
 """)
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
         _fresh_modules()
