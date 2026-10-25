@@ -544,9 +544,14 @@ def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dic
         intent = json.loads(intent_path.read_text(encoding="utf-8-sig"))
     else:
         assert profile_home is not None
-        owner = find_canonical_live_owner(profile_home)
+        try:
+            owner = find_canonical_live_owner(profile_home)
+        except Exception as exc:
+            # Discovery runs before the intent exists and never admits: definite, not ambiguous.
+            raise LiveTargetUnavailableError(
+                f"canonical Bot Chat target is unavailable ({exc})") from exc
         if owner is None:
-            return None
+            raise LiveTargetUnavailableError("canonical Bot Chat target is unavailable")
         intent = dict(owner=owner, message=Path(dm_file).read_text(encoding="utf-8-sig"),
                       delivery_id=_dm_delivery_id(dm_file),
                       **({"author": author} if author else {}))
@@ -773,6 +778,9 @@ def _start_delivery(argv: list[str], content: str, label: str, *, stdin_file: bo
         try:
             record = _admit_live_dm(profile_home, dm_file, author)
         except LiveTargetUnavailableError as exc:
+            # Nothing was admitted (discovery precedes the intent): a definite no-send the
+            # sender can read, never the ambiguous "do not resend" state. Upstream
+            # 43faacfb8de7 tools/bot_mode_dm.py:632-636.
             return _settled_no_send(dm_file, exc)
         except Exception as exc:
             return json.dumps({"status": "ambiguous", "delivery_id": _dm_delivery_id(dm_file),
