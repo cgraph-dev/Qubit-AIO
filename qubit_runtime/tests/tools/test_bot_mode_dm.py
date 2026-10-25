@@ -257,12 +257,71 @@ def _runner_author(command):
     return json.loads(parts[marker + 2])
 
 
+class _FakeAuthority:
+    """The target profile's canonical ``bot_relay.deliver`` door: one admission per
+    envelope id, exact retries inspect it, a changed payload conflicts."""
+
+    def __init__(self):
+        self.calls = []
+        self.records = {}
+
+    def __call__(self, home, params):
+        from tools import bot_live_delivery as live
+
+        self.calls.append((Path(home).resolve(), dict(params)))
+        record = self.records.get(params["id"])
+        if record is None:
+            record = self.records[params["id"]] = dict(
+                status="queued", delivery_id=params["id"], profile_home=str(Path(home).resolve()),
+                session_id="local-bot", message=params["message"], admission_id="adm-" + params["id"][:8],
+                reply="")
+            with live._locked(home) as root:
+                live._write(root / f"{params['id']}.json", record)
+        elif record["message"] != params["message"]:
+            raise ValueError("admission_conflict")
+        return {k: record[k] for k in ("status", "delivery_id", "profile_home", "session_id", "reply")}
+
+    def settle(self, delivery_id, **outcome):
+        """The owner settles the admission and republishes its receipt file (what waiters poll)."""
+        from tools import bot_live_delivery as live
+
+        record = self.records[delivery_id]
+        record.update(outcome)
+        with live._locked(record["profile_home"]) as root:
+            live._write(root / f"{delivery_id}.json", record)
+
+
+def _canonical_target(monkeypatch, *targets):
+    """Every ``targets`` profile home has a ready authority; any other home has none.
+
+    A local Bot Chat delivery is admitted by the profile authority (the pinned contract:
+    no live authority is a typed ``runtime_unavailable`` refusal, never a CLI fallback), so
+    the hand-off/runner-shape tests install this stand-in before messaging a local target.
+    """
+    from tools import bot_live_delivery as live
+
+    homes = {t.resolve() for t in targets}
+
+    def owner_of(home):
+        home = Path(home).resolve()
+        if home not in homes:
+            return None
+        return dict(profile_home=str(home), session_id="local-bot", canonical=True,
+                    lease_id="authority-1", live_session_id="local-bot")
+
+    monkeypatch.setattr(live, "find_canonical_live_owner", owner_of)
+    authority = _FakeAuthority()
+    monkeypatch.setattr(live, "authority_delivery", authority)
+    return authority
+
+
 def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     calls = _capture_spawn(monkeypatch)
     # These assertions target the -p/turn-args shape; pin the entrypoint resolution
     # so the test stays hermetic across venvs that do/don't expose a sibling script.
     monkeypatch.setattr(bot_relay, "_qubit_cli", lambda: "hermes")
     home = _managed_home(tmp_path, teammates=("researcher",))
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     agent = _FakeAgent(home, title="Bot Chat")
 
     result = json.loads(
@@ -324,6 +383,7 @@ def test_cli_runner_ack_is_queued_with_the_runner_delivery_id(tmp_path, monkeypa
 
     calls = _capture_spawn(monkeypatch)
     home = _managed_home(tmp_path, teammates=("researcher",))
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     result = json.loads(bot_mode_dm.message_agent_tool(
         target="researcher", message="hi", agent=_FakeAgent(home, title="Bot Chat")))
 
@@ -367,6 +427,7 @@ def test_friendly_names_and_desktop_slugs_resolve_to_folder_ids(tmp_path, monkey
     _rename(home, "builder", display_name="Builder")
     expected = {"Scribe": "writer", "@scribe": "writer", "Dr. Foo": "foo", "dr-foo": "foo", "drfoo": "foo",
                 "Builder": "builder"}[target]
+    _canonical_target(monkeypatch, home / "profiles" / expected)
 
     result = json.loads(bot_mode_dm.message_agent_tool(target=target, message="ping", agent=_FakeAgent(home)))
 
@@ -393,6 +454,7 @@ def test_connection_qualified_target_reaches_the_relay_not_a_look_alike_local_bo
     bot_relay.write_remote_roster(home, [
         {"profile": "default", "handle": "hermes", "connection_id": "mini", "connection_label": "Mini"},
     ])
+    _canonical_target(monkeypatch, home / "profiles" / "ops")
 
     result = json.loads(bot_mode_dm.message_agent_tool(target=target, message="status?", agent=_FakeAgent(home)))
 
@@ -414,6 +476,7 @@ def test_ambiguous_friendly_name_fails_closed(tmp_path, monkeypatch):
     _rename(home, "aaa", display_name="Scribe")
     _rename(home, "bbb", display_name="Scribe")
     _rename(home, "ops", display_name="Hermes")
+    _canonical_target(monkeypatch, home)
 
     ambiguous = json.loads(bot_mode_dm.message_agent_tool(target="Scribe", message="ping", agent=_FakeAgent(home)))
     hijack = json.loads(bot_mode_dm.message_agent_tool(target="hermes", message="ping",
@@ -495,6 +558,7 @@ def test_delivery_pins_the_qubit_entrypoint_beside_this_interpreter(tmp_path, mo
 
     calls = _capture_spawn(monkeypatch)
     home = _managed_home(tmp_path, teammates=("researcher",), peers=("spark",))
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     agent = _FakeAgent(home, title="Bot Chat")
 
     result = json.loads(
@@ -522,6 +586,7 @@ def test_peer_delivery_author_carries_the_sender_hostname_and_local_stays_bare(t
     calls = _capture_spawn(monkeypatch)
     monkeypatch.setattr("socket.gethostname", lambda: " eri/mac\x00.local ")
     home = _managed_home(tmp_path, teammates=("researcher", "coder"), peers=("spark",))
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     agent = _FakeAgent(home / "profiles" / "coder", title="Bot Chat")
 
     assert json.loads(bot_mode_dm.message_agent_tool(target="spark", message="ping", agent=agent))["status"] == "queued"
@@ -539,6 +604,7 @@ def test_renamed_primary_signs_with_its_friendly_name_and_is_reachable_by_it(tmp
     calls = _capture_spawn(monkeypatch)
     monkeypatch.setattr(bot_relay, "_qubit_cli", lambda: "hermes")
     home = _managed_home(tmp_path, teammates=("coder",))
+    _canonical_target(monkeypatch, home, home / "profiles" / "coder")
     (home / "profile.yaml").write_text("display_name: Maia\n", encoding="utf-8")
 
     result = json.loads(bot_mode_dm.message_agent_tool(target="coder", message="hi", agent=_FakeAgent(home)))
@@ -566,6 +632,7 @@ def test_named_profile_sender_prefix(tmp_path, monkeypatch):
     calls = _capture_spawn(monkeypatch)
     home = _managed_home(tmp_path, teammates=("researcher", "coder"))
     profile_home = home / "profiles" / "coder"
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     agent = _FakeAgent(profile_home, title="Bot Chat")
 
     result = json.loads(
@@ -1044,7 +1111,6 @@ def test_cleanup_sweeps_stale_live_intents_and_keeps_fresh_ones(tmp_path, monkey
     assert fresh.exists()
 
 
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local _wait_live_dm reports ambiguous for a zero-budget pending receipt")
 def test_settled_live_wait_unlinks_the_intent_but_a_pending_one_keeps_it(tmp_path, monkeypatch, capsys):
     from tools import bot_live_delivery as live
 
@@ -1118,6 +1184,7 @@ def test_ack_names_poll_return_path_when_session_cannot_receive_completions(tmp_
         "output": "Background process started", "session_id": "proc_np1", "notify_on_complete": False,
         "notify_unsupported": "poll"}))
     home = _managed_home(tmp_path, teammates=("researcher",))
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     result = json.loads(bot_mode_dm.message_agent_tool(
         target="researcher", message="hi", agent=_FakeAgent(home, title="Bot Chat")))
 
@@ -1167,6 +1234,7 @@ def test_poll_reply_is_persisted_as_a_delivery_row_when_the_runner_exits(tmp_pat
 
     monkeypatch.setattr(terminal_tool_module, "terminal_tool", fake_terminal_tool)
     home = _managed_home(tmp_path, teammates=("researcher",))
+    _canonical_target(monkeypatch, home / "profiles" / "researcher")
     agent = _FakeAgent(home, title="Bot Chat")
     rows = []
     agent._session_db.append_message = lambda session_id, role, **kw: rows.append((session_id, role, kw)) or 1
@@ -1531,7 +1599,6 @@ def test_real_peer_delivery_command_round_trip(tmp_path):
     assert observed.read_text(encoding="utf-8") == "secret λ\nsecond line"
     assert not dm_file.exists()
 
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local bot_mode_dm falls through to the runner when authority lookup is unavailable")
 @pytest.mark.parametrize("lookup", ["not_ready", "no_owner"])
 def test_unavailable_authority_is_reported_never_worked_around(tmp_path, monkeypatch, lookup):
     """No canonical target, found BEFORE any intent is pinned: nothing was admitted, so the sender

@@ -1,5 +1,7 @@
 """Warning policy cannot change the identity or outcome of a Bot Chat handoff."""
 import json
+import time
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -30,6 +32,35 @@ def owner(tmp_path, monkeypatch):
         assert refusal is None
         leases.append(lease)
         return lease
+
+    # The pinned contract admits through the profile authority (discovery), which a hermetic
+    # test cannot start. Stand in the authority the registry used to advertise: a consumer
+    # lease is the live owner, and its deliver door writes the same durable mailbox receipt.
+    def _live_entry(home):
+        entry = mailbox.find_canonical_owner(home)
+        meta = (entry or {}).get("metadata") or {}
+        if not entry or meta.get("bot_live_delivery_consumer") is not True:
+            return None
+        return dict(profile_home=str(Path(home).resolve()), session_id=entry["session_id"],
+                    lease_id=entry["lease_id"], live_session_id=meta.get("live_session_id", ""),
+                    canonical=True)
+
+    class _Authority:
+        def __call__(self, home, params):
+            owner = _live_entry(home)
+            assert owner is not None
+            record = dict(id=params["id"], owner=owner, status="queued", delivery_id=params["id"],
+                          message=params["message"], reply="", notification_category="result",
+                          profile_home=str(Path(home).resolve()), session_id=owner["session_id"],
+                          created_at=time.time_ns(), sequence=1)
+            if params.get("notification_category"):
+                record["notification_category"] = params["notification_category"]
+            with mailbox._locked(home) as root:
+                mailbox._write(root / f"{params['id']}.json", record)
+            return dict(record)
+
+    monkeypatch.setattr(mailbox, "find_canonical_live_owner", _live_entry)
+    monkeypatch.setattr(mailbox, "authority_delivery", _Authority())
 
     yield tmp_path, acquire, run
     for lease in leases:
