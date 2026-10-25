@@ -154,9 +154,10 @@ class TestResolveProvider:
         # the hermetic conftest. Force-disable it so this test exercises
         # the specific "GitHub token alone shouldn't auto-pick copilot"
         # behavior, not the Bedrock fallback.
+        # The fork's resolver passes instance_metadata; accept the fork's kwarg.
         monkeypatch.setattr(
             "agent.bedrock_adapter.has_aws_credentials",
-            lambda env=None: False,
+            lambda env=None, **kwargs: False,
         )
         monkeypatch.setenv("GITHUB_TOKEN", "gh-test-token")
         with pytest.raises(AuthError, match="not connected to any AI provider"):
@@ -292,7 +293,8 @@ class TestRuntimeProviderResolution:
         assert result["api_mode"] == "codex_responses"
 
     def test_runtime_copilot_acp_uses_process_runtime(self, monkeypatch):
-        monkeypatch.setattr("qubit_cli.auth.shutil.which", lambda command: f"/usr/local/bin/{command}")
+                # The fork resolver passes path=; accept the fork's kwarg.
+        monkeypatch.setattr("qubit_cli.auth.shutil.which", lambda command, **kwargs: f"/usr/local/bin/{command}")
         monkeypatch.setenv("HERMES_COPILOT_ACP_ARGS", "--acp --stdio --debug")
 
         from qubit_cli.runtime_provider import resolve_runtime_provider
