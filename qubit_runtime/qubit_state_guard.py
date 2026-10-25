@@ -24,16 +24,26 @@ _STATE_DB_GUARD_BYPASS_ENV = "HERMES_STATE_DB_GUARD_BYPASS"
 
 
 def _real_platform_state_root() -> Optional[Path]:
-    """The REAL platform-default Qubit root. Avoids ``Path.home()`` /
-    ``qubit_constants`` (tests monkeypatch Path.home to a tempdir); ``expanduser``
-    reads HOME/passwd, which the conftest never rewrites."""
+    """The REAL platform-default Qubit root (canonical ``.qubit``). Avoids
+    ``Path.home()`` / ``qubit_constants`` (tests monkeypatch Path.home to a
+    tempdir); ``expanduser`` reads HOME/passwd, which the conftest never rewrites."""
+    return _platform_state_root_for(".qubit", "qubit")
+
+
+def _legacy_platform_state_root() -> Optional[Path]:
+    """The pre-rebrand platform default (``.hermes``), still accepted read-old and
+    therefore still a production root the test guard must refuse."""
+    return _platform_state_root_for(".hermes", "hermes")
+
+
+def _platform_state_root_for(dir_name: str, win_name: str) -> Optional[Path]:
     try:
         home = Path(os.path.expanduser("~"))
         if sys.platform == "win32":
             base = os.environ.get("LOCALAPPDATA", "").strip()
-            root = Path(base) / "hermes" if base else home / "AppData" / "Local" / "hermes"
+            root = Path(base) / win_name if base else home / "AppData" / "Local" / win_name
         else:
-            root = home / ".hermes"
+            root = home / dir_name
         return root.resolve()
     except Exception:
         return None

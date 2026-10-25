@@ -62,10 +62,15 @@ def _make_wal_db(path: Path) -> None:
     # connection exists, and the ro holder cannot checkpoint at all.
     # The committed row therefore lives only in the -wal file.
     holder = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    holder.execute("SELECT 1").fetchone()
+    holder.isolation_level = None
+    # An open read transaction (not a bare SELECT 1) is what pins the WAL:
+    # without it the writer's close checkpoints and unlinks the sidecar.
+    holder.execute("BEGIN")
+    holder.execute("SELECT * FROM t").fetchall()
     conn.execute("INSERT INTO t VALUES (42)")
     conn.commit()
     conn.close()
+    holder.execute("COMMIT")
     holder.close()
     assert path.with_name(path.name + "-wal").is_file(), (
         "fixture precondition: -wal sidecar must survive with pending frames"

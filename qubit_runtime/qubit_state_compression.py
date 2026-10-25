@@ -739,7 +739,11 @@ class SessionCompressionMixin:
                 "UPDATE session_turn_leases SET expires_at = ? "
                 "WHERE conversation_id = ? AND holder = ?", (expires_at, conversation_id, holder),
             ).rowcount > 0
-        return bool(self._execute_write(_do, patience_s=patience_s))
+        # Lease maintenance must ride out a sibling's long hold (#: routine writes use
+        # the 20s budget, which would hard-interrupt a healthy turn) unless a caller
+        # explicitly supplies a budget.
+        return bool(self._execute_write(
+            _do, patience_s=self._TURN_LEASE_WRITE_PATIENCE_S if patience_s is None else patience_s))
 
     def release_session_turn_lease(self, session_id: str, holder: str) -> None:
         """Release a turn lease iff ``holder`` still owns it; idempotent."""
