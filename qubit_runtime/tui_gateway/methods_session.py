@@ -2019,7 +2019,10 @@ def _(rid, params: dict, session: dict) -> dict:
 def _compute_host_ack_error(rid, ack: dict, code: int, default: str):
     """``_err`` for a ``control.error``/``error`` ack, else None."""
     if ack.get("type") in {"control.error", "error"}:
-        return _err(rid, code, str(ack.get("message") or default))
+        # The host forwards a typed refusal (e.g. 4131 export-cap) when it has one.
+        host_code = ack.get("code")
+        return _err(rid, host_code if isinstance(host_code, int) else code,
+                    str(ack.get("message") or default))
     return None
 
 
