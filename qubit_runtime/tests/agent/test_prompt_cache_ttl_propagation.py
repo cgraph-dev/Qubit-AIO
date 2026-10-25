@@ -31,8 +31,12 @@ class TestPlanCacheSectionsThreadsTtlAndPrefix:
     def test_cache_ttl_1h_reaches_markers(self):
         from agent.agent_runtime_helpers import plan_cache_sections_for_destination
 
+        # A replayable history: fork suppresses cache markers on one-shot requests
+        # (no tools, <=1 user turn, no assistant/tool turns), so include a prior turn.
         messages = [
             {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "answer"},
             {"role": "user", "content": "hello"},
         ]
         out_msgs, _ = plan_cache_sections_for_destination(
@@ -80,8 +84,12 @@ class TestPlanCacheSectionsThreadsTtlAndPrefix:
     def test_qwen_1h_clamped_to_5m(self):
         from agent.agent_runtime_helpers import plan_cache_sections_for_destination
 
+        # A replayable history: fork suppresses cache markers on one-shot requests
+        # (no tools, <=1 user turn, no assistant/tool turns), so include a prior turn.
         messages = [
             {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "answer"},
             {"role": "user", "content": "hello"},
         ]
         out_msgs, _ = plan_cache_sections_for_destination(
@@ -213,8 +221,12 @@ class TestAuxFallbackReplanThreadsTtl:
             "anthropic_messages",
             "claude-opus-4.8",
         )
+        # A replayable history: fork suppresses cache markers on one-shot requests
+        # (no tools, <=1 user turn, no assistant/tool turns), so include a prior turn.
         messages = [
             {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "answer"},
             {"role": "user", "content": "hello"},
         ]
         out_msgs, _ = auxiliary_client._replan_synchronous_cache_sections(
