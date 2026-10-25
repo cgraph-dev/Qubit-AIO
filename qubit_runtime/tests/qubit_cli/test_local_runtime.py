@@ -472,11 +472,11 @@ def test_boot_in_flight_real_gate(tmp_path, monkeypatch):
     -> True; either missing -> False."""
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
     from qubit_cli.local_runtime import endpoint as ep
-    monkeypatch.setattr("qubit_cli.local_runtime.binaries.installed_engine", lambda: None)
+    monkeypatch.setattr("qubit_cli.local_runtime.binaries.installed_engine", lambda *a, **k: None)
 
     enabled = {"local_runtime": {"enabled": True}}
     assert ep._boot_in_flight(enabled) is False
-    monkeypatch.setattr("qubit_cli.local_runtime.binaries.installed_engine", lambda: object())
+    monkeypatch.setattr("qubit_cli.local_runtime.binaries.installed_engine", lambda *a, **k: object())
     assert ep._boot_in_flight(enabled) is True
     # Disabled -> False even when installed.
     assert ep._boot_in_flight({"local_runtime": {"enabled": False}}) is False
@@ -999,8 +999,8 @@ def test_boot_prices_the_engine_it_serves(tmp_path, monkeypatch):
                         lambda: {"local_runtime": {"backend": "cpu"}})  # another profile's config
     priced: list = []
     monkeypatch.setattr(bootstrap, "_generate_presets",
-                        lambda mdir, path: priced.append(hardware._configured_engine()) or path)
-    monkeypatch.setattr(bootstrap, "_admitted_models_max", lambda mdir, configured: configured)
+                        lambda *a, **k: priced.append(hardware._configured_engine()) or path)
+    monkeypatch.setattr(bootstrap, "_admitted_models_max", lambda mdir, configured, *a, **k: configured)
 
     class _NoStart:
         def __init__(self, *a, **k):
