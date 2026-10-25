@@ -181,6 +181,9 @@ def test_guard_refusal_is_recorded_in_runtime_status_and_cleared_on_default(tmp_
     from gateway import status as gw_status
     from qubit_cli.gateway_multiplex_mode import MultiplexDecision, record_multiplex_decision
     monkeypatch.setattr(gw_status, "_get_runtime_status_path", lambda: tmp_path / "gateway_state.json")
+    # Only the runtime-lock owner writes the status file (a pre-lock write published a racing
+    # process as a live gateway); model the owner here.
+    monkeypatch.setattr(gw_status, "owns_gateway_runtime_lock", lambda: True)
     record_multiplex_decision(MultiplexDecision(False, "guard", "profile(s) 'coder' still run their own gateway"))
     assert "coder" in gw_status.read_runtime_status(tmp_path / "gateway_state.json")["multiplex_standalone_reason"]
     record_multiplex_decision(MultiplexDecision(True, "default", "unset; default applies"))
