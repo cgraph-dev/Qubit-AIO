@@ -78,8 +78,8 @@ def test_registered_as_a_home_step():
 
 class TestExposeCli:
     @posix_only
-    @pytest.mark.parametrize("hermes", ["missing", "foreign"])
-    def test_repair_only_preserves_missing_and_foreign_commands(self, fake_install, monkeypatch, hermes):
+    @pytest.mark.parametrize("cli", ["missing", "foreign"])
+    def test_repair_only_preserves_missing_and_foreign_commands(self, fake_install, monkeypatch, cli):
         home, root = fake_install
         monkeypatch.setattr("qubit_cli.config.load_config", lambda: pytest.fail("repair read config"))
         wrapper_dir = home / ".local" / "bin"
@@ -87,50 +87,48 @@ class TestExposeCli:
         assert _launchers.expose_cli(create=False) == {"ok": True, "written": []}
         assert not wrapper_dir.exists()
         assert not extra.exists()
-        assert {p.name for p in (root / ".hermes/bin").iterdir()} == set(_launchers.ENTRY_POINTS)
+        assert {p.name for p in (root / ".qubit/bin").iterdir()} == set(_launchers.ENTRY_POINTS)
 
-        # An owned ACP entry must be repaired even without an owned hermes
+        # An owned ACP entry must be repaired even without an owned qubit
         # sibling admitting this directory. Its old target is already gone.
         extra.mkdir()
-        dangling = root / "venv/bin/hermes-acp"
-        acp = extra / "hermes-acp"
+        dangling = root / "venv/bin/qubit-acp"
+        acp = extra / "qubit-acp"
         acp.symlink_to(dangling)
         assert not acp.exists() and acp.is_symlink()
         foreign = b"#!/bin/sh\n# user-owned caf\xc3\xa9 command\nexit 19\n"
-        if hermes == "foreign":
-            (extra / "hermes").write_bytes(foreign)
+        if cli == "foreign":
+            (extra / "qubit").write_bytes(foreign)
         wrapper_dir.mkdir(parents=True)
-        (wrapper_dir / "hermes").write_bytes(foreign)
-        foreign_link = wrapper_dir / "hermes-acp"
-        foreign_target = home / "other-install/hermes-acp"
+        (wrapper_dir / "qubit").write_bytes(foreign)
+        foreign_link = wrapper_dir / "qubit-acp"
+        foreign_target = home / "other-install/qubit-acp"
         foreign_link.symlink_to(foreign_target)
-        before = {path: path.lstat().st_mtime_ns for path in (wrapper_dir, wrapper_dir / "hermes", foreign_link)}
+        before = {path: path.lstat().st_mtime_ns for path in (wrapper_dir, wrapper_dir / "qubit", foreign_link)}
 
-        assert _launchers.expose_cli(create=False) == {"ok": True, "written": ["hermes-acp"]}
+        assert _launchers.expose_cli(create=False) == {"ok": True, "written": ["qubit-acp"]}
         assert acp.is_file() and not acp.is_symlink() and os.access(acp, os.X_OK)
         assert not dangling.exists()
-        assert not (extra / "hermes-agent").exists()
-        assert not (wrapper_dir / "hermes-agent").exists()
-        if hermes == "foreign":
-            assert (extra / "hermes").read_bytes() == foreign
+        if cli == "foreign":
+            assert (extra / "qubit").read_bytes() == foreign
         else:
-            assert not (extra / "hermes").exists()
-        assert (wrapper_dir / "hermes").read_bytes() == foreign
+            assert not (extra / "qubit").exists()
+        assert (wrapper_dir / "qubit").read_bytes() == foreign
         assert foreign_link.is_symlink() and foreign_link.readlink() == foreign_target
         assert before == {path: path.lstat().st_mtime_ns for path in before}
         assert _launchers.expose_cli(create=False) == {"ok": True, "written": []}
 
     @posix_only
-    def test_writes_all_three_wrappers_fresh(self, fake_install):
+    def test_writes_all_wrappers_fresh(self, fake_install):
         home, root = fake_install
         result = _launchers.expose_cli()
         assert result["ok"] is True
-        assert sorted(result["written"]) == ["hermes", "hermes-acp", "hermes-agent"]
-        for name in ("hermes", "hermes-agent", "hermes-acp"):
+        assert sorted(result["written"]) == ["qubit", "qubit-acp"]
+        for name in ("qubit", "qubit-acp"):
             wrapper = home / ".local" / "bin" / name
             body = wrapper.read_text(encoding="utf-8-sig")
             assert str(root) in body
-            assert str(root / ".hermes" / "bin") in body
+            assert str(root / ".qubit" / "bin") in body
             assert os.access(wrapper, os.X_OK)
 
 
@@ -141,13 +139,13 @@ class TestExposeCli:
         other = "/somewhere/else/checkout"
         wrapper_dir = home / ".local" / "bin"
         wrapper_dir.mkdir(parents=True)
-        foreign = f'#!/bin/sh\nexec "{other}/venv/bin/python" "{other}/hermes" "$@"\n'
-        (wrapper_dir / "hermes").write_text(foreign, encoding="utf-8")
+        foreign = f'#!/bin/sh\nexec "{other}/venv/bin/python" "{other}/qubit" "$@"\n'
+        (wrapper_dir / "qubit").write_text(foreign, encoding="utf-8")
         result = _launchers.expose_cli()
-        assert (wrapper_dir / "hermes").read_text(encoding="utf-8-sig") == foreign
-        assert "hermes" not in result["written"]
-        # The other two had no file at all — those ARE written.
-        assert sorted(result["written"]) == ["hermes-acp", "hermes-agent"]
+        assert (wrapper_dir / "qubit").read_text(encoding="utf-8-sig") == foreign
+        assert "qubit" not in result["written"]
+        # The ACP wrapper had no file at all — that one IS written.
+        assert sorted(result["written"]) == ["qubit-acp"]
 
     @posix_only
     def test_config_gate_disables(self, fake_install, monkeypatch):
@@ -215,15 +213,15 @@ class TestExposeCli:
         home, root = fake_install
         wrapper_dir = home / ".local" / "bin"
         wrapper_dir.mkdir(parents=True)
-        console_script = root / "venv" / "bin" / "hermes"
+        console_script = root / "venv" / "bin" / "qubit"
         console_script.write_text("# real console script\n", encoding="utf-8")
-        (wrapper_dir / "hermes").symlink_to(console_script)
+        (wrapper_dir / "qubit").symlink_to(console_script)
         result = _launchers.expose_cli()
-        assert "hermes" in result["written"]
+        assert "qubit" in result["written"]
         # The venv console script survives untouched…
         assert console_script.read_text(encoding="utf-8-sig") == "# real console script\n"
         # …and the link-dir entry is now a real file, not a symlink.
-        assert not (wrapper_dir / "hermes").is_symlink()
+        assert not (wrapper_dir / "qubit").is_symlink()
 
 
 @pytest.mark.platforms("macos")
