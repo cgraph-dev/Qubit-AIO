@@ -55,3 +55,9 @@ def nvidia_platform() -> NvidiaPlatform | None:
     return classify_nvidia_platform(
         os_family=facts.os_family(), native_arch=facts.native_arch(), cpu_model=facts.cpu_model(),
         gpu_class=facts.gpu_class(), nvidia_gpus=facts.nvidia_gpus())
+
+
+def is_nvidia_arm_soc() -> bool:
+    """True for an NVIDIA ARM SoC host (RTX Spark / DGX Spark): the setup facts use it to
+    label the machine kind. ``nvidia_platform`` holds the recognition rules."""
+    return nvidia_platform() in ("rtx_spark", "dgx_spark")

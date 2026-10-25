@@ -174,14 +174,19 @@ def _managed_web_search() -> bool:
 
 def _get_search_backend() -> str:
     """Backend for web_search: ``web.search_backend`` (strict, no probe) > ``web.backend`` > autodetect.
-    The managed Qubit route serves search from Perplexity (extract stays on Firecrawl); managed Firecrawl
-    is the per-call fallback, see ``_memoized_search``."""
-    return _configured_backend("search_backend") or ("perplexity" if _managed_web_search() else _get_backend())
+    The managed Qubit route (a ``nous`` pin or shared selection) serves search from Perplexity
+    (extract stays on Firecrawl); managed Firecrawl is the per-call fallback, see ``_memoized_search``."""
+    pin = _configured_backend("search_backend")
+    if pin and pin != NOUS_MANAGED_PROVIDER:
+        return pin
+    return "perplexity" if _managed_web_search() else _get_backend()
 
 
 def _get_extract_backend() -> str:
-    """Backend for web_extract: ``web.extract_backend`` (strict, no probe) > ``web.backend`` > autodetect."""
-    return _configured_backend("extract_backend") or _get_backend()
+    """Backend for web_extract: ``web.extract_backend`` (strict, no probe) > ``web.backend`` > autodetect.
+    A ``nous`` pin is managed Firecrawl; the client picks the gateway route for that capability."""
+    pin = _configured_backend("extract_backend")
+    return "firecrawl" if pin == NOUS_MANAGED_PROVIDER else pin or _get_backend()
 
 
 def _ddgs_package_importable() -> bool:

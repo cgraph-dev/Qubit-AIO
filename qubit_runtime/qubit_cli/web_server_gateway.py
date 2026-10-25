@@ -47,9 +47,14 @@ def _probe_gateway_health() -> tuple[bool, dict | None]:
     if not _GATEWAY_HEALTH_URL:
         return False, None
     base = re.sub(r"/health(/detailed)?$", "", _GATEWAY_HEALTH_URL.rstrip("/"))
+    import os as _os
+    auth_key = _os.environ.get("API_SERVER_KEY", "").strip()
     for path in (f"{base}/health/detailed", f"{base}/health"):
         try:
-            req = urllib.request.Request(path, method="GET")
+            # The key authenticates the detailed endpoint only; /health is public and must never
+            # receive it (an unauthenticated fallback would otherwise leak the credential).
+            headers = {"Authorization": f"Bearer {auth_key}"} if auth_key and path.endswith("/health/detailed") else {}
+            req = urllib.request.Request(path, method="GET", headers=headers)
             with urllib.request.urlopen(req, timeout=_GATEWAY_HEALTH_TIMEOUT) as resp:
                 if resp.status == 200:
                     return True, _read_dashboard_json_response(resp)

@@ -1,6 +1,6 @@
 """Each web capability picks its own route: the user's own key or the Nous Tool Gateway.
 
-"Use for Extract" on the Nous Subscription row must send extract through the gateway while search
+"Use for Extract" on the Qubit Subscription row must send extract through the gateway while search
 keeps the user's own Firecrawl key, and the toolset-level Nous pick must take both back. Before the
 fix the managed pick wrote "firecrawl", which reads as the BYOK key, so the gateway was unreachable
 per capability (#100513).
@@ -40,12 +40,12 @@ def test_web_capability_picks_choose_own_key_or_nous_gateway(client, monkeypatch
         return client.get("/api/tools/toolsets/web/config").json()
 
     put(provider="Firecrawl", capability="search")
-    data = put(provider="Nous Subscription", capability="extract")
+    data = put(provider="Qubit Subscription", capability="extract")
     assert (data["search_via_nous"], data["extract_via_nous"]) == (False, True)
     assert fc._get_firecrawl_client("search").kwargs["api_key"] == "fc-own-key"
     assert fc._get_firecrawl_client("extract").kwargs["api_key"] == "nous-tok"
 
-    data = put(provider="Nous Subscription")
+    data = put(provider="Qubit Subscription")
     web = load_config()["web"]
     assert not web.get("search_backend") and not web.get("extract_backend")
     assert (data["search_via_nous"], data["extract_via_nous"]) == (True, True)
