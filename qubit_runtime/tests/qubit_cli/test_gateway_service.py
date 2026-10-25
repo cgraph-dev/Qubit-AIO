@@ -1499,6 +1499,12 @@ class TestSystemUnitQubitHome:
             lambda run_as_user=None: ("alice", "alice", "/home/alice", 1001),
         )
         monkeypatch.setattr(gateway_cli, "_build_service_path_dirs", lambda: [])
+        # The caller is simulated as root; resolving the real store would read the
+        # host's /root/.qubit. Pin the interpreter instead (only the LD_LIBRARY_PATH
+        # remap is under test).
+        monkeypatch.setattr(gateway_cli, "get_python_path", lambda: "/root/venv/bin/python3")
+        from qubit_cli import _launchers as _launchers_mod
+        monkeypatch.setattr(_launchers_mod, "resolve_store_python", lambda *a, **k: None)
         monkeypatch.setenv("LD_LIBRARY_PATH", "/root/cuda/lib:/opt/cuda/lib64")
 
         unit = gateway_cli.generate_systemd_unit(system=True, run_as_user="alice")

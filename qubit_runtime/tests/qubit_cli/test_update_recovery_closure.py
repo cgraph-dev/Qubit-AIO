@@ -28,7 +28,7 @@ SOURCE = Path(__file__).resolve().parents[2]
 # What a minted launcher imports before the application entry.
 BOOT = ("qubit_bootstrap.py", "qubit_constants.py", "qubit_cli/__init__.py", "qubit_cli/_launchers.py",
         "qubit_cli/_early_recovery.py", "qubit_cli/_parser.py", "qubit_cli/runtime_state.py",
-        "qubit_cli/venv_sync.py", "qubit_cli/steward.py", "qubit_cli/stderr_timestamp.py",
+        "qubit_cli/venv_sync.py", "qubit_cli/steward.py", "qubit_cli/install_source.py", "qubit_cli/stderr_timestamp.py",
         "qubit_cli/update_lock.py", "qubit_cli/update_custody.py", "pm/environments.py",
         "pm/filesystem.py", "pm/paths.py")
 _HOLDER = ("import sys, time\nfrom pathlib import Path\nsys.path.insert(0, sys.argv[1])\n"

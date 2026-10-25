@@ -107,7 +107,7 @@ def test_rescue_retention_uses_real_refs(tmp_path, monkeypatch, mode):
 
 
 @pytest.mark.parametrize('fault,body,modules,message', [
-    ('syntax', '<<<<<<< Updated upstream\nVALUE = 2\n', (), 'made the Hermes agent unexecutable'),
+    ('syntax', '<<<<<<< Updated upstream\nVALUE = 2\n', (), 'made the Qubit agent unexecutable'),
     ('import', "raise RuntimeError('restored local failure')\n", ('consumer',), 'restored local failure'),
     ('preexisting', 'VALUE = 2\n', ('first',), None),
     ('later', "raise RuntimeError('restored later failure')\n", ('first', 'consumer'), 'restored later failure'),

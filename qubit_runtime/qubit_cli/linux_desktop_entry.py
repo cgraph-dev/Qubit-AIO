@@ -25,9 +25,10 @@ from typing import Callable, Mapping, Optional
 # Identity the packaged app claims for its window: electron-builder bakes product-identity.cjs's
 # `appId` into extraMetadata.desktopName, and Electron hands that string to the compositor
 # verbatim (Wayland app_id, CHROME_DESKTOP). GNOME links a window to a launcher by StartupWMClass
-# or by a `<app_id>.desktop` file name, so the entry has to carry the same id — under the old
-# "qubit.desktop" name a packaged launch matches neither rung and lands on the placeholder icon.
-APP_ID = "com.nousresearch.qubit"
+# or by a `<app_id>.desktop` file name, so the entry has to carry the same id. The build identity
+# keeps the historical ``hermes`` kebab so an installed app's OS registration/userData does not
+# move; the user-visible name is Qubit.
+APP_ID = "com.nousresearch.hermes"
 DESKTOP_ENTRY_NAME = f"{APP_ID}.desktop"
 
 # Entry name written before the app-id rename; a successful install converts it into a hidden
@@ -666,7 +667,7 @@ def _hicolor_subdir(dimensions: Optional[tuple[int, int]]) -> str:
 
 
 def _hicolor_icon_dest(subdir: str) -> Path:
-    return _xdg_data_home() / "icons" / "hicolor" / subdir / "apps" / "hermes.png"
+    return _xdg_data_home() / "icons" / "hicolor" / subdir / "apps" / "qubit.png"
 
 
 def _remove_stale_scalable_icon() -> bool:
@@ -830,7 +831,7 @@ def install_desktop_entry(project_root: Path) -> Optional[Path]:
     # Prefer the themed name: the icon is COPIED into the hicolor tree, so the entry outlives the
     # checkout (an absolute Icon= path breaks when the checkout moves). Absolute path only when
     # the copy is impossible (read-only tree); themed name when the checkout has no icon at all.
-    icon_value = str(icon) if icon.is_file() else "hermes"
+    icon_value = str(icon) if icon.is_file() else "qubit"
     if icon.is_file() and _install_icon_to_hicolor(icon):
         icon_value = "qubit"
     contents = render_desktop_entry(exec_command, icon_value)

@@ -97,8 +97,12 @@ def applicable_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, ..
     from packaging.requirements import Requirement
     from packaging.utils import canonicalize_name
 
+    # The application checkout supplies Qubit itself under either its distribution
+    # name (``qubit-agent``) or the bare product name. ``hermes-agent`` stays filtered
+    # as the pre-rebrand read-old alias.
+    own = {"qubit", "qubit-agent", "hermes-agent"}
     return tuple(spec for spec in specs
-                 if not (req := Requirement(spec)).url and canonicalize_name(req.name) != "hermes-agent")
+                 if not (req := Requirement(spec)).url and canonicalize_name(req.name) not in own)
 
 
 def unsupported_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, ...]:

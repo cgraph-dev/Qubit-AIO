@@ -767,7 +767,7 @@ _FS_LIST_ERRNO = (
 
 
 @router.get("/api/fs/list")
-async def fs_list(path: str, profile: Optional[str] = None):
+async def fs_list(path: str, request: Request = None, profile: Optional[str] = None):
     backend = await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
@@ -775,6 +775,7 @@ async def fs_list(path: str, profile: Optional[str] = None):
         except Exception as exc:
             _raise_fs_backend_error(exc)
     target = _agent_fs_path(path, profile_home=_fs_profile_home(profile))
+    _hosted_fs_read_guard(target, request)
     try:
         entries = []
         with os.scandir(target) as scan:
@@ -922,7 +923,8 @@ def _fs_profile_home(profile: Optional[str]) -> Optional[Path]:
 
 @router.get("/api/fs/read-data-url")
 async def fs_read_data_url(
-    path: str, profile: Optional[str] = None, session_id: Optional[str] = None,
+    path: str, request: Request = None, profile: Optional[str] = None,
+    session_id: Optional[str] = None,
 ):
     from qubit_cli.web_server import _FS_DATA_URL_MAX_BYTES
     backend = await asyncio.to_thread(_fs_backend, profile)
@@ -935,7 +937,9 @@ async def fs_read_data_url(
             _raise_fs_backend_error(exc)
         encoded = base64.b64encode(data).decode("ascii")
         return {"dataUrl": f"data:{_fs_mime_type(Path(target))};base64,{encoded}"}
-    target, st = _fs_regular_file(await _fs_download_path(path, profile, session_id), _fs_profile_home(profile))
+    target = await _fs_download_path(path, profile, session_id)
+    _hosted_fs_read_guard(target, request)
+    target, st = _fs_regular_file(target, _fs_profile_home(profile))
     if st.st_size > _FS_DATA_URL_MAX_BYTES:
         raise HTTPException(status_code=413, detail="File too large")
     encoded = await asyncio.to_thread(
@@ -946,7 +950,8 @@ async def fs_read_data_url(
 
 @router.get("/api/fs/download")
 async def fs_download(
-    path: str, profile: Optional[str] = None, session_id: Optional[str] = None,
+    path: str, request: Request = None, profile: Optional[str] = None,
+    session_id: Optional[str] = None,
 ):
     backend = await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
@@ -963,7 +968,9 @@ async def fs_download(
             media_type=_fs_mime_type(target_path),
             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
         )
-    target, _st = _fs_regular_file(await _fs_download_path(path, profile, session_id), _fs_profile_home(profile))
+    target = await _fs_download_path(path, profile, session_id)
+    _hosted_fs_read_guard(target, request)
+    target, _st = _fs_regular_file(target, _fs_profile_home(profile))
     await asyncio.to_thread(_refuse_live_database, target)
     return FileResponse(
         path=str(target),

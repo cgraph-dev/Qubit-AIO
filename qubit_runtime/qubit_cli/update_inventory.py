@@ -354,31 +354,41 @@ def print_update_plan(plan: UpdatePlan) -> None:
 
 
 def _serve_unit_matches_profile(profile: str, unit: object) -> bool:
-    """Does *unit* name a ``hermes-serve*``/``hermes-dashboard*`` unit for *profile*? (OWN vocabulary;
-    the gateway's ``hermes-gateway*`` names never cover serve/dashboard runtimes.)
+    """Does *unit* name a ``qubit-serve*``/``qubit-dashboard*`` unit for *profile*? (OWN vocabulary;
+    the gateway's ``qubit-gateway*`` names never cover serve/dashboard runtimes.)
 
-    Exact names only — ``work`` must not claim ``hermes-serve-workbench`` — and a scope prefix
-    (``user/hermes-serve``) is tolerated because the restart phase records scope-qualified identities in
-    some lists. See #100479.
+    Exact names only — ``work`` must not claim ``qubit-serve-workbench`` — and a scope prefix
+    (``user/qubit-serve``) is tolerated because the restart phase records scope-qualified identities in
+    some lists. Pre-rebrand ``hermes-*`` units remain recognised as read-old aliases. See #100479.
     """
     name = str(unit).removesuffix(".service").rsplit("/", 1)[-1]
     suffix = "" if profile == "default" else f"-{profile}"
-    return name in {f"hermes-serve{suffix}", f"hermes-dashboard{suffix}"}
+    return name in {
+        f"qubit-serve{suffix}", f"qubit-dashboard{suffix}",
+        f"hermes-serve{suffix}", f"hermes-dashboard{suffix}",
+    }
 
 
 def _gateway_service_matches_profile(profile: str, service: object) -> bool:
     """Match an exact gateway service/label (systemd/launchd/s6 shapes) to a profile.
 
-    Never substring-match: ``foo`` must not claim ``hermes-gateway-foobar.service``.
-    Launchd labels are ``ai.hermes.gateway`` / ``ai.hermes.gateway-<profile>`` — they do
-    not contain the substring ``hermes-gateway``, so a successful macOS kickstart must
-    still credit the planned default gateway. A scope prefix (``user/hermes-gateway``,
-    ``gui/501/ai.hermes.gateway``) is stripped the same way serve units are.
+    Never substring-match: ``foo`` must not claim ``qubit-gateway-foobar.service``.
+    Launchd labels are ``ai.qubit.gateway`` / ``ai.qubit.gateway-<profile>`` — they do
+    not contain the substring ``qubit-gateway``, so a successful macOS kickstart must
+    still credit the planned default gateway. A scope prefix (``user/qubit-gateway``,
+    ``gui/501/ai.qubit.gateway``) is stripped the same way serve units are. Pre-rebrand
+    ``hermes-*`` names stay accepted as read-old aliases.
     """
     name = str(service).removesuffix(".service").rsplit("/", 1)[-1]
     if profile == "default":
-        return name in {"hermes-gateway", "ai.hermes.gateway", "gateway", "gateway-default"}
-    return name in {f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}", f"gateway-{profile}"}
+        return name in {
+            "qubit-gateway", "ai.qubit.gateway", "hermes-gateway", "ai.hermes.gateway",
+            "gateway", "gateway-default",
+        }
+    return name in {
+        f"qubit-gateway-{profile}", f"ai.qubit.gateway-{profile}",
+        f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}", f"gateway-{profile}",
+    }
 
 
 def _gateway_named_in(r: RuntimeRecord, names: set) -> bool:

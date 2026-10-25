@@ -95,11 +95,11 @@ def installation_command(repo_root: Path, args=(), *, module: str = "qubit_cli.m
     if resolve_store_python(root) is None:
         return runtime_command(root, args, module=module, python=python, home=home)
     prefix = [] if module == "qubit_cli.main" else ["--run-module", module]
-    return [str(root / ".hermes" / "bin" / "hermes"), *prefix, *args]
+    return [str(root / ".qubit" / "bin" / "qubit"), *prefix, *args]
 
 #: Launcher command names — keep in lockstep with scripts/install.ps1
 #: Publish-UserCommand and qubit_cli/_install_repair.py.
-WINDOWS_BIN_LAUNCHERS = ("hermes", "hermes-acp")
+WINDOWS_BIN_LAUNCHERS = ("qubit", "qubit-acp")
 
 #: command name -> (entry module, callable) — mirrors pyproject.toml
 #: [project.scripts].
@@ -617,8 +617,8 @@ def _owns_launcher(target: Path, root: Path) -> bool:
         return True
     # The historical updater wrote ACP as a sibling-hermes forwarder. Adopt
     # it only when that sibling demonstrably belongs to this installation.
-    if target.name == "hermes-acp":
-        sibling = target.with_name("hermes")
+    if target.name in ("hermes-acp", "qubit-acp"):
+        sibling = target.with_name(target.name[:-4])
         return (tokens == ["exec", str(sibling), "acp", "$@"]
                 and _owns_launcher(sibling, root))
     return False
@@ -636,8 +636,9 @@ def _publish_conveniences(root: Path, out_dir: Path, names, *, create: bool = Tr
         if (not create or target.exists() or target.is_symlink()) and not _owns_launcher(target, root):
             continue
         before = target.lstat().st_mtime_ns if target.exists() or target.is_symlink() else None
-        command = ([str(root / ".hermes/bin/hermes"), "--run-module", "run_agent"]
-                   if name == "hermes-agent" else [str(root / ".hermes/bin" / name)])
+        command = ([str(root / ".qubit/bin/qubit"), "--run-module", "run_agent"]
+                   if name in ("qubit-agent", "hermes-agent")
+                   else [str(root / ".qubit/bin" / name)])
         if _write_shell(target, command) is None:
             raise OSError(f"could not publish launcher {target}")
         published[target] = before != target.lstat().st_mtime_ns
@@ -796,7 +797,7 @@ def _kept_shared_launcher(name: str, local: Path, store: Path, own: Path | None)
 def ensure_install_launchers(repo_root: Path, out_dir: Path) -> list[str]:
     """Publish exact-install commands; conveniences follow them across Python repins."""
     root = Path(repo_root).resolve()
-    local = root / ".hermes" / "bin"
+    local = root / ".qubit" / "bin"
     local.mkdir(parents=True, exist_ok=True)
     store = store_root(root)
     own = resolve_store_python(root)
@@ -872,7 +873,7 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
     if resolve_store_python(root, publication=True) is None:
         return {"ok": True, "skipped": "no-store-python"}
     try:
-        local = root / ".hermes" / "bin"
+        local = root / ".qubit" / "bin"
         if len(ensure_install_launchers(root, local)) != len(WINDOWS_BIN_LAUNCHERS):
             return {"ok": False, "error": "source launcher publication failed"}
         dirs = [Path.home() / ".local" / "bin"]
@@ -884,7 +885,7 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
                 dirs.append(directory)
         written = []
         for directory in dirs:
-            published = _publish_conveniences(root, directory, (*WINDOWS_BIN_LAUNCHERS, "hermes-agent"), create=create)
+            published = _publish_conveniences(root, directory, WINDOWS_BIN_LAUNCHERS, create=create)
             written.extend(path.name for path, changed in published.items() if changed)
         return {"ok": True, "written": written}
     except OSError as exc:

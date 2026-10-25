@@ -266,8 +266,15 @@ def _qubit_holder_subcommand(cmdline: str) -> str | None:
 
     def _is_entry(i: int, token: str) -> bool:
         low = token.lower().strip("\"'").replace("\\", "/")
-        return (low.endswith("qubit_cli.main") and i > 0 and tokens[i - 1] == "-m") or (
-            low.rsplit("/", 1)[-1] in ("hermes", "hermes.exe")) or low.endswith("qubit_cli/main.py")
+        # Canonical entry names first, then the pre-rebrand read-old aliases: an installed
+        # launcher may still be hermes(.exe) or the old hermes_cli/main.py path.
+        return (
+            (low.endswith("qubit_cli.main") and i > 0 and tokens[i - 1] == "-m")
+            or (low.endswith("hermes_cli.main") and i > 0 and tokens[i - 1] == "-m")
+            or low.rsplit("/", 1)[-1] in ("qubit", "qubit.exe", "hermes", "hermes.exe")
+            or low.endswith("qubit_cli/main.py")
+            or low.endswith("hermes_cli/main.py")
+        )
 
     entry_idx = next((i for i, token in enumerate(tokens) if _is_entry(i, token)), None)
     if entry_idx is None:
@@ -635,7 +642,9 @@ def _looks_like_desktop_control_plane(cmdline: str) -> bool:
     A cmdline whose subcommand cannot be determined is NOT a control plane — callers must not guess
     ownership. See #90778, #91869.
     """
-    return "qubit_cli.main" in (cmdline or "").lower() and _qubit_holder_subcommand(cmdline) in _BACKEND_PURPOSES
+    low = (cmdline or "").lower()
+    entry = "qubit_cli.main" in low or "hermes_cli.main" in low
+    return entry and _qubit_holder_subcommand(cmdline) in _BACKEND_PURPOSES
 
 
 def _desktop_owns_gateway_lifecycle() -> bool:

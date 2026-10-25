@@ -66,7 +66,7 @@ def _git_stdout(git_cmd, args, cwd, **kw) -> Optional[str]:
 def _prune_orphan_rescue_refs(
     git_cmd, cwd, branch, keep=_ORPHAN_RESCUE_REFS_TO_KEEP, max_age_days=_ORPHAN_RESCUE_REF_MAX_AGE_DAYS
 ) -> None:
-    """Expire old rescue refs (``refs/hermes-update-backups/<kind>-<branch>-<ts>-<sha>``).
+    """Expire old rescue refs (``refs/qubit-update-backups/<kind>-<branch>-<ts>-<sha>``).
 
     ``<kind>`` is ``orphan`` (no common ancestor), ``diverged`` (local commits on the target
     branch) or ``detached`` (commits made on a detached HEAD the update moved off). All are written

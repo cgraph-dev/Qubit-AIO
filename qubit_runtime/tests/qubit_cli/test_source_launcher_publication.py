@@ -255,9 +255,12 @@ def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeyp
     (out / "qubit-acp").write_text(
         '#!/usr/bin/env bash\n# Hermes Agent — ACP launcher (written by `qubit update`).\n'
         f'exec "{out}/qubit" acp "$@"\n', encoding="utf-8")
-    # Mentions this install only in a comment and runs another checkout's venv.
+    # Mentions this install only in a comment and runs another checkout's venv. It is an
+    # UNRELATED command sharing bin: writing it over ``qubit`` (an earlier port typo) would
+    # both forbid republishing that launcher and assert the foreign bytes survive, which the
+    # reachability contract below cannot satisfy at once.
     foreign = f'#!/bin/sh\n# user note about {repo}/venv/bin/qubit\nexec "{tmp_path}/other/venv/bin/qubit" "$@"\n'
-    (out / "qubit").write_text(foreign, encoding="utf-8")
+    (out / "unrelated-command").write_text(foreign, encoding="utf-8")
 
     result = _launchers.expose_cli()
     assert result["ok"], result
@@ -270,7 +273,7 @@ def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeyp
         assert receipt["value"] == "migrated"
         assert receipt["argv"] == ["quoted argument"]
         assert Path(receipt["exe"]).samefile(interpreter)
-    assert (out / "qubit").read_text(encoding="utf-8-sig") == foreign
+    assert (out / "unrelated-command").read_text(encoding="utf-8-sig") == foreign
     before = {p: p.stat().st_mtime_ns for p in out.iterdir()}
     assert _launchers.expose_cli()["written"] == []
     assert before == {p: p.stat().st_mtime_ns for p in out.iterdir()}
@@ -590,7 +593,6 @@ def _torn_by_a_killed_merge(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("surface", ["launcher", "runtime"])
-@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
 def test_a_merge_killed_writing_hermes_constants_is_repaired_by_the_next_launch(tmp_path, monkeypatch, surface):
     """C1 recovery reachability: the launcher reaches the repair before importing any other
     checkout module, so a torn ``qubit_constants.py`` is put back instead of killing every launch."""
@@ -651,7 +653,6 @@ def test_stage_launcher_ignores_an_inherited_runtime_directory(tmp_path, monkeyp
     assert "python-foreign" not in wrapper
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
 def test_service_launcher_binds_the_tree_store_despite_inherited_runtime_override(tmp_path, monkeypatch):
     from qubit_cli import gateway
 
@@ -706,7 +707,6 @@ def _record_store_python(store: Path, interpreter: Path) -> Path:
     return python
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
 def test_install_launchers_never_bind_a_fixture_store_under_scratch(tmp_path, monkeypatch):
     # #131745's layout: a process aimed at an e2e fixture home under the
     # install's own cache/scratch republishes the real install's launchers.
@@ -725,7 +725,6 @@ def test_install_launchers_never_bind_a_fixture_store_under_scratch(tmp_path, mo
         assert shlex.quote(str(own)) in wrapper
 
 
-@pytest.mark.xfail(strict=True, reason="wave-24 short-port: local launcher publishes the legacy .hermes layout / BOOT_FILES incomplete")
 def test_publication_uses_the_runtime_store_when_the_tree_records_none(tmp_path, monkeypatch):
     # The desktop source-backend contract keeps its store beside QUBIT_HOME
     # and names it through HERMES_RUNTIME_DIR. A tree with no store of its own
