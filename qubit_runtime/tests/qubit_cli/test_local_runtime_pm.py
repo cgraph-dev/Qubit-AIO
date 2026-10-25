@@ -9,8 +9,8 @@ from pm.lock import Lockfile
 
 
 @pytest.mark.parametrize("target,vendor,expected", [
-    ("linux-x64", "nvidia", "vulkan"),
-    ("linux-arm64", "nvidia", "vulkan"),
+    ("linux-x64", "nvidia", "cuda"),
+    ("linux-arm64", "nvidia", "cuda"),
     ("win32-arm64", "nvidia", "cuda"),
     ("win32-arm64", "AMD Radeon", "cpu"),
     ("win32-x64", "AMD Radeon", "vulkan"),
@@ -19,8 +19,10 @@ from pm.lock import Lockfile
 ])
 def test_auto_backend_uses_only_compatible_pins(target, vendor, expected):
     assert binaries.resolve_backend("auto", gpu_vendor=vendor, target=target) == expected
+    # Explicit choices stay strict: metal is never published for Linux targets
+    # (the fork's lock DOES pin cuda for linux, so cuda is a valid explicit pick).
     with pytest.raises(binaries.BinaryResolutionError):
-        binaries.resolve_backend("cuda", target="linux-x64")
+        binaries.resolve_backend("metal", target="linux-x64")
 
 
 def test_missing_pin_is_refused_instead_of_constructing_download_url(tmp_path, monkeypatch):
