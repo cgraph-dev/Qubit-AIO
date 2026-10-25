@@ -282,7 +282,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
             Path(get_qubit_home()),
             get_secret("A_ONLY_TOKEN"),
             get_secret("B_ONLY_TOKEN"),
-            get_secret("QUBIT_API_KEY"),
+            get_secret("HERMES_API_KEY"),
         ))
         return {"warning": ""}
 
@@ -308,7 +308,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
     assert invoke(None) == ""  # no warning — the switch resolved its credential
     _probe("b")  # activate multiplexing and freeze the launch profile's own secret scope
     with pytest.raises(UnscopedSecretError):
-        get_secret("QUBIT_API_KEY")
+        get_secret("HERMES_API_KEY")
     assert invoke(b) == ""
     assert invoke(None) == ""
 
@@ -317,7 +317,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
         (b, None, B_VAL, B_API_KEY),
         (root, A_VAL, None, A_API_KEY),
     ]
-    assert os.environ["QUBIT_API_KEY"] == A_API_KEY
+    assert os.environ["HERMES_API_KEY"] == A_API_KEY
     assert "B_ONLY_TOKEN" not in os.environ
 
 
@@ -338,7 +338,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
             Path(get_qubit_home()),
             get_secret("A_ONLY_TOKEN"),
             get_secret("B_ONLY_TOKEN"),
-            get_secret("QUBIT_API_KEY"),
+            get_secret("HERMES_API_KEY"),
         ))
         return {"warning": ""}
 
@@ -364,7 +364,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
     assert invoke(None) == ""  # no warning — the switch resolved its credential
     _probe("b")  # activate multiplexing and freeze the launch profile's own secret scope
     with pytest.raises(UnscopedSecretError):
-        get_secret("QUBIT_API_KEY")
+        get_secret("HERMES_API_KEY")
     assert invoke(b) == ""
     assert invoke(None) == ""
 
@@ -373,7 +373,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
         (b, None, B_VAL, B_API_KEY),
         (root, A_VAL, None, A_API_KEY),
     ]
-    assert os.environ["QUBIT_API_KEY"] == A_API_KEY
+    assert os.environ["HERMES_API_KEY"] == A_API_KEY
     assert "B_ONLY_TOKEN" not in os.environ
 
 
@@ -394,7 +394,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
             Path(get_qubit_home()),
             get_secret("A_ONLY_TOKEN"),
             get_secret("B_ONLY_TOKEN"),
-            get_secret("QUBIT_API_KEY"),
+            get_secret("HERMES_API_KEY"),
         ))
         return {"warning": ""}
 
@@ -420,7 +420,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
     assert invoke(None) == ""  # no warning — the switch resolved its credential
     _probe("b")  # activate multiplexing and freeze the launch profile's own secret scope
     with pytest.raises(UnscopedSecretError):
-        get_secret("QUBIT_API_KEY")
+        get_secret("HERMES_API_KEY")
     assert invoke(b) == ""
     assert invoke(None) == ""
 
@@ -429,7 +429,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
         (b, None, B_VAL, B_API_KEY),
         (root, A_VAL, None, A_API_KEY),
     ]
-    assert os.environ["QUBIT_API_KEY"] == A_API_KEY
+    assert os.environ["HERMES_API_KEY"] == A_API_KEY
     assert "B_ONLY_TOKEN" not in os.environ
 
 
