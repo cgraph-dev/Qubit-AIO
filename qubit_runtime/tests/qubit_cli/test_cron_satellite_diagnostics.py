@@ -17,7 +17,7 @@ def served_root(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_PROFILE", "probe")
     # Never read the real host rendezvous record of the developer's live gateway.
     (tmp_path / "locks").mkdir()
-    monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
     monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
     monkeypatch.setattr(jobs, "CRON_DIR", home / "cron")
@@ -96,6 +96,9 @@ def test_host_record_rung_names_the_roster_and_a_runnable_restart(served_root, c
     from gateway import host_rendezvous as hr
     from qubit_cli import cron
 
+    # A real gateway holds the host-role lock for its whole life; read_record requires that
+    # proven owner, so the fixture must model it before publishing.
+    hr.claim_host_lock(hr.ROLE_GATEWAY)
     hr.publish_record(hr.ROLE_GATEWAY, profiles=("default", "probe"))
 
     cron.cron_status()
@@ -161,7 +164,7 @@ def test_desktop_serve_ticker_is_not_reported_as_no_gateway(tmp_path, monkeypatc
     home.mkdir()
     (tmp_path / "locks").mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.delenv("QUBIT_PROFILE", raising=False)
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
     monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: home)
