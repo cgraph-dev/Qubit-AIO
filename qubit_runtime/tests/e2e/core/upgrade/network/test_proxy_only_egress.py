@@ -34,7 +34,7 @@ pytestmark = [
     pytest.mark.skipif(I.real_uv() is None, reason="uv required"),
 ]
 
-GIT_PATH = "/NousResearch/qubit.git/"
+GIT_PATH = "/NousResearch/hermes-agent.git/"
 
 
 @pytest.fixture(scope="module")
@@ -57,7 +57,6 @@ def _assert_updated_through_proxy(inst: S.Installed, r: S.Result, new: str) -> N
     assert v.rc == 0 and I.TRACEBACK not in v.out, "`qubit --version` broken after the update\n" + I.describe(v.cp)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_update_through_tls_inspecting_proxy_lands_on_the_new_commit(inst):
     """Corporate root installed in the OS trust store, HTTPS_PROXY set, direct egress impossible."""
     new = inst.publish("tls-inspecting")
@@ -69,7 +68,6 @@ def test_update_through_tls_inspecting_proxy_lands_on_the_new_commit(inst):
     _assert_updated_through_proxy(inst, r, new)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_update_through_authenticating_proxy_and_credentials_stay_private(inst):
     """The proxy answers 407 without ``Proxy-Authorization``; the user's HTTPS_PROXY carries
     ``user:password@``. The update must authenticate everywhere and never print the password."""
@@ -83,7 +81,6 @@ def test_update_through_authenticating_proxy_and_credentials_stay_private(inst):
     assert "pr0xy-s3cret-e2e" not in r.out, "the proxy password was printed by the updater\n" + r.report(inst)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_update_with_corporate_root_only_in_ssl_cert_file(inst):
     """The corporate root is NOT in the OS store; the user points ``SSL_CERT_FILE`` at a bundle
     that has it (the usual workaround on machines they don't administer). Every TLS client the
@@ -99,7 +96,7 @@ def test_update_with_corporate_root_only_in_ssl_cert_file(inst):
     _assert_updated_through_proxy(inst, r, new)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
+@pytest.mark.xfail(strict=True, reason="wave-25 short-port: the fork deliberately falls back to the git branch when the main channel host is unreachable (qubit_cli/source_releases.py:188-195), so the update succeeds; the upstream test expects the channel cut to fail fast with no fall-through")
 def test_tunnel_cut_to_channel_host_fails_fast_and_changes_nothing(inst):
     """The #124022 symptom made deterministic: the proxy accepts the CONNECT to the release
     host and hangs up before TLS (``UNEXPECTED_EOF``). The update must stop, say the channel
@@ -118,7 +115,6 @@ def test_tunnel_cut_to_channel_host_fails_fast_and_changes_nothing(inst):
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_tunnel_cut_to_the_git_host_fails_fast_and_changes_nothing(inst):
     """The #124022 symptom made deterministic: the proxy accepts the CONNECT to github.com and
     hangs up before TLS (``UNEXPECTED_EOF``). The update must stop within bounds, change
@@ -127,7 +123,7 @@ def test_tunnel_cut_to_the_git_host_fails_fast_and_changes_nothing(inst):
     before = inst.state()
     edge = inst.edge(eof_hosts=["github.com"])
     try:
-        r = inst.hermes("update", "--yes", edge=edge, timeout=300)
+        r = inst.qubit("update", "--yes", edge=edge, timeout=300)
     finally:
         edge.close()
     assert r.secs < 60, f"a cut tunnel took {r.secs:.0f}s to fail\n" + r.report(inst)
