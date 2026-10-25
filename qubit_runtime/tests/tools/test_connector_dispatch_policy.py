@@ -31,7 +31,7 @@ def test_remote_entries_run_request_hook_and_execution_policies(monkeypatch, blo
         events.append(("hook", name))
         assert args == {"body": "request-rewrite"}
         assert kw["middleware_trace"] == [{"source": "test-policy"}]
-        assert kw["tool_call_id"] == "policy-call"
+        assert kw["tool_call_id"].startswith("policy-call")  # per-entry "#<position>" suffix
         if name == denied and blocked_by == "hook":
             return "hook denied", None
         return None, {"body": "hook-rewrite"}
@@ -50,6 +50,9 @@ def test_remote_entries_run_request_hook_and_execution_policies(monkeypatch, blo
     monkeypatch.setattr(plugins, "_dispatch_pre_tool_call_hooks", hook)
 
     class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
         def execute(self, planned):
             wire.extend(planned)
             return [{"data": "remote-ok", "error": None} for _ in planned]
@@ -89,6 +92,9 @@ def test_stop_during_a_connector_batch_leaves_unstarted_entries_unsent(monkeypat
     wire = []
 
     class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
         def execute(self, planned):
             wire.extend(planned)
             set_interrupt(True)  # /stop lands while the first entry is on the wire.

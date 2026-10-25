@@ -28,6 +28,9 @@ def test_connector_scope_controls_schema_discovery_and_execution(monkeypatch, en
     name = "connectors__gmail__SEND_EMAIL"
 
     class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
         def search(self, queries):
             remote.append("search")
             return {"results": [{"tools": ["GMAIL_SEND_EMAIL"]}], "schemas": {

@@ -239,9 +239,10 @@ def build_write_denied_prefixes(home: str) -> list[str]:
 
 
 def get_safe_write_roots() -> set[str]:
-    """Resolved HERMES_WRITE_SAFE_ROOT paths (``os.pathsep``-separated list)."""
+    """Resolved QUBIT_WRITE_SAFE_ROOT (read-old HERMES_WRITE_SAFE_ROOT) paths."""
     roots: set[str] = set()
-    for path in filter(None, os.getenv("HERMES_WRITE_SAFE_ROOT", "").split(os.pathsep)):
+    raw = os.getenv("QUBIT_WRITE_SAFE_ROOT") or os.getenv("HERMES_WRITE_SAFE_ROOT", "")
+    for path in filter(None, raw.split(os.pathsep)):
         with suppress(OSError, ValueError):
             roots.add(os.path.realpath(os.path.expanduser(path)))
     return roots
@@ -335,7 +336,7 @@ def get_write_denied_error(path: str, *, verb: str = "Write", entry: bool = Fals
     if denial == "safe_root":
         roots_display = os.pathsep.join(sorted(get_safe_write_roots()))
         return (
-            f"{verb} denied: '{path}' is outside HERMES_WRITE_SAFE_ROOT "
+            f"{verb} denied: '{path}' is outside QUBIT_WRITE_SAFE_ROOT (HERMES_WRITE_SAFE_ROOT) "
             f"({roots_display}). Unset the variable or add this path's directory prefix."
         )
     if denial == "nt_namespace":

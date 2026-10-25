@@ -667,8 +667,8 @@ class TestValidateCronBaseUrl:
     def test_named_custom_matching_host_allowed(self, monkeypatch):
         self._patch_named_legit(monkeypatch)
         assert self._v("custom:legit", "https://legit.example/v1") is None
-        # subdomain of the configured host is still the provider's own endpoint
-        assert self._v("custom:legit", "https://eu.legit.example/v1") is None
+        # Same-origin only: a subdomain is a different host and is now refused.
+        assert self._v("custom:legit", "https://eu.legit.example/v1") is not None
 
     def test_named_custom_lookalike_host_blocked(self, monkeypatch):
         self._patch_named_legit(monkeypatch)

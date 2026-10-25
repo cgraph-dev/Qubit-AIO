@@ -463,7 +463,8 @@ class TestCacheDirectoryMounts:
         paste.write_text("pasted body", encoding="utf-8")
 
         mounts = get_cache_directory_mounts()
-        assert "/root/.qubit/composer-pastes" in {m["container_path"] for m in mounts}
+        # The container bind target is the fixed /root/.hermes anchor (not the host home name).
+        assert "/root/.hermes/composer-pastes" in {m["container_path"] for m in mounts}
 
         synced = {Path(host) for host, _ in iter_sync_files("~/.qubit")}
         assert paste in synced
@@ -565,8 +566,8 @@ class TestToAgentVisiblePathPerBackend:
         staged = link_home / "attachments" / "paste.txt"
         staged.write_text("x", encoding="utf-8")
         from tools.credential_files import to_agent_visible_cache_path
-        assert to_agent_visible_cache_path(str(staged.resolve())) == "/root/.qubit/attachments/paste.txt"
-        assert to_agent_visible_cache_path(str(staged)) == "/root/.qubit/attachments/paste.txt"
+        assert to_agent_visible_cache_path(str(staged.resolve())) == "/root/.hermes/attachments/paste.txt"
+        assert to_agent_visible_cache_path(str(staged)) == "/root/.hermes/attachments/paste.txt"
         # A sibling outside the mounted dirs still passes through.
         outside = real_home / "notes.txt"
         assert to_agent_visible_cache_path(str(outside)) == str(outside)
