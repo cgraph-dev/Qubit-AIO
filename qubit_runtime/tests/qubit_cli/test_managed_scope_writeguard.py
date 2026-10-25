@@ -124,7 +124,7 @@ def test_api_env_write_of_locked_key_is_refused_and_writes_nothing(pinned_env, m
     from qubit_cli.web_server import _SESSION_TOKEN, app
 
     if lock == "install":
-        monkeypatch.setenv("QUBIT_MANAGED", "nixos")
+        monkeypatch.setenv("HERMES_MANAGED", "nixos")
     home, before = pinned_env
     body = {"key": "DEEPSEEK_API_KEY", **({"value": NEW_KEY} if method == "PUT" else {})}
     resp = TestClient(app).request(method, "/api/env", json=body, headers={"X-Hermes-Session-Token": _SESSION_TOKEN})
@@ -174,7 +174,7 @@ def test_disconnect_on_a_package_managed_install_still_clears_the_auth_store(ant
     import json
 
     home, _managed, _reload = anthropic_homes
-    monkeypatch.setenv("QUBIT_MANAGED", "nixos")
+    monkeypatch.setenv("HERMES_MANAGED", "nixos")
     resp = _disconnect("anthropic")
     assert resp.get("result", {}).get("disconnected") is True, resp
     assert "anthropic" not in json.loads((home / "auth.json").read_text(encoding="utf-8"))["credential_pool"]
