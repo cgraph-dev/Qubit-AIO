@@ -551,7 +551,10 @@ def test_auto_multiplex_migration_false_opts_out_of_the_update_hook_but_not_the_
         "model:\n  default: x\ngateway:\n  auto_multiplex_migration: false\n", encoding="utf-8")
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-    assert exc.value.code == 0
+    # The CLI surface is a read-only plan + the operator-owned refusal; the operator console's
+    # engine (apply_migration) is what performs the mutating step.
+    assert exc.value.code == 3
+    assert gm.apply_migration(gm.build_migration_plan(), served_wait=0.1) is True
     assert _config_flag(fleet.root) is True and not (fleet.root / gm.MANIFEST_NAME).exists()
 
 
@@ -576,7 +579,8 @@ def test_explicit_migrate_with_no_standalone_secondaries_still_flips_flag_and_re
         real_wait(home, exp, t))[1])
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-    assert exc.value.code == 0
+    assert exc.value.code == 3
+    assert gm.apply_migration(gm.build_migration_plan(), served_wait=0.1) is True
     manifest = seen["m"]
     assert fleet.services.pop("default-detached") is True
     assert _config_flag(fleet.root) is True
@@ -851,7 +855,8 @@ def test_migrate_leaves_exactly_one_host_unit_serving_every_profile_and_is_idemp
     assert len(fleet.services) == 3  # default + the two per-profile units
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-    assert exc.value.code == 0
+    assert exc.value.code == 3
+    assert gm.apply_migration(gm.build_migration_plan(), served_wait=0.1) is True
     assert fleet.services == {"default": ("systemd", False)}
     assert fleet.pids == {}
     served = json.loads((fleet.root / "gateway_state.json").read_text(encoding="utf-8"))["served_profiles"]
@@ -885,7 +890,8 @@ def test_half_migrated_host_converges_on_a_re_run(fleet, capsys):
 
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-    assert exc.value.code == 0
+    assert exc.value.code == 3
+    assert gm.apply_migration(gm.build_migration_plan(), served_wait=0.1) is True
     assert fleet.services == {"default": ("systemd", False)} and fleet.pids == {}
     out = capsys.readouterr().out
     assert "Half-migrated host" in out and "serves 3 profiles" in out
@@ -902,7 +908,8 @@ def test_migrate_enables_the_survivor_before_it_removes_anything(fleet, capsys):
 
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-    assert exc.value.code == 0
+    assert exc.value.code == 3
+    assert gm.apply_migration(gm.build_migration_plan(), served_wait=0.1) is True
 
     first_removal = min(i for i, op in enumerate(fleet.ops) if op[1] in ("stop", "uninstall"))
     assert fleet.ops.index(("default", "enable")) < first_removal
@@ -928,8 +935,8 @@ def test_migrate_refuses_when_the_survivor_cannot_be_enabled(fleet, monkeypatch,
 
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-
-    assert exc.value.code == 1
+    assert exc.value.code == 3
+    assert gm.apply_migration(gm.build_migration_plan(), served_wait=0.1) is False
     assert not any(op[1] in ("stop", "uninstall") for op in fleet.ops), "refusal must precede every removal"
     assert fleet.pids == {"coder": 4101, "ops": 4102} and _config_flag(fleet.root) is None
     assert not gm._manifest_path(fleet.root).exists()
