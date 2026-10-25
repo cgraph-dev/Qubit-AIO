@@ -168,9 +168,10 @@ def test_only_operator_workspaces_and_listed_directories_are_trusted(tmp_path, m
         assert shell_linted(sibling) == 0
     finally:
         clear_session_vars(tokens)
-    monkeypatch.setenv("QUBIT_KANBAN_TASK", "t_1")
+    # HERMES_KANBAN_TASK is the producer's spelling (kanban_db_dispatch.py); QUBIT_KANBAN_TASK is a stale rebrand.
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_1")
     assert shell_linted(sibling) == 0
-    monkeypatch.delenv("QUBIT_KANBAN_TASK")
+    monkeypatch.delenv("HERMES_KANBAN_TASK")
     # ...and never $HOME: a dotfiles repo there would trust every directory below it.
     monkeypatch.setenv("HOME", str(sibling))
     monkeypatch.setenv("USERPROFILE", str(sibling))
