@@ -992,7 +992,8 @@ def test_spawn_qubit_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path)
     _web_server_gateway._spawn_qubit_action(["gateway", "restart"], "gateway-restart")
 
     assert "_QUBIT_GATEWAY" not in captured["env"]
-    assert captured["env"]["QUBIT_NONINTERACTIVE"] == "1"
+    # HERMES_* env vars are deliberately not renamed in the fork (brand §2).
+    assert captured["env"]["HERMES_NONINTERACTIVE"] == "1"
     # Default-profile actions preserve the historical process environment.
     assert captured["env"]["OPENAI_API_KEY"] == "default-action-provider-key"
 
@@ -1048,7 +1049,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
         "ZAI_API_KEY": "default-zai",
         "A2A_AUTH_MINI": "default-a2a-auth",
         "EXTERNAL_PROFILE_AUTH": "default-secret-source-auth",
-        "QUBIT_ACP_AUTH_METHOD": "default-acp",
+        "HERMES_ACP_AUTH_METHOD": "default-acp",
         "PROFILE_ENV_TEST_BENIGN": "keep-me",
     }.items():
         monkeypatch.setenv(key, value)
@@ -1080,12 +1081,12 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     child_env = captured["env"]
     assert captured["cmd"][-4:] == ["-p", "verifier", "gateway", "restart"]
     assert child_env["QUBIT_HOME"] == str(target_home)
-    assert child_env["QUBIT_NONINTERACTIVE"] == "1"
+    assert child_env["HERMES_NONINTERACTIVE"] == "1"
     assert child_env["PROFILE_ENV_TEST_BENIGN"] == "keep-me"
     for leaked_key in (
         "DISCORD_BOT_TOKEN", "API_SERVER_ENABLED", "API_SERVER_KEY", "BLUEBUBBLES_SERVER_URL",
         "BLUEBUBBLES_PASSWORD", "NTFY_TOPIC", "NTFY_TOKEN", "OPENAI_API_KEY", "ZAI_API_KEY",
-        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "QUBIT_ACP_AUTH_METHOD",
+        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "HERMES_ACP_AUTH_METHOD",
     ):
         assert leaked_key not in child_env, leaked_key
 
@@ -1142,8 +1143,9 @@ def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
         def terminate(self):
             calls.append("terminate")
 
-    monkeypatch.setenv("QUBIT_DESKTOP", "1")
-    monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    # is_desktop_owned_backend reads the HERMES_ spellings (not renamed in the fork).
+    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
     monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
     monkeypatch.setitem(_web_server_gateway._ACTION_PROCS, "gateway-restart", _FakeRunningProc())
@@ -1170,8 +1172,9 @@ def test_desktop_lifespan_reaps_orphans_with_a_startup_grace(monkeypatch):
         seen["min_age_s"] = min_age_s
         return False
 
-    monkeypatch.setenv("QUBIT_DESKTOP", "1")
-    monkeypatch.setenv("QUBIT_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
+    # is_desktop_owned_backend reads the HERMES_ spellings (not renamed in the fork).
+    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-spawn-token")
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
     monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
     monkeypatch.setattr("qubit_cli.gateway._reap_unsupervised_gateway_orphans", _fake_reap)

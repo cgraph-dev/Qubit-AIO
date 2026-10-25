@@ -160,7 +160,9 @@ async def list_skills_hub_sources(profile: Optional[str] = None):
             # GitHub exposes a rate-limit flag; the index an availability flag.
             if sid == "github":
                 entry["rate_limited"] = _flag(src, "is_rate_limited")
-            if sid == "hermes-index":
+            # Accept the legacy upstream id and the rebranded one (the source module and
+            # third-party hubs still advertise either spelling).
+            if sid in ("hermes-index", "qubit-index"):
                 index_available = _flag(src, "is_available")
                 entry["available"] = index_available
                 # Empty-query search on the index returns featured/popular skills.
