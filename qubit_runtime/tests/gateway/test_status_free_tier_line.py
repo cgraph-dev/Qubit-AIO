@@ -1,4 +1,9 @@
-"""The in-chat /status line identifies an active Nous free-tier route."""
+"""The in-chat /status line identifies an active Nous free-tier route.
+
+Post-freeze suite (absent at pin 43faacf): the fork's route needs ``free_inference_active`` — a
+welcome-trial claim read on the desktop's local backend — so the seeded identity carries the claim
+and the process looks like the desktop backend. The line's visibility contract is unchanged.
+"""
 
 import base64
 import json
@@ -12,6 +17,7 @@ from gateway.session import SessionEntry, build_session_key
 from qubit_cli import anon_auth
 from qubit_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
 from tests.gateway.test_status_command import _make_event, _make_runner, _make_source
+from tests.qubit_cli.anon_portal import as_local_desktop_backend
 
 def _runner():
     source = _make_source()
@@ -54,6 +60,7 @@ def _free_tier_state() -> dict:
         "access_token": _jwt(),
         "expires_at": "2999-01-01T00:00:00+00:00",
         "inference_base_url": "https://welcome-api.nousresearch.com/v1",
+        anon_auth.WELCOME_CLAIM_FLAG: True,
     }
 
 def _account_state() -> dict:
@@ -68,6 +75,7 @@ def _account_state() -> dict:
 def isolated_auth_store(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    as_local_desktop_backend(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_status_names_the_free_tier_and_the_slash_command_when_the_free_tier_carries_inference(
