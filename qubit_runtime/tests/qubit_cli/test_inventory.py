@@ -179,10 +179,12 @@ def test_include_unconfigured_appends_canonical_skeletons():
         payload = build_models_payload(ctx, include_unconfigured=True)
     # All canonical providers other than openrouter should appear as
     # skeleton rows. MoA is virtual/opt-in and excluded from unconfigured.
-    from qubit_cli.models import CANONICAL_PROVIDERS
+    from qubit_cli.models_catalog_static import listed_canonical_providers
 
     seen_slugs = {r["slug"] for r in payload["providers"]}
-    for entry in CANONICAL_PROVIDERS:
+    # Listed canonical set: pre-release profiles the user has not opted into are
+    # deliberately hidden from provider lists (solstice invariant).
+    for entry in listed_canonical_providers():
         if entry.slug == "moa":
             continue  # virtual; only shown when explicitly configured
         assert entry.slug in seen_slugs, f"missing {entry.slug}"
@@ -423,7 +425,7 @@ def test_canonical_order_with_unconfigured_preserves_full_universe():
     custom rows trailing. MoA is excluded from unconfigured skeletons
     (virtual, opt-in only — issue #63353).
     """
-    from qubit_cli.models import CANONICAL_PROVIDERS
+    from qubit_cli.models_catalog_static import listed_canonical_providers
 
     rows = [
         {"slug": "custom:Ollama", "name": "Ollama", "models": [],
@@ -439,13 +441,12 @@ def test_canonical_order_with_unconfigured_preserves_full_universe():
             canonical_order=True,
         )
     slugs = [r["slug"] for r in payload["providers"]]
-    # First row: first canonical provider in declaration order.
-    assert slugs[0] == CANONICAL_PROVIDERS[0].slug
+    # First row: first LISTED canonical provider in declaration order.
+    listed = listed_canonical_providers()
+    assert slugs[0] == listed[0].slug
     # Custom row trails all visible canonical rows. MoA is virtual/opt-in
     # so it is excluded from the unconfigured skeleton set.
-    visible_canonical_count = sum(
-        1 for e in CANONICAL_PROVIDERS if e.slug != "moa"
-    )
+    visible_canonical_count = sum(1 for e in listed if e.slug != "moa")
     assert slugs.index("custom:Ollama") >= visible_canonical_count
 
 
@@ -736,14 +737,16 @@ def test_picker_metadata_uses_one_config_read_for_real_models_dev_lookups(tmp_pa
     assert snapshot_result == baseline
 
     def _rows(model_ids):
+        # A routing aggregator: only those get a featured shortlist (user-defined rows are
+        # explicit allow-lists now).
         return [{
-            "slug": "custom:lab",
-            "name": "Lab",
+            "slug": "openrouter",
+            "name": "OpenRouter",
             "models": model_ids,
             "total_models": len(model_ids),
             "is_current": False,
-            "is_user_defined": True,
-            "source": "user-config",
+            "is_user_defined": False,
+            "source": "built-in",
         }]
 
     def _build_and_count(model_ids):
