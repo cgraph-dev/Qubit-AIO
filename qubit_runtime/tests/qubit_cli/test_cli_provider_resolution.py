@@ -286,7 +286,10 @@ def test_runtime_resolution_failure_is_not_sticky(monkeypatch):
 
     monkeypatch.setattr("qubit_cli.runtime_provider.resolve_runtime_provider", _runtime_resolve)
     monkeypatch.setattr("qubit_cli.runtime_provider.format_runtime_provider_error", lambda exc: str(exc))
-    monkeypatch.setattr("run_agent.AIAgent", _DummyAgent)
+    # The fork routes CLI turns through GatewayAgent and opens a gateway session before
+    # constructing it; stub both so this stays a credential-resolution test.
+    monkeypatch.setattr("qubit_cli.gateway_agent.GatewayAgent", _DummyAgent)
+    monkeypatch.setattr(cli.QubitCLI, "_ensure_gateway_session", lambda self: None)
 
     shell = cli.HermesCLI(model="gpt-5", compact=True, max_turns=1)
 
