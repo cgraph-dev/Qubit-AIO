@@ -147,7 +147,10 @@ def _claim_receipt(path: Path) -> Path | None:
 
 
 def _stale(receipt: dict) -> bool:
-    return time.time() - receipt["finished_at"] > MAX_RECEIPT_AGE_SECONDS
+    """Age on the store's clock (``_utc_now``), so a simulated/test clock is honoured."""
+    from .shared_metrics import _utc_now
+
+    return _utc_now().timestamp() - receipt["finished_at"] > MAX_RECEIPT_AGE_SECONDS
 
 
 def report_pending_installs(home: Path) -> None:

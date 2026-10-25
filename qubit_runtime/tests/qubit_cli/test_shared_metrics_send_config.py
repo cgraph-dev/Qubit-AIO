@@ -24,8 +24,10 @@ class TestDefaults:
         assert shared["send"] is False
 
     def test_default_endpoint_is_production(self):
+        """Fork contract: the shipped config leaves the endpoint empty and the runtime resolves
+        DEFAULT_ENDPOINT internally (see config_defaults' shared_metrics comment)."""
         shared = DEFAULT_CONFIG["telemetry"]["shared_metrics"]
-        assert shared["endpoint"] == DEFAULT_ENDPOINT
+        assert shared["endpoint"] == ""
         assert DEFAULT_ENDPOINT.startswith("https://")
 
     def test_empty_config_sends_nothing(self):
