@@ -400,6 +400,9 @@ _ALWAYS_STRIP_KEYS: frozenset[str] = frozenset({
     # child (credentialed CLIs included) consumes them.
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
     "HERMES_DASHBOARD_OIDC_CLIENT_SECRET", "HERMES_DASHBOARD_DRAIN_SECRET",
+    # Canonical Qubit spellings of the same dashboard secrets (read-old names stay too).
+    "QUBIT_DASHBOARD_BASIC_AUTH_PASSWORD", "QUBIT_DASHBOARD_BASIC_AUTH_SECRET",
+    "QUBIT_DASHBOARD_OIDC_CLIENT_SECRET", "QUBIT_DASHBOARD_DRAIN_SECRET",
     # Remote-compute / infrastructure secrets
     "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "DAYTONA_API_KEY",
 }) | _ADAPTER_SECRET_ENV | _left_core_env(secrets_only=True)  # every declared adapter secret is Tier 1

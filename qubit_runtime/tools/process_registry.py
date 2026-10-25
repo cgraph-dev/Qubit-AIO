@@ -1278,6 +1278,11 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin, ProcessOu
             # spawn before signalling: pgid == pid would only prove the pid leads a
             # group, and a reaped child can be recycled onto an unrelated leader.
             self._terminate_host_pid(proc.pid, session.host_start_time)
+        # We hold the real Popen handle: if the PID-based path refused (unknown/recycled
+        # start time) or the process is a fake in tests, this guarantees the child is
+        # killed rather than leaked untracked.
+        with suppress(Exception):
+            proc.kill()
         with suppress(Exception):
             proc.wait(timeout=5)
 

@@ -13,6 +13,7 @@ import json
 from contextlib import ExitStack, suppress
 import logging
 import re
+import threading
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -728,6 +729,42 @@ _ACTION_HANDLERS = {
     "remove_file": lambda a: _remove_file(a["name"], a["file_path"])}
 
 
+# Sync push debounce: a burst of skill_manage writes collapses into one push on a daemon timer.
+# One timer per profile home: in a multiplexed process B's write must not cancel A's pending push.
+_sync_push_timers: Dict[str, threading.Timer] = {}
+_sync_push_lock = threading.Lock()
+_SYNC_PUSH_DEBOUNCE_S = 5.0
+
+
+def _maybe_debounced_sync_push(skill_name: str) -> None:
+    """Debounced best-effort sync push after a skill write; never blocks the caller. Skills not
+    opted into sync do nothing (no auth/network); ``maybe_push_skills`` enforces the access gate."""
+    try:
+        from tools.skill_usage import is_sync_enabled
+        if not is_sync_enabled(skill_name):
+            return
+    except Exception:
+        return
+    from qubit_constants import qubit_home_key
+    home_key = qubit_home_key()
+    # Timer threads start with empty ContextVars; without the scheduling turn's context the push would
+    # resolve the launch profile's home and credentials instead of the writing profile's.
+    ctx = _ctxvars.copy_context()
+
+    def _fire():
+        with suppress(Exception):
+            from tools.skills_sync_client import maybe_push_skills
+            maybe_push_skills(message=f"sync: {skill_name}")
+    with _sync_push_lock:
+        pending = _sync_push_timers.get(home_key)
+        if pending is not None:
+            pending.cancel()  # only sets an Event; never raises
+        timer = threading.Timer(_SYNC_PUSH_DEBOUNCE_S, ctx.run, args=(_fire,))
+        timer.daemon = True
+        _sync_push_timers[home_key] = timer
+        timer.start()
+
+
 def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
                     session_id, ledger_before) -> None:
     """Best-effort post-mutation side effects (never break the tool): ledger, prompt-cache
@@ -763,6 +800,9 @@ def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
             bump_patch(name, action=action, task_id=task_id, session_id=session_id)
         elif action == "delete" and not result.get("_archived"):
             forget(name)
+    # Only AFTER the write gate passed (staged writes returned early): never push un-reviewed content.
+    with suppress(Exception):
+        _maybe_debounced_sync_push(name)
 
 
 def skill_manage(

@@ -564,3 +564,48 @@ registry.register(
     check_fn=check_web_api_key, requires_env=_web_requires_env(), is_async=True, emoji="📄",
     max_result_size_chars=100_000,
 )
+
+# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
+_PLUGIN_COMPAT_LAZY = {
+    'DEFAULT_EXTRACT_CHAR_LIMIT': ('tools.web_tools_truncate', 'DEFAULT_EXTRACT_CHAR_LIMIT'),
+    'Firecrawl': ('plugins.web.firecrawl.provider', 'Firecrawl'),
+    'MAX_STORED_TEXT_CHARS': ('tools.web_tools_truncate', 'MAX_STORED_TEXT_CHARS'),
+    'build_vendor_gateway_url': ('tools.managed_tool_gateway', 'build_vendor_gateway_url'),
+    'managed_nous_tools_enabled': ('tools.tool_backend_helpers', 'managed_nous_tools_enabled'),
+    'normalize_url_for_request': ('tools.url_safety', 'normalize_url_for_request'),
+    'nous_tool_gateway_unavailable_message': ('tools.tool_backend_helpers', 'nous_tool_gateway_unavailable_message'),
+    'prefers_gateway': ('tools.tool_backend_helpers', 'prefers_gateway'),
+    'resolve_managed_tool_gateway': ('tools.managed_tool_gateway', 'resolve_managed_tool_gateway'),
+    'sensitive_query_param_name': ('tools.url_safety', 'sensitive_query_param_name'),
+}
+
+
+def _plugin_compat_getattr(name):
+    target = _PLUGIN_COMPAT_LAZY.get(name)
+    if target is None:
+        return _plugin_compat_prev_getattr(name)
+    import importlib
+    from qubit_cli.plugin_compat import warn_once
+    warn_once(__name__, name, *target)
+    return getattr(importlib.import_module(target[0]), target[1])
+
+
+setattr(_plugin_compat_getattr, "_plugin_compat_wrapper", True)
+
+
+def _install_plugin_compat_getattr():
+    """Chain the compat resolver once, including across retained-module reloads."""
+    global __getattr__, _plugin_compat_prev_getattr
+    current = globals().get("__getattr__")
+    if current is None:
+        def current(name):
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if getattr(current, "_plugin_compat_wrapper", False):
+        return
+    _plugin_compat_prev_getattr = current
+    __getattr__ = _plugin_compat_getattr
+
+
+_install_plugin_compat_getattr()
+# ---- END PLUGIN-COMPAT ----
+

@@ -764,11 +764,12 @@ class TestBackslashDoublingDrift:
         assert err is None or "twice" not in err
 
     def test_quote_drift_guard_still_fires(self):
-        """The pre-existing apostrophe escape-drift guard must keep working."""
+        """The quote-drift layer now auto-corrects a verified spurious escape; the
+        pre-existing reject-and-ask guard is reached only when correction is unproven."""
         b = "\\"
         content = "print('hello world')\nrest = 1\n"
         old = "print(" + b + "'hello world" + b + "')\nrest = 1"
         new = "print(" + b + "'hello there" + b + "')\nrest = 1"
         result, count, strategy, err = self.replace(content, old, new)
-        assert count == 0
-        assert err is not None and "apostrophe" in err
+        assert count == 1 and err is None
+        assert "print('hello there')" in result
