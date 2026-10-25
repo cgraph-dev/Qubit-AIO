@@ -69,6 +69,7 @@ class _FakeRPC:
         execution_generation,
         on_terminal,
         member_id="",
+        **_kwargs,
     ):
         on_terminal({"status": "settled", "text": f"reply from {profile}"})
         return {"accepted": True}
@@ -281,6 +282,7 @@ class _PromptRecordingRPC(_FakeRPC):
         execution_generation,
         on_terminal,
         member_id="",
+        **_kwargs,
     ):
         self.prompts.append((profile, prompt))
         on_terminal({"status": "settled", "text": f"reply from {profile}"})

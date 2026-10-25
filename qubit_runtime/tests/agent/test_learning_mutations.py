@@ -192,7 +192,9 @@ def test_memory_drift_is_refused_with_backup_like_memory_tool(home, mutate):
     from tools.memory_tool_store import _drift_error
 
     path = home / "memories" / "MEMORY.md"
-    raw = "alpha note\n§\n\n§\nbeta note\n"
+    # Layout differences (blank lines/empty entries) are deliberately NOT drift (#107270).
+    # Real drift is free-form text over the whole-file char limit, which no tool write can make.
+    raw = "alpha note\n§\n" + "x" * 5000
     path.write_text(raw, encoding="utf-8")
 
     res = mutate()

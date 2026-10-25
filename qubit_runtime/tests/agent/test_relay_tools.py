@@ -76,8 +76,9 @@ def test_request_rewrite_reaches_authorized_callback_once(relay_turn):
     def rewrite_request(_name, args):
         return {**args, "path": "/approved/path"}
 
-    async def wrap_execution(context, next_call):
-        result = await next_call(context.args)
+    # nemo_relay invokes execution intercepts as fn(tool_name, args, next_call).
+    async def wrap_execution(_name, args, next_call):
+        result = await next_call(args)
         return relay.ToolExecutionInterceptOutcome(
             {**result.result, "wrapped": True},
             annotation={"audit": "annotation-canary"},

@@ -1990,7 +1990,9 @@ class TestOpenAIReasoningWireProjection:
 
     def test_explicit_none_is_sent_and_unset_keeps_the_default(self, transport):
         assert self._reasoning(transport, "gpt-5.6-sol", {"enabled": False}) == {"effort": "none"}
-        assert self._reasoning(transport, "gpt-5.6-sol", None) == {"effort": "medium", "summary": "auto"}
+        # The fork opts the live-verified OpenAI reasoning family into context=all_turns.
+        assert self._reasoning(transport, "gpt-5.6-sol", None) == {
+            "effort": "medium", "summary": "auto", "context": "all_turns"}
         # Astra's vocabulary has no ``none``: nothing to send, never an escalated level.
         assert self._reasoning(transport, "gpt-6-astra", {"enabled": False}) is None
 

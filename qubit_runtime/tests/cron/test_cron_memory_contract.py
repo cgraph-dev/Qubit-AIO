@@ -62,8 +62,6 @@ def _run_job_patches(tmp_path):
     config load reads ``tmp_path/config.yaml`` (write one to exercise config
     toggles).
     """
-    fake_db = MagicMock()
-    fake_db.get_compression_tip.side_effect = lambda session_id: session_id
     mock_agent = MagicMock()
     mock_agent.run_conversation.return_value = {"final_response": "ok"}
     base = [
@@ -71,7 +69,6 @@ def _run_job_patches(tmp_path):
         patch("cron.scheduler_delivery._resolve_origin", return_value=None),
         patch("qubit_cli.env_loader.load_qubit_dotenv"),
         patch("qubit_cli.env_loader.reset_secret_source_cache"),
-        patch("qubit_state_registry.acquire", return_value=fake_db),
         patch(
             "qubit_cli.runtime_provider.resolve_runtime_provider",
             return_value={
@@ -85,7 +82,7 @@ def _run_job_patches(tmp_path):
     ]
     with contextlib.ExitStack() as stack:
         entered = [stack.enter_context(cm) for cm in base]
-        yield fake_db, entered[-1]
+        yield MagicMock(), entered[-1]
 
 class TestCronMemoryContractOff:
     """Direction (b): the supported OFF switch stays off."""

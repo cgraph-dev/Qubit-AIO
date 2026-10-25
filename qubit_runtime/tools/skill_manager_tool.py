@@ -30,8 +30,8 @@ from agent.skill_utils import (
     SKILL_PROMPT_DESC_LIMIT)
 from tools.skill_manager_guards import (
     _background_review_delete_guard, _background_review_preflight, _background_review_read_before_write_guard,
-    _containing_skills_root, _curator_consolidation_delete_guard, _is_path_redirect, _pinned_guard,
-    _validate_delete_target, _is_background_review, _refusal as _err)
+    _containing_skills_root, _curator_consolidation_delete_guard, _is_path_redirect, _org_mirror_write_guard,
+    _pinned_guard, _validate_delete_target, _is_background_review, _refusal as _err)
 from tools.skill_manager_batch import (
     _PATCH_EITHER_OR, _PATCH_NEEDS_NEW_STRING, _PATCH_NEEDS_OLD_STRING, _op_shape_error, _skill_manage_batch)
 from tools.skills_guard import scan_skill, should_allow_install, format_scan_report
@@ -389,7 +389,9 @@ def _locate_for_write(name: str, action: str, not_found_suffix: str = ""):
     if not existing:
         return None, _err(_skill_not_found_error(name, not_found_suffix))
     skill_dir = existing["path"]
-    guard = _background_review_delete_guard(name, skill_dir) if action == "delete" else None
+    guard = _org_mirror_write_guard(name, skill_dir, action)
+    if not guard and action == "delete":
+        guard = _background_review_delete_guard(name, skill_dir)
     return (None, guard) if guard else (skill_dir, None)
 
 

@@ -82,7 +82,8 @@ class TestBuildAnthropicClient:
             )
             kwargs = mock_sdk.Anthropic.call_args[1]
             headers = kwargs["default_headers"]
-            assert headers["HTTP-Referer"] == "https://github.com/cgraph-dev/qubit-voicebridge"
+            # Canonical repo is cgraph-dev/Qubit-AIO (production + git remote); the old voicebridge URL was stale.
+            assert headers["HTTP-Referer"] == "https://github.com/cgraph-dev/Qubit-AIO"
             assert headers["X-Title"] == "Qubit Agent"
             from qubit_cli.version_info import get_version_info
             assert headers["User-Agent"] == f"QubitAgent/{get_version_info().base_version}"
@@ -550,7 +551,8 @@ class TestRunOauthSetupToken:
 
     def test_returns_token_from_credential_files(self, monkeypatch, tmp_path):
         """After subprocess completes, reads credentials from Claude Code files."""
-        monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/claude")
+        # locate_command now calls shutil.which(name, path=...) via the platform resolver.
+        monkeypatch.setattr("shutil.which", lambda *a, **k: "/usr/bin/claude")
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
         monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
 
@@ -580,7 +582,8 @@ class TestRunOauthSetupToken:
 
     def test_returns_none_when_no_creds_found(self, monkeypatch, tmp_path):
         """Returns None when subprocess completes but no credentials are found."""
-        monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/claude")
+        # locate_command now calls shutil.which(name, path=...) via the platform resolver.
+        monkeypatch.setattr("shutil.which", lambda *a, **k: "/usr/bin/claude")
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
         monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
         monkeypatch.setattr("agent.anthropic_credentials.Path.home", lambda: tmp_path)

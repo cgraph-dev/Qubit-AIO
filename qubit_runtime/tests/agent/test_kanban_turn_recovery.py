@@ -33,7 +33,6 @@ from agent.kanban_turn_recovery import (
     worker_claim_is_live,
 )
 from qubit_cli.kanban_db import KANBAN_RATE_LIMIT_EXIT_CODE
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local recover_failed_kanban_turns lacks the pin's task_id/claim_check contract")
 def test_explicit_blank_carrier_never_falls_back_to_the_env_pin(clear_kanban_env):
     """Owner-side workers pass the bound frame's task id explicitly; a blank explicit id is
     not a worker and must not be rescued by whatever ``HERMES_KANBAN_TASK`` the owner
@@ -128,7 +127,6 @@ def test_non_worker_frame_is_never_recovered(clear_kanban_env, monkeypatch):
     frame = {"text": "hello", "policy": {}}
     assert session_kanban.run_worker_turns(_Agent(), frame, []) is failed
     assert entered == ["hello"]
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local recover_failed_kanban_turns lacks the pin's task_id/claim_check contract")
 def test_worker_client_reports_the_owner_exit_and_reply(owner_worker, monkeypatch, capsys):
     """The dispatcher-spawned process is the client half: it exits with the code the owner
     booked for this exact attempt, ends its log with the attempt's reply, and writes the

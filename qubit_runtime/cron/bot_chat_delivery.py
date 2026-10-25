@@ -128,14 +128,16 @@ def _drain(root: Path) -> None:
             atomic_json_write(path, record, fsync_dir=True, mode=0o600)
         job = record["job"]
         job.pop("_bot_chat_delivery_receipts", None)
+        # Records written by the retired legacy defer carry no ``profile`` (own-profile only).
+        profile = record.get("profile", "")
         try:
-            error = _deliver_to_bot_chat(job, record["content"], record["profile"], deferred=record)
+            error = _deliver_to_bot_chat(job, record["content"], profile, deferred=record)
         except Exception as exc:
             # The claim survives uncertainty; one failed attempt must not stop peers.
             error = f"{type(exc).__name__}: {exc}"
             logger.exception("Deferred Bot Chat delivery %s failed", record["id"])
         receipt = job.get("_bot_chat_delivery_receipts", {}).get(
-            f"bot-chat:{record['profile'] or '(own)'}")
+            f"bot-chat:{profile or '(own)'}")
         status = "transferred" if receipt else "ambiguous" if error else "settled"
         if job.get("_notification_all_targets_suppressed"):
             status = "suppressed"

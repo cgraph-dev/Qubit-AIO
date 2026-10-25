@@ -11,7 +11,7 @@ import types
 import pytest
 
 from agent.prompt_builder import PLATFORM_HINTS
-from agent.system_prompt import platform_hint
+from agent.system_prompt import _default_platform_hint, platform_hint
 from gateway.session_context import _VAR_MAP
 
 EXTRA = "Always attach the report as a .pdf."
@@ -33,13 +33,16 @@ def deliver_to(monkeypatch):
 def test_cron_agent_gets_delivery_channel_hint_with_its_override(deliver_to):
     hint = platform_hint(_agent("cron", {"slack": {"append": EXTRA}}))
     assert hint.startswith(PLATFORM_HINTS["cron"])
-    assert PLATFORM_HINTS["slack"] in hint
+    # slack/telegram hints are registered by their platform plugins, not PLATFORM_HINTS.
+    assert _default_platform_hint("slack") in hint
     assert EXTRA in hint
     # The cron hint's own override channel is untouched by the destination's.
     assert platform_hint(_agent("cron", {"cron": {"replace": "X"}})).startswith("X\n\n")
 
 
 def test_delivery_target_only_applies_to_cron_agents(deliver_to):
-    assert platform_hint(_agent("telegram")) == PLATFORM_HINTS["telegram"]
+    telegram_hint = platform_hint(_agent("telegram"))
+    assert telegram_hint == _default_platform_hint("telegram")
+    assert "Delivery destination" not in telegram_hint
     _VAR_MAP["HERMES_CRON_AUTO_DELIVER_PLATFORM"].set("")
     assert platform_hint(_agent("cron")) == PLATFORM_HINTS["cron"]

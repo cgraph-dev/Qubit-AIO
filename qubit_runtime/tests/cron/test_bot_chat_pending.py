@@ -12,6 +12,13 @@ from qubit_cli.active_sessions import try_acquire_active_session
 from qubit_state import SessionDB
 
 
+@pytest.fixture(autouse=True)
+def _legacy_owner_lane(monkeypatch):
+    """These cases exercise the legacy unowned CLI lane; the authority lane is covered elsewhere."""
+    monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", lambda *_a, **_k: None)
+    monkeypatch.setattr("tools.bot_live_delivery.find_create_missing_owner", lambda *_a, **_k: None)
+
+
 @pytest.mark.parametrize("error", [None, subprocess.TimeoutExpired("hermes", 1)])
 def test_cli_owner_deferral_and_attempt_fence(tmp_path, monkeypatch, error):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))

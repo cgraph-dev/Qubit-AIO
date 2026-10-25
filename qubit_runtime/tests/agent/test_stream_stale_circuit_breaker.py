@@ -161,9 +161,9 @@ class TestStreamStaleCircuitBreaker:
         count once, or a single wedged turn trips the breaker for the next one."""
         from agent import chat_completion_helpers as h
 
-        monkeypatch.setenv("QUBIT_STREAM_STALE_TIMEOUT", "0.1")
-        monkeypatch.setenv("QUBIT_STREAM_STALE_GIVEUP", "50")
-        monkeypatch.setenv("QUBIT_STREAM_RETRIES", "0")
+        monkeypatch.setenv("HERMES_STREAM_STALE_TIMEOUT", "0.1")
+        monkeypatch.setenv("HERMES_STREAM_STALE_GIVEUP", "50")
+        monkeypatch.setenv("HERMES_STREAM_RETRIES", "0")
         agent = _make_anthropic_agent()
         agent._consecutive_stale_streams = 0
         unblock = threading.Event()

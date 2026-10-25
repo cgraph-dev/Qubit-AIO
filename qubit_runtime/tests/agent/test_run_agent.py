@@ -3499,6 +3499,9 @@ class TestRunConversation:
         """A clean-stop reasoning answer returns without compression or recovery."""
         self._setup_agent(agent)
         agent.base_url = "http://127.0.0.1:1234/v1"
+        # Reasoning promotion is capability-gated in the fork; the trusted local
+        # Nemotron parser route is one of the opt-ins.
+        agent.model = "nemotron-3.5-lightning"
         agent.compression_enabled = True
         empty_resp = _mock_response(
             content=None,

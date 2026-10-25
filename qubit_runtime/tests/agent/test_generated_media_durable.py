@@ -51,7 +51,8 @@ def test_old_generated_media_is_not_swept(tmp_path, monkeypatch, save, sweeper):
     # _MEDIA_DELIVERY_CACHE_SUBDIRS) cover it; the import-time roots do not.
     home = tmp_path / "profiles" / "p"
     home.mkdir(parents=True)
-    monkeypatch.setattr(base, "_QUBIT_ROOT", tmp_path)
+    # gateway.platforms.base names the root _HERMES_ROOT (legacy internal); patch the real attr.
+    monkeypatch.setattr(base, "_HERMES_ROOT", tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
 
     path = save(base64.b64encode(PNG_1PX).decode(), prefix="red_test")
@@ -73,5 +74,6 @@ def test_generated_dir_is_mounted_from_the_writers_location(tmp_path, monkeypatc
 
     path = save_b64_image(base64.b64encode(PNG_1PX).decode(), prefix="red_test")
     mounts = {m["container_path"]: m["host_path"] for m in get_cache_directory_mounts()}
-    assert "/root/.qubit/cache/generated" in mounts, sorted(mounts)
-    assert path.is_relative_to(Path(mounts["/root/.qubit/cache/generated"]).resolve())
+    # BRAND §2: the docker bind-mount target stays /root/.hermes inside the container.
+    assert "/root/.hermes/cache/generated" in mounts, sorted(mounts)
+    assert path.is_relative_to(Path(mounts["/root/.hermes/cache/generated"]).resolve())

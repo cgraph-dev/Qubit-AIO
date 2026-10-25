@@ -860,9 +860,9 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
             from cron.bot_chat_delivery import defer, read_pending
 
             pending = read_pending(key)
-            if pending is not None and pending["status"] != "queued":
+            if pending is not None:
                 # An earlier admission/disposition already owns this id: suppression cannot
-                # overwrite a settled (or otherwise terminal) outcome.
+                # overwrite an existing outcome (a queued admission included).
                 job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
                     "status": pending["status"], "delivery_id": key}
                 if pending["status"] == "suppressed":

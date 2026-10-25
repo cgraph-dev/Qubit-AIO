@@ -276,6 +276,11 @@ def _retire_count_for_request(
         byte_window = max(k for k in range(floor, total + 1) if _bytes_fit(k))
         quantum = max(1, min(batch, byte_window - floor + 1))
         excess = total - floor
+        # The last step down TO the floor may be shorter than a full quantum: the floor is
+        # satisfiability, so when the whole overshoot is sub-quantum retire all of it rather
+        # than keeping more than the floor (a reserved-only breach can never be made to fit).
+        if excess < quantum:
+            return excess
         return excess - excess % quantum
     window = max(k for k in range(total + 1) if _fits(k)) if _fits(0) else 0
     quantum = max(1, min(batch, window - floor))

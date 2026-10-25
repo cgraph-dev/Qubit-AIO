@@ -250,3 +250,28 @@ def _curator_consolidation_delete_guard(
         f"forwarding target is not permitted here — the deterministic inactivity prune handles "
         f"staleness archival separately. Keeping '{name}' active.",
         _fail_closed=True)
+
+
+def _is_org_mirror(skill_path: Path) -> bool:
+    from agent.skill_utils import is_org_mirror_path
+    from tools import skill_manager_tool as _smt
+    return is_org_mirror_path(skill_path, _smt._skills_dir())
+
+
+def _org_mirror_write_guard(name: str, skill_path: Path, action: str) -> Optional[Dict[str, Any]]:
+    """Org-shared skills are EDITABLE IN PLACE — this only blocks deletion. Edits land in the
+    mirror, survive the next org pull (baseline sidecar in skills_sync_client) and reach the org
+    via `qubit sync propose`. Deletion stays refused: the mirror is a view of org HEAD, so a
+    local delete just comes back, and removing for everyone is an admin action."""
+    if action not in {"delete", "remove_file"}:
+        return None
+    try:
+        if _is_org_mirror(skill_path):
+            return _refusal(
+                f"Cannot {action} '{name}' locally: it is shared by your organisation, so a local "
+                f"delete would just come back on the next sync. Ask an org admin to remove it for "
+                f"everyone. (Editing it IS allowed — your changes are kept and can be proposed "
+                f"back with `qubit sync propose {name}`.)")
+    except Exception:
+        logger.debug("org mirror guard lookup failed for %s", name, exc_info=True)
+    return None

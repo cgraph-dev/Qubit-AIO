@@ -49,7 +49,7 @@ def test_cache_survives_platform_empty_string_none_flapping(tmp_path):
         assert scan_count == 1  # First scan
 
         # Second call: platform explicitly "" (what the TUI gateway sets)
-        with patch.dict(os.environ, {"QUBIT_PLATFORM": ""}, clear=False):
+        with patch.dict(os.environ, {"HERMES_PLATFORM": ""}, clear=False):
             cmds2 = get_skill_commands()
         # Both "" and None normalize to None — cache hit, NO rescan
         assert cmds2 is cmds1
@@ -97,7 +97,7 @@ def test_cache_creates_multiple_slots_for_distinct_platform_or_home(tmp_path):
         # Scan profile A, platform 'telegram'
         token = set_qubit_home_override(profile_a)
         try:
-            with patch.dict(os.environ, {"QUBIT_PLATFORM": "telegram"}):
+            with patch.dict(os.environ, {"HERMES_PLATFORM": "telegram"}):
                 cmds_a_telegram = get_skill_commands()
         finally:
             reset_qubit_home_override(token)
@@ -107,7 +107,7 @@ def test_cache_creates_multiple_slots_for_distinct_platform_or_home(tmp_path):
         # Switch to profile B, same platform 'telegram' — different home → rescan
         token = set_qubit_home_override(profile_b)
         try:
-            with patch.dict(os.environ, {"QUBIT_PLATFORM": "telegram"}):
+            with patch.dict(os.environ, {"HERMES_PLATFORM": "telegram"}):
                 cmds_b_telegram = get_skill_commands()
         finally:
             reset_qubit_home_override(token)
@@ -117,7 +117,7 @@ def test_cache_creates_multiple_slots_for_distinct_platform_or_home(tmp_path):
         # Switch to profile A, platform 'discord' — different platform → rescan
         token = set_qubit_home_override(profile_a)
         try:
-            with patch.dict(os.environ, {"QUBIT_PLATFORM": "discord"}):
+            with patch.dict(os.environ, {"HERMES_PLATFORM": "discord"}):
                 cmds_a_discord = get_skill_commands()
         finally:
             reset_qubit_home_override(token)
@@ -127,7 +127,7 @@ def test_cache_creates_multiple_slots_for_distinct_platform_or_home(tmp_path):
         # Back to profile A, telegram — cache hit from the first scan
         token = set_qubit_home_override(profile_a)
         try:
-            with patch.dict(os.environ, {"QUBIT_PLATFORM": "telegram"}):
+            with patch.dict(os.environ, {"HERMES_PLATFORM": "telegram"}):
                 cmds_a_telegram_again = get_skill_commands()
         finally:
             reset_qubit_home_override(token)

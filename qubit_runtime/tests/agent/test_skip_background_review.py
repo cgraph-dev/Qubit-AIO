@@ -110,7 +110,9 @@ def test_persistence_failure_error_fallback_is_pinned_and_leaves_final_response_
     memory sync and the background-review gate still see the turn as having produced nothing."""
     from qubit_constants import profile_cli_selector
 
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes" / "profiles" / "research"))
+    profile_home = tmp_path / ".hermes" / "profiles" / "research"
+    profile_home.mkdir(parents=True)  # logging setup fails closed on a missing named profile
+    monkeypatch.setenv("QUBIT_HOME", str(profile_home))
     selector = profile_cli_selector()
     assert selector.strip()
     agent = _make_agent()

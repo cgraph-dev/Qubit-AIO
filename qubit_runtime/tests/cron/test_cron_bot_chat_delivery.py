@@ -26,6 +26,13 @@ from cron.scheduler_delivery import (
 )
 from cron.scheduler_preflight import _preflight_check_delivery
 from qubit_cli.quiet_single_query import TURN_REPORT_FILE_ENV
+
+
+@pytest.fixture(autouse=True)
+def _default_legacy_lane(monkeypatch):
+    """Default to the legacy unowned CLI lane; authority cases override these in the body."""
+    monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", lambda *_a, **_k: None)
+    monkeypatch.setattr("tools.bot_live_delivery.find_create_missing_owner", lambda *_a, **_k: None)
 def test_failure_notice_reaches_the_owner_as_a_diagnostic(tmp_path, monkeypatch):
     """A delivered ``for_failure`` notice keeps ``notification_category="diagnostic"`` through
     the owner transport (R1/R2 minor: the category was accepted but dropped)."""
