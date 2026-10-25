@@ -501,7 +501,8 @@ def test_ssh_backend_staged_text_attachment_still_expands(tmp_path: Path, monkey
 
 def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(tmp_path: Path, monkeypatch):
     """Binaries stay on disk: the ref must render the path the ssh backend resolves (the
-    file-sync mirrors the staging dirs to ``~/.qubit`` on the remote)."""
+    file-sync mirrors the staging dirs to ``~/.hermes`` on the remote; the remote home
+    name is the legacy spelling the ssh/daytona sync backends write)."""
     from agent.context_references import preprocess_context_references
 
     payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
@@ -516,7 +517,7 @@ def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(t
 
     assert result.expanded
     assert "binary file, not inlined" in result.message
-    assert "~/.qubit/attachments/archive.zip" in result.message
+    assert "~/.hermes/attachments/archive.zip" in result.message
 
 
 def test_ref_outside_workspace_and_staging_dirs_is_still_refused(tmp_path: Path, monkeypatch):
@@ -557,7 +558,7 @@ def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, mon
 
     assert result.expanded
     assert "binary file, not inlined" in result.message
-    assert "~/.qubit/attachments/" not in result.message
+    assert "~/.hermes/attachments/" not in result.message
 
 
 # ── Gateway container + Remote SSH execution backend (#110174) ───────────────
@@ -601,7 +602,8 @@ def test_ssh_backend_staged_text_attachment_still_expands(tmp_path: Path, monkey
 
 def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(tmp_path: Path, monkeypatch):
     """Binaries stay on disk: the ref must render the path the ssh backend resolves (the
-    file-sync mirrors the staging dirs to ``~/.qubit`` on the remote)."""
+    file-sync mirrors the staging dirs to ``~/.hermes`` on the remote; the remote home
+    name is the legacy spelling the ssh/daytona sync backends write)."""
     from agent.context_references import preprocess_context_references
 
     payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
@@ -616,7 +618,7 @@ def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(t
 
     assert result.expanded
     assert "binary file, not inlined" in result.message
-    assert "~/.qubit/attachments/archive.zip" in result.message
+    assert "~/.hermes/attachments/archive.zip" in result.message
 
 
 def test_ref_outside_workspace_and_staging_dirs_is_still_refused(tmp_path: Path, monkeypatch):
@@ -657,7 +659,7 @@ def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, mon
 
     assert result.expanded
     assert "binary file, not inlined" in result.message
-    assert "~/.qubit/attachments/" not in result.message
+    assert "~/.hermes/attachments/" not in result.message
 
 
 # ── Gateway container + Remote SSH execution backend (#110174) ───────────────
@@ -701,7 +703,8 @@ def test_ssh_backend_staged_text_attachment_still_expands(tmp_path: Path, monkey
 
 def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(tmp_path: Path, monkeypatch):
     """Binaries stay on disk: the ref must render the path the ssh backend resolves (the
-    file-sync mirrors the staging dirs to ``~/.qubit`` on the remote)."""
+    file-sync mirrors the staging dirs to ``~/.hermes`` on the remote; the remote home
+    name is the legacy spelling the ssh/daytona sync backends write)."""
     from agent.context_references import preprocess_context_references
 
     payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
@@ -716,7 +719,7 @@ def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(t
 
     assert result.expanded
     assert "binary file, not inlined" in result.message
-    assert "~/.qubit/attachments/archive.zip" in result.message
+    assert "~/.hermes/attachments/archive.zip" in result.message
 
 
 def test_ref_outside_workspace_and_staging_dirs_is_still_refused(tmp_path: Path, monkeypatch):
@@ -757,7 +760,7 @@ def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, mon
 
     assert result.expanded
     assert "binary file, not inlined" in result.message
-    assert "~/.qubit/attachments/" not in result.message
+    assert "~/.hermes/attachments/" not in result.message
 
 
 
