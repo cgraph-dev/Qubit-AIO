@@ -522,6 +522,16 @@ def _require_session(request: Request):
 @router.get("/api/auth/me", name="auth_me")
 async def api_auth_me(request: Request):
     """Return the verified session as JSON. Auth-required (gate enforces)."""
+    sess = getattr(request.state, "session", None)
+    if sess is None and not getattr(request.app.state, "auth_required", False):
+        # Loopback mode has no OAuth Session: the legacy auth_middleware already validated the
+        # ephemeral session token, so return the minimal identity the SPA boot needs (#66223).
+        from qubit_cli.web_server import _has_valid_session_token
+
+        if _has_valid_session_token(request):
+            return {
+                "user_id": "local", "email": "", "display_name": "Local user",
+                "org_id": "", "provider": "loopback", "expires_at": None}
     sess = _require_session(request)
     return {
         "user_id": sess.user_id, "email": sess.email, "display_name": sess.display_name,
