@@ -79,10 +79,19 @@ def desktop_install_record() -> Path:
     return get_default_qubit_root() / "desktop-installed-apps.json"
 
 
+def _agent_root(qubit_home: Path) -> Path:
+    """The checkout directory under QUBIT_HOME: canonical ``qubit/``, legacy ``hermes-agent/``."""
+    canonical = qubit_home / "qubit"
+    if canonical.exists():
+        return canonical
+    return qubit_home / "hermes-agent"
+
+
 def agent_is_installed(qubit_home: Path) -> bool:
     """True when a usable Python agent install exists under QUBIT_HOME (gates the desktop UI's options).
     Package source or a venv alone is enough — a source checkout without a venv is still "the agent is here"."""
-    return any((qubit_home / "hermes-agent" / sub).is_dir() for sub in ("qubit_cli", "venv", ".venv"))
+    root = _agent_root(qubit_home)
+    return any((root / sub).is_dir() for sub in ("qubit_cli", "venv", ".venv"))
 
 
 def gui_is_installed(qubit_home: Path) -> bool:
@@ -102,9 +111,12 @@ def gui_install_summary(qubit_home: Path | None = None) -> dict:
     # removed; sealed trees (nix / desktop-app / docker) get data-only.
     from qubit_cli import steward as steward_mod
 
-    steward, code_removal_allowed = steward_mod.classify_install(home / "hermes-agent")
+    steward, code_removal_allowed = steward_mod.classify_install(_agent_root(home))
 
     return {
+        # Canonical key the desktop IPC types read; the legacy spelling stays published for older
+        # bundles (dual-publish, like the plugin SDK globals).
+        "qubit_home": str(home),
         "hermes_home": str(home),
         "agent_installed": agent_is_installed(home),
         "gui_installed": gui_is_installed(home),
