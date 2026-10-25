@@ -2672,6 +2672,17 @@ def run_job(
     if owner_execution is not None and owner_execution[2:] != (job['id'], execution_id):
         owner_execution = None
     if not job.get("no_agent") and owner_execution is None:
+        # Fail closed on a corrupt config BEFORE admitting the job to the canonical owner:
+        # delegating first would let a spawned gateway/worker touch the broken file (and the
+        # local caller would report a transport failure instead of the actionable guard text).
+        from qubit_cli.config import InvalidUserConfigError, require_parseable_user_config
+
+        try:
+            require_parseable_user_config()
+        except InvalidUserConfigError as exc:
+            _jid = job.get("id")
+            logger.error("Job '%s': refusing to run — %s", _jid, exc)
+            return False, f"# Cron Job: {job.get('name') or _jid}\n\nError: {exc}\n", "", str(exc)
         from cron.scheduler_authority import run_canonical_job
         return run_canonical_job(job, extra_prompt=extra_prompt, cancel_event=cancel_event,
                                  execution_id=execution_id)
