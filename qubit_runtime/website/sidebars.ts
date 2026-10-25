@@ -371,8 +371,6 @@ const sidebars: SidebarsConfig = {
                     'user-guide/skills/optional/creative/creative-auteur',
                     'user-guide/skills/optional/creative/creative-baoyu-article-illustrator',
                     'user-guide/skills/optional/creative/creative-baoyu-comic',
-                    'user-guide/skills/optional/creative/creative-brag',
-                    'user-guide/skills/optional/creative/creative-brag-slim',
                     'user-guide/skills/optional/creative/creative-comfyui',
                     'user-guide/skills/optional/creative/creative-concept-diagrams',
                     'user-guide/skills/optional/creative/creative-creative-ideation',
@@ -493,6 +491,7 @@ const sidebars: SidebarsConfig = {
                   collapsed: true,
                   items: [
                     'user-guide/skills/optional/migration/migration-openclaw-migration',
+                    'user-guide/skills/optional/migration/migration-qubit-migration',
                   ],
                 },
                 {
@@ -558,7 +557,9 @@ const sidebars: SidebarsConfig = {
                   items: [
                     'user-guide/skills/optional/productivity/productivity-canvas',
                     'user-guide/skills/optional/productivity/productivity-decision-questionnaire',
+                    'user-guide/skills/optional/productivity/productivity-first-task',
                     'user-guide/skills/optional/productivity/productivity-here-now',
+                    'user-guide/skills/optional/productivity/productivity-initiate-setup',
                     'user-guide/skills/optional/productivity/productivity-live-dashboard',
                     'user-guide/skills/optional/productivity/productivity-memento-flashcards',
                     'user-guide/skills/optional/productivity/productivity-property-listings',

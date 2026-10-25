@@ -8,7 +8,7 @@ platforms: [linux, macos, windows]
 metadata:
   qubit:
     tags: [Migration, Qubit, Qubit, Memory, Persona, Import]
-    related_skills: [qubit-agent]
+    related_skills: [hermes-agent]
 ---
 
 # Qubit -> Qubit Migration
