@@ -80,8 +80,10 @@ def test_boot_replaces_incumbent_with_stale_presets(qubit_home, monkeypatch):
     monkeypatch.setattr(
         "qubit_cli.local_runtime.endpoint._state_endpoint",
         lambda: {"base_url": "http://127.0.0.1:18434/v1", "pid": 12345})
+    # The fork's _stop_state_server() reads and identity-checks the recorded process itself
+    # (no caller-supplied state); record the call instead of forwarding a dict.
     monkeypatch.setattr(boot, "_stop_state_server",
-                        lambda state: stopped.setdefault("pid", state["pid"]))
+                        lambda *a, **k: stopped.setdefault("pid", 12345))
 
     sentinel = object()
 
@@ -116,8 +118,10 @@ def test_refresh_bounces_an_adopted_server(qubit_home, monkeypatch):
     monkeypatch.setattr(
         "qubit_cli.local_runtime.endpoint._state_endpoint",
         lambda: {"base_url": "http://127.0.0.1:18434/v1", "pid": 4242})
+    # The fork's _stop_state_server() reads and identity-checks the recorded process itself
+    # (no caller-supplied state); record the call instead of forwarding a dict.
     monkeypatch.setattr(boot, "_stop_state_server",
-                        lambda state: stopped.setdefault("pid", state["pid"]))
+                        lambda *a, **k: stopped.setdefault("pid", 4242))
     booted = {}
     monkeypatch.setattr(boot, "ensure_local_runtime",
                         lambda cfg, force=False: booted.setdefault("force", force) or object())

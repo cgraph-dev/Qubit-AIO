@@ -130,9 +130,11 @@ def test_global_switch_clears_context_pin_owned_by_previous_route(monkeypatch):
 
     writes = []
     monkeypatch.setattr(cli_mod, "_cprint", lambda *_a, **_k: None)
+    # The fork persists the whole model selection with atomic_config_replace (not per-key
+    # round-trip writes); capture the published document instead.
     monkeypatch.setattr(
-        "utils.atomic_roundtrip_yaml_update",
-        lambda path, key, value: writes.append((key, value)),
+        "qubit_cli.config.atomic_config_replace",
+        lambda path, config: writes.append(config),
     )
     cli = _StubCLI()
     cli.model = "shared-model"
@@ -172,4 +174,5 @@ def test_global_switch_clears_context_pin_owned_by_previous_route(monkeypatch):
     ):
         cli_mod.HermesCLI._apply_model_switch_result(cli, result, True)
 
-    assert ("model.context_length", None) in writes
+    assert writes, "global switch did not publish a config document"
+    assert "context_length" not in writes[-1]["model"]
