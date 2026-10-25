@@ -328,7 +328,13 @@ def _seed_row(record: dict) -> None:
     if not record.get("_branch_seed_persisted"):
         with contextlib.suppress(Exception), _session_db(record) as db:
             if db is not None:
-                db.delete_session(key)
+                # NOT delete_session(): that retires a tombstone the first-prompt retry could never
+                # re-create, so the whole seed would be lost instead of re-copied.
+                rollback = getattr(db, "rollback_created_session", None)
+                if callable(rollback):
+                    rollback(key)
+                else:
+                    db.delete_session(key)
         return
     try:
         if title := record.get("pending_title"):
@@ -356,6 +362,17 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
     from .methods_session_model_guard import model_override_conflict
     if conflict := model_override_conflict(params, _profile_build_scope(profile_home)):
         return _err(rid, -32602, conflict.pop("message"), conflict)
+    idem_key = _str_param(params, "idempotency_key") or None
+    if idem_key is not None:
+        with _sessions_lock:
+            now_gc = time.time()
+            existing_sid, ts = _idempotency_keys.get(idem_key, (None, 0.0))
+            if existing_sid is not None and existing_sid in _sessions:
+                if now_gc - ts <= _IDEMPOTENCY_KEY_TTL:
+                    _idempotency_keys[idem_key] = (existing_sid, now_gc)
+                    return _ok(rid, _create_idempotent_hit(
+                        existing_sid, _sessions[existing_sid], copy_parent_history))
+                _idempotency_keys.pop(idem_key, None)
     (sid, source), key = _new_runtime_ids(params), _new_session_key()
     history = _coerce_seed_history(params.get("messages"))
     # Branch: links back so list_sessions_rich keeps it visible and the sidebar nests it.
@@ -381,6 +398,13 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
     explicit_cwd, session_cwd, remote_cwd = _resolve_create_cwd(params, source, profile_home)
     _enable_gateway_prompts()
     session_model_override, create_reasoning_override, create_service_tier_override = _create_overrides(params)
+    if session_model_override is not None:
+        default_model, default_provider = _session_default_route({"profile_home": profile_home})
+        chosen = (session_model_override.get("model") or "", session_model_override.get("provider") or "")
+        if chosen != (default_model or "", default_provider or ""):
+            logger.info(
+                "session.create %s: client override %s/%s beats the profile default %s/%s",
+                key, chosen[0], chosen[1] or "(auto)", default_model or "(none)", default_provider or "(auto)")
     now = time.time()
     with _sessions_lock:
         _sessions[sid] = {
@@ -425,6 +449,9 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
     elif history:
         _seed_row(_sessions[sid])
     # Return immediately so Ink can paint; the AIAgent builds right after the flush.
+    if idem_key is not None:
+        with _sessions_lock:
+            _idempotency_keys[idem_key] = (sid, time.time())
     _schedule_agent_build(sid)
     _schedule_session_cap_enforcement()  # trim detached idle sessions over the cap
     cwd = _sessions[sid]["cwd"]
@@ -438,6 +465,19 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
                  "tools": {}, "skills": {}, "cwd": cwd, "branch": git_probe.branch(cwd),
                  "project": _project_info_for_cwd(cwd), "lazy": True, "desktop_contract": DESKTOP_BACKEND_CONTRACT,
                  "profile_name": _response_profile_name(profile)}})
+
+
+def _create_idempotent_hit(existing_sid: str, session: dict, omit_messages: bool) -> dict:
+    """The SAME result shape a fresh ``_create_session`` returns for the existing child (#65410)."""
+    history = session.get("history") or []
+    messages = ([] if omit_messages else
+                _history_to_messages(history, profile_home=session.get("profile_home")))
+    return {
+        "session_id": existing_sid, "stored_session_id": session.get("session_key") or "",
+        "message_count": len(history) if omit_messages else len(messages),
+        **({"messages_omitted": True} if omit_messages else {"messages": messages}),
+        "info": _fallback_session_info(session),
+    }
 
 
 @method("session.create")
@@ -1057,7 +1097,9 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 4016, "cwd required")
     from qubit_constants import translate_cwd_for_wsl_backend
     resolved = os.path.abspath(os.path.expanduser(translate_cwd_for_wsl_backend(raw)))
-    if not os.path.isdir(resolved):
+    profile_home = _profile_home((params.get("profile") or "").strip() or None)
+    # An ssh profile's workspace lives on the remote host; a local isdir() cannot vouch for it.
+    if not os.path.isdir(resolved) and not _cwd_is_remote(profile_home):
         return _err(rid, 4017, f"working directory does not exist: {raw}")
     # Snapshot under the lock — concurrent RPCs mutate _sessions.
     with _sessions_lock:
@@ -1227,7 +1269,9 @@ def _(rid, params: dict) -> dict:
 def _(rid, params: dict) -> dict:
     """Set/clear ``hidden`` (leaves the default list, stays resumable by its owner) on a session + lineage:
     LIVE runtime id first (unpersisted drafts via ``pending_hidden``), then a stored id/key in the profile db."""
-    hidden = is_truthy_value(params.get("hidden", True))
+    if "hidden" not in params:
+        return _err(rid, 4006, "hidden flag required")
+    hidden = is_truthy_value(params.get("hidden"))
     # Quiet live lookup: a stored id that is not in memory is this method's expected second tier, not a
     # rejection — _sess_nowait would log "session-scoped RPC rejected … not in memory" for a request that is
     # then fulfilled from the profile db, burying the real stale-runtime-id signal under sweep noise.
@@ -1267,11 +1311,12 @@ def _(rid, params: dict, session: dict) -> dict:
         if db is None:
             return _db_unavailable_error(rid, code=5007)
         try:
+            target_key = _submit_row_target_key(session)
             if row_id is None:
-                row_id = db.latest_message_row_id(session["session_key"], role=newest_role)
+                row_id = db.latest_message_row_id(target_key, role=newest_role)
                 if row_id is None:
                     return _err(rid, 4040, "no message to react to yet")
-            reactions = db.set_message_reaction(session["session_key"], int(row_id), emoji, author=author)
+            reactions = db.set_message_reaction(target_key, int(row_id), emoji, author=author)
         except Exception as e:
             return _err(rid, 5007, str(e))
     if reactions is None:
@@ -1921,6 +1966,7 @@ def _(rid, params: dict, session: dict) -> dict:
         model=mirror.get("model") or getattr(live_agent, "model", None),
         provider=mirror.get("provider") or getattr(live_agent, "provider", None),
         tokens=_session_usage_snapshot(session).get("total"), agent_running=bool(session.get("running")),
+        home=session.get("profile_home"),
     )
     project = _project_info_for_cwd(_display_session_cwd(session))
     lines = [
@@ -1933,7 +1979,7 @@ def _(rid, params: dict, session: dict) -> dict:
 @_session_method("session.history")
 def _(rid, params: dict, session: dict) -> dict:
     history = list(session.get("history", []))
-    if session.get("session_key"):
+    if target_key := _submit_row_target_key(session):
         with _session_db(session) as db:
             if db is not None:
                 # include_row_ids: the durable row id is how clients address a persisted turn (reactions,
@@ -1943,7 +1989,7 @@ def _(rid, params: dict, session: dict) -> dict:
                     # stamp, so an unstamped read here silently strips the one durable address clients can
                     # use. See #87059.
                     history = db.get_messages_as_conversation(
-                        session["session_key"], include_ancestors=True, include_row_ids=True)
+                        target_key, include_ancestors=True, include_row_ids=True)
     return _ok(rid, {"count": len(history), "messages": _history_to_messages(history, profile_home=session.get("profile_home"))})
 
 

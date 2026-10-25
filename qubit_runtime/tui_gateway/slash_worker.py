@@ -27,7 +27,6 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
-import cli as cli_mod
 from tui_gateway._env import env_float
 from tui_gateway._stdin_recovery import handle_spurious_eof
 from rich.console import Console
@@ -145,6 +144,12 @@ def _run(cli: QubitCLI, command: str) -> str:
     finally:
         if old is not None:
             cli_mod._cprint = old
+    # /prompt, /compose and /blueprint park the composed text for the interactive REPL loop;
+    # this worker has none, so hand it to the gateway as the next turn (#107800).
+    seed = getattr(cli, "_pending_agent_seed", None)
+    if seed:
+        cli._harvested_seed = str(seed)
+    cli._pending_agent_seed = None
     # Desktop chat bubbles render plain text, not ANSI. A command that emits Rich color (e.g. /journey
     # under the gateway's inherited COLORTERM) would leak raw escapes; strip at this single choke point.
     from tools.ansi_strip import strip_ansi
@@ -201,7 +206,8 @@ def main():
         try:
             req = json.loads(line)
             rid = req.get("id")
-            _reply(id=rid, ok=True, output=_run(cli, req.get("command", "")))
+            output = _run(cli, req.get("command", ""))
+            _reply(id=rid, ok=True, output=output, seed=getattr(cli, "_harvested_seed", "") or "")
         except Exception as e:
             _reply(id=rid, ok=False, error=str(e))
         finally:

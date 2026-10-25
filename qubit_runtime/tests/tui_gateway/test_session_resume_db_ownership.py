@@ -47,6 +47,7 @@ class _RecordingDB:
         self.closed = 0
         self.rows: dict = {}
         self.reopen_error: Exception | None = None
+        self.read_error: Exception | None = None
 
     def close(self):
         self.closed += 1
@@ -65,6 +66,8 @@ class _RecordingDB:
             raise self.reopen_error
 
     def get_resume_conversations(self, _target):
+        if self.read_error is not None:
+            raise self.read_error
         return ([], [])
 
     def get_ancestor_display_prefix(self, _target):
@@ -157,12 +160,15 @@ def test_deferred_desktop_resume_keeps_stored_workspace_provenance(
 
 
 def test_resume_closes_profile_db_when_reopen_fails(profile_dbs, monkeypatch):
-    """The 'resume failed' early return must not leak the handle."""
+    """The 'resume failed' early return must not leak the handle.
+
+    Since #128508 resume is a READ-ONLY mount (it no longer reopens the row); the failure that
+    exercises the same early return is an unreadable transcript."""
 
     def _factory(db_path=None, **kwargs):
         db = _RecordingDB(db_path=db_path, **kwargs)
         db.rows["s1"] = {"id": "s1", "cwd": ""}
-        db.reopen_error = RuntimeError("database is locked")
+        db.read_error = RuntimeError("database is locked")
         profile_dbs.append(db)
         return db
 

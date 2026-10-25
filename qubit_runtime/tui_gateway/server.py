@@ -298,6 +298,7 @@ class _SlashWorker:
         self._lock = threading.Lock()
         self._seq = 0
         self.stderr_tail: list[str] = []
+        self._last_seed = ""
         self.stdout_queue: queue.Queue[dict | None] = queue.Queue()
         # ``--provider`` pins the child to the parent agent's virtual provider: without it the
         # worker re-resolves provider from config, so a MoA session (provider=moa, model=<preset>)
@@ -366,9 +367,15 @@ class _SlashWorker:
                     continue
                 if not msg.get("ok"):
                     raise RuntimeError(msg.get("error", "slash worker failed"))
+                self._last_seed = str(msg.get("seed") or "")
                 return str(msg.get("output", "")).rstrip()
             raise RuntimeError(
                 f"slash worker closed pipe{': ' + chr(10).join(self.stderr_tail[-8:]) if self.stderr_tail else ''}")
+
+    def pop_seed(self) -> str:
+        """The next-turn prompt a worker-routed command composed on its last run (one-shot)."""
+        seed, self._last_seed = self._last_seed, ""
+        return seed
 
     def close(self):
         if getattr(self, "_closed", False):
@@ -1347,11 +1354,14 @@ def _load_cfg() -> dict:
     return {}
 
 
-def _save_cfg(cfg: dict):
+def _save_cfg(cfg: dict, *, allow_deletions: bool = False):
+    """Write ``cfg`` (always a full raw read→mutate snapshot). ``allow_deletions`` selects the
+    replace writer for a deliberate key removal (e.g. clearing a details_mode override); the
+    omission-refusing writer otherwise catches a partial-config mistake."""
     global _cfg_cache, _cfg_sig, _cfg_path
-    from qubit_cli.config import atomic_config_write
+    from qubit_cli.config import atomic_config_replace, atomic_config_write
     path = _active_config_path()
-    atomic_config_write(path, cfg)
+    (atomic_config_replace if allow_deletions else atomic_config_write)(path, cfg)
     with _cfg_lock:
         _cfg_cache, _cfg_path = copy.deepcopy(cfg), path
         try:
@@ -1604,8 +1614,9 @@ def _resolve_model() -> str:
 def _resolve_session_platform() -> str:
     """``HERMES_DESKTOP=1`` without ``HERMES_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
     suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``qubit --tui``)."""
-    desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP"))
-    return "desktop" if desktop and not is_truthy_value(os.environ.get("HERMES_DESKTOP_TERMINAL")) else "tui"
+    desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP") or os.environ.get("QUBIT_DESKTOP"))
+    terminal = os.environ.get("HERMES_DESKTOP_TERMINAL") or os.environ.get("QUBIT_DESKTOP_TERMINAL")
+    return "desktop" if desktop and not is_truthy_value(terminal) else "tui"
 
 
 def _resolve_session_source(explicit: str | None) -> str:
@@ -1880,7 +1891,8 @@ def _append_model_switch_marker(session: dict | None, *, model: str, provider: s
 
     See #65891.
     """
-    session_key = str((session or {}).get("session_key") or "").strip()
+    session_key = _submit_row_target_key(session or {}) if session else ""
+    session_key = str(session_key or "").strip()
     if not session_key:
         return
     provider_part = f" via provider {provider}" if provider else ""
@@ -1903,6 +1915,11 @@ def _append_model_switch_marker(session: dict | None, *, model: str, provider: s
         with (contextlib.nullcontext(db) if db is not None else _session_db(session)) as db:
             if db is not None:
                 from agent.context_compressor import _DB_PERSISTED_MARKER
+                # The in-memory strip has a durable twin: superseded rows stay as inactive history
+                # instead of replaying on every resume (#65891).
+                collapse = getattr(db, "deactivate_messages_by_display_kind", None)
+                if callable(collapse):
+                    collapse(session_key, "model_switch")
                 entry["_row_id"] = db.append_message(
                     session_id=session_key, role="user", content=marker, display_kind="model_switch")
                 entry[_DB_PERSISTED_MARKER] = True
@@ -3737,6 +3754,7 @@ from . import (  # noqa: E402
     session_compression as _session_compression, model_switch as _model_switch,
     compute_host_bridge as _compute_host_bridge, session_workdir as _session_workdir,
     session_lifecycle as _session_lifecycle, session_reaper as _session_reaper,
+    session_registry as _session_registry, agent_factory as _agent_factory,
     session_transports as _session_transports,
     methods_browser_control as _methods_browser_control, methods_bot_relay as _methods_bot_relay,
     methods_complete as _methods_complete, methods_config as _methods_config,
@@ -3754,7 +3772,7 @@ from . import (  # noqa: E402
     methods_plugin_catalog as _methods_plugin_catalog)
 
 for _m in (
-    _session_transports, _session_reaper, _session_lifecycle, _session_workdir, _compute_host_bridge, _model_switch,
+    _session_transports, _session_reaper, _session_lifecycle, _session_registry, _agent_factory, _session_workdir, _compute_host_bridge, _model_switch,
     _session_compression, _change_watcher, _tool_progress, _session_notifications,
     _prompt_attachments, _session_history, _agent_callbacks, _session_auto_continue, _plugin_inject, _rpc_dispatch,
     _methods_complete_helpers, _methods_slash, _methods_voice, _methods_browser,

@@ -432,9 +432,12 @@ def _(rid, params: dict) -> dict:
     (#124651) and an unknown profile is 4064 like ``complete.slash`` — never a launch-profile palette.
     Every loader (quick, plugin, skill) runs inside the scope."""
     from tui_gateway.command_discovery import command_catalog
-    scope = _session_home_scope(_sessions.get(params.get("session_id", "")), cwd=_completion_cwd(params),
-                                profile=params.get("profile"))
-    return _ok(rid, command_catalog(load_cfg=_load_cfg, module_loader=_tools_mod, scope=scope))
+    try:
+        scope = _session_home_scope(_sessions.get(params.get("session_id", "")), cwd=_completion_cwd(params),
+                                    profile=params.get("profile"))
+        return _ok(rid, command_catalog(load_cfg=_load_cfg, module_loader=_tools_mod, scope=scope))
+    except ProfileUnavailableError:
+        return _err(rid, 4064, f"profile '{params.get('profile')}' not found")
 
 
 @method("cli.exec")
@@ -1061,7 +1064,15 @@ def _(rid, params: dict) -> dict:
                     return _err(rid, 5030, f"slash worker start failed: {e}")
     try:
         output = worker.run(cmd)
-        payload = {"output": output or "(no output)"}
+        seed = ""
+        pop_seed = getattr(worker, "pop_seed", None)
+        if callable(pop_seed):
+            seed = str(pop_seed() or "").strip()
+        if seed:
+            # A composed prompt is a turn, not output: Desktop/TUI already handle {type: "send"}.
+            payload = {"type": "send", "message": seed}
+        else:
+            payload = {"output": output or "(no output)"}
         if warning := _mirror_slash_side_effects(sid, session, cmd):
             payload["warning"] = warning
         if base in _SESSION_CONTROL_SLASHES:
@@ -1096,8 +1107,8 @@ def _(rid, params: dict, session) -> dict:
     def go(mgr, cwd):
         if not mgr.enabled:
             return _ok(rid, {"enabled": False, "checkpoints": []})
-        keys = ("hash", "timestamp", "message")
-        rows = [{k: c.get(k, "") for k in keys} for c in mgr.list_checkpoints(cwd)]
+        rows = [{"hash": c.get("hash", ""), "timestamp": c.get("timestamp", ""),
+                 "message": c.get("message") or c.get("reason") or ""} for c in mgr.list_checkpoints(cwd)]
         return _ok(rid, {"enabled": True, "checkpoints": rows})
     return _with_checkpoints(session, go)
 
@@ -1174,12 +1185,30 @@ def _(rid, params: dict) -> dict:
     action = params.get("action", "status")
     if action == "status":
         url = _resolve_browser_cdp_url()
-        return _ok(rid, {"connected": bool(url), "url": url})
+        from tools.browser_use_cli import is_browser_use_cli_mode
+        return _ok(rid, {"connected": bool(url), "url": url, "browser_use": is_browser_use_cli_mode()})
+    if action == "use":
+        return _browser_manage_use(rid, params)
     if action == "disconnect":
         return _browser_disconnect(rid)
     if action == "connect":
         return _browser_connect(rid, params)
     return _err(rid, 4015, f"unknown action: {action}")
+
+
+def _browser_manage_use(rid, params: dict) -> dict:
+    """``/browser use [off]``: persist the target profile's ``browser.backend`` and drop cached
+    tool availability so the next agent build gets the swapped surface."""
+    from tools.browser_use_cli import is_browser_use_cli_mode, set_browser_use_mode
+    profile = (params.get("profile") or "").strip() or None
+    enabled = params.get("enabled", True)
+    try:
+        with _session_home_scope(None, profile=profile):
+            set_browser_use_mode(enabled is not False)
+            return _ok(rid, {"connected": bool(_resolve_browser_cdp_url()),
+                             "browser_use": is_browser_use_cli_mode()})
+    except ProfileUnavailableError:
+        return _err(rid, 4064, f"profile '{profile}' not found")
 
 
 @_scoped_rpc("config.show", 5030)
@@ -1206,9 +1235,12 @@ def _(rid, params: dict) -> dict:
 def _(rid, params: dict) -> dict:
     mt = _tools_mod("model_tools")
     session = _sessions.get(params.get("session_id", ""))
-    enabled = getattr(session["agent"], "enabled_toolsets", None) if session else _load_enabled_toolsets()
+    # Same read-back contract as tools.list: the session's own pin (its profile's config.yaml),
+    # never the launch profile's, even before the agent is built.
+    enabled, disabled = _session_toolsets(session)
     # Pre-assembly list: /tools must also show tools deferred behind the tool_search bridge (as the CLI).
-    tools = mt.get_tool_definitions(enabled_toolsets=enabled, quiet_mode=True, skip_tool_search_assembly=True)
+    tools = mt.get_tool_definitions(enabled_toolsets=enabled, disabled_toolsets=disabled,
+                                     quiet_mode=True, skip_tool_search_assembly=True)
     sections = {}
     for tool in sorted(tools, key=lambda t: t["function"]["name"]):
         name = tool["function"]["name"]
@@ -1335,8 +1367,19 @@ def _skills_search(rid, params, query):
 
 
 def _skills_install(rid, params, query):
-    quiet = _tools_mod("types").SimpleNamespace(print=lambda *a, **k: None)
-    _tools_mod("qubit_cli.skills_hub").do_install(query, skip_confirm=True, console=quiet)
+    class _Sink:
+        def __init__(self):
+            self.lines: list[str] = []
+
+        def print(self, *args, **_kwargs):
+            self.lines.append(" ".join(str(a) for a in args))
+
+    sink = _Sink()
+    verdict = _tools_mod("qubit_cli.skills_hub").do_install(query, skip_confirm=True, console=sink)
+    log = "\n".join(line for line in sink.lines if line.strip())
+    if verdict is not True:
+        tail = next((line for line in reversed(sink.lines) if line.strip()), "install did not complete")
+        return _err(rid, 5031, tail, data={"installed": False, "log": log})
     return _ok(rid, {"installed": True, "name": query})
 
 
@@ -1372,8 +1415,12 @@ def _(rid, params: dict) -> dict:
 def _(rid, params: dict) -> dict:
     # Bound like ``commands.catalog``: an unbound rescan runs against the launch env, reports the session's
     # project skills as "Removed" and republishes a registry without them (#114359).
-    with _session_home_scope(_sessions.get(params.get("session_id", "")), cwd=_completion_cwd(params)):
-        result = _tools_mod("agent.skill_commands").reload_skills()
+    try:
+        with _session_home_scope(_sessions.get(params.get("session_id", "")), cwd=_completion_cwd(params),
+                                 profile=params.get("profile")):
+            result = _tools_mod("agent.skill_commands").reload_skills()
+    except ProfileUnavailableError:
+        return _err(rid, 4064, f"profile '{params.get('profile')}' not found")
     added, removed = result.get("added") or [], result.get("removed") or []
     lines = ["Reloading skills..."] + ([] if added or removed else ["No new skills detected."])
     for label, items in (("Added skills:", added), ("Removed skills:", removed)):

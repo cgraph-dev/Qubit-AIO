@@ -28,7 +28,7 @@ def _write_display_sections(*, sections=None, drop_sections=(), **display_fields
         cur.pop(name, None)
     display["sections"] = cur
     cfg["display"] = display
-    _save_cfg(cfg)
+    _save_cfg(cfg, allow_deletions=bool(drop_sections))
 
 
 def _emit_session_info(sid: str, session: dict) -> None:

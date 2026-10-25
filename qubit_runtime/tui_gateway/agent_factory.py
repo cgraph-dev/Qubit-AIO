@@ -27,8 +27,9 @@ def _resolve_model() -> str:
 def _resolve_session_platform() -> str:
     """``HERMES_DESKTOP=1`` without ``HERMES_DESKTOP_TERMINAL`` → "desktop" (chat panel; the agent then
     suggests TUI-only slash commands), else "tui" (embedded terminal pane or standalone ``hermes --tui``)."""
-    desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP"))
-    return "desktop" if desktop and not is_truthy_value(os.environ.get("HERMES_DESKTOP_TERMINAL")) else "tui"
+    desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP") or os.environ.get("QUBIT_DESKTOP"))
+    terminal = os.environ.get("HERMES_DESKTOP_TERMINAL") or os.environ.get("QUBIT_DESKTOP_TERMINAL")
+    return "desktop" if desktop and not is_truthy_value(terminal) else "tui"
 
 
 def _resolve_session_source(explicit: str | None) -> str:
