@@ -30,7 +30,7 @@ def probe(base):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def rows():
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             db.row_factory = sqlite3.Row
             return [dict(r) for r in db.execute('SELECT * FROM session_admissions ORDER BY seq')]
 

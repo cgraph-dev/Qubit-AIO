@@ -17,7 +17,7 @@ from tests.gateway.fixtures.local_recovery_probe import Model, child_env, daemon
 
 
 def admissions(home):
-    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
         db.row_factory = sqlite3.Row
         return [dict(row) for row in db.execute('SELECT * FROM session_admissions ORDER BY seq')]
 

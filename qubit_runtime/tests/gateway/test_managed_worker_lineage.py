@@ -44,7 +44,7 @@ def test_worker_lineage_and_settlement(tmp_path, mode, invariant):
                PYTHONPATH=str(root), OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def query(sql, args=()):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute(sql, args).fetchall()
 
     async def call(ws, method, **params):

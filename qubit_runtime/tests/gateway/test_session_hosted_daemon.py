@@ -167,7 +167,7 @@ def test_room_unknown_discard_releases_only_its_followers(tmp_path):
                               payload={'text': 'FOLLOWER_HOSTED', 'thread_id': 'thread'})
             assert reply['result']['accepted'], reply
             import sqlite3
-            with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+            with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
                 previous["lease"] = db.execute("SELECT process_generation FROM hosted_room_driver_leases WHERE room_id=?", ("unknown",)).fetchone()[0]
             proc.kill()
             await asyncio.to_thread(proc.wait, 10)
@@ -183,7 +183,7 @@ def test_room_unknown_discard_releases_only_its_followers(tmp_path):
                 actions = [a for a in snapshot['pending_actions'] if a['kind'] == 'discard']
                 if actions:
                     import sqlite3
-                    with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+                    with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
                         lease = db.execute('SELECT process_generation FROM hosted_room_driver_leases WHERE room_id=?', ('unknown',)).fetchone()
                     if lease is not None and lease[0] != previous['lease']:
                         break

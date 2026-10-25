@@ -47,11 +47,11 @@ def test_local_session_authoring_commands_run_the_gateway_handler(tmp_path):
     out, sid = {}, {}
 
     def admissions():
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             return [r[0] for r in db.execute('SELECT request_id FROM session_admissions')]
 
     def meta(key):
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             row = db.execute('SELECT value FROM state_meta WHERE key = ?', (key,)).fetchone()
             return json.loads(row[0]) if row else None
 
@@ -218,7 +218,7 @@ def test_local_goal_kickoff_is_judged_and_continued_by_the_gateway(tmp_path):
     assert out['status'].startswith('✓ Goal done (2/20 turns)'), out['status']
     users = [m['content'] for m in out['messages'] if m.get('role') == 'user']
     assert users[0] == 'write the probe' and 'standing goal' in users[1], users
-    with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+    with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
         rows = db.execute('SELECT request_id, principal_id FROM session_admissions').fetchall()
     kick = [r for r in rows if r[0] == 'kick']
     continuation = [r for r in rows if r[0] != 'kick']

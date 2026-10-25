@@ -118,7 +118,9 @@ def test_next_managed_turn_reads_the_previous_workers_background_output(tmp_path
 
     async def exercise(desc):
         async with websocket(home, desc) as ws:
-            created = await rpc(ws, 'session.create', request_id='bg', source='cli', cwd=str(home), model='m',
+            # Daemon cold start under host load can exceed the fixture's normal bound.
+            created = await rpc(ws, 'session.create', timeout=120, request_id='bg', source='cli',
+                                cwd=str(home), model='m',
                                 provider='custom', base_url=url, api_key='loopback-only', toolsets=['terminal'],
                                 ignore_rules=True)
             sid = created['result']['session_id']

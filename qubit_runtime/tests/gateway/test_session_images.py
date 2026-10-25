@@ -116,12 +116,12 @@ def test_authenticated_daemon_upload_retains_exact_admitted_bytes(tmp_path):
                 denied = await rpc(ws, 'image.attach_bytes', **{**params, **changes})
                 assert denied['error']['message'] == 'invalid_params', denied
             assert list((home / 'cache/images').iterdir()) == [path]
-            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                 assert db.execute('SELECT count(*) FROM session_admissions').fetchone()[0] == 0
             submitted = await rpc(ws, 'prompt.submit', session_id=sid, input_id='image-input',
                                   text='Retain upload', attachments=[{'path': str(path), 'mime': image['mime']}])
             assert 'result' in submitted, submitted
-            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                 payload = json.loads(db.execute('SELECT payload_json FROM session_admissions WHERE request_id=?', ('image-input',)).fetchone()[0])
             retained = payload['attachments_v1']['media'][0]
             path.write_bytes(b'client staging changed after ACK')

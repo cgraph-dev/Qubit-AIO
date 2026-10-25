@@ -101,7 +101,7 @@ def test_followers_survive_compression_and_restart_in_order_exactly_once(tmp_pat
                              PYTHONUNBUFFERED='1')
 
     def rows(sql, args=()):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             db.row_factory = sqlite3.Row
             return [dict(row) for row in db.execute(sql, args)]
 

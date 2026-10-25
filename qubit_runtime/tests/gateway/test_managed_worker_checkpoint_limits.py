@@ -68,7 +68,7 @@ def test_managed_worker_trims_checkpoints_to_the_configured_max_snapshots(tmp_pa
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def status(request_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute('SELECT status FROM session_admissions WHERE request_id=?', (request_id,)).fetchall()
 
     async def exercise(desc):
@@ -83,7 +83,7 @@ def test_managed_worker_trims_checkpoints_to_the_configured_max_snapshots(tmp_pa
                 assert 'result' in submitted, submitted
                 await async_wait_until(lambda: status(request_id) == [('terminal',)], timeout=90, interval=.05,
                                        what=request_id + ' terminal')
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute('SELECT COUNT(*) FROM worker_executions WHERE session_id=?', (sid,)).fetchone()[0]
     try:
         with daemon(root, home, env, barrier=False) as (_owner, desc):

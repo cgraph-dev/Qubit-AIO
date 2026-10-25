@@ -88,7 +88,7 @@ def test_real_tool_enabled_worker_never_opens_canonical_database(tmp_path):
             proof = json.loads(receipt.read_text())
             assert not proof['failed'] and proof['result'] == 'WORKER_TOOL_LEDGER_OK', proof
             assert proof['opens'] == [] and proof['fds'] == [], proof
-            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                 tools = db.execute("SELECT content FROM messages WHERE session_id=? AND role='tool'", (sid,)).fetchall()
                 assert len(tools) == 1 and 'WORKER_TOOL_LEDGER_OK' in tools[0][0], tools
                 assert db.execute('SELECT COUNT(*) FROM session_turn_leases').fetchone()[0] == 0

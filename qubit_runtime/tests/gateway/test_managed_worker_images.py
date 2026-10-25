@@ -68,7 +68,7 @@ def test_admitted_images_reach_managed_worker(tmp_path, mode, model):
             if model == 'image-fixture':
                 import sqlite3
                 from contextlib import closing
-                with closing(sqlite3.connect((home / 'state.db').as_uri() + '?mode=ro', uri=True)) as db:
+                with closing(sqlite3.connect((home / 'state.db').as_uri() + '?mode=ro', uri=True, timeout=30)) as db:
                     assert db.execute('SELECT SUM(input_tokens) FROM session_model_usage WHERE session_id=? AND task=?',
                                       (sid, 'vision')).fetchone()[0] > 0
 

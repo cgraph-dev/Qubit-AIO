@@ -104,7 +104,7 @@ async def test_voice_turn_is_admitted_and_scoped_to_its_own_turn(tmp_path, monke
     assert seen == [('spoken', True, ''), ('typed', False, '')]
 
 def _admissions(home):
-    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
         return dict(db.execute('SELECT request_id, status FROM session_admissions'))
 
 
@@ -231,7 +231,7 @@ def test_managed_worker_turn_carries_the_committed_surface_to_the_model(tmp_path
         model.server_close()
         thread.join(timeout=5)
 
-    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
         assert db.execute('SELECT COUNT(*) FROM worker_executions').fetchone()[0] == 3, 'every turn ran in a child'
     turns = {}
     for request in model.requests:

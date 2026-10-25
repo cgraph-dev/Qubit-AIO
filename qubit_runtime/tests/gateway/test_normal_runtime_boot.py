@@ -161,7 +161,7 @@ def test_normal_entrypoint_earns_authenticated_authority_readiness(tmp_path, mod
             assert descriptor.get('state') == 'ready', (descriptor, log.read())
             assert descriptor['authority_epoch'] > 0
             import sqlite3
-            with sqlite3.connect(f"file:{home / 'state.db'}?mode=ro", uri=True) as db:
+            with sqlite3.connect(f"file:{home / 'state.db'}?mode=ro", uri=True, timeout=30) as db:
                 assert db.execute('SELECT epoch, instance_id FROM runtime_epoch').fetchone() == (
                     descriptor['authority_epoch'], descriptor['instance_id'])
             assert descriptor['served_profiles'] == [{'profile_id': str(home), 'home': str(home)}]

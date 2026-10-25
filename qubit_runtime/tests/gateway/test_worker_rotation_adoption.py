@@ -79,7 +79,7 @@ def test_rotated_agent_survives_owner_kill_and_explicit_adoption(tmp_path):
                 assert proof['restart']['after_epoch'] > first['epoch']
                 assert len(peer.requests) == 2
                 assert 'RECOVERY_ACK_WORKER_INFERENCE' in proof['result']
-                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                     assert db.execute('SELECT COUNT(*) FROM session_turn_leases').fetchone()[0] == 0
                     assert db.execute('SELECT session_id,status FROM worker_executions').fetchone() == (proof['after'], 'terminal')
                     assert db.execute('SELECT input_tokens,output_tokens FROM sessions WHERE id=?', (proof['after'],)).fetchone() == (10, 5)

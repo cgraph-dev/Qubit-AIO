@@ -55,7 +55,7 @@ def test_worker_survives_owner_restart_without_repeating_tool(tmp_path):
                 assert first['outbox_full'] == 'outbox_full'
                 assert first['writable_canonical_fds'] == []
                 assert first['canonical_opens'] == []
-                with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+                with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
                     assert db.execute('SELECT COUNT(*) FROM messages WHERE session_id=?', (sid,)).fetchone()[0] == 3
                     assert db.execute('SELECT input_tokens FROM sessions WHERE id=?', (sid,)).fetchone()[0] == 11
                 owner.kill(); owner.wait(timeout=10)
@@ -68,7 +68,7 @@ def test_worker_survives_owner_restart_without_repeating_tool(tmp_path):
                 assert second['writable_canonical_fds'] == []
                 assert second['canonical_opens'] == []
                 assert second['pid'] == first['pid'] == worker.pid
-                with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+                with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
                     assert db.execute("SELECT COUNT(*) FROM messages WHERE content='tool-marker'").fetchone()[0] == 1
                     assert db.execute('SELECT input_tokens FROM sessions WHERE id=?', (sid,)).fetchone()[0] == 11
                     assert db.execute("SELECT input_tokens FROM session_model_usage WHERE task='compression'").fetchone()[0] == 5

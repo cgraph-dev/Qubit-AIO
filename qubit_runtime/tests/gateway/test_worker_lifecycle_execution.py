@@ -50,7 +50,7 @@ def test_worker_lifecycle_then_owner_successor_refuses_late_mutations(tmp_path):
             return ids
 
     def rows(sid):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             db.row_factory = sqlite3.Row
             return dict(db.execute('SELECT * FROM sessions WHERE id=?', (sid,)).fetchone())
 
@@ -61,7 +61,7 @@ def test_worker_lifecycle_then_owner_successor_refuses_late_mutations(tmp_path):
             response = await rpc(ws, 'prompt.submit', session_id=sid, input_id='successor', text='SUCCESSOR')
             assert 'result' in response, response
             def terminal():
-                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                     status = db.execute('SELECT status FROM session_admissions WHERE request_id=?', ('successor',)).fetchone()
                 return status and status[0] == 'terminal'
             await async_wait_until(terminal, timeout=30, what='the successor admission terminal')

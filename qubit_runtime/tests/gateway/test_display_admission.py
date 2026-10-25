@@ -105,7 +105,7 @@ def test_real_daemon_persists_hidden_rows_and_the_paste_title_preview(tmp_path, 
         model.server_close()
         thread.join(timeout=5)
 
-    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
         rows = {sid: db.execute("SELECT content, display_kind, display_metadata FROM messages WHERE session_id=? AND role='user'",
                                 (sid,)).fetchall() for sid in sids.values()}
     [(hidden_text, hidden_kind, _)] = rows[sids['hidden']]
