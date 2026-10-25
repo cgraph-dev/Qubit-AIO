@@ -50,12 +50,14 @@ def _named_profiles(argv: list[str]) -> set[str]:
 
 def _packaged_exe(root: Path) -> Path:
     desktop_dir = root / "apps" / "desktop"
+    # The packaged binary is named from the electron-builder product identity
+    # (displayName "Qubit"), so match the launcher's real candidate list.
     if sys.platform == "darwin":
-        exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
     elif sys.platform == "win32":
         exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
     else:
-        exe = desktop_dir / "release" / "linux-unpacked" / "qubit"
+        exe = desktop_dir / "release" / "linux-unpacked" / "Qubit"
         exe.parent.mkdir(parents=True, exist_ok=True)
         (exe.parent / "chrome-sandbox").write_text("", encoding="utf-8")
     exe.parent.mkdir(parents=True, exist_ok=True)
