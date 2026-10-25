@@ -567,7 +567,10 @@ def _under_gateway_supervisor(argv: list) -> bool:
     identity-assumption vector). Generated units only ever WRITE the QUBIT_
     spelling; see gateway/restart.py ``SUPERVISED_CHILD_ENV``.
     """
-    from gateway.restart import (
+    # Leaf module: the early-recovery bootstrap runs under ``-S`` (damaged/missing
+    # site-packages), so importing gateway.restart here would pull qubit_cli.config and
+    # fail on ruamel before PM can repair the environment.
+    from gateway.supervisor_markers import (
         EXTERNAL_GATEWAY_SUPERVISOR_ENV,
         EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES,
         s6_supervised_child_marker_present,

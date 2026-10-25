@@ -7,6 +7,17 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping
 
+from gateway.supervisor_markers import (  # noqa: F401 — re-exported for existing importers
+    EXTERNAL_GATEWAY_SUPERVISOR_ENV,
+    EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES,
+    S6_SUPERVISED_CHILD_ENV,
+    S6_SUPERVISED_CHILD_ENV_ALIASES,
+    SUPERVISED_CHILD_ENV,
+    SUPERVISED_CHILD_ENV_ALIASES,
+    external_supervisor_marker_present,
+    s6_supervised_child_marker_present,
+    supervised_child_marker_present,
+)
 from qubit_cli.config import DEFAULT_CONFIG
 
 # EX_TEMPFAIL (sysexits.h): ask the service manager to restart after a graceful drain/reload.
@@ -30,53 +41,6 @@ def map_fatal_config_exit_for_launchd(returncode: int) -> int:
     if returncode == GATEWAY_FATAL_CONFIG_EXIT_CODE:
         return 0
     return returncode
-
-# The supervised-child marker family. One canonical (QUBIT_) spelling is WRITTEN by every
-# generated launcher; the legacy (HERMES_) spelling stays READ-ONLY so a systemd unit,
-# launchd plist or Windows Scheduled Task installed by an older build — which exports the
-# legacy name and cannot be rewritten in place — is still recognised. Do not write the
-# aliases; they exist only to converge installed machines onto the canonical name, which
-# happens whenever the unit is regenerated (`qubit gateway install` /
-# `refresh_systemd_unit_if_needed`). S6_SUPERVISED_CHILD is the s6-image sibling of the
-# same marker.
-SUPERVISED_CHILD_ENV = "QUBIT_SUPERVISED_CHILD"
-SUPERVISED_CHILD_ENV_ALIASES = ("HERMES_SUPERVISED_CHILD",)
-S6_SUPERVISED_CHILD_ENV = "QUBIT_S6_SUPERVISED_CHILD"
-S6_SUPERVISED_CHILD_ENV_ALIASES = ("HERMES_S6_SUPERVISED_CHILD",)
-
-# Set by ``qubit gateway run --external-supervisor``. Unlike systemd's INVOCATION_ID
-# and launchd's XPC_SERVICE_NAME, this survives wrappers that replace the child
-# environment (e.g. ``sudo env -i``).
-EXTERNAL_GATEWAY_SUPERVISOR_ENV = "QUBIT_GATEWAY_EXTERNAL_SUPERVISOR"
-EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES = ("HERMES_GATEWAY_EXTERNAL_SUPERVISOR",)
-
-
-def supervised_child_marker_present(env: Mapping[str, str]) -> bool:
-    """True when *env* carries any supervised-child marker, canonical or legacy.
-
-    Canonical-first lookup over the family so a launcher written by either build is
-    recognised: the QUBIT_ spelling is what generated units now write, the HERMES_
-    alias is what units installed by older builds still write. Presence-only, like the
-    consumers in ``qubit_cli.dashboard_procs`` — the value is not parsed.
-    """
-    return any(
-        env.get(name) for name in (SUPERVISED_CHILD_ENV, *SUPERVISED_CHILD_ENV_ALIASES)
-    )
-
-
-def s6_supervised_child_marker_present(env: Mapping[str, str]) -> bool:
-    """True when *env* carries any s6 supervised-child marker, canonical or legacy."""
-    return any(
-        env.get(name) for name in (S6_SUPERVISED_CHILD_ENV, *S6_SUPERVISED_CHILD_ENV_ALIASES)
-    )
-
-
-def external_supervisor_marker_present(env: Mapping[str, str]) -> bool:
-    """True when *env* opts into ``--external-supervisor``, canonical or legacy."""
-    return any(
-        env.get(name)
-        for name in (EXTERNAL_GATEWAY_SUPERVISOR_ENV, *EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES)
-    )
 
 # Forwarded by the stderr-timestamp launchd wrapper (qubit_cli/stderr_timestamp.py) to the gateway
 # grandchild, which sees ``XPC_SERVICE_NAME=0``. Read only via :func:`launchd_job_label`.
