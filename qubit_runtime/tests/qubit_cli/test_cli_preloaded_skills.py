@@ -40,7 +40,8 @@ def test_main_applies_preloaded_skills_to_system_prompt(monkeypatch):
         created["cli"] = _DummyCLI(**kwargs)
         return created["cli"]
 
-    monkeypatch.setattr(cli_mod, "HermesCLI", fake_cli)
+    # main() constructs the canonical QubitCLI (HermesCLI is only an alias).
+    monkeypatch.setattr(cli_mod, "QubitCLI", fake_cli)
     monkeypatch.setattr(
         cli_mod,
         "build_preloaded_skills_prompt",
@@ -67,7 +68,8 @@ def test_main_raises_for_unknown_preloaded_skill(monkeypatch):
         created["cli"] = _DummyCLI(**kwargs)
         return created["cli"]
 
-    monkeypatch.setattr(cli_mod, "HermesCLI", fake_cli)
+    # main() constructs the canonical QubitCLI (HermesCLI is only an alias).
+    monkeypatch.setattr(cli_mod, "QubitCLI", fake_cli)
     monkeypatch.setattr(
         cli_mod,
         "build_preloaded_skills_prompt",
