@@ -21,6 +21,9 @@ from gateway.run import GatewayRunner
 def _bare_runner(multiplex: bool = True):
     runner = object.__new__(GatewayRunner)
     runner.config = MagicMock(multiplex_profiles=multiplex)
+    # A bare MagicMock would auto-create the reservation attribute and bypass the
+    # profiles_to_serve fallback this test patches.
+    runner.config._runtime_profile_homes = None
     runner.adapters = {}
     runner._profile_adapters = {}
     runner.pairing_store = MagicMock()
