@@ -359,6 +359,11 @@ class TestSalvageFollowups:
             )
             assert done.wait(timeout=5), "background refresh did not complete"
         assert saved["custom:https://gw.example.com/v1#fp"]["models"] == ["refreshed"]
+        # The save happens before the worker's finally releases the inflight key; wait for that
+        # release rather than racing it (the key still guards a concurrent refresh).
+        deadline = time.time() + 5
+        while "custom:https://gw.example.com/v1#fp" in mod._swr_refresh_inflight and time.time() < deadline:
+            time.sleep(0.01)
         assert "custom:https://gw.example.com/v1#fp" not in mod._swr_refresh_inflight
 
     def test_corrupt_at_field_degrades_to_live_fetch_instead_of_raising(self):
