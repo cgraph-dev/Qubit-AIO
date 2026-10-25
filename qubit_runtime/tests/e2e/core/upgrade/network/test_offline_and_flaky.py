@@ -47,7 +47,6 @@ def inst(tmp_path_factory):
     return S.seed_install(tmp_path_factory.mktemp("net-flaky"))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_offline_update_fails_fast_and_changes_nothing(inst):
     inst.publish("offline")
     before = inst.state()
@@ -58,7 +57,6 @@ def test_offline_update_fails_fast_and_changes_nothing(inst):
         "the offline failure does not say the network was unreachable\n" + r.report(inst))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_offline_provisioning_of_a_missing_tool_fails_loudly(inst):
     """The tool store lost an entry (pruned, antivirus, disk cleanup) and the machine is offline:
     the documented remedy `qubit pm install <tool>` must fail within bounds, name the tool and
@@ -74,7 +72,6 @@ def test_offline_provisioning_of_a_missing_tool_fails_loudly(inst):
             "an offline install left a store entry behind\n" + r.report(inst))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_channel_503_with_retry_after_is_retried_then_updates(inst):
     """One 503 + ``Retry-After: 1`` from the release host (a CDN blip), then normal service."""
     new = inst.publish("channel-blip")
@@ -90,7 +87,7 @@ def test_channel_503_with_retry_after_is_retried_then_updates(inst):
     assert len(reads) >= 2, f"update succeeded without re-reading the record ({reads})\n" + r.report(inst)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
+@pytest.mark.xfail(strict=True, reason="wave-25 short-port: the fork deliberately falls back to the git branch when the main channel record is unreadable (qubit_cli/source_releases.py:188-195), so a main-channel 503 updates instead of failing; the upstream test expects fail-fast and no fall-through")
 def test_channel_outage_fails_truthfully_within_bounds(inst):
     """The release host answers 503 to every request: bounded retries, then a truthful failure,
     and no fall-through to the git branch."""
@@ -107,7 +104,6 @@ def test_channel_outage_fails_truthfully_within_bounds(inst):
     assert "503" in r.out and "channel" in r.out.lower(), "the failure does not name the 503 from the channel\n" + r.report(inst)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_forge_rate_limit_fails_truthfully(inst):
     """Every git request gets HTTP 429 (the repo-scoped throttle users hit): the update must exit
     non-zero, say it was rate limited, and print no success banner (#106026)."""
@@ -132,7 +128,6 @@ ARTIFACT_HOSTS = {
 }
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 @pytest.mark.parametrize("tool_name", sorted(ARTIFACT_HOSTS))
 def test_pm_download_retries_then_refuses_a_digest_mismatch(inst, tool_name):
     """Artifact host: two 503s with Retry-After (retried), then bytes that are not the pinned
@@ -158,7 +153,7 @@ def test_pm_download_retries_then_refuses_a_digest_mismatch(inst, tool_name):
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
+@pytest.mark.xfail(strict=True, reason="wave-25 short-port: the fork reads the main channel record before falling back to the git branch (qubit_cli/source_releases.py:188-195), so the record read is never skipped; the upstream test expects main to read no release record")
 def test_main_update_reads_no_release_record_and_survives_a_release_host_outage(inst):
     """The release host answers 503 to everything (a CDN outage, or the regional WAF 403s of
     #128295): ``main`` follows the git branch and never reads a release record, so the update
@@ -167,7 +162,7 @@ def test_main_update_reads_no_release_record_and_survives_a_release_host_outage(
     assets = N.static_app({}, always={MAIN_RECORD: N.Response(503, b"down\n", {"Retry-After": "1"})})
     edge = inst.edge(assets=assets)
     try:
-        r = inst.hermes("update", "--yes", edge=edge)
+        r = inst.qubit("update", "--yes", edge=edge)
     finally:
         edge.close()
     assert r.rc == 0 and inst.head() == new, "a release-host outage blocked a main update\n" + r.report(inst)

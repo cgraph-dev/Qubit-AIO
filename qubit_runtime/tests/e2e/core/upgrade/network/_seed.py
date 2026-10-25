@@ -36,7 +36,9 @@ from tests.e2e.core.upgrade import _install_helpers as I
 from tests.e2e.core.upgrade.network import _netedge as N
 
 ASSETS = "qubit-assets.nousresearch.com"
-REPOSITORY = "NousResearch/qubit"
+# The runtime installer clones this origin (scripts/install.sh REPO_URL), and channel
+# records are validated against the origin repository, so the harness publishes for it.
+REPOSITORY = "NousResearch/hermes-agent"
 # Hosts a correctly isolated update must never reach directly; with the proxy they appear in
 # the proxy log as "refused" (the proxy has no route for them).
 PUBLIC_INDEXES = ("pypi.org", "files.pythonhosted.org", "registry.npmjs.org")
@@ -193,6 +195,10 @@ def seed_install(root: Path) -> Installed:
     # The host's SSL_CERT_FILE (allowlisted by _helpers) would replace the sandbox's trust store
     # and hide the corporate root the cells install; the cells control trust explicitly.
     sb.env.pop("SSL_CERT_FILE", None)
+    # The fork has no dedicated release-asset domain (install_source defaults the channel base to
+    # the public repository), but this edge serves channel metadata on its own host, so point the
+    # installed updater at it explicitly — the supported QUBIT_RELEASE_ASSETS_BASE_URL override.
+    sb.env["QUBIT_RELEASE_ASSETS_BASE_URL"] = f"https://{ASSETS}"
     script = sb.root / "install.sh"
     shutil.copy(H.WORKTREE / "scripts" / "install.sh", script)
     cp = sb.run(["bash", str(script), "--non-interactive", "--skip-browser"], timeout=1800, input="")
@@ -201,7 +207,7 @@ def seed_install(root: Path) -> Installed:
     (sb.home / ".gitconfig").write_text("", encoding="utf-8")
     gitroot = root / "gitroot"
     (gitroot / "NousResearch").mkdir(parents=True, exist_ok=True)
-    (gitroot / "NousResearch" / "qubit.git").symlink_to(origin)
+    (gitroot / "NousResearch" / "hermes-agent.git").symlink_to(origin)
     ca = N.TestCA(root / "corporate-ca")
     inst = Installed(root, sb, origin, gitroot, ca, ca.os_trust_store(root / "corporate-ca" / "etc-ssl-certs"))
     assert_isolated(inst)
