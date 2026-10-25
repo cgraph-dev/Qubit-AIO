@@ -21,7 +21,7 @@ def _assert_qubit_identity_headers(headers):
     plus Perplexity's integration header."""
     from qubit_cli.version_info import get_version_info
 
-    assert headers["HTTP-Referer"] == "https://github.com/cgraph-dev/qubit-voicebridge"
+    assert headers["HTTP-Referer"] == "https://qubit.nousresearch.com"
     assert headers["X-Title"] == "Qubit Agent"
     assert headers["User-Agent"] == f"Qubit-Agent/{get_version_info().base_version}"
     assert headers["X-Pplx-Integration"] == "qubit-agent"

@@ -209,7 +209,6 @@ def test_resolution_never_raises(voice_home, monkeypatch):
     assert result["stt"]["mode"] in {"direct", "relay"}
     assert result["tts"]["mode"] in {"direct", "relay"}
 
-@pytest.mark.xfail(strict=True, reason="wave-24 short-port: configured xai stt model does not reach the client")
 def test_xai_config_model_reaches_client(voice_home, monkeypatch):
     voice_home({"stt": {"provider": "xai", "xai": {"model": "grok-voice-transcribe-1.0"}}})
     monkeypatch.setenv("XAI_API_KEY", "xai_key1")

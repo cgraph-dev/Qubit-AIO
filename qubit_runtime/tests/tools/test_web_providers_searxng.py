@@ -210,6 +210,9 @@ class TestCheckWebApiKey:
         # Disable the keyless free tier — with it on, zero credentials still
         # resolves (Parallel/Exa anonymous MCP; see test_web_keyless_fallback.py).
         monkeypatch.setattr(web_search_registry, "_keyless_tier_enabled", lambda: False)
+        # ddgs is a registered backend now; neutralize its own availability probe
+        # (the module-level importable check no longer governs the registry path).
+        monkeypatch.setattr("plugins.web.ddgs.provider.DDGSWebSearchProvider.is_available", lambda self: False)
         assert web_tools.check_web_api_key() is False
 
 

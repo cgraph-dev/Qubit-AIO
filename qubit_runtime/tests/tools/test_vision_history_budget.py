@@ -186,10 +186,19 @@ class TestNativeTurnDedupe:
                 self.calls += 1
                 return _tool_call_turn() if self.calls == 1 else _final_turn()
 
+        def _run_coro(coro):
+            """Run a coroutine even when the turn already owns this thread's loop."""
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return asyncio.run(coro)
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(asyncio.run, coro).result()
+
         def _dispatch(name, args, task_id=None, **kwargs):
             assert name == "vision_analyze"
-            result = asyncio.new_event_loop().run_until_complete(
-                vision_tools._handle_vision_analyze(args, task_id=task_id))
+            result = _run_coro(vision_tools._handle_vision_analyze(args, task_id=task_id))
             tool_results.append(result)
             return result
 
@@ -210,4 +219,4 @@ class TestNativeTurnDedupe:
         assert not _embedded(tool_results[0])
         assert json.loads(tool_results[0])["already_in_context"] is True
         # The scope ended with the turn: a later load (after compression) embeds again.
-        assert _embedded(asyncio.new_event_loop().run_until_complete(_vision_analyze_native(same, "q")))
+        assert _embedded(_run_coro(_vision_analyze_native(same, "q")))

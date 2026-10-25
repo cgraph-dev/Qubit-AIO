@@ -51,7 +51,8 @@ class TestWriteVerification:
             def hexdigest(self):
                 return self._h.hexdigest()
 
-        with mock_patch.object(fo.hashlib, "sha256", _WrongHash):
+        with mock_patch.object(fo._native_io, "sha256_of",
+                               lambda path: _WrongHash().hexdigest()):
             r = json.loads(write_file_tool(str(f), "actual content\n", task_id="t-wv"))
         assert "error" in r
 
@@ -67,7 +68,8 @@ class TestWriteVerification:
                 raise RuntimeError("no hash binary")
             return real_exec(self, cmd, **kw)
 
-        with mock_patch.object(fo.ShellFileOperations, "_exec", flaky_exec):
+        with mock_patch.object(fo.ShellFileOperations, "_exec", flaky_exec), \
+             mock_patch.object(fo.ShellFileOperations, "_native_read_enabled", return_value=False):
             r = json.loads(write_file_tool(str(f), "content lands anyway\n", task_id="t-wv2"))
         assert "error" not in r
         assert f.read_text() == "content lands anyway\n"

@@ -151,5 +151,7 @@ class TestPromotionKeepsTheDetachmentGuard:
              patch("tools.terminal_tool._start_cleanup_thread"):
             result = json.loads(terminal_tool(command="sleep 5 &", timeout=9999))
             result2 = json.loads(terminal_tool(command="nohup make test", timeout=9999))
-        assert "'&' backgrounding" in result["error"]
+        # A lone trailing `&` is now converted to a tracked background session.
+        assert result.get("error") is None
+        assert result.get("auto_backgrounded")
         assert "nohup" in result2["error"]

@@ -52,6 +52,10 @@ def test_unselected_cloud_credentials_do_not_expose_edge_tool(monkeypatch):
 
     monkeypatch.setattr(tts_tool, "_load_tts_config", lambda: {})
     monkeypatch.setattr(tts_tool, "_import_edge_tts", MagicMock(side_effect=ImportError))
+    # Availability of the default edge provider is pm's answer now.
+    monkeypatch.setattr(tts_tool, "_pm_extra_available", lambda extra: False)
+    monkeypatch.setattr(tts_tool, "_check_neutts_available", lambda: False)
+    monkeypatch.setattr(tts_tool, "_ready_after_first_use_install", lambda provider: False)
     monkeypatch.setenv("OPENAI_API_KEY", "unselected-key")
 
     assert tts_tool.check_tts_requirements() is False

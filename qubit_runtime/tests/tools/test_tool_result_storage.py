@@ -1,6 +1,8 @@
 """Tests for tools/tool_result_storage.py -- 3-layer tool result persistence."""
 
 import json
+from pathlib import Path
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -481,6 +483,11 @@ class TestSpillover:
         import os
         import time as _time
 
+        # The prune now follows ``sessions.retention_days``; pin a 1-day window so a
+        # 48h-old archive is genuinely expired.
+        home = Path(os.environ["QUBIT_HOME"])
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "config.yaml").write_text("sessions:\n  retention_days: 1\n", encoding="utf-8")
         spill_dir = get_spillover_dir()
         spill_dir.mkdir(parents=True, exist_ok=True)
         old = spill_dir / "ancient.txt"

@@ -55,8 +55,8 @@ _KEY_URL = "https://www.perplexity.ai/account/api"
 _HEADERS = {
     "HTTP-Referer": "https://qubit.nousresearch.com",
     "X-Title": "Qubit Agent",
-    "User-Agent": f"QubitAgent/{get_version_info().base_version}",
-    "X-Pplx-Integration": "qubit",
+    "User-Agent": f"Qubit-Agent/{get_version_info().base_version}",
+    "X-Pplx-Integration": "qubit-agent",
 }
 
 
