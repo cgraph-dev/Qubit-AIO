@@ -37,14 +37,25 @@ def test_doctor_lists_the_files_the_runtime_loads(tmp_path, monkeypatch, capsys,
     relay_runtime._reset_for_tests()
     host = relay_runtime.RelayRuntime(relay=relay, profile_key="profile")
     try:
-        assert host._plugin_configuration_state is relay_runtime._RelayPluginConfigurationState.ACTIVE
-        loaded = relay_runtime._activation_config_paths(relay_runtime._PLUGIN_CONFIGURATION._activation)
+        if not explicit:
+            # Relay 0.9 removed standard user/system discovery: with no explicit
+            # HERMES_NEMO_RELAY_PLUGINS_TOML the runtime stays disabled and doctor
+            # reports no files (a nearby ~/.config/nemo-relay/plugins.toml is ignored).
+            assert host._plugin_configuration_state is relay_runtime._RelayPluginConfigurationState.DISABLED
+            loaded = ()
+        else:
+            assert host._plugin_configuration_state is relay_runtime._RelayPluginConfigurationState.ACTIVE
+            loaded = relay_runtime._activation_config_paths(relay_runtime._PLUGIN_CONFIGURATION._activation)
     finally:
         host.shutdown()
         relay_runtime._reset_for_tests()
 
-    assert (str(user_config) in loaded) is not explicit
+    if not explicit:
+        assert "No Relay plugin files found" in doctor_output
+        assert str(user_config) not in doctor_output
+        return
+    assert str(selected) in loaded
+    assert str(user_config) not in loaded
     assert "Relay plugins enabled" in doctor_output
     assert all(path in doctor_output for path in loaded)
-    if explicit:
-        assert str(user_config) not in doctor_output
+    assert str(user_config) not in doctor_output

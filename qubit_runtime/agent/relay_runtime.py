@@ -171,12 +171,19 @@ def _activation_requires_managed_execution(activation: Any) -> bool:
 
 
 def _activation_config_paths(activation: Any) -> list[str]:
-    """Return the plugins.toml files an activation loaded, lowest precedence first."""
+    """Return the plugins.toml files an activation loaded, lowest precedence first.
+
+    Relay 0.9's activation report no longer carries ``config_paths``; an explicitly selected
+    file is still the one that was loaded, so fall back to it (matching resolve_plugin_sources).
+    """
     try:
         paths = getattr(activation, "report", {}).get("config_paths")
     except Exception:
-        return []
-    return [str(path) for path in paths] if isinstance(paths, list) else []
+        paths = None
+    if isinstance(paths, list) and paths:
+        return [str(path) for path in paths]
+    explicit = _explicit_plugins_toml()
+    return [str(explicit)] if explicit is not None else []
 
 
 def _report_requires_managed_execution(report: Any) -> bool:
