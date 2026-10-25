@@ -702,18 +702,18 @@
     },
     "task_entrypoint": {
       "enum": [
-"api",
-"background",
-"batch",
-"delegated",
-"gateway_message",
-"interactive",
-"one_shot",
-"other",
-"python",
-"scheduled_task",
-"unknown"
-]
+        "api",
+        "background",
+        "batch",
+        "delegated",
+        "gateway_message",
+        "interactive",
+        "one_shot",
+        "other",
+        "python",
+        "scheduled_task",
+        "unknown"
+      ]
     },
     "duration_bucket": {
       "enum": [
@@ -2506,7 +2506,8 @@
             "failed_stage",
             "from_version_age_bucket",
             "kind",
-            "outcome"
+            "outcome",
+            "failure_class"
           ],
           "properties": {
             "apply_mode": {
@@ -2560,8 +2561,58 @@
               "enum": [
                 "failed",
                 "noop",
+                "partial",
                 "refused",
                 "success"
+              ]
+            },
+            "failure_class": {
+              "enum": [
+                "aborted_before_apply",
+                "branch_missing",
+                "branch_unsupported",
+                "build_failed",
+                "channel_unresolved",
+                "checkout_move_failed",
+                "commit_point_refused",
+                "deps_failed",
+                "detached_head",
+                "disk_full",
+                "downgrade_refused",
+                "download_failed",
+                "exception",
+                "fetch_failed",
+                "fleet_stale",
+                "fleet_unverified",
+                "gateway_pause_failed",
+                "git_failed",
+                "git_in_progress",
+                "git_index_locked",
+                "git_timeout",
+                "head_moved",
+                "interrupted",
+                "local_changes_blocked",
+                "local_changes_parked",
+                "lock_held",
+                "managed_install",
+                "merge_conflict",
+                "none",
+                "not_git_checkout",
+                "old_version_handoff",
+                "os_error",
+                "other",
+                "parked_branch_blocked",
+                "permission_denied",
+                "restart_failed",
+                "stash_restore_rejected",
+                "subprocess_failed",
+                "syntax_rollback",
+                "target_syntax_error",
+                "target_unresolved",
+                "unexpected_branch",
+                "unknown",
+                "venv_foreign_owner",
+                "zip_failed"
               ]
             }
           }
@@ -3297,9 +3348,8 @@
             "toolset": {
               "enum": [
                 "bot_room",
-                "setup",
-                "start_chat",
                 "browser",
+                "catalog",
                 "clarify",
                 "code_execution",
                 "coding",
@@ -3316,6 +3366,11 @@
                 "feishu_doc",
                 "feishu_drive",
                 "file",
+                "homeassistant",
+                "image_gen",
+                "kanban",
+                "memory",
+                "project",
                 "qubit-acp",
                 "qubit-api-server",
                 "qubit-bluebubbles",
@@ -3340,17 +3395,12 @@
                 "qubit-weixin",
                 "qubit-whatsapp",
                 "qubit-yuanbao",
-                "homeassistant",
-                "image_gen",
-                "kanban",
-                "memory",
-                "project",
                 "safe",
                 "search",
                 "session_search",
                 "setup",
                 "skills",
-                "spotify",
+                "start_chat",
                 "terminal",
                 "todo",
                 "tts",

@@ -1053,4 +1053,10 @@ def _run_post_update_maintenance(
             print(line)
 
     _print_post_update_notices_and_self_heals()
+    # A non-✓ completion message (parked local changes) withholds success on its own; only a
+    # ✓ message that still came back False is the SQLite verdict.
+    if not update_complete and (completion_message or "✓").startswith("✓"):
+        from qubit_cli.update_receipt import record_followup
+        record_followup("sqlite_runtime", "the selected Python links an unsafe SQLite runtime",
+                        retry="run the installer again")
     return update_complete

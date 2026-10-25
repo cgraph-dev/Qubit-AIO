@@ -60,7 +60,10 @@ def reset_bundled_skill(name: str, restore: bool = False) -> dict:
     return {"ok": True, "action": action, "message": message, "synced": synced}
 
 
-_OWN_REPO_PREFIXES = ("nousresearch/qubit/skills/", "skills-sh/nousresearch/qubit/")
+_OWN_REPO_PREFIXES = (
+    "nousresearch/qubit/skills/", "skills-sh/nousresearch/qubit/",
+    "nousresearch/qubit-agent/skills/", "skills-sh/nousresearch/qubit-agent/",
+)
 
 
 def bundled_skill_for_install(identifier: str) -> Optional[str]:

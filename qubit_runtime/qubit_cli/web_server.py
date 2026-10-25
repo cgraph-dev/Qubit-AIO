@@ -298,15 +298,6 @@ _DASHBOARD_EMBEDDED_CHAT_ENABLED = True
 _DESKTOP_ATTACHMENT_WS_MAX_BYTES = 384 * 1024 * 1024
 
 
-# CORS: localhost origins only — allow_origins=["*"] on 0.0.0.0 would let any
-# website read/modify config and secrets.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Endpoints that do NOT require the session token; everything else under /api/
 # is gated below. Shared with the OAuth gate so the two allowlists cannot
 # drift (/api/status once 401'd under the OAuth gate, breaking the portal probe).
@@ -668,6 +659,17 @@ async def _dashboard_health_middleware(request: Request, call_next):
     if response.status_code >= 500:
         DASHBOARD_HEALTH.record_error(f"http_{response.status_code}", request.url.path)
     return response
+
+# CORS: localhost origins only — allow_origins=["*"] on 0.0.0.0 would let any
+# website read/modify config and secrets. Registered LAST (outermost) so an
+# OPTIONS preflight is answered before the auth middlewares: registered before
+# them it was innermost and every cross-origin preflight got a 401.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # Authenticated-route self-test: one in-process request per minute against a

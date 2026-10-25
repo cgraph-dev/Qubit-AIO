@@ -833,7 +833,7 @@ def _lap_lmstudio_row(b: _PickerBuild, user_providers: dict) -> None:
     from qubit_cli.model_switch import _declared_model_ids
     configured_models = _declared_model_ids(configured.get("models")) if isinstance(configured, dict) else []
     model_ids = list(dict.fromkeys([*configured_models, *b.curated.get("lmstudio", [])]))
-    b.add_builtin_row("lmstudio", get_label("lmstudio"), is_current, model_ids, "hermes")
+    b.add_builtin_row("lmstudio", get_label("lmstudio"), is_current, model_ids, "qubit")
 
 
 def _lap_builtin_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None:
@@ -948,7 +948,7 @@ def _lap_overlay_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None
         if isinstance(configured, dict):
             model_ids = list(dict.fromkeys([*_declared_model_ids(configured.get("models")), *model_ids]))
         b.add_builtin_row(
-            hermes_slug, get_label(hermes_slug), b.current_provider in (hermes_slug, pid), model_ids, "hermes")
+            hermes_slug, get_label(hermes_slug), b.current_provider in (hermes_slug, pid), model_ids, "qubit")
         b.seen_slugs.add(pid.lower())
 
 

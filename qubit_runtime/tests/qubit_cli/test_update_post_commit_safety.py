@@ -103,6 +103,11 @@ _CHILD = textwrap.dedent('''
         def profile_sync():
             raise SystemExit("profile skill sync exited 3")
         maint._sync_profiles_after_update = profile_sync
+    if not mode.startswith("sqlite"):
+        # The linked-SQLite fact is the sqlite-* modes' own seam; other modes must not inherit
+        # this host interpreter's SQLite version as an owed step.
+        from qubit_cli import update_cmd as _update_cmd
+        _update_cmd._post_update_sqlite_runtime_status = lambda: (True, None)
     from qubit_cli import update_receipt
     from qubit_cli.venv_sync import arm_completion, completion_pending_path
     arm_completion(source)

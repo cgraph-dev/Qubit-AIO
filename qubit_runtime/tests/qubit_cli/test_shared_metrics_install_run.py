@@ -76,10 +76,10 @@ def test_schema_and_installers_match_the_contract_exactly():
     assert {"$ref": "#/$defs/install_run_counter"} in schema["properties"]["metrics"]["items"]["oneOf"]
 
     sh, ps1 = INSTALL_SH.read_text(encoding="utf-8-sig"), INSTALL_PS1.read_text(encoding="utf-8-sig")
-    # Initialize-ResolvedPaths runs before the ladder's try, so its Fail can never write a receipt and
-    # carries no class (a class there would be dead); every ladder call site must carry one.
+    # Initialize-ResolvedPaths runs before the ladder's try: any Fail there could never write a
+    # receipt, so it must carry no class. (The current initializer has no failing branch.)
     pre_ladder = re.search(r"\nfunction Initialize-ResolvedPaths \{\r?\n.*?\r?\n\}\r?\n", ps1, re.S).group(0)
-    assert re.search(r'Fail "[^\n]*-InstallDir\."\r?\n', pre_ladder)
+    assert re.search(r'Fail "[^\n]*" ?[a-z_]', pre_ladder) is None
     ps1 = ps1.replace(pre_ladder, "\n")
     # Every fail()/Fail call site passes a class from the contract, and every class is used somewhere.
     sh_sites = re.findall(r'(?<![-\w])fail "(?:[^"\\$]|\\.|\$\([^)]*\)|\$)*" ?([a-z_]*)', sh)

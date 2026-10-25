@@ -122,13 +122,23 @@ def dumps_toml(document: Mapping[str, Any]) -> str:
         return "\n".join(lines).strip() + "\n"
 
 
+def _validate_with_relay(payload: Mapping[str, Any]) -> list:
+    """Diagnostics from whichever validator this Relay install exposes (0.8: ``validate``,
+    0.9+: ``validate_exact``). Both refuse to layer the payload over ambient user config."""
+    from nemo_relay import plugin
+
+    exact = getattr(plugin, "validate_exact", None)
+    if exact is not None:
+        report = exact(dict(payload))
+        return list((report.get("config") or {}).get("diagnostics") or [])
+    report = plugin.validate(dict(payload))
+    return list((report or {}).get("diagnostics") or [])
+
+
 def validate_relay_plugin_payload(payload: Mapping[str, Any]) -> list:
     """Run the payload through Relay's own validator; returns the warnings (empty = clean).
     Raises when Relay rejects the document, including by error-level diagnostics."""
-    from nemo_relay import plugin
-
-    # validate() would layer the payload over the ambient user config; the runtime never does.
-    diagnostics = list(plugin.validate_exact(dict(payload))["config"]["diagnostics"])
+    diagnostics = _validate_with_relay(payload)
     # Relay 0.8's initialize() raised on these; 0.9's validator only reports them.
     if errors := [d for d in diagnostics if d.get("level") == "error"]:
         raise ValueError("; ".join(str(d.get("message") or d.get("code") or d) for d in errors))

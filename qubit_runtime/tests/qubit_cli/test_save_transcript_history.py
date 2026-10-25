@@ -30,8 +30,10 @@ def _cli_save(db, fmt, out):
 
     stub = SimpleNamespace(_session_db=db, session_id="s1", conversation_history=[], model="m",
                            session_start=datetime(2026, 1, 1))
-    cli.HermesCLI.save_conversation(stub, f"/save {fmt} {out}")
-    return out.read_text(encoding="utf-8")
+    printed = io.StringIO()
+    with contextlib.redirect_stdout(printed):
+        cli.HermesCLI.save_conversation(stub, f"/save {fmt} {out}")
+    return out.read_text(encoding="utf-8") if out.exists() else printed.getvalue()
 
 
 def _gateway_save(db, fmt, out):
@@ -54,8 +56,8 @@ def _gateway_save(db, fmt, out):
         updated_at=datetime.now(), platform=Platform.TELEGRAM, chat_type="dm")
     runner._session_db = AsyncSessionDB(db)
     event = MessageEvent(text=f"/save {fmt} {out.name}", source=source, message_id="m1")
-    assert asyncio.run(runner._handle_save_command(event)) == "Export complete."
-    return delivered["text"]
+    reply = asyncio.run(runner._handle_save_command(event))
+    return delivered["text"] if reply == "Export complete." else reply
 
 
 @pytest.mark.parametrize("save", [_cli_save, _gateway_save], ids=["cli", "gateway"])

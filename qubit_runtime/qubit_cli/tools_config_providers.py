@@ -712,7 +712,7 @@ _select_plugin_video_gen_provider = partial(_select_plugin_gen_provider, "video_
 # enums (apps/desktop/src/app/settings/constants.ts).
 STT_MODEL_CATALOG = {
     "local": ["base", "tiny", "small", "medium", "large-v3"],
-    "groq": ["whisper-large-v3-turbo", "whisper-large-v3", "distil-whisper-large-v3-en"],
+    "groq": ["whisper-large-v3-turbo", "whisper-large-v3"],
     "openai": ["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"],
     "elevenlabs": ["scribe_v2", "scribe_v1"]}
 
@@ -770,6 +770,11 @@ def _write_provider_config(provider: dict, config: dict, *, managed_feature) -> 
 
     if provider.get("web_backend"):
         web_cfg = _select_into(config, "web", "backend", provider["web_backend"], managed_feature)
+        if managed_feature:
+            # A whole-toolset managed pick governs both capabilities: per-capability pins resolve
+            # FIRST, so a leftover one would keep outranking the "nous" selection just written.
+            web_cfg.pop("search_backend", None)
+            web_cfg.pop("extract_backend", None)
         tier = provider.get("web_tier")
         tiers = web_cfg.setdefault("provider_tier", {}) if tier else web_cfg.get("provider_tier")
         if isinstance(tiers, dict):

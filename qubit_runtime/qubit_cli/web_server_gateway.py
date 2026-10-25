@@ -47,9 +47,14 @@ def _probe_gateway_health() -> tuple[bool, dict | None]:
     if not _GATEWAY_HEALTH_URL:
         return False, None
     base = re.sub(r"/health(/detailed)?$", "", _GATEWAY_HEALTH_URL.rstrip("/"))
+    import os as _os
+    auth_key = _os.environ.get("API_SERVER_KEY", "").strip()
     for path in (f"{base}/health/detailed", f"{base}/health"):
         try:
-            req = urllib.request.Request(path, method="GET")
+            # The key authenticates the detailed endpoint only; /health is public and must never
+            # receive it (an unauthenticated fallback would otherwise leak the credential).
+            headers = {"Authorization": f"Bearer {auth_key}"} if auth_key and path.endswith("/health/detailed") else {}
+            req = urllib.request.Request(path, method="GET", headers=headers)
             with urllib.request.urlopen(req, timeout=_GATEWAY_HEALTH_TIMEOUT) as resp:
                 if resp.status == 200:
                     return True, _read_dashboard_json_response(resp)
@@ -522,10 +527,18 @@ def _spawn_qubit_action(
     _ACTION_PROCS[name] = proc
     action_id = ((env_overrides or {}).get("QUBIT_ACTION_ID")
                  or (env_overrides or {}).get("HERMES_ACTION_ID"))
+    sidecar = _ACTION_LOG_DIR / f"{name}.action_id"
     if action_id:
         _ACTION_IDS[name] = action_id
+        # Persist the id beside the log: the in-memory registry is lost when the dashboard
+        # restarts mid-action and the start header is pushed out of the tail boundary.
+        try:
+            sidecar.write_text(action_id + "\n", encoding="utf-8")
+        except OSError:
+            pass
     else:
         _ACTION_IDS.pop(name, None)
+        sidecar.unlink(missing_ok=True)
     return proc
 
 

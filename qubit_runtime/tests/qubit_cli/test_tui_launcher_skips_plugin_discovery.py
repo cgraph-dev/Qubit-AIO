@@ -68,7 +68,9 @@ def test_plugin_discovery_skipped_for_tui_launch(monkeypatch):
     )
 
 
-def test_plugin_discovery_runs_for_plain_chat(monkeypatch):
+def test_plugin_discovery_runs_for_non_gateway_agent_commands(monkeypatch):
+    # Fork contract: plain chat turns execute in the gateway (which discovers plugins itself),
+    # so the launcher only discovers for agent commands that still run locally (cron run).
     calls = _install_discover_spy(monkeypatch)
-    main_mod._prepare_agent_startup(_args(tui=False, command="chat"))
+    main_mod._prepare_agent_startup(_args(tui=False, command="cron", cron_command="run"))
     assert calls == ["discover"]

@@ -271,12 +271,13 @@ class TestPtyBridgeClose:
         bridge = PtyBridge.__new__(PtyBridge)
         bridge._proc = fake
         bridge._fd = -1
-        bridge._pgid = 67890
+        # recorded at spawn; the child leads its own group (pgid == pid)
+        bridge._pgid = 12345
         bridge._closed = False
 
         bridge.close()
 
-        assert sent == [(67890, signal.SIGHUP)]
+        assert sent == [(12345, signal.SIGHUP)]
         assert bridge._closed is True
 
     def test_close_ends_helpers_that_outlive_a_dead_leader(self):

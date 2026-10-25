@@ -208,9 +208,9 @@ def test_live_pooled_children_prove_idle_or_busy_over_the_desktop_probe(tmp_path
     try:
         ports = {}
         for name, proc in children.items():
-            ready, lines = _read_until(proc, "HERMES_BACKEND_READY")
+            ready, lines = _read_until(proc, "QUBIT_BACKEND_READY")
             assert ready, f"{name}: no READY sentinel; output:\n{''.join(lines)}"
-            ready_line = next(l for l in lines if "HERMES_BACKEND_READY" in l)
+            ready_line = next(l for l in lines if "QUBIT_BACKEND_READY" in l)
             ports[name] = int(ready_line.strip().rsplit("port=", 1)[1])
 
         # READY precedes quiescence: the desktop child's cron ticker runs its first tick right at

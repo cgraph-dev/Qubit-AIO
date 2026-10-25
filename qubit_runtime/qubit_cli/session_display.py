@@ -90,7 +90,7 @@ def _session_hint_display() -> str | None:
     try:
         proc = subprocess.run(
             ["systemctl", "--user", "show-environment"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3,
         )
         for line in (proc.stdout or "").splitlines():
             if line.startswith("DISPLAY="):

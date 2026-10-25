@@ -543,7 +543,12 @@ async def select_toolset_provider(
                         raise _bad_request(f"Provider {body.provider!r} has no web backend key")
                     if body.capability not in web_provider_capabilities(backend):
                         raise _bad_request(f"{body.provider} does not support {body.capability}")
-                    _dict_section(config, "web")[f"{body.capability}_backend"] = backend
+                    # The managed row's web_backend names the vendor serving it ("firecrawl");
+                    # writing that would read as the user's OWN key. Its pin is "nous" (gateway route).
+                    from tools.tool_backend_helpers import NOUS_MANAGED_PROVIDER
+
+                    _dict_section(config, "web")[f"{body.capability}_backend"] = (
+                        NOUS_MANAGED_PROVIDER if prov.get("managed_nous_feature") else backend)
                 else:
                     try:
                         apply_provider_selection(name, body.provider, config)

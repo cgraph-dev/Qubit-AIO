@@ -100,14 +100,16 @@ def test_external_profile_does_not_mask_a_missed_own_gateway(external_profile_ho
     restart.restarted_services.clear()
     update_receipt.begin_update_receipt()
 
-    with pytest.raises(SystemExit) as exc:
-        fleet._verify_fleet_after_update(
-            restart, _pre_update_plan=plan, _windows_gateway_resume=None, update_complete=True,
-        )
+    # Contract C3: no longer SystemExit(1); the miss is flagged and owed instead.
+    fleet._verify_fleet_after_update(
+        restart, _pre_update_plan=plan, _windows_gateway_resume=None, update_complete=True,
+    )
 
-    assert exc.value.code == 1
-    outcomes = {o["profile"]: o["outcome"] for o in update_receipt.read_latest_receipt()["runtime_outcomes"]}
+    assert restart.incomplete
+    receipt = update_receipt.read_latest_receipt()
+    outcomes = {o["profile"]: o["outcome"] for o in receipt["runtime_outcomes"]}
     assert outcomes == {"default": "unaccounted", "work": "external"}
+    assert [f["step"] for f in receipt["followups"]] == ["gateway_restart"]
 
 
 def test_external_requires_verified_pid_evidence():

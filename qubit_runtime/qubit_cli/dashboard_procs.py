@@ -869,9 +869,13 @@ def _valid_lockfile_payload(parsed: object, ownership_id: str) -> bool:
     if not (isinstance(pid, int) and 0 < pid <= 4194304 and isinstance(port, int)
             and 0 <= port <= 65535):
         return False
-    # String fields must be present and bounded (the writer enforces <=1024).
+    # String fields must be present and bounded (the writer enforces <=1024). The canonical
+    # qubitPath/qubitHome and the legacy hermesPath/hermesHome are both accepted: the Desktop
+    # and windows_ssh_runtime may each write either spelling.
+    path_key = "qubitPath" if "qubitPath" in parsed else "hermesPath"
+    home_key = "qubitHome" if "qubitHome" in parsed else "hermesHome"
     if any(not isinstance(parsed.get(f), str) or len(parsed[f]) > 1024
-           for f in ("profile", "hermesPath", "hermesHome", "logPath", "startedAt")):
+           for f in ("profile", path_key, home_key, "logPath", "startedAt")):
         return False
     # Suffix-only check of logPath so a relocated QUBIT_HOME can't reject a legitimate backend.
     return parsed["logPath"].endswith(f"/{ownership_id}/{parsed['spawnNonce']}.log")

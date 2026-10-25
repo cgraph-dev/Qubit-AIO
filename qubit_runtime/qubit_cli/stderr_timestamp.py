@@ -119,7 +119,7 @@ def _child_launchd_label_env(environ: Mapping[str, str] | None = None) -> dict[s
     env = os.environ if environ is None else environ
     for variable in ("XPC_SERVICE_NAME", _LAUNCHD_LABEL_ENV):
         label = str(env.get(variable, "") or "").strip()
-        if label.startswith("ai.hermes"):
+        if label.startswith(("ai.qubit", "ai.hermes")):
             return {_LAUNCHD_LABEL_ENV: label}
     return {}
 

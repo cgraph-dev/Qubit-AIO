@@ -179,12 +179,12 @@ def test_register_self_inherits_spawn_tag_lineage(tmp_path):
 
 
 def test_register_self_falls_back_to_desktop_parent_env(tmp_path):
-    # Legacy Desktop: no QUBIT_SPAWN, but QUBIT_PARENT_PID + winms marker.
+    # Legacy Desktop: no QUBIT_SPAWN, but HERMES_PARENT_PID + winms marker.
     ledger = tmp_path / "spawn-ledger.json"
     fake = _fake_psutil({999: 50.0})
     env = {
-        "QUBIT_PARENT_PID": "888",
-        "QUBIT_PARENT_START_MARKER": "winms:1755689000123",
+        "HERMES_PARENT_PID": "888",
+        "HERMES_PARENT_START_MARKER": "winms:1755689000123",
     }
     with patch.dict(sys.modules, {"psutil": fake}), \
          patch.dict(pi.os.environ, env, clear=False), \
@@ -296,11 +296,11 @@ def test_updater_ledger_rung_never_raises():
 
 
 def test_desktop_ssh_backend_spawn_shape_is_desktop_owned(monkeypatch):
-    """Desktop's SSH spawn is ``env QUBIT_DESKTOP=1 qubit serve --isolated ... --ssh-session-token-file F``
+    """Desktop's SSH spawn is ``env HERMES_DESKTOP=1 qubit serve --isolated ... --ssh-session-token-file F``
     with NO token env var (its tests assert the var name never appears on the wire). Missing that
     shape made the SSH child claim ROLE_SERVE on the remote host (the #119824 shape there)."""
-    monkeypatch.setenv("QUBIT_DESKTOP", "1")
-    monkeypatch.delenv("QUBIT_DASHBOARD_SESSION_TOKEN", raising=False)
+    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
     ssh_argv = ["serve", "--isolated", "--host", "127.0.0.1", "--port", "0",
                 "--ssh-session-token-file", "/home/u/.qubit/desktop-ssh/abc.token"]
 

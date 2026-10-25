@@ -41,9 +41,11 @@ def _git_run(git_cmd, args, cwd=None, *, check=False, env=None):
     The updater's git runner: capture all output and decode as UTF-8 regardless of the
     Windows ANSI code page (#52649). ``check=True`` raises on non-zero exit. The spawn
     always hides its console window (#117781). ``env`` replaces the child's environment.
+    The custody policy (``GIT_NO_DETACH``) stops git forking a detached gc/maintenance child.
     """
+    from qubit_cli.update_custody import GIT_NO_DETACH
     return subprocess.run(
-        git_cmd + list(args),
+        git_cmd + list(GIT_NO_DETACH) + list(args),
         cwd=cwd,
         capture_output=True,
         text=True, encoding="utf-8", errors="replace",

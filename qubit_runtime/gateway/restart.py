@@ -108,7 +108,7 @@ def launchd_job_label(environ: Mapping[str, str] | None = None) -> str | None:
     env = os.environ if environ is None else environ
     for var in ("XPC_SERVICE_NAME", LAUNCHD_LABEL_ENV):
         label = str(env.get(var, "") or "").strip()
-        if label.startswith("ai.hermes"):
+        if label.startswith(("ai.qubit", "ai.hermes")):
             return label
     return None
 

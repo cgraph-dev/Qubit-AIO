@@ -128,7 +128,7 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "stt.provider": _select("Speech-to-text provider", "local", "groq", "openai", "xai", "elevenlabs"),
     "stt.local.model": _select("Local faster-whisper model size", "tiny", "base", "small", "medium", "large-v3"),
     "stt.groq.model": _select(
-        "Groq Whisper model", "whisper-large-v3-turbo", "whisper-large-v3", "distil-whisper-large-v3-en"
+        "Groq Whisper model", "whisper-large-v3-turbo", "whisper-large-v3"
     ),
     "stt.openai.model": _select(
         "OpenAI transcription model", "whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"

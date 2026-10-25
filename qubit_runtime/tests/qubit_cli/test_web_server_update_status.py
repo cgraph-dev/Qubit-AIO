@@ -56,7 +56,7 @@ class TestUpdateStatusRootLog:
         assert data["running"] is False
         assert data["exit_code"] == 0
         assert data["action_id"] == action_id
-        assert f"=== hermes-update completed {action_id} ===" in data["lines"]
+        assert f"=== qubit-update completed {action_id} ===" in data["lines"]
 
 
     def test_update_status_ignores_another_profiles_completion_in_the_shared_root_log(self, monkeypatch, tmp_path):

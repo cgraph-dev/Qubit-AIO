@@ -732,11 +732,21 @@ def map_lost_and_found_rows(lf_conn: sqlite3.Connection, dest: sqlite3.Connectio
         # Per-kind destination columns + NOT NULL substitutes. Identity fields are never fabricated:
         # rows with a NULL session id / role / source were already rejected by classify_lost_and_found_row.
         targets: dict[str, tuple[list[str], dict[int, Any]]] = {}
-        for kind_name, protected in (("sessions", (0, 1)), ("messages", (1, 2)), ("session_model_usage", (0, 1))):
+        # Identity fields are never fabricated. Protect them BY NAME: the runtime-authority schema
+        # put runtime_revision/runtime_generation between id and source, so a fixed index would
+        # drop those NOT NULL defaults and every salvaged session would fail to insert.
+        protected_names = {
+            "sessions": ("id", "source"),
+            "messages": ("session_id", "role"),
+            "session_model_usage": ("session_id", "model"),
+        }
+        for kind_name, protected in protected_names.items():
+            columns = _table_columns(dest, kind_name)
             defaults = _notnull_defaults(dest, kind_name)
-            for index in protected:
-                defaults.pop(index, None)
-            targets[kind_name] = (_table_columns(dest, kind_name), defaults)
+            for name in protected:
+                if name in columns:
+                    defaults.pop(columns.index(name), None)
+            targets[kind_name] = (columns, defaults)
         dest_types = {table: _declared_types(dest, table) for table in targets}
         lf_tables = [
             str(row[0]) for row in

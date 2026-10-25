@@ -255,10 +255,18 @@ def test_post_update_guard_covers_sibling_profiles(tmp_path, monkeypatch, capsys
     _make_valid_db(root_home / "state.db", 10)
     root_before = (root_home / "state.db").read_bytes()
 
-    # Sibling: live DB corrupted post-update (the #68474 zeroed signature),
-    # with its own VALID pre-update snapshot under its own snapshots dir.
+    # Corrupt only the sessions B-tree; the canonical epoch must remain readable (header
+    # corruption now requires transcript salvage instead of an in-place restore).
     _make_valid_snapshot(sibling_home, "20260901-pre-update", 25)
-    (sibling_home / "state.db").write_bytes(b"\x00" * 4096)
+    state = sibling_home / "state.db"
+    _make_valid_db(state, 3)
+    with sqlite3.connect(state) as conn:
+        page = conn.execute("SELECT rootpage FROM sqlite_master WHERE name='sessions'").fetchone()[0]
+        page_size = conn.execute("PRAGMA page_size").fetchone()[0]
+    conn.close()
+    with state.open("r+b") as stream:
+        stream.seek((page - 1) * page_size)
+        stream.write(b"\x00")
 
     monkeypatch.setattr(update_cmd, "get_qubit_home", lambda: root_home)
     monkeypatch.setattr(

@@ -67,24 +67,17 @@ def test_resolve_spotify_runtime_credentials_refreshes_without_changing_active_p
 
 
 def test_auth_spotify_status_command_reports_logged_in(capsys, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        auth_mod,
-        "get_auth_status",
-        lambda provider=None: {
-            "logged_in": True,
-            "auth_type": "oauth_pkce",
-            "client_id": "spotify-client",
-            "redirect_uri": "http://127.0.0.1:43827/spotify/callback",
-            "scope": "user-library-read",
-        },
-    )
-
+    """Fork contract: Spotify moved out of core into the `spotify` plugin, so core
+    `qubit auth status spotify` redirects to `qubit spotify status` instead of rendering
+    the account."""
     from qubit_cli.auth_commands import auth_status_command
 
-    auth_status_command(SimpleNamespace(provider="spotify"))
-    output = capsys.readouterr().out
-    assert "spotify: logged in" in output
-    assert "client_id: spotify-client" in output
+    with pytest.raises(SystemExit) as exc:
+        auth_status_command(SimpleNamespace(provider="spotify"))
+    message = str(exc.value)
+    assert "moved out of core" in message
+    assert "qubit spotify status" in message
+    assert "qubit plugins install spotify" in message
 
 
 

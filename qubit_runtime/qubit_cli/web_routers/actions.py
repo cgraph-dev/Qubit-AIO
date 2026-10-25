@@ -415,7 +415,10 @@ async def get_action_status(name: str, lines: int = 200):
         # the outcome instead of inferring it from liveness probes.
         # See #81193, #87359, #91277.
         # The store is root-wide (every profile's runs): show THIS action's receipt when one exists.
-        update_receipt_summary = _latest_update_receipt_summary(spawned_action_id)
+        # After a dashboard restart the in-memory/sidecar spawn id is gone; the durable marker
+        # is then the only identity left, so use it to find OUR receipt rather than the latest
+        # (another profile's) one.
+        update_receipt_summary = _latest_update_receipt_summary(spawned_action_id or durable_update_action_id)
         if spawned_action_id and (update_receipt_summary or {}).get("action_id") == spawned_action_id:
             action_receipt_summary = update_receipt_summary
 
