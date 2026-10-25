@@ -31,12 +31,25 @@ def _no_tool_downloads(monkeypatch):
 
 @pytest.fixture
 def completion_tail(monkeypatch):
-    """Record the completion child instead of running it (the tail spawns via update_custody.run)."""
-    from qubit_cli import update_custody
+    """Record the completion child instead of running it.
 
+    The fork's tail re-execs ``qubit_cli/source_completion.py`` through
+    ``subprocess.call`` in ``venv_sync`` (the old ``update_custody.run`` seam is gone), so
+    intercept that module's spawn.
+    """
+    real = venv_sync.subprocess
     spawned: list = []
-    monkeypatch.setattr(update_custody, "run", lambda command, **kw: spawned.append(command)
-                        or subprocess.CompletedProcess(command, 0))
+
+    class _Subprocess:
+        def __getattr__(self, name):
+            return getattr(real, name)
+
+        @staticmethod
+        def call(command, **kwargs):
+            spawned.append(command)
+            return 0
+
+    monkeypatch.setattr(venv_sync, "subprocess", _Subprocess())
     return spawned
 
 
