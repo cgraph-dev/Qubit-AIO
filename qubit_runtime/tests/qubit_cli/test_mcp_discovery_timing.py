@@ -168,6 +168,10 @@ def test_init_agent_forwards_single_query_flag(monkeypatch):
     cli._install_tool_callbacks = lambda: None
     cli._ensure_tirith_security = lambda: None
     cli._ensure_runtime_credentials = lambda: True
+    # The fork builds GatewayAgent behind a gateway session; stub the transport seams.
+    cli._ensure_gateway_session = lambda: None
+    monkeypatch.setattr("qubit_cli.gateway_agent.GatewayAgent",
+                        lambda *_a, **_k: types.SimpleNamespace())
     cli._single_query_mode = True
 
     seen = {}
@@ -184,7 +188,9 @@ def test_init_agent_forwards_single_query_flag(monkeypatch):
     monkeypatch.setattr(run_agent, "AIAgent", lambda *_a, **_k: types.SimpleNamespace())
 
     assert cli._init_agent() is True
-    assert seen.get("single_query") is True
+    # The fork's CLI no longer waits for MCP discovery at agent build: the gateway session
+    # that runs the turn owns its MCP servers (oneshot.py still does this for -Q).
+    assert seen == {}
 
 def test_init_agent_defaults_to_interactive(monkeypatch):
     """Without _single_query_mode, the helper uses interactive (short) bound."""
@@ -197,6 +203,10 @@ def test_init_agent_defaults_to_interactive(monkeypatch):
     cli._install_tool_callbacks = lambda: None
     cli._ensure_tirith_security = lambda: None
     cli._ensure_runtime_credentials = lambda: True
+    # The fork builds GatewayAgent behind a gateway session; stub the transport seams.
+    cli._ensure_gateway_session = lambda: None
+    monkeypatch.setattr("qubit_cli.gateway_agent.GatewayAgent",
+                        lambda *_a, **_k: types.SimpleNamespace())
 
     seen = {}
 
@@ -212,7 +222,8 @@ def test_init_agent_defaults_to_interactive(monkeypatch):
     monkeypatch.setattr(run_agent, "AIAgent", lambda *_a, **_k: types.SimpleNamespace())
 
     assert cli._init_agent() is True
-    assert seen.get("single_query") is False
+    # Gateway-owned MCP discovery: no in-CLI wait at agent build.
+    assert seen == {}
 
 # ── bounded wait: slow server doesn't freeze startup ────────────────────────
 
