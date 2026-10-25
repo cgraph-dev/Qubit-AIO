@@ -175,7 +175,7 @@ def test_provisioning_does_not_use_human_diagnostics(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "lockfile_path", lambda: lock)
     monkeypatch.setattr(engine, "sealed", lambda: False)
     monkeypatch.setattr(engine, "lazy_installs_allowed", lambda: True)
-    monkeypatch.setattr(pm, "check", lambda: ["translated diagnostic without a package token"])
+    monkeypatch.setattr(pm, "drift", lambda **kw: {"node": "translated diagnostic without a package token"})
     ensured = []
     monkeypatch.setattr(pm, "ensure", lambda name, **kwargs: ensured.append((name, kwargs)))
 
