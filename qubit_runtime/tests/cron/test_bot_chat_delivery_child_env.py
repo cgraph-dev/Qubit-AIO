@@ -51,6 +51,10 @@ def _capture_child_env(monkeypatch) -> dict:
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
     monkeypatch.setattr(delivery, "_run_bot_chat_turn", _fake_turn)
+    # This file exercises the legacy unowned CLI lane: emulate discovery that is reachable
+    # but has no live Bot Chat owner (the fork's authoritative lane is covered elsewhere).
+    monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", lambda *_a, **_k: None)
+    monkeypatch.setattr("tools.bot_live_delivery.find_create_missing_owner", lambda *_a, **_k: None)
     return captured
 
 

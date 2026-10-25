@@ -35,6 +35,9 @@ def multiplexer(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
     monkeypatch.setattr(delivery, "_run_bot_chat_turn", _fake_turn)
+    # Legacy unowned CLI lane: discovery reachable but no live Bot Chat owner.
+    monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", lambda *_a, **_k: None)
+    monkeypatch.setattr("tools.bot_live_delivery.find_create_missing_owner", lambda *_a, **_k: None)
     set_multiplex_active(True)
     try:
         yield root, captured

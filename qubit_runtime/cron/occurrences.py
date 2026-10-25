@@ -100,3 +100,9 @@ def unclaimed_pending_slot(job, now):
     if pending.get("by") != _machine_id() and _claim_is_live(pending, now, FIRE_CLAIM_TTL_SECONDS):
         return None
     return slot
+
+
+def get_catch_up_occurrence_count() -> int:
+    """Profile-local stale-schedule catch-up counter (owned by cron.jobs)."""
+    from cron.jobs import get_catch_up_occurrence_count as _count
+    return _count()

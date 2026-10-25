@@ -31,6 +31,7 @@ from qubit_constants import display_qubit_home, get_qubit_home
 from cron.constants import CLAIM_TTL_INACTIVITY_HEADROOM, FIRE_CLAIM_SKEW_SECONDS, FIRE_CLAIM_TTL_SECONDS
 from cron.env_settings import cron_env_setting
 from cron import store_health
+from qubit_cli.observability.shared_metrics_gateway import record_cron_missed
 from typing import Optional, Dict, List, Any, Callable, Set, Tuple, Union, Collection
 
 logger = logging.getLogger(__name__)
@@ -1401,13 +1402,48 @@ def load_jobs() -> List[Dict[str, Any]]:
             jobs = [{**v, "id": v.get("id") or k} for k, v in jobs.items() if isinstance(v, dict)]
             repair = "id-keyed jobs map flattened to list"
             unmergeable = True
+        elif not isinstance(jobs, list):
+            if getattr(_jobs_lock_state, "depth", 0):
+                logger.warning(
+                    "Replacing invalid jobs.json 'jobs' field (%s) with an empty list",
+                    type(jobs).__name__)
+            jobs = []
+            repair = repair or "invalid jobs field replaced with list"
+            unmergeable = True
     elif isinstance(data, list):
         jobs = data
         repair = "bare list wrapped as dict"
     else:
         raise RuntimeError(
             f"Cron database corrupted: expected {{'jobs': [...]}}, got {type(data).__name__}")
-    if jobs and repair:
+    junk = [j for j in jobs if not isinstance(j, dict)]
+    if junk:
+        # Every reader and the due scan index records as dicts: one junk entry would crash the
+        # whole tick and freeze every healthy sibling job.
+        if getattr(_jobs_lock_state, "depth", 0):
+            logger.warning(
+                "Skipping %d non-object entr%s in jobs.json (types: %s)",
+                len(junk), "y" if len(junk) == 1 else "ies",
+                ", ".join(sorted({type(j).__name__ for j in junk})))
+        jobs = [j for j in jobs if isinstance(j, dict)]
+        repair = repair or "non-object entries dropped"
+    for job in jobs:
+        # A hand-edited "completed" that is not a non-negative int (null, "2", 1.0, -5, Infinity)
+        # would crash every counter reader or grant extra runs; normalize once here.
+        rep = job.get("repeat")
+        if isinstance(rep, dict) and "completed" in rep and (
+                type(rep["completed"]) is not int or rep["completed"] < 0):
+            try:
+                rep["completed"] = max(int(rep["completed"]), 0)
+            except (TypeError, ValueError, OverflowError):
+                rep["completed"] = 0
+            repair = repair or "invalid repeat.completed normalized"
+    if repair:
+        if not getattr(_jobs_lock_state, "depth", 0):
+            # An unlocked snapshot may predate a locked writer's update to a job it already holds
+            # (the shrink-merge only restores missing ids), so re-read and repair under the lock.
+            with _jobs_lock():
+                return load_jobs()
         # Keep the shrink-merge (a degraded-lock sibling's create may have landed since the read)
         # unless disk is STILL a shape the merge would refuse: a sibling may have rewritten it.
         try:
@@ -2390,6 +2426,10 @@ def _record_run_outcome(
         # Consecutive agent-failure streak; delivery failures do NOT count
         # (scheduler._failure_streak_nudge).
         job["failure_streak"] = int(job.get("failure_streak") or 0) + 1
+        # Sticky last-failure stamp (#118354): the next success resets last_status and
+        # failure_streak, which erases the only job-level trace that a run ever failed.
+        # latest failure wins; delivery failures keep their own sticky last_delivery_error.
+        job["last_failure"] = {"at": now, "detail": error or (status or "run failed")}
     job["last_delivery_error"] = delivery_error
     # Clear both claims: the run is over, so the job is claimable again.
     job["fire_claim"] = None
@@ -2680,9 +2720,12 @@ def clear_run_claim(job_id: str) -> bool:
     tick" invariant that the scheduler comment promises (#86522).
     """
     def apply(jobs, _i, job):
-        if job.get("schedule", {}).get("kind") != "once" or job.get("run_claim") is None:
-            return False  # recurring, or already cleared
-        job["run_claim"] = None
+        claim = job.get("run_claim")
+        if job.get("schedule", {}).get("kind") != "once" or claim in (None, {"outage": True}):
+            return False  # recurring, already cleared, or already reduced to the outage marker
+        # Keep the outage marker (no "at": a stale claim, so it re-dispatches) or the skipped
+        # one-shot, past its grace, is retired as missed on the next scan.
+        job["run_claim"] = {"outage": True} if isinstance(claim, dict) and claim.get("outage") else None
         save_jobs(jobs)
         return True
 
@@ -2928,6 +2971,12 @@ def _normalize_due_scan_records(raw_jobs: List[Dict[str, Any]]) -> bool:
     (older writers used ``job_id``), non-dict ``schedule``, or non-ISO timestamp used to abort the
     whole scan before save_jobs(), freezing the scheduler in a fast-forward loop."""
     changed = False
+    # A non-object entry is a load-repair case; drop it here so a store whose repair could not be
+    # persisted (full disk) cannot abort the due scan.
+    kept = [rj for rj in raw_jobs if isinstance(rj, dict)]
+    if len(kept) != len(raw_jobs):
+        raw_jobs[:] = kept
+        changed = True
     for rj in raw_jobs:
         if not rj.get("id"):
             rj["id"] = rj.pop("job_id", None) or uuid.uuid4().hex[:12]
@@ -2978,11 +3027,16 @@ def _recover_missing_next_run(job: Dict[str, Any], scan: _DueScan) -> Optional[s
             recovery_kind = kind
     if not recovered_next:
         return None
-    job["next_run_at"] = recovered_next
     logger.info(
         "Job '%s' had no next_run_at; recovering %s run at %s",
         job.get("name", job.get("id", "?")), recovery_kind, recovered_next)
-    scan.persist(job["id"], next_run_at=recovered_next)
+    fields: Dict[str, Any] = {"next_run_at": recovered_next}
+    if _is_recoverable_error_job(job):
+        # A transient croniter ImportError left this recurring job in state=error; re-armed jobs
+        # go back to scheduled or they would be silently skipped forever (#127182).
+        fields["state"] = "scheduled"
+    job.update(fields)
+    scan.persist(job["id"], **fields)
     return recovered_next
 
 
@@ -3135,12 +3189,14 @@ def _fast_forward_missed_recurring(d: _DueJob, grace: int) -> bool:
             "Job '%s' missed its scheduled time (%s, grace=%ds). "
             "Skipping missed occurrence because cron.catch_up_missed is false; next run: %s",
             d.label, d.next_run, grace, new_next)
+        d.scan.on_saved.append(lambda job=d.job: record_cron_missed(job))
         return True
     logger.info(
         "Job '%s' missed its scheduled time (%s, grace=%ds). "
         "Running now; next run provisionally set to: %s (re-anchored on completion)",
         d.label, d.next_run, grace, new_next)
-    record_catch_up_occurrence()
+    # Count only once the fast-forward's save lands (a full disk did not persist the catch-up).
+    d.scan.on_saved.append(record_catch_up_occurrence)
     return False
 
 
@@ -3163,6 +3219,7 @@ def _retire_expired_oneshot(d: _DueJob) -> bool:
     if not (claim or d.job.get("fire_claim")):
         _write_missed_oneshot_diagnostic(d.job, d.next_run)
         d.scan.retire(d.job["id"])
+        d.scan.on_saved.append(lambda job=d.job: record_cron_missed(job))
     return True
 
 
@@ -3286,6 +3343,8 @@ def _evaluate_due_job(job: Dict[str, Any], scan: _DueScan, run_claim_ttl: float)
         # fixed window is not enough for a run that outlives a tick. The other process sees the
         # fresh claim and skips; mark_job_run() clears it. The TTL only covers a tick that DIES.
         claim = {"at": now.isoformat(), "by": _machine_id()}
+        if _elapsed_seconds(now, d.next_run_dt) > ONESHOT_GRACE_SECONDS:  # only an outage lets it through
+            claim["outage"] = True
         job["run_claim"] = claim
         scan.persist(job["id"], run_claim=claim)
 

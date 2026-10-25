@@ -71,13 +71,11 @@ def _run_job_patched(job, tmp_path, *, resolve=None, skill_view=None):
 
     Returns (success, output, final_response, error, agent_constructed).
     """
-    fake_db = MagicMock()
     patches = [
         patch("cron.scheduler._qubit_home", tmp_path),
         patch("cron.scheduler_delivery._resolve_origin", return_value=None),
         patch("qubit_cli.env_loader.load_qubit_dotenv"),
         patch("qubit_cli.env_loader.reset_secret_source_cache"),
-        patch("qubit_state_registry.acquire", return_value=fake_db),
         patch("tools.mcp_tool_discovery.discover_mcp_tools", return_value=[]),
     ]
     if resolve is None:

@@ -23,6 +23,9 @@ def cli_lane(tmp_path, monkeypatch):
     monkeypatch.setattr(
         delivery, "_run_bot_chat_turn",
         Mock(side_effect=subprocess.TimeoutExpired(["hermes"], 600)))
+    # Route through the legacy unowned CLI lane (no live authority in this fixture).
+    monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", lambda *_a, **_k: None)
+    monkeypatch.setattr("tools.bot_live_delivery.find_create_missing_owner", lambda *_a, **_k: None)
     return tmp_path
 
 

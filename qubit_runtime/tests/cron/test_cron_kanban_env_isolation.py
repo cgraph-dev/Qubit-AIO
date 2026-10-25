@@ -381,7 +381,10 @@ def test_dispatcher_grants_only_the_assigned_worker_scope(tmp_path, monkeypatch)
         f"open({str(output)!r}, 'w').write(json.dumps(result))\n"
     )
     worker.chmod(0o700)
-    monkeypatch.setenv("HERMES_BIN", str(worker))
+    # The dispatcher's worker argv is fixed to `python -m qubit_cli.kanban_worker_client`;
+    # seam it to the fixture worker (this test covers the granted env, not argv resolution).
+    from qubit_cli import kanban_db_dispatch as kb_dispatch
+    monkeypatch.setattr(kb_dispatch, "_worker_argv", lambda *a, **k: [str(worker)])
     # Building a new worker under an existing task must replace, not inherit, its scope.
     monkeypatch.setenv("HERMES_KANBAN_TASK", "prior-task")
     # A dispatcher launched from an agent's shell carries the descendant fence itself; the worker it

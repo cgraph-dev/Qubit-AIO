@@ -69,7 +69,9 @@ def _deliver_bot_chat(job: dict, content: str) -> str:
     # report-driven ``_run_bot_chat_turn(argv, env, report_path, timeout)`` (#113608); ``create``
     # keeps the second patch a no-op where the helper does not exist, so no real child is spawned.
     with patch("cron.scheduler_delivery.subprocess.run", side_effect=_fake_run), \
-            patch("cron.scheduler_delivery._run_bot_chat_turn", create=True, side_effect=_fake_run):
+            patch("cron.scheduler_delivery._run_bot_chat_turn", create=True, side_effect=_fake_run), \
+            patch("tools.bot_live_delivery.find_canonical_live_owner", return_value=None), \
+            patch("tools.bot_live_delivery.find_create_missing_owner", return_value=None):
         err = _deliver_to_bot_chat(job, content, "")
     assert err is None, err
     return captured["message"]

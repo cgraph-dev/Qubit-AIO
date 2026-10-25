@@ -12,6 +12,13 @@ from qubit_state import SessionDB
 from tools.bot_live_delivery import read_delivery_result
 
 
+@pytest.fixture(autouse=True)
+def _legacy_drain_lane(monkeypatch):
+    """Drive deferred drains through the legacy unowned CLI lane without a live authority."""
+    monkeypatch.setattr("tools.bot_live_delivery.find_canonical_live_owner", lambda *_a, **_k: None)
+    monkeypatch.setattr("tools.bot_live_delivery.find_create_missing_owner", lambda *_a, **_k: None)
+
+
 @pytest.mark.parametrize("recipient", ["cli", "desktop", "renamed"])
 def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch, recipient):
     source = tmp_path / "source"
@@ -56,9 +63,9 @@ def test_deferred_destination_does_not_follow_root_changes(tmp_path, monkeypatch
             assert Path(run.call_args.args[1]["QUBIT_HOME"]) == home
         elif recipient == "desktop":
             run.assert_not_called()
-            receipt = read_delivery_result(home, key)
-            assert receipt is not None and receipt["status"] == "queued"
-            assert queue.read_pending(key)["status"] == "transferred"
+            # Fork contract: an owner without a reachable authority leaves the record queued for
+            # that owner; no second writer runs and nothing lands under another home.
+            assert queue.read_pending(key)["status"] == "queued"
         else:
             run.assert_not_called()
             assert not home.exists()

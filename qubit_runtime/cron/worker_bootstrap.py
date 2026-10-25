@@ -44,15 +44,23 @@ from pathlib import Path
 # worker's own children; they inherit the activated PYTHONPATH instead.
 # Distinct from ``_QUBIT_CRON_EXTERNAL_WORKER`` (the owning execution id) in scheduler.py.
 WORKER_MARKER = "_QUBIT_CRON_WORKER_BOOT"
+# A marked process was booted at package import; finish_worker_boot re-arms the marker for the
+# bootstrap import so a relaunch replays the whole worker.
+_BOOT_CLAIMED = False
 
 
 def worker_bootstrap() -> None:
     """Run PM's dependency boot in the marked external worker (again after a relaunch)."""
+    global _BOOT_CLAIMED
     if not os.environ.get(WORKER_MARKER):
         return
+    _BOOT_CLAIMED = True
     from pm.environments import activate_dependencies
 
     activate_dependencies(Path(__file__).resolve().parent.parent)
+    # Consumed here so the worker's own children do not inherit it; finish_worker_boot re-arms it
+    # for the bootstrap import when it may relaunch.
+    os.environ.pop(WORKER_MARKER, None)
 
 
 def finish_worker_boot() -> None:
@@ -62,6 +70,13 @@ def finish_worker_boot() -> None:
     ``sys.argv[0]`` is still ``-m`` and ``__main__`` has no spec, so the relaunch command could
     not name the module to re-run. In ``__main__`` both are set.
     """
-    import qubit_bootstrap  # noqa: F401
-
-    os.environ.pop(WORKER_MARKER, None)
+    global _BOOT_CLAIMED
+    if _BOOT_CLAIMED:
+        # The package import consumed the marker; a relaunch from the bootstrap import must carry
+        # it so the new process boots its dependencies too.
+        os.environ[WORKER_MARKER] = "1"
+    try:
+        import qubit_bootstrap  # noqa: F401
+    finally:
+        _BOOT_CLAIMED = False
+        os.environ.pop(WORKER_MARKER, None)

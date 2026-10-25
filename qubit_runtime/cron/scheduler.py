@@ -902,10 +902,12 @@ def _cron_interval_minutes(expr: str) -> Optional[float]:
     if expr in _cron_interval_cache:
         return _cron_interval_cache[expr]
     result = None
+    ok = False
     with contextlib.suppress(Exception):
         from cron.jobs import _ensure_croniter
 
-        if _ensure_croniter():
+        ok = _ensure_croniter()
+        if ok:
             from cron.jobs import croniter as _croniter
             from datetime import datetime
 
@@ -915,7 +917,11 @@ def _cron_interval_minutes(expr: str) -> Optional[float]:
             second = it.get_next(datetime)
             gap = (second - first).total_seconds() / 60.0
             result = gap if gap > 0 else None
-    _cron_interval_cache[expr] = result
+    # Cache a real cadence or a bad-expr None (croniter loaded, expr invalid: stable). Skip the
+    # None from a transient croniter ImportError so it can't pin the floor allowance for the
+    # process lifetime once the import recovers.
+    if result is not None or ok:
+        _cron_interval_cache[expr] = result
     return result
 
 
@@ -1526,6 +1532,22 @@ def _resolve_job_workdir(job: dict, job_id: str) -> Optional[str]:
 
 
 def _run_no_agent_job(
+    job: dict, job_id: str, job_name: str, cancel_event,
+) -> tuple[bool, str, str, Optional[str]]:
+    """Run a no_agent job under the firing profile's secret scope.
+
+    The short-circuit runs before ``_run_one_job_body`` installs that scope, so a routed fire would
+    otherwise load its ``.env`` into the shared process env and the child would see no routed
+    secrets. The scope also turns on multiplex semantics for exactly this span.
+    """
+    tokens = _install_fire_secret_scope()
+    try:
+        return _run_no_agent_job_scoped(job, job_id, job_name, cancel_event)
+    finally:
+        _reset_fire_secret_scope(tokens)
+
+
+def _run_no_agent_job_scoped(
     job: dict, job_id: str, job_name: str, cancel_event,
 ) -> tuple[bool, str, str, Optional[str]]:
     """no_agent short-circuit — the script IS the job (no AIAgent, no tokens). stdout → delivered
@@ -3799,6 +3821,7 @@ def _launch_external_cron_worker(job: dict) -> bool:
         reset_secret_scope,
         set_secret_scope,
     )
+    from cron.scheduler_provider import routed_profile_fire
     from qubit_cli.env_loader import hydrate_profile_secret_sources
     from tools.environments.local import build_subprocess_env, strip_launch_profile_env
     from tools.process_registry import (
@@ -3813,7 +3836,10 @@ def _launch_external_cron_worker(job: dict) -> bool:
         )
     except Exception:
         require_restart_safe_scope = False
-    multiplex_active = is_multiplex_active()
+    # A fire routed to another profile is multiplexed at this handoff even when the process flag is
+    # off (the desktop ticker is not a multiplexer): the payload says so, and the worker env is built
+    # under that context so the scrub and the launch-residue strip both apply.
+    multiplex_active = is_multiplex_active() or routed_profile_fire()
     dispatch = restart_safe_gateway_child_argv(
         command,
         unit_suffix=f"cron-{job_id}-exec-{execution_id}",
@@ -3850,16 +3876,14 @@ def _launch_external_cron_worker(job: dict) -> bool:
         raise
 
     profile_home = _get_qubit_home().resolve()
-    hydrate_profile_secret_sources(profile_home)
-    secret_token = set_secret_scope(build_profile_secret_scope(profile_home), profile_home=str(profile_home))
-    try:
+    # Same hydrate -> scope -> (routed) multiplex-context install the in-process fire uses, for
+    # exactly the env build; the helper's reset order keeps the context from outliving its scope.
+    with _fire_secret_scope():
         worker_env = strip_launch_profile_env(build_subprocess_env(
             scrub_secrets=multiplex_active,
             inherit_profile_home=True,
             extra={"QUBIT_HOME": str(profile_home)},
         ))
-    finally:
-        reset_secret_scope(secret_token)
     worker_env = systemd_user_bus_env(worker_env)
     # Unattended worker: the gateway sets HERMES_EXEC_ASK at startup (interactive launches set
     # the other two), and an inherited presence var makes every env-fallback consumer in the
@@ -4379,6 +4403,14 @@ def _process_due_job(job: dict, adapters, loop, verbose: bool) -> bool:
     # Claim only when the worker actually starts, so a queued lease can't expire first.
     try:
         claimed = claim_job_for_fire(job["id"], return_job=True)
+    except OSError as exc:
+        # The store cannot persist the fire claim: record the skipped run and settle the receipt.
+        from cron import store_health
+        store_health.note_unwritable(
+            exc, f"skipped job '{job.get('name') or job['id']}'", "claim", [job])
+        settle_unstarted_execution(
+            job["execution_id"], job["id"], f"Cron store unwritable; not started: {exc}")
+        return False
     except BaseException as exc:  # settle first, then surface the real error
         settle_unstarted_execution(
             job["execution_id"], job["id"], f"Fire claim failed: {type(exc).__name__}: {exc}")
@@ -4545,6 +4577,7 @@ from cron.scheduler_preflight import (  # noqa: E402
 # tick paths see every name they need.
 if __name__ == "__main__":
     if "--external-worker-file" in sys.argv:
+        finish_worker_boot()  # may relaunch: before the payload is read and the ack published
         import argparse
 
         parser = argparse.ArgumentParser(add_help=False)
