@@ -262,11 +262,23 @@ def _effective_model(model_cfg: Dict[str, Any], target_model: Optional[str]) -> 
 
 def _copilot_runtime_api_mode(model_cfg: Dict[str, Any], api_key: str, *, target_model: Optional[str] = None) -> str:
     configured_mode = _configured_api_mode("copilot", model_cfg)
-    if configured_mode:
-        return configured_mode
     # Use the model being resolved, not the persisted default: a Claude MoA slot inheriting
     # codex_responses from a GPT-5 default fails with "model ... does not support Responses API".
     model_name = str(_effective_model(model_cfg, target_model)).strip()
+    if configured_mode:
+        # #46527: a persisted codex_responses can be stale after a /model switch (the Copilot
+        # OAuth setup records it for gpt-5.4-mini, then the user picks gpt-5-mini, which Copilot
+        # serves on chat completions only). Veto it when the effective model's own mode differs;
+        # a genuinely Responses-native model (gpt-5.4-mini) keeps the explicit mode.
+        if configured_mode == "codex_responses":
+            try:
+                derived = (_models.copilot_model_api_mode(model_name, api_key=api_key)
+                           if model_name else "chat_completions")
+            except Exception:
+                derived = configured_mode
+            if derived != "codex_responses":
+                return derived
+        return configured_mode
     try:
         return _models.copilot_model_api_mode(model_name, api_key=api_key) if model_name else "chat_completions"
     except Exception:
