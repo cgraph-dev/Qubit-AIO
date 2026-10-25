@@ -153,7 +153,7 @@ class TestShowStatusXaiOAuth:
         status_mod.show_status(SimpleNamespace(full=True, deep=False))
         out = capsys.readouterr().out
 
-        assert "Nous Portal" in out
+        assert "Qubit Labs" in out
         assert "MiniMax OAuth" in out
 
     def test_status_function_exception_does_not_crash(self, monkeypatch, capsys, tmp_path):

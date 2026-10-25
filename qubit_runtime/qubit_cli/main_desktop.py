@@ -1467,9 +1467,14 @@ def build_prepared_desktop(desktop_dir: Path, *, source_mode: bool, npm: str, en
         if stopped:
             print(f"  ⚠ Stopped running desktop app to free the build output (pid {', '.join(map(str, stopped))})")
     try:
-        run_contained(build_cmd, f"Building desktop {build_label}", cwd=desktop_dir, env=build_env)
+        # The desktop build writes the checkout like every other product build, so it runs in
+        # the update's custody (checkout lock fd + descendant reaping, Windows job).
+        from qubit_cli.source_build import run_in_custody
+
+        run_in_custody(desktop_dir, build_cmd, f"Building desktop {build_label}",
+                       cwd=desktop_dir, env=build_env)
         if staging_dir is not None:
-            run_contained([npm, "run", "builder", "--", "--dir", "--publish", "never",
+            run_in_custody(desktop_dir, [npm, "run", "builder", "--", "--dir", "--publish", "never",
                            f"-c.directories.output={staging_dir}"], "Packaging the desktop app",
                           cwd=desktop_dir, env=build_env)
         packaged_executable = (

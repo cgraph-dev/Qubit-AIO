@@ -519,10 +519,18 @@ def _spawn_qubit_action(
     _ACTION_PROCS[name] = proc
     action_id = ((env_overrides or {}).get("QUBIT_ACTION_ID")
                  or (env_overrides or {}).get("HERMES_ACTION_ID"))
+    sidecar = _ACTION_LOG_DIR / f"{name}.action_id"
     if action_id:
         _ACTION_IDS[name] = action_id
+        # Persist the id beside the log: the in-memory registry is lost when the dashboard
+        # restarts mid-action and the start header is pushed out of the tail boundary.
+        try:
+            sidecar.write_text(action_id + "\n", encoding="utf-8")
+        except OSError:
+            pass
     else:
         _ACTION_IDS.pop(name, None)
+        sidecar.unlink(missing_ok=True)
     return proc
 
 

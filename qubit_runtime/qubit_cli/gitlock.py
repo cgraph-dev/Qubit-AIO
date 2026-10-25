@@ -356,10 +356,15 @@ def clear_stale_tmp_packs(repo_root: Path, *, min_age_seconds: Optional[int] = N
 
 
 def _git_stdout_lines(repo_root: Path, args: List[str]) -> List[str]:
-    """Run a read-only git query in ``repo_root``; [] on any failure."""
+    """Run a read-only git query in ``repo_root``; [] on any failure.
+
+    Carries the updater custody policy so even a read-only query never forks a detached
+    gc/maintenance child.
+    """
+    from qubit_cli.update_custody import GIT_NO_DETACH
     try:
         result = subprocess.run(
-            ["git", *args], cwd=str(repo_root),
+            ["git", *GIT_NO_DETACH, *args], cwd=str(repo_root),
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
             creationflags=windows_hide_flags(),
         )
