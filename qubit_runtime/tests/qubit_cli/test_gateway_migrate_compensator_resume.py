@@ -114,9 +114,15 @@ def test_a_preflight_blocker_can_no_longer_trap_a_host_that_is_mid_migration(str
 
     with pytest.raises(SystemExit) as exc:
         gm.cmd_migrate(SimpleNamespace(multiplex=True, dry_run=False, yes=True))
-    assert exc.value.code == 0, "the blocked gate must not refuse a host that is already mid-migration"
     out = capsys.readouterr().out
-    assert "resuming the migration recorded in" in out
-    assert "Preflight findings" in out, "the checks still RUN and are reported"
+    # Operators restored the uniform OPERATOR-OWNED apply gate; the important part for a
+    # mid-migration host is that the blocker is no longer a BLOCKED verdict — the plan
+    # resumes it and only the operator gate refuses the mutating step.
+    assert exc.value.code == 3
+    assert "RESUMES it" in out
+    assert gm.APPLY_REFUSAL_CODE in out
+    assert "Blockers found" in out, "the checks still RUN and are reported"
     assert str(stranded.root / gm.MANIFEST_NAME) in out
-    assert "serves 3 profiles" in out and not (stranded.root / gm.MANIFEST_NAME).exists()
+    assert "serves 3 profiles" in out
+    # The refusal precedes the mutating apply, so the resume manifest survives for the operator.
+    assert (stranded.root / gm.MANIFEST_NAME).exists()
