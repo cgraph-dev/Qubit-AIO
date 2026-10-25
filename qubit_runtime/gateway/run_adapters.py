@@ -1260,6 +1260,11 @@ class GatewayAdapterLifecycleMixin:
                 continue
             # No credential in THIS profile's scope: an adapter would fan inbound across every such profile.
             if multiplex and not _platform_has_bot_credential(platform, platform_config):
+                # WhatsApp is shared ingress too: even without a local credential, record that
+                # the secondary asked for it so status shows the reason and the startup phase can
+                # emit the loud "not being served" warning when the default does not own it.
+                if platform is Platform.WHATSAPP:
+                    self._note_unserved_secondary_platform(profile_name, platform)
                 logger.info(
                     "[MULTIPLEX] Profile '%s': skipping %s - no bot credential "
                     "in this profile's secrets", profile_name, platform.value,
