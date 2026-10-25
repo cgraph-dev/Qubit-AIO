@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - Windows
     fcntl = None
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 import threading
@@ -200,38 +201,42 @@ def test_local_delivery_command_never_reenters_the_lock():
     assert not any("bot_mode_dm" in part for part in argv)
 
 
-def test_relay_deliver_returns_target_busy_error(tmp_path, monkeypatch):
+def test_relay_deliver_reports_an_unreachable_authority_as_runtime_unavailable(tmp_path, monkeypatch):
+    """The relay door is a transport bridge: the target profile's authority owns admission, so an
+    unreachable authority is the typed ``runtime_unavailable`` refusal the sender retries on."""
     import tui_gateway.server as srv
+    from tools import bot_live_delivery as live
 
     h = tmp_path / "h"
     (h / "profiles" / "ops").mkdir(parents=True)
     (h / "profiles" / "ops" / "config.yaml").touch()  # identity marker: bare dirs are not profiles
     monkeypatch.setenv("QUBIT_HOME", str(h))
-    monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 0.2)
+    monkeypatch.setattr(bot_relay, "local_delivery_command",
+                        lambda prof, tmp: pytest.fail("the relay door never spawns a local turn"))
+    monkeypatch.setattr(live, "authority_delivery",
+                        lambda home, params: (_ for _ in ()).throw(ValueError("profile authority is not ready")))
 
-    spawned = {}
+    out = srv._methods["bot_relay.deliver"](
+        1, {"id": "00000000000000000000000000000001", "profile": "ops", "message": "x"})
 
-    # Deterministic spawn detection: sentinel argv from the exact factory the
-    # deliver handler uses. A global subprocess.run patch also intercepts
-    # unrelated gateway-init calls (git rev-parse / ls-remote in CI), so
-    # never fuzzy-match argv — mark the delivery command itself.
-    monkeypatch.setattr(
-        bot_relay, "local_delivery_command", lambda prof, tmp: ["__delivery__", prof]
-    )
+    assert out["error"]["code"] == 5094
+    assert out["error"]["data"]["reason"] == "runtime_unavailable"
 
-    def _fake_run(argv, **kwargs):
-        argv = list(argv or [])
-        if argv and argv[0] == "__delivery__":
-            spawned["argv"] = argv
 
-        class _Done:
-            returncode = 0
-            stdout = ""
-            stderr = ""
+def test_relay_deliver_bridges_to_the_authority_without_taking_the_local_turn_lock(tmp_path, monkeypatch):
+    """The delivered turn is the authority's, not this gateway's: a busy profile flock on disk must
+    not make the relay door wait (that lock is the retired local-CLI lane's)."""
+    import tui_gateway.server as srv
+    from tools import bot_live_delivery as live
 
-        return _Done()
-
-    monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", _fake_run)
+    h = tmp_path / "h"
+    (h / "profiles" / "ops").mkdir(parents=True)
+    (h / "profiles" / "ops" / "config.yaml").touch()  # identity marker: bare dirs are not profiles
+    monkeypatch.setenv("QUBIT_HOME", str(h))
+    monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 5.0)
+    seen = []
+    monkeypatch.setattr(live, "authority_delivery",
+                        lambda home, params: seen.append((home, params)) or {"status": "settled", "reply": "pong"})
 
     held = threading.Event()
     release = threading.Event()
@@ -241,47 +246,17 @@ def test_relay_deliver_returns_target_busy_error(tmp_path, monkeypatch):
     t.start()
     assert held.wait(timeout=5)
     try:
-        out = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000001", "profile": "ops", "message": "x"})
-        assert "error" in out
-        assert out["error"]["code"] == 5096
-        assert "target_busy" in out["error"]["message"]
-        assert out["error"]["data"]["reason"] == "target_busy"
-        assert not spawned, "turn must not spawn while the profile is busy"
+        start = time.monotonic()
+        out = srv._methods["bot_relay.deliver"](
+            1, {"id": "00000000000000000000000000000002", "profile": "ops", "message": "x"})
+        elapsed = time.monotonic() - start
     finally:
         release.set()
         t.join(timeout=5)
-
-
-def test_relay_deliver_serializes_then_succeeds(tmp_path, monkeypatch):
-    import tui_gateway.server as srv
-
-    h = tmp_path / "h"
-    (h / "profiles" / "ops").mkdir(parents=True)
-    (h / "profiles" / "ops" / "config.yaml").touch()  # identity marker: bare dirs are not profiles
-    monkeypatch.setenv("QUBIT_HOME", str(h))
-    monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 5.0)
-
-    class _Proc:
-        returncode = 0
-        stdout = "pong"
-        stderr = ""
-
-    monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", lambda *a, **k: _Proc())
-
-    held = threading.Event()
-    release = threading.Event()
-    t = threading.Thread(
-        target=_hold_flock, args=(turn_lock_path(h, "ops"), held, release)
-    )
-    t.start()
-    assert held.wait(timeout=5)
-    threading.Timer(0.3, release.set).start()
-    start = time.monotonic()
-    out = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000002", "profile": "ops", "message": "x"})
-    t.join(timeout=5)
     assert "error" not in out, out
     assert out["result"]["reply"] == "pong"
-    assert time.monotonic() - start >= 0.2, "deliver should have queued"
+    assert seen and Path(seen[0][0]) == h / "profiles" / "ops"
+    assert elapsed < 2.5, "the authority bridge must not wait on the retired local turn lock"
 
 
 class _WithReason(RuntimeError):
@@ -294,42 +269,36 @@ class _WithReason(RuntimeError):
         self.reason = reason
 
 
-@pytest.mark.parametrize(
-    ("failure", "code", "reason"),
-    [
-        (TurnBusyError("ops", 0.2), 5096, "target_busy"),
-        (subprocess.TimeoutExpired(["hermes"], 600), 5093, "delivery_timeout"),
-        (RuntimeError("Error code: 401 - invalid api key"), 5094, "provider_auth_or_access"),
-        (RuntimeError("something nobody has a rule for"), 5094, "unknown"),
-        (_WithReason("CERTIFICATE_VERIFY_FAILED", "ssl handshake failed"), 5094, "unknown"),
-        (_WithReason("provider_quota_limit", "quota exhausted"), 5094, "provider_quota_limit"),
-    ],
-    ids=["busy", "turn-timed-out", "classifiable-failure", "unclassifiable-failure",
-         "reason-outside-the-vocabulary", "reason-inside-the-vocabulary"],
-)
-def test_every_relay_refusal_carries_its_typed_reason(tmp_path, monkeypatch, failure, code, reason):
-    """`data.reason` is the only channel the Desktop forwards: it reads `error.data.reason` and puts
-    it in the sender's reply file, and the sender re-classifies from free text otherwise — which can
-    never produce these codes. A refusal that ships only a JSON-RPC code reaches the sending agent as
-    `[reason: unknown]`, so it cannot tell "retry shortly" from an auth failure. The turn-failure
-    branch already did this; these three did not."""
+@pytest.mark.parametrize("failure", [
+    subprocess.TimeoutExpired(["qubit"], 600),
+    RuntimeError("Error code: 401 - invalid api key"),
+    RuntimeError("something nobody has a rule for"),
+    _WithReason("CERTIFICATE_VERIFY_FAILED", "ssl handshake failed"),
+    _WithReason("provider_quota_limit", "quota exhausted"),
+], ids=["turn-timed-out", "classifiable-failure", "unclassifiable-failure",
+        "reason-outside-the-vocabulary", "reason-inside-the-vocabulary"])
+def test_every_authority_refusal_is_the_typed_runtime_unavailable_boundary(tmp_path, monkeypatch, failure):
+    """Every way the target authority can be unreachable (timeout, auth, unknown, an exception that
+    happens to carry a stdlib ``reason``) shares one closed-vocabulary refusal: the Desktop forwards
+    ``data.reason`` to the sender, which must never receive an arbitrary exception attribute."""
     import tui_gateway.server as srv
+    from tools import bot_live_delivery as live
 
     h = tmp_path / "h"
     (h / "profiles" / "ops").mkdir(parents=True)
     (h / "profiles" / "ops" / "config.yaml").touch()  # identity marker: bare dirs are not profiles
     monkeypatch.setenv("QUBIT_HOME", str(h))
-    monkeypatch.setattr(bot_relay, "local_delivery_command", lambda prof, tmp: ["__delivery__", prof])
 
-    def _raise(argv, **kwargs):
+    def _raise(home, params):
         raise failure
 
-    monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", _raise)
+    monkeypatch.setattr(live, "authority_delivery", _raise)
 
-    out = srv._methods["bot_relay.deliver"](1, {"id": "00000000000000000000000000000003", "profile": "ops", "message": "x"})
+    out = srv._methods["bot_relay.deliver"](
+        1, {"id": "00000000000000000000000000000003", "profile": "ops", "message": "x"})
 
-    assert out["error"]["code"] == code
-    assert out["error"]["data"]["reason"] == reason
+    assert out["error"]["code"] == 5094
+    assert out["error"]["data"]["reason"] == "runtime_unavailable"
 
 
 @pytest.mark.parametrize(
