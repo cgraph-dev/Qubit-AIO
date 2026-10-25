@@ -103,8 +103,12 @@ def test_schema_init_failure_still_closes_connection(monkeypatch, tmp_path):
 
     def tracking_connect(*args, **kwargs):
         conn = real_connect(*args, **kwargs)
-        opened.append(id(conn))
-        return _FailingSchemaConnection(conn, closed)
+        # The schema reference parser opens its own :memory: connection (closed in its
+        # finally); this contract covers the ledger's file-backed connection only.
+        is_file = not args or str(args[0]) != ":memory:"
+        if is_file:
+            opened.append(id(conn))
+        return _FailingSchemaConnection(conn, closed if is_file else [])
 
     monkeypatch.setattr(ad.sqlite3, "connect", tracking_connect)
 

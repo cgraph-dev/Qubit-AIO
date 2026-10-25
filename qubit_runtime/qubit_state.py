@@ -47,6 +47,7 @@ from qubit_state_errors import (
 )
 from qubit_state_guard import (
     _STATE_DB_GUARD_BYPASS_ENV, _in_test_context, _is_production_state_db, _real_platform_state_root,
+    _legacy_platform_state_root,
     _register_test_instance, _set_last_init_error, get_last_init_error,
 )
 from qubit_state_readpool import _READ_POOL_MAX, _proc_fd_targets, _read_budget_for
@@ -222,7 +223,10 @@ def _ensure_test_isolation(db_path: Path) -> None:
         resolved = Path(db_path).expanduser().resolve()
     except Exception:
         return
-    roots = [r for r in (_real_platform_state_root(),) if r is not None]
+    # Canonical and read-old homes are both production: get_qubit_home() prefers
+    # ~/.qubit, so guarding only ~/.hermes would let an argless SessionDB() open
+    # the live canonical state.db from a pytest child.
+    roots = [r for r in (_real_platform_state_root(), _legacy_platform_state_root()) if r is not None]
     for extra in _STATE_DB_GUARD_EXTRA_DENY_ROOTS:
         try:
             roots.append(Path(extra).expanduser().resolve())

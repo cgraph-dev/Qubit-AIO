@@ -144,6 +144,10 @@ def release_embed(image_url: str) -> None:
 # scopes those handles here for the turn and the tool inherits them through contextvars.
 _NATIVE_HANDLE_RE = re.compile(r"^\[Image attached(?: at)?: (.+?)\]\s*$", re.MULTILINE)
 _native_turn_images: ContextVar[frozenset[str]] = ContextVar("vision_native_turn_images", default=frozenset())
+# Tool workers may not inherit the turn's ContextVar (async/executor boundary). Mirror the
+# active scopes by task id so the dedupe still applies; entries are removed at turn end.
+_native_turn_by_task: dict[str, frozenset[str]] = {}
+_native_turn_lock = threading.Lock()
 
 
 def _native_turn_keys(user_message: Any) -> frozenset[str]:
@@ -156,20 +160,33 @@ def _native_turn_keys(user_message: Any) -> frozenset[str]:
 
 
 @contextlib.contextmanager
-def native_turn_images(user_message: Any) -> Iterator[None]:
+def native_turn_images(user_message: Any, *, key: str = "") -> Iterator[None]:
     """Scope the images natively attached to ``user_message`` to the running turn."""
-    token = _native_turn_images.set(_native_turn_keys(user_message))
+    keys = _native_turn_keys(user_message)
+    token = _native_turn_images.set(keys)
+    if key:
+        with _native_turn_lock:
+            _native_turn_by_task[key] = keys
     try:
         yield
     finally:
         _native_turn_images.reset(token)
+        if key:
+            with _native_turn_lock:
+                _native_turn_by_task.pop(key, None)
 
 
-def native_turn_duplicate(image_url: str, region: Optional[list]) -> Optional[str]:
+def native_turn_duplicate(image_url: str, region: Optional[list], *, key: str = "") -> Optional[str]:
     """Text tool result when ``image_url`` already rides the active user turn natively, else
     ``None``. A native re-embed would put the identical pixels into the same request twice
     (the Telegram case in #76411); a ``region`` crop still embeds because it returns new detail."""
-    if region is not None or _image_key(image_url) not in _native_turn_images.get():
+    if region is not None:
+        return None
+    keys = _native_turn_images.get()
+    if key:
+        with _native_turn_lock:
+            keys = keys | _native_turn_by_task.get(key, frozenset())
+    if _image_key(image_url) not in keys:
         return None
     return json.dumps({
         "success": True,

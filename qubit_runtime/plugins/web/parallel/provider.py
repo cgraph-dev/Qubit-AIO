@@ -22,6 +22,11 @@ _MISSING_KEY = "PARALLEL_API_KEY environment variable not set. Get your API key 
 
 
 def _client(slot: str, cls_name: str) -> Any:
+    # Key presence is checked BEFORE the lazy SDK install: a missing key is the
+    # actionable error, and an install would not conjure one either.
+    if not provider_env("PARALLEL_API_KEY"):
+        raise ValueError(_MISSING_KEY)
+
     def _factory(api_key: str) -> Any:
         import parallel  # deliberately lazy
         return getattr(parallel, cls_name)(api_key=api_key)

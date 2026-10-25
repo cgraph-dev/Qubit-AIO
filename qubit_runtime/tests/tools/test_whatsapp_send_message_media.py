@@ -153,11 +153,12 @@ def _resp(status, json_data=None, text_data=None):
     return r
 
 
-def _session_with(responses):
+def _session_with(responses, health=None):
     """Build a mocked aiohttp.ClientSession that returns *responses* in order
     and records every POST (url, json_payload)."""
     calls = []
     idx = [0]
+    health_resp = health or _resp(200, {})
 
     def _post(url, **kwargs):
         calls.append((url, kwargs.get("json")))
@@ -168,8 +169,15 @@ def _session_with(responses):
         ctx.__aexit__ = AsyncMock(return_value=False)
         return ctx
 
+    def _get(url, **kwargs):
+        ctx = MagicMock()
+        ctx.__aenter__ = AsyncMock(return_value=health_resp)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        return ctx
+
     session = MagicMock()
     session.post = MagicMock(side_effect=_post)
+    session.get = MagicMock(side_effect=_get)
     session_ctx = MagicMock()
     session_ctx.__aenter__ = AsyncMock(return_value=session)
     session_ctx.__aexit__ = AsyncMock(return_value=False)

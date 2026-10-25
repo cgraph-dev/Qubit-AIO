@@ -249,14 +249,18 @@ _ARGV_LIST_PUNCTUATION = re.compile(r"[\[\],]+")
 # the self-targeting shape (named profile == the profile running the guard). See #78028.
 _PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
     r"(?i)"
-    r"(?:qubit|hermes)\s+"
-    # Any global flags before the profile selector (each may carry a value).
-    r"(?:-{1,2}\S+(?:\s+\S+)?\s+)*"
+    r"(?:qubit|hermes)\s++"
+    # Any global flags before the profile selector (each may carry a value). Possessive
+    # quantifiers keep a long non-matching flag run linear instead of backtracking over every
+    # split (#129281); the selector itself is excluded from the flag token.
+    r"(?:(?!-{1,2}(?:profile|p)(?:\s|=|$))-\S++"
+    r"(?:\s++(?!-\S)(?!-{1,2}(?:profile|p)(?:\s|=|$))(?!gateway\b)\S++)?"
+    r"\s++)*"
     # The selector: exactly the shapes the CLI's `_apply_profile_override` accepts.
-    r"(?:--profile=([^\s]+)|(?:-p|--profile)\s+([^\s]+))"
+    r"(?:--profile=([^\s]+)|(?:-p|--profile)\s++([^\s]+))"
     # Any global flags between the selector and the subcommand.
-    r"(?:\s+-{1,2}\S+(?:\s+\S+)?)*"
-    r"\s+gateway\s+(?:restart|stop)"
+    r"(?:\s++(?!gateway\b)-\S++(?:\s++(?!gateway\b)(?!-\S)\S++)?)*"
+    r"\s++gateway\s++(?:restart|stop)"
 )
 
 # Branch B needs the label AFTER the verb in one `[^\n]*` span; a loop that builds the label in an

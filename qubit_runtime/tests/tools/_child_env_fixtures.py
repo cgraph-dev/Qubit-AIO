@@ -21,7 +21,7 @@ def child_env(monkeypatch, tmp_path):
     )
     seed = {k: v for k, v in os.environ.items() if k.upper() in names}
     seed.update(HOME=str(tmp_path), USERPROFILE=str(tmp_path), USER="env-test",
-                QUBIT_HOME=str(tmp_path / "hermes"),
+                QUBIT_HOME=str(tmp_path / "qubit"),
                 HERMES_RUNTIME_DIR=str(tmp_path / "runtime"),
                 TERMINAL_ENV="local", TERMINAL_CWD=str(tmp_path), LANG="C.UTF-8")
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

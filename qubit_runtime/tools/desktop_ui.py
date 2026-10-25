@@ -61,11 +61,14 @@ def emit(event: str, payload: dict) -> bool:
     if _emit is None:
         return False
     if event in _SESSION_SCOPED_EVENTS:
-        sid = get_session_env("HERMES_SESSION_ID", "")
+        sid = (get_session_env("QUBIT_SESSION_ID", "")
+               or get_session_env("HERMES_SESSION_ID", ""))
         if not sid:
-            sid = get_session_env("HERMES_UI_SESSION_ID", "")
+            sid = (get_session_env("QUBIT_UI_SESSION_ID", "")
+                   or get_session_env("HERMES_UI_SESSION_ID", ""))
     else:
-        sid = get_session_env("HERMES_UI_SESSION_ID", "")
+        sid = (get_session_env("QUBIT_UI_SESSION_ID", "")
+               or get_session_env("HERMES_UI_SESSION_ID", ""))
     _emit(sid, event, payload)
     return True
 

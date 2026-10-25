@@ -513,7 +513,8 @@ def _connectors_on(monkeypatch, client_factory):
 
     monkeypatch.setattr(config, "connectors_available", lambda: True)
     monkeypatch.setattr(bridge, "connectors_available", lambda: True)
-    monkeypatch.setattr(bridge, "_default_client_factory", client_factory)
+    # The default factory now receives a CallRef; these fakes take no arguments.
+    monkeypatch.setattr(bridge, "_default_client_factory", lambda *a, **k: client_factory())
     invalidate_check_fn_cache()
 
 
@@ -602,7 +603,12 @@ class _RecordingTransport:
 
     def request(self, method, url, *, headers=None, json=None, timeout=None):
         self.requests.append({"method": method, "url": url, "json": json})
-        tools = (json or {}).get("tools") or []
+        body = json or {}
+        if "call" in body:
+            # Current wire contract: one call per request, one ``result`` envelope.
+            call = body["call"]
+            return _FakeResponse({"result": {**call, "data": "ok"}})
+        tools = body.get("tools") or []
         results = [
             {"index": i, "connector": t.get("connector"), "tool": t.get("tool"), "data": "ok"}
             for i, t in enumerate(tools)
@@ -629,7 +635,8 @@ def _recording_client_factory(transport):
 
 def _sent_tools(transport):
     assert len(transport.requests) == 1
-    return transport.requests[0]["json"]["tools"]
+    body = transport.requests[0]["json"]
+    return body.get("tools") or [body["call"]]
 
 
 def test_hook_rewrite_and_restored_vendor_slug_reach_the_gateway_request_body(monkeypatch):
@@ -641,8 +648,14 @@ def test_hook_rewrite_and_restored_vendor_slug_reach_the_gateway_request_body(mo
     monkeypatch.setattr(plugins, "_dispatch_pre_tool_call_hooks",
                         lambda name, args, **kw: (None, {**args, "body": "[REDACTED]"}))
 
-    out = _tool_call([{"name": "connectors__gmail__SEND_EMAIL",
-                       "arguments": {"to": "x@example.com", "body": "sk-secret"}}])
+    # Unlike the other cases here, this one exercises the pre_tool_call hook itself,
+    # so it must not run through the helper that skips it.
+    import model_tools
+    out = json.loads(model_tools.handle_function_call(
+        "tool_call",
+        {"calls": [{"name": "connectors__gmail__SEND_EMAIL",
+                    "arguments": {"to": "x@example.com", "body": "sk-secret"}}]},
+        enabled_toolsets=["connections"], session_id="bridge-session"))
 
     assert _sent_tools(transport) == [
         {"connector": "gmail", "tool": "GMAIL_SEND_EMAIL",

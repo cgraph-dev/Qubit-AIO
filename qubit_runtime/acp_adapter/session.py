@@ -207,6 +207,36 @@ class SessionManager:
         logger.info("Forked ACP session %s -> %s", session_id, new_id)
         return state
 
+    def end_all_sessions(self) -> int:
+        """Signalled at adapter shutdown: stamp every ACP session ended (#118216).
+
+        ACP has no explicit session end, so without this writer ``source='acp'`` rows
+        stay invisible to prune/archive forever (maintenance only selects ended rows)
+        and the sidebar accumulates one auto-titled row per editor wake. First-writer
+        wins, so a row already ended at a boundary (e.g. ``compression``) keeps its
+        original reason. Returns the number of ACP sessions seen; a process with no DB
+        simply ends nothing.
+        """
+        db = self._get_db()
+        if db is None:
+            return 0
+        ids = set()
+        with self._lock:
+            ids.update(self._sessions.keys())
+        try:
+            for row in db.list_sessions_rich(source="acp", limit=100000):
+                sid = row.get("id") or row.get("session_id")
+                if sid:
+                    ids.add(str(sid))
+        except Exception:
+            logger.debug("Failed to enumerate ACP sessions for shutdown", exc_info=True)
+        for sid in ids:
+            try:
+                db.end_session(sid, "acp_disconnect")
+            except Exception:
+                logger.debug("Failed to end ACP session %s", sid, exc_info=True)
+        return len(ids)
+
     def list_sessions(self, cwd: str | None = None) -> List[Dict[str, Any]]:
         """Return lightweight info dicts for all sessions (memory + database)."""
         normalized_cwd = _normalize_cwd_for_compare(cwd) if cwd else None
@@ -429,6 +459,14 @@ class SessionManager:
         if row is None or row.get("source") != "acp":
             return None
 
+        # A row stamped ended by a previous adapter's shutdown (end_all_sessions) is
+        # being resumed by this process: reopen it, exactly as the TUI gateway's cold
+        # resume does, so it is live and visible to maintenance again (#118216).
+        try:
+            db.reopen_session(session_id)
+        except Exception:
+            logger.debug("Failed to reopen ACP session %s", session_id, exc_info=True)
+
         meta = _parse_model_config(row.get("model_config"))
         cwd, model = meta.get("cwd", "."), row.get("model") or None
 
@@ -508,6 +546,14 @@ class SessionManager:
                 "credential_pool": runtime.get("credential_pool"),
                 "command": runtime.get("command"), "args": list(runtime.get("args") or []),
             })
+            # A custom provider's ``extra_body`` must reach the agent as on the CLI
+            # (#103738); an explicit base_url naming a different endpoint must not
+            # inherit overrides resolved for the configured one.
+            request_overrides = runtime.get("request_overrides")
+            if request_overrides:
+                resolved_url = runtime.get("base_url")
+                if not base_url or not resolved_url or base_url == resolved_url:
+                    kwargs["request_overrides"] = request_overrides
         except Exception as exc:
             resolve_error = exc
             logger.debug("ACP session falling back to default provider resolution", exc_info=True)

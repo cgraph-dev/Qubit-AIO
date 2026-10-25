@@ -451,3 +451,69 @@ def ensure_hub_dirs() -> None:
     ):
         if not path.exists():
             path.write_text(initial, encoding="utf-8")
+
+# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
+_PLUGIN_COMPAT_LAZY = {
+    'BrowseShSource': ('tools.skills_hub_sources', 'BrowseShSource'),
+    'ClawHubSource': ('tools.skills_hub_clawhub', 'ClawHubSource'),
+    'GITHUB_TAP_PROVIDERS': ('tools.skills_hub_github', 'GITHUB_TAP_PROVIDERS'),
+    'GitHubAuth': ('tools.skills_hub_github', 'GitHubAuth'),
+    'GitHubSource': ('tools.skills_hub_github', 'GitHubSource'),
+    'QUBIT_INDEX_TTL': ('tools.skills_hub_search', 'QUBIT_INDEX_TTL'),
+    'QUBIT_INDEX_URL': ('tools.skills_hub_search', 'QUBIT_INDEX_URL'),
+    'QubitIndexSource': ('tools.skills_hub_official', 'QubitIndexSource'),
+    'LobeHubSource': ('tools.skills_hub_sources', 'LobeHubSource'),
+    'OptionalSkillSource': ('tools.skills_hub_official', 'OptionalSkillSource'),
+    'ScanResult': ('tools.skills_guard', 'ScanResult'),
+    'SkillBundle': ('tools.skills_hub_models', 'SkillBundle'),
+    'SkillMeta': ('tools.skills_hub_models', 'SkillMeta'),
+    'SkillSource': ('tools.skills_hub_models', 'SkillSource'),
+    'SkillsShSource': ('tools.skills_hub_skillssh', 'SkillsShSource'),
+    'TRUSTED_REPOS': ('tools.skills_guard', 'TRUSTED_REPOS'),
+    'UrlSource': ('tools.skills_hub_sources', 'UrlSource'),
+    'WellKnownSkillSource': ('tools.skills_hub_sources', 'WellKnownSkillSource'),
+    'bundle_content_hash': ('tools.skills_hub_install', 'bundle_content_hash'),
+    'check_for_skill_updates': ('tools.skills_hub_install', 'check_for_skill_updates'),
+    'content_hash': ('tools.skills_guard', 'content_hash'),
+    'create_source_router': ('tools.skills_hub_search', 'create_source_router'),
+    'github_provider_for': ('tools.skills_hub_github', 'github_provider_for'),
+    'install_from_quarantine': ('tools.skills_hub_install', 'install_from_quarantine'),
+    'is_excluded_skill_path': ('agent.skill_utils', 'is_excluded_skill_path'),
+    'parallel_search_sources': ('tools.skills_hub_search', 'parallel_search_sources'),
+    'quarantine_bundle': ('tools.skills_hub_install', 'quarantine_bundle'),
+    'source_url_for_bundle': ('tools.skills_hub_models', 'source_url_for_bundle'),
+    'unified_search': ('tools.skills_hub_search', 'unified_search'),
+    'uninstall_skill': ('tools.skills_hub_install', 'uninstall_skill'),
+    'windows_hide_flags': ('qubit_cli._subprocess_compat', 'windows_hide_flags'),
+}
+
+
+def _plugin_compat_getattr(name):
+    target = _PLUGIN_COMPAT_LAZY.get(name)
+    if target is None:
+        return _plugin_compat_prev_getattr(name)
+    import importlib
+    from qubit_cli.plugin_compat import warn_once
+    warn_once(__name__, name, *target)
+    return getattr(importlib.import_module(target[0]), target[1])
+
+
+setattr(_plugin_compat_getattr, "_plugin_compat_wrapper", True)
+
+
+def _install_plugin_compat_getattr():
+    """Chain the compat resolver once, including across retained-module reloads."""
+    global __getattr__, _plugin_compat_prev_getattr
+    current = globals().get("__getattr__")
+    if current is None:
+        def current(name):
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if getattr(current, "_plugin_compat_wrapper", False):
+        return
+    _plugin_compat_prev_getattr = current
+    __getattr__ = _plugin_compat_getattr
+
+
+_install_plugin_compat_getattr()
+# ---- END PLUGIN-COMPAT ----
+

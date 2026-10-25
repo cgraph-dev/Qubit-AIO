@@ -316,23 +316,31 @@ def _apply_toolset_selection(tools: set, names: List[str], quiet_mode: bool, *, 
 def _select_tool_names(enabled_toolsets: Optional[List[str]], disabled_toolsets: Optional[List[str]], quiet_mode: bool) -> set:
     """Tool names requested by the toolset selection (before check_fn filtering)."""
     tools: set = set()
+    from toolsets import profile_role_toolsets
+    denied_role_toolsets = profile_role_toolsets()[1]
+    role_granted: set = set()
     if enabled_toolsets is not None:
-        enabled = list(enabled_toolsets)
+        # A role-reserved toolset reaches only a profile carrying that role, whatever the
+        # config/CLI/env/"all" asked for: drop it from the request before resolving, and let
+        # an explicitly enabled sibling toolset still grant a tool it shares (``catalog``
+        # and ``setup`` both list ``manage_catalog``; only the role gate is exclusive).
+        enabled = [name for name in enabled_toolsets if name not in denied_role_toolsets]
         # Dispatcher-spawned kanban workers always get the lifecycle handoff
         # tools, even when the assignee profile restricts its chat toolsets.
         if (os.environ.get("HERMES_KANBAN_TASK") and not _is_delegated_child_context()
                 and _is_dispatcher_owned_worker() and "kanban" not in enabled):
             enabled.append("kanban")
         _apply_toolset_selection(tools, enabled, quiet_mode, disable=False)
+        for name in enabled:
+            if validate_toolset(name):
+                role_granted.update(resolve_toolset(name))
     else:
         from toolsets import get_all_toolsets
         for ts_name in get_all_toolsets():
             tools.update(resolve_toolset(ts_name))
-    # A role-reserved toolset (``setup``) reaches only a profile carrying that role, whatever the config,
-    # CLI flag, env pin or "all" asked for; this is the one point every surface's selection passes.
-    from toolsets import profile_role_toolsets
-    for ts_name in profile_role_toolsets()[1]:
-        tools.difference_update(resolve_toolset(ts_name))
+    # Subtract role-reserved toolsets that were not legitimately granted above.
+    for ts_name in denied_role_toolsets:
+        tools.difference_update(set(resolve_toolset(ts_name)) - role_granted)
     # Disabled toolsets are always subtracted LAST, so a tool in a disabled
     # toolset is stripped even when a composite (hermes-cli) re-enables it.
     # This ensures that even if a composite toolset (like hermes-cli) is enabled, any tools belonging to a

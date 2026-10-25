@@ -380,7 +380,10 @@ def test_repair_rebuilds_stale_btree_indexes(tmp_path):
     # The real detector must see the real corruption...
     reason = qubit_state_repair._db_opens_cleanly(db_path)
     assert reason is not None
-    assert "wrong # of entries in index idx_messages_session" in reason
+    # SQLite versions word this class differently ("wrong # of entries" on older
+    # builds, "row N missing from index" on 3.45); both name the stale index.
+    assert "idx_messages_session" in reason
+    assert "wrong # of entries in index" in reason or "missing from index" in reason
 
     # ...and the real repair ladder must fix it via REINDEX.
     report = repair_state_db_schema(db_path)

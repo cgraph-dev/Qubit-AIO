@@ -22,6 +22,7 @@ import pytest
 
 import qubit_state
 from qubit_state import SessionDB
+from qubit_state_pidns import holder_namespace_token
 
 
 @pytest.fixture
@@ -95,7 +96,9 @@ def test_non_expired_lock_from_dead_pid_is_reclaimed(
     # ``_process_is_gone`` consults psutil *before* its POSIX/nt split — the
     # nt early-return is unreachable here on any host, so faking the platform
     # bought nothing.
-    dead_holder = "pid=424242:tid=1:agent=abc:nonce=deadbeef"
+    # Fork contract: a structured holder is probed only when it carries this
+    # process' PID-namespace stamp (unstamped holders defer to TTL).
+    dead_holder = f"pid=424242{holder_namespace_token()}:tid=1:agent=abc:nonce=deadbeef"
     assert db.try_acquire_compression_lock(
         "sess1", dead_holder, ttl_seconds=300
     ) is True
@@ -111,7 +114,7 @@ def test_non_expired_lock_from_dead_pid_is_reclaimed(
     )
 
     assert db.try_acquire_compression_lock(
-        "sess1", "pid=525252:tid=2:agent=def:nonce=fresh", ttl_seconds=300
+        "sess1", f"pid=525252{holder_namespace_token()}:tid=2:agent=def:nonce=fresh", ttl_seconds=300
     ) is True
     assert probed == [424242]
 
@@ -122,7 +125,7 @@ def test_probe_doubt_keeps_lease_until_ttl(
     db: SessionDB, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A probe that errors out is doubt, not proof of death → TTL protects."""
-    holder = "pid=424242:tid=1:agent=abc:nonce=doubt"
+    holder = f"pid=424242{holder_namespace_token()}:tid=1:agent=abc:nonce=doubt"
     assert db.try_acquire_compression_lock(
         "sess1", holder, ttl_seconds=300
     ) is True
@@ -135,18 +138,18 @@ def test_probe_doubt_keeps_lease_until_ttl(
     )
 
     assert db.try_acquire_compression_lock(
-        "sess1", "pid=525252:tid=2:agent=def:nonce=other", ttl_seconds=300
+        "sess1", f"pid=525252{holder_namespace_token()}:tid=2:agent=def:nonce=other", ttl_seconds=300
     ) is False
     assert db.get_compression_lock_holder("sess1") == holder
 
 
 def test_non_expired_lock_from_live_pid_is_not_reclaimed(db: SessionDB) -> None:
-    live_holder = f"pid={os.getpid()}:tid=1:agent=abc:nonce=live"
+    live_holder = f"pid={os.getpid()}{holder_namespace_token()}:tid=1:agent=abc:nonce=live"
     assert db.try_acquire_compression_lock(
         "sess1", live_holder, ttl_seconds=300
     ) is True
     assert db.try_acquire_compression_lock(
-        "sess1", "pid=525252:tid=2:agent=def:nonce=other", ttl_seconds=300
+        "sess1", f"pid=525252{holder_namespace_token()}:tid=2:agent=def:nonce=other", ttl_seconds=300
     ) is False
 
 
@@ -173,7 +176,7 @@ def test_unstructured_holder_waits_for_ttl(
         lambda *_args: pytest.fail("unstructured holder must not probe a PID"),
     )
     assert db.try_acquire_compression_lock(
-        "sess1", "pid=525252:tid=2:agent=def:nonce=other", ttl_seconds=300
+        "sess1", f"pid=525252{holder_namespace_token()}:tid=2:agent=def:nonce=other", ttl_seconds=300
     ) is False
 
 

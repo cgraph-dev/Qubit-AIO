@@ -753,7 +753,7 @@ async def _vision_analyze_native(
     or a JSON error string (the normal tool-result contract) on failure."""
     if not isinstance(image_url, str) or not image_url.strip():
         return tool_error("image_url is required", success=False)
-    already_native = _native_turn_duplicate(image_url, region)
+    already_native = _native_turn_duplicate(image_url, region, key=task_id or "")
     if already_native is not None:
         return already_native
     # A cap > 0 RESERVES the slot here (atomic check-and-count); released below if no embed happens.

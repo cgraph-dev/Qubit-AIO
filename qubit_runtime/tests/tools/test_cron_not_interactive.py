@@ -37,5 +37,14 @@ def test_api_server_platform_keeps_exec_ask_for_runs_approval_bridge(monkeypatch
     """api_server resolves approvals via ``approval.request`` → ``POST /v1/runs/{id}/approval``;
     clearing ``is_ask`` there would turn every dangerous command into an instant BLOCK."""
     monkeypatch.setenv("HERMES_SESSION_PLATFORM", "api_server")
-    _, _, _, is_ask = approval_mod._presence()
+    # The /v1/runs bridge registers its notifier before the turn; that registration
+    # is the discriminator (an api_server turn with no surface must not park).
+    from tools.approval import register_gateway_notify, unregister_gateway_notify
+    from tools.approval_context import get_current_session_key
+    key = get_current_session_key()
+    register_gateway_notify(key, lambda data: None)
+    try:
+        _, _, _, is_ask = approval_mod._presence()
+    finally:
+        unregister_gateway_notify(key)
     assert is_ask is True

@@ -69,11 +69,14 @@ def find_canonical_live_owner(profile_home: Path | str) -> dict[str, Any] | None
     from qubit_cli.gateway_runtime import discover_gateway_endpoint
 
     home = Path(profile_home).resolve()
+    # A profile with no store cannot have a live owner at all; answer that before
+    # requiring the authority, so a first-ever delivery falls through to transport
+    # instead of failing as "authority not ready".
+    if not (home / 'state.db').is_file():
+        return None
     discovery = discover_gateway_endpoint(home, timeout=5)
     if discovery.state != 'ready' or discovery.endpoint is None:
         raise ValueError('profile authority is not ready')
-    if not (home / 'state.db').is_file():
-        return None
     tip = _bot_chat_tip(home)
     return dict(profile_home=str(home), session_id=tip or '', canonical=True,
                 lease_id=discovery.endpoint.instance_id, live_session_id=tip or '')

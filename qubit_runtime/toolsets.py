@@ -434,9 +434,14 @@ def resolve_toolset(name: str, visited: set[str] | None = None, *, include_regis
     # session platform gates: a profile gets those only when its config names them.
     if name in {"all", "*"}:
         all_tools: Set[str] = set()
+        # Role-reserved toolsets (``setup``) never come in through "all" unless the
+        # running profile carries that role; their tools also appear in platform-gated
+        # sets (``catalog``), which are added only when a config names them.
+        denied_role_toolsets = profile_role_toolsets()[1]
         for toolset_name in get_toolset_names():
-            if toolset_name not in TOOLSET_SESSION_PLATFORMS:
-                all_tools.update(resolve_toolset(toolset_name, visited.copy(), include_registry=include_registry))
+            if toolset_name in TOOLSET_SESSION_PLATFORMS or toolset_name in denied_role_toolsets:
+                continue
+            all_tools.update(resolve_toolset(toolset_name, visited.copy(), include_registry=include_registry))
         return sorted(all_tools)
 
     # Diamond include or cycle: [] silently — the tools are collected via another path.

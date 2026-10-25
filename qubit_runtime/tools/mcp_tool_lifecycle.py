@@ -277,7 +277,7 @@ def _take_reapable_pids(include_active: bool, server_name: Optional[str]) -> tup
 
 
 def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int], my_pgid: Optional[int],
-                        expected_start: Optional[int] = None) -> None:
+                        expected_start: Optional[int] = None) -> bool:
     """SIGTERM/SIGKILL via the spawn-time pgroup on POSIX (reaches reparented grandchildren),
     falling back to a per-pid signal.
 
@@ -300,7 +300,7 @@ def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int
                     logger.debug(
                         "Skip signalling MCP pid %d (%s): start-time mismatch — PID was recycled; "
                         "refusing to kill an unrelated process group.", pid, server_name)
-                    return
+                    return False
             except (TypeError, ValueError):
                 pass  # junk fingerprints: best-effort, never break signalling
     killpg = getattr(os, "killpg", None)
@@ -329,6 +329,7 @@ def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int
         pass
     if os.name == "nt":  # Windows has no pgid reaching reparented grandchildren — kill the tree
         _kill_windows_process_tree(pid, sig)
+    return True
 
 
 def _kill_windows_process_tree(pid: int, sig: int) -> None:
@@ -387,13 +388,19 @@ def _kill_orphaned_mcp_children(include_active: bool = False, server_name: Optio
     except (AttributeError, OSError):
         my_pgid = None  # Windows or restricted environment
 
+    refused: set[int] = set()
     for pid, owner in pids.items():
-        _signal_mcp_process(pid, _signal.SIGTERM, owner, pgids.get(pid), my_pgid, starts.get(pid))
+        if not _signal_mcp_process(pid, _signal.SIGTERM, owner, pgids.get(pid), my_pgid, starts.get(pid)):
+            refused.add(pid)
+            continue
         logger.debug("Sent SIGTERM to orphaned MCP process %d (%s)", pid, owner)
     time.sleep(2)
     sigkill = getattr(_signal, "SIGKILL", _signal.SIGTERM)
     from gateway.status import _pid_exists  # ``os.kill(pid, 0)`` is NOT a no-op on Windows
     for pid, owner in pids.items():
+        if pid in refused:
+            # Recycled PID: never probe (or signal) the unrelated group that owns it now.
+            continue
         if _pid_exists(pid) or _group_alive(pgids.get(pid), my_pgid):  # leader or descendants survived SIGTERM
             _signal_mcp_process(pid, sigkill, owner, pgids.get(pid), my_pgid, starts.get(pid))
             logger.warning("Force-killed MCP process %d (%s) after SIGTERM timeout", pid, owner)

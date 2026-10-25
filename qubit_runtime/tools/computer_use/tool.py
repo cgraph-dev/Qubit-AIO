@@ -549,8 +549,26 @@ def _classify_action_result(res: ActionResult) -> Dict[str, Any]:
         return {"decision": "verify_fresh_state", "hint": ("Input was delivered but not confirmed. Re-capture and check the "
                 "result BEFORE any retry — do not repeat the input on an escalation recommendation alone.")}
     if res.effect == "suspected_noop" or not res.ok or res.code is not None:
-        return {"decision": "escalate", **({"recommended": res.escalation.get("recommended")}
-                                           if isinstance(res.escalation, dict) else {}), "hint": (
+        meta = res.meta if isinstance(res.meta, dict) else {}
+        driver_recommendation = (res.escalation.get("recommended")
+                                 if isinstance(res.escalation, dict) else None)
+        # Zero delivered keystrokes behind a trusted-event check: retrying the same
+        # delivery rung cannot help, the AX ``set_value`` write path bypasses the filter.
+        # A driver recommendation (e.g. the synthesis budget's ``chunk``) stays authoritative.
+        try:
+            zero_delivery = (
+                res.action == "type" and not driver_recommendation
+                and int(meta.get("delivered_chars") or 0) == 0
+                and int(meta.get("requested_chars") or 0) > 0)
+        except (TypeError, ValueError):
+            zero_delivery = False
+        if zero_delivery:
+            return {"decision": "escalate", "recommended": "set_value", "hint": (
+                "None of the requested keystrokes landed (the target's trusted-event check dropped them). "
+                "Do not re-issue the same type action: use the accessibility set_value path to write the text "
+                "directly.")}
+        return {"decision": "escalate", **({"recommended": driver_recommendation}
+                                           if driver_recommendation else {}), "hint": (
             "The input likely did not land. Climb one rung following `recommended`: 'px' → re-issue by coordinate; "
             "'foreground' (or a failed pixel click) → re-issue with delivery_mode='foreground' (separate approval). "
             "Do not predict the rung from the app being Electron/Chromium — react to this signal.")}

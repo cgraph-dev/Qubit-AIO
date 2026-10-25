@@ -32,7 +32,8 @@ def test_show_needs_something_to_point_at_or_say():
 
 
 def test_start_validates_its_steps():
-    assert "non-empty steps" in _run(action="start")["error"]
+    # No steps = the app's built-in tour (valid); an explicit empty list is not.
+    assert "error" not in _run(action="start")
     assert "non-empty steps" in _run(action="start", steps=[])["error"]
     assert "steps[1] must be an object" in _run(action="start", steps=[{"selector": "#a"}, "nope"])["error"]
     assert "steps[1] needs" in _run(action="start", steps=[{"selector": "#a"}, {}])["error"]

@@ -67,7 +67,6 @@ def test_reuse_environment_fingerprint_ignores_volatile_temp_mounts(tmp_path, mo
         hermes_home="/profiles/alpha",
     )
 @pytest.mark.require_symlinks
-@pytest.mark.xfail(strict=True, reason="wave-23 short-port: local docker environment fingerprint/label contract diverges from the pin")
 def test_symlinked_skills_tree_reuses_container_across_processes(monkeypatch, tmp_path):
     """A symlink under ``skills/`` makes the skills mount a fresh mkdtemp copy per
     process (and even per DockerEnvironment construction — ``_safe_skills_path``

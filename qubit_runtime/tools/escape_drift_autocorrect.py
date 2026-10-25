@@ -47,11 +47,17 @@ def maybe_correct_backslash_doubling(old_string: str, new_string: str, content: 
     halved_old = _halve_backslash_runs(old_string)
     if halved_old not in content:
         return old_string, new_string
+    # Same non-trivial-signal rule as the reject guard: one lone doubled backslash in
+    # prose is too weak to call a wire artifact.
+    file_runs = [len(run) for run in _BACKSLASH_RUN_RE.findall(halved_old)]
+    if not (any(n >= 2 for n in file_runs) or len(file_runs) >= 2):
+        return old_string, new_string
 
-    if "\\" in new_string:
+    if "\\" in new_string and _BACKSLASH_RUN_RE.findall(new_string) != _BACKSLASH_RUN_RE.findall(halved_old):
         raise AmbiguousEscapeDriftError(
-            "Escape-drift detected: halving old_string's backslashes matches the file, "
-            "but correcting new_string could remove intentional backslashes. "
+            "Escape-drift detected: every backslash run in old_string is exactly twice as long "
+            "as in the matched region of the file, but new_string still carries backslash runs "
+            "that do not match that region. Correcting it could remove intentional backslashes. "
             "Re-read the file and resend old_string/new_string with their intended escaping."
         )
     return halved_old, new_string

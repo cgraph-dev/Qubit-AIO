@@ -72,8 +72,17 @@ def is_loopback_host(host: str | None) -> bool:
     """True for a host that must always bypass a proxy: ``localhost`` or any loopback IP literal
     (``127.x.x.x``, ``::1``, ``::ffff:127.0.0.1``)."""
     host = str(host or "").strip().lower().strip("[]")
+    if host == "localhost":
+        return True
     ip = _ip_or_none(host)
-    return host == "localhost" or (ip is not None and ip.is_loopback)
+    if ip is None:
+        return False
+    if ip.is_loopback:
+        return True
+    # IPv4-mapped IPv6 (``::ffff:127.0.0.1``): Python reports is_loopback False on the
+    # mapped address itself, so judge the embedded IPv4.
+    mapped = getattr(ip, "ipv4_mapped", None)
+    return bool(mapped is not None and mapped.is_loopback)
 
 
 def loopback_connect_kwargs(url: str) -> dict:

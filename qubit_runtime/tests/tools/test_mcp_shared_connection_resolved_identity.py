@@ -138,7 +138,7 @@ def test_profile_with_other_profile_identity_header_gets_its_own_http_connection
             time.sleep(0.05)
         port = port_file.read_text(encoding="utf-8-sig")
         team = {"url": f"http://127.0.0.1:{port}/mcp",
-                "identity_header": {"name": "X-Hermes-Profile", "value_from": "profile"}}
+                "identity_header": {"name": "X-Qubit-Profile", "value_from": "profile"}}
         for home in two_profile_homes.values():
             (home / "config.yaml").write_text(yaml.safe_dump({"model": _MODEL, "mcp_servers": {"team": team}}), encoding="utf-8")
 
