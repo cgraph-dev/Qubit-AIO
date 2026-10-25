@@ -701,6 +701,8 @@ def test_default_spawn_does_not_auto_load_any_skill(kanban_home, monkeypatch):
     try:
         tid = kb.create_task(conn, title="skill-loading test",
                              assignee="some-profile")
+        # A managed dispatch requires the claimed task's current run (restart-safe scope).
+        kb.claim_task(conn, tid)
         task = kb.get_task(conn, tid)
         workspace = kbw.resolve_workspace(task)
         pid = kbd._default_spawn(task, str(workspace))
@@ -708,16 +710,15 @@ def test_default_spawn_does_not_auto_load_any_skill(kanban_home, monkeypatch):
     finally:
         conn.close()
 
+    import sys
     cmd = captured["cmd"]
     assert "--skills" not in cmd, (
         f"spawn argv should not auto-load any skill: {cmd}"
     )
-    assert "--accept-hooks" in cmd, f"spawn argv missing --accept-hooks: {cmd}"
-    assert cmd.index("--accept-hooks") < cmd.index("chat"), (
-        f"--accept-hooks must come before 'chat' in argv: {cmd}"
-    )
-    # Assignee + task env are still present
-    assert "some-profile" in cmd
+    # The fork spawns the receipt-waiting worker client with no agent CLI flags at all:
+    # profile/home/board/skills travel in the sanitized environment.
+    assert cmd == [sys.executable, "-m", "qubit_cli.kanban_worker_client"]
+    # Assignee + task env are the contract now (no agent flags in argv).
     env = captured["env"]
     assert env.get("HERMES_KANBAN_TASK") == tid
     assert env.get("HERMES_PROFILE") == "some-profile"
@@ -1374,6 +1375,8 @@ def test_dead_worker_reap_reads_the_log_of_the_dispatching_board(kanban_home):
     from qubit_cli import kanban_db_dispatch as kbd
     assert kb.get_current_board() == "default"
     board = "other-board"
+    from qubit_cli import kanban_db_boards as kbb
+    kbb.create_board(board)  # the fork refuses to resurrect an uncreated named board
     conn = kbc.connect(board=board)
     try:
         tid = kb.create_task(conn, title="handoff", assignee="worker")
