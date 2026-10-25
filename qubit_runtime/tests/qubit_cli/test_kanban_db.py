@@ -331,7 +331,7 @@ def test_rate_limit_exit_requeues_without_counting_failure(
     from qubit_cli import kanban_db_dispatch as _kbd
 
     monkeypatch.setattr(_kb, "_pid_alive", lambda _pid: False)
-    monkeypatch.setenv("QUBIT_KANBAN_CRASH_GRACE_SECONDS", "0")
+    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
 
     with kbc.connect() as conn:
         host = _kb._claimer_id().split(":", 1)[0]
@@ -394,7 +394,7 @@ def test_terminal_provider_exit_blocks_after_one_attempt_in_either_lane(kanban_h
     from qubit_cli import kanban_db_dispatch as _kbd
 
     monkeypatch.setattr(_kb, "_pid_alive", lambda _pid: False)
-    monkeypatch.setenv("QUBIT_KANBAN_CRASH_GRACE_SECONDS", "0")
+    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
 
     with kbc.connect() as conn:
         host = _kb._claimer_id().split(":", 1)[0]
@@ -438,7 +438,7 @@ def test_respawn_guard_defers_rate_limited_within_cooldown(
     fall into ``blocker_auth`` (which would defer forever)."""
     import qubit_cli.kanban_db as _kb
 
-    monkeypatch.setenv("QUBIT_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
+    monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
     now = 5_000_000
 
     with kbc.connect() as conn:
@@ -492,7 +492,7 @@ def test_respawn_guard_blocker_auth_curated_not_open_stem(
     ordinary English words like "author"/"authored"/"authoring"/"authoritative"
     in worker progress prose, parking a healthy ``ready`` card forever (#117009).
     The auth family must be a curated set of real auth-failure tokens."""
-    monkeypatch.setenv("QUBIT_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
 
     with kbc.connect() as conn:
         tid = kb.create_task(conn, title="prose", assignee="a")
@@ -565,7 +565,7 @@ def test_infrastructure_spawn_refusal_never_charges_the_card(
     monkeypatch.setattr(process_registry, "_is_supervised_gateway_process", lambda: True)
     monkeypatch.setenv("INVOCATION_ID", "managed-gateway")
     monkeypatch.setattr(process_registry, "_systemd_run_user_scope_available", lambda: False)
-    monkeypatch.setenv("QUBIT_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
 
     def spawn_via_real_boundary(task, workspace, board=None):
         kbd._restart_safe_worker_argv(task, ["qubit", "chat"])  # raises: real probe verdict, real _degrade()
@@ -587,11 +587,11 @@ def test_infrastructure_spawn_refusal_never_charges_the_card(
         assert [r["outcome"] for r in runs] == ["spawn_failed"] * 3
         assert all(json.loads(r["metadata"])["infrastructure"] is True for r in runs)
 
-        monkeypatch.setenv("QUBIT_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
+        monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "300")
         assert kbd.check_respawn_guard(conn, tid) == "infrastructure_cooldown"
 
         # Control: an ordinary spawn failure on the same card still spends budget.
-        monkeypatch.setenv("QUBIT_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+        monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
 
         def spawn_broken(task, workspace, board=None):
             raise RuntimeError("profile launcher exploded")
@@ -1047,7 +1047,7 @@ class TestSharedBoardPaths:
     def _set_home(self, monkeypatch, tmp_path, qubit_home):
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-        monkeypatch.delenv("QUBIT_KANBAN_HOME", raising=False)
+        monkeypatch.delenv("HERMES_KANBAN_HOME", raising=False)
 
 
     def test_profile_worker_resolves_to_shared_root(
@@ -1156,18 +1156,19 @@ class TestSharedBoardPaths:
             claim_expires=None,
             tenant=None,
             branch_name="wt/t_dispatch_env",
+            current_run_id=1,
         )
         kbd._default_spawn(task, str(tmp_path / "ws"))
 
         env = captured["env"]
-        assert env["QUBIT_KANBAN_DB"] == str(default_home / "kanban.db")
-        assert env["QUBIT_KANBAN_WORKSPACES_ROOT"] == str(
+        assert env["HERMES_KANBAN_DB"] == str(default_home / "kanban.db")
+        assert env["HERMES_KANBAN_WORKSPACES_ROOT"] == str(
             default_home / "kanban" / "workspaces"
         )
-        assert env["QUBIT_KANBAN_TASK"] == "t_dispatch_env"
-        assert env["QUBIT_KANBAN_BRANCH"] == "wt/t_dispatch_env"
+        assert env["HERMES_KANBAN_TASK"] == "t_dispatch_env"
+        assert env["HERMES_KANBAN_BRANCH"] == "wt/t_dispatch_env"
         for key in sc._VAR_MAP:
-            if key == "QUBIT_SESSION_SOURCE":
+            if key == "HERMES_SESSION_SOURCE":
                 # Re-set by the dispatcher, so what matters is that it carries
                 # the worker's own tag rather than the inherited routing value.
                 assert env[key] == "kanban"
@@ -1578,17 +1579,17 @@ def test_connect_heals_reduced_tasks_schema_seeded_by_external_harness(kanban_ho
 def test_resolve_qubit_argv_prefers_module_form_over_path_shim(monkeypatch):
     """A `qubit` on PATH must not shadow the running install (#111569):
     the module argv wins whenever ``qubit_cli`` is importable; only an
-    explicit ``$QUBIT_BIN`` overrides it."""
+    explicit ``$HERMES_BIN`` overrides it."""
     import shutil
     import sys
     from qubit_cli import kanban_db_dispatch as kbd
 
-    monkeypatch.delenv("QUBIT_BIN", raising=False)
+    monkeypatch.delenv("HERMES_BIN", raising=False)
     monkeypatch.setattr(shutil, "which", lambda name: "/tmp/planted/qubit")
     monkeypatch.setattr(kbd, "_safe_which_no_cwd", lambda name: "/tmp/planted/qubit")
     assert kbd._resolve_qubit_argv() == [sys.executable, "-m", "qubit_cli.main"]
 
-    monkeypatch.setenv("QUBIT_BIN", "/opt/qubit/bin/qubit")
+    monkeypatch.setenv("HERMES_BIN", "/opt/qubit/bin/qubit")
     assert kbd._resolve_qubit_argv() == ["/opt/qubit/bin/qubit"]
 
 
@@ -1609,7 +1610,7 @@ def test_resolve_qubit_argv_module_actually_runs():
     import unittest.mock as mock
 
     with mock.patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("QUBIT_BIN", None)
+        os.environ.pop("HERMES_BIN", None)
         with mock.patch.object(shutil, "which", return_value=None):
             argv = kbd._resolve_qubit_argv()
     r = subprocess.run(argv + ["--version"], capture_output=True, text=True, timeout=30)
@@ -1641,9 +1642,9 @@ def test_default_spawn_pins_repo_root_on_module_worker_pythonpath(tmp_path, monk
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("QUBIT_KANBAN_HOME", raising=False)
+    monkeypatch.delenv("HERMES_KANBAN_HOME", raising=False)
     monkeypatch.delenv("PYTHONPATH", raising=False)
-    monkeypatch.delenv("QUBIT_BIN", raising=False)
+    monkeypatch.delenv("HERMES_BIN", raising=False)
 
     captured = {}
 
@@ -1659,16 +1660,18 @@ def test_default_spawn_pins_repo_root_on_module_worker_pythonpath(tmp_path, monk
         id="t_import_root", title="x", body=None, assignee="coder", status="ready",
         priority=0, created_by=None, created_at=0, started_at=None, completed_at=None,
         workspace_kind="worktree", workspace_path=str(tmp_path / "ws"), claim_lock=None,
-        claim_expires=None, tenant=None, branch_name=None,
+        claim_expires=None, tenant=None, branch_name=None, current_run_id=1,
     )
 
     monkeypatch.setattr(kbd, "_resolve_qubit_argv", lambda: [sys.executable, "-m", "qubit_cli.main"])
     kbd._default_spawn(task, str(tmp_path / "ws"))
     assert captured["env"]["PYTHONPATH"].split(os.pathsep)[0] == root
 
+    # The fork always spawns the module-form worker client (never a PATH shim), so the
+    # repo root stays pinned on PYTHONPATH in every case.
     monkeypatch.setattr(kbd, "_resolve_qubit_argv", lambda: ["/opt/qubit/bin/qubit"])
     kbd._default_spawn(task, str(tmp_path / "ws"))
-    assert root not in captured["env"].get("PYTHONPATH", "").split(os.pathsep)
+    assert captured["env"]["PYTHONPATH"].split(os.pathsep)[0] == root
 
 
 # ---------------------------------------------------------------------------
