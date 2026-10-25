@@ -171,7 +171,7 @@ def _host_state_dir() -> str:
     state_home = os.environ.get("XDG_STATE_HOME") or ""
     if not os.path.isabs(state_home):
         state_home = os.path.join(os.path.expanduser("~"), ".local", "state")
-    return os.path.join(state_home, "hermes", "gateway-locks")
+    return os.path.join(state_home, "qubit", "gateway-locks")
 
 
 def _pid_is_live(pid: int) -> bool:
