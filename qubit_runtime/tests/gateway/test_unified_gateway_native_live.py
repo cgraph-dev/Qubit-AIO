@@ -74,23 +74,35 @@ class Model(BaseHTTPRequestHandler):
             pass
 
 
-def control(home, verb, params=None):
-    """Bootstrap control channel: private named pipe on Windows, AF_UNIX elsewhere."""
+def control(home, verb, params=None, *, attempts=1):
+    """Bootstrap control channel: private named pipe on Windows, AF_UNIX elsewhere.
+
+    ``attempts`` > 1 rides a brief owner restart window (a socket file that exists
+    while the listener is being rebound answers ECONNREFUSED); a permanently dead
+    owner still exhausts the attempts and raises."""
     request = json.dumps({'protocol': 1, 'id': 1, 'verb': verb, 'params': params or {}}).encode() + b'\n'
-    if os.name == 'nt':
-        from gateway.runtime_bootstrap_windows import query_runtime_control
-        raw = query_runtime_control(home, request, 2)
-    else:
-        from gateway.control_socket import resolve_client_socket_path
-        path = resolve_client_socket_path(home)
-        if path is None:
-            raise FileNotFoundError('control socket absent')
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
-            peer.settimeout(2)
-            peer.connect(str(path))
-            peer.sendall(request)
-            with peer.makefile('rb') as stream:
-                raw = stream.readline()
+    for attempt in range(attempts):
+        try:
+            if os.name == 'nt':
+                from gateway.runtime_bootstrap_windows import query_runtime_control
+                raw = query_runtime_control(home, request, 2)
+            else:
+                from gateway.control_socket import resolve_client_socket_path
+                path = resolve_client_socket_path(home)
+                if path is None:
+                    raise FileNotFoundError('control socket absent')
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
+                    peer.settimeout(2)
+                    peer.connect(str(path))
+                    peer.sendall(request)
+                    with peer.makefile('rb') as stream:
+                        raw = stream.readline()
+        except (ConnectionRefusedError, FileNotFoundError):
+            if attempt + 1 >= attempts:
+                raise
+            time.sleep(0.2)
+            continue
+        break
     reply = json.loads(raw.split(b'\n', 1)[0])
     assert reply.get('ok'), reply
     return reply['result']
@@ -121,7 +133,8 @@ async def ok(ws, method, **params):
 
 def websocket(home, desc, purpose='interactive'):
     grant = control(home, 'session-ticket', {'profile_id': desc['served_profiles'][0]['profile_id'],
-                                             'instance_id': desc['instance_id'], 'purpose': purpose})
+                                             'instance_id': desc['instance_id'], 'purpose': purpose},
+                    attempts=10)
     return connect(desc['api_origin'].replace('http:', 'ws:') + '/api/ws',
                    subprotocols=['hermes-gateway-v1', 'hermes-gateway-ticket.' + grant['ticket']],
                    open_timeout=20)
@@ -252,7 +265,11 @@ def harness(tmp_path, peer):
         'gateway': {'multiplex_profiles': False},
         'model': {'provider': 'custom', 'default': 'native-model', 'base_url': url},
         'auxiliary': {'title_generation': {'enabled': False}},
-        'platform_toolsets': {'cli': []}}), encoding='utf-8')
+        'platform_toolsets': {'cli': []},
+        # DELETE journal (the host's SQLite is WAL-refused) fsyncs every schema commit;
+        # on a loaded host that stalls boot and shutdown long enough to trip the
+        # process deadlines. Durability is meaningless in a throwaway test home.
+        'database': {'synchronous': 0}}), encoding='utf-8')
     audit = tmp_path / 'audit.jsonl'
     site = tmp_path / 'audit-site'
     site.mkdir()

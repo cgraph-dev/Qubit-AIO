@@ -79,7 +79,8 @@ def daemon(root, home, env, *, barrier, fixture='local_recovery_daemon.py'):
     with (home / ('first.log' if barrier else 'restart.log')).open('w+') as log:
         proc = subprocess.Popen(command, cwd=root, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         try:
-            deadline = time.monotonic() + 120
+            # A loaded CI host can take minutes to import the gateway stack.
+            deadline = time.monotonic() + 180
             desc = {}
             while proc.poll() is None and time.monotonic() < deadline:
                 try:
@@ -111,7 +112,8 @@ def probe(tmp_path):
     thread.start()
     url = f'http://127.0.0.1:{peer.server_port}/v1'
     cfg = {'gateway': {'multiplex_profiles': False}, 'model': {'provider': 'custom', 'default': 'old-default', 'base_url': url},
-           'auxiliary': {'title_generation': {'enabled': False}}, 'platform_toolsets': {'cli': []}}
+           'auxiliary': {'title_generation': {'enabled': False}}, 'platform_toolsets': {'cli': []},
+           'database': {'synchronous': 0}}
     (home / 'config.yaml').write_text(json.dumps(cfg))
     env = child_env()
     env.update(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home), PYTHONPATH=str(root),

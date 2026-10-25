@@ -75,6 +75,9 @@ class _LifecycleBuilder:
         self.polling_request = request
         return self
 
+    def concurrent_updates(self, _processor):
+        return self
+
     def build(self):
         return self.app
 
