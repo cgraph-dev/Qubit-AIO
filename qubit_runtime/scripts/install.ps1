@@ -1171,6 +1171,8 @@ function Stage-Complete {
             completedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         }
         $marker | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $InstallDir ".hermes-bootstrap-complete") -Encoding UTF8
+        # Dual-publish: the canonical marker beside the legacy one every reader still accepts.
+        Copy-Item -Force (Join-Path $InstallDir ".hermes-bootstrap-complete") (Join-Path $InstallDir ".qubit-bootstrap-complete")
         Write-Ok "Qubit Agent install complete (pinned $commit). Run: qubit"
     }
 }

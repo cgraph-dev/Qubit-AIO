@@ -52,9 +52,15 @@ def test_successful_source_completion_writes_checkout_identity(tmp_path, monkeyp
 
 def test_failed_source_completion_does_not_publish_identity(tmp_path, monkeypatch):
     root = _repo(tmp_path)
-    _completion_dependencies(monkeypatch, lambda **_kwargs: False)
+    _completion_dependencies(monkeypatch, lambda **_kwargs: True)
 
-    assert not complete_source_checkout(root, desktop=False, assume_yes=True)
+    def broken_build(root, *, desktop):
+        raise RuntimeError("web UI build: npm exited 1")
+
+    monkeypatch.setattr("qubit_cli.source_build.build_update_products", broken_build)
+    owed: list = []
+    assert not complete_source_checkout(root, desktop=False, assume_yes=True, followups=owed)
+    assert [step for step, _ in owed] == ["build"]
     assert not (root / "install-stamp.json").exists()
 
 

@@ -72,17 +72,24 @@ def write_source_stamp(root: Path, *, adopted: bool = False) -> dict | None:
 
 
 BOOTSTRAP_RECEIPT = ".hermes-bootstrap-complete"
+# The canonical marker and the legacy name are both honoured: installers dual-publish so an
+# install made by either build is refreshed after an update (writer/reader stay together).
+BOOTSTRAP_RECEIPTS = (".qubit-bootstrap-complete", BOOTSTRAP_RECEIPT)
 
 
 def refresh_bootstrap_receipt(root: Path, stamp: dict) -> None:
-    """Move the installers' bootstrap receipt to the commit ``stamp`` just published.
+    """Move the installers' bootstrap receipt(s) to the commit ``stamp`` just published.
 
     install.sh / install.ps1 write the receipt once, at the commit they installed;
     an update that moves the checkout has to move it too, or it keeps naming the
     replaced release. Only an existing receipt is refreshed: its presence is what
     marks a script install, so a manual clone never grows one.
     """
-    receipt_path = Path(root) / BOOTSTRAP_RECEIPT
+    for name in BOOTSTRAP_RECEIPTS:
+        _refresh_bootstrap_receipt(Path(root) / name, stamp)
+
+
+def _refresh_bootstrap_receipt(receipt_path: Path, stamp: dict) -> None:
     try:
         # install.ps1 writes it with Windows PowerShell's UTF-8 BOM.
         previous = json.loads(receipt_path.read_text(encoding="utf-8-sig"))
@@ -100,7 +107,7 @@ def refresh_bootstrap_receipt(root: Path, stamp: dict) -> None:
         "pinnedBranch": stamp["branch"] or previous.get("pinnedBranch"),
         "completedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
     }
-    fd, tmp_name = tempfile.mkstemp(dir=root, prefix=".hermes-bootstrap-complete.", suffix=".tmp")
+    fd, tmp_name = tempfile.mkstemp(dir=receipt_path.parent, prefix=f"{receipt_path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(json.dumps(receipt, indent=2) + "\n")

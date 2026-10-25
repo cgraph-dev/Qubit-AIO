@@ -81,7 +81,7 @@ def test_resolve_last_session_real_db_prefers_workspace(monkeypatch, tmp_path):
             cmd, 0, stdout=str(repo_a), stderr=""
         ),
     )
-    monkeypatch.setattr("qubit_state.SessionDB", lambda **kw: real_db(db_path=state_db, **kw))
+    monkeypatch.setattr("qubit_state.SessionDB", lambda **kw: real_db(**{**kw, "db_path": state_db}))
     assert _resolve_last_session("cli") == "repo_a"
 
 
@@ -109,6 +109,6 @@ def test_resolve_last_session_cli_continues_a_oneshot(monkeypatch, tmp_path):
         db.close()
 
     monkeypatch.setattr("qubit_cli.main._resolve_workspace_key", lambda: None)
-    monkeypatch.setattr("qubit_state.SessionDB", lambda **kw: real_db(db_path=state_db, **kw))
+    monkeypatch.setattr("qubit_state.SessionDB", lambda **kw: real_db(**{**kw, "db_path": state_db}))
     assert _resolve_last_session("cli") == "oneshot_run"
     assert _resolve_last_session("tui") == "tui_chat"

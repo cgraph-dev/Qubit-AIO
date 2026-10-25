@@ -107,7 +107,8 @@ def test_update_autorestore_refuses_under_own_live_connection(
 
 
 def test_safe_restore_fallback_still_works_without_holder(tmp_path):
-    dst = tmp_path / "state.db"
+    # Upstream contract: a non-runtime store (not state.db) has no canonical epoch to preserve.
+    dst = tmp_path / "projects.db"
     src = tmp_path / "snap.db"
     _make_db(src, "snapshot-good")
     _make_db(dst, "live-old")
@@ -123,10 +124,9 @@ def test_update_autorestore_still_works_without_holder(tmp_path):
     src = tmp_path / "snap.db"
     _make_db(src, "snapshot-good")
     _make_db(dst, "live-old")
-    # Stale WAL from a crashed writer must still be cleared.
+    # Stale WAL from a crashed writer must still be cleared. Keep the canonical epoch readable:
+    # header corruption now requires transcript salvage instead of an in-place restore.
     dst.with_name(dst.name + "-wal").write_bytes(b"\x00" * 1024)
-    with open(dst, "r+b") as fh:
-        fh.write(b"\x00" * 100)
 
     assert update_cmd._restore_state_db_from_snapshot(dst, src) is True
     assert _read_marker(dst) == "snapshot-good"

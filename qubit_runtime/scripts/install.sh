@@ -904,6 +904,8 @@ stage_complete() {
         printf '{\n  "schemaVersion": 1,\n  "pinnedCommit": "%s",\n  "pinnedBranch": "%s",\n  "completedAt": "%s"\n}\n' \
             "$commit" "$BRANCH" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" > "$INSTALL_DIR/.hermes-bootstrap-complete.tmp"
         mv -f "$INSTALL_DIR/.hermes-bootstrap-complete.tmp" "$INSTALL_DIR/.hermes-bootstrap-complete"
+        # Dual-publish: the canonical marker beside the legacy one every reader still accepts.
+        cp -f "$INSTALL_DIR/.hermes-bootstrap-complete" "$INSTALL_DIR/.qubit-bootstrap-complete" 2>/dev/null || :
     fi
     log_success "Qubit Agent install complete. Run: qubit"
 }
