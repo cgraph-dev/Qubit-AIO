@@ -29,6 +29,14 @@ def _build_rig(monkeypatch, tmp_path, request, surface_a, mode):
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_BASE_HOME", str(tmp_path))
+    # Every parametrised case opens three fresh state DBs (root, profile a, profile b)
+    # and this interpreter's linked SQLite (3.45.1) falls back to DELETE journal mode,
+    # so each ~100-statement schema commit fsyncs. On a loaded host that made opens
+    # take seconds and the full file outrun its deadline; the home is private to one
+    # test, so durability is meaningless here.
+    root_home = get_qubit_home()
+    root_home.mkdir(parents=True, exist_ok=True)
+    (root_home / "config.yaml").write_text("database:\n  synchronous: 0\n")
     # The global fixture pins the default DB; restore call-time profile resolution
     # within these explicitly private homes instead of sharing its root handle.
     monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", qubit_state._IMPORT_DEFAULT_DB_PATH)
