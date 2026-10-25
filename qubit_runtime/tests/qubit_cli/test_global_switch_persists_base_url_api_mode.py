@@ -79,11 +79,11 @@ def _run_switch(monkeypatch, result, cmd="/model MiniMax-M3 --global"):
 
     monkeypatch.setattr(cli_mod, "_cprint", lambda *a, **k: None)
     saved: dict[str, object] = {}
-
-    def _fake_save(path, key, value):
-        saved[key] = value
-
-    monkeypatch.setattr("utils.atomic_roundtrip_yaml_update", _fake_save)
+    # The fork persists one atomic config document (not per-key round-trips): capture it.
+    monkeypatch.setattr("qubit_cli.config.read_user_config_raw",
+                        lambda *a, **k: {"model": {}})
+    monkeypatch.setattr("qubit_cli.config.atomic_config_replace",
+                        lambda path, config: saved.update(config))
     monkeypatch.setattr("qubit_cli.model_switch.switch_model", lambda **kw: result)
     monkeypatch.setattr(
         "qubit_cli.inventory.load_picker_context",
@@ -98,10 +98,10 @@ def test_global_switch_persists_base_url_and_api_mode(monkeypatch):
     write the newly resolved base_url and api_mode, not just default/provider."""
     saved = _run_switch(monkeypatch, _make_result())
 
-    assert saved["model.default"] == "MiniMax-M3"
-    assert saved["model.provider"] == "custom:minimax"
-    assert saved["model.base_url"] == "https://api.minimax.io/v1"
-    assert saved["model.api_mode"] == "chat_completions"
+    assert saved["model"]["default"] == "MiniMax-M3"
+    assert saved["model"]["provider"] == "custom:minimax"
+    assert saved["model"]["base_url"] == "https://api.minimax.io/v1"
+    assert saved["model"]["api_mode"] == "chat_completions"
 
 
 def test_session_only_switch_does_not_touch_config(monkeypatch):
@@ -133,11 +133,11 @@ def _run_apply(monkeypatch, result, persist_global=True):
 
     monkeypatch.setattr(cli_mod, "_cprint", lambda *a, **k: None)
     saved: dict[str, object] = {}
-
-    def _fake_save(path, key, value):
-        saved[key] = value
-
-    monkeypatch.setattr("utils.atomic_roundtrip_yaml_update", _fake_save)
+    # The fork persists one atomic config document (not per-key round-trips): capture it.
+    monkeypatch.setattr("qubit_cli.config.read_user_config_raw",
+                        lambda *a, **k: {"model": {}})
+    monkeypatch.setattr("qubit_cli.config.atomic_config_replace",
+                        lambda path, config: saved.update(config))
     cli_mod.HermesCLI._apply_model_switch_result(_StubCLI(), result, persist_global)
     return saved
 
