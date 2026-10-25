@@ -32,7 +32,9 @@ def test_every_entry_ships_exactly_one_q4_build():
         assert len(entry.variants) == 1, (
             f"{entry.id}: {len(entry.variants)} variants — expected exactly one")
         build = entry.variants[0]
-        assert build.quant.startswith(("UD-Q4", "Q4")), (
+        # The fork's catalog also ships IQ4_XS (an imatrix 4-bit build) where the
+        # repo has no K_M/XL Q4 build; it is still the single Q4-class rung.
+        assert build.quant.startswith(("UD-Q4", "Q4", "UD-IQ4", "IQ4")), (
             f"{entry.id}: ships {build.quant}, not a Q4-class build")
         for asset in entry.download_files(build):
             assert asset.size_bytes > 0, f"{entry.id}: no size on {asset.path}"
