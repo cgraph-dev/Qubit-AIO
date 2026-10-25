@@ -14,7 +14,7 @@ from qubit_cli import anon_auth, anon_challenge
 from tests.qubit_cli.anon_portal import PORTAL, WELCOME, make_jwt
 
 
-def _exchange(monkeypatch, token: str) -> tuple[dict, list[dict]]:
+def _exchange(monkeypatch, token: str, *, purpose: str = "inference") -> tuple[dict, list[dict]]:
     noted: list[dict] = []
     monkeypatch.setattr(anon_challenge, "note_optional_challenges",
                         lambda payload, portal: noted.append(payload))
@@ -23,12 +23,13 @@ def _exchange(monkeypatch, token: str) -> tuple[dict, list[dict]]:
         return httpx.Response(200, json={"access_token": token, "expires_in": 900})
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
-    return anon_auth.exchange_anon_jwt(client, PORTAL, "anon_0001", auth_state={}), noted
+    return anon_auth.exchange_anon_jwt(
+        client, PORTAL, "anon_0001", auth_state={}, purpose=purpose), noted
 
 
 def test_connectors_only_exchange_does_not_touch_the_inference_challenge(monkeypatch):
     token = make_jwt(scope="connectors:invoke")
-    payload, noted = _exchange(monkeypatch, token)
+    payload, noted = _exchange(monkeypatch, token, purpose="connectors")
     assert payload["access_token"] == token
     assert noted == []
 
