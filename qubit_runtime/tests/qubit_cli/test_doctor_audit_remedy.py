@@ -46,7 +46,10 @@ def test_root_remedy_never_prescribes_local_audit_fix(capsys):
     assert "run: cd" not in out
     assert "npm audit fix" not in out
     assert "lockfile bump" in out
-    assert issues == ["Browser tools (agent-browser) has 2 npm vulnerabilities"]
+    # The fork appends the durable remedy to the recorded issue (lockfile upgrade).
+    assert len(issues) == 1
+    assert issues[0].startswith("Browser tools (agent-browser) has 2 npm vulnerabilities")
+    assert "lockfile" in issues[0]
 
 
 
