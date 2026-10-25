@@ -172,6 +172,12 @@ class TestMemoryManager:
 
     @staticmethod
     def _set_spill_config(monkeypatch, tmp_path, *, max_chars):
+        # External recall spill is opt-in in the fork (memory.prefetch_spill_enabled);
+        # without it the manager keeps a 100k ceiling instead of this profile's limit.
+        monkeypatch.setattr(
+            "qubit_cli.config.load_config",
+            lambda: {"memory": {"prefetch_spill_enabled": True}},
+        )
         monkeypatch.setattr(
             "agent.memory_manager.get_spill_config",
             lambda: {"enabled": True, "max_chars": max_chars, "preview_head": 12,

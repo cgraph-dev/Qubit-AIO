@@ -106,8 +106,10 @@ class TestListingCollisionsAndLabels:
         skills = tmp_path / "skills"
         skills.mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(pb, "get_skills_dir", lambda: skills, raising=True)
+        # Fork contract: one precedence-ordered root list replaces the pin's get_all_skills_dirs.
+        from agent.skill_utils import TIER_LOCAL
         monkeypatch.setattr(
-            pb, "get_all_skills_dirs", lambda: [skills], raising=True
+            pb, "get_skill_search_roots", lambda *a, **k: [(TIER_LOCAL, skills)], raising=True
         )
         monkeypatch.setattr(pb, "get_disabled_skill_names", lambda *a, **k: set())
         monkeypatch.setattr(
@@ -137,8 +139,10 @@ class TestListingCollisionsAndLabels:
         )
         _mark_active(skills, "org-1")
         out = pb.build_skills_system_prompt()
-        # BOTH entries flagged — neither silently wins.
-        assert out.count("[name collision") == 2
+        # Fork contract: a same-tier name collision resolves ONE copy and marks the other
+        # unloadable, with a fail-loud rename note naming the shared skill; skill_view refuses it.
+        assert "k8s-debug" in out
+        assert "skill_view cannot load it" in out
 
     def test_no_collision_flag_when_unique(self, tmp_path, monkeypatch):
         skills, pb = self._render(tmp_path, monkeypatch)

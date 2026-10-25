@@ -807,7 +807,7 @@ class TestSendTimeEmptyAssistantPad:
              and not m.get("tool_calls")),
             None,
         )
-        assert stub is not None and stub["content"] == "[response interrupted]"
+        assert stub is not None and stub["content"] == "[interrupt: no assistant output for this turn]"  # fork copy
 
     def test_tool_call_turn_not_padded_on_send(self, loop_agent):
         history = [
@@ -904,7 +904,7 @@ class TestSendTimePadMultimodalSafety:
         ]
         out = repair_empty_non_final_messages(api_messages)
         assert out[0]["content"] == [{"type": "text", "text": "hi"}]
-        assert out[1]["content"] == "[response interrupted]"
+        assert out[1]["content"] == "[interrupt: no assistant output for this turn]"  # fork copy
         assert out[2]["content"] == ""
         # input list untouched (repair is copy-on-write)
         assert api_messages[1]["content"] == ""

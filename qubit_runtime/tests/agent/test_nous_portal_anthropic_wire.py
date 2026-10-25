@@ -411,13 +411,15 @@ class TestPortalThinkingReplay:
         self._assert_thinking_kept(STAGING_URL)
 
     def test_other_third_party_gateways_still_strip_thinking(self):
-        """The Portal carve-out must not leak into MiniMax-style proxies."""
+        """The Portal carve-out must not leak into unknown third-party relays."""
         from agent.anthropic_message_convert import convert_messages_to_anthropic
 
+        # MiniMax has its own signed replay route in the fork; use an unknown relay here,
+        # which is the third_party contract this test covers.
         _system, converted = convert_messages_to_anthropic(
             self._messages(),
-            base_url="https://api.minimax.io/anthropic",
-            model="MiniMax-M2.7",
+            base_url="https://relay.example.invalid/anthropic",
+            model="some-proxy-model",
         )
         assistant = next(m for m in converted if m["role"] == "assistant")
         thinking = [
