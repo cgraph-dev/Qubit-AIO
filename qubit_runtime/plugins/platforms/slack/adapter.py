@@ -1668,8 +1668,10 @@ class SlackAdapter(BasePlatformAdapter):
         from qubit_cli.commands_platforms import slack_native_slashes
         _slash_names = [name for name, _d, _h in slack_native_slashes()]
         if _slash_names:
+            # ``hermes`` stays matchable as the legacy root an old workspace manifest
+            # declares; the published manifest only lists canonical names.
             _slash_pattern = re.compile(
-                r"^/(?:" + "|".join(re.escape(n) for n in _slash_names) + r")$")
+                r"^/(?:hermes|" + "|".join(re.escape(n) for n in _slash_names) + r")$")
         else:  # pragma: no cover - registry always non-empty
             _slash_pattern = re.compile(r"^/qubit$")
 
@@ -6099,7 +6101,7 @@ class SlackAdapter(BasePlatformAdapter):
         ``<subcommand> [args]`` via the registry, else free-form text is a regular question."""
         slash_name = (command.get("command") or "").lstrip("/").strip()
         raw_text = str(command.get("text") or "")
-        if slash_name not in {"qubit", ""}:
+        if slash_name not in {"qubit", "hermes", ""}:
             return f"/{slash_name}" if not raw_text else f"/{slash_name} {raw_text}"
         legacy_text = raw_text.strip()
         from qubit_cli.commands_platforms import slack_subcommand_map
