@@ -34,22 +34,18 @@ def completion_tail(monkeypatch):
     """Record the completion child instead of running it.
 
     The fork's tail re-execs ``qubit_cli/source_completion.py`` through
-    ``subprocess.call`` in ``venv_sync`` (the old ``update_custody.run`` seam is gone), so
-    intercept that module's spawn.
+    ``qubit_cli.update_custody.run`` (the older ``subprocess.call`` seam is gone), so
+    intercept that module's spawn where ``venv_sync`` imports it.
     """
-    real = venv_sync.subprocess
+    from types import SimpleNamespace
+    from qubit_cli import update_custody
     spawned: list = []
 
-    class _Subprocess:
-        def __getattr__(self, name):
-            return getattr(real, name)
+    def _run(command, **kwargs):
+        spawned.append(command)
+        return SimpleNamespace(returncode=0)
 
-        @staticmethod
-        def call(command, **kwargs):
-            spawned.append(command)
-            return 0
-
-    monkeypatch.setattr(venv_sync, "subprocess", _Subprocess())
+    monkeypatch.setattr(update_custody, "run", _run)
     return spawned
 
 

@@ -1446,7 +1446,8 @@ def test_lmstudio_bare_providers_block_does_not_hide_live_catalog(monkeypatch):
     row = rows[0]
     assert sorted(row["models"]) == sorted(live_catalog)
     assert row["total_models"] == len(live_catalog)
-    assert row["source"] == "hermes"
+    # The fork labels the provider row with its canonical brand.
+    assert row["source"] == "qubit"
 
 
 def test_lmstudio_providers_block_with_explicit_endpoint_still_uses_section3(monkeypatch):
