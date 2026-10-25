@@ -212,7 +212,7 @@ def test_resolve_credentials_quarantines_dead_tokens_on_terminal_refresh_failure
     }
     saved_states = []
 
-    def _capture_save(s):
+    def _capture_save(s, **kwargs):
         saved_states.append(dict(s))
 
     def _terminal_refresh(_state):
@@ -401,7 +401,7 @@ def test_token_provider_quarantines_state_on_terminal_refresh():
          patch("httpx.Client") as mock_client_class, \
          patch(
              "qubit_cli.auth._minimax_save_auth_state",
-             side_effect=lambda s: saved_states.append(dict(s)),
+             side_effect=lambda s, **kw: saved_states.append(dict(s)),
          ):
         mock_instance = MagicMock()
         mock_instance.__enter__ = MagicMock(return_value=mock_instance)
