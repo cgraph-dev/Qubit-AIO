@@ -44,7 +44,8 @@ def _agent_args(**overrides) -> Namespace:
     return Namespace(**base)
 
 
-def test_prepare_agent_startup_backgrounds_blocking_mcp_for_chat(monkeypatch):
+def test_prepare_agent_startup_backgrounds_blocking_mcp_for_non_gateway_agent_command(monkeypatch):
+    """`chat` turns run in the gateway (it owns MCP); `rl` still discovers in-process, off-thread."""
     stop = threading.Event()
     calls = {"mcp": 0}
 
@@ -88,7 +89,7 @@ def test_prepare_agent_startup_backgrounds_blocking_mcp_for_chat(monkeypatch):
 
     try:
         start = time.monotonic()
-        main_mod._prepare_agent_startup(_agent_args())
+        main_mod._prepare_agent_startup(_agent_args(command="rl"))
         elapsed = time.monotonic() - start
         assert elapsed < 2.0
         deadline = time.monotonic() + 3.0
