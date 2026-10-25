@@ -72,7 +72,9 @@ def test_single_query_main_skips_clear_on_exit_summary(monkeypatch):
             if clear_screen:
                 clear_calls.append("CLEARED")  # should NOT happen
 
-    monkeypatch.setattr(cli_mod, "HermesCLI", FakeCLI)
+    # The fork renamed the class QubitCLI (HermesCLI is only a compat alias), and main()
+    # constructs QubitCLI directly; patch the canonical name.
+    monkeypatch.setattr(cli_mod, "QubitCLI", FakeCLI)
     monkeypatch.setattr(cli_mod.atexit, "register", lambda *_a, **_kw: None)
     monkeypatch.setattr(
         cli_mod,
