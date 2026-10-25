@@ -81,6 +81,8 @@ gateway:
       {message}
 
       _Alternative texte : répondez `{prefix}approve` pour changer de modèle ou `{prefix}cancel` pour conserver le modèle actuel._
+    err_once_local: "`--once` is not available in this session; use `/model <name>` and switch back after the turn."
+    local_next_turn: "Applies from your next message."
   agents:
     header: "🤖 **Agents et tâches actifs**"
     active_agents: "**Agents actifs :** {count}"
@@ -3440,6 +3442,7 @@ cli:
     label_verbose: "Verbeux :"
     label_started: "Démarré :"
     label_config_file: "Fichier de config :"
+    google_vertex_oauth: "Google Vertex OAuth"
   context:
     header: "🧠 Utilisation du contexte — {model}"
     compute_failed: "(._.) Impossible de calculer la répartition du contexte : {error}"

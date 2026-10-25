@@ -76,6 +76,8 @@ gateway:
     next_turn_only: "    (лише на наступний хід — відновиться після однієї відповіді)"
     switch_cancelled: "🟡 Перемикання моделі скасовано. Поточна модель без змін ({model})."
     guard_confirm: "⚠️ **{title}**\n\n{message}\n\n_Текстова альтернатива: відповідайте `{prefix}approve`, щоб перемкнути, або `{prefix}cancel`, щоб залишити поточну модель._"
+    err_once_local: "`--once` is not available in this session; use `/model <name>` and switch back after the turn."
+    local_next_turn: "Applies from your next message."
   agents:
     header: "🤖 **Активні агенти та завдання**"
     active_agents: "**Активні агенти:** {count}"
@@ -3133,6 +3135,7 @@ cli:
     label_verbose: "Докладний режим:"
     label_started: "Запущено:"
     label_config_file: "Файл конфігурації:"
+    google_vertex_oauth: "Google Vertex OAuth"
   context:
     header: "🧠 Використання контексту — {model}"
     compute_failed: "(._.) Не вдалося обчислити розбивку контексту: {error}"

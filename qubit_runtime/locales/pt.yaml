@@ -76,6 +76,8 @@ gateway:
     next_turn_only: "    (apenas no próximo turno — volta ao normal após uma resposta)"
     switch_cancelled: "🟡 Troca de modelo cancelada. Modelo atual inalterado ({model})."
     guard_confirm: "⚠️ **{title}**\n\n{message}\n\n_Alternativa em texto: responda `{prefix}approve` para trocar ou `{prefix}cancel` para manter o modelo atual._"
+    err_once_local: "`--once` is not available in this session; use `/model <name>` and switch back after the turn."
+    local_next_turn: "Applies from your next message."
   agents:
     header: "🤖 **Agentes e tarefas ativos**"
     active_agents: "**Agentes ativos:** {count}"
@@ -3133,6 +3135,7 @@ cli:
     label_verbose: "Detalhado:"
     label_started: "Iniciado em:"
     label_config_file: "Arquivo de configuração:"
+    google_vertex_oauth: "Google Vertex OAuth"
   context:
     header: "🧠 Uso de contexto — {model}"
     compute_failed: "(._.) Não foi possível calcular a distribuição do contexto: {error}"

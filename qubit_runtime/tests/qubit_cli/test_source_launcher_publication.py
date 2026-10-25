@@ -17,7 +17,7 @@ BOOT_FILES = (
     "qubit_bootstrap.py", "qubit_constants.py", "qubit_cli/__init__.py", "qubit_cli/_launchers.py",
     "pm/environments.py", "pm/filesystem.py", "pm/paths.py", "qubit_cli/runtime_state.py",
     "qubit_cli/_early_recovery.py", "qubit_cli/_parser.py",
-    "qubit_cli/venv_sync.py", "qubit_cli/steward.py",
+    "qubit_cli/venv_sync.py", "qubit_cli/steward.py", "qubit_cli/install_source.py",
     "qubit_cli/stderr_timestamp.py",
     "scripts/hermes-gateway",
 )
