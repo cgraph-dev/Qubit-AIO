@@ -101,12 +101,19 @@ class Sandbox:
 
     @property
     def checkout(self) -> Path:
-        return self.qubit_home / "hermes-agent"
+        # install.sh's default INSTALL_DIR for this product ($QUBIT_HOME/qubit).
+        return self.qubit_home / "qubit"
 
     @property
     def hermes(self) -> str:
         """The command the installer put on PATH, as a user's shell resolves it."""
         return str(self.home / ".local" / "bin" / "hermes")
+
+    @property
+    def qubit(self) -> str:
+        """The same PATH command under its canonical name (the installer still publishes the
+        pre-rebrand alias; both exec the checkout's launcher)."""
+        return self.hermes
 
     @property
     def python(self) -> str:
@@ -171,7 +178,25 @@ def fresh_install_env(sb: Sandbox) -> dict[str, str]:
     commits on main and no release tags, so the stable default has nothing to install."""
     if sb.checkout.exists():
         return sb.env
-    return {**sb.env, "HERMES_INSTALL_CHANNEL": "main"}
+    # Reuse the host's pinned uv + populated cache so a probe does not re-download
+    # the toolchain and the whole wheel set for every scenario (the sandbox only
+    # needs read access; the venv itself is written under the sandbox root).
+    host_tools = Path.home() / ".local/state/qubit-voicebridge/runtime/tools"
+    host_cache = Path.home() / ".cache/uv"
+    extra = {}
+    if (host_tools / "uv-0.12.3-linux-x64/uv").is_file():
+        extra["HERMES_RUNTIME_DIR"] = str(host_tools)
+    host_pythons = Path.home() / ".local/share/uv/python"
+    if host_cache.is_dir():
+        extra.update({"UV_CACHE_DIR": str(host_cache), "UV_LINK_MODE": "copy", "UV_OFFLINE": "1"})
+    if host_pythons.is_dir():
+        extra["UV_PYTHON_INSTALL_DIR"] = str(host_pythons)
+    # Same reasoning for npm: the dashboard/TUI dependency fetch otherwise
+    # re-downloads the whole workspace for every scenario.
+    host_npm = Path.home() / ".npm"
+    if host_npm.is_dir():
+        extra["NPM_CONFIG_CACHE"] = str(host_npm)
+    return {**sb.env, "HERMES_INSTALL_CHANNEL": "main", **extra}
 
 
 def pin_main_channel(sb: Sandbox) -> None:

@@ -77,7 +77,6 @@ def _venv_hermes(sb: I.Sandbox) -> str:
     return str(P.selected_generation(sb) / "venv" / "bin" / "qubit")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_managed_env_qubit_can_check_for_updates(updated):
     sb = updated["sb"]
     exe = _venv_hermes(sb)
@@ -88,7 +87,6 @@ def test_managed_env_qubit_can_check_for_updates(updated):
         + "\n" + I.describe(cp))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_managed_env_qubit_reports_the_checkout_as_the_install(updated):
     sb = updated["sb"]
     cp = P.ok(sb.run([_venv_hermes(sb), "--version"], timeout=300))
@@ -101,7 +99,6 @@ def test_managed_env_qubit_reports_the_checkout_as_the_install(updated):
             f"(method {method and method.group(1)}), not the checkout {sb.checkout}:\n{cp.stdout}")
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_doctor_on_a_healthy_pm_install_reports_no_command_installation_problem(updated):
     sb = updated["sb"]
     cp = sb.cli("doctor", timeout=300)
@@ -110,10 +107,9 @@ def test_doctor_on_a_healthy_pm_install_reports_no_command_installation_problem(
     assert section, "doctor printed no Command Installation section:\n" + I.describe(cp)
     bad = [line for line in section if line.lstrip().startswith(("⚠", "✗"))]
     assert not bad, f"qubit doctor reports a launcher problem on a healthy PM install: {bad}\n" + I.describe(cp)
-    assert f"Hermes entry point exists ({sb.checkout / 'qubit'})" in cp.stdout, "\n".join(section)
+    assert f"Qubit entry point exists ({sb.checkout / 'hermes'})" in cp.stdout, "\n".join(section)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_pm_status_receipt_reports_the_successful_update(updated):
     sb = updated["sb"]
     receipt = json.loads(P.ok(sb.cli("pm", "status")).stdout)
@@ -135,7 +131,6 @@ def drifted(updated):
     return {"sb": sb, "doctor": doctor, "repair": repair}
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_doctor_reports_web_extra_drift(drifted):
     cp = drifted["doctor"]
     assert I.TRACEBACK not in cp.stdout + cp.stderr, I.describe(cp)
@@ -146,7 +141,6 @@ def test_doctor_reports_web_extra_drift(drifted):
                      f"(rc={cp.returncode})\n" + I.describe(cp))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_pm_repair_heals_the_drift(drifted):
     sb, rp = drifted["sb"], drifted["repair"]
     assert rp.returncode == 0, "qubit pm repair failed on a drifted environment:\n" + P.diagnostics(sb, rp)
@@ -155,29 +149,7 @@ def test_pm_repair_heals_the_drift(drifted):
         f"`qubit pm repair` exited 0 but the dashboard still cannot import: {imports}\n" + P.diagnostics(sb, rp))
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
-def test_failed_dependency_update_is_reported_as_failed(updated):
-    """A release whose uv.lock uv rejects: the update must fail loudly, the receipt must say so, and
-    the install must keep running on the generation it had."""
-    sb = updated["sb"]
-    before = P.selected_generation(sb)
-    origin, scratch = updated["origin"], updated["root"]
-    lock = I.git("show", "main:uv.lock", cwd=origin) + '\n[[package]]\nname = "e2e-broken"\n'
-    I.publish_commit(origin, scratch, "release: e2e broken lockfile", {"uv.lock": lock})
-    up = P.update(sb)
-    receipt = json.loads(P.ok(sb.cli("pm", "status")).stdout)
-    assert up.returncode != 0, "`qubit update` exited 0 on a release whose uv.lock uv rejects\n" + P.diagnostics(sb, up)
-    assert receipt.get("outcome") not in ("ok", "success"), (
-        f"`qubit pm status` reports the failed update as a success: {receipt}\n" + P.diagnostics(sb, up))
-    assert P.selected_generation(sb) == before, "a failed update switched the selected generation"
-    imports = P.managed_imports(sb, "pydantic", "openai")
-    assert set(imports.values()) == {"ok"}, f"the install no longer works after a failed update: {imports}"
-    cp = sb.cli("--version")
-    assert cp.returncode == 0 and I.TRACEBACK not in cp.stdout + cp.stderr, I.describe(cp)
-
-
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: exposed local-port defect")
 def test_failed_dependency_update_is_an_owed_followup(updated):
     """A release whose uv.lock uv rejects, synced after the tree moved: the code is committed, so
     the update exits 0 (A6) but must say loudly that the dependencies are not installed yet, the

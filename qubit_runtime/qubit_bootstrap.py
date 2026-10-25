@@ -581,6 +581,22 @@ from qubit_cli._parser import command_argv
 
 # Repair needs only stdlib. Do not activate the damaged tree to reach it.
 _pm_repair = command_argv(sys.argv[1:])[:2] == ["pm", "repair"]
+if _pm_repair:
+    # The CLI still imports its config layer (ruamel) before it dispatches `pm repair`, so
+    # PM's OWN runtime must be importable; only the damaged application graph stays unactivated.
+    try:
+        import json as _json
+
+        from pm.environments import install_state_dir as _install_state_dir
+        from pm.environments import site_packages as _site_packages
+
+        _pm_state = _install_state_dir(_root) / "pm-runtime"
+        _pm_selected = _json.loads((_pm_state / "selected.json").read_text(encoding="utf-8-sig"))
+        _pm_site = _site_packages(_pm_state / str(_pm_selected["generation"]))
+        if _pm_site.is_dir():
+            sys.path.insert(0, str(_pm_site))
+    except Exception:
+        pass  # no PM runtime recorded yet: the repair below reports the real damage
 if not _pm_repair:
     from qubit_cli.venv_sync import prepare_launch, relaunch_command
 
