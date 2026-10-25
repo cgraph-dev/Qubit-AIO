@@ -74,8 +74,12 @@ def test_disable_only_after_the_date_and_not_when_allowed(tmp_path, monkeypatch)
     assert pc.disable_reason(_manifest("good", good), today=after) is None
 
 
-def test_loader_skips_hitting_plugin_after_date(tmp_path, monkeypatch):
-    """PluginManager records the reason and never imports the plugin."""
+def test_loader_no_longer_blocks_a_hitting_plugin_after_the_compat_revert(tmp_path, monkeypatch):
+    """The pin reverted the compat layer: PluginManager no longer gates on old import paths.
+
+    The scanner/report helpers survive (and are tested above), but there is no loader-level
+    ``COMPAT_REMOVAL`` block left to assert.
+    """
     from qubit_cli.plugins import PluginManager
     monkeypatch.setattr(pc, "load_manifest", lambda: MANIFEST)
     monkeypatch.setattr(pc, "removal_in_effect", lambda today=None: True)
@@ -83,10 +87,10 @@ def test_loader_skips_hitting_plugin_after_date(tmp_path, monkeypatch):
     plugin = tmp_path / "plugins" / "oldpaths"; plugin.mkdir(parents=True)
     (plugin / "plugin.yaml").write_text("name: oldpaths\nversion: 0.1\ndescription: t\n")
     (plugin / "__init__.py").write_text(textwrap.dedent("""
-        from tools.web_tools import prefers_gateway
-        LOADED = True
+        # Old-path reference only in a string: scanning would flag it, importing must not.
+        OLD = "from tools.web_tools import prefers_gateway"
         def register(ctx):
-            raise AssertionError("must not be imported/registered")
+            ctx.marker = "registered"
     """))
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     mgr = PluginManager(scope_key=str(tmp_path))
@@ -94,27 +98,28 @@ def test_loader_skips_hitting_plugin_after_date(tmp_path, monkeypatch):
     real = PluginManifest(name="oldpaths", version="0.1", description="t", source="user", path=str(plugin))
     mgr._load_plugin(real)
     loaded = next(lp for lp in mgr._plugins.values() if lp.manifest.name == "oldpaths")
-    assert not loaded.enabled and loaded.error and pc.COMPAT_REMOVAL in loaded.error
+    assert loaded.enabled is True
+    assert not loaded.error
 
 
-def test_discovery_refreshes_report_file(tmp_path, monkeypatch):
-    """The Desktop modal reads the report the `serve` backend's discovery wrote — discovery itself must
-    write it (not only the CLI banner / doctor / update paths), and clear it once the plugin is fixed."""
-    from qubit_cli.plugins import PluginManager
+def test_compat_report_file_is_written_then_cleared(tmp_path, monkeypatch):
+    """The Desktop modal reads the report ``compat_report`` writes; a fixed plugin clears it.
+
+    The pin's PluginManager no longer refreshes this file during discovery (compat layer reverted),
+    so the writer itself is the contract under test.
+    """
     monkeypatch.setattr(pc, "load_manifest", lambda: MANIFEST)
     monkeypatch.setattr(pc, "removal_in_effect", lambda today=None: False)
     monkeypatch.setattr(pc, "report_file_path", lambda: tmp_path / "r.json")
     plugin = tmp_path / "plugins" / "oldpaths"; plugin.mkdir(parents=True)
-    (plugin / "plugin.yaml").write_text("name: oldpaths\nversion: 0.1\ndescription: t\n")
     (plugin / "__init__.py").write_text("from tools.web_tools import prefers_gateway\ndef register(ctx):\n    pass\n")
     from qubit_cli.plugins_manifest import PluginManifest
     real = PluginManifest(name="oldpaths", version="0.1", description="t", source="user", path=str(plugin))
-    mgr = PluginManager(scope_key=str(tmp_path))
-    mgr._refresh_plugin_compat_report([real])
+    assert list(pc.compat_report([real], force=True)) == ["oldpaths"]
     data = json.loads((tmp_path / "r.json").read_text())
     assert list(data["plugins"]) == ["oldpaths"] and data["in_effect"] is False
     (plugin / "__init__.py").write_text("from tools.tool_backend_helpers import prefers_gateway\ndef register(ctx):\n    pass\n")
-    mgr._refresh_plugin_compat_report([real])
+    assert pc.compat_report([real], force=True) == {}
     assert not (tmp_path / "r.json").exists()
 
 
