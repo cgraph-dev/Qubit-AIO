@@ -712,7 +712,7 @@ _select_plugin_video_gen_provider = partial(_select_plugin_gen_provider, "video_
 # enums (apps/desktop/src/app/settings/constants.ts).
 STT_MODEL_CATALOG = {
     "local": ["base", "tiny", "small", "medium", "large-v3"],
-    "groq": ["whisper-large-v3-turbo", "whisper-large-v3", "distil-whisper-large-v3-en"],
+    "groq": ["whisper-large-v3-turbo", "whisper-large-v3"],
     "openai": ["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe", "gpt-transcribe"],
     "elevenlabs": ["scribe_v2", "scribe_v1"]}
 

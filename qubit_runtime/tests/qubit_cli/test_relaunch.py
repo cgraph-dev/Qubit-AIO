@@ -28,9 +28,9 @@ class TestResolveHermesBin:
     def test_falls_back_to_path_which(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["-c"])  # not a real path
         monkeypatch.setattr(
-            relaunch_mod.shutil, "which", lambda name: "/usr/bin/hermes" if name == "hermes" else None
+            relaunch_mod.shutil, "which", lambda name: "/usr/bin/qubit" if name == "qubit" else None
         )
-        assert relaunch_mod.resolve_qubit_bin() == "/usr/bin/hermes"
+        assert relaunch_mod.resolve_qubit_bin() == "/usr/bin/qubit"
 
 
 class TestExtractInheritedFlags:
@@ -195,12 +195,12 @@ class TestResolveHermesBinWindowsPyGuard:
         # exercise the None-fallback path (that's a separate test).
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: r"C:\venv\Scripts\hermes.exe" if name == "hermes" else None,
+            lambda name: r"C:\venv\Scripts\qubit.exe" if name == "qubit" else None,
         )
 
         bin_path = relaunch_mod.resolve_qubit_bin()
         # Must NOT be the .py — must be the hermes.exe PATH entry.
-        assert bin_path == r"C:\venv\Scripts\hermes.exe"
+        assert bin_path == r"C:\venv\Scripts\qubit.exe"
 
     def test_posix_python_launcher_falls_through_to_path(self, monkeypatch, tmp_path):
         """A Python source launcher must not be re-executed through its shebang.
@@ -222,7 +222,7 @@ class TestResolveHermesBinWindowsPyGuard:
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: str(wrapper) if name == "hermes" else None,
+            lambda name: str(wrapper) if name == "qubit" else None,
         )
         assert relaunch_mod.resolve_qubit_bin() == str(wrapper)
 
@@ -239,7 +239,7 @@ class TestResolveHermesBinWindowsPyGuard:
         monkeypatch.setattr(
             relaunch_mod.shutil,
             "which",
-            lambda name: str(script) if name == "hermes" else None,
+            lambda name: str(script) if name == "qubit" else None,
         )
 
         assert relaunch_mod.resolve_qubit_bin() is None

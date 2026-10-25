@@ -610,12 +610,15 @@ def test_get_effective_configurable_toolsets_dedupes_bundled_plugins():
         f"duplicate toolset keys in effective list: "
         f"{[k for k in keys if keys.count(k) > 1]}"
     )
-    # Spotify specifically — the bug that motivated the dedupe.
+    # Spotify specifically — the bug that motivated the dedupe. In this fork Spotify is
+    # plugin-only, so the single row is the plugin's; if a built-in row returns, it wins.
     spotify_rows = [t for t in all_ts if t[0] == "spotify"]
     assert len(spotify_rows) == 1, spotify_rows
-    # Built-in label wins over the plugin label.
-    builtin_label = next(label for key, label, _ in CONFIGURABLE_TOOLSETS if key == "spotify")
-    assert spotify_rows[0][1] == builtin_label
+    builtin_label = next((label for key, label, _ in CONFIGURABLE_TOOLSETS if key == "spotify"), None)
+    if builtin_label is not None:
+        assert spotify_rows[0][1] == builtin_label
+    else:
+        assert spotify_rows[0][1]
 
 
 
