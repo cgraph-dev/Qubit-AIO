@@ -18,7 +18,7 @@ def test_user_unit_dir_follows_the_account_home_not_a_profile_pinned_process_hom
     process_home.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(active_root))
     monkeypatch.setenv("HOME", str(process_home))
-    monkeypatch.setenv("QUBIT_REAL_HOME", str(account_home))
+    monkeypatch.setenv("HERMES_REAL_HOME", str(account_home))
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
 
     unit_path = gateway.get_systemd_unit_path(system=False)
