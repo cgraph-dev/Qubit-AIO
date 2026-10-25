@@ -46,11 +46,20 @@ class TestImapResponseGuard(unittest.TestCase):
         )
         fetch_iter = iter(fetch_responses)
 
+        # The adapter now performs a bounded header preflight before requesting
+        # RFC822; answer that with real headers so the batch reaches the body
+        # response under test. ``store`` is the rejected-UID seen marker.
+        headers = _raw_email()
+
         def uid_handler(command, *args):
             if command == "search":
                 return ("OK", [uids])
             if command == "fetch":
+                if args and "BODY.PEEK" in args[-1]:
+                    return ("OK", [(b"1 (BODY[HEADER.FIELDS ...] {123}", headers)])
                 return next(fetch_iter)
+            if command == "store":
+                return ("OK", [])
             return ("NO", [])
 
         mock_imap = MagicMock()

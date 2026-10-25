@@ -39,6 +39,7 @@ def _wire(user_config):
         tools_holder=[None],
         process_task_id=None,
         process_baseline=None,
+        voice_turn=False,
         run_generation=0,
     )
     holder = types.SimpleNamespace(

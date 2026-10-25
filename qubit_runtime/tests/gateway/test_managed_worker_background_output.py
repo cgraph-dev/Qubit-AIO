@@ -113,7 +113,7 @@ def test_next_managed_turn_reads_the_previous_workers_background_output(tmp_path
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def settled(request_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute('SELECT status FROM session_admissions WHERE request_id=?', (request_id,)).fetchall() == [('terminal',)]
 
     async def exercise(desc):
