@@ -89,7 +89,7 @@ class TestDoctorPlatformHints:
 
         hint = doctor_platform._sqlite_upgrade_hint()
 
-        assert "docker pull nousresearch/qubit:latest" in hint
+        assert "docker pull nousresearch/hermes-agent:latest" in hint
         assert "qubit update" not in hint
 
 
@@ -100,7 +100,7 @@ class TestDoctorPlatformHints:
         # out-of-place method through the in-place `qubit update` path.
         hint = doctor_platform._sqlite_upgrade_hint("apt")
 
-        assert "run `pkg upgrade qubit`" in hint
+        assert "run `pkg upgrade hermes-agent`" in hint
         assert "qubit update" not in hint
 
     def test_sqlite_upgrade_hint_preserves_nix_guidance_as_prose(self):
@@ -285,7 +285,7 @@ class TestDoctorToolAvailabilityOverrides:
 
 
     def test_marks_kanban_available_only_when_missing_worker_env_gate(self, monkeypatch):
-        monkeypatch.delenv("QUBIT_KANBAN_TASK", raising=False)
+        monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
 
         available, unavailable = doctor_tools._apply_doctor_tool_availability_overrides(
             [],
@@ -296,7 +296,7 @@ class TestDoctorToolAvailabilityOverrides:
         assert unavailable == []
 
     def test_leaves_kanban_unavailable_when_worker_env_is_set(self, monkeypatch):
-        monkeypatch.setenv("QUBIT_KANBAN_TASK", "probe")
+        monkeypatch.setenv("HERMES_KANBAN_TASK", "probe")
         kanban_entry = {"name": "kanban", "env_vars": [], "tools": ["kanban_show"]}
 
         available, unavailable = doctor_tools._apply_doctor_tool_availability_overrides(
@@ -420,10 +420,16 @@ class TestDoctorMemoryProviderSection:
 
     def test_catalog_provider_not_installed_names_install_command(self, monkeypatch, tmp_path):
         # mem0 left core for the plugin catalog: a home still configured for it gets the exact command.
+        import plugins.memory as memory_pkg
+        monkeypatch.setattr(memory_pkg, "load_memory_provider", lambda name: None)
+        monkeypatch.setattr(memory_pkg, "find_provider_dir", lambda name: None)
         out = self._run_doctor_and_capture(monkeypatch, tmp_path, provider="mem0")
         section = out.split("Memory Provider", 1)[1][:600]
         assert "Built-in memory active" not in out
-        assert "mem0 plugin not found" in section and "plugins install mem0" in section
+        # The fork's in-tree catalog has no mem0 entry, so the fallback is `qubit memory
+        # setup`; a catalog entry still yields the install command.
+        assert "mem0 plugin not found" in section
+        assert "plugins install mem0" in section or "qubit memory setup" in section
 
     def test_mem0_provider_not_installed_shows_fail(self, monkeypatch, tmp_path):
         # Make mem0 import fail
@@ -1297,7 +1303,7 @@ class TestDoctorXaiOAuthStatus:
         with contextlib.redirect_stdout(buf):
             doctor_mod.run_doctor(Namespace(fix=False))
         out = buf.getvalue()
-        assert "Nous Portal auth" in out
+        assert "Qubit Labs auth" in out
         assert "logged in" in out
 
     def test_function_raises_does_not_crash_doctor(self, monkeypatch, tmp_path):
@@ -1317,7 +1323,7 @@ class TestDoctorXaiOAuthStatus:
 
 
 class TestDoctorStaleMaxIterationsDrift:
-    """Regression for #17534: a stale QUBIT_MAX_ITERATIONS in .env shadows
+    """Regression for #17534: a stale HERMES_MAX_ITERATIONS in .env shadows
     agent.max_turns in config.yaml. The repro symptom is config.yaml saying
     400 while the gateway activity line reads N/90. Doctor must detect the
     drift, and `--fix` must remove the .env ghost (config.yaml wins).
@@ -1340,7 +1346,7 @@ class TestDoctorStaleMaxIterationsDrift:
         )
         env_lines = ["OPENAI_API_KEY=sk-test\n"]
         if ghost is not None:
-            env_lines.append(f"QUBIT_MAX_ITERATIONS={ghost}\n")
+            env_lines.append(f"HERMES_MAX_ITERATIONS={ghost}\n")
         (qubit_home / ".env").write_text("".join(env_lines), encoding="utf-8")
 
         monkeypatch.setattr(doctor_mod, "QUBIT_HOME", qubit_home)
@@ -1349,9 +1355,9 @@ class TestDoctorStaleMaxIterationsDrift:
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         if os_environ_value is not None:
             # Simulate the gateway bridge having already overridden os.environ.
-            monkeypatch.setenv("QUBIT_MAX_ITERATIONS", str(os_environ_value))
+            monkeypatch.setenv("HERMES_MAX_ITERATIONS", str(os_environ_value))
         else:
-            monkeypatch.delenv("QUBIT_MAX_ITERATIONS", raising=False)
+            monkeypatch.delenv("HERMES_MAX_ITERATIONS", raising=False)
 
         # Short-circuit at the Tool Availability stage — the drift check runs
         # well before it in the Configuration Files section.
@@ -1371,19 +1377,19 @@ class TestDoctorStaleMaxIterationsDrift:
             monkeypatch, tmp_path, fix=False, ghost=90, cfg_turns=400,
             os_environ_value=400,  # bridge contaminated os.environ
         )
-        assert "QUBIT_MAX_ITERATIONS=90" in out
+        assert "HERMES_MAX_ITERATIONS=90" in out
         assert "shadows" in out
         # Warn-only must NOT mutate .env.
-        assert "QUBIT_MAX_ITERATIONS=90" in (qubit_home / ".env").read_text(encoding="utf-8")
+        assert "HERMES_MAX_ITERATIONS=90" in (qubit_home / ".env").read_text(encoding="utf-8")
 
     def test_fix_removes_ghost(self, monkeypatch, tmp_path):
         out, qubit_home = self._run_config_section(
             monkeypatch, tmp_path, fix=True, ghost=90, cfg_turns=400,
             os_environ_value=400,
         )
-        assert "Removed stale QUBIT_MAX_ITERATIONS" in out
+        assert "Removed stale HERMES_MAX_ITERATIONS" in out
         env_after = (qubit_home / ".env").read_text(encoding="utf-8")
-        assert "QUBIT_MAX_ITERATIONS" not in env_after
+        assert "HERMES_MAX_ITERATIONS" not in env_after
         assert "OPENAI_API_KEY=sk-test" in env_after  # other keys preserved
 
 
