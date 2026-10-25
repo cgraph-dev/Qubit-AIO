@@ -487,7 +487,7 @@ def _migrate_to_34(results: Dict[str, Any], quiet: bool) -> None:
 def _migrate_to_38(results: Dict[str, Any], quiet: bool) -> None:
     # 37 → 38: the bundled observability/nemo_relay plugin was removed (Relay lifecycle moved
     # into the agent core); drop it from plugins.enabled.
-    from qubit_cli.relay_plugin_cutover import legacy_relay_plugin_keys
+    from qubit_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, legacy_relay_plugin_keys
 
     config = read_raw_config()
     plugins = config.get("plugins")
@@ -504,7 +504,7 @@ def _migrate_to_38(results: Dict[str, Any], quiet: bool) -> None:
     message = (
         "Removed legacy Relay plugin from plugins.enabled: "
         f"{', '.join(removed)}. Configure a standard user or system Relay plugins.toml, or use "
-        "QUBIT_NEMO_RELAY_PLUGINS_TOML for an explicit user-file override.")
+        f"{RELAY_PLUGINS_CONFIG_ENV} for an explicit user-file override.")
     results["warnings"].append(message)
     if not quiet:
         print(f"  ⚠ {message}")

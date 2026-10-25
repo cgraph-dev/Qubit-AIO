@@ -1,4 +1,4 @@
-"""``qubit update`` / ``qubit migrate relay``: legacy ``QUBIT_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
+"""``qubit update`` / ``qubit migrate relay``: legacy ``HERMES_NEMO_RELAY_ATIF_*``/``ATOF_*`` vars
 become a validated ``relay-plugins.toml`` per profile home, selected from ``.env``."""
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ from qubit_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, configured_
 nemo_relay = pytest.importorskip("nemo_relay")
 
 LEGACY_ENV = """OPENAI_API_KEY=sk-test
-QUBIT_NEMO_RELAY_ATOF_ENABLED=1
-QUBIT_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY={home}/telemetry/atof
-QUBIT_NEMO_RELAY_ATOF_FILENAME=qubit-atof.jsonl
-QUBIT_NEMO_RELAY_ATOF_MODE=append
-QUBIT_NEMO_RELAY_ATIF_ENABLED=1
-QUBIT_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY={home}/telemetry/atif
-QUBIT_NEMO_RELAY_ATIF_FILENAME_TEMPLATE=trajectory-{{session_id}}.json
-QUBIT_NEMO_RELAY_ATIF_SUBAGENT_EXPORT_MODE=all
+HERMES_NEMO_RELAY_ATOF_ENABLED=1
+HERMES_NEMO_RELAY_ATOF_OUTPUT_DIRECTORY={home}/telemetry/atof
+HERMES_NEMO_RELAY_ATOF_FILENAME=qubit-atof.jsonl
+HERMES_NEMO_RELAY_ATOF_MODE=append
+HERMES_NEMO_RELAY_ATIF_ENABLED=1
+HERMES_NEMO_RELAY_ATIF_OUTPUT_DIRECTORY={home}/telemetry/atif
+HERMES_NEMO_RELAY_ATIF_FILENAME_TEMPLATE=trajectory-{{session_id}}.json
+HERMES_NEMO_RELAY_ATIF_SUBAGENT_EXPORT_MODE=all
 """
 
 
@@ -57,16 +57,16 @@ def test_legacy_env_becomes_validated_toml_selected_from_env(profile_env):
     sink = document["components"][0]["config"]["atof"]["sinks"][0]
     assert sink["type"] == "file" and sink["filename"] == "qubit-atof.jsonl"
     assert document["components"][0]["config"]["atif"]["filename_template"] == "trajectory-{session_id}.json"
-    # Relay accepts the complete document generated from the legacy settings.
-    report = nemo_relay.plugin.validate_exact(document)
-    assert report["config"]["diagnostics"] == []
+    # Relay accepts the complete document generated from the legacy settings. (Fork supports
+    # both Relay 0.8's validate() and 0.9's validate_exact().)
+    assert validate_relay_plugin_payload(document) == []
     # .env now selects the file; the legacy lines survive as comments (not deleted), so the
     # runtime warning + doctor finding go quiet and a second run is a no-op.
     env = _parse_env(profile_env / ".env")
     assert env[RELAY_PLUGINS_CONFIG_ENV] == str(toml_path)
     assert env["OPENAI_API_KEY"] == "sk-test"
     assert configured_legacy_relay_env_vars(env) == ()
-    assert "# migrated to relay-plugins.toml: QUBIT_NEMO_RELAY_ATOF_ENABLED=1" in (profile_env / ".env").read_text(encoding="utf-8")
+    assert "# migrated to relay-plugins.toml: HERMES_NEMO_RELAY_ATOF_ENABLED=1" in (profile_env / ".env").read_text(encoding="utf-8")
     assert migrate_profile_relay_env(profile_env).skipped_reason == "no legacy exporter variables"
 
 
@@ -95,12 +95,11 @@ def _relay_report(*diagnostics):
 
 def test_error_diagnostics_reject_the_payload_like_relay_0_8_did(monkeypatch):
     monkeypatch.setattr(
-        nemo_relay.plugin,
-        "validate_exact",
-        lambda _payload: _relay_report(
+        "qubit_cli.relay_plugin_migrate._validate_with_relay",
+        lambda _payload: [
             {"level": "warning", "code": "unknown_field", "message": "unknown field 'x'"},
             {"level": "error", "code": "unsupported_value", "message": "atof.mode 'nope' is unsupported"},
-        ),
+        ],
     )
 
     with pytest.raises(ValueError, match="atof.mode 'nope' is unsupported"):
@@ -109,7 +108,7 @@ def test_error_diagnostics_reject_the_payload_like_relay_0_8_did(monkeypatch):
 
 def test_warning_diagnostics_are_returned_not_raised(monkeypatch):
     warning = {"level": "warning", "code": "unknown_field", "message": "unknown field 'x'"}
-    monkeypatch.setattr(nemo_relay.plugin, "validate_exact", lambda _payload: _relay_report(warning))
+    monkeypatch.setattr("qubit_cli.relay_plugin_migrate._validate_with_relay", lambda _payload: [warning])
 
     assert validate_relay_plugin_payload({"version": 1}) == [warning]
 
@@ -118,9 +117,8 @@ def test_error_diagnostics_leave_env_untouched(profile_env, monkeypatch):
     (profile_env / ".env").write_text(LEGACY_ENV.format(home=profile_env), encoding="utf-8")
     before = (profile_env / ".env").read_text(encoding="utf-8")
     monkeypatch.setattr(
-        nemo_relay.plugin,
-        "validate_exact",
-        lambda _payload: _relay_report({"level": "error", "code": "bad", "message": "rejected"}),
+        "qubit_cli.relay_plugin_migrate._validate_with_relay",
+        lambda _payload: [{"level": "error", "code": "bad", "message": "rejected"}],
     )
 
     result = migrate_profile_relay_env(profile_env)

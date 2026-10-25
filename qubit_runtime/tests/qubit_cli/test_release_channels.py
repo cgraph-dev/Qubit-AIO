@@ -42,7 +42,7 @@ def test_resolve_verifies_exact_manifest_and_preserves_retirement_constraints():
         manifest, record = seed_manifest(pub, request, objects)
         record["policy"] = "stable-release"
         objects["releases/channels/next-preview.json"] = canonical_json(record)
-        reader = ChannelReader(url + "/bucket", repository="example/qubit")
+        reader = ChannelReader(url + "/bucket", repository="example/hermes-agent")
         assert reader.resolve("next-preview").manifest == manifest
         old = pub._read("old-preview")[0]
         old.update(state="retired", destination="next-preview", minimumVersion="1.0.0",
@@ -148,7 +148,7 @@ def test_reader_rejects_cycles_identity_substitution_and_cross_authority():
         pub.create("alpha")
         request = pub.allocate("alpha", "a" * 40, "1.2.3")
         manifest, record = seed_manifest(pub, request, objects)
-        reader = ChannelReader(url + "/bucket", repository="example/qubit")
+        reader = ChannelReader(url + "/bucket", repository="example/hermes-agent")
         substituted = deepcopy(manifest)
         substituted["request"]["identity"]["appId"] = "ai.other.identity"
         raw = canonical_json(substituted)
@@ -157,11 +157,11 @@ def test_reader_rejects_cycles_identity_substitution_and_cross_authority():
         objects["releases/channels/alpha.json"] = canonical_json(record)
         with pytest.raises(ChannelError, match="identity"):
             reader.resolve("alpha")
-        record["repository"] = "other/qubit"
+        record["repository"] = "other/hermes-agent"
         objects["releases/channels/alpha.json"] = canonical_json(record)
         with pytest.raises(ChannelError, match="authority"):
             reader.resolve("alpha")
-        record["repository"] = "example/qubit"
+        record["repository"] = "example/hermes-agent"
         record.update(state="retired", destination="alpha", minimumVersion="1.0.0", lastHead=record["head"],
                       destinationHead=record["head"], receiverProtocol=1,
                       receiver={"kind": "discontinued"})
