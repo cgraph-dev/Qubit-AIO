@@ -56,7 +56,8 @@ def _build_rig(monkeypatch, tmp_path, request, surface_a, mode):
         home.mkdir(parents=True)
         (home / "config.yaml").write_text(
             f"delegation:\n  surface_child_process_notifications: {str(surface).lower()}\n"
-            f"display:\n  background_process_notifications: {mode}\n",
+            f"display:\n  background_process_notifications: {mode}\n"
+            f"database:\n  synchronous: 0\n",
         )
         homes[name] = home
 
