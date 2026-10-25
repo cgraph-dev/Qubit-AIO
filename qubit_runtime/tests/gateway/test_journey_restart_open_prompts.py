@@ -99,7 +99,7 @@ def test_restart_fences_open_prompts_and_never_reruns_work(tmp_path, restart):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
 
     def admissions():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             db.row_factory = sqlite3.Row
             return {r['request_id']: dict(r) for r in db.execute(
                 'SELECT admission_id,request_id,target_session_id,status,outcome,seq FROM session_admissions')}

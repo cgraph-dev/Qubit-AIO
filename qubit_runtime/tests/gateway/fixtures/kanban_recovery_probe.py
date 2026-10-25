@@ -75,7 +75,7 @@ def main():
         raise AssertionError(('deadline', receipt, [p.poll() for p in clients],
                               list((home / 'shared').rglob('*.log'))))
     def admission():
-        with closing(sqlite3.connect((owner / 'state.db').as_uri() + '?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect((owner / 'state.db').as_uri() + '?mode=ro', uri=True, timeout=30)) as db:
             db.row_factory = sqlite3.Row
             row = db.execute('SELECT * FROM session_admissions').fetchone()
             return dict(row) if row else None
@@ -140,7 +140,7 @@ def main():
                     answer = asyncio.run(retry(desc, params))
                     assert answer['receipt']['status'] == 'unknown', answer
                     assert answer['session_id'] == first['target_session_id']
-                    with closing(sqlite3.connect((owner / 'state.db').as_uri() + '?mode=ro', uri=True)) as db:
+                    with closing(sqlite3.connect((owner / 'state.db').as_uri() + '?mode=ro', uri=True, timeout=30)) as db:
                         frozen = json.loads(db.execute('SELECT value FROM state_meta WHERE key=?',
                             ('gateway.local_policy.v1:' + first['target_session_id'],)).fetchone()[0])
                         assert frozen['policy']['model'] == 'frozen-model', frozen

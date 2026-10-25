@@ -92,7 +92,7 @@ def test_real_agent_worker_persists_context_usage_and_releases_lease(tmp_path, p
             assert proof['context']['input_tokens'] == 10, proof
             assert proof['context']['output_tokens'] == 5, proof
             assert proof['finished']['status'] == 'terminal'
-            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                 assert db.execute('SELECT COUNT(*) FROM session_turn_leases').fetchone()[0] == 0
                 assert db.execute('SELECT input_tokens,output_tokens FROM sessions WHERE id=?', (sid,)).fetchone() == (10, 5)
                 rows = db.execute('SELECT role,content FROM messages WHERE session_id=? ORDER BY id', (sid,)).fetchall()

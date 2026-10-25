@@ -107,8 +107,9 @@ class TestGatewayConnectionErrorReply:
     def test_every_reply_names_a_slash_command_and_no_jargon(self):
         """Each shaped reply must give the chat user something they can run; 'provider' and
         'gateway logs' are operator words (the log pointer is the `hermes logs` command)."""
-        from gateway.run import _PROVIDER_ERROR_REPLIES
-        replies = [reply for _, reply in _PROVIDER_ERROR_REPLIES] + [_gateway_provider_error_reply("zzz")]
+        from gateway.run import _PROVIDER_ERROR_REPLIES, t
+        # The table stores i18n keys, not literal copy; render each as the user sees it.
+        replies = [t(key) for _, key in _PROVIDER_ERROR_REPLIES] + [_gateway_provider_error_reply("zzz")]
         for reply in replies:
             assert any(cmd in reply for cmd in ("/login", "/retry", "/model")), reply
             assert "provider" not in reply.lower(), reply

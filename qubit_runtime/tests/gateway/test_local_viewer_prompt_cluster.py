@@ -55,6 +55,7 @@ def _authority(session_id="c"):
         db=SimpleNamespace(get_session=lambda sid: {"runtime_generation": 7}),
         logical_owner=lambda sid: "canonical-" + sid,
         publish_execution=lambda *a, **k: True,
+        adopt_agent=lambda *a, **k: True,
     )
 
 

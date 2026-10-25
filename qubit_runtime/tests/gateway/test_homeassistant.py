@@ -225,8 +225,11 @@ class TestConfigIntegration:
         assert Platform.HOMEASSISTANT in config.platforms
         ha = config.platforms[Platform.HOMEASSISTANT]
         assert ha.enabled is True
-        assert ha.token == "env-token"
-        assert ha.extra["url"] == "http://10.0.0.5:8123"
+        # Home Assistant is a bundled plugin platform now: HASS_TOKEN/HASS_URL are
+        # read through the scoped secret store, not copied into the shared
+        # PlatformConfig (where they would leak across profiles).
+        from plugins.platforms.homeassistant.adapter import validate_ha_config
+        assert validate_ha_config(ha) is True
 
 
 # ---------------------------------------------------------------------------

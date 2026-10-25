@@ -36,7 +36,7 @@ def probe(base, legacy_root, owner_root=None):
         assert result.returncode == 0, result.stdout + result.stderr
         return result.stdout
     def query(sql, args=()):
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             db.row_factory = sqlite3.Row
             return [dict(r) for r in db.execute(sql, args)]
     async def wait_settled():

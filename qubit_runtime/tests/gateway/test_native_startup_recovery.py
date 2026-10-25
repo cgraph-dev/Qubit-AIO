@@ -40,7 +40,7 @@ def test_native_queue_recovers_only_after_current_adapter_publication(tmp_path):
     env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, PYTHONUNBUFFERED='1')
     def rows():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return dict(db.execute('SELECT request_id,status FROM session_admissions'))
     async def submit():
         body = json.dumps({'text': 'SAFE_QUEUE'}).encode()

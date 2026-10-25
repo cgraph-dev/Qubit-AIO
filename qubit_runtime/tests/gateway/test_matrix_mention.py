@@ -244,11 +244,11 @@ async def test_bare_mention_passes_empty_string(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mention_room, mention_body, claims, same_sync_batch", [
-    ("!room1:example.org", "@qubit:example.org", True, False),
-    ("!room2:example.org", "@qubit:example.org", False, False),
-    ("!room1:example.org", "@qubit:example.org hi", False, False),
-    ("!room1:example.org", "@qubit:example.org", True, True),
-    ("!room1:example.org", "@qubit:example.org", True, "two_voices"),
+    ("!room1:example.org", "@hermes:example.org", True, False),
+    ("!room2:example.org", "@hermes:example.org", False, False),
+    ("!room1:example.org", "@hermes:example.org hi", False, False),
+    ("!room1:example.org", "@hermes:example.org", True, True),
+    ("!room1:example.org", "@hermes:example.org", True, "two_voices"),
 ])
 async def test_bare_mention_claims_parked_voice_only_in_same_room(
         monkeypatch, mention_room, mention_body, claims, same_sync_batch):
@@ -271,7 +271,7 @@ async def test_bare_mention_claims_parked_voice_only_in_same_room(
     voice.content.update({"msgtype": "m.audio", "url": "mxc://example.org/v", "info": {"mimetype": "audio/ogg"},
                           "org.matrix.msc3245.voice": {}, "m.mentions": {}})
     mention = _make_event(mention_body, event_id="$text", room_id=mention_room,
-                          mention_user_ids=["@qubit:example.org"])
+                          mention_user_ids=["@hermes:example.org"])
 
     if same_sync_batch:
         resolve_identity = adapter._resolve_room_identity
@@ -290,7 +290,7 @@ async def test_bare_mention_claims_parked_voice_only_in_same_room(
         await asyncio.gather(*(adapter._on_room_message(e) for e in batch))
         if same_sync_batch == "two_voices":
             await adapter._on_room_message(_make_event(
-                "@qubit:example.org", event_id="$text2", mention_user_ids=["@qubit:example.org"]))
+                "@hermes:example.org", event_id="$text2", mention_user_ids=["@hermes:example.org"]))
             dispatched = [m.args[0].message_id for m in adapter.handle_message.await_args_list]
             assert dispatched == ["$voice", "$voice2"]
             assert not adapter._parked_voices._parked and not adapter._parked_voices._inflight

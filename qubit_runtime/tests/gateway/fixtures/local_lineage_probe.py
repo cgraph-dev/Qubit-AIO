@@ -33,7 +33,7 @@ def probe(tmp_path):
     sessions, params, targets, pids, epochs = {}, {}, {}, [], []
     route_targets = {}
     def db_rows():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return dict(db.execute('SELECT request_id,status FROM session_admissions'))
     async def terminal(request_id):
         await async_wait_until(lambda: db_rows().get(request_id) == 'terminal', timeout=30, interval=.03,
@@ -59,7 +59,7 @@ def probe(tmp_path):
                 'session_id': sessions['safe'], 'input_id': 'safe', 'text': 'RECOVER_SAFE'}}))
             # Wait for the actual publication, not just admission before the fixture ran.
             def published():
-                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                     ended = dict(db.execute('SELECT id,end_reason FROM sessions'))
                 if all(ended.get(sessions[n]) == reason for n, reason in
                        [('safe', 'compression'), ('reset', 'session_reset'), ('unknown', 'compression')]):

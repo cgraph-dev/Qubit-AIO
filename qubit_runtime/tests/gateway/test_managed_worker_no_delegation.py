@@ -59,7 +59,7 @@ def test_managed_worker_turn_does_not_offer_delegate_task(tmp_path):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def rows(sql):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute(sql).fetchall()
 
     async def exercise(desc):

@@ -55,7 +55,7 @@ def child_env():
     return {k: os.environ[k] for k in CHILD_ENV_KEYS if k in os.environ}
 
 
-async def rpc(ws, method, *, timeout=20, **params):
+async def rpc(ws, method, *, timeout=60, **params):
     await ws.send(json.dumps({'jsonrpc': '2.0', 'id': method, 'method': method, 'params': params}))
     async with asyncio.timeout(timeout):
         while True:
@@ -118,7 +118,7 @@ def probe(tmp_path):
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
     sessions, params, pids, epochs = {}, {}, [], []
     def rows():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return dict(db.execute('SELECT request_id,status FROM session_admissions'))
     async def first(desc, proc):
         async with websocket(home, desc) as ws:

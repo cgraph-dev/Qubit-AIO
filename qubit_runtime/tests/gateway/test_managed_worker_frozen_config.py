@@ -82,7 +82,7 @@ def test_existing_session_keeps_frozen_mcp_transport_after_profile_edit(tmp_path
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def status(request_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return db.execute('SELECT status FROM session_admissions WHERE request_id=?', (request_id,)).fetchall()
 
     async def create(ws, name):

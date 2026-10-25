@@ -625,7 +625,10 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
     # (e.g. the Discord bot-token lock). See #22418.
     if any(b == "desktop-gateway.py" for b in basenames):
         return "run"
-    if any(b in ("qubit-gateway", "qubit-gateway.exe") for b in basenames):
+    # Read-old/write-new like ``_LEGACY_GATEWAY_KIND``: a pre-rebrand install
+    # still runs ``hermes-gateway[.exe]`` and must be recognised as a gateway.
+    if any(b in ("qubit-gateway", "qubit-gateway.exe",
+                 "hermes-gateway", "hermes-gateway.exe") for b in basenames):
         return "run"
     joined = " ".join(tokens)
     if "qubit_cli.main" not in joined and "qubit_cli/main.py" not in joined and not any(

@@ -54,13 +54,13 @@ def test_new_session_never_absorbs_or_drops_earlier_queued_work(tmp_path, restar
                              OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url, PYTHONUNBUFFERED='1')
 
     def admissions():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             db.row_factory = sqlite3.Row
             return {r['request_id']: dict(r) for r in db.execute(
                 'SELECT request_id,target_session_id,status,outcome,seq FROM session_admissions')}
 
     def user_turns(session_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
             return [r[0] for r in db.execute("SELECT content FROM messages WHERE session_id=? AND role='user' "
                                               'ORDER BY id', (session_id,))]
 

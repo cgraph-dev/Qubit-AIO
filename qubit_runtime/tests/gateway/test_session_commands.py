@@ -48,7 +48,7 @@ def test_ordinary_daemon_slash_skill_uses_durable_fifo(tmp_path):
     receipts = []
 
     def rows():
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             return list(db.execute('SELECT request_id,status,seq FROM session_admissions ORDER BY seq'))
 
     async def probe(desc):

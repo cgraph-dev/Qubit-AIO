@@ -27,8 +27,9 @@ class TestMatrixMaxMessageLength:
         assert adapter._SPLIT_THRESHOLD == 11900
 
     def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("MATRIX_MAX_MESSAGE_LENGTH", "20000")
+        # 9000 stays under the 45 KB event-content ceiling (15000 after HTML/UTF-8 budgets).
+        monkeypatch.setenv("MATRIX_MAX_MESSAGE_LENGTH", "9000")
         adapter = _make_adapter()
-        assert adapter.max_message_length == 20000
+        assert adapter.max_message_length == 9000
 
 

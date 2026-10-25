@@ -184,7 +184,7 @@ def main():
                     return first['result']['session_id'], first['result']['session_id'] == second['result']['session_id']
             sid, same = asyncio.run(retry())
             import sqlite3
-            with closing(sqlite3.connect((home / 'state.db').as_uri() + '?mode=ro', uri=True)) as db:
+            with closing(sqlite3.connect((home / 'state.db').as_uri() + '?mode=ro', uri=True, timeout=30)) as db:
                 receipt['source'] = db.execute('SELECT source FROM sessions WHERE id=?', (sid,)).fetchone()[0]
                 receipt['admissions'] = db.execute('SELECT count(*) FROM session_admissions').fetchone()[0]
             with closing(connect(board='owned')) as conn:

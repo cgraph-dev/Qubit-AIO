@@ -19,6 +19,9 @@ def mock_runner():
     """Create a minimal mock GatewayRunner with the methods we need."""
     runner = MagicMock(spec=GatewayRunner)
     runner.config = MagicMock(profile_routes=[])
+    # A bare MagicMock auto-creates the reservation attribute and bypasses the
+    # profiles_to_serve fallback these tests patch.
+    runner.config._runtime_profile_homes = None
     # Bind the actual methods to the mock
     runner._profile_name_for_source = GatewayRunner._profile_name_for_source.__get__(runner)
     runner._resolve_profile_home_for_source = GatewayRunner._resolve_profile_home_for_source.__get__(runner)

@@ -43,7 +43,7 @@ def test_api_crash_queue_and_identified_result_retry(tmp_path):
     def rows():
         # Canonical OpenAI-compat identities are ``chat:<auth namespace>:<Idempotency-Key>``;
         # index them by the client key so the assertions stay about admission status.
-        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True) as db:
+        with sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30) as db:
             return {('chat:' + rid.rsplit(':', 1)[1] if rid.startswith('chat:') else rid): status
                     for rid, status in db.execute('SELECT request_id,status FROM session_admissions')}
 

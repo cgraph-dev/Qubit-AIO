@@ -57,7 +57,7 @@ def test_full_agent_worker_rotation_continues_inference_without_canonical_opens(
             assert proof['compressed_count'] < proof['input_count']
             assert len(peer.requests) == 2, 'summary and continuation must both run'
             assert 'RECOVERY_ACK_WORKER_INFERENCE' in proof['result']
-            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
                 assert db.execute('SELECT COUNT(*) FROM session_turn_leases').fetchone()[0] == 0
                 assignment = db.execute('SELECT session_id,status FROM worker_executions').fetchone()
                 assert assignment == (proof['after'], 'terminal')
