@@ -852,6 +852,30 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         # No receipt state, including ambiguous/failed, authorizes a CLI replay.
         receipt = read_delivery_result(home, key)
         target = f"bot-chat:{profile_label}"
+        if receipt is None and not deferred and suppress_notification:
+            # Suppression is a durable disposition, not a send, and it does not depend on the
+            # target's authority being reachable: bottle it before discovery so a down gateway
+            # can never park a hidden warning for a later replay. Upstream 43faacfb8de7
+            # cron/scheduler_delivery.py:767-774.
+            from cron.bot_chat_delivery import defer, read_pending
+
+            pending = read_pending(key)
+            if pending is not None and pending["status"] != "queued":
+                # An earlier admission/disposition already owns this id: suppression cannot
+                # overwrite a settled (or otherwise terminal) outcome.
+                job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
+                    "status": pending["status"], "delivery_id": key}
+                if pending["status"] == "suppressed":
+                    job["_notification_all_targets_suppressed"] = True
+                return None if pending["status"] in ("settled", "suppressed") else (
+                    f"{target} {pending['status']} (receipt {key}): completion unverified; do not resend")
+            pending = defer(key, dict(job), content, profile, home,
+                            for_failure=for_failure, suppressed=True)
+            job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
+                "status": pending["status"], "delivery_id": key}
+            job["_notification_all_targets_suppressed"] = True
+            return None if pending["status"] in ("settled", "suppressed") else (
+                f"{target} {pending['status']} (receipt {key}): completion unverified; do not resend")
         if receipt is None and not deferred:
             from cron.bot_chat_delivery import defer, read_pending
             from tools.bot_live_delivery import find_canonical_owner
