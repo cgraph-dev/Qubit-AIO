@@ -137,7 +137,7 @@ def _age_cached_rows(seconds):
     for row in cache.values():
         row["at"] -= seconds
     for key, row in cache.items():
-        models_mod._store_cache_entry(key, row, cache)
+        models_mod._store_cache_entry(key, row)
 
 
 def test_picker_native_catalog_uses_the_short_native_ttl(monkeypatch):
@@ -1446,7 +1446,7 @@ def test_lmstudio_bare_providers_block_does_not_hide_live_catalog(monkeypatch):
     row = rows[0]
     assert sorted(row["models"]) == sorted(live_catalog)
     assert row["total_models"] == len(live_catalog)
-    assert row["source"] == "qubit"
+    assert row["source"] == "hermes"
 
 
 def test_lmstudio_providers_block_with_explicit_endpoint_still_uses_section3(monkeypatch):
