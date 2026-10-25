@@ -1,4 +1,11 @@
-"""Home-channel startup notice names the free tier only when a guest carries the gateway's inference."""
+"""Home-channel startup notice names the free tier only when a guest carries the gateway's inference.
+
+Post-freeze suite (absent at pin 43faacf): the fork gates "the free tier carries inference" on
+``free_inference_active`` — a guest that claimed the welcome trial, read on the desktop's local
+backend — so the seeded identity must carry that claim and the process must look like the desktop
+backend. The notice contract itself (exactly one line, guest/anonymous never named, explicit keys
+win) is unchanged.
+"""
 
 import base64
 import json
@@ -13,6 +20,7 @@ from gateway.platforms.base import SendResult
 from qubit_cli import anon_auth
 from qubit_cli.auth import _auth_store_lock, _load_auth_store, _save_auth_store
 from tests.gateway.restart_test_helpers import make_restart_runner
+from tests.qubit_cli.anon_portal import as_local_desktop_backend
 
 
 
@@ -35,7 +43,8 @@ def _seed_nous(state: dict) -> None:
 def _guest_state() -> dict:
     return {"auth_method": anon_auth.ANON_AUTH_METHOD, "account_tier": "anonymous", "anon_token": "anon_0001",
             "client_id": "nas-anonymous", "access_token": _jwt(), "expires_at": "2999-01-01T00:00:00+00:00",
-            "inference_base_url": "https://welcome-api.nousresearch.com/v1"}
+            "inference_base_url": "https://welcome-api.nousresearch.com/v1",
+            anon_auth.WELCOME_CLAIM_FLAG: True}
 
 
 def _account_state() -> dict:
@@ -48,6 +57,8 @@ def nous_runner(tmp_path, monkeypatch):
     monkeypatch.setattr(gateway_run, "_qubit_home", tmp_path)
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    # The fork's free-tier route only carries inference on the desktop's local backend.
+    as_local_desktop_backend(monkeypatch)
     # Provider precedence gates the line and is answered from persisted state only (no network at boot).
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
