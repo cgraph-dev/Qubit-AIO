@@ -44,10 +44,10 @@ def test_waiter_argv_uses_forward_slashes_on_windows():
 
 
 @pytest.mark.platforms("linux")
-def test_local_delivery_resolves_sibling_hermes(tmp_path, monkeypatch):
+def test_local_delivery_resolves_sibling_qubit(tmp_path, monkeypatch):
     bin_dir = tmp_path / "venv" / "bin"
     bin_dir.mkdir(parents=True)
-    sibling = bin_dir / "hermes"
+    sibling = bin_dir / "qubit"
     sibling.touch()
     sibling.chmod(0o755)
     monkeypatch.setattr("sys.executable", str(bin_dir / "python"))
@@ -64,9 +64,9 @@ def test_local_delivery_uses_shutil_which_when_no_sibling(tmp_path, monkeypatch)
     empty = tmp_path / "nowhere"
     empty.mkdir(parents=True)
     monkeypatch.setattr("sys.executable", str(empty / "python"))
-    which_hit = str(tmp_path / "usr-local-bin" / "hermes")
+    which_hit = str(tmp_path / "usr-local-bin" / "qubit")
     monkeypatch.setattr(
-        bot_relay.shutil, "which", lambda name: which_hit if name == "hermes" else None
+        bot_relay.shutil, "which", lambda name: which_hit if name == "qubit" else None
     )
 
     argv = bot_relay.local_delivery_command("ops", "query.json")

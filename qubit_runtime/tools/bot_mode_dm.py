@@ -551,7 +551,9 @@ def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dic
             raise LiveTargetUnavailableError(
                 f"canonical Bot Chat target is unavailable ({exc})") from exc
         if owner is None:
-            raise LiveTargetUnavailableError("canonical Bot Chat target is unavailable")
+            # No live canonical owner: the caller falls through to the explicit local
+            # transport (or refuses a local-profile DM) rather than pinning an intent.
+            return None
         intent = dict(owner=owner, message=Path(dm_file).read_text(encoding="utf-8-sig"),
                       delivery_id=_dm_delivery_id(dm_file),
                       **({"author": author} if author else {}))
