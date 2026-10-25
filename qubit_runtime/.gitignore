@@ -69,6 +69,7 @@ privvy*
 images/
 __pycache__/
 hermes_agent.egg-info/
+qubit_agent.egg-info/
 wandb/
 testlogs
 playwright-report/
@@ -87,6 +88,7 @@ environments/benchmarks/evals/
 
 # Web UI build output
 hermes_cli/web_dist/
+qubit_cli/web_dist/
 # Cross-process web UI build lock (flock target, always empty)
 .web_ui_build.lock
 apps/desktop/build/

@@ -89,6 +89,12 @@ STARTED_AT="$(date +%s)"  # the shim's elapsed clock; see serve-ui.py
 UI_SERVER_PID="" UI_BROWSER_PID="" UI_PANEL_PID="" UI_PROFILE_DIR="" FINAL_CODE=1
 FINAL_MSG="update did not complete"
 DONE_NOTE=""  # set when the update succeeded but the app will NOT reopen itself
+owed_followup_steps() { # $OUT -> the distinct owed steps, space-separated, in print order
+  # qubit_cli/update_receipt.record_followup prints each as one whole line.
+  printf '%s\n' "$OUT" | sed -n "s/^.*Update follow-up '\([A-Za-z0-9_]*\)' did not finish: .*$/\1/p" \
+    | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ *$//'
+}
+
 
 log() { echo "$(date +%Y-%m-%dT%H:%M:%S%z) $1" | tee -a "$LOG" 2>/dev/null; }
 

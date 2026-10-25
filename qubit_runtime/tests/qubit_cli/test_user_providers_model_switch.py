@@ -79,6 +79,18 @@ def test_list_authenticated_providers_enumerates_dict_format_models(monkeypatch)
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
+    # Hermetic: a host running Ollama must not swap the explicit dict catalog for a live one.
+    monkeypatch.setattr("qubit_cli.models.fetch_api_models", lambda *a, **k: None)
+    monkeypatch.setattr("qubit_cli.models_local.should_use_ollama_native_catalog", lambda *a, **k: False)
+    def _no_cache(*a, **k):
+        fetch = k.pop("fetch_models", None)
+        k.pop("cache_only", None)
+        k.pop("ttl_seconds", None)
+        if fetch is not None:
+            return fetch()
+        from qubit_cli import models as _models
+        return _models.fetch_api_models(*a, **k)
+    monkeypatch.setattr("qubit_cli.models.cached_fetch_api_models", _no_cache)
 
     user_providers = {
         "local-ollama": {
@@ -516,6 +528,17 @@ def test_section3_probes_no_key_endpoint_without_explicit_models(monkeypatch):
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
+    # Hermetic: force the generic discovery seam this test patches (no host Ollama probe).
+    monkeypatch.setattr("qubit_cli.models_local.should_use_ollama_native_catalog", lambda *a, **k: False)
+    def _no_cache(*a, **k):
+        fetch = k.pop("fetch_models", None)
+        k.pop("cache_only", None)
+        k.pop("ttl_seconds", None)
+        if fetch is not None:
+            return fetch()
+        from qubit_cli import models as _models
+        return _models.fetch_api_models(*a, **k)
+    monkeypatch.setattr("qubit_cli.models.cached_fetch_api_models", _no_cache)
 
     probed = {}
 
@@ -563,6 +586,17 @@ def test_section3_probes_no_key_endpoint_with_singular_default_model(monkeypatch
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
+    # Hermetic: force the generic discovery seam this test patches (no host Ollama probe).
+    monkeypatch.setattr("qubit_cli.models_local.should_use_ollama_native_catalog", lambda *a, **k: False)
+    def _no_cache(*a, **k):
+        fetch = k.pop("fetch_models", None)
+        k.pop("cache_only", None)
+        k.pop("ttl_seconds", None)
+        if fetch is not None:
+            return fetch()
+        from qubit_cli import models as _models
+        return _models.fetch_api_models(*a, **k)
+    monkeypatch.setattr("qubit_cli.models.cached_fetch_api_models", _no_cache)
 
     probed = {}
 

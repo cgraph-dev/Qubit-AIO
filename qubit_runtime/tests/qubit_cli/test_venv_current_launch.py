@@ -26,7 +26,9 @@ def launch(tmp_path, monkeypatch):
     (root / "pyproject.toml").write_text("[project]\nname='example'\n", encoding="utf-8")
     (root / "install-stamp.json").write_text('{"updateMechanism": "self"}', encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
+    # The canonical bridge var is HERMES_*; conftest sets it suite-wide, so clear both.
     monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
+    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: True)
     store_python = tmp_path / "store" / "cpython-3.14" / "bin" / "python3"
     store_python.parent.mkdir(parents=True)

@@ -1688,6 +1688,18 @@ try {
         if ($rebuild.Code -ne 0) { $desktopBuildFailed = $true }
     }
 
+    # Every other owed follow-up of the committed update (a gateway still on the old code, a
+    # Windows resume, a lost completion...) prints one whole "Update follow-up '<step>' did not
+    # finish:" line (qubit_cli/update_receipt.record_followup): never a plain success either.
+    $owedSteps = @([regex]::Matches(($res.Output -join "`n"), "Update follow-up '([A-Za-z0-9_]+)' did not finish: ") |
+        ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+    if ($owedSteps.Count -gt 0) {
+        $owedHint = if ($owedSteps -contains 'gateway_restart') { " Run 'qubit gateway restart' to move the messaging gateway onto the new code now." } else { '' }
+        $manualAction = $true
+        $manualMsg = "Qubit was updated, but some follow-up steps did not finish (" + ($owedSteps -join ', ') + "). The next launch or 'qubit update' retries them; the update log has the details." + $owedHint
+        Write-HandoffLog $manualMsg
+    }
+
     # A zero-exit update is not proof that the runtime survived the update.
     if ($res.Code -eq 0 -and -not $desktopBuildFailed) {
         $verifyCommand = @(Get-QubitRuntimeCommand -InstallRoot $InstallRoot -Module 'qubit_cli.desktop_update_verify')
