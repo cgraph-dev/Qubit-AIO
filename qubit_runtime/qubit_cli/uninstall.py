@@ -64,8 +64,17 @@ def _remove_each(candidates, remove) -> list:
 
 
 def get_project_root() -> Path:
-    """Get the project installation directory."""
-    return Path(__file__).parent.parent.resolve()
+    """The checkout this runtime belongs to (nearest ancestor holding ``.git``).
+
+    The runtime lives in ``qubit_runtime/`` inside the checkout, so the module's own
+    parent is NOT the tree to classify/remove: steward ownership (.git) is one level up.
+    An installed layout with no VCS keeps the runtime dir as a last resort.
+    """
+    here = Path(__file__).parent.parent.resolve()
+    for candidate in (here, *here.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return here
 
 
 def code_removal_refusal() -> str | None:
