@@ -2,7 +2,7 @@
 
 Build the real image and verify the actual runtime behavior:
 
-  1. PUID/PGID env vars remap the hermes user UID/GID at boot
+  1. PUID/PGID env vars remap the qubit user UID/GID at boot
   2. HERMES_UID/HERMES_GID take precedence over PUID/PGID aliases
   3. NAS-style low UIDs (99:100) are accepted and remapped
   4. Invalid UIDs are rejected
@@ -15,25 +15,25 @@ from tests.docker.conftest import docker_exec_sh, start_container
 def test_puid_pgid_remaps_qubit_user(
     built_image: str, container_name: str,
 ) -> None:
-    """PUID=1000 PGID=1000 must remap the hermes user to UID 1000."""
+    """PUID=1000 PGID=1000 must remap the qubit user to UID 1000."""
     start_container(built_image, container_name, "PUID=1000", "PGID=1000")
 
     r = docker_exec_sh(
         container_name,
-        "id -u hermes",
+        "id -u qubit",
         timeout=10,
     )
     assert r.stdout.strip() == "1000", (
-        f"expected hermes UID 1000 after PUID remap, got: {r.stdout.strip()}"
+        f"expected qubit UID 1000 after PUID remap, got: {r.stdout.strip()}"
     )
 
     r = docker_exec_sh(
         container_name,
-        "id -g hermes",
+        "id -g qubit",
         timeout=10,
     )
     assert r.stdout.strip() == "1000", (
-        f"expected hermes GID 1000 after PGID remap, got: {r.stdout.strip()}"
+        f"expected qubit GID 1000 after PGID remap, got: {r.stdout.strip()}"
     )
 
     # The remapped user must still be able to write to the data volume.
@@ -43,7 +43,7 @@ def test_puid_pgid_remaps_qubit_user(
         timeout=10,
     )
     assert "WRITE_OK" in r.stdout, (
-        f"hermes user cannot write to /opt/data after remap: {r.stdout}"
+        f"qubit user cannot write to /opt/data after remap: {r.stdout}"
     )
 
 def test_nas_low_uid_accepted(
@@ -52,12 +52,12 @@ def test_nas_low_uid_accepted(
     """NAS-style low UIDs (99:100, common on Unraid) must be accepted."""
     start_container(built_image, container_name, "PUID=99", "PGID=100")
 
-    r = docker_exec_sh(container_name, "id -u hermes", timeout=10)
+    r = docker_exec_sh(container_name, "id -u qubit", timeout=10)
     assert r.stdout.strip() == "99", (
-        f"expected hermes UID 99, got: {r.stdout.strip()}"
+        f"expected qubit UID 99, got: {r.stdout.strip()}"
     )
 
-    r = docker_exec_sh(container_name, "id -g hermes", timeout=10)
+    r = docker_exec_sh(container_name, "id -g qubit", timeout=10)
     assert r.stdout.strip() == "100", (
-        f"expected hermes GID 100, got: {r.stdout.strip()}"
+        f"expected qubit GID 100, got: {r.stdout.strip()}"
     )

@@ -21,7 +21,7 @@
 set -e
 
 if [ -z "${HERMES_MAIN_WRAPPER_ENV_READY:-}" ] && \
-   [ -z "${QUBIT_HOME:-}" ] && \
+   [ -z "${QUBIT_HOME:-}" ] && [ -z "${HERMES_HOME:-}" ] && \
    [ -x /command/with-contenv ]; then
     export HERMES_MAIN_WRAPPER_ENV_READY=1
     exec /command/with-contenv sh "$0" "$@"

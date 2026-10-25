@@ -1,7 +1,7 @@
 """Runtime smoke test for Docker config-schema migration on boot.
 
 Build the real image and verify: a config.yaml present in $QUBIT_HOME
-is migrated by docker_config_migrate.py on boot, running as the hermes
+is migrated by docker_config_migrate.py on boot, running as the qubit
 user.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ def test_config_migration_runs_on_boot(
     built_image: str, container_name: str,
 ) -> None:
     """A config.yaml in $QUBIT_HOME must be migrated on boot by
-    docker_config_migrate.py, running as the hermes user."""
+    docker_config_migrate.py, running as the qubit user."""
     # Start container
     start_container(built_image, container_name)
 
@@ -33,7 +33,7 @@ def test_config_migration_runs_on_boot(
         'stat -c "%U" /opt/data/config.yaml',
         timeout=10,
     )
-    assert r.stdout.strip() == "hermes", (
+    assert r.stdout.strip() == "qubit", (
         f"config.yaml not owned by hermes (migration may have run as root): "
         f"{r.stdout.strip()}"
     )

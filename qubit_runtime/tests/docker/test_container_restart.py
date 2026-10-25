@@ -79,7 +79,7 @@ def restart_container(request, built_image: str):
 def test_stopped_gateway_stays_stopped_after_restart(restart_container: str) -> None:
     container = restart_container
 
-    docker_exec(container, "hermes", "profile", "create", "writer").check_returncode()
+    docker_exec(container, "qubit", "profile", "create", "writer").check_returncode()
 
     # Write 'stopped' directly so we don't have to race against the
     # gateway's own state writes.
@@ -110,7 +110,7 @@ def test_stale_gateway_pid_cleaned_up_on_restart(restart_container: str) -> None
     process-mismatch checks."""
     container = restart_container
 
-    docker_exec(container, "hermes", "profile", "create", "ghost").check_returncode()
+    docker_exec(container, "qubit", "profile", "create", "ghost").check_returncode()
 
     # Stamp stale runtime files alongside a 'running' state so the
     # reconciler walks this profile.

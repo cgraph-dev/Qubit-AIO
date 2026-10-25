@@ -46,19 +46,19 @@ RUN apt-get -o Acquire::Retries=3 update && \
 FROM debian:13.4@sha256:e2d08da6f42ef4b09b165d55528a12727aeed8240dc9edf888e3ec07e10ef9da AS runtime_base
 
 # Disable Python stdout buffering to ensure logs are printed immediately.
-# Do not write .pyc files at runtime: /opt/hermes is immutable in the
+# Do not write .pyc files at runtime: /opt/qubit is immutable in the
 # published container and writable state belongs under /opt/data.
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # The pm-pinned full Chromium lives in the managed tool store at
-# /opt/hermes/tools — outside the /opt/data volume mount, so the
+# /opt/qubit/tools — outside the /opt/data volume mount, so the
 # build-time install survives the volume overlay at runtime. pm's
 # chromium package fact exports the same value (PLAYWRIGHT_BROWSERS_PATH
 # at the store root); the image ENV names the same directory so
 # Playwright and the browser tool resolve the pinned build even before pm
 # composes tool env.
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/tools
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/qubit/tools
 
 # Install system dependencies in one layer, clear APT cache.
 # tini was previously PID 1 to reap orphaned zombie processes (MCP stdio
@@ -172,10 +172,10 @@ RUN set -eu; \
 COPY --chmod=0755 docker/tini-shim.sh /usr/bin/tini
 
 # Non-root user for runtime; UID can be overridden via HERMES_UID at runtime
-RUN useradd -u 10000 -m -d /opt/data hermes
+RUN useradd -u 10000 -m -d /opt/data qubit
 
 
-WORKDIR /opt/hermes
+WORKDIR /opt/qubit
 
 # ---------- Pinned toolchain from pm/lock.json (single authority) ----------
 # The image used to assemble uv from a second authority — an astral image
@@ -186,7 +186,7 @@ WORKDIR /opt/hermes
 # stages the pinned uv + full Chromium (sha256-verified at
 # download — the same code path pm.sh/pm.ps1 and the desktop payload use)
 # into the image's own runtime dir, a self-contained store baked under
-# /opt/hermes, outside the /opt/data volume so it survives the overlay.
+# /opt/qubit, outside the /opt/data volume so it survives the overlay.
 # PM alone resolves the pinned uv for dependency preparation; build consumers
 # receive Python environments, never an installer executable.
 #
@@ -194,11 +194,11 @@ WORKDIR /opt/hermes
 # here rather than by `npx playwright install`,
 # which fetched whatever revision the npm-resolved playwright wanted,
 # unverified, and recorded no fact. The resolved browser binary path is
-# baked to /etc/hermes/agent-browser-executable-path for stage2-hook.sh:
+# baked to /etc/qubit/agent-browser-executable-path for stage2-hook.sh:
 # the layout differs per arch (chrome-linux64/chrome on amd64,
 # chromium-linux-arm64/chromium on arm64), so it is resolved at build time
 # and never hunted at boot.
-ENV HERMES_RUNTIME_DIR=/opt/hermes/tools
+ENV HERMES_RUNTIME_DIR=/opt/qubit/tools
 COPY pm/ pm/
 # pm's lazy imports resolve get_default_hermes_root()/project_venv_dir()
 # from qubit_constants (stdlib-only) at install time — a sealed-stage
@@ -217,12 +217,12 @@ RUN set -eu; \
     browser_bin="$(python3 -c 'from pm import installed_package; print(installed_package("chromium").binary)')"; \
     test -n "$browser_bin"; \
     "$browser_bin" --version; \
-    mkdir -p /etc/hermes; \
-    printf '%s' "$browser_bin" > /etc/hermes/agent-browser-executable-path
+    mkdir -p /etc/qubit; \
+    printf '%s' "$browser_bin" > /etc/qubit/agent-browser-executable-path
 
 # PM is resident too: never borrow application libraries or create its worker
 # environment under /root (unreachable to the runtime UID).
-RUN python3 -c 'from pathlib import Path; from pm import stage_manager_runtime; from scripts.bundles.payload import seal_pm_runtime; root = Path("/opt/hermes"); python = Path("/usr/local/bin/python3").resolve(); stage_manager_runtime(python=python, destination=root / "pm-runtime", project=root / "pm"); seal_pm_runtime(root, python)'
+RUN python3 -c 'from pathlib import Path; from pm import stage_manager_runtime; from scripts.bundles.payload import seal_pm_runtime; root = Path("/opt/qubit"); python = Path("/usr/local/bin/python3").resolve(); stage_manager_runtime(python=python, destination=root / "pm-runtime", project=root / "pm"); seal_pm_runtime(root, python)'
 
 # JS build helpers use the prepared interpreter without an installer parent.
 ENV HERMES_PYTHON=/usr/local/bin/python3
@@ -273,18 +273,16 @@ FROM runtime_base AS python_deps
 # Source binding is created after the source copy below.
 COPY pyproject.toml uv.lock ./
 RUN touch ./README.md
-RUN python3 -m pm.build_env --source /opt/hermes --python /usr/local/bin/python3 \
-    --out /opt/hermes/.venv --no-install-project --sealed \
+RUN python3 -m pm.build_env --source /opt/qubit --python /usr/local/bin/python3 \
+    --out /opt/qubit/.venv --no-install-project --sealed \
     --extra all --extra messaging --extra otlp --extra anthropic --extra bedrock \
     --extra azure-identity --extra matrix --extra google-chat
 
-# Icons render on the runtime environment: Pillow and resvg-py are core
-# dependencies. A stage of its own so the frontend stage keeps building its
-# Node dependencies in parallel with the Python ones.
-FROM python_deps AS icons
-COPY scripts/generate_icons.py scripts/
-COPY assets/ assets/
-RUN /opt/hermes/.venv/bin/python -I scripts/generate_icons.py --source /opt/hermes --out /tmp/hermes-icons
+# Icons are committed artifacts (scripts/generate_icons.py: "GENERATED
+# OUTPUTS ARE COMMITTED. Regular builds and installs consume them and never
+# render"), so the image consumes the checked-in web/public icons directly.
+# Rendering them here required desktop-only source artwork (assets/dmg-volume.png)
+# that is not part of the runtime tree.
 
 # Frontend dependencies never enter the runtime layers.
 FROM runtime_base AS frontend_build
@@ -295,7 +293,7 @@ COPY ui-tui/packages/qubit-ink/ ui-tui/packages/qubit-ink/
 COPY apps/shared/ apps/shared/
 COPY scripts/build/node-deps.mjs scripts/build/node-deps.mjs
 ENV npm_config_install_links=false
-RUN node scripts/build/node-deps.mjs --source /opt/hermes --workspace ui-tui --workspace web
+RUN node scripts/build/node-deps.mjs --source /opt/qubit --workspace ui-tui --workspace web
 
 COPY pyproject.toml uv.lock ./
 COPY web/ web/
@@ -303,15 +301,14 @@ COPY ui-tui/ ui-tui/
 COPY scripts/build/*.mjs scripts/build/
 COPY scripts/generate-icons.mjs scripts/generate_icons.py scripts/
 COPY assets/ assets/
-COPY --from=icons /tmp/hermes-icons /tmp/hermes-icons
-RUN node scripts/build/tui.mjs --source /opt/hermes --out /opt/products/tui && \
-    node scripts/build/web.mjs --source /opt/hermes --icons /tmp/hermes-icons --out /opt/products/web
+RUN node scripts/build/tui.mjs --source /opt/qubit --out /opt/products/tui && \
+    node scripts/build/web.mjs --source /opt/qubit --icons /opt/qubit --out /opt/products/web
 
 FROM python_deps AS runtime
 # Standalone TypeScript linting is a runtime feature; Vite/esbuild are not.
-COPY --from=frontend_build /opt/hermes/node_modules/typescript /opt/hermes/node_modules/typescript
-RUN mkdir -p /opt/hermes/node_modules/.bin && \
-    ln -s ../typescript/bin/tsc /opt/hermes/node_modules/.bin/tsc
+COPY --from=frontend_build /opt/qubit/node_modules/typescript /opt/qubit/node_modules/typescript
+RUN mkdir -p /opt/qubit/node_modules/.bin && \
+    ln -s ../typescript/bin/tsc /opt/qubit/node_modules/.bin/tsc
 
 # ---------- Photon iMessage sidecar deps (baked, NS-606) ----------
 # The photon plugin's Node sidecar needs its own node_modules
@@ -330,8 +327,8 @@ RUN cd plugins/platforms/photon/sidecar && \
     npm cache clean --force
 
 # Shared product outputs are independent of application dependency assembly.
-COPY --from=frontend_build /opt/products/tui /opt/hermes/ui-tui
-COPY --from=frontend_build /opt/products/web /opt/hermes/qubit_cli/web_dist
+COPY --from=frontend_build /opt/products/tui /opt/qubit/ui-tui
+COPY --from=frontend_build /opt/products/web /opt/qubit/qubit_cli/web_dist
 # ---------- Bot Screen X socket directory ----------
 # Xvnc would create this itself (/tmp is 1777); pre-creating it keeps ownership
 # deterministic when HERMES_UID is remapped between boots.
@@ -339,7 +336,7 @@ RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
 # XDG_RUNTIME_DIR (set below) sits under a predictable name in world-writable /tmp.
 # Shipping it root-owned means stage2 finds a directory it trusts and chowns it.
-RUN mkdir -p /tmp/hermes-runtime && chmod 0700 /tmp/hermes-runtime
+RUN mkdir -p /tmp/qubit-runtime && chmod 0700 /tmp/qubit-runtime
 
 # ---------- Source code ----------
 # .dockerignore excludes node_modules, so the installs above survive.
@@ -347,22 +344,22 @@ RUN mkdir -p /tmp/hermes-runtime && chmod 0700 /tmp/hermes-runtime
 # the final read-only permissions at copy time so we skip the separate
 # `chmod -R` pass that previously walked ~30k files across the venv +
 # node_modules + source (21s amd64 / 222s arm64 — #49113).  `a+rX,go-w`
-# gives the non-root hermes user read + traverse but no write; root retains
+# gives the non-root qubit user read + traverse but no write; root retains
 # write so the build steps below don't need chmod u+w dances.
 COPY --link --chmod=a+rX,go-w . .
 
 # The shared assembler binds the prepared environment and frontend products.
-RUN /opt/hermes/.venv/bin/python -m docker.build_agent
+RUN /opt/qubit/.venv/bin/python -m docker.build_agent
 
-# Wire the exec shim and install-method stamp.  Files under /opt/hermes are
+# Wire the exec shim and install-method stamp.  Files under /opt/qubit are
 # already root-owned (COPY, dep assembly, npm install all run as root) and
-# read-only for the hermes user (go-w from the --chmod above).
+# read-only for the qubit user (go-w from the --chmod above).
 
 USER root
-RUN mkdir -p /opt/hermes/bin && \
-    cp /opt/hermes/docker/qubit-exec-shim.sh /opt/hermes/bin/hermes && \
-    chmod 0755 /opt/hermes /opt/hermes/bin/hermes && \
-    printf 'docker\n' > /opt/hermes/.install_method
+RUN mkdir -p /opt/qubit/bin && \
+    cp /opt/qubit/docker/qubit-exec-shim.sh /opt/qubit/bin/qubit && \
+    chmod 0755 /opt/qubit /opt/qubit/bin/qubit && \
+    printf 'docker\n' > /opt/qubit/.install_method
 # The ``.install_method`` stamp is baked next to the running code (the install
 # tree), NOT into $HERMES_HOME. $HERMES_HOME (/opt/data) is a shared data
 # volume that is commonly bind-mounted from the host and even shared with a
@@ -370,14 +367,14 @@ RUN mkdir -p /opt/hermes/bin && \
 # host install's marker and wrongly block its ``hermes update``. A code-scoped
 # stamp is read first by detect_install_method() and is immune to the share.
 # Start as root so the s6-overlay stage2 hook can usermod/groupmod and chown
-# the data volume. Each supervised service then drops to the hermes user via
-# `s6-setuidgid hermes` in its run script. If HERMES_UID is unset, services
-# run as the default hermes user (UID 10000).
+# the data volume. Each supervised service then drops to the qubit user via
+# `s6-setuidgid qubit` in its run script. If HERMES_UID is unset, services
+# run as the default qubit user (UID 10000).
 
 # ---------- Image provenance + install stamp ----------
 # CI (.github/workflows/docker.yml) runs scripts/write_install_stamp.py
 # before `docker build`, so the bulk `COPY . .` above already placed a
-# full-provenance /opt/hermes/install-stamp.json next to the code.
+# full-provenance /opt/qubit/install-stamp.json next to the code.
 # .dockerignore excludes .git, so the stamp is the only commit channel the
 # image carries: qubit_cli/version_info.py reads it at runtime (stamp
 # first, live git second, unknown third), and both `hermes dump` and
@@ -390,18 +387,18 @@ RUN mkdir -p /opt/hermes/bin && \
 #
 # The versioned, non-secret provenance marker is the authoritative runtime
 # signal that this filesystem came from an immutable image.  It deliberately
-# lives outside both /opt/hermes (which operators sometimes bind-mount as a
+# lives outside both /opt/qubit (which operators sometimes bind-mount as a
 # checkout) and /opt/data (the mutable HERMES_HOME volume).  Its `revision`
 # is read from the install stamp; the fallback stamp's all-zero commit maps
 # to null.
 RUN set -eu; \
-    if [ ! -f /opt/hermes/install-stamp.json ]; then \
+    if [ ! -f /opt/qubit/install-stamp.json ]; then \
         printf '{"schemaVersion":2,"commit":"0000000000000000000000000000000000000000","distribution":"docker","source":"fallback","updateMechanism":"external"}\n' \
-            > /opt/hermes/install-stamp.json; \
+            > /opt/qubit/install-stamp.json; \
     fi; \
-    python3 -c 'import json; from pathlib import Path; path = Path("/opt/hermes/install-stamp.json"); stamp = json.loads(path.read_text()); stamp["pmRuntime"] = "/opt/hermes/pm-runtime"; path.write_text(json.dumps(stamp) + "\n")'; \
-    mkdir -p /etc/hermes; \
-    python3 -c 'import json, pathlib, tomllib; project = tomllib.loads(pathlib.Path("/opt/hermes/pyproject.toml").read_text(encoding="utf-8"))["project"]; stamp = json.loads(pathlib.Path("/opt/hermes/install-stamp.json").read_text(encoding="utf-8")); commit = stamp.get("commit"); revision = commit if commit and set(commit) != {"0"} else None; marker = pathlib.Path("/etc/hermes/image-provenance.json"); marker.write_text(json.dumps({"schema": 1, "deployment_kind": "image", "manager": "docker", "image": "nousresearch/hermes-agent", "version": project["version"], "revision": revision}, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"); marker.chmod(0o444)'
+    python3 -c 'import json; from pathlib import Path; path = Path("/opt/qubit/install-stamp.json"); stamp = json.loads(path.read_text()); stamp["pmRuntime"] = "/opt/qubit/pm-runtime"; path.write_text(json.dumps(stamp) + "\n")'; \
+    mkdir -p /etc/qubit; \
+    python3 -c 'import json, pathlib, tomllib; project = tomllib.loads(pathlib.Path("/opt/qubit/pyproject.toml").read_text(encoding="utf-8"))["project"]; stamp = json.loads(pathlib.Path("/opt/qubit/install-stamp.json").read_text(encoding="utf-8")); commit = stamp.get("commit"); revision = commit if commit and set(commit) != {"0"} else None; marker = pathlib.Path("/etc/qubit/image-provenance.json"); marker.write_text(json.dumps({"schema": 1, "deployment_kind": "image", "manager": "docker", "image": "nousresearch/hermes-agent", "version": project["version"], "revision": revision}, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"); marker.chmod(0o444)'
 
 # ---------- s6-overlay service wiring ----------
 # Static services declared at build time: main-hermes + dashboard.
@@ -420,17 +417,17 @@ COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 # slots from $HERMES_HOME/profiles/<name>/ after a container restart
 # (the /run/service/ scandir is tmpfs and wiped on restart). Phase 4.
 RUN mkdir -p /etc/cont-init.d && \
-    printf '#!/command/with-contenv sh\nexec /opt/hermes/docker/stage2-hook.sh\n' \
+    printf '#!/command/with-contenv sh\nexec /opt/qubit/docker/stage2-hook.sh\n' \
         > /etc/cont-init.d/01-hermes-setup && \
     chmod +x /etc/cont-init.d/01-hermes-setup
 COPY --chmod=0755 docker/cont-init.d/015-supervise-perms /etc/cont-init.d/015-supervise-perms
 COPY --chmod=0755 docker/cont-init.d/02-reconcile-profiles /etc/cont-init.d/02-reconcile-profiles
 
 # ---------- Runtime ----------
-ENV HERMES_WEB_DIST=/opt/hermes/qubit_cli/web_dist
+ENV HERMES_WEB_DIST=/opt/qubit/qubit_cli/web_dist
 # Point the TUI launcher at the prebuilt bundle baked at build time (Layer 8:
 # `ui-tui && npm run build`). This makes _make_tui_argv take the prebuilt-bundle
-# fast path (`node --expose-gc /opt/hermes/ui-tui/dist/entry.js`) and skip the
+# fast path (`node --expose-gc /opt/qubit/ui-tui/dist/entry.js`) and skip the
 # _tui_need_npm_install / runtime `npm install` branch entirely — exactly the
 # nix/packaged-release path the launcher was designed for.
 #
@@ -444,11 +441,12 @@ ENV HERMES_WEB_DIST=/opt/hermes/qubit_cli/web_dist
 # embedded-chat (/api/pty) connections → ENOTEMPTY → the chat tab dies with a
 # 502 / "[session ended]". Pointing at the prebuilt bundle sidesteps the whole
 # check. (A separate launcher hardening is tracked independently.)
-ENV HERMES_TUI_DIR=/opt/hermes/ui-tui
+ENV HERMES_TUI_DIR=/opt/qubit/ui-tui
 ENV HERMES_HOME=/opt/data
+ENV QUBIT_HOME=/opt/data
 ENV HERMES_WRITE_SAFE_ROOT=/opt/data
 # Opt-in backend SDKs install on first use into PM dependency generations under
-# /opt/data/installs (the sealed /opt/hermes/.venv is never written); stage2
+# /opt/data/installs (the sealed /opt/qubit/.venv is never written); stage2
 # re-resolves them against each new image. security.allow_lazy_installs: false
 # turns this off.
 
@@ -456,21 +454,21 @@ ENV HERMES_WRITE_SAFE_ROOT=/opt/data
 # to create /run/user/<uid>. The default fallback ($HOME/.cache) is the /opt/data
 # volume, which a host-side install may share — two instances would then contend
 # for one lock. Container-scoped instead; seeded 0700 by docker/stage2-hook.sh.
-ENV XDG_RUNTIME_DIR=/tmp/hermes-runtime
+ENV XDG_RUNTIME_DIR=/tmp/qubit-runtime
 
 # `docker exec` privilege-drop shim. When operators run
 # `docker exec <c> hermes ...` they default to root, and any file the
 # command writes under $HERMES_HOME (auth.json, .env, config.yaml) ends
 # up root-owned and unreadable to the supervised gateway (UID 10000).
-# The shim lives at /opt/hermes/bin/hermes, sits earliest on PATH, and
-# transparently re-exec's the real venv binary via `s6-setuidgid hermes`
+# The shim lives at /opt/qubit/bin/qubit, sits earliest on PATH, and
+# transparently re-exec's the real venv binary via `s6-setuidgid qubit`
 # when invoked as root. Non-root callers (supervised processes,
 # `--user hermes`, etc.) hit the short-circuit path with no overhead.
 # Recursion is impossible because the shim exec's the venv binary by
-# absolute path (/opt/hermes/.venv/bin/hermes). See the shim source for
+# absolute path (/opt/qubit/.venv/bin/qubit). See the shim source for
 # the opt-out env var (HERMES_DOCKER_EXEC_AS_ROOT=1).
-COPY --chmod=0755 docker/qubit-exec-shim.sh /opt/hermes/bin/hermes
-COPY --chmod=0755 docker/entrypoint-dispatch.sh /opt/hermes/docker/entrypoint-dispatch.sh
+COPY --chmod=0755 docker/qubit-exec-shim.sh /opt/qubit/bin/qubit
+COPY --chmod=0755 docker/entrypoint-dispatch.sh /opt/qubit/docker/entrypoint-dispatch.sh
 
 # Pre-s6 entrypoint.sh did `source .venv/bin/activate` which exported
 # the venv bin onto PATH; Architecture B's main-wrapper.sh does the
@@ -479,19 +477,19 @@ COPY --chmod=0755 docker/entrypoint-dispatch.sh /opt/hermes/docker/entrypoint-di
 # bin globally so `docker exec <container> hermes ...` and any
 # subprocess that doesn't activate the venv first still find hermes.
 #
-# /opt/hermes/bin is prepended ahead of the venv so the privilege-drop
+# /opt/qubit/bin is prepended ahead of the venv so the privilege-drop
 # shim wins PATH resolution. The shim's last act is to exec the venv
 # binary by absolute path, so this PATH ordering is transparent to
 # every other consumer.
-ENV PATH="/opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:${PATH}"
+ENV PATH="/opt/qubit/bin:/opt/qubit/.venv/bin:/opt/data/.local/bin:${PATH}"
 # PM's atomic writer creates private facts for source installs. In the
 # image these are shared, non-secret package metadata, read by UID 10000.
 # uv's environment locks are build-only and may be world-writable. Remove
 # them after all builds; never relax permissions on mutable PM/home state.
-RUN mkdir -p /opt/data && chmod 0644 /opt/hermes/tools/facts.json && \
-    rm -f /opt/hermes/.venv/.lock /opt/hermes/pm-runtime/.lock
+RUN mkdir -p /opt/data && chmod 0644 /opt/qubit/tools/facts.json && \
+    rm -f /opt/qubit/.venv/.lock /opt/qubit/pm-runtime/.lock
 # Build helpers use system Python above; TUI gateway children need the sealed runtime.
-ENV HERMES_PYTHON=/opt/hermes/.venv/bin/python
+ENV HERMES_PYTHON=/opt/qubit/.venv/bin/python
 VOLUME [ "/opt/data" ]
 
 # The image ENTRYPOINT is a tiny dispatcher rather than `/init` directly.
@@ -520,11 +518,11 @@ VOLUME [ "/opt/data" ]
 #   docker run <image> --tui            → entrypoint-dispatch.sh --tui
 #
 # main-wrapper.sh handles arg routing (bare-exec vs. hermes
-# subcommand vs. no-args), drops to the hermes user via s6-setuidgid,
+# subcommand vs. no-args), drops to the qubit user via s6-setuidgid,
 # and exec's the final program so its exit code becomes the container
 # exit code. The dispatcher preserves that contract across both the
 # supervised PID-1 path and the non-PID-1 fallback path. Without the
 # wrapper-as-ENTRYPOINT, leading-dash args like `--version` would be
 # intercepted by /init's POSIX shell.
-ENTRYPOINT [ "/opt/hermes/docker/entrypoint-dispatch.sh" ]
+ENTRYPOINT [ "/opt/qubit/docker/entrypoint-dispatch.sh" ]
 CMD [ ]

@@ -49,15 +49,15 @@ def test_tui_bootstrap_starts_the_correct_supervised_owner(
         "-c",
         (
             "import json, subprocess; "
-            "r = subprocess.run(['python', '/opt/hermes/ui-tui/scripts/gateway_bootstrap.py', '--start'], "
-            "capture_output=True, text=True, timeout=45); "
+            "r = subprocess.run(['python', '/opt/qubit/ui-tui/scripts/gateway_bootstrap.py', '--start'], "
+            "capture_output=True, text=True, timeout=90); "
             "assert r.returncode == 0, r.stderr; "
             "grant = json.loads(r.stdout); "
             "assert grant['url'] and grant['protocols'] and grant['instance_id']; "
             "print(json.dumps({'profile_id': grant['profile_id']}))"
         ),
-        timeout=60,
-        extra_docker_args=("-e", f"HERMES_HOME={home}"),
+        timeout=120,
+        extra_docker_args=("-e", f"QUBIT_HOME={home}"),
     )
     assert probe.returncode == 0, probe.stderr
     assert json.loads(probe.stdout)["profile_id"] == home

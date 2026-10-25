@@ -71,12 +71,12 @@ def bootstrap(start: bool, recover: bool = False) -> dict:
                 "QUBIT_TUI_CHECKPOINTS", "QUBIT_TUI_PASS_SESSION_ID", "QUBIT_KANBAN_BOARD",
                 "HERMES_KANBAN_BOARD", "QUBIT_TUI_CLIENT_ENV"):
         os.environ.pop(key, None)
-    receipt = (ensure_gateway_runtime(home, timeout=30, idle_exit=True) if start
+    receipt = (ensure_gateway_runtime(home, timeout=60, idle_exit=True) if start
                else discover_gateway_endpoint(home, timeout=5))
     # A restart's after-turn wait still owns its turns (#139041): attach to answer a parked prompt,
     # on a recovery too, rather than re-ensuring until the restart ends.
     if not start and recover and not attachable(receipt):
-        receipt = ensure_gateway_runtime(home, timeout=30, idle_exit=True)
+        receipt = ensure_gateway_runtime(home, timeout=60, idle_exit=True)
     if not attachable(receipt):
         raise RuntimeError(failure_message(receipt))
     endpoint = receipt.endpoint

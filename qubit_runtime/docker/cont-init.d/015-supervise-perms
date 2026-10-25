@@ -1,12 +1,12 @@
 #!/command/with-contenv sh
 # shellcheck shell=sh
 # Make supervise/ trees for ALL declared s6 services queryable and
-# controllable by the unprivileged hermes user (UID 10000).
+# controllable by the unprivileged qubit user (UID 10000).
 #
 # Background (PR #30136 review item I4): the entire s6 lifecycle
-# (s6-svc, s6-svstat, s6-svwait) is dispatched as the hermes user
+# (s6-svc, s6-svstat, s6-svwait) is dispatched as the qubit user
 # inside the container (every Hermes runtime path runs under
-# ``s6-setuidgid hermes``). But s6-supervise creates each service's
+# ``s6-setuidgid qubit``). But s6-supervise creates each service's
 # ``supervise/`` and top-level ``event/`` directory with mode 0700
 # owned by its effective UID — which is root, because s6-supervise
 # is spawned by s6-svscan running as PID 1. So unprivileged clients
@@ -63,14 +63,14 @@ for svc in "$SVC_ROOT"/*; do
 
     # supervise/ tree — needed by s6-svstat / s6-svc.
     if [ -d "$svc/supervise" ]; then
-        chown -R hermes:hermes "$svc/supervise" 2>/dev/null || \
+        chown -R qubit:qubit "$svc/supervise" 2>/dev/null || \
             echo "[supervise-perms] could not chown $svc/supervise"
         # 0710 = group searchable. ``s6-svstat`` only needs to openat
         # status, not list the dir, but giving the hermes group +x is
         # the minimum that lets group members access the contents.
         chmod 0710 "$svc/supervise" 2>/dev/null || true
         # supervise/control is a FIFO that s6-svc writes commands
-        # into; the hermes user needs +w. Owner is already hermes
+        # into; the qubit user needs +w. Owner is already hermes
         # after the recursive chown above; widen perms to 0660 so
         # ``s6-svc`` works for any member of the hermes group too.
         if [ -p "$svc/supervise/control" ]; then
@@ -80,7 +80,7 @@ for svc in "$SVC_ROOT"/*; do
 
     # Top-level event/ dir — s6-svlisten1 / s6-svwait subscribe here.
     if [ -d "$svc/event" ]; then
-        chown hermes:hermes "$svc/event" 2>/dev/null || \
+        chown qubit:qubit "$svc/event" 2>/dev/null || \
             echo "[supervise-perms] could not chown $svc/event"
         # Preserve s6's 03730 mode (setgid + g+rwx + sticky).
         chmod 03730 "$svc/event" 2>/dev/null || true

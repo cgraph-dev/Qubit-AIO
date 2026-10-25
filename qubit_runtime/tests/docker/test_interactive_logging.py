@@ -48,7 +48,7 @@ def _emit_supervised_output(container: str) -> None:
         "from qubit_cli.service_manager import S6ServiceManager; "
         "directory = Path('/opt/data/console-probe-bin'); "
         "directory.mkdir(); "
-        "executable = directory / 'hermes'; "
+        "executable = directory / 'qubit'; "
         f"executable.write_text({script!r}, encoding='utf-8'); "
         "executable.chmod(0o755); "
         "manager = S6ServiceManager(); "

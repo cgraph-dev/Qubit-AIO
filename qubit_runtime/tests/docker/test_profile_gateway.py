@@ -82,14 +82,14 @@ def test_named_profile_gateway_start_refuses_without_force(
 ) -> None:
     start_container(built_image, container_name, cmd="sleep 120")
 
-    r = _sh(container_name, f"hermes profile create {PROFILE}")
+    r = _sh(container_name, f"qubit profile create {PROFILE}")
     assert r.returncode == 0, f"profile create failed: {r.stderr}"
 
     # Profile create's s6-register hook still produces the slot (registered DOWN).
     r = _sh(container_name, f"test -d /run/service/gateway-{PROFILE}")
     assert r.returncode == 0, "s6 service slot not created on profile create"
 
-    r = _sh(container_name, f"hermes -p {PROFILE} gateway start", timeout=60)
+    r = _sh(container_name, f"qubit -p {PROFILE} gateway start", timeout=60)
     assert r.returncode != 0, f"a named profile started its own gateway: {r.stdout!r}"
     assert not _svstat_wants_up(container_name), (
         f"refused start still flipped the slot's want-state: {_svstat(container_name)!r}")
@@ -99,15 +99,15 @@ def test_named_profile_gateway_force_start_then_stop(
     built_image: str, container_name: str,
 ) -> None:
     start_container(built_image, container_name, cmd="sleep 120")
-    r = _sh(container_name, f"hermes profile create {PROFILE}")
+    r = _sh(container_name, f"qubit profile create {PROFILE}")
     assert r.returncode == 0, f"profile create failed: {r.stderr}"
 
-    r = _sh(container_name, f"hermes -p {PROFILE} gateway start --force", timeout=60)
+    r = _sh(container_name, f"qubit -p {PROFILE} gateway start --force", timeout=60)
     assert r.returncode == 0, (
         f"--force gateway start failed: stderr={r.stderr!r} stdout={r.stdout!r}"
     )
     _wait_for_want_state(container_name, want_up=True)
 
-    r = _sh(container_name, f"hermes -p {PROFILE} gateway stop", timeout=30)
+    r = _sh(container_name, f"qubit -p {PROFILE} gateway stop", timeout=30)
     assert r.returncode == 0
     _wait_for_want_state(container_name, want_up=False)
