@@ -175,6 +175,7 @@ docs/superpowers/*
 # ignore it so `hermes update`'s `git stash push --include-untracked` does not
 # treat it as a local edit and autostash it on every run (#38529).
 .hermes-bootstrap-complete
+.qubit-bootstrap-complete
 
 # Flat-install runtime state (checkout root == $HERMES_HOME, e.g. installs made
 # with HERMES_INSTALL_DIR=$HERMES_HOME or by older installers): every root-level

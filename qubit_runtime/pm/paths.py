@@ -11,10 +11,10 @@ def repo_root() -> Path:
 
 
 def install_root() -> Path:
-    """The tree this process runs from. ``HERMES_INSTALL_ROOT`` when a steward
-    wrapper sets it (Nix points it at the sealed tree whose install stamp lives
+    """The tree this process runs from. ``QUBIT_INSTALL_ROOT`` (legacy
+    ``HERMES_INSTALL_ROOT`` accepted) when a steward wrapper sets it (Nix points it at the sealed tree whose install stamp lives
     outside the package dir), else the executing checkout."""
-    env = os.environ.get("HERMES_INSTALL_ROOT")
+    env = os.environ.get("QUBIT_INSTALL_ROOT") or os.environ.get("HERMES_INSTALL_ROOT")
     return Path(env) if env else repo_root()
 
 

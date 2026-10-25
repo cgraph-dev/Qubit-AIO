@@ -192,8 +192,12 @@ def step_adopt_blessed_checkout(project_root: Path | None = None) -> dict:
 
     root = install_root() if project_root is None else Path(project_root)
 
-    # The blessed roots: the canonical locations installers create.
+    # The blessed roots: the canonical locations installers create. The
+    # fork installs its managed clone at ``<home>/qubit``; ``hermes-agent``
+    # and the FHS path remain read-old aliases so a pre-rename install is
+    # still adopted exactly once.
     blessed = (
+        get_qubit_home() / "qubit",
         get_qubit_home() / "hermes-agent",
         Path("/usr/local/lib/hermes-agent"),
     )

@@ -85,9 +85,9 @@ def publish_launchers(project_root: Path, *, create: bool = True) -> None:
         # source-driver.sh refuses to let --version paper over the gap), so
         # this skip is a half-finished update, never a quiet no-op.
         log.warning("launchers: no managed interpreter under %s; %s not published",
-                    root, root / ".hermes" / "bin")
+                    root, root / ".qubit" / "bin")
         return
-    written = ensure_install_launchers(root, root / ".hermes" / "bin")
+    written = ensure_install_launchers(root, root / ".qubit" / "bin")
     if len(written) != len(ENTRY_POINTS):
         from pm.package import InstallError
 

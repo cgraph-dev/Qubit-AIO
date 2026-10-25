@@ -257,15 +257,15 @@ def interrupted_pull_marker(root: Path) -> Path:
 # objects first when no updater published them (``_launchers._CLOSURE_REPAIR``).
 # The modules import only the stdlib and each other; the package initializer is published empty.
 RECOVERY_CLOSURE_DIR = "hermes-update-recovery"
-RECOVERY_CLOSURE = ("qubit_runtime/qubit_cli/_early_recovery.py", "qubit_runtime/qubit_cli/update_lock.py",
-                    "qubit_runtime/qubit_cli/update_custody.py")
+RECOVERY_CLOSURE = ("qubit_cli/_early_recovery.py", "qubit_cli/update_lock.py",
+                    "qubit_cli/update_custody.py")
 
 
 # ``<blob id> <path>`` per published file (``RECOVERY_CLOSURE`` + the empty package initializer):
 # a closure is used only when every file hashes to its id (a power loss can leave the renamed dir
 # with files git's objects never had), else it is rebuilt from git's objects.
 RECOVERY_CLOSURE_MANIFEST = "MANIFEST"
-RECOVERY_CLOSURE_INIT = "qubit_runtime/qubit_cli/__init__.py"
+RECOVERY_CLOSURE_INIT = "qubit_cli/__init__.py"
 
 
 def recovery_closure_dir(root: Path, pre: str) -> Path:

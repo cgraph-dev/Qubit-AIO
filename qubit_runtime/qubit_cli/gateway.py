@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from qubit_cli import gateway_service_owner, setup_platforms  # noqa: F401 — resolved lazily by siblings through the facade
+_temp_home_in_service_definition = gateway_service_owner.temp_home_in_service_definition
 
 # UV's bundled Python ships a minimal PATH; ensure launchctl/systemctl are discoverable.
 if os.name == "posix":
@@ -121,7 +122,7 @@ def _get_service_pids(all_profiles: bool = False) -> set:
     """PIDs managed by systemd/launchd gateway services (excluded from stale-process sweeps).
 
     Relies on the service manager committing the new PID before the restart command returns.
-    ``all_profiles`` widens the current profile's unit/label to the whole ``hermes-gateway*`` /
+    ``all_profiles`` widens the current profile's unit/label to the whole ``qubit-gateway*`` /
     ``ai.hermes.gateway*`` fleet so update/reaper never kill a sibling's service gateway as "manual".
 
     ``all_profiles`` widens the launchd branch to every installed ``ai.hermes.gateway*`` LaunchAgent — the
@@ -130,13 +131,13 @@ def _get_service_pids(all_profiles: bool = False) -> set:
     Default-scope callers (``gateway status``, cron checks) keep seeing only the current profile's service;
     the orphan reaper passes all_profiles=True for the same friendly-fire reason. The systemd branch mirrors
     this: default scope filters to the current profile's exact unit name; ``all_profiles=True`` widens to
-    the ``hermes-gateway*`` fleet glob.
+    the ``qubit-gateway*`` fleet glob.
     """
     pids: set = set()
 
     # --- systemd (Linux): user and system scopes ---
     if supports_systemd_services():
-        pattern = "hermes-gateway*" if all_profiles else get_service_name()
+        pattern = "qubit-gateway*" if all_profiles else get_service_name()
         for scope_args in [["systemctl", "--user"], ["systemctl"]]:
             try:
                 # Belt-and-suspenders for the EXCLUDE use case (#74075): a bare ``launchctl list`` prefix
@@ -173,9 +174,9 @@ def _get_service_pids(all_profiles: bool = False) -> set:
     if is_macos():
         labels = {get_launchd_label()}
         if all_profiles:
-            # Whole fleet, mirroring the systemd ``hermes-gateway*`` glob above.
+            # Whole fleet, mirroring the systemd ``qubit-gateway*`` glob above.
             # Every gateway LaunchAgent, not just the invoking profile's — mirrors the systemd branch's
-            # ``hermes-gateway*`` pattern above. The update path restarts the whole fleet, and its
+            # ``qubit-gateway*`` pattern above. The update path restarts the whole fleet, and its
             # stale-process sweep must not mistake a sibling service's fresh PID for a manual gateway it
             # should kill (#41403).
             labels.update(launchd_gateway_labels_for_install())
@@ -2196,7 +2197,7 @@ def _windows_gateway_breakaway_state() -> bool | None:
 # Service Configuration
 # =============================================================================
 
-_SERVICE_BASE = "hermes-gateway"
+_SERVICE_BASE = "qubit-gateway"
 SERVICE_DESCRIPTION = "Qubit Agent Gateway - Messaging Platform Integration"
 
 _SYSTEM_UNIT_DIR = Path("/etc/systemd/system")
@@ -2227,7 +2228,7 @@ def _native_service_homes() -> set[Path]:
 
 
 def _bare_unit_pinned_home() -> Path | None:
-    """Resolved ``QUBIT_HOME`` pinned by an installed ``hermes-gateway.service``, or None. The unit is the
+    """Resolved ``QUBIT_HOME`` pinned by an installed ``qubit-gateway.service``, or None. The unit is the
     one naming basis that holds still across the sudo mid-command switch (see ``_profile_suffix``) and it
     covers every elevated identity — ``sudo -i`` and cron included, where SUDO_USER is absent.
 
@@ -2266,7 +2267,7 @@ def _profile_suffix() -> str:
     ``<root>/profiles/<name>``, else a short hash of the path.
 
     Bare-name owners: this process's platform-native default (``~/.hermes``), under sudo the invoking
-    user's native default, and the home pinned by an installed ``hermes-gateway.service``. Under sudo the
+    user's native default, and the home pinned by an installed ``qubit-gateway.service``. Under sudo the
     naming basis moves MID-COMMAND — sudo strips QUBIT_HOME and sets HOME=/root, then
     ``_sync_qubit_home_from_systemd_unit()`` adopts the unit's own QUBIT_HOME into ``os.environ`` — so a
     basis derived from the process alone names one unit before the adoption and another after it. The
@@ -2276,7 +2277,7 @@ def _profile_suffix() -> str:
 
     The bare name is deliberately NOT tied to ``get_default_qubit_root()``: that helper treats any
     QUBIT_HOME outside ``~/.hermes`` (Docker ``/opt/data``, a temp dir) as "the root itself", which let a
-    temp-home harness resolve to the default profile's ``hermes-gateway`` unit and uninstall the
+    temp-home harness resolve to the default profile's ``qubit-gateway`` unit and uninstall the
     production gateway. Service names are host-wide identities; a home with no installed bare unit and
     no native default keeps its own suffix.
     """
@@ -2310,7 +2311,7 @@ def _profile_arg(qubit_home: str | None = None, default_root: str | Path | None 
 
 
 def get_service_name() -> str:
-    """Systemd service name: ``hermes-gateway`` for default QUBIT_HOME, ``hermes-gateway-<profile>``
+    """Systemd service name: ``qubit-gateway`` for default QUBIT_HOME, ``qubit-gateway-<profile>``
     or ``-<hash>`` otherwise."""
     suffix = _profile_suffix()
     return f"{_SERVICE_BASE}-{suffix}" if suffix else _SERVICE_BASE
@@ -2564,7 +2565,7 @@ def has_conflicting_systemd_units() -> bool:
 
 
 # Legacy pre-rename names: explicit allowlist (NOT a glob) so profile and third-party units never match.
-_LEGACY_SERVICE_NAMES: tuple[str, ...] = ("hermes.service",)
+_LEGACY_SERVICE_NAMES: tuple[str, ...] = ("qubit.service", "hermes.service")
 
 # ExecStart markers identifying a unit as running our gateway; a legacy unit is flagged only if one matches.
 _LEGACY_UNIT_EXECSTART_MARKERS: tuple[str, ...] = (
@@ -2587,7 +2588,7 @@ def _find_legacy_qubit_units() -> list[tuple[str, Path, bool]]:
     marker check so profile/third-party units never match; no mutation.
 
     Detects unit files installed by older Qubit versions that used a different service name (e.g. When both
-    a legacy unit and the current ``hermes-gateway.service`` are active, they fight over the same bot token
+    a legacy unit and the current ``qubit-gateway.service`` are active, they fight over the same bot token
     — the PR #5646 signal-recovery change turns this into a 30-second SIGTERM flap loop.
     """
     results: list[tuple[str, Path, bool]] = []
@@ -2618,7 +2619,7 @@ def print_legacy_unit_warning() -> None:
     print_warning("Legacy Qubit gateway unit(s) detected from an older install:")
     for name, path, is_system in legacy:
         print_info(f"    {path}  ({_service_scope_label(is_system)} scope)")
-    print_info("  These run alongside the current hermes-gateway service and")
+    print_info("  These run alongside the current qubit-gateway service and")
     print_info("  cause SIGTERM flap loops — both try to use the same bot token.")
     print_info("  Remove them with:")
     print_info("    qubit gateway migrate-legacy")
@@ -3246,7 +3247,7 @@ def _prepare_service_launcher(*, system: bool = False, run_as_user: str | None =
         # QUBIT_RUNTIME_DIR cannot stand in for this install's store (#131745).
         if resolve_store_python(root, publication=True) is None:
             return  # Externally owned Nix/developer runtime.
-        local = root / ".hermes" / "bin"
+        local = root / ".qubit" / "bin"
         paths = ensure_install_launchers(root, local)
         if len(paths) != len(ENTRY_POINTS):
             raise RuntimeError("Could not publish the gateway installation launcher")
@@ -3278,12 +3279,19 @@ def generate_systemd_unit(system: bool = False, run_as_user: str | None = None) 
     if system:
         username, group_name, home_dir, uid = _system_service_identity(run_as_user)
         qubit_home = _qubit_home_for_target_user(home_dir)
-        # Profile arg relative to the TARGET user's ~/.hermes when qubit_home lives under it.
-        target_root = Path(home_dir) / ".hermes"
-        try:
-            Path(qubit_home).resolve().relative_to(target_root.resolve())
-            profile_arg = _profile_arg(qubit_home, default_root=target_root)
-        except ValueError:
+        # Profile arg relative to the TARGET user's canonical ~/.qubit home (the
+        # pre-rebrand ~/.hermes layout is still accepted as a read-old fallback).
+        from qubit_constants import _LEGACY_HOME_DIR, _QUBIT_HOME_DIR
+        profile_arg = ""
+        for home_name in (_QUBIT_HOME_DIR, _LEGACY_HOME_DIR):
+            target_root = Path(home_dir) / home_name
+            try:
+                Path(qubit_home).resolve().relative_to(target_root.resolve())
+                profile_arg = _profile_arg(qubit_home, default_root=target_root)
+                break
+            except ValueError:
+                continue
+        else:
             profile_arg = _profile_arg(qubit_home)
         # Remap paths under the calling user's home (/root/) to the target user's so the service can read them.
         python_path = _remap_path_for_user(python_path, home_dir)
@@ -3586,9 +3594,17 @@ def _get_restart_drain_timeout() -> float:
 
 def _agent_timeout_setting(env_var: str, key: str, parse) -> float:
     """``parse(env)`` when the env var is non-empty, else ``parse(agent.<key>)`` (None if unset)."""
-    env_raw = os.getenv(env_var)
-    if env_raw is not None and str(env_raw).strip() != "":
-        return parse(env_raw)
+    # Canonical spelling first, then the pre-rebrand alias: a writer emits QUBIT_*,
+    # while a launcher installed before the rename still exports HERMES_*.
+    names = [env_var]
+    if env_var.startswith("HERMES_"):
+        names.insert(0, "QUBIT_" + env_var[len("HERMES_"):])
+    elif env_var.startswith("QUBIT_"):
+        names.append("HERMES_" + env_var[len("QUBIT_"):])
+    for name in names:
+        env_raw = os.getenv(name)
+        if env_raw is not None and str(env_raw).strip() != "":
+            return parse(env_raw)
     cfg = read_raw_config()
     agent_cfg = cfg.get("agent", {}) if isinstance(cfg, dict) else {}
     if isinstance(agent_cfg, dict) and key in agent_cfg:

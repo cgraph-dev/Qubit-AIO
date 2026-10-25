@@ -9,14 +9,15 @@ wrappers (git/gh can block).
 import asyncio
 import shutil
 import time
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from qubit_cli import web_git as _web_git
 from qubit_cli._subprocess_compat import bounded_probe_run
 from qubit_cli.web_deps import late
-from qubit_cli.web_server_files import _fs_path
+from qubit_cli.web_server_files import _fs_path, _managed_files_policy
 from qubit_cli.web_models import (
     GitBranchSwitchBody,
     GitCommitBody,
@@ -43,6 +44,49 @@ async def _git_op(fn, *args):
 
 def _git_path(path: str) -> str:
     return str(_fs_path(path))
+
+
+def _guard_git_read(request: Request, path: str, file: str | None = None) -> Path:
+    """Apply the dashboard's managed-files boundary to a git read.
+
+    A locked files root confines the repository and hides credential files from
+    diffs (the same denylist as ``/api/fs``); an unlocked root keeps the old
+    unrestricted behaviour. Returns the resolved repository path.
+    """
+    from pathlib import Path
+
+    from qubit_cli.web_routers.files import _is_sensitive_path
+
+    target = Path(_git_path(path))
+    policy = _managed_files_policy(request, create_root=False)
+    if policy.locked_root is not None:
+        root = policy.locked_root.resolve()
+        resolved = target.resolve()
+        if resolved != root and root not in resolved.parents:
+            raise HTTPException(status_code=403, detail="Path is outside the managed files root")
+        if file is not None and _is_sensitive_path(Path(file)):
+            raise HTTPException(status_code=403, detail="Access to sensitive files is not allowed")
+    return target
+
+
+def _filter_sensitive_diff(diff: str) -> str:
+    """Drop per-file diff hunks for credential paths, keeping safe files intact."""
+    from pathlib import Path
+
+    from qubit_cli.web_routers.files import _is_sensitive_path
+
+    kept: list[str] = []
+    skipping = False
+    for line in diff.splitlines(keepends=True):
+        if line.startswith("diff --git "):
+            parts = line.rstrip("\n").split(" b/", 1)
+            rel = parts[1] if len(parts) == 2 else ""
+            skipping = bool(rel) and _is_sensitive_path(Path(rel))
+        elif line.startswith("# New (untracked) files:"):
+            skipping = False
+        if not skipping:
+            kept.append(line)
+    return "".join(kept)
 
 
 @router.get("/api/git/status")
@@ -127,19 +171,31 @@ async def git_review_list_route(path: str, scope: str = "uncommitted", base: Opt
 
 @router.get("/api/git/review/diff")
 async def git_review_diff_route(
-    path: str, file: str, scope: str = "uncommitted", base: Optional[str] = None, staged: bool = False
+    request: Request, path: str, file: str, scope: str = "uncommitted",
+    base: Optional[str] = None, staged: bool = False
 ):
-    return {"diff": await _git_op(_web_git.review_diff, _git_path(path), file, scope, base, staged)}
+    target = _guard_git_read(request, path, file)
+    diff = await _git_op(_web_git.review_diff, str(target), file, scope, base, staged)
+    policy = _managed_files_policy(request, create_root=False)
+    return {"diff": _filter_sensitive_diff(diff) if policy.locked_root is not None else diff}
 
 
 @router.get("/api/git/file-diff")
-async def git_file_diff_route(path: str, file: str):
-    return {"diff": await _git_op(_web_git.file_diff_vs_head, _git_path(path), file)}
+async def git_file_diff_route(request: Request, path: str, file: str):
+    target = _guard_git_read(request, path, file)
+    diff = await _git_op(_web_git.file_diff_vs_head, str(target), file)
+    policy = _managed_files_policy(request, create_root=False)
+    return {"diff": _filter_sensitive_diff(diff) if policy.locked_root is not None else diff}
 
 
 @router.get("/api/git/review/commit-context")
-async def git_commit_context_route(path: str):
-    return await _git_op(_web_git.review_commit_context, _git_path(path))
+async def git_commit_context_route(request: Request, path: str):
+    target = _guard_git_read(request, path)
+    result = await _git_op(_web_git.review_commit_context, str(target))
+    policy = _managed_files_policy(request, create_root=False)
+    if policy.locked_root is not None and isinstance(result, dict) and isinstance(result.get("diff"), str):
+        result = {**result, "diff": _filter_sensitive_diff(result["diff"])}
+    return result
 
 
 @router.get("/api/git/review/rev-parse")

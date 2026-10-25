@@ -21,7 +21,7 @@ def _is_windows() -> bool:
 #: managed binary dir (the default Qubit root's ``bin``, next to uv.exe)
 #: on the user PATH. Keep in lockstep with WINDOWS_BIN_LAUNCHERS in
 #: qubit_cli/_launchers.py and scripts/install.ps1.
-_WINDOWS_BIN_LAUNCHERS = ("hermes", "hermes-acp")
+_WINDOWS_BIN_LAUNCHERS = ("qubit", "qubit-acp")
 
 
 def _normalize_windows_path(value) -> str:
@@ -142,7 +142,7 @@ def ensure_windows_bin_launchers(
         exe = target / f"{name}.exe"
         if not exe.exists():
             return not ((target / f"{name}.cmd").is_file()
-                        and _launcher_present(root / ".hermes" / "bin", name))
+                        and _launcher_present(root / ".qubit" / "bin", name))
         return exe_is_venv_bound(exe, venv_dir)
 
     targets: list[Path] = []
@@ -153,7 +153,7 @@ def ensure_windows_bin_launchers(
     # override), so the healthy path must stay at a couple of stat calls.
     if _normalize_windows_path(root.parent) == _normalize_windows_path(home):
         canonical = home / "bin"
-        local = root / ".hermes" / "bin"
+        local = root / ".qubit" / "bin"
         if any(not _launcher_present(local, name) for name in _WINDOWS_BIN_LAUNCHERS):
             # Upgrade existing PM installs too: their healthy external launcher
             # predates the exact-install command and may lack the runtime query.

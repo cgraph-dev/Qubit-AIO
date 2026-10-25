@@ -13,13 +13,15 @@ import copy
 from typing import Any
 
 
-def rebase_for_save(config: dict[str, Any], live_raw: dict[str, Any], merge_existing: bool) -> dict[str, Any]:
+def rebase_for_save(config: dict[str, Any], live_raw: dict[str, Any], merge_existing: bool,
+                    replace_keys=None) -> dict[str, Any]:
     from qubit_cli import config as _config
 
     if _config._worker_config_snapshot() is not None:
-        return _three_way(live_raw or {}, config, _config.load_config())
+        return _config._merge_partial_save(
+            _config._three_way(live_raw or {}, config, _config.load_config()), config, replace_keys)
     if merge_existing and live_raw:
-        return _config._merge_partial_save(live_raw, config)
+        return _config._merge_partial_save(live_raw, config, replace_keys)
     return config
 
 

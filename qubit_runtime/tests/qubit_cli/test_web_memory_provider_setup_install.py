@@ -11,6 +11,12 @@ import pytest
 from qubit_cli.web_routers import memory_providers as mp
 
 
+# The admission contract is dependency-union resolution, not a particular interpreter
+# version: pin the fixture's ``requires-python`` to the interpreter running this suite
+# (the upstream fixture hardcoded a newer release and could never lock here).
+_PY_REQUIRES = f">={sys.version_info.major}.{sys.version_info.minor}"
+
+
 @pytest.mark.parametrize("surface", ["dashboard", "cli"])
 @pytest.mark.parametrize("declaration", ["pyproject", "python_dependencies", "pip_dependencies"])
 def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_path, monkeypatch, surface, declaration):
@@ -29,7 +35,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
     for name in ("existing_dep", "provider_dep"):
         _wheel(wheels, name, "1.0")
     (core / "pyproject.toml").write_text(
-        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.14"\n'
+        f'[project]\nname="core"\nversion="1"\nrequires-python="{_PY_REQUIRES}"\n'
         '[tool.uv]\npackage=false\nno-index=true\n'
         f'find-links=[{json.dumps(wheels.as_posix())}]\n')
     incumbent, candidate = (home / "plugins" / name for name in ("incumbent", "candidate"))
@@ -41,7 +47,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
         if declaration == "pyproject":
             manifest.write_text('name: candidate\n')
             (candidate / "pyproject.toml").write_text(
-                '[project]\nname="candidate"\nversion="1"\nrequires-python=">=3.14"\n'
+                f'[project]\nname="candidate"\nversion="1"\nrequires-python="{_PY_REQUIRES}"\n'
                 f'dependencies={json.dumps(requirements)}\n[tool.uv]\npackage=false\n')
         else:
             manifest.write_text(f'name: candidate\n{declaration}: {json.dumps(requirements)}\n')

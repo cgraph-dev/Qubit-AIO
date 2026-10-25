@@ -148,7 +148,7 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
     assert values["Icon"] == str(lde.icon_path(root))
 
     assert values["Type"] == "Application"
-    assert values["Name"] == "Hermes"
+    assert values["Name"] == "Qubit"
     assert values["Terminal"] == "false"
 
 
@@ -696,7 +696,7 @@ def test_installed_entry_carries_the_window_app_id(tmp_path, xdg_home, monkeypat
     assert entry.name == f"{lde.APP_ID}.desktop"
     values = _parse(entry.read_text(encoding="utf-8"))
     assert values["StartupWMClass"] == lde.APP_ID
-    assert values["Name"] == "Hermes"  # the menu label is not part of the identity
+    assert values["Name"] == "Qubit"  # the menu label is not part of the identity
 
 
 def test_install_keeps_the_legacy_entry_as_a_hidden_alias(tmp_path, xdg_home, monkeypatch):

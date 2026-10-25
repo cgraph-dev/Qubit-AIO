@@ -1509,17 +1509,42 @@ def _offer_skill_config_vars(missing_skill_config: List[Dict[str, Any]], results
     _persist_migration(config)
 
 
-def _merge_partial_save(raw: dict, override: dict) -> dict:
+def _merge_partial_save(raw: dict, override: dict, replace_keys=None) -> dict:
     """Merge *override* over *raw* for partial ``save_config`` writes.
     Omitted top-level sections are preserved; shared dict sections deep-merge so one nested key
     can change without dropping siblings on disk. Key REMOVALS are not supported here —
-    migrations go through ``_persist_migration`` with a full ``read_raw_config()`` dict."""
+    migrations go through ``_persist_migration`` with a full ``read_raw_config()`` dict —
+    except for a path named in *replace_keys*, whose value is authoritative: the override's
+    subtree replaces the disk one and an omitted path is deleted. ``moa.presets`` uses this so
+    a dashboard delete cannot be resurrected by the generic deep merge (#58819)."""
     result = copy.deepcopy(override)
     for key, value in raw.items():
         if key not in result:
             result[key] = copy.deepcopy(value)
         elif isinstance(result.get(key), dict) and isinstance(value, dict):
             result[key] = _deep_merge(value, result[key])
+    for path in replace_keys or ():
+        path = tuple(path)
+        parent = result
+        for part in path[:-1]:
+            node = parent.get(part)
+            if not isinstance(node, dict):
+                parent = None
+                break
+            parent = node
+        if parent is None:
+            continue
+        leaf = path[-1]
+        source = override
+        for part in path:
+            if not isinstance(source, dict) or part not in source:
+                source = None
+                break
+            source = source[part]
+        if source is None:
+            parent.pop(leaf, None)
+        else:
+            parent[leaf] = copy.deepcopy(source)
     return result
 
 
@@ -2508,7 +2533,8 @@ def _commented_sections_for_save(normalized: Dict[str, Any]) -> Optional[str]:
 
 def save_config(
     config: Dict[str, Any], *, strip_defaults: bool = True,
-    preserve_keys: Optional[Set[Tuple[str, ...]]] = None, merge_existing: bool = False):
+    preserve_keys: Optional[Set[Tuple[str, ...]]] = None, merge_existing: bool = False,
+    replace_keys: Optional[Set[Tuple[str, ...]]] = None):
     """Save configuration to ~/.hermes/config.yaml.
     Schema defaults are not written unless the user explicitly set them (the path exists in the
     raw config before normalisation), so config.yaml is never contaminated with defaults that
@@ -2531,7 +2557,7 @@ def save_config(
         # strip pass drop every user section whose value matches a default (#113301).
         _raw_for_paths = require_readable_config_before_write(config_path)
         from qubit_cli.config_worker_save import rebase_for_save  # frozen-worker writes + merge_existing
-        config = rebase_for_save(config, _raw_for_paths, merge_existing)
+        config = rebase_for_save(config, _raw_for_paths, merge_existing, replace_keys)
 
         current_normalized = _canonicalize_config(config)
         normalized = current_normalized

@@ -284,6 +284,10 @@ _MOA_PRESET_FIELDS = (
     "degraded_reference_policy", "fanout", "enabled",
 )
 
+#: Per-preset fields a legacy flat payload represents; applied in place to the current
+#: default preset so the flat compatibility view and the named map stay consistent.
+_MOA_PRESET_KEYS = ("reference_models", "aggregator", *_MOA_PRESET_FIELDS)
+
 
 def _slot_dict(slot: MoaModelSlot) -> dict:
     # Drop unset optionals so saved slots stay minimal ({provider, model}).
@@ -308,9 +312,21 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
         # load→mutate→save runs on a worker thread (sync-def endpoint); the
         # desktop's debounced PUT /api/config autosave races it, so the whole
         # span holds _CONFIG_MUTATION_LOCK or one of the two saves is dropped.
+        # Load→mutate→save runs on a worker thread (sync-def endpoint); the
+        # desktop's debounced PUT /api/config autosave races it, so the whole
+        # span holds _CONFIG_MUTATION_LOCK or one of the two saves is dropped.
         with config_write_scope(body.profile or profile):
-            cfg = load_config()
-            if body.presets:
+            # Fail-closed raw read: a transient read error must refuse the write, never
+            # fall back to a default-expanded snapshot and persist it. The raw section is
+            # also the authority for undeclared MoA keys (save_traces, trace_dir).
+            from qubit_cli.config import get_config_path, require_readable_config_before_write
+
+            on_disk = require_readable_config_before_write(get_config_path())
+            raw_moa = on_disk.get("moa") if isinstance(on_disk.get("moa"), dict) else {}
+            raw_moa = dict(raw_moa)
+
+            named = bool(body.presets)
+            if named:
                 raw = {
                     "default_preset": body.default_preset,
                     "active_preset": body.active_preset,
@@ -328,14 +344,47 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
             if problems:
                 raise HTTPException(status_code=422, detail="Invalid MoA config: " + "; ".join(problems))
             normalized = normalize_moa_config(raw)
-            # Merge, don't overwrite: hand-edited keys not in MoaConfigPayload (save_traces, trace_dir) survive.
-            # See issue #58819. Write ONLY the moa section (merge_existing deep-merges it over the
-            # on-disk raw file): saving the whole default-expanded ``cfg`` snapshot re-persisted
-            # every other section too, so a Desktop MoA autosave could wipe a chain another
-            # surface wrote meanwhile (#89184, ``fallback_providers: []``).
-            moa_section = dict(cfg.get("moa") or {})
-            moa_section.update(normalized)
-            save_config({"moa": moa_section}, merge_existing=True)
+            # ``moa.presets`` is authoritative ONLY for a named payload: the GUI expresses
+            # a deletion by omitting the name. A legacy flat payload predates named maps,
+            # so it must leave the persisted map (and its ids) untouched and update the
+            # current default preset in place (#58819).
+            replace_keys = set()
+            if named:
+                replace_keys.add(("moa", "presets"))
+                raw_moa["default_preset"] = normalized["default_preset"]
+                raw_moa["active_preset"] = normalized["active_preset"]
+                # A surviving preset keeps hand-edited, undeclared metadata
+                # (``operator_note``); an omitted name is deleted by replace_keys.
+                existing = raw_moa.get("presets")
+                existing = existing if isinstance(existing, dict) else {}
+                presets = {}
+                for name, preset in normalized["presets"].items():
+                    base = existing.get(name)
+                    presets[name] = ({**base, **preset} if isinstance(base, dict) else preset)
+                raw_moa["presets"] = presets
+            else:
+                presets = raw_moa.get("presets")
+                if isinstance(presets, dict) and presets:
+                    default_name = str(raw_moa.get("default_preset") or "").strip()
+                    if default_name not in presets:
+                        default_name = next(iter(presets))
+                    preset = dict(presets.get(default_name) or {})
+                    preset.update({key: normalized[key] for key in _MOA_PRESET_KEYS})
+                    presets = dict(presets)
+                    presets[default_name] = preset
+                    raw_moa["presets"] = presets
+                    raw_moa["default_preset"] = default_name
+                else:
+                    raw_moa["presets"] = normalized["presets"]
+                    raw_moa["default_preset"] = normalized["default_preset"]
+            # Mirror the resolved default preset at the MoA level (compat view), but never
+            # touch undeclared siblings (privacy_filter, save_traces, trace_dir, ...).
+            for key in _MOA_PRESET_KEYS:
+                raw_moa[key] = normalized[key]
+            # Write ONLY the moa section: merge_existing preserves every other section and
+            # replace_keys makes the named map authoritative instead of deep-merged (#89184,
+            # #58819). ``active_preset`` stays whatever was on disk for a legacy payload.
+            save_config({"moa": raw_moa}, merge_existing=True, replace_keys=replace_keys)
             return {"ok": True, **normalized}
 
 
