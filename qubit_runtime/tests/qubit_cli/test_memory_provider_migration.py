@@ -67,17 +67,17 @@ def test_startup_recovery_attempts_each_profile_home(tmp_path, monkeypatch):
     homes = [tmp_path / "a", tmp_path / "b"]
     for profile_home in homes:
         profile_home.mkdir()
-        (profile_home / "config.yaml").write_text("memory:\n  provider: twin\n", encoding="utf-8")
+        (profile_home / "config.yaml").write_text("memory:\n  provider: hindsight\n", encoding="utf-8")
     monkeypatch.setattr(mig, "_attempted", set())
     monkeypatch.setattr(mig, "catalog_source", lambda name: name)
     monkeypatch.setattr(pm_install, "lazy_installs_allowed", lambda: True)
     installed = []
 
-    def fake_installer(profile_home):
+    def fake_installer(profile_home, **kwargs):
         def install(name):
             plugin_dir = profile_home / "plugins" / name
             plugin_dir.mkdir(parents=True)
-            (plugin_dir / "__init__.py").write_text("class Twin(MemoryProvider): ...\n", encoding="utf-8")
+            (plugin_dir / "__init__.py").write_text("class Hindsight(MemoryProvider): ...\n", encoding="utf-8")
             installed.append(profile_home)
             return {"ok": True}
 
@@ -88,7 +88,7 @@ def test_startup_recovery_attempts_each_profile_home(tmp_path, monkeypatch):
     for profile_home in (homes[0], homes[1], homes[0]):
         token = set_qubit_home_override(profile_home)
         try:
-            outcomes.append(mig.recover_at_startup("twin"))
+            outcomes.append(mig.recover_at_startup("hindsight"))
         finally:
             reset_qubit_home_override(token)
 
@@ -241,6 +241,11 @@ def test_missing_catalog_provider_recovery_names_the_profile_install_command(tmp
     (home / "config.yaml").write_text("memory:\n  provider: honcho\n", encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(home))
     want = "qubit -p work plugins install honcho"
+    # honcho is bundled in this fork: simulate the catalog-not-installed state this test describes.
+    import plugins.memory as memory_pkg
+    monkeypatch.setattr(memory_pkg, "load_memory_provider", lambda name: None)
+    monkeypatch.setattr(memory_pkg, "find_provider_dir", lambda name: None)
+    monkeypatch.setattr(memory_setup, "_get_available_providers", lambda: [])
 
     doctor_state._memory_provider_generic("honcho")
     memory_setup.cmd_status(SimpleNamespace())
