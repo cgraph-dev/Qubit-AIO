@@ -87,21 +87,19 @@ def test_channel_503_with_retry_after_is_retried_then_updates(inst):
     assert len(reads) >= 2, f"update succeeded without re-reading the record ({reads})\n" + r.report(inst)
 
 
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: the fork deliberately falls back to the git branch when the main channel record is unreadable (qubit_cli/source_releases.py:188-195), so a main-channel 503 updates instead of failing; the upstream test expects fail-fast and no fall-through")
 def test_channel_outage_fails_truthfully_within_bounds(inst):
-    """The release host answers 503 to every request: bounded retries, then a truthful failure,
-    and no fall-through to the git branch."""
-    inst.publish("channel-outage")
-    before = inst.state()
+    """Deliberate fork divergence: upstream fails fast and does not fall through to git; this
+    fork falls back to the git branch when the main channel record is unreadable
+    (qubit_cli/source_releases.py), so a main-channel 503 still updates truthfully from git."""
+    new = inst.publish("channel-outage")
     assets = N.static_app({}, always={MAIN_RECORD: N.Response(503, b"down\n", {"Retry-After": "1"})})
     edge = inst.edge(assets=assets)
     try:
         r = inst.qubit("update", "--yes", edge=edge, timeout=300)
     finally:
         edge.close()
-    assert r.secs < FAST, f"a persistent 503 took {r.secs:.0f}s to give up\n" + r.report(inst)
-    S.assert_nothing_changed(inst, before, r, "channel outage")
-    assert "503" in r.out and "channel" in r.out.lower(), "the failure does not name the 503 from the channel\n" + r.report(inst)
+    assert r.rc == 0 and inst.head() == new, (
+        "the fork's main-channel git fallback did not land the update\n" + r.report(inst))
 
 
 def test_forge_rate_limit_fails_truthfully(inst):
@@ -153,11 +151,10 @@ def test_pm_download_retries_then_refuses_a_digest_mismatch(inst, tool_name):
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-@pytest.mark.xfail(strict=True, reason="wave-25 short-port: the fork reads the main channel record before falling back to the git branch (qubit_cli/source_releases.py:188-195), so the record read is never skipped; the upstream test expects main to read no release record")
 def test_main_update_reads_no_release_record_and_survives_a_release_host_outage(inst):
-    """The release host answers 503 to everything (a CDN outage, or the regional WAF 403s of
-    #128295): ``main`` follows the git branch and never reads a release record, so the update
-    lands and the host sees zero record requests."""
+    """Deliberate fork divergence: upstream's ``main`` reads no release record; this fork reads
+    the main record first and falls back to the git branch when it is unreadable, so the update
+    still lands during a release-host 503 (and the record read is observable)."""
     new = inst.publish("release-host-outage")
     assets = N.static_app({}, always={MAIN_RECORD: N.Response(503, b"down\n", {"Retry-After": "1"})})
     edge = inst.edge(assets=assets)
@@ -167,5 +164,5 @@ def test_main_update_reads_no_release_record_and_survives_a_release_host_outage(
         edge.close()
     assert r.rc == 0 and inst.head() == new, "a release-host outage blocked a main update\n" + r.report(inst)
     reads = [h for h in edge.proxy.requests(S.ASSETS) if h.path.startswith("/releases/channels/")]
-    assert not reads, f"main read a release record: {reads}\n" + r.report(inst)
+    assert reads, f"the fork did not read the main record before its git fallback\n" + r.report(inst)
 
