@@ -1,0 +1,48 @@
+name: windows-ci
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python version
+        run: python --version
+      - name: Compile the runtime and tests
+        run: python -m compileall -q qubit_runtime/qubit_cli qubit_runtime/gateway qubit_runtime/tools qubit_runtime/tests
+      - name: Install the runtime and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e qubit_runtime
+          python -m pip install pytest psutil pyyaml pathspec
+      - name: Collect the core Windows e2e suites
+        working-directory: qubit_runtime
+        run: >
+          python -m pytest --collect-only -q -m "" -p no:cacheprovider
+          tests/e2e/core/windows tests/e2e/core/windows_update
+      - name: Collect every other Windows-specific test file
+        working-directory: qubit_runtime
+        shell: pwsh
+        run: |
+          $paths = @(Get-ChildItem -Recurse -File -Path tests -Filter "*windows*.py" |
+            Where-Object { $_.FullName -notmatch "tests[\\/]e2e[\\/]core[\\/]windows" } |
+            ForEach-Object { $_.FullName })
+          if ($paths.Count -eq 0) { throw "no Windows-specific test files found" }
+          python -m pytest --collect-only -q -m "" -p no:cacheprovider `
+            --continue-on-collection-errors @paths
+      - name: Run the core Windows e2e suites
+        working-directory: qubit_runtime
+        env:
+          QUBIT_E2E_WINDOWS_INSTALL: "0"
+        run: >
+          python -m pytest -q -m "platforms('windows')" -p no:cacheprovider
+          tests/e2e/core/windows

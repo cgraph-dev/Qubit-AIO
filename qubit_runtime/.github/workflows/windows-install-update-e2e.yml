@@ -84,6 +84,7 @@ jobs:
           QUBIT_E2E_MACHINE_ROOT: ${{ runner.temp }}\wm
           QUBIT_E2E_PROFILES_ROOT: C:\Users
           QUBIT_E2E_ARTIFACTS: ${{ runner.temp }}\win-update-e2e
+          HERMES_E2E_ARTIFACTS: ${{ runner.temp }}\win-update-e2e
           # One journey per file, all in parallel (each is mostly network + subprocess wait).
           HERMES_TEST_WORKERS: '6'
           # test_crash_cells.py runs its whole journey (install, gateway phase, six crash cells)
@@ -93,6 +94,22 @@ jobs:
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
           NOUS_API_KEY: ''
+
+      - name: Every crash cell ran
+        # run_tests.sh reports a file whose every test was deselected or skipped as passed, so
+        # the journey's manifest is the proof the crash cells actually ran a verdict.
+        env:
+          HERMES_E2E_ARTIFACTS: ${{ runner.temp }}\win-update-e2e
+        shell: pwsh
+        run: |
+          if (-not $env:HERMES_E2E_ARTIFACTS) { throw "HERMES_E2E_ARTIFACTS is not set" }
+          $manifest = Join-Path $env:HERMES_E2E_ARTIFACTS 'crash-cells-ran.txt'
+          if (-not (Test-Path -LiteralPath $manifest)) {
+            throw "the crash journey did not publish its manifest at $manifest"
+          }
+          $failed = @(Get-Content -LiteralPath $manifest | Where-Object { $_ -match ': failed$' })
+          if ($failed.Count -gt 0) { throw "crash cell(s) did not run to a verdict: $($failed -join '; ')" }
+          Write-Host (Get-Content -LiteralPath $manifest -Raw)
 
       - name: Upload transcripts, logs and receipts
         if: always()
