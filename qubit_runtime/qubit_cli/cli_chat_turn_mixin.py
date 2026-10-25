@@ -87,6 +87,13 @@ class CLIChatTurnMixin:
             # Lone surrogates (rich-text clipboard paste) crash the OpenAI SDK's JSON serialization.
             from agent.message_sanitization import _sanitize_surrogates
             message = _sanitize_surrogates(message)
+        if isinstance(message, str):
+            # Expand @file:/@diff/@folder against this session's cwd, with the active provider's
+            # context budget. A refused injection returns its warning instead of running the turn
+            # (the helper §"context_injection_refused" contract).
+            message, _blocked_ctx = self._chat_expand_context_references(message)
+            if _blocked_ctx is not None:
+                return _blocked_ctx
 
         self._chat_stage_user_message(agent, message)
         if isinstance(message, TimelineNotification):

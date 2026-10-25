@@ -9,6 +9,8 @@ def test_at_context_resolution_passes_active_provider():
     from cli import HermesCLI
 
     cli = HermesCLI.__new__(HermesCLI)
+    # The fork's chat path stages the user turn into conversation_history.
+    cli.conversation_history = []
     cli.model = "gpt-5.6-terra"
     cli.base_url = "https://chatgpt.com/backend-api/codex"
     cli.api_key = "token"
