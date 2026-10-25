@@ -33,9 +33,12 @@ def install_tree(tmp_path, monkeypatch):
     repo.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
     environment = install_state_dir(repo) / "environments" / "gen1" / "venv"
+    # pyvenv.cfg first: site_packages() derives the lib/pythonX.Y dir from it.
+    environment.mkdir(parents=True, exist_ok=True)
+    (environment / "pyvenv.cfg").write_text(
+        f"version = {sys.version_info.major}.{sys.version_info.minor}", encoding="utf-8")
     site = site_packages(environment)
     site.mkdir(parents=True)
-    (environment / "pyvenv.cfg").write_text("version = 3.14", encoding="utf-8")
     (environment.parent / ".lease-managed").touch()
     runtime_facts_path(repo).write_text(
         json.dumps({"packages": {"venv": {"environment": str(environment)}}}), encoding="utf-8")
