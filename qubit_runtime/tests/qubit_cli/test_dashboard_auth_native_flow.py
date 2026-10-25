@@ -185,7 +185,7 @@ def _walk_native_login(client, *, redirect_uri, challenge, state="cli-state"):
     loop_qs = parse_qs(loop.query)
     # No session cookie must be set on the native callback response.
     set_cookie = r2.headers.get("set-cookie", "")
-    assert "qubit_session_at" not in set_cookie, (
+    assert "hermes_session_at" not in set_cookie, (
         f"native callback must NOT set a session cookie; got {set_cookie!r}"
     )
     return loop_qs["code"][0], loop_qs["state"][0]
@@ -556,7 +556,7 @@ def test_native_password_login_full_roundtrip(pw_gated_client):
     code = qs["code"][0]
     # No browser session on the native branch; the PKCE cookie is cleared.
     set_cookie = r.headers.get("set-cookie", "")
-    assert "qubit_session_at" not in set_cookie, (
+    assert "hermes_session_at" not in set_cookie, (
         f"native password login must NOT set a session cookie; got {set_cookie!r}"
     )
     assert "pkce" in set_cookie  # the clearing Set-Cookie
@@ -652,7 +652,7 @@ def test_native_password_login_rejects_cross_provider_completion(
     assert r.status_code == 400, r.text
     assert "different provider" in r.json()["detail"]
     set_cookie = r.headers.get("set-cookie", "")
-    assert "qubit_session_at" not in set_cookie
+    assert "hermes_session_at" not in set_cookie
 
     # The pending entry survived — provider A completes normally.
     r2 = pw_gated_client.post(
@@ -681,7 +681,7 @@ def test_password_login_without_broker_still_mints_cookies(pw_gated_client):
     assert r.status_code == 200, r.text
     assert r.json()["next"] == "/"
     set_cookie = r.headers.get("set-cookie", "")
-    assert "qubit_session_at" in set_cookie
+    assert "hermes_session_at" in set_cookie
 
 
 # ---------------------------------------------------------------------------
