@@ -590,7 +590,7 @@ class TestPostLoginLandingPrefix:
         )
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "qubit_session_pkce" in c
+            if "hermes_session_pkce" in c
         )
         pkce_kv = pkce_set.split(";", 1)[0]
         state = r1.headers["location"].split("state=")[1]
@@ -619,7 +619,7 @@ class TestPostLoginLandingPrefix:
         )
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "qubit_session_pkce" in c
+            if "hermes_session_pkce" in c
         )
         pkce_kv = pkce_set.split(";", 1)[0]
         state = r1.headers["location"].split("state=")[1]
