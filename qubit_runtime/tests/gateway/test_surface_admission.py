@@ -109,7 +109,9 @@ def _admissions(home):
 
 
 def _wait_for(predicate):
-    deadline = time.monotonic() + 30
+    # A managed-worker turn imports the whole agent stack in a fresh child; on a loaded
+    # host that can take far longer than the 30 s this once allowed.
+    deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
         if predicate():
             return
@@ -139,6 +141,7 @@ def test_real_daemon_accepts_hud_and_voice_live_submits_and_notes_the_model(tmp_
         'model': {'provider': 'custom', 'default': 'local-wire-stub', 'base_url': base},
         'auxiliary': {'title_generation': {'enabled': False}},
         'platform_toolsets': {'gui': []}, 'terminal': {'cwd': str(home)},
+        'database': {'synchronous': 0},
     }))
     env = child_env() | dict(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home),
         PYTHONPATH=str(root), OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, PYTHONUNBUFFERED='1')
@@ -182,7 +185,6 @@ def test_real_daemon_accepts_hud_and_voice_live_submits_and_notes_the_model(tmp_
     assert len({request['messages'][0]['content'] for request in model.requests}) == 1, 'frozen system prefix must not vary per surface'
 
 
-@pytest.mark.xfail(strict=True, reason="environment: live daemon boot exceeds the fixture deadline on this host (isolated runtime provisioning)")
 def test_managed_worker_turn_carries_the_committed_surface_to_the_model(tmp_path, monkeypatch):
     """The same committed surface reaches the model from a managed child (N2): live-voice note and
     spoken context on the user message, ``voice_turn`` on ``auxiliary.voice_chat``, and the following
@@ -205,6 +207,7 @@ def test_managed_worker_turn_carries_the_committed_surface_to_the_model(tmp_path
         'auxiliary': {'title_generation': {'enabled': False}, 'voice_chat': {
             'provider': 'custom', 'model': 'voice-model', 'base_url': base, 'api_key': 'loopback-only'}},
         'platform_toolsets': {'cli': []},
+        'database': {'synchronous': 0},
     }))
     env = child_env() | dict(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home),
         PYTHONPATH=str(root), OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, PYTHONUNBUFFERED='1')
