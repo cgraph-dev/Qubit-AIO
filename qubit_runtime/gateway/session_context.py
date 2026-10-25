@@ -193,6 +193,9 @@ def get_session_env(name: str, default: str = "") -> str:
     ContextVar wins if ever set here (even to ``""``); else ``os.environ``; else *default*.
     The canonical ``QUBIT_*`` spelling is accepted when the legacy name is unset."""
     var = _VAR_MAP.get(name)
+    if var is None and name.startswith("QUBIT_"):
+        # The canonical spelling reads the same var the legacy name binds.
+        var = _VAR_MAP.get("HERMES_" + name[len("QUBIT_"):])
     if var is not None and (value := var.get()) is not _UNSET:
         return value
     value = os.getenv(name)

@@ -39,8 +39,16 @@ def server():
     # server's ``current_transport()`` never reads (first-in-process test sees ``_stdio_transport`` as caller).
     import tui_gateway.server_requests  # noqa: F401
     import tui_gateway.transport  # noqa: F401
+    # Only the home lookup is pinned: every other qubit_constants symbol stays real so a
+    # profile-home override set through set_qubit_home_override() is visible to the server's
+    # imported getter (a whole-module MagicMock silently swallowed the override).
+    import qubit_constants as _real_constants
+    _constants = types.ModuleType("qubit_constants")
+    _constants.__dict__.update(
+        {k: v for k, v in vars(_real_constants).items() if not k.startswith("__")})
+    _constants.get_qubit_home = MagicMock(return_value="/tmp/hermes_test")
     with patch.dict("sys.modules", {
-        "qubit_constants": MagicMock(get_qubit_home=MagicMock(return_value="/tmp/hermes_test")),
+        "qubit_constants": _constants,
         "qubit_cli.env_loader": MagicMock(),
         "qubit_cli.banner": MagicMock(),
         "qubit_state": MagicMock(),
@@ -326,6 +334,14 @@ def _silent_ws():
             self.frames.append(obj)
             return True
 
+        async def write_many_if_current_async(self, frames, is_current=None):
+            self.frames.extend(frames)
+            return True
+
+        async def write_many_async(self, frames):
+            self.frames.extend(frames)
+            return True
+
         def close(self):
             pass
 
@@ -514,7 +530,7 @@ def _start_batch_clarify(server, buf, qids, timeout=None):
     if timeout is not None:
         server._clarify_timeout_seconds = lambda: timeout
     thread = threading.Thread(
-        target=lambda: box.__setitem__("answer", server._clarify_block("s1", normalized)), daemon=True)
+        target=lambda: box.__setitem__("answer", server._clarify_block("s1", "", None, questions=normalized)), daemon=True)
     thread.start()
     return thread, box, _wait_open(server_requests, buf)
 

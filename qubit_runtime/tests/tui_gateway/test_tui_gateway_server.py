@@ -4987,7 +4987,7 @@ def test_session_close_releases_resume_lock_before_slow_teardown(monkeypatch):
         server._sessions.pop("slow-close", None)
 
     assert not thread.is_alive()
-    assert response["result"] == {"closed": True}
+    assert response["result"]["closed"] is True
 
 
 def test_session_close_settles_active_turn_before_teardown(monkeypatch):
@@ -5032,6 +5032,7 @@ def test_session_close_settles_active_turn_before_teardown(monkeypatch):
         assert not teardown_started.wait(timeout=0.1)
         release_turn.set()
         close_thread.join(timeout=2.0)
+        assert response["result"]["closed"] is True
     finally:
         release_turn.set()
         run_thread.join(timeout=2.0)
@@ -5040,7 +5041,7 @@ def test_session_close_settles_active_turn_before_teardown(monkeypatch):
 
     assert not close_thread.is_alive()
     assert teardown_started.is_set()
-    assert response["result"] == {"closed": True}
+    assert response["result"]["closed"] is True
 
 
 def test_ws_orphan_reap_interrupts_isolated_turn_then_reaps(monkeypatch):
@@ -7601,6 +7602,7 @@ def test_notification_poller_live_loop_requeues_foreign_completion_for_owner(
     def _deliver(_rid, sid, session, text, **_kw):
         delivered["a" if sid == "sid-a-live-handoff" else "b"].append(text)
         session["running"] = False
+        return True  # an admitted turn; a falsy verdict is a refused delivery (re-queued)
 
     monkeypatch.setattr(server, "_run_prompt_submit", _deliver)
     server._sessions.update(
@@ -10271,9 +10273,11 @@ def test_config_set_model_global_persists(monkeypatch):
     monkeypatch.setattr("qubit_cli.model_switch.switch_model", _switch_model)
     monkeypatch.setattr(server, "_restart_slash_worker", lambda sid, session: None)
     monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
-    # persist_model_selection uses targeted per-key writes (#48305) so it
-    # preserves sibling model.* keys instead of rewriting the whole block.
-    monkeypatch.setattr("utils.atomic_roundtrip_yaml_update", lambda path, key, value: saved_values.__setitem__(key, value))
+    # persist_model_selection publishes ONE complete read->merge->replace snapshot (targeted
+    # per-key writes could leave a mixed route after a failed write), preserving sibling
+    # model.* keys by merging them into the raw config first.
+    monkeypatch.setattr("qubit_cli.config.atomic_config_replace",
+                        lambda path, cfg: saved_values.update(cfg.get("model") or {}))
 
     resp = server.handle_request(
         {
@@ -10289,9 +10293,9 @@ def test_config_set_model_global_persists(monkeypatch):
 
     assert resp["result"]["value"] == "anthropic/claude-sonnet-4.6"
     assert seen["is_global"] is True
-    assert saved_values["model.default"] == "anthropic/claude-sonnet-4.6"
-    assert saved_values["model.provider"] == "anthropic"
-    assert saved_values["model.base_url"] == "https://api.anthropic.com"
+    assert saved_values["default"] == "anthropic/claude-sonnet-4.6"
+    assert saved_values["provider"] == "anthropic"
+    assert saved_values["base_url"] == "https://api.anthropic.com"
 
 
 def test_config_set_model_explicit_provider_skips_broken_default_init(monkeypatch):
@@ -12520,7 +12524,7 @@ def test_rollback_restore_resolves_number_and_file_path():
         def list_checkpoints(self, cwd):
             return [{"hash": "aaa111"}, {"hash": "bbb222"}]
 
-        def restore(self, cwd, target, file_path=None):
+        def restore(self, cwd, target, file_path=None, safe=None, **_kw):
             calls["args"] = (cwd, target, file_path)
             return {"success": True, "message": "done"}
 
@@ -12575,7 +12579,7 @@ def test_rollback_restore_truncates_from_real_user_turn_not_marker(monkeypatch):
         def list_checkpoints(self, cwd):
             return [{"hash": "abc123"}]
 
-        def restore(self, cwd, target, file_path=None):
+        def restore(self, cwd, target, file_path=None, safe=None, **_kw):
             return {"success": True, "message": "restored"}
 
     history = [
@@ -12632,7 +12636,7 @@ def test_rollback_restore_skips_legacy_compaction_handoff(monkeypatch):
         def list_checkpoints(self, cwd):
             return [{"hash": "abc123"}]
 
-        def restore(self, cwd, target, file_path=None):
+        def restore(self, cwd, target, file_path=None, safe=None, **_kw):
             return {"success": True, "message": "restored"}
 
     handoff = {
@@ -12693,7 +12697,7 @@ def test_rollback_restore_preserves_composite_carrier_scaffold(monkeypatch, tmp_
         def list_checkpoints(self, cwd):
             return [{"hash": "abc123"}]
 
-        def restore(self, cwd, target, file_path=None):
+        def restore(self, cwd, target, file_path=None, safe=None, **_kw):
             return {"success": True, "message": "restored"}
 
     carrier = {
@@ -14412,7 +14416,9 @@ def test_interrupt_error_after_tts_stop_still_resumes_wake(monkeypatch):
             {"id": "host", "method": "session.interrupt", "params": {"session_id": "sid"}},
             transport=owner,
         )
-        assert failed["error"]["code"] == 5019
+        # A failed compute-host interrupt is recovered locally (the Stop must still work) and the
+        # voice wake is re-armed exactly as on the error path this test used to pin.
+        assert failed["result"]["status"] == "interrupted"
         assert state["paused"] is False
         assert state["resumed"] == [owner, owner]
     finally:
@@ -16020,6 +16026,9 @@ def test_session_delete_fails_closed_when_active_snapshot_raises(monkeypatch):
 
 def test_session_delete_returns_4007_when_missing(monkeypatch):
     class _DB:
+        def get_session_model_config_value(self, *_a, **_kw):
+            return None
+
         def delete_session(self, sid, sessions_dir=None, **_kw):
             return False
 
@@ -16035,6 +16044,9 @@ def test_session_delete_returns_4007_when_missing(monkeypatch):
 
 def test_session_delete_propagates_db_exception(monkeypatch):
     class _DB:
+        def get_session_model_config_value(self, *_a, **_kw):
+            return None
+
         def delete_session(self, sid, sessions_dir=None, **_kw):
             raise RuntimeError("disk full")
 
@@ -16056,6 +16068,9 @@ def test_session_delete_success_returns_deleted_id(monkeypatch):
     captured: dict = {}
 
     class _DB:
+        def get_session_model_config_value(self, *_a, **_kw):
+            return None
+
         def delete_session(self, sid, sessions_dir=None, **_kw):
             captured["sid"] = sid
             captured["sessions_dir"] = sessions_dir
@@ -16282,6 +16297,9 @@ def test_session_delete_honors_params_profile_sessions_dir(monkeypatch, tmp_path
     class ProfileDB:
         def __init__(self, db_path=None):
             captured["db_path"] = db_path
+
+        def get_session_model_config_value(self, *_a, **_kw):
+            return None
 
         def delete_session(self, sid, sessions_dir=None, **_kw):
             captured["sid"] = sid

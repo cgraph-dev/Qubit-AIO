@@ -411,6 +411,22 @@ class SessionSessionsMixin:
         self._insert_session_row(session_id, source, **kwargs)
         return session_id
 
+    def rollback_created_session(self, session_id: str) -> bool:
+        """Remove a row this process JUST created and then failed to seed — no delete tombstone.
+
+        ``delete_session`` retires a ``RETIRED_PREFIX`` marker that blocks any re-create, which is
+        right for a user delete but wrong for a create-time compensation: the first-prompt retry
+        must be able to create the row again and copy the whole seed (#93959)."""
+        from qubit_state_mutation_retirement import RETIRED_PREFIX
+
+        def _do(conn):
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            conn.execute("DELETE FROM state_meta WHERE key = ?", (RETIRED_PREFIX + session_id,))
+            self._delete_unreferenced_system_prompts(conn)
+            return True
+        return self._execute_write(_do)
+
     def ensure_session(self, session_id: str, source: str = "unknown", model: str | None = None, **kwargs) -> str:
         """Ensure a session row exists (upsert). Accepts optional kwargs."""
         self._insert_session_row(session_id, source, model=model, **kwargs)
