@@ -95,6 +95,26 @@ def test_edit_action_opens_the_editor_and_submits_text():
         ov.close()
 
 
+def test_streaming_updates_do_not_remap_or_hide_the_window():
+    """Regression: partials re-show/re-lift/re-geometry the panel every tick."""
+    ov, _ = _make()
+    try:
+        ov.show()
+        ov.root.update()
+        unmaps = []
+        ov.root.bind("<Unmap>", lambda event: unmaps.append(event))
+        for i in range(50):
+            ov.set_status("listening", "speak now")
+            ov.set_live_transcript(f"word {i}")
+            ov.set_level(0.7)
+            ov.root.update()
+        assert ov.root.state() == "normal"
+        assert ov.root.winfo_viewable() == 1
+        assert unmaps == []
+    finally:
+        ov.close()
+
+
 def test_history_rows_show_kind_time_and_text_and_clear():
     ov, _ = _make()
     try:

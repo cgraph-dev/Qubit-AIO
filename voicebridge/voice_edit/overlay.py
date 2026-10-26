@@ -309,7 +309,11 @@ class PreviewOverlay:
         try:
             width = getattr(self, "_window_width", 820)
             height = self._preview_height if preview else self._listening_height
-            self.root.geometry(f"{width}x{height}+{self._window_x}+{self._window_y}")
+            geometry = f"{width}x{height}+{self._window_x}+{self._window_y}"
+            if geometry == getattr(self, "_last_geometry", ""):
+                return
+            self._last_geometry = geometry
+            self.root.geometry(geometry)
         except Exception:
             pass
 
@@ -558,7 +562,6 @@ class PreviewOverlay:
             self._set_listening(True)
             if value:
                 self._detail_var.set("Listening — keep speaking.")
-            self.show()
 
     def set_level(self, level: float) -> None:
         """Draw a smooth voice meter from 0..1 (no-op when the window is hidden)."""
@@ -610,6 +613,7 @@ class PreviewOverlay:
 
     # -- status -----------------------------------------------------------
     def set_status(self, state: str, detail: str = "") -> None:
+        previous = getattr(self, "_state", "idle")
         self._state = state or "idle"
         label = _STATUS_LABEL.get(self._state, self._state.replace("_", " ").title())
         icon = _ICONS.get(self._state, "●")
@@ -622,7 +626,8 @@ class PreviewOverlay:
         if detail:
             self._detail_var.set(str(detail))
         if self._state == "listening":
-            self._resize(False)
+            if previous != "listening":
+                self._resize(False)
             self._set_listening(True)
             self._live_badge_var.set("LIVE")
             self._live_badge.configure(bg=_ACCENT_DARK, fg=_ACCENT)
@@ -810,15 +815,22 @@ class PreviewOverlay:
 
     # -- public API -------------------------------------------------------
     def show(self) -> None:
-        self.root.deiconify()
-        self.root.lift()
-        try:
-            self.root.attributes("-topmost", True)
-        except Exception:
-            pass
+        if self.root.state() == "withdrawn":
+            self.root.deiconify()
+            try:
+                self.root.lift()
+            except Exception:
+                pass
+            if not getattr(self, "_topmost_set", False):
+                try:
+                    self.root.attributes("-topmost", True)
+                    self._topmost_set = True
+                except Exception:
+                    pass
 
     def hide(self) -> None:
-        self.root.withdraw()
+        if self.root.state() != "withdrawn":
+            self.root.withdraw()
         self._set_listening(False)
 
     def close(self) -> None:
