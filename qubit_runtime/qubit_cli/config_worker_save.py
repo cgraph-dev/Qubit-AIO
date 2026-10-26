@@ -18,8 +18,36 @@ def rebase_for_save(config: dict[str, Any], live_raw: dict[str, Any], merge_exis
     from qubit_cli import config as _config
 
     if _config._worker_config_snapshot() is not None:
-        return _config._merge_partial_save(
-            _config._three_way(live_raw or {}, config, _config.load_config()), config, replace_keys)
+        # ``_three_way`` lives in THIS module; ``_config`` only re-exports the frozen-worker flag
+        # and the merge helper. Calling ``_config._three_way`` raised AttributeError, and
+        # ``save_permanent_allowlist`` swallowed it — a frozen worker could not write its own
+        # approval back (test_managed_worker_frozen_config).
+        #
+        # The three-way result already carries only the caller's deltas over its frozen base;
+        # merging the whole snapshot over it (the old `_merge_partial_save` step) re-applied
+        # unchanged frozen values and reverted live profile edits. Apply only the caller's
+        # ``replace_keys`` paths, which must be authoritative.
+        rebased = _three_way(live_raw or {}, config, _config.load_config())
+        for path in replace_keys or ():
+            path = tuple(path)
+            parent = rebased
+            for part in path[:-1]:
+                parent = parent.get(part) if isinstance(parent, dict) else None
+                if parent is None:
+                    break
+            if not isinstance(parent, dict):
+                continue
+            source: Any = config
+            for part in path:
+                if not isinstance(source, dict) or part not in source:
+                    source = None
+                    break
+                source = source[part]
+            if source is None:
+                parent.pop(path[-1], None)
+            else:
+                parent[path[-1]] = copy.deepcopy(source)
+        return rebased
     if merge_existing and live_raw:
         return _config._merge_partial_save(live_raw, config, replace_keys)
     return config
