@@ -94,14 +94,14 @@ Implemented in `agent/runtime_openjarvis.py` over the pinned CLI; `tests/runtime
 
 **Acceptance (met):** same prompt through both engines yields the port event sequence; missing/mismatched/unverifiable OpenJarvis refuses with `data["refusal"]`; no child (or same-group descendant) survives cancel/timeout; focused runtime tests green (70 passed).
 
-## Phase 3 — Route a product caller through the port (native only)
+## Phase 3 — Route a product caller through the port (native only) — ✅ implemented 2026-10-26, `feat/p3-oneshot-port`
 
 - Move `qubit chat`/oneshot (choose the simpler oneshot path first) behind
   `RuntimePort` with the native backend; add `--engine` with default `native`.
 - Reconcile streaming with the existing `stream_callback`/TUI event bus.
 - Keep every existing focused chat/oneshot test green.
 
-**Acceptance:** oneshot/chat tests unchanged; `--engine native` is byte-equivalent; `--engine openjarvis` works from P2.
+**Acceptance (met for the `-z` oneshot path):** focused oneshot/chat/runtime tests **204 passed**; `--engine native` is byte-equivalent (same call shape, final text, exit codes); `--engine openjarvis` runs through the P2 backend and refuses cleanly when unconfigured. `qubit chat -q` still runs native only and refuses other engines explicitly.
 
 ## Phase 4 — Recipes (the 8-agent mapping)
 
