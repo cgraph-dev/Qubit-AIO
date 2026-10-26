@@ -30,8 +30,10 @@ class RuntimeRegistry:
         return sorted(self._backends)
 
 
-def build_registry(agent_factory: Callable[[Any], Any]) -> RuntimeRegistry:
+def build_registry(
+    agent_factory: Callable[[Any], Any], *, native_stream: bool = True,
+) -> RuntimeRegistry:
     registry = RuntimeRegistry()
-    registry.register(NativeRuntime(agent_factory))
+    registry.register(NativeRuntime(agent_factory, stream=native_stream))
     registry.register(OpenJarvisRuntime())
     return registry

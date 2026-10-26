@@ -11,6 +11,7 @@ deadline. Later events from a stubborn turn are discarded.
 """
 from __future__ import annotations
 
+import contextvars
 import queue
 import threading
 from typing import Any, Callable, Iterator
@@ -29,12 +30,20 @@ class NativeRuntime:
         agent_factory: Callable[[TurnRequest], Any],
         *,
         cancel_grace_seconds: float = 5.0,
+        stream: bool = True,
     ) -> None:
         """*cancel* is a ``threading.Event`` (``wait``/``is_set``); the port types it
         loosely so later engines can adapt their own token. ``request.session_id`` is
-        advisory for the native adapter: the caller's factory owns session wiring."""
+        advisory for the native adapter: the caller's factory owns session wiring.
+
+        ``stream=False`` runs the agent exactly as a caller that supplies no
+        ``stream_callback`` does: no delta events are produced and the turn's final
+        text arrives in ``done``. Product callers whose output contract is
+        final-response-only (``qubit -z``) use this so enabling the port does not
+        switch their provider calls into streaming mode."""
         self._agent_factory = agent_factory
         self._cancel_grace = max(0.0, float(cancel_grace_seconds))
+        self._stream = bool(stream)
 
     def run_turn(self, request: TurnRequest, cancel: Any | None = None) -> Iterator[TurnEvent]:
         events: "queue.Queue[TurnEvent | None]" = queue.Queue()
@@ -82,13 +91,19 @@ class NativeRuntime:
                 agent_box["agent"] = agent
                 if cancel is not None and cancel.is_set():
                     _interrupt(agent)
-                result = agent.run_conversation(
-                    request.prompt,
-                    system_message=request.system,
-                    conversation_history=list(request.history) or None,
-                    task_id=request.task_id,
-                    stream_callback=lambda chunk: _emit(TurnEvent("delta", text=str(chunk))),
-                )
+                turn_kwargs: dict[str, Any] = {
+                    "conversation_history": list(request.history) or None,
+                }
+                # Omit optional None values so a factory returning a caller-owned
+                # agent sees the same call shape it saw before the port existed.
+                if request.system is not None:
+                    turn_kwargs["system_message"] = request.system
+                if request.task_id is not None:
+                    turn_kwargs["task_id"] = request.task_id
+                if self._stream:
+                    turn_kwargs["stream_callback"] = (
+                        lambda chunk: _emit(TurnEvent("delta", text=str(chunk))))
+                result = agent.run_conversation(request.prompt, **turn_kwargs)
                 result = result if isinstance(result, dict) else {}
                 if result.get("completed") is False:
                     _terminal(TurnEvent(
@@ -113,10 +128,16 @@ class NativeRuntime:
                 turn_done.set()
                 events.put(None)
 
+        # The turn runs on a worker thread, but it must see the caller's context
+        # (one-shot sets HERMES session ContextVars such as stateless delivery
+        # before the turn; a fresh thread would silently reset them).
+        turn_context = contextvars.copy_context()
         if cancel is not None:
             threading.Thread(
                 target=_watch_cancel, daemon=True, name="runtime-port-cancel").start()
-        threading.Thread(target=_run, daemon=True, name="runtime-port-turn").start()
+        threading.Thread(
+            target=turn_context.run, args=(_run,), daemon=True,
+            name="runtime-port-turn").start()
         while True:
             event = events.get()
             if event is None:

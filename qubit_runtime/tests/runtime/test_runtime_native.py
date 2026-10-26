@@ -143,6 +143,24 @@ def test_uncooperative_cancel_emits_terminal_within_grace():
         release.set()
 
 
+def test_turn_sees_the_callers_contextvars():
+    """The port runs on a worker thread; one-shot ContextVars must cross with it."""
+    import contextvars
+
+    marker = contextvars.ContextVar("p3_probe", default="unset")
+    marker.set("caller")
+    seen = {}
+
+    class _Agent:
+        def run_conversation(self, message, **kwargs):
+            seen["value"] = marker.get()
+            return {"completed": True, "final_response": "ok"}
+
+    _collect(NativeRuntime(lambda request: _Agent()), TurnRequest(prompt="hi", session_id="s1"))
+
+    assert seen["value"] == "caller"
+
+
 def test_done_data_is_bounded_to_identity_fields():
     agent = _FakeAgent({"completed": True, "final_response": "ok", "messages": [{"secret": "x"}]})
     events = _collect(NativeRuntime(lambda request: agent), TurnRequest(prompt="hi", session_id="s1"))
