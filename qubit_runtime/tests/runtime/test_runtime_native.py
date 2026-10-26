@@ -138,6 +138,7 @@ def test_uncooperative_cancel_emits_terminal_within_grace():
         terminals = [e for e in events if e.kind in ("done", "error")]
         assert len(terminals) == 1 and terminals[0].kind == "error"
         assert terminals[0].data["cancelled"] is True
+        assert set(terminals[0].data) <= {"interrupted", "cancelled"}
     finally:
         release.set()
 

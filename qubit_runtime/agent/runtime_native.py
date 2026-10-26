@@ -30,6 +30,9 @@ class NativeRuntime:
         *,
         cancel_grace_seconds: float = 5.0,
     ) -> None:
+        """*cancel* is a ``threading.Event`` (``wait``/``is_set``); the port types it
+        loosely so later engines can adapt their own token. ``request.session_id`` is
+        advisory for the native adapter: the caller's factory owns session wiring."""
         self._agent_factory = agent_factory
         self._cancel_grace = max(0.0, float(cancel_grace_seconds))
 
