@@ -68,6 +68,9 @@ class TestSetMoaModelsPreservesUndeclaredKeys:
 
         with (
             patch("qubit_cli.config.load_config", side_effect=fake_load_config),
+            # The fork writes from a fail-closed RAW read (not the expanded load_config
+            # snapshot), because the raw section is the authority for undeclared keys.
+            patch("qubit_cli.config.require_readable_config_before_write", return_value=existing_cfg),
             patch("qubit_cli.config.save_config", side_effect=fake_save_config),
             patch("qubit_cli.web_server_profiles._profile_scope"),
         ):

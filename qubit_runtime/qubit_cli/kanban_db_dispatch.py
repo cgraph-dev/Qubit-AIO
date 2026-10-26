@@ -2797,7 +2797,11 @@ def _restart_safe_worker_argv(task: Task, command: list[str]) -> list[str]:
             require_restart_safe_scope=True,
             outlives_parent=True,
         )
-        if dispatch.mode != "in_process":
+        # A "degraded" dispatch is the helper's documented unmanaged fallback (no user
+        # bus): spawn it with a warning instead of refusing, matching the outlives_parent
+        # contract. Only a REAL scope would open an untraceable worker under a placeholder
+        # suffix, so that is the one mode that must be refused here.
+        if dispatch.mode == "scoped":
             raise RuntimeError(
                 "cannot create restart-safe systemd scope for Kanban worker: "
                 "the claimed task has no current run id"
