@@ -45,6 +45,7 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -140,10 +141,11 @@ class OpenJarvisRuntime:
     ) -> None:
         self._binary = binary or os.environ.get(BIN_ENV) or None
         self._source = source or os.environ.get(SOURCE_ENV) or None
-        home_path = Path(home or os.environ.get(HOME_ENV) or self._default_home()).expanduser()
-        if not home_path.is_absolute():
-            home_path = (Path.cwd() / home_path).resolve()
-        self._home = home_path
+        try:
+            self._home_raw = str(home or os.environ.get(HOME_ENV) or self._default_home())
+        except (OSError, RuntimeError, UnicodeError):
+            self._home_raw = str(Path.home() / ".qubit" / "openjarvis")
+        self._home = Path(self._home_raw)
         self._model = model if model is not None else os.environ.get(MODEL_ENV)
         self._agent = agent if agent is not None else os.environ.get(AGENT_ENV)
         self._tools = tools if tools is not None else os.environ.get(TOOLS_ENV)
@@ -202,6 +204,7 @@ class OpenJarvisRuntime:
             return self._resolved
 
     def _resolve_uncached(self) -> ResolvedOpenJarvis:
+        self._home = self._resolve_home()
         binary = self._binary or shutil.which("jarvis")
         if not binary:
             raise RuntimeRefusalError(
@@ -263,6 +266,19 @@ class OpenJarvisRuntime:
             ) from exc
         return ResolvedOpenJarvis(str(binary_path), resolved_source, commit)
 
+    def _resolve_home(self) -> Path:
+        try:
+            home = Path(self._home_raw).expanduser()
+            if not home.is_absolute():
+                home = Path.cwd() / home
+            return home.resolve()
+        except (OSError, RuntimeError, UnicodeError) as exc:
+            raise RuntimeRefusalError(
+                "openjarvis_home_unavailable",
+                f"cannot resolve the OpenJarvis home {self._home_raw!r}: {exc}",
+                "Set QUBIT_OPENJARVIS_HOME to a resolvable directory.",
+            ) from exc
+
     def _verify_binary_commit(self, binary: Path) -> None:
         """Bind the executable that will run to the pinned commit.
 
@@ -298,42 +314,48 @@ class OpenJarvisRuntime:
             )
 
     def _probe_version(self, binary: Path) -> str | None:
-        """Bounded, group-killing ``--version`` probe; ``None`` means no answer."""
+        """Bounded, group-killing ``--version`` probe; ``None`` means no answer.
+
+        Output goes to an unlinked temp file rather than a pipe: a descendant
+        holding the inherited pipe can no longer block the read or leak a
+        reader thread. Only the first 20 KiB is read, so a runaway banner is
+        harmless.
+        """
         env = dict(os.environ)
         env["OPENJARVIS_HOME"] = str(self._home)
         try:
-            proc = subprocess.Popen(
-                [str(binary), "--version"],
-                env=env,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                errors="replace",
-                start_new_session=True,
-            )
+            with tempfile.TemporaryFile(mode="w+b") as sink:
+                proc = subprocess.Popen(
+                    [str(binary), "--version"],
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=sink,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+                pgid = proc.pid
+                try:
+                    proc.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    self._terminate(proc, pgid)
+                    return None
+                # Reap any probe descendant still holding the group alive.
+                try:
+                    os.killpg(pgid, 0)
+                except ProcessLookupError:
+                    pass
+                else:
+                    try:
+                        os.killpg(pgid, signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+                sink.seek(0)
+                raw = sink.read(20_000)
         except (OSError, ValueError):
             return None
-        chunks: list[str] = []
-        overflow = threading.Event()
-        reader = threading.Thread(
-            target=self._drain, args=(proc.stdout, chunks, 20_000, overflow),
-            daemon=True, name="runtime-openjarvis-version")
-        reader.start()
-        deadline = time.monotonic() + 5.0
-        while proc.poll() is None and time.monotonic() < deadline and not overflow.is_set():
-            time.sleep(0.05)
-        failed = proc.poll() is None or overflow.is_set()
-        if failed:
-            self._terminate(proc, proc.pid)
-        reader.join(timeout=_TERMINATE_GRACE_S)
-        try:
-            proc.wait(timeout=_TERMINATE_GRACE_S)
-        except subprocess.TimeoutExpired:  # pragma: no cover - unkillable child
+        if proc.returncode != 0:
             return None
-        if failed or proc.returncode != 0:
-            return None
-        return "".join(chunks)
+        return raw.decode("utf-8", "replace")
 
     @staticmethod
     def _absolute_binary(binary: str) -> Path | None:
@@ -369,9 +391,10 @@ class OpenJarvisRuntime:
         try:
             proc = subprocess.run(
                 ["git", "-C", str(cwd), *args],
-                capture_output=True, text=True, timeout=10, env=env, check=False,
+                capture_output=True, text=True, errors="replace",
+                timeout=10, env=env, check=False,
             )
-        except (OSError, subprocess.SubprocessError):
+        except (OSError, subprocess.SubprocessError, UnicodeError):
             return None
         return proc.stdout if proc.returncode == 0 else None
 
@@ -445,18 +468,23 @@ class OpenJarvisRuntime:
     # --------------------------------------------------------------- turn/event
 
     def run_turn(self, request: TurnRequest, cancel: Any | None = None) -> Iterator[TurnEvent]:
-        """Never return zero events: unexpected adapter failures become one error."""
+        """Never return zero events and never a second terminal event."""
+        terminal_seen = False
         try:
             for event in self._run_turn(request, cancel):
+                if event.kind in ("done", "error"):
+                    terminal_seen = True
                 yield event
         except RuntimeRefusalError as exc:
-            yield self._refusal_event(exc)
+            if not terminal_seen:
+                yield self._refusal_event(exc)
         except Exception as exc:  # noqa: BLE001 - the port owns the terminal event
-            yield TurnEvent(
-                "error",
-                text=self._safe_text(f"OpenJarvis adapter failure: {exc}", 2_000),
-                data={"engine": self.name, "adapter_error": self.name},
-            )
+            if not terminal_seen:
+                yield TurnEvent(
+                    "error",
+                    text=self._safe_text(f"OpenJarvis adapter failure: {exc}", 2_000),
+                    data={"engine": self.name, "adapter_error": self.name},
+                )
 
     def _run_turn(
         self, request: TurnRequest, cancel: Any | None = None

@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from agent.runtime_openjarvis import PINNED_COMMIT, OpenJarvisRuntime
-from agent.runtime_port import RuntimeRefusalError, TurnRequest
+from agent.runtime_port import RuntimeRefusalError, TurnEvent, TurnRequest
 from agent.runtime_registry import RuntimeRegistry, build_registry
 from qubit_cli.runtime_cmd import cmd_runtime
 
@@ -34,6 +34,17 @@ if argv and argv[0] == "--version":
     if os.environ.get("FAKE_OJ_VERSION_NOSTAMP"):
         print("jarvis, version 1.2.3")
         sys.exit(0)
+    if os.environ.get("FAKE_OJ_VERSION_DESCENDANT"):
+        marker = os.environ["FAKE_OJ_DESC_PID"]
+        subprocess.Popen([
+            sys.executable, "-c",
+            "import os,signal,sys,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+            "open(sys.argv[1],'w').write(str(os.getpid())); time.sleep(60)", marker,
+        ])
+        for _ in range(500):
+            if os.path.exists(marker):
+                break
+            time.sleep(0.01)
     print("jarvis, version fake.g" + os.environ.get("FAKE_OJ_PIN", "")[:9])
     sys.exit(0)
 if not argv or argv[0] != "ask":
@@ -96,6 +107,10 @@ if "LINGER" in prompt:
         "import os,signal,sys,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
         "open(sys.argv[1],'w').write(str(os.getpid())); time.sleep(60)", marker,
     ])
+    for _ in range(500):
+        if os.path.exists(marker):
+            break
+        time.sleep(0.01)
     print(json.dumps({"content": "child done"}))
     sys.exit(0)
 if "ECHO_PROMPT" in prompt:
@@ -330,6 +345,7 @@ def test_relative_binary_is_resolved_absolutely(tmp_path, pinned, monkeypatch):
 
     assert events[-1].kind == "done"
     assert events[-1].data["binary"] == str(script.resolve())
+    assert Path(events[-1].data["binary"]).is_absolute()
 
 
 def test_nul_prompt_is_a_typed_refusal(tmp_path, pinned):
@@ -641,6 +657,62 @@ def test_query_file_with_invalid_utf8_is_reported_not_a_traceback(tmp_path, pinn
 
     assert code == 2
     assert "cannot read" in err.getvalue()
+
+
+def test_git_decode_failure_is_fail_closed(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    real_run = subprocess.run
+
+    def fake_run(cmd, *args, **kwargs):
+        if "status" in cmd:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr("agent.runtime_openjarvis.subprocess.run", fake_run)
+    assert OpenJarvisRuntime._git(["status"], repo) is None
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+    with pytest.raises(RuntimeRefusalError) as exc:
+        backend.resolve()
+    assert exc.value.code == "openjarvis_commit_unverifiable"
+
+
+def test_symlink_loop_home_does_not_crash_registry(tmp_path, monkeypatch):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    os.symlink(b, a)
+    os.symlink(a, b)
+    monkeypatch.setenv("QUBIT_OPENJARVIS_HOME", str(a))
+
+    registry = build_registry(lambda request: object())  # must not raise
+    events = list(registry.get("openjarvis").run_turn(_request()))
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_home_unavailable"
+
+
+def test_version_probe_kills_a_lingering_descendant(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    marker = tmp_path / "probe-descendant.pid"
+    monkeypatch.setenv("FAKE_OJ_VERSION_DESCENDANT", "1")
+    monkeypatch.setenv("FAKE_OJ_DESC_PID", str(marker))
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    assert backend.resolve().commit == commit
+    _assert_process_gone(marker)
+
+
+def test_wrapper_never_emits_a_second_terminal(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    def fake_run_turn(request, cancel=None):
+        yield TurnEvent("done", text="ok")
+        raise RuntimeError("bug after the terminal event")
+
+    monkeypatch.setattr(backend, "_run_turn", fake_run_turn)
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["done"]
 
 
 # --------------------------------------------------------------------- CLI/registry
