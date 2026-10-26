@@ -101,7 +101,7 @@ Implemented in `agent/runtime_openjarvis.py` over the pinned CLI; `tests/runtime
 - Reconcile streaming with the existing `stream_callback`/TUI event bus.
 - Keep every existing focused chat/oneshot test green.
 
-**Acceptance (met for the `-z` oneshot path):** focused oneshot/chat/runtime tests **204 passed**; `--engine native` is byte-equivalent (same call shape, final text, exit codes); `--engine openjarvis` runs through the P2 backend and refuses cleanly when unconfigured. `qubit chat -q` still runs native only and refuses other engines explicitly.
+**Acceptance (met for the `-z` oneshot path):** focused oneshot/chat/runtime tests **205 passed**; `--engine native` is byte-equivalent (same call shape, final text, exit codes); `--engine openjarvis` runs through the P2 backend and refuses cleanly when unconfigured. `qubit chat -q` still runs native only and refuses other engines explicitly.
 
 ## Phase 4 — Recipes (the 8-agent mapping)
 

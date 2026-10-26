@@ -165,6 +165,43 @@ def test_a_registered_non_native_engine_runs_and_prints_done_text(monkeypatch, c
     assert backend.requests[0].prompt == "hello"
 
 
+def test_non_native_resume_passes_history_without_writing_the_native_session(
+    monkeypatch, tmp_path, capsys,
+):
+    import agent.runtime_registry as registry_mod
+    from agent.runtime_registry import RuntimeRegistry
+    from qubit_state import SessionDB
+
+    db = SessionDB(db_path=tmp_path / "state.db")
+    db.create_session(session_id="s1", source="cli")
+    db.append_message("s1", "user", content="remember ZEBRA42")
+
+    backend = _FakeBackend([TurnEvent("done", text="ok", data={"completed": True})])
+    backend.name = "openjarvis"
+
+    def fake_build_registry(factory, *, native_stream=True):
+        registry = RuntimeRegistry()
+        registry.register(backend)
+        return registry
+
+    monkeypatch.setattr(registry_mod, "build_registry", fake_build_registry)
+    monkeypatch.setattr(oneshot, "_create_session_db_for_oneshot", lambda: db)
+
+    assert oneshot.run_oneshot("next", engine="openjarvis", resume="s1") == 0
+
+    request = backend.requests[0]
+    assert request.session_id == "s1"
+    assert request.history[0]["content"] == "remember ZEBRA42"
+
+    reopened = SessionDB(db_path=tmp_path / "state.db")
+    try:
+        # The P2 adapter is stateless: the native row keeps only its original
+        # history, so a later native resume is not fed a foreign engine's turn.
+        assert len(reopened.get_messages("s1")) == 1
+    finally:
+        reopened.close()
+
+
 def test_openjarvis_refuses_native_only_flags(capsys):
     assert oneshot.run_oneshot("hello", engine="openjarvis", model="some-model") == 2
 
