@@ -47,7 +47,7 @@ recorded split-pass evidence (completed full pass + every failing file re-run gr
 plus the live browser/Telegram evidence, is accepted. Windows stays out of scope. `VERIFIED`
 remains unclaimed because the matrix was not one uninterrupted pass. This plan now starts.
 
-## Phase 1b — Hermes/OpenClaw skill sources (independent, start here)
+## Phase 1b — Hermes/OpenClaw skill sources (✅ implemented 2026-10-26, `4d768d778`)
 
 Ported from `open-jarvis/OpenJarvis@0583901` `src/openjarvis/skills/sources/`
 (Apache-2.0, record in `THIRD_PARTY_NOTICES.md`). Do **not** replace

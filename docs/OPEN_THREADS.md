@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 48 — 2026-10-26 (OpenJarvis skill sources; Telegram @QubitBot)
+
+- ✅ Owner waived the single clean full-matrix run; split-pass evidence accepted; `VERIFIED` not claimed; Windows out of scope.
+- ✅ Ported OpenJarvis's Hermes/OpenClaw resolver semantics into `tools/skills_hub_git_sources.py`; hub/security/installer unchanged; 7 new tests + 137 focused hub tests green; `hermes:`/`openclaw:` search/install proven on local origins; provenance recorded.
+- ✅ Telegram handle: `/setusername` does not exist; new **@QubitBot** created, token swapped, gateway restarted, `getMe`/polling confirmed. Old-bot inbound round-trip proven earlier (`message_id 302`).
+- 🟡 @QubitBot inbound needs one owner message; then `/deletebot` the old `hermes...` bot.
+- 📋 Next: Phase 1 RuntimePort (native) then the OpenJarvis backend; program/spec updated.
+
 ## Wave 47 — 2026-10-26 (W49 sign-off; runtime-boundary program queued)
 
 - ✅ 293-file recheck closed: 248/482 → 249/249 lane files green, then the full matrix's 31 extra files green. 107 commits, 310 files changed from `8443a63b4`.
