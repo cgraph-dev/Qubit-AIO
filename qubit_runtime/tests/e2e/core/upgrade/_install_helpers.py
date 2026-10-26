@@ -105,15 +105,14 @@ class Sandbox:
         return self.qubit_home / "qubit"
 
     @property
-    def hermes(self) -> str:
-        """The command the installer put on PATH, as a user's shell resolves it."""
-        return str(self.home / ".local" / "bin" / "hermes")
+    def qubit(self) -> str:
+        """The canonical command the installer put on PATH, as a user's shell resolves it."""
+        return str(self.home / ".local" / "bin" / "qubit")
 
     @property
-    def qubit(self) -> str:
-        """The same PATH command under its canonical name (the installer still publishes the
-        pre-rebrand alias; both exec the checkout's launcher)."""
-        return self.hermes
+    def hermes(self) -> str:
+        """Read-old alias for the same PATH command: the fork publishes ``qubit`` only."""
+        return self.qubit
 
     @property
     def python(self) -> str:

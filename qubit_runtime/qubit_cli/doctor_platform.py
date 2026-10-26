@@ -619,7 +619,13 @@ def _check_command_installation(should_fix: bool, f: Finding) -> None:
     prefix = os.environ.get("PREFIX", "")
     termux = prefix and (os.environ.get("TERMUX_VERSION") or "com.termux/files/usr" in prefix)
     link_dir, display = (Path(prefix) / "bin", "$PREFIX/bin") if termux else (Path.home() / ".local" / "bin", "~/.local/bin")
-    link = link_dir / "hermes"
+    # The installer publishes the canonical ``qubit`` command; a pre-rebrand install may still
+    # own a ``hermes`` link, which is repaired under its read-old name instead of duplicated.
+    link = link_dir / "qubit"
+    legacy_link = link_dir / "hermes"
+    if (not link.is_symlink() and not link.exists()
+            and (legacy_link.is_symlink() or legacy_link.exists())):
+        link = legacy_link
     if link.is_symlink():
         target, expected = link.resolve(), venv_bin.resolve()
         if target == expected:
@@ -642,7 +648,7 @@ def _check_command_installation(should_fix: bool, f: Finding) -> None:
     if pm_launcher:
         from qubit_cli._launchers import stage_launcher
 
-        if stage_launcher("hermes", PROJECT_ROOT, link_dir) is None:
+        if stage_launcher("qubit", PROJECT_ROOT, link_dir) is None:
             check_fail("Could not publish Qubit launcher")
             return f.manual_issues.append("Repair the PM store interpreter through the installation owner, then rerun 'qubit doctor --fix'")
         check_ok(f"{verb} PM launcher: {display}/qubit")
