@@ -2334,12 +2334,13 @@ def _b_recipe(ctx, args):
     sections = [section.as_dict() for section in run.sections]
     if run.refusal:
         return {"recipe": {
-            "id": spec.id, "state": "UNAVAILABLE", "code": run.refusal,
-            "detail": run.hint or run.refusal, "sections": sections}}
+            "id": spec.id, "title": spec.title, "state": "UNAVAILABLE",
+            "code": run.refusal, "detail": run.hint or run.refusal,
+            "sections": sections}}
     if run.failed:
         raise RuntimeError("the recipe turn failed to produce a brief")
     return {"recipe": {
-        "id": spec.id, "state": "OK", "engine": run.engine,
+        "id": spec.id, "title": spec.title, "state": "OK", "engine": run.engine,
         "brief": run.brief, "sections": sections}}
 
 
@@ -5817,10 +5818,11 @@ def _sum_recipe(result):
     recipe = body.get("recipe", {}) if isinstance(body, dict) else {}
     if not isinstance(recipe, dict):
         return "That recipe returned nothing."
+    title = str(recipe.get("title") or "That recipe").strip() or "That recipe"
     if recipe.get("state") == "UNAVAILABLE":
-        return f"Morning digest is unavailable: {recipe.get('code', 'unavailable')}."
+        return f"{title} is unavailable: {recipe.get('code', 'unavailable')}."
     brief = str(recipe.get("brief", "") or "").strip()
-    return brief or "The morning digest is empty."
+    return brief or f"{title} returned an empty brief."
 
 
 def _sum_files(result):
@@ -10433,6 +10435,13 @@ _CB("recipe_morning_digest", "Morning digest",
     examples=("qubit, give me my morning digest",),
     help="Runs the morning_digest recipe (weather, calendar, unread mail, "
          "health) and speaks the brief; unavailable sections name their gap.")
+_CB("recipe_monitor_operative", "Operative status",
+    ("what's my operative status", "operative status", "monitor my work",
+     "status of my work", "how is my work doing", "monitor operative"),
+    "recipe", fixed=(("recipe", "monitor_operative"),), summary="recipe",
+    examples=("qubit, what's my operative status",),
+    help="Runs the read-only monitor_operative recipe (cron, kanban, memory, "
+         "compression) and speaks the brief; unavailable sections name their gap.")
 
 # Upstream kanban lifecycle shapes with NO Qubit construct (the Qubit CLI
 # refuses them typed). Spoken attempts get the same audited refusal and name
