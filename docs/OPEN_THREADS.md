@@ -17,6 +17,13 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 49 — 2026-10-26 (RuntimePort Phase 1)
+
+- ✅ `agent/runtime_port.py`, `runtime_native.py`, `runtime_registry.py`; diagnostic `qubit runtime engines|run`; no product caller touched.
+- ✅ 22 runtime tests + 18 focused chat checks; live `PORT_OK` on `deepseek-v4.1-flash`. Reviewer's two blockers (factory outside try; uncooperative cancel could hang) fixed and pinned.
+- 🟡 Next: Phase 2 OpenJarvis backend (out-of-process, pinned commit); then Phase 3 routes oneshot/chat through the port.
+- 🔴 Not done: Phase 2–8; no full-matrix rerun (owner waived).
+
 ## Wave 48 — 2026-10-26 (OpenJarvis skill sources; Telegram @QubitBot)
 
 - ✅ Owner waived the single clean full-matrix run; split-pass evidence accepted; `VERIFIED` not claimed; Windows out of scope.

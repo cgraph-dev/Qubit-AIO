@@ -10,15 +10,17 @@ from typing import Any
 from agent.runtime_port import TurnRequest, UnknownRuntimeError
 
 
-def _prompt(args) -> str | None:
+def _prompt(args) -> tuple[str | None, str | None]:
+    """``(prompt, error)``; a missing file is reported, not flattened to "no prompt"."""
     if args.prompt:
-        return args.prompt
+        return args.prompt, None
     if args.query_file:
         try:
-            return Path(args.query_file).read_text(encoding="utf-8-sig").strip() or None
-        except OSError:
-            return None
-    return None
+            text = Path(args.query_file).read_text(encoding="utf-8-sig").strip()
+        except OSError as exc:
+            return None, f"runtime run: cannot read {args.query_file}: {exc}"
+        return (text or None), None
+    return None, None
 
 
 def _native_factory(request: TurnRequest) -> Any:
@@ -55,14 +57,17 @@ def cmd_runtime(args, *, registry=None) -> int:
         print("\n".join(registry.available()))
         return 0
 
-    prompt = _prompt(args)
-    if not prompt:
-        print("runtime run: --prompt or --query-file is required", file=sys.stderr)
-        return 2
     try:
         backend = registry.get(args.engine)
     except UnknownRuntimeError as exc:
         print(str(exc), file=sys.stderr)
+        return 2
+    prompt, prompt_error = _prompt(args)
+    if prompt_error:
+        print(prompt_error, file=sys.stderr)
+        return 2
+    if not prompt:
+        print("runtime run: --prompt or --query-file is required", file=sys.stderr)
         return 2
 
     request = TurnRequest(prompt=prompt, session_id=f"runtime-port-{uuid.uuid4().hex[:12]}")
@@ -71,7 +76,8 @@ def cmd_runtime(args, *, registry=None) -> int:
         for event in backend.run_turn(request)
     ]
     if args.json:
-        print(json.dumps({"engine": backend.name, "events": events}, ensure_ascii=False))
+        print(json.dumps({"engine": backend.name, "events": events},
+                         ensure_ascii=False, default=str))
     else:
         for event in events:
             if event["text"]:

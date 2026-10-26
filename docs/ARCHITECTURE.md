@@ -58,6 +58,17 @@ for d in run_agent.py model_tools.py toolsets.py cli.py qubit_cli agent gateway 
 done
 ```
 
+### Engine boundary
+
+`agent/runtime_port.py` is the engine-neutral turn contract: a `TurnRequest`
+in, ordered `TurnEvent`s out (exactly one terminal `done` or `error`), with
+capabilities and a cancel token. `agent/runtime_native.py` wraps the vendored
+`AIAgent` (default, unchanged); `agent/runtime_registry.py` selects a backend
+by name. `qubit runtime engines` and `qubit runtime run` are diagnostics only;
+they do not replace the product chat/oneshot/gateway path. Later phases add
+out-of-process engines behind the same port.
+
+
 ### Dashboard routers
 
 `qubit_runtime/qubit_cli/web_server.py` mounts the dashboard routers; one module per surface

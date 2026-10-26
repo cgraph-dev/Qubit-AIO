@@ -60,3 +60,26 @@ def test_unknown_engine_exits_nonzero_with_the_list(capsys):
 def test_missing_prompt_is_refused(capsys):
     assert cmd_runtime(_args(prompt=None), registry=_Registry()) == 2
     assert "prompt" in capsys.readouterr().err.lower()
+
+
+def test_missing_query_file_is_reported(capsys, tmp_path):
+    from qubit_cli.runtime_cmd import cmd_runtime as _cmd
+
+    args = _args(prompt=None, query_file=str(tmp_path / "missing.txt"))
+    assert _cmd(args, registry=_Registry()) == 2
+    assert "cannot read" in capsys.readouterr().err
+
+
+def test_parser_registers_engines_and_run():
+    import argparse
+
+    from qubit_cli.subcommands.runtime import build_runtime_parser
+
+    parser = argparse.ArgumentParser()
+    subs = parser.add_subparsers(dest="command")
+    build_runtime_parser(subs, cmd_runtime=lambda args: 0)
+
+    run = parser.parse_args(["runtime", "run", "--engine", "native", "--prompt", "x", "--json"])
+    assert run.runtime_action == "run" and run.engine == "native"
+    assert run.prompt == "x" and run.json is True
+    assert parser.parse_args(["runtime", "engines"]).runtime_action == "engines"

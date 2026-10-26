@@ -96,3 +96,59 @@ def test_cancel_interrupts_the_agent_and_emits_one_error():
     terminals = [e for e in events if e.kind in ("done", "error")]
     assert len(terminals) == 1 and terminals[0].kind == "error"
     assert terminals[0].data["interrupted"] is True
+
+
+def test_factory_failure_emits_one_error():
+    def _factory(request):
+        raise RuntimeError("no credentials")
+
+    events = _collect(NativeRuntime(_factory), TurnRequest(prompt="hi", session_id="s1"))
+    assert [e.kind for e in events] == ["error"]
+    assert "no credentials" in events[-1].text
+
+
+def test_uncooperative_cancel_emits_terminal_within_grace():
+    started = threading.Event()
+    release = threading.Event()
+
+    class _Stubborn:
+        def interrupt(self, message=None, **kwargs):
+            return True  # ignores the interrupt
+
+        def run_conversation(self, message, **kwargs):
+            started.set()
+            release.wait(10)
+            return {"completed": True, "final_response": "late"}
+
+    agent = _Stubborn()
+    cancel = threading.Event()
+    events = []
+    backend = NativeRuntime(lambda request: agent, cancel_grace_seconds=0.2)
+    consumer = threading.Thread(
+        target=lambda: events.extend(backend.run_turn(
+            TurnRequest(prompt="hi", session_id="s1"), cancel=cancel)),
+        daemon=True,
+    )
+    consumer.start()
+    assert started.wait(2)
+    cancel.set()
+    consumer.join(3)
+    try:
+        assert not consumer.is_alive()
+        terminals = [e for e in events if e.kind in ("done", "error")]
+        assert len(terminals) == 1 and terminals[0].kind == "error"
+        assert terminals[0].data["cancelled"] is True
+    finally:
+        release.set()
+
+
+def test_done_data_is_bounded_to_identity_fields():
+    agent = _FakeAgent({"completed": True, "final_response": "ok", "messages": [{"secret": "x"}]})
+    events = _collect(NativeRuntime(lambda request: agent), TurnRequest(prompt="hi", session_id="s1"))
+    assert set(events[-1].data) == {"completed", "turn_id", "interrupted"}
+
+
+def test_error_data_is_bounded():
+    agent = _FakeAgent({"completed": False, "error": "nope", "messages": [{"secret": "x"}]})
+    events = _collect(NativeRuntime(lambda request: agent), TurnRequest(prompt="hi", session_id="s1"))
+    assert set(events[-1].data) <= {"interrupted"}
