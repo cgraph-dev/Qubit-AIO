@@ -1,0 +1,79 @@
+"""``qubit runtime`` handler: diagnostics only, no product turn path."""
+from __future__ import annotations
+
+import json
+import sys
+import uuid
+from pathlib import Path
+from typing import Any
+
+from agent.runtime_port import TurnRequest, UnknownRuntimeError
+
+
+def _prompt(args) -> str | None:
+    if args.prompt:
+        return args.prompt
+    if args.query_file:
+        try:
+            return Path(args.query_file).read_text(encoding="utf-8-sig").strip() or None
+        except OSError:
+            return None
+    return None
+
+
+def _native_factory(request: TurnRequest) -> Any:
+    from qubit_cli.config import load_config
+    from qubit_cli.runtime_provider import resolve_runtime_provider
+    from run_agent import AIAgent
+
+    model_cfg = load_config().get("model") or {}
+    requested = model_cfg.get("provider")
+    target_model = model_cfg.get("default")
+    runtime = resolve_runtime_provider(requested=requested, target_model=target_model)
+    return AIAgent(
+        api_key=runtime.get("api_key"),
+        base_url=runtime.get("base_url"),
+        provider=runtime.get("provider"),
+        requested_provider=runtime.get("requested_provider"),
+        api_mode=runtime.get("api_mode"),
+        model=target_model or runtime.get("model"),
+        enabled_toolsets=[],
+        quiet_mode=True,
+        platform="cli",
+        skip_context_files=True,
+        skip_memory=True,
+        max_iterations=1,
+    )
+
+
+def cmd_runtime(args, *, registry=None) -> int:
+    if registry is None:
+        from agent.runtime_registry import build_registry
+        registry = build_registry(_native_factory)
+
+    if args.runtime_action == "engines":
+        print("\n".join(registry.available()))
+        return 0
+
+    prompt = _prompt(args)
+    if not prompt:
+        print("runtime run: --prompt or --query-file is required", file=sys.stderr)
+        return 2
+    try:
+        backend = registry.get(args.engine)
+    except UnknownRuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    request = TurnRequest(prompt=prompt, session_id=f"runtime-port-{uuid.uuid4().hex[:12]}")
+    events = [
+        {"kind": event.kind, "text": event.text, "data": event.data}
+        for event in backend.run_turn(request)
+    ]
+    if args.json:
+        print(json.dumps({"engine": backend.name, "events": events}, ensure_ascii=False))
+    else:
+        for event in events:
+            if event["text"]:
+                print(f"[{event['kind']}] {event['text']}")
+    return 0 if events and events[-1]["kind"] == "done" else 1
