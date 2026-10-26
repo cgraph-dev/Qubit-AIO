@@ -26,6 +26,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 - 🟡 Live/operational gaps: no optimizer run (DSPy absent; stated unavailable), no energy/FLOPs sampler, no dashboard surface, no `-z` usage capture.
 - 🔴 Not done: no service restart, no full matrix, no `VERIFIED`.
 
+## Wave 59 — 2026-10-27 (Phase 4: monitor_operative recipe)
+
+- ✅ Read-only `monitor_operative` over existing surfaces: cron (failed/paused/overdue/next run/ticker), kanban board stats (blocked/oldest-ready/repeated failures; overdue explicitly `not_supported`), memory provider discovery, compression counters via `SessionDB(read_only=True)`. No mutations; each section degrades typed; facts bounded/redacted.
+- ✅ `qubit recipe list|run monitor_operative [--engine] [--dry-run] [--json]`; voice `recipe_monitor_operative` ("what's my operative status", "monitor my work"); cron spec `0 */4 * * *`, no job created.
+- ✅ Shared recipe section collection moved to `recipes/sections.py`; morning_digest behavior preserved.
+- ✅ Tests: recipes + trace integration **72 passed**; monitor voice **5 passed**.
+- 🔴 No service restart, no live owner-profile probe, no live cron job, no full matrix, no `VERIFIED`.
+
+---
+
 ## Wave 58 — 2026-10-26 (RuntimePort Phase 3 completion: `chat -q`)
 
 - ✅ Native `-Q`/`-q` single-query turns now cross `RuntimePort` via `run_agent_through_port` (thread-local callbacks re-bound on the port worker; raw envelope retained). Non-native `chat -q` skips native agent construction and runs through P2; interactive chat/TUI and native-only flags refuse typed (exit 2).
