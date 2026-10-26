@@ -857,25 +857,19 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
             # target's authority being reachable: bottle it before discovery so a down gateway
             # can never park a hidden warning for a later replay. Upstream 43faacfb8de7
             # cron/scheduler_delivery.py:767-774.
-            from cron.bot_chat_delivery import defer, read_pending
+            from cron.bot_chat_delivery import defer
 
-            pending = read_pending(key)
-            if pending is not None:
-                # An earlier admission/disposition already owns this id: suppression cannot
-                # overwrite an existing outcome (a queued admission included).
-                job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
-                    "status": pending["status"], "delivery_id": key}
-                if pending["status"] == "suppressed":
-                    job["_notification_all_targets_suppressed"] = True
-                return None if pending["status"] in ("settled", "suppressed") else (
-                    f"{target} {pending['status']} (receipt {key}): completion unverified; do not resend")
+            # Suppression converts an earlier queued admission into a durable suppressed
+            # disposition (``defer`` upgrades queued -> suppressed in place) and never opens a
+            # send. This pass reports nothing: the admission was reported by the call that
+            # created it, and re-reporting it would turn a disposition into a retry warning.
             pending = defer(key, dict(job), content, profile, home,
                             for_failure=for_failure, suppressed=True)
             job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
                 "status": pending["status"], "delivery_id": key}
-            job["_notification_all_targets_suppressed"] = True
-            return None if pending["status"] in ("settled", "suppressed") else (
-                f"{target} {pending['status']} (receipt {key}): completion unverified; do not resend")
+            if pending["status"] == "suppressed":
+                job["_notification_all_targets_suppressed"] = True
+            return None
         if receipt is None and not deferred:
             from cron.bot_chat_delivery import defer, read_pending
             from tools.bot_live_delivery import find_canonical_owner

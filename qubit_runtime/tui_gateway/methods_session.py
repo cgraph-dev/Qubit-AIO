@@ -610,6 +610,10 @@ class _Resume:
     """Per-call ``session.resume`` state. ``owns_db``: the DEDICATED profile handle is ours
     to close (handler ``finally``) until handed to the hydration worker or the agent."""
 
+    # Mirror of the ``__init__`` default: hand-built instances (``__new__`` + fields) must
+    # render data-URI image parts, matching a resume whose params omit the flag.
+    inline_images = True
+
     def __init__(self, rid, params: dict, target: str) -> None:
         self.rid, self.params, self.target = rid, params, target
         self.db, self.owns_db, self.found, self.profile_resume_cwd = None, False, None, ""

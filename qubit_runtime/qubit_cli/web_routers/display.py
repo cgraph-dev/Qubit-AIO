@@ -66,7 +66,9 @@ def _consume_display_ticket(ws: WebSocket) -> Optional[dict]:
         info = consume_ticket(ticket)
     except TicketInvalid:
         return None
-    if info.get("provider") != "bot-desktop" or not info.get("hermes_home"):
+    # ``hermes_home`` is the legacy ticket key still minted by older desktop builds;
+    # ``qubit_home`` is canonical. Read both so a ticket from either side authenticates.
+    if info.get("provider") != "bot-desktop" or not (info.get("qubit_home") or info.get("hermes_home")):
         return None
     return info
 
@@ -125,7 +127,7 @@ async def _bridge(ws: WebSocket, info: dict) -> None:
     from tools.bot_desktop.rfb_filter import RfbClientFilter
     from pathlib import Path
 
-    profile_home = str(info["qubit_home"])
+    profile_home = str(info.get("qubit_home") or info.get("hermes_home") or "")
     profile_key = qubit_home_key(profile_home)
     viewer_id = str(info.get("viewer_id") or info.get("user_id") or "viewer")
     try:

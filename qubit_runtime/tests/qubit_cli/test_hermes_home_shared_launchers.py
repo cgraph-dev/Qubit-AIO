@@ -103,18 +103,20 @@ def test_missing_dead_and_same_store_launchers_still_publish(tmp_path, monkeypat
     # Missing launchers are published.
     before = _publish(repo)
 
-    # A same-store repin is published.
+    # A same-store repin is published. The ``.hermes/bin`` files are stable conveniences that
+    # forward to the checkout's canonical ``.qubit/bin`` launchers, so their bytes do not change;
+    # the resolved interpreter behind them must follow the repin.
     repinned = _repoint_store(default_home, "repin")
     after = _publish(repo)
-    assert after != before
-    assert all(_launchers._launcher_python(repo / ".hermes" / "bin" / name) == repinned for name in after)
+    assert after == before
+    assert all(_launchers._launcher_python(repo / ".qubit" / "bin" / name) == repinned for name in after)
 
     # A launcher whose interpreter died with its root is repaired, not kept: the bricked
     # state of #123238 heals on the next launch from any live root.
     repinned.unlink()
     _isolate(tmp_path, monkeypatch, temp_home)
     healed = _publish(repo)
-    assert all(_launchers._launcher_python(repo / ".hermes" / "bin" / name) == temp_python for name in healed)
+    assert all(_launchers._launcher_python(repo / ".qubit" / "bin" / name) == temp_python for name in healed)
 
 
 def _write_dead_exe(target: Path, missing_python: Path) -> None:

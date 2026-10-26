@@ -1547,6 +1547,11 @@ def _gui_build_patches(root: Path, run_side_effect):
         patch("qubit_cli.main_desktop._register_linux_desktop_entry"),
         patch("qubit_cli.main_desktop._stop_desktop_processes_locking_build", return_value=[]),
         patch("qubit_cli.main.subprocess.run", side_effect=run_side_effect),
+        # The fork runs build/pack steps through the checkout-custody seam
+        # (``source_build.run_in_custody`` -> pm.progress.run_contained), which owns the
+        # subprocess; drive it with the same fake instead of ``subprocess.run``.
+        patch("qubit_cli.source_build.run_in_custody",
+              side_effect=lambda _root, command, _label, **_kw: run_side_effect(command)),
     ]
 
 
