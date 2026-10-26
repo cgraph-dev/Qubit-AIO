@@ -197,6 +197,34 @@ def test_no_url_is_invented_and_configured_urls_drop_credentials():
     assert "https://dash.example.com/hermes" in rendered
 
 
+def test_deliver_result_renders_each_target_in_its_transport_style():
+    from cron.scheduler_delivery import _deliver_result
+    from gateway.config import GatewayConfig, Platform, PlatformConfig
+
+    sent: list[tuple[str, str]] = []
+
+    async def sender(platform, pconfig, chat_id, content, **_kwargs):
+        sent.append((platform.value, content))
+        return {"success": True, "message_id": "m1"}
+
+    cfg = GatewayConfig()
+    cfg.platforms[Platform.TELEGRAM] = PlatformConfig(enabled=True)
+    cfg.platforms[Platform.WHATSAPP] = PlatformConfig(enabled=True)
+    job = {
+        "id": "j1",
+        "name": "Brief",
+        "deliver": "telegram:111,whatsapp:222",
+        "schedule": {"kind": "interval", "minutes": 5, "display": "every 5m"},
+    }
+    with patch("gateway.config.load_gateway_config", return_value=cfg),          patch("cron.scheduler.load_config", return_value={}),          patch("tools.send_message_tool._send_to_platform", new=sender),          patch("sys.is_finalizing", return_value=False):
+        assert _deliver_result(job, "Body text.") is None
+
+    rendered = dict(sent)
+    assert "**Job:**" in rendered["telegram"]
+    assert "**Job:**" not in rendered["whatsapp"]
+    assert "*Job:*" in rendered["whatsapp"]
+
+
 def test_telegram_conversion_escapes_user_text_and_keeps_links():
     from plugins.platforms.telegram.adapter import TelegramAdapter
 
