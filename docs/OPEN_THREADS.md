@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 54 — 2026-10-26 (RuntimePort Phase 3: `qubit -z` through the port)
+
+- ✅ `qubit -z/--oneshot` now runs through `RuntimePort` with the native backend; `--engine` (default `native`) accepted on the top-level/chat parsers. `_run_agent` became a factory + `run_turn`; `_CapturingAgent` preserves the raw envelope, usage file, exit mapping and the historical re-raise.
+- ✅ Default native call shape is unchanged (no stream callback, no `None` system/task kwargs; contextvars cross to the worker). `--engine openjarvis` uses P2 with a typed refusal (exit 2) and no fallback; non-native flags are refused, not ignored.
+- ✅ Focused `nice -n 10` run: 205 passed in the lane (12 new engine tests + a contextvars pin). Merge gate re-ran 42 focused oneshot/runtime tests → 42 passed.
+- 🟡 `qubit chat -q` is still native-only and refuses other engines; OpenJarvis turns do not write the native session store (P2 is stateless).
+- 🔴 Not done: no service restart (CLI-only change), no full matrix, no `VERIFIED`.
+
 ## Wave 53 — 2026-10-26 (Voice Edit panel + live dictation)
 
 - ✅ `voicebridge/voice_edit/overlay.py` redesigned (status pill, live meter, flat actions, diff counts, compact history, dynamic sizing); 757 focused Voice Edit/STT/overlay tests pass; real-Tk visual check on `:0`.
