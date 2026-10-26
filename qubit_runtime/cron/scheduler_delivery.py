@@ -857,12 +857,24 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
             # target's authority being reachable: bottle it before discovery so a down gateway
             # can never park a hidden warning for a later replay. Upstream 43faacfb8de7
             # cron/scheduler_delivery.py:767-774.
-            from cron.bot_chat_delivery import defer
+            from cron.bot_chat_delivery import defer, read_pending
+            from tools.bot_live_delivery import find_canonical_owner
 
-            # Suppression converts an earlier queued admission into a durable suppressed
-            # disposition (``defer`` upgrades queued -> suppressed in place) and never opens a
-            # send. This pass reports nothing: the admission was reported by the call that
-            # created it, and re-reporting it would turn a disposition into a retry warning.
+            # A live consumer already owns this handoff. Its queued admission is an outcome;
+            # a later warning policy must neither cancel it nor hide it, so report the receipt
+            # instead of converting it. A CLI (non-consumer) owner's queued admission is the
+            # legacy lane, where suppression is a durable disposition and this pass reports
+            # nothing (the call that admitted it already did).
+            try:
+                consumer = find_canonical_owner(home) or {}
+            except Exception:
+                consumer = {}
+            if (consumer.get("metadata") or {}).get("bot_live_delivery_consumer"):
+                pending = read_pending(key)
+                if pending is not None:
+                    job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
+                        "status": pending["status"], "delivery_id": key}
+                    return f"{target} {pending['status']} (receipt {key}): completion unverified; do not resend"
             pending = defer(key, dict(job), content, profile, home,
                             for_failure=for_failure, suppressed=True)
             job.setdefault("_bot_chat_delivery_receipts", {})[target] = {
