@@ -1,6 +1,5 @@
 """SQLite completion and fleet verification remain independent update outcomes."""
 
-from contextlib import nullcontext
 import json
 
 import pytest
@@ -39,22 +38,24 @@ def test_fleet_completion_preserves_runtime_verdict_and_restart_obligation(
         assert rows_expected is True
         return snapshot
 
-    monkeypatch.setattr(update_cmd_fleet, "_collect_fleet_snapshot", collect)
+    # ``_verify_fleet_after_update`` lives in the split verify module and resolves the
+    # collector from its own globals, so patch it there (``update_cmd_fleet`` only re-exports).
+    monkeypatch.setattr("qubit_cli.update_cmd_fleet_verify._collect_fleet_snapshot", collect)
     update_cmd_fleet._write_fleet_restart_pending_marker()
     assert update_cmd_fleet._fleet_restart_obligation_armed()
     healthy = update_complete and state == "current"
     with update_receipt.update_receipt_scope():
         update_receipt.begin_update_receipt()
-        with nullcontext() if healthy else pytest.raises(SystemExit) as exc:
-            update_cmd_fleet._verify_fleet_after_update(
-                restart, _pre_update_plan=None, _windows_gateway_resume=None,
-                update_complete=update_complete,
-            )
-        if not healthy:
-            assert exc.value.code == 1
+        # Fork contract C3 (post-freeze): the code is committed, so an owed gateway restart is a
+        # recorded follow-up, never a failed update — no SystemExit even when the fleet is stale
+        # or down. Validation.py's sibling tests pin the same success-with-follow-up outcome.
+        update_cmd_fleet._verify_fleet_after_update(
+            restart, _pre_update_plan=None, _windows_gateway_resume=None,
+            update_complete=update_complete,
+        )
 
     receipt = json.loads((get_qubit_home() / "logs/update_receipts/latest.json").read_text())
-    assert receipt["outcome"] == ("success" if healthy else "partial")
+    assert receipt["outcome"] == "success"
     assert receipt["fleet"] == snapshot
     assert restart.incomplete is (state != "current")
     assert update_cmd_fleet._fleet_restart_obligation_armed() is (state != "current")
