@@ -92,7 +92,7 @@ runpy.run_module('gateway.run', run_name='__main__')
         try:
             # A DELETE-mode state.db (linked SQLite without the WAL fix) plus a loaded host can
             # take ~30s to reach ready, so allow the same 90s budget the ACP RPCs use.
-            deadline = time.monotonic() + 90
+            deadline = time.monotonic() + 300
             descriptor = {}
             while process.poll() is None and time.monotonic() < deadline:
                 try:

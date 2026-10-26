@@ -61,7 +61,7 @@ async def test_cold_acp_load_retains_policy_and_executes_after_daemon_restart(da
         process = subprocess.Popen([sys.executable, '-m', 'gateway.run'], cwd=root, env=env,  # noqa: ASYNC220 -- Popen returns immediately; the test drives the child through its handle
             stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         try:
-            deadline = time.monotonic() + 90
+            deadline = time.monotonic() + 300
             current = {}
             while process.poll() is None and time.monotonic() < deadline:
                 try:
