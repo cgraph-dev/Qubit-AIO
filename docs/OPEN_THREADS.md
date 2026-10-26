@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 50 — 2026-10-26 (RuntimePort Phase 2: OpenJarvis engine)
+
+- ✅ `agent/runtime_openjarvis.py` (pinned out-of-process `jarvis ask --json` adapter), registered as a non-default engine; `qubit runtime engines|run --engine openjarvis` work. No in-process import; no cross-engine session store.
+- ✅ Typed refusals for missing binary, unverifiable/dirty checkout, commit mismatch, binary `g<sha>` mismatch, interface mismatch, invalid/oversized prompt and unresolvable home. Cancel/timeout/Ctrl-C kill the process group (descendants included) and emit exactly one terminal event. Provenance recorded (`THIRD_PARTY_NOTICES.md`).
+- ✅ `tests/runtime` **70 passed**; three adversarial reviews, all findings fixed; live turn through OpenJarvis 0583901 + Ollama returned `PORT_OJ_OK5` with usage.
+- 🟡 Next: Phase 3 — route the simpler `qubit` oneshot path through the port with `--engine` default `native`; reconcile streaming; keep focused chat/oneshot tests green.
+- 🟡 In flight this session (separate worktrees): cron message polish, Voice Edit UI redesign, and selective port of the upstream OpenJarvis test *scenarios* for the adapted surfaces.
+- 🔴 Not done: Phase 4–8; no product caller uses OpenJarvis yet; no service restart (diagnostic only); no `VERIFIED`.
+
 ## Wave 49 — 2026-10-26 (RuntimePort Phase 1)
 
 - ✅ `agent/runtime_port.py`, `runtime_native.py`, `runtime_registry.py`; diagnostic `qubit runtime engines|run`; no product caller touched.

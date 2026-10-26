@@ -3,7 +3,7 @@
 Date: 2026-10-26. Owner direction: Qubit absorbs other agents' capabilities;
 this document scopes the first program that makes the agent runtime a boundary
 instead of a vendored monolith, and uses OpenJarvis as the proof that a second
-engine can plug in. Status: Phase 1b (Hermes/OpenClaw skill sources) and Phase 1 (RuntimePort + native backend) implemented; Phases 2–8 proposed. See `docs/STATUS.md` for evidence.
+engine can plug in. Status: Phase 1b (Hermes/OpenClaw skill sources), Phase 1 (RuntimePort + native backend) and Phase 2 (out-of-process OpenJarvis engine) implemented; Phases 3–8 proposed. See `docs/STATUS.md` for evidence.
 
 ## Outcome
 

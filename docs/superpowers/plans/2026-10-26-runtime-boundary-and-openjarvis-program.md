@@ -83,16 +83,16 @@ Detailed plan: `docs/superpowers/plans/2026-10-26-phase-1-runtime-port-native-ba
 - `qubit runtime run --engine native --prompt "Reply with exactly: PORT_OK" --json` returns a `done` event with `PORT_OK` (live model) and a typed refusal for an unknown engine.
 - Focused chat/oneshot tests remain green (no behaviour change).
 
-## Phase 2 — OpenJarvis backend (out-of-process)
+## Phase 2 — OpenJarvis backend (out-of-process) — ✅ implemented 2026-10-26, `cca47a45c`
 
-Write its own plan after P1. Scope:
+Implemented in `agent/runtime_openjarvis.py` over the pinned CLI; `tests/runtime` 70 passed; live turn through OpenJarvis 0583901 + Ollama answered `PORT_OJ_OK5`; three adversarial reviews closed. Scope:
 
 - Pin an OpenJarvis commit; record repo/paths/license/local changes in `THIRD_PARTY_NOTICES.md`.
 - Pin its interface: `jarvis ask --json` and/or its FastAPI agent/session/WS routes (`src/openjarvis/server/api_routes.py`, `ws_bridge.py`). Contract test against the pinned version.
 - Implement `agent/runtime_openjarvis.py`: spawn/serve with an isolated home; map request/events/cancel; typed refusal when the binary/commit is absent or mismatched.
 - No OpenJarvis import in-process; no cross-engine session store.
 
-**Acceptance:** same prompt through both engines yields the port event sequence; missing/mismatched OpenJarvis refuses; no child left after cancel; focused runtime tests green.
+**Acceptance (met):** same prompt through both engines yields the port event sequence; missing/mismatched/unverifiable OpenJarvis refuses with `data["refusal"]`; no child (or same-group descendant) survives cancel/timeout; focused runtime tests green (70 passed).
 
 ## Phase 3 — Route a product caller through the port (native only)
 
