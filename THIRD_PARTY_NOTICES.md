@@ -700,3 +700,29 @@ the upstream `LICENSE` carries the full text and copyright).
 - The brief's schedule → preparation → urgent-mail ordering also follows the
   Qubit-bundled `google-workspace` skill's `references/daily-brief.md`
   (procedure only, no code copied).
+
+## OpenJarvis Google Contacts connector field mapping — Apache-2.0
+
+The read-only Google Contacts connector
+(`qubit_runtime/connectors/google_contacts.py`) adapts the People API field
+mapping and contact-shape constants from
+[open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis) at commit
+`05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0; the upstream
+`LICENSE` carries the full text and copyright).
+
+- Reference sources: `src/openjarvis/connectors/gcontacts.py`
+  (`_gcontacts_api_list` People API endpoint/fields, `_format_contact` name/
+  email/phone/organization mapping, `contacts_find`/`contacts_get_info` tool
+  intent) and `tests/connectors/test_gcontacts.py` (field-mapping scenarios).
+- Local adaptation: `qubit_runtime/connectors/google_contacts.py`,
+  `qubit_runtime/tools/google_contacts_tool.py`, and
+  `qubit_runtime/tests/connectors/`. **No OpenJarvis code is vendored or
+  imported**; OpenJarvis is not a Qubit dependency. Qubit's credential path,
+  scope preflight, pagination bounds, typed refusals, redaction and registry
+  integration are original.
+- Deliberate divergences: Qubit reads the existing Google Workspace
+  `google_token.json` and refreshes it through google-auth (no second OAuth
+  flow, token store, or `~/.openjarvis` path); query search uses the People API
+  `people:searchContacts` endpoint rather than client-side filtering; the
+  connector is read-only and returns bound results, where OpenJarvis also runs
+  a bulk document-sync pipeline.
