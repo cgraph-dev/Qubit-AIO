@@ -17,6 +17,22 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 53 — 2026-10-26 (Voice Edit panel + live dictation)
+
+- ✅ `voicebridge/voice_edit/overlay.py` redesigned (status pill, live meter, flat actions, diff counts, compact history, dynamic sizing); 757 focused Voice Edit/STT/overlay tests pass; real-Tk visual check on `:0`.
+- ✅ Words stream while speaking: helper shows the panel on the hotkey, forwards partials, and the STT client composes segment-aware cumulative text. Wake path shows its final words immediately.
+- 🟡 Not live: `qubit-voice-typing.service` was not restarted (outside the authorized restart set). Restart it to load the new panel.
+
+## Wave 52 — 2026-10-26 (OpenJarvis test scenarios ported)
+
+- ✅ 11 missing upstream scenarios ported as Qubit-native tests (7 skills, 4 runtime); no upstream import/network; provenance recorded. `tests/runtime` + git skill sources 88 passed; focused hub 144 passed/1 skipped; merged focused set 111 passed.
+- 🔴 Not ported (deliberate): their importer/trust layer, eval telemetry/energy sampler, OpenClaw payload runner, GitHub recursive resolver, commit-drift override, live external suite.
+
+## Wave 51 — 2026-10-26 (Cron notice formatting)
+
+- ✅ `cron/notice_format.py` + delivery integration: one status icon, bounded summary, structured details, local/relative times, configured-link only, per-transport rendering/escaping, plain fallback, redaction before truncation. 23 notice tests + 599-file matrix green in the lane; 111 focused passed on merged main.
+- 🟡 Needs a gateway restart to emit live; no scheduling/behaviour change.
+
 ## Wave 50 — 2026-10-26 (RuntimePort Phase 2: OpenJarvis engine)
 
 - ✅ `agent/runtime_openjarvis.py` (pinned out-of-process `jarvis ask --json` adapter), registered as a non-default engine; `qubit runtime engines|run --engine openjarvis` work. No in-process import; no cross-engine session store.
