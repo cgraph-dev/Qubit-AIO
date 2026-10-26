@@ -28,6 +28,12 @@ import time
 
 argv = sys.argv[1:]
 if argv and argv[0] == "--version":
+    if os.environ.get("FAKE_OJ_VERSION_FAIL"):
+        print("version probe failed", file=sys.stderr)
+        sys.exit(1)
+    if os.environ.get("FAKE_OJ_VERSION_NOSTAMP"):
+        print("jarvis, version 1.2.3")
+        sys.exit(0)
     print("jarvis, version fake.g" + os.environ.get("FAKE_OJ_PIN", "")[:9])
     sys.exit(0)
 if not argv or argv[0] != "ask":
@@ -65,7 +71,7 @@ if "FAIL" in prompt:
     print("boom failure", file=sys.stderr)
     sys.exit(1)
 if "LEAKLONG" in prompt:
-    print("x" * 3000 + os.environ.get("QUBIT_TEST_API_KEY", ""), file=sys.stderr)
+    print("x" * 1990 + os.environ.get("QUBIT_TEST_API_KEY", ""), file=sys.stderr)
     sys.exit(1)
 if "LEAK" in prompt:
     print("provider key " + os.environ.get("QUBIT_TEST_API_KEY", ""), file=sys.stderr)
@@ -82,6 +88,15 @@ if "INCOMPLETE" in prompt:
     sys.exit(0)
 if "ERROR_WITH_CONTENT" in prompt:
     print(json.dumps({"error": "partial failure", "content": "partial"}))
+    sys.exit(0)
+if "LINGER" in prompt:
+    marker = os.path.join(home, "descendant.pid")
+    subprocess.Popen([
+        sys.executable, "-c",
+        "import os,signal,sys,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "open(sys.argv[1],'w').write(str(os.getpid())); time.sleep(60)", marker,
+    ])
+    print(json.dumps({"content": "child done"}))
     sys.exit(0)
 if "ECHO_PROMPT" in prompt:
     print(json.dumps({"content": prompt}))
@@ -150,8 +165,9 @@ def _assert_process_gone(pid_file: Path, timeout: float = 5.0) -> None:
 
 
 @pytest.fixture
-def pinned(tmp_path):
+def pinned(tmp_path, monkeypatch):
     script, repo, commit = _repo_cli(tmp_path)
+    monkeypatch.setenv("FAKE_OJ_PIN", commit)
     return script, repo, commit
 
 
@@ -421,7 +437,7 @@ def test_keyboard_interrupt_reaps_the_child_before_propagating(tmp_path, pinned,
     backend = _backend(
         tmp_path, binary=str(script), source=str(repo), pinned_commit=commit, home=home)
 
-    def _boom(proc, pgid, cancel):
+    def _boom(proc, pgid, cancel, state):
         time.sleep(0.3)
         raise KeyboardInterrupt
 
@@ -504,6 +520,127 @@ def test_malformed_json_is_an_error(tmp_path, pinned):
 
 def test_json_with_trailing_status_text_is_parsed(tmp_path):
     assert OpenJarvisRuntime._parse('{"content": "ok"}\nstatus: done') == {"content": "ok"}
+
+
+def test_surrogate_prompt_is_a_typed_refusal_not_a_traceback(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    events = _run(backend, "\udcff")
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_invalid_prompt"
+
+
+def test_version_probe_failure_refuses(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    monkeypatch.setenv("FAKE_OJ_VERSION_FAIL", "1")
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    with pytest.raises(RuntimeRefusalError) as exc:
+        backend.resolve()
+    assert exc.value.code == "openjarvis_commit_unverifiable"
+
+
+def test_version_probe_without_a_stamp_refuses(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    monkeypatch.setenv("FAKE_OJ_VERSION_NOSTAMP", "1")
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    with pytest.raises(RuntimeRefusalError) as exc:
+        backend.resolve()
+    assert exc.value.code == "openjarvis_commit_unverifiable"
+
+
+def test_git_status_failure_is_fail_closed(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    real_git = OpenJarvisRuntime._git
+
+    def fake_git(args, cwd):
+        if args and args[0] == "status":
+            return None
+        return real_git(args, cwd)
+
+    monkeypatch.setattr(OpenJarvisRuntime, "_git", staticmethod(fake_git))
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    with pytest.raises(RuntimeRefusalError) as exc:
+        backend.resolve()
+    assert exc.value.code == "openjarvis_commit_unverifiable"
+
+
+def test_bare_binary_name_is_found_on_path(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    monkeypatch.setenv("PATH", str(repo) + os.pathsep + os.environ["PATH"])
+    backend = _backend(tmp_path, binary="jarvis", source=str(repo), pinned_commit=commit)
+
+    events = _run(backend)
+
+    assert events[-1].kind == "done"
+
+
+def test_sixty_thousand_character_cap_is_still_enforced(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    events = _run(backend, "x" * 60_001)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_prompt_too_large"
+
+
+def test_e2big_from_spawn_maps_to_prompt_too_large(tmp_path, pinned, monkeypatch):
+    import errno
+
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    import subprocess as _subprocess
+    real_popen = _subprocess.Popen
+
+    def _e2big(argv, *args, **kwargs):
+        if "--no-context" not in argv:
+            return real_popen(argv, *args, **kwargs)
+        raise OSError(errno.E2BIG, "Argument list too long")
+
+    monkeypatch.setattr("agent.runtime_openjarvis.subprocess.Popen", _e2big)
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_prompt_too_large"
+
+
+def test_successful_child_with_a_lingering_descendant_completes_quickly(tmp_path, pinned):
+    script, repo, commit = pinned
+    home = tmp_path / "ojhome"
+    backend = _backend(
+        tmp_path, binary=str(script), source=str(repo), pinned_commit=commit, home=home,
+        timeout_seconds=30)
+
+    started = time.monotonic()
+    events = _run(backend, "LINGER")
+
+    assert time.monotonic() - started < 10
+    assert events[-1].kind == "done"
+    assert events[-1].text == "child done"
+    _assert_process_gone(home / "descendant.pid")
+
+
+def test_query_file_with_invalid_utf8_is_reported_not_a_traceback(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+    registry = RuntimeRegistry()
+    registry.register(backend)
+    bad = tmp_path / "bad.txt"
+    bad.write_bytes(b"\xff\xfe")
+    err = io.StringIO()
+
+    with redirect_stdout(io.StringIO()), redirect_stderr(err):
+        code = cmd_runtime(
+            _cli_args(prompt=None, query_file=str(bad), json=False), registry=registry)
+
+    assert code == 2
+    assert "cannot read" in err.getvalue()
 
 
 # --------------------------------------------------------------------- CLI/registry

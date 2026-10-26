@@ -17,7 +17,7 @@ def _prompt(args) -> tuple[str | None, str | None]:
     if args.query_file:
         try:
             text = Path(args.query_file).read_text(encoding="utf-8-sig").strip()
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             return None, f"runtime run: cannot read {args.query_file}: {exc}"
         return (text or None), None
     return None, None
