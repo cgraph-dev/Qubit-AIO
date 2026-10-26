@@ -21,11 +21,11 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 - ✅ `qubit_runtime/recipes/` typed `RecipeSpec` + registry + RuntimePort runner; `morning_digest` collects weather/calendar/unread mail deterministically and degrades each section with a stable typed reason (`missing_connector`, `missing_credential`, `connector_not_configured`, `tool_error`). Health is honestly unavailable (no connector). Facts/brief redacted; model only writes from facts.
 - ✅ CLI `qubit recipe list|run morning_digest [--engine] [--dry-run] [--json]`; native default, OpenJarvis through P2 with typed refusal (not live-probed). Exit 0/2/1/130.
-- ✅ Voice: additive `recipe_morning_digest` bridge with "give me my morning digest" aliases, running the read-only recipe and speaking the redacted brief. Requires a bridge restart to load live.
+- ✅ Voice: additive `recipe_morning_digest` bridge with "give me my morning digest" aliases, running the read-only recipe and speaking the redacted brief. **Live:** bridge restarted 00:29; alias resolution confirmed in-process; `/chat` 200.
 - ✅ Cron helper builds the job spec; no live job created. Owner command recorded in STATUS.
 - ✅ Tests: recipes 43 passed; voice recipe 5 passed; runtime 75 passed in the lane. Merge gate: 48 focused passed.
 - 🟡 Degraded: no health connector; calendar/mail need the existing Google Workspace token; weather needs its script/network; no live connector probe; no dashboard recipe surface.
-- 🔴 Not done: `monitor_operative`/`deep_research`, service restart (deferred), full matrix, `VERIFIED`.
+- 🔴 Not done: `monitor_operative`/`deep_research`, full matrix, `VERIFIED`.
 
 ## Wave 54 — 2026-10-26 (RuntimePort Phase 3: `qubit -z` through the port)
 
