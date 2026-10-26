@@ -144,6 +144,7 @@ def _run_and_exit_oneshot(
     usage_file: object = None,
     resume: object = None,
     reasoning: object = None,
+    engine: object = "native",
 ) -> None:
     try:
         from qubit_cli.oneshot import run_oneshot
@@ -157,6 +158,7 @@ def _run_and_exit_oneshot(
             usage_file=usage_file,
             resume=resume,
             reasoning=reasoning,
+            engine=engine,
         )
     except KeyboardInterrupt:
         rc = 130
@@ -1757,6 +1759,16 @@ _CHAT_PASSTHROUGH = (
 
 def cmd_chat(args):
     """Run interactive chat CLI."""
+    _engine = (getattr(args, "engine", None) or "native").strip() or "native"
+    if _engine != "native":
+        # P3 routes the -z/--oneshot path. The classic chat/query path still builds
+        # the vendored AIAgent directly; never accept an engine it cannot honour.
+        print(
+            "Error: --engine is only supported on the -z/--oneshot path in this build; "
+            f"'qubit chat' runs the native engine (requested {_engine!r}).",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     _apply_safe_mode(args)
     _apply_user_config_bypass(args)
     _guard_noninteractive_user_config(args)
@@ -3129,6 +3141,26 @@ def _set_chat_arg_defaults(args) -> None:
             setattr(args, attr, default)
 
 
+def _refuse_engine_outside_oneshot(args) -> None:
+    """Reject ``--engine`` where this build has no engine surface.
+
+    Only ``-z/--oneshot`` runs through the RuntimePort today; `qubit chat`
+    (including ``-q``) still builds the vendored agent and refuses in
+    ``cmd_chat`` with its own message. Any other top-level command has no
+    engine choice at all, so accepting the flag silently would be a lie.
+    """
+    engine = (getattr(args, "engine", None) or "native").strip() or "native"
+    if engine == "native" or getattr(args, "oneshot", None):
+        return
+    if getattr(args, "command", None) in (None, "chat"):
+        return
+    print(
+        "Error: --engine is only supported on the -z/--oneshot path in this build.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+
 def _run_oneshot_from_args(args) -> None:
     """Top-level --oneshot / -z: single-shot mode, stdout = final response only.
 
@@ -3156,6 +3188,7 @@ def _run_oneshot_from_args(args) -> None:
         usage_file=getattr(args, "usage_file", None),
         resume=getattr(args, "resume", None),
         reasoning=getattr(args, "reasoning", None),
+        engine=getattr(args, "engine", "native"),
     )
 
 
@@ -3672,6 +3705,8 @@ def main():
     if args.version:
         cmd_version(args)
         return
+
+    _refuse_engine_outside_oneshot(args)
 
     # --yolo must be set *before* plugin discovery: tools.approval freezes
     # _YOLO_MODE_FROZEN at import; set later (inside cmd_chat) it does nothing.

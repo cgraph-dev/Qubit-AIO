@@ -12,11 +12,12 @@ import json
 import logging
 import os
 import sys
+import threading
 from contextlib import redirect_stderr, redirect_stdout
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from gateway.session_context import declare_stateless_channel
 from qubit_cli.fallback_config import get_fallback_chain
@@ -235,6 +236,23 @@ def _write_usage_file(path: Optional[str], result: dict, failure: Optional[str] 
         pass
 
 
+def _validate_engine(engine: str) -> str | None:
+    """Return an error message for an unknown engine, else ``None``.
+
+    Runs before the stdout/stderr redirect so the registered list reaches the real
+    terminal. A refusal (engine known but not runnable) is discovered later, inside
+    the turn, and is reported after the redirect ends.
+    """
+    from agent.runtime_port import UnknownRuntimeError
+    from agent.runtime_registry import build_registry
+
+    try:
+        build_registry(lambda request: None).get(engine)
+    except UnknownRuntimeError as exc:
+        return str(exc)
+    return None
+
+
 def run_oneshot(
     prompt: str,
     model: Optional[str] = None,
@@ -244,17 +262,51 @@ def run_oneshot(
     usage_file: Optional[str] = None,
     resume: Optional[str] = None,
     reasoning: object = None,
+    engine: str = "native",
+    stream=None,
 ) -> int:
     """Execute a single prompt and print only the final content block.
 
     Model/provider fall back to ``HERMES_INFERENCE_MODEL`` and config.yaml. ``usage_file`` gets a
     JSON usage report even when the run fails. ``resume`` is a session id (already normalized by
     the CLI layer: latest/title/--continue resolution) whose transcript is loaded and continued
-    by this turn. Returns the exit code; the caller owns process termination.
+    by this turn. ``engine`` selects a RuntimePort backend (default ``native``); a typed refusal
+    or unknown name returns 2 and never falls back. ``stream`` is an optional delta sink; the
+    default ``-z`` contract is final-response-only. Returns the exit code; the caller owns
+    process termination.
     """
+    engine = (engine or "native").strip() or "native"
     # Silence every stdlib logger: AIAgent, tools and provider adapters log to stderr through the
     # root logger. File handlers from setup_logging() keep working (level-independent).
     logging.disable(logging.CRITICAL)
+
+    # Engine selection is validated before the redirect so its diagnostic is visible.
+    engine_error = _validate_engine(engine)
+    if engine_error:
+        sys.stderr.write(f"qubit -z: {engine_error}\n")
+        return 2
+
+    if engine != "native":
+        # These flags select the vendored agent's route/toolset and have no
+        # equivalent in the bounded P2 request. Refuse rather than accepting a
+        # flag the engine would silently ignore.
+        unsupported = [
+            flag for flag, value in (
+                ("--model", model),
+                ("--provider", provider),
+                ("--reasoning", reasoning),
+                ("--toolsets", toolsets),
+            )
+            if value not in (None, "", [], ())
+        ]
+        if unsupported:
+            sys.stderr.write(
+                f"qubit -z: --engine {engine} does not accept "
+                f"{', '.join(unsupported)} yet; configure the engine with its own "
+                "environment (QUBIT_OPENJARVIS_MODEL / QUBIT_OPENJARVIS_TOOLS) "
+                "or omit these flags.\n"
+            )
+            return 2
 
     # --provider without --model is ambiguous (the provider may not host the configured model, and
     # picking its catalog default hides the mismatch). Validate BEFORE the stderr redirect.
@@ -304,6 +356,8 @@ def run_oneshot(
                 resume=resume,
                 reasoning=reasoning,
                 ledger=bool(usage_file),
+                engine=engine,
+                stream=stream,
             )
         except BaseException as exc:  # noqa: BLE001
             # Capture anything escaping the agent (OSError from prompt_toolkit on a non-TTY pipe,
@@ -323,6 +377,19 @@ def run_oneshot(
 
     _write_usage_file(usage_file, result)
 
+    if result.get("refusal"):
+        # A typed refusal means no turn was attempted. Keep it distinct from a
+        # failed turn (exit 1); the stable code is shown beside the message.
+        refusal = str(result.get("refusal"))
+        error = str(result.get("error") or refusal)
+        prefix = f"[{refusal}] " if error != refusal else ""
+        real_stderr.write(f"qubit -z: {prefix}{error}\n")
+        hint = str(result.get("hint") or "")
+        if hint:
+            real_stderr.write(hint if hint.endswith("\n") else hint + "\n")
+        real_stderr.flush()
+        return 2
+
     if response:
         # Lone UTF-16 surrogates would raise UnicodeEncodeError on a real stdout and abort with
         # exit 1 after the turn already completed — scrub to U+FFFD first.
@@ -334,6 +401,19 @@ def run_oneshot(
         if not response.endswith("\n"):
             real_stdout.write("\n")
         real_stdout.flush()
+
+    if str(result.get("_runtime_engine") or "native") != "native":
+        # Non-native engines follow the runtime CLI convention: a cancelled turn is
+        # 130, a failed turn is 1. Native keeps the historical -z mapping below.
+        if result.get("interrupted"):
+            return 130
+        if result.get("failed") or result.get("partial") or result.get("completed") is False:
+            error = str(result.get("error") or "")
+            if error:
+                real_stderr.write(f"qubit -z: {error}\n")
+                real_stderr.flush()
+            return 1
+        return 0 if (response or "").strip() else 1
 
     exit_code = _oneshot_exit_code(response, result)
     if exit_code == 1:
@@ -434,7 +514,9 @@ def _resolve_model_and_provider(cfg: dict, model: Optional[str], provider: Optio
     return choice
 
 
-def _load_resume_target(session_db, resume: Optional[str]) -> tuple[Optional[str], list, Optional[dict]]:
+def _load_resume_target(
+    session_db, resume: Optional[str], *, reopen: bool = True,
+) -> tuple[Optional[str], list, Optional[dict]]:
     """Resolve ``resume`` to ``(session_id, conversation_history, session_meta)`` for a oneshot turn.
 
     Follows the same contract as the interactive CLI resume: compression-chain redirect via
@@ -468,10 +550,11 @@ def _load_resume_target(session_db, resume: Optional[str]) -> tuple[Optional[str
     session_db.assert_resume_safe(resolved, tip_only=True)
     restored, _display = session_db.get_resume_conversations(resolved)
     history = [m for m in restored if m.get("role") != "session_meta"]
-    try:
-        session_db.reopen_session(resolved)
-    except Exception:
-        logging.debug("reopen_session failed for resumed one-shot session %s", resolved, exc_info=True)
+    if reopen:
+        try:
+            session_db.reopen_session(resolved)
+        except Exception:
+            logging.debug("reopen_session failed for resumed one-shot session %s", resolved, exc_info=True)
     return resolved, history, session_meta
 
 
@@ -500,6 +583,150 @@ def _apply_stored_session_runtime(
     return choice
 
 
+_PORT_CANCEL_GRACE_SECONDS = 5.0
+
+
+class _CapturingAgent:
+    """Thin delegate that retains the agent's full result envelope.
+
+    The RuntimePort native adapter copies only bounded identity fields into event
+    data (so a result cannot leak credentials). The one-shot caller still needs the
+    raw envelope for ``--usage-file`` and its exit-code contract, so the factory
+    returns this delegate and reads ``result``/``error`` after the turn. Every
+    other attribute delegates to the real agent.
+    """
+
+    def __init__(self, agent, done: threading.Event) -> None:
+        self._agent = agent
+        self._done = done
+        self.result: Any = None
+        self.error: BaseException | None = None
+
+    def run_conversation(self, *args, **kwargs):
+        try:
+            self.result = self._agent.run_conversation(*args, **kwargs)
+            return self.result
+        except BaseException as exc:  # noqa: BLE001 - re-raised after the port terminal
+            self.error = exc
+            raise
+        finally:
+            self._done.set()
+
+    def interrupt(self, *args, **kwargs):
+        interrupt = getattr(self._agent, "interrupt", None)
+        if interrupt is None:
+            return None
+        return interrupt(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._agent, name)
+
+
+@dataclass
+class _PortTurn:
+    """A consumed RuntimePort event stream: terminal event plus bounded extras."""
+
+    text: str = ""
+    terminal: str | None = None
+    data: dict = field(default_factory=dict)
+    usage: dict = field(default_factory=dict)
+    deltas: list[str] = field(default_factory=list)
+
+
+def _run_port_turn(backend, request, *, stream=None, cancel=None) -> _PortTurn:
+    """Drive one backend turn, forwarding deltas to *stream* and keeping the rest.
+
+    The port guarantees one terminal event, but a callable that never yields one is
+    still bounded: the loop ends at end-of-stream and the caller sees no terminal.
+    """
+    outcome = _PortTurn()
+    for event in backend.run_turn(request, cancel):
+        if event.kind == "delta":
+            outcome.deltas.append(event.text)
+            if stream is not None and event.text:
+                stream(event.text)
+        elif event.kind == "usage":
+            outcome.usage.update(event.data or {})
+        elif event.kind in ("done", "error"):
+            outcome.terminal = event.kind
+            outcome.text = event.text
+            outcome.data = dict(event.data or {})
+            break
+    return outcome
+
+
+def _port_result(engine: str, outcome: _PortTurn, session_id: Optional[str]) -> dict:
+    """Translate a non-native port outcome into the result dict ``-z`` consumes."""
+    refusal = str(outcome.data.get("refusal") or "")
+    interrupted = bool(outcome.data.get("interrupted"))
+    result: dict[str, Any] = {
+        "engine": engine,
+        "_runtime_engine": engine,
+        "session_id": session_id or None,
+        "interrupted": interrupted,
+    }
+    if outcome.terminal == "done":
+        result.update(completed=True, failed=False, final_response=outcome.text)
+    else:
+        result.update(
+            completed=False,
+            failed=True,
+            # A failed CLI turn may have streamed partial content before erroring.
+            final_response="".join(outcome.deltas),
+            error=outcome.text or "turn did not complete",
+        )
+        if refusal:
+            result.update(refusal=refusal, hint=str(outcome.data.get("hint") or ""))
+    model = outcome.data.get("model")
+    if isinstance(model, str) and model:
+        result["model"] = model
+    usage = outcome.usage
+    if usage:
+        if usage.get("prompt_tokens") is not None:
+            result["input_tokens"] = usage["prompt_tokens"]
+        if usage.get("completion_tokens") is not None:
+            result["output_tokens"] = usage["completion_tokens"]
+        if usage.get("total_tokens") is not None:
+            result["total_tokens"] = usage["total_tokens"]
+    return result
+
+
+def _run_port_oneshot(prompt, *, engine, skills, resume, stream):
+    """Run a non-native engine through the port.
+
+    Qubit owns the prompt and, when ``--resume`` is used, the history loaded from
+    its own store; the backend's adapter owns its process. No native session row is
+    written for a non-native turn (the P2 adapter is stateless).
+    """
+    from agent.runtime_port import TurnRequest
+    from agent.runtime_registry import build_registry
+
+    session_db = None
+    session_id: Optional[str] = None
+    history: list = []
+    try:
+        if resume:
+            session_db = _create_session_db_for_oneshot()
+            session_id, history, _meta = _load_resume_target(session_db, resume, reopen=False)
+        skills_prompt = _build_preloaded_skills_prompt(skills)
+        backend = build_registry(lambda request: None).get(engine)
+        outcome = _run_port_turn(
+            backend,
+            TurnRequest(
+                prompt=prompt,
+                session_id=session_id or "",
+                history=tuple(history),
+                system=skills_prompt,
+            ),
+            stream=stream,
+        )
+        result = _port_result(engine, outcome, session_id)
+        return result.get("final_response", ""), result
+    finally:
+        if session_db is not None:
+            _quietly("session store cleanup", session_db.close)
+
+
 def _run_agent(
     prompt: str,
     model: Optional[str] = None,
@@ -510,10 +737,21 @@ def _run_agent(
     resume: Optional[str] = None,
     reasoning: object = None,
     ledger: bool = False,
+    engine: str = "native",
+    stream=None,
 ) -> tuple[str, dict]:
     """Build an AIAgent exactly like a normal CLI chat turn, run one conversation, and return
     ``(final_response, run_result)``. Imports are local to keep CLI startup cheap. *ledger* (set when
-    ``--usage-file`` is requested) attaches this run's auxiliary usage to the result."""
+    ``--usage-file`` is requested) attaches this run's auxiliary usage to the result.
+
+    ``engine`` selects a RuntimePort backend. ``native`` keeps the historical call shape (and
+    re-raises agent failures); any other engine runs its own out-of-process adapter.
+    """
+    engine = (engine or "native").strip() or "native"
+    if engine != "native":
+        return _run_port_oneshot(
+            prompt, engine=engine, skills=skills, resume=resume, stream=stream)
+
     from qubit_cli.config import load_config
     from qubit_cli.runtime_provider import resolve_runtime_with_fallback
     from qubit_cli.tools_config import _get_platform_tools
@@ -570,49 +808,95 @@ def _run_agent(
 
     skills_prompt = _build_preloaded_skills_prompt(skills)
 
-    # The try spans agent construction (not just ``chat``) so the store is always closed, even when
-    # ``AIAgent(...)`` raises — the one-shot exit path hard-exits via os._exit and skips finalizers.
-    agent = relay_session_id = None
-    try:
-        agent = AIAgent(
-            api_key=runtime.get("api_key"),
-            base_url=runtime.get("base_url"),
-            provider=runtime.get("provider"),
-            requested_provider=runtime.get("requested_provider"),
-            api_mode=runtime.get("api_mode"),
-            model=choice.model,
-            enabled_toolsets=toolsets_list,
-            quiet_mode=True,
-            platform="cli",
-            session_db=session_db,
-            session_id=resume_sid,
-            credential_pool=runtime.get("credential_pool"),
-            fallback_model=get_fallback_chain(cfg) or None,
-            # The resolved provider's request body (a custom entry's extra_body), as `qubit chat` passes it.
-            request_overrides=runtime.get("request_overrides"),
-            ephemeral_system_prompt=skills_prompt,
-            reasoning_config=reasoning_config,
-            # The only interactive callback wired: no user sits at a terminal. Sudo prompts gate on
-            # HERMES_INTERACTIVE (never set), hook approval via HERMES_ACCEPT_HOOKS=1, dangerous
-            # commands via HERMES_YOLO_MODE=1, skill secret capture degrades gracefully.
-            clarify_callback=_oneshot_clarify_callback,
-        )
+    from agent.runtime_port import TurnRequest
+    from agent.runtime_registry import build_registry
+
+    aux_before = _auxiliary_usage(session_db, resume_sid) if ledger else {}
+    done = threading.Event()
+    box: dict[str, Any] = {}
+    capture_box: dict[str, Any] = {}
+
+    def build_agent(request: TurnRequest):
+        # Construction runs inside the port's turn try (on its worker thread), so a
+        # missing credential reaches the caller as one terminal error rather than a
+        # silently empty stream. Capture it anyway to preserve the historical
+        # re-raise contract of `qubit -z`.
+        try:
+            agent = AIAgent(
+                api_key=runtime.get("api_key"),
+                base_url=runtime.get("base_url"),
+                provider=runtime.get("provider"),
+                requested_provider=runtime.get("requested_provider"),
+                api_mode=runtime.get("api_mode"),
+                model=choice.model,
+                enabled_toolsets=toolsets_list,
+                quiet_mode=True,
+                platform="cli",
+                session_db=session_db,
+                session_id=resume_sid,
+                credential_pool=runtime.get("credential_pool"),
+                fallback_model=get_fallback_chain(cfg) or None,
+                # The resolved provider's request body (a custom entry's extra_body), as `qubit chat` passes it.
+                request_overrides=runtime.get("request_overrides"),
+                ephemeral_system_prompt=skills_prompt,
+                reasoning_config=reasoning_config,
+                # The only interactive callback wired: no user sits at a terminal. Sudo prompts gate on
+                # HERMES_INTERACTIVE (never set), hook approval via HERMES_ACCEPT_HOOKS=1, dangerous
+                # commands via HERMES_YOLO_MODE=1, skill secret capture degrades gracefully.
+                clarify_callback=_oneshot_clarify_callback,
+            )
+        except BaseException as exc:  # noqa: BLE001 - re-raised after the port terminal
+            capture_box["error"] = exc
+            raise
         # Belt-and-braces: no streaming display callbacks may bypass our stdout capture.
         agent.suppress_status_output = True
         agent.stream_delta_callback = None
         agent.tool_gen_callback = None
-
-        aux_before = _auxiliary_usage(session_db, resume_sid) if ledger else {}
+        capture = _CapturingAgent(agent, done)
+        capture_box["capture"] = capture
+        box["agent"] = capture
         # Relay keys the root conversation to the id at turn entry; compression may rotate
         # agent.session_id mid-turn without opening a second root, so keep the entry id.
-        relay_session_id = getattr(agent, "session_id", None)
-        result = agent.run_conversation(prompt, conversation_history=conversation_history or None)
+        box["relay_session_id"] = getattr(agent, "session_id", None)
+        return capture
+
+    backend = build_registry(build_agent, native_stream=stream is not None).get(engine)
+    cancel = threading.Event()
+    try:
+        outcome = _run_port_turn(
+            backend,
+            TurnRequest(
+                prompt=prompt,
+                session_id=resume_sid or "",
+                history=tuple(conversation_history or ()),
+            ),
+            stream=stream,
+            cancel=cancel,
+        )
+        construction_error = capture_box.get("error")
+        if construction_error is not None:
+            raise construction_error
+        capture = capture_box.get("capture")
+        if capture is not None and capture.error is not None:
+            raise capture.error
+        result = capture.result if capture is not None else None
+        if not isinstance(result, dict):
+            # A factory that never ran (or an agent with no envelope) still gets a
+            # truthful terminal outcome instead of an empty success.
+            result = _port_result(engine, outcome, resume_sid)
         if ledger:
-            _attach_auxiliary_usage(result, session_db, aux_before,
-                                    fallback_session_id=agent.session_id or resume_sid)
+            _attach_auxiliary_usage(
+                result, session_db, aux_before,
+                fallback_session_id=getattr(box.get("agent"), "session_id", None) or resume_sid)
         return (result.get("final_response") or "", result)
+    except KeyboardInterrupt:
+        # The agent runs on the port's worker thread; ask it to stop and give it the
+        # adapter's grace window before the finally tears the agent down.
+        cancel.set()
+        done.wait(_PORT_CANCEL_GRACE_SECONDS)
+        raise
     finally:
-        _close_agent(agent, session_db, relay_session_id)
+        _close_agent(box.get("agent"), session_db, box.get("relay_session_id"))
 
 
 def _quietly(what: str, fn) -> None:
