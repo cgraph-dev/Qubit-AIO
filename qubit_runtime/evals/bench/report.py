@@ -35,14 +35,15 @@ def render_summary(report: dict[str, Any]) -> str:
     else:
         lines.append("Latency: unavailable")
 
-    prompt = report.get("prompt_tokens") or {}
-    completion = report.get("completion_tokens") or {}
-    if prompt.get("status") == "ok" and completion.get("status") == "ok":
-        lines.append(
-            f"Tokens: prompt {prompt.get('total')} (mean {_fmt(prompt.get('mean'))}) · "
-            f"completion {completion.get('total')} (mean {_fmt(completion.get('mean'))})")
-    else:
-        lines.append("Tokens: unavailable")
+    for key, label in (("prompt_tokens", "Prompt tokens"),
+                       ("completion_tokens", "Completion tokens")):
+        metric = report.get(key) or {}
+        if metric.get("status") == "ok":
+            lines.append(
+                f"{label}: {metric.get('total')} total "
+                f"(mean {_fmt(metric.get('mean'))})")
+        else:
+            lines.append(f"{label}: unavailable")
 
     cost = report.get("cost_usd") or {}
     if cost.get("status") == "ok":
