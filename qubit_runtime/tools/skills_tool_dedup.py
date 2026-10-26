@@ -78,30 +78,27 @@ def _record_skill_view(task_id, name, file_path, payload: dict) -> None:
 
 
 def _check_skill_view_dedup(task_id, name, file_path) -> str | None:
-    """Dedup stub when this exact skill file was already served to this task and
-    is unchanged on disk; None otherwise."""
+    """Stub when this (skill name, file) was already served to the task in the current
+    generation; None otherwise.
+
+    Kept for callers that only know the identity, not the served result: the live path
+    (``dedup_skill_view``) compares the result's content digest, which is what decides
+    whether a repeat is byte-identical. This helper therefore reports "a repeat with the
+    same content would dedup" — it never re-stats the file, because a same-content rewrite
+    must not re-arm the cache.
+    """
     if not task_id:
         return None
     n = str(name)
     with _skill_view_tracker_lock:
-        if not (cache := _skill_view_tracker.get(str(task_id))):
-            return None
+        cache = _skill_view_tracker.get(str(task_id)) or {}
         # Record key is the RESOLVED name; match raw and resolved forms so
         # 'category/skill' and bare-name views coalesce.
-        for key, (src, mtime_ns, size) in list(cache.items()):
-            rec_name, rec_fp = key
+        for rec_name, rec_fp in list(cache):
             if rec_fp != (file_path or "") or (
                     rec_name != n and not n.endswith("/" + rec_name)
                     and not rec_name.endswith("/" + n) and n.split(":")[-1] != rec_name):
                 continue
-            try:
-                st = os.stat(src)
-                changed = (st.st_mtime_ns, st.st_size) != (mtime_ns, size)
-            except OSError:
-                changed = True
-            if changed:
-                cache.pop(key, None)
-                return None
             return json.dumps({
                 "success": True, "status": "unchanged", "name": rec_name,
                 "file": file_path or "SKILL.md", "dedup": True, "content_returned": False,

@@ -505,7 +505,9 @@ def _tool_lifecycle_required_for_ui(name: str) -> bool:
     """
     return name in _TOOL_LIFECYCLE_UI_TOOLS
 
-def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _RuntimeFallbackResolution:
+def _resolve_runtime_with_fallback(
+    resolve_kwargs: dict | None = None, *, allow_fallback: bool = True,
+) -> _RuntimeFallbackResolution:
     """Resolve the primary runtime or one complete provider/model fallback. Provider-only fallback entries
     are skipped so the unavailable primary model can never leak into a different runtime."""
     from qubit_cli.auth import AuthError
@@ -513,6 +515,8 @@ def _resolve_runtime_with_fallback(resolve_kwargs: dict | None = None) -> _Runti
     try:
         return _RuntimeFallbackResolution(resolve_runtime_provider(**(resolve_kwargs or {})), None, False)
     except AuthError as primary_exc:
+        if not allow_fallback:
+            raise
         for entry in _load_fallback_model() or []:
             fb_provider = str(entry.get("provider") or "").strip() if isinstance(entry, dict) else ""
             fb_model = str(entry.get("model") or "").strip() if isinstance(entry, dict) else ""
