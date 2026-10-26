@@ -293,7 +293,7 @@ class GoogleContactsConnector:
                 REASON_MISSING_CREDENTIAL,
                 f"google_token.json not found at {path}; run the google-workspace setup",
             ) from None
-        except OSError:
+        except (OSError, UnicodeError):
             raise GoogleContactsError(
                 REASON_MISSING_CREDENTIAL,
                 "google_token.json could not be read; re-run the google-workspace setup",

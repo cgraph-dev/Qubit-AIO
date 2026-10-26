@@ -150,6 +150,14 @@ def test_corrupt_token_is_a_typed_missing_credential(tmp_path):
         connector.list()
     assert raised.value.reason == "missing_credential"
 
+def test_unreadable_token_bytes_are_a_typed_missing_credential(tmp_path):
+    path = tmp_path / "google_token.json"
+    path.write_bytes(b"\xff\xfe\x00not-utf8")
+    connector = GoogleContactsConnector(token_path=path)
+    with pytest.raises(GoogleContactsError) as raised:
+        connector.list()
+    assert raised.value.reason == "missing_credential"
+
 
 # -- list ------------------------------------------------------------------
 
