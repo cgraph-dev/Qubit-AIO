@@ -26,6 +26,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 - 🟡 Live/operational gaps: no optimizer run (DSPy absent; stated unavailable), no energy/FLOPs sampler, no dashboard surface, no `-z` usage capture.
 - 🔴 Not done: no service restart, no full matrix, no `VERIFIED`.
 
+## Wave 58 — 2026-10-26 (RuntimePort Phase 3 completion: `chat -q`)
+
+- ✅ Native `-Q`/`-q` single-query turns now cross `RuntimePort` via `run_agent_through_port` (thread-local callbacks re-bound on the port worker; raw envelope retained). Non-native `chat -q` skips native agent construction and runs through P2; interactive chat/TUI and native-only flags refuse typed (exit 2).
+- ✅ Focused gate: 52 passed (new `test_chat_query_engine.py` 16 + oneshot/single-query/quiet suites).
+- 🟡 Non-native resume supplies native-store history but does not persist the new turn (P2 stateless); clarify is bounded by the non-interactive note; no live OpenJarvis turn probe.
+- 🔴 No service restart (CLI-only), no full matrix, no `VERIFIED`.
+
+---
+
 ## Wave 56 — 2026-10-26 (Phase 5: Google Contacts connector)
 
 - ✅ Read-only `connectors/google_contacts.py` over the existing `$QUBIT_HOME/google_token.json` and google-auth refresh path; `list`/`search` (People API, bounded), typed `missing_credential`/`missing_scope`/`reauthorize_required`/401/403/429/timeout/network/HTTP errors; results bounded and token-safe.
