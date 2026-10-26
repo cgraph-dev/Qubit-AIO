@@ -26,7 +26,7 @@ def _tree(tmp_path, monkeypatch):
     monkeypatch.setattr(doctor, "PROJECT_ROOT", project)
     monkeypatch.setattr(doctor, "QUBIT_HOME", home)
     monkeypatch.setattr(doctor, "DOCTOR_CHECKS", ((None, doctor_platform._check_command_installation),))
-    command = tmp_path / ".local" / "bin" / "hermes"
+    command = tmp_path / ".local" / "bin" / "qubit"
     command.parent.mkdir(parents=True)
     monkeypatch.setenv("PATH", str(command.parent))
     return project, home, command
@@ -72,7 +72,7 @@ def test_pm_generation_does_not_require_a_legacy_console_script(tmp_path, monkey
     project, home, command = _tree(tmp_path, monkeypatch)
     selected = _generation(project)
     _pm_source(project, home)
-    assert _launchers.stage_launcher("hermes", project, command.parent) == command
+    assert _launchers.stage_launcher("qubit", project, command.parent) == command
 
     doctor.run_doctor(Namespace(fix=True))
 

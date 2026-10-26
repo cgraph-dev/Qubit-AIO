@@ -87,6 +87,13 @@ class CLIChatTurnMixin:
             # Lone surrogates (rich-text clipboard paste) crash the OpenAI SDK's JSON serialization.
             from agent.message_sanitization import _sanitize_surrogates
             message = _sanitize_surrogates(message)
+        if isinstance(message, str) and not isinstance(message, TimelineNotification):
+            # Resolve @ references here only to refuse a blocked injection (with the active
+            # provider's context budget); the raw text is what the agent receives, since the
+            # gateway expands references against its own session cwd.
+            _expanded, _blocked_ctx = self._chat_expand_context_references(message)
+            if _blocked_ctx is not None:
+                return _blocked_ctx
         self._chat_stage_user_message(agent, message)
         if isinstance(message, TimelineNotification):
             message = str(message)  # UI metadata is on the staged row, never in model content.
