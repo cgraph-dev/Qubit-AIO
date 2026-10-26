@@ -3236,8 +3236,10 @@ def _save_compose_deliver(
         output_file = (
             None if self_removal_delivery_allowed(job["id"])
             else save_job_output(job["id"], output))
-    if verbose and output_file is not None:
-        logger.info("Output saved to: %s", output_file)
+    if output_file is not None:
+        job["_output_file_display"] = str(output_file)
+        if verbose:
+            logger.info("Output saved to: %s", output_file)
 
     # A shutdown-killed tool subprocess can leave a plausible final_response from truncated
     # output; force the honest "interrupted" failure path. Peek-only (consumed later).
@@ -3549,8 +3551,10 @@ def _run_one_job_body(
             "execution_id": execution_id}
         if fence.cancel_event is not None:
             _run_kwargs["cancel_event"] = fence.cancel_event
+        _run_started = time.monotonic()
         try:
             success, output, final_response, error = run_job(job, **_run_kwargs)
+            job["_run_duration_seconds"] = round(time.monotonic() - _run_started, 3)
         except BaseException:
             # run_job hands back the agent even when raising; tear down so a failed run never leaks.
             # BaseException so KeyboardInterrupt/SystemExit mid-run still trigger teardown.

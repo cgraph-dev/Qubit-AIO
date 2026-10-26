@@ -1338,6 +1338,22 @@ def _is_channel_dm_topic(runtime_adapter: Any, chat_id: Any, loop: Any, job_id: 
     return is_channel
 
 
+def _cron_dashboard_url(cfg: Optional[dict]) -> str:
+    """The operator-configured dashboard public URL, or "".
+
+    Only an existing ``dashboard.public_url`` is ever used; no per-run URL is invented because the
+    runtime has no stable public run route.
+    """
+    try:
+        dashboard = (cfg or {}).get("dashboard")
+        url = dashboard.get("public_url") if isinstance(dashboard, dict) else ""
+        from cron.notice_format import safe_url
+
+        return safe_url(url)
+    except Exception:
+        return ""
+
+
 def _cron_delivery_notify_enabled(cfg: Optional[dict]) -> bool:
     """Resolve ``cron.delivery.notify`` (default True). Only an explicit ``False`` disables; a
     missing/malformed section keeps the default so a typo cannot silently mute briefs."""
@@ -1516,7 +1532,7 @@ def _live_route_metadata(t: _TargetDelivery) -> tuple[Optional[str], dict, dict]
         route_thread_id = None
         route_metadata = {
             "direct_messages_topic_id": str(thread_id), "job_id": job["id"],
-            "notify": t.notify_delivery,
+            "notify": t.notify_delivery, "disable_link_preview": True,
         }
         media_metadata = {"direct_messages_topic_id": str(thread_id), "notify": t.notify_delivery}
     else:
@@ -1526,7 +1542,10 @@ def _live_route_metadata(t: _TargetDelivery) -> tuple[Optional[str], dict, dict]
         # thread_id is absent from metadata; cron deliveries have no inbound reply anchor, so the metadata
         # key bypasses that check and lets the adapter route via a plain message_thread_id. See #52060.
         route_thread_id = str(thread_id) if thread_id is not None else None
-        route_metadata = {"job_id": job["id"], "notify": t.notify_delivery}
+        route_metadata = {
+            "job_id": job["id"], "notify": t.notify_delivery,
+            "disable_link_preview": True,
+        }
         if route_thread_id:
             route_metadata["thread_id"] = route_thread_id
         media_metadata = {"notify": t.notify_delivery}
@@ -2090,30 +2109,33 @@ def _deliver_result(
     # Targets acked with NO evidence (bare SendResult(success=True) — Slack/Matrix/Mattermost);
     # persisted as ``last_delivery_unverified`` so `qubit cron list` shows it.
     unverified_targets: list = []
-    if wrap_response:
-        task_name = job.get("name", job["id"])
-        delivery_content = (
-            f"Cronjob Response: {task_name}\n"
-            f"(job_id: {job.get('id', '')})\n"
-            f"-------------\n\n"
-            f"{content}\n\n"
-            "To stop or manage this job, send me a new message "
-            f"(e.g. \"stop reminder {task_name}\")."
-        )
-    else:
-        delivery_content = content
-
     from gateway.platforms.base import BasePlatformAdapter
     # Bridge media-policy config into the env vars the path validator reads. The gateway does this
     # at boot; standalone runs (`qubit cron run`) did not, silently dropping files. Idempotent.
     from gateway.media_policy import apply_media_policy_env
     apply_media_policy_env(user_cfg)
-    media_files, cleaned_delivery_content = BasePlatformAdapter.extract_media(delivery_content)
-    # Redact at this single chokepoint, BEFORE the live-adapter / standalone send lanes below.
+    media_files, cleaned_delivery_content = BasePlatformAdapter.extract_media(content)
+    # Redact at this single chokepoint, BEFORE the live-adapter / standalone send lanes below and
+    # BEFORE any excerpt is bounded: a truncated credential can no longer match the redactor.
     # Shell-job stdout/stderr is already redacted where it is captured, but an LLM cron job's
     # response text reaches delivery unscanned — so a job that surfaced a credential (echoed a
     # failing curl with an API key, summarised a config file) sent it verbatim to the chat.
     cleaned_delivery_content = _redact_cron_payload(cleaned_delivery_content, "delivery content")
+    notice = None
+    if wrap_response:
+        from cron.notice_format import build_run_notice
+
+        safe_job = dict(job)
+        safe_job["name"] = _redact_cron_payload(
+            str(job.get("name") or job.get("id") or "cron job"), "job name")
+        notice = build_run_notice(
+            safe_job,
+            cleaned_delivery_content,
+            success=not for_failure,
+            duration_seconds=job.get("_run_duration_seconds"),
+            output_path=job.get("_output_file_display"),
+            dashboard_url=_cron_dashboard_url(user_cfg),
+        )
     requested_media = len(media_files)
     media_files = BasePlatformAdapter.filter_media_delivery_paths(media_files)
     # Policy-dropped attachments will never be sent on ANY lane — record them in run status.
@@ -2175,14 +2197,21 @@ def _deliver_result(
         if t is None:
             continue
         target_errors: list = []
+        if notice is not None:
+            from cron.notice_format import render_notice
+
+            target_content = render_notice(notice, target["platform"])
+            target_content = _redact_cron_payload(target_content, "delivery content")
+        else:
+            target_content = cleaned_delivery_content
         delivered = t.live_adapter_ready and _deliver_via_live_adapter(
-            t, cleaned_delivery_content, media_files,
+            t, target_content, media_files,
             target_errors=target_errors, delivery_errors=delivery_errors,
             unverified_targets=unverified_targets,
         )
         if not delivered:
             _deliver_standalone(
-                t, cleaned_delivery_content, media_files, target_errors, delivery_errors)
+                t, target_content, media_files, target_errors, delivery_errors)
 
     # Filter-time drops apply to every target; report them once. A run whose every target was
     # suppressed sent nothing, so there is no drop to report.

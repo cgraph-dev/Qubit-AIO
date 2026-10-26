@@ -1271,8 +1271,11 @@ class TelegramAdapter(TelegramHeldInboundMixin, BasePlatformAdapter):
             return default
         return bool(value)
 
-    def _link_preview_kwargs(self) -> Dict[str, Any]:
-        if not getattr(self, "_disable_link_previews", False):
+    def _link_preview_kwargs(self, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        disabled = getattr(self, "_disable_link_previews", False)
+        if (metadata or {}).get("disable_link_preview"):
+            disabled = True
+        if not disabled:
             return {}
         if LinkPreviewOptions is not None:
             return {"link_preview_options": LinkPreviewOptions(is_disabled=True)}
@@ -3490,7 +3493,7 @@ class TelegramAdapter(TelegramHeldInboundMixin, BasePlatformAdapter):
             try:
                 send_kwargs = {
                     "chat_id": normalize_telegram_chat_id(chat_id), "reply_to_message_id": reply_to_id, **thread_kwargs,
-                    **self._link_preview_kwargs(), **self._notification_kwargs(metadata)}
+                    **self._link_preview_kwargs(metadata), **self._notification_kwargs(metadata)}
                 return await self._send_chunk_markdown_or_plain(chunk, send_kwargs), used_thread_fallback
             except _NetErr as send_err:
                 # BadRequest subclasses NetworkError in PTB but is permanent; handle specific cases.
@@ -3958,7 +3961,7 @@ class TelegramAdapter(TelegramHeldInboundMixin, BasePlatformAdapter):
         thread_id: Optional[str], metadata: Optional[Dict[str, Any]], finalize: bool):
         """Send one continuation chunk (MarkdownV2 then plain on finalize; raw when streaming); drops the
         reply anchor once on 'reply message not found'. Returns the sent message or None."""
-        base = {**self._link_preview_kwargs(), **self._notification_kwargs(metadata)}
+        base = {**self._link_preview_kwargs(metadata), **self._notification_kwargs(metadata)}
         for use_markdown in (True, False) if finalize else (False,):
             try:
                 if use_markdown:
@@ -4140,7 +4143,8 @@ class TelegramAdapter(TelegramHeldInboundMixin, BasePlatformAdapter):
         """Send a control-style message (prompt/picker) with topic routing + thread fallback."""
         reply_to_id = self._reply_to_message_id_for_send(None, metadata, reply_to_mode=reply_to_mode)
         kwargs: Dict[str, Any] = {
-            "chat_id": normalize_telegram_chat_id(chat_id), "text": text, "parse_mode": parse_mode, **self._link_preview_kwargs()}
+            "chat_id": normalize_telegram_chat_id(chat_id), "text": text, "parse_mode": parse_mode,
+            **self._link_preview_kwargs(metadata)}
         if reply_markup is not None:
             kwargs["reply_markup"] = reply_markup
         kwargs["reply_to_message_id"] = reply_to_id
