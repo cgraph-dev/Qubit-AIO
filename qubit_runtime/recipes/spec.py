@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Callable, Mapping
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 
@@ -34,6 +35,10 @@ class RecipeSpec:
     approval_policy: str
     output_format: str
     voice_aliases: tuple[str, ...] = field(default_factory=tuple)
+    # Deterministic collectors keyed by section id. Runtime data, not serialized:
+    # the runner calls them before any model turn and passes their facts to the prompt.
+    collectors: Mapping[str, Callable] = field(
+        default_factory=dict, repr=False, compare=False, hash=False)
 
     def __post_init__(self) -> None:
         if not _ID_RE.fullmatch(self.id or ""):

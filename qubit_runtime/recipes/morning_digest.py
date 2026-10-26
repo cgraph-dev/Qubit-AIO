@@ -30,9 +30,12 @@ from recipes.sections import (
     REASON_MISSING_CREDENTIAL,
     REASON_TOOL_ERROR,
     SectionResult,
+    SectionUnavailable,
     available,
     unavailable,
 )
+from recipes.sections import collect_sections as _collect_sections
+from recipes.sections import render_brief, render_facts
 from recipes.spec import RecipeSpec
 
 SECTION_TITLES = {
@@ -44,15 +47,6 @@ SECTION_TITLES = {
 SECTION_ORDER = tuple(SECTION_TITLES)
 
 _SCRIPT_TIMEOUT_S = 20.0
-
-
-class SectionUnavailable(Exception):
-    """A collector's typed, non-fatal refusal."""
-
-    def __init__(self, reason: str, detail: str = "") -> None:
-        self.reason = reason
-        self.detail = detail
-        super().__init__(detail or reason)
 
 
 def _redact(value: object) -> str:
@@ -212,65 +206,15 @@ DEFAULT_COLLECTORS: dict[str, Callable[[datetime], SectionResult]] = {
 }
 
 
-def _result_or_unavailable(section_id: str, collector: Callable, now: datetime) -> SectionResult:
-    title = SECTION_TITLES[section_id]
-    try:
-        result = collector(now)
-    except SectionUnavailable as exc:
-        return unavailable(section_id, title, exc.reason, _redact(exc.detail))
-    except Exception as exc:  # noqa: BLE001 - one bad collector must not fail the recipe
-        return unavailable(
-            section_id, title, REASON_TOOL_ERROR,
-            _redact(f"{type(exc).__name__}: {exc}"))
-    if not isinstance(result, SectionResult):
-        return unavailable(
-            section_id, title, REASON_TOOL_ERROR,
-            f"collector returned {type(result).__name__}, not SectionResult")
-    if result.id != section_id:
-        return unavailable(
-            section_id, title, REASON_TOOL_ERROR,
-            f"collector returned section {result.id!r}")
-    return result
-
-
 def collect_sections(
     collectors: Mapping[str, Callable[[datetime], SectionResult]] | None = None,
     *,
     now: datetime | None = None,
     sections: Sequence[str] = SECTION_ORDER,
 ) -> tuple[SectionResult, ...]:
-    moment = now or datetime.now(timezone.utc)
-    active = dict(DEFAULT_COLLECTORS)
-    active.update(collectors or {})
-    results = []
-    for section_id in sections:
-        collector = active.get(section_id)
-        if collector is None:
-            results.append(unavailable(
-                section_id, SECTION_TITLES.get(section_id, section_id),
-                REASON_MISSING_CONNECTOR, f"no collector for {section_id!r}"))
-            continue
-        results.append(_result_or_unavailable(section_id, collector, moment))
-    return tuple(results)
-
-
-def render_facts(sections: Sequence[SectionResult]) -> str:
-    parts: list[str] = []
-    for section in sections:
-        parts.append(f"## {section.title}")
-        if section.available:
-            if section.facts:
-                parts.extend(f"- {_redact(fact)}" for fact in section.facts)
-            else:
-                parts.append("- (no items)")
-        else:
-            detail = _redact(section.detail)
-            parts.append(f"- unavailable ({section.reason}): {detail or 'no detail'}")
-    return "\n".join(parts)
-
-
-def render_brief(spec: RecipeSpec, sections: Sequence[SectionResult]) -> str:
-    return f"# {spec.title}\n\n{render_facts(sections)}"
+    return _collect_sections(
+        collectors, now=now, sections=sections,
+        titles=SECTION_TITLES, defaults=DEFAULT_COLLECTORS)
 
 
 MORNING_DIGEST_PROMPT = """\
@@ -316,4 +260,5 @@ MORNING_DIGEST = RecipeSpec(
         "my morning digest",
         "daily digest",
     ),
+    collectors=DEFAULT_COLLECTORS,
 )

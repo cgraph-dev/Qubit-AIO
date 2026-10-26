@@ -14,8 +14,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from agent.redact import redact_for_egress
 from agent.runtime_port import TurnEvent, TurnRequest
-from recipes.morning_digest import collect_sections, render_brief, render_facts
-from recipes.sections import SectionResult
+from recipes.sections import SectionResult, collect_sections, render_brief, render_facts
 from recipes.spec import RecipeSpec
 from traces.recorder import try_record_trace
 
@@ -90,7 +89,8 @@ def _sections_for(
 ) -> tuple[SectionResult, ...]:
     if fixture is not None:
         return tuple(fixture)
-    return collect_sections(collectors, now=now, sections=spec.sections)
+    return collect_sections(
+        collectors, now=now, sections=spec.sections, defaults=spec.collectors)
 
 
 def _usage_value(events: Sequence[TurnEvent], key: str):
