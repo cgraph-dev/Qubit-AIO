@@ -533,7 +533,8 @@ def _held_disposition(record: dict | None) -> bool:
     return bool(record) and record.get("refused") is True and record.get("reason") == HELD_NOT_SENT
 
 
-def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dict] = None) -> dict | None:
+def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dict] = None, *,
+                   allow_transport_fallback: bool = False) -> dict | None:
     """Pin intent before admission; retries may inspect, never change transport."""
     from tools.bot_live_delivery import deliver_to_live_owner, find_canonical_live_owner, read_delivery_result
     from utils import fsync_directory
@@ -544,16 +545,24 @@ def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dic
         intent = json.loads(intent_path.read_text(encoding="utf-8-sig"))
     else:
         assert profile_home is not None
+
+        def _no_store() -> bool:
+            return not (Path(profile_home) / "state.db").is_file()
+
         try:
             owner = find_canonical_live_owner(profile_home)
         except Exception as exc:
+            # A first-ever profile (no store) cannot have a live owner: the runner hands it
+            # to the caller's explicit transport. Any other profile is a definite no-send.
+            if allow_transport_fallback and _no_store():
+                return None
             # Discovery runs before the intent exists and never admits: definite, not ambiguous.
             raise LiveTargetUnavailableError(
                 f"canonical Bot Chat target is unavailable ({exc})") from exc
         if owner is None:
-            # No live canonical owner: the caller falls through to the explicit local
-            # transport (or refuses a local-profile DM) rather than pinning an intent.
-            return None
+            if allow_transport_fallback and _no_store():
+                return None
+            raise LiveTargetUnavailableError("canonical Bot Chat target is unavailable")
         intent = dict(owner=owner, message=Path(dm_file).read_text(encoding="utf-8-sig"),
                       delivery_id=_dm_delivery_id(dm_file),
                       **({"author": author} if author else {}))
@@ -717,7 +726,7 @@ def _run_delivery(argv: list[str], dm_file: str, *, stdin_file: bool,
         home = profile_home or _local_delivery_home(argv)
         if home is not None or os.path.exists(_live_intent_file(dm_file)):
             try:
-                record = _admit_live_dm(home, dm_file, author)
+                record = _admit_live_dm(home, dm_file, author, allow_transport_fallback=True)
             except LiveTargetHeldError as exc:
                 print(_settled_no_send(dm_file, exc))  # the owner settled the id: drop the payload too
                 return 1
