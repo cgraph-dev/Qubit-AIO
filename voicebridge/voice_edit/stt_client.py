@@ -429,6 +429,23 @@ class SttClient:
         self.error: Optional[SttError] = None
         self.first_partial_ms: Optional[int] = None
         self.completed_at: Optional[int] = None
+        #: Cumulative hypothesis for the live panel: each segment is replaced
+        #: by its newest hypothesis (``replace=True``) and joined in order.
+        self.interim_text: str = ""
+        self._segment_text: Dict[int, str] = {}
+
+    def _apply_partial(self, text: str, *, segment: Any, replace: Any) -> None:
+        try:
+            seg = int(segment or 0)
+        except (TypeError, ValueError):
+            seg = 0
+        if replace is False:
+            previous = self._segment_text.get(seg, "")
+            text = f"{previous} {text}".strip() if previous else text
+        self._segment_text[seg] = text
+        self.interim_text = " ".join(
+            value for _, value in sorted(self._segment_text.items()) if value
+        ).strip()
 
     @staticmethod
     def _with_ticket(url: str, ticket: str) -> str:
@@ -516,11 +533,22 @@ class SttClient:
                             if self.first_partial_ms is None:
                                 self.first_partial_ms = int(
                                     (time.monotonic() - started) * 1000)
+                            # Raw partials stay available for diagnostics/tests.
                             self.partials.append(text)
+                            self._apply_partial(
+                                text,
+                                segment=msg.get("segment", 0),
+                                replace=msg.get("replace", True),
+                            )
                             if on_partial:
-                                on_partial(text)
+                                on_partial(self.interim_text or text)
                     elif kind == "stt.final":
                         self.final_text = str(msg.get("text", "") or "")
+                        if self.final_text:
+                            # The final may be a whole-utterance rescore: show
+                            # exactly it, not a join with stale partial spans.
+                            self.interim_text = self.final_text
+                            self._segment_text.clear()
                     elif kind == "stt.completed":
                         if not self.final_text:
                             self.final_text = str(msg.get("final_text", "") or "")

@@ -65,13 +65,13 @@ class FakeMic:
         pass
 
 
-def _run(conn, mic, *, timeout=10.0):
+def _run(conn, mic, *, timeout=10.0, on_partial=None):
     client = SttClient(url="ws://test/agent/api/audio/stt/ws?ticket=t",
                        ticket="t", opener=lambda url: _awaitable(conn))
     ev = threading.Event()
 
     async def _go():
-        return await client.run(mic, ev)
+        return await client.run(mic, ev, on_partial=on_partial)
     loop = asyncio.new_event_loop()
     try:
         final = loop.run_until_complete(asyncio.wait_for(_go(), timeout=timeout))
@@ -155,6 +155,26 @@ def test_partial_then_final_and_completed():
     assert client.error is None
     assert client.partials == ["make it", "make it clear"]
     assert final == "make it clearer"
+
+
+def test_partial_segments_are_replaced_and_joined_for_live_display():
+    conn = FakeWs(events=[
+        {"type": "stt.started", "engine": "fake"},
+        {"type": "stt.partial", "text": "hello", "segment": 0, "replace": True},
+        {"type": "stt.partial", "text": "hello world", "segment": 0, "replace": True},
+        {"type": "stt.partial", "text": "again", "segment": 1, "replace": True},
+        {"type": "stt.final", "text": "Hello world again.", "segment": 1},
+        {"type": "stt.completed", "final_text": "Hello world again.",
+         "sequence": 0, "metrics": {}},
+    ])
+    mic = FakeMic([b"\x00\x00" * 480])
+    seen = []
+    client, final = _run(conn, mic, on_partial=seen.append)
+
+    assert seen == ["hello", "hello world", "hello world again"]
+    assert client.partials == ["hello", "hello world", "again"]
+    assert client.interim_text == "Hello world again."
+    assert final == "Hello world again."
 
 
 def test_server_error_is_typed():

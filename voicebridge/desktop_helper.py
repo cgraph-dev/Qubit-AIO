@@ -1607,6 +1607,7 @@ class DesktopHelper:
         instead of an 8 s-loop-stale one. Never raises; never runs when
         the helper has no heartbeat writer (tests/embedded use).
         """
+        self._ui_level(level)
         try:
             now = time.monotonic()
             if now - float(getattr(self, "_level_hb_at", 0.0) or 0.0) \
@@ -2087,6 +2088,25 @@ class DesktopHelper:
     def _ui_error(self, code: str, detail: str) -> None:
         self._ui(self.overlay.show_error, code, detail)
 
+    def _ui_live(self, text: str, final: bool = False) -> None:
+        """Stream the interim transcript into the panel (no-op for old fakes)."""
+        fn = getattr(self.overlay, "set_live_transcript", None)
+        if callable(fn):
+            self._ui(fn, str(text or ""), bool(final))
+
+    def _ui_level(self, level: float) -> None:
+        """Throttled live voice meter (the panel owns the drawing)."""
+        try:
+            now = time.monotonic()
+            if now - float(getattr(self, "_ui_level_at", 0.0) or 0.0) < 0.08:
+                return
+            self._ui_level_at = now
+            fn = getattr(self.overlay, "set_level", None)
+            if callable(fn):
+                self._ui(fn, float(level))
+        except Exception:
+            pass
+
     # -- typed talk events (fail-soft; never break a turn) ---------------
     def _talk_emit(self, event_type: str, **fields: Any) -> None:
         """Emit one typed talk boundary (journaled as ``voice_edit.talk.*``).
@@ -2149,7 +2169,11 @@ class DesktopHelper:
             h = " ".join(str(heard or "").split())[:160]
             r = " ".join(str(result or "").split())[:240]
             line = f"{ts}  {kind}: heard {h!r} -> {r!r}"
-            self._ui(self.overlay.append_history, line)
+            entry = getattr(self.overlay, "append_history_entry", None)
+            if callable(entry):
+                self._ui(entry, kind, h, r, ts)
+            else:
+                self._ui(self.overlay.append_history, line)
             if bool(_read_cfg(self.cfg, "voice_edit", "history_panel",
                               default=True)):
                 self._ui(self.overlay.show)
@@ -2494,6 +2518,13 @@ class DesktopHelper:
     def _start_listening(self) -> None:
         if not self._open_request():
             return
+        # Show the panel before the first partial: the user should see the
+        # live transcript (and level meter) the moment they press the hotkey.
+        try:
+            self._ui(self.overlay.show)
+            self._ui_live("", final=False)
+        except Exception:
+            pass
         # Start the microphone + STT FIRST (browser-like: audio flows the
         # moment you press), then capture the selection concurrently.
         self._worker = threading.Thread(target=self._transcribe, daemon=True,
@@ -2567,6 +2598,7 @@ class DesktopHelper:
         # The wake path never streamed interim partials, so the heard words
         # jumped straight to the answer with no text preview. Show them now,
         # on the same status surface Right-Ctrl partials use.
+        self._ui_live(cmd, final=True)
         self._safe_show()
         self._ui_status("heard", cmd[-160:])
         worker = threading.Thread(target=self._wake_turn, args=(cmd,),
@@ -2828,6 +2860,7 @@ class DesktopHelper:
             self._finish_error()
             return
         self._talk_emit("transcript.final", chars=len(self._transcript))
+        self._ui_live(self._transcript, final=True)
         self._process_transcript()
 
     def _ready_cue(self) -> None:
@@ -2839,6 +2872,7 @@ class DesktopHelper:
 
     def _on_partial(self, text: str) -> None:
         self._interim = text
+        self._ui_live(text, final=False)
         self._ui_status("listening", text[-160:])
 
     def _on_stt_error(self, code: str, detail: str) -> None:
