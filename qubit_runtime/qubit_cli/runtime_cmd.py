@@ -82,4 +82,12 @@ def cmd_runtime(args, *, registry=None) -> int:
         for event in events:
             if event["text"]:
                 print(f"[{event['kind']}] {event['text']}")
-    return 0 if events and events[-1]["kind"] == "done" else 1
+    terminal = events[-1] if events else None
+    if terminal and terminal["kind"] == "error" and terminal["data"].get("refusal"):
+        # A typed refusal means no turn was attempted; keep it distinct from a
+        # failed turn (exit 1) and print the actionable hint.
+        hint = terminal["data"].get("hint")
+        if hint and not args.json:
+            print(hint, file=sys.stderr)
+        return 2
+    return 0 if terminal and terminal["kind"] == "done" else 1

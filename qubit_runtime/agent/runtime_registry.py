@@ -1,9 +1,16 @@
-"""Named RuntimePort backends. Phase 1 registers only ``native``."""
+"""Named RuntimePort backends.
+
+``native`` is the default (vendored ``AIAgent``). ``openjarvis`` is an optional
+out-of-process engine: it is always registered so ``qubit runtime engines`` can
+name it, but it refuses cleanly when its pinned CLI is absent, unpinned or
+unverifiable. Availability never changes the default engine.
+"""
 from __future__ import annotations
 
 from typing import Any, Callable
 
 from agent.runtime_native import NativeRuntime
+from agent.runtime_openjarvis import OpenJarvisRuntime
 from agent.runtime_port import RuntimeBackend, UnknownRuntimeError
 
 
@@ -26,4 +33,5 @@ class RuntimeRegistry:
 def build_registry(agent_factory: Callable[[Any], Any]) -> RuntimeRegistry:
     registry = RuntimeRegistry()
     registry.register(NativeRuntime(agent_factory))
+    registry.register(OpenJarvisRuntime())
     return registry

@@ -23,6 +23,22 @@ class UnknownRuntimeError(ValueError):
         )
 
 
+class RuntimeRefusalError(RuntimeError):
+    """A registered backend cannot run on this host.
+
+    A refusal is not a turn failure: the engine is absent, unpinned or
+    unreachable, so no work was attempted. ``code`` is the stable machine key
+    carried in the terminal event's ``data["refusal"]``; ``hint`` is the
+    actionable next step shown to the user.
+    """
+
+    def __init__(self, code: str, message: str, hint: str = "") -> None:
+        self.code = code
+        self.message = message
+        self.hint = hint
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class RuntimeCapabilities:
     streaming: bool = True

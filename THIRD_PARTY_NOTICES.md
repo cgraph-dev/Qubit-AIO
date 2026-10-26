@@ -642,3 +642,22 @@ the upstream `LICENSE` carries the full text and copyright).
   `qubit_runtime/tests/tools/test_skills_hub_git_sources.py`. Qubit's hub
   (auth, cache, trust, SSRF guards, bundle validation, installer) is not
   replaced; only the resolver semantics were ported.
+
+## OpenJarvis out-of-process engine adapter — Apache-2.0
+
+The optional `openjarvis` RuntimePort backend
+(`qubit_runtime/agent/runtime_openjarvis.py`) drives
+[open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis) at commit
+`05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0; the upstream
+`LICENSE` carries the full text and copyright). **No OpenJarvis source is
+copied or imported into the Qubit process**; the adapter spawns the pinned
+`jarvis ask --json` CLI and maps its result onto Qubit's port events.
+
+- Reference interface: `src/openjarvis/cli/ask.py` (`ask` options and JSON
+  result shape), `src/openjarvis/evals/backends/external/{hermes_agent.py,
+  openclaw.py,_subprocess_runner.py}` (the out-of-process, pinned-commit,
+  "foreign code never imports into this process" pattern).
+- Local adaptation: `qubit_runtime/agent/runtime_openjarvis.py` plus
+  `qubit_runtime/tests/runtime/test_runtime_openjarvis.py`. Qubit owns session
+  state and renders system/history into the CLI prompt; OpenJarvis keeps its own
+  `OPENJARVIS_HOME`, isolated under Qubit's home.
