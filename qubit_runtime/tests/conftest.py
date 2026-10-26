@@ -1415,7 +1415,7 @@ def _moa_caches_isolated():
 # The real root is captured at conftest import (pre-sandbox), honoring a
 # genuinely-custom pre-set QUBIT_HOME exactly like the kanban deny-list
 # (_qubit_home_points_at_production governs which values count).
-_REAL_HERMES_ROOT_CANDIDATES: list[Path] = []
+_REAL_QUBIT_ROOT_CANDIDATES: list[Path] = []
 
 
 def _capture_real_qubit_root() -> list[Path]:
@@ -1457,7 +1457,7 @@ def _capture_real_qubit_root() -> list[Path]:
     return roots
 
 
-_REAL_HERMES_ROOT_CANDIDATES = _capture_real_qubit_root()
+_REAL_QUBIT_ROOT_CANDIDATES = _capture_real_qubit_root()
 # Captured before any test can patch sys.platform, HOME or XDG_*: a test that runs the real
 # GUI uninstall or update swap would otherwise delete the developer's own Hermes app. Only the
 # ones present (none on CI runners, so the guard costs nothing there), each literal and resolved.
@@ -1479,7 +1479,7 @@ def _forbid_real_qubit_home_io(monkeypatch, request):
         return
     from tests.home_io_guard import HomeIOGuard
 
-    HomeIOGuard(lambda: _REAL_HERMES_ROOT_CANDIDATES, lambda: _REAL_INSTALLED_GUI_APPS).install(monkeypatch)
+    HomeIOGuard(lambda: _REAL_QUBIT_ROOT_CANDIDATES, lambda: _REAL_INSTALLED_GUI_APPS).install(monkeypatch)
 
 
 @pytest.fixture

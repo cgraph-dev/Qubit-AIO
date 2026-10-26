@@ -92,7 +92,11 @@ class HomeIOGuard:
             if metadata:
                 path = os.environ.get("PATH", "")
                 cwd = os.getcwd() if self._relative_path_entries(path) else None
-                if os.path.dirname(absolute) in self._path_entries(path, cwd):
+                entries = self._path_entries(path, cwd)
+                # Command lookup probes ``<entry>/<name>`` and realpath()s the entry and each
+                # of its ancestors (PM-managed bin dirs under the home live on PATH).
+                if (os.path.dirname(absolute) in entries or absolute in entries
+                        or any(_contains(absolute, entry) for entry in entries)):
                     return
             # The interpreter's own installation (a PM-managed python under ~/.hermes/tools):
             # stdlib source reads (linecache, traceback) are not Hermes state either, nor is
