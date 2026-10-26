@@ -676,3 +676,27 @@ copied or imported into the Qubit process**; the adapter spawns the pinned
   tool-result shape); the energy sampler, eval telemetry propagation and
   OpenClaw `payloads` runner are not ported because Qubit does not implement
   those layers.
+
+## OpenJarvis morning-digest prompt/policy — Apache-2.0
+
+The `morning_digest` recipe's synthesis prompt and section policy
+(`qubit_runtime/recipes/morning_digest.py`) adapts the "ONLY facts from the
+data", "never invent personal context", per-section guide wording and
+word-limit brevity rule from [open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis)
+at commit `05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0;
+the upstream `LICENSE` carries the full text and copyright).
+
+- Reference sources: `src/openjarvis/agents/morning_digest.py`
+  (`_SECTION_PROMPTS`, `_build_system_prompt`) and
+  `src/openjarvis/tools/digest_collect.py` (section ordering/format only).
+- Local adaptation: `qubit_runtime/recipes/morning_digest.py`,
+  `qubit_runtime/recipes/runner.py`, and `qubit_runtime/tests/recipes/`.
+  **No OpenJarvis code is vendored or imported.** Qubit's deterministic
+  collectors, independent degradation, typed unavailable reasons, CLI, voice
+  and cron wiring are original.
+- Deliberate divergence: OpenJarvis asks the model to silently omit absent
+  sources; Qubit reports each missing connector/credential as a typed
+  `unavailable` section so a gap is never hidden.
+- The brief's schedule → preparation → urgent-mail ordering also follows the
+  Qubit-bundled `google-workspace` skill's `references/daily-brief.md`
+  (procedure only, no code copied).

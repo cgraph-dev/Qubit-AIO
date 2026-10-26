@@ -373,6 +373,8 @@ from qubit_cli.subcommands.hooks import build_hooks_parser
 from qubit_cli.subcommands.doctor import build_doctor_parser
 from qubit_cli.subcommands.runtime import build_runtime_parser
 from qubit_cli.runtime_cmd import cmd_runtime
+from qubit_cli.subcommands.recipe import build_recipe_parser
+from qubit_cli.recipe_cmd import cmd_recipe
 from qubit_cli.subcommands.verify import build_verify_parser
 from qubit_cli.subcommands.security import build_security_parser
 from qubit_cli.subcommands.approvals import build_approvals_parser
@@ -3518,6 +3520,7 @@ def _build_cli_parser():
     build_hooks_parser(subparsers, cmd_hooks=cmd_hooks)
     build_doctor_parser(subparsers, cmd_doctor=cmd_doctor)
     build_runtime_parser(subparsers, cmd_runtime=cmd_runtime)
+    build_recipe_parser(subparsers, cmd_recipe=cmd_recipe)
     build_verify_parser(subparsers, cmd_verify=cmd_verify)
     build_security_parser(subparsers, cmd_security=cmd_security)
     build_approvals_parser(subparsers, cmd_approvals=cmd_approvals)
