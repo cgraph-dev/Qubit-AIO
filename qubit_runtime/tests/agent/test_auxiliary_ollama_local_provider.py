@@ -20,9 +20,10 @@ import pytest
 def _keyless_environment(monkeypatch):
     for key in ("OPENAI_API_KEY", "OPENAI_BASE_URL"):
         monkeypatch.delenv(key, raising=False)
-    # The key ladder inherits the main config's key on a host match; the placeholder
-    # assertions below need that rung empty.
-    with patch("agent.auxiliary_client._read_main_api_key_if_same_host", return_value=None):
+    # The key ladder inherits the main config's key on a same-origin match (the fork's
+    # post-freeze name for upstream's ``..._if_same_host``); the placeholder assertions
+    # below need that rung empty.
+    with patch("agent.auxiliary_client._read_main_api_key_if_same_origin", return_value=None):
         yield
 
 
@@ -57,7 +58,7 @@ def test_ollama_lane_with_bare_local_host_resolves_custom_client_under_v1(
 
     if env_openai_key:
         monkeypatch.setenv("OPENAI_API_KEY", env_openai_key)
-        monkeypatch.setattr(ac, "_read_main_api_key_if_same_host", lambda _base: "sk-MAIN-SECRET")
+        monkeypatch.setattr(ac, "_read_main_api_key_if_same_origin", lambda _base: "sk-MAIN-SECRET")
     lane = {"provider": "ollama", "model": "qwen3.8:27b", "base_url": "http://127.0.0.1:11434", "api_key": api_key}
     monkeypatch.setattr(ac, "_get_auxiliary_task_config", lambda task: dict(lane) if task == "title_generation" else {})
     provider, model, base_url, key, _mode = ac._resolve_task_provider_model("title_generation")
