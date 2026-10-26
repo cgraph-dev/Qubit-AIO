@@ -97,3 +97,11 @@ done
     ownership remains `gateway.runtime_ownership.process_ownership`, so there is no behavior
     change and no double-flock risk. This supersedes ruling 8 for the B1 row; the completeness
     instrument now reports `AT TARGET`. Evidence: `docs/STATUS.md` wave 43.
+
+11. **Windows is out of scope for the W49 milestone (owner ruling, 2026-10-25).** The
+   GitHub-hosted Windows jobs never acquire a runner, so they cannot be made green from
+   this repo; the owner directed that they are not chased. Windows-only suites are
+   documented but excluded from the matrix and the release verdict. Linux remains in
+   scope. Evidence and the milestone record: `docs/STATUS.md` wave 47 and
+   `docs/FROZEN_TARGET.md` §"Platform scope".
+

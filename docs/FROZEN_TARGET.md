@@ -29,6 +29,14 @@ The freeze makes the finish line reachable.
 re-freeze: the pin is 1,094 commits behind upstream `origin/main` as of 2026-10-17 — that
 backlog is explicitly out of scope until retirement.
 
+## Platform scope (owner ruling, 2026-10-25)
+
+Windows is **out of scope** for the W49 milestone and its matrix. The GitHub-hosted
+Windows jobs never acquire a runner (nothing in this repo can make them), and the owner
+ruled that they are not chased. Windows-only suites may exist and are documented here and
+in `docs/DECISIONS.md` ruling 11; they are not part of the release verdict. Linux (and the
+existing cross-platform code paths) remain in scope.
+
 ## The rule
 
 - Measure EVERYTHING against `43faacfb8de7b29548547a7fbdedad0cc6e7391c`. Never `origin/main`.

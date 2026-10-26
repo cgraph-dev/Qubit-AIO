@@ -17,6 +17,16 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 47 — 2026-10-26 (W49 sign-off; runtime-boundary program queued)
+
+- ✅ 293-file recheck closed: 248/482 → 249/249 lane files green, then the full matrix's 31 extra files green. 107 commits, 310 files changed from `8443a63b4`.
+- ✅ Non-gateway full pass 35,646 tests: 5 files/6 tests + 1 non-zero + 1 no-run, all re-ran green alone. Gateway: earlier full pass + 17 failed files re-ran green alone (second pass stopped at 70% under host load).
+- ✅ Frozen-pin **AT TARGET** (2,623/2,623); brand **OK (46)**; frontend **1,166 passed** + `tsc` 0; Docker **12 passed**; E2E **26 passed**; live restarted on `0058fd633`, identify ready, `/chat` 200, Telegram polling connected, browser write-path + reload + 0 console errors.
+- 🟡 Not proven this session: one clean full-matrix pass (the host ran a 3D game at ~230% CPU; split passes + per-file reruns instead), and a live Telegram **inbound** owner reply (outbound `sendMessage` 200, `message_id 302`).
+- 🟡 `VERIFIED` not claimed for the same two reasons; the owner decision on accepting split-pass evidence is open.
+- 📋 Next thread: runtime boundary + OpenJarvis program. Spec `docs/superpowers/specs/2026-10-26-runtime-boundary-and-openjarvis-design.md`, program `docs/superpowers/plans/2026-10-26-runtime-boundary-and-openjarvis-program.md`, Phase 1 `docs/superpowers/plans/2026-10-26-phase-1-runtime-port-native-backend.md`. Execution chosen: **native** for Phase 1, subagent-driven for later bulk phases. Gated on P0 sign-off.
+
+
 ## Wave 45 — 2026-10-24 (CI runner online; GitHub billing gate)
 
 - ✅ `qubit-ci.yml` added (actionlint-clean); self-hosted runner `qubit-local` online.
