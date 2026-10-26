@@ -726,3 +726,31 @@ mapping and contact-shape constants from
   `people:searchContacts` endpoint rather than client-side filtering; the
   connector is read-only and returns bound results, where OpenJarvis also runs
   a bulk document-sync pipeline.
+
+## OpenJarvis trace schema and eval metric names — Apache-2.0
+
+The opt-in local trace store (`qubit_runtime/traces/`) and the offline eval
+bench (`qubit_runtime/evals/bench/`) adapt the *field set and reporting shape*
+of [open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis) at commit
+`05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0; the upstream
+`LICENSE` carries the full text and copyright). **No OpenJarvis source is
+vendored, imported, or required at runtime.**
+
+- Reference sources: `src/openjarvis/traces/store.py` (interaction trace
+  columns: id, engine, model, query/result, timestamps, token totals, latency,
+  metadata), `src/openjarvis/evals/core/types.py` (`EvalResult`/`RunSummary`
+  metric names for accuracy, latency, prompt/completion tokens, cost, energy
+  and estimated FLOPs), and `src/openjarvis/cli/eval_cmd.py` /
+  `cli/optimize_cmd.py` (CLI vocabulary only).
+- Local adaptation: `qubit_runtime/traces/` and
+  `qubit_runtime/evals/bench/` plus their tests. Qubit's SQLite schema and
+  migration/versioning, write-time redaction and length bounds, opt-in
+  config/env gate, typed errors, retention/prune semantics, offline JSONL
+  adapter and JSON/summary renderer are original.
+- Deliberate divergences: Qubit stores only bounded, redacted excerpts and no
+  message bodies, raw tool arguments/results or credentials; unknown
+  energy/FLOPs/cost stay `null` and the bench reports them as `unavailable`
+  rather than `0`; the eval bench makes no model calls and opens no network
+  connection. The upstream DSPy-style optimization loop
+  (`src/openjarvis/learning/optimize/`) is **not ported and not run** in this
+  slice — `qubit evals run` states optimization as unavailable.

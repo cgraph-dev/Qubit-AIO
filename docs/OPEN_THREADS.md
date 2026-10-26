@@ -17,6 +17,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 57 — 2026-10-27 (Phase 6 slice: local traces + offline eval bench)
+
+- ✅ `qubit_runtime/traces/`: versioned local SQLite store, write-time redaction/bounding, typed missing/corrupt/version errors, list/show/export JSONL/prune. Default OFF (`traces.enabled` / `QUBIT_TRACES_ENABLED`).
+- ✅ `qubit_runtime/evals/bench/`: offline JSONL or trace-store eval; accuracy only with labels, latency p50/p95, token totals/means, cost when known, explicit `unavailable` for energy/FLOPs; no model calls, no network.
+- ✅ CLI `qubit traces list|show|export|prune`, `qubit evals run --dataset FILE [--json] | --from-traces`; exits 0/2/1. Recipe runner records behind the opt-in gate; `-z` intentionally not wired.
+- ✅ Focused tests **41 passed** (traces + eval bench) and **159 passed** combined with recipes/runtime. Provenance recorded; no upstream code vendored.
+- 🟡 Live/operational gaps: no optimizer run (DSPy absent; stated unavailable), no energy/FLOPs sampler, no dashboard surface, no `-z` usage capture.
+- 🔴 Not done: no service restart, no full matrix, no `VERIFIED`.
+
 ## Wave 56 — 2026-10-26 (Phase 5: Google Contacts connector)
 
 - ✅ Read-only `connectors/google_contacts.py` over the existing `$QUBIT_HOME/google_token.json` and google-auth refresh path; `list`/`search` (People API, bounded), typed `missing_credential`/`missing_scope`/`reauthorize_required`/401/403/429/timeout/network/HTTP errors; results bounded and token-safe.
