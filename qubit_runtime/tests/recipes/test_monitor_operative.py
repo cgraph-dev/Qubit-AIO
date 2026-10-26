@@ -89,6 +89,12 @@ def test_cron_reports_counts_failures_overdue_next_runs_and_heartbeat():
     assert "Scheduler heartbeat: fresh (12s ago)." in text
 
 
+def test_disabled_job_without_a_pause_marker_counts_as_paused():
+    jobs = [{"id": "d", "name": "disabled", "enabled": False, "state": "scheduled"}]
+    result = collect_cron(NOW, jobs=jobs, heartbeat=1.0, last_error=None)
+    assert "1 job(s): 0 scheduled, 1 paused, 0 completed." in result.facts
+
+
 def test_empty_cron_store_is_available_and_stale_heartbeat_is_named():
     result = collect_cron(NOW, jobs=[], heartbeat=10_000, last_error="boom")
     text = "\n".join(result.facts)
@@ -178,7 +184,7 @@ def test_memory_reports_the_configured_installed_provider():
         provider_names=["honcho", "supermemory"])
     assert result.available
     assert "Provider: honcho." in result.facts
-    assert "Installed providers: 2." in result.facts
+    assert "Provider modules found: 2." in result.facts
 
 
 def test_compression_reports_only_durable_counters():

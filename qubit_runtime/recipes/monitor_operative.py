@@ -184,7 +184,10 @@ def collect_cron(
     total = len(records)
     states = [_job_state(job) for job in records]
     completed = sum(1 for state in states if state == "completed")
-    paused = sum(1 for state in states if state == "paused")
+    paused = sum(
+        1 for job, state in zip(records, states)
+        if state == "paused" or (not job.get("enabled", True) and state != "completed")
+    )
     active = sum(
         1 for job, state in zip(records, states)
         if job.get("enabled", True) and state not in {"paused", "completed"}
@@ -376,7 +379,7 @@ def collect_memory(
             f"configured memory provider {provider!r} is not installed")
     facts = [
         f"Provider: {_bounded_name(provider)}.",
-        f"Installed providers: {len(names)}.",
+        f"Provider modules found: {len(names)}.",
     ]
     return available("memory", SECTION_TITLES["memory"], facts,
                      source="memory plugin registry (read-only)")
