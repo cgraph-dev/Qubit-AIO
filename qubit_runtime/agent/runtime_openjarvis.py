@@ -10,22 +10,34 @@ owner of session state.
 Pinned interface (``open-jarvis/OpenJarvis@05839014127772bd077ba9ba2a2393a007f63ac6``,
 Apache-2.0; provenance in ``THIRD_PARTY_NOTICES.md``)::
 
-    jarvis ask <prompt> --json --no-stream --no-context [-m MODEL]
-        [--agent NAME] [--tools a,b]
+    jarvis ask --json --no-stream --no-context [-m MODEL]
+        [--agent NAME] [--tools a,b] -- <prompt>
 
 The direct-to-engine result is an OpenAI-shaped object with ``content`` and
 ``usage``; agent mode returns ``content``, ``turns`` and ``tool_results``.
-``OPENJARVIS_HOME`` isolates the child's state from any user install.
+``--agent ""`` selects direct mode (the pinned CLI falls back to its configured
+default agent when the flag is absent). ``OPENJARVIS_HOME`` isolates the child's
+state from any user install.
 
 Refusals are typed, never a silent fallback to native:
-``openjarvis_unavailable`` (no executable), ``openjarvis_commit_unverifiable``
-(not a git checkout), ``openjarvis_commit_mismatch`` (wrong pin),
-``openjarvis_interface_mismatch`` (the CLI rejected a pinned flag) and
-``openjarvis_prompt_too_large``. Each is a terminal ``error`` event carrying
-``data["refusal"]`` and an actionable ``data["hint"]``.
+``openjarvis_unavailable`` (no runnable executable), ``openjarvis_commit_unverifiable``
+(not a git checkout), ``openjarvis_checkout_dirty`` (uncommitted tracked edits),
+``openjarvis_commit_mismatch`` (wrong source pin), ``openjarvis_binary_mismatch``
+(the executable's build stamp names another commit), ``openjarvis_interface_mismatch``
+(the CLI rejected a pinned flag), ``openjarvis_invalid_prompt`` (NUL byte),
+``openjarvis_prompt_too_large`` (argument/byte budget) and
+``openjarvis_home_unavailable`` (state directory cannot be created). Each is a
+terminal ``error`` event carrying ``data["refusal"]`` and an actionable
+``data["hint"]``.
+
+The executable is operator configuration (an editable install normally lives
+outside the source checkout), so the adapter records its absolute path in the
+terminal event and verifies the checkout it came from: the source must be a
+clean git checkout at the pinned commit.
 """
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -63,13 +75,25 @@ _INSTALL_HINT = (
 )
 
 _DEFAULT_TIMEOUT_S = 300.0
-_TERMINATE_GRACE_S = 5.0
+_TERMINATE_GRACE_S = 2.0
 _MAX_PROMPT_CHARS = 60_000
+_MAX_PROMPT_BYTES = 120_000
+_MAX_STDOUT_BYTES = 2_000_000
+_MAX_STDERR_BYTES = 200_000
 _MAX_STDERR_CHARS = 2_000
 _MAX_TOOL_NAME_CHARS = 200
+_READ_CHUNK = 65_536
 _USAGE_KEYS = ("prompt_tokens", "prompt_tokens_evaluated", "completion_tokens", "total_tokens")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
-_SECRET_HINT = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.IGNORECASE)
+_SECRET_HINT = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PASSWD)", re.IGNORECASE)
+_SECRET_SHAPE = re.compile(
+    r"(?<![A-Za-z0-9])(?:"
+    r"sk-[A-Za-z0-9_\-]{8,}|"
+    r"gh[pousr]_[A-Za-z0-9]{20,}|"
+    r"xox[abprs]-[A-Za-z0-9\-]{10,}|"
+    r"AKIA[0-9A-Z]{16}"
+    r")"
+)
 
 
 def _bounded(value: Any, limit: int) -> str:
@@ -144,14 +168,20 @@ class OpenJarvisRuntime:
     def _collect_secret_values() -> tuple[str, ...]:
         values = []
         for key, value in os.environ.items():
-            if value and len(value) >= 8 and _SECRET_HINT.search(key):
+            if not value or len(value) < 8:
+                continue
+            if _SECRET_HINT.search(key) or "://" in value:
                 values.append(value)
-        return tuple(values)
+        return tuple(sorted(set(values), key=len, reverse=True))
 
     def _redact(self, text: str) -> str:
         for secret in self._secret_values:
             text = text.replace(secret, "***")
-        return text
+        return _SECRET_SHAPE.sub("***", text)
+
+    def _safe_text(self, value: Any, limit: int) -> str:
+        """Redact BEFORE bounding so a cut can never expose a secret prefix."""
+        return _bounded(self._redact(value if isinstance(value, str) else str(value or "")), limit)
 
     # ------------------------------------------------------------- pin/lifecycle
 
@@ -171,8 +201,8 @@ class OpenJarvisRuntime:
                 "the OpenJarvis 'jarvis' CLI is not installed or not on PATH",
                 _INSTALL_HINT,
             )
-        binary_path = Path(binary).expanduser()
-        if not binary_path.is_file() or not os.access(binary_path, os.X_OK):
+        binary_path = self._absolute_binary(binary)
+        if binary_path is None:
             raise RuntimeRefusalError(
                 "openjarvis_unavailable",
                 f"OpenJarvis executable is not runnable: {binary}",
@@ -192,6 +222,13 @@ class OpenJarvisRuntime:
                 f"cannot read a commit from OpenJarvis source at {source}",
                 f"QUBIT_OPENJARVIS_SOURCE must be a git checkout. {_INSTALL_HINT}",
             )
+        if self._git_dirty(source):
+            raise RuntimeRefusalError(
+                "openjarvis_checkout_dirty",
+                f"OpenJarvis source at {source} has uncommitted tracked changes",
+                "Commit or stash them, then re-run; an edited checkout is not the "
+                "reviewed interface.",
+            )
         if commit != self._pinned_commit:
             raise RuntimeRefusalError(
                 "openjarvis_commit_mismatch",
@@ -200,7 +237,52 @@ class OpenJarvisRuntime:
                 f"Check out {self._pinned_commit} or point the pin at a reviewed "
                 "interface change; refusing to run an unpinned interface.",
             )
+        binary_commit = self._probe_binary_commit(binary_path)
+        if binary_commit and not self._pinned_commit.startswith(binary_commit):
+            raise RuntimeRefusalError(
+                "openjarvis_binary_mismatch",
+                f"the 'jarvis' executable at {binary_path} reports commit "
+                f"{binary_commit}, not the pinned {self._pinned_commit[:12]}",
+                "Point QUBIT_OPENJARVIS_BIN at the executable installed from the "
+                "pinned checkout, or reinstall it.",
+            )
         return ResolvedOpenJarvis(str(binary_path), str(Path(source).resolve()), commit)
+
+    def _probe_binary_commit(self, binary: Path) -> str | None:
+        """Read the ``g<sha>`` build stamp from ``jarvis --version`` when present.
+
+        The executable is operator config and an editable install lives outside
+        the source checkout, so this binds the binary it will actually run to the
+        verified checkout. A build without a git stamp is accepted (the source
+        commit remains the primary pin); a conflicting stamp is a refusal.
+        """
+        env = dict(os.environ)
+        env["OPENJARVIS_HOME"] = str(self._home)
+        try:
+            proc = subprocess.run(
+                [str(binary), "--version"], capture_output=True, text=True,
+                timeout=5, env=env, check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        output = f"{proc.stdout}\n{proc.stderr}"
+        match = re.search(r"g([0-9a-f]{7,40})", output)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _absolute_binary(binary: str) -> Path | None:
+        """Resolve once, absolutely — never let Popen re-resolve a bare name on PATH."""
+        path = Path(binary).expanduser()
+        if not path.is_absolute():
+            found = shutil.which(binary)
+            path = Path(found) if found else Path.cwd() / path
+        try:
+            path = path.resolve()
+        except OSError:
+            return None
+        if not path.is_file() or not os.access(path, os.X_OK):
+            return None
+        return path
 
     @staticmethod
     def _git_toplevel(start: Path) -> str | None:
@@ -212,6 +294,12 @@ class OpenJarvisRuntime:
         out = OpenJarvisRuntime._git(["rev-parse", "HEAD"], Path(source))
         commit = (out or "").strip().lower()
         return commit if _COMMIT_RE.match(commit) else None
+
+    @staticmethod
+    def _git_dirty(source: str) -> bool:
+        out = OpenJarvisRuntime._git(
+            ["status", "--porcelain", "--untracked-files=no"], Path(source))
+        return bool((out or "").strip())
 
     @staticmethod
     def _git(args: list[str], cwd: Path) -> str | None:
@@ -245,11 +333,18 @@ class OpenJarvisRuntime:
                 blocks.append("\n".join(lines))
             blocks.append(request.prompt)
             prompt = "\n\n".join(blocks)
-        if len(prompt) > _MAX_PROMPT_CHARS:
+        if "\x00" in prompt:
+            raise RuntimeRefusalError(
+                "openjarvis_invalid_prompt",
+                "the prompt contains a NUL byte",
+                "Strip binary data before running a turn.",
+            )
+        if len(prompt) > _MAX_PROMPT_CHARS or len(prompt.encode("utf-8")) > _MAX_PROMPT_BYTES:
             raise RuntimeRefusalError(
                 "openjarvis_prompt_too_large",
-                f"rendered prompt is {len(prompt)} characters "
-                f"(limit {_MAX_PROMPT_CHARS})",
+                f"rendered prompt is {len(prompt)} characters / "
+                f"{len(prompt.encode('utf-8'))} bytes "
+                f"(limits {_MAX_PROMPT_CHARS} chars / {_MAX_PROMPT_BYTES} bytes)",
                 "Shorten the history or use a backend that accepts structured "
                 "history; the pinned OpenJarvis CLI takes one positional query.",
             )
@@ -288,7 +383,20 @@ class OpenJarvisRuntime:
             yield self._refusal_event(exc)
             return
 
-        self._home.mkdir(parents=True, exist_ok=True)
+        try:
+            self._home.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            yield TurnEvent(
+                "error",
+                text=self._safe_text(f"cannot create the OpenJarvis home: {exc}", 2_000),
+                data={
+                    "refusal": "openjarvis_home_unavailable",
+                    "hint": f"Set QUBIT_OPENJARVIS_HOME to a writable directory "
+                            f"(currently {self._home}).",
+                },
+            )
+            return
+
         try:
             proc = subprocess.Popen(
                 self._argv(resolved, prompt),
@@ -301,14 +409,35 @@ class OpenJarvisRuntime:
                 start_new_session=True,
             )
         except OSError as exc:
+            refusal = "openjarvis_unavailable"
+            hint = _INSTALL_HINT
+            if exc.errno == errno.E2BIG:
+                refusal = "openjarvis_prompt_too_large"
+                hint = "Shorten the prompt or its history."
             yield TurnEvent(
                 "error",
-                text=self._redact(f"cannot start OpenJarvis: {exc}"),
-                data={"refusal": "openjarvis_unavailable", "hint": _INSTALL_HINT},
+                text=self._safe_text(f"cannot start OpenJarvis: {exc}", 2_000),
+                data={"refusal": refusal, "hint": hint},
+            )
+            return
+        except ValueError as exc:  # argv cannot carry a NUL — defence in depth
+            yield TurnEvent(
+                "error",
+                text=self._safe_text(f"invalid OpenJarvis invocation: {exc}", 2_000),
+                data={"refusal": "openjarvis_invalid_prompt",
+                      "hint": "Strip binary data before running a turn."},
             )
             return
 
-        stdout, stderr, outcome = self._communicate(proc, cancel)
+        pgid = proc.pid
+        try:
+            stdout, stderr, outcome = self._communicate(proc, pgid, cancel)
+        except BaseException:
+            # KeyboardInterrupt/SystemExit must not leave the session leader's
+            # group behind. Re-raise after the child has been reaped.
+            self._terminate(proc, pgid)
+            raise
+
         if outcome == "cancelled":
             yield TurnEvent(
                 "error",
@@ -323,9 +452,16 @@ class OpenJarvisRuntime:
                 data={"cancelled": True, "timeout": True, "engine": self.name},
             )
             return
+        if outcome == "output_overflow":
+            yield TurnEvent(
+                "error",
+                text="OpenJarvis produced more output than the adapter accepts",
+                data={"engine": self.name, "output_overflow": True},
+            )
+            return
         if proc.returncode != 0:
-            detail = self._redact(_bounded(stderr.strip(), _MAX_STDERR_CHARS))
-            lowered = detail.lower()
+            detail = self._safe_text(stderr.strip(), _MAX_STDERR_CHARS)
+            lowered = stderr.lower()
             if "no such option" in lowered or "unrecognized arguments" in lowered:
                 yield TurnEvent(
                     "error",
@@ -348,18 +484,30 @@ class OpenJarvisRuntime:
         if payload is None:
             yield TurnEvent(
                 "error",
-                text=self._redact(
-                    "malformed OpenJarvis result: " + _bounded(stdout.strip(), _MAX_STDERR_CHARS)),
+                text=self._safe_text(
+                    "malformed OpenJarvis result: " + _bounded(stdout.strip(), _MAX_STDERR_CHARS),
+                    2_000),
                 data={"engine": self.name},
             )
             return
 
         error_text = payload.get("error") or payload.get("detail")
         content = _bounded(payload.get("content", ""), 1_000_000)
-        if error_text and not content:
+        if error_text:
+            # A payload that carries both content and an error is a failed turn:
+            # surface the partial text, but never claim completion.
+            if content:
+                yield TurnEvent("delta", text=content)
             yield TurnEvent(
                 "error",
-                text=self._redact(_bounded(error_text, _MAX_STDERR_CHARS)),
+                text=self._safe_text(error_text, _MAX_STDERR_CHARS),
+                data={"engine": self.name},
+            )
+            return
+        if payload.get("completed") is False:
+            yield TurnEvent(
+                "error",
+                text="OpenJarvis reported an incomplete turn",
                 data={"engine": self.name},
             )
             return
@@ -396,6 +544,7 @@ class OpenJarvisRuntime:
             "completed": True,
             "engine": self.name,
             "commit": resolved.commit,
+            "binary": _bounded(resolved.binary, 500),
             "tool_calls": len(tool_results),
         }
         if self._model:
@@ -406,45 +555,103 @@ class OpenJarvisRuntime:
             done_data["turns"] = turns
         yield TurnEvent("done", text=content, data=done_data)
 
-    def _communicate(
-        self, proc: subprocess.Popen, cancel: Any | None
-    ) -> tuple[str, str, str]:
-        """Drain the child while honoring cancel/timeout; always reaps it."""
-        deadline = time.monotonic() + self._timeout
-        while True:
-            if cancel is not None and cancel.is_set():
-                self._terminate(proc)
-                return "", "", "cancelled"
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                self._terminate(proc)
-                return "", "", "timeout"
-            try:
-                stdout, stderr = proc.communicate(timeout=min(0.1, remaining))
-                return stdout or "", stderr or "", "completed"
-            except subprocess.TimeoutExpired:
-                continue
+    # ------------------------------------------------------------- process drain
 
-    def _terminate(self, proc: subprocess.Popen) -> None:
-        """Terminate the child's whole group, then reap it (no orphan survives)."""
-        if proc.poll() is not None:
-            return
-        self._signal_group(proc, signal.SIGTERM)
+    def _communicate(
+        self, proc: subprocess.Popen, pgid: int, cancel: Any | None
+    ) -> tuple[str, str, str]:
+        """Drain both pipes with hard byte caps, honour cancel/timeout, reap."""
+        out_chunks: list[str] = []
+        err_chunks: list[str] = []
+        overflow = threading.Event()
+        readers = [
+            threading.Thread(
+                target=self._drain, args=(proc.stdout, out_chunks, _MAX_STDOUT_BYTES, overflow),
+                daemon=True, name="runtime-openjarvis-stdout"),
+            threading.Thread(
+                target=self._drain, args=(proc.stderr, err_chunks, _MAX_STDERR_BYTES, overflow),
+                daemon=True, name="runtime-openjarvis-stderr"),
+        ]
+        for reader in readers:
+            reader.start()
+
+        deadline = time.monotonic() + self._timeout
+        outcome = "completed"
         try:
-            proc.communicate(timeout=_TERMINATE_GRACE_S)
-            return
+            while True:
+                if cancel is not None and cancel.is_set():
+                    outcome = "cancelled"
+                    break
+                if overflow.is_set():
+                    outcome = "output_overflow"
+                    break
+                if time.monotonic() >= deadline:
+                    outcome = "timeout"
+                    break
+                if proc.poll() is not None and not any(r.is_alive() for r in readers):
+                    break
+                time.sleep(0.05)
+        except BaseException:
+            outcome = "interrupted"
+            raise
+        finally:
+            if outcome != "completed":
+                self._terminate(proc, pgid)
+            for reader in readers:
+                reader.join(timeout=_TERMINATE_GRACE_S)
+            try:
+                proc.wait(timeout=_TERMINATE_GRACE_S)
+            except subprocess.TimeoutExpired:
+                self._terminate(proc, pgid)
+                try:
+                    proc.wait(timeout=_TERMINATE_GRACE_S)
+                except subprocess.TimeoutExpired:  # pragma: no cover - unkillable child
+                    pass
+        return "".join(out_chunks), "".join(err_chunks), outcome
+
+    @staticmethod
+    def _drain(stream: Any, sink: list[str], cap: int, overflow: threading.Event) -> None:
+        total = 0
+        try:
+            while True:
+                chunk = stream.read(_READ_CHUNK)
+                if not chunk:
+                    break
+                total += len(chunk.encode("utf-8", "replace"))
+                if total > cap:
+                    overflow.set()
+                    break
+                sink.append(chunk)
+        except (OSError, ValueError):
+            pass
+        finally:
+            try:
+                stream.close()
+            except OSError:
+                pass
+
+    def _terminate(self, proc: subprocess.Popen, pgid: int) -> None:
+        """Terminate the child's whole group, then reap it (no orphan survives).
+
+        The direct child can exit on SIGTERM while a descendant ignores it and
+        keeps the inherited pipes open, so the group gets SIGKILL after a
+        bounded grace regardless of the direct child's status.
+        """
+        self._signal_group(proc, pgid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=_TERMINATE_GRACE_S)
         except subprocess.TimeoutExpired:
             pass
-        self._signal_group(proc, signal.SIGKILL)
+        self._signal_group(proc, pgid, signal.SIGKILL)
         try:
-            proc.communicate(timeout=_TERMINATE_GRACE_S)
+            proc.wait(timeout=_TERMINATE_GRACE_S)
         except subprocess.TimeoutExpired:  # pragma: no cover - unkillable kernel child
             pass
 
     @staticmethod
-    def _signal_group(proc: subprocess.Popen, sig: int) -> None:
+    def _signal_group(proc: subprocess.Popen, pgid: int, sig: int) -> None:
         try:
-            os.killpg(os.getpgid(proc.pid), sig)
+            os.killpg(pgid, sig)
         except (ProcessLookupError, PermissionError):
             try:
                 proc.send_signal(sig)
@@ -467,12 +674,12 @@ class OpenJarvisRuntime:
                 continue
             if isinstance(parsed, dict):
                 return parsed
-        if start > 0:
-            # Tolerate trailing banner/status text after the JSON object.
+        # Tolerate trailing banner/status text after the JSON object.
+        for candidate in candidates:
             try:
-                parsed, _ = json.JSONDecoder().raw_decode(text[start:])
+                parsed, _ = json.JSONDecoder().raw_decode(candidate)
             except (json.JSONDecodeError, ValueError):
-                parsed = None
+                continue
             if isinstance(parsed, dict):
                 return parsed
         return None

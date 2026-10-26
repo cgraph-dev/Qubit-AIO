@@ -48,13 +48,30 @@ def _native_factory(request: TurnRequest) -> Any:
     )
 
 
+def _availability_suffix(registry, name: str) -> str:
+    """Annotate engines that can be registered but cannot run on this host."""
+    from agent.runtime_port import RuntimeRefusalError
+
+    resolve = getattr(registry.get(name), "resolve", None)
+    if not callable(resolve):
+        return ""
+    try:
+        resolve()
+    except RuntimeRefusalError as exc:
+        return f" (unavailable: {exc.code})"
+    except Exception:  # noqa: BLE001 - listing must never crash on a probe
+        return " (unavailable)"
+    return ""
+
+
 def cmd_runtime(args, *, registry=None) -> int:
     if registry is None:
         from agent.runtime_registry import build_registry
         registry = build_registry(_native_factory)
 
     if args.runtime_action == "engines":
-        print("\n".join(registry.available()))
+        for name in registry.available():
+            print(name + _availability_suffix(registry, name))
         return 0
 
     try:
@@ -71,10 +88,16 @@ def cmd_runtime(args, *, registry=None) -> int:
         return 2
 
     request = TurnRequest(prompt=prompt, session_id=f"runtime-port-{uuid.uuid4().hex[:12]}")
-    events = [
-        {"kind": event.kind, "text": event.text, "data": event.data}
-        for event in backend.run_turn(request)
-    ]
+    try:
+        events = [
+            {"kind": event.kind, "text": event.text, "data": event.data}
+            for event in backend.run_turn(request)
+        ]
+    except KeyboardInterrupt:
+        # A backend that spawns a child reaps it before re-raising; keep the
+        # conventional SIGINT exit code instead of a traceback.
+        print("runtime run: interrupted", file=sys.stderr)
+        return 130
     if args.json:
         print(json.dumps({"engine": backend.name, "events": events},
                          ensure_ascii=False, default=str))
