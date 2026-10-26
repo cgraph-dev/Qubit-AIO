@@ -210,6 +210,7 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
         adopt_unanswered_turn, bind_quiet_session_key, continue_quiet_notify_completions,
         exit_single_query, quiet_notify_linger_seconds, take_turn_report_path, write_turn_report,
     )
+    from qubit_cli.oneshot import run_agent_through_port
 
     author = take_turn_author_from_env()
     # A spawner that bounds only the turn (cron Bot Chat lane) learns the outcome from this
@@ -220,9 +221,12 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
     author_kwargs = {"turn_author": author} if author is not None and _accepts_keyword(cli.agent.run_conversation, "turn_author") else {}
     with bind_quiet_session_key(getattr(cli, "session_id", "") or "default"):
         try:
-            result = cli.agent.run_conversation(
-                user_message=effective_query, conversation_history=cli.conversation_history, **author_kwargs,
-            )
+            result = run_agent_through_port(
+                cli.agent, effective_query,
+                session_id=getattr(cli, "session_id", "") or "",
+                history=cli.conversation_history,
+                extra_kwargs=author_kwargs,
+            )[1]
         except KeyboardInterrupt:
             _emit_interrupted_session_end(cli, reason="keyboard_interrupt")
             if emitter is not None:
@@ -244,11 +248,12 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
         def _quiet_recover_turn(nudge):
             nonlocal result
             _history = result.get("messages") if isinstance(result, dict) else None
-            result = cli.agent.run_conversation(
-                user_message=nudge,
-                conversation_history=_history or cli.conversation_history,
-                **author_kwargs,
-            )
+            result = run_agent_through_port(
+                cli.agent, nudge,
+                session_id=getattr(cli, "session_id", "") or "",
+                history=_history or cli.conversation_history,
+                extra_kwargs=author_kwargs,
+            )[1]
             _sync_cli_session_id_from_agent(cli)
 
         _recover_turns(
@@ -273,9 +278,12 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
 
             def _follow_up(text):
                 nonlocal history
-                follow = cli.agent.run_conversation(
-                    user_message=text, conversation_history=history, **author_kwargs,
-                )
+                follow = run_agent_through_port(
+                    cli.agent, text,
+                    session_id=getattr(cli, "session_id", "") or "",
+                    history=history,
+                    extra_kwargs=author_kwargs,
+                )[1]
                 if isinstance(follow, dict) and follow.get("messages"):
                     history = follow["messages"]
                 # Same sync contract as the main turn: a compression rotation during a

@@ -173,9 +173,9 @@ def _add_top_level_flags(parser: argparse.ArgumentParser) -> None:
     add("-t", "--toolsets", default=None,
         help="Comma-separated toolsets to enable for this invocation. Applies to -z/--oneshot and --tui.")
     inherited(parser, "--engine", default="native", metavar="NAME", help=(
-        "RuntimePort engine for -z/--oneshot (default: native). 'openjarvis' runs the "
-        "pinned out-of-process engine and refuses, without falling back, when absent. "
-        "See 'qubit runtime engines'."))
+        "RuntimePort engine for -z/--oneshot and non-interactive chat -q "
+        "(default: native). 'openjarvis' runs the pinned out-of-process engine and "
+        "refuses, without falling back, when absent. See 'qubit runtime engines'."))
     add("--resume", "-r", metavar="SESSION", default=None, help=(
         "Resume a previous session by ID or title, or pass 'latest' for "
         "the most recent session (workspace-scoped, like -c with no name)"))
@@ -274,8 +274,10 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
     add("-Q", "--quiet", action="store_true",
         help="Quiet mode for programmatic use: suppress banner, spinner, and tool previews. Only output the final response and session info.")
     add("--engine", default=SUPPRESS, metavar="NAME", help=(
-        "RuntimePort engine. In this build only 'native' is available on the chat/query "
-        "path; -z/--oneshot also accepts 'openjarvis'."))
+        "RuntimePort engine for non-interactive single-query runs (-q/--query-file, "
+        "-Q or --oneshot; default: native). 'openjarvis' runs the pinned out-of-process "
+        "engine and refuses, without falling back, when absent. Interactive chat is "
+        "native-only."))
     add("--format", choices=["text", "stream-json"], default="text", dest="output_format", help=(
         "Output format for single-query mode (-q). 'text' prints the final response as plain text (default). "
         "'stream-json' emits newline-delimited JSON events (JSONL), implies --quiet, and cannot be combined with --tui."))

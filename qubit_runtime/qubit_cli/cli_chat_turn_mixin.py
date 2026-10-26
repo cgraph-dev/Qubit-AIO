@@ -325,21 +325,35 @@ class CLIChatTurnMixin:
             set_sudo_password_callback,
         )
         from agent.vault_backends.unlock import set_code_prompt_callback, set_save_login_prompt_callback, set_unlock_prompt_callback
-        # terminal_tool callbacks are thread-local: run()'s registration is invisible here.
-        set_sudo_password_callback(self._sudo_password_callback)
-        set_approval_callback(self._approval_callback)
-        set_secret_capture_callback(self._secret_capture_callback)
-        set_unlock_prompt_callback(self._vault_unlock_callback)
-        set_save_login_prompt_callback(self._vault_save_login_callback)
-        set_code_prompt_callback(self._vault_code_callback)
-        # Bind the approval session key so ``is_current_session_yolo_enabled()`` resolves
-        # against the same key ``/yolo`` toggles under (``enable_session_yolo(self.session_id)``).
+
         try:
-            from tools.approval_context import reset_current_session_key, set_current_session_key
-            _approval_session_token = set_current_session_key(self.session_id or "default")
+            from tools.approval_context import reset_current_session_key
         except Exception:
             reset_current_session_key = None  # type: ignore[assignment]
-            _approval_session_token = None
+
+        def _bind_thread_context():
+            """Bind terminal-tool/vault callbacks + the approval key on the CURRENT thread.
+
+            The port runs the turn on its own worker thread; ``contextvars`` are copied
+            for it, but ``terminal_tool``'s callback registry is thread-local, so the
+            factory re-binds it there before constructing the capture delegate.
+            """
+            set_sudo_password_callback(self._sudo_password_callback)
+            set_approval_callback(self._approval_callback)
+            set_secret_capture_callback(self._secret_capture_callback)
+            set_unlock_prompt_callback(self._vault_unlock_callback)
+            set_save_login_prompt_callback(self._vault_save_login_callback)
+            set_code_prompt_callback(self._vault_code_callback)
+            # Bind the approval session key so ``is_current_session_yolo_enabled()`` resolves
+            # against the same key ``/yolo`` toggles under (``enable_session_yolo(self.session_id)``).
+            try:
+                from tools.approval_context import set_current_session_key
+                return set_current_session_key(self.session_id or "default")
+            except Exception:
+                return None
+
+        # terminal_tool callbacks are thread-local: run()'s registration is invisible here.
+        _approval_session_token = _bind_thread_context()
         agent_message = turn.voice_prefix + message if turn.voice_prefix else message
         self.agent._voice_turn_pending = bool(turn.voice_prefix)  # auxiliary.voice_chat route
         # One-shot /model and /reload-skills notes; _prepend_note_to_message also handles
@@ -364,12 +378,31 @@ class CLIChatTurnMixin:
             from agent.notification_presentation import notification_turn
             muted = getattr(turn, "mute_notification_reply", False)
             with notification_turn(self.agent, muted=muted, session_id=self.session_id):
-                turn.result = self.agent.run_conversation(
-                    user_message=agent_message,
-                    conversation_history=self.conversation_history[:-1],
-                    stream_callback=None if muted else turn.stream_callback, task_id=self.session_id,
-                    persist_user_message=_persist_clean_user_message, moa_config=_moa_cfg,
-                )
+                if getattr(self, "_single_query_mode", False):
+                    # ``chat -q`` runs its one turn through the RuntimePort. The
+                    # surrounding CLI output (stream display, boxes, timestamps,
+                    # session summary) is unchanged; only the engine boundary moved.
+                    from qubit_cli.oneshot import run_agent_through_port
+
+                    turn.result = run_agent_through_port(
+                        self.agent, agent_message,
+                        session_id=self.session_id or "",
+                        history=self.conversation_history[:-1],
+                        task_id=self.session_id,
+                        stream=None if muted else turn.stream_callback,
+                        extra_kwargs={
+                            "persist_user_message": _persist_clean_user_message,
+                            "moa_config": _moa_cfg,
+                        },
+                        setup=_bind_thread_context,
+                    )[1]
+                else:
+                    turn.result = self.agent.run_conversation(
+                        user_message=agent_message,
+                        conversation_history=self.conversation_history[:-1],
+                        stream_callback=None if muted else turn.stream_callback, task_id=self.session_id,
+                        persist_user_message=_persist_clean_user_message, moa_config=_moa_cfg,
+                    )
             if getattr(self, "_pending_moa_disable_after_turn", False):
                 _restore = getattr(self, "_pending_moa_restore_model", None) or {}
                 for _key, _value in _restore.items():

@@ -1766,15 +1766,6 @@ _CHAT_PASSTHROUGH = (
 def cmd_chat(args):
     """Run interactive chat CLI."""
     _engine = (getattr(args, "engine", None) or "native").strip() or "native"
-    if _engine != "native":
-        # P3 routes the -z/--oneshot path. The classic chat/query path still builds
-        # the vendored AIAgent directly; never accept an engine it cannot honour.
-        print(
-            "Error: --engine is only supported on the -z/--oneshot path in this build; "
-            f"'qubit chat' runs the native engine (requested {_engine!r}).",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
     _apply_safe_mode(args)
     _apply_user_config_bypass(args)
     _guard_noninteractive_user_config(args)
@@ -1788,6 +1779,40 @@ def cmd_chat(args):
         _refuse_unforwarded_tui_flags(args)
 
     _resolve_chat_session_args(args, use_tui)
+    # Read --query-file before the engine decision: it turns the invocation into a
+    # concrete query, which is what decides whether -q seeds an interactive session.
+    _read_query_file(args)
+
+    if _engine != "native":
+        # A non-native engine runs ONE single-query turn through the port. An
+        # interactive session (no query, a TTY seed, or the Ink TUI) has no
+        # engine-neutral conversation loop, so refuse instead of pretending.
+        from cli import _should_seed_interactive
+
+        if use_tui:
+            print(
+                f"Error: --engine {_engine!r} is not supported with --tui; "
+                "use it on a single-query run.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        if not (getattr(args, "query", None) or getattr(args, "image", None)):
+            print(
+                f"Error: --engine {_engine!r} is only supported for non-interactive "
+                "single-query runs (-q/--query-file, -Q or --oneshot).",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        if _should_seed_interactive(
+            getattr(args, "query", None), getattr(args, "image", None),
+            bool(getattr(args, "quiet", False)), bool(getattr(args, "oneshot_exit", False)),
+        ):
+            print(
+                f"Error: --engine {_engine!r} cannot seed an interactive session; "
+                "add --oneshot (or -Q) to answer the query and exit.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
 
     _warn_retired_xai_models()
 
@@ -1831,6 +1856,25 @@ def cmd_chat(args):
         offer_consent_before_chat(args)
     _confirm_startup_expensive_model_override(args)
 
+    if _engine != "native":
+        from qubit_cli.single_query_engine import (
+            native_only_flags,
+            run_non_native_single_query,
+        )
+
+        flags = list(native_only_flags(args))
+        if getattr(args, "image", None):
+            flags.append("--image")
+        raise SystemExit(run_non_native_single_query(
+            getattr(args, "query", None) or "",
+            engine=_engine,
+            resume=getattr(args, "resume", None),
+            skills=getattr(args, "skills", None),
+            quiet=bool(getattr(args, "quiet", False)),
+            stream_json=bool(getattr(args, "output_format", "text") == "stream-json"),
+            flags=flags,
+        ))
+
     passthrough = {k: getattr(args, k, d) for k, d in _CHAT_PASSTHROUGH}
     if use_tui:
         _launch_tui(
@@ -1841,8 +1885,6 @@ def cmd_chat(args):
             accept_hooks=getattr(args, "accept_hooks", False),
             **passthrough,
         )
-
-    _read_query_file(args)
 
     safe_mode = getattr(args, "safe_mode", False)
     kwargs = {
@@ -3150,10 +3192,11 @@ def _set_chat_arg_defaults(args) -> None:
 def _refuse_engine_outside_oneshot(args) -> None:
     """Reject ``--engine`` where this build has no engine surface.
 
-    Only ``-z/--oneshot`` runs through the RuntimePort today; `qubit chat`
-    (including ``-q``) still builds the vendored agent and refuses in
-    ``cmd_chat`` with its own message. Any other top-level command has no
-    engine choice at all, so accepting the flag silently would be a lie.
+    ``-z/--oneshot`` and non-interactive ``qubit chat -q`` single-query runs
+    cross the RuntimePort (native is the default; other engines are refused by
+    ``cmd_chat`` when the invocation is interactive). Any other top-level
+    command has no engine choice at all, so accepting the flag silently would be
+    a lie.
     """
     engine = (getattr(args, "engine", None) or "native").strip() or "native"
     if engine == "native" or getattr(args, "oneshot", None):

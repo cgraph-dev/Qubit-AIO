@@ -242,11 +242,11 @@ def test_run_oneshot_from_args_forwards_the_engine(monkeypatch):
     assert captured["engine"] == "openjarvis"
 
 
-def test_chat_refuses_a_non_native_engine(capsys):
+def test_chat_refuses_a_non_native_engine_for_an_interactive_session(capsys):
     import qubit_cli.main as main_mod
 
     with pytest.raises(SystemExit) as exc:
         main_mod.cmd_chat(SimpleNamespace(engine="openjarvis"))
 
     assert exc.value.code == 2
-    assert "--engine is only supported on the -z/--oneshot path" in capsys.readouterr().err
+    assert "only supported for non-interactive single-query runs" in capsys.readouterr().err

@@ -596,13 +596,30 @@ class _CapturingAgent:
     other attribute delegates to the real agent.
     """
 
-    def __init__(self, agent, done: threading.Event) -> None:
+    def __init__(
+        self,
+        agent,
+        done: threading.Event,
+        *,
+        extra_kwargs: Optional[dict[str, Any]] = None,
+        user_message_keyword: bool = False,
+    ) -> None:
         self._agent = agent
         self._done = done
+        self._extra_kwargs = dict(extra_kwargs or {})
+        self._user_message_keyword = bool(user_message_keyword)
         self.result: Any = None
         self.error: BaseException | None = None
 
     def run_conversation(self, *args, **kwargs):
+        # The port calls the turn positionally; callers that were converted from
+        # ``run_conversation(user_message=..., ...)`` keep receiving that keyword
+        # (their tests and any callable that only accepts keywords stay valid).
+        if self._user_message_keyword and args and "user_message" not in kwargs:
+            kwargs["user_message"] = args[0]
+            args = args[1:]
+        if self._extra_kwargs:
+            kwargs.update(self._extra_kwargs)
         try:
             self.result = self._agent.run_conversation(*args, **kwargs)
             return self.result
@@ -691,12 +708,13 @@ def _port_result(engine: str, outcome: _PortTurn, session_id: Optional[str]) -> 
     return result
 
 
-def _run_port_oneshot(prompt, *, engine, skills, resume, stream):
+def _run_port_oneshot(prompt, *, engine, skills, resume, stream, extra_system=None):
     """Run a non-native engine through the port.
 
     Qubit owns the prompt and, when ``--resume`` is used, the history loaded from
     its own store; the backend's adapter owns its process. No native session row is
-    written for a non-native turn (the P2 adapter is stateless).
+    written for a non-native turn (the P2 adapter is stateless). *extra_system*
+    appends a caller-owned bound (``chat -q`` says no interactive user exists).
     """
     from agent.runtime_port import TurnRequest
     from agent.runtime_registry import build_registry
@@ -709,6 +727,7 @@ def _run_port_oneshot(prompt, *, engine, skills, resume, stream):
             session_db = _create_session_db_for_oneshot()
             session_id, history, _meta = _load_resume_target(session_db, resume, reopen=False)
         skills_prompt = _build_preloaded_skills_prompt(skills)
+        system = "\n\n".join(part for part in (skills_prompt, extra_system) if part) or None
         backend = build_registry(lambda request: None).get(engine)
         outcome = _run_port_turn(
             backend,
@@ -716,7 +735,7 @@ def _run_port_oneshot(prompt, *, engine, skills, resume, stream):
                 prompt=prompt,
                 session_id=session_id or "",
                 history=tuple(history),
-                system=skills_prompt,
+                system=system,
             ),
             stream=stream,
         )
@@ -725,6 +744,83 @@ def _run_port_oneshot(prompt, *, engine, skills, resume, stream):
     finally:
         if session_db is not None:
             _quietly("session store cleanup", session_db.close)
+
+
+def run_agent_through_port(
+    agent,
+    prompt,
+    *,
+    session_id: Optional[str] = None,
+    history: object = (),
+    task_id: Optional[str] = None,
+    stream=None,
+    extra_kwargs: Optional[dict[str, Any]] = None,
+    setup=None,
+    cancel=None,
+) -> tuple[str, dict]:
+    """Run one already-constructed native agent turn through the RuntimePort.
+
+    Product surfaces that own their own ``AIAgent`` (``chat -q``/``-Q``) call this so
+    the turn crosses the same engine boundary as ``-z``. The factory returns a
+    capture delegate rather than the agent itself, so the caller keeps the raw
+    result envelope (exit mapping, ``messages``, usage) while the port supplies the
+    bounded event stream. *extra_kwargs* are turn-local arguments the port request
+    does not model (``persist_user_message``/``moa_config``/``turn_author``);
+    *setup* re-establishes caller thread-local callbacks on the port worker thread.
+    """
+    from agent.runtime_port import TurnRequest
+    from agent.runtime_registry import build_registry
+
+    done = threading.Event()
+    box: dict[str, Any] = {}
+    # The port's bounded request carries a tuple and the native adapter omits an
+    # empty history. Callers converted from a direct ``run_conversation`` passed
+    # their list verbatim (``[]`` included), so inject it unchanged at the turn.
+    turn_extra = dict(extra_kwargs or {})
+    turn_extra.setdefault("conversation_history", history)
+
+    def build(request: TurnRequest):
+        if setup is not None:
+            setup()
+        capture = _CapturingAgent(
+            agent, done, extra_kwargs=turn_extra, user_message_keyword=True)
+        box["capture"] = capture
+        return capture
+
+    backend = build_registry(build, native_stream=stream is not None).get("native")
+    cancel_event = cancel if cancel is not None else threading.Event()
+    try:
+        outcome = _run_port_turn(
+            backend,
+            TurnRequest(
+                prompt=prompt,
+                session_id=session_id or "",
+                history=tuple(history or ()),
+                task_id=task_id,
+            ),
+            stream=stream,
+            cancel=cancel_event,
+        )
+    except KeyboardInterrupt:
+        # The turn runs on the port's worker thread now; ask it to stop and bound
+        # the wait before re-raising into the caller's existing Ctrl-C contract.
+        cancel_event.set()
+        try:
+            agent.interrupt("single-query interrupted", hard_cancel=True,
+                            tool_reason="single_query.cancel")
+        except Exception:
+            pass
+        done.wait(_PORT_CANCEL_GRACE_SECONDS)
+        raise
+    capture = box.get("capture")
+    if capture is not None and capture.error is not None:
+        raise capture.error
+    result = capture.result if capture is not None else None
+    if not isinstance(result, dict):
+        # A factory/turn that produced no envelope still gets a truthful terminal
+        # outcome instead of a fabricated success.
+        result = _port_result("native", outcome, session_id)
+    return (result.get("final_response") or "", result)
 
 
 def _run_agent(
