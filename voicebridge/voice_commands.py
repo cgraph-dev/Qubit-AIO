@@ -2313,6 +2313,36 @@ def _b_ide(ctx, args):
     return {"ide": IDE.status(ctx.cfg)}
 
 
+def _b_recipe(ctx, args):
+    """Run a registered Qubit recipe through the RuntimePort.
+
+    Reads run immediately (recipes are read-only collectors plus one model
+    turn); a typed section gap is reported per section, never fabricated.
+    """
+    from . import qubit_runtime as QR
+
+    QR.ensure_path()
+    from recipes.registry import UnknownRecipeError, build_recipe_registry
+    from recipes.runner import run_recipe
+
+    recipe_id = str(args.get("recipe", "") or "morning_digest").strip()
+    try:
+        spec = build_recipe_registry().get(recipe_id)
+    except UnknownRecipeError as exc:
+        raise ValueError(str(exc)) from exc
+    run = run_recipe(spec, engine="native")
+    sections = [section.as_dict() for section in run.sections]
+    if run.refusal:
+        return {"recipe": {
+            "id": spec.id, "state": "UNAVAILABLE", "code": run.refusal,
+            "detail": run.hint or run.refusal, "sections": sections}}
+    if run.failed:
+        raise RuntimeError("the recipe turn failed to produce a brief")
+    return {"recipe": {
+        "id": spec.id, "state": "OK", "engine": run.engine,
+        "brief": run.brief, "sections": sections}}
+
+
 def _b_schedules(ctx, args):
     """Packet 8U scheduled jobs (same schedules module the CLI uses).
 
@@ -5529,6 +5559,7 @@ _BACKENDS: Dict[str, Callable] = {
     "websites": _b_websites,
     "task_run": _b_task_run,
     "schedules": _b_schedules,
+    "recipe": _b_recipe,
     "files": _b_files,
     "ide": _b_ide,
     "git": _b_git,
@@ -5779,6 +5810,17 @@ def _sum_schedules(result):
     if not jobs:
         return "No scheduled jobs."
     return f"{len(jobs)} scheduled jobs, {active} active."
+
+
+def _sum_recipe(result):
+    body = result if isinstance(result, dict) else {}
+    recipe = body.get("recipe", {}) if isinstance(body, dict) else {}
+    if not isinstance(recipe, dict):
+        return "That recipe returned nothing."
+    if recipe.get("state") == "UNAVAILABLE":
+        return f"Morning digest is unavailable: {recipe.get('code', 'unavailable')}."
+    brief = str(recipe.get("brief", "") or "").strip()
+    return brief or "The morning digest is empty."
 
 
 def _sum_files(result):
@@ -6072,6 +6114,7 @@ _SUMMARIES = {
     "file_patch": _sum_file_patch,
     "web": _sum_web,
     "schedules": _sum_schedules,
+    "recipe": _sum_recipe,
     "files": _sum_files,
     "ide": _sum_ide,
     "wake": _sum_wake,
@@ -10383,6 +10426,13 @@ _CB("skills_install", "Install a skill manifest",
     examples=("qubit, skills install",),
     help="Validate + stage a local reviewed skill manifest disabled; remote "
          "identifiers are typed-refused and never fetched (confirmed).")
+_CB("recipe_morning_digest", "Morning digest",
+    ("give me my morning digest", "morning digest", "my morning digest",
+     "daily digest", "run my morning digest", "get my morning digest"),
+    "recipe", fixed=(("recipe", "morning_digest"),), summary="recipe",
+    examples=("qubit, give me my morning digest",),
+    help="Runs the morning_digest recipe (weather, calendar, unread mail, "
+         "health) and speaks the brief; unavailable sections name their gap.")
 
 # Upstream kanban lifecycle shapes with NO Qubit construct (the Qubit CLI
 # refuses them typed). Spoken attempts get the same audited refusal and name
