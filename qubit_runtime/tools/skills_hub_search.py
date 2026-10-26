@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from qubit_cli import install_source
 from tools.skills_hub_clawhub import ClawHubSource
 from tools.skills_hub_github import GitHubAuth, GitHubSource, _filter_results_by_provider, _provider_filter_of
+from tools.skills_hub_git_sources import HermesGitSource, OpenClawGitSource
 from tools.skills_hub_models import SkillMeta, SkillSource, TRUST_RANK, _dedupe_by_trust, hub
 from tools.skills_hub_official import QubitIndexSource, OptionalSkillSource
 from tools.skills_hub_skillssh import SkillsShSource
@@ -87,6 +88,10 @@ def _load_stale_index_cache() -> Optional[dict]:
 # index is available and no source filter is active (~70 GitHub calls/search
 # for unauthenticated users otherwise).
 _API_SOURCE_IDS = frozenset({"github", "skills-sh", "clawhub", "lobehub", "well-known"})
+# Git-backed skill sources download a whole repository. They stay out of an
+# unfiltered ("all") search and are prepared only when explicitly selected by
+# ``--source``; an explicit ``hermes:``/``openclaw:`` identifier still fetches.
+_EXPLICIT_ONLY_SOURCE_IDS = frozenset({"hermes", "openclaw"})
 # Consulted only when the index answered a non-empty query with nothing: the
 # index is rebuilt asynchronously and lags the registries, so a skill that is
 # live on skills.sh may not be in it yet. GitHub stays out — one miss (a typo)
@@ -110,6 +115,8 @@ def create_source_router(auth: Optional[GitHubAuth] = None) -> List[SkillSource]
         WellKnownSkillSource(),
         UrlSource(),                      # direct HTTP(S) URL to a SKILL.md
         GitHubSource(auth=auth, extra_taps=TapsManager().list_taps()),
+        HermesGitSource(),
+        OpenClawGitSource(),
         ClawHubSource(),
         LobeHubSource(),
         BrowseShSource(),                 # browse.sh site-specific browser skills
@@ -147,6 +154,8 @@ def _select_active_sources(sources: List[SkillSource], source_filter: str) -> Li
     active: List[SkillSource] = []
     for src in sources:
         sid = src.source_id()
+        if effective == "all" and sid in _EXPLICIT_ONLY_SOURCE_IDS:
+            continue
         if effective != "all" and sid != effective and sid != "official":
             continue
         if index_available and sid in _API_SOURCE_IDS:
@@ -248,6 +257,14 @@ def parallel_search_sources(
     timed_out_ids: List[str] = []
     if not active:
         return all_results, source_counts, timed_out_ids
+
+    # An explicit ``--source hermes|openclaw`` is the one place a whole repo may
+    # be cloned; an unfiltered search never reaches these sources.
+    if source_filter.strip().lower() not in ("", "all") and not provider_filter:
+        for src in active:
+            prepare = getattr(src, "prepare", None)
+            if callable(prepare):
+                prepare()
 
     deadline = time.monotonic() + overall_timeout
     _fan_out(active, query, per_source_limits, provider_filter, deadline, on_source_done,

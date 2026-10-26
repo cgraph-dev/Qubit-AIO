@@ -628,3 +628,17 @@ statement in distributions:
 >
 > The above copyright notice and this permission notice shall be included in all
 > copies or substantial portions of the Software.
+
+## OpenJarvis skill source resolvers — Apache-2.0
+
+Adapted from [open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis)
+at commit `05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0;
+the upstream `LICENSE` carries the full text and copyright).
+
+- Reference sources: `src/openjarvis/skills/sources/base.py`, `hermes.py`,
+  `openclaw.py` — clone/pull cache, skill walk, frontmatter preview, commit
+  pin, stale-cache refresh fallback, OpenClaw `_meta.json` sidecar.
+- Local adaptation: `qubit_runtime/tools/skills_hub_git_sources.py` and
+  `qubit_runtime/tests/tools/test_skills_hub_git_sources.py`. Qubit's hub
+  (auth, cache, trust, SSRF guards, bundle validation, installer) is not
+  replaced; only the resolver semantics were ported.

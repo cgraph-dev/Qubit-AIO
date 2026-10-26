@@ -13,7 +13,8 @@ def _flag(parser, *names, help, **kw):
 
 # Registry sources, then provider filters (GitHub taps stored under source="github").
 _SOURCE_CHOICES = [
-    "all", "official", "skills-sh", "well-known", "github", "clawhub", "lobehub", "browse-sh",
+    "all", "official", "skills-sh", "well-known", "github", "clawhub", "hermes", "openclaw",
+    "lobehub", "browse-sh",
     "nvidia", "openai", "anthropic", "huggingface", "voltagent", "gstack", "minimax"]
 
 
