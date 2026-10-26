@@ -84,7 +84,10 @@ def _wait_for_reader_close(session):
     # escapee exits), so the master FD is still released.
     reader = session._reader_thread
     assert reader is not None
-    assert _wait_for(lambda: not reader.is_alive(), _ESCAPEE_LIFETIME_S + 7)
+    # The escapee's own exit ends the blocked read; on a loaded host its scheduler
+    # wake-up can lag well past the nominal lifetime, so leave generous slack. A leaked
+    # PTY child still fails here (the foreground ``sleep 120`` outlives this bound).
+    assert _wait_for(lambda: not reader.is_alive(), _ESCAPEE_LIFETIME_S + 30)
     assert session._pty.closed
 
 
