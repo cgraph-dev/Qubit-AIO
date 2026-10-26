@@ -106,6 +106,9 @@ def test_finite_chat_joins_parallel_children_before_final_response(tmp_path, mod
         f"model:\n  provider: custom\n  base_url: {url}\n  api_mode: chat_completions\n"
         "memory:\n  memory_enabled: false\n  user_profile_enabled: false\n"
         "terminal:\n  env: local\n  oneshot_completion_wait_seconds: 1\n"
+        # Hermetic: never fetch the live model catalog during CLI init (a cold QUBIT_HOME
+        # would otherwise hit the network before the synthetic provider is used).
+        "model_catalog:\n  enabled: false\n"
         f"delegation:\n  max_concurrent_children: 2\n  base_url: {url}\n"
         "  api_key: local-test-only\n  model: test-model\n",
         encoding="utf-8",
@@ -121,6 +124,12 @@ def test_finite_chat_joins_parallel_children_before_final_response(tmp_path, mod
                HERMES_MANAGED_DIR=str(tmp_path / "managed"), TERMINAL_CWD=str(tmp_path),
                OPENAI_BASE_URL=url, OPENAI_API_KEY="local-test-only", PYTHONPATH=str(REPO_ROOT),
                PYTHONDONTWRITEBYTECODE="1", LANG="C.UTF-8")
+    # Reuse the host's pinned runtime so the CLI's gateway attach does not provision a
+    # fresh managed Python inside the test (slow under load; the test exercises the agent
+    # loop, not PM/install).
+    host_tools = Path.home() / ".local/state/qubit-voicebridge/runtime/tools"
+    if host_tools.is_dir():
+        env["HERMES_RUNTIME_DIR"] = str(host_tools)
     mode_flags = {"quiet": ["-Q"], "oneshot": ["--oneshot"], "redirected": []}
     command = [
         sys.executable, "-c", "from qubit_cli.main import main; main()", "chat",
