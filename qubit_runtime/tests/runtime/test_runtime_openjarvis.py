@@ -61,6 +61,10 @@ if "--agent" not in argv:
     print("Error: no such option: --agent", file=sys.stderr)
     sys.exit(2)
 agent = argv[argv.index("--agent") + 1]
+reject = os.environ.get("FAKE_OJ_REJECT_AGENT")
+if reject and agent == reject:
+    print("Error: unknown agent: " + agent, file=sys.stderr)
+    sys.exit(2)
 home = os.environ.get("OPENJARVIS_HOME", "")
 if home:
     try:
@@ -94,6 +98,8 @@ if "HUGE" in prompt:
 if "MALFORMED" in prompt:
     print("not json at all")
     sys.exit(0)
+if "EMPTY_STDOUT" in prompt:
+    sys.exit(0)
 if "INCOMPLETE" in prompt:
     print(json.dumps({"completed": False, "content": "partial"}))
     sys.exit(0)
@@ -115,6 +121,9 @@ if "LINGER" in prompt:
     sys.exit(0)
 if "ECHO_PROMPT" in prompt:
     print(json.dumps({"content": prompt}))
+    sys.exit(0)
+if "ECHO_ARGV" in prompt:
+    print(json.dumps({"content": " ".join(argv)}))
     sys.exit(0)
 if agent:
     print(json.dumps({
@@ -239,6 +248,21 @@ def test_default_direct_mode_is_passed_as_an_empty_agent(tmp_path, pinned):
     events = _run(backend)
     assert events[-1].text == "OJ_OK"
     assert "turns" not in events[-1].data
+
+
+def test_configured_model_and_tools_reach_the_cli(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(
+        tmp_path, binary=str(script), source=str(repo), pinned_commit=commit,
+        model="fake-model-7", tools="calculator,think")
+
+    events = _run(backend, "ECHO_ARGV")
+
+    argv = events[-1].text
+    assert "-m fake-model-7" in argv
+    assert "--tools calculator,think" in argv
+    assert "--no-context" in argv
+    assert events[-1].data["model"] == "fake-model-7"
 
 
 def test_history_and_system_reach_the_spawned_prompt(tmp_path, pinned):
@@ -532,6 +556,41 @@ def test_malformed_json_is_an_error(tmp_path, pinned):
 
     assert [e.kind for e in events] == ["error"]
     assert "malformed" in events[0].text.lower()
+
+
+def test_empty_success_output_is_malformed(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+
+    events = _run(backend, "EMPTY_STDOUT")
+
+    assert [e.kind for e in events] == ["error"]
+    assert "malformed" in events[0].text.lower()
+
+
+def test_unknown_agent_is_a_nonzero_error_not_a_done(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    monkeypatch.setenv("FAKE_OJ_REJECT_AGENT", "nope")
+    backend = _backend(
+        tmp_path, binary=str(script), source=str(repo), pinned_commit=commit, agent="nope")
+
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["exit_code"] == 2
+    assert "unknown agent" in events[0].text
+
+
+def test_binary_removed_after_resolve_is_a_typed_unavailable(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+    backend.resolve()
+    script.unlink()
+
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_unavailable"
 
 
 def test_json_with_trailing_status_text_is_parsed(tmp_path):

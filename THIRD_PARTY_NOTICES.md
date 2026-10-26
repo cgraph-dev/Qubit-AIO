@@ -642,6 +642,12 @@ the upstream `LICENSE` carries the full text and copyright).
   `qubit_runtime/tests/tools/test_skills_hub_git_sources.py`. Qubit's hub
   (auth, cache, trust, SSRF guards, bundle validation, installer) is not
   replaced; only the resolver semantics were ported.
+- Test scenarios adapted from OpenJarvis `0583901`, Apache-2.0:
+  `tests/skills/test_sources.py` and `tests/skills/test_source_refresh_fallback.py`.
+  Only the resolver-level scenarios that Qubit implements are reproduced
+  (layout walk, frontmatter preview, commit pin, stale-cache fallback and
+  warning lifecycle); the importer, trust-gate, telemetry and CLI-display
+  tests were not ported because those layers are Qubit's own.
 
 ## OpenJarvis out-of-process engine adapter — Apache-2.0
 
@@ -661,3 +667,12 @@ copied or imported into the Qubit process**; the adapter spawns the pinned
   `qubit_runtime/tests/runtime/test_runtime_openjarvis.py`. Qubit owns session
   state and renders system/history into the CLI prompt; OpenJarvis keeps its own
   `OPENJARVIS_HOME`, isolated under Qubit's home.
+- Test scenarios adapted from OpenJarvis `0583901`, Apache-2.0:
+  `tests/evals/comparison/test_subprocess_runner.py`,
+  `tests/evals/comparison/test_third_party.py`,
+  `tests/cli/test_ask_e2e.py` and `tests/cli/test_ask_agent.py`. Only the
+  scenarios that apply to the Qubit adapter are reproduced (timeout/crash/
+  malformed output, commit-pin mismatch, model/tools/agent options, usage and
+  tool-result shape); the energy sampler, eval telemetry propagation and
+  OpenClaw `payloads` runner are not ported because Qubit does not implement
+  those layers.
