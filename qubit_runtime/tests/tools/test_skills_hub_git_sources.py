@@ -105,6 +105,100 @@ def test_pull_failure_keeps_cache_and_warns(tmp_path):
     assert "stale" in src.refresh_warning
 
 
+def test_search_matches_partial_names_and_empty_query_returns_all(tmp_path):
+    origin = _repo(tmp_path, {
+        "skills/research/alpha/SKILL.md": "---\nname: alpha\ndescription: First.\n---\n",
+        "skills/research/beta/SKILL.md": "---\nname: beta\ndescription: Second.\n---\n",
+        "skills/research/no-skill/notes.md": "not a skill\n",
+    })
+    src = HermesGitSource(cache_root=tmp_path / "cache", repo_url=str(origin))
+    src.sync()
+
+    assert [m.name for m in src.search("")] == ["alpha", "beta"]
+    assert [m.name for m in src.search("bet")] == ["beta"]
+    assert [m.name for m in src.search("research")] == ["alpha", "beta"]
+    assert src.search("notes") == []
+
+
+def test_frontmatter_absent_falls_back_to_the_directory_name(tmp_path):
+    origin = _repo(tmp_path, {
+        "skills/research/plain/SKILL.md": "Just a body, no frontmatter.\n",
+    })
+    src = HermesGitSource(cache_root=tmp_path / "cache", repo_url=str(origin))
+    src.sync()
+
+    found = src.search("plain")
+    assert [m.name for m in found] == ["plain"]
+    assert found[0].description == ""
+    bundle = src.fetch("hermes:research/plain")
+    assert bundle is not None
+    assert bundle.files["SKILL.md"] == "Just a body, no frontmatter.\n"
+
+
+def test_initial_clone_failure_is_fatal_but_prepare_is_safe(tmp_path):
+    src = HermesGitSource(
+        cache_root=tmp_path / "cache", repo_url=str(tmp_path / "does-not-exist"))
+    with pytest.raises(subprocess.CalledProcessError):
+        src.sync()
+    assert src.refresh_warning == ""
+    assert src.prepare() is False
+    assert src.search("demo") == []
+
+
+def test_empty_cache_does_not_hide_a_failed_refresh(tmp_path):
+    cache = tmp_path / "cache"
+    (cache / ".git").mkdir(parents=True)  # looks cloned, but holds no skills
+    src = HermesGitSource(cache_root=cache, repo_url=str(tmp_path / "unused"))
+
+    with pytest.raises(RuntimeError, match="cache is empty"):
+        src.sync()
+    assert src.refresh_warning == ""
+
+
+def test_successful_refresh_clears_the_stale_warning(tmp_path):
+    origin = _hermes_repo(tmp_path)
+    src = HermesGitSource(cache_root=tmp_path / "cache", repo_url=str(origin))
+    src.sync()
+
+    _git(src.cache_dir(), "remote", "set-url", "origin", str(tmp_path / "gone"))
+    src.sync()
+    assert "stale" in src.refresh_warning
+
+    _git(src.cache_dir(), "remote", "set-url", "origin", str(origin))
+    src.sync()
+    assert src.refresh_warning == ""
+    assert src.search("research")
+
+
+def test_failed_refresh_still_serves_the_cached_bundle_and_commit(tmp_path):
+    origin = _hermes_repo(tmp_path)
+    src = HermesGitSource(cache_root=tmp_path / "cache", repo_url=str(origin))
+    src.sync()
+    commit = src.current_revision()
+
+    _git(src.cache_dir(), "remote", "set-url", "origin", str(tmp_path / "gone"))
+    src.sync()
+
+    bundle = src.fetch("hermes:research/demo")
+    assert bundle is not None
+    assert bundle.metadata["commit"] == commit
+    assert "stale" in src.refresh_warning
+
+
+def test_cache_cannot_satisfy_a_missing_skill(tmp_path):
+    origin = _hermes_repo(tmp_path)
+    src = HermesGitSource(cache_root=tmp_path / "cache", repo_url=str(origin))
+    src.sync()
+
+    assert src.inspect("hermes:research/missing") is None
+    assert src.fetch("hermes:research/missing") is None
+
+    _git(src.cache_dir(), "remote", "set-url", "origin", str(tmp_path / "gone"))
+    src.sync()
+    assert src.inspect("hermes:research/missing") is None
+    assert src.fetch("hermes:research/missing") is None
+
+
 def test_router_registers_both_sources_and_keeps_them_out_of_all():
     from tools.skills_hub_search import _select_active_sources, create_source_router
 
