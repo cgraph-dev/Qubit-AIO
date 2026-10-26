@@ -21,7 +21,7 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 - ✅ `voicebridge/voice_edit/overlay.py` redesigned (status pill, live meter, flat actions, diff counts, compact history, dynamic sizing); 757 focused Voice Edit/STT/overlay tests pass; real-Tk visual check on `:0`.
 - ✅ Words stream while speaking: helper shows the panel on the hotkey, forwards partials, and the STT client composes segment-aware cumulative text. Wake path shows its final words immediately.
-- 🟡 Not live: `qubit-voice-typing.service` was not restarted (outside the authorized restart set). Restart it to load the new panel.
+- 🟡 Not live: `qubit-voice-typing.service` was not restarted (outside the authorized restart set). Run `systemctl --user restart qubit-voice-typing` to load the new panel.
 
 ## Wave 52 — 2026-10-26 (OpenJarvis test scenarios ported)
 
@@ -31,7 +31,7 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 ## Wave 51 — 2026-10-26 (Cron notice formatting)
 
 - ✅ `cron/notice_format.py` + delivery integration: one status icon, bounded summary, structured details, local/relative times, configured-link only, per-transport rendering/escaping, plain fallback, redaction before truncation. 23 notice tests + 599-file matrix green in the lane; 111 focused passed on merged main.
-- 🟡 Needs a gateway restart to emit live; no scheduling/behaviour change.
+- ✅ Live: gateway+bridge restarted 22:47 (identify ready, protocol 1, epoch 25; `/chat` 200; Telegram polling); new notices apply to deliveries after the restart. No scheduling/behaviour change.
 
 ## Wave 50 — 2026-10-26 (RuntimePort Phase 2: OpenJarvis engine)
 
