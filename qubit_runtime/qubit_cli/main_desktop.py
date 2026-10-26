@@ -169,7 +169,8 @@ def _desktop_packaged_executable_in(release_dir: Path) -> Optional[Path]:
         ]
     else:
         candidates = [
-            release_dir / d / n for d in ("linux-unpacked", "linux-arm64-unpacked") for n in ("hermes", "Qubit")
+            release_dir / d / n for d in ("linux-unpacked", "linux-arm64-unpacked")
+            for n in ("hermes", "qubit", "Qubit")
         ]
 
     existing = [p for p in candidates if p.exists()]

@@ -62,17 +62,17 @@ def test_systemd_unit_of_another_home_is_left_alone(monkeypatch, own_home):
     restarted: list[str] = []
     failed: list[str] = []
     fleet._restart_one_systemd_gateway_unit(
-        "hermes-gateway", scope="user", scope_cmd=["systemctl", "--user"], drain_budget=5.0,
+        "qubit-gateway", scope="user", scope_cmd=["systemctl", "--user"], drain_budget=5.0,
         _manage_cmd_cache={}, restarted_services=restarted, failed_or_stale_units=failed,
     )
     assert drained == [] and write_verbs == [] and restarted == [] and failed == []
 
     main_pid["value"] = 4343  # control: same unit name, this update's home
     fleet._restart_one_systemd_gateway_unit(
-        "hermes-gateway", scope="user", scope_cmd=["systemctl", "--user"], drain_budget=5.0,
+        "qubit-gateway", scope="user", scope_cmd=["systemctl", "--user"], drain_budget=5.0,
         _manage_cmd_cache={}, restarted_services=restarted, failed_or_stale_units=failed,
     )
-    assert drained == [4343] and restarted == ["hermes-gateway"] and failed == []
+    assert drained == [4343] and restarted == ["qubit-gateway"] and failed == []
 
 
 def test_manual_gateway_of_another_home_is_not_stopped(monkeypatch, own_home):

@@ -35,12 +35,18 @@ def completion_tail(monkeypatch):
 
     spawned = Spawned()
 
-    def call(command, **kwargs):
+    class Result:
+        def __init__(self, code):
+            self.returncode = code
+
+    def run(command, **kwargs):
         spawned.append(command)
         spawned.kwargs = kwargs
-        return spawned.exit_code
+        return Result(spawned.exit_code)
 
-    monkeypatch.setattr(venv_sync.subprocess, "call", call)
+    # The fork's tail runs through ``update_custody.run`` (the subprocess.call seam is gone).
+    from qubit_cli import update_custody
+    monkeypatch.setattr(update_custody, "run", run)
     return spawned
 
 

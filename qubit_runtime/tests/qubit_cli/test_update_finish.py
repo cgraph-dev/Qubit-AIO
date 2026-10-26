@@ -58,9 +58,13 @@ def completion(tmp_path, monkeypatch):
     # The selected interpreter is dependency-free, not the pytest environment. A symlink, not a
     # copy: a relocatable build (python-build-standalone) locates its stdlib beside the resolved
     # executable, so a lone copied binary cannot even import ``encodings``.
+    # A dependency-free interpreter, not the pytest environment. Build a throwaway venv
+    # instead of symlinking the base: a host whose base interpreter ships PyYAML would
+    # otherwise hand the selected generation a yaml it must not have (the updater's
+    # degradation scenario assumes none). ``-I`` still ignores PYTHONPATH/PYTHONHOME.
     python = tmp_path / "store/python/bin/python3"
-    python.parent.mkdir(parents=True)
-    python.symlink_to(Path(sys._base_executable).resolve())
+    subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(tmp_path / "store/python")],
+                   check=True, capture_output=True)
     _put(tmp_path / "store", "facts.json", json.dumps({"packages": {"python": {"entry": "python"}}}))
     # A real venv: isolated build children (icon generation, npm lifecycle scripts) run on the
     # selected generation's own interpreter, not on the store Python that hosts the completion.
