@@ -17,6 +17,14 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 
 ---
 
+## Wave 56 — 2026-10-26 (Phase 5: Google Contacts connector)
+
+- ✅ Read-only `connectors/google_contacts.py` over the existing `$QUBIT_HOME/google_token.json` and google-auth refresh path; `list`/`search` (People API, bounded), typed `missing_credential`/`missing_scope`/`reauthorize_required`/401/403/429/timeout/network/HTTP errors; results bounded and token-safe.
+- ✅ Exposed as the read-only `google_contacts` tool/toolset with `search`/`list`; discovery only when the existing token is present. No second OAuth flow/store, no writes.
+- ✅ Tests: connectors **45 passed**; focused tool registry/toolset/config set **184 passed, 6 pre-existing skips**.
+- 🟡 Live probe blocked on owner Google credentials with Contacts scope; a cold-cache search may be stale immediately after the warmup (documented). Token refresh persists to the same file using the skill's existing pattern.
+- 🔴 Not done: Apple Calendar/Contacts/Health/Music, Dropbox; live probe; service restart; full matrix; `VERIFIED`.
+
 ## Wave 55 — 2026-10-26 (Phase 4: morning_digest recipe)
 
 - ✅ `qubit_runtime/recipes/` typed `RecipeSpec` + registry + RuntimePort runner; `morning_digest` collects weather/calendar/unread mail deterministically and degrades each section with a stable typed reason (`missing_connector`, `missing_credential`, `connector_not_configured`, `tool_error`). Health is honestly unavailable (no connector). Facts/brief redacted; model only writes from facts.
