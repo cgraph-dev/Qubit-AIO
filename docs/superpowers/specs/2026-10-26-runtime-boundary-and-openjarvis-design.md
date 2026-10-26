@@ -60,6 +60,37 @@ Recipes are a Qubit concept: prompt + tool set + schedule + memory/approval
 policy + voice command, executed on whichever backend. OpenJarvis agent files
 are reference implementations, not code to copy wholesale.
 
+
+## Reviewed upstream adapters (2026-10-26, `open-jarvis/OpenJarvis@0583901`, Apache-2.0)
+
+The two adapter families are deliberately small; ours is a superset in both areas.
+
+**Skill sources** (`src/openjarvis/skills/sources/{base,hermes,openclaw}.py`):
+- `SourceResolver` clones/pulls a repo into a cache, walks `skills/<category>/<skill>/SKILL.md`
+  (Hermes) or `skills/<owner>/<skill>/SKILL.md` + `_meta.json` (OpenClaw), reads frontmatter,
+  and returns a lightweight `ResolvedSkill(name, source, path, category, description, commit, sidecar)`.
+- Refresh is best-effort: a failed `git pull` keeps the existing cache and warns; a failed
+  first clone raises. The commit SHA is recorded per result.
+- Their `SkillImporter` adds trust classification, dangerous-capability checks, tool-reference
+  translation, and opt-in scripts. Tests: `tests/skills/test_sources.py`,
+  `tests/skills/test_source_refresh_fallback.py`, `test_importer.py`.
+
+Our `tools/skills_hub_*` already has a broader hub: GitHub API auth (PAT/gh/App), taps,
+index cache, trust levels, SSRF-guarded fetch, bundle validation, installer/security, and
+multiple sources (`official`, `hermes-index`, `skills-sh`, `clawhub`, `github`, `lobehub`,
+`well-known`, `url`, `browse-sh`). **Do not replace that hub.** Port the two resolver
+semantics as new `SkillSource` adapters (`hermes`, `openclaw`) and keep our installer,
+trust, and security. This is the only way to gain their Hermes/OpenClaw import without
+losing the security and install layers.
+
+**Agent/eval backends** (`src/openjarvis/evals/backends/external/{hermes_agent,openclaw,_subprocess_runner}.py`):
+- The foreign framework runs as a subprocess; *"Foreign code never imports into this process;
+  we cross the boundary only via stdin/stdout JSON."*
+- Path + interpreter are explicit (`HERMES_AGENT_PATH`, `HERMES_AGENT_PYTHON`, `OPENCLAW_PATH`)
+  and the commit is pinned/verified.
+- This is the exact shape for our RuntimePort P2 `openjarvis` backend (and a future
+  `hermes`/`openclaw` engine): out-of-process, pinned, no in-process import.
+
 ## Phases and gates
 
 Each phase produces working, testable software and its own detailed plan. All
@@ -70,6 +101,7 @@ commit, docs pushed).
 | Phase | Deliverable | Acceptance | Depends on |
 |---|---|---|---|
 | P0 | Gate: current milestone signed off | `docs/STATUS.md` records matrix + live evidence; `canonical/main` pushed; services restarted | — |
+| P1b | Hermes/OpenClaw skill sources in the existing hub (ported resolver semantics) | `hermes:<name>` / `openclaw:<owner>/<name>` search/inspect/fetch/install; cache refresh fallback; commit pinned; local-repo tests | P0 |
 | P1 | RuntimePort + native backend + diagnostic `qubit runtime` | Contract tests green; `qubit runtime run --engine native` answers a prompt; no behaviour change to chat/gateway (focused suites) | P0 |
 | P2 | OpenJarvis backend (out-of-process) | Pinned commit + Apache-2.0 notice; `qubit runtime run --engine openjarvis` answers; typed refusal when absent; no imports of `openjarvis` in-process | P1, OpenJarvis API contract pinned |
 | P3 | Route `qubit chat`/oneshot through the port (native only) | Existing chat/oneshot tests green; `--engine` accepted; default unchanged | P1 |

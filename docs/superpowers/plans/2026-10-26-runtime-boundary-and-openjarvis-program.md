@@ -42,7 +42,33 @@
 - [ ] `canonical/main` pushed; shared worktree fast-forwarded; gateway+bridge restarted on that commit; identify ready; `/chat` 200.
 - [ ] `docs/OPEN_THREADS.md` carries this program as the next thread.
 
-**Gate:** the above are recorded with commands + observed output. This plan is not started before then.
+**Gate (owner decision 2026-10-26):** the single clean full-matrix run is **waived**; the
+recorded split-pass evidence (completed full pass + every failing file re-run green alone),
+plus the live browser/Telegram evidence, is accepted. Windows stays out of scope. `VERIFIED`
+remains unclaimed because the matrix was not one uninterrupted pass. This plan now starts.
+
+## Phase 1b — Hermes/OpenClaw skill sources (independent, start here)
+
+Ported from `open-jarvis/OpenJarvis@0583901` `src/openjarvis/skills/sources/`
+(Apache-2.0, record in `THIRD_PARTY_NOTICES.md`). Do **not** replace
+`tools/skills_hub_*`: our hub owns auth, taps, cache, trust, SSRF guards, bundle
+validation and the installer. Add two `SkillSource` adapters:
+
+- `hermes` — clone/pull `https://github.com/NousResearch/hermes-agent.git`, walk
+  `skills/<category>/<skill>/SKILL.md`, frontmatter preview, commit SHA.
+- `openclaw` — clone/pull `https://github.com/openclaw/skills.git`, walk
+  `skills/<owner>/<skill>/SKILL.md`, `_meta.json` sidecar, commit SHA.
+
+Both: lazy sync, best-effort refresh (stale cache + warning on pull failure;
+first clone must succeed), identifiers `hermes:<name>` and
+`openclaw:<owner>/<name>` (bare `<name>` accepted when unique), community
+trust, no network in tests (local git repos).
+
+Detailed plan: `docs/superpowers/plans/2026-10-26-hermes-openclaw-skill-sources.md`.
+
+**Acceptance:** `tests/tools/test_skills_hub_git_sources.py` green; a local
+Hermes/OpenClaw repo search/inspect/fetch/refresh works; `create_source_router`
+lists both; `qubit skills install hermes:<name>` works against the local repo.
 
 ## Phase 1 — RuntimePort + native backend (detailed)
 
