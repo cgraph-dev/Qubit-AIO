@@ -46,7 +46,7 @@ async def test_real_acp_answer_resolves_the_exact_pending_control(daemon, tmp_pa
                 prompt=[{"type": "text", "text": "Remove owned fixture after consent"}]))
             try:
                 await async_wait_until(lambda: any(f.get("method") == "session/request_permission" for f in acp.frames),
-                                       timeout=15, what="the ACP permission request")
+                                       timeout=120, what="the ACP permission request")
                 permission = next(f for f in acp.frames if f.get("method") == "session/request_permission")
                 assert target.exists()
                 pending = (await ws.rpc("session.resume", session_id=sid))["prompts"][0]

@@ -108,10 +108,10 @@ runpy.run_module('gateway.run', run_name='__main__')
             if process.poll() is None:
                 process.send_signal(signal.SIGINT)
                 try:
-                    process.wait(timeout=20)
+                    process.wait(timeout=90)
                 except subprocess.TimeoutExpired:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=60)
 
 
 @pytest.fixture

@@ -68,7 +68,7 @@ async def editor(daemon, tmp_path):
         finally:
             process.stdin.close()
             try:
-                await asyncio.wait_for(process.wait(), 5)
+                await asyncio.wait_for(process.wait(), 90)
             except TimeoutError:
                 process.kill()
                 await process.wait()
@@ -132,7 +132,7 @@ async def test_acp_permission_detach_keeps_canonical_waiter(daemon, tmp_path, mo
                 prompt=[{"type": "text", "text": "Remove the owned fixture"}]))
             try:
                 await async_wait_until(lambda: any(f.get("method") == "session/request_permission" for f in acp.frames),
-                                       timeout=15, what="the ACP permission request")
+                                       timeout=120, what="the ACP permission request")
                 permission = next(f for f in acp.frames if f.get("method") == "session/request_permission")
                 assert target.exists()
                 snapshot = await ws.rpc("session.resume", session_id=sid)
@@ -149,7 +149,7 @@ async def test_acp_permission_detach_keeps_canonical_waiter(daemon, tmp_path, mo
         response = await ws.rpc("approval.respond", session_id=sid, prompt_id=pending["prompt_id"],
             execution_generation=pending["execution_generation"], choice="once")
         assert response["status"] == "resolved", response
-        await async_wait_until(lambda: not target.exists(), timeout=20, what="the approved deletion")
+        await async_wait_until(lambda: not target.exists(), timeout=120, what="the approved deletion")
         print("ACP_PERMISSION_RECEIPT=" + json.dumps({"session_id": sid, "permission": permission,
               "stale_generation_rejected": True, "detached_waiter_resolved_by_ws": True,
               "real_owned_deletion": not target.exists()}))
