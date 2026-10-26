@@ -1,5 +1,7 @@
 """Terminal child envs route GUI launches to the running Bot Desktop (#125830)."""
 
+import os
+
 import pytest
 
 from tools.environments.local import _make_run_env
@@ -40,7 +42,9 @@ def test_stopped_bot_desktop_leaves_the_seat_env_alone(monkeypatch):
     monkeypatch.setenv("DISPLAY", ":0")
     env = _make_run_env({})
     assert env["DISPLAY"] == ":0"
-    assert "XAUTHORITY" not in env or env.get("XAUTHORITY") == ""
+    # A seat XAUTHORITY (when the host has one) passes through untouched; the stopped
+    # Bot Desktop's own value is never injected.
+    assert env.get("XAUTHORITY") in (None, "", os.environ.get("XAUTHORITY"))
 
 
 def test_routing_does_not_stamp_bot_desktop_activity(monkeypatch):

@@ -318,7 +318,7 @@ def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int
         else:
             try:
                 killpg(pgid, sig)
-                return
+                return True
             except (ProcessLookupError, PermissionError, OSError) as exc:
                 # Pgroup gone or refused — still try the direct child.
                 logger.debug("killpg(%d, %d) failed for MCP server '%s': %s; falling back to kill(pid)",

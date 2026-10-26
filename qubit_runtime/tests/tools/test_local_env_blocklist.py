@@ -1411,7 +1411,7 @@ def test_passthrough_accepted_before_an_adapter_owns_the_name_stops_forwarding_i
     if declared_by == "skill":
         register_env_passthrough(names)
     else:
-        home = child_env / "hermes"
+        home = child_env / "qubit"
         home.mkdir(exist_ok=True)
         (home / "config.yaml").write_text("terminal:\n  env_passthrough: [{}]\n".format(", ".join(names)), encoding="utf-8")
     builders = [lambda: local._make_run_env({}), lambda: local._sanitize_subprocess_env(dict(os.environ)),
@@ -1455,7 +1455,7 @@ def test_payload_venv_that_is_not_real_is_not_provenance(tmp_path, monkeypatch, 
 def test_runtime_adapter_secret_follows_the_bound_profiles_registry(child_env, monkeypatch):
     from gateway.platform_registry import PlatformEntry, platform_registry
     from tools.env_passthrough import is_env_passthrough, register_env_passthrough
-    home_a, home_b = child_env / "hermes", child_env / "profile-b"
+    home_a, home_b = child_env / "qubit", child_env / "profile-b"
     home_a.mkdir(exist_ok=True)
     home_b.mkdir()
     name = "ACME_CHAT_SIGNING_SECRET"  # declared by a user adapter; no OPTIONAL_ENV_VARS entry
