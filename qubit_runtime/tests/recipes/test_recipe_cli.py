@@ -63,8 +63,12 @@ def test_list_json_is_machine_readable():
     with redirect_stdout(out):
         assert cmd_recipe(argparse.Namespace(recipe_action="list", json=True)) == 0
     payload = json.loads(out.getvalue())
-    assert payload[0]["id"] == "morning_digest"
-    assert payload[0]["sections"] == ["weather", "calendar", "unread_mail", "health"]
+    ids = [row["id"] for row in payload]
+    assert ids == ["monitor_operative", "morning_digest"]
+    morning = next(row for row in payload if row["id"] == "morning_digest")
+    assert morning["sections"] == ["weather", "calendar", "unread_mail", "health"]
+    monitor = next(row for row in payload if row["id"] == "monitor_operative")
+    assert monitor["sections"] == ["cron", "kanban", "memory", "compression"]
 
 
 def test_run_prints_the_brief(monkeypatch):
