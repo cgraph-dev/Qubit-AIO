@@ -224,7 +224,12 @@ def audit(voice_commands=None, roles: Iterable[Any] | None = None) -> dict[str, 
 
     from voicebridge import role_bridges
 
-    role_bridges.install(voice_commands, roles=roles)
+    install_error = ""
+    try:
+        role_bridges.install(voice_commands, roles=roles)
+    except Exception as exc:  # a broken bridge is a reported gap, not a crash
+        install_error = (
+            f"role bridge install failed: {type(exc).__name__}: {exc}")
 
     owners = _installed_owners(voice_commands)
     records = [_audit_role(voice_commands, role, owners) for role in roles]
@@ -240,6 +245,8 @@ def audit(voice_commands=None, roles: Iterable[Any] | None = None) -> dict[str, 
     }
 
     gaps: list[str] = []
+    if install_error:
+        gaps.append(install_error)
     for role_id in missing:
         gaps.append(f"missing required role: {role_id}")
     for row in records:
