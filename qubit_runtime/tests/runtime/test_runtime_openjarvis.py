@@ -777,9 +777,9 @@ def test_wrapper_never_emits_a_second_terminal(tmp_path, pinned, monkeypatch):
 # --------------------------------------------------------------------- CLI/registry
 
 
-def test_registry_lists_both_engines_and_native_is_the_parser_default():
+def test_registry_lists_all_engines_and_native_is_the_parser_default():
     registry = build_registry(lambda request: object())
-    assert registry.available() == ["native", "openjarvis"]
+    assert registry.available() == ["native", "openjarvis", "rust_local"]
     assert registry.get("native").name == "native"
 
     from qubit_cli.subcommands.runtime import build_runtime_parser
