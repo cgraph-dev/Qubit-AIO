@@ -74,8 +74,9 @@ def cmd_runtime(args, *, registry=None) -> int:
             print(name + _availability_suffix(registry, name))
         return 0
 
+    engine = (getattr(args, "engine", None) or "native").strip() or "native"
     try:
-        backend = registry.get(args.engine)
+        backend = registry.get(engine)
     except UnknownRuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2

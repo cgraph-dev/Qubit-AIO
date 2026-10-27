@@ -1,6 +1,8 @@
 """``qubit recipe`` subcommand parser."""
 from __future__ import annotations
 
+import argparse
+
 from typing import Callable
 
 
@@ -15,7 +17,8 @@ def build_recipe_parser(subparsers, *, cmd_recipe: Callable) -> None:
 
     run = recipe_sub.add_parser("run", help="Run one recipe")
     run.add_argument("recipe_id", help="Recipe id (for example morning_digest)")
-    run.add_argument("--engine", default="native", help="Engine name (default: native)")
+    run.add_argument("--engine", default=argparse.SUPPRESS,
+                     help="Engine name (default: native)")
     run.add_argument("--topic", default="",
                      help="Topic for input-driven recipes (for example deep_research)")
     run.add_argument("--dry-run", action="store_true",

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import sys
+import tempfile
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -167,6 +169,7 @@ class TraceStore:
             db_path = default_db_path()
         self._db_path = ":memory:" if str(db_path) == ":memory:" else str(Path(db_path).expanduser())
         self._create = bool(create)
+        self._snapshot_dir: str | None = None
         self._lock = threading.RLock()
         self._conn = self._open()
 
@@ -191,8 +194,41 @@ class TraceStore:
                 # of silently creating a schema in place.
                 from urllib.parse import quote
 
-                target = self._db_path
-                uri = f"file:{quote(str(Path(target).resolve()))}?mode=ro&immutable=1"
+                target = Path(self._db_path)
+                wal = Path(str(target) + "-wal")
+                shm = Path(str(target) + "-shm")
+                if wal.exists() or shm.exists():
+                    # A live writer can keep committed rows in -wal. Snapshot the
+                    # triplet to a private directory and read the copy: the source
+                    # is never opened read-write and never gets sidecars created.
+                    snapshot = Path(tempfile.mkdtemp(prefix="qubit-traces-ro-"))
+                    os.chmod(snapshot, 0o700)
+                    copied = False
+                    try:
+                        shutil.copy2(target, snapshot / "traces.db")
+                        for side in (wal, shm):
+                            if side.exists():
+                                shutil.copy2(side, snapshot / side.name)
+                        copied = True
+                    except OSError:
+                        shutil.rmtree(snapshot, ignore_errors=True)
+                    if copied:
+                        self._snapshot_dir = str(snapshot)
+                        copy_db = snapshot / "traces.db"
+                        conn = sqlite3.connect(
+                            f"file:{quote(str(copy_db.resolve()))}?mode=ro",
+                            uri=True, check_same_thread=False)
+                        conn.row_factory = sqlite3.Row
+                        try:
+                            conn.execute("PRAGMA query_only=ON")
+                            self._verify_schema(conn)
+                        except BaseException:
+                            conn.close()
+                            shutil.rmtree(snapshot, ignore_errors=True)
+                            self._snapshot_dir = None
+                            raise
+                        return conn
+                uri = f"file:{quote(str(target.resolve()))}?mode=ro&immutable=1"
                 conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
                 conn.row_factory = sqlite3.Row
                 self._verify_schema(conn)
@@ -284,6 +320,9 @@ class TraceStore:
                 except sqlite3.DatabaseError:
                     pass
             self._conn.close()
+            if self._snapshot_dir:
+                shutil.rmtree(self._snapshot_dir, ignore_errors=True)
+                self._snapshot_dir = None
 
     def __enter__(self) -> "TraceStore":
         return self

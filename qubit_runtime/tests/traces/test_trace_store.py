@@ -152,3 +152,18 @@ def test_read_only_path_does_not_chmod_or_create_wal(tmp_path):
         assert store.count() == 1
     assert path.stat().st_mode & 0o777 == 0o444
     assert (tmp_path / "traces.db-wal").exists() == before_wal
+
+
+def test_read_sees_a_committed_row_while_a_writer_holds_uncheckpointed_wal(tmp_path):
+    path = tmp_path / "traces.db"
+    writer = TraceStore(path)
+    try:
+        writer.insert(_row("live-writer"))
+        assert (tmp_path / "traces.db-wal").exists()
+        before = (path.stat().st_size, path.stat().st_mode, (tmp_path / "traces.db-wal").stat().st_size)
+        with TraceStore(path, create=False) as reader:
+            assert reader.get("live-writer").id == "live-writer"
+        assert (path.stat().st_size, path.stat().st_mode,
+                (tmp_path / "traces.db-wal").stat().st_size) == before
+    finally:
+        writer.close()
