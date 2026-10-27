@@ -37,10 +37,12 @@ class RecipeRegistry:
 
 
 def build_recipe_registry() -> RecipeRegistry:
+    from recipes.deep_research import DEEP_RESEARCH
     from recipes.monitor_operative import MONITOR_OPERATIVE
     from recipes.morning_digest import MORNING_DIGEST
 
     registry = RecipeRegistry()
+    registry.register(DEEP_RESEARCH)
     registry.register(MONITOR_OPERATIVE)
     registry.register(MORNING_DIGEST)
     return registry

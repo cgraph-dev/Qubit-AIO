@@ -362,7 +362,8 @@ def test_cli_json_listing_includes_monitor_operative():
     with redirect_stdout(out):
         assert cmd_recipe(argparse.Namespace(recipe_action="list", json=True)) == 0
     payload = json.loads(out.getvalue())
-    assert [row["id"] for row in payload] == ["monitor_operative", "morning_digest"]
+    assert [row["id"] for row in payload] == [
+        "deep_research", "monitor_operative", "morning_digest"]
 
 
 def test_monitor_cron_spec_is_metadata_only_and_never_creates_a_job(tmp_path, monkeypatch):
