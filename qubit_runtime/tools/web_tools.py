@@ -182,11 +182,48 @@ def _get_search_backend() -> str:
     return "perplexity" if _managed_web_search() else _get_backend()
 
 
+def _backend_supports(capability: str, backend: str) -> bool:
+    """Whether *backend* advertises *capability* (``"search"``/``"extract"``).
+
+    Unknown providers answer True so the dispatcher's strict-selection error stays the
+    honest surface; only a registered provider's own flags can veto its capability.
+    """
+    if not backend:
+        return False
+    provider = _registered_web_provider(backend)
+    if provider is None:
+        _ensure_web_plugins_loaded()
+        provider = _registered_web_provider(backend)
+    if provider is None:
+        return True
+    try:
+        if capability == "search":
+            return bool(provider.supports_search())
+        return bool(provider.supports_extract())
+    except Exception as exc:  # noqa: BLE001 — a broken provider is not capable
+        logger.debug("web provider %r capability probe failed: %s", backend, exc)
+        return False
+
+
 def _get_extract_backend() -> str:
     """Backend for web_extract: ``web.extract_backend`` (strict, no probe) > ``web.backend`` > autodetect.
-    A ``nous`` pin is managed Firecrawl; the client picks the gateway route for that capability."""
+    A ``nous`` pin is managed Firecrawl; the client picks the gateway route for that capability.
+
+    An explicitly configured backend is returned as-is even when it is search-only, so the
+    vendor's "search-only" error is honest rather than silently rerouted. An *autodetected*
+    shared backend is different: the search walk can land on ddgs/brave-free/searxng (all
+    search-only) on a fresh install, and returning that name would make web_extract refuse
+    even though the registry can resolve a capable extract provider (keyed or keyless).
+    In that case return ``""`` so ``_resolve_extract_provider`` runs the capability-aware
+    resolution instead of pinning the search-only autodetect result.
+    """
     pin = _configured_backend("extract_backend")
-    return "firecrawl" if pin == NOUS_MANAGED_PROVIDER else pin or _get_backend()
+    if pin:
+        return "firecrawl" if pin == NOUS_MANAGED_PROVIDER else pin
+    shared = _get_backend()
+    if _backend_supports("extract", shared):
+        return shared
+    return shared if _configured_backend() else ""
 
 
 def _ddgs_package_importable() -> bool:

@@ -51,7 +51,6 @@ DEFAULT_EXTRACT_CHARS = 4000
 
 _MAX_FACT_CHARS = 500
 _MAX_TITLE_CHARS = 160
-_MAX_URL_CHARS = 300
 _MAX_DESCRIPTION_CHARS = 240
 _MAX_EXCERPT_CHARS = 340
 _MAX_ERROR_CHARS = 200
@@ -81,14 +80,22 @@ class _ResearchPlan:
         self.max_sources = max(1, min(int(max_sources), MAX_SOURCES_CAP))
         self.sources: list[dict[str, Any]] = []
         self.searched = False
+        self.search_error: SectionUnavailable | None = None
 
     # -- collectors ------------------------------------------------------
 
     def collect_search(self, now: Any = None) -> SectionResult:
-        payload = self._call_search()
-        items = _search_items(payload)
-        self.sources = _numbered_sources(items, self.max_results)
+        # Mark it run before normalizing: a backend failure (raised transport
+        # error or an error payload) must not make the sources section claim
+        # search "has not run yet".
         self.searched = True
+        try:
+            payload = self._call_search()
+            items = _search_items(payload)
+            self.sources = _numbered_sources(items, self.max_results)
+        except SectionUnavailable as exc:
+            self.search_error = exc
+            raise
         if not self.sources:
             return available(
                 "search", SECTION_TITLES["search"],
@@ -106,6 +113,10 @@ class _ResearchPlan:
         if not self.searched:
             raise SectionUnavailable(
                 REASON_TOOL_ERROR, "the search section has not run yet")
+        if self.search_error is not None:
+            raise SectionUnavailable(
+                REASON_TOOL_ERROR,
+                f"the search section failed: {self.search_error.detail or self.search_error.reason}")
         if not self.sources:
             return available(
                 "sources", SECTION_TITLES["sources"],
@@ -236,7 +247,10 @@ def _classify_error(message: object) -> str:
     text = redact_text(message).lower()
     if any(marker in text for marker in (
             "not configured", "no web search provider", "no web extract provider",
-            "run `qubit tools`", "run qubit tools", "no provider")):
+            "run `qubit tools`", "run qubit tools", "no provider",
+            # A stored-but-unregistered backend and a disabled bundled plugin
+            # are configuration gaps, not transient tool failures.
+            "no registered web", "disabled in config", "set via qubit tools")):
         return REASON_CONNECTOR_NOT_CONFIGURED
     if any(marker in text for marker in (
             "api key", "api_key", "credential", "not set", "unauthorized",
@@ -246,7 +260,19 @@ def _classify_error(message: object) -> str:
 
 
 def _raise_payload_error(payload: Mapping[str, Any], *, what: str) -> None:
-    if payload.get("success") is False or payload.get("ok") is False:
+    """Refuse a tool payload that reports failure.
+
+    ``web_search_tool``/``web_extract_tool`` return ``tool_error(...)`` on an
+    exception, which is an ``{"error": ...}`` body with **no** ``success`` key.
+    Treating that as an empty result silently reported "No web results" (or
+    "not returned by the extract backend") instead of the real typed gap, so an
+    explicit ``error`` is a failure unless the payload also says success.
+    """
+    failed = payload.get("success") is False or payload.get("ok") is False
+    if not failed and payload.get("error") and payload.get("success") is not True \
+            and payload.get("ok") is not True:
+        failed = True
+    if failed:
         message = payload.get("error") or payload.get("message") or "unknown error"
         raise SectionUnavailable(
             _classify_error(message), f"{what}: {_clip(message, _MAX_ERROR_CHARS)}")
@@ -289,7 +315,7 @@ def _normalize_url(value: object) -> str:
     path = parts.path.rstrip("/") or "/"
     normalized = urlunsplit((
         parts.scheme.lower(), parts.netloc.lower(), path, parts.query, ""))
-    return normalized[:_MAX_URL_CHARS]
+    return normalized
 
 
 def _dedupe_key(url: str) -> str:
@@ -357,13 +383,39 @@ def _extract_rows(payload: Any) -> list[Mapping[str, Any]]:
     return [row for row in rows if isinstance(row, Mapping)]
 
 
+def _row_url(row: Mapping[str, Any], known: Mapping[str, Any]) -> str:
+    """Requested URL for an extract row, preferring any candidate we asked for.
+
+    Providers may report a redirect target in ``url`` while naming the URL we
+    requested in ``metadata.sourceURL`` (the same distinction the extract
+    cache uses). Falling back to list position for such a row could attach one
+    page's text to another citation.
+    """
+    candidates: list[str] = []
+    url = _normalize_url(row.get("url"))
+    if url:
+        candidates.append(url)
+    meta = row.get("metadata")
+    if isinstance(meta, Mapping):
+        for key in ("sourceURL", "source_url", "url"):
+            candidate = _normalize_url(meta.get(key))
+            if candidate:
+                candidates.append(candidate)
+    for candidate in candidates:
+        if _dedupe_key(candidate) in known:
+            return candidate
+    return candidates[0] if candidates else ""
+
+
 def _apply_extraction(payload: Any, targets: Sequence[dict[str, Any]]) -> None:
     rows = _extract_rows(payload)
     by_url = {_dedupe_key(source["url"]): source for source in targets}
     for index, row in enumerate(rows):
-        url = _normalize_url(row.get("url"))
+        url = _row_url(row, by_url)
         source = by_url.get(_dedupe_key(url)) if url else None
-        if source is None and index < len(targets):
+        # Positional fallback only for a row that names no URL at all; a row
+        # naming an unknown URL must not overwrite a different citation.
+        if source is None and not url and index < len(targets):
             source = targets[index]
         if source is None:
             continue
