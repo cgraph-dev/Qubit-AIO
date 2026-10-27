@@ -17,6 +17,8 @@
 
 **2026-10-27 hotfix:** a live rewrite returned `OK.` from the tiny local model; `transform.py` now rejects degenerate/truncated output, retries the API tier in `auto`, and types `VOICE_EDIT_DEGENERATE_OUTPUT` otherwise. Bridge restarted; `/chat` 200. Re-test "rewrite this clearly" live.
 
+**2026-10-27 hotfix 2:** "Rewrite this more clearly" now parses as rewrite+clear (it hit the clarify table); Revert now sets X input focus (`windowfocus`) and settles 80–150 ms before Ctrl+Z. 137 voice tests pass. Re-test Revert and the rewrite live.
+
 ## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
 
 - ✅ D8 dual-publish, D12 qubit unit candidates, D21 audit, D16 website rebrand (469 files), D17/D18 prose-only, D19 evidence framing.
