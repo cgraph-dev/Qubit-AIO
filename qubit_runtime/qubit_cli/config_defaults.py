@@ -33,6 +33,13 @@ def _aux(timeout, *, reasoning_effort=True, **extra):
 DEFAULT_CONFIG = {
     "model": "",
     "providers": {},
+    # Agent-role model tiers (`qubit agent run`). Keys are the role tiers
+    # `local` / `detail` / `api`; each value is either a `{provider, model}`
+    # mapping or a model-profile string (a model id run on the active
+    # provider). Empty = every role uses the globally active model, which is
+    # the historical behavior; an unmapped role reports `model_tier_applied:
+    # false` instead of failing.
+    "roles": {"model_tiers": {}},
     "fallback_providers": [],
     # min_switch_reset_seconds: opt-in (0 = off). When a rate-limited primary declares a reset
     # sooner than this many seconds, stay on it (the retry backoff rides out the window) instead

@@ -70,6 +70,8 @@ def cmd_agent(
     role_id = str(getattr(args, "role", "") or "").strip()
     engine = str(getattr(args, "engine", "") or "native").strip() or "native"
     prompt = str(getattr(args, "prompt", "") or "")
+    model = str(getattr(args, "model", "") or "").strip()
+    provider = str(getattr(args, "provider", "") or "").strip()
     as_json = bool(getattr(args, "json", False))
 
     from recipes.registry import UnknownRecipeError
@@ -82,8 +84,14 @@ def cmd_agent(
         print(str(exc), file=sys.stderr)
         return 2
 
+    run_kwargs: dict[str, Any] = {"engine": engine}
+    if model:
+        run_kwargs["model"] = model
+    if provider:
+        run_kwargs["provider"] = provider
+
     try:
-        result = (runner or _run)(role_id, prompt, engine=engine)
+        result = (runner or _run)(role_id, prompt, **run_kwargs)
     except (UnknownRoleError, UnknownRuntimeError, UnknownRecipeError,
             RecipeInputError) as exc:
         print(str(exc), file=sys.stderr)

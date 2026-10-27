@@ -22,5 +22,9 @@ def build_agent_parser(subparsers, *, cmd_agent: Callable) -> None:
                      help="Prompt text for this role turn")
     run.add_argument("--engine", default=argparse.SUPPRESS,
                      help="Engine name (default: native)")
+    run.add_argument("--model", default="",
+                     help="Model override (wins over the role's model tier)")
+    run.add_argument("--provider", default="",
+                     help="Provider override (wins over the role's model tier)")
     run.add_argument("--json", action="store_true", help="Print JSON")
     parser.set_defaults(func=cmd_agent)
