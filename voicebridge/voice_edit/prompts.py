@@ -219,6 +219,33 @@ DEFAULT_PROMPTS: Dict[str, PromptSpec] = {
             "details.\n\n"
             "Return only the rewritten text."),
     ),
+    "uppercase": PromptSpec(
+        action="uppercase", title="UPPERCASE", version=PROMPT_VERSION,
+        text=(
+            "Return the selected text with every letter converted to "
+            "uppercase.\n\n"
+            "Change the letter case only. Preserve all words, whitespace, "
+            "punctuation, numbers, identifiers, URLs, and formatting.\n\n"
+            "Return only the transformed text."),
+    ),
+    "lowercase": PromptSpec(
+        action="lowercase", title="lowercase", version=PROMPT_VERSION,
+        text=(
+            "Return the selected text with every letter converted to "
+            "lowercase.\n\n"
+            "Change the letter case only. Preserve all words, whitespace, "
+            "punctuation, numbers, identifiers, URLs, and formatting.\n\n"
+            "Return only the transformed text."),
+    ),
+    "title_case": PromptSpec(
+        action="title_case", title="Title Case", version=PROMPT_VERSION,
+        text=(
+            "Return the selected text in title case: capitalize the first "
+            "letter of each word and lowercase the rest.\n\n"
+            "Change the letter case only. Preserve all words, whitespace, "
+            "punctuation, numbers, identifiers, URLs, and formatting.\n\n"
+            "Return only the transformed text."),
+    ),
     "custom_transform": PromptSpec(
         action="custom_transform", title="Custom transform",
         version=PROMPT_VERSION,

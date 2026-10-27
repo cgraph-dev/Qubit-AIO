@@ -25,6 +25,8 @@ ACTIONS = frozenset({
     "custom_transform",
     # Verbatim dictation: "Qubit, type this for me: <text>". No model call.
     "dictate_text",
+    # Deterministic case transforms: no model call, no egress.
+    "uppercase", "lowercase", "title_case",
 })
 
 STYLES = frozenset({

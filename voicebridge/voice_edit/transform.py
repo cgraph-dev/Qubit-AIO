@@ -40,6 +40,64 @@ def digest_text(text: str) -> str:
     return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
 
 
+# ---------------------------------------------------------------------------
+# Deterministic case transforms (no model, no egress)
+# ---------------------------------------------------------------------------
+_CASE_ACTIONS = frozenset({"uppercase", "lowercase", "title_case"})
+_CASE_DETAIL = {
+    "uppercase": "the text is already uppercase",
+    "lowercase": "the text is already lowercase",
+    "title_case": "the text is already title case",
+}
+
+
+def _title_segment(word: str) -> str:
+    for i, ch in enumerate(word):
+        if ch.isalpha():
+            return word[:i] + ch.upper() + word[i + 1:].lower()
+    return word
+
+
+def _title_word(word: str) -> str:
+    """Title-case one whitespace-delimited token.
+
+    Hyphen-separated compounds capitalize each part (``well-known`` ->
+    ``Well-Known``) while apostrophes stay inside the word so ``don't`` ->
+    ``Don't`` (``str.title`` would produce ``Don'T``). Leading punctuation and
+    quotes are preserved.
+    """
+    return "-".join(_title_segment(part) for part in word.split("-"))
+
+
+def title_case_text(text: str) -> str:
+    """Title-case every whitespace-delimited word, preserving whitespace."""
+    return re.sub(r"\S+", lambda m: _title_word(m.group(0)), text or "")
+
+
+def _case_text(action: str, text: str) -> str:
+    if action == "uppercase":
+        return text.upper()
+    if action == "lowercase":
+        return text.lower()
+    return title_case_text(text)
+
+
+def _apply_case(action: str, text: str, started: float) -> TransformResult:
+    out = _case_text(action, text)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if out == text:
+        return TransformResult(
+            ok=False, code="VOICE_EDIT_NO_CHANGE",
+            detail=_CASE_DETAIL[action], action=action,
+            model="deterministic", provider="", locality="local",
+            privacy_mode="local", elapsed_ms=elapsed_ms,
+            prompt_version="case")
+    return TransformResult(
+        ok=True, text=out, action=action, model="deterministic",
+        provider="", locality="local", privacy_mode="local",
+        elapsed_ms=elapsed_ms, prompt_version="case")
+
+
 def _preserved_tokens(text: str) -> List[str]:
     out: List[str] = []
     for rx in (_URL_RE, _FLAG_RE, _BACKTICK_RE, _IDENT_RE):
@@ -407,6 +465,13 @@ class TransformEngine:
         mode = (privacy_override or settings["routing"]).lower()
         if mode not in ("local", "api", "auto"):
             mode = "auto"
+
+        # Case transforms are deterministic and local: handled before prompt
+        # rendering and before any provider/profile resolution, so they work
+        # cold, offline, and in api-only configurations.
+        case_action = str(getattr(cmd, "action", "") or "")
+        if case_action in _CASE_ACTIONS:
+            return _apply_case(case_action, text, time.monotonic())
 
         rendered = render_prompt(cmd, text)
         started = time.monotonic()
