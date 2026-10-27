@@ -129,3 +129,26 @@ def test_read_path_does_not_create_a_missing_store(tmp_path):
         TraceStore(path, create=False)
     assert exc.value.code == "trace_store_missing"
     assert not path.exists()
+
+
+def test_read_only_path_does_not_repair_a_zero_byte_store(tmp_path):
+    path = tmp_path / "traces.db"
+    path.write_bytes(b"")
+    with pytest.raises(TraceStoreCorruptError):
+        TraceStore(path, create=False)
+    assert path.stat().st_size == 0
+    assert not (tmp_path / "traces.db-wal").exists()
+    assert not (tmp_path / "traces.db-shm").exists()
+
+
+def test_read_only_path_does_not_chmod_or_create_wal(tmp_path):
+    path = tmp_path / "traces.db"
+    with TraceStore(path) as store:
+        store.insert(_row("ro"))
+        store._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    path.chmod(0o444)
+    before_wal = (tmp_path / "traces.db-wal").exists()
+    with TraceStore(path, create=False) as store:
+        assert store.count() == 1
+    assert path.stat().st_mode & 0o777 == 0o444
+    assert (tmp_path / "traces.db-wal").exists() == before_wal

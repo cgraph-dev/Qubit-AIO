@@ -19,8 +19,8 @@ def _settings(args):
     return settings
 
 
-def _store(args) -> TraceStore:
-    return TraceStore(_settings(args).path, create=False)
+def _store(args, *, write: bool = False) -> TraceStore:
+    return TraceStore(_settings(args).path, create=write)
 
 
 def _row_line(row) -> str:
@@ -46,7 +46,7 @@ def _print_rows(rows, as_json: bool) -> None:
 def cmd_traces(args) -> int:
     action = getattr(args, "traces_action", "")
     try:
-        with _store(args) as store:
+        with _store(args, write=(action == "prune")) as store:
             if action == "list":
                 rows = store.list(
                     limit=int(getattr(args, "limit", 50) or 50),

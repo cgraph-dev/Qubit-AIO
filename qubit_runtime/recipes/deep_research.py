@@ -473,5 +473,6 @@ DEEP_RESEARCH = RecipeSpec(
         "researched brief",
     ),
     input_fields=("topic",),
+    section_titles=SECTION_TITLES,
     collector_factory=build_collectors,
 )

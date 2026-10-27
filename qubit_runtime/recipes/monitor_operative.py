@@ -526,5 +526,6 @@ MONITOR_OPERATIVE = RecipeSpec(
         "how is my work doing",
         "monitor operative",
     ),
+    section_titles=SECTION_TITLES,
     collectors=DEFAULT_COLLECTORS,
 )

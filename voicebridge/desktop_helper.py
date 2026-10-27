@@ -2518,19 +2518,22 @@ class DesktopHelper:
     def _start_listening(self) -> None:
         if not self._open_request():
             return
-        # Show the panel before the first partial: the user should see the
-        # live transcript (and level meter) the moment they press the hotkey.
-        try:
-            self._ui(self.overlay.show)
-            self._ui_live("", final=False)
-        except Exception:
-            pass
         # Start the microphone + STT FIRST (browser-like: audio flows the
         # moment you press), then capture the selection concurrently.
         self._worker = threading.Thread(target=self._transcribe, daemon=True,
                                          name="voice-edit-stt")
         self._worker.start()
-        if not self._capture_selection():
+        # Capture the focused window BEFORE mapping the panel: a topmost Tk
+        # window takes focus, and the selection capture reads the focused
+        # window (otherwise it captures nothing or the wrong app). Partials
+        # still update the (hidden) panel and are visible as soon as it maps.
+        captured = self._capture_selection()
+        try:
+            self._ui(self.overlay.show)
+            self._ui_live("", final=False)
+        except Exception:
+            pass
+        if not captured:
             self._drop_pre_roll()
             self._stop.set()
 

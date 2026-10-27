@@ -447,6 +447,14 @@ class GoogleContactsConnector:
                     REASON_INVALID_RESPONSE,
                     "the Google People API returned an unexpected payload",
                 )
+            error = data.get("error")
+            if error:
+                code = error.get("code") if isinstance(error, dict) else None
+                raise GoogleContactsError(
+                    REASON_HTTP_ERROR,
+                    "the Google People API returned an error payload",
+                    status=code if isinstance(code, int) else None,
+                )
             return data
         if status == 401:
             raise GoogleContactsError(
@@ -483,6 +491,7 @@ class GoogleContactsConnector:
         limit: int,
         extract: Callable[[dict[str, Any]], Iterable[Contact]],
         page_size_cap: int,
+        payload_key: str,
     ) -> list[Contact]:
         contacts: list[Contact] = []
         page_token: Optional[str] = None
@@ -493,6 +502,11 @@ class GoogleContactsConnector:
             if page_token:
                 page_params["pageToken"] = page_token
             data = self._get_json(url, page_params, token)
+            if payload_key in data and not isinstance(data.get(payload_key), list):
+                raise GoogleContactsError(
+                    REASON_INVALID_RESPONSE,
+                    f"the Google People API returned a non-list {payload_key!r}",
+                )
             for contact in extract(data):
                 if len(contacts) >= limit:
                     break
@@ -535,6 +549,7 @@ class GoogleContactsConnector:
             limit=bounded,
             extract=_connections_people,
             page_size_cap=LIST_PAGE_SIZE,
+            payload_key="connections",
         )
 
     def search(self, query: object, limit: object = DEFAULT_LIMIT) -> list[Contact]:
@@ -561,6 +576,11 @@ class GoogleContactsConnector:
             {"query": text, "readMask": SEARCH_READ_MASK, "pageSize": bounded},
             token,
         )
+        if "results" in data and not isinstance(data.get("results"), list):
+            raise GoogleContactsError(
+                REASON_INVALID_RESPONSE,
+                "the Google People API returned a non-list 'results'",
+            )
         return list(_search_people(data))[:bounded]
 
 

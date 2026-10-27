@@ -1123,6 +1123,7 @@ class PreviewOverlay:
         value = str(text or "").strip()
         if not final and not value:
             self._reset_preview_placeholder()
+            self._set_live_text("", placeholder=True)
         if value:
             self._set_live_text(value)
             self._buffer_fill = min(1.0, len(value) / 220.0)

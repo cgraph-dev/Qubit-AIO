@@ -488,3 +488,30 @@ def test_injected_http_get_means_no_live_network(monkeypatch, tmp_path):
 
 def test_defaults_are_bounded():
     assert 0 < DEFAULT_LIMIT <= MAX_LIMIT
+
+
+def test_error_payload_with_http_200_is_typed(tmp_path):
+    fake = _FakeGet(_Response(200, {"error": {"code": 403, "message": "denied"}}))
+    conn = GoogleContactsConnector(token_path=_write_token(tmp_path), http_get=fake)
+    with pytest.raises(GoogleContactsError) as exc:
+        conn.list()
+    assert exc.value.reason == "http_error"
+
+
+def test_wrong_shaped_connections_is_invalid_response(tmp_path):
+    fake = _FakeGet(_Response(200, {"connections": "oops"}))
+    conn = GoogleContactsConnector(token_path=_write_token(tmp_path), http_get=fake)
+    with pytest.raises(GoogleContactsError) as exc:
+        conn.list()
+    assert exc.value.reason == "invalid_response"
+
+
+def test_wrong_shaped_search_results_is_invalid_response(tmp_path):
+    fake = _FakeGet(
+        _Response(200, {"results": []}),  # warmup
+        _Response(200, {"results": "oops"}),
+    )
+    conn = GoogleContactsConnector(token_path=_write_token(tmp_path), http_get=fake)
+    with pytest.raises(GoogleContactsError) as exc:
+        conn.search("ada")
+    assert exc.value.reason == "invalid_response"

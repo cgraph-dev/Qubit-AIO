@@ -3201,10 +3201,17 @@ def _refuse_engine_outside_oneshot(args) -> None:
     engine = (getattr(args, "engine", None) or "native").strip() or "native"
     if engine == "native" or getattr(args, "oneshot", None):
         return
-    if getattr(args, "command", None) in (None, "chat"):
+    command = getattr(args, "command", None)
+    if command in (None, "chat"):
+        return
+    # The diagnostic runtime command and recipes own an engine surface too.
+    if command == "runtime" and getattr(args, "runtime_action", None) == "run":
+        return
+    if command == "recipe" and getattr(args, "recipe_action", None) == "run":
         return
     print(
-        "Error: --engine is only supported on the -z/--oneshot path in this build.",
+        "Error: --engine is only supported on -z/--oneshot, chat -q, "
+        "runtime run, and recipe run in this build.",
         file=sys.stderr,
     )
     raise SystemExit(2)

@@ -260,5 +260,6 @@ MORNING_DIGEST = RecipeSpec(
         "my morning digest",
         "daily digest",
     ),
+    section_titles=SECTION_TITLES,
     collectors=DEFAULT_COLLECTORS,
 )

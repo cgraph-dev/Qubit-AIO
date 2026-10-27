@@ -96,6 +96,17 @@ def test_edit_action_opens_the_editor_and_submits_text():
         ov.close()
 
 
+def test_a_new_turn_clears_the_previous_transcript():
+    ov, _ = _make()
+    try:
+        ov.set_live_transcript("turn one words", final=True)
+        ov.set_live_transcript("", final=False)
+        ov.root.update()
+        assert ov.live_text.get("1.0", "end").strip() == ""
+    finally:
+        ov.close()
+
+
 def test_streaming_updates_do_not_remap_or_hide_the_window():
     """Regression: partials re-show/re-lift/re-geometry the panel every tick."""
     ov, _ = _make()

@@ -121,7 +121,8 @@ def _sections_for(
     if active is None and spec.collector_factory is not None:
         active = spec.collector_factory(dict(inputs or {}))
     return collect_sections(
-        active, now=now, sections=spec.sections, defaults=spec.collectors)
+        active, now=now, sections=spec.sections, titles=spec.section_titles,
+        defaults=spec.collectors)
 
 
 def _usage_value(events: Sequence[TurnEvent], key: str):
@@ -187,11 +188,13 @@ def run_recipe(
             flops=_usage_value(events, "flops"))
 
     terminal = events[-1] if events else None
-    if terminal is None:
+    if terminal is None or terminal.kind not in ("done", "error"):
+        # A backend that ends on a delta (or yields nothing) did not complete a
+        # turn; never treat partial text as a successful brief.
         record("", success=False, error_code="no_terminal_event")
         return RecipeRun(
             recipe_id=spec.id, engine=engine_name, brief="", sections=sections,
-            failed=True)
+            events=tuple(events), terminal="", failed=True)
 
     if terminal.kind == "error":
         refusal = str(terminal.data.get("refusal") or "")

@@ -35,6 +35,9 @@ class RecipeSpec:
     approval_policy: str
     output_format: str
     voice_aliases: tuple[str, ...] = field(default_factory=tuple)
+    # Human section labels, used when a section degrades before its collector
+    # returns (otherwise an unavailable section would render as a raw id).
+    section_titles: Mapping[str, str] = field(default_factory=dict)
     # Inputs the caller must supply (e.g. ``topic`` for deep_research). Input
     # values are substituted into the prompt as ``{name}`` and are never
     # serialized to callers.
@@ -81,5 +84,6 @@ class RecipeSpec:
             "approval_policy": self.approval_policy,
             "output_format": self.output_format,
             "voice_aliases": list(self.voice_aliases),
+            "section_titles": dict(self.section_titles),
             "inputs": list(self.input_fields),
         }

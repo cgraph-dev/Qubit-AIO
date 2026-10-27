@@ -145,3 +145,30 @@ def test_unknown_engine_raises_before_collecting():
     with pytest.raises(UnknownRuntimeError):
         run_recipe(MORNING_DIGEST, registry=_Registry({}), engine="nope",
                    fixture=_sections())
+
+
+def test_a_delta_only_stream_is_a_failed_run_not_a_brief():
+    backend = _FakeBackend([TurnEvent("delta", text="NOT-A-BRIEF")])
+    run = run_recipe(
+        MORNING_DIGEST, registry=_Registry({"fake": backend}),
+        engine="fake", fixture=_sections())
+
+    assert run.failed is True
+    assert run.exit_code == 1
+    assert run.terminal == ""
+    assert run.brief == ""
+
+
+def test_unavailable_section_uses_the_spec_title():
+    from dataclasses import replace
+
+    spec = replace(
+        MORNING_DIGEST,
+        id="title_probe",
+        sections=("weather",),
+        collectors={},
+        section_titles={"weather": "Weather"},
+    )
+    run = run_recipe(spec, dry_run=True, fixture=None,
+                     collectors={})
+    assert run.sections[0].title == "Weather"

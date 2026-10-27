@@ -179,11 +179,24 @@ class TraceStore:
                 raise TraceStoreError(
                     f"no trace store at {path} (tracing is off by default)",
                     code="trace_store_missing")
-            try:
-                path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            except OSError as exc:
-                raise TraceStoreError(f"cannot create trace store directory: {exc}") from exc
+            if self._create:
+                try:
+                    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                except OSError as exc:
+                    raise TraceStoreError(f"cannot create trace store directory: {exc}") from exc
         try:
+            if not self._create:
+                # A read command must never repair or rewrite the store. ``mode=ro``
+                # also makes a zero-byte/truncated file a typed corruption instead
+                # of silently creating a schema in place.
+                from urllib.parse import quote
+
+                target = self._db_path
+                uri = f"file:{quote(str(Path(target).resolve()))}?mode=ro&immutable=1"
+                conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
+                conn.row_factory = sqlite3.Row
+                self._verify_schema(conn)
+                return conn
             conn = sqlite3.connect(self._db_path, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             if self._db_path != ":memory:":
@@ -204,6 +217,30 @@ class TraceStore:
             except OSError:
                 pass
         return conn
+
+    @staticmethod
+    def _verify_schema(conn: sqlite3.Connection) -> None:
+        has_traces = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='traces'"
+        ).fetchone() is not None
+        has_version = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_version'"
+        ).fetchone() is not None
+        if not has_traces or not has_version:
+            raise TraceStoreCorruptError(
+                "trace store has no schema (empty or corrupt file)")
+        row = conn.execute("SELECT version FROM schema_version").fetchone()
+        if row is None:
+            raise TraceStoreCorruptError(
+                "trace store has a traces table but no schema_version row")
+        try:
+            version = int(row[0])
+        except (TypeError, ValueError) as exc:
+            raise TraceStoreCorruptError("trace store has an invalid schema version") from exc
+        if version > CURRENT_SCHEMA_VERSION:
+            raise TraceStoreVersionError(
+                f"trace store schema v{version} is newer than this Qubit supports "
+                f"(v{CURRENT_SCHEMA_VERSION})")
 
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)")
@@ -238,6 +275,14 @@ class TraceStore:
 
     def close(self) -> None:
         with self._lock:
+            if self._create and self._db_path != ":memory:":
+                # Checkpoint before closing so an immutable read sees every row
+                # without needing a -wal/-shm sidecar (read commands must not
+                # mutate the store or its directory).
+                try:
+                    self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                except sqlite3.DatabaseError:
+                    pass
             self._conn.close()
 
     def __enter__(self) -> "TraceStore":

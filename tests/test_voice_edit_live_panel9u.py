@@ -71,6 +71,9 @@ class RecordingOverlay:
 
 
 class FakeClient:
+    def __init__(self):
+        self.capture_calls = 0
+
     def status(self):
         return {"enabled": True, "estop": False}
 
@@ -78,6 +81,7 @@ class FakeClient:
         return {"ok": True, "request_id": "req-live"}
 
     def capture(self, rid):
+        self.capture_calls += 1
         return {"ok": True, "selection": {"available": True,
                                           "captured_via": "clipboard",
                                           "app_class": "code"}}
@@ -195,13 +199,35 @@ def test_panel_opens_on_the_hotkey_before_the_first_partial(monkeypatch):
 
     helper.on_hotkey("ptt_start")
     try:
-        assert overlay.events and overlay.events[0] == "show"
+        assert "show" in overlay.events
+        show_index = overlay.events.index("show")
+        partial_indexes = [i for i, e in enumerate(overlay.events)
+                           if isinstance(e, tuple) and e[0] == "live"]
+        assert not partial_indexes or show_index < min(partial_indexes)
         assert not overlay.live or all(not final for _, final in overlay.live)
     finally:
         gate.set()
         if helper._worker is not None:
             helper._worker.join(timeout=5)
         helper.on_hotkey("ptt_end")
+
+
+def test_selection_is_captured_before_the_panel_maps(monkeypatch):
+    helper, overlay = _helper(monkeypatch)
+    seen = []
+    original_show = overlay.show
+
+    def tracking_show():
+        seen.append(helper.client.capture_calls)
+        original_show()
+
+    overlay.show = tracking_show
+    helper.on_hotkey("ptt_start")
+    if helper._worker is not None:
+        helper._worker.join(timeout=5)
+    helper.on_hotkey("ptt_end")
+
+    assert seen and seen[0] == 1
 
 
 def test_wake_turn_shows_the_final_words_immediately(monkeypatch):
