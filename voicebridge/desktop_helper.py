@@ -4027,6 +4027,14 @@ def main(argv: Optional[list] = None) -> int:
             )
             if resolve_panel_backend(cfg) == "web":
                 try:
+                    hud_index = (Path(__file__).resolve().parents[1]
+                                 / "frontend" / "voice-edit-hud" / "out"
+                                 / "index.html")
+                    if not hud_index.is_file():
+                        raise WebPanelUnavailable(
+                            "hud_not_built",
+                            "frontend/voice-edit-hud/out is missing; run "
+                            "`npm ci && npm run build` in frontend/voice-edit-hud")
                     overlay = WebPanelOverlay(_overlay_action)
                 except WebPanelUnavailable as exc:
                     print(f"Voice Edit web panel unavailable "

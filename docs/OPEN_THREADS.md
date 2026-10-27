@@ -33,6 +33,7 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 - ✅ Audit blockers fixed: engine flag precedence, trace WAL snapshot reads, gateway status identity, capture-before-show, stale transcript, contact shapes, recipe terminal/titles.
 - ✅ Focused: 733+6 skipped runtime/CLI/connector/recipe/trace/eval set, 134 root voice/HUD, 89 extra, 57 frontend; live HUD screenshot.
 - 🟡 Next: exercise one real mic turn through the web HUD (confirm partials/preview/actions), then consider making `web` the default; live connector probes when owner credentials exist; owner sign-off rows from `docs/PHASE8_INVENTORY.md`.
+- ℹ️ HUD build: `npm ci && npm run build` in `frontend/voice-edit-hud` (export is gitignored; basePath `/voice-edit`); missing export falls back to Tk with a typed hint.
 - 🔴 Not done: full matrix, `VERIFIED`, Tk removal.
 
 ## Wave 59 — 2026-10-27 (Phase 4: monitor_operative recipe)
