@@ -79,6 +79,37 @@ class StreamJsonEmitter:
                         "output": output if len(output) <= _TOOL_OUTPUT_CAP else output[:_TOOL_OUTPUT_CAP] + "...",
                         "duration_ms": int(float(duration) * 1000), "is_error": bool(kwargs.get("is_error", False))})
 
+    def on_port_tool_event(self, event: Any) -> None:
+        """Map a RuntimePort ``tool`` event onto the stream-json tool pair.
+
+        The port's event is a completed-call summary (tool name plus an outcome
+        flag), not a start/end pair, so it is emitted as ``tool_use`` followed
+        by ``tool_result``. The schema never gains invented input or output:
+        fields the backend did not report are simply absent.
+        """
+        data = getattr(event, "data", None) or {}
+        name = str(data.get("tool") or data.get("name") or getattr(event, "text", "") or "unknown")
+        call_id = data.get("tool_call_id")
+        use: dict[str, Any] = {"type": "tool_use", "name": name}
+        if call_id:
+            use["tool_call_id"] = call_id
+        if isinstance(data.get("input"), dict):
+            use["input"] = data["input"]
+        self._emit(use)
+
+        result: dict[str, Any] = {
+            "type": "tool_result",
+            "name": name,
+            "is_error": bool(data.get("is_error") or data.get("success") is False),
+        }
+        if call_id:
+            result["tool_call_id"] = call_id
+        output = data.get("output")
+        if isinstance(output, str):
+            result["output"] = (
+                output if len(output) <= _TOOL_OUTPUT_CAP else output[:_TOOL_OUTPUT_CAP] + "...")
+        self._emit(result)
+
     def emit_result(self, result: Any, session_id: str = "", exit_code: int = 0) -> int:
         """Write the terminal ``result`` record (once) and return the process exit code it reports."""
         data = result if isinstance(result, dict) else {"final_response": "" if result is None else str(result)}

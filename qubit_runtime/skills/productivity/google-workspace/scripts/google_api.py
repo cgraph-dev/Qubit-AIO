@@ -37,6 +37,7 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
 from _qubit_home import get_qubit_home
+from _token_store import persist_authorized_user_credentials, token_file_lock
 
 QUBIT_HOME = get_qubit_home()
 TOKEN_PATH = QUBIT_HOME / "google_token.json"
@@ -243,7 +244,14 @@ def _datetime_with_timezone(value: str) -> str:
 
 
 def get_credentials():
-    """Load and refresh credentials from token file."""
+    """Load and refresh credentials from token file.
+
+    The refresh is written through the shared atomic writer (mode 0600 from
+    creation, fsync, ``os.replace``) and serialised with an advisory lock so two
+    processes refreshing the same token cannot overwrite each other with a
+    stale value. The credentials are re-read inside the lock: a refresh another
+    process already completed is used as-is instead of hitting Google again.
+    """
     _ensure_authenticated()
 
     from google.oauth2.credentials import Credentials
@@ -251,13 +259,12 @@ def get_credentials():
 
     creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), _stored_token_scopes())
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        TOKEN_PATH.write_text(
-            json.dumps(
-                _normalize_authorized_user_payload(json.loads(creds.to_json())),
-                indent=2,
-            ), encoding="utf-8"
-        )
+        with token_file_lock(TOKEN_PATH):
+            creds = Credentials.from_authorized_user_file(
+                str(TOKEN_PATH), _stored_token_scopes())
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                persist_authorized_user_credentials(TOKEN_PATH, creds)
     if not creds.valid:
         print("Token is invalid. Re-run setup.", file=sys.stderr)
         sys.exit(1)

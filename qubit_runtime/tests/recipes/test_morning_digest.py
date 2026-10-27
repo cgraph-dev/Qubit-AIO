@@ -143,8 +143,36 @@ def test_unread_mail_formats_and_bounds(monkeypatch):
     ])
     result = collect_unread_mail()
     assert result.available
-    assert result.facts[0] == "Invoice — from billing@example.com"
+    # PII policy: the brief is spoken/journalled, so raw addresses are not kept.
+    assert result.facts[0] == "Invoice — from [email]"
+    assert "billing@example.com" not in result.facts[0]
     assert "sk-abcdefghijklmnop" not in result.facts[1]
+
+
+def test_mail_and_calendar_contacts_are_redacted_from_the_spoken_brief(monkeypatch):
+    _google_ready(monkeypatch, [
+        {"subject": "Call +1 (555) 123-4567 about the invoice",
+         "from": "Alice <alice@example.com>"},
+    ])
+    mail = collect_unread_mail()
+    assert mail.available
+    assert "[email]" in mail.facts[0]
+    assert "[phone]" in mail.facts[0]
+    assert "alice@example.com" not in mail.facts[0]
+    assert "555" not in mail.facts[0]
+
+    _google_ready(monkeypatch, [
+        {"summary": "Sync with bob@example.com at +40712345678",
+         "start": "2026-10-27T09:00:00+02:00"},
+    ])
+    calendar = collect_calendar(datetime(2026, 10, 27, tzinfo=timezone.utc))
+    assert calendar.available
+    assert "[email]" in calendar.facts[0]
+    assert "bob@example.com" not in calendar.facts[0]
+    # The monitoring scrub may fully mark a phone or mask its middle; either
+    # way the raw number never reaches the spoken brief.
+    assert "40712345678" not in calendar.facts[0]
+    assert "[phone]" in calendar.facts[0] or "****" in calendar.facts[0]
 
 
 def test_empty_inbox_is_available(monkeypatch):

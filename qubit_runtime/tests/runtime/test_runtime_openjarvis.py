@@ -593,6 +593,108 @@ def test_binary_removed_after_resolve_is_a_typed_unavailable(tmp_path, pinned):
     assert events[0].data["refusal"] == "openjarvis_unavailable"
 
 
+def test_dirty_checkout_after_resolve_is_revalidated_before_the_turn(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+    backend.resolve()
+    script.write_text(_FAKE_CLI + "\n# edited after resolve\n", encoding="utf-8")
+
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_checkout_dirty"
+
+
+def test_new_commit_after_resolve_is_revalidated_before_the_turn(tmp_path, pinned):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+    backend.resolve()
+    (repo / "after-resolve.txt").write_text("moved\n", encoding="utf-8")
+    _git(repo, "add", "after-resolve.txt")
+    _git(repo, "commit", "-q", "-m", "move the pin")
+
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_commit_mismatch"
+
+
+def test_binary_stamp_swap_after_resolve_is_revalidated_before_the_turn(
+        tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    backend = _backend(tmp_path, binary=str(script), source=str(repo), pinned_commit=commit)
+    backend.resolve()
+    monkeypatch.setenv("FAKE_OJ_PIN", "0" * 40)
+
+    events = _run(backend)
+
+    assert [e.kind for e in events] == ["error"]
+    assert events[0].data["refusal"] == "openjarvis_binary_mismatch"
+
+
+def test_direct_resolve_reuses_a_short_cache_and_force_reprobes(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    backend = _backend(
+        tmp_path, binary=str(script), source=str(repo), pinned_commit=commit,
+        resolve_cache_seconds=30.0)
+    calls = {"n": 0}
+    real = backend._resolve_uncached
+
+    def counted():
+        calls["n"] += 1
+        return real()
+
+    monkeypatch.setattr(backend, "_resolve_uncached", counted)
+    backend.resolve()
+    backend.resolve()
+    assert calls["n"] == 1
+
+    backend.resolve(force=True)
+    assert calls["n"] == 2
+
+
+def test_zero_cache_reprobes_on_every_direct_resolve(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    backend = _backend(
+        tmp_path, binary=str(script), source=str(repo), pinned_commit=commit,
+        resolve_cache_seconds=0)
+    calls = {"n": 0}
+    real = backend._resolve_uncached
+
+    def counted():
+        calls["n"] += 1
+        return real()
+
+    monkeypatch.setattr(backend, "_resolve_uncached", counted)
+    backend.resolve()
+    backend.resolve()
+    assert calls["n"] == 2
+
+
+def test_resolve_ttl_expiry_reprobes_without_force(tmp_path, pinned, monkeypatch):
+    script, repo, commit = pinned
+    backend = _backend(
+        tmp_path, binary=str(script), source=str(repo), pinned_commit=commit,
+        resolve_cache_seconds=5.0)
+    calls = {"n": 0}
+    real = backend._resolve_uncached
+
+    def counted():
+        calls["n"] += 1
+        return real()
+
+    monkeypatch.setattr(backend, "_resolve_uncached", counted)
+    clock = {"now": 100.0}
+    monkeypatch.setattr(
+        "agent.runtime_openjarvis.time.monotonic", lambda: clock["now"])
+
+    backend.resolve()
+    assert calls["n"] == 1
+    clock["now"] += 5.0
+    backend.resolve()
+    assert calls["n"] == 2
+
+
 def test_json_with_trailing_status_text_is_parsed(tmp_path):
     assert OpenJarvisRuntime._parse('{"content": "ok"}\nstatus: done') == {"content": "ok"}
 

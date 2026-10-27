@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
-from agent.redact import redact_for_egress
+from agent.monitoring.redaction import redact_for_export
 from recipes.sections import (
     REASON_CONNECTOR_NOT_CONFIGURED,
     REASON_MISSING_CONNECTOR,
@@ -50,8 +50,16 @@ _SCRIPT_TIMEOUT_S = 20.0
 
 
 def _redact(value: object) -> str:
+    # PII policy (explicit): the morning brief is spoken aloud and its text can
+    # be journalled by a voice transport, so raw e-mail addresses and phone
+    # numbers are never carried into the model prompt or the spoken brief.
+    # ``redact_for_export`` is the same unconditional secret+PII scrub used for
+    # monitoring egress (agent/monitoring/redaction.py): secrets are masked and
+    # e-mail/phone/UUID shapes become ``[email]`` / ``[phone]`` / ``[id]``.
+    # Calendar titles and mail subjects stay readable; only the contact shapes
+    # are removed. This is a deliberate user-visible change, not a silent one.
     try:
-        return redact_for_egress(str(value or ""))
+        return redact_for_export(str(value or ""))
     except Exception:
         return ""
 

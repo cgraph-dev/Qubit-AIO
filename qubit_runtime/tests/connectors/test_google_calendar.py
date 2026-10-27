@@ -8,6 +8,7 @@ No live network: every Calendar API call goes through an injected fake
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -468,6 +469,38 @@ def test_expired_token_refreshes_and_writes_back_to_the_same_file(tmp_path):
     assert payload["token"] == "new-access-token"
     assert payload["type"] == "authorized_user"
     assert payload["scopes"] == [CALENDAR_SCOPE]
+
+
+def test_concurrent_refresh_reuses_the_token_another_process_wrote(tmp_path):
+    """Two callers that both saw an expired token must not both refresh.
+
+    Each thread starts from the same stale payload. The shared advisory lock
+    admits one refresh; the other re-reads the atomically written token and
+    returns it without touching Google.
+    """
+    token = _write_token(tmp_path, expiry="2000-01-01T00:00:00Z")
+    stale_payload = json.loads(token.read_text(encoding="utf-8"))
+    fake_get = _FakeGet(_Response(200, {"items": []}))
+    refresh = _FakeRefresh()
+    connector = GoogleCalendarConnector(
+        token_path=token, http_get=fake_get, refresh_request=refresh)
+    barrier = threading.Barrier(2)
+    results: list[str] = []
+
+    def worker() -> None:
+        barrier.wait()
+        results.append(connector._access_token(dict(stale_payload)))
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+
+    assert results == ["new-access-token", "new-access-token"]
+    assert len(refresh.calls) == 1
+    payload = json.loads(token.read_text(encoding="utf-8"))
+    assert payload["token"] == "new-access-token"
 
 
 def test_failed_refresh_is_typed_and_redacted(tmp_path):

@@ -293,6 +293,56 @@ def test_non_native_chat_stream_json_emits_deltas_and_result(monkeypatch, capsys
     assert lines[2]["text"] == "Hello"
 
 
+def test_non_native_chat_stream_json_emits_port_tool_events(monkeypatch, capsys):
+    backend = _FakeBackend([
+        TurnEvent("tool", text="calculator", data={
+            "tool": "calculator",
+            "success": True,
+            "input": {"expression": "2+2"},
+            "output": "4",
+        }),
+        TurnEvent("done", text="4", data={"completed": True}),
+    ])
+    _patch_registry(monkeypatch, backend)
+
+    from qubit_cli.single_query_engine import run_non_native_single_query
+
+    assert run_non_native_single_query("hi", engine="openjarvis", stream_json=True) == 0
+
+    import json
+
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
+    assert [line["type"] for line in lines] == [
+        "system", "tool_use", "tool_result", "result"]
+    assert lines[1]["name"] == "calculator"
+    assert lines[1]["input"] == {"expression": "2+2"}
+    assert lines[2]["name"] == "calculator"
+    assert lines[2]["output"] == "4"
+    assert lines[2]["is_error"] is False
+    assert lines[3]["text"] == "4"
+
+
+def test_non_native_chat_stream_json_marks_a_failed_tool_result(monkeypatch, capsys):
+    backend = _FakeBackend([
+        TurnEvent("tool", text="calculator", data={
+            "tool": "calculator", "success": False}),
+        TurnEvent("done", text="could not compute", data={"completed": True}),
+    ])
+    _patch_registry(monkeypatch, backend)
+
+    from qubit_cli.single_query_engine import run_non_native_single_query
+
+    assert run_non_native_single_query("hi", engine="openjarvis", stream_json=True) == 0
+
+    import json
+
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
+    result = next(line for line in lines if line["type"] == "tool_result")
+    assert result["name"] == "calculator"
+    assert result["is_error"] is True
+    assert "output" not in result
+
+
 def test_native_only_flags_lists_only_explicit_values():
     from qubit_cli.single_query_engine import native_only_flags
 

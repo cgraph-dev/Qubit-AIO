@@ -648,13 +648,17 @@ class _PortTurn:
     data: dict = field(default_factory=dict)
     usage: dict = field(default_factory=dict)
     deltas: list[str] = field(default_factory=list)
+    tools: list = field(default_factory=list)
 
 
-def _run_port_turn(backend, request, *, stream=None, cancel=None) -> _PortTurn:
+def _run_port_turn(backend, request, *, stream=None, cancel=None, tool_sink=None) -> _PortTurn:
     """Drive one backend turn, forwarding deltas to *stream* and keeping the rest.
 
     The port guarantees one terminal event, but a callable that never yields one is
     still bounded: the loop ends at end-of-stream and the caller sees no terminal.
+    *tool_sink*, when supplied, receives each ``tool`` event so a consumer can map
+    it onto its own schema (the stream-json emitter does this); without it tool
+    events are retained in the outcome and never dropped silently.
     """
     outcome = _PortTurn()
     for event in backend.run_turn(request, cancel):
@@ -662,6 +666,10 @@ def _run_port_turn(backend, request, *, stream=None, cancel=None) -> _PortTurn:
             outcome.deltas.append(event.text)
             if stream is not None and event.text:
                 stream(event.text)
+        elif event.kind == "tool":
+            outcome.tools.append(event)
+            if tool_sink is not None:
+                tool_sink(event)
         elif event.kind == "usage":
             outcome.usage.update(event.data or {})
         elif event.kind in ("done", "error"):
@@ -708,13 +716,15 @@ def _port_result(engine: str, outcome: _PortTurn, session_id: Optional[str]) -> 
     return result
 
 
-def _run_port_oneshot(prompt, *, engine, skills, resume, stream, extra_system=None):
+def _run_port_oneshot(prompt, *, engine, skills, resume, stream, extra_system=None,
+                      tool_sink=None):
     """Run a non-native engine through the port.
 
     Qubit owns the prompt and, when ``--resume`` is used, the history loaded from
     its own store; the backend's adapter owns its process. No native session row is
     written for a non-native turn (the P2 adapter is stateless). *extra_system*
-    appends a caller-owned bound (``chat -q`` says no interactive user exists).
+    appends a caller-owned bound (``chat -q`` says no interactive user exists);
+    *tool_sink* receives the port's ``tool`` events for the caller's output schema.
     """
     from agent.runtime_port import TurnRequest
     from agent.runtime_registry import build_registry
@@ -738,6 +748,7 @@ def _run_port_oneshot(prompt, *, engine, skills, resume, stream, extra_system=No
                 system=system,
             ),
             stream=stream,
+            tool_sink=tool_sink,
         )
         result = _port_result(engine, outcome, session_id)
         return result.get("final_response", ""), result

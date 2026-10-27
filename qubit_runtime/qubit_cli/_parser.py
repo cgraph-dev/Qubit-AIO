@@ -280,7 +280,8 @@ def _build_chat_parser(subparsers) -> argparse.ArgumentParser:
         "native-only."))
     add("--format", choices=["text", "stream-json"], default="text", dest="output_format", help=(
         "Output format for single-query mode (-q). 'text' prints the final response as plain text (default). "
-        "'stream-json' emits newline-delimited JSON events (JSONL), implies --quiet, and cannot be combined with --tui."))
+        "'stream-json' emits newline-delimited JSON events (system, text, tool_use, tool_result, result), "
+        "implies --quiet, and cannot be combined with --tui."))
     add("--resume", "-r", metavar="SESSION_ID", default=SUPPRESS, help=(
         "Resume a previous session by ID (shown on exit), or 'latest' "
         "for the most recent session"))
