@@ -12,6 +12,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Dict, Optional, Tuple
 
+from .health import display_health
 from .schema import VoiceEditError
 from .service import VoiceEditService
 from .settings import (export_settings, import_settings, list_local_models,
@@ -69,7 +70,9 @@ def handle(cfg: Any, method: str, api_path: str,
     svc = service_for(cfg)
     try:
         if path == "/api/voice-edit/status" and method in ("GET", "HEAD"):
-            return _ok(**svc.status())
+            payload = svc.status()
+            payload["display_health"] = display_health(cfg)
+            return _ok(**payload)
         if path == "/api/voice-edit/log" and method in ("GET", "HEAD"):
             from . import logview
             limit = 200
