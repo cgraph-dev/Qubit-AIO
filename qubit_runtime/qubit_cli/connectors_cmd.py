@@ -1,4 +1,4 @@
-"""``hermes connectors``: list, connect, rename and remove hosted connector accounts."""
+"""``qubit connectors``: list, connect, rename and remove hosted connector accounts."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Callable, NoReturn
 
 _POLL_SECONDS = 2.0
 _DONE_STATES = frozenset({"connected", "skipped", "failed", "expired", "not_connected"})
-_SIGN_IN = "Sign in with `hermes login` to manage connectors."
+_SIGN_IN = "Sign in with `qubit login` to manage connectors."
 
 
 class _CommandError(Exception):
@@ -55,6 +55,18 @@ def _match_named(app: str, rows: list[dict[str, Any]], name: str) -> dict[str, A
         what = "No" if not matches else "More than one"
         _fail(f"{what} {app} account is called {name!r}. {_names_hint(app, rows)}")
     return matches[0]
+
+
+def _status(args) -> int:
+    """Read-only readiness report: no network, no portal login, no secrets."""
+    from qubit_cli.connector_status import collect_status, render_json, render_text
+
+    rows = collect_status()
+    if getattr(args, "json_output", False):
+        print(render_json(rows))
+    else:
+        print(render_text(rows))
+    return 0
 
 
 def _list(args) -> int:
@@ -119,7 +131,7 @@ def _report_connect(app: str, alias: str | None, target: dict[str, Any]) -> int:
     if state == "connected":
         if alias:
             print(f"{app_title(app)} account {alias} is connected. "
-                  f"Rename it anytime: hermes connectors rename {app} {alias} --to <new-name>")
+                  f"Rename it anytime: qubit connectors rename {app} {alias} --to <new-name>")
         else:
             print(f"{app_title(app)} is connected.")
         return 0
@@ -209,7 +221,7 @@ def _disconnect(args) -> int:
     if not args.yes:
         if not sys.stdin.isatty():
             _fail("Refusing to remove an account without confirmation. Pass --yes to confirm.")
-        answer = input(f"Remove {app} account {name}? This signs Hermes out of it. [y/N] ").strip().lower()
+        answer = input(f"Remove {app} account {name}? This signs Qubit out of it. [y/N] ").strip().lower()
         if answer not in ("y", "yes"):
             print("Nothing removed.")
             return 0
@@ -221,23 +233,29 @@ def _disconnect(args) -> int:
 _ACTIONS: dict[str, Callable[[Any], int]] = {
     "list": _list,
     "ls": _list,
+    "status": _status,
+    "doctor": _status,
     "accounts": _accounts,
     "connect": _connect,
     "rename": _rename,
     "disconnect": _disconnect,
 }
 
+# Readiness is a local report; it must work signed out and without the portal.
+_PORTAL_FREE_ACTIONS = frozenset({"status", "doctor"})
+
 
 def cmd_connectors(args) -> int:
     from tools.connectors import connectors_available
     from tools.connectors.gateway.errors import GatewayAuthError, ToolGatewayError
 
-    handler = _ACTIONS.get(getattr(args, "connectors_action", None) or "list")
+    action = getattr(args, "connectors_action", None) or "list"
+    handler = _ACTIONS.get(action)
     if handler is None:
         print(f"Unknown connectors action: {args.connectors_action}", file=sys.stderr)
         return 2
-    if not connectors_available():
-        print("Connectors are not available. Sign in with `hermes login` first.", file=sys.stderr)
+    if action not in _PORTAL_FREE_ACTIONS and not connectors_available():
+        print("Connectors are not available. Sign in with `qubit login` first.", file=sys.stderr)
         return 1
     try:
         return handler(args)

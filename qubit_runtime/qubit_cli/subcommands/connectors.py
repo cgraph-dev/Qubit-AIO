@@ -1,4 +1,4 @@
-"""``hermes connectors`` subcommand parser."""
+"""``qubit connectors`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -9,10 +9,16 @@ def build_connectors_parser(subparsers) -> None:
 
     parser = subparsers.add_parser(
         "connectors", help="Manage hosted app connectors and their accounts",
-        description="List, connect, rename and remove the app accounts Hermes uses through Nous Portal.")
+        description="List, connect, rename and remove the app accounts Qubit uses through Nous Portal.")
     actions = parser.add_subparsers(dest="connectors_action")
 
     actions.add_parser("list", aliases=["ls"], help="Show every connector and whether it is connected")
+
+    status = actions.add_parser(
+        "status", aliases=["doctor"],
+        help="Show read-only connector readiness without contacting any service")
+    status.add_argument(
+        "--json", dest="json_output", action="store_true", help="Emit a JSON document")
 
     accounts = actions.add_parser("accounts", help="Show connected accounts")
     accounts.add_argument("app", nargs="?", help="Only show accounts of this app")
