@@ -127,6 +127,20 @@ def test_missing_provider_is_a_typed_connector_gap():
     assert result.reason == "connector_not_configured"
 
 
+def test_misconfigured_provider_is_a_connector_gap():
+    from tools.web_tools_extract import _disabled_plugin_error, _strict_selection_error
+
+    for text in (
+        _strict_selection_error("extract", "bogus"),
+        _disabled_plugin_error("extract", "web/firecrawl"),
+    ):
+        results = collect_sections(
+            {"topic": "t"},
+            search_fn=lambda q, limit, text=text: {"success": False, "error": text},
+            fetch_fn=lambda urls: {"results": []}, now=NOW)
+        assert _by_id(results)["search"].reason == "connector_not_configured", text
+
+
 def test_missing_credential_is_typed_not_a_tool_error():
     results = collect_sections(
         {"topic": "t"},
@@ -155,6 +169,37 @@ def test_invalid_json_is_a_typed_tool_error():
     result = _by_id(results)["search"]
     assert result.reason == "tool_error"
     assert "invalid JSON" in result.detail
+
+
+def test_error_only_tool_payload_is_a_gap_not_no_results():
+    """``tool_error(...)`` is an ``{"error"}`` body with no success key.
+
+    Treating it as an empty list reported "No web results" for a crashed
+    provider, hiding the real failure.
+    """
+    results = collect_sections(
+        {"topic": "t"},
+        search_fn=lambda q, limit: {"error": "Error searching web: provider crashed"},
+        fetch_fn=lambda urls: {"results": []}, now=NOW)
+    by_id = _by_id(results)
+    assert not by_id["search"].available
+    assert by_id["search"].reason == "tool_error"
+    assert "provider crashed" in by_id["search"].detail
+    assert not by_id["sources"].available
+    assert "the search section failed" in by_id["sources"].detail
+
+
+def test_error_only_fetch_payload_keeps_the_real_detail():
+    results = collect_sections(
+        {"topic": "t"},
+        search_fn=_search({"title": "A", "url": "https://example.com/a"}),
+        fetch_fn=lambda urls: {"error": "Error extracting content: gateway timeout"},
+        now=NOW)
+    sources = _by_id(results)["sources"]
+    assert not sources.available
+    assert sources.reason == "tool_error"
+    assert "gateway timeout" in sources.detail
+    assert "not returned by the extract backend" not in sources.detail
 
 
 def test_fetch_excerpts_keep_the_search_numbering():
@@ -194,6 +239,35 @@ def test_fetch_budget_caps_extraction_without_dropping_citations():
     assert _by_id(results)["sources"].reason == "tool_error"
 
 
+def test_redirected_row_maps_by_source_url_not_position():
+    """A row whose ``url`` is the redirect target must attach to the requested
+    URL named in ``metadata.sourceURL``; positional fallback previously gave
+    page B's text to citation A."""
+    results = collect_sections(
+        {"topic": "t"},
+        search_fn=_search(
+            {"title": "A", "url": "https://example.com/a"},
+            {"title": "B", "url": "https://example.com/b"}),
+        fetch_fn=lambda urls: {"results": [{
+            "url": "https://redirect.example/x",
+            "metadata": {"sourceURL": "https://example.com/b"},
+            "content": "B text",
+        }]},
+        now=NOW)
+    facts = _by_id(results)["sources"].facts
+    assert "[1] A — https://example.com/a — content unavailable" in facts[0]
+    assert "[2] B — https://example.com/b — excerpt: B text" in facts[1]
+
+
+def test_url_less_row_still_uses_the_request_order_fallback():
+    results = collect_sections(
+        {"topic": "t"},
+        search_fn=_search({"title": "A", "url": "https://example.com/a"}),
+        fetch_fn=lambda urls: {"results": [{"content": "positional text"}]},
+        now=NOW)
+    assert "excerpt: positional text" in _by_id(results)["sources"].facts[0]
+
+
 def test_all_fetches_failing_is_a_typed_tool_error():
     results = collect_sections(
         {"topic": "t"},
@@ -215,6 +289,26 @@ def test_no_results_is_honest_in_both_sections():
     assert by_id["search"].facts == ("No web results for 'nothing'.",)
     assert by_id["sources"].available
     assert "search returned no usable URLs" in by_id["sources"].facts[0]
+
+
+def test_long_url_is_fetched_whole_but_rendered_bounded():
+    """A long URL must not be silently truncated into a different (404) target;
+    the fact text is bounded by the normal clip instead."""
+    long_url = "https://example.com/" + "a" * 400
+    seen = []
+
+    def fetch(urls):
+        seen.extend(urls)
+        return {"results": [{"url": long_url, "content": "ok"}]}
+
+    results = collect_sections(
+        {"topic": "t"},
+        search_fn=_search({"title": "A", "url": long_url}),
+        fetch_fn=fetch, max_sources=1, now=NOW)
+    assert seen == [long_url]
+    search_fact = _by_id(results)["search"].facts[0]
+    assert search_fact.startswith("[1] A — https://example.com/")
+    assert len(search_fact) <= 500
 
 
 def test_sources_without_search_are_a_typed_gap():
