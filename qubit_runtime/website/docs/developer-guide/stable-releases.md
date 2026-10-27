@@ -299,7 +299,7 @@ the short SHA. All desktop icon formats derive from the same artwork.
 One-off stamps use `source: commit-build`. No app update feed or App Installer
 subscription is published for them, and both the GUI and bundled CLI refuse
 update requests. They direct the recipient to ask the developer for a new
-build. Source checkout channels are separate: `hermes update --set-channel`
+build. Source checkout channels are separate: `qubit update --set-channel`
 remains available there and selects the published release's source commit.
 
 `--build-commit` prints its deterministic downloads-page URL before dispatch,

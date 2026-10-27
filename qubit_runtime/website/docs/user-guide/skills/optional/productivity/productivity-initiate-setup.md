@@ -14,17 +14,17 @@ Run the first-run setup chat in the Qubit desktop app.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/productivity/initiate-setup` |
+| Source | Optional — install with `qubit skills install official/productivity/initiate-setup` |
 | Path | `optional-skills/productivity/initiate-setup` |
 | Version | `0.3.0` |
-| Author | Siddharth Balyan (alt-glitch) + Hermes Agent |
+| Author | Siddharth Balyan (alt-glitch) + Qubit |
 | License | MIT |
 | Platforms | linux, macos, windows |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Initiate Setup Skill

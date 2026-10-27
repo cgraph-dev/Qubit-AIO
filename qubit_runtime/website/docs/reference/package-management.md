@@ -5,9 +5,9 @@ description: "PM tool pins, Python environments, optional dependencies, and inst
 
 # Package management
 
-`hermes pm` manages Hermes tool binaries and Python dependency environments.
+`qubit pm` manages Qubit tool binaries and Python dependency environments.
 It is not the application updater. Use the installation's
-[update method](../getting-started/updating.md) to update Hermes itself.
+[update method](../getting-started/updating.md) to update Qubit itself.
 
 ## Pins, installed state, and runtime selection
 
@@ -23,7 +23,7 @@ Each file has a separate role:
 | Payload `manifest.json` | Relative payload layout and the completed launch contract from the bundle builder. |
 | `install-stamp.json` | Build provenance and the declared distribution/update owner. |
 
-A lockfile entry does not prove that a package is installed. `hermes pm doctor`
+A lockfile entry does not prove that a package is installed. `qubit pm doctor`
 compares the installed state with the lock and checks the realized bytes.
 Startup uses a cheaper check. It does not query upstream versions on every launch.
 For self-managed source installs, the pre-import launcher compares PM's recorded
@@ -49,7 +49,7 @@ The original command keeps the update lock while waiting; a missing or failed
 completion result cannot report success. Correlated PM failures remain in the
 update receipt, and interrupted restarts retain their fleet obligation.
 Dependency or build failures never retry through pip or a source re-download.
-Use `hermes pm repair` for damaged dependency files. See the developer
+Use `qubit pm repair` for damaged dependency files. See the developer
 [source completion ownership note](../developer-guide/source-update-completion.md).
 
 ## Source installs and packaged builds
@@ -85,7 +85,7 @@ the network. See the
 [desktop build guide](https://github.com/NousResearch/hermes-agent/blob/main/apps/desktop/BUILDING.md)
 for native compiler requirements and release verification limits.
 
-A packaged application's base payload is immutable. Hermes runs its backend
+A packaged application's base payload is immutable. Qubit runs its backend
 from that payload, rather than copying a source checkout on first launch.
 The bundle builder checks its files and writes the launch paths into the desktop
 build stamp. Electron uses those paths without probing or repairing the payload.
@@ -102,13 +102,13 @@ provides its runtime through derivations. See the
 
 ## Writable state
 
-The platform default data root is `~/.hermes` on POSIX and
-`%LOCALAPPDATA%\hermes` on Windows. `HERMES_HOME` and profiles can change
+The platform default data root is `~/.qubit` on POSIX and
+`%LOCALAPPDATA%\qubit` on Windows. `HERMES_HOME` and profiles can change
 which data root a process uses.
 
 | State | Default location |
 |---|---|
-| Shared writable tool entries | `tools/` under the resolved default Hermes root. |
+| Shared writable tool entries | `tools/` under the resolved default Qubit root. |
 | Resumable downloads | `cache/partials/` under that root, not inside a signed payload. |
 | Per-install selection and journal | `installs/INSTALL_KEY/` under the dependency-state root. |
 | Python generations | `installs/INSTALL_KEY/environments/`. |
@@ -159,10 +159,10 @@ including code-only updates that do not require a new environment.
 Plugin selection changes, including pack enables, use the same admission
 transaction. PM reads the latest selection under its shared lock before applying
 each change. A failed candidate does not replace the selected environment or
-silently disable other plugins. If preparation succeeds, a running Hermes process
+silently disable other plugins. If preparation succeeds, a running Qubit process
 can still require a restart to activate the new environment.
 
-Ordinary Hermes application updates preserve user plugin directories. Explicit
+Ordinary Qubit application updates preserve user plugin directories. Explicit
 plugin updates can change the selected plugin's files. A wrapper with no Python
 dependency declaration does not join the shared environment. Its external
 sidecar remains separately owned. See the
@@ -174,7 +174,7 @@ sidecar remains separately owned. See the
 dependencies remain usable when this setting is false.
 
 ```bash
-hermes config set security.allow_lazy_installs false
+qubit config set security.allow_lazy_installs false
 ```
 
 Explicit install commands are distinct from on-demand installation. However,
@@ -215,11 +215,11 @@ interpreter or redirect an installed desktop app to this checkout.
 
 ### Prepare a checkout
 
-Use an ordinary terminal outside the packaged Hermes app. Leave any existing
+Use an ordinary terminal outside the packaged Qubit app. Leave any existing
 Python virtual environment first. On Windows, use native PowerShell with Git.
 On ARM64, PM prepares Visual Studio C++ tools, Clang, native Rust, and static
 OpenSSL development libraries before every dependency build from a checkout:
-setup, `activate.ps1`, `install.ps1`, `hermes update`, and repair alike. It
+setup, `activate.ps1`, `install.ps1`, `qubit update`, and repair alike. It
 reuses existing installations and installs missing prerequisites. Missing
 Visual Studio components need administrator rights: an interactive install
 asks through a UAC prompt, while CI, ssh and scheduled runs need an
@@ -281,7 +281,7 @@ dependency must not prevent the dependency manager from starting.
 
 uv is a private PM implementation detail. Application code, setup flows, and
 build callers request Python operations, not uv executables or command arguments.
-Do not mutate a Hermes environment with raw pip or uv commands.
+Do not mutate a Qubit environment with raw pip or uv commands.
 
 PM's runtime contains `ruamel.yaml`, `packaging`, `tomli-w`, and `truststore`, not the application
 dependency tree. CLI commands and application-requested installs and repairs run
@@ -300,7 +300,7 @@ against the managed Python on the next invocation; subsequent invocations reuse 
 `pm.venv_is_current()` checks through an existing PM worker, even when lazy
 installs are disabled. It never bootstraps PM for a probe. If the manager
 runtime is unavailable, it returns false without downloading tools or
-dependencies. Run an explicit `hermes pm install` to prepare PM first.
+dependencies. Run an explicit `qubit pm install` to prepare PM first.
 
 Native bundles and Docker images stage this same PM lock through the shared
 runtime builder. Termux supplies its verified offline wheelhouse to that
@@ -325,13 +325,13 @@ fish, or assuming that a Zsh startup file has Bash semantics.
 Each activation invokes PM's install/sync path and trusts the recorded tool
 digest instead of re-hashing every entry. PM still installs a missing tool and
 rebuilds a stale dependency generation; a deliberate install keeps the byte
-check. Run `python -m pm.cli install` or `hermes update` to re-check realized
+check. Run `python -m pm.cli install` or `qubit update` to re-check realized
 bytes. A setup failure returns an error before changing the activated shell
 environment, including when re-sourcing an already active environment.
 
 After sync, activation prepends installed PM tools to `PATH` and sets
 `PYTHONPATH` to this checkout and its selected dependency tree. It also
-defines `hermes` as a shell function for this worktree. The function runs
+defines `qubit` as a shell function for this worktree. The function runs
 this checkout's CLI and hides the installed command, including an MSIX alias.
 It runs only while the shell is inside this worktree and refuses outside it,
 so a sibling worktree does not inherit the command. The prompt gains a prefix
@@ -349,7 +349,7 @@ python -c "import sys, pm; print(sys.executable); print(pm.__file__)"
 python -c "import httpx; print(httpx.__file__)"
 node --version
 npm --version
-hermes --version
+qubit --version
 ```
 
 `python` must resolve to the PM store interpreter. `pm.__file__` must point
@@ -359,14 +359,14 @@ attention, even if `source ./activate` itself returned successfully.
 
 ### Work on this source tree
 
-`hermes` is this worktree's CLI while the shell is inside it. Outside the
+`qubit` is this worktree's CLI while the shell is inside it. Outside the
 worktree the function refuses, so it cannot run another checkout's tree or
 fall through to an installed command:
 
 ```bash
-hermes setup
-hermes
-hermes --tui
+qubit setup
+qubit
+qubit --tui
 python -m pm.cli status
 ```
 
@@ -399,7 +399,7 @@ python -m pm.cli install
 
 After a standalone sync, reactivate the environment. Restart affected processes.
 Use `python -m pm.cli doctor` for tool diagnostics and `python -m pm.cli status`
-for the latest sync receipt. Do not run `hermes update` just to refresh a
+for the latest sync receipt. Do not run `qubit update` just to refresh a
 feature branch: it is an application update and can change the source branch.
 
 Managed tool names and Python extra names are different interfaces:
@@ -424,18 +424,18 @@ before starting another Python process.
 2. Relock:
 
    ```bash
-   hermes pm lock
+   qubit pm lock
    ```
 
    This re-resolves `uv.lock` from `pyproject.toml` with the same settings CI
    checks, including the 14-day `exclude-newer` quarantine. It changes no
    environment. When the lock is already current, it says so and writes
-   nothing. (`hermes pm lock --bump NAME VERSION` is a different operation: it
+   nothing. (`qubit pm lock --bump NAME VERSION` is a different operation: it
    pins a managed tool in `pm/lock.json` and does not touch `uv.lock`.)
 3. Source the activation script again (`source ./activate`, or
    `. .\activate.ps1` in PowerShell) to sync the application venv and the test
    interpreter to the new lock. Activation covers `[all]`. If you added an
-   opt-in extra outside `[all]`, `hermes pm lock` prints the command that also
+   opt-in extra outside `[all]`, `qubit pm lock` prints the command that also
    puts it in the test interpreter, for example
    `source ./activate --test-extras all,NAME`.
 4. Commit `pyproject.toml` and `uv.lock` together.
@@ -469,7 +469,7 @@ remove only that disposable environment first. Then run `scripts/run_tests.sh`
 tests and never enters a packaged runtime.
 
 For editor debugging, select that independent interpreter, set the working
-directory to this checkout, and launch `hermes` as the script. Keep its
+directory to this checkout, and launch `qubit` as the script. Keep its
 `HERMES_HOME` separate from production. Terminal activation does not configure
 an editor that was already running. Do not point an editor at a transient PM
 generation or a signed application's Python executable.
@@ -503,24 +503,24 @@ For application environment builds, PM must already be able to start in the
 invoking Python. These builds are not an interpreter bootstrap. They do not modify a running application's
 imports or replace its selected environment. Nix's declarative uv2nix builds
 remain Nix-owned. Package-manager commands for unrelated projects or agent
-sandboxes do not manage Hermes itself.
+sandboxes do not manage Qubit itself.
 
 ## Commands
 
 ```bash
-hermes pm --help
-hermes pm doctor
-hermes pm status
-hermes pm install
-hermes pm install chromium
+qubit pm --help
+qubit pm doctor
+qubit pm status
+qubit pm install
+qubit pm install chromium
 ```
 
 | Command | Effect |
 |---|---|
 | `pm install [names...]` | Install named packages. With no names, provision required tools plus Python, put those tools on PATH, and then sync the `all` extra. A bare install also installs the default optional tools (`agent-browser` and Chromium); a failed download of these prints a warning and does not fail the install. Naming a package you declined earlier undoes that choice. |
-| `pm install --without NAME` | Do a bare install without the default optional package `NAME` (only `agent-browser`), and record that choice. Later bare installs and `hermes update` also leave it out. The installers' `--skip-browser` / `-SkipBrowser` use this. |
+| `pm install --without NAME` | Do a bare install without the default optional package `NAME` (only `agent-browser`), and record that choice. Later bare installs and `qubit update` also leave it out. The installers' `--skip-browser` / `-SkipBrowser` use this. |
 | `pm install --tools-only` | Install that tool closure and put it on PATH, then stop. The venv sync does not run. |
-| `pm env [names...]` | Print installed packages' PM-contributed environment values as JSON. It does not install missing packages, though a cold Hermes launch may prepare its own Python runtime first. |
+| `pm env [names...]` | Print installed packages' PM-contributed environment values as JSON. It does not install missing packages, though a cold Qubit launch may prepare its own Python runtime first. |
 | `pm doctor` | Check installed tool identities, files, and digests against the lock. |
 | `pm repair` | Rebuild the recorded Python dependency set in a new generation, validate it, then select it. Does not update pins, features, or plugin configuration. |
 | `pm status` | Print the latest sync/update receipt as JSON, or report that no receipt exists. |
@@ -571,10 +571,10 @@ remain under uv and npm's own retry policies.
 ## Diagnostics
 
 - **Slow Python dependency builds:** PM's streamed uv commands enable verbose output. Bundle and build logs show package activity and build-backend stdout/stderr while the build runs, not only after failure.
-- **Missing or outdated tool:** read `hermes pm doctor`, then use an explicit PM install on a writable installation.
-- **New environment requires restart:** restart the affected Hermes process. Do not add a second site-packages tree to its live imports.
-- **Dependency conflict:** read `hermes pm status`. Correct the plugin requirements before retrying admission.
-- **Damaged Python dependencies:** run `hermes pm repair`, then restart Hermes. Repair replays the selected generation's saved workspace and lock without parsing plugin configuration. An unreadable record or missing saved lock fails without selecting a reduced dependency set. Before a generation exists, repair uses the shipped or committed lock and recorded feature set.
+- **Missing or outdated tool:** read `qubit pm doctor`, then use an explicit PM install on a writable installation.
+- **New environment requires restart:** restart the affected Qubit process. Do not add a second site-packages tree to its live imports.
+- **Dependency conflict:** read `qubit pm status`. Correct the plugin requirements before retrying admission.
+- **Damaged Python dependencies:** run `qubit pm repair`, then restart Qubit. Repair replays the selected generation's saved workspace and lock without parsing plugin configuration. An unreadable record or missing saved lock fails without selecting a reduced dependency set. Before a generation exists, repair uses the shipped or committed lock and recorded feature set.
 - **Interrupted dependency install:** startup requests the same PM repair before dependency activation. Automatic attempts are bounded; `pm repair` retries explicitly. A failed repair preserves the previous selection and its retry marker.
 - **Damaged Python executable or application source:** repair or reinstall through the package owner. PM cannot run without those files. Signed payload files are never modified by dependency repair.
 - **Unknown package or extra:** use the declared name. `pm install` takes package names, not Python extra names or pip specifications.

@@ -6,8 +6,8 @@ description: "Add or override UI languages for the CLI, gateway, TUI and Desktop
 
 # Language Packs
 
-Hermes ships 17 UI languages (`display.language`). The list is **pluggable**: a language pack is a
-plugin (or a folder in your Hermes home) that adds a new language or overrides the wording of an
+Qubit ships 17 UI languages (`display.language`). The list is **pluggable**: a language pack is a
+plugin (or a folder in your Qubit home) that adds a new language or overrides the wording of an
 existing one — for the Python side (CLI approval prompts, gateway replies, tool verbs, tips), the
 `qubit --tui` interface and the Desktop app, all from one pack.
 
@@ -16,13 +16,13 @@ What a pack translates is the **static UI text**. Agent responses, tool output, 
 
 ## Where languages come from
 
-When Hermes looks up a string it walks these layers, top first, and takes the first hit:
+When Qubit looks up a string it walks these layers, top first, and takes the first hit:
 
 1. **Plugin language packs** — every installed plugin that declares `provides_locales` (the last one
    loaded wins when two packs cover the same key).
 2. **Your overlay** — `<QUBIT_HOME>/locales/<lang>.yaml` (per profile: each profile home has its own
    `locales/` folder).
-3. **Bundled** — the `locales/<lang>.yaml` files shipped with Hermes.
+3. **Bundled** — the `locales/<lang>.yaml` files shipped with Qubit.
 4. The same three layers for English, then the raw key.
 
 Every layer may be **partial**: a pack or overlay only needs the keys it changes.
@@ -57,7 +57,7 @@ qubit-lang-pl/
   locales/
     pl.yaml            # core: Python-side strings (approval.*, gateway.*, cli.*, display.*, slash.*, tips.*, ...)
     pl.tui.yaml        # optional: qubit --tui strings
-    pl.desktop.yaml    # optional: Hermes Desktop strings
+    pl.desktop.yaml    # optional: Qubit Desktop strings
 ```
 
 `plugin.yaml`:
@@ -65,7 +65,7 @@ qubit-lang-pl/
 ```yaml
 name: qubit-lang-pl
 version: 1.0.0
-description: Polish language pack for Hermes
+description: Polish language pack for Qubit
 provides_locales:
   - id: pl            # lowercase BCP-47-style tag: pl, pt-br, zh-hant
     endonym: Polski   # shown in language switchers
@@ -82,7 +82,7 @@ When the manifest declares `provides_locales`, the plugin loader registers every
   dotted keys (`approval.denied`, `gateway.goal_cleared`). Copy `en.yaml`, translate the values, delete
   what you do not want to override.
 - **`pl.tui.yaml` / `pl.desktop.yaml`** mirror the English catalogs of the TUI and Desktop apps. The key
-  sets are exported to `locales/_keys.tui.json` and `locales/_keys.desktop.json` in the Hermes repo,
+  sets are exported to `locales/_keys.tui.json` and `locales/_keys.desktop.json` in the Qubit repo,
   which is what the validator checks against.
 - YAML values must be **text**. A number, list, `true`/`false` or empty value is rejected.
 - Never use YAML reserved words (`on`, `off`, `yes`, `no`) as keys.
@@ -90,7 +90,7 @@ When the manifest declares `provides_locales`, the plugin loader registers every
 ### Placeholders
 
 - Core (Python) strings use **named** placeholders exactly as English does: `"⏳ Draining {count} active agent(s)..."`.
-  Keep every `{name}` from the English value; a missing or misspelled placeholder makes Hermes fall
+  Keep every `{name}` from the English value; a missing or misspelled placeholder makes Qubit fall
   back to the untranslated string for that key.
 - TUI and Desktop entries whose English value is a *function* (it takes arguments) are written in YAML
   as strings with **positional** placeholders: `"{0} of {1} sessions"`.
@@ -127,16 +127,16 @@ never changes `display.language`.
 
 ## Personal overrides without a plugin
 
-Drop a partial file into your Hermes home:
+Drop a partial file into your Qubit home:
 
 ```yaml
-# ~/.hermes/locales/en.yaml — only the keys you want to change
+# ~/.qubit/locales/en.yaml — only the keys you want to change
 approval:
   denied: "      ✗ Nope."
 ```
 
 The overlay applies to that profile only (`~/.qubit/profiles/<name>/locales/` for a named profile).
-Overlay files for a language Hermes does not bundle make that language selectable too. Edits are read
+Overlay files for a language Qubit does not bundle make that language selectable too. Edits are read
 on the next start or the next `display.language` change.
 
 ## Troubleshooting
@@ -148,5 +148,5 @@ on the next start or the next `display.language` change.
   `qubit plugins validate`; unknown keys are listed), or the placeholder set differs from English.
 - **Language listed but the TUI/Desktop is still English** — the pack has no `.tui.yaml` /
   `.desktop.yaml`; those surfaces render English plus whatever the pack provides. For the 16 bundled
-  languages the TUI ships its own `locales/<lang>.tui.yaml` in the Hermes tree (the Desktop bundles
+  languages the TUI ships its own `locales/<lang>.tui.yaml` in the Qubit tree (the Desktop bundles
   its translations in-app), so a pack for one of those only needs the keys it wants to override.

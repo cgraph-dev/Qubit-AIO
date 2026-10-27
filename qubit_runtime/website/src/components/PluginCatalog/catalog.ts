@@ -114,7 +114,7 @@ export const TIER_CONFIG: Record<
 // grouped sections; keep it in sync with CATALOG_CATEGORIES in
 // hermes_cli/plugin_catalog.py and website/scripts/extract-plugins.py.
 export const CATEGORY_CONFIG: Record<string, { label: string; icon: string; blurb: string }> = {
-  desktop: { label: "Desktop", icon: "\u{1F5A5}\u{FE0F}", blurb: "Panes, tabs and views for Hermes Desktop" },
+  desktop: { label: "Desktop", icon: "\u{1F5A5}\u{FE0F}", blurb: "Panes, tabs and views for Qubit Desktop" },
   memory: { label: "Memory", icon: "\u{1F9E0}", blurb: "Memory providers and context engines" },
   platform: { label: "Platforms", icon: "\u{1F4AC}", blurb: "Messaging and channel adapters" },
   web: { label: "Web & Browser", icon: "\u{1F310}", blurb: "Search backends, extraction and browser control" },
