@@ -971,6 +971,137 @@ def cron_notepad(args) -> int:
         return 1
 
 
+_PREVIEW_TRANSPORTS = ("telegram", "discord", "whatsapp", "plain")
+_PREVIEW_OK_STATUSES = frozenset({"ok", "success", "delivery_failed", "delivery_queued"})
+
+
+def _preview_transport_for_job(job: Dict[str, Any]) -> str:
+    """The job's first concrete delivery transport, else ``plain``.
+
+    Only the transports the notice formatter renders distinctly are considered; ``origin`` and
+    ``local`` have no transport of their own, so they fall through to the plain fallback.
+    """
+    deliver = job.get("deliver")
+    entries = deliver if isinstance(deliver, list) else [deliver]
+    for entry in entries:
+        for part in str(entry or "").split(","):
+            name = part.split(":", 1)[0].strip().lower()
+            if name in _PREVIEW_TRANSPORTS:
+                return name
+    return "plain"
+
+
+def _preview_latest_output(job_id: str) -> tuple[str, Optional[Path]]:
+    """The newest saved output artifact for *job_id*, bounded, or ``("", None)``.
+
+    Reads only; a missing/unreadable output dir is an empty preview, never a created directory.
+    """
+    if not job_id:
+        return "", None
+    try:
+        from cron.jobs import _job_output_dir
+
+        directory = _job_output_dir(job_id)
+        files = sorted(
+            (path for path in directory.glob("*.md") if path.is_file()),
+            key=lambda path: path.name, reverse=True)
+    except Exception:
+        return "", None
+    if not files:
+        return "", None
+    path = files[0]
+    try:
+        return path.read_text(encoding="utf-8-sig", errors="replace")[:65536], path
+    except OSError:
+        return "", None
+
+
+def _preview_dashboard_url() -> str:
+    """The operator-configured dashboard URL, or "" (no per-run URL is ever invented)."""
+    try:
+        from cron.scheduler_delivery import _cron_dashboard_url
+        from qubit_cli.config import load_config_readonly
+
+        return _cron_dashboard_url(load_config_readonly())
+    except Exception:
+        return ""
+
+
+def _build_preview_notice(job: Dict[str, Any]):
+    """The exact notice object delivery would render for this job's last run (or its schedule)."""
+    from cron.notice_format import build_run_notice, build_simple_notice
+
+    dashboard_url = _preview_dashboard_url()
+    body, output_path = _preview_latest_output(str(job.get("id") or ""))
+    if body:
+        status = str(job.get("last_status") or "").strip().lower()
+        success = not status or status in _PREVIEW_OK_STATUSES
+        return build_run_notice(
+            job, body, success=success, output_path=output_path,
+            dashboard_url=dashboard_url, include_output_path=True)
+    paused = not job.get("enabled", True) or str(job.get("state") or "") == "paused"
+    summary = ""
+    status = str(job.get("last_status") or "").strip().lower()
+    if status and status not in _PREVIEW_OK_STATUSES:
+        summary = str(job.get("last_error") or "").strip()
+    return build_simple_notice(
+        job, "paused" if paused else "scheduled", summary=summary, link=dashboard_url)
+
+
+def _preview_text(notice, transport: str) -> str:
+    """Render *notice* exactly as the transport receives it."""
+    from cron.notice_format import render_notice
+
+    text = render_notice(notice, transport)
+    if transport == "telegram":
+        try:
+            from plugins.platforms.telegram.adapter import TelegramAdapter
+            return TelegramAdapter.format_message(None, text)
+        except Exception:
+            return text
+    return text
+
+
+def cron_preview(args) -> int:
+    """Render a job's notice for one transport without sending or mutating anything."""
+    from cron.jobs import AmbiguousJobReference, resolve_job_ref
+    from cron.notice_format import contains_link
+
+    ref = str(getattr(args, "job_id", "") or "")
+    transport = str(getattr(args, "transport", None) or "").strip().lower()
+    try:
+        job = resolve_job_ref(ref)
+    except AmbiguousJobReference as exc:
+        print(color(str(exc), Colors.RED))
+        return 2
+    if not job:
+        print(color(f"Job not found: {ref}", Colors.RED))
+        return 2
+    if not transport:
+        transport = _preview_transport_for_job(job)
+    if transport not in _PREVIEW_TRANSPORTS:
+        print(color(f"Unknown transport: {transport}. Choose one of: "
+                    f"{', '.join(_PREVIEW_TRANSPORTS)}", Colors.RED))
+        return 2
+    notice = _build_preview_notice(job)
+    text = _preview_text(notice, transport)
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "job_id": notice.job_id,
+            "job_name": notice.job_name,
+            "transport": transport,
+            "kind": notice.kind,
+            "text": text,
+            "link": notice.link,
+            "link_preview": contains_link(text),
+            "sent": False,
+            "mutated": False,
+        }, ensure_ascii=False, indent=2))
+        return 0
+    print(text)
+    return 0
+
+
 # Late-bound lambdas keep module-level monkeypatching working; list/status/runs return None -> 0.
 _CRON_SUBCOMMANDS = {
     "list": lambda a: cron_list(getattr(a, "all", False)) or 0,
@@ -980,6 +1111,7 @@ _CRON_SUBCOMMANDS = {
     "runs": lambda a: cron_runs(getattr(a, "job_id", None), getattr(a, "limit", 20)) or 0,
     "incidents": lambda a: cron_incidents(a),
     "notepad": lambda a: cron_notepad(a),
+    "preview": lambda a: cron_preview(a),
     "create": lambda a: cron_create(a),
     "edit": lambda a: cron_edit(a),
     "pause": lambda a: _job_action("pause", a.job_id, "Paused"),
@@ -999,5 +1131,5 @@ def cron_command(args):
     if handler is not None:
         return handler(args)
     print(f"Unknown cron command: {subcmd}\n"
-          "Usage: qubit cron [list|create|edit|pause|resume|run|remove|status|runs|doctor|tick]")
+          "Usage: qubit cron [list|create|edit|pause|resume|run|remove|status|runs|doctor|tick|preview]")
     sys.exit(1)

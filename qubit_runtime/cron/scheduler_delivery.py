@@ -1510,15 +1510,25 @@ def _inchannel_surface_supported(runtime_adapter, platform_name: str) -> bool:
     return bool(getattr(runtime_adapter, "supports_inchannel_continuable", False))
 
 
-def _live_route_metadata(t: _TargetDelivery) -> tuple[Optional[str], dict, dict]:
+def _live_route_metadata(
+    t: _TargetDelivery, *, text: str = "",
+) -> tuple[Optional[str], dict, dict]:
     """Compute ``(route_thread_id, route_metadata, media_metadata)`` for a live send, ONCE so text
     and media agree. ``telegram:<positive_chat_id>:<numeric_thread_id>`` is ambiguous (private
     forum topic vs channel DM topic need OPPOSITE routing) — see ``_is_channel_dm_topic``.
-    ``thread_id`` rides in ``route_metadata`` to bypass the router's private-chat anchor rule."""
+    ``thread_id`` rides in ``route_metadata`` to bypass the router's private-chat anchor rule.
+
+    Link previews are suppressed only when the payload carries no link (a bare cron status line
+    must not expand into a preview of some other URL the adapter picked up); a real notice link
+    keeps its preview. Cron never invents a URL — ``notice_format`` only links a configured
+    dashboard URL or a real artifact path.
+    """
+    from cron.notice_format import contains_link
     from gateway.config import Platform
     from gateway.delivery import _looks_like_int, looks_like_telegram_private_chat_id
     job = t.job
     thread_id = t.thread_id
+    disable_link_preview = not contains_link(text)
     is_ambiguous_telegram_topic = (
         t.platform == Platform.TELEGRAM
         and thread_id is not None
@@ -1532,7 +1542,7 @@ def _live_route_metadata(t: _TargetDelivery) -> tuple[Optional[str], dict, dict]
         route_thread_id = None
         route_metadata = {
             "direct_messages_topic_id": str(thread_id), "job_id": job["id"],
-            "notify": t.notify_delivery, "disable_link_preview": True,
+            "notify": t.notify_delivery, "disable_link_preview": disable_link_preview,
         }
         media_metadata = {"direct_messages_topic_id": str(thread_id), "notify": t.notify_delivery}
     else:
@@ -1544,7 +1554,7 @@ def _live_route_metadata(t: _TargetDelivery) -> tuple[Optional[str], dict, dict]
         route_thread_id = str(thread_id) if thread_id is not None else None
         route_metadata = {
             "job_id": job["id"], "notify": t.notify_delivery,
-            "disable_link_preview": True,
+            "disable_link_preview": disable_link_preview,
         }
         if route_thread_id:
             route_metadata["thread_id"] = route_thread_id
@@ -1741,7 +1751,7 @@ def _deliver_via_live_adapter(
     this lane's soft failures (surfaced only if standalone also fails); ``delivery_errors`` =
     partial failures (media, thread fallback) that surface even on success."""
     job = t.job
-    route_thread_id, route_metadata, media_metadata = _live_route_metadata(t)
+    route_thread_id, route_metadata, media_metadata = _live_route_metadata(t, text=cleaned_text)
     delivered = False
     try:
         # Send cleaned text (MEDIA tags stripped) through the gateway's DeliveryRouter so it gets

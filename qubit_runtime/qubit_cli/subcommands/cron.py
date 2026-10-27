@@ -20,6 +20,14 @@ def build_cron_parser(subparsers, *, cmd_cron: Callable) -> None:
     cron_list = cron_subparsers.add_parser("list", help="List scheduled jobs")
     _flag(cron_list, "--all", help="Include disabled and completed jobs")
 
+    cron_preview = cron_subparsers.add_parser(
+        "preview", help="Render a job's notice without sending or changing it")
+    cron_preview.add_argument("job_id", help="Job ID or name to preview")
+    cron_preview.add_argument(
+        "--transport", choices=["telegram", "discord", "whatsapp", "plain"],
+        help="Render for this transport (default: the job's first delivery target, else plain)")
+    _flag(cron_preview, "--json", help="Emit the rendered text and metadata as JSON")
+
     cron_create = cron_subparsers.add_parser(
         "create", aliases=["add"], help="Create a scheduled job")
     cron_create.add_argument("schedule", help="Schedule like '30m', 'every 2h', or '0 9 * * *'")
