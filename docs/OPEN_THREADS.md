@@ -1,18 +1,28 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-27 (Tk HUD + fleet)
+## ▶ Resume point — 2026-10-27 (Tk HUD action pass + live probes)
 
-**State:** `main` HEAD after this handoff commit (`git log -1`); `canonical/main` pushed; worktree clean; ~64 GB free. Live `qubit-gateway`, `qubit-voicebridge`, `qubit-voice-typing` are active. Gateway identify: `state=ready`, protocol 1; `/chat?resume=20261019_094333_0a4efc` → 200.
+**State:** `main` = `e0c39d860` (worktree clean; `canonical/main` push pending this session). Live `qubit-gateway`, `qubit-voicebridge` (pid 111266, `DISPLAY=:0`) and `qubit-voice-typing` are active; `/chat?resume=20261019_094333_0a4efc` → 200; Telegram `@QubitBot` polling.
 
-**Panel:** the native **Tk HUD** only (`voicebridge/voice_edit/overlay.py`); the web HUD/Next.js/Three.js path was removed at owner direction (Wave 61). `desktop_helper` always uses `make_overlay`; there is no `panel_backend` config anymore. Tk cannot run Next.js/Three.js/GSAP; the cyberpunk look is Canvas drawing. Screenshot: `/tmp/opencode/tk-hud-live.png`.
+**Panel:** the native **Tk HUD** only (`voicebridge/voice_edit/overlay.py`); no browser HUD. The action pass is covered by `tests/test_voice_edit_hud_actions9u.py` (real Tk buttons → real helper → fake service), and the focused 8-file HUD set is **112 passed**. Live service capture was proven after restarting the bridge with `DISPLAY=:0`; before that restart the live service returned `unsupported_session` (no selection). Do not reintroduce a web HUD.
 
 **Do next, in order:**
-1. Exercise one real Right-Ctrl utterance through the Tk HUD; verify live partials, final transcript, preview diff and Apply/Copy/Edit/Retry/Revert/Cancel. Fix anything the live turn exposes.
-2. Run the final focused/full matrix once and record evidence in `docs/STATUS.md`; `VERIFIED` is **not** claimed.
-3. Live connector probes when owner credentials exist (Google Calendar/Contacts scope, Dropbox token); Apple is platform-gated on Linux.
-4. Review `docs/PHASE8_INVENTORY.md` rows with the owner; no HERMES_*/.hermes deletions without sign-off.
+1. Owner: one real Right-Ctrl selection turn through the Tk HUD with a **supported** command (e.g. "rewrite this", "shorten this") to confirm the live preview/Apply/Revert path; custom case commands ("uppercase") are not transformer actions and currently fall through the brain.
+2. If a cold local model matters: the brain classifier's 4 s `brain_timeout_s` and `voice_edit.timeout_s: 8.0` are shorter than a cold `qubit-brain4` load (~17.5 s measured). Consider a prewarm (or longer first-call budget) only with owner sign-off; no config/ruling change was made this session.
+3. Live connector probes need owner credentials (`google_token.json` / `dropbox_token.json`); Apple is `not_supported` on Linux (verified for all four connectors).
+4. Owner sign-off on `docs/PHASE8_INVENTORY.md` §8 rows; no `HERMES_*`/`.hermes`/plugin/attribution deletion or rename without a `docs/DECISIONS.md` ruling.
+5. Final matrix remains open: focused sets are green (112 Tk/voice; 690 passed / 6 skipped runtime/CLI/connectors/recipes/traces/evals), but the 33-file broader voice run hit the 900 s cap at 39% with no failures and no full-repo matrix was run. `VERIFIED` is **not** claimed.
 
-**Known limits:** no live mic turn through the Tk HUD yet; no live Google/Apple/Dropbox credentials; `qubit gateway status` labels the live service "manual" (cosmetic supervisor detection).
+**Known limits:** no real mic or owner-credentialed live turn this session; `qubit gateway status` may label the live service "manual" (cosmetic supervisor detection); the web HUD exists only in git history (`567564088`).
+
+## Wave 62 — 2026-10-27 (Tk HUD actions, live connector refusals, bridge DISPLAY)
+
+- ✅ `tests/test_voice_edit_hud_actions9u.py`: real Tk `PreviewOverlay` + real `DesktopHelper`; Apply/Copy/Edit/Retry/Revert/Cancel, disabled-before-preview, edited preview, stale-transcript clear, no lift/geometry across 40 partials. Focused 8-file Tk/voice set **112 passed**.
+- ✅ Live bridge DISPLAY defect cleared: the pre-restart bridge (pid 2466) had no `DISPLAY`, so live `voice_edit.capture` was `unsupported_session`; after restarting `qubit-voicebridge` a real selection captured `available: true, char_count: 23, captured_via: "clipboard", app_class: "code_code"`. Scratch window/files removed.
+- ✅ Voice logs: weather answered at 12:41:42 and 12:43:33; one PTT at 12:41:34 was a ~0.1 s tap → empty transcript (not a fault); one `MODEL_UNAVAILABLE` from the 4 s brain classifier on a cold model (direct 30 s call succeeded after 17.5 s).
+- ✅ Connector refusals: Google Contacts/Calendar and Dropbox name the missing token path (no credentials on this host); Apple Contacts/Calendar/Health/Music raise `reason=not_supported, platform=linux` with the required framework.
+- ✅ P8 inventory reviewed read-only; no deletions or renames.
+- 🔴 No full matrix, no `VERIFIED`; broader 33-file voice run hit the 900 s cap at 39% (no failures observed).
 
 ## Wave 60 — 2026-10-27 (HUD + connector/runtime/remediation fleet)
 
