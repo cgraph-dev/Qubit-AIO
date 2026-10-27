@@ -409,6 +409,48 @@ def _routing_settings(cfg: Any) -> Dict[str, Any]:
     }
 
 
+_DEGENERATE_JUNK = {
+    "ok", "okay", "sure", "done", "yes", "no", "fine", "great",
+    "certainly", "of course", "got it", "understood",
+}
+
+
+def _degenerate_output(text: str, out: str, action: str) -> bool:
+    """True when a model answer cannot be a real rewrite of *text*.
+
+    Tiny local models sometimes answer the instruction with "OK." or a short
+    prefix of the input instead of transforming it. Treating that as a
+    successful rewrite put the junk into the user's field, so it must be
+    retried on the stronger tier (auto mode) or surfaced as a typed error.
+    Shorten/summarize may legitimately be much shorter, so they use a lower
+    floor and are never escalated for length alone.
+    """
+    source = (text or "").strip()
+    answer = (out or "").strip()
+    if not answer:
+        return True
+    core = answer.lower().strip(" \t\r\n.!?;:,'\"")
+    if core in _DEGENERATE_JUNK:
+        return True
+    action = str(action or "").lower()
+    if action in ("summarize", "shorten", "bullet_points"):
+        return len(answer) < 5
+    floor = max(8, int(len(source) * 0.2))
+    if len(answer) < floor:
+        return True
+    # A truncated prefix ("The quick brown fox" for a 120-char sentence) is
+    # not a rewrite, even when it is longer than the junk floor.
+    if source and answer.lower() != source.lower() and \
+            source.lower().startswith(answer.lower()) and \
+            len(answer) < int(len(source) * 0.6):
+        return True
+    return False
+
+
+def _fallback_target(settings: Dict[str, Any]) -> Optional[str]:
+    """The API tier for a one-shot retry: configured profile, else active."""
+    return settings["api_profile"] or None
+
 class TransformEngine:
     """Runs one transformation through the canonical provider gateway."""
 
@@ -566,13 +608,12 @@ class TransformEngine:
         # never silent); otherwise fail loudly so narration is never
         # returned as the rewrite.
         if is_narration_only(out):
-            if (mode == "auto" and settings["allow_api"]
-                    and settings["api_profile"]):
+            if (mode == "auto" and settings["allow_api"]):
                 fallback_note = ("local model returned narration only; "
-                                 "retried on configured API")
+                                 "retried on the API tier")
                 res = self._invoke(cfg, system=rendered["system"],
                                    user=rendered["user"],
-                                   profile_id=settings["api_profile"],
+                                   profile_id=_fallback_target(settings),
                                    timeout_s=settings["timeout_s"],
                                    cancel=cancel)
                 elapsed_ms = int((time.monotonic() - started) * 1000)
@@ -612,6 +653,51 @@ class TransformEngine:
                     ok=False, code="VOICE_EDIT_NARRATION_ONLY",
                     detail="model returned narration instead of a rewrite; "
                            "nothing was fabricated",
+                    action=getattr(cmd, "action", ""),
+                    style=getattr(cmd, "style", ""),
+                    provider=str(getattr(res, "provider", "") or ""),
+                    model=str(getattr(res, "model", "") or ""),
+                    elapsed_ms=elapsed_ms, privacy_mode=mode,
+                    prompt_version=rendered["prompt_version"],
+                    injection_suspected=injection)
+
+        # Degenerate answer (a tiny model replying "OK." or a truncated
+        # prefix). In auto mode retry once on the API tier; otherwise fail
+        # loudly so junk is never returned as a rewrite.
+        if _degenerate_output(text, out, getattr(cmd, "action", "")):
+            if mode == "auto" and settings["allow_api"]:
+                fallback_note = ("local model returned a fragment; retried "
+                                 "on the API tier")
+                res = self._invoke(cfg, system=rendered["system"],
+                                   user=rendered["user"],
+                                   profile_id=_fallback_target(settings),
+                                   timeout_s=settings["timeout_s"],
+                                   cancel=cancel)
+                elapsed_ms = int((time.monotonic() - started) * 1000)
+                details = getattr(res, "details", None) or {}
+                if isinstance(details, dict):
+                    locality = str(details.get("locality", "") or "")
+                if not getattr(res, "ok", False):
+                    return TransformResult(
+                        ok=False, code=str(getattr(res, "code", "MODEL_ERROR")
+                                           or "MODEL_ERROR"),
+                        detail=str(getattr(res, "message", "")
+                                   or "model refused")[:200],
+                        action=getattr(cmd, "action", ""),
+                        style=getattr(cmd, "style", ""),
+                        provider=str(getattr(res, "provider", "") or ""),
+                        model=str(getattr(res, "model", "") or ""),
+                        elapsed_ms=elapsed_ms, privacy_mode=mode,
+                        prompt_version=rendered["prompt_version"],
+                        injection_suspected=injection)
+                out = strip_narration_preamble(_strip_model_wrapper(
+                    str(getattr(res, "text", "") or "")))
+            if _degenerate_output(text, out, getattr(cmd, "action", "")):
+                return TransformResult(
+                    ok=False, code="VOICE_EDIT_DEGENERATE_OUTPUT",
+                    detail="the model returned a fragment instead of a "
+                           "rewrite; nothing was inserted. Configure a "
+                           "stronger detail model or allow the API tier.",
                     action=getattr(cmd, "action", ""),
                     style=getattr(cmd, "style", ""),
                     provider=str(getattr(res, "provider", "") or ""),
