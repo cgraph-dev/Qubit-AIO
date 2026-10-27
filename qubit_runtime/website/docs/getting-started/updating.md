@@ -1,7 +1,7 @@
 ---
 sidebar_position: 3
 title: "Updating & Uninstalling"
-description: "How to update Hermes Agent to the latest version or uninstall it"
+description: "How to update Qubit to the latest version or uninstall it"
 ---
 
 # Updating & Uninstalling
@@ -12,7 +12,7 @@ Choose the update method for the installation that is running:
 
 | Installation | Update method |
 |---|---|
-| Managed source checkout | `hermes update`, or the source-built desktop's update handoff. |
+| Managed source checkout | `qubit update`, or the source-built desktop's update handoff. |
 | Windows sideload MSIX | The desktop Update control and Windows App Installer. |
 | Microsoft Store package | Microsoft Store updates. |
 | macOS bundled app | The desktop Update control, through `electron-updater`. |
@@ -20,14 +20,14 @@ Choose the update method for the installation that is running:
 | Nix | Update the flake/profile and rebuild. |
 | Termux APT | `pkg update`, then `pkg upgrade hermes-agent`. |
 
-`hermes update` does not rewrite package-owned application files. PM manages
-dependencies, not application distribution: `hermes pm update` is a maintainer
+`qubit update` does not rewrite package-owned application files. PM manages
+dependencies, not application distribution: `qubit pm update` is a maintainer
 pin-update command, not an alternative application updater.
 
 For a managed source installation:
 
 ```bash
-hermes update
+qubit update
 ```
 
 The default source channel tracks `main`. Configured stable and canary channels
@@ -62,12 +62,12 @@ command is `hermes-canary`.
 One-off commit bundles are separate from both release channels and from other
 commit bundles. Their red icons show the short build SHA, also used in the
 `hermes-<short-sha>` CLI command. They do not check for or install updates,
-including through `hermes update` or `hermes update --check`. They explain:
+including through `qubit update` or `qubit update --check`. They explain:
 
 > This build doesn't get updates. Ask the developer who gave it to you for a new build.
 
-Separate applications still share Hermes profiles, configuration, and sessions
-under the same Hermes home. Running different builds against one profile is not
+Separate applications still share Qubit profiles, configuration, and sessions
+under the same Qubit home. Running different builds against one profile is not
 schema isolation: newer builds can change stored data that an older build cannot
 read. Back up shared data before testing. The desktop and standalone CLI warn
 when another live installation uses the same profile; this is advisory, not a
@@ -78,12 +78,12 @@ shared; the application that most recently registered it handles links.
 ### Source channels and install identity
 
 ```bash
-hermes update --install-id
-hermes update --set-channel stable
-hermes update --channel stable --check
+qubit update --install-id
+qubit update --set-channel stable
+qubit update --channel stable --check
 # Or track published canary commits in this source installation:
-hermes update --set-channel canary
-hermes update
+qubit update --set-channel canary
+qubit update
 ```
 
 `--install-id` prints the installation identity and path. `--set-channel`
@@ -92,9 +92,9 @@ update. `--channel` is a one-run override. An explicit `--branch` takes preceden
 for a source checkout.
 
 Channel names are registered in the release archive on Cloudflare R2, not in a
-fixed list shipped with Hermes. The `main` record selects source-branch delivery;
+fixed list shipped with Qubit. The `main` record selects source-branch delivery;
 published-build channels select an exact Git commit. Custom preview channels use
-the same source commands, for example `hermes update --set-channel pm-preview`.
+the same source commands, for example `qubit update --set-channel pm-preview`.
 The publisher must have created that channel before an update can resolve it.
 An unavailable or invalid record reports an error rather than falling back to
 `main` or another release. Switching a source channel does not install a desktop
@@ -116,7 +116,7 @@ can advance stored data formats; switching back is not a schema rollback.
 Back up data before changing release channels.
 
 :::tip
-`hermes update` automatically detects new configuration options and prompts you to add them. If you skipped that prompt, you can manually run `hermes config check` to see missing options, then `hermes config migrate` to interactively add them.
+`qubit update` automatically detects new configuration options and prompts you to add them. If you skipped that prompt, you can manually run `qubit config check` to see missing options, then `qubit config migrate` to interactively add them.
 :::
 
 ### Passive update notices
@@ -124,23 +124,23 @@ Back up data before changing release channels.
 Pinned or noninteractive installations can disable passive CLI version and banner update checks:
 
 ```bash
-hermes config set updates.check false
+qubit config set updates.check false
 ```
 
-This suppresses both cached update notices and passive update-check network requests. The default is `true`. Explicit `hermes update --check` and `hermes update` still work; this setting does not control the Desktop application's updater.
+This suppresses both cached update notices and passive update-check network requests. The default is `true`. Explicit `qubit update --check` and `qubit update` still work; this setting does not control the Desktop application's updater.
 
 ### What happens during an update
 
-For an admitted source checkout, `hermes update` runs these phases:
+For an admitted source checkout, `qubit update` runs these phases:
 
-1. **Pre-update snapshot** — Hermes saves selected state files for every profile in that profile's `state-snapshots/` directory. These include pairing data, cron jobs, `config.yaml`, `.env`, and `auth.json`. Automatic quick snapshots skip individual files larger than 1 GiB. `updates.pre_update_backup` selects `quick`, `full`, or `off`. Full archives use the [backup exclusions](../reference/faq.md#hermes-backup-vs-hermes-profile-export). Recovery uses [Snapshots and rollback](../user-guide/checkpoints-and-rollback.md). Quick snapshots recover state files, not application code. The snapshot is best-effort: if it fails, the update prints a `⚠ Pre-update snapshot FAILED` warning and continues, and the receipt records `pre_update_backup` as a failed step (a deliberate `off`/`--no-backup` lands in the receipt's skips with its reason instead).
+1. **Pre-update snapshot** — Qubit saves selected state files for every profile in that profile's `state-snapshots/` directory. These include pairing data, cron jobs, `config.yaml`, `.env`, and `auth.json`. Automatic quick snapshots skip individual files larger than 1 GiB. `updates.pre_update_backup` selects `quick`, `full`, or `off`. Full archives use the [backup exclusions](../reference/faq.md#qubit-backup-vs-qubit-profile-export). Recovery uses [Snapshots and rollback](../user-guide/checkpoints-and-rollback.md). Quick snapshots recover state files, not application code. The snapshot is best-effort: if it fails, the update prints a `⚠ Pre-update snapshot FAILED` warning and continues, and the receipt records `pre_update_backup` as a failed step (a deliberate `off`/`--no-backup` lands in the receipt's skips with its reason instead).
 2. **Code update** — applies the configured source branch or stable release tag and updates submodules.
-3. **Post-pull syntax validation + auto-rollback** — after the pull, Hermes compiles the nine critical files every `hermes` invocation imports at startup. If any fails to parse (e.g. an orphan merge-conflict marker, an accidentally truncated file), Hermes runs `git reset --hard <pre-pull-sha>` to roll the install back so your shell stays bootable. Re-run `hermes update` once the upstream fix lands.
-4. **Dependency preparation** — PM provisions required tools and prepares a complete Python environment from the new lock, existing extras, and enabled plugin requirements. It validates that environment before publishing its selection. A plugin never fails the update. A plugin that no longer fits the new core is added to `plugins.disabled` in every profile that enables it (a memory provider has `memory.provider` cleared). That covers a `requires-python` that excludes Hermes's Python, a `manifest_version` newer than this Hermes supports, and dependencies that the resolver proves can't resolve alongside core and earlier plugins in config order, or that fail their own build. A download or network failure gets one retry and is disabled if it fails again. The update prints `⚠ Disabled plugin '<name>' in <home>: <reason>`, records it in the receipt's warnings, and continues. Re-enable it with `hermes plugins enable <name>` once the plugin ships a compatible release, or once the network is back. A `requires_hermes` range the running version misses never disables a plugin, because a source checkout without release tags can read as an older release. That plugin sits out instead (`⚠ Left plugin '<name>' … out of this update`), stays enabled, and rejoins once Hermes reports a version it accepts. A secondary profile whose config cannot be read sits out the same way until the config is fixed. Only a core that cannot build on its own fails this step.
+3. **Post-pull syntax validation + auto-rollback** — after the pull, Qubit compiles the nine critical files every `qubit` invocation imports at startup. If any fails to parse (e.g. an orphan merge-conflict marker, an accidentally truncated file), Qubit runs `git reset --hard <pre-pull-sha>` to roll the install back so your shell stays bootable. Re-run `qubit update` once the upstream fix lands.
+4. **Dependency preparation** — PM provisions required tools and prepares a complete Python environment from the new lock, existing extras, and enabled plugin requirements. It validates that environment before publishing its selection. A plugin never fails the update. A plugin that no longer fits the new core is added to `plugins.disabled` in every profile that enables it (a memory provider has `memory.provider` cleared). That covers a `requires-python` that excludes Qubit's Python, a `manifest_version` newer than this Qubit supports, and dependencies that the resolver proves can't resolve alongside core and earlier plugins in config order, or that fail their own build. A download or network failure gets one retry and is disabled if it fails again. The update prints `⚠ Disabled plugin '<name>' in <home>: <reason>`, records it in the receipt's warnings, and continues. Re-enable it with `qubit plugins enable <name>` once the plugin ships a compatible release, or once the network is back. A `requires_hermes` range the running version misses never disables a plugin, because a source checkout without release tags can read as an older release. That plugin sits out instead (`⚠ Left plugin '<name>' … out of this update`), stays enabled, and rejoins once Qubit reports a version it accepts. A secondary profile whose config cannot be read sits out the same way until the config is fixed. Only a core that cannot build on its own fails this step.
 5. **Config migration** — detects new config options added since your version and prompts you to set them
-6. **Desktop rebuild (stage-and-swap)** — if the Hermes Desktop app was built from this checkout, it is rebuilt so the GUI matches the new code. The rebuild packs into a temporary staging directory next to `apps/desktop/release/`, verifies the staged app, and only then renames it over the previous build (on Windows a real-time scanner briefly holding `release/win-unpacked` is ridden out with a few short retries). A rebuild that fails at any point — corrupt Electron download, missing dependency, disk full — leaves the previous app untouched and launchable; the update fails at that step, and `hermes desktop --build-only --force-build` or the next `hermes update` retries the rebuild. On macOS the rebuilt bundle is then copied (with `ditto`, signature intact) over a stale `/Applications/Hermes.app` or `~/Applications/Hermes.app`, so the copy Finder and the Dock launch matches the backend; an installed copy that is currently running is left alone and the update tells you to quit it and run `hermes update` again.
-7. **Gateway auto-restart**: running gateways are refreshed after the update completes. Service-managed gateways (systemd on Linux, launchd on macOS) restart through the service manager. Manual gateways are relaunched when Hermes can map their PID to a profile. Manually launched `hermes serve` / `hermes dashboard` backends are different: the updater leaves them running and asks their owner to restart them. See [Manual backend restart reminders](#manual-backend-restart-reminders). Backends owned by a running Desktop app remain the app's responsibility.
-8. **Multiplex migration (multi-profile installs)** — once the fleet is verified on the new code, an install with two or more profiles that still run **one gateway per profile** is folded into a single multiplexed default gateway when nothing blocks it (same as `hermes gateway migrate --multiplex --yes`); if a blocker exists (a bot token shared by two profiles, a secondary profile binding a port with no `/p/<profile>/` ingress) the update prints the blockers with their fixes and changes nothing. Single-profile installs are never touched. See [Migrating from per-profile gateways](../user-guide/multi-profile-gateways.md#migrating-from-per-profile-gateways).
+6. **Desktop rebuild (stage-and-swap)** — if the Qubit Desktop app was built from this checkout, it is rebuilt so the GUI matches the new code. The rebuild packs into a temporary staging directory next to `apps/desktop/release/`, verifies the staged app, and only then renames it over the previous build (on Windows a real-time scanner briefly holding `release/win-unpacked` is ridden out with a few short retries). A rebuild that fails at any point — corrupt Electron download, missing dependency, disk full — leaves the previous app untouched and launchable; the update fails at that step, and `qubit desktop --build-only --force-build` or the next `qubit update` retries the rebuild. On macOS the rebuilt bundle is then copied (with `ditto`, signature intact) over a stale `/Applications/Qubit.app` or `~/Applications/Qubit.app`, so the copy Finder and the Dock launch matches the backend; an installed copy that is currently running is left alone and the update tells you to quit it and run `qubit update` again.
+7. **Gateway auto-restart**: running gateways are refreshed after the update completes. Service-managed gateways (systemd on Linux, launchd on macOS) restart through the service manager. Manual gateways are relaunched when Qubit can map their PID to a profile. Manually launched `qubit serve` / `qubit dashboard` backends are different: the updater leaves them running and asks their owner to restart them. See [Manual backend restart reminders](#manual-backend-restart-reminders). Backends owned by a running Desktop app remain the app's responsibility.
+8. **Multiplex migration (multi-profile installs)** — once the fleet is verified on the new code, an install with two or more profiles that still run **one gateway per profile** is folded into a single multiplexed default gateway when nothing blocks it (same as `qubit gateway migrate --multiplex --yes`); if a blocker exists (a bot token shared by two profiles, a secondary profile binding a port with no `/p/<profile>/` ingress) the update prints the blockers with their fixes and changes nothing. Single-profile installs are never touched. See [Migrating from per-profile gateways](../user-guide/multi-profile-gateways.md#migrating-from-per-profile-gateways).
 
 ### Why the gateway restart can take a while
 
@@ -154,7 +154,7 @@ The restart is drain-first: the running gateway refuses new turns, then waits fo
      finish or kill the work above to release the drain now; agent.restart_after_turn_timeout in config.yaml caps this wait
 ```
 
-Chat turns show their session key, model and current tool; cron jobs show the job id, name and the process running them (an external restart-safe worker on systemd installs, otherwise the gateway itself). `hermes gateway status` lists the same units while the gateway is draining. To stop waiting, finish or kill the listed work, or lower `agent.restart_after_turn_timeout` in `config.yaml` (`0` enters the forced drain immediately).
+Chat turns show their session key, model and current tool; cron jobs show the job id, name and the process running them (an external restart-safe worker on systemd installs, otherwise the gateway itself). `qubit gateway status` lists the same units while the gateway is draining. To stop waiting, finish or kill the listed work, or lower `agent.restart_after_turn_timeout` in `config.yaml` (`0` enters the forced drain immediately).
 
 Wedged work does not hold the restart: a chat turn idle past `agent.gateway_timeout`, or a cron run older than the scheduler's in-flight allowance (`max(2 × the job's interval, cron.inflight_max_minutes)`, 30 minutes by default), is excluded from the wait and interrupted by the restart instead.
 
@@ -166,105 +166,105 @@ On Windows, a Desktop reopened during packaging is stopped again immediately bef
 
 ### Updating against a non-default branch: `--branch`
 
-On the default source channel, `hermes update` tracks `origin/main`. Use
+On the default source channel, `qubit update` tracks `origin/main`. Use
 `--branch NAME` for a one-run branch override:
 
 ```bash
-hermes update --branch release-candidate
-hermes update --check --branch experimental   # preview behindness only
+qubit update --branch release-candidate
+qubit update --check --branch experimental   # preview behindness only
 ```
 
-If your local checkout is on a different branch, Hermes auto-stashes any uncommitted work, switches HEAD to the target branch, and then pulls. Branches that don't exist locally are auto-tracked from `origin/<name>` (`git checkout -B <name> origin/<name>`). Branches that don't exist anywhere fail cleanly — your stashed changes are restored before exit so you're never stranded in a weird state. The `main`-only fork-upstream sync logic is automatically skipped on non-`main` branches.
+If your local checkout is on a different branch, Qubit auto-stashes any uncommitted work, switches HEAD to the target branch, and then pulls. Branches that don't exist locally are auto-tracked from `origin/<name>` (`git checkout -B <name> origin/<name>`). Branches that don't exist anywhere fail cleanly — your stashed changes are restored before exit so you're never stranded in a weird state. The `main`-only fork-upstream sync logic is automatically skipped on non-`main` branches.
 
 ### Checkout parked on a feature branch
 
-If the source checkout was left sitting on a feature branch (by tooling, a worktree experiment, or a manual checkout), `hermes update` switches it back to the update target automatically whenever the working tree is clean:
+If the source checkout was left sitting on a feature branch (by tooling, a worktree experiment, or a manual checkout), `qubit update` switches it back to the update target automatically whenever the working tree is clean:
 
 - **Branch fully merged** (every commit already contained in `origin/main` — `git cherry` reports nothing unmerged): the update says so — `Checkout was parked on '<branch>' (fully merged) — switched back to main` — and stays on `main` afterwards.
 - **Branch has unmerged commits** but the tree is clean: the update still switches to `main` so the update can proceed — this is what non-interactive callers (the desktop update button, gateway `/update`, cron) rely on, since they have no way to resolve a skip. Your commits are untouched: `git checkout` never discards committed work, and the update prints a loud notice naming the branch and commit count, plus the `git checkout <branch>` command to pick the work back up later.
 
-If you *deliberately* run a custom branch (local patches maintained on top of main), set `updates.parked_branch_strategy: update_in_place` in `config.yaml`. The update then merges `origin/main` **into** your branch instead of switching away from it — the checkout never moves, your commits survive, and the running code advances. Fast-forward when possible; on divergence a true merge behind a `pre-update-<stamp>` safety tag, stopping cleanly (nothing changed) on conflict. `hermes update --switch-branch` overrides back to the switch path for one run — useful on a deep feature branch that must not accumulate update-driven merge commits.
+If you *deliberately* run a custom branch (local patches maintained on top of main), set `updates.parked_branch_strategy: update_in_place` in `config.yaml`. The update then merges `origin/main` **into** your branch instead of switching away from it — the checkout never moves, your commits survive, and the running code advances. Fast-forward when possible; on divergence a true merge behind a `pre-update-<stamp>` safety tag, stopping cleanly (nothing changed) on conflict. `qubit update --switch-branch` overrides back to the switch path for one run — useful on a deep feature branch that must not accumulate update-driven merge commits.
 
-When the parked branch has **uncommitted changes** (dirty tree), Hermes does **not** touch it. The code update is marked **SKIPPED** with a loud warning naming the branch, how far behind `origin/main` it is, and the exact commands to resolve — instead of pretending the update succeeded. The completion line always shows the actual branch and HEAD (`✓ Update complete! [main @ 30fcf9580]`) so drift is visible at a glance. Set `updates.auto_switch_parked_branch: false` in `config.yaml` to disable the auto-switch entirely (the skip warning still fires).
+When the parked branch has **uncommitted changes** (dirty tree), Qubit does **not** touch it. The code update is marked **SKIPPED** with a loud warning naming the branch, how far behind `origin/main` it is, and the exact commands to resolve — instead of pretending the update succeeded. The completion line always shows the actual branch and HEAD (`✓ Update complete! [main @ 30fcf9580]`) so drift is visible at a glance. Set `updates.auto_switch_parked_branch: false` in `config.yaml` to disable the auto-switch entirely (the skip warning still fires).
 
 ### Local commits on the target branch
 
-Commits made directly on the update target (`main`) stop fast-forwards once upstream moves, and the checkout cannot tell them apart from an upstream force-push, so the update resets `main` to `origin/main`. Before the reset it saves the old HEAD as `refs/hermes-update-backups/diverged-main-<stamp>-<sha>` and prints that ref along with how many commits leave the branch. `git log origin/main..<ref>` lists them; `git branch <name> <ref>` or `git cherry-pick` brings them back. Re-running the installer over an existing checkout (`install.sh` / `install.ps1`, which desktop bootstrap does) writes the same refs. Whenever `hermes update` writes one, it keeps the ten newest per kind and drops any older than 30 days. To carry patches across updates, keep them on a custom branch with `updates.parked_branch_strategy: update_in_place` instead.
+Commits made directly on the update target (`main`) stop fast-forwards once upstream moves, and the checkout cannot tell them apart from an upstream force-push, so the update resets `main` to `origin/main`. Before the reset it saves the old HEAD as `refs/hermes-update-backups/diverged-main-<stamp>-<sha>` and prints that ref along with how many commits leave the branch. `git log origin/main..<ref>` lists them; `git branch <name> <ref>` or `git cherry-pick` brings them back. Re-running the installer over an existing checkout (`install.sh` / `install.ps1`, which desktop bootstrap does) writes the same refs. Whenever `qubit update` writes one, it keeps the ten newest per kind and drops any older than 30 days. To carry patches across updates, keep them on a custom branch with `updates.parked_branch_strategy: update_in_place` instead.
 
 ### Local changes on non-interactive updates
 
-When you run `hermes update` in a terminal, Hermes stashes any uncommitted source-tree changes, pulls, then **asks** whether to restore them — exactly as it always has. Nothing changes for interactive updates.
+When you run `qubit update` in a terminal, Qubit stashes any uncommitted source-tree changes, pulls, then **asks** whether to restore them — exactly as it always has. Nothing changes for interactive updates.
 
 The autostash only ever covers *source-tree* changes. On a **flat install** — where the git checkout root is also `$HERMES_HOME` (for example an install made with `HERMES_INSTALL_DIR=$HERMES_HOME`, or one created by an older installer) — the profile's runtime state (`state.db` and its WAL/SHM sidecars, `state-snapshots/`, `backups/`, `sessions/`, `cron/jobs.json`, the `cron/*.db` stores, `config.yaml`, `auth.json`, `memories/`, lock/pid files, …) lives inside the checkout as untracked files. Those paths are git-ignored, so the autostash never touches them and the running gateway keeps its database through the update. If you keep other untracked files in a flat install's root, move them out of the checkout or add them to `.git/info/exclude`; anything untracked and not ignored is swept into the autostash like a source edit.
 
 When the update runs **without a terminal** — from the desktop/chat app's "Update" button or a gateway-triggered update — there's no prompt to answer. The `updates.non_interactive_local_changes` setting decides what happens to your stashed changes:
 
 ```yaml
-# ~/.hermes/config.yaml
+# ~/.qubit/config.yaml
 updates:
   non_interactive_local_changes: stash   # default: keep + auto-restore
   # non_interactive_local_changes: discard  # throw local source edits away
 ```
 
 - `stash` (default) — auto-stash, pull, then auto-restore your changes on top of the updated code. Nothing is lost; if a restore hits conflicts they're preserved in a git stash for manual recovery.
-- `discard` — auto-stash and drop the stash after the pull, so the update always lands on a clean tree. Use this only on machines where you never intend to keep local edits to the Hermes source. It stash-drops (not `git reset --hard` + `git clean -fd`), so ignored paths like `node_modules`, `venv`, and build outputs are never touched.
+- `discard` — auto-stash and drop the stash after the pull, so the update always lands on a clean tree. Use this only on machines where you never intend to keep local edits to the Qubit source. It stash-drops (not `git reset --hard` + `git clean -fd`), so ignored paths like `node_modules`, `venv`, and build outputs are never touched.
 
 In the desktop app this is **Settings → Advanced → In-App Update Local Changes**.
 
-**Desktop updates never auto-restore.** The desktop updater invokes `hermes update --keep-stash`: local source edits are still stashed so the update can proceed, but they are **not** re-applied afterward — they stay parked in `git stash` and the update log prints the exact `git stash apply <ref>` command to bring them back. This prevents local edits from silently riding along across desktop updates and breaking the freshly updated install. (`non_interactive_local_changes: discard` still wins if you've opted into discarding.) To restore parked changes manually:
+**Desktop updates never auto-restore.** The desktop updater invokes `qubit update --keep-stash`: local source edits are still stashed so the update can proceed, but they are **not** re-applied afterward — they stay parked in `git stash` and the update log prints the exact `git stash apply <ref>` command to bring them back. This prevents local edits from silently riding along across desktop updates and breaking the freshly updated install. (`non_interactive_local_changes: discard` still wins if you've opted into discarding.) To restore parked changes manually:
 
 ```bash
-cd ~/.hermes/hermes-agent   # or your install root
+cd ~/.qubit/hermes-agent   # or your install root
 git stash list --format='%gd %H %s'   # find the hermes-update-autostash entry
 git stash apply stash@{0}
 ```
 
-You can pass `--keep-stash` to a terminal `hermes update` too if you want the same never-reapply behavior interactively.
+You can pass `--keep-stash` to a terminal `qubit update` too if you want the same never-reapply behavior interactively.
 
-### Preview-only: `hermes update --check`
+### Preview-only: `qubit update --check`
 
-`hermes update --check` compares the checkout with its source-channel target
+`qubit update --check` compares the checkout with its source-channel target
 without applying code, installing dependencies, or restarting gateways. The
 comparison can fetch Git metadata; it is not a promise of zero filesystem writes.
 Package-owned installs report their external update method.
 
-### Fleet preview: `hermes update --plan`
+### Fleet preview: `qubit update --plan`
 
-Before updating a machine that runs several profiles or services, run `hermes update --plan`. It prints the install kind, running Hermes services across profiles, their supervisors and running code versions, and the restart mechanism for each service. Manually launched `hermes serve` / `hermes dashboard` backends appear with their recorded bind endpoint, but restart is deferred to their owner; the updater does not stop or relaunch them. Image- or package-managed installs report the external update command instead. The plan is read-only and safe on a live fleet.
+Before updating a machine that runs several profiles or services, run `qubit update --plan`. It prints the install kind, running Qubit services across profiles, their supervisors and running code versions, and the restart mechanism for each service. Manually launched `qubit serve` / `qubit dashboard` backends appear with their recorded bind endpoint, but restart is deferred to their owner; the updater does not stop or relaunch them. Image- or package-managed installs report the external update command instead. The plan is read-only and safe on a live fleet.
 
-The same inventory is embedded in every real update's receipt (`~/.hermes/logs/update_receipts/`), so after an update you can compare what the updater saw against what it did.
+The same inventory is embedded in every real update's receipt (`~/.qubit/logs/update_receipts/`), so after an update you can compare what the updater saw against what it did.
 
 ### Update receipts and the fleet version check
 
-Every `hermes update` run writes a machine-readable receipt to `~/.hermes/logs/update_receipts/` (last 20 kept, `latest.json` always points at the most recent): the pre-update fleet plan, each step taken, anything skipped and why, the gateway restart outcome, and the final fleet version matrix. The SQLite runtime repair is one of those steps (`sqlite_runtime_repair`): a failed repair records the actual reason (for example the `uv sync` error) and the SQLite version pair, a deferred or not-applicable repair lands in the skips with its reason. After the restart phase the updater compares each live gateway's running code against the freshly updated checkout and prints a per-profile matrix — a gateway still serving pre-update code is reported loudly with the exact restart command, and the update exits non-zero so automation never treats a mixed-version fleet as healthy. Both `--plan` and the fleet check ask each running gateway directly over its local control socket (`gateway.sock` in the profile's data directory, a named pipe on Windows) when available, so version and supervisor information comes from the gateway itself; gateways from older versions are still discovered through their state files as before.
+Every `qubit update` run writes a machine-readable receipt to `~/.qubit/logs/update_receipts/` (last 20 kept, `latest.json` always points at the most recent): the pre-update fleet plan, each step taken, anything skipped and why, the gateway restart outcome, and the final fleet version matrix. The SQLite runtime repair is one of those steps (`sqlite_runtime_repair`): a failed repair records the actual reason (for example the `uv sync` error) and the SQLite version pair, a deferred or not-applicable repair lands in the skips with its reason. After the restart phase the updater compares each live gateway's running code against the freshly updated checkout and prints a per-profile matrix — a gateway still serving pre-update code is reported loudly with the exact restart command, and the update exits non-zero so automation never treats a mixed-version fleet as healthy. Both `--plan` and the fleet check ask each running gateway directly over its local control socket (`gateway.sock` in the profile's data directory, a named pipe on Windows) when available, so version and supervisor information comes from the gateway itself; gateways from older versions are still discovered through their state files as before.
 
-A multiplexed default gateway is one process serving several profiles, so it appears once in the matrix and vouches for every profile in its `served_profiles` record. The same coverage clears the "A previous `hermes update` pulled new code but did not restart running gateways" hint: once that gateway (or, after a manual `git pull`, every gateway an update restarted) runs the current code, `hermes gateway restart` is enough — the hint no longer waits for the next `hermes update` to write a fresh receipt. The same is true of the restart obligation left by an update that died before recording which gateways it owed (or by an older updater that never recorded them): once every live gateway runs the current checkout, the obligation is retired and the hint stops. On a host that runs no gateway at all (the Desktop app alone), it is retired once no profile has a gateway that went away without a clean stop and every running backend is restarted by its own supervisor or has its own reminder. That obligation is recorded once per HOST, in the cross-profile rendezvous directory (`$HERMES_GATEWAY_LOCK_DIR`, else `$XDG_STATE_HOME/hermes/gateway-locks`) as `host-update-restart.json`, so every profile's CLI sees the same one: `hermes -p coder update` and `hermes -p writer update` restart the shared multiplexed gateway once between them, not once each. An obligation left behind by an older per-profile updater (`fleet_restart_pending` in one profile's Hermes home) is still read and cleared. An update whose pre-update plan found no gateway at all owes nothing and leaves no breadcrumb. A backend supervised by Desktop, systemd or launchd is restarted by its supervisor and never blocks this settlement; only a manual backend whose reminder could not be saved keeps the obligation open.
+A multiplexed default gateway is one process serving several profiles, so it appears once in the matrix and vouches for every profile in its `served_profiles` record. The same coverage clears the "A previous `qubit update` pulled new code but did not restart running gateways" hint: once that gateway (or, after a manual `git pull`, every gateway an update restarted) runs the current code, `qubit gateway restart` is enough — the hint no longer waits for the next `qubit update` to write a fresh receipt. The same is true of the restart obligation left by an update that died before recording which gateways it owed (or by an older updater that never recorded them): once every live gateway runs the current checkout, the obligation is retired and the hint stops. On a host that runs no gateway at all (the Desktop app alone), it is retired once no profile has a gateway that went away without a clean stop and every running backend is restarted by its own supervisor or has its own reminder. That obligation is recorded once per HOST, in the cross-profile rendezvous directory (`$HERMES_GATEWAY_LOCK_DIR`, else `$XDG_STATE_HOME/hermes/gateway-locks`) as `host-update-restart.json`, so every profile's CLI sees the same one: `qubit -p coder update` and `qubit -p writer update` restart the shared multiplexed gateway once between them, not once each. An obligation left behind by an older per-profile updater (`fleet_restart_pending` in one profile's Qubit home) is still read and cleared. An update whose pre-update plan found no gateway at all owes nothing and leaves no breadcrumb. A backend supervised by Desktop, systemd or launchd is restarted by its supervisor and never blocks this settlement; only a manual backend whose reminder could not be saved keeps the obligation open.
 
 ### Manual backend restart reminders
 
-After updating, ask the owner of each manually launched backend to relaunch `hermes serve` or `hermes dashboard`; reconnect Desktop for an SSH backend. Restarting gateways alone does not refresh these processes.
+After updating, ask the owner of each manually launched backend to relaunch `qubit serve` or `qubit dashboard`; reconnect Desktop for an SSH backend. Restarting gateways alone does not refresh these processes.
 
 For a verified live backend, the updater saves a reminder before recording its restart as `deferred`. This allows the update to complete if the remaining checks pass. An unknown process identity cannot qualify for fresh deferral.
 
-Reminders live in `serve_restart_pending/` under the active Hermes home, separately from rotating update receipts. Each reminder identifies a process by PID and creation time. Startup warnings retain it while that process is alive or its liveness is unknown, and remove it only when that exact process is confirmed gone. A later update or a healthy gateway does not remove it.
+Reminders live in `serve_restart_pending/` under the active Qubit home, separately from rotating update receipts. Each reminder identifies a process by PID and creation time. Startup warnings retain it while that process is alive or its liveness is unknown, and remove it only when that exact process is confirmed gone. A later update or a healthy gateway does not remove it.
 
-If saving fails, Hermes warns and carries the unsaved obligation into later receipts for retry. Check storage permissions and free space, and restart the backend as instructed. If both reminder and receipt storage fail, durable retention cannot be guaranteed.
+If saving fails, Qubit warns and carries the unsaved obligation into later receipts for retry. Check storage permissions and free space, and restart the backend as instructed. If both reminder and receipt storage fail, durable retention cannot be guaranteed.
 
 ### Automated updates from inside the gateway: `--no-gateway-restart`
 
 An update launched *by* the gateway (a cron job, the Desktop updater, any automation that is a
 child of the gateway process) cannot survive its own fleet restart: the gateway drains on
 `SIGUSR1` and systemd's `KillMode=mixed` then kills everything left in the cgroup, updater
-included. `hermes update --no-gateway-restart` runs the full pipeline (pull, dependencies,
+included. `qubit update --no-gateway-restart` runs the full pipeline (pull, dependencies,
 Node workspaces, web UI, maintenance) and skips only the restart and fleet verification. The
-pending-restart marker is kept, so the next CLI start warns and the next normal `hermes update`
-(or `hermes gateway restart`) catches the fleet up. Pair it with a separate restart step, for
+pending-restart marker is kept, so the next CLI start warns and the next normal `qubit update`
+(or `qubit gateway restart`) catches the fleet up. Pair it with a separate restart step, for
 example a timer 10–15 minutes after the update job. The receipt records the deferral; a stale
 fleet caused only by the deferral does not make the update `partial`.
 
 ### Interrupted gateway restarts
 
-If an earlier update pulled code but did not finish restarting the fleet, the next `hermes update` retries even when the checkout is already current. An empty process scan does not prove recovery: failed systemd units and installed launchd jobs may have no live PID. If discovery or restart fails, or a requested service cannot be verified active, the marker stays pending and the update exits nonzero. Recover the affected services with the printed commands and retry.
+If an earlier update pulled code but did not finish restarting the fleet, the next `qubit update` retries even when the checkout is already current. An empty process scan does not prove recovery: failed systemd units and installed launchd jobs may have no live PID. If discovery or restart fails, or a requested service cannot be verified active, the marker stays pending and the update exits nonzero. Recover the affected services with the printed commands and retry.
 
 A failed historical receipt alone does not prove that gateways are still stale. Startup and gateway-status warnings, as well as update catch-up, check for a live successor on the current checkout for every gateway profile recorded in that receipt. A manual gateway restart can settle receipt-only advice without rewriting the historical outcome. Manual backend obligations must first transfer to their separate reminders.
 
@@ -277,13 +277,13 @@ Legacy markers without an inventory, and malformed or unsupported inventories, c
 For high-value profiles (production gateways, shared team installs) you can opt into a full pre-pull backup of `HERMES_HOME` (config, auth, sessions, skills, pairing):
 
 ```bash
-hermes update --backup
+qubit update --backup
 ```
 
 Or make it the default for every run:
 
 ```yaml
-# ~/.hermes/config.yaml
+# ~/.qubit/config.yaml
 updates:
   pre_update_backup: full
 ```
@@ -291,13 +291,13 @@ updates:
 `updates.pre_update_backup` has three modes:
 
 - `quick` saves the selected state files described above. This is the default.
-- `full` adds a zip archive with the [backup exclusions](../reference/faq.md#hermes-backup-vs-hermes-profile-export). Large data directories can take several minutes.
+- `full` adds a zip archive with the [backup exclusions](../reference/faq.md#qubit-backup-vs-qubit-profile-export). Large data directories can take several minutes.
 - `off` disables pre-update backups. `--no-backup` selects this mode for one run.
 
 Legacy boolean values remain supported: `true` means `full`, and `false` means `off`.
 
 :::tip Moving to a new machine instead?
-Update backups protect an in-place update. If you're migrating your whole setup to different hardware, use `hermes backup` + `hermes import` instead — see [Exporting Hermes to another machine](../reference/faq.md#exporting-hermes-to-another-machine) and [`hermes backup` vs `hermes profile export`](../reference/faq.md#hermes-backup-vs-hermes-profile-export).
+Update backups protect an in-place update. If you're migrating your whole setup to different hardware, use `qubit backup` + `qubit import` instead — see [Exporting Qubit to another machine](../reference/faq.md#exporting-qubit-to-another-machine) and [`qubit backup` vs `qubit profile export`](../reference/faq.md#qubit-backup-vs-qubit-profile-export).
 :::
 
 ### Windows process ownership and dependency changes
@@ -308,12 +308,12 @@ imported libraries in place. A running process keeps its current imports until
 it restarts.
 
 Follow any blocker diagnostic for the specific process and installation. Do
-not kill every process named Python or Hermes. Source updates and MSIX package
+not kill every process named Python or Qubit. Source updates and MSIX package
 replacement have different owners and shutdown requirements.
 
 The parser retains `--force` and `--force-venv` for Windows compatibility. They
 are not normal update instructions or a guarantee that an OS file lock can be
-bypassed. Inspect `hermes update --plan`, the update log, and `hermes pm status`
+bypassed. Inspect `qubit update --plan`, the update log, and `qubit pm status`
 before retrying a failed update.
 
 ### Recommended Post-Update Validation
@@ -322,34 +322,34 @@ After a source update, run the following diagnostics. For a bundled app, use
 its About page and backend health instead of Git commands inside the package.
 
 1. `git status --short` — if the tree is unexpectedly dirty, inspect before continuing
-2. `hermes doctor` — checks config, dependencies, and service health
-3. `hermes --version` — confirm the version bumped as expected
-4. If you use the gateway: `hermes gateway status`
-5. `hermes pm status` — inspect dependency preparation and any failed steps.
+2. `qubit doctor` — checks config, dependencies, and service health
+3. `qubit --version` — confirm the version bumped as expected
+4. If you use the gateway: `qubit gateway status`
+5. `qubit pm status` — inspect dependency preparation and any failed steps.
 
 :::warning Dirty working tree after update
-If `git status --short` shows unexpected changes after `hermes update`, stop and inspect them before continuing. This usually means local modifications were reapplied on top of the updated code, or a dependency step refreshed lockfiles.
+If `git status --short` shows unexpected changes after `qubit update`, stop and inspect them before continuing. This usually means local modifications were reapplied on top of the updated code, or a dependency step refreshed lockfiles.
 :::
 
 ### If your terminal disconnects mid-update
 
-`hermes update` protects itself against accidental terminal loss:
+`qubit update` protects itself against accidental terminal loss:
 
 - The update ignores `SIGHUP`, so closing your SSH session or terminal window no longer kills it mid-install. `pip` and `git` child processes inherit this protection, so the Python environment cannot be left half-installed by a dropped connection.
-- All output is mirrored to `~/.hermes/logs/update.log` while the update runs. If your terminal disappears, reconnect and inspect the log to see whether the update finished and whether the gateway restart succeeded:
+- All output is mirrored to `~/.qubit/logs/update.log` while the update runs. If your terminal disappears, reconnect and inspect the log to see whether the update finished and whether the gateway restart succeeded:
 
 ```bash
-tail -f ~/.hermes/logs/update.log
+tail -f ~/.qubit/logs/update.log
 ```
 
 - `Ctrl-C` (SIGINT) and system shutdown (SIGTERM) are still honored — those are deliberate cancellations, not accidents.
 
-You no longer need to wrap `hermes update` in `screen` or `tmux` to survive a terminal drop.
+You no longer need to wrap `qubit update` in `screen` or `tmux` to survive a terminal drop.
 
 ### Checking your current version
 
 ```bash
-hermes --version
+qubit --version
 ```
 
 Compare against the latest release at the [GitHub releases page](https://github.com/NousResearch/hermes-agent/releases).
@@ -386,16 +386,16 @@ procedure. Do not run Git or pip inside a signed app or an immutable image.
 
 ### Python 3.14 and older interpreters
 
-Hermes runs only on **Python 3.14**. `pyproject.toml` still declares
+Qubit runs only on **Python 3.14**. `pyproject.toml` still declares
 `requires-python = ">=3.11,<3.15"`, but every runtime dependency carries a
 `python_version >= '3.14'` marker. The wider range exists for one reason: a
 source install whose venv predates the PM migration (Python 3.11–3.13) must be
-able to check out the new code and run `hermes update` once more. That update
+able to check out the new code and run `qubit update` once more. That update
 hands off to a fresh completion process, PM provisions the pinned 3.14
 interpreter from `pm/lock.json`, builds the dependency environment on it, and
 repoints the launchers. After that the old interpreter is no longer used.
 
-What this means outside `hermes update`:
+What this means outside `qubit update`:
 
 - `pip install .`, `uv pip install .`, `pip install -e .`, or a Homebrew/PyPI
   package built on Python 3.11–3.13 installs `hermes-agent` with **no
@@ -404,13 +404,13 @@ What this means outside `hermes update`:
   a packaged build.
 - A Nix build outside the repo flake sees the same marker-gated dependency set
   and needs a 3.14 interpreter.
-- A `hermes` launcher that still points at a pre-migration venv should be
-  repaired with `hermes update` (or `python -m pm.cli install` from the
+- A `qubit` launcher that still points at a pre-migration venv should be
+  repaired with `qubit update` (or `python -m pm.cli install` from the
   checkout), not by reinstalling into the old venv.
 
 ### Image-managed installs (Docker): the provenance marker
 
-Published Docker images bake a small read-only marker (`/etc/hermes/image-provenance.json`) that authoritatively identifies the filesystem as image-managed. `hermes update`, `hermes update --check`, and the dashboard's Update button all consult it before touching anything: on an image-managed install they refuse cleanly (exit code 2), print the actual update command (`docker pull nousresearch/hermes-agent:latest`), and write a `refused` receipt so fleet tooling can see the attempt happened. The marker wins even when a source checkout is bind-mounted into the container — the refusal is based on what the running filesystem *is*, not what it looks like. A damaged marker still refuses (fail-closed). Nix- and apt-managed installs refuse through the same gate using the existing detection.
+Published Docker images bake a small read-only marker (`/etc/hermes/image-provenance.json`) that authoritatively identifies the filesystem as image-managed. `qubit update`, `qubit update --check`, and the dashboard's Update button all consult it before touching anything: on an image-managed install they refuse cleanly (exit code 2), print the actual update command (`docker pull nousresearch/hermes-agent:latest`), and write a `refused` receipt so fleet tooling can see the attempt happened. The marker wins even when a source checkout is bind-mounted into the container — the refusal is based on what the running filesystem *is*, not what it looks like. A damaged marker still refuses (fail-closed). Nix- and apt-managed installs refuse through the same gate using the existing detection.
 
 ### Note for Nix users
 
@@ -437,25 +437,25 @@ See [Nix Setup](./nix-setup.md) for more details.
 ## Uninstalling
 
 ```bash
-hermes uninstall
+qubit uninstall
 ```
 
-For source installs, review `hermes uninstall --dry-run` before removal.
+For source installs, review `qubit uninstall --dry-run` before removal.
 The default removal can preserve configuration and user data. `--full` also
 removes data. `--data` removes user data without deleting package-owned code.
 These modes are destructive; make a backup first.
 
 For MSIX/Store, use Windows Settings → Apps → Installed apps. For macOS,
-quit Hermes and move its app bundle to Trash. Docker, Nix, and Termux use the
+quit Qubit and move its app bundle to Trash. Docker, Nix, and Termux use the
 same manager that installed them. Their package files are not removed by the
 source uninstaller. Data deletion is separate from package removal.
 
 :::tip Moving to a new machine rather than leaving?
-Run `hermes backup` before you remove the installation. The full archive includes
+Run `qubit backup` before you remove the installation. The full archive includes
 credentials but excludes downloaded runtimes, dependency environments, caches,
 and browser profiles. Review its skipped-file report before you delete source data.
-`hermes profile export` packs one profile without credentials.
-See [`hermes backup` vs `hermes profile export`](../reference/faq.md#hermes-backup-vs-hermes-profile-export).
+`qubit profile export` packs one profile without credentials.
+See [`qubit backup` vs `qubit profile export`](../reference/faq.md#qubit-backup-vs-qubit-profile-export).
 :::
 
 ### Manual Uninstall
@@ -463,13 +463,13 @@ See [`hermes backup` vs `hermes profile export`](../reference/faq.md#hermes-back
 ```bash
 rm -f ~/.local/bin/hermes
 rm -rf /path/to/hermes-agent
-rm -rf ~/.hermes            # Optional — keep if you plan to reinstall
+rm -rf ~/.qubit            # Optional — keep if you plan to reinstall
 ```
 
 :::info
 If you installed the gateway as a system service, stop and disable it first:
 ```bash
-hermes gateway stop
+qubit gateway stop
 # Linux: systemctl --user disable hermes-gateway
 # macOS: launchctl remove ai.hermes.gateway
 ```

@@ -1,14 +1,14 @@
 ---
-title: "Inspecting Hermes Desktop Dom — Read the live Hermes desktop DOM/CSS over CDP"
-sidebar_label: "Inspecting Hermes Desktop Dom"
-description: "Read the live Hermes desktop DOM/CSS over CDP"
+title: "Inspecting Qubit Desktop Dom — Read the live Qubit desktop DOM/CSS over CDP"
+sidebar_label: "Inspecting Qubit Desktop Dom"
+description: "Read the live Qubit desktop DOM/CSS over CDP"
 ---
 
 {/* This page is auto-generated from the skill's SKILL.md by website/scripts/generate-skill-docs.py. Edit the source SKILL.md, not this page. */}
 
-# Inspecting Hermes Desktop Dom
+# Inspecting Qubit Desktop Dom
 
-Read the live Hermes desktop DOM/CSS over CDP.
+Read the live Qubit desktop DOM/CSS over CDP.
 
 ## Skill metadata
 
@@ -17,7 +17,7 @@ Read the live Hermes desktop DOM/CSS over CDP.
 | Source | Bundled (installed by default) |
 | Path | `skills/software-development/inspecting-hermes-desktop-dom` |
 | Version | `1.0.0` |
-| Author | Hermes Agent |
+| Author | Qubit |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `desktop`, `electron`, `cdp`, `dom`, `ui-verification`, `self-inspection` |
@@ -26,10 +26,10 @@ Read the live Hermes desktop DOM/CSS over CDP.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
-# Inspecting the live Hermes desktop DOM
+# Inspecting the live Qubit desktop DOM
 
 ## Overview
 
@@ -140,10 +140,10 @@ When there is no port, or you must not disturb the user's window:
 
 ```bash
 cd apps/desktop
-HERMES_HOME=$HOME/.hermes/cache/scratch/cdp-probe-home \
+HERMES_HOME=$HOME/.qubit/cache/scratch/cdp-probe-home \
 HERMES_DESKTOP_DEV_SERVER=http://127.0.0.1:5174 \
 HERMES_DESKTOP_CDP_PORT=9333 \
-  npx electron . --user-data-dir=$HOME/.hermes/cache/scratch/cdp-probe-userdata
+  npx electron . --user-data-dir=$HOME/.qubit/cache/scratch/cdp-probe-userdata
 ```
 
 The separate `--user-data-dir` dodges Electron's single-instance lock, so it

@@ -14,7 +14,7 @@ Import an Qubit setup (memories, skills) into Qubit.
 
 | | |
 |---|---|
-| Source | Optional — install with `hermes skills install official/migration/qubit-migration` |
+| Source | Optional — install with `qubit skills install official/migration/qubit-migration` |
 | Path | `optional-skills/migration/qubit-migration` |
 | Version | `1.0.0` |
 | Author | Qubit Agent (Qubit Labs) |
@@ -24,7 +24,7 @@ Import an Qubit setup (memories, skills) into Qubit.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Qubit -> Qubit Migration

@@ -1,24 +1,24 @@
 ---
 sidebar_position: 8
 title: "Memory Provider Plugins"
-description: "How to build a memory provider plugin for Hermes Agent"
+description: "How to build a memory provider plugin for Qubit"
 ---
 
 # Building a Memory Provider Plugin
 
-Memory provider plugins give Hermes Agent persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. This guide covers how to build one.
+Memory provider plugins give Qubit persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. This guide covers how to build one.
 
 :::tip
-Memory providers are one of two **provider plugin** types. The other is [Context Engine Plugins](./context-engine-plugin.md), which replace the built-in context compressor. Both follow the same pattern: single-select, config-driven, managed via `hermes plugins`.
+Memory providers are one of two **provider plugin** types. The other is [Context Engine Plugins](./context-engine-plugin.md), which replace the built-in context compressor. Both follow the same pattern: single-select, config-driven, managed via `qubit plugins`.
 :::
 
 ## Installation Layouts
 
-Hermes discovers memory providers from four sources, in this precedence order:
+Qubit discovers memory providers from four sources, in this precedence order:
 
 | Source | Location | Notes |
 |---|---|---|
-| Bundled | `plugins/memory/<name>/` | Ships with Hermes. Closed to new providers — see [CONTRIBUTING](https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md). |
+| Bundled | `plugins/memory/<name>/` | Ships with Qubit. Closed to new providers — see [CONTRIBUTING](https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md). |
 | User | `$HERMES_HOME/plugins/<name>/` | Dropped in by the user, per profile. |
 | Project | `./.hermes/plugins/<name>/` | Opt-in via `HERMES_ENABLE_PROJECT_PLUGINS=1`. |
 | Package | `hermes_agent.memory_providers` entry point | Distribution supplied by the installation owner; nothing to copy. |
@@ -36,23 +36,23 @@ Discovery only *enumerates* — it never imports a provider. Nothing runs until
 `memory.provider` names it.
 
 Entry-point discovery does not install packages. Do not inject a provider into
-Hermes's selected environment with pip. On PM-managed installations, ship a
+Qubit's selected environment with pip. On PM-managed installations, ship a
 directory provider with declared Python dependencies; plugin admission and
-`hermes memory setup` prepare them through PM before use. Owner-managed builds
+`qubit memory setup` prepare them through PM before use. Owner-managed builds
 (such as Nix) can include an entry-point distribution declaratively.
 
 CLI and dashboard setup share candidate preparation. PM includes the provider's
 `pyproject.toml` or legacy `pip_dependencies` / `python_dependencies` alongside
 the active plugin union; an importable module does not bypass declared version
 constraints. Dashboard readiness checks the same inputs without installing
-anything. A successful preparation may require restarting Hermes before the
+anything. A successful preparation may require restarting Qubit before the
 running process can use the selected dependency generation. External sidecar
 checks and setup commands remain separate from the Python union.
 
 ### Directory Provider
 
 A directory provider lives in `plugins/memory/<name>/` when bundled with
-Hermes, in `$HERMES_HOME/plugins/<name>/` when installed by a user, or in
+Qubit, in `$HERMES_HOME/plugins/<name>/` when installed by a user, or in
 `./.hermes/plugins/<name>/` for a project-local one:
 
 ```
@@ -79,8 +79,8 @@ keep your implementation, skills, and other resources in the normal Python
 package layout. No copy under `$HERMES_HOME/plugins/` is required.
 
 A package entry point gets everything a directory install does, including the
-two files Hermes reads from disk rather than importing — `config_schema.py`
-(the dashboard config panel) and `cli.py` (your `hermes <provider>`
+two files Qubit reads from disk rather than importing — `config_schema.py`
+(the dashboard config panel) and `cli.py` (your `qubit <provider>`
 subcommands). Both are found next to your package's `__init__.py`, so point the
 entry point at a package rather than a single module if you ship either.
 
@@ -162,7 +162,7 @@ workspace; absent or empty cwd remains unpinned.
 
 | Method | Purpose | Must Implement? |
 |--------|---------|-----------------|
-| `get_config_schema()` | Declare config fields for `hermes memory setup` | **Yes** |
+| `get_config_schema()` | Declare config fields for `qubit memory setup` | **Yes** |
 | `save_config(values, hermes_home)` | Write non-secret config to native location | **Yes** (unless env-var-only) |
 
 ### Optional Hooks
@@ -183,7 +183,7 @@ entry selected under the native-store lock. Notifications are emitted only after
 the complete write or batch succeeds. Batch notifications preserve operation order;
 each operation's previous content reflects earlier operations in that batch.
 `old_text` is the caller's search text, not the identity of the changed entry.
-Older Hermes versions can omit `previous_content`. Providers that require exact
+Older Qubit versions can omit `previous_content`. Providers that require exact
 identity should skip destructive mirroring when it is absent.
 
 ### Oversized prefetch results
@@ -234,20 +234,20 @@ uncompressed transcript is preserved, the compaction attempt errors with
 `BLOCKED_MISSING_PREREQUISITE`, and it can be retried once your store
 recovers. With the gate off (default), nothing changes for existing providers.
 
-None of the providers bundled with Hermes advertise checkpoint API v2 — the
+None of the providers bundled with Qubit advertise checkpoint API v2 — the
 contract is opt-in and exists for third-party archiving providers. Enabling
 `checkpoint_required` without one therefore blocks every compression attempt
 (manual and automatic): agent init logs a warning naming the active provider,
 and each refusal names `compression.checkpoint_required` as the key to disable.
 
-The gate binds to every compaction authority, not just the Hermes
+The gate binds to every compaction authority, not just the Qubit
 summarizer: server-side native compaction (`compression.codex_responses_native`)
 is suppressed while the gate is armed, post-turn micro-compaction
 (`compression.micro_compact`) is forced off at agent init (it absorbs old
 exchanges into a rolling summary with no checkpoint hook in its path), and
 the `codex_app_server` API mode is refused at agent init — the codex agent
 compacts its own thread with no truthful pre-compaction boundary, so a
-required checkpoint cannot be guaranteed there. The checkpoint-aware Hermes
+required checkpoint cannot be guaranteed there. The checkpoint-aware Qubit
 compressor stays the only lossy authority.
 
 What your provider receives depends on its declared API version. Version 1
@@ -272,24 +272,24 @@ Contract tests: `tests/agent/test_pre_compress_checkpoint_contract.py`.
 
 ## Setup UX — what a standalone provider keeps
 
-Every setup surface Hermes gives a bundled provider is driven by files in the provider's
+Every setup surface Qubit gives a bundled provider is driven by files in the provider's
 own directory, so a provider installed from the plugin catalog keeps all of them:
 
 | Surface | What the provider ships |
 |---|---|
 | Desktop → Capabilities → Tools → Memory (config panel) | `config_schema.py` (below) |
-| `hermes memory setup` wizard | `get_config_schema()` declares the fields the wizard prompts for, `save_config(config, hermes_home)` persists them, `post_setup(hermes_home, config)` runs afterwards for anything interactive (OAuth, first sync); `get_status_config()` feeds `hermes memory status` |
-| `hermes <provider> …` subcommands | `cli.py` with `register_cli(subparser)` ([Adding CLI Commands](#adding-cli-commands)) |
-| Python dependencies | `pyproject.toml` `[project] dependencies` (or `python_dependencies` in `plugin.yaml`); installed under Hermes' own pins at install time and re-applied across `hermes update` |
+| `qubit memory setup` wizard | `get_config_schema()` declares the fields the wizard prompts for, `save_config(config, hermes_home)` persists them, `post_setup(hermes_home, config)` runs afterwards for anything interactive (OAuth, first sync); `get_status_config()` feeds `qubit memory status` |
+| `qubit <provider> …` subcommands | `cli.py` with `register_cli(subparser)` ([Adding CLI Commands](#adding-cli-commands)) |
+| Python dependencies | `pyproject.toml` `[project] dependencies` (or `python_dependencies` in `plugin.yaml`); installed under Qubit's own pins at install time and re-applied across `qubit update` |
 
 Your provider's name, `memory.<name>` config section, data directory and tool names are the
-contract with existing users. A provider that moves out of core keeps all four; Hermes then
+contract with existing users. A provider that moves out of core keeps all four; Qubit then
 installs the catalog plugin automatically for anyone whose `memory.provider` still names it
-(on `hermes update`, and once at agent start when `security.allow_lazy_installs` is on).
+(on `qubit update`, and once at agent start when `security.allow_lazy_installs` is on).
 
 ## Config Schema
 
-`get_config_schema()` returns a list of field descriptors used by `hermes memory setup`:
+`get_config_schema()` returns a list of field descriptors used by `qubit memory setup`:
 
 ```python
 def get_config_schema(self):
@@ -319,7 +319,7 @@ def get_config_schema(self):
 Fields with `secret: True` and `env_var` go to `.env`. Non-secret fields are passed to `save_config()`.
 
 :::tip Minimal vs Full Schema
-Every field in `get_config_schema()` is prompted during `hermes memory setup`. Providers with many options should keep the schema minimal — only include fields the user **must** configure (API key, required credentials). Document optional settings in a config file reference (e.g. `$HERMES_HOME/myprovider.json`) rather than prompting for them all during setup. This keeps the setup wizard fast while still supporting advanced configuration. See the Supermemory provider for an example — it only prompts for the API key; all other options live in `supermemory.json`.
+Every field in `get_config_schema()` is prompted during `qubit memory setup`. Providers with many options should keep the schema minimal — only include fields the user **must** configure (API key, required credentials). Document optional settings in a config file reference (e.g. `$HERMES_HOME/myprovider.json`) rather than prompting for them all during setup. This keeps the setup wizard fast while still supporting advanced configuration. See the Supermemory provider for an example — it only prompts for the API key; all other options live in `supermemory.json`.
 :::
 
 ## Save Config
@@ -399,7 +399,7 @@ The same applies to prefetch and writer threads. Small JSON config sidecars (`$H
 `messages` is optional OpenAI-style conversation context as of the completed
 turn. When present, it includes user/assistant messages, assistant tool calls,
 and tool result messages. Providers that do not need raw turn context can omit
-the `messages` parameter; Hermes will continue calling them with the legacy
+the `messages` parameter; Qubit will continue calling them with the legacy
 signature.
 
 Cloud providers should document what parts of `messages` are sent off-device.
@@ -408,7 +408,7 @@ workspace data.
 
 ## Profile Isolation
 
-All storage paths **must** use the `hermes_home` kwarg from `initialize()`, not hardcoded `~/.hermes`:
+All storage paths **must** use the `hermes_home` kwarg from `initialize()`, not hardcoded `~/.qubit`:
 
 ```python
 # CORRECT — profile-scoped
@@ -416,7 +416,7 @@ from hermes_constants import get_hermes_home
 data_dir = get_hermes_home() / "my-provider"
 
 # WRONG — shared across all profiles
-data_dir = Path("~/.hermes/my-provider").expanduser()
+data_dir = Path("~/.qubit/my-provider").expanduser()
 ```
 
 ## Testing
@@ -441,16 +441,16 @@ mgr.shutdown_all()
 
 ## Adding CLI Commands
 
-Memory provider plugins can register their own CLI subcommand tree (e.g. `hermes my-provider status`, `hermes my-provider config`). This uses a convention-based discovery system — no changes to core files needed.
+Memory provider plugins can register their own CLI subcommand tree (e.g. `qubit my-provider status`, `qubit my-provider config`). This uses a convention-based discovery system — no changes to core files needed.
 
 ### How it works
 
 1. Add a `cli.py` file to your plugin directory
 2. Define a `register_cli(subparser)` function that builds the argparse tree
 3. The memory plugin system discovers it at startup via `discover_plugin_cli_commands()`
-4. Your commands appear under `hermes <provider-name> <subcommand>`
+4. Your commands appear under `qubit <provider-name> <subcommand>`
 
-**Active-provider gating:** Your CLI commands only appear when your provider is the active `memory.provider` in config. If a user hasn't configured your provider, your commands won't show in `hermes --help`.
+**Active-provider gating:** Your CLI commands only appear when your provider is the active `memory.provider` in config. If a user hasn't configured your provider, your commands won't show in `qubit --help`.
 
 ### Example
 
@@ -465,10 +465,10 @@ def my_command(args):
     elif sub == "config":
         print("Showing config...")
     else:
-        print("Usage: hermes my-provider <status|config>")
+        print("Usage: qubit my-provider <status|config>")
 
 def register_cli(subparser) -> None:
-    """Build the hermes my-provider argparse tree.
+    """Build the qubit my-provider argparse tree.
 
     Called by discover_plugin_cli_commands() at argparse setup time.
     """
@@ -498,10 +498,10 @@ Only **one** external memory provider can be active at a time. If a user tries t
 
 ## `HERMES_HOME` survival contract (what wrappers can rely on)
 
-For wrapper-style providers that keep their runtime in a sidecar venv outside Hermes-managed Python (no dependency surface — no `pyproject.toml`, `pip_dependencies`, or `python_dependencies` — at the scanned plugin root; a `pyproject.toml` belonging solely to an external or nested sidecar is not scanned):
+For wrapper-style providers that keep their runtime in a sidecar venv outside Qubit-managed Python (no dependency surface — no `pyproject.toml`, `pip_dependencies`, or `python_dependencies` — at the scanned plugin root; a `pyproject.toml` belonging solely to an external or nested sidecar is not scanned):
 
 - **Location.** `$HERMES_HOME/plugins/<name>/` is the profile-scoped plugin location, and `HERMES_HOME` follows the active context override, then `$HERMES_HOME`, then the platform default. Propagate `HERMES_HOME` when launching the wrapper or sidecar so profile isolation holds; `MemoryManager.initialize_all` injects the active `hermes_home` into every provider.
-- **Survival.** Ordinary Hermes updates — including managed-venv rebuild/replacement by pm — do not delete or rewrite `$HERMES_HOME/plugins/**`. An installed wrapper directory and its marker file (e.g. `mnemosyne-wrapper.json`) survive. Explicit plugin updates and deletion flows (`hermes uninstall`, `hermes plugins remove`, profile deletion, user deletion) are excluded from this guarantee.
+- **Survival.** Ordinary Qubit updates — including managed-venv rebuild/replacement by pm — do not delete or rewrite `$HERMES_HOME/plugins/**`. An installed wrapper directory and its marker file (e.g. `mnemosyne-wrapper.json`) survive. Explicit plugin updates and deletion flows (`qubit uninstall`, `qubit plugins remove`, profile deletion, user deletion) are excluded from this guarantee.
 - **Sidecar isolation.** A plugin root with no dependency surface never joins the pm workspace dependency union; a resync or venv rebuild neither provisions deps for it nor touches its tree.
 - **Conflicts.** For native shared-venv plugins, an unsatisfiable dependency union fails loudly: the candidate plugin stays unenabled and unimported (the admission authority refuses before publishing config, reporting the plugin identity plus the resolver's reason, with a re-enable/retry path and a machine-readable pm receipt). Dependency resolution does not automatically disable other plugins or run a bisect. Explicit plugin updates, removal, and independent security gates are separate operations.
 

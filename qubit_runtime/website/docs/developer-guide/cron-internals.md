@@ -1,7 +1,7 @@
 ---
 sidebar_position: 11
 title: "Cron Internals"
-description: "How Hermes stores, schedules, edits, pauses, skill-loads, and delivers cron jobs"
+description: "How Qubit stores, schedules, edits, pauses, skill-loads, and delivers cron jobs"
 ---
 
 # Cron Internals
@@ -16,7 +16,7 @@ The cron subsystem provides scheduled task execution — from simple one-shot de
 | `cron/scheduler.py` | Scheduler loop — due-job detection, execution, repeat tracking |
 | `tools/cronjob_tools.py` | Model-facing `cronjob_manage` tool registration and handler |
 | `gateway/run.py` | Gateway integration — cron ticking in the long-running loop |
-| `hermes_cli/cron.py` | CLI `hermes cron` subcommands |
+| `hermes_cli/cron.py` | CLI `qubit cron` subcommands |
 
 ## Scheduling Model
 
@@ -33,7 +33,7 @@ The model-facing surface is a single `cronjob_manage` tool with action-style ope
 
 ## Job Storage
 
-Jobs are stored in `~/.hermes/cron/jobs.json` with atomic write semantics (write to temp file, then rename). Each job record contains:
+Jobs are stored in `~/.qubit/cron/jobs.json` with atomic write semantics (write to temp file, then rename). Each job record contains:
 
 ```json
 {
@@ -66,7 +66,7 @@ Jobs are stored in `~/.hermes/cron/jobs.json` with atomic write semantics (write
 ### `last_status` literals
 
 `last_status` is a closed set written only by `cron.jobs.mark_job_run`. Every
-renderer (`hermes cron list`/`doctor`, the `cronjob_manage` tool, the web dashboard
+renderer (`qubit cron list`/`doctor`, the `cronjob_manage` tool, the web dashboard
 badge, the Desktop routine inspector) maps each literal explicitly — a consumer
 must never test `== "ok"` for "the user got their result":
 
@@ -163,7 +163,7 @@ dropped silently. The mechanics, in the order the due scan applies them
    resume applies rules 3–5 to it — one late/catch-up run, or a logged skip.
    One-shots and future instants recompute from now on resume.
 
-The same store fields drive every topology: a standalone `hermes -p X gateway
+The same store fields drive every topology: a standalone `qubit -p X gateway
 run` and a profile served by the host gateway (`_start_multiplex` ticks each
 home under `_profile_cron_scope`) evaluate the identical record. One gateway
 process per host ticks *every* profile's store — `gateway.multiplex_profiles`
@@ -215,10 +215,10 @@ A ticker whose checkout was updated under it (boot revision ≠ disk revision) y
 only to a gateway that can actually take it over: the runtime-lock holder must be a live gateway
 whose `gateway_state.json` heartbeat is fresh and whose stamped `code_sha` is the on-disk revision.
 A lock held by a process that is itself still running the pre-update code — the common case right
-after `hermes update` with a single gateway — never counts as a fresh gateway, so the ticker keeps
+after `qubit update` with a single gateway — never counts as a fresh gateway, so the ticker keeps
 dispatching instead of yielding every tick to nobody.
 
-In CLI mode, cron jobs only fire when `hermes cron` commands are run or during active CLI sessions.
+In CLI mode, cron jobs only fire when `qubit cron` commands are run or during active CLI sessions.
 
 ### Managed cron (Chronos) for scale-to-zero
 
@@ -293,7 +293,7 @@ Create a daily funding report → attach "ai-funding-daily-report" skill
 Jobs can also attach a Python script via the `script` field. The script runs *before* each agent turn, and its stdout is injected into the prompt as context. This enables data collection and change detection patterns:
 
 ```python
-# ~/.hermes/scripts/check_competitors.py
+# ~/.qubit/scripts/check_competitors.py
 import requests, json
 # Fetch competitor release notes, diff against last run
 # Print summary to stdout — agent analyzes and reports
@@ -338,7 +338,7 @@ Most platforms also accept an optional thread/topic as a third segment: `platfor
 | Target | Syntax | Example |
 |--------|--------|---------|
 | Origin chat | `origin` | Deliver to the chat where the job was created |
-| Local file | `local` | Save to `~/.hermes/cron/output/` |
+| Local file | `local` | Save to `~/.qubit/cron/output/` |
 | Telegram | `telegram`, `telegram:<chat_id>`, `telegram:<chat_id>:<thread_id>`, `telegram:@username` | `telegram:-1001234567890:17585` |
 | Discord | `discord`, `discord:#channel`, `discord:<channel_id>`, `discord:<channel_id>:<thread_id>` | `discord:#engineering` |
 | Slack | `slack`, `slack:#channel`, `slack:<channel_id>`, `slack:<channel_id>:<thread_ts>` | `slack:#engineering` |
@@ -363,7 +363,7 @@ Platforms in the first group have explicit, validated target syntax — named ch
 
 For **Telegram topics**, use `telegram:<chat_id>:<thread_id>` (e.g., `telegram:-1001234567890:17585`). For **Slack threads**, the third segment is the parent message's `thread_ts` (e.g., `slack:C0123ABCD45:1700000000.000100`), so it only applies when replying under an existing message.
 
-**Bot Chat** (`bot-chat`, `bot-chat:<profile>`) is a machine-local pseudo-platform, not a gateway adapter. A mailbox-capable canonical live owner receives durable admission immediately (idle or busy); only that owner executes the incoming turn. `scheduler_delivery._deliver_to_bot_chat` resolves the target with `get_profile_dir` or the job's current `get_hermes_home`, derives the receipt ID from the source home, job ID, durable `execution_id`, and target home, and checks the receipt before discovering an owner. An existing receipt never permits CLI fallback. Without a mailbox owner it retains `hermes [-p <profile>] chat --in ~ -c "Bot Chat" --create-if-missing -Q --query-file <tmp>` and normal ownership fencing. Both lanes deliver a real inbound turn, not a transcript mirror. Queued/claimed receipts populate `last_delivery_queued` with receipt IDs. The delivery aggregator excludes admission notices from genuine errors and records execution `delivery_outcome=queued`; successful jobs use `last_status=delivery_queued`. Genuine errors on mixed targets take precedence as failed while retaining queued receipt metadata. The target profile’s durable receipt is authoritative for terminal completion. Queued is the historical admission outcome, not proof of delivery. Historical cron status does not automatically track later receipt completion. Bot-chat targets are excluded from `all` and credential preflight. Bot-chat-only external workers bypass the gateway delivery queue; mixed external-worker targets retain gateway handoff. `cron.bot_chat_delivery_timeout_seconds` (default 600) bounds only the legacy subprocess lane.
+**Bot Chat** (`bot-chat`, `bot-chat:<profile>`) is a machine-local pseudo-platform, not a gateway adapter. A mailbox-capable canonical live owner receives durable admission immediately (idle or busy); only that owner executes the incoming turn. `scheduler_delivery._deliver_to_bot_chat` resolves the target with `get_profile_dir` or the job's current `get_hermes_home`, derives the receipt ID from the source home, job ID, durable `execution_id`, and target home, and checks the receipt before discovering an owner. An existing receipt never permits CLI fallback. Without a mailbox owner it retains `qubit [-p <profile>] chat --in ~ -c "Bot Chat" --create-if-missing -Q --query-file <tmp>` and normal ownership fencing. Both lanes deliver a real inbound turn, not a transcript mirror. Queued/claimed receipts populate `last_delivery_queued` with receipt IDs. The delivery aggregator excludes admission notices from genuine errors and records execution `delivery_outcome=queued`; successful jobs use `last_status=delivery_queued`. Genuine errors on mixed targets take precedence as failed while retaining queued receipt metadata. The target profile’s durable receipt is authoritative for terminal completion. Queued is the historical admission outcome, not proof of delivery. Historical cron status does not automatically track later receipt completion. Bot-chat targets are excluded from `all` and credential preflight. Bot-chat-only external workers bypass the gateway delivery queue; mixed external-worker targets retain gateway handoff. `cron.bot_chat_delivery_timeout_seconds` (default 600) bounds only the legacy subprocess lane.
 
 ### Response Wrapping
 
@@ -386,24 +386,24 @@ Cron-run sessions have the `cronjob` toolset disabled. This prevents:
 
 ## Locking
 
-The scheduler uses cross-process file-based locking (`fcntl.flock` on Unix, `msvcrt.locking` on Windows) to prevent overlapping ticks from executing the same due-job batch twice — even between the gateway's in-process ticker and a standalone `hermes cron` / manual `tick()` call. If the lock cannot be acquired, `tick()` returns 0 immediately.
+The scheduler uses cross-process file-based locking (`fcntl.flock` on Unix, `msvcrt.locking` on Windows) to prevent overlapping ticks from executing the same due-job batch twice — even between the gateway's in-process ticker and a standalone `qubit cron` / manual `tick()` call. If the lock cannot be acquired, `tick()` returns 0 immediately.
 
 ### Stale-code yield
 
-Before the tick lock, a gateway whose checkout was updated under it (boot revision ≠ disk revision) yields the tick when another process holds the gateway runtime lock — a fresher gateway's ticker dispatches instead, and the stale one must not race it with mixed `sys.modules`. The yield is raised (`CronTickYielded`) and persisted as the ticker's last error, so `hermes cron status` reports **"Gateway is running STALE code — its cron ticker yields every tick and fires NOTHING"** with both revisions and the restart command, even though the liveness heartbeat keeps refreshing. `hermes update` closes the loop: a gateway the post-update fleet version matrix proves stale is handed to the drain-first `request_restart` path (SIGUSR1) instead of being left running; a supervised gateway respawns on the new code, a bare `gateway run` is stopped and listed under "Restart manually".
+Before the tick lock, a gateway whose checkout was updated under it (boot revision ≠ disk revision) yields the tick when another process holds the gateway runtime lock — a fresher gateway's ticker dispatches instead, and the stale one must not race it with mixed `sys.modules`. The yield is raised (`CronTickYielded`) and persisted as the ticker's last error, so `qubit cron status` reports **"Gateway is running STALE code — its cron ticker yields every tick and fires NOTHING"** with both revisions and the restart command, even though the liveness heartbeat keeps refreshing. `qubit update` closes the loop: a gateway the post-update fleet version matrix proves stale is handed to the drain-first `request_restart` path (SIGUSR1) instead of being left running; a supervised gateway respawns on the new code, a bare `gateway run` is stopped and listed under "Restart manually".
 
 ## CLI Interface
 
-The `hermes cron` CLI provides direct job management:
+The `qubit cron` CLI provides direct job management:
 
 ```bash
-hermes cron list                    # Show all jobs
-hermes cron create                  # Interactive job creation (alias: add)
-hermes cron edit <job_id>           # Edit job configuration
-hermes cron pause <job_id>          # Pause a running job
-hermes cron resume <job_id>         # Resume a paused job
-hermes cron run <job_id>            # Trigger immediate execution
-hermes cron remove <job_id>         # Delete a job
+qubit cron list                    # Show all jobs
+qubit cron create                  # Interactive job creation (alias: add)
+qubit cron edit <job_id>           # Edit job configuration
+qubit cron pause <job_id>          # Pause a running job
+qubit cron resume <job_id>         # Resume a paused job
+qubit cron run <job_id>            # Trigger immediate execution
+qubit cron remove <job_id>         # Delete a job
 ```
 
 ## Related Docs
