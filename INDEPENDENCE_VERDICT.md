@@ -1,13 +1,18 @@
-# INDEPENDENCE VERDICT — can `~/.hermes` be retired?
+# Qubit Independence Verdict — can the legacy `~/.hermes` tree be retired?
+
+> **Historical evidence — captured output retains pre-rebrand names.** The framing of this report
+> is Qubit's; every raw log line, code path, command, unit name and path below is preserved exactly
+> as captured on 2026-10-07. Pre-rebrand names appear only as literal evidence of the legacy tree
+> being retired.
 
     worktree   /tmp/qb-e5   branch e5
     base       7e4d180b     (clean, 0 dirty — proven at task start)
     date       2026-10-07
     scope      measurement + audit ONLY. No product code edited. No service restarted/stopped.
 
-**VERDICT: YES — hermes can be deleted today, with two caveats that are not blockers for the
-running services.** The core runtime, the four live services' startup paths, the cron scheduler,
-the scheduled autobackup, and the update subsystem all resolve their home through
+**VERDICT: YES — the legacy `~/.hermes` tree can be retired today, with two caveats that are not
+blockers for the running services.** The core runtime, the four live services' startup paths, the
+cron scheduler, the scheduled autobackup, and the update subsystem all resolve their home through
 `get_qubit_home()` / `get_default_qubit_root()` → `~/.qubit` (or an explicitly pinned
 `QUBIT_HOME`). No live path **adopts** `~/.hermes`. The `~/.hermes` references that remain are
 either a fail-closed *sentinel* (compared against, never used), stale docstrings/comments, or
@@ -80,16 +85,16 @@ fork adopting the operator's `~/.hermes`".
 
 ## 2. THE SERVICES — STATIC AUDIT (nothing restarted/stopped)
 
-Units live at `~/.config/systemd/user/`. The four Qubit units + one stray hermes unit:
+Units live at `~/.config/systemd/user/`. The four Qubit units + one stray legacy hermes unit:
 
-| Unit | ExecStart | QUBIT_HOME in unit? | hermes path at startup? |
+| Unit | ExecStart | QUBIT_HOME in unit? | legacy `hermes` path at startup? |
 |------|-----------|---------------------|--------------------------|
 | `qubit-gateway.service` | `python -m voicebridge.gateway_daemon` | **YES** `=%h/.local/state/qubit-voicebridge/runtime` | none (preflight rejects the sentinel) |
 | `qubit-voice-typing.service` | `python -m voicebridge.desktop_helper` | **YES** same | none |
 | `qubit-voicebridge.service` | `python -m voicebridge run` | **no** | resolves via `use_qubit_home`/`runtime_home_for_cfg`; **no** `~/.hermes` (see below) |
 | `qubit-voice-orb.service` | `python -m voicebridge.orb` | **no** | X11 Tk overlay; no home work at startup |
-| `qubit-autobackup.{service,timer}` (every 15 min) | `~/.local/bin/qubit-autobackup.sh` | n/a (script) | **zero** hermes refs in the script |
-| `hermes-dashboard.service` | `~/.local/bin/hermes dashboard ...` | n/a | **THIS is a hermes unit** — still `WantedBy=default.target` (see §5) |
+| `qubit-autobackup.{service,timer}` (every 15 min) | `~/.local/bin/qubit-autobackup.sh` | n/a (script) | **zero** legacy hermes refs in the script |
+| `hermes-dashboard.service` | `~/.local/bin/hermes dashboard ...` | n/a | **THIS is a legacy hermes unit** — still `WantedBy=default.target` (see §5) |
 
 Live process env (read from `/proc`, no restart):
 
@@ -97,7 +102,7 @@ Live process env (read from `/proc`, no restart):
     pid 1318041 voicebridge.desktop_helper  QUBIT_HOME=/home/trick/.local/state/qubit-voicebridge/runtime
     pid 1318276 voicebridge run             (no QUBIT_HOME in env — resolves internally to the same Qubit home)
 
-### Code path the services execute at startup — hermes references
+### Code path the services execute at startup — legacy hermes references
 
   * `voicebridge/gateway_daemon.py` — pins a Qubit-owned home via `pin_qubit_home()` and REFUSES to
     launch if the home resolves to the external reference home (lines 61-68). Its module docstring
@@ -114,7 +119,7 @@ Live process env (read from `/proc`, no restart):
 **Conclusion:** no live service reads or writes `~/.hermes` at startup when `QUBIT_HOME` is set
 (which systemd guarantees for gateway + typing, and the run/daemon entry points guarantee for the
 others). The only unit that actually *needs* `~/.hermes` is `hermes-dashboard.service` — and that
-one is hermes itself, not Qubit.
+one is the upstream product itself, not Qubit.
 
 ---
 
@@ -243,8 +248,8 @@ Two unattended schedulers exist:
      explicit `home` or call `get_qubit_home()`.
    - `lifecycle_guard.py`'s `~/.hermes` mentions are docstrings naming launchd/systemd units.
    - `web_server_cron.py:102` `~/.hermes` is a docstring for the profile-default rule.
-   **FINDING: the cron scheduler cannot reach `~/.hermes`.** The only hermes-ish identifiers are
-   the `hermes-gateway`/`ai.hermes.gateway` unit NAMES (identity strings for restart guards), which
+   **FINDING: the cron scheduler cannot reach `~/.hermes`.** The only legacy hermes-ish
+   identifiers are the `hermes-gateway`/`ai.hermes.gateway` unit NAMES (identity strings for restart guards), which
    do not read a home.
 
 2. **`qubit-autobackup.timer`** (every 15 min, `oneshot`).
@@ -272,13 +277,13 @@ which is a correctness nit, not a data-loss risk.
 
 ---
 
-## 6. STRAY HERMES UNIT FOUND
+## 6. STRAY LEGACY UNIT FOUND (`hermes-dashboard.service`)
 
 `hermes-dashboard.service` is **still enabled** (`default.target.wants/hermes-dashboard.service`)
 and runs `~/.local/bin/hermes dashboard --port 9119` with `EnvironmentFile=/home/trick/.hermes/.env`.
 It is *not* one of the four Qubit units and is not in the task's list, but it WILL fail (and
-restart-storm, `Restart=always`) the moment `~/.hermes` is moved aside. Retiring hermes must
-disable it. Flagged here; not touched.
+restart-storm, `Restart=always`) the moment `~/.hermes` is moved aside. Retiring the legacy tree
+must disable it. Flagged here; not touched.
 
 ---
 
@@ -301,7 +306,7 @@ Ordering per HANDOFF §7: port → delete → rebrand. This deletes only; rebran
     systemctl --user status qubit-gateway.service qubit-voicebridge.service \
                          qubit-voice-orb.service qubit-voice-typing.service --no-pager | tail -40
 
-### Step 1 — retire the stray hermes unit FIRST (it needs ~/.hermes)
+### Step 1 — retire the stray legacy hermes unit FIRST (it needs ~/.hermes)
 
     systemctl --user disable --now hermes-dashboard.service
     # keep the file (move, don't delete) so the choice is reversible:
