@@ -15,6 +15,8 @@
 
 **Known limits:** no full matrix/`VERIFIED`; no website build; `roles.model_tiers` still empty on this host; D21 count differs from the inventory (documented).
 
+**2026-10-27 hotfix:** a live rewrite returned `OK.` from the tiny local model; `transform.py` now rejects degenerate/truncated output, retries the API tier in `auto`, and types `VOICE_EDIT_DEGENERATE_OUTPUT` otherwise. Bridge restarted; `/chat` 200. Re-test "rewrite this clearly" live.
+
 ## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
 
 - ✅ D8 dual-publish, D12 qubit unit candidates, D21 audit, D16 website rebrand (469 files), D17/D18 prose-only, D19 evidence framing.
