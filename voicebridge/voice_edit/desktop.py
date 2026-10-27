@@ -341,7 +341,13 @@ class DesktopAdapter:
             return False
         rc, _, _ = self._run(["xdotool", "windowactivate", "--sync",
                               window_id], timeout=_RUN_TIMEOUT, env=self._env)
-        return rc == 0
+        # ``windowactivate`` sets the WM-active window; ``windowfocus`` sets
+        # the X input focus (the GTK text widget) so a synthesized Ctrl+Z is
+        # not delivered to the withdrawn panel/toolbar.
+        focus_rc, _, _ = self._run(["xdotool", "windowfocus", "--sync",
+                                    window_id], timeout=_RUN_TIMEOUT,
+                                   env=self._env)
+        return rc == 0 or focus_rc == 0
 
     # -- key synthesis ----------------------------------------------------
     def _key(self, chord: str, *, clear_modifiers: bool = False) -> bool:
@@ -626,6 +632,9 @@ class DesktopAdapter:
                 ok=False, code="VOICE_EDIT_FOCUS_LOST",
                 detail="the original application is no longer focused; revert "
                        "was not attempted", app_class=snapshot.app_class)
+        # Undo is only meaningful once the text widget owns the keyboard
+        # focus; a topmost panel may still be unwinding. Bounded settle.
+        time.sleep(0.08)
         ok = self._key("Control_L+z")
         return InsertionResult(
             ok=ok, code="" if ok else "VOICE_EDIT_UNDO_FAILED",

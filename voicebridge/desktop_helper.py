@@ -3809,6 +3809,9 @@ class DesktopHelper:
                 pass
             if self.snapshot is not None and self.snapshot.window_id:
                 self.desktop.activate_window(self.snapshot.window_id)
+                # Let the WM/GTK settle input focus back on the target text
+                # widget before the service re-reads/keys it.
+                time.sleep(0.12)
             try:
                 out = self.client.apply(rid, confirm=True)
             except HelperError as exc:
@@ -3831,6 +3834,9 @@ class DesktopHelper:
                 pass
             if self.snapshot is not None and self.snapshot.window_id:
                 self.desktop.activate_window(self.snapshot.window_id)
+                # The panel was topmost; give the target's text widget time to
+                # regain keyboard focus before Ctrl+Z is synthesized.
+                time.sleep(0.15)
             try:
                 out = self.client.revert(rid)
             except HelperError as exc:

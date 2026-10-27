@@ -121,7 +121,7 @@ def enabled_cfg(**over):
     ("Make this funnier.", "make_funny"),
     ("Make this shorter.", "shorten"),
     ("Fix the grammar.", "correct_grammar"),
-    ("Make this clearer.", "clarify"),
+    ("Make this clearer.", "rewrite"),
     ("Turn this into bullet points.", "bullet_points"),
     ("Expand this with more detail.", "expand"),
     ("Summarize this.", "summarize"),
@@ -1264,7 +1264,7 @@ def test_clarify_narration_shares_guard():
         "I'm processing your request and will respond shortly.") is True
     assert is_narration_only("Do the thing clearly.") is False
     cfg = enabled_cfg()
-    cmd = parser.parse("make it clearer", selected_text="do the thing")
+    cmd = parser.parse("clarify this", selected_text="do the thing")
     assert cmd.action == "clarify"
     res = TransformEngine(runner=lambda *a, **k: FakeResult(
         text="Sure, here is the clearer version: Do the thing clearly.")).transform(
@@ -1316,7 +1316,7 @@ def test_clarify_here_is_only_shares_guard():
     from voicebridge.voice_edit.transform import is_narration_only
     assert is_narration_only("Here is the clearer version.") is True
     cfg = enabled_cfg()
-    cmd = parser.parse("make it clearer", selected_text="do the thing")
+    cmd = parser.parse("clarify this", selected_text="do the thing")
     assert cmd.action == "clarify"
     res = TransformEngine(runner=lambda *a, **k: FakeResult(
         text="Sure, here is the clearer version: Do the thing clearly.")).transform(

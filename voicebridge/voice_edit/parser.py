@@ -31,9 +31,8 @@ _ACTION_RULES = [
     ("improve_prompt", ("improve the prompt", "improve this prompt",
                         "rewrite this prompt", "make this a better prompt")),
     ("clarify", ("so an llm understands it", "so a language model understands",
-                 "clear for llm", "for an llm", "make this clearer",
-                 "make it clearer", "clarify this", "clarify", "make clear",
-                 "more clear", "clearer")),
+                 "clear for llm", "for an llm", "clarify this", "clarify",
+                 "make clear")),
     ("professionalize", ("professionally", "professional", "more formal",
                          "business tone", "make it professional")),
     ("humanize", ("sound more human", "sound human", "more human",
@@ -72,7 +71,8 @@ _ACTION_RULES = [
                     "convert it", "convert to")),
     ("rewrite", ("redo this text for me", "redo this text", "redo this",
                  "redo it", "rewrite this", "rewrite it", "rewrite", "reword",
-                 "rephrase", "paraphrase")),
+                 "rephrase", "paraphrase", "make this clearer",
+                 "make it clearer", "more clear", "clearer")),
 ]
 
 # Loose redo trigger (Lane 3, 2026-10-03): ASR mishears the middle noun

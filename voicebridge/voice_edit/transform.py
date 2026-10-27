@@ -434,8 +434,10 @@ def _degenerate_output(text: str, out: str, action: str) -> bool:
         return True
     action = str(action or "").lower()
     if action in ("summarize", "shorten", "bullet_points"):
-        return len(answer) < 5
-    floor = max(8, int(len(source) * 0.2))
+        # A short answer is the point of these actions; only reject junk or
+        # an effectively empty result.
+        return len(answer) < 2
+    floor = max(4, int(len(source) * 0.2))
     if len(answer) < floor:
         return True
     # A truncated prefix ("The quick brown fox" for a 120-char sentence) is
