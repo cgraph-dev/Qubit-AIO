@@ -780,3 +780,30 @@ vendored, imported, or required at runtime.**
   connection. The upstream DSPy-style optimization loop
   (`src/openjarvis/learning/optimize/`) is **not ported and not run** in this
   slice — `qubit evals run` states optimization as unavailable.
+
+## OpenJarvis prompt-variant optimizer idea — Apache-2.0
+
+The offline prompt-variant selector (`qubit_runtime/evals/optimize/`, exposed as
+`qubit optimize variants`) adapts the *idea and CLI vocabulary* of scoring
+candidate prompt variants against labeled examples from
+[open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis) at commit
+`05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0; the upstream
+`LICENSE` carries the full text and copyright). **No OpenJarvis source is
+vendored, imported, or required at runtime, and DSPy is not a dependency.**
+
+- Reference sources: `src/openjarvis/cli/optimize_cmd.py` (command vocabulary
+  only) and `src/openjarvis/learning/optimize/` (the concept of comparing
+  candidate prompt variants on scored examples).
+- Local adaptation: `qubit_runtime/evals/optimize/` plus
+  `qubit_runtime/tests/evals/test_variant_optimizer.py`. Qubit's variant
+  validation and bounds, dataset/trace adapters, optional label sidecar for
+  trace ids, deterministic prompt-to-variant matching, exact/contains/callable
+  scorers, Wilson confidence intervals, refusal codes, and JSON/text reports
+  are original.
+- Deliberate divergences: this is **offline selection, not an optimization
+  run**. It never generates or rewrites a prompt, never calls a model, never
+  opens a network connection, and never invents a winner: it refuses when no
+  labels exist or fewer than two variants have the minimum labeled samples. The
+  upstream DSPy-style loop (prompt proposal, model calls, iterative search) is
+  **not ported and not run**; `qubit evals run` continues to report
+  optimization as unavailable.

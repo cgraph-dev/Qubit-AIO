@@ -15,6 +15,8 @@ from typing import Any, Iterable, Mapping
 _RESPONSE_KEYS = ("response", "response_excerpt", "answer", "output", "model_answer")
 _REFERENCE_KEYS = ("reference", "expected", "label", "reference_text")
 _ID_KEYS = ("id", "record_id", "trace_id")
+_PROMPT_KEYS = ("prompt", "prompt_excerpt", "query")
+_VARIANT_KEYS = ("variant", "variant_name", "prompt_variant")
 
 
 class EvalInputError(ValueError):
@@ -42,6 +44,8 @@ class EvalSample:
     energy_joules: float | None = None
     flops: float | None = None
     error: str | None = None
+    prompt: str = ""
+    variant: str | None = None
 
     @property
     def is_labeled(self) -> bool:
@@ -60,6 +64,8 @@ class EvalSample:
             "energy_joules": self.energy_joules,
             "flops": self.flops,
             "error": self.error,
+            "prompt": self.prompt,
+            "variant": self.variant,
         }
 
 
@@ -108,6 +114,12 @@ def sample_from_mapping(obj: Mapping[str, Any], *, fallback_id: str) -> EvalSamp
     found_response, raw_response = _pick(obj, _RESPONSE_KEYS)
     response = _text(raw_response, "response") if found_response else ""
 
+    found_prompt, raw_prompt = _pick(obj, _PROMPT_KEYS)
+    prompt = _text(raw_prompt, "prompt") if found_prompt else ""
+
+    found_variant, raw_variant = _pick(obj, _VARIANT_KEYS)
+    variant = _text(raw_variant, "variant").strip() or None if found_variant else None
+
     found_reference, raw_reference = _pick(obj, _REFERENCE_KEYS)
     reference = _text(raw_reference, "reference") if found_reference and raw_reference is not None else None
 
@@ -155,6 +167,8 @@ def sample_from_mapping(obj: Mapping[str, Any], *, fallback_id: str) -> EvalSamp
         energy_joules=energy,
         flops=flops,
         error=error,
+        prompt=prompt,
+        variant=variant,
     )
 
 
@@ -202,6 +216,7 @@ def samples_from_traces(rows: Iterable[Any]) -> list[EvalSample]:
             energy_joules=getattr(row, "energy_joules", None),
             flops=getattr(row, "flops", None),
             error=getattr(row, "error_code", None),
+            prompt=str(getattr(row, "prompt_excerpt", "") or ""),
         ))
     return samples
 

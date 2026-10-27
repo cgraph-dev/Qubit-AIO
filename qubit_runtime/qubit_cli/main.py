@@ -379,6 +379,8 @@ from qubit_cli.subcommands.traces import build_traces_parser
 from qubit_cli.traces_cmd import cmd_traces
 from qubit_cli.subcommands.evals import build_evals_parser
 from qubit_cli.evals_cmd import cmd_evals
+from qubit_cli.subcommands.optimize import build_optimize_parser
+from qubit_cli.optimize_cmd import cmd_optimize
 from qubit_cli.subcommands.verify import build_verify_parser
 from qubit_cli.subcommands.security import build_security_parser
 from qubit_cli.subcommands.approvals import build_approvals_parser
@@ -2907,6 +2909,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "computer-use",
         "config", "console", "cron", "curator", "dashboard", "serve", "debug", "doctor",
         "dump", "egress", "evals", "fallback", "gateway", "hooks", "import", "import-agent", "insights",
+        "optimize",
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
         "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "portal", "profile",
@@ -3577,6 +3580,7 @@ def _build_cli_parser():
     build_recipe_parser(subparsers, cmd_recipe=cmd_recipe)
     build_traces_parser(subparsers, cmd_traces=cmd_traces)
     build_evals_parser(subparsers, cmd_evals=cmd_evals)
+    build_optimize_parser(subparsers, cmd_optimize=cmd_optimize)
     build_verify_parser(subparsers, cmd_verify=cmd_verify)
     build_security_parser(subparsers, cmd_security=cmd_security)
     build_approvals_parser(subparsers, cmd_approvals=cmd_approvals)
