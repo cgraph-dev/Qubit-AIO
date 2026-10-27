@@ -47,6 +47,9 @@ function Probe() {
       <button type="button" onClick={() => send('apply')}>
         apply
       </button>
+      <button type="button" onClick={() => send('edit')}>
+        open editor
+      </button>
       <button type="button" onClick={() => send('edit_submit', { text: 'x' })}>
         edit
       </button>
@@ -109,9 +112,11 @@ describe('useVoiceSocket (live contract)', () => {
     act(() => socket.open());
 
     fireEvent.click(screen.getByText('apply'));
+    fireEvent.click(screen.getByText('open editor'));
     fireEvent.click(screen.getByText('edit'));
     expect(socket.sent).toEqual([
       JSON.stringify({ action: 'apply' }),
+      JSON.stringify({ action: 'edit' }),
       JSON.stringify({ action: 'edit_submit', payload: { text: 'x' } }),
     ]);
   });

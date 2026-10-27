@@ -80,6 +80,9 @@ export function VoiceEditHud({ mock }: VoiceEditHudProps) {
   const handleAction = useCallback(
     (action: ClientAction) => {
       if (action === 'edit') {
+        // Notify the helper that review has entered manual edit, then open
+        // the local overlay. The text only ships on edit_submit.
+        send('edit');
         setEditorOpen(true);
         return;
       }
