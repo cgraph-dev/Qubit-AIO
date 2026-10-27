@@ -83,6 +83,59 @@ _REDO_FOR_ME_RE = re.compile(
     r"\bredo\b.+?\bfor\s+me\b\s*[,:\-–—]*\s*(.*)$",
     re.IGNORECASE | re.DOTALL)
 
+# Deterministic case commands. Unlike the substring action rules below these
+# are anchored to the whole utterance: a selection plus ordinary dictation
+# ("I keep the lowercase letters in the password") must not be mistaken for a
+# "make it lowercase" command.
+_CASE_VERB = (r"(?:make|change|convert|turn|switch|set|put|write|type|"
+              r"render|format|transform)")
+_CASE_OBJECT = (
+    r"(?:it|this|that|these|those|everything|all\s+of\s+it|"
+    r"(?:this|that)\s+text|"
+    r"the\s+(?:selected\s+|whole\s+|entire\s+)?(?:text|selection|sentence|"
+    r"words?|letters?|thing)|all\s+(?:the\s+)?(?:text|words?|letters?))")
+_CASE_UPPER = (r"(?:uppercase|upper[\s-]?case|all[\s-]?caps|"
+               r"all\s+capital\s+letters|capital\s+letters|caps)")
+_CASE_LOWER = (r"(?:lowercase|lower[\s-]?case|all[\s-]?lowercase|"
+               r"all\s+small\s+letters|small\s+letters)")
+_CASE_TITLE = (r"(?:title[\s-]?case|titlecase|proper[\s-]?case)")
+_CASE_TAIL = r"\s*(?:please|now|for\s+me)?\s*[.!?]*\s*$"
+
+
+def _case_re(word: str) -> "re.Pattern[str]":
+    verb_led = (r"^(?:please\s+|just\s+)?" + _CASE_VERB +
+                r"\s+(?:" + _CASE_OBJECT + r"\s+)?"
+                r"(?:to|into|in)?\s*" + word + _CASE_TAIL)
+    word_led = (r"^(?:please\s+|just\s+)?" + word + r"\s*"
+                r"(?:" + _CASE_OBJECT + r"\s*)?" + _CASE_TAIL)
+    return re.compile(r"(?:" + verb_led + r")|(?:" + word_led + r")",
+                      re.IGNORECASE)
+
+
+_CASE_ACTION_RES = (
+    ("uppercase", _case_re(_CASE_UPPER)),
+    ("lowercase", _case_re(_CASE_LOWER)),
+    ("title_case", _case_re(_CASE_TITLE)),
+    # "capitalize the words" / "capitalize each word" / "capitalize it" is
+    # title case (the owner's phrasing), never a model round-trip.
+    ("title_case", re.compile(
+        r"^(?:please\s+|just\s+)?capitali[sz]e\s+"
+        r"(?:the\s+|each\s+|every\s+|all\s+(?:the\s+)?)*"
+        r"(?:words?|letters?|text|selection|sentence|title|it|this|that)"
+        r"\b" + _CASE_TAIL, re.IGNORECASE)),
+    ("title_case", re.compile(
+        r"^(?:please\s+|just\s+)?capitali[sz]e\s+the\s+first\s+letter\s+"
+        r"of\s+(?:each|every)\s+word\b" + _CASE_TAIL, re.IGNORECASE)),
+)
+
+
+def _match_case_action(low: str) -> Optional[str]:
+    for action, rx in _CASE_ACTION_RES:
+        if rx.match(low):
+            return action
+    return None
+
+
 # Style words that can appear without an explicit action ("make it persuasive").
 _STYLE_RULES = [
     ("persuasive", ("persuasive", "convincing", "compelling")),
@@ -249,10 +302,16 @@ def parse(transcript: str, *, selected_text: str = "",
         return cmd
 
     action_hit: Optional[str] = None
-    for action, phrases in _ACTION_RULES:
-        if _contains_any(low, phrases):
-            action_hit = action
-            break
+    # Case commands are checked first and whole-utterance anchored so they
+    # work without a model (and never steal ordinary sentences).
+    case_hit = _match_case_action(low)
+    if case_hit is not None:
+        action_hit = case_hit
+    else:
+        for action, phrases in _ACTION_RULES:
+            if _contains_any(low, phrases):
+                action_hit = action
+                break
 
     # Loose redo fallback: "redo <anything> for me" (any middle, including
     # ASR-misheard nouns). Content after "for me" becomes the selection when
