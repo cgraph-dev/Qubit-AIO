@@ -1,4 +1,8 @@
-# E2 — the Memory Wiki plugin tab is broken on every route
+# Qubit E2 — the Memory Wiki plugin tab is broken on every route
+
+> **Historical evidence — captured output retains pre-rebrand names.** The framing of this report
+> is Qubit's; raw page/console captures and quoted command output below are preserved verbatim
+> from the run. Pre-rebrand plugin globals appear only as literal evidence.
 
 **Severity: high** (a whole feature tab is dead), **same root cause family as E1**.
 

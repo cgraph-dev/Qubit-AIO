@@ -1,4 +1,8 @@
-# E2E journey walk — 2026-10-16
+# Qubit E2E journey walk — 2026-10-16
+
+> **Historical evidence — captured output retains pre-rebrand names.** The framing of this report
+> is Qubit's; raw DOM/console/network captures and quoted command output below are preserved
+> verbatim from the run. Pre-rebrand globals, headers and paths appear only as literal evidence.
 
 Exploratory end-to-end pass over the served Qubit dashboard
 (`http://127.0.0.1:8890`), headless Chrome 149 over raw CDP. Worktree
