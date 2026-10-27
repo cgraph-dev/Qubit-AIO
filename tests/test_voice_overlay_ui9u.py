@@ -45,7 +45,8 @@ def test_listening_and_live_transcript_render_before_preview():
         ov.root.update()
         assert "Listening" in ov._pill.cget("text")
         assert ov.live_text.get("1.0", "end").strip() == "make it"
-        assert any(ov._level_canvas.itemcget(bar, "fill") in ("#22d3ee", "#a78bfa")
+        from voicebridge.voice_edit import overlay as OV
+        assert any(ov._level_canvas.itemcget(bar, "fill") in (OV._CYAN, OV._VIOLET)
                    for bar in ov._level_bars)
 
         ov.set_live_transcript("make it clearer", final=True)
