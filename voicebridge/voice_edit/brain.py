@@ -51,6 +51,15 @@ def _runner_default(cfg: Any, *, system: str, user: str,
         local_mode="chat", reasoning="low")
 
 
+def _configured_model(cfg: Any) -> str:
+    """Truthful configured model identity for the failure trace."""
+    try:
+        from ..providers import resolver
+        return str(resolver.resolve(cfg, role=resolver.DEFAULT_ROLE).model)
+    except Exception:
+        return ""
+
+
 def _extract_json(text: str) -> Optional[Dict[str, Any]]:
     t = (text or "").strip()
     if t.startswith("```"):
@@ -86,11 +95,21 @@ class BrainRouter:
         try:
             res = run(cfg, system=_SYSTEM, user=user,
                       profile_id=None, timeout_s=timeout_s)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - classifier is advisory
+            # The cold-start limit must be visible: the classifier budget is
+            # short by design (default 4 s) while a cold local load is much
+            # longer. The budget is NOT changed here; this trace names the
+            # timeout and model so the gap is diagnosable from the journal.
+            log_event("voice_edit.brain.error",
+                      code="BRAIN_CALL_FAILED", error=type(exc).__name__,
+                      timeout_s=timeout_s, model=_configured_model(cfg))
             return None
         if not getattr(res, "ok", False):
             log_event("voice_edit.brain.error",
-                      code=str(getattr(res, "code", "") or ""))
+                      code=str(getattr(res, "code", "") or ""),
+                      timeout_s=timeout_s,
+                      model=str(getattr(res, "model", "") or
+                                _configured_model(cfg)))
             return None
         data = _extract_json(str(getattr(res, "text", "") or ""))
         if not data:
