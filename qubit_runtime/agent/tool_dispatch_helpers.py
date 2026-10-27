@@ -71,7 +71,7 @@ def _context_pruned_argument_paths(tool_name: str, args: Any) -> list[str]:
 
     A minted marker is identified by its prefix plus the first rendered numeric
     count. This catches a marker cut short before its fixed sentence while still
-    letting Hermes edit source/docs that mention the bare prefix or template.
+    letting Qubit edit source/docs that mention the bare prefix or template.
     Unknown/plugin/MCP tools stay effect-capable by default; known read-only
     tools may inspect or quote compressed history.
     """

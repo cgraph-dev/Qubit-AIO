@@ -155,7 +155,7 @@ def resolve_workspace_for_file(file_path: str, *, cwd: Optional[str] = None) -> 
 
 
 def operator_workspace_roots() -> Set[str]:
-    """Git worktrees the operator pointed Hermes at: the launch dir and the surface-set workspace
+    """Git worktrees the operator pointed Qubit at: the launch dir and the surface-set workspace
     (``resolve_agent_cwd``: the Desktop/TUI session cwd, ``qubit -w``'s worktree, a gateway's
     ``terminal.cwd``).  The agent's ``cd`` moves neither (it only moves the terminal's cwd).  A repo at
     or above ``$HOME`` never counts: a dotfiles repo would trust every directory below it."""

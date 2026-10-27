@@ -1,6 +1,6 @@
 """Bitwarden Secrets Manager (`bws` CLI) integration.
 
-Pulls API keys from BSM at startup so they need not live in ``~/.hermes/.env``.
+Pulls API keys from BSM at startup so they need not live in ``~/.qubit/.env``.
 ``bws`` is auto-installed into the PM tool store (one pinned version,
 SHA-256-verified against the published checksum). The one bootstrap secret is
 the access token in ``.env``; every other key can live in BSM. One

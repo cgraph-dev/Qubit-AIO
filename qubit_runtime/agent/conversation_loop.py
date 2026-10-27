@@ -1612,7 +1612,7 @@ def _run_conversation_turn(
     agent._last_compression_attempt_in_place = None
     begin_fast_mode_turn(agent, conversation_history)
 
-    # Adopt ~/.hermes/.env credential/base-url edits made since the last turn — a
+    # Adopt ~/.qubit/.env credential/base-url edits made since the last turn — a
     # Settings save updates .env, not this worker's client (#67821). No-op if unchanged.
     try:
         agent._try_refresh_env_client_credentials()

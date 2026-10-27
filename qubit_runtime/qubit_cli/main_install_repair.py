@@ -331,7 +331,7 @@ def _is_windows_npm_path(npm_path: str) -> bool:
 def _resolve_node_runtime_npm() -> str | None:
     """PM's npm, refused on a POSIX host when it is a Windows shim (EISDIR over WSL UNC paths, #30271).
 
-    Never re-scans the user's PATH for another npm: Hermes runs only its PM-managed toolchain.
+    Never re-scans the user's PATH for another npm: Qubit runs only its PM-managed toolchain.
     """
     from qubit_constants import find_node_executable
     npm = find_node_executable("npm")

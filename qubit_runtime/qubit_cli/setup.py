@@ -1,4 +1,4 @@
-"""Interactive setup wizard for Qubit Agent (config lives in ~/.hermes/).
+"""Interactive setup wizard for Qubit Agent (config lives in ~/.qubit/).
 
 Independently-runnable sections: Model & Provider, Terminal Backend, Agent Settings, Messaging
 Platforms, Tools. Section bodies live in sibling setup_* modules and are re-exported here; they

@@ -2,7 +2,7 @@
 
 Providers register via :meth:`PluginContext.register_browser_provider`; the active one (selected by
 ``browser.cloud_provider``) services every cloud-mode ``browser_*`` tool call. They live in
-``<repo>/plugins/browser/<name>/`` (built-in) or ``~/.hermes/plugins/browser/<name>/`` (user).
+``<repo>/plugins/browser/<name>/`` (built-in) or ``~/.qubit/plugins/browser/<name>/`` (user).
 
 Session metadata contract (legacy ``CloudBrowserProvider`` shape; ``tools.browser_tool`` needs no
 translation). ``bb_session_id`` is a legacy key name kept verbatim — it holds the provider's session ID

@@ -1,8 +1,8 @@
-"""Curator snapshot + rollback. Before any mutating curator pass, ``~/.hermes/skills/`` is tar.gz'd under
-``~/.hermes/skills/.curator_backups/<utc-iso>/`` with a ``manifest.json``. Rollback first snapshots the CURRENT tree (so it is
+"""Curator snapshot + rollback. Before any mutating curator pass, ``~/.qubit/skills/`` is tar.gz'd under
+``~/.qubit/skills/.curator_backups/<utc-iso>/`` with a ``manifest.json``. Rollback first snapshots the CURRENT tree (so it is
 itself undoable), then extracts the chosen snapshot into place. Excluded: ``.curator_backups/``, ``.hub/`` (hub-managed), ``.git/``.
 Included: skill dirs, ``.usage.json``, ``.archive/``, ``.curator_state`` (so rollback also restores last-run-at and the curator
-doesn't re-fire), ``.bundled_manifest``, ``.curator_suppressed``. Each snapshot also copies ``~/.hermes/cron/jobs.json`` as
+doesn't re-fire), ``.bundled_manifest``, ``.curator_suppressed``. Each snapshot also copies ``~/.qubit/cron/jobs.json`` as
 ``cron-jobs.json``: the consolidation pass rewrites cron ``skills``/``skill`` references in place, so rollback restores those two
 fields (only) — the rest is live state."""
 
@@ -151,7 +151,7 @@ def _mkdir(path: Path, what: str, *, exist_ok: bool) -> bool:
 
 
 def snapshot_skills(reason: str = "manual", *, protect_ids: Optional[Set[str]] = None) -> Optional[Path]:
-    """Create a tar.gz snapshot of ``~/.hermes/skills/`` and prune old ones. Returns the snapshot dir, or None when
+    """Create a tar.gz snapshot of ``~/.qubit/skills/`` and prune old ones. Returns the snapshot dir, or None when
     skipped (disabled, skills dir missing, IO error) — logged at debug so the curator never aborts a pass over a
     backup failure. ``protect_ids`` survive the prune step (rollback protects its target)."""
     if not is_enabled():
@@ -404,7 +404,7 @@ def _cron_summary(cron_report: Dict[str, Any]) -> Optional[str]:
 
 
 def rollback(backup_id: Optional[str] = None) -> Tuple[bool, str, Optional[Path]]:
-    """Restore ``~/.hermes/skills/`` from a snapshot (explicit id or newest): safety-snapshot the CURRENT tree; stage
+    """Restore ``~/.qubit/skills/`` from a snapshot (explicit id or newest): safety-snapshot the CURRENT tree; stage
     current top-level entries; extract; on failure move staged entries back. Returns ``(ok, message, snapshot_path)``."""
     target = _resolve_backup(backup_id)
     if target is None:

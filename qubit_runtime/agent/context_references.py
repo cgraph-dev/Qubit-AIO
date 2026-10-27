@@ -486,7 +486,7 @@ def _composer_paste_roots() -> list[Path]:
 
 
 def _agent_staged_path(path: Path) -> bool:
-    """True when *path* sits in a Hermes dir the gateway stages for the agent.
+    """True when *path* sits in a Qubit dir the gateway stages for the agent.
 
     Those are the ``_CACHE_DIRS`` roots — ``attachments/`` (file drops),
     ``images/`` (image uploads), ``cache/*`` (platform downloads) and now
@@ -507,7 +507,7 @@ def _agent_staged_path(path: Path) -> bool:
 
 
 def _agent_staged_path(path: Path) -> bool:
-    """True when *path* sits in a Hermes dir the gateway stages for the agent.
+    """True when *path* sits in a Qubit dir the gateway stages for the agent.
 
     Those are the ``_CACHE_DIRS`` roots — ``attachments/`` (file drops),
     ``images/`` (image uploads), ``cache/*`` (platform downloads) and now

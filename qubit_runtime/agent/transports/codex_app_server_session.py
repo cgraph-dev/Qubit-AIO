@@ -232,7 +232,7 @@ class CodexAppServerSession:
         self._model_provider = (model_provider or "").strip() or None
         # The tier this thread last received on turn/start; None = codex's own default, never overridden.
         self._service_tier_sent: Any = None
-        # Hermes' composed system prompt (SOUL.md, memory, channel overrides). Sent ONCE per thread as
+        # Qubit' composed system prompt (SOUL.md, memory, channel overrides). Sent ONCE per thread as
         # ``thread/start.developerInstructions``: codex keeps its own base instructions (tool guidance) and
         # inserts this as the first developer message of every model request. ``baseInstructions`` would
         # REPLACE codex's base and ``instructions`` is accepted but ignored (verified against codex 0.147).
@@ -282,7 +282,7 @@ class CodexAppServerSession:
             wanted, self._resume_thread_id = self._resume_thread_id, None  # one attempt per stored id
             thread_id = self._resume_thread(wanted, params)
             # A resumed thread may carry a tier an earlier process selected (CLI ``/fast`` rebuilds the agent),
-            # so its first turn sends Hermes' tier even when that is a clearing null.
+            # so its first turn sends Qubit' tier even when that is a clearing null.
             self._service_tier_sent = _TIER_UNKNOWN
             logger.info("codex app-server thread resumed: id=%s cwd=%s", thread_id[:8], self._cwd)
         else:
@@ -460,7 +460,7 @@ class CodexAppServerSession:
         model / reasoning_effort: sent on ``turn/start`` (codex applies them to this and later turns), so an
         in-place ``/model`` or effort change reaches a thread that was started with other settings.
         service_tier: sent only when it differs from what this thread last received, so codex's own configured
-        tier is left alone until Hermes selects one, and ``None`` after a selection clears it.
+        tier is left alone until Qubit selects one, and ``None`` after a selection clears it.
 
         post_tool_quiet_timeout: if codex emits a tool completion and then goes quiet for this many seconds
         without emitting another item or `turn/completed`, log a warning (once per tool result) and keep

@@ -3,7 +3,7 @@
 The flag lives in the ROOT profile's ``config.yaml`` (``get_default_qubit_root()``), never in the
 launch profile's: a pooled backend launched under ``-p work`` must read and write the same file as
 one launched under ``default``, because onboarding always targets the default profile.
-Unset means "only on a machine that never used Hermes"; ``true`` re-runs it once; ``false`` means done.
+Unset means "only on a machine that never used Qubit"; ``true`` re-runs it once; ``false`` means done.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ def _root_config() -> Path:
 
 def should_run(*, assume_fresh: bool = False) -> bool:
     """The root config's explicit ``onboarding.run`` (managed overlay included) when it is a bool,
-    else whether this machine has never used Hermes (``install_state``; *assume_fresh* is the
+    else whether this machine has never used Qubit (``install_state``; *assume_fresh* is the
     unpackaged desktop's ``--fresh-install`` switch)."""
     value = _explicit_run()
     if value is not None:

@@ -171,7 +171,7 @@ def _dump_subagent_timeout_diagnostic(
     worker_thread: Optional[threading.Thread], goal: str,
 ) -> Optional[str]:
     """Structured diagnostic for a subagent that timed out before any API call (otherwise "timed out with no
-    response", 0 API calls, nothing to inspect): ``~/.hermes/logs/subagent-timeout-<sid>-<ts>.log`` with the
+    response", 0 API calls, nothing to inspect): ``~/.qubit/logs/subagent-timeout-<sid>-<ts>.log`` with the
     child's config, prompt/schema sizes, activity snapshot and worker stack. Path, or None on failure."""
     try:
         from qubit_constants import get_qubit_home

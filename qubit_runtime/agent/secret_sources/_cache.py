@@ -47,7 +47,7 @@ class CachedFetch:
 
 
 def resolve_cache_home(home_path: Optional[Path] = None) -> Path:
-    """``home_path`` as resolved by ``load_qubit_dotenv()``, else ``$QUBIT_HOME``/``~/.hermes``."""
+    """``home_path`` as resolved by ``load_qubit_dotenv()``, else ``$QUBIT_HOME``/``~/.qubit``."""
     if home_path is None:
         from qubit_constants import get_qubit_home
 

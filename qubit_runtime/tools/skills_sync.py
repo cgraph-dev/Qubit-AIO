@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Skills Sync -- manifest-based seeding and updating of bundled skills. Copies repo skills/ into
-~/.hermes/skills/, tracking each synced skill's origin hash in .bundled_manifest (v2 "name:hash"
+~/.qubit/skills/, tracking each synced skill's origin hash in .bundled_manifest (v2 "name:hash"
 lines; v1 plain names auto-migrate). NEW skills are copied and recorded; EXISTING skills update
 only when bundled changed AND the user copy still matches the origin hash (else user-customized
 -> SKIP); user-DELETED skills are not re-added; upstream-REMOVED ones leave the manifest once no active or
@@ -134,7 +134,7 @@ def _read_suppressed_names() -> set:
     """Built-in skills the curator pruned — must NOT be re-seeded on sync.
 
     Delegates to ``tools.skill_usage`` (single source of truth) and falls back
-    to reading ``~/.hermes/skills/.curator_suppressed`` directly if that import
+    to reading ``~/.qubit/skills/.curator_suppressed`` directly if that import
     is unavailable in a packaged/update context.
     """
     try:
@@ -394,7 +394,7 @@ def _seed_category_descriptions(bundled_dir: Path, only_dirs: Optional[Set[Path]
 
 
 def sync_skills(quiet: bool = False) -> dict:
-    """Sync bundled skills into ~/.hermes/skills/ using the manifest; returns the per-category
+    """Sync bundled skills into ~/.qubit/skills/ using the manifest; returns the per-category
     result dict. Opted-out profiles seed ONLY ESSENTIAL_SKILLS (the system prompt always
     points at ``hermes-agent``)."""
     essential_only = (_qubit_home() / NO_BUNDLED_SKILLS_MARKER).exists()

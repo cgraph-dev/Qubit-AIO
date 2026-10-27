@@ -63,7 +63,7 @@ class TransportSpec:
     url: Optional[str] = None
     version: Optional[str] = None  # informational, pinned
     # Static env for the stdio subprocess (telemetry opt-outs, mode flags). NOT for secrets — those
-    # go through auth.env so they are prompted for and land in ~/.hermes/.env.
+    # go through auth.env so they are prompted for and land in ~/.qubit/.env.
     env: Dict[str, str] = field(default_factory=dict)
 
 
@@ -425,7 +425,7 @@ def _run_bootstrap(cwd: Path, commands: List[str]) -> None:
 
 
 def _do_git_install(entry: CatalogEntry) -> Path:
-    """Clone the entry's repo into ``~/.hermes/mcp-installs/<name>`` and run bootstrap. Returns the dir."""
+    """Clone the entry's repo into ``~/.qubit/mcp-installs/<name>`` and run bootstrap. Returns the dir."""
     assert entry.install is not None and entry.install.type == "git"
     install = entry.install
     dest = _install_root() / entry.name
@@ -480,7 +480,7 @@ def _expand_install_dir(value: str, install_dir: Optional[Path]) -> str:
 def _prompt_env_vars(specs: List[EnvVarSpec], preloaded: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """Prompt for each env spec.
 
-    Secrets persist to ~/.hermes/.env. Non-secrets are only collected and
+    Secrets persist to ~/.qubit/.env. Non-secrets are only collected and
     returned — the caller inlines them into the server config (config.yaml),
     since .env is secrets-only. Values already supplied by the caller
     (``preloaded``, e.g. from a dashboard form) skip the prompt.

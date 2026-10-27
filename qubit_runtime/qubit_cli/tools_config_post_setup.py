@@ -28,7 +28,7 @@ def _info_lines(*lines: str) -> None:
 
 def _ensure_browser_use_cli(*, verbose_hints: bool = False) -> None:
     """Confirm the Browser Use CLI engine is runnable. It is browser-harness, a core dependency of
-    Hermes's own venv, so there is nothing to download; a miss means the venv needs a re-sync.
+    Qubit's own venv, so there is nothing to download; a miss means the venv needs a re-sync.
     Primary driver engine for EVERY browser backend except Camofox (Firefox-based, no CDP surface)."""
     from tools.browser_use_cli import _find_cli
 
@@ -159,7 +159,7 @@ def _post_setup_python(spec: dict) -> None:
 
 
 def _post_setup_spotify() -> None:
-    # Full `qubit auth spotify` flow: no client_id yet → interactive wizard (persists to ~/.hermes/.env)
+    # Full `qubit auth spotify` flow: no client_id yet → interactive wizard (persists to ~/.qubit/.env)
     # then PKCE; existing app → OAuth only.
     from types import SimpleNamespace
     try:

@@ -296,7 +296,7 @@ def _is_valid_installed_skill_name(name: str) -> bool:
 
 
 def _existing_categories() -> List[str]:
-    """Sorted category buckets under ``~/.hermes/skills/`` (children without their own SKILL.md)."""
+    """Sorted category buckets under ``~/.qubit/skills/`` (children without their own SKILL.md)."""
     from tools.skills_hub import SKILLS_DIR
     from tools.skills_hub_install import _category_skill_dirs
     try:
@@ -725,7 +725,7 @@ _SKILL_METRIC_SOURCES = {"official": "catalog", "url": "url", "bundled": "bundle
 
 
 def _install_bundled(c: Console, name: str, invalidate_cache: bool) -> tuple:
-    """``_install_skill`` for a name Hermes ships: point at the active copy, or restore it from the
+    """``_install_skill`` for a name Qubit ships: point at the active copy, or restore it from the
     bundled source. The hub copy of a built-in is either a stranger's same-named skill or this
     repo's files rescanned as community content and refused, so neither is fetched."""
     from types import SimpleNamespace

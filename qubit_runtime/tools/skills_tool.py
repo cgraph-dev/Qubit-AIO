@@ -86,7 +86,7 @@ def _skills_scan_signature(dirs_to_scan, disabled) -> tuple:
     return (tuple(sig), frozenset(disabled), platform)
 
 
-QUBIT_HOME = get_qubit_home()  # all skills live in ~/.hermes/skills/ (seeded from bundled)
+QUBIT_HOME = get_qubit_home()  # all skills live in ~/.qubit/skills/ (seeded from bundled)
 SKILLS_DIR = QUBIT_HOME / "skills"
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
 
@@ -170,7 +170,7 @@ def check_skills_requirements() -> bool:
 
 
 def _get_category_from_path(skill_path: Path) -> Optional[str]:
-    """``~/.hermes/skills/mlops/axolotl/SKILL.md`` -> ``"mlops"``; active profile dir first
+    """``~/.qubit/skills/mlops/axolotl/SKILL.md`` -> ``"mlops"``; active profile dir first
     (respects test monkeypatching), then skills.external_dirs."""
     dirs_to_check = [_skills_dir()]
     with suppress(Exception):

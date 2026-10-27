@@ -1047,7 +1047,7 @@ class CLIInfoMixin:
             print(f"  {t('gateway.reload_mcp.failed', error=str(e))}")
 
     def _reload_skills(self) -> None:
-        """Reload skills: rescan ~/.hermes/skills/ and queue a note for the next user turn.
+        """Reload skills: rescan ~/.qubit/skills/ and queue a note for the next user turn.
 
         Skills are invoked at runtime (``/skill-name``, ``skills_list``, ``skill_view``), not from
         the system prompt, so this does NOT clear the prompt cache. If anything was added/removed

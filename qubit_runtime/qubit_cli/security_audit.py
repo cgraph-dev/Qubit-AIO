@@ -111,7 +111,7 @@ _PLUGIN_PIN_FILES = (("requirements.txt", _parse_requirements), ("requirements-d
 
 
 def _discover_plugins(qubit_home: Path) -> list[Component]:
-    """Python deps declared by plugins under ``~/.hermes/plugins``. Plugins typically don't install
+    """Python deps declared by plugins under ``~/.qubit/plugins``. Plugins typically don't install
     into the venv, so their stated requirements are audit surface the venv scan misses.
     """
     plugins_dir = qubit_home / "plugins"

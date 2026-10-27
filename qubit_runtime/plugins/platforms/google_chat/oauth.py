@@ -32,7 +32,7 @@ from utils import atomic_write_text
 logger = logging.getLogger("gateway.platforms.google_chat_user_oauth")
 
 # Filesystem-safe key: lowercase, keep ``[a-z0-9._-@]`` so token files stay
-# human-readable under ``ls ~/.hermes/google_chat_user_tokens/``.
+# human-readable under ``ls ~/.qubit/google_chat_user_tokens/``.
 _EMAIL_FS_RE = re.compile(r"[^a-z0-9._@-]+")
 
 # Least privilege: chat.messages.create covers BOTH media.upload and the

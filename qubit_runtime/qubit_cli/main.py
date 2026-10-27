@@ -48,7 +48,7 @@ from qubit_cli import _startup_fast
 import itertools
 
 # A literal ``~``/``$VAR`` in QUBIT_HOME (fish, or any quoted value) must become absolute
-# before the first reader — otherwise it resolves against cwd and scaffolds <cwd>/~/.hermes.
+# before the first reader — otherwise it resolves against cwd and scaffolds <cwd>/~/.qubit.
 _startup_fast.normalize_qubit_home_env()
 
 # Startup-liveness watchdog: for gateway runs, arm BEFORE the heavy import
@@ -450,7 +450,7 @@ _startup_fast.ensure_project_root_on_path()
 # Profile override — MUST happen before any qubit module import: many modules
 # cache QUBIT_HOME at import time. --profile/-p is pre-parsed from sys.argv,
 # QUBIT_HOME set, and the flag stripped so argparse never sees it. Falls back
-# to ~/.hermes/active_profile for the sticky default.
+# to ~/.qubit/active_profile for the sticky default.
 _PROFILE_NAME_RE = r"^[a-z0-9][a-z0-9_-]{0,63}$"  # mirrors qubit_cli.profiles._PROFILE_ID_RE
 # Set only when -p/--profile was on argv. Sticky active_profile must not count:
 # `qubit desktop` with no flag must not overwrite Desktop's stored profile.
@@ -1099,7 +1099,7 @@ def _termux_should_prefetch_update_check() -> bool:
 
 
 def _dotenv_has_provider_key(env_file: Path, provider_env_vars: set) -> bool:
-    """True if ~/.hermes/.env assigns a non-empty value to any provider key."""
+    """True if ~/.qubit/.env assigns a non-empty value to any provider key."""
     if not env_file.exists():
         return False
     try:
@@ -1652,7 +1652,7 @@ def _start_chat_background_prefetch() -> None:
     foreground and competes for CPU on single-core devices). The skills sync
     is idempotent and hash-gated (~120-170ms of rglob/hashing) so it normally
     runs in a daemon thread — skill loading happens at agent init, long after.
-    The ONE exception is an unseeded ~/.hermes/skills: there the banner
+    The ONE exception is an unseeded ~/.qubit/skills: there the banner
     prefetch races the sync and caches an empty index ("No skills installed"
     on the very first launch), so the first run syncs in the foreground and
     drops the banner's skills cache.
@@ -2211,7 +2211,7 @@ def select_provider_and_model(args=None):
     _offer_reasoning_after_pick(current_model, saves_before)
 
     # Post-switch cleanup: switching to a named provider (anything except
-    # "custom") leaves a stale OPENAI_BASE_URL in ~/.hermes/.env that poisons
+    # "custom") leaves a stale OPENAI_BASE_URL in ~/.qubit/.env that poisons
     # auxiliary clients using provider:auto — clear it proactively. (#5161)
     if selected_provider not in {
         "custom",
@@ -2496,7 +2496,7 @@ from qubit_cli.update_receipt import update_receipt_scope
 
 @update_receipt_scope()
 def cmd_update(args):
-    """Update Hermes Agent: hangup protection + update lock around ``_cmd_update_impl``."""
+    """Update Qubit Agent: hangup protection + update lock around ``_cmd_update_impl``."""
     # Marks this frame as the CURRENT updater for
     # _old_updater.in_historical_update(); historical on-disk updaters do not
     # declare this local, so only they hand off through retired shims.

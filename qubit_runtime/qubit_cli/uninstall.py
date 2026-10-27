@@ -768,8 +768,8 @@ def run_uninstall(args):
     Run the uninstall process.
     
     Options:
-    - Full uninstall: removes code + ~/.hermes/ (configs, data, logs)
-    - Keep data: removes code but keeps ~/.hermes/ for future reinstall
+    - Full uninstall: removes code + ~/.qubit/ (configs, data, logs)
+    - Keep data: removes code but keeps ~/.qubit/ for future reinstall
     """
     _refuse_if_steward_owned()
 
@@ -958,7 +958,7 @@ def remove_dashboard_launchd_jobs() -> list[Path]:
     (``_launchd_plist_dirs`` + ``_parse_dashboard_runtime``): read each plist, match the
     arguments, ``launchctl bootout`` the job's domains (launchd takes the process down;
     booting out an already-unloaded job is fine and never checked), then delete the
-    plist — a stale, not-loaded plist is still Hermes-created and still goes. A missing,
+    plist — a stale, not-loaded plist is still Qubit-created and still goes. A missing,
     unreadable, or malformed plist is skipped, never fatal. macOS only (empty list
     elsewhere)."""
     if sys.platform != "darwin":
@@ -1101,7 +1101,7 @@ def _perform_uninstall(
     else:
         log_info("No legacy runtime trees to remove")
 
-    # 5. Optionally remove ~/.hermes/ data directory (and named profiles)
+    # 5. Optionally remove ~/.qubit/ data directory (and named profiles)
     if full_uninstall:
         # 5a. Named profiles' homes live under <default>/profiles/ (swept by the rmtree below),
         #     but their services + alias scripts live OUTSIDE the default root.

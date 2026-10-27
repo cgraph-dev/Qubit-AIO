@@ -1666,7 +1666,7 @@ class _CodexCompletionsAdapter:
             text_parts, tool_calls_raw, usage, finish_reason = _parse_codex_final_response(
                 final, issuer_kind=issuer_kind, issuer_model=issuer_model,
             )
-            # Undo only the aliases THIS request emitted, before the call reaches Hermes dispatch.
+            # Undo only the aliases THIS request emitted, before the call reaches Qubit dispatch.
             for tc in tool_calls_raw or ():
                 if tc.function.name in wire_aliases:
                     tc.function.name = wire_aliases[tc.function.name]
@@ -2021,7 +2021,7 @@ def _maybe_wrap_anthropic(
 
 
 def _read_nous_auth() -> Optional[dict]:
-    """Qubit provider state dict from the credential pool or ~/.hermes/auth.json; None when not active with tokens."""
+    """Qubit provider state dict from the credential pool or ~/.qubit/auth.json; None when not active with tokens."""
     pool_present, entry = _select_pool_entry("nous")
     if pool_present:
         if entry is None:
@@ -4611,7 +4611,7 @@ def _try_main_fallback_chain(
 
 def _warn_stale_openai_base_url(runtime_provider: str) -> None:
     """Warn once when OPENAI_BASE_URL is set but config.yaml names a non-custom provider (a stale
-    ~/.hermes/.env value after `qubit model` poisons routing)."""
+    ~/.qubit/.env value after `qubit model` poisons routing)."""
     global _stale_base_url_warned
     if _stale_base_url_warned:
         return
@@ -7101,7 +7101,7 @@ def _note_relay_auxiliary_error(exc: BaseException) -> None:
 
 
 def _fail_relay_auxiliary_call(exc: BaseException) -> None:
-    """Close a call that ended in ``exc`` without replacing it: a Hermes abort is ``cancelled``,
+    """Close a call that ended in ``exc`` without replacing it: a Qubit abort is ``cancelled``,
     anything else ``failed`` with the classifier's reason for the error that ended it."""
     try:
         from agent import auxiliary_call_outcome

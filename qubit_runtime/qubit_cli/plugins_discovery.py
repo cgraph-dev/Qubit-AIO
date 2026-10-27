@@ -335,7 +335,7 @@ def collect_directory_manifests() -> List[PluginManifest]:
 
 def resolve_manifest_winners(manifests: List[PluginManifest]) -> Dict[str, PluginManifest]:
     """Later sources win on key collision (project > user > bundled): a same-named copy under
-    ``~/.hermes/plugins/<name>`` is the documented way to override a bundled plugin, and is logged. A flat
+    ``~/.qubit/plugins/<name>`` is the documented way to override a bundled plugin, and is logged. A flat
     user/project manifest that claims a bundled key from a *differently named* directory is an impostor, not
     an override (``impostor_dir/plugin.yaml`` with ``name: kanban``): it is skipped with a warning so
     ``qubit plugins enable kanban`` never activates unrelated code under the bundled name."""

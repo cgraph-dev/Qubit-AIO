@@ -605,7 +605,7 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
     # the inline source will spawn later, not to this process (#107002). Case-preserving tokens:
     # the operand-taking ``-X``/``-W``/``-Q`` must not be conflated with ``-q``/``-b``.
     if command_line_runs_inline_source(cased_tokens):
-        # …unless the source is a Hermes bootstrap running the entry point in THIS process (store
+        # …unless the source is a Qubit bootstrap running the entry point in THIS process (store
         # launcher, launcher script, venv_sync re-entry): then its argv is this process's (#124318).
         cased_tokens = inline_bootstrap_argv(cased_tokens)
         if cased_tokens is None:

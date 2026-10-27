@@ -285,7 +285,7 @@ def union_with_nous_on_sale_models(curated_ids: list[str], pricing: dict[str, di
     discount first. A sale lives only in ``/v1/models`` ``pricing.original``, so without this the
     picker badges discounts on curated rows but never shows a discounted model the curated list and
     Portal recommendations omit. Free rows stay with ``freeRecommendedModels``; rows the gateway
-    marks tool-less (``"tools": False``) are skipped because Hermes is tool-calling-first, and
+    marks tool-less (``"tools": False``) are skipped because Qubit is tool-calling-first, and
     image/video generation rows are skipped because they are not chat models."""
     from math import isfinite
 

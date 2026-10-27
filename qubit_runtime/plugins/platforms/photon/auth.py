@@ -3,7 +3,7 @@
 Management calls hit ``https://app.photon.codes/api/...`` (OAuth 2.0 device flow, Bearer)
 like the official CLI. The dashboard project ``id`` *is* the Spectrum Cloud project id and
 Spectrum is always provisioned at create-time; the sidecar authenticates with
-``(id, projectSecret)``. Storage: runtime SDK creds -> ``~/.hermes/.env``; management
+``(id, projectSecret)``. Storage: runtime SDK creds -> ``~/.qubit/.env``; management
 metadata -> ``auth.json`` under ``credential_pool.photon`` (device token), ``photon_project``
 (ids + secret for offline status) and ``photon_user`` (numbers).
 """

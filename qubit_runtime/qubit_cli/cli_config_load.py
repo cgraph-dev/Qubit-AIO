@@ -256,7 +256,7 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
 
 
 def load_cli_config() -> Dict[str, Any]:
-    """~/.hermes/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
+    """~/.qubit/config.yaml (else ./cli-config.yaml) over built-in defaults; env vars win.
 
     ``HERMES_IGNORE_USER_CONFIG=1`` skips the user config entirely (``.env`` still loads).
     """

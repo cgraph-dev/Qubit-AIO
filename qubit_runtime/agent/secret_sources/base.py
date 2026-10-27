@@ -1,7 +1,7 @@
 """Secret-source contract: the ABC every secret backend implements.
 
 A *secret source* resolves credentials from an external secret manager into
-env-var-shaped values at process startup, AFTER ``~/.hermes/.env`` has loaded
+env-var-shaped values at process startup, AFTER ``~/.qubit/.env`` has loaded
 and BEFORE the rest of Qubit reads ``os.environ``. The contract is deliberately
 narrow: read-only; startup-time and synchronous (one ``fetch()`` per process per
 QUBIT_HOME, under a registry-enforced wall-clock timeout, no background

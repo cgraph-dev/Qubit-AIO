@@ -18,7 +18,7 @@ method = _registry.method
 def _relay_root() -> Path:
     """Install root shared by every profile (relay state is install-wide). Same formula as the
     writers (``tools/bot_relay``, ``tools/bot_mode_dm``): both ends of the mailbox must agree for
-    every QUBIT_HOME, including non-``profiles/`` subdirs of ``~/.hermes``."""
+    every QUBIT_HOME, including non-``profiles/`` subdirs of ``~/.qubit``."""
     from tools.bot_mode_probe import _default_home, _qubit_root
     return _qubit_root(Path(_default_home()))
 

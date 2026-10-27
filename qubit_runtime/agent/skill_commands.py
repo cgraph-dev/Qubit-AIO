@@ -630,7 +630,7 @@ def get_skill_commands() -> Dict[str, Dict[str, Any]]:
 
 # Plugin projection cache. The projection re-parses every plugin SKILL.md and sits on the
 # per-keystroke completion path (94 ms per Tab measured with 60 plugin skills), so it is reused
-# while its tag holds: the resolved Hermes home (plugin managers are home-keyed, so profiles never
+# while its tag holds: the resolved Qubit home (plugin managers are home-keyed, so profiles never
 # share a registry) plus the registered qualified names (a plugin enable/disable/install changes
 # them). ``reload_skills()`` drops it explicitly to pick up edited SKILL.md files.
 _plugin_skill_commands: Dict[str, Dict[str, Any]] = {}

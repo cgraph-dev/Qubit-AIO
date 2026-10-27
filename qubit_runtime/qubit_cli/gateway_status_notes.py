@@ -5,7 +5,7 @@ from qubit_cli.config import get_qubit_home
 
 
 def _incompatible_owner_verdict() -> str | None:
-    """``incompatible: <reason>`` when the gateway answering for this home is one this Hermes's clients
+    """``incompatible: <reason>`` when the gateway answering for this home is one this Qubit's clients
     (TUI, Desktop, chat) refuse, e.g. an older Qubit daemon left running across an upgrade."""
     from qubit_cli.gateway_runtime import discover_gateway_endpoint
     try:

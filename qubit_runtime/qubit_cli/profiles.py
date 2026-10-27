@@ -56,7 +56,7 @@ _CLONE_ALL_STRIP: list[str] = [
 ]
 
 # Infrastructure excluded from --clone-all ONLY when the source is the default profile
-# (``~/.hermes``): git checkout (+ ~3 GB venv), worktrees, sibling profiles, shared bins,
+# (``~/.qubit``): git checkout (+ ~3 GB venv), worktrees, sibling profiles, shared bins,
 # npm packages, and the managed local-models trees — GGUF weights (tens of GB), the
 # llama.cpp runtime binaries and the managed Node install, all re-downloadable on demand
 # and resolved from the default root only. Named profiles never hold these at root, so the
@@ -303,7 +303,7 @@ def _get_profiles_root() -> Path:
 
 
 def _get_default_qubit_home() -> Path:
-    """Default (pre-profile) QUBIT_HOME: ``~/.hermes``, or QUBIT_HOME itself in
+    """Default (pre-profile) QUBIT_HOME: ``~/.qubit``, or QUBIT_HOME itself in
     Docker/custom deployments (e.g. ``/opt/data``)."""
     from qubit_constants import get_default_qubit_root
     return get_default_qubit_root()
@@ -2113,8 +2113,8 @@ def _retarget_active_profile(old: str, new: str, message: str) -> None:
 
 
 def get_active_profile_name() -> str:
-    """Profile name inferred from QUBIT_HOME: ``"default"`` when unset or ``~/.hermes``, the
-    name under ``~/.hermes/profiles/<name>``, ``"custom"`` for any other path."""
+    """Profile name inferred from QUBIT_HOME: ``"default"`` when unset or ``~/.qubit``, the
+    name under ``~/.qubit/profiles/<name>``, ``"custom"`` for any other path."""
     from qubit_constants import get_qubit_home
     resolved = get_qubit_home().resolve()
     if resolved == _get_default_qubit_home().resolve():
@@ -2307,7 +2307,7 @@ def export_profile(name: str, output_path: str, extra_files: Optional[Dict[str, 
     # Archive base name without extension (.tar.gz appended by the writer).
     base = str(Path(output_path)).removesuffix(".tar.gz").removesuffix(".tgz")
 
-    # The default profile IS ~/.hermes (dir name ".hermes"), so both paths stage a filtered
+    # The default profile IS ~/.qubit (dir name ".qubit"), so both paths stage a filtered
     # copy under a temp dir named after the canonical id: root allow-list for default,
     # credential exclusion for named profiles.
     def _ignore_credentials(directory: str, contents: list) -> set:
@@ -2349,7 +2349,7 @@ def import_profile(archive_path: str, name: Optional[str] = None) -> Path:
         raise ValueError("Profile archive must contain exactly one top-level directory.")
 
     # Default-profile archives have "default/" at top level; importing as "default" would
-    # target ~/.hermes itself.
+    # target ~/.qubit itself.
     canon = _canon_valid(inferred_name)
     if canon == "default":
         raise ValueError(

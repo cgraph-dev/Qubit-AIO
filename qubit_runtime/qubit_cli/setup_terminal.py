@@ -290,7 +290,7 @@ def setup_terminal_backend(config: dict):
     backends = list(_BUILTIN_TERMINAL_BACKENDS)
     if _platform.system() == "Linux":
         backends.append(("singularity", "Singularity/Apptainer - HPC-friendly container"))
-    # Plugin-registered backends (~/.hermes/plugins/). Fail-soft: a broken plugin must not take
+    # Plugin-registered backends (~/.qubit/plugins/). Fail-soft: a broken plugin must not take
     # the wizard down.
     plugin_backend_names = []
     try:

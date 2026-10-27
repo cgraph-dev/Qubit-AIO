@@ -179,7 +179,7 @@ def main():
     _start_parent_death_watchdog(_watchdog_parent(args.parent_pid, is_windows=sys.platform == "win32"))
     # Keep the heavyweight CLI import behind the watchdog (importing it at module
     # load left a reparenting window before main() could snapshot PPID), but ahead
-    # of MCP discovery: importing cli loads ~/.hermes/.env and sets HERMES_QUIET,
+    # of MCP discovery: importing cli loads ~/.qubit/.env and sets HERMES_QUIET,
     # which MCP ``${VAR}`` interpolation in the runtime prep depends on.
     from cli import QubitCLI as HermesCLI
     _prepare_slash_worker_runtime()

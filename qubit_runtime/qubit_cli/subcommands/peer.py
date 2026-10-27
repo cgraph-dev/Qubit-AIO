@@ -5,7 +5,7 @@ API is the transport (no new server surface). ``dm`` resolves the remote canonic
 "Bot Chat" session (creating it when missing) and runs ONE synchronous turn — the
 cross-machine twin of ``qubit -p <bot> chat --in ~ -c "Bot Chat"``. ``run``/``status``
 /``stop`` do the same turn through the async Runs API. Peer labels/URLs live in
-config.yaml (``bot_peers``); the key lives in ``~/.hermes/.env`` as
+config.yaml (``bot_peers``); the key lives in ``~/.qubit/.env`` as
 ``HERMES_PEER_<NAME>_KEY``. ``<peer>/<profile>`` targets the ``/p/<profile>/`` mirror.
 """
 

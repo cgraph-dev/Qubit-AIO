@@ -1647,7 +1647,7 @@ class CredentialPool(CredentialPoolAdminMixin, CredentialPoolModelCooldownMixin)
         """Write a rotated Anthropic pair to its authoritative singleton, or fail closed.
 
         claude_code -> ~/.claude/.credentials.json (so the fallback resolver
-        and other profiles see it). hermes_pkce -> ~/.hermes/.anthropic_oauth.json
+        and other profiles see it). hermes_pkce -> ~/.qubit/.anthropic_oauth.json
         (``_seed_from_singletons`` re-seeds it every load; a borrowed row commits
         to the ROOT's file, never a new profile-local copy, #100339). Not
         ``endswith``: manual:hermes_pkce is pool-owned and a singleton for it
@@ -2599,7 +2599,7 @@ def _seed_anthropic_singletons(seed: _Seeder) -> None:
     # rotation on a 401/429 would silently flip the session onto OAuth, which
     # forces the Claude Code identity injection, `mcp_` tool-name rewrite and
     # claude-cli User-Agent the user explicitly opted out of. Prefer
-    # ~/.hermes/.env over os.environ, as `_seed_from_env` does.
+    # ~/.qubit/.env over os.environ, as `_seed_from_env` does.
     _env_file = load_env()
 
     def _env_val(key: str) -> str:
@@ -2845,7 +2845,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
 
 
 def get_env_prefer_dotenv(key: str) -> str:
-    """Resolve a credential env var, preferring ~/.hermes/.env over os.environ.
+    """Resolve a credential env var, preferring ~/.qubit/.env over os.environ.
 
     The user's config file is authoritative; stale env vars from parent
     processes (Codex CLI, test scripts) must not override deliberate .env

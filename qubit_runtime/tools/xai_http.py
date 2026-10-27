@@ -180,7 +180,7 @@ def resolve_xai_http_credentials(
     """Resolve bearer credentials for direct xAI HTTP endpoints.
 
     Default order: Qubit-managed xAI OAuth, then ``XAI_API_KEY`` (via ``get_env_value`` so
-    ``~/.hermes/.env`` keys count). ``prefer_api_key=True`` inverts that for API-metered
+    ``~/.qubit/.env`` keys count). ``prefer_api_key=True`` inverts that for API-metered
     endpoints where the subscription OAuth bearer authorizes but misbehaves (x_search answers
     without citations, TTS 403s). Both branches honor ``HERMES_XAI_BASE_URL``/``XAI_BASE_URL``
     behind the same origin-pinning validation. ``force_refresh=True`` forces an OAuth refresh;
@@ -188,7 +188,7 @@ def resolve_xai_http_credentials(
     entry, not whichever its strategy selects first.
 
     Prefers Qubit-managed xAI OAuth credentials when available, then falls back to ``XAI_API_KEY`` resolved
-    via ``qubit_cli.config.get_env_value`` so keys stored in ``~/.hermes/.env`` (the standard Qubit
+    via ``qubit_cli.config.get_env_value`` so keys stored in ``~/.qubit/.env`` (the standard Qubit
     location) are honored — not just ones already exported into ``os.environ``. This keeps direct xAI
     endpoints (images, TTS, STT, etc.) aligned with the main runtime auth model and preserves the regression
     contract from PR #17140 / #17163.

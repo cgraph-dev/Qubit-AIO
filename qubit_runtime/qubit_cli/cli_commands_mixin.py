@@ -93,7 +93,7 @@ _CRON_SUBCOMMANDS = {
 _ON_WORDS = {"on", "enable", "true", "1"}
 _OFF_WORDS = {"off", "disable", "false", "0"}
 
-# /busy modes; what Enter does while Hermes is working lives in the catalog as
+# /busy modes; what Enter does while Qubit is working lives in the catalog as
 # ``cli.commands.busy.short_<mode>`` (status line) / ``long_<mode>`` (post-set explanation).
 _BUSY_MODES = ("queue", "steer", "interrupt")
 

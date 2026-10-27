@@ -3,7 +3,7 @@
 ``resolve_anthropic_token()`` order: ``ANTHROPIC_TOKEN`` / ``CLAUDE_CODE_OAUTH_TOKEN``,
 ``ANTHROPIC_API_KEY``, Qubit-owned OAuth grants in the ``auth.json`` credential
 pool, then ``~/.claude/.credentials.json`` / macOS Keychain as a borrowed fallback.
-``~/.hermes/.anthropic_oauth.json`` (Qubit PKCE) and
+``~/.qubit/.anthropic_oauth.json`` (Qubit PKCE) and
 the Claude Code file are *singletons*: ``credential_pool._seed_from_singletons()``
 re-reads them on every ``load_pool()``, so a failed write here is a failed refresh
 (``CredentialPersistError``), not a cache miss.
@@ -735,7 +735,7 @@ def run_oauth_setup_token() -> Optional[str]:
     return _first_env("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_TOKEN") or None
 
 
-# ── Qubit-native PKCE OAuth flow (~/.hermes/.anthropic_oauth.json); mirrors Claude Code / pi-ai / OpenCode ──
+# ── Qubit-native PKCE OAuth flow (~/.qubit/.anthropic_oauth.json); mirrors Claude Code / pi-ai / OpenCode ──
 
 
 def _get_qubit_oauth_file() -> Path:
@@ -816,7 +816,7 @@ def run_qubit_oauth_login_pure() -> Optional[Dict[str, Any]]:
 
 
 def read_qubit_oauth_credentials() -> Optional[Dict[str, Any]]:
-    """Read Qubit-managed OAuth credentials from ~/.hermes/.anthropic_oauth.json."""
+    """Read Qubit-managed OAuth credentials from ~/.qubit/.anthropic_oauth.json."""
     data = _load_json_if_exists(_get_qubit_oauth_file(), "Qubit OAuth credentials")
     return data if data is not None and data.get("accessToken") else None
 
@@ -824,7 +824,7 @@ def read_qubit_oauth_credentials() -> Optional[Dict[str, Any]]:
 def _write_qubit_oauth_credentials(
     access_token: str, refresh_token: Optional[str], expires_at_ms: Optional[int], *, target: Optional[Path] = None
 ) -> None:
-    """Commit refreshed hermes_pkce tokens to ~/.hermes/.anthropic_oauth.json (``CredentialPersistError`` on failure).
+    """Commit refreshed hermes_pkce tokens to ~/.qubit/.anthropic_oauth.json (``CredentialPersistError`` on failure).
     ``target`` lets a named profile commit a grant it BORROWED from the global root back to the ROOT singleton
     instead of forking a copy under its own QUBIT_HOME; without this write-through the next ``load_pool()``
     re-seeds the stale (consumed) pair from the file over the rotated pool entry."""

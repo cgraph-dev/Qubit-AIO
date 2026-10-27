@@ -1633,7 +1633,7 @@ Full guide: website/docs/user-guide/messaging/google_chat.md
 
 
 def interactive_setup() -> None:
-    """``qubit setup`` wizard: print GCP instructions, prompt for env vars, persist to ``~/.hermes/.env``."""
+    """``qubit setup`` wizard: print GCP instructions, prompt for env vars, persist to ``~/.qubit/.env``."""
     from qubit_cli.cli_output import print_info, print_success, print_warning, prompt, prompt_yes_no
     from qubit_cli.config import get_env_value, save_env_value
     from qubit_cli.setup_platforms import declines_reconfigure

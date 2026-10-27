@@ -6,7 +6,7 @@ module load; ``skills_sync_client_wire`` / ``skills_sync_client_org`` are re-exp
 ACCESS GATE (pre-launch): INERT unless the user is a Qubit admin per the ``tool_gateway_admin``
 JWT claim (NAS's misleading name for the global portal-admin permission; replace before shipping).
 OPT-IN DEFAULT (provisional): local intent is the ``sync`` flag in ``.usage.json``; the DURABLE
-cross-device state is the ``sync-manifest`` blob in the plane. Only ~/.hermes/skills/ skills qualify."""
+cross-device state is the ``sync-manifest`` blob in the plane. Only ~/.qubit/skills/ skills qualify."""
 
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def _org_dir() -> Path:  # local mirror root for org skills (read-only by conven
 
 
 def _rel_to_skills_dir(skill_dir: Path) -> Optional[Path]:
-    """*skill_dir* relative to ~/.hermes/skills/, or None if outside/unresolvable."""
+    """*skill_dir* relative to ~/.qubit/skills/, or None if outside/unresolvable."""
     try:
         return skill_dir.resolve().relative_to(_skills_dir().resolve())
     except (OSError, ValueError):
@@ -138,7 +138,7 @@ def _rel_to_skills_dir(skill_dir: Path) -> Optional[Path]:
 
 
 def _skill_rel_path(skill_name: str) -> Optional[PurePosixPath]:
-    """The skill's path relative to ~/.hermes/skills/ (posix), or None."""
+    """The skill's path relative to ~/.qubit/skills/ (posix), or None."""
     from tools.skill_usage import _find_skill_dir
     skill_dir = _find_skill_dir(skill_name)
     rel = _rel_to_skills_dir(skill_dir) if skill_dir is not None else None
@@ -168,7 +168,7 @@ def list_synced_skill_names() -> List[str]:
 
 
 def _all_local_skill_names() -> List[str]:
-    """Every local skill name (dir under ~/.hermes/skills/ with SKILL.md; frontmatter ``name`` or dir name)."""
+    """Every local skill name (dir under ~/.qubit/skills/ with SKILL.md; frontmatter ``name`` or dir name)."""
     names: List[str] = []
     root = _skills_dir()
     try:
@@ -220,7 +220,7 @@ def _default_device_label() -> str:
 
 
 def stable_device_id() -> str:
-    """Per-device label at ~/.hermes/skills/.sync_device_id. An existing file always wins; else seeded
+    """Per-device label at ~/.qubit/skills/.sync_device_id. An existing file always wins; else seeded
     from HERMES_SYNC_DEVICE_NAME (first use only, for Qubit Cloud) or a friendly default, then persisted."""
     with suppress(OSError):
         val = _device_id_path().read_text(encoding="utf-8-sig").strip()
@@ -252,7 +252,7 @@ def set_device_name(name: str) -> str:
 
 
 # Local sync STATE: last HEAD pushed/pulled + its root tree (FULL-digest namespace). Distinct from
-# the bundled manifest (skills_sync.py) and the plane's `sync-manifest`. ~/.hermes/skills/.sync_state.
+# the bundled manifest (skills_sync.py) and the plane's `sync-manifest`. ~/.qubit/skills/.sync_state.
 _EMPTY_STATE: Dict[str, Any] = {"head": None, "skills": {}}
 
 

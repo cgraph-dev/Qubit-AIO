@@ -1,7 +1,7 @@
 """Multi-provider authentication system for Qubit Agent.
 
 - ``ProviderConfig`` / ``PROVIDER_REGISTRY`` describe every known inference provider.
-- The auth store (``~/.hermes/auth.json``) holds per-provider state, the credential pool and
+- The auth store (``~/.qubit/auth.json``) holds per-provider state, the credential pool and
   suppression markers; ``_auth_store_lock`` / ``_load_auth_store`` / ``_save_auth_store`` are the
   only I/O primitives (cross-process flock, atomic 0o600 writes).
 - ``resolve_provider()`` picks the active provider via the documented priority chain.
@@ -273,7 +273,7 @@ def get_anthropic_key() -> str:
 
     Order mirrors ``PROVIDER_REGISTRY["anthropic"].api_key_env_vars``.
 
-    Checks both the ``.env`` file and the process environment, preferring ``~/.hermes/.env`` so a deliberate
+    Checks both the ``.env`` file and the process environment, preferring ``~/.qubit/.env`` so a deliberate
     key rotation isn't shadowed by a stale shell export (matches the api-key resolution path — see #20591).
     """
     from qubit_cli.config import get_env_value_prefer_dotenv
@@ -393,7 +393,7 @@ def _resolve_api_key_provider_secret(provider_id: str, pconfig: ProviderConfig) 
             pass
         return "", ""
 
-    # Prefer ~/.hermes/.env over os.environ so a deliberate key rotation in .env isn't shadowed by
+    # Prefer ~/.qubit/.env over os.environ so a deliberate key rotation in .env isn't shadowed by
     # a stale shell export inherited from a parent process (Codex CLI, test runners, etc.).
     from qubit_cli.config import get_env_value_prefer_dotenv
 
@@ -491,7 +491,7 @@ def _nonempty_str(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-# ── Auth Store — persistence layer for ~/.hermes/auth.json ──────────────────────────────────────────
+# ── Auth Store — persistence layer for ~/.qubit/auth.json ──────────────────────────────────────────
 
 def _auth_file_path() -> Path:
     path = get_qubit_home() / "auth.json"
@@ -1620,7 +1620,7 @@ def _env_key_auto_detected(
                     logger.warning(
                         # An exported API key now wins over a logged-in OAuth provider (the #29285 fix).
                         # Surface that so a user who deliberately uses OAuth but has a stale key in
-                        # ~/.hermes/.env isn't silently switched without knowing why.
+                        # ~/.qubit/.env isn't silently switched without knowing why.
                         "Provider resolved to %r via %s, preempting your "
                         "logged-in OAuth provider %r. If you meant to use the "
                         "OAuth login, unset %s or set `model.provider` "

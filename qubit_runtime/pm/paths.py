@@ -52,7 +52,7 @@ def partials_root() -> Path:
     (WindowsApps/agent-payload), and partials are mutable state the
     downloader writes continuously, so they must land somewhere writable
     on every install kind: ``%LOCALAPPDATA%\\qubit\\cache\\partials`` on
-    Windows, ``~/.hermes/cache/partials`` on POSIX.
+    Windows, ``~/.qubit/cache/partials`` on POSIX.
     """
     from qubit_constants import get_default_qubit_root
 
