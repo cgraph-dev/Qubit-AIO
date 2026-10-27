@@ -66,8 +66,13 @@ def _dispatch(args, *, fake=None):
         dropbox_tool_handler(args, connector_factory=lambda: fake)), fake
 
 
-def test_tool_definition_is_not_registered_globally():
-    assert registry.get_entry("dropbox") is None
+def test_tool_is_registered_in_its_own_toolset():
+    entry = registry.get_entry("dropbox")
+    assert entry is not None
+    assert entry.toolset == "dropbox"
+    assert entry.schema is DROPBOX_TOOL_SCHEMA
+    assert entry.handler is dropbox_tool_handler
+    assert entry.check_fn is dropbox_tool_configured
 
 
 def test_schema_is_read_only_and_has_no_write_actions():
@@ -185,7 +190,8 @@ def test_generic_failure_does_not_leak_the_exception_body():
     assert "secret internal detail" not in raw
 
 
-def test_build_dropbox_tool_returns_an_unwired_definition():
+def test_build_dropbox_tool_returns_a_definition_without_replacing_the_registered_tool():
+    before = registry.get_entry("dropbox")
     fake = _FakeConnector(entries=[_entry("built.txt")])
     tool = build_dropbox_tool(connector_factory=lambda: fake)
 
@@ -196,7 +202,7 @@ def test_build_dropbox_tool_returns_an_unwired_definition():
     assert callable(tool.check_fn)
     payload = json.loads(tool.handler({"action": "list_folder"}))
     assert payload["entries"][0]["name"] == "built.txt"
-    assert registry.get_entry("dropbox") is None
+    assert registry.get_entry("dropbox") is before
 
 
 def test_build_copies_the_schema_so_callers_cannot_mutate_the_shared_one():
@@ -206,7 +212,8 @@ def test_build_copies_the_schema_so_callers_cannot_mutate_the_shared_one():
     assert build_dropbox_tool().schema["description"] != "mutated"
 
 
-def test_registry_kwargs_expose_the_definition_without_registering():
+def test_registry_kwargs_expose_the_definition_without_replacing_the_registered_tool():
+    before = registry.get_entry("dropbox")
     tool = build_dropbox_tool(connector_factory=lambda: _FakeConnector())
     kwargs = tool.as_registry_kwargs()
     assert kwargs["name"] == "dropbox"
@@ -214,7 +221,7 @@ def test_registry_kwargs_expose_the_definition_without_registering():
     assert kwargs["schema"]["name"] == "dropbox"
     assert kwargs["handler"] is tool.handler
     assert kwargs["check_fn"] is tool.check_fn
-    assert registry.get_entry("dropbox") is None
+    assert registry.get_entry("dropbox") is before
 
 
 def test_configured_probe_uses_the_documented_token_file(monkeypatch, tmp_path):

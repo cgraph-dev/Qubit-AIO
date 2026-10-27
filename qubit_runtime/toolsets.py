@@ -38,8 +38,9 @@ _QUBIT_CORE_TOOLS = [
     "computer_use",
     # Service-gated connector account status and authorization links.
     "manage_connections",
-    # Read-only Google Contacts over the existing Google Workspace token.
-    "google_contacts",
+    # Read-only connector tools over their existing credential/platform paths.
+    "google_contacts", "google_calendar", "dropbox",
+    "apple_calendar", "apple_contacts", "apple_health", "apple_music",
 ]
 
 # Webhook payloads are untrusted third-party content: no file/system execution.
@@ -142,6 +143,24 @@ TOOLSETS = {
     "google_contacts": _ts(
         "Read-only Google Contacts search and listing (uses the existing Google Workspace token)",
         ["google_contacts"]),
+    "google_calendar": _ts(
+        "Read-only Google Calendar event listing and search (uses the existing Google Workspace token)",
+        ["google_calendar"]),
+    "dropbox": _ts(
+        "Read-only Dropbox folder listing, metadata and search (uses the existing Dropbox token)",
+        ["dropbox"]),
+    "apple_calendar": _ts(
+        "Read-only Apple Calendar events (macOS EventKit; not exposed on other hosts)",
+        ["apple_calendar"]),
+    "apple_contacts": _ts(
+        "Read-only Apple Contacts search and listing (macOS Contacts; not exposed on other hosts)",
+        ["apple_contacts"]),
+    "apple_health": _ts(
+        "Read-only Apple Health daily summary (macOS HealthKit; not exposed on other hosts)",
+        ["apple_health"]),
+    "apple_music": _ts(
+        "Read-only Apple Music library listing (macOS MusicKit/Music.app; not exposed on other hosts)",
+        ["apple_music"]),
     "project": _ts("Desktop Projects — create/switch named workspaces (GUI sessions only)", ["desktop_project"]),
     "bot_room": _ts("Verified text-only Group Chat turn capabilities"),
 

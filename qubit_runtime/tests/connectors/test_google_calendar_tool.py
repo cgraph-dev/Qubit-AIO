@@ -58,14 +58,20 @@ def _event(title: str = "Standup") -> Event:
     )
 
 
-def test_factory_exposes_a_definition_without_global_wiring():
+def test_factory_and_registry_expose_the_same_definition():
     definition = build_google_calendar_tool()
     assert definition["name"] == "google_calendar"
     assert definition["toolset"] == "google_calendar"
     assert definition["schema"] is GOOGLE_CALENDAR_SCHEMA
     assert definition["handler"] is handle_google_calendar
     assert definition["check_fn"] is not None
-    assert registry.get_entry("google_calendar") is None
+
+    entry = registry.get_entry("google_calendar")
+    assert entry is not None
+    assert entry.toolset == definition["toolset"]
+    assert entry.schema is definition["schema"]
+    assert entry.handler is definition["handler"]
+    assert entry.check_fn is definition["check_fn"]
 
 
 def test_schema_is_read_only_and_bounded():
