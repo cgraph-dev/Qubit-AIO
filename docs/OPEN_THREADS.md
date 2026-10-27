@@ -1,49 +1,22 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-27 (HUD/fleet wave)
+## ▶ Resume point — 2026-10-27 (Tk HUD + fleet)
 
-**State:** `main` at `f1beefbb5` (this handoff commit follows); `canonical/main` pushed; worktree clean; ~67 GB free. Live `qubit-gateway`, `qubit-voicebridge`, `qubit-voice-typing` are active. Gateway identify: `state=ready`, protocol 1, `authority_epoch=28`; `/chat?resume=20261019_094333_0a4efc` → 200. The Voice Edit web HUD (Next.js/Three.js/GSAP) is open in Chromium at 900×760; `voice_edit.panel_backend: web` is set in `~/.config/qubit-voicebridge/voice.yaml` (backup `.bak-webhud-*`), Tk remains the fallback.
+**State:** `main` HEAD after this handoff commit (`git log -1`); `canonical/main` pushed; worktree clean; ~64 GB free. Live `qubit-gateway`, `qubit-voicebridge`, `qubit-voice-typing` are active. Gateway identify: `state=ready`, protocol 1; `/chat?resume=20261019_094333_0a4efc` → 200.
 
-**HUD build:** `frontend/voice-edit-hud/out` exists (gitignored). After a clean checkout, run `npm ci && npm run build` in `frontend/voice-edit-hud` (basePath `/voice-edit`). If the export is missing, the helper falls back to Tk with a typed hint; `systemctl --user restart qubit-voice-typing` reloads either panel.
+**Panel:** the native **Tk HUD** only (`voicebridge/voice_edit/overlay.py`); the web HUD/Next.js/Three.js path was removed at owner direction (Wave 61). `desktop_helper` always uses `make_overlay`; there is no `panel_backend` config anymore. Tk cannot run Next.js/Three.js/GSAP; the cyberpunk look is Canvas drawing. Screenshot: `/tmp/opencode/tk-hud-live.png`.
 
 **Do next, in order:**
-1. Exercise one real Right-Ctrl utterance through the web HUD; verify live partials, final transcript, preview diff, and Apply/Copy/Edit/Retry/Revert/Cancel reach the helper. Fix anything the live turn exposes.
-2. Only after that, decide whether `web` becomes the default (currently explicit config). If the browser is closed manually it does not relaunch until the helper restarts — decide whether that matters.
+1. Exercise one real Right-Ctrl utterance through the Tk HUD; verify live partials, final transcript, preview diff and Apply/Copy/Edit/Retry/Revert/Cancel. Fix anything the live turn exposes.
+2. Run the final focused/full matrix once and record evidence in `docs/STATUS.md`; `VERIFIED` is **not** claimed.
 3. Live connector probes when owner credentials exist (Google Calendar/Contacts scope, Dropbox token); Apple is platform-gated on Linux.
 4. Review `docs/PHASE8_INVENTORY.md` rows with the owner; no HERMES_*/.hermes deletions without sign-off.
-5. Run the final matrix/focused gates and record evidence; `VERIFIED` is **not** claimed.
 
-**Known limits:** no live mic turn through the HUD yet; no live Google/Apple/Dropbox credentials; `qubit gateway status` still labels the live service "manual" (cosmetic supervisor detection); full matrix not run.
-
-**Purpose.** This repo's agent sessions repeatedly died mid-work
-(`maximum number of tool-calling iterations`, context compaction, "previous
-turn was interrupted mid-run") and each new agent started with no knowledge of
-what the last one left unfinished — the owner's words: *"agents stop and you
-forget to continue work."* This file is the single durable answer to "what was
-in flight?". Read it first; update it at the end of every session.
-
-**Source of record.** OpenViking session `20261010_005652_080bf0`
-(744 messages, 2026-10-11 04:53 → 2026-10-12 06:00), archives
-`history/archive_001..007/messages.jsonl`. Every item below cites the archive
-turn it came from and the on-disk state checked **2026-10-12**.
-
-**State-verification legend:** ✅ DONE (verified on disk) · 🟡 PARTIAL /
-needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
-
----
-
-## Wave 57 — 2026-10-27 (Phase 6 slice: local traces + offline eval bench)
-
-- ✅ `qubit_runtime/traces/`: versioned local SQLite store, write-time redaction/bounding, typed missing/corrupt/version errors, list/show/export JSONL/prune. Default OFF (`traces.enabled` / `QUBIT_TRACES_ENABLED`).
-- ✅ `qubit_runtime/evals/bench/`: offline JSONL or trace-store eval; accuracy only with labels, latency p50/p95, token totals/means, cost when known, explicit `unavailable` for energy/FLOPs; no model calls, no network.
-- ✅ CLI `qubit traces list|show|export|prune`, `qubit evals run --dataset FILE [--json] | --from-traces`; exits 0/2/1. Recipe runner records behind the opt-in gate; `-z` intentionally not wired.
-- ✅ Focused tests **41 passed** (traces + eval bench); final combined command with recipes/runtime and parser checks → **169 passed**. Provenance recorded; no upstream code vendored.
-- 🟡 Live/operational gaps: no optimizer run (DSPy absent; stated unavailable), no energy/FLOPs sampler, no dashboard surface, no `-z` usage capture.
-- 🔴 Not done: no service restart, no full matrix, no `VERIFIED`.
+**Known limits:** no live mic turn through the Tk HUD yet; no live Google/Apple/Dropbox credentials; `qubit gateway status` labels the live service "manual" (cosmetic supervisor detection).
 
 ## Wave 60 — 2026-10-27 (HUD + connector/runtime/remediation fleet)
 
-- ✅ Web Voice Edit HUD live: Next.js/Three.js/GSAP static app + loopback WS backend; `panel_backend: web`; Chromium 900×760; Tk fallback.
+- ✅ Voice Edit panel: the native Tk cyberpunk HUD is the final panel; a Next.js/Three.js web HUD was built then removed at owner direction (Wave 61).
 - ✅ Google Calendar/Dropbox wired; Apple pack platform-gated; `rust_local` registered as optional; token writes atomic; pin TTL; stream-json tools; PII policy; deep-research provider/citation fixes; offline variant selector; P8 inventory.
 - ✅ Audit blockers fixed: engine flag precedence, trace WAL snapshot reads, gateway status identity, capture-before-show, stale transcript, contact shapes, recipe terminal/titles.
 - ✅ Focused: 733+6 skipped runtime/CLI/connector/recipe/trace/eval set, 134 root voice/HUD, 89 extra, 57 frontend; live HUD screenshot.

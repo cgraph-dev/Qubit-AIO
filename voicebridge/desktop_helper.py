@@ -4019,32 +4019,7 @@ def main(argv: Optional[list] = None) -> int:
     def _overlay_action(action: str, payload: Dict[str, Any]) -> None:
         helper.on_overlay_action(action, payload)
 
-    overlay: Any = None
-    if not args.headless:
-        try:
-            from .voice_edit.web_panel import (
-                WebPanelOverlay, WebPanelUnavailable, resolve_panel_backend,
-            )
-            if resolve_panel_backend(cfg) == "web":
-                try:
-                    hud_index = (Path(__file__).resolve().parents[1]
-                                 / "frontend" / "voice-edit-hud" / "out"
-                                 / "index.html")
-                    if not hud_index.is_file():
-                        raise WebPanelUnavailable(
-                            "hud_not_built",
-                            "frontend/voice-edit-hud/out is missing; run "
-                            "`npm ci && npm run build` in frontend/voice-edit-hud")
-                    overlay = WebPanelOverlay(_overlay_action)
-                except WebPanelUnavailable as exc:
-                    print(f"Voice Edit web panel unavailable "
-                          f"({exc.code}: {exc.detail}); falling back to Tk.",
-                          file=sys.stderr)
-                    overlay = None
-        except Exception:
-            overlay = None
-    if overlay is None:
-        overlay = make_overlay(_overlay_action, headless=args.headless)
+    overlay: Any = make_overlay(_overlay_action, headless=args.headless)
     client = HelperClient(resolve_service_base(cfg), resolve_token(cfg))
     helper = DesktopHelper(cfg, client=client, overlay=overlay, desktop=desktop,
                            notify=_notify_send)
