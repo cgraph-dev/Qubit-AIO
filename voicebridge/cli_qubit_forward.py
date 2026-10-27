@@ -134,6 +134,13 @@ NATIVE_MCP_READS = frozenset({
 # A subcommand in neither set is a typed refusal, so no mutating upstream
 # surface is reachable through an unrestricted bypass.
 FAMILY_FORWARD = {
+    # Read-only connector readiness plus the existing connect/rename/
+    # disconnect operations (which require --confirm here). Without this row
+    # ``qubit connectors status`` was an argparse invalid choice even though
+    # the runtime parser owned the command.
+    "connectors": ("connectors",
+                   frozenset({"", "status", "doctor", "list", "ls", "accounts"}),
+                   frozenset({"connect", "rename", "disconnect"})),
     "bundles": ("bundles", frozenset({"list", "show", ""}),
                 frozenset({"create", "delete", "reload"})),
     "claw": ("claw", frozenset({""}),

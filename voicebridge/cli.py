@@ -4649,8 +4649,16 @@ def main(argv=None) -> int:
     if raw and raw[0] in ("agent", "hermes"):
         from . import qubit_runtime
         from .branding import help_overlay
+        # ``qubit agent <legacy>`` is the historical passthrough that strips
+        # ``agent`` (``qubit agent chat`` -> runtime ``chat``). The Qubit-native
+        # role surface lives at ``agent roles|run`` inside the runtime parser,
+        # so those two must keep the ``agent`` token; stripping it turned
+        # ``qubit agent roles`` into runtime ``roles`` (invalid choice).
+        forwarded = raw[1:]
+        if raw[0] == "agent" and len(raw) > 1 and raw[1] in ("roles", "run"):
+            forwarded = raw
         with help_overlay.active():
-            return qubit_runtime.run(raw[1:])
+            return qubit_runtime.run(forwarded)
     # Agent 1: forward supported `<family> <sub>` pairs to the real vendored
     # fork (same in-process runtime as `qubit agent`). Only pairs the Qubit
     # parser does not own are routed, so native commands are never shadowed.

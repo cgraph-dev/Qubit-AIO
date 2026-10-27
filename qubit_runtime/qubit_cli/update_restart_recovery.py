@@ -143,9 +143,16 @@ def _run_profile_restart(profile: str, *, run: Callable[..., Any]) -> bool:
 
 def _systemd_unit_candidates(profile: str) -> tuple[str, ...]:
     """Unit names the existing systemd gateway lifecycle produces per profile."""
+    # The installer publishes ``qubit-gateway.service`` (and
+    # ``qubit-gateway-<profile>.service``); the legacy names stay as
+    # read-old candidates so a pre-rename install still verifies.
     if profile == "default":
-        return ("hermes-gateway.service", "gateway.service", "gateway-default.service")
-    return (f"hermes-gateway-{profile}.service", f"gateway-{profile}.service")
+        return ("qubit-gateway.service", "qubit-gateway-default.service",
+                "hermes-gateway.service", "gateway.service",
+                "gateway-default.service")
+    return (f"qubit-gateway-{profile}.service",
+            f"hermes-gateway-{profile}.service",
+            f"gateway-{profile}.service")
 
 
 def _systemd_verified_active(profile: str, *, run: Callable[..., Any]) -> bool:

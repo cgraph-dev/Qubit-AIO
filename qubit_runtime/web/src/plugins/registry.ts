@@ -110,12 +110,15 @@ export const SDK_CONTRACT_VERSION = "1.1.0";
 // here (duplicate ambient declarations with differing modifiers conflict).
 
 export function exposePluginSDK() {
-  window.__HERMES_PLUGINS__ = {
+  // One registry + one SDK object, published under BOTH spellings. First-party
+  // code uses the canonical QUBIT names; the historical HERMES aliases keep
+  // pre-rebrand plugin bundles (whose dist we cannot rebuild) loading.
+  const pluginRegistry = {
     register: registerPlugin,
     registerSlot,
   };
 
-  window.__HERMES_PLUGIN_SDK__ = {
+  const pluginSdk = {
     // Contract version of the plugin SDK surface (see plugins/sdk.d.ts).
     // Bump on backwards-incompatible changes; additive changes don't need it.
     sdkVersion: SDK_CONTRACT_VERSION,
@@ -189,4 +192,9 @@ export function exposePluginSDK() {
     // Hooks
     useI18n,
   };
+
+  window.__QUBIT_PLUGINS__ = pluginRegistry;
+  window.__QUBIT_PLUGIN_SDK__ = pluginSdk;
+  window.__HERMES_PLUGINS__ = pluginRegistry;
+  window.__HERMES_PLUGIN_SDK__ = pluginSdk;
 }
