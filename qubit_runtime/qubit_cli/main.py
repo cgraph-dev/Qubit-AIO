@@ -366,6 +366,7 @@ from qubit_cli.subcommands.slack import build_slack_parser
 from qubit_cli.subcommands.login import build_login_parser
 from qubit_cli.subcommands.logout import build_logout_parser
 from qubit_cli.subcommands.auth import build_auth_parser
+from qubit_cli.subcommands.connectors import build_connectors_parser
 from qubit_cli.subcommands.status import build_status_parser
 from qubit_cli.subcommands.pause import build_pause_parser
 from qubit_cli.subcommands.webhook import build_webhook_parser
@@ -3562,6 +3563,7 @@ def _build_cli_parser():
     build_login_parser(subparsers, cmd_login=cmd_login)
     build_logout_parser(subparsers, cmd_logout=cmd_logout)
     build_auth_parser(subparsers, cmd_auth=cmd_auth)
+    build_connectors_parser(subparsers)
     build_status_parser(subparsers, cmd_status=cmd_status)
     build_pause_parser(subparsers)
     build_cron_parser(subparsers, cmd_cron=cmd_cron)
