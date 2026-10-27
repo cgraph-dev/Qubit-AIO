@@ -26,6 +26,15 @@ needs action · 🔴 OPEN · ❓ UNVERIFIED (claim made, not re-checkable).
 - 🟡 Live/operational gaps: no optimizer run (DSPy absent; stated unavailable), no energy/FLOPs sampler, no dashboard surface, no `-z` usage capture.
 - 🔴 Not done: no service restart, no full matrix, no `VERIFIED`.
 
+## Wave 60 — 2026-10-27 (HUD + connector/runtime/remediation fleet)
+
+- ✅ Web Voice Edit HUD live: Next.js/Three.js/GSAP static app + loopback WS backend; `panel_backend: web`; Chromium 900×760; Tk fallback.
+- ✅ Google Calendar/Dropbox wired; Apple pack platform-gated; `rust_local` registered as optional; token writes atomic; pin TTL; stream-json tools; PII policy; deep-research provider/citation fixes; offline variant selector; P8 inventory.
+- ✅ Audit blockers fixed: engine flag precedence, trace WAL snapshot reads, gateway status identity, capture-before-show, stale transcript, contact shapes, recipe terminal/titles.
+- ✅ Focused: 733+6 skipped runtime/CLI/connector/recipe/trace/eval set, 134 root voice/HUD, 89 extra, 57 frontend; live HUD screenshot.
+- 🟡 Next: exercise one real mic turn through the web HUD (confirm partials/preview/actions), then consider making `web` the default; live connector probes when owner credentials exist; owner sign-off rows from `docs/PHASE8_INVENTORY.md`.
+- 🔴 Not done: full matrix, `VERIFIED`, Tk removal.
+
 ## Wave 59 — 2026-10-27 (Phase 4: monitor_operative recipe)
 
 - ✅ Read-only `monitor_operative` over existing surfaces: cron (failed/paused/overdue/next run/ticker), kanban board stats (blocked/oldest-ready/repeated failures; overdue explicitly `not_supported`), memory provider discovery, compression counters via `SessionDB(read_only=True)`. No mutations; each section degrades typed; facts bounded/redacted.

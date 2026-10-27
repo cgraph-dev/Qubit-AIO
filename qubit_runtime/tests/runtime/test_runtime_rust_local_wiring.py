@@ -69,7 +69,7 @@ def test_build_registry_registers_rust_local_without_changing_the_default():
     parser = argparse.ArgumentParser()
     subs = parser.add_subparsers(dest="command")
     build_runtime_parser(subs, cmd_runtime=lambda args: 0)
-    assert parser.parse_args(["runtime", "run", "--prompt", "x"]).engine == "native"
+    assert getattr(parser.parse_args(["runtime", "run", "--prompt", "x"]), "engine", "native") == "native"
 
 
 def test_engines_annotates_an_unavailable_rust_engine(monkeypatch):

@@ -7,7 +7,7 @@
  */
 import process from 'node:process';
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/voice-edit';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

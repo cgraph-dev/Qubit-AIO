@@ -169,3 +169,12 @@ def test_live_payload_launched_gateway_is_found_for_its_home(argv, profile, foun
     monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: " ".join(_payload_launcher(argv)))
 
     assert status.live_gateway_pid_for_home(home) == (4242 if found else None)
+
+
+def test_voicebridge_gateway_daemon_is_recognized_as_the_gateway():
+    assert looks_like_gateway_command_line(
+        "/home/x/.venv/bin/python -m voicebridge.gateway_daemon")
+    assert looks_like_gateway_command_line(
+        "/home/x/.venv/bin/python -m voicebridge.gateway_daemon --profile default")
+    assert not looks_like_gateway_command_line(
+        "/home/x/.venv/bin/python -m voicebridge run")

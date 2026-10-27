@@ -625,6 +625,12 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
     # (e.g. the Discord bot-token lock). See #22418.
     if any(b == "desktop-gateway.py" for b in basenames):
         return "run"
+    # The VoiceBridge messaging gateway is the live daemon for this install
+    # (``python -m voicebridge.gateway_daemon``); without this, `qubit gateway
+    # status` reports "not running" while the PID/heartbeat are live.
+    if any(b in ("voicebridge.gateway_daemon", "voicebridge/gateway_daemon.py")
+           for b in basenames):
+        return "run"
     # Read-old/write-new like ``_LEGACY_GATEWAY_KIND``: a pre-rebrand install
     # still runs ``hermes-gateway[.exe]`` and must be recognised as a gateway.
     if any(b in ("qubit-gateway", "qubit-gateway.exe",

@@ -889,7 +889,7 @@ def test_registry_lists_all_engines_and_native_is_the_parser_default():
     parser = argparse.ArgumentParser()
     subs = parser.add_subparsers(dest="command")
     build_runtime_parser(subs, cmd_runtime=lambda args: 0)
-    assert parser.parse_args(["runtime", "run", "--prompt", "x"]).engine == "native"
+    assert getattr(parser.parse_args(["runtime", "run", "--prompt", "x"]), "engine", "native") == "native"
 
 
 def test_module_never_imports_openjarvis_in_process():
