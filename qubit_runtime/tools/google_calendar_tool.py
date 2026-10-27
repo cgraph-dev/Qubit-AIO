@@ -5,9 +5,9 @@ Exposes one model-facing action surface (``list`` / ``search``) over
 the OAuth token refresh, scope checks and typed refusals live in the connector;
 this module only validates arguments and renders bounded JSON.
 
-This module deliberately does not register itself in the global tool registry:
-wiring the toolset is a separate, explicit decision. Call
-``build_google_calendar_tool()`` to obtain the definition.
+The tool registers in the ``google_calendar`` toolset at import; its ``check_fn``
+keeps the schema out of every session until the existing Google Workspace token
+is present.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from connectors.google_calendar import (
     GoogleCalendarError,
     REASON_INVALID_REQUEST,
 )
-from tools.registry import tool_error, tool_result
+from tools.registry import registry, tool_error, tool_result
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ GOOGLE_CALENDAR_SCHEMA = {
 
 
 def build_google_calendar_tool() -> dict[str, Any]:
-    """Return the tool definition without registering it globally."""
+    """Return the tool definition without registering another copy."""
     return {
         "name": TOOL_NAME,
         "toolset": TOOLSET,
@@ -165,6 +165,18 @@ def build_google_calendar_tool() -> dict[str, Any]:
         "description": "Read-only Google Calendar listing and search",
         "max_result_size_chars": _MAX_RESULT_CHARS,
     }
+
+
+registry.register(
+    name=TOOL_NAME,
+    toolset=TOOLSET,
+    schema=GOOGLE_CALENDAR_SCHEMA,
+    handler=handle_google_calendar,
+    check_fn=_google_calendar_configured,
+    emoji="📅",
+    description="Read-only Google Calendar listing and search",
+    max_result_size_chars=_MAX_RESULT_CHARS,
+)
 
 
 __all__ = [

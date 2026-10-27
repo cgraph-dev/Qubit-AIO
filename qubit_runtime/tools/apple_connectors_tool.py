@@ -1,9 +1,9 @@
-"""Model-facing definitions for the read-only Apple connector pack.
+"""Model-facing definitions and registry wiring for the read-only Apple pack.
 
-This module deliberately performs **no global registration** and imports no
-framework. It exposes JSON schemas and handler factories; a caller that wants
-to wire an Apple tool into a toolset constructs a handler with an injected
-read-only backend and registers it itself.
+The four tools register in their own toolsets at import, each behind a
+``check_fn`` that is true only on macOS when the matching framework module is
+installed. Callers that provide their own read-only framework adapter can still
+use the handler factories directly.
 
 On non-macOS hosts every handler returns a typed ``not_supported`` error naming
 the host platform and the required macOS framework. It never returns an empty
@@ -12,7 +12,10 @@ success payload in place of a refusal.
 
 from __future__ import annotations
 
+import importlib.util
 import logging
+import shutil
+import sys
 from typing import Any, Callable, Optional
 
 from connectors.apple_calendar import (
@@ -39,7 +42,7 @@ from connectors.apple_music import (
     MAX_LIMIT as MUSIC_MAX_LIMIT,
     AppleMusicConnector,
 )
-from tools.registry import tool_error, tool_result
+from tools.registry import registry, tool_error, tool_result
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +188,39 @@ def _tool_failure(name: str, exc: Exception) -> str:
         return _error_payload(exc)
     logger.warning("%s tool failed with %s", name, type(exc).__name__)
     return tool_error(f"{name} failed", reason="tool_error")
+
+
+def _framework_module_available(module_name: str) -> bool:
+    """True when the macOS framework bridge module is importable on this host."""
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _apple_host_ready(*framework_modules: str) -> bool:
+    """macOS only, and at least one of the tool's framework modules must exist."""
+    if sys.platform != "darwin":
+        return False
+    return any(_framework_module_available(name) for name in framework_modules)
+
+
+def apple_calendar_configured() -> bool:
+    return _apple_host_ready("EventKit")
+
+
+def apple_contacts_configured() -> bool:
+    return _apple_host_ready("Contacts")
+
+
+def apple_health_configured() -> bool:
+    return _apple_host_ready("HealthKit")
+
+
+def apple_music_configured() -> bool:
+    if _apple_host_ready("MusicKit", "ScriptingBridge"):
+        return True
+    return sys.platform == "darwin" and shutil.which("osascript") is not None
 
 
 def make_calendar_handler(
@@ -351,3 +387,47 @@ def apple_tool_definitions() -> tuple[dict[str, Any], ...]:
             "description": "Read-only Apple Music library listing",
         },
     )
+
+
+APPLE_TOOL_REGISTRATIONS = (
+    {
+        "name": "apple_calendar",
+        "toolset": "apple_calendar",
+        "schema": APPLE_CALENDAR_SCHEMA,
+        "handler": make_calendar_handler(),
+        "check_fn": apple_calendar_configured,
+        "emoji": "\U0001F4C5",
+        "description": "Read-only Apple Calendar events",
+    },
+    {
+        "name": "apple_contacts",
+        "toolset": "apple_contacts",
+        "schema": APPLE_CONTACTS_SCHEMA,
+        "handler": make_contacts_handler(),
+        "check_fn": apple_contacts_configured,
+        "emoji": "\U0001F465",
+        "description": "Read-only Apple Contacts search and listing",
+    },
+    {
+        "name": "apple_health",
+        "toolset": "apple_health",
+        "schema": APPLE_HEALTH_SCHEMA,
+        "handler": make_health_handler(),
+        "check_fn": apple_health_configured,
+        "emoji": "\U0001FA7A",
+        "description": "Read-only Apple Health daily summary",
+    },
+    {
+        "name": "apple_music",
+        "toolset": "apple_music",
+        "schema": APPLE_MUSIC_SCHEMA,
+        "handler": make_music_handler(),
+        "check_fn": apple_music_configured,
+        "emoji": "\U0001F3B5",
+        "description": "Read-only Apple Music library listing",
+    },
+)
+
+for _registration in APPLE_TOOL_REGISTRATIONS:
+    registry.register(max_result_size_chars=100_000, **_registration)
+del _registration

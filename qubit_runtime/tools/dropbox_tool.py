@@ -1,10 +1,9 @@
-"""Read-only Dropbox tool definition.
+"""Read-only Dropbox tool definition and registry wiring.
 
 This module exposes a model-facing tool surface over
-``connectors.dropbox.DropboxConnector`` without touching the global registry or
-toolset table. Callers that want to offer Dropbox build the tool with
-:func:`build_dropbox_tool` and decide where it belongs; importing this module
-has no wiring side effect.
+``connectors.dropbox.DropboxConnector`` and registers it in the ``dropbox``
+toolset at import. Its ``check_fn`` keeps the schema out of every session until
+the documented Dropbox token file is present.
 
 The three actions are ``list_folder``, ``metadata`` and ``search``. There is no
 upload, delete, create, move, copy or share action. Errors keep the connector's
@@ -26,7 +25,7 @@ from connectors.dropbox import (
     DropboxError,
     REASON_INVALID_REQUEST,
 )
-from tools.registry import tool_error, tool_result
+from tools.registry import registry, tool_error, tool_result
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +186,7 @@ def build_dropbox_tool(
     *,
     connector_factory: Optional[Callable[[], DropboxConnector]] = None,
 ) -> DropboxToolDefinition:
-    """Build the read-only Dropbox tool without registering it anywhere."""
+    """Build an inspectable Dropbox definition without replacing the registered tool."""
     schema = copy.deepcopy(DROPBOX_TOOL_SCHEMA)
     if connector_factory is None:
         handler = dropbox_tool_handler
@@ -202,6 +201,18 @@ def build_dropbox_tool(
         handler=handler,
         check_fn=dropbox_tool_configured,
     )
+
+
+registry.register(
+    name=TOOL_NAME,
+    toolset=TOOLSET,
+    schema=DROPBOX_TOOL_SCHEMA,
+    handler=dropbox_tool_handler,
+    check_fn=dropbox_tool_configured,
+    emoji="🗂️",
+    description="Read-only Dropbox listing, metadata and search",
+    max_result_size_chars=_MAX_RESULT_CHARS,
+)
 
 
 __all__ = [

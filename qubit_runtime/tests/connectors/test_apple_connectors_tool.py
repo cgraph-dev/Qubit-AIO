@@ -68,20 +68,22 @@ def _json(raw: str) -> dict:
     return payload
 
 
-def test_definitions_are_data_only_and_not_registered_globally():
-    for name in APPLE_NAMES:
-        assert registry.get_entry(name) is None
-
+def test_definitions_match_their_registered_tools():
     definitions = apple_tool_definitions()
 
-    for name in APPLE_NAMES:
-        assert registry.get_entry(name) is None
     assert [item["name"] for item in definitions] == list(APPLE_NAMES)
     assert [item["toolset"] for item in definitions] == list(APPLE_NAMES)
     assert definitions[0]["schema"] is APPLE_CALENDAR_SCHEMA
     assert definitions[1]["schema"] is APPLE_CONTACTS_SCHEMA
     assert definitions[2]["schema"] is APPLE_HEALTH_SCHEMA
     assert definitions[3]["schema"] is APPLE_MUSIC_SCHEMA
+
+    for item in definitions:
+        entry = registry.get_entry(item["name"])
+        assert entry is not None
+        assert entry.toolset == item["toolset"]
+        assert entry.schema is item["schema"]
+        assert entry.check_fn is not None
 
 
 @pytest.mark.parametrize(
