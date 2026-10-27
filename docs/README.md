@@ -95,6 +95,10 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `PHASE8_INVENTORY.md` | Phase 8 measured inventory — HERMES_*/.hermes/plugin-SDK surface and owner decision table |
 | `PHASE8-SIGNOFF-PACK.md` | P8 owner sign-off pack — measured drift and the decision table |
 | `MATRIX-BASELINE-2026-10-27.md` | Matrix baseline — pre-merge chunk runs, failures and per-file reruns |
+| `PHASE8-D21-AUDIT.md` | P8 D21 — write-only env names re-derived and kept |
+| `REBRAND-EVIDENCE-2026-10-27.md` | D19 evidence framing rebrand — raw captures preserved |
+| `REBRAND-PROSE-2026-10-27.md` | D17/D18 prose cleanup — comments/docstrings only |
+| `REBRAND-WEBSITE-2026-10-27.md` | D16 vendored website rebrand — counts and exceptions |
 | `PLAN.md` | Qubit PLAN — where the real plan lives, and the rules for claiming progress |
 | `PORT-PLAN.md` | PORT PLAN — closing the upstream gap in finishable chunks |
 | `POST_RESTART_VERIFICATION_2026-10-10.md` | Post-Restart Verification + Health Baseline — 2026-10-10 |

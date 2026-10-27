@@ -1,5 +1,10 @@
 # PHASE 8 — owner sign-off pack (re-measured)
 
+> **Owner decision recorded 2026-10-27 (`docs/DECISIONS.md` ruling 12).**
+> Keep D1–D7, D9–D11, D13–D15, D20, D22; D8/D12 fixed; D21 audited (all kept);
+> D16/D19 rebranded; D17/D18 cleaned; D15 legal attribution untouched. The
+> row table below remains the evidence; the ruling is the authority.
+
 **Status:** read-only decision aid. **Owner sign-off still required.** No product code, docs,
 env vars, paths, globals, or services were changed, deleted, or renamed by this lane. This
 document does not claim `VERIFIED`, parity, or completion.

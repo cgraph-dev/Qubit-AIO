@@ -105,3 +105,21 @@ done
    scope. Evidence and the milestone record: `docs/STATUS.md` wave 47 and
    `docs/FROZEN_TARGET.md` §"Platform scope".
 
+12. **P8 owner decision (2026-10-27).** The owner reviewed the measured
+    inventory and directed: keep D1–D7, D9–D11, D13–D15, D20 and D22 as-is;
+    verify D8/D12/D21; rebrand D16 and D19; clean up D17 and D18; never touch
+    D15 legal attribution. Execution evidence: D8 now dual-publishes the
+    canonical and legacy plugin-SDK globals in the vendored SPA; D12 probes
+    `qubit-gateway*` units before the legacy names; D21's write-only set was
+    re-derived (19 line-level / 18 true writers, not 22) and every writer is
+    kept because a reader or child inheritance exists; D16 rebranded the
+    vendored website (469 files; brand guard OK); D19 rebranded only the
+    document framing while preserving raw evidence; D17/D18 changed comments
+    and prose only (brand guard OK). No `HERMES_*`, `.hermes`,
+    `/root/.hermes`, plugin-global, model-name or attribution contract was
+    renamed. Evidence: `docs/REBRAND-WEBSITE-2026-10-27.md`,
+    `docs/REBRAND-PROSE-2026-10-27.md`,
+    `docs/REBRAND-EVIDENCE-2026-10-27.md`, `docs/PHASE8-D21-AUDIT.md`.
+    → Provenance: owner session 2026-10-27; measure/decision pack in
+    `docs/PHASE8-SIGNOFF-PACK.md`.
+

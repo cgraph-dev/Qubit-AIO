@@ -1,18 +1,26 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-27 (readiness wave merged)
+## ▶ Resume point — 2026-10-27 (P8 decision executed)
 
-**State:** `main` = the Wave 64 readiness merge (worktree clean; `canonical/main` pushed). Live `qubit-gateway`, `qubit-voicebridge` (pid 1175783, `DISPLAY=:0`) and `qubit-voice-typing` are active; `/chat?resume=20261019_094333_0a4efc` → **200**; `/api/voice-edit/status` → `helper_live: true`, `display_health: {x11: true}`; Telegram `@QubitBot` polling.
+**State:** `main` = the Wave 65 merge (worktree clean; `canonical/main` pushed). Live `qubit-gateway`, `qubit-voicebridge` and `qubit-voice-typing` active; `/chat?resume=20261019_094333_0a4efc` → **200**; Telegram `@QubitBot` polling. Preflight now works from the real launcher: `qubit agent roles` lists 8, `qubit connectors status` shows typed rows.
 
-**What changed:** 8 readiness lanes closed the absorption limits. Model tiers are real via `roles.model_tiers` (+ `--model/--provider`); deterministic `uppercase`/`lowercase`/`title_case` transforms need no model; `voicebridge/voice_edit/warm.py` warms the local/detail models on the first turn edge; `qubit connectors status` reports credential/platform readiness; `/api/voice-edit/status` carries `display_health`; `scripts/verify_role_voice.py` proves all 8 roles by text+voice; `docs/PHASE8-SIGNOFF-PACK.md` and `docs/MATRIX-BASELINE-2026-10-27.md` record the remaining decisions/evidence.
+**What changed:** the owner's P8 ruling is recorded (`docs/DECISIONS.md` ruling 12) and executed — D8 canonical+legacy plugin SDK dual-publish, D12 `qubit-gateway*` restart candidates, D21 audit (18 true write-only names, all kept), D16 website rebrand (469 files), D17/D18 comments/prose only, D19 evidence framing only. The preflight also exposed and fixed two launcher bugs: `qubit agent roles|run` was stripped to runtime `roles|run`, and `connectors` had no forward route.
 
 **Do next, in order:**
-1. Owner live test: one role by voice (e.g. "fix this code") and one Tk selection case command ("make it uppercase"); confirm the new deterministic path and the real role turn.
-2. If local tiers are wanted, fill `roles.model_tiers` (`local`/`detail` → provider+model) in the runtime config; otherwise the active model is used and reported as `model_tier_applied: false`.
-3. Release gate: one uninterrupted full-matrix pass. The baseline chunks timed out under host load; the 29 combined-run failures all pass per file (47 passed) and the 21 gateway failures pass alone. `VERIFIED` is **not** claimed until a clean pass (or an owner waiver) is recorded.
-4. P8 owner sign-off on `docs/PHASE8-SIGNOFF-PACK.md` D1–D22; no `HERMES_*`/`.hermes`/plugin/attribution deletion or rename without a ruling.
+1. Run the full gate with the canonical per-file runner after sleep:
+   `cd qubit_runtime && nice -n 10 python scripts/run_tests_parallel.py -j 6 --file-timeout 600 tests`
+2. Owner live test: one voice role ("simple mode: reply with exactly OK"), one Tk selection case ("make it uppercase"), one normal rewrite/Apply/Revert.
+3. Optional: build the vendored website (`qubit_runtime/website`) and click through; not built this session.
+4. P8 is now recorded; only the full matrix and live voice turn remain before a `VERIFIED` claim.
 
-**Known limits:** no owner live voice role/selection turn yet; `roles.model_tiers` is empty on this host; combined-run test contamination still requires per-file reruns; OpenJarvis remains an optional benchmark, not a dependency.
+**Known limits:** no full matrix/`VERIFIED`; no website build; `roles.model_tiers` still empty on this host; D21 count differs from the inventory (documented).
+
+## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
+
+- ✅ D8 dual-publish, D12 qubit unit candidates, D21 audit, D16 website rebrand (469 files), D17/D18 prose-only, D19 evidence framing.
+- ✅ Launcher fixes: `qubit agent roles|run` keep the `agent` token; `qubit connectors status|list|accounts` forward; connect/rename/disconnect confirm-gated. Tests pin both.
+- ✅ Verified: 5 launcher/dual-publish + 102 roles/connector/D12 + 27 root role/bridge/rebrand; brand guard **OK (46)**; compileall clean; live preflight 3 active, `/chat` 200, 8 roles, typed connector rows.
+- 🔴 No website build, no full matrix, no `VERIFIED`.
 
 ## Wave 64 — 2026-10-27 (readiness wave)
 
