@@ -1,9 +1,10 @@
 """Named RuntimePort backends.
 
 ``native`` is the default (vendored ``AIAgent``). ``openjarvis`` is an optional
-out-of-process engine: it is always registered so ``qubit runtime engines`` can
-name it, but it refuses cleanly when its pinned CLI is absent, unpinned or
-unverifiable. Availability never changes the default engine.
+out-of-process engine and ``rust_local`` is an optional in-process PyO3 engine:
+both are always registered so ``qubit runtime engines`` can name them, but each
+refuses cleanly when its dependency is absent, unpinned or unverifiable.
+Availability never changes the default engine and a refusal never falls back.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from typing import Any, Callable
 from agent.runtime_native import NativeRuntime
 from agent.runtime_openjarvis import OpenJarvisRuntime
 from agent.runtime_port import RuntimeBackend, UnknownRuntimeError
+from agent.runtime_rust_local import RustLocalRuntime
 
 
 class RuntimeRegistry:
@@ -36,4 +38,5 @@ def build_registry(
     registry = RuntimeRegistry()
     registry.register(NativeRuntime(agent_factory, stream=native_stream))
     registry.register(OpenJarvisRuntime())
+    registry.register(RustLocalRuntime())
     return registry
