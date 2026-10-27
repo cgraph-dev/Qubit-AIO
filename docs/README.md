@@ -66,6 +66,7 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `FLAKY-TEST-FINDINGS.md` | Flaky-test findings — `test_office_vendor_habblaud.py` (OPEN_THREADS §4.15) |
 | `FROZEN_TARGET.md` | FROZEN TARGET: upstream `43faacfb8de7` |
 | `FROZEN_TARGET_WORKLIST.md` | FROZEN-TARGET WORKLIST — production symbols still missing |
+| `HANDOFF_PROMPT.md` | Operational handoff prompt — current state and next work (not authority) |
 | `HERMES_RESIDUE_INVENTORY.md` | Hermes-residue inventory (deliberate compat vs accidental half-rebrand) |
 | `IDENTITY.md` | Qubit IDENTITY — what Qubit is |
 | `LEFTOVER_UNVERIFIED_VERDICTS_2026-10-19.md` | Leftover unverified items — verdicts with literal evidence |
