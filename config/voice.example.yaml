@@ -268,6 +268,7 @@ agent_runtime:
 #   mic_gain: 12.0
 #   speak_answers: true       # speak replies aloud
 #   history_panel: true       # show the overlay history
+#   panel_backend: tk         # tk (native HUD, default) | web (local Next.js HUD)
 #
 # Local chat wording (applies to the voice brain; both configurable):
 # intent:
