@@ -52,6 +52,7 @@ from .voice_edit.session_fsm import (
 from .voice_edit.stt_client import ParecMic, SttClient, SttError, transcribe_once
 from .voice_edit.talk_events import TalkEventSequencer
 from .voice_edit.talk_fsm import TalkStateMachine, reduce as reduce_talk
+from .voice_edit.warm import warm_async as warm_voice_models
 
 
 def _trace(stage: str, **fields: Any) -> None:
@@ -2344,6 +2345,15 @@ class DesktopHelper:
                 self._ui_status("error", f"{exc.code}")
                 self._talk_emit("error", code=exc.code)
                 return False
+            # Start the local voice-edit model warm on the earliest turn edge.
+            # Fire-and-forget: single-flight, cooldown-bounded, never blocks the
+            # hotkey and never changes behavior when warming fails. This is
+            # separate from the STT decoder warm below; the classifier/transform
+            # budgets stay untouched, the model just starts loading now.
+            try:
+                warm_voice_models(self.cfg)
+            except Exception:
+                pass
             # Accurate mode: cue the wait for the background prewarm, bounded,
             # so the user is not left waiting blind on the first activation.
             self._wait_for_warm()
