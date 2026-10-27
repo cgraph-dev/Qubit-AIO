@@ -1,18 +1,25 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-27 (OpenJarvis 8 agents absorbed as roles)
+## ▶ Resume point — 2026-10-27 (readiness wave merged)
 
-**State:** `main` = the Wave 63 merge commit (worktree clean; `canonical/main` pushed). Live `qubit-gateway`, `qubit-voicebridge` (pid 111266, `DISPLAY=:0`) and `qubit-voice-typing` are active; `/chat?resume=20261019_094333_0a4efc` → 200; Telegram `@QubitBot` polling.
+**State:** `main` = the Wave 64 readiness merge (worktree clean; `canonical/main` pushed). Live `qubit-gateway`, `qubit-voicebridge` (pid 1175783, `DISPLAY=:0`) and `qubit-voice-typing` are active; `/chat?resume=20261019_094333_0a4efc` → **200**; `/api/voice-edit/status` → `helper_live: true`, `display_health: {x11: true}`; Telegram `@QubitBot` polling.
 
-**What changed:** OpenJarvis's 8 agents are now Qubit-native **roles** — one loop, one authority path, one `QUBIT_HOME`, voice-reachable. `qubit_runtime/roles/` (contract, auto-discovered registry, runner), `qubit agent roles|run`, `voicebridge/role_bridges.py`, `scripts/audit_openjarvis_absorption.py`, `docs/OPENJARVIS-8-AGENT-ABSORPTION.md`. Roles: `orchestrator`, `react`, `operative`, `openhands`, `simple`, `researcher`, `digest` (recipe), `monitor` (recipe). OpenJarvis itself is **not** installed and is not used by the role path.
+**What changed:** 8 readiness lanes closed the absorption limits. Model tiers are real via `roles.model_tiers` (+ `--model/--provider`); deterministic `uppercase`/`lowercase`/`title_case` transforms need no model; `voicebridge/voice_edit/warm.py` warms the local/detail models on the first turn edge; `qubit connectors status` reports credential/platform readiness; `/api/voice-edit/status` carries `display_health`; `scripts/verify_role_voice.py` proves all 8 roles by text+voice; `docs/PHASE8-SIGNOFF-PACK.md` and `docs/MATRIX-BASELINE-2026-10-27.md` record the remaining decisions/evidence.
 
 **Do next, in order:**
-1. Owner live test of one role by voice (e.g. "fix this code" → `role_openhands`) and one by text (`qubit agent run simple --prompt ...`); confirm real work and no confirmation bypass.
-2. Decide whether to add a `roles.model_tiers` map. Today `AgentRole.model_tier` is a declared hint; the runner uses the active model and reports the real `model`/`provider` (a `simple` turn used `deepseek-v4.1-flash` and took ~101 s).
-3. Full matrix / `VERIFIED`: focused evidence is green (roles **60 passed**; root absorption/voice **26 passed**; audit **CLEAN 8/8**), but no full-repo matrix and no release verdict.
-4. Open items from Wave 62: owner live Tk selection turn; credentialed connector probes; P8 §8 owner sign-off; cold local-model budget note.
+1. Owner live test: one role by voice (e.g. "fix this code") and one Tk selection case command ("make it uppercase"); confirm the new deterministic path and the real role turn.
+2. If local tiers are wanted, fill `roles.model_tiers` (`local`/`detail` → provider+model) in the runtime config; otherwise the active model is used and reported as `model_tier_applied: false`.
+3. Release gate: one uninterrupted full-matrix pass. The baseline chunks timed out under host load; the 29 combined-run failures all pass per file (47 passed) and the 21 gateway failures pass alone. `VERIFIED` is **not** claimed until a clean pass (or an owner waiver) is recorded.
+4. P8 owner sign-off on `docs/PHASE8-SIGNOFF-PACK.md` D1–D22; no `HERMES_*`/`.hermes`/plugin/attribution deletion or rename without a ruling.
 
-**Known limits:** no live voice role turn through the bridge yet; role turns call the real provider; `qubit gateway status` may label the live service "manual"; OpenJarvis remains an optional benchmark/engine, not a dependency.
+**Known limits:** no owner live voice role/selection turn yet; `roles.model_tiers` is empty on this host; combined-run test contamination still requires per-file reruns; OpenJarvis remains an optional benchmark, not a dependency.
+
+## Wave 64 — 2026-10-27 (readiness wave)
+
+- ✅ 8 lanes merged: model tiers, deterministic case transforms, cold-start warm, connector status, display health, role-voice harness, P8 sign-off pack, matrix baseline.
+- ✅ Merged-tree evidence: roles **74 passed**; new focused set **84 passed**; HUD/voice **192 passed**; runtime/recipes/connectors/traces/evals **695 passed, 6 skipped**; audit **CLEAN 8/8**; role voice **CLEAN 8/8**; connector status typed rows; live `display_health.x11=true`.
+- ✅ Matrix baseline: chunks 1/2 green (572 + 138); chunks 3/4 timed out at 23%/31% under host load; 29 chunk-3 failures reproduce only in the combined run and **47 tests pass per file**; 21 chunk-4 failures pass alone.
+- 🔴 No single uninterrupted full-matrix pass, so **no `VERIFIED`**; no owner live voice role/selection turn; `roles.model_tiers` empty by default.
 
 ## Wave 63 — 2026-10-27 (OpenJarvis 8-agent absorption)
 

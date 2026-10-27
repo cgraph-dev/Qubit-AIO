@@ -98,7 +98,9 @@ All seven lanes are merged on `main` and the merged tree was exercised:
   returns `role_openhands`. The `monitor` aliases stay with the existing
   `monitor_operative` recipe bridge, which calls the same recipe.
 
-Honest limits: `AgentRole.model_tier` is a declared hint; the runner uses the
-active model and reports the real `model`/`provider` plus `model_tier` in the
-result (no separate tier map was configured). Role turns call the real model,
-so latency depends on the provider. No full matrix and **no `VERIFIED`** claim.
+Honest limits: `AgentRole.model_tier` is real when `roles.model_tiers` is
+configured (or `--model`/`--provider` is passed); without that map the runner
+uses the active model and reports `model_tier_applied: false` plus the actual
+`model`/`provider` — it never claims the tier was honoured. Role turns call the
+real model, so latency depends on the provider. No full matrix and **no
+`VERIFIED`** claim.
