@@ -179,6 +179,10 @@ FAMILY_FORWARD_WAVE6 = {
     # fork resolves the alias it was invoked with.
     "journey": ("journey", frozenset({"list", ""}),
                 frozenset({"delete", "edit"})),
+    # `optimize variants` is a read-only offline report over local labeled
+    # samples (no model, no network, no writes); it is forwarded to the
+    # vendored parser so `qubit optimize` names the real command.
+    "optimize": ("optimize", frozenset({"variants", ""}), frozenset()),
     "learning": ("learning", frozenset({"list", ""}),
                  frozenset({"delete", "edit"})),
     "pets": ("pets", frozenset({"list", "show", "doctor", ""}),
