@@ -13,6 +13,11 @@ A native-store resume supplies history but the P2 adapter is stateless: the new
 turn is not written to the native session store (same contract as ``qubit -z``).
 Interactive clarify, native toolsets/model routing and image attachments are
 native-only and are refused rather than silently dropped.
+
+``--format stream-json`` carries the port's ``tool`` events: each becomes a
+``tool_use``/``tool_result`` pair (the engine reports a completed-call summary,
+so no input/output is invented). The schema can represent them, so this path
+never silently drops a tool call.
 """
 from __future__ import annotations
 
@@ -126,11 +131,13 @@ def run_non_native_single_query(
     emitter = None
     streamed: list[str] = []
     sink = None
+    tool_sink = None
     if stream_json:
         from qubit_cli.stream_json import StreamJsonEmitter
 
         emitter = StreamJsonEmitter(model="", session_id="")
         sink = emitter.on_text_delta
+        tool_sink = emitter.on_port_tool_event
     elif not quiet:
         def sink(text: str) -> None:  # noqa: F811 - non-streaming/quiet paths leave it None
             if not text:
@@ -142,7 +149,7 @@ def run_non_native_single_query(
     try:
         response, result = _run_port_oneshot(
             prompt, engine=engine, skills=skills, resume=resume, stream=sink,
-            extra_system=_NON_INTERACTIVE_NOTE,
+            extra_system=_NON_INTERACTIVE_NOTE, tool_sink=tool_sink,
         )
     except KeyboardInterrupt:
         return 130

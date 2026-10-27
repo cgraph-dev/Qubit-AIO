@@ -21,6 +21,11 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 from urllib.parse import quote
 
+from connectors._google_token_store import (
+    persist_authorized_user_credentials,
+    token_file_lock,
+)
+
 logger = logging.getLogger(__name__)
 
 CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
@@ -326,18 +331,32 @@ class GoogleCalendarConnector:
             return str(credentials.token)
 
         if credentials.expired and credentials.refresh_token:
-            request = self._refresh_request or self._default_refresh_request()
-            try:
-                credentials.refresh(request)
-            except Exception as exc:
-                raise GoogleCalendarError(
-                    REASON_REAUTHORIZE_REQUIRED,
-                    "Google token refresh failed "
-                    f"({type(exc).__name__}); re-run the google-workspace setup",
-                ) from None
-            self._persist_refreshed(credentials)
-            if credentials.token:
-                return str(credentials.token)
+            with token_file_lock(self.token_path):
+                # Another process may have refreshed while this one waited for
+                # the advisory lock. Re-read so only one refresh reaches Google
+                # and a stale token never overwrites the fresh one.
+                try:
+                    credentials = Credentials.from_authorized_user_info(
+                        self._read_payload())
+                except Exception:
+                    pass
+
+                if credentials.valid and credentials.token:
+                    return str(credentials.token)
+
+                if credentials.expired and credentials.refresh_token:
+                    request = self._refresh_request or self._default_refresh_request()
+                    try:
+                        credentials.refresh(request)
+                    except Exception as exc:
+                        raise GoogleCalendarError(
+                            REASON_REAUTHORIZE_REQUIRED,
+                            "Google token refresh failed "
+                            f"({type(exc).__name__}); re-run the google-workspace setup",
+                        ) from None
+                    self._persist_refreshed(credentials)
+                    if credentials.token:
+                        return str(credentials.token)
 
         raise GoogleCalendarError(
             REASON_MISSING_CREDENTIAL,
@@ -351,25 +370,15 @@ class GoogleCalendarConnector:
         return Request()
 
     def _persist_refreshed(self, credentials: Any) -> None:
-        """Write the refreshed token back to the same file; never to a new store."""
-        try:
-            payload = json.loads(credentials.to_json())
-        except Exception:
-            return
-        if not isinstance(payload, dict):
-            return
-        if not payload.get("type"):
-            payload["type"] = "authorized_user"
-        try:
-            self.token_path.write_text(
-                json.dumps(payload, indent=2), encoding="utf-8")
-        except OSError:
+        """Write the refreshed token back to the same file; never to a new store.
+
+        The shared writer replaces the file atomically (0600 from creation,
+        fsync, ``os.replace``) so a concurrent reader never sees a partial
+        token. A failed write is non-fatal: this turn keeps the in-memory
+        credentials and the next process simply refreshes again.
+        """
+        if not persist_authorized_user_credentials(self.token_path, credentials):
             logger.warning("google_calendar: refreshed token could not be persisted")
-            return
-        try:
-            self.token_path.chmod(0o600)
-        except OSError:
-            pass
 
     # -- Calendar API ----------------------------------------------------
 

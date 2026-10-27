@@ -86,6 +86,12 @@ _MAX_STDERR_BYTES = 200_000
 _MAX_STDERR_CHARS = 2_000
 _MAX_TOOL_NAME_CHARS = 200
 _READ_CHUNK = 65_536
+# A direct ``resolve()`` caller (``qubit runtime engines``, diagnostics, tests)
+# may repeat the git/version probes within milliseconds; that short cache keeps
+# the one-shot CLI fast. Every turn revalidates explicitly (``force=True``) so
+# a long-lived gateway notices an edited checkout, a moved pin or a swapped
+# binary before it spawns a turn.
+_DEFAULT_RESOLVE_CACHE_S = 5.0
 _USAGE_KEYS = ("prompt_tokens", "prompt_tokens_evaluated", "completion_tokens", "total_tokens")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SECRET_HINT = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PASSWD)", re.IGNORECASE)
@@ -138,6 +144,7 @@ class OpenJarvisRuntime:
         tools: str | None = None,
         pinned_commit: str = PINNED_COMMIT,
         timeout_seconds: float | None = None,
+        resolve_cache_seconds: float | None = None,
     ) -> None:
         self._binary = binary or os.environ.get(BIN_ENV) or None
         self._source = source or os.environ.get(SOURCE_ENV) or None
@@ -159,8 +166,17 @@ class OpenJarvisRuntime:
         if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             timeout_seconds = _DEFAULT_TIMEOUT_S
         self._timeout = max(1.0, timeout_seconds)
+        if resolve_cache_seconds is None:
+            resolve_cache_seconds = _DEFAULT_RESOLVE_CACHE_S
+        try:
+            cache_seconds = float(resolve_cache_seconds)
+        except (TypeError, ValueError):
+            cache_seconds = _DEFAULT_RESOLVE_CACHE_S
+        self._resolve_cache_s = (
+            cache_seconds if math.isfinite(cache_seconds) and cache_seconds >= 0 else 0.0)
         self._secret_values = self._collect_secret_values()
         self._resolved: ResolvedOpenJarvis | None = None
+        self._resolved_at: float | None = None
         self._resolve_lock = threading.Lock()
 
     # ------------------------------------------------------------------ config
@@ -195,13 +211,28 @@ class OpenJarvisRuntime:
 
     # ------------------------------------------------------------- pin/lifecycle
 
-    def resolve(self) -> ResolvedOpenJarvis:
-        """Locate the pinned CLI; raise :class:`RuntimeRefusalError` otherwise."""
+    def resolve(self, *, force: bool = False) -> ResolvedOpenJarvis:
+        """Locate the pinned CLI; raise :class:`RuntimeRefusalError` otherwise.
+
+        *force* re-runs every probe (path, checkout commit, dirty tree, binary
+        build stamp). A turn always forces, so a long-lived backend never runs
+        yesterday's verified pin. Without *force*, a result is reused for at
+        most ``resolve_cache_seconds`` so the one-shot CLI and
+        ``qubit runtime engines`` do not pay for repeated subprocess probes.
+        """
         with self._resolve_lock:
-            if self._resolved is not None:
+            now = time.monotonic()
+            if (
+                not force
+                and self._resolved is not None
+                and self._resolved_at is not None
+                and (now - self._resolved_at) < self._resolve_cache_s
+            ):
                 return self._resolved
-            self._resolved = self._resolve_uncached()
-            return self._resolved
+            resolved = self._resolve_uncached()
+            self._resolved = resolved
+            self._resolved_at = time.monotonic()
+            return resolved
 
     def _resolve_uncached(self) -> ResolvedOpenJarvis:
         self._home = self._resolve_home()
@@ -490,7 +521,7 @@ class OpenJarvisRuntime:
         self, request: TurnRequest, cancel: Any | None = None
     ) -> Iterator[TurnEvent]:
         try:
-            resolved = self.resolve()
+            resolved = self.resolve(force=True)
             prompt = self._render_prompt(request)
         except RuntimeRefusalError as exc:
             yield self._refusal_event(exc)
