@@ -1,5 +1,20 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+## ▶ Resume point — 2026-10-27 (HUD/fleet wave)
+
+**State:** `main` at `f1beefbb5` (this handoff commit follows); `canonical/main` pushed; worktree clean; ~67 GB free. Live `qubit-gateway`, `qubit-voicebridge`, `qubit-voice-typing` are active. Gateway identify: `state=ready`, protocol 1, `authority_epoch=28`; `/chat?resume=20261019_094333_0a4efc` → 200. The Voice Edit web HUD (Next.js/Three.js/GSAP) is open in Chromium at 900×760; `voice_edit.panel_backend: web` is set in `~/.config/qubit-voicebridge/voice.yaml` (backup `.bak-webhud-*`), Tk remains the fallback.
+
+**HUD build:** `frontend/voice-edit-hud/out` exists (gitignored). After a clean checkout, run `npm ci && npm run build` in `frontend/voice-edit-hud` (basePath `/voice-edit`). If the export is missing, the helper falls back to Tk with a typed hint; `systemctl --user restart qubit-voice-typing` reloads either panel.
+
+**Do next, in order:**
+1. Exercise one real Right-Ctrl utterance through the web HUD; verify live partials, final transcript, preview diff, and Apply/Copy/Edit/Retry/Revert/Cancel reach the helper. Fix anything the live turn exposes.
+2. Only after that, decide whether `web` becomes the default (currently explicit config). If the browser is closed manually it does not relaunch until the helper restarts — decide whether that matters.
+3. Live connector probes when owner credentials exist (Google Calendar/Contacts scope, Dropbox token); Apple is platform-gated on Linux.
+4. Review `docs/PHASE8_INVENTORY.md` rows with the owner; no HERMES_*/.hermes deletions without sign-off.
+5. Run the final matrix/focused gates and record evidence; `VERIFIED` is **not** claimed.
+
+**Known limits:** no live mic turn through the HUD yet; no live Google/Apple/Dropbox credentials; `qubit gateway status` still labels the live service "manual" (cosmetic supervisor detection); full matrix not run.
+
 **Purpose.** This repo's agent sessions repeatedly died mid-work
 (`maximum number of tool-calling iterations`, context compaction, "previous
 turn was interrupted mid-run") and each new agent started with no knowledge of
