@@ -342,7 +342,7 @@ class ProviderProfile:
         through to its existing construction path.
 
         This is the hook that lets a provider ship *outside* this tree: with it,
-        a profile registered from ``~/.hermes/plugins/model-providers/`` or a
+        a profile registered from ``~/.qubit/plugins/model-providers/`` or a
         pip entry point can supply its own transport without any core edit. See
         ``plugins/model-providers/copilot-acp/`` for the in-tree example.
         """

@@ -148,7 +148,7 @@ class CodexEventProjector:
     @staticmethod
     def _web_search_spec(item: dict) -> tuple[str, str, dict, str]:
         # Codex ran the search itself; the result names it so a later non-Codex
-        # turn does not read this as a Hermes web_search call.
+        # turn does not read this as a Qubit web_search call.
         result = {"provider": "codex"}
         if item.get("status"):
             result["status"] = item["status"]

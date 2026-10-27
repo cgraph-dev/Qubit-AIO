@@ -946,7 +946,7 @@ def _names_launch_profile(profile: str) -> bool:
 def _derive_chat_session_id(system_prompt: Optional[str], first_user_message: str,
                             profile: Optional[str] = None) -> str:
     """Stable session id from the system prompt + first user message (constant across all
-    turns of an Open WebUI-style conversation), so one Hermes session/sandbox is reused.
+    turns of an Open WebUI-style conversation), so one Qubit session/sandbox is reused.
     A routed ``/p/<profile>/`` prefix namespaces the seed: the id keys process-wide state
     (session store, per-session sandbox), so two profiles opening with identical text must not
     collide (#123989). Default/standalone ids are unchanged so live conversations survive, and

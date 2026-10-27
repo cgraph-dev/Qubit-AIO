@@ -884,7 +884,7 @@ class OpenAICompatRoutesMixin:
                 history = []
         else:
             # Stable id from the conversation fingerprint so Open WebUI-style clients map onto
-            # one Hermes session; namespaced by the routed profile (#123989).
+            # one Qubit session; namespaced by the routed profile (#123989).
             first_user = next(
                 (cm.get("content", "") for cm in conversation_messages if cm.get("role") == "user"), "")
             session_id = _derive_chat_session_id(system_prompt, first_user, _api_request_profile.get())

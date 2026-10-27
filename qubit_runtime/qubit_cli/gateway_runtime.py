@@ -343,7 +343,7 @@ def ensure_gateway_runtime(profile_home: str | Path, *, timeout: float = DEFAULT
     Never installs anything. The one owner it replaces is a gateway an older Hermes left running on
     this install's own home (``incompatible``/``runtime_protocol``, the upgrade case): it is stopped
     the way ``hermes gateway stop`` stops it, once, and the current one started like any absent
-    owner. Another install's or a newer Hermes's gateway stays refused, with the reason in ``detail``
+    owner. Another install's or a newer Qubit's gateway stays refused, with the reason in ``detail``
     (``qubit_cli.gateway_runtime_replace``).
 
     A successful service command or Popen is not session readiness. After an

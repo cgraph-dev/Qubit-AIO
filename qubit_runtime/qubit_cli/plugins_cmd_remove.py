@@ -140,7 +140,7 @@ def _remove_user_plugin(plugins_dir: Path, name: str, target: Path, *, allow_liv
 
 
 def dashboard_remove_user_plugin(name: str) -> dict[str, Any]:
-    """Delete a plugin tree under ``~/.hermes/plugins/`` only."""
+    """Delete a plugin tree under ``~/.qubit/plugins/`` only."""
     plugins_dir = _pc()._plugins_dir()
     if any(n == name and src == "bundled" for n, _ver, _d, src, _path, _key in _pc()._discover_all_plugins()):
         return {"ok": False, "error": "Bundled plugins cannot be removed from the dashboard."}

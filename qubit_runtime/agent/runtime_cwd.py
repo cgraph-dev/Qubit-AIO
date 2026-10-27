@@ -109,8 +109,8 @@ def resolve_agent_cwd() -> Path:
 
 def resolve_context_cwd(*, include_session_override: bool = True) -> Path | None:
     """Configured cwd for context-file discovery, or None (build_context_files_prompt then falls back to the
-    launch dir). An existing configured path is honored verbatim — including the Hermes source tree, a
-    legitimate workspace when developing Hermes; fallback-directory policy lives in the caller.
+    launch dir). An existing configured path is honored verbatim — including the Qubit source tree, a
+    legitimate workspace when developing Qubit; fallback-directory policy lives in the caller.
 
     Launch-artifact callers can skip the session override while still honoring the active profile's
     TERMINAL_CWD.

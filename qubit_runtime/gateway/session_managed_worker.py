@@ -432,7 +432,7 @@ def _launch_env_only_credentials(home, env):
     (``launch_secret_scope``: systemd ``Environment=`` / ``op run`` keys with no ``.env`` line) that
     the scrub removed from *env* — the same mapping the owner's own ``get_secret`` reads for this
     profile. Credential names only: non-credential names the constructor removed on purpose
-    (unbound session context, venv markers) stay removed, and Hermes-internal secrets
+    (unbound session context, venv markers) stay removed, and Qubit-internal secrets
     (``AUXILIARY_*_API_KEY``, relay auth) never reach a child. Only the launch home's worker calls
     this; a routed home's worker sees its own files only."""
     from tools.environments.local import _scrub_credentials

@@ -122,7 +122,7 @@ class MemoryProvider(ABC):
         """Initialize once at agent startup (connections, resources, threads).
 
         kwargs always include ``qubit_home`` (profile-scoped storage; never hardcode
-        ``~/.hermes``) and ``platform``; may include ``agent_context`` ("primary" |
+        ``~/.qubit``) and ``platform``; may include ``agent_context`` ("primary" |
         "subagent" | "cron" | "flush" — skip writes for non-primary contexts),
         ``agent_identity``, ``agent_workspace``, ``parent_session_id``, ``user_id``, ``user_id_alt``.
         """

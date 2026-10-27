@@ -289,7 +289,7 @@ def _display_system_platform(*, system: str, release: str, version: str, platfor
 
 # Gateway + update actions (invoked from the Status page). Spawned detached so the request
 # returns immediately; stdin is DEVNULL so stray input() fails fast; stdout/stderr stream to
-# ~/.hermes/logs/<action>.log which the dashboard tails.
+# ~/.qubit/logs/<action>.log which the dashboard tails.
 
 _ACTION_LOG_DIR: Path = get_qubit_home() / "logs"
 

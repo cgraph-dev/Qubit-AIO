@@ -33,7 +33,7 @@ MESSAGE_UID = "message_uid"
 # absorption order (the uid sibling of ``_absorbed_row_ids``; persisted as ``messages.absorbed_message_uids``).
 # The survivor keeps the FIRST constituent's uid.
 ABSORBED_MESSAGE_UIDS = "_absorbed_message_uids"
-# Per-occurrence tool-call identity. Provider tool-call ids repeat (Hermes mints deterministic ``call_<12hex>``
+# Per-occurrence tool-call identity. Provider tool-call ids repeat (Qubit mints deterministic ``call_<12hex>``
 # ids for identical calls, and models reuse ids), so an assistant row carries ``{provider id: uid}`` for its
 # ``tool_calls`` (``messages.tool_call_uids``) and its tool-result rows carry the matching uid
 # (``messages.tool_call_uid``). The provider-facing ``id`` is untouched; these never reach the wire.

@@ -676,7 +676,7 @@ _SETUP_PROMPTS = (
 
 
 def interactive_setup() -> None:
-    """``qubit setup gateway`` → SimpleX wizard (writes ``~/.hermes/.env``); CLI helpers are lazy-imported."""
+    """``qubit setup gateway`` → SimpleX wizard (writes ``~/.qubit/.env``); CLI helpers are lazy-imported."""
     from qubit_cli.config import get_env_value, save_env_value
     from qubit_cli.cli_output import print_header, print_info, prompt
     from qubit_cli.setup_platforms import declines_reconfigure

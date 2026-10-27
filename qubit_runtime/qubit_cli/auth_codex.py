@@ -1,6 +1,6 @@
 """OpenAI Codex OAuth: token store, refresh, quota probe, device-code login.
 
-Tokens live in ~/.hermes/auth.json, NOT ~/.codex/: Qubit keeps its own Codex OAuth session
+Tokens live in ~/.qubit/auth.json, NOT ~/.codex/: Qubit keeps its own Codex OAuth session
 separate from the Codex CLI / VS Code extension so one app's refresh-token rotation cannot
 invalidate the other's session.
 
@@ -115,7 +115,7 @@ def _load_auth_store_maybe_locked(lock: bool) -> Dict[str, Any]:
 
 
 def _read_codex_tokens(*, _lock: bool = True) -> Dict[str, Any]:
-    """Read Codex OAuth tokens from Qubit auth store (~/.hermes/auth.json)."""
+    """Read Codex OAuth tokens from Qubit auth store (~/.qubit/auth.json)."""
     from qubit_cli.auth import _load_provider_state, _nonempty_str
     auth_store = _load_auth_store_maybe_locked(_lock)
     state = _load_provider_state(auth_store, "openai-codex")
@@ -949,7 +949,7 @@ def _pool_codex_credential() -> Tuple[str, str]:
 
 def _login_openai_codex(args, pconfig: ProviderConfig, *, force_new_login: bool = False) -> None:
     """OpenAI Codex login: device code by default, browser PKCE when opted in (``--browser`` /
-    ``auth.codex_login_flow``). Tokens stored in ~/.hermes/auth.json."""
+    ``auth.codex_login_flow``). Tokens stored in ~/.qubit/auth.json."""
     from qubit_cli.auth import (
         _codex_access_token_is_expiring, _import_codex_cli_tokens,
         _offer_existing_oauth_credentials, _print_login_success, _prompt_yes_no, _save_codex_tokens,

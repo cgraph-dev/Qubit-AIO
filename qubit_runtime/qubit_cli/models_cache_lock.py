@@ -1,6 +1,6 @@
 """Cross-process lock for ``provider_models_cache.json`` read-modify-write.
 
-Parallel prefetch workers, SWR refresh threads and other Hermes processes (dashboard, desktop,
+Parallel prefetch workers, SWR refresh threads and other Qubit processes (dashboard, desktop,
 CLI) all rewrite the one cache file; each write must re-read it under this lock or a slow writer
 puts back the snapshot it loaded before its fetch, dropping rows written meanwhile.
 """

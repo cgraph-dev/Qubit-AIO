@@ -15,7 +15,7 @@ from datetime import UTC
 
 
 def _dotenv_key_names() -> set[str]:
-    """Env-var names assigned a non-empty value in ~/.hermes/.env — what the managed backends (launchd /
+    """Env-var names assigned a non-empty value in ~/.qubit/.env — what the managed backends (launchd /
     systemd / desktop ``serve``) load, as opposed to the shell exports ``os.getenv`` reflects here.
 
     ``qubit debug share`` runs in a terminal, so ``os.getenv`` reflects the shell's environment, which can
@@ -272,7 +272,7 @@ def _api_key_lines(show_keys: bool) -> list[str]:
     for env_var, label in _API_KEYS:
         val = os.getenv(env_var, "")
         display = _redact(val) if show_keys and val else ("set" if val else "not set")
-        # Set in this shell but absent from ~/.hermes/.env: a managed backend loads .env, not the login
+        # Set in this shell but absent from ~/.qubit/.env: a managed backend loads .env, not the login
         # shell, so it likely can't see this key — flag it so support doesn't chase a phantom "configured".
         if val and env_var not in dotenv_keys:
             display += " (shell only — not in .env; managed/desktop backend may not see it)"

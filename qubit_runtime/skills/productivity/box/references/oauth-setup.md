@@ -8,7 +8,7 @@ Authorize the Box account that Qubit should act as. OAuth follows that account's
 
 Everyone who uses a shared or background Qubit deployment receives the access of the one Box account it authorizes, so do not connect it to a broader personal or administrator account. Before starting the browser flow, make sure the authorization browser is signed in as the intended Box account.
 
-Choose a descriptive environment name, such as `hermes-box-oauth`. Do not overwrite or reauthorize an existing environment until its identity is confirmed.
+Choose a descriptive environment name, such as `qubit-box-oauth`. Do not overwrite or reauthorize an existing environment until its identity is confirmed.
 
 ## Same-host interactive path
 

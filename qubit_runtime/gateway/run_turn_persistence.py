@@ -540,7 +540,7 @@ class GatewayTurnPersistenceMixin:
 
         return response
 
-    # Chat-side next steps keyed by HTTP status; Hermes commands only (/login is the gateway's own
+    # Chat-side next steps keyed by HTTP status; Qubit commands only (/login is the gateway's own
     # sign-in, `{relogin}` the profile-aware host equivalent, filled from the turn's agent provider).
     # Values are catalog keys (``gateway.errors.hint_*``); 401 carries a ``{relogin}`` placeholder.
     _STATUS_HINTS = {

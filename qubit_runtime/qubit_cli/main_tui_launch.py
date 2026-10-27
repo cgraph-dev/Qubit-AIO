@@ -579,7 +579,7 @@ def _pin_kanban_board_env() -> None:
 
 
 def _sync_bundled_skills_quietly() -> None:
-    """Seed ``~/.hermes/skills/`` with the bundled library (idempotent, milliseconds when synced).
+    """Seed ``~/.qubit/skills/`` with the bundled library (idempotent, milliseconds when synced).
     Failures are swallowed: skills are an enhancement, not a hard dependency."""
     with contextlib.suppress(Exception):
         from tools.skills_sync import sync_skills

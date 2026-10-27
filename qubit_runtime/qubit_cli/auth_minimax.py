@@ -159,7 +159,7 @@ def _minimax_poll_token(
 
 
 def _minimax_save_auth_state(auth_state: Dict[str, Any], *, set_active: bool = True) -> None:
-    """Persist MiniMax OAuth state to Hermes auth store (~/.qubit/auth.json).
+    """Persist MiniMax OAuth state to Qubit auth store (~/.qubit/auth.json).
 
     ``set_active=False`` rewrites credentials without making minimax-oauth the
     active provider (``_save_provider_state_to_source``'s rule: a token refresh

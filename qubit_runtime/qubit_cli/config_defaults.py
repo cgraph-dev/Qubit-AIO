@@ -334,7 +334,7 @@ DEFAULT_CONFIG = {
         # required_environment_variables pass through automatically).
         "env_passthrough": [],
         # Remote-backend sync-back refuses to extract a downloaded state archive larger than this
-        # (bytes); raise it for a ~/.hermes tree that legitimately exceeds 2 GiB.
+        # (bytes); raise it for a ~/.qubit tree that legitimately exceeds 2 GiB.
         "sync_back_max_bytes": 2 * 1024 * 1024 * 1024,
         # HOME for host tool subprocesses: "auto" = host keeps the real OS-user HOME, containers use
         # QUBIT_HOME/home; "real" = force real HOME; "profile" = force QUBIT_HOME/home when it
@@ -456,7 +456,7 @@ DEFAULT_CONFIG = {
         # of the ACTIVE default-Chromium profile (Local State -> profile.last_used; cookies, logins,
         # prefs copied and re-synced per fresh session) driven by Qubit' packaged Chromium. The
         # snapshot dir sidesteps Chrome 136+'s default-profile debugging block and never contends
-        # with the running browser. Turning off deletes ~/.hermes/browser-profile/ so credentials
+        # with the running browser. Turning off deletes ~/.qubit/browser-profile/ so credentials
         # don't outlive consent. Chromium-family only (Chrome, Edge, Brave, Brave Origin, Chromium);
         # Firefox etc. fails closed. Also gates the browser_exec `local` argument (real-profile
         # local session even under a cloud backend). Desktop Settings -> Browser.
@@ -508,7 +508,7 @@ DEFAULT_CONFIG = {
         "enabled": False,
         # Max checkpoints per working directory; enforced by ref rewrite + GC of older commits.
         "max_snapshots": 20,
-        # Hard ceiling on total ~/.hermes/checkpoints/ size (MB); the oldest checkpoint per project
+        # Hard ceiling on total ~/.qubit/checkpoints/ size (MB); the oldest checkpoint per project
         # is dropped round-robin until under the cap. 0 disables.
         "max_total_size_mb": 500,
         # Skip files larger than this (MB) when staging (datasets, model weights). 0 = no filter.
@@ -1152,7 +1152,7 @@ DEFAULT_CONFIG = {
         "piper": {
             # Voice name (downloaded on first use) or absolute path to a .onnx file; list:
             # github.com/OHF-Voice/piper1-gpl/blob/main/docs/VOICES.md. Optional keys: voices_dir
-            # (~/.hermes/cache/piper-voices/), use_cuda, length_scale (2.0 = twice as slow),
+            # (~/.qubit/cache/piper-voices/), use_cuda, length_scale (2.0 = twice as slow),
             # noise_scale, noise_w_scale, volume, normalize_audio.
             "voice": "en_US-lessac-medium",
         },
@@ -1306,7 +1306,7 @@ DEFAULT_CONFIG = {
 
     # Context engine — how the context window is managed near the token limit. "compressor" =
     # built-in lossy summarization; or a plugin name (e.g. "lcm") installed in
-    # plugins/context_engine/<name>/ or ~/.hermes/plugins/.
+    # plugins/context_engine/<name>/ or ~/.qubit/plugins/.
     "context": {
         "engine": "compressor",
         # Return freed glibc pages at agent/TUI cleanup boundaries (no-op elsewhere).
@@ -1371,7 +1371,7 @@ DEFAULT_CONFIG = {
         "max_iterations": 250,
         # Hard per-summary char ceiling on subagent results, layered on the dynamic budget (each
         # summary is sized to the parent's remaining context headroom; trimmed text spills to
-        # ~/.hermes/cache/delegation/ with a head+tail window + read_file offset footer, nothing
+        # ~/.qubit/cache/delegation/ with a head+tail window + read_file offset footer, nothing
         # lost). 0 disables the ceiling; the dynamic budget still applies.
         "max_summary_chars": 24000,
         # Inactivity cap per child (seconds, floor 30) — time with NO progress, not total runtime. 0 = no cap:
@@ -1454,7 +1454,7 @@ DEFAULT_CONFIG = {
         },
     },
     # Skills — external skill directories shared across tools/agents. Paths are expanded (~, ${VAR})
-    # and resolved; read-only — creation goes to ~/.hermes/skills/ unless create_dir redirects it.
+    # and resolved; read-only — creation goes to ~/.qubit/skills/ unless create_dir redirects it.
     "skills": {
         "external_dirs": [],   # e.g. ["~/.agents/skills", "/shared/team-skills"]
         # Where skill_manage-created skills go (empty = profile-local dir). When set, new skills
@@ -1490,8 +1490,8 @@ DEFAULT_CONFIG = {
         # review fork. true = ALWAYS stage (SKILL.md too large for an inline prompt): /skills
         # pending, /skills diff <id>, /skills approve|reject <id>.
         "write_approval": False,
-        # Audit ledger: every skill mutation appends to ~/.hermes/skills/.curator_ledger.jsonl with
-        # before/after hashes (blobs under ~/.hermes/.curator_backups/blobs/); powers `qubit
+        # Audit ledger: every skill mutation appends to ~/.qubit/skills/.curator_ledger.jsonl with
+        # before/after hashes (blobs under ~/.qubit/.curator_backups/blobs/); powers `qubit
         # curator ledger` / `rollback <entry-id>`. Never a gate — failures can't block.
         # See #79686.
         "ledger": True,
@@ -1523,7 +1523,7 @@ DEFAULT_CONFIG = {
         # delete older archived skills (never automatic; logged in the ledger).
         "archive_ttl_days": 0,
         # Before a consolidation pass (the only one that rewrites skill content in place), snapshot
-        # ~/.hermes/skills/ to ~/.hermes/skills/.curator_backups/<utc-iso>/skills.tar.gz (`qubit curator
+        # ~/.qubit/skills/ to ~/.qubit/skills/.curator_backups/<utc-iso>/skills.tar.gz (`qubit curator
         # rollback`). The prune-only pass just moves directories into .archive/ and takes none.
         "backup": {
             "enabled": True,
@@ -1738,9 +1738,9 @@ DEFAULT_CONFIG = {
         # Opt-in unattended apply for the cadence check. Git-row plugins ONLY; every apply runs the
         # same security scan / consent pipeline as the manual update command.
         "auto_apply": False,
-        # Where third-party Python plugins run. in_process: imported into Hermes (default).
-        # host: one plugin-host process per profile runs them and they reach Hermes only through
-        # ctx (a crashing or hanging plugin takes down its host, which restarts; Hermes keeps
+        # Where third-party Python plugins run. in_process: imported into Qubit (default).
+        # host: one plugin-host process per profile runs them and they reach Qubit only through
+        # ctx (a crashing or hanging plugin takes down its host, which restarts; Qubit keeps
         # running). Bundled plugins stay in-process; `qubit plugins validate` says whether a
         # plugin can run in the host.
         "isolation": "in_process",
@@ -1751,7 +1751,7 @@ DEFAULT_CONFIG = {
     },
     # Shell-script hooks: event name (pre_tool_call, post_tool_call, pre_llm_call, subagent_stop,
     # ...) -> list of {matcher, command, timeout}. First run of a new command prompts for consent;
-    # approvals persist in ~/.hermes/shell-hooks-allowlist.json. Schema + examples:
+    # approvals persist in ~/.qubit/shell-hooks-allowlist.json. Schema + examples:
     # website/docs/user-guide/features/hooks.md.
     "hooks": {},
     # Auto-accept shell-hook registrations without a TTY prompt (also --accept-hooks or
@@ -2039,7 +2039,7 @@ DEFAULT_CONFIG = {
         # the portal sign-in every managed tool gates on.
         "connectors": {"enabled": True},
     },
-    "logging": {  # File logging to ~/.hermes/logs/: agent.log captures INFO+, errors.log WARNING+.
+    "logging": {  # File logging to ~/.qubit/logs/: agent.log captures INFO+, errors.log WARNING+.
         "level": "INFO",       # minimum level for agent.log: DEBUG, INFO, WARNING
         "max_size_mb": 5,      # max size per log file before rotation
         "backup_count": 3,     # rotated backups to keep
@@ -2222,7 +2222,7 @@ DEFAULT_CONFIG = {
         # honored.
         "trust_env": True,
         # Media delivery. False: any emitted file path is delivered natively unless under the
-        # credential/system denylist (/etc, /proc, ~/.ssh, ~/.aws, ~/.hermes/.env, auth.json). True:
+        # credential/system denylist (/etc, /proc, ~/.ssh, ~/.aws, ~/.qubit/.env, auth.json). True:
         # files must be under the Qubit cache, media_delivery_allow_dirs, or fresher than
         # trust_recent_files_seconds — recommended for public-facing gateways so prompt injection
         # can't exfiltrate host secrets. Bridged to HERMES_MEDIA_DELIVERY_STRICT.
@@ -2270,7 +2270,7 @@ DEFAULT_CONFIG = {
         # edit is sent as a fresh message so the timestamp reflects completion.
         "fresh_final_after_seconds": 0.0,
     },
-    # Automatic cleanup of ~/.hermes/state.db, which otherwise grows without bound and slows FTS5
+    # Automatic cleanup of ~/.qubit/state.db, which otherwise grows without bound and slows FTS5
     # inserts, /resume listing, and insights queries.
     "sessions": {
         # Prune ENDED sessions inactive for retention_days (activity = freshest of live activity /
@@ -2310,7 +2310,7 @@ DEFAULT_CONFIG = {
         # off = none.
         "fts_optimize_notice": "advise",
         # CJK-bigram search index (messages_fts_cjk). When the extension is built
-        # (native/fts5_cjk/build.sh → ~/.hermes/lib/libfts5_cjk.so), 1-2 char CJK terms get exact
+        # (native/fts5_cjk/build.sh → ~/.qubit/lib/libfts5_cjk.so), 1-2 char CJK terms get exact
         # index matches instead of LIKE scans. True = use when present (inert otherwise); False =
         # never load/serve it. Bridged to HERMES_CJK_FTS.
         "cjk_fts": True,
@@ -2453,7 +2453,7 @@ DEFAULT_CONFIG = {
         "retries": 2,
     },
     # External secret sources — pull credentials from secret managers at startup instead of storing
-    # them in ~/.hermes/.env.
+    # them in ~/.qubit/.env.
     # Browser credential vault: which login sources browser_vault_list/fill may draw from. The local
     # encrypted vault (`qubit vault add`, Desktop → Settings → Credential Vault) is always on.
     # External password managers are unlocked per session with a masked master-password prompt;
@@ -2491,7 +2491,7 @@ DEFAULT_CONFIG = {
             # BSM values overwrite existing env vars, so rotating in Bitwarden takes effect without
             # clearing the matching .env line.
             "override_existing": True,
-            # Auto-download bws into ~/.hermes/bin/ on first use; False = bws must be on PATH.
+            # Auto-download bws into ~/.qubit/bin/ on first use; False = bws must be on PATH.
             "auto_install": True,
             # Passed to bws as BWS_SERVER_URL. Empty = US Cloud (bws default);
             # https://vault.bitwarden.eu for EU; your own URL for self-hosted.
@@ -2605,7 +2605,7 @@ DEFAULT_CONFIG = {
         "enabled": False,  # When false, nothing starts, no docker mounts, no binary installs.
         # Tunnel listener port; sandboxes get HTTPS_PROXY=http://<host>:<port>.
         "tunnel_port": 9090,
-        # Auto-download the pinned binary into ~/.hermes/bin/; False = iron-proxy on PATH.
+        # Auto-download the pinned binary into ~/.qubit/bin/; False = iron-proxy on PATH.
         "auto_install": True,
         # Upstream secret source: env = process env; bitwarden = refetch via `bws secret list` on
         # each proxy restart (requires secrets.bitwarden.enabled).

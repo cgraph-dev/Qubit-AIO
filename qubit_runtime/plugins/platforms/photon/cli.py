@@ -264,7 +264,7 @@ def _cmd_status(_args: argparse.Namespace) -> int:
 
 
 def _telemetry_enabled() -> bool:
-    """PHOTON_TELEMETRY from env / ~/.hermes/.env; truthy set mirrors the sidecar's."""
+    """PHOTON_TELEMETRY from env / ~/.qubit/.env; truthy set mirrors the sidecar's."""
     try:
         from qubit_cli.config import get_env_value
         raw = get_env_value("PHOTON_TELEMETRY")

@@ -391,7 +391,7 @@ def set_moa_models(body: MoaConfigPayload, profile: Optional[str] = None):
 @router.post("/api/model/set")
 async def set_model_assignment(body: ModelAssignment, profile: Optional[str] = None):
     """Assign a model to the main slot or an auxiliary task slot. Writes
-    ``~/.hermes/config.yaml`` — applies to **new** sessions only; a running chat
+    ``~/.qubit/config.yaml`` — applies to **new** sessions only; a running chat
     PTY hot-swaps via the ``/model`` slash command instead."""
     scope, task = (body.scope or "").strip().lower(), (body.task or "").strip().lower()
     provider, model = (body.provider or "").strip(), (body.model or "").strip()

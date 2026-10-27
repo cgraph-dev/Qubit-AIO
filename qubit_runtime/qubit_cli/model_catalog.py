@@ -1,7 +1,7 @@
 """Remote model catalog fetcher.
 
 ``get_catalog()`` returns the parsed manifest: in-process cache (TTL) → disk cache at
-``~/.hermes/cache/model_catalog.json`` → master URL fetch; any fetch failure keeps the stale copy
+``~/.qubit/cache/model_catalog.json`` → master URL fetch; any fetch failure keeps the stale copy
 (or ``{}``). ``get_curated_openrouter_models()`` / ``get_curated_nous_models()`` are thin accessors
 whose callers fall back to the in-repo lists on ``None``.
 """

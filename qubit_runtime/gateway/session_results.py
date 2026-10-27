@@ -105,7 +105,7 @@ def close_discarded_turn(db, conn, row):
 
     The lost input stays in the transcript for the user to resend, but an open ``user`` tail would be
     merged into the follower's provider request by consecutive-user repair, re-sending the discarded
-    turn as context. A Hermes-authored boundary (``display_kind=failed_turn``, stripped of its type
+    turn as context. A Qubit-authored boundary (``display_kind=failed_turn``, stripped of its type
     before the wire) ends it. Its side effects are unknown, so the hedged copy. The boundary lands on
     the CURRENT physical transcript (local reset/compression lineage tip), resolved on this
     connection. Idempotent on the durable tail, like the gateway and core failed-turn closers.

@@ -2,7 +2,7 @@
 """Skill Manager Tool — agent-managed skill creation & editing.
 
 Skills are the agent's procedural memory (narrow "how to do X"; MEMORY.md/USER.md are
-broad, declarative). New skills land in ~/.hermes/skills/ (or ``skills.create_dir``);
+broad, declarative). New skills land in ~/.qubit/skills/ (or ``skills.create_dir``);
 existing skills (bundled, hub, user) are modified in place. Layout:
 ``<skills>/[category/]<skill>/SKILL.md`` + optional ``references/ templates/ scripts/ assets/``.
 """
@@ -65,7 +65,7 @@ def _security_scan_skill(skill_dir: Path) -> Optional[str]:
     return None
 
 
-# All skills live in ~/.hermes/skills/ (single source of truth)
+# All skills live in ~/.qubit/skills/ (single source of truth)
 QUBIT_HOME = get_qubit_home()
 SKILLS_DIR = QUBIT_HOME / "skills"
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
@@ -790,7 +790,7 @@ def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
     with suppress(Exception):
         from tools.skill_usage import bump_patch, forget, record_created
         # During the curator consolidation pass, a verified consolidation must be RECOVERABLE: archival into
-        # ~/.hermes/skills/.archive/ is documented as the maximum destructive action the curator may take,
+        # ~/.qubit/skills/.archive/ is documented as the maximum destructive action the curator may take,
         # and `qubit curator restore` promises the skill can be brought back. Route through the recoverable
         # archive primitive instead of permanent rmtree so a misjudged consolidation can be undone (#29912).
         # Foreground, user-directed deletes keep their existing hard-delete semantics.

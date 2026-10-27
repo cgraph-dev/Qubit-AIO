@@ -274,7 +274,7 @@ def cmd_check_updates(args: Any | None = None) -> None:
 
 
 def dashboard_update_user_plugin(name: str, *, accept_capabilities: bool = False) -> dict[str, Any]:
-    """``git pull`` inside ``~/.hermes/plugins/<name>``; catalog installs re-pin instead. A re-pin that
+    """``git pull`` inside ``~/.qubit/plugins/<name>``; catalog installs re-pin instead. A re-pin that
     widens the plugin returns ``{"ok": False, "consent_required": True, "delta": {...}}`` with nothing
     changed — the surface shows the delta and retries with *accept_capabilities*."""
     from qubit_cli import plugins_cmd_catalog as catalog

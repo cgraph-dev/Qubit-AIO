@@ -93,7 +93,7 @@ def find_removal_step(provider: str, source: str) -> Optional[RemovalStep]:
 
 
 def _remove_env_source(provider: str, removed) -> RemovalResult:
-    """env:<VAR> — clear from ~/.hermes/.env; hint when the shell exports it."""
+    """env:<VAR> — clear from ~/.qubit/.env; hint when the shell exports it."""
     from qubit_cli.config import get_env_path, remove_env_value
 
     result = RemovalResult()
@@ -137,7 +137,7 @@ def _remove_env_source(provider: str, removed) -> RemovalResult:
 
 
 def _remove_qubit_pkce(provider: str, removed) -> RemovalResult:
-    """~/.hermes/.anthropic_oauth.json is ours — delete it outright."""
+    """~/.qubit/.anthropic_oauth.json is ours — delete it outright."""
     from qubit_constants import get_qubit_home
 
     result = RemovalResult()

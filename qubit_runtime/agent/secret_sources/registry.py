@@ -296,7 +296,7 @@ def enabled_source_names(secrets_cfg: dict, home_path: Path) -> frozenset:
 
 
 def _active_profile_name(home_path: Optional[Path]) -> str:
-    """Active profile name (``~/.hermes/profiles/<name>``); "" for the default profile."""
+    """Active profile name (``~/.qubit/profiles/<name>``); "" for the default profile."""
     if home_path is not None:
         resolved = Path(home_path)
         if resolved.parent.name == "profiles" and resolved.name:

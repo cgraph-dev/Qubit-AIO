@@ -647,7 +647,7 @@ def _oauth_provider_disconnect_command(
 def _oauth_provider_disconnect_hint(provider: Dict[str, Any], status: Dict[str, Any]) -> Optional[str]:
     """Return the manual disconnect path when the API cannot clear this provider."""
     # "anthropic" is flow == "external" (no in-dashboard login) but Qubit still
-    # OWNS its credential (the PKCE file ~/.hermes/.anthropic_oauth.json and its
+    # OWNS its credential (the PKCE file ~/.qubit/.anthropic_oauth.json and its
     # credential-pool entry, written by `qubit auth add anthropic`), so it is
     # excluded from the "external providers can't be auto-disconnected" rule.
     if provider.get("flow") == "external" and provider.get("id") != "anthropic":

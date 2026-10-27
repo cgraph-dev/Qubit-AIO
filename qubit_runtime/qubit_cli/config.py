@@ -605,7 +605,7 @@ _HERMES_HOME_SUBDIRS = (
 
 
 def ensure_qubit_home():
-    """Ensure the ~/.hermes directory skeleton exists with secure permissions.
+    """Ensure the ~/.qubit directory skeleton exists with secure permissions.
     Memoized per home path: this runs on EVERY ``load_config()`` and the ~14 mkdir/chmod syscalls
     made repeated loads the dominant cost of hot read paths."""
     home = get_qubit_home()
@@ -1299,7 +1299,7 @@ def _persist_migration(config: Dict[str, Any]) -> None:
     persist values that DIFFER from the schema default, plus explicit removals/renames of user
     data. Every migration step MUST write through here (``save_config`` with default-stripping
     ON, no ``merge_existing``) so the invariant cannot regress one migration at a time. A migration
-    is Hermes' own write, never a user turning a feature off."""
+    is Qubit' own write, never a user turning a feature off."""
     from qubit_cli.observability.shared_metrics_disabled import qubit_applied_write
 
     with qubit_applied_write():
@@ -2535,7 +2535,7 @@ def save_config(
     config: Dict[str, Any], *, strip_defaults: bool = True,
     preserve_keys: Optional[Set[Tuple[str, ...]]] = None, merge_existing: bool = False,
     replace_keys: Optional[Set[Tuple[str, ...]]] = None):
-    """Save configuration to ~/.hermes/config.yaml.
+    """Save configuration to ~/.qubit/config.yaml.
     Schema defaults are not written unless the user explicitly set them (the path exists in the
     raw config before normalisation), so config.yaml is never contaminated with defaults that
     would hide future default changes. ``merge_existing`` deep-merges the on-disk raw config
@@ -2580,7 +2580,7 @@ def save_config(
 
 
 def load_env() -> Dict[str, str]:
-    """Load ~/.hermes/.env as a dict. Memoised inside ``load_env_file`` (``get_env_value()`` runs
+    """Load ~/.qubit/.env as a dict. Memoised inside ``load_env_file`` (``get_env_value()`` runs
     hundreds of times per interactive menu render). Each assignment's value is opaque data for
     boundary discovery."""
     # A frozen-policy worker never opens the profile's files; its secrets arrive
@@ -2626,7 +2626,7 @@ def _sanitize_env_lines(lines: list) -> list:
 
 
 def sanitize_env_file() -> int:
-    """Rewrite ~/.hermes/.env with normalized line formatting; returns the number of changed lines."""
+    """Rewrite ~/.qubit/.env with normalized line formatting; returns the number of changed lines."""
     env_path = get_env_path()
     if not env_path.exists():
         return 0
@@ -2848,7 +2848,7 @@ def _managed_source(filename: str):
 
 
 def save_env_value(key: str, value: str):
-    """Save or update a value in ~/.hermes/.env (also matching ``export KEY=`` lines, so a save
+    """Save or update a value in ~/.qubit/.env (also matching ``export KEY=`` lines, so a save
     never appends a second line that a later delete would resurrect)."""
     if _env_write_blocked(key, "set"):
         return
@@ -2885,7 +2885,7 @@ def custom_endpoint_key_env(identity: str) -> str:
 
 
 def remove_env_value(key: str) -> bool:
-    """Remove a key from ~/.hermes/.env and os.environ; True if it was found and removed."""
+    """Remove a key from ~/.qubit/.env and os.environ; True if it was found and removed."""
     if _env_write_blocked(key, "remove"):
         return False
     if not _ENV_VAR_NAME_RE.match(key):
@@ -2942,7 +2942,7 @@ def save_env_value_secure(key: str, value: str) -> Dict[str, Any]:
 
 
 def reload_env() -> int:
-    """Re-read ~/.hermes/.env into os.environ; returns count of vars changed.
+    """Re-read ~/.qubit/.env into os.environ; returns count of vars changed.
     Removes deleted vars only when known to Qubit (OPTIONAL_ENV_VARS and _EXTRA_ENV_KEYS) so
     unrelated environment is never clobbered."""
     env_vars = load_env()
@@ -2971,7 +2971,7 @@ def _scoped_environ_get(key: str) -> Optional[str]:
 
 
 def get_env_value(key: str) -> Optional[str]:
-    """Get a value from ``os.environ`` (scope-aware) or ``~/.hermes/.env``.
+    """Get a value from ``os.environ`` (scope-aware) or ``~/.qubit/.env``.
 
     The ``os.environ`` read routes through ``agent.secret_scope.get_secret`` so that, under an active
     profile scope (multiplexed gateway turn), this is scope-checked rather than leaking another profile's
@@ -4156,7 +4156,7 @@ def _platform_manifest_paths(home: Optional[Path] = None, source: PlatformManife
     """Yield ``(dir_name, manifest_path, require_kind, stat)`` for every platform plugin manifest.
     ``source`` is ``"bundled"`` (shipped ``plugins/platforms/*``), ``"user"`` (``<home>/plugins/
     platforms/*`` plus flat ``<home>/plugins/*`` installs, which must declare ``kind: platform``,
-    #46600) or ``"all"``. ``home`` defaults to the bound Hermes home. A directory that cannot be
+    #46600) or ``"all"``. ``home`` defaults to the bound Qubit home. A directory that cannot be
     listed or searched yields ``(name, None, require_kind, error)``: a plugin there can't load
     either, so callers skip it. One ``scandir`` per root and one ``stat`` per candidate, because
     the child-env scrub stamps these on every spawn."""

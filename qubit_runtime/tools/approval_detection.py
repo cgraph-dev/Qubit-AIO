@@ -21,7 +21,7 @@ _SSH_SENSITIVE_PATH = r'(?:~|\$home|\$\{home\})/\.ssh(?:/|$)'
 _HERMES_ENV_PATH = (
     r'(?:~\/\.hermes/|(?:\$home|\$\{home\})/\.hermes/|(?:\$qubit_home|\$\{qubit_home\})/)' r'\.env\b'
 )
-# ~/.hermes/config.yaml IS the security policy (approvals.mode, yolo, allowlist) and the config cache is mtime-keyed,
+# ~/.qubit/config.yaml IS the security policy (approvals.mode, yolo, allowlist) and the config cache is mtime-keyed,
 # so a write takes effect mid-session. Terminal-side coverage (sed -i, tee, >, cp) pairs the file_tools deny.
 _HERMES_CONFIG_PATH = (
     r'(?:~\/\.hermes/|(?:\$home|\$\{home\})/\.hermes/|(?:\$qubit_home|\$\{qubit_home\})/)' r'config\.yaml\b'
@@ -412,7 +412,7 @@ DANGEROUS_PATTERNS = [
     # DESTINATION fires; reading OUT of a sensitive path (`cp ~/.ssh/config /tmp/x`) stays safe.
     # The trailing `[^\s"\']*` consumes the rest of the destination filename.
     # The tee/redirection patterns above already gate _SENSITIVE_WRITE_TARGET (~/.ssh/*,
-    # ~/.netrc/.pgpass/.npmrc/.pypirc, shell rc files, ~/.hermes/config.yaml/.env), but cp/mv/install was
+    # ~/.netrc/.pgpass/.npmrc/.pypirc, shell rc files, ~/.qubit/config.yaml/.env), but cp/mv/install was
     # only paired for /etc and project-relative env/config — so `cp evil ~/.ssh/authorized_keys` (key
     # implant), `cp creds ~/.netrc`, and `cp evil ~/.bashrc` (login-time command injection) slipped through
     # with auto-approve. Same unpaired-door rationale as #14639 / the sed-tee-redirect pairing on these
@@ -427,7 +427,7 @@ DANGEROUS_PATTERNS = [
     (rf'\bsed\s+--in-place\b.*\s{_SYSTEM_CONFIG_PATH}', "in-place edit of system config (long flag)"),
     # sed -i on Qubit config/.env bypasses the redirection/tee rules; pairs the file_tools
     # write_file/patch deny so the terminal side is not an open door.
-    # In-place edit of a Qubit-managed security file (~/.hermes/config.yaml or .env). sed -i bypasses the
+    # In-place edit of a Qubit-managed security file (~/.qubit/config.yaml or .env). sed -i bypasses the
     # redirection/tee patterns above because it mutates the file directly. See #14639.
     (rf'\bsed\s+-[^\s]*i.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Qubit config/env"),
     (rf'\bsed\s+--in-place\b.*(?:{_HERMES_CONFIG_PATH}|{_HERMES_ENV_PATH})', "in-place edit of Qubit config/env (long flag)"),

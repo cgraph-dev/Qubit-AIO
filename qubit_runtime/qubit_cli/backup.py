@@ -1889,7 +1889,7 @@ def restore_cron_prompt_fields_if_degraded(
     Args:
         snapshot_id: The pre-update quick-snapshot id (from
             :func:`create_quick_snapshot`).
-        qubit_home: Override for the Hermes home directory (tests/siblings).
+        qubit_home: Override for the Qubit home directory (tests/siblings).
 
     Returns:
         ``None`` when no action was taken (the common, healthy path). On a

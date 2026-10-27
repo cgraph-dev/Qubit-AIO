@@ -1,6 +1,6 @@
 """CLI entry point for the hermes-agent ACP adapter.
 
-Loads ``~/.hermes/.env``, routes logging to stderr (stdout is reserved for ACP
+Loads ``~/.qubit/.env``, routes logging to stderr (stdout is reserved for ACP
 JSON-RPC), and starts the ACP agent server.
 
 Usage::
@@ -79,7 +79,7 @@ def _setup_logging() -> None:
 
 
 def _load_env() -> None:
-    """Load .env from QUBIT_HOME (default ``~/.hermes``)."""
+    """Load .env from QUBIT_HOME (default ``~/.qubit``)."""
     from qubit_cli.env_loader import load_qubit_dotenv
 
     qubit_home = get_qubit_home()

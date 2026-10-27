@@ -1,7 +1,7 @@
 """Timezone-aware clock for Qubit.
 
 ``now()`` returns a tz-aware datetime in the user's configured IANA timezone. Resolution order:
-``HERMES_TIMEZONE`` env var, then ``timezone`` in ``~/.hermes/config.yaml``, else server-local
+``HERMES_TIMEZONE`` env var, then ``timezone`` in ``~/.qubit/config.yaml``, else server-local
 time. Invalid timezone values log a warning and fall back — never crash.
 """
 

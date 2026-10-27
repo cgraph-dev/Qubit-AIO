@@ -739,7 +739,7 @@ def _run_full_backup() -> None:
         size_bytes = 0
 
     from qubit_cli.sizefmt import format_bytes
-    # display_qubit_home so the user sees ~/.hermes/...
+    # display_qubit_home so the user sees ~/.qubit/...
     try:
         from qubit_constants import get_qubit_home, display_qubit_home
         display_path = f"{display_qubit_home()}/{out_path.relative_to(get_qubit_home())}"

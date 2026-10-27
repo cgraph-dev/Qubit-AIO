@@ -34,7 +34,7 @@ def _short_url(url: str) -> str:
 
 
 def _clear_stale_openai_base_url():
-    """Remove OPENAI_BASE_URL from ~/.hermes/.env unless the active provider is 'custom' — a
+    """Remove OPENAI_BASE_URL from ~/.qubit/.env unless the active provider is 'custom' — a
     leftover value routes provider:auto auxiliary clients to the old custom endpoint."""
     from qubit_cli.config import get_env_value, save_env_value, load_config
     model_cfg = load_config().get("model", {})

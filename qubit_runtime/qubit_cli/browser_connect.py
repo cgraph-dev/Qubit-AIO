@@ -348,7 +348,7 @@ def detect_default_chromium(system: str | None = None) -> str | None:
 # --- Real-profile SNAPSHOT launch -------------------------------------------------------
 # Never drive the live default user-data-dir: Chromium ≥136 (Google builds) refuses remote
 # debugging on it, and the user's running browser holds it (SingletonLock). Instead snapshot
-# the real profile into ``~/.hermes/browser-profile/`` and launch the user's real binary on
+# the real profile into ``~/.qubit/browser-profile/`` and launch the user's real binary on
 # the copy — with NO mock-keychain/basic-store switches, so OS-keyring-encrypted cookies
 # decrypt exactly as in the user's own browser.
 
@@ -895,7 +895,7 @@ def _open_launch_stderr_log(path: str):
       per-candidate overwrite semantics.
     * **On an already-existing log** ``O_CREAT`` applies ``mode`` only to a
       file it actually creates, so the inode keeps whatever it had. An older
-      Hermes left this file at 0644 on disk, so creation-time hardening alone
+      Qubit left this file at 0644 on disk, so creation-time hardening alone
       would leave every *upgrading* install exposed at the one path in this
       change with a guessable name. ``qubit_cli.config._secure_file``
       reconciles it, for the same reason ``_ensure_chrome_debug_data_dir``

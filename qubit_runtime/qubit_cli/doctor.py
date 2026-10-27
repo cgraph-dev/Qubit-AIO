@@ -13,9 +13,9 @@ from qubit_constants import display_qubit_home
 
 PROJECT_ROOT = get_project_root()
 QUBIT_HOME = get_qubit_home()
-_DHH = display_qubit_home()  # user-facing display path (e.g. ~/.hermes or ~/.hermes/profiles/coder)
+_DHH = display_qubit_home()  # user-facing display path (e.g. ~/.qubit or ~/.qubit/profiles/coder)
 
-# Load environment variables from ~/.hermes/.env so API key checks work
+# Load environment variables from ~/.qubit/.env so API key checks work
 _env_path = get_env_path()
 load_qubit_dotenv(qubit_home=_env_path.parent, project_env=PROJECT_ROOT / ".env")
 

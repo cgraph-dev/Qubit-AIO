@@ -264,7 +264,7 @@ def get_spotify_auth_status() -> Dict[str, Any]:
 
 
 def _spotify_interactive_setup(redirect_uri_hint: str) -> str:
-    """Walk the user through creating a Spotify developer app; persist the client_id to ~/.hermes/.env."""
+    """Walk the user through creating a Spotify developer app; persist the client_id to ~/.qubit/.env."""
     from qubit_cli.auth import _is_remote_session
     from qubit_cli.config import save_env_value
     from qubit_constants import display_qubit_home

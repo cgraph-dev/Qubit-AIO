@@ -100,7 +100,7 @@ def _systemd(home: Path, deadline: float) -> ExistingService | None:
     paths = (Path.home() / ".config/systemd/user" / unit, Path("/etc/systemd/system") / unit)
     # On non-systemd hosts there is no manager to own transient units. Installed
     # definitions still count: a broken manager is not permission to bypass one.
-    # Every Hermes entrypoint ensures the gateway, so a host with no installed unit must not
+    # Every Qubit entrypoint ensures the gateway, so a host with no installed unit must not
     # touch the service manager at all (a headless runner has no user bus to answer it).
     # With a unit installed anywhere, both scopes are asked: two claiming the name is a conflict.
     installed = (*paths, Path("/usr/lib/systemd/system") / unit, Path("/lib/systemd/system") / unit)

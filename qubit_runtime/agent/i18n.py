@@ -1,4 +1,4 @@
-"""Lightweight i18n for Hermes' static user-facing strings (approval prompts, gateway replies, CLI, tips).
+"""Lightweight i18n for Qubit' static user-facing strings (approval prompts, gateway replies, CLI, tips).
 
 Catalogs are flat dotted-key mappings resolved through layers, top first:
 

@@ -459,7 +459,7 @@ def _copy_example_files(plugin_dir: Path, console) -> None:
 
 def _missing_env_specs(manifest: dict) -> list[dict]:
     """``requires_env`` entries (plain names or ``{name, description, url, secret}`` dicts,
-    normalised to dicts; nameless entries dropped) whose variable is unset in ``~/.hermes/.env``."""
+    normalised to dicts; nameless entries dropped) whose variable is unset in ``~/.qubit/.env``."""
     env_specs = [
         {"name": entry} if isinstance(entry, str) else entry
         for entry in manifest.get("requires_env") or []
@@ -1082,7 +1082,7 @@ def dashboard_set_agent_plugin_enabled(name: str, *, enabled: bool) -> dict[str,
 
 
 def _user_installed_plugin_dir(name: str) -> Optional[Path]:
-    """Resolved path under ``~/.hermes/plugins/<name>`` if it exists, else the user install
+    """Resolved path under ``~/.qubit/plugins/<name>`` if it exists, else the user install
     :func:`_find_plugin_entry` resolves *name* to (its manifest or catalog name)."""
     try:
         target = _sanitize_plugin_name(name, _plugins_dir(), allow_subdir=True)

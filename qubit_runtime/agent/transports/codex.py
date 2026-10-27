@@ -617,7 +617,7 @@ def _reasoning_fields(
             if params.get("github_reasoning_extra") is not None:
                 # Request a reasoning summary so the Responses API actually returns
                 # reasoning text. Without ``summary: "auto"`` the GitHub/Copilot
-                # /responses endpoint returns reasoning items with no summary, so Hermes
+                # /responses endpoint returns reasoning items with no summary, so Qubit
                 # persists empty reasoning/thinking content for every Copilot model on
                 # the Responses API (gpt-5.4, gpt-5, ...) — the same loss the non-GitHub
                 # branch below already avoids. Verified against api.githubcopilot.com

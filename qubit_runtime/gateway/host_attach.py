@@ -114,7 +114,7 @@ def record_home(record) -> Path:
 
 
 def launched_by_other_tenant(owner_home: Path | str, our_home: Path | str) -> bool:
-    """Was the owner launched from ANOTHER Hermes root (a second tenant on this host)?
+    """Was the owner launched from ANOTHER Qubit root (a second tenant on this host)?
 
     The host record and lock are per OS user, and two tenants (separate ``QUBIT_HOME`` roots)
     each expose a profile named ``default``: tenant A's multiplexer "serving default" is a name

@@ -4,7 +4,7 @@ The legacy sidecar ran ``subprocess.run(cwd=os.getcwd())`` in its own process: o
 the daemon's directory (the install root for an auto-started one), not the session's launch cwd or
 ``-w`` worktree, and the sidecar's contract refused the ``session_id`` Ink sends (dokterdok N22).
 Here the command runs for exactly one local session, in its frozen launch cwd, behind the same
-hardline/dangerous-command refusal, with Hermes-managed secrets scrubbed from the child and the
+hardline/dangerous-command refusal, with Qubit-managed secrets scrubbed from the child and the
 output redacted before it crosses the wire. Nothing enters the transcript or the admission FIFO.
 """
 import asyncio

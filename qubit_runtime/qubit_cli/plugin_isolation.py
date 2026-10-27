@@ -1,12 +1,12 @@
 """Where third-party Python plugin code is allowed to run (``plugins.isolation``).
 
-``in_process`` (default) imports every plugin into the Hermes process, as always. ``host`` keeps
+``in_process`` (default) imports every plugin into the Qubit process, as always. ``host`` keeps
 third-party plugin code OUT of it: general plugins load in one plugin-host process per profile
-(:mod:`qubit_cli.plugin_host`) and talk to Hermes only through ``ctx``; every other path that would
+(:mod:`qubit_cli.plugin_host`) and talk to Qubit only through ``ctx``; every other path that would
 import a user-supplied module in-process (category providers, model-provider profiles, dashboard
-plugin APIs) refuses with a stated reason. Bundled plugins ship with Hermes and stay in-process.
+plugin APIs) refuses with a stated reason. Bundled plugins ship with Qubit and stay in-process.
 
-That second half is the property a pooled deployment needs: one Hermes process serving many
+That second half is the property a pooled deployment needs: one Qubit process serving many
 profiles must never share an interpreter with a profile's plugin code. The same boundary gives a
 single-user install crash isolation (a plugin that segfaults or hangs takes down its host, not the
 gateway), which is why it is a plain config value and not a cloud-only switch.
@@ -81,7 +81,7 @@ def _plugins_config(config: Optional[Mapping[str, Any]] = None) -> Mapping[str, 
     return section if isinstance(section, Mapping) else {}
 
 
-# Set in the plugin host's environment: inside the host, plugin code is already out of Hermes, so
+# Set in the plugin host's environment: inside the host, plugin code is already out of Qubit, so
 # every loader there imports directly (a host must never spawn a host of its own).
 HOST_PROCESS_ENV = "QUBIT_PLUGIN_HOST_PROCESS"
 
@@ -115,7 +115,7 @@ def in_process_import_refusal(what: str, *, source: str = "user",
                               config: Optional[Mapping[str, Any]] = None) -> Optional[str]:
     """Reason an in-process import of third-party code must not happen, or ``None`` when allowed.
 
-    Every loader that imports a user-supplied module into the Hermes process asks this first;
+    Every loader that imports a user-supplied module into the Qubit process asks this first;
     bundled code always passes.
     """
     if source == "bundled" or isolation_mode(config) != ISOLATION_HOST:

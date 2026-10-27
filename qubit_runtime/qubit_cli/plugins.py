@@ -1,7 +1,7 @@
 """Qubit Plugin System — discovers, loads, and manages plugins.
 
 Sources, later overriding earlier on key collision: bundled ``<repo>/plugins/<name>/`` (``memory/``
-and ``context_engine/`` have their own discovery), user ``~/.hermes/plugins/<name>/``, project
+and ``context_engine/`` have their own discovery), user ``~/.qubit/plugins/<name>/``, project
 ``./.hermes/plugins/<name>/`` (opt-in via ``HERMES_ENABLE_PROJECT_PLUGINS``), and pip packages in
 the ``hermes_agent.plugins`` entry-point group. A directory plugin needs a ``plugin.yaml`` manifest
 and an ``__init__.py`` exposing ``register(ctx)``. Plugins register callbacks for ``VALID_HOOKS``
@@ -392,7 +392,7 @@ class PluginContext:
 
     @property
     def profile_name(self) -> str:
-        """Active profile name (``"default"``, the ``~/.hermes/profiles/<name>`` id, or ``"custom"``),
+        """Active profile name (``"default"``, the ``~/.qubit/profiles/<name>`` id, or ``"custom"``),
         derived from ``QUBIT_HOME`` — not ``_cli_ref``, which is None outside the interactive CLI —
         so gateway and kanban workers get it too."""
         try:

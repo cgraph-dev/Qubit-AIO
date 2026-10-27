@@ -82,7 +82,7 @@ def _subdict(node: Any, *keys: str) -> Dict[str, Any]:
 
 
 def _read_config_section(*path: str, label: str, log: logging.Logger = logger) -> Dict[str, Any]:
-    """Read a nested section of ~/.hermes/config.yaml. Tolerates missing file."""
+    """Read a nested section of ~/.qubit/config.yaml. Tolerates missing file."""
     try:
         from qubit_cli.config import load_config_readonly
         cfg = load_config_readonly()
@@ -471,7 +471,7 @@ CURATOR_REVIEW_PROMPT = (
 # --- Per-run reports — {YYYYMMDD-HHMMSS}/run.json + REPORT.md under logs/curator/ ---
 
 def _reports_root() -> Path:
-    """``~/.hermes/logs/curator/`` (telemetry next to agent.log, not under skills/). mkdir'd here too so gateway-only / bare-library entry paths work."""
+    """``~/.qubit/logs/curator/`` (telemetry next to agent.log, not under skills/). mkdir'd here too so gateway-only / bare-library entry paths work."""
     root = get_qubit_home() / "logs" / "curator"
     try:
         root.mkdir(parents=True, exist_ok=True)

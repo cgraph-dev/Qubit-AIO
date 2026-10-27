@@ -72,7 +72,7 @@ def _any_filter_args(args) -> bool:
 
 
 def _export_dir(output) -> Path:
-    """``--output`` dir for multi-file exports; ``~/.hermes/session-exports`` when empty or ``-``."""
+    """``--output`` dir for multi-file exports; ``~/.qubit/session-exports`` when empty or ``-``."""
     return Path(output).expanduser() if output and output != "-" else get_qubit_home() / "session-exports"
 
 
