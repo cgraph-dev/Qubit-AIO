@@ -13420,3 +13420,19 @@ def cancel_voice_turn(orch: Any) -> None:
         cancel_pending(ctx)
     except Exception as exc:
         _audit("cancel_error", "voice:user", {"error": str(exc)[:160]})
+
+
+# --------------------------------------- Qubit-native agent roles (additive)
+# Each role's declared ``voice_aliases`` becomes a CLI_BRIDGE entry whose
+# backend calls the real ``roles.runner``. Registration lives in
+# ``role_bridges`` so this frozen registry is not edited per role; a broken
+# optional role module must never take voice down, so the import is guarded.
+try:  # pragma: no cover - exercised through the role bridge tests
+    from .role_bridges import install as _install_role_bridges
+
+    _install_role_bridges()
+except Exception as _role_bridges_error:  # noqa: BLE001
+    import logging as _logging
+
+    _logging.getLogger(__name__).debug(
+        "agent role voice bridges unavailable: %s", _role_bridges_error)

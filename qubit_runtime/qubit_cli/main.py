@@ -373,6 +373,8 @@ from qubit_cli.subcommands.hooks import build_hooks_parser
 from qubit_cli.subcommands.doctor import build_doctor_parser
 from qubit_cli.subcommands.runtime import build_runtime_parser
 from qubit_cli.runtime_cmd import cmd_runtime
+from qubit_cli.subcommands.agent import build_agent_parser
+from qubit_cli.agent_cmd import cmd_agent
 from qubit_cli.subcommands.recipe import build_recipe_parser
 from qubit_cli.recipe_cmd import cmd_recipe
 from qubit_cli.subcommands.traces import build_traces_parser
@@ -2922,6 +2924,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "webhook", "whatsapp", "whatsapp-cloud", "worktree", "chat", "secrets", "security",
         "browser",
         "verify",
+        "agent",
         # Plugin commands missing from top-level --help is an accepted trade-off.
         "help",
     }
@@ -2983,6 +2986,7 @@ _AGENT_SUBCOMMANDS = {
     "cron": ("cron_command", {"run", "tick"}),
     "gateway": ("gateway_command", {"run"}),
     "mcp": ("mcp_action", {"serve"}),
+    "agent": ("agent_action", {"run"}),
 }
 
 
@@ -3212,9 +3216,11 @@ def _refuse_engine_outside_oneshot(args) -> None:
         return
     if command == "recipe" and getattr(args, "recipe_action", None) == "run":
         return
+    if command == "agent" and getattr(args, "agent_action", None) == "run":
+        return
     print(
         "Error: --engine is only supported on -z/--oneshot, chat -q, "
-        "runtime run, and recipe run in this build.",
+        "runtime run, recipe run, and agent run in this build.",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -3577,6 +3583,7 @@ def _build_cli_parser():
     build_hooks_parser(subparsers, cmd_hooks=cmd_hooks)
     build_doctor_parser(subparsers, cmd_doctor=cmd_doctor)
     build_runtime_parser(subparsers, cmd_runtime=cmd_runtime)
+    build_agent_parser(subparsers, cmd_agent=cmd_agent)
     build_recipe_parser(subparsers, cmd_recipe=cmd_recipe)
     build_traces_parser(subparsers, cmd_traces=cmd_traces)
     build_evals_parser(subparsers, cmd_evals=cmd_evals)
