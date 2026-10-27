@@ -1,19 +1,26 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-27 (Tk HUD action pass + live probes)
+## ▶ Resume point — 2026-10-27 (OpenJarvis 8 agents absorbed as roles)
 
-**State:** `main` = `e0c39d860` (worktree clean; `canonical/main` push pending this session). Live `qubit-gateway`, `qubit-voicebridge` (pid 111266, `DISPLAY=:0`) and `qubit-voice-typing` are active; `/chat?resume=20261019_094333_0a4efc` → 200; Telegram `@QubitBot` polling.
+**State:** `main` = the Wave 63 merge commit (worktree clean; `canonical/main` pushed). Live `qubit-gateway`, `qubit-voicebridge` (pid 111266, `DISPLAY=:0`) and `qubit-voice-typing` are active; `/chat?resume=20261019_094333_0a4efc` → 200; Telegram `@QubitBot` polling.
 
-**Panel:** the native **Tk HUD** only (`voicebridge/voice_edit/overlay.py`); no browser HUD. The action pass is covered by `tests/test_voice_edit_hud_actions9u.py` (real Tk buttons → real helper → fake service), and the focused 8-file HUD set is **112 passed**. Live service capture was proven after restarting the bridge with `DISPLAY=:0`; before that restart the live service returned `unsupported_session` (no selection). Do not reintroduce a web HUD.
+**What changed:** OpenJarvis's 8 agents are now Qubit-native **roles** — one loop, one authority path, one `QUBIT_HOME`, voice-reachable. `qubit_runtime/roles/` (contract, auto-discovered registry, runner), `qubit agent roles|run`, `voicebridge/role_bridges.py`, `scripts/audit_openjarvis_absorption.py`, `docs/OPENJARVIS-8-AGENT-ABSORPTION.md`. Roles: `orchestrator`, `react`, `operative`, `openhands`, `simple`, `researcher`, `digest` (recipe), `monitor` (recipe). OpenJarvis itself is **not** installed and is not used by the role path.
 
 **Do next, in order:**
-1. Owner: one real Right-Ctrl selection turn through the Tk HUD with a **supported** command (e.g. "rewrite this", "shorten this") to confirm the live preview/Apply/Revert path; custom case commands ("uppercase") are not transformer actions and currently fall through the brain.
-2. If a cold local model matters: the brain classifier's 4 s `brain_timeout_s` and `voice_edit.timeout_s: 8.0` are shorter than a cold `qubit-brain4` load (~17.5 s measured). Consider a prewarm (or longer first-call budget) only with owner sign-off; no config/ruling change was made this session.
-3. Live connector probes need owner credentials (`google_token.json` / `dropbox_token.json`); Apple is `not_supported` on Linux (verified for all four connectors).
-4. Owner sign-off on `docs/PHASE8_INVENTORY.md` §8 rows; no `HERMES_*`/`.hermes`/plugin/attribution deletion or rename without a `docs/DECISIONS.md` ruling.
-5. Final matrix remains open: focused sets are green (112 Tk/voice; 690 passed / 6 skipped runtime/CLI/connectors/recipes/traces/evals), but the 33-file broader voice run hit the 900 s cap at 39% with no failures and no full-repo matrix was run. `VERIFIED` is **not** claimed.
+1. Owner live test of one role by voice (e.g. "fix this code" → `role_openhands`) and one by text (`qubit agent run simple --prompt ...`); confirm real work and no confirmation bypass.
+2. Decide whether to add a `roles.model_tiers` map. Today `AgentRole.model_tier` is a declared hint; the runner uses the active model and reports the real `model`/`provider` (a `simple` turn used `deepseek-v4.1-flash` and took ~101 s).
+3. Full matrix / `VERIFIED`: focused evidence is green (roles **60 passed**; root absorption/voice **26 passed**; audit **CLEAN 8/8**), but no full-repo matrix and no release verdict.
+4. Open items from Wave 62: owner live Tk selection turn; credentialed connector probes; P8 §8 owner sign-off; cold local-model budget note.
 
-**Known limits:** no real mic or owner-credentialed live turn this session; `qubit gateway status` may label the live service "manual" (cosmetic supervisor detection); the web HUD exists only in git history (`567564088`).
+**Known limits:** no live voice role turn through the bridge yet; role turns call the real provider; `qubit gateway status` may label the live service "manual"; OpenJarvis remains an optional benchmark/engine, not a dependency.
+
+## Wave 63 — 2026-10-27 (OpenJarvis 8-agent absorption)
+
+- ✅ Seven worktrees (core, orchestrator, react, operative, openhands, pack, audit) merged cleanly; each committed in its own worktree.
+- ✅ Contract `qubit_runtime/roles/base.py`; auto-discovered registry; role runner through `RuntimePort` (native), typed `role_engine_unsupported` for engines that cannot honour prompt/toolsets; recipe aliases dispatch the existing recipes.
+- ✅ CLI `qubit agent roles [--json]` / `qubit agent run <role> --prompt ...`; voice bridges for 7 roles; `resolve("fix this code")` → `role_openhands`.
+- ✅ Verified: audit **CLEAN (8/8, 0 wrappers)**; `qubit_runtime/tests/roles` **60 passed**; root absorption/voice **26 passed**; real `simple` turn returned `ROLES_OK`; `monitor` returned the real read-only sections.
+- 🔴 No full matrix, no `VERIFIED`; `model_tier` is advisory; OpenJarvis not installed.
 
 ## Wave 62 — 2026-10-27 (Tk HUD actions, live connector refusals, bridge DISPLAY)
 

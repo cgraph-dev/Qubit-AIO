@@ -75,14 +75,30 @@ audit, so later roles can be added without editing the tool. `--json` emits the
 same report with `required`, `found`, `missing`, `duplicates`, `unexpected`,
 per-role fields/flags and the ordered `gaps` list.
 
-## Status
+## Status — merged 2026-10-27
 
-The audit tool and its hermetic tests are implemented in this lane:
-`scripts/audit_openjarvis_absorption.py` and
-`tests/test_openjarvis_absorption.py` (temporary role trees only; no network).
+All seven lanes are merged on `main` and the merged tree was exercised:
 
-**The merged-tree run is pending.** The role modules are owned by the sibling
-lanes and land separately; when this lane started, `qubit_runtime/roles/`
-contained only `base.py` and `__init__.py`. Run the command above on the merged
-tree and record the table and exit code before claiming 8/8. This document is
-not a `VERIFIED` claim and does not assert that any role is live.
+- `scripts/audit_openjarvis_absorption.py` → **CLEAN (8/8, 0 wrappers)**, exit 0.
+  Rows: `digest`, `monitor`, `openhands`, `operative`, `orchestrator`, `react`,
+  `researcher`, `simple`; no missing/duplicate ids; no wrapper indicators.
+- `qubit_runtime/tests/roles` → **60 passed** (contract, discovery, runner,
+  native toolset wiring, recipe dispatch, typed refusals, voice alias binding).
+- root absorption/voice set (`tests/test_openjarvis_absorption.py`,
+  `tests/test_recipe_voice_wave4x.py`, `tests/test_voice_inventory_coverage.py`)
+  → **26 passed**.
+- Real CLI: `qubit agent roles --json` lists all eight;
+  `qubit agent run simple --prompt 'Reply with exactly: ROLES_OK' --json` →
+  `{"ok": true, "text": "ROLES_OK", "model": "deepseek-v4.1-flash",
+  "provider": "opencode-go"}`; `qubit agent run monitor --json` returned the
+  real read-only cron/kanban/memory/compression sections.
+- Voice: `role_bridges.install()` registers 7 additive `CLI_BRIDGE_REGISTRY`
+  entries (`role_digest`, `role_openhands`, `role_operative`, `role_orchestrator`,
+  `role_react`, `role_researcher`, `role_simple`); `resolve("fix this code")`
+  returns `role_openhands`. The `monitor` aliases stay with the existing
+  `monitor_operative` recipe bridge, which calls the same recipe.
+
+Honest limits: `AgentRole.model_tier` is a declared hint; the runner uses the
+active model and reports the real `model`/`provider` plus `model_tier` in the
+result (no separate tier map was configured). Role turns call the real model,
+so latency depends on the provider. No full matrix and **no `VERIFIED`** claim.

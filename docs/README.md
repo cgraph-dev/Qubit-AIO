@@ -88,6 +88,7 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `OFFICE_UNBLOCK_2026-10-17_1812.md` | Office unblock — 2026-10-17 18:12 tick (lead-quality) |
 | `OMNIROUTE_CHAT_FALLBACK.md` | OmniRoute /chat fallback — diagnosis, fix, verification, rollback |
 | `OPEN_THREADS.md` | OPEN_THREADS.md — durable handoff ledger |
+| `OPENJARVIS-8-AGENT-ABSORPTION.md` | OpenJarvis 8-agent absorption — Qubit-native roles, mapping and audit |
 | `ORB_FX_SPEC.md` | Orb FX Spec — Qubit-mark animation contract |
 | `PARITY.md` | Qubit PARITY — the target, the instruments, the gaps |
 | `PARITY_VERIFICATION_2026-10-09.md` | Parity Verification — post z-wave (2026-10-09) |

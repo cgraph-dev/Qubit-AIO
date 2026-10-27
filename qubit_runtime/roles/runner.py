@@ -100,6 +100,7 @@ def _base_result(role: AgentRole, engine: str, *, elapsed_ms: float = 0.0,
         "provider": None,
         "elapsed_ms": round(max(0.0, elapsed_ms), 3),
         "json_mode": bool(json_mode),
+        "model_tier": role.model_tier,
     }
 
 

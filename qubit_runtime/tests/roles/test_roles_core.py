@@ -229,6 +229,7 @@ def test_non_native_engine_that_advertises_role_support_may_run(monkeypatch):
 
     assert result["ok"] is True
     assert result["text"] == "honoured"
+    assert result["model_tier"] == "local"
     assert backend.ran is True
 
 
