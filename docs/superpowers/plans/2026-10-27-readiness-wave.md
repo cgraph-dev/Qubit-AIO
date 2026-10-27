@@ -27,8 +27,11 @@ ready", then run the gate once. **This plan does not itself claim `VERIFIED`.**
 ## Release gate (after merge)
 
 1. Focused gate: roles, voice/HUD, connectors, recipes, runtime.
-2. Full matrix once (non-gateway + gateway + frontend), every failure fixed or
-   documented with a green alone-rerun; Windows out of scope.
+2. Full matrix once with the **canonical per-file runner**
+   (`cd qubit_runtime && python scripts/run_tests_parallel.py -j 6 --file-timeout 600 tests`),
+   every failure fixed or documented; Windows out of scope. Raw combined-pytest
+   chunks are not the gate (they share one interpreter and show known
+   cross-file contamination).
 3. Live: gateway/bridge/voice-typing active; `/chat` 200; one real role turn;
    one real Tk selection turn; connector refusals recorded.
 4. `docs/STATUS.md` + `docs/OPEN_THREADS.md` updated; canonical pushed.
