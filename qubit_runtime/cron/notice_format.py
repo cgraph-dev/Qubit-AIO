@@ -269,6 +269,9 @@ def _strip_status_lead(text: str, job_name: str = "") -> str:
     return text.lstrip()
 
 
+_LINK_RE = re.compile(r"\[[^\]]+\]\(https?://|https?://", re.IGNORECASE)
+
+
 def _starts_with_status_icon(line: str) -> bool:
     stripped = line.lstrip()
     return _STATUS_ICON_RE.match(stripped) is not None
@@ -384,6 +387,53 @@ def _style_for(transport: Optional[str]) -> str:
     return "plain"
 
 
+def contains_link(text: str) -> bool:
+    """True when *text* carries a Markdown link or a bare http(s) URL."""
+    return bool(_LINK_RE.search(str(text or "")))
+
+
+def compact_artifact_path(value: Any) -> str:
+    """A real artifact path, shortened relative to the active QUBIT home when it lives there.
+
+    Only shortens a path that actually exists under the home; anything else is returned unchanged
+    (never invented, never rewritten to a public URL).
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        from pathlib import Path
+
+        from qubit_constants import get_qubit_home
+
+        home = Path(get_qubit_home()).expanduser().resolve()
+        path = Path(text).expanduser()
+        try:
+            resolved = path.resolve()
+        except OSError:
+            resolved = path
+        return str(resolved.relative_to(home))
+    except Exception:
+        return text
+
+
+def _link_label(label: str) -> str:
+    """A Markdown link label with the bracket/newline characters a renderer could misparse removed."""
+    text = str(label or "Open").replace("\r", " ").replace("\n", " ")
+    return text.translate(str.maketrans({"[": "(", "]": ")", "\\": "/"})).strip()
+
+
+def _link_target(url: str) -> str:
+    """A Markdown link destination safe on every renderer (parens/backslash percent-encoded).
+
+    Telegram MarkdownV2 requires ')' and '\\' escaped inside a link URL; percentage-encoding removes
+    the ambiguity instead of relying on each adapter's escape pass (whose safety net previously
+    escaped a literal '(' inside the URL, producing a broken backslash).
+    """
+    target = str(url or "").strip()
+    return (target.replace("\\", "%5C").replace("(", "%28").replace(")", "%29"))
+
+
 def _detail_lines(notice: CronNotice, style: str, *, next_run: str) -> list[str]:
     bold = "**" if style == "markdown" else "*" if style == "whatsapp" else ""
     job_value = _sanitize_name(notice.job_name)
@@ -441,7 +491,7 @@ def _render_markdown(notice: CronNotice) -> str:
     if summary_truncated and notice.job_id:
         lines.append(f"**Full output:** qubit cron runs {notice.job_id}")
     if notice.link:
-        lines.append(f"[{notice.link_label}]({notice.link})")
+        lines.append(f"[{_link_label(notice.link_label)}]({_link_target(notice.link)})")
     if notice.footer:
         lines.append("")
         lines.append(notice.footer)
@@ -519,6 +569,7 @@ def build_run_notice(
     duration_seconds: Optional[float] = None,
     output_path: Any = None,
     dashboard_url: str = "",
+    include_output_path: bool = False,
     now: Optional[datetime] = None,
 ) -> CronNotice:
     """Build a completed/failed/partial run notice from the job record and run output."""
@@ -532,8 +583,8 @@ def build_run_notice(
     else:
         summary, truncated = summarize_excerpt(body)
     details: list[tuple[str, str]] = []
-    if output_path and truncated:
-        details.append(("Saved", str(output_path)))
+    if output_path and (truncated or include_output_path):
+        details.append(("Saved", compact_artifact_path(output_path)))
     return CronNotice(
         kind=kind,
         job_name=name,
