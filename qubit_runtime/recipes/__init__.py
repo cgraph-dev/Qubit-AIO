@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from recipes.registry import RecipeRegistry, UnknownRecipeError, build_recipe_registry
-from recipes.runner import RecipeRun, build_prompt, run_recipe
+from recipes.runner import RecipeInputError, RecipeRun, build_prompt, normalize_inputs, run_recipe
 from recipes.sections import (
     AVAILABLE,
     UNAVAILABLE,
@@ -15,6 +15,7 @@ from recipes.spec import RecipeSpec
 __all__ = [
     "AVAILABLE",
     "UNAVAILABLE",
+    "RecipeInputError",
     "RecipeRegistry",
     "RecipeRun",
     "RecipeSpec",
@@ -23,6 +24,7 @@ __all__ = [
     "available",
     "build_prompt",
     "build_recipe_registry",
+    "normalize_inputs",
     "run_recipe",
     "unavailable",
 ]

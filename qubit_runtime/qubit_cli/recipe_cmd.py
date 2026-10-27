@@ -7,7 +7,7 @@ from typing import Any
 
 from agent.runtime_port import UnknownRuntimeError
 from recipes.registry import UnknownRecipeError, build_recipe_registry
-from recipes.runner import run_recipe
+from recipes.runner import RecipeInputError, run_recipe
 
 
 def _recipe_registry(registry: Any | None) -> Any:
@@ -60,10 +60,15 @@ def cmd_recipe(
         return 2
 
     engine = str(getattr(args, "engine", "") or "native").strip() or "native"
+    topic = str(getattr(args, "topic", "") or "").strip()
+    run_inputs = {"topic": topic} if topic else None
     try:
         run = run_recipe(
             spec, registry=_backend_registry(backend_registry), engine=engine,
-            dry_run=bool(getattr(args, "dry_run", False)))
+            dry_run=bool(getattr(args, "dry_run", False)), inputs=run_inputs)
+    except RecipeInputError as exc:
+        print(f"recipe run: {exc}", file=sys.stderr)
+        return 2
     except UnknownRuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2

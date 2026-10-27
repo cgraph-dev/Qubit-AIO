@@ -2323,14 +2323,19 @@ def _b_recipe(ctx, args):
 
     QR.ensure_path()
     from recipes.registry import UnknownRecipeError, build_recipe_registry
-    from recipes.runner import run_recipe
+    from recipes.runner import RecipeInputError, run_recipe
 
     recipe_id = str(args.get("recipe", "") or "morning_digest").strip()
     try:
         spec = build_recipe_registry().get(recipe_id)
     except UnknownRecipeError as exc:
         raise ValueError(str(exc)) from exc
-    run = run_recipe(spec, engine="native")
+    topic = str(args.get("topic", "") or "").strip()
+    try:
+        run = run_recipe(
+            spec, engine="native", inputs={"topic": topic} if topic else None)
+    except RecipeInputError as exc:
+        raise ValueError(str(exc)) from exc
     sections = [section.as_dict() for section in run.sections]
     if run.refusal:
         return {"recipe": {
@@ -10442,6 +10447,15 @@ _CB("recipe_monitor_operative", "Operative status",
     examples=("qubit, what's my operative status",),
     help="Runs the read-only monitor_operative recipe (cron, kanban, memory, "
          "compression) and speaks the brief; unavailable sections name their gap.")
+_CB("recipe_deep_research", "Deep research",
+    ("deep research", "do deep research on", "research this topic",
+     "make a researched brief on"),
+    "recipe", args=(_R("topic"),),
+    fixed=(("recipe", "deep_research"),), summary="recipe",
+    examples=("qubit, deep research quantum error correction",),
+    help="Runs the bounded deep_research recipe (web search plus page "
+         "extraction with numbered citations) and speaks the brief; "
+         "unavailable sections name their gap.")
 
 # Upstream kanban lifecycle shapes with NO Qubit construct (the Qubit CLI
 # refuses them typed). Spoken attempts get the same audited refusal and name

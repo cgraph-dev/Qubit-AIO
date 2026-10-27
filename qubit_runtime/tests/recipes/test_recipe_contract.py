@@ -1,5 +1,6 @@
 import pytest
 
+from recipes.deep_research import DEEP_RESEARCH
 from recipes.monitor_operative import MONITOR_OPERATIVE
 from recipes.morning_digest import MORNING_DIGEST
 from recipes.registry import RecipeRegistry, UnknownRecipeError, build_recipe_registry
@@ -20,10 +21,12 @@ def test_morning_digest_spec_declares_the_bounded_surface():
 
 def test_registry_lists_and_looks_up_builtins():
     registry = build_recipe_registry()
-    assert registry.available() == ["monitor_operative", "morning_digest"]
+    assert registry.available() == [
+        "deep_research", "monitor_operative", "morning_digest"]
     assert registry.get("morning_digest") is MORNING_DIGEST
     assert registry.get("monitor_operative") is MONITOR_OPERATIVE
-    assert registry.specs() == (MONITOR_OPERATIVE, MORNING_DIGEST)
+    assert registry.get("deep_research") is DEEP_RESEARCH
+    assert registry.specs() == (DEEP_RESEARCH, MONITOR_OPERATIVE, MORNING_DIGEST)
 
 
 def test_unknown_recipe_lists_available_ids():
@@ -31,7 +34,8 @@ def test_unknown_recipe_lists_available_ids():
     with pytest.raises(UnknownRecipeError) as exc:
         registry.get("nope")
     assert "morning_digest" in str(exc.value)
-    assert exc.value.available == ["monitor_operative", "morning_digest"]
+    assert exc.value.available == [
+        "deep_research", "monitor_operative", "morning_digest"]
 
 
 def test_duplicate_registration_is_refused():

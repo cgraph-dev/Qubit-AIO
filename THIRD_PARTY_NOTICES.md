@@ -701,6 +701,32 @@ the upstream `LICENSE` carries the full text and copyright).
   Qubit-bundled `google-workspace` skill's `references/daily-brief.md`
   (procedure only, no code copied).
 
+## OpenJarvis research-loop policy — Apache-2.0
+
+The `deep_research` recipe's bounded-retrieval and citation policy
+(`qubit_runtime/recipes/deep_research.py`) adapts the research-loop ideas from
+[open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis) at commit
+`05839014127772bd077ba9ba2a2393a007f63ac6` (Apache License 2.0; the upstream
+`LICENSE` carries the full text and copyright).
+
+- Reference sources: `src/openjarvis/agents/research_loop.py`
+  (`SYSTEM_PROMPT` citation rules, `max_iterations` tool budget,
+  `build_sources_for_client` source cap and `renumber_citations`
+  first-appearance renumbering) and `src/openjarvis/agents/deep_research.py`
+  (force-synthesis wording after the turn budget).
+- Local adaptation: `qubit_runtime/recipes/deep_research.py` plus
+  `qubit_runtime/tests/recipes/test_deep_research.py`. **No OpenJarvis code is
+  vendored or imported.** Qubit assigns citation numbers deterministically
+  from the search results (first-appearance order, de-duplicated), bounds the
+  search to 8 results and extraction to 5 pages, and uses Qubit's existing
+  `web_search` / `web_extract` tools. The model only writes the brief.
+- Deliberate divergence: OpenJarvis runs a planner-executor loop over a
+  personal knowledge corpus with `search`/`clarify` tool calls. Qubit's recipe
+  is a single deterministic retrieval frame; iterative multi-hop refinement
+  remains the native agent's job (it can call `web_search`/`web_extract`
+  repeatedly). Unread sources and fetch failures are reported as explicit
+  facts and typed section gaps instead of being silently omitted.
+
 ## OpenJarvis Google Contacts connector field mapping — Apache-2.0
 
 The read-only Google Contacts connector

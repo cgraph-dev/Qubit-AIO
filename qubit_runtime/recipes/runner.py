@@ -25,6 +25,16 @@ def _default_agent_factory(request: TurnRequest) -> Any:
     return _native_factory(request)
 
 
+class RecipeInputError(ValueError):
+    """A recipe's declared inputs are missing or blank."""
+
+    def __init__(self, recipe_id: str, missing: Sequence[str]) -> None:
+        self.recipe_id = recipe_id
+        self.missing = tuple(missing)
+        super().__init__(
+            f"recipe {recipe_id!r} requires input(s): {', '.join(self.missing)}")
+
+
 def _redact(value: object) -> str:
     try:
         return redact_for_egress(str(value or ""))
@@ -32,12 +42,29 @@ def _redact(value: object) -> str:
         return ""
 
 
+def normalize_inputs(spec: RecipeSpec,
+                     inputs: Mapping[str, Any] | None) -> dict[str, str]:
+    """Return bounded input values, raising for any declared-but-blank input."""
+    provided = {
+        str(key): _redact(value).strip()
+        for key, value in dict(inputs or {}).items()
+    }
+    missing = [name for name in spec.input_fields if not provided.get(name)]
+    if missing:
+        raise RecipeInputError(spec.id, missing)
+    return provided
+
+
 def build_prompt(spec: RecipeSpec, sections: Sequence[SectionResult],
-                 now: datetime | None = None) -> str:
+                 now: datetime | None = None,
+                 inputs: Mapping[str, Any] | None = None) -> str:
     moment = now or datetime.now(timezone.utc)
     today = moment.astimezone().strftime("%A, %B %d, %Y")
-    return str(spec.prompt).replace("{facts}", render_facts(sections)).replace(
+    text = str(spec.prompt).replace("{facts}", render_facts(sections)).replace(
         "{today}", today)
+    for key, value in dict(inputs or {}).items():
+        text = text.replace("{" + str(key) + "}", _redact(value))
+    return text
 
 
 @dataclass(frozen=True)
@@ -86,11 +113,15 @@ def _sections_for(
     collectors: Mapping[str, Callable[[datetime], SectionResult]] | None,
     fixture: Sequence[SectionResult] | None,
     now: datetime | None,
+    inputs: Mapping[str, str] | None = None,
 ) -> tuple[SectionResult, ...]:
     if fixture is not None:
         return tuple(fixture)
+    active = collectors
+    if active is None and spec.collector_factory is not None:
+        active = spec.collector_factory(dict(inputs or {}))
     return collect_sections(
-        collectors, now=now, sections=spec.sections, defaults=spec.collectors)
+        active, now=now, sections=spec.sections, defaults=spec.collectors)
 
 
 def _usage_value(events: Sequence[TurnEvent], key: str):
@@ -113,8 +144,11 @@ def run_recipe(
     fixture: Sequence[SectionResult] | None = None,
     now: datetime | None = None,
     cancel: Any | None = None,
+    inputs: Mapping[str, Any] | None = None,
 ) -> RecipeRun:
-    """Run *spec* once. Raises ``UnknownRuntimeError`` for an unregistered engine."""
+    """Run *spec* once. Raises ``UnknownRuntimeError`` for an unregistered engine
+    and ``RecipeInputError`` when a declared input is missing."""
+    resolved_inputs = normalize_inputs(spec, inputs)
     engine_name = str(engine or "native").strip() or "native"
     if registry is None:
         from agent.runtime_registry import build_registry
@@ -122,7 +156,7 @@ def run_recipe(
         registry = build_registry(_default_agent_factory, native_stream=True)
     backend = registry.get(engine_name)
 
-    sections = _sections_for(spec, collectors, fixture, now)
+    sections = _sections_for(spec, collectors, fixture, now, resolved_inputs)
     if dry_run:
         return RecipeRun(
             recipe_id=spec.id, engine=engine_name,
@@ -130,7 +164,7 @@ def run_recipe(
             sections=sections, terminal="done")
 
     request = TurnRequest(
-        prompt=build_prompt(spec, sections, now),
+        prompt=build_prompt(spec, sections, now, resolved_inputs),
         session_id=f"recipe-{spec.id}-{uuid.uuid4().hex[:12]}",
     )
     started = time.perf_counter()
