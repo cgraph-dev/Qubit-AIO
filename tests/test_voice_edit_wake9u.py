@@ -333,6 +333,33 @@ def test_kws_cue_on_hit_is_opt_in(monkeypatch):
     assert "ready" not in beeps
 
 
+def test_cue_on_speech_fires_at_segment_open_and_suppresses_final(monkeypatch):
+    """A spotter-deaf voice still gets an immediate cue at speech onset.
+
+    The final ``wake`` beep is suppressed for that segment, so the owner
+    hears one cue, not a cue plus a late confirmation.
+    """
+    import voicebridge.voice_edit.wake as wake_mod
+
+    beeps = []
+    monkeypatch.setattr(wake_mod, "beep",
+                        lambda cfg, kind="wake": beeps.append(kind) or True)
+    commands = []
+    m = WakeMonitor(
+        FakeCfg(wake={"enabled": True, "cue_on_speech": True,
+                      "vad": "energy"}),
+        on_command=commands.append,
+        is_busy=lambda: False,
+        mic_factory=lambda: SeqMic(
+            [loud_frame(), loud_frame()] + [silent_frame()] * 8),
+        transcribe=lambda pcm: "hey qubit what time is it",
+        kws=FakeKws(hits=0))
+    _run_loop(m, lambda: bool(commands))
+    assert commands == ["what time is it"]
+    assert beeps.count("ready") == 1
+    assert "wake" not in beeps
+
+
 def test_forced_segment_emits_command_from_kws():
     # Keyword fired; ASR rendered the wake phrase -> strip it.
     m, commands = _monitor(["hey qubit, type this for me: hello"])

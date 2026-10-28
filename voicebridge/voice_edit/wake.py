@@ -1015,6 +1015,10 @@ class WakeMonitor:
         self._thread: Optional[threading.Thread] = None
         self._armed_until = 0.0
         self._lock = threading.Lock()
+        # Set while this segment already played the immediate cue; the final
+        # ``wake`` beep is skipped then (one cue per utterance). The loop
+        # resets it at each segment boundary.
+        self._cue_segment = False
         self.last_error = ""
         # Continuous ("keep listening") mode state (2026-10-06). A bounded
         # run of no-wake follow-up commands layered on the existing arm
@@ -1236,6 +1240,11 @@ class WakeMonitor:
         # tail can never leak into the next.
         prev: List[bytes] = []
         kws_hit = False
+        # True once this segment already played the immediate "ready" cue.
+        # The final ``wake`` beep is skipped then, so one utterance still
+        # gets exactly one cue. Cleared after the segment is handled (or on
+        # a busy reset), never mid-segment.
+        self._cue_segment = False
         try:
             while not self._stop.is_set():
                 # Yield the microphone and STT to any active Right-Ctrl session.
@@ -1244,6 +1253,7 @@ class WakeMonitor:
                     buf.clear()
                     prev.clear()
                     kws_hit = False
+                    self._cue_segment = False
                     now = time.monotonic()
                     if now - getattr(self, "_last_busy_log", 0.0) > 30.0:
                         self._last_busy_log = now
@@ -1279,8 +1289,10 @@ class WakeMonitor:
                             # that the spotter heard the phrase; it is off by
                             # default because acoustic hits can be room
                             # noise/TV/music.
-                            if _wake_cue_on_kws(self.cfg):
+                            if (_wake_cue_on_kws(self.cfg)
+                                    and not self._cue_segment):
                                 beep(self.cfg, "ready")
+                                self._cue_segment = True
                     except Exception as exc:
                         now = time.monotonic()
                         if now - getattr(self, "_last_kws_err", 0.0) > 5.0:
@@ -1297,6 +1309,22 @@ class WakeMonitor:
                         prev.clear()
                         _trace("capturing")
                         self._last_capturing_log = time.monotonic()
+                        # Immediate fallback cue for a spotter-deaf voice:
+                        # the VAD just confirmed real speech, so this lands
+                        # ~300 ms after onset instead of after endpoint+ASR.
+                        # Never cue an already-armed follow-up (the wake
+                        # phrase already armed it) and never double-cue a
+                        # segment the KWS already announced.
+                        if not self._cue_segment:
+                            try:
+                                with self._lock:
+                                    armed = (time.monotonic()
+                                             < self._armed_until)
+                            except Exception:
+                                armed = False
+                            if not armed and _wake_cue_on_speech(self.cfg):
+                                beep(self.cfg, "ready")
+                                self._cue_segment = True
                     else:
                         # Long segments (up to 15 s) would outlast the
                         # orb's 6 s listen window — re-fire about every
@@ -1350,7 +1378,10 @@ class WakeMonitor:
                         else:
                             _trace("asr_fallback_skip", bytes=len(pcm))
                         continue
-                self._handle_segment(pcm, forced=hit)
+                try:
+                    self._handle_segment(pcm, forced=hit)
+                finally:
+                    self._cue_segment = False
         finally:
             try:
                 mic.stop()
@@ -1629,7 +1660,8 @@ class WakeMonitor:
                     # + KWS-hit turn) emits twice.
                     with self._lock:
                         self._armed_until = 0.0
-                    beep(self.cfg, "wake")
+                    if not self._cue_segment:
+                        beep(self.cfg, "wake")
                     self._emit(cmd)
                 else:
                     with self._lock:
@@ -1661,7 +1693,8 @@ class WakeMonitor:
                 # re-beep as the audible "still listening" cue, emit
                 # nothing. Non-empty path below is byte-identical.
                 _trace("armed_empty_repeat", chars=len(text))
-                beep(self.cfg, "wake")
+                if not self._cue_segment:
+                    beep(self.cfg, "wake")
                 return
             # Continuous mode: an utterance accepted through a live
             # follow-up run consumes one of its bounded budget. When the
@@ -1695,7 +1728,8 @@ class WakeMonitor:
             trailing = strip_wake_trailing(text, aliases=aliases)
             if trailing is not None:
                 _trace("wake_trailing", chars=len(trailing))
-                beep(self.cfg, "wake")
+                if not self._cue_segment:
+                    beep(self.cfg, "wake")
                 # A fresh, deliberate wake ends any continuous run.
                 self._reset_continuous()
                 self._emit(trailing)
@@ -1712,7 +1746,8 @@ class WakeMonitor:
             # KWS-hit path still serves acoustic bare detections.
             _trace("bare_wake_drop", chars=len(text))
             return
-        beep(self.cfg, "wake")
+        if not self._cue_segment:
+            beep(self.cfg, "wake")
         # A fresh, deliberate wake ends any continuous run.
         self._reset_continuous()
         if remainder.strip():
@@ -1856,6 +1891,23 @@ def _wake_cue_on_kws(cfg: Any, default: bool = False) -> bool:
     """
     try:
         return bool(_cfg(cfg, "voice_edit", "wake", "cue_on_kws",
+                         default=default))
+    except Exception:
+        return default
+
+
+def _wake_cue_on_speech(cfg: Any, default: bool = False) -> bool:
+    """Whether a short cue fires when the VAD opens a speech segment.
+
+    This is the fallback for voices the spotter is deaf to: the cue lands at
+    speech onset (~300 ms) instead of after the segment is endpointed and
+    transcribed (~1 s). It is opt-in because any idle room speech opens a
+    segment and would cue. The final ``wake`` beep is suppressed for a
+    segment that already cued, so one utterance still gets exactly one cue.
+    Never raises; an unreadable config uses the default.
+    """
+    try:
+        return bool(_cfg(cfg, "voice_edit", "wake", "cue_on_speech",
                          default=default))
     except Exception:
         return default

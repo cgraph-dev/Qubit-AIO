@@ -410,6 +410,10 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             # OFF: acoustic hits can be room noise/TV/music.
             "cue_on_kws": _read_cfg(cfg, "voice_edit", "wake",
                                     "cue_on_kws", default=False) is True,
+            # Immediate cue at VAD speech onset for spotter-deaf voices.
+            # Opt-in: any idle room speech opens a segment and would cue.
+            "cue_on_speech": _read_cfg(cfg, "voice_edit", "wake",
+                                       "cue_on_speech", default=False) is True,
             "asr_fallback_max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "asr_fallback_max_s",
                 default=15.0) or 15.0),
@@ -618,6 +622,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                          f"wake.{k} must be a number")
         if "cue_on_kws" in wake:
             clean_wake["cue_on_kws"] = bool(wake["cue_on_kws"])
+        if "cue_on_speech" in wake:
+            clean_wake["cue_on_speech"] = bool(wake["cue_on_speech"])
         if "hold_silence_ms" in wake:
             try:
                 clean_wake["hold_silence_ms"] = float(wake["hold_silence_ms"])
