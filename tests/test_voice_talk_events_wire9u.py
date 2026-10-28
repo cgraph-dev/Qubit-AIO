@@ -274,6 +274,17 @@ def test_speak_emits_interrupt_on_barge_in(monkeypatch):
 
     talk = RecordingTalk()
     helper, overlay, client = _make(monkeypatch, talk=talk)
+
+    class FakeWake:
+        phrase = "hey qubit"
+
+        def _do_transcribe(self, pcm):
+            return "hey qubit"
+
+        def expect_reply(self, timeout_s=None):
+            pass
+
+    helper._wake = FakeWake()
     helper._mic_factory = lambda: LoudMic()
     monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
     monkeypatch.setattr(subprocess, "Popen", BargePopen)

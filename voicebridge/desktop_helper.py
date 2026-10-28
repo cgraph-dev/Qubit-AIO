@@ -34,7 +34,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .logging_setup import log_event
 from .chat_transport import parse_route_word
@@ -3469,14 +3469,59 @@ class DesktopHelper:
             except Exception:
                 return False
 
-    def _play_with_barge_in(self, proc: Any) -> bool:
-        """Block until ``proc`` ends; stop it on confident speech or STOP.
+    def _barge_in_has_wake(self, pcm: bytes) -> bool:
+        """True only when the interrupting audio actually contains the wake.
 
-        Returns True when playback was interrupted (confident room speech
-        or an explicit orb STOP). Disabled (or an unopenable mic) degrades
-        to a plain wait — speech never breaks because detection cannot run.
-        The mic stream is short-lived (this playback only) and never
-        touches the wake monitor's mic.
+        The barge-in watcher is an RMS gate; stopping a reply on any loud
+        speech made a cough or room conversation look like a wake. This
+        transcribes the short buffered utterance through the same STT the
+        wake monitor uses and applies the wake-phrase rules. Any failure
+        (no wake monitor, empty/echo transcript, STT error) is a clear no.
+        Never raises.
+        """
+        try:
+            if len(pcm) < 4800:
+                return False
+            wake = getattr(self, "_wake", None)
+            transcribe = getattr(wake, "_do_transcribe", None)
+            if not callable(transcribe):
+                return False
+            text = str(transcribe(pcm) or "").strip()
+            if not text:
+                return False
+            from .voice_edit.wake import (WAKE_ALIASES, _matches_custom_trigger,
+                                          strip_wake, strip_wake_trailing,
+                                          wake_match_kind)
+            aliases = [str(getattr(wake, "phrase", "") or "hey qubit"),
+                       *WAKE_ALIASES]
+            try:
+                from .voice_edit import wake_words as _ww
+                aliases.extend(_ww.active_triggers())
+            except Exception:
+                pass
+            if _matches_custom_trigger(text):
+                return True
+            if (strip_wake(text, aliases=aliases) is not None
+                    and wake_match_kind(text, aliases=aliases) != "bare"):
+                return True
+            if strip_wake_trailing(text, aliases=aliases) is not None:
+                return True
+            _trace("speak.barge_in_not_wake", chars=len(text))
+            return False
+        except Exception:
+            return False
+
+    def _play_with_barge_in(self, proc: Any) -> bool:
+        """Block until ``proc`` ends; stop it on the wake phrase or STOP.
+
+        A confident-speech trigger first pauses playback and transcribes a
+        short buffer: only an actual "hey qubit" (or a custom wake trigger)
+        stops the reply; ordinary room speech resumes exactly where it was.
+        Returns True when playback was interrupted (wake phrase or explicit
+        orb STOP). Disabled (or an unopenable mic) degrades to a plain wait
+        — speech never breaks because detection cannot run. The mic stream
+        is short-lived (this playback only) and never touches the wake
+        monitor's mic.
         """
         stop = getattr(self, "_speak_stop", None)
         if stop is not None:
@@ -3508,6 +3553,9 @@ class DesktopHelper:
             frame_ms = int(getattr(mic, "frame_ms", 300) or 300)
         except Exception:
             frame_ms = 300
+        # Keep the last ~1.5 s so the word "hey" that started the trigger is
+        # in the gate buffer, not only the tail after the threshold fired.
+        recent: List[bytes] = []
         try:
             while proc.poll() is None:
                 if stop is not None:
@@ -3527,18 +3575,63 @@ class DesktopHelper:
                     frame = None
                 if not frame:
                     continue
+                recent.append(frame)
+                del recent[:-5]
                 # One real frame = one nominal frame duration of audio: the
                 # mic delivers at its own cadence, so counting frames maps to
                 # real confident-speech time without wall-clock flakiness.
                 if watcher.feed(frame_rms(frame), frame_ms):
+                    # Gate the stop on the actual wake phrase. Pause the
+                    # player while a short buffer (including the trigger
+                    # frame and the next ~1.2 s) is transcribed; a non-wake
+                    # utterance resumes exactly where it was.
+                    gate = list(recent)
+                    paused = False
+                    # Use SIGSTOP/SIGCONT explicitly; imported lazily so a
+                    # fake proc without signal support still works.
                     try:
-                        proc.terminate()
+                        import signal as _signal
+                        proc.send_signal(_signal.SIGSTOP)
+                        paused = True
                     except Exception:
-                        pass
-                    interrupted = True
-                    _trace("speak.barge_in", threshold=threshold,
+                        paused = False
+                    for _ in range(4):
+                        try:
+                            nxt = mic.read_frame(timeout=0.2)
+                        except Exception:
+                            nxt = None
+                        if nxt:
+                            gate.append(nxt)
+                    if self._barge_in_has_wake(b"".join(gate)):
+                        if paused:
+                            # SIGTERM to a SIGSTOPed child stays pending; let
+                            # it run so terminate() actually lands.
+                            try:
+                                import signal as _signal
+                                proc.send_signal(_signal.SIGCONT)
+                            except Exception:
+                                pass
+                        try:
+                            proc.terminate()
+                        except Exception:
+                            pass
+                        interrupted = True
+                        _trace("speak.barge_in", threshold=threshold,
+                               min_ms=min_ms, wake=True)
+                        break
+                    _trace("speak.barge_in_ignored", threshold=threshold,
                            min_ms=min_ms)
-                    break
+                    if paused:
+                        try:
+                            import signal as _signal
+                            proc.send_signal(_signal.SIGCONT)
+                        except Exception:
+                            pass
+                    recent.clear()
+                    watcher = BargeInWatcher(threshold=threshold,
+                                             min_ms=min_ms,
+                                             frame_ms=frame_ms)
+                    continue
         finally:
             try:
                 mic.stop()

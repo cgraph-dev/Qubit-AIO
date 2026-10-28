@@ -73,10 +73,14 @@ class FakeProc:
     def __init__(self):
         self.terminated = False
         self.waited = False
+        self.signals = []
         self._alive = True
 
     def poll(self):
         return None if self._alive else 0
+
+    def send_signal(self, signum):
+        self.signals.append(int(signum))
 
     def terminate(self):
         self.terminated = True
@@ -111,6 +115,19 @@ class FakeClient:
 
     def speak(self, text):
         return self._wav
+
+
+class FakeWake:
+    def __init__(self, text="hey qubit"):
+        self.text = text
+        self.phrase = "hey qubit"
+        self.armed = []
+
+    def _do_transcribe(self, pcm):
+        return self.text
+
+    def expect_reply(self, timeout_s=None):
+        self.armed.append(timeout_s)
 
 
 class FakeOverlay:
@@ -157,6 +174,9 @@ def _helper(monkeypatch, cfg, mic, procs):
                 self._inner._alive = False
             return self._inner.poll()
 
+        def send_signal(self, signum):
+            self._inner.send_signal(signum)
+
         def terminate(self):
             self._inner.terminate()
 
@@ -164,6 +184,7 @@ def _helper(monkeypatch, cfg, mic, procs):
             return self._inner.wait(timeout=timeout)
 
     monkeypatch.setattr("subprocess.Popen", FakePopen)
+    helper._wake = FakeWake()
     return helper
 
 
@@ -176,6 +197,21 @@ def test_speak_loud_speech_interrupts_playback(monkeypatch):
     assert procs, "expected playback to start"
     assert procs[0].terminated is True, "loud speech must stop playback"
     assert helper._speaking is False, "speaking flag must clear"
+
+
+def test_barge_in_ignores_speech_without_the_wake_phrase(monkeypatch):
+    """Confident speech alone must not stop a reply; only "hey qubit" does."""
+    mic = FakeMic([_frame(0.01), _frame(0.60)])
+    procs = []
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), mic, procs)
+    helper._wake = FakeWake("this is just a normal sentence")
+    helper._speak("hello there this is a long spoken reply with many words")
+    assert procs and procs[0].terminated is False
+    assert helper._barge_interrupted is False
+    import signal
+    assert signal.SIGSTOP in procs[0].signals
+    assert signal.SIGCONT in procs[0].signals
 
 
 def test_speak_silence_plays_through(monkeypatch):
@@ -212,18 +248,14 @@ def test_barge_in_arms_wake_for_the_interrupting_utterance(monkeypatch):
     """A barge-in opens the wake arm so its command is not discarded."""
     from voicebridge import desktop_helper as DH
 
-    class FakeWake:
-        def __init__(self):
-            self.armed = []
-
-        def expect_reply(self, timeout_s=None):
-            self.armed.append(timeout_s)
+    class W(FakeWake):
+        pass
 
     mic = FakeMic([_frame(0.01), _frame(0.60)])
     procs = []
     helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
                                        barge_in_ms=200), mic, procs)
-    helper._wake = FakeWake()
+    helper._wake = W()
     helper._speak("hello there this is a long spoken reply with many words")
     assert helper._wake.armed == [8.0]
 
