@@ -67,7 +67,12 @@ def test_delete_board_archives_and_reverts_current(client):
     archived = Path(body["result"]["new_path"])
     assert archived.is_dir()
     assert (archived / "kanban.db").exists()
-    assert not kb.board_dir("widget").exists()
+    # The original slug deliberately keeps an ``archived`` tombstone (so a stale
+    # dashboard tab cannot recreate an empty board), but its live DB is gone.
+    tombstone = kb.board_dir("widget")
+    assert tombstone.is_dir()
+    assert kb.read_board_metadata("widget")["archived"] is True
+    assert not (tombstone / "kanban.db").exists()
 
     assert all(b["slug"] != "widget" for b in client.get("/api/plugins/kanban/boards").json()["boards"])
 
