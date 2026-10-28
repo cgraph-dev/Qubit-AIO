@@ -403,6 +403,20 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
             "kws_threshold": float(_read_cfg(cfg, "voice_edit", "wake",
                                              "kws_threshold", default=0.25) or
                                    0.25),
+            # Spotter-only input conditioning (ASR audio is never touched).
+            # Boost-only normalization is ON by default: live post-AGC peaks
+            # are 0.03-0.10, well below the model's healthy range.
+            "kws_normalize": _read_cfg(cfg, "voice_edit", "wake",
+                                       "kws_normalize", default=True) is not False,
+            "kws_input_gain": float(_read_cfg(cfg, "voice_edit", "wake",
+                                              "kws_input_gain", default=1.0) or
+                                    1.0),
+            "kws_target_peak": float(_read_cfg(cfg, "voice_edit", "wake",
+                                               "kws_target_peak", default=0.5) or
+                                     0.5),
+            "kws_max_gain": float(_read_cfg(cfg, "voice_edit", "wake",
+                                            "kws_max_gain", default=6.0) or
+                                  6.0),
             "asr_fallback": _read_cfg(cfg, "voice_edit", "wake",
                                         "asr_fallback", default=True) is not False,
             # Immediate single-note cue at the spotter hit (the final
@@ -582,7 +596,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                 raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                      "wake.vad must be auto|silero|webrtc|energy")
             clean_wake["vad"] = vad
-        for k in ("kws_threshold", "kws_score"):
+        for k in ("kws_threshold", "kws_score", "kws_input_gain",
+                  "kws_target_peak", "kws_max_gain"):
             if k in wake:
                 try:
                     clean_wake[k] = float(wake[k])
@@ -592,6 +607,17 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                          f"wake.{k} must be a number")
         if "kws_threshold" in clean_wake:
             clean_wake["kws_threshold"] = max(0.05, min(clean_wake["kws_threshold"], 0.9))
+        if "kws_normalize" in wake:
+            clean_wake["kws_normalize"] = bool(wake["kws_normalize"])
+        if "kws_input_gain" in clean_wake:
+            clean_wake["kws_input_gain"] = max(
+                1.0, min(clean_wake["kws_input_gain"], 16.0))
+        if "kws_target_peak" in clean_wake:
+            clean_wake["kws_target_peak"] = max(
+                0.05, min(clean_wake["kws_target_peak"], 0.9))
+        if "kws_max_gain" in clean_wake:
+            clean_wake["kws_max_gain"] = max(
+                1.0, min(clean_wake["kws_max_gain"], 16.0))
         if "asr_fallback" in wake:
             clean_wake["asr_fallback"] = bool(wake["asr_fallback"])
         if "asr_fallback_max_s" in wake:

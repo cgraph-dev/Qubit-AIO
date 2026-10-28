@@ -17,6 +17,89 @@ from typing import Any, List, Optional
 
 MODEL_PREFIX = "sherpa-onnx-kws-"
 
+#: KWS-only input conditioning defaults. The live spotter sees post-AGC mic
+#: frames whose peaks are routinely 0.03-0.10 while the model expects a
+#: healthy level; boost-only normalization lifts those frames without
+#: touching normal-level audio (the ASR path never sees any of this).
+DEFAULT_INPUT_TARGET_PEAK = 0.5
+DEFAULT_INPUT_MAX_GAIN = 6.0
+#: Peaks at/below this are digital silence or the room floor; never amplify
+#: them (doing so would only give the spotter louder noise).
+MIN_CONDITION_PEAK = 0.002
+
+
+def condition_samples(samples: Any, *, gain: float = 1.0,
+                      normalize: bool = True,
+                      target_peak: float = DEFAULT_INPUT_TARGET_PEAK,
+                      max_gain: float = DEFAULT_INPUT_MAX_GAIN):
+    """Condition one float32 frame for the spotter only.
+
+    Returns ``(out, stats)``. ``stats`` carries only levels/gains — never
+    audio. The transform is deliberately boost-only and bounded:
+
+    * ``gain`` is a fixed multiplier clamped to 1..16 (default 1.0);
+    * ``normalize`` lifts a quiet frame toward ``target_peak`` by at most
+      ``max_gain`` (clamped 1..16);
+    * frames already at/above ``target_peak`` (or at/below
+      ``MIN_CONDITION_PEAK``) are returned unchanged, so normal audio is
+      not distorted and near-silence is not amplified.
+
+    ASR never consumes this output; the wake loop feeds the raw capture to
+    every transcription path.
+    """
+    import numpy as np
+
+    try:
+        a = np.asarray(samples, dtype=np.float32)
+    except Exception:
+        return samples, {"raw_peak": 0.0, "peak": 0.0, "gain": 1.0,
+                         "normalized": False}
+    stats = {"raw_peak": 0.0, "peak": 0.0, "gain": 1.0,
+             "normalized": False}
+    if a.size == 0:
+        return a, stats
+    try:
+        raw_peak = float(np.abs(a).max())
+    except Exception:
+        return a, stats
+    stats["raw_peak"] = round(raw_peak, 4)
+    try:
+        fixed = max(1.0, min(float(gain), 16.0))
+    except (TypeError, ValueError):
+        fixed = 1.0
+    total = fixed
+    if fixed > 1.0:
+        a = np.clip(a * fixed, -1.0, 1.0)
+    try:
+        want_norm = bool(normalize)
+    except Exception:
+        want_norm = False
+    if want_norm:
+        try:
+            tgt = max(0.05, min(float(target_peak), 0.9))
+        except (TypeError, ValueError):
+            tgt = DEFAULT_INPUT_TARGET_PEAK
+        try:
+            cap = max(1.0, min(float(max_gain), 16.0))
+        except (TypeError, ValueError):
+            cap = DEFAULT_INPUT_MAX_GAIN
+        try:
+            peak = float(np.abs(a).max())
+        except Exception:
+            peak = 0.0
+        if peak > MIN_CONDITION_PEAK:
+            factor = min(cap, tgt / peak)
+            if factor > 1.0:
+                a = np.clip(a * factor, -1.0, 1.0)
+                total *= factor
+                stats["normalized"] = True
+    stats["gain"] = round(total, 3)
+    try:
+        stats["peak"] = round(float(np.abs(a).max()), 4)
+    except Exception:
+        stats["peak"] = stats["raw_peak"]
+    return a, stats
+
 
 def models_root() -> Path:
     try:
@@ -111,4 +194,4 @@ def keywords_for(phrase: str) -> List[str]:
 
 
 __all__ = ["KwsDetector", "find_model_dir", "models_root", "keywords_for",
-           "MODEL_PREFIX"]
+           "condition_samples", "MODEL_PREFIX"]

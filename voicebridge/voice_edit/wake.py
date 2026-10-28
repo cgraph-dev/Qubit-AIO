@@ -36,6 +36,7 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 
 from . import debug as _dbg
+from .kws import condition_samples
 from .sound import beep
 
 
@@ -1011,6 +1012,13 @@ class WakeMonitor:
             self.engine = "kws"
         elif self.engine == "auto":
             self.engine = "asr"
+        # Spotter-only input conditioning (never touches the ASR audio).
+        # Boost-only and bounded; defaults lift the live 0.03-0.10 peaks
+        # toward the model's healthy range without touching normal audio.
+        self._kws_input_gain = _wake_kws_input_gain(cfg)
+        self._kws_normalize = _wake_kws_normalize(cfg)
+        self._kws_target_peak = _wake_kws_target_peak(cfg)
+        self._kws_max_gain = _wake_kws_max_gain(cfg)
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._armed_until = 0.0
@@ -1240,6 +1248,11 @@ class WakeMonitor:
         # tail can never leak into the next.
         prev: List[bytes] = []
         kws_hit = False
+        # Per-segment KWS level diagnostics (bounded: one trace at endpoint,
+        # never per-frame audio). ``raw`` is what the mic/AGC delivered;
+        # ``cond`` is what the spotter actually saw after conditioning.
+        seg_raw_peak = 0.0
+        seg_cond_peak = 0.0
         # True once this segment already played the immediate "ready" cue.
         # The final ``wake`` beep is skipped then, so one utterance still
         # gets exactly one cue. Cleared after the segment is handled (or on
@@ -1253,6 +1266,8 @@ class WakeMonitor:
                     buf.clear()
                     prev.clear()
                     kws_hit = False
+                    seg_raw_peak = 0.0
+                    seg_cond_peak = 0.0
                     self._cue_segment = False
                     now = time.monotonic()
                     if now - getattr(self, "_last_busy_log", 0.0) > 30.0:
@@ -1273,14 +1288,31 @@ class WakeMonitor:
                     try:
                         samples = (np.frombuffer(frame, dtype="<i2")
                                    .astype(np.float32) / 32768.0)
+                        fed, kstats = condition_samples(
+                            samples, gain=self._kws_input_gain,
+                            normalize=self._kws_normalize,
+                            target_peak=self._kws_target_peak,
+                            max_gain=self._kws_max_gain)
+                        seg_raw_peak = max(seg_raw_peak,
+                                           float(kstats.get("raw_peak", 0.0)))
+                        seg_cond_peak = max(seg_cond_peak,
+                                            float(kstats.get("peak", 0.0)))
                         n = getattr(self, "_dbg_frames", 0) + 1
                         self._dbg_frames = n
                         if n % 100 == 0:
+                            # Bounded rolling diagnostic (one per 100 frames):
+                            # raw capture level vs what the spotter received.
                             _trace("kws.frames", n=n,
-                                   peak=round(float(np.abs(samples).max()), 3))
-                        if self._kws.feed(samples):
+                                   peak=kstats.get("raw_peak", 0.0),
+                                   conditioned=kstats.get("peak", 0.0),
+                                   gain=kstats.get("gain", 1.0),
+                                   normalize=bool(self._kws_normalize))
+                        if self._kws.feed(fed):
                             kws_hit = True
-                            _trace("kws.hit")
+                            _trace("kws.hit",
+                                   peak=kstats.get("raw_peak", 0.0),
+                                   conditioned=kstats.get("peak", 0.0),
+                                   gain=kstats.get("gain", 1.0))
                             # The final ``wake`` beep stays on actual
                             # emission (forced-path full/trailing/custom and
                             # the unarmed full match), so exactly one beep
@@ -1350,6 +1382,16 @@ class WakeMonitor:
                 ep.reset()
                 hit = kws_hit
                 kws_hit = False
+                if self._kws is not None and not hit:
+                    # One line per completed segment (not per frame): the
+                    # level evidence needed to explain a live miss without
+                    # ever logging audio.
+                    _trace("kws.miss", bytes=len(pcm),
+                           raw_peak=round(seg_raw_peak, 4),
+                           conditioned=round(seg_cond_peak, 4),
+                           normalize=bool(self._kws_normalize))
+                seg_raw_peak = 0.0
+                seg_cond_peak = 0.0
                 if self._kws is not None:
                     if hit:
                         # Reset ONLY on a hit (latch clear). Resetting after
@@ -1875,6 +1917,53 @@ def _wake_max_s(cfg: Any, default: float = 15.0) -> float:
     except Exception:
         v = default
     return max(2.0, min(v, 25.0))
+
+
+def _wake_kws_input_gain(cfg: Any, default: float = 1.0) -> float:
+    """Fixed spotter-only gain (``wake.kws_input_gain``, clamped 1..16)."""
+    try:
+        v = float(_cfg(cfg, "voice_edit", "wake", "kws_input_gain",
+                       default=default))
+    except (TypeError, ValueError):
+        v = default
+    return max(1.0, min(v, 16.0))
+
+
+def _wake_kws_normalize(cfg: Any, default: bool = True) -> bool:
+    """Whether quiet frames are peak-normalized for the spotter only.
+
+    Default ON: live peaks sit at 0.03-0.10 while the model wants a
+    healthier level. Boost-only and bounded (see
+    :func:`voicebridge.voice_edit.kws.condition_samples`), so normal audio
+    is untouched and the ASR path never sees this transform.
+    """
+    try:
+        v = _cfg(cfg, "voice_edit", "wake", "kws_normalize", default=default)
+        if v is None:
+            return default
+        return bool(v)
+    except Exception:
+        return default
+
+
+def _wake_kws_target_peak(cfg: Any, default: float = 0.5) -> float:
+    """Spotter normalization target (``wake.kws_target_peak``, 0.05..0.9)."""
+    try:
+        v = float(_cfg(cfg, "voice_edit", "wake", "kws_target_peak",
+                       default=default))
+    except (TypeError, ValueError):
+        v = default
+    return max(0.05, min(v, 0.9))
+
+
+def _wake_kws_max_gain(cfg: Any, default: float = 6.0) -> float:
+    """Upper bound on spotter normalization (``wake.kws_max_gain``, 1..16)."""
+    try:
+        v = float(_cfg(cfg, "voice_edit", "wake", "kws_max_gain",
+                       default=default))
+    except (TypeError, ValueError):
+        v = default
+    return max(1.0, min(v, 16.0))
 
 
 def _wake_cue_on_kws(cfg: Any, default: bool = False) -> bool:
