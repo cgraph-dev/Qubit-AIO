@@ -340,3 +340,146 @@ def test_barge_echo_floor_never_trips_at_default(monkeypatch):
     assert procs, "expected playback to start"
     assert procs[0].terminated is False, "echo floor must not interrupt"
     assert procs[0].waited is True, "playback must complete normally"
+
+
+# ---------------------------------------------------------------------------
+# Wave 69 — generation-fenced barge-in takeover.
+#
+# A wake heard during TTS used to only stop the reply: the command spoken in
+# the gate was discarded (the user had to repeat it) and the interrupted
+# worker could still land its stale PREVIEW/status over the next turn. The
+# takeover now fences that worker by turn generation, clears the HUD, and
+# either executes the already-spoken remainder once or arms for the next one.
+# ---------------------------------------------------------------------------
+
+
+def _wait_for(predicate, timeout=2.0):
+    import time
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def test_barge_in_wake_command_executes_the_spoken_remainder_once(monkeypatch):
+    """hey qubit + command during TTS executes that command (not discarded)."""
+    mic = FakeMic([_frame(0.01), _frame(0.60)])
+    procs = []
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), mic, procs)
+    helper._wake = FakeWake("hey qubit open youtube")
+    calls = []
+    monkeypatch.setattr(helper, "on_wake_command",
+                        lambda command, _barge=False: calls.append(
+                            (command, _barge)))
+    helper._speak("hello there this is a long spoken reply with many words")
+    assert _wait_for(lambda: bool(calls)), "the interrupting command must run"
+    assert calls == [("open youtube", True)]
+    assert helper.state == helper.IDLE
+
+
+def test_barge_in_bare_wake_arms_and_leaves_status_idle(monkeypatch):
+    """A bare wake stops the reply, arms the next utterance, and clears HUD."""
+    mic = FakeMic([_frame(0.01), _frame(0.60)])
+    procs = []
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), mic, procs)
+    helper._wake = FakeWake("hey qubit")
+    helper._speak("hello there this is a long spoken reply with many words")
+    assert helper._wake.armed == [8.0]
+    assert helper.state == helper.IDLE
+    assert helper.overlay.statuses[-1][0] == "idle"
+
+
+def test_second_barge_in_wake_cannot_double_emit(monkeypatch):
+    """Only one takeover may run in a window; a second wake is ignored."""
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), FakeMic([]), [])
+    calls = []
+    monkeypatch.setattr(helper, "on_wake_command",
+                        lambda command, _barge=False: calls.append(command))
+    assert helper._begin_barge_takeover("open youtube") is True
+    assert helper._begin_barge_takeover("open youtube") is False
+    assert _wait_for(lambda: bool(calls))
+    import time
+    time.sleep(0.1)
+    assert calls == ["open youtube"]
+
+
+def test_wake_monitor_tail_cannot_reemit_the_takeover_command(monkeypatch):
+    """The monitor's late tail of the same utterance is deduped, not run again."""
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), FakeMic([]), [])
+    opened = []
+    monkeypatch.setattr(helper, "_open_request",
+                        lambda: opened.append(1) or False)
+    helper._begin_barge_takeover("open youtube")
+    assert _wait_for(lambda: bool(opened))
+    assert opened == [1]
+    # A second, non-barge emission of the SAME text right afterwards is the
+    # captured tail, not a new command: it must never reach _open_request.
+    helper.on_wake_command("open youtube")
+    assert opened == [1]
+
+
+def test_interrupted_turn_cannot_resurrect_its_preview(monkeypatch):
+    """A worker that resumes after the barge-in must not overwrite the turn."""
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), FakeMic([]), [])
+    calls = []
+    monkeypatch.setattr(helper, "on_wake_command",
+                        lambda command, _barge=False: calls.append(command))
+
+    def fake_route(_rid, _text):
+        return {"mode": "answer", "question": "what is up"}
+
+    def fake_answer(_question, *, mode="answer"):
+        # Simulate the barge-in landing while the old reply is speaking.
+        helper._begin_barge_takeover("make it dark")
+        return
+
+    monkeypatch.setattr(helper.client, "route", fake_route, raising=False)
+    monkeypatch.setattr(helper, "_answer_question", fake_answer)
+    helper._process_transcript("what is up")
+    # The old worker's post-speak PREVIEW write is fenced.
+    assert helper.state != helper.PREVIEW
+    assert helper.state == helper.IDLE
+    assert _wait_for(lambda: bool(calls))
+    assert calls == ["make it dark"]
+
+
+def test_stale_worker_finish_after_takeover_is_discarded(monkeypatch):
+    """A late old-worker finish cannot reset the interrupting turn; no crash."""
+    helper = _helper(monkeypatch, _cfg(), FakeMic([]), [])
+    helper._turn_gen = 5
+    old_gen = helper._turn_gen
+    helper._begin_barge_takeover("")  # fences: _turn_gen becomes 6
+    helper.state = helper.PROCESSING   # the interrupting turn is now working
+    helper._finish_error(old_gen)      # old worker lands late
+    assert helper.state == helper.PROCESSING
+    gone = helper._barge_takeover_pending
+    assert isinstance(gone, bool)
+    helper._finish_error(helper._turn_gen)
+    assert helper.state == helper.IDLE
+
+
+def test_takeover_during_brain_work_suppresses_the_stale_reply(monkeypatch):
+    """A wake during ask_result must not let the old turn speak its answer."""
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), FakeMic([]), [])
+    helper._wake = FakeWake("hey qubit")
+    spoken = []
+
+    def fake_ask_result(_question, _rid):
+        # The user barges in while the brain is still working.
+        helper._begin_barge_takeover("")
+        return {"ok": True, "answer": "stale answer that must not be spoken"}
+
+    monkeypatch.setattr(helper.client, "ask_result", fake_ask_result,
+                        raising=False)
+    helper._speak = lambda text: spoken.append(text)
+    helper._answer_question("what is up")
+    assert spoken == []
+    assert helper.state == helper.IDLE

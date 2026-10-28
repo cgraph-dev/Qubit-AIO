@@ -1315,6 +1315,25 @@ class DesktopHelper:
         self._turn_seq = 0
         self._turn_stopped_seq = -1
         self._turn_stop_announced = False
+        # Turn lifecycle generation (barge-in takeover fence): bumped at the
+        # START of every turn and again when a wake-phrase barge-in supersedes
+        # the turn that is speaking. A worker that resumes after its turn was
+        # superseded checks this and never writes state/preview/HUD again, so
+        # an interrupted turn cannot resurrect over the interrupting one.
+        self._turn_gen = 0
+        # A wake-phrase barge-in settlement is in flight: exactly one takeover
+        # at a time (a second wake in the same window is ignored, never a
+        # second command emission). ``_barge_takeover_gen`` is the generation
+        # the takeover was armed for; a newer turn aborts it.
+        self._barge_takeover_lock = threading.Lock()
+        self._barge_takeover_pending = False
+        self._barge_takeover_gen = -1
+        # The gate's transcribed command (empty for a bare wake) and the
+        # echo/dedupe guard that stops the wake monitor re-emitting the same
+        # utterance after its tail is captured again.
+        self._barge_wake_command: Optional[str] = None
+        self._barge_last_cmd = ""
+        self._barge_last_cmd_at = 0.0
         # Which turn (epoch) already asked the service to cancel its in-flight
         # /ask turn. A STOP asks once per turn: the service's own cancel
         # signals the helper back with SIGUSR2, so an unguarded request would
@@ -2583,7 +2602,7 @@ class DesktopHelper:
             self._wake_route_target = None
         self.on_wake_command(command)
 
-    def on_wake_command(self, command: str) -> None:
+    def on_wake_command(self, command: str, *, _barge: bool = False) -> None:
         """A hands-free wake utterance arrived (already transcribed).
 
         Runs the begin/transform path with a key-synthesis-free local focus
@@ -2595,10 +2614,31 @@ class DesktopHelper:
         + model + blocking TTS + agent) used to park inside the monitor
         loop's thread, blinding the detector for the entire turn — exactly
         when conversational confirm asks the user to answer.
+
+        ``_barge=True`` is the internal path for a command the barge-in gate
+        already transcribed: it may run while the takeover settle flag is
+        being released and is exempt from the duplicate re-emit guard.
         """
         cmd = (command or "").strip()
         if not cmd:
             return
+        if not _barge:
+            # A takeover (from a command spoken during TTS) owns this turn;
+            # a second wake in the same window must not double-emit.
+            if getattr(self, "_barge_takeover_pending", False):
+                _trace("wake.barge_takeover_dup", chars=len(cmd))
+                return
+            # The wake monitor can still capture the tail of the utterance
+            # the barge-in gate already executed; drop the same command when
+            # it lands again immediately.
+            try:
+                if (self._barge_last_cmd
+                        and cmd == self._barge_last_cmd
+                        and time.monotonic() - self._barge_last_cmd_at < 2.0):
+                    _trace("wake.barge_echo_drop", chars=len(cmd))
+                    return
+            except Exception:
+                pass
         if not self._open_request():
             _trace("wake.turn_refused", state=self.state)
             return
@@ -2898,7 +2938,16 @@ class DesktopHelper:
         self._talk_emit("error", code=code)
         self._finish_error()
 
-    def _finish_error(self) -> None:
+    def _finish_error(self, turn_gen: Optional[int] = None) -> None:
+        # A worker whose turn was superseded by a wake-phrase barge-in must
+        # never reset the interrupting turn to IDLE. Callers inside a turn
+        # pass the generation they started with; the takeover bumps it.
+        current_gen = getattr(self, "_turn_gen", None)
+        if (turn_gen is not None and current_gen is not None
+                and turn_gen != current_gen):
+            _trace("turn.stale_discard", where="finish_error",
+                   turn_gen=turn_gen, current=current_gen)
+            return
         self._talk_emit("response.done")
         self._talk_end()
         self._active = False
@@ -2924,6 +2973,10 @@ class DesktopHelper:
           so a follow-up can never overlap Qubit working or talking.
         Never raises; a missing/dead wake listener is simply a no-op.
         """
+        # A barge-in takeover owns the next turn; the interrupted worker must
+        # not arm a follow-up run over it.
+        if getattr(self, "_barge_takeover_pending", False):
+            return
         try:
             on, window, maxf = continuous_settings(self.cfg)
         except Exception:
@@ -3081,6 +3134,12 @@ class DesktopHelper:
         self._turn_seq += 1
         self._turn_stopped_seq = -1
         self._turn_stop_announced = False
+        # This worker's turn generation: every write after a blocking speak
+        # is conditional on it still being current. A wake-phrase barge-in
+        # bumps the generation, so the interrupted worker can never land a
+        # stale PREVIEW/error over the interrupting turn.
+        self._turn_gen += 1
+        turn_gen = self._turn_gen
         if self.snapshot is None and self.request_id:
             # Ensure the selection snapshot exists even if capture lagged.
             self._capture_selection()
@@ -3089,6 +3148,12 @@ class DesktopHelper:
         # touches chat/session state, so timers surface here — every voice
         # turn announces what fired while away (sleep: panel/History only).
         self._deliver_fired_timers()
+        # A barge-in during a fired-timer reminder supersedes this turn too:
+        # never route/answer it over the interrupting wake.
+        if self._turn_gen != turn_gen:
+            _trace("turn.superseded", where="after_timers",
+                   turn_gen=turn_gen, current=self._turn_gen)
+            return
         # A staged task (mode "task") is confirm-gated, and the confirmation
         # is scoped to its session: unrelated input — including a command on
         # the wake path — must NOT silently discard or overwrite it (the
@@ -3103,7 +3168,7 @@ class DesktopHelper:
                 return
             if outcome == "cancel":
                 self._ui_status("idle", "task cancelled")
-                self._finish_error()
+                self._finish_error(turn_gen)
                 return
             if outcome == "expired":
                 # P0-3: confirmations bind intent to recency — a "yes" hours
@@ -3112,7 +3177,7 @@ class DesktopHelper:
                 _trace("task.expired", request_id=self.request_id,
                        session=fsm.session)
                 self._ui_status("idle", "confirmation expired — say it again")
-                self._finish_error()
+                self._finish_error(turn_gen)
                 return
             # Unrecognised input: keep the staged action and do NOT route or
             # overwrite it (the core fix). The wake path traces the guard so
@@ -3128,7 +3193,7 @@ class DesktopHelper:
             self._speak("You have a pending confirmation. "
                         "Say yes to run it, no to cancel.")
             self._await_reply("say yes, no, or cancel")
-            self._finish_error()
+            self._finish_error(turn_gen)
             return
         self.state = self.PROCESSING
         self._ui_status("processing", text[-160:])
@@ -3141,7 +3206,7 @@ class DesktopHelper:
         except HelperError as exc:
             self._ui_error(exc.code, exc.detail)
             self._talk_emit("error", code=exc.code)
-            self._finish_error()
+            self._finish_error(turn_gen)
             return
         mode = out.get("mode")
         if mode == "dictate":
@@ -3151,24 +3216,30 @@ class DesktopHelper:
             # A question or plain conversation: answer it via the brain and
             # show the reply -- never type the utterance into the field.
             self._answer_question(str(out.get("question", "")), mode=str(mode))
-            self.state = self.PREVIEW
-            self._preview = out
+            # A barge-in takeover bumps the generation while that reply was
+            # playing; this worker must not resurrect its PREVIEW over the
+            # interrupting turn.
+            if self._turn_gen == turn_gen:
+                self.state = self.PREVIEW
+                self._preview = out
         elif mode == "task":
             self._propose_task(out)
         elif mode == "clarify":
             self._ui_status("clarify", str(out.get("question", "")))
             self._notify_status("Qubit", str(out.get("question", "")))
             self._speak(str(out.get("question", "")))
+            if self._turn_gen != turn_gen:
+                return
             self._await_reply(str(out.get("question", "")) or
                               "answer the question aloud")
             # A clarification asks the user to speak again: return to IDLE so
             # the next activation starts a fresh session (staying in PROCESSING
             # swallowed every subsequent PTT).
-            self._finish_error()
+            self._finish_error(turn_gen)
         elif mode == "ignore":
             # e.g. the speaker only said the wake phrase: type nothing.
             self._ui_status("idle", "no command heard")
-            self._finish_error()
+            self._finish_error(turn_gen)
         elif mode == "preview":
             self.state = self.PREVIEW
             self._preview = out
@@ -3178,7 +3249,7 @@ class DesktopHelper:
         else:
             self._ui_error(str(out.get("code", "VOICE_EDIT_ERROR")),
                            str(out.get("detail", "")))
-            self._finish_error()
+            self._finish_error(turn_gen)
 
     @staticmethod
     def _affirmative(text: str) -> bool:
@@ -3203,6 +3274,10 @@ class DesktopHelper:
         "hey qubit" again. Never raises; a missing/dead wake listener
         simply leaves Right-Ctrl as the answer path.
         """
+        # A barge-in takeover owns the next utterance; the interrupted turn
+        # must not re-arm listening over it.
+        if getattr(self, "_barge_takeover_pending", False):
+            return
         try:
             wake = getattr(self, "_wake", None)
             if wake is not None and hasattr(wake, "expect_reply"):
@@ -3216,6 +3291,7 @@ class DesktopHelper:
 
     def _propose_task(self, out: Dict[str, Any]) -> None:
         """Stage a confirm-gated task and ask for confirmation (never runs it)."""
+        turn_gen = getattr(self, "_turn_gen", -1)
         task = str(out.get("task_text") or out.get("summary") or "").strip()
         if not task:
             self._ui_status("error", "nothing to run")
@@ -3238,6 +3314,8 @@ class DesktopHelper:
         self._ui_status("clarify", "confirm to run the task")
         self._notify_status("Qubit", f"Confirm task: {task[:200]}")
         self._speak(f"{task[:200]}. Say yes to run it, or no to cancel.")
+        if getattr(self, "_turn_gen", turn_gen) != turn_gen:
+            return
         self._await_reply("say yes to run, no to cancel")
 
     def _run_task(self, text: str) -> None:
@@ -3277,7 +3355,10 @@ class DesktopHelper:
             self._ui_preview(self._preview)
             self._notify_status("Qubit", reply[:200])
             self._history("task", text, reply)
+            turn_gen = getattr(self, "_turn_gen", -1)
             self._speak(reply)
+            if getattr(self, "_turn_gen", turn_gen) != turn_gen:
+                return
             # The task ran to completion: keep listening for a follow-up.
             self._maybe_arm_continuous()
             return
@@ -3288,6 +3369,7 @@ class DesktopHelper:
 
     def _answer_question(self, question: str, *, mode: str = "answer") -> None:
         """Ask the Qubit brain, display the answer, and speak it aloud."""
+        turn_gen = getattr(self, "_turn_gen", -1)
         # Slice 1 talk-back: an "in chat:" turn runs the headless worker and
         # can take many seconds, so acknowledge immediately (status + voice)
         # instead of silent waiting. The full reply is spoken at the end
@@ -3299,6 +3381,8 @@ class DesktopHelper:
         if _rw is not None and _rw["route"] == "in-chat":
             self._ui_status("working", "working in /chat…")
             self._speak("On it — working on that in chat.")
+            if getattr(self, "_turn_gen", turn_gen) != turn_gen:
+                return
         self._ui_status("processing", "answering…")
         self._talk_emit("response.started", mode=mode)
         spoken = False
@@ -3349,11 +3433,18 @@ class DesktopHelper:
                 return
             self._ui_error(exc.code, exc.detail)
             self._talk_emit("error", code=exc.code)
-            self._finish_error()
+            self._finish_error(turn_gen)
+            return
+        # The barge-in may have landed while the brain was working: the
+        # interrupting turn owns the conversation now; do not finish or
+        # speak this superseded reply over it.
+        if getattr(self, "_turn_gen", turn_gen) != turn_gen:
+            _trace("turn.superseded", where="before_answer_finish",
+                   turn_gen=turn_gen, current=getattr(self, "_turn_gen", -1))
             return
         if not reply:
             self._ui_status("error", "no answer")
-            self._finish_error()
+            self._finish_error(turn_gen)
             return
         _trace("answer", mode=mode, chars=len(reply),
                **(_dbg.text_fields(self.cfg, answer=reply)))
@@ -3371,6 +3462,10 @@ class DesktopHelper:
         self._history(mode, question, reply)
         if not spoken:
             self._speak(reply)
+        # A wake-phrase barge-in superseded this turn: never speak the
+        # clipboard receipt or arm a follow-up over the interrupting turn.
+        if getattr(self, "_turn_gen", turn_gen) != turn_gen:
+            return
         if clip_ok is True:
             self._speak("Copied to clipboard.")
         elif clip_ok is False:
@@ -3469,8 +3564,15 @@ class DesktopHelper:
             except Exception:
                 return False
 
-    def _barge_in_has_wake(self, pcm: bytes) -> bool:
-        """True only when the interrupting audio actually contains the wake.
+    def _barge_in_wake_command(self, pcm: bytes) -> Optional[str]:
+        """Return the command spoken after the wake phrase, or None.
+
+        ``None``  -> the interrupting audio is not a wake (resume playback).
+        ``""``    -> a bare wake ("hey qubit") with no command: stop and arm
+                     the listener for the next utterance.
+        non-empty -> the full wake phrase plus a command ("hey qubit, open
+                     youtube"): stop and EXECUTE the already-spoken remainder
+                     as the interrupting turn instead of discarding it.
 
         The barge-in watcher is an RMS gate; stopping a reply on any loud
         speech made a cough or room conversation look like a wake. This
@@ -3481,17 +3583,17 @@ class DesktopHelper:
         """
         try:
             if len(pcm) < 4800:
-                return False
+                return None
             wake = getattr(self, "_wake", None)
             transcribe = getattr(wake, "_do_transcribe", None)
             if not callable(transcribe):
-                return False
+                return None
             text = str(transcribe(pcm) or "").strip()
             if not text:
-                return False
+                return None
             from .voice_edit.wake import (WAKE_ALIASES, _matches_custom_trigger,
-                                          strip_wake, strip_wake_trailing,
-                                          wake_match_kind)
+                                          _strip_custom_trigger, strip_wake,
+                                          strip_wake_trailing, wake_match_kind)
             aliases = [str(getattr(wake, "phrase", "") or "hey qubit"),
                        *WAKE_ALIASES]
             try:
@@ -3500,16 +3602,27 @@ class DesktopHelper:
             except Exception:
                 pass
             if _matches_custom_trigger(text):
-                return True
-            if (strip_wake(text, aliases=aliases) is not None
-                    and wake_match_kind(text, aliases=aliases) != "bare"):
-                return True
-            if strip_wake_trailing(text, aliases=aliases) is not None:
-                return True
+                return str(_strip_custom_trigger(text) or "").strip()
+            remainder = strip_wake(text, aliases=aliases)
+            if remainder is not None:
+                if wake_match_kind(text, aliases=aliases) == "bare":
+                    return ""
+                return str(remainder).strip()
+            trailing = strip_wake_trailing(text, aliases=aliases)
+            if trailing is not None:
+                return str(trailing).strip()
             _trace("speak.barge_in_not_wake", chars=len(text))
-            return False
+            return None
         except Exception:
-            return False
+            return None
+
+    def _barge_in_has_wake(self, pcm: bytes) -> bool:
+        """True only when the interrupting audio actually contains the wake.
+
+        Compatibility wrapper over :meth:`_barge_in_wake_command` (a bare
+        wake and a wake+command both count as a wake).
+        """
+        return self._barge_in_wake_command(pcm) is not None
 
     def _play_with_barge_in(self, proc: Any) -> bool:
         """Block until ``proc`` ends; stop it on the wake phrase or STOP.
@@ -3549,6 +3662,7 @@ class DesktopHelper:
         except Exception:
             return self._wait_playback(proc)
         interrupted = False
+        self._barge_wake_command = None
         try:
             frame_ms = int(getattr(mic, "frame_ms", 300) or 300)
         except Exception:
@@ -3602,7 +3716,8 @@ class DesktopHelper:
                             nxt = None
                         if nxt:
                             gate.append(nxt)
-                    if self._barge_in_has_wake(b"".join(gate)):
+                    wake_cmd = self._barge_in_wake_command(b"".join(gate))
+                    if wake_cmd is not None:
                         if paused:
                             # SIGTERM to a SIGSTOPed child stays pending; let
                             # it run so terminate() actually lands.
@@ -3615,9 +3730,11 @@ class DesktopHelper:
                             proc.terminate()
                         except Exception:
                             pass
+                        self._barge_wake_command = wake_cmd
                         interrupted = True
                         _trace("speak.barge_in", threshold=threshold,
-                               min_ms=min_ms, wake=True)
+                               min_ms=min_ms, wake=True,
+                               command_chars=len(wake_cmd))
                         break
                     _trace("speak.barge_in_ignored", threshold=threshold,
                            min_ms=min_ms)
@@ -3708,6 +3825,100 @@ class DesktopHelper:
         except Exception:
             pass
 
+    def _begin_barge_takeover(self, command: str = "") -> bool:
+        """Fence the speaking turn and own the interrupting wake.
+
+        A wake-phrase barge-in is a NEW turn in the user's intent even though
+        it arrives while the previous worker is still unwinding. This bumps
+        ``_turn_gen`` so that worker's late writes (PREVIEW, errors, follow-up
+        arming) are discarded, clears the HUD from PROCESSING/PREVIEW and the
+        "Stopped" pill, and then either:
+
+        * ``command`` non-empty (the gate heard "hey qubit, <cmd>"): execute
+          the already-spoken remainder exactly once as the interrupting turn;
+        * ``command`` empty (a bare wake): arm the wake listener for the next
+          utterance, preserving the wake-phrase gate.
+
+        At most one takeover is in flight; a second wake in the same window is
+        ignored rather than double-emitting. Never raises; returns True when
+        this call actually started the takeover.
+        """
+        cmd = (command or "").strip()
+        with self._barge_takeover_lock:
+            if self._barge_takeover_pending:
+                _trace("wake.barge_takeover_ignored", chars=len(cmd))
+                return False
+            # Fence the turn that was speaking: any late write from its
+            # worker is ignored from here on.
+            self._turn_gen += 1
+            gen = self._turn_gen
+            self._barge_takeover_gen = gen
+            self.state = self.IDLE
+            self._ui_status("idle", "ready")
+            self._barge_takeover_pending = True
+            if cmd:
+                self._barge_last_cmd = cmd
+                self._barge_last_cmd_at = time.monotonic()
+        if cmd:
+            # The old worker unwinds within a few milliseconds of playback
+            # ending; give it that instant so this turn starts on a clean
+            # generation, then run the spoken remainder exactly once.
+            t = threading.Timer(0.05, self._run_barge_takeover,
+                                args=(cmd, gen))
+            t.daemon = True
+            t.start()
+            _trace("wake.barge_takeover", chars=len(cmd))
+        else:
+            # Bare wake: stop the reply and arm for the next utterance.
+            try:
+                wake = getattr(self, "_wake", None)
+                if wake is not None:
+                    wake.expect_reply(8.0)
+                    _trace("wake.barge_in_armed")
+            except Exception:
+                pass
+            # Short settle guard: only long enough for the interrupted worker
+            # to stop arming/awaiting over the new turn. Must not swallow the
+            # command the user speaks next.
+            t = threading.Timer(0.1, self._clear_barge_takeover, args=(gen,))
+            t.daemon = True
+            t.start()
+        return True
+
+    def _clear_barge_takeover(self, gen: int) -> None:
+        """Release the settle guard for exactly the takeover generation."""
+        try:
+            with self._barge_takeover_lock:
+                if self._barge_takeover_gen == gen:
+                    self._barge_takeover_pending = False
+        except Exception:
+            pass
+
+    def _run_barge_takeover(self, cmd: str, gen: int) -> None:
+        """Run the barge-in remainder once, on a fresh turn generation."""
+        try:
+            if gen != self._turn_gen:
+                _trace("wake.barge_takeover_stale", turn_gen=gen,
+                       current=self._turn_gen)
+                return
+            if self.state not in (self.IDLE, self.PREVIEW):
+                # A capture/PTT in the settle window owns the turn now.
+                _trace("wake.barge_takeover_busy", state=self.state)
+                return
+            with self._barge_takeover_lock:
+                if (not self._barge_takeover_pending
+                        or self._barge_takeover_gen != gen):
+                    return
+                # Released before the turn starts; the echo guard below stops
+                # the wake monitor re-emitting the same captured tail.
+                self._barge_takeover_pending = False
+            self._ui_status("idle", "ready")
+            self.on_wake_command(cmd, _barge=True)
+        except Exception as exc:  # never fatal
+            _trace("wake.barge_takeover_error", detail=str(exc)[:160])
+        finally:
+            self._clear_barge_takeover(gen)
+
     def _speak(self, text: str) -> None:
         """Speak the gist of ``text`` through the service's TTS, locally.
 
@@ -3721,6 +3932,11 @@ class DesktopHelper:
         """
         if not text or not bool(_read_cfg(self.cfg, "voice_edit",
                                           "speak_answers", default=True)):
+            return
+        # A superseding barge-in owns the turn now: a stale worker must never
+        # speak a receipt/prompt over it.
+        if getattr(self, "_barge_takeover_pending", False):
+            _trace("speak.superseded_skip", chars=len(text or ""))
             return
         import os
         import shutil
@@ -3797,17 +4013,13 @@ class DesktopHelper:
                 self._talk_emit("interrupt")
                 self._ui_status("interrupted", "stopped — speak again")
                 self._schedule_interrupted_clear()
-                # The barge-in watcher heard speech but the wake monitor
-                # was yielding the mic during TTS. Open the arm so the
-                # utterance's tail (or the next command) is accepted
-                # without requiring a second "hey qubit".
-                try:
-                    wake = getattr(self, "_wake", None)
-                    if wake is not None:
-                        wake.expect_reply(8.0)
-                        _trace("wake.barge_in_armed")
-                except Exception:
-                    pass
+                # The barge-in watcher heard the wake phrase while the wake
+                # monitor was yielding the mic during TTS. Fence this turn and
+                # either execute the command already spoken in the gate or arm
+                # for the next one — never both, never twice.
+                wake_cmd = self._barge_wake_command or ""
+                self._barge_wake_command = None
+                self._begin_barge_takeover(wake_cmd)
         except Exception as exc:  # never fatal
             _trace("speak_failed", detail=str(exc)[:120])
         finally:
