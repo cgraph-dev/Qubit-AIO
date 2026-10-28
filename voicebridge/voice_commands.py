@@ -10082,6 +10082,10 @@ CLI_COVERAGE = {
         "shares_purge",
     ),
     "agent": (),
+    # Qubit Office is structured ledger/org work: rows, cents, agent and
+    # department ids, and preview/confirm mutations. It has no spoken argument
+    # form today, so it is an explicit CLI/dashboard surface, not a silent gap.
+    "office": (),
 }
 
 # Guard rows: a guard's typed refusal is the voice surface for a capability
@@ -10244,6 +10248,11 @@ VOICE_IMPOSSIBLE = {
     # a spoken turn cannot name it unambiguously or safely
     "agent": "the Qubit Agent runtime is a raw CLI passthrough: run "
              "`qubit agent <args...>` in a terminal",
+    # office rows carry typed ids/cents and mutations need preview/confirm;
+    # the ledger is operated from the CLI or the Office page
+    "office": "Qubit Office ledger/org rows use structured arguments (kind, "
+              "cents, agent/department ids) and preview/confirm mutations: "
+              "use `qubit office ...` in a terminal or the Office page",
 }
 
 

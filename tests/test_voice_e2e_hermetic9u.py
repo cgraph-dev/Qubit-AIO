@@ -59,15 +59,30 @@ def _cfg(tmp_path, monkeypatch, extra: str = ""):
     return C.Config.load(p)
 
 
+def _force_legacy_model_path(monkeypatch):
+    """Keep these tests on the stubbed legacy model path.
+
+    The product now prefers the vendored tool-capable ``AIAgent`` for general
+    turns (DECISIONS #26). That agent bypasses the ``local_llm`` stubs below,
+    so without this seam a hermetic test would contact the real local model.
+    Returning ``None`` from the agent seam is the documented fallback: the
+    turn continues on the same ``chat_transport`` model path this file pins.
+    """
+    from voicebridge import chat_transport as CT
+
+    monkeypatch.setattr(CT, "_agent_chat", lambda *a, **k: None)
+
+
 def _stub_local(monkeypatch, reply="stub chat reply"):
     """Stub the local Brain4 non-streaming call (no Ollama, no network)."""
     import voicebridge.local_llm as _llm
 
+    _force_legacy_model_path(monkeypatch)
     calls = []
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
+              reasoning=None, cancel=None, should_stop=None):
         calls.append({"text": text, "model": model})
         return reply
 
@@ -80,6 +95,7 @@ def _stub_local_stream(monkeypatch, reply="stub stream reply"):
     """Stub the local Brain4 streaming call (no Ollama, no network)."""
     import voicebridge.local_llm as _llm
 
+    _force_legacy_model_path(monkeypatch)
     calls = []
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
@@ -179,15 +195,17 @@ def test_right_ctrl_local_engine_transcript_enters_canonical_turn(
             pass
 
         def transcribe(self, path):
-            return Transcript(text="turn on the desk light", provider="sherpa",
-                              language="en", confidence=0.97, duration_s=0.4)
+            return Transcript(text="tell me a short story",
+                              provider="sherpa",
+                              language="en", confidence=0.97,
+                              duration_s=0.4)
 
     monkeypatch.setattr(HC, "_asr_from_cfg", lambda c: _ASR())
 
     code, out = HC.dispatch(cfg, "POST", "/api/audio/transcribe", {},
                             {"data_url": _wav_data_url()})
     assert code == 200 and out["ok"] is True, out
-    assert out["transcript"] == "turn on the desk light"
+    assert out["transcript"] == "tell me a short story"
     assert out["provider"] == "sherpa"
 
     _stub_local_stream(monkeypatch, "ok")
@@ -198,7 +216,7 @@ def test_right_ctrl_local_engine_transcript_enters_canonical_turn(
 
     shown = CT.store(cfg).show("voice-local")
     assert [m["role"] for m in shown["messages"]] == ["user", "assistant"]
-    assert shown["messages"][0]["content"] == "turn on the desk light"
+    assert shown["messages"][0]["content"] == "tell me a short story"
 
 
 @pytest.mark.xfail(
@@ -607,6 +625,7 @@ def test_stream_cancel_marks_cancelled_and_recovery_does_not_duplicate(
     from voicebridge import chat_transport as CT
     import voicebridge.local_llm as _llm
 
+    _force_legacy_model_path(monkeypatch)
     cfg = _cfg(tmp_path, monkeypatch)
     started = threading.Event()
     release = threading.Event()

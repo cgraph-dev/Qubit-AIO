@@ -61,6 +61,13 @@ DASHBOARD_ONLY_PLUGIN_ROUTES = {
     # Live-update poll for the board tab (real task_events read); the spoken
     # kanban surface covers board/task/stats/config/projects.
     "h_plugin_kanban_events",
+    # Obsidian note editor routes. The note body is arbitrary markdown and the
+    # note name is a vault-relative path, so these are the dashboard plugin's
+    # editor/refresh controls, not a spoken mutation; the structured-argument
+    # rule applies (same as the kanban write controls below).
+    "h_plugin_obsidian_note_put",
+    "h_plugin_obsidian_note_get",
+    "h_plugin_obsidian_refresh",
     # Vendored kanban WRITE controls. They are native-backed on the one board
     # store (confirm-gated); the capability is spoken through the Tier-1
     # ``kanban_*`` entries (``kanban_create``/``kanban_move``/``kanban_comment``
@@ -260,6 +267,16 @@ def test_fleet_reads_share_the_compat_backend_result(tmp_path, monkeypatch):
     _seed_history(cfg, monkeypatch)
     _seed_kanban(cfg, monkeypatch)
     HP.reset_plugin_caches()
+
+    # The first-ever achievements read intentionally starts a background scan
+    # and serves the "pending" placeholder (the dashboard does the same, which
+    # is why it polls /scan-status). Warm the cache with the engine's own
+    # synchronous rescan so both surfaces below compare one finished snapshot
+    # instead of racing the background thread.
+    code, warmed = HC.dispatch(
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {},
+        actor="dashboard:user")
+    assert code == 200 and warmed.get("ok") is True, warmed
 
     route_by_handler = {r["handler"]: r for r in _plugin_routes()}
     for text, entry_id, handler in _FLEET_READ_BATTERY:

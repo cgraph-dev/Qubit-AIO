@@ -54,15 +54,30 @@ def _cfg(tmp_path, monkeypatch, extra: str = ""):
     return C.Config.load(p)
 
 
+def _force_legacy_model_path(monkeypatch):
+    """Keep these tests on the stubbed legacy model path.
+
+    General turns now prefer the vendored tool-capable ``AIAgent`` (DECISIONS
+    #26), which bypasses the ``local_llm`` stubs below. Returning ``None`` from
+    that seam falls back to the same ``chat_transport`` model path this file
+    pins, so the tests stay hermetic and assert the turn/store contract rather
+    than a live provider reply.
+    """
+    from voicebridge import chat_transport as CT
+
+    monkeypatch.setattr(CT, "_agent_chat", lambda *a, **k: None)
+
+
 def _stub_local(monkeypatch, reply="stub chat reply"):
     """Stub the local Brain4 non-streaming call (no Ollama, no network)."""
     import voicebridge.local_llm as _llm
 
+    _force_legacy_model_path(monkeypatch)
     calls = []
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
+              reasoning=None, cancel=None, should_stop=None):
         calls.append({"text": text, "model": model,
                       "conversation_prompt": conversation_prompt})
         return reply
@@ -76,6 +91,7 @@ def _stub_local_stream(monkeypatch, reply="stub stream reply"):
     """Stub the local Brain4 streaming call (no Ollama, no network)."""
     import voicebridge.local_llm as _llm
 
+    _force_legacy_model_path(monkeypatch)
     calls = []
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
@@ -337,7 +353,7 @@ def test_ws_ticket_mints_and_pty_upgrade_is_gated(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("path", [
-    "/api/console", "/api/ws", "/api/events", "/api/pub",
+    "/api/console", "/api/ws", "/api/pub",
     "/api/audio/speak-stream", "/api/plugins/kanban/events",
     "/agent/api/console", "/agent/api/ws",
 ])
@@ -353,6 +369,29 @@ def test_upstream_raw_ws_dialects_stay_typed_refused(tmp_path, monkeypatch,
         status, payload = _raw_upgrade(port, path)
         assert status == 426, (path, status, payload)
         assert payload["ok"] is False and payload["code"]
+        assert payload["owner"] == "qubit-policy"
+    finally:
+        ui.stop()
+
+
+def test_events_ws_requires_the_dashboard_token(tmp_path, monkeypatch):
+    """`/api/events` is an owned WebSocket, not an upstream raw dialect.
+
+    It is a real subscriber socket for the Qubit dashboard sidebar, so a bare
+    upgrade without the session token is a typed 401 TOKEN_REQUIRED rather
+    than the 426 refusal an unowned upstream dialect returns.
+    """
+    cfg = _prod_cfg(tmp_path, monkeypatch)
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    ui = _server(cfg, state)
+    ui.start()
+    try:
+        port = ui._server.server_address[1]
+        status, payload = _raw_upgrade(port, "/api/events")
+        assert status == 401, (status, payload)
+        assert payload["ok"] is False
+        assert payload["code"] == "TOKEN_REQUIRED"
         assert payload["owner"] == "qubit-policy"
     finally:
         ui.stop()

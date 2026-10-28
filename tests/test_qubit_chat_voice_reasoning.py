@@ -39,16 +39,25 @@ class _FakeResult:
 
 
 def _stub_gateway(monkeypatch):
-    """Capture the kwargs run_session passes to the provider gateway."""
+    """Capture the kwargs run_session passes to the provider gateway.
+
+    ``run_session`` prefers the vendored tool-capable agent when the runtime is
+    importable. The reasoning preference is applied on BOTH paths, but this
+    file pins the planner/gateway contract, so force that documented fallback
+    (``None``) and keep the test hermetic — no real model is contacted.
+    """
     capture: dict = {}
 
     def _run_role(prompt, cfg, **kwargs):
         capture.update(kwargs)
         return _FakeResult()
 
+    import voicebridge.agent as _agent
     import voicebridge.providers.gateway as _gw
 
     monkeypatch.setattr(_gw, "run_role", _run_role)
+    monkeypatch.setattr(_agent, "_run_vendored_session",
+                        lambda *a, **k: None)
     return capture
 
 
