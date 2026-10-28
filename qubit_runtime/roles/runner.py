@@ -19,6 +19,11 @@ from roles.registry import get_role
 _DEFAULT_PROMPT = "Proceed with your role."
 _JSON_INSTRUCTION = "\n\nReturn only one JSON object; no prose around it."
 _ACTIVE_TIERS = ("api", "")
+#: Provider aliases whose endpoint can be discovered by the local-model picker.
+#: The shipped ``local``/``detail`` tiers use ``ollama``; a user may point a
+#: tier at any configured provider instead.
+_LOCAL_SERVER_PROVIDERS = frozenset({"ollama"})
+_ENDPOINT_SUFFIXES = ("/api/tags", "/v1/models", "/api", "/v1")
 
 
 def _json_instruction(json_mode: bool) -> str:
@@ -83,6 +88,82 @@ def _parse_tier_entry(entry: Any) -> tuple[str | None, str | None] | None:
     return None
 
 
+def _active_model(config: Any) -> dict[str, str | None]:
+    """The globally active ``model.provider`` / ``model.default`` pair."""
+    resolved_config = _load_tier_config(config)
+    model_cfg = _config_get(resolved_config, "model", default={}) or {}
+    if not isinstance(model_cfg, dict):
+        model_cfg = {}
+    return {
+        "provider": str(model_cfg.get("provider") or "").strip() or None,
+        "model": str(model_cfg.get("default") or "").strip() or None,
+    }
+
+
+def _local_ollama_base_url() -> str:
+    """The OpenAI-compatible local Ollama endpoint, or ``""`` when unknown.
+
+    Uses the same authority as the local model picker: ``providers.ollama.base_url``
+    → an active local ``model.base_url`` → ``OLLAMA_HOST`` → Ollama's local
+    default, normalized onto the ``/v1`` surface the chat transport speaks.
+    This lets the shipped ``{provider: ollama, model: qubit-brain}`` tiers work
+    on a host that runs Ollama without also wiring it into the runtime config.
+    """
+    try:
+        from qubit_cli.models_local import _get_ollama_base_url
+
+        base = str(_get_ollama_base_url() or "").strip()
+    except Exception:  # noqa: BLE001 - no local endpoint is the honest default
+        return ""
+    base = base.rstrip("/")
+    for suffix in _ENDPOINT_SUFFIXES:
+        if base.endswith(suffix):
+            base = base[: -len(suffix)].rstrip("/")
+            break
+    if base and "://" not in base:
+        base = "http://" + base
+    return f"{base}/v1" if base else ""
+
+
+def _resolve_role_runtime(selection: dict[str, Any], config: Any = None) -> Any:
+    """Resolve the provider runtime for one role turn.
+
+    A tier mapped to a local-server alias gets the local endpoint filled in when
+    the user did not configure one. If a *tier-map* entry still cannot resolve
+    (an unknown provider, a bad shape), the turn falls back to the active model
+    with an honest note instead of failing; explicit CLI overrides keep their
+    errors so a typo is never silent.
+    """
+    from qubit_cli.runtime_provider import resolve_runtime_provider
+
+    requested = selection.get("requested")
+    target_model = selection.get("target_model")
+    requested_norm = str(requested or "").strip().lower()
+    explicit_base = None
+    if requested_norm in _LOCAL_SERVER_PROVIDERS:
+        explicit_base = _local_ollama_base_url() or None
+    kwargs: dict[str, Any] = {"requested": requested, "target_model": target_model}
+    if explicit_base:
+        kwargs["explicit_base_url"] = explicit_base
+    try:
+        return resolve_runtime_provider(**kwargs)
+    except Exception as exc:  # noqa: BLE001 - a bad tier map must not fail a turn
+        note = str(selection.get("note") or "")
+        if not note.startswith("roles.model_tiers["):
+            raise
+        active = _active_model(config)
+        runtime = resolve_runtime_provider(
+            requested=active["provider"], target_model=active["model"])
+        selection.update({
+            "requested": active["provider"],
+            "target_model": active["model"],
+            "applied": False,
+            "note": (f"{note} could not resolve "
+                     f"({type(exc).__name__}); using the active model"),
+        })
+        return runtime
+
+
 def resolve_model_selection(
     role: AgentRole,
     *,
@@ -98,11 +179,9 @@ def resolve_model_selection(
     (``--model``/``--provider``) win over the map.
     """
     resolved_config = _load_tier_config(config)
-    model_cfg = _config_get(resolved_config, "model", default={}) or {}
-    if not isinstance(model_cfg, dict):
-        model_cfg = {}
-    active_provider = str(model_cfg.get("provider") or "").strip() or None
-    active_model = str(model_cfg.get("default") or "").strip() or None
+    active = _active_model(resolved_config)
+    active_provider = active["provider"]
+    active_model = active["model"]
 
     tier = str(role.model_tier or "")
     requested = active_provider
@@ -164,7 +243,6 @@ def _native_role_agent(role: AgentRole, request: TurnRequest,
     disabling every tool. ``selection`` is the resolved tier (see
     ``resolve_model_selection``); resolving here keeps direct callers working.
     """
-    from qubit_cli.runtime_provider import resolve_runtime_provider
     from run_agent import AIAgent
 
     if config is None:
@@ -173,9 +251,8 @@ def _native_role_agent(role: AgentRole, request: TurnRequest,
         selection = resolve_model_selection(
             role, model_override=model_override,
             provider_override=provider_override, config=config)
-    requested = selection.get("requested")
     target_model = selection.get("target_model")
-    runtime = resolve_runtime_provider(requested=requested, target_model=target_model)
+    runtime = _resolve_role_runtime(selection, config)
     agent = AIAgent(
         api_key=runtime.get("api_key"),
         base_url=runtime.get("base_url"),
