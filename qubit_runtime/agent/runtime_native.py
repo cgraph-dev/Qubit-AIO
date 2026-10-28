@@ -104,7 +104,16 @@ class NativeRuntime:
                     turn_kwargs["stream_callback"] = (
                         lambda chunk: _emit(TurnEvent("delta", text=str(chunk))))
                 result = agent.run_conversation(request.prompt, **turn_kwargs)
-                result = result if isinstance(result, dict) else {}
+                if not isinstance(result, dict):
+                    # No envelope is not a success: a turn that returns None (or any
+                    # non-dict) never settled, so the terminal must be an error rather
+                    # than a fabricated ``completed`` turn.
+                    _terminal(TurnEvent(
+                        "error",
+                        text="turn did not complete",
+                        data={"interrupted": bool(cancel is not None and cancel.is_set())},
+                    ))
+                    return
                 if result.get("completed") is False:
                     _terminal(TurnEvent(
                         "error",

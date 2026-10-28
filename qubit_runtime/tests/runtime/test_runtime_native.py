@@ -171,3 +171,14 @@ def test_error_data_is_bounded():
     agent = _FakeAgent({"completed": False, "error": "nope", "messages": [{"secret": "x"}]})
     events = _collect(NativeRuntime(lambda request: agent), TurnRequest(prompt="hi", session_id="s1"))
     assert set(events[-1].data) <= {"interrupted"}
+
+
+def test_non_dict_result_is_an_error_not_a_fabricated_success():
+    """A turn that returns no envelope (``None`` or any non-dict) never settled; the
+    one-shot exit mapping must see a failed terminal, not ``completed: True``."""
+    agent = _FakeAgent(None)
+    events = _collect(NativeRuntime(lambda request: agent), TurnRequest(prompt="hi", session_id="s1"))
+    terminals = [e for e in events if e.kind in ("done", "error")]
+    assert len(terminals) == 1 and terminals[0].kind == "error"
+    assert "did not complete" in terminals[0].text
+    assert terminals[0].data["interrupted"] is False
