@@ -17,6 +17,7 @@ from connectors.google_contacts import (
     CONTACTS_SCOPE,
     DEFAULT_LIMIT,
     MAX_LIMIT,
+    MAX_PAGES,
     GoogleContactsConnector,
     GoogleContactsError,
 )
@@ -235,6 +236,20 @@ def test_list_stops_when_api_repeats_a_page_token(tmp_path):
     )
     assert _connector(tmp_path, fake).list(limit=10) == []
     assert len(fake.calls) == 2
+
+
+def test_list_bounds_an_endless_stream_of_fresh_page_tokens(tmp_path):
+    class _EndlessGet:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def __call__(self, url, *, params, headers, timeout):
+            self.calls.append(dict(params))
+            return _Response(200, _connections(next_page=f"page-{len(self.calls)}"))
+
+    fake = _EndlessGet()
+    assert _connector(tmp_path, fake).list(limit=10) == []
+    assert len(fake.calls) == MAX_PAGES
 
 
 def test_list_empty_result_is_empty_not_an_error(tmp_path):

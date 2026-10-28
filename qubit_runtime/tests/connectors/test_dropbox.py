@@ -15,6 +15,7 @@ from connectors.dropbox import (
     DEFAULT_LIMIT,
     DROPBOX_API_BASE,
     MAX_LIMIT,
+    MAX_PAGES,
     TOKEN_FILENAME,
     DropboxConnector,
     DropboxError,
@@ -260,6 +261,20 @@ def test_list_stops_when_the_api_repeats_a_cursor(tmp_path):
     )
     assert _connector(tmp_path, fake).list_folder(limit=10) == []
     assert len(fake.calls) == 2
+
+
+def test_list_bounds_an_endless_stream_of_fresh_cursors(tmp_path):
+    class _EndlessPost:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def __call__(self, url, *, body, headers, timeout):
+            self.calls.append(dict(body))
+            return _Response(200, _listing(cursor=f"cursor-{len(self.calls)}", has_more=True))
+
+    fake = _EndlessPost()
+    assert _connector(tmp_path, fake).list_folder(limit=10) == []
+    assert len(fake.calls) == MAX_PAGES
 
 
 def test_list_skips_deleted_and_unknown_entries(tmp_path):

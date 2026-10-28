@@ -37,6 +37,10 @@ EVENTS_URL_TEMPLATE = f"{CALENDAR_API_BASE}/calendars/{{calendar_id}}/events"
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 LIST_PAGE_SIZE = 250  # Calendar API caps maxResults at 2500; stay conservative.
+# Hard cap on paginated requests. A well-behaved server needs one page for the
+# 100-result limit; this bounds an upstream that keeps returning fresh page
+# tokens with no usable events (a request storm, not progress).
+MAX_PAGES = 20
 
 MAX_CALENDAR_ID_CHARS = 256
 MAX_EVENT_ID_CHARS = 256
@@ -420,6 +424,16 @@ class GoogleCalendarConnector:
                     REASON_INVALID_RESPONSE,
                     "the Google Calendar API returned an unexpected payload",
                 )
+            error = data.get("error")
+            if error:
+                # A proxy/edge can wrap an error in a 200 envelope; never render
+                # that as "no events" (the Contacts connector already refuses it).
+                code = error.get("code") if isinstance(error, dict) else None
+                raise GoogleCalendarError(
+                    REASON_HTTP_ERROR,
+                    "the Google Calendar API returned an error payload",
+                    status=code if isinstance(code, int) else None,
+                )
             return data
         if status == 401:
             raise GoogleCalendarError(
@@ -474,7 +488,14 @@ class GoogleCalendarConnector:
         events: list[Event] = []
         page_token: Optional[str] = None
         seen_tokens: set[str] = set()
+        pages = 0
         while len(events) < limit:
+            if pages >= MAX_PAGES:
+                # Endless fresh page tokens with no usable rows must not loop.
+                logger.warning(
+                    "google_calendar: pagination stopped after %d pages", pages)
+                break
+            pages += 1
             page_params = dict(base_params)
             page_params["maxResults"] = max(
                 1, min(limit - len(events), LIST_PAGE_SIZE))
@@ -558,6 +579,7 @@ __all__ = [
     "GoogleCalendarConnector",
     "GoogleCalendarError",
     "MAX_LIMIT",
+    "MAX_PAGES",
     "PRIMARY_CALENDAR_ID",
     "REASON_FORBIDDEN",
     "REASON_HTTP_ERROR",
