@@ -10258,6 +10258,7 @@ _r("GET", r"/api/config", "h_config")
 _r("GET", r"/api/config/schema", "h_config_schema")
 _r("GET", r"/api/config/defaults", "h_config_defaults")
 _r("GET", r"/api/config/effective", "h_config_effective")
+_r("POST", r"/api/browser/open", "h_browser_open")
 _r("GET", r"/api/egress/status", "h_egress_status")
 _r("GET", r"/api/model/info", "h_model_info")
 _r("GET", r"/api/model/recommended-default", "h_model_recommended_default")
@@ -14979,6 +14980,34 @@ def _persist_overrides_to_home(values: Dict[str, Any], cfg: Any = None) -> bool:
         return True
     except Exception:
         return False
+
+
+def h_browser_open(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/browser/open -> launch one selected Chromium profile with CDP.
+
+    The browser profile is the user's real profile; no copy is made. This only
+    starts the browser and waits for its local CDP endpoint.
+    """
+    from qubit_cli.subcommands.browser import launch_cdp_browser
+
+    if not isinstance(b, dict):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "browser open needs an object body"}
+    browser = str(b.get("browser") or "chromium")
+    profile_dir = str(b.get("profile_dir") or "")
+    try:
+        port = int(b.get("port") or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if not port:
+        port = 9222
+    ok, message = launch_cdp_browser(browser, profile_dir, port,
+                                     str(b.get("url") or ""))
+    return (200 if ok else 400), {
+        "ok": bool(ok), "message": message, "port": port,
+        "profile_dir": profile_dir,
+    }
 
 
 def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -19809,3 +19838,5 @@ _r("GET", r"/api/computer/files", "h_computer_files_list")
 _r("POST", r"/api/computer/files/read", "h_computer_files_read")
 _r("POST", r"/api/computer/files/write", "h_computer_files_write")
 _r("POST", r"/api/computer/files/mkdir", "h_computer_files_mkdir")
+
+HANDLERS["h_browser_open"] = h_browser_open

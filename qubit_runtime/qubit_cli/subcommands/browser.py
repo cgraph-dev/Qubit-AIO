@@ -32,6 +32,47 @@ def _cdp_port(cfg: dict, fallback: int = 9222) -> int:
     return int(fallback)
 
 
+def launch_cdp_browser(browser: str, profile_dir: str, port: int,
+                       url: str = "") -> tuple[bool, str]:
+    """Launch one Chromium profile with CDP and wait for readiness.
+
+    Returns ``(ok, message)``. The SAME profile is used; no copy is made.
+    """
+    from qubit_cli.browser_connect import chromium_executable
+
+    if _cdp_version(port):
+        return True, f"CDP already ready on http://127.0.0.1:{port}"
+    if not browser:
+        from qubit_cli.browser_connect import detect_default_chromium
+        browser = detect_default_chromium() or ""
+    exe = chromium_executable(browser) if browser else None
+    if not exe:
+        return False, f"Could not find the {browser or 'Chromium'} executable."
+    if not profile_dir or not os.path.isdir(profile_dir):
+        return False, f"Chromium profile not found: {profile_dir or '(empty)'}"
+    argv = [exe, f"--user-data-dir={profile_dir}",
+            f"--remote-debugging-port={int(port)}", "--no-first-run",
+            "--no-default-browser-check"]
+    if url:
+        argv.append(str(url))
+    try:
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except Exception as exc:
+        return False, f"Could not launch {exe}: {exc}"
+    deadline = time.time() + 20.0
+    while time.time() < deadline:
+        version = _cdp_version(port)
+        if version:
+            return True, (f"CDP ready on http://127.0.0.1:{port} "
+                          f"({version}); profile: {profile_dir}")
+        time.sleep(0.25)
+    return False, ("Chromium did not expose CDP within 20s. Close an existing "
+                   "Chromium on this profile and retry.")
+
+
 def build_browser_parser(subparsers) -> None:
     """Attach the ``browser`` subcommand to ``subparsers``."""
     browser_parser = subparsers.add_parser(
@@ -84,9 +125,6 @@ def build_browser_parser(subparsers) -> None:
             return 1
 
         if action == "open":
-            if _cdp_version(port):
-                print(f"✓ CDP already ready on http://127.0.0.1:{port} — Qubit can use it.")
-                return 0
             browser = (getattr(_args, "browser", "") or detect_default_chromium())
             if not browser or browser == UNSUPPORTED_CHANNEL:
                 print("✗ No supported Chromium browser detected.", file=sys.stderr)
@@ -94,39 +132,10 @@ def build_browser_parser(subparsers) -> None:
             profile = (getattr(_args, "profile_dir", "")
                        or str((cfg.get("browser") or {}).get("profile_dir") or "")
                        or real_profile_data_dir(browser))
-            exe = chromium_executable(browser)
-            if not exe:
-                print(f"✗ Could not find the {browser} executable.", file=sys.stderr)
-                return 1
-            if not profile or not os.path.isdir(profile):
-                print(f"✗ Chromium profile not found: {profile}", file=sys.stderr)
-                return 1
-            argv = [exe, f"--user-data-dir={profile}",
-                    f"--remote-debugging-port={port}", "--no-first-run",
-                    "--no-default-browser-check"]
-            if getattr(_args, "url", ""):
-                argv.append(str(_args.url))
-            try:
-                subprocess.Popen(argv, stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL,
-                                 start_new_session=True)
-            except Exception as exc:
-                print(f"✗ Could not launch {exe}: {exc}", file=sys.stderr)
-                return 1
-            deadline = time.time() + 20.0
-            while time.time() < deadline:
-                version = _cdp_version(port)
-                if version:
-                    print(f"✓ Chromium CDP ready on http://127.0.0.1:{port}")
-                    print(f"  profile: {profile}")
-                    print("  Qubit browser.cdp_url should point at this port.")
-                    return 0
-                time.sleep(0.25)
-            print("✗ Chromium did not expose CDP within 20s.", file=sys.stderr)
-            print("  If Chromium is already running on this profile, close it and retry;", file=sys.stderr)
-            print("  or pass --profile-dir with the active profile.", file=sys.stderr)
-            return 1
+            ok, msg = launch_cdp_browser(browser, profile, port,
+                                         str(getattr(_args, "url", "") or ""))
+            print(("✓ " if ok else "✗ ") + msg)
+            return 0 if ok else 1
 
         if action != "close-profile":
             browser_parser.print_help()

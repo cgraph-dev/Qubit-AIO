@@ -120,6 +120,8 @@ function typedErrorCode(e: unknown): string | null {
   }
 }
 
+type BrowserDetected = Awaited<ReturnType<typeof api.getBrowserDetected>>;
+
 export default function ConfigPage() {
   const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [schema, setSchema] = useState<Record<
@@ -134,6 +136,12 @@ export default function ConfigPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [configPath, setConfigPath] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("");
+  const [browserDetected, setBrowserDetected] = useState<BrowserDetected | null>(null);
+  const [browserChoice, setBrowserChoice] = useState("");
+  const [browserProfileChoice, setBrowserProfileChoice] = useState("");
+  const [browserBusy, setBrowserBusy] = useState(false);
+  const [browserMessage, setBrowserMessage] = useState("");
+  const [useMyBrowser, setUseMyBrowser] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   // Confirm gates for staged writes: the deferral for api.saveConfig's
   // confirm callback, plus the copy shown in the dialog.
@@ -217,6 +225,30 @@ export default function ConfigPage() {
       setActiveCategory(categoryOrder[0]);
     }
   }, [categoryOrder, activeCategory]);
+
+  useEffect(() => {
+    if (activeCategory !== "browser") return;
+    let live = true;
+    api.getBrowserDetected().then((info) => {
+      if (!live) return;
+      setBrowserDetected(info);
+      setUseMyBrowser(Boolean(info.current.cdp_url));
+      const current = info.current.profile_dir;
+      const browser =
+        info.browsers.find((b) => b.profile_root === current) ||
+        info.browsers.find((b) =>
+          b.profiles.some((p) => p.path === current),
+        ) ||
+        info.browsers[0];
+      setBrowserChoice(browser?.id ?? "");
+      const profile =
+        browser?.profiles.find((p) => p.path === current) ||
+        browser?.profiles.find((p) => p.name === browser.active_profile) ||
+        browser?.profiles[0];
+      setBrowserProfileChoice(profile?.path ?? "");
+    }).catch(() => { if (live) setBrowserMessage("Could not detect installed browsers."); });
+    return () => { live = false; };
+  }, [activeCategory]);
 
   /* ---- Categories ---- */
   const categories = useMemo(() => {
@@ -771,6 +803,138 @@ export default function ConfigPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="grid gap-2 px-4 pb-4">
+                  {activeCategory === "browser" && (
+                    <div className="mb-3 border border-border bg-muted/10 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-medium">Use my installed browser</div>
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={useMyBrowser}
+                            onChange={(e) => {
+                              const on = e.target.checked;
+                              setUseMyBrowser(on);
+                              if (!config) return;
+                              if (on) {
+                                const path = browserProfileChoice;
+                                let next = setNestedValue(config, "browser.cdp_url", path ? "http://127.0.0.1:9222" : "");
+                                next = setNestedValue(next, "browser.profile_dir", path);
+                                next = setNestedValue(next, "browser.use_real_profile", false);
+                                setConfig(next);
+                              } else {
+                                let next = setNestedValue(config, "browser.cdp_url", "");
+                                next = setNestedValue(next, "browser.profile_dir", "");
+                                next = setNestedValue(next, "browser.use_real_profile", false);
+                                setConfig(next);
+                              }
+                            }}
+                          />
+                          optional
+                        </label>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Qubit attaches to one Chromium window over CDP; the profile stays yours and is never copied.
+                      </p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <label className="text-xs">
+                          <span className="mb-1 block text-muted-foreground">Installed browser</span>
+                          <select
+                            className="w-full border border-border bg-background px-2 py-1 text-xs"
+                            value={browserChoice}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              setBrowserChoice(id);
+                              const b = browserDetected?.browsers.find((x) => x.id === id);
+                              const prof = b?.profiles.find((x) => x.name === b.active_profile) || b?.profiles[0];
+                              setBrowserProfileChoice(prof?.path ?? "");
+                              if (useMyBrowser && config) {
+                                let next = setNestedValue(config, "browser.profile_dir", prof?.path ?? "");
+                                next = setNestedValue(next, "browser.cdp_url", prof ? "http://127.0.0.1:9222" : "");
+                                setConfig(next);
+                              }
+                            }}
+                          >
+                            {(browserDetected?.browsers ?? []).map((b) => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                            {!browserDetected?.browsers.length && <option value="">No Chromium detected</option>}
+                          </select>
+                        </label>
+                        <label className="text-xs">
+                          <span className="mb-1 block text-muted-foreground">Profile</span>
+                          <select
+                            className="w-full border border-border bg-background px-2 py-1 text-xs"
+                            value={browserProfileChoice}
+                            onChange={(e) => {
+                              const path = e.target.value;
+                              setBrowserProfileChoice(path);
+                              if (useMyBrowser && config) {
+                                let next = setNestedValue(config, "browser.profile_dir", path);
+                                next = setNestedValue(next, "browser.cdp_url", path ? "http://127.0.0.1:9222" : "");
+                                setConfig(next);
+                              }
+                            }}
+                          >
+                            {(browserDetected?.browsers.find((b) => b.id === browserChoice)?.profiles ?? []).map((p) => (
+                              <option key={p.path} value={p.path}>{p.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Button
+                          size="xs"
+                          className="uppercase"
+                          disabled={browserBusy || !browserChoice || !browserProfileChoice}
+                          onClick={() => {
+                            setBrowserBusy(true);
+                            setBrowserMessage("Launching…");
+                            setUseMyBrowser(true);
+                            if (config) {
+                              let next = setNestedValue(config, "browser.profile_dir", browserProfileChoice);
+                              next = setNestedValue(next, "browser.cdp_url", "http://127.0.0.1:9222");
+                              next = setNestedValue(next, "browser.use_real_profile", false);
+                              setConfig(next);
+                            }
+                            api.openBrowser({
+                              browser: browserChoice,
+                              profile_dir: browserProfileChoice,
+                              port: 9222,
+                            }).then((res) => {
+                              setBrowserMessage(res.message);
+                              return api.getBrowserDetected();
+                            }).then((info) => {
+                              setBrowserDetected(info);
+                              if (info.current.cdp_url && config) {
+                                let next = setNestedValue(config, "browser.cdp_url", info.current.cdp_url);
+                                next = setNestedValue(next, "browser.profile_dir", info.current.profile_dir);
+                                next = setNestedValue(next, "browser.use_real_profile", false);
+                                setConfig(next);
+                              }
+                            }).catch((e) => setBrowserMessage(String(e)))
+                              .finally(() => setBrowserBusy(false));
+                          }}
+                        >
+                          {browserBusy ? "Opening…" : "Open browser"}
+                        </Button>
+                        <Button
+                          size="xs"
+                          ghost
+                          onClick={() => {
+                            api.getBrowserDetected().then(setBrowserDetected).catch(() => {});
+                          }}
+                        >
+                          Refresh
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {browserDetected?.cdp.ready
+                            ? `CDP ready (${browserDetected.cdp.version})`
+                            : "CDP not ready"}
+                          {browserMessage ? ` — ${browserMessage}` : ""}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   {renderFields(activeFields)}
                 </CardContent>
               </Card>

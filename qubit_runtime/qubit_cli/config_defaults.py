@@ -459,6 +459,10 @@ DEFAULT_CONFIG = {
         # With a cloud provider, auto-spawn local Chromium for LAN/localhost URLs instead
         "auto_local_for_private_urls": True,
         "cdp_url": "",  # persistent CDP endpoint for attaching to an existing Chromium/Chrome
+        # Chromium user-data-dir used by ``qubit browser open``; empty = detect
+        # the installed profile. Kept next to cdp_url so the dashboard can show
+        # exactly which real profile a CDP browser belongs to.
+        "profile_dir": "",
         # Consent to browse with the user's REAL logins locally: runs on a Qubit-managed SNAPSHOT
         # of the ACTIVE default-Chromium profile (Local State -> profile.last_used; cookies, logins,
         # prefs copied and re-synced per fresh session) driven by Qubit' packaged Chromium. The

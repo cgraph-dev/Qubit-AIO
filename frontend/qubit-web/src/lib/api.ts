@@ -1355,6 +1355,38 @@ export const api = {
     ),
   getConfig: (profile = getManagementProfile()) =>
     fetchJSON<Record<string, unknown>>(appendProfileParam("/api/config", profile)),
+  getBrowserDetected: (profile = getManagementProfile()) =>
+    fetchJSON<{
+      browsers: Array<{
+        id: string;
+        name: string;
+        executable: string;
+        profile_root: string;
+        active_profile: string;
+        profiles: Array<{ name: string; path: string }>;
+      }>;
+      current: {
+        cdp_url: string;
+        profile_dir: string;
+        use_real_profile: boolean;
+        backend: string;
+      };
+      cdp: { port: number; ready: boolean; version: string };
+    }>(appendProfileParam("/api/browser/detected", profile)),
+  openBrowser: (payload: {
+    browser: string;
+    profile_dir: string;
+    port?: number;
+    url?: string;
+  }) =>
+    fetchJSON<{ ok: boolean; message: string; port: number; profile_dir: string }>(
+      "/api/browser/open",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ),
   getDefaults: () => fetchJSON<Record<string, unknown>>("/api/config/defaults"),
   getSchema: () => fetchJSON<{ fields: Record<string, unknown>; category_order: string[] }>("/api/config/schema"),
   getModelInfo: (

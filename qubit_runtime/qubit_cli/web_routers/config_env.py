@@ -106,6 +106,144 @@ async def get_schema(profile: Optional[str] = None):
     return {"fields": fields, "category_order": _CATEGORY_ORDER}
 
 
+def _browser_profile_roots(browser: str) -> list[str]:
+    """Candidate profile roots for one Chromium key (native, snap, flatpak)."""
+    from pathlib import Path as _Path
+    from qubit_cli.browser_connect import real_profile_data_dir
+    roots: list[str] = []
+    try:
+        native = real_profile_data_dir(browser)
+        if native:
+            roots.append(native)
+    except Exception:
+        pass
+    home = _Path.home()
+    extra = {
+        "chromium": [home / "snap/chromium/common/chromium",
+                     home / ".var/app/org.chromium.Chromium/config/chromium"],
+        "chrome": [home / ".config/google-chrome"],
+        "brave": [home / "snap/brave/current/.config/BraveSoftware/Brave-Browser",
+                  home / ".config/BraveSoftware/Brave-Browser"],
+        "brave-origin": [home / ".config/BraveSoftware/Brave-Browser"],
+        "edge": [home / ".config/microsoft-edge"],
+    }.get(browser, [])
+    for path in extra:
+        text = str(path)
+        if text not in roots and path.is_dir():
+            roots.append(text)
+    return roots
+
+
+def _profile_dirs(root: str) -> tuple[list[dict[str, Any]], str]:
+    from pathlib import Path as _Path
+    import json
+    root_p = _Path(root)
+    profiles = []
+    try:
+        for child in sorted(root_p.iterdir()):
+            if not child.is_dir():
+                continue
+            if not ((child / "Cookies").is_file() or (child / "Preferences").is_file()):
+                continue
+            profiles.append({"name": child.name, "path": str(child)})
+    except Exception:
+        pass
+    active = "Default"
+    try:
+        state = json.loads((root_p / "Local State").read_text(encoding="utf-8-sig"))
+        active = str((state.get("profile") or {}).get("last_used") or active)
+    except Exception:
+        pass
+    if not any(p["name"] == active for p in profiles) and profiles:
+        active = profiles[0]["name"]
+    return profiles, active
+
+
+def _cdp_ready(port: int) -> str:
+    import urllib.request
+    try:
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{int(port)}/json/version", timeout=1.0) as resp:
+            import json
+            data = json.loads(resp.read(4096).decode("utf-8", "replace"))
+        return str(data.get("Browser") or "ready")
+    except Exception:
+        return ""
+
+
+def _cdp_port_from_config(cfg: dict, fallback: int = 9222) -> int:
+    url = str(((cfg.get("browser") or {}) if isinstance(cfg, dict) else {}).get("cdp_url") or "")
+    for token in url.split(":")[::-1]:
+        if token.isdigit():
+            return int(token)
+    return int(fallback)
+
+
+@config_router.get("/api/browser/detected")
+async def browser_detected(profile: Optional[str] = None):
+    """Installed Chromium-family browsers, profiles, and current CDP state."""
+    from qubit_cli.browser_connect import chromium_executable
+    with _config_profile_scope(profile):
+        cfg = load_config()
+    cfg = cfg if isinstance(cfg, dict) else {}
+    browsers = []
+    for key in ("chromium", "chrome", "brave", "brave-origin", "edge"):
+        exe = ""
+        try:
+            exe = chromium_executable(key) or ""
+        except Exception:
+            exe = ""
+        if not exe:
+            continue
+        roots = _browser_profile_roots(key)
+        profiles: list[dict[str, Any]] = []
+        active = "Default"
+        root = roots[0] if roots else ""
+        for candidate in roots:
+            found, candidate_active = _profile_dirs(candidate)
+            if found:
+                root, profiles, active = candidate, found, candidate_active
+                break
+        browsers.append({
+            "id": key, "name": key.replace("-", " ").title(),
+            "executable": exe, "profile_root": root,
+            "profiles": profiles, "active_profile": active,
+        })
+    bcfg = cfg.get("browser") if isinstance(cfg.get("browser"), dict) else {}
+    port = _cdp_port_from_config(cfg)
+    return {
+        "browsers": browsers,
+        "current": {
+            "cdp_url": str(bcfg.get("cdp_url") or ""),
+            "profile_dir": str(bcfg.get("profile_dir") or ""),
+            "use_real_profile": bool(bcfg.get("use_real_profile") or False),
+            "backend": bcfg.get("backend") or "",
+        },
+        "cdp": {"port": port, "ready": bool(_cdp_ready(port)),
+                "version": _cdp_ready(port)},
+    }
+
+
+@router.post("/api/browser/open")
+async def browser_open(payload: Dict[str, Any], profile: Optional[str] = None):
+    """Launch one selected Chromium profile with CDP for Qubit."""
+    from qubit_cli.subcommands.browser import launch_cdp_browser
+    browser = str(payload.get("browser") or "chromium")
+    profile_dir = str(payload.get("profile_dir") or "")
+    try:
+        port = int(payload.get("port") or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if not port:
+        with _config_profile_scope(profile):
+            cfg = load_config()
+        port = _cdp_port_from_config(cfg if isinstance(cfg, dict) else {})
+    ok, message = launch_cdp_browser(browser, profile_dir, port,
+                                     str(payload.get("url") or ""))
+    return {"ok": bool(ok), "message": message, "port": port,
+            "profile_dir": profile_dir}
+
+
 @config_router.get("/api/egress/status")
 async def get_egress_status(profile: Optional[str] = None):
     """Dashboard/Desktop-readable egress proxy status and remediation text."""
