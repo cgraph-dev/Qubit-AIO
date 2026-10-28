@@ -4,12 +4,12 @@
 
 **State:** `main` at `ce104699e` after the five-lane W69 merge; live `qubit-voice-typing` restarted on the merged wake/barge-in code (pid `3201624`), wake `engine: kws`, `segmenter: silero`, hotkey child healthy. `/chat` remains on the active API profile (`opencode-go/deepseek-v4.1-flash`); local model is still `qubit-brain` at 32k.
 
-**W69 outcome:** wake KWS conditioning + diagnostics, generation-fenced barge-in takeover, bounded connector pagination, and a broad matrix report (`docs/MATRIX-W69-2026-10-28.md`). Role tiers were briefly defaulted to local then **reverted** because `qubit-brain`'s 32,768 window is below the 64,000 tool-use floor; roles stay on the active model unless the owner maps them.
+**W69 outcome:** wake KWS conditioning + diagnostics, generation-fenced barge-in takeover, bounded connector pagination, a broad matrix report (`docs/MATRIX-W69-2026-10-28.md`), and `qubit-brain` raised to a **65,536-token** window (GGUF max 262,144) so local `local`/`detail` role tiers clear the 64,000 tool-use floor. A real `qubit agent run simple` returned `CTX64_OK` on `ollama/qubit-brain`.
 
 **Do next (in order):**
-1. Decide the local tool-context question: raise `qubit-brain` to 64k (the model supports 262,144; a 64k override was validated on a real `simple` role turn) or keep roles on the API.
-2. Regenerate the two gitignored `docs/generated/*` artifacts so the 12 environment/artifact matrix failures can be re-run.
-3. Fix the 20 standalone matrix failures in bounded lanes (Codex originator, plugin manifests, kanban/telegram drift, three missing `stdin=` guards; see the matrix report).
+1. Regenerate the two gitignored `docs/generated/*` artifacts so the environment/artifact matrix failures can be re-run.
+2. Fix the remaining standalone matrix failures in bounded lanes (Codex originator, plugin manifests, kanban/telegram drift, three missing `stdin=` guards; see the matrix report).
+3. Re-run the 32k-context voice/chat tests; the guard no longer fires.
 4. Full matrix with the canonical per-file runner; no `VERIFIED` until one clean pass.
 
 ## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
