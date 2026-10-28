@@ -106,12 +106,12 @@ def test_ensure_creates_dashboard_session_at_local_brain_default(monkeypatch):
 def test_ensure_reuses_existing_session_without_reddefaulting_model(monkeypatch):
     """An existing voice transcript is never overwritten or re-defaulted."""
     store = FakeStore([{"id": "voice-chat", "source": "dashboard",
-                        "model": "qubit-brain4", "message_count": 592}])
+                        "model": "qubit-brain", "message_count": 592}])
     monkeypatch.setattr(VS, "_store", lambda cfg, store=None: store)
     out = VS.ensure_voice_session(_cfg(), None, store=store, model="qubit-brain")
     assert out["ok"] is True and out["created"] is False
     # The stored model is untouched (ensure is a no-op for an existing row).
-    assert store.rows["voice-chat"]["model"] == "qubit-brain4"
+    assert store.rows["voice-chat"]["model"] == "qubit-brain"
     assert store.create_calls == []
 
 

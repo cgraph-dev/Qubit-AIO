@@ -3357,7 +3357,7 @@ class DesktopHelper:
             "mode": mode,
             "detected": {"action": mode, "style": "", "language": "",
                          "audience": ""},
-            "model": "qubit-brain4", "provider": "local",
+            "model": "qubit-brain", "provider": "local",
             "privacy_mode": "local", "injection_suspected": False,
             "facts_dropped": [], "elapsed_ms": 0,
             "target_app": (self.snapshot.app_class if self.snapshot else "")})

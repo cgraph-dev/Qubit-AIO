@@ -242,13 +242,13 @@ def test_provider_identity_records_configured_identity(tmp_path):
                    "language": "en"}
     data["tts"] = {"provider": "piper", "voice": "en_US-amy-medium",
                    "sample_rate": 22050}
-    data["intent"] = {"local_llm": {"model": "qubit-brain4"}}
+    data["intent"] = {"local_llm": {"model": "qubit-brain"}}
     cfg = Q.Config(data=data, path=cfg.path)
     out = provider_identity(cfg)
     assert out["asr"]["configured_provider"] == "sherpa"
     assert out["asr"]["engine"] == "parakeet"
     assert out["tts"]["voice"] == "en_US-amy-medium"
-    assert out["reasoning_model"]["configured"] == "qubit-brain4"
+    assert out["reasoning_model"]["configured"] == "qubit-brain"
     assert out["tts"]["fallback_to_piper"] is False
 
 

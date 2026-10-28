@@ -231,8 +231,8 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
         "routing": str(_read_cfg(cfg, "voice_edit", "routing",
                                  default="auto") or "auto"),
         "local_profile": str(_read_cfg(cfg, "voice_edit", "local_profile",
-                                       default="qubit-brain4") or
-                             "qubit-brain4"),
+                                       default="qubit-brain") or
+                             "qubit-brain"),
         "api_profile": str(_read_cfg(cfg, "voice_edit", "api_profile",
                                      default="") or ""),
         "allow_api": bool(_read_cfg(cfg, "voice_edit", "allow_api",

@@ -388,8 +388,8 @@ def _routing_settings(cfg: Any) -> Dict[str, Any]:
         "routing": str(_read_cfg(cfg, "voice_edit", "routing",
                                  default="auto") or "auto").lower(),
         "local_profile": str(_read_cfg(cfg, "voice_edit", "local_profile",
-                                       default="qubit-brain4") or
-                             "qubit-brain4"),
+                                       default="qubit-brain") or
+                             "qubit-brain"),
         # Rewriting is careful work, not speed work: the detail tier
         # (usually a bigger local model) handles transforms when
         # configured, the local tier otherwise. Chat answers keep the

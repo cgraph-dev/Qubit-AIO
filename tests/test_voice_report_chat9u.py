@@ -250,7 +250,7 @@ def test_store_failure_falls_through_without_raising():
         ok = True
         text = "brain fallback"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 
@@ -301,7 +301,7 @@ def test_non_report_ask_does_not_use_report_store():
         ok = True
         text = "brain answer"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 

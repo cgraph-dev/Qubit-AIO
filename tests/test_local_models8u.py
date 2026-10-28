@@ -43,7 +43,7 @@ def test_status_honest_states(tmp_path, monkeypatch):
 
     # Runtime up + configured model present -> AVAILABLE.
     monkeypatch.setattr(LM, "_probe_local",
-                        lambda *_a, **_k: _runtime(["qubit-brain4:latest"]))
+                        lambda *_a, **_k: _runtime(["qubit-brain:latest"]))
     out = LM.status(cfg)
     assert out["state"] == "AVAILABLE" and out["available"] is True
     assert out["model_present"] is True and out["observed_models"] == 1
@@ -58,7 +58,7 @@ def test_status_honest_states(tmp_path, monkeypatch):
     cfg_off = _cfg(tmp_path, monkeypatch,
                    "intent:\n  local_llm:\n    enabled: false\n")
     monkeypatch.setattr(LM, "_probe_local",
-                        lambda *_a, **_k: _runtime(["qubit-brain4"]))
+                        lambda *_a, **_k: _runtime(["qubit-brain"]))
     out = LM.status(cfg_off)
     assert out["state"] == "UNAVAILABLE" and out["enabled"] is False
 
@@ -96,15 +96,15 @@ def test_catalog_from_config_and_runtime(tmp_path, monkeypatch):
     assert by_id["fake-model:latest"]["source"] == "runtime"
     assert by_id["fake-model:latest"]["size"] == 123
     # Config-declared resident model is listed even though not observed.
-    assert by_id["qubit-brain4"]["state"] == "configured"
-    assert by_id["qubit-brain4"]["size"] is None
+    assert by_id["qubit-brain"]["state"] == "configured"
+    assert by_id["qubit-brain"]["size"] is None
 
     # Runtime down -> configured models only, runtime_observed False.
     monkeypatch.setattr(LM, "_probe_local", lambda *_a, **_k: None)
     out = LM.catalog(cfg)
     assert out["runtime_observed"] is False
     assert all(r["state"] == "configured" for r in out["models"])
-    assert any(r["id"] == "qubit-brain4" for r in out["models"])
+    assert any(r["id"] == "qubit-brain" for r in out["models"])
 
 
 def test_jobs_typed_empty(tmp_path, monkeypatch):
@@ -118,17 +118,17 @@ def test_every_write_is_a_typed_gate_and_writes_nothing(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     _no_estop(monkeypatch)
     monkeypatch.setattr(LM, "_probe_local",
-                        lambda *_a, **_k: _runtime(["qubit-brain4"]))
+                        lambda *_a, **_k: _runtime(["qubit-brain"]))
     state_dir = cfg.state_dir()
     before = sorted(p.name for p in state_dir.iterdir())
 
     writes = [
         LM.runtime_install(cfg, confirmed=True),
-        LM.download(cfg, model="qubit-brain4", confirmed=True),
+        LM.download(cfg, model="qubit-brain", confirmed=True),
         LM.sideload(cfg, path="/tmp/models/x.gguf", confirmed=True),
         LM.server(cfg, "start", confirmed=True),
-        LM.eject(cfg, model="qubit-brain4", confirmed=True),
-        LM.activate(cfg, model="qubit-brain4", confirmed=True),
+        LM.eject(cfg, model="qubit-brain", confirmed=True),
+        LM.activate(cfg, model="qubit-brain", confirmed=True),
         LM.quickstart(cfg, confirmed=True),
     ]
     for out in writes:
@@ -146,7 +146,7 @@ def test_confirmation_gate_precedes_broker(tmp_path, monkeypatch):
     _no_estop(monkeypatch)
     monkeypatch.setattr(LM, "_probe_local", lambda *_a, **_k: None)
     for out in (LM.runtime_install(cfg),
-                LM.download(cfg, model="qubit-brain4"),
+                LM.download(cfg, model="qubit-brain"),
                 LM.quickstart(cfg)):
         assert out["code"] == LM.CONFIRM_CODE, out
         assert out["state"] == "REFUSED"
@@ -157,8 +157,8 @@ def test_runtime_ops_typed_unavailable_without_backend(tmp_path, monkeypatch):
     _no_estop(monkeypatch)
     monkeypatch.setattr(LM, "_probe_local", lambda *_a, **_k: None)
     for out in (LM.server(cfg, "stop", confirmed=True),
-                LM.eject(cfg, model="qubit-brain4", confirmed=True),
-                LM.activate(cfg, model="qubit-brain4", confirmed=True)):
+                LM.eject(cfg, model="qubit-brain", confirmed=True),
+                LM.activate(cfg, model="qubit-brain", confirmed=True)):
         assert out["code"] == LM.UNAVAILABLE_CODE, out
         assert out["state"] == "REFUSED"
 
@@ -203,7 +203,7 @@ def test_redaction_of_endpoints_and_model_ids(tmp_path, monkeypatch):
 def test_estop_latches_writes(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     monkeypatch.setattr(LM, "estop_engaged", lambda _cfg: True)
-    out = LM.download(cfg, model="qubit-brain4", confirmed=True)
+    out = LM.download(cfg, model="qubit-brain", confirmed=True)
     assert out["state"] == "ESTOP" and out["code"] == LM.ESTOP_CODE
     out = LM.server(cfg, "start", confirmed=True)
     assert out["state"] == "ESTOP" and out["code"] == LM.ESTOP_CODE
@@ -217,34 +217,34 @@ def test_fallback_chain_is_read_only_and_honest(tmp_path, monkeypatch):
     assert out["state"] == "OK" and out["schema"] == LM.FALLBACK_SCHEMA
     assert out["runtime_observed"] is False
     assert all(row["available"] is False for row in out["chain"])
-    assert any(row["id"] == "qubit-brain4" for row in out["chain"])
+    assert any(row["id"] == "qubit-brain" for row in out["chain"])
     assert "read-only" in out["rollback"]
 
 
 def test_resolve_fallback_selects_available_model(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     monkeypatch.setattr(LM, "_probe_local",
-                        lambda *_a, **_k: _runtime(["qubit-brain4:latest"]))
-    direct = LM.resolve_fallback(cfg, model="qubit-brain4")
+                        lambda *_a, **_k: _runtime(["qubit-brain:latest"]))
+    direct = LM.resolve_fallback(cfg, model="qubit-brain")
     assert direct["state"] == "OK" and direct["fallback"] is False
-    assert direct["selected"] == "qubit-brain4"
+    assert direct["selected"] == "qubit-brain"
 
     # Requested but absent -> automatic fallback to an available candidate.
     fell = LM.resolve_fallback(cfg, model="no-such-model-xyz")
     assert fell["state"] == "OK" and fell["fallback"] is True
-    assert fell["selected"] == "qubit-brain4"
+    assert fell["selected"] == "qubit-brain"
     assert "unavailable" in fell["detail"]
 
     # No requested model -> first available candidate, no fallback claimed.
     auto = LM.resolve_fallback(cfg)
     assert auto["state"] == "OK" and auto["fallback"] is False
-    assert auto["selected"] == "qubit-brain4"
+    assert auto["selected"] == "qubit-brain"
 
 
 def test_resolve_fallback_unavailable_never_fabricates(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     monkeypatch.setattr(LM, "_probe_local", lambda *_a, **_k: None)
-    out = LM.resolve_fallback(cfg, model="qubit-brain4")
+    out = LM.resolve_fallback(cfg, model="qubit-brain")
     assert out["state"] == "UNAVAILABLE" and out["code"] == LM.UNAVAILABLE_CODE
     assert out["selected"] is None
     assert "nothing was started" in out["detail"]
@@ -254,7 +254,7 @@ def test_resolve_fallback_redacts_and_needs_no_creds(tmp_path, monkeypatch):
     secret = "sk-AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
     cfg = _cfg(tmp_path, monkeypatch)
     monkeypatch.setattr(LM, "_probe_local",
-                        lambda *_a, **_k: _runtime(["qubit-brain4"]))
+                        lambda *_a, **_k: _runtime(["qubit-brain"]))
     out = LM.resolve_fallback(cfg, model=secret)
     assert secret not in json.dumps(out)
     assert out["state"] == "OK" and out["fallback"] is True

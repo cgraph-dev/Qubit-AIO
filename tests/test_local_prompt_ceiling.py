@@ -101,7 +101,7 @@ def test_oversized_prompt_trimmed_and_turn_still_runs(oversized, journal):
     assert fields["limit"] == DEFAULT_MAX_PROMPT_CHARS
 
     # The real payload path (what is serialized for the provider) carries it.
-    payload = llm._chat_payload(question, "", "qubit-brain4", 100, "",
+    payload = llm._chat_payload(question, "", "qubit-brain", 100, "",
                                 stream=False)
     user_msg = payload["messages"][-1]["content"]
     assert len(json.dumps(payload["messages"])) > 0

@@ -62,7 +62,7 @@ class FakeResult:
     code = ""
     message = ""
     provider = "ollama"
-    model = "qubit-brain4"
+    model = "qubit-brain"
     details = {"locality": "local"}
 
 

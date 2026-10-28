@@ -10,7 +10,7 @@ transport is stubbed (the live Brain4 proof lives in
 Defects locked here:
 
 * ``POST /api/qubit/chat/stream`` dropped the request ``model`` entirely, so an
-  unknown model was silently routed to ``qubit-brain4`` (a wrong-model turn)
+  unknown model was silently routed to ``qubit-brain`` (a wrong-model turn)
   while the non-streaming ``/api/qubit/chat`` returned a typed
   ``MODEL_NOT_ALLOWED``. The streaming branch now resolves/validates the model
   (and the e-stop + empty-text guards) BEFORE the SSE stream opens.
@@ -129,7 +129,7 @@ def _stub_stream(monkeypatch, reply="stream reply"):
 
     seen = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
               should_stop=None, num_ctx=None, reasoning=None):
         seen.append({"text": text, "model": model})
@@ -166,7 +166,7 @@ def test_chat_stream_route_is_declared_in_the_route_authority():
 
 def test_sse_rejects_disallowed_model_before_stream(tmp_path, monkeypatch):
     """A streaming request for an unknown model is a typed 400, never a
-    silently mis-routed qubit-brain4 turn."""
+    silently mis-routed qubit-brain turn."""
     cfg, state = _cfg(tmp_path, monkeypatch)
     _stub_stream(monkeypatch)
     ui, port = _start_webui(cfg, state)
@@ -210,7 +210,7 @@ def test_sse_honors_configured_model_and_persists(tmp_path, monkeypatch):
     try:
         status, headers, body = _http(
             port, "POST", "/agent/api/qubit/chat/stream",
-            {"text": "hello", "session": "a2-ok", "model": "qubit-brain4"},
+            {"text": "hello", "session": "a2-ok", "model": "qubit-brain"},
             raw=True)
         assert status == 200
         assert headers.get("Content-Type", "").startswith("text/event-stream")
@@ -221,8 +221,8 @@ def test_sse_honors_configured_model_and_persists(tmp_path, monkeypatch):
         deltas = [d["text"] for e, d in events if e == "delta"]
         assert "".join(deltas) == "SSE_OK", deltas
         start = [d for e, d in events if e == "start"][0]
-        assert start["model"] == "qubit-brain4"
-        assert stub.seen and stub.seen[0]["model"] == "qubit-brain4"
+        assert start["model"] == "qubit-brain"
+        assert stub.seen and stub.seen[0]["model"] == "qubit-brain"
         done = [d for e, d in events if e == "done"][0]
         assert done["ok"] is True and done["reply"] == "SSE_OK"
         # The streamed turn is persisted server-side (sidebar + transcript).
@@ -258,7 +258,7 @@ def test_session_persists_across_listener_restart(tmp_path, monkeypatch):
     ui, port = _start_webui(cfg, state)
     try:
         _, _, turn = _http(port, "POST", "/agent/api/qubit/chat",
-                           {"text": "remember me", "session": "a2-restart"})
+                           {"text": "remember me", "session": "a2-restart", "model": "qubit-brain"})
         assert turn["ok"] is True
     finally:
         ui.stop()
@@ -273,7 +273,7 @@ def test_session_persists_across_listener_restart(tmp_path, monkeypatch):
         assert "a2-restart" in ids
         _, _, shown = _http(
             port2, "GET", "/agent/api/qubit/chat/sessions/a2-restart")
-        assert shown["session"]["model"] == "qubit-brain4"
+        assert shown["session"]["model"] == "qubit-brain"
         assert [m["content"] for m in shown["messages"]] == \
             ["remember me", "restart me"]
     finally:
@@ -291,7 +291,7 @@ def test_stream_timeout_is_typed_and_not_fabricated(tmp_path, monkeypatch):
         raise TimeoutError("read timed out")
 
     monkeypatch.setattr(_llm, "chat_local_stream", _slow)
-    events = list(CT.stream_turn(cfg, "slow", session="a2-timeout"))
+    events = list(CT.stream_turn(cfg, "slow", session="a2-timeout", model="qubit-brain"))
     errs = [e for e in events if e["event"] == "error"]
     assert errs and errs[0]["code"] == "MODEL_ERROR"
     assert "timed out" in errs[0]["detail"]
@@ -321,7 +321,7 @@ def test_stream_cancel_emits_cancelled_and_keeps_user(tmp_path, monkeypatch):
     box = []
 
     def _run():
-        box.extend(list(CT.stream_turn(cfg, "long", session="a2-cancel")))
+        box.extend(list(CT.stream_turn(cfg, "long", session="a2-cancel", model="qubit-brain")))
 
     t = threading.Thread(target=_run)
     t.start()
@@ -507,10 +507,10 @@ def test_cli_dashboard_voice_share_brain4_authority(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg, _ = _cfg(tmp_path, monkeypatch)
-    assert CT.configured_model(cfg) == "qubit-brain4"
-    assert AG._model(cfg) == "qubit-brain4"
-    assert HC._qubit_model(cfg)["name"] == "qubit-brain4"
-    assert CT.resolve_model(cfg, None)["model"] == "qubit-brain4"
+    assert CT.configured_model(cfg) == "qubit-brain"
+    assert AG._model(cfg) == "qubit-brain"
+    assert HC._qubit_model(cfg)["name"] == "qubit-brain"
+    assert CT.resolve_model(cfg, None)["model"] == "qubit-brain"
 
 
 # --------------------------------------------- one fork home (never ~/.hermes)

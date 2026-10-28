@@ -73,7 +73,7 @@ class R:
     """A ``ProviderResult``-shaped stub."""
 
     def __init__(self, *, ok=True, text="", code="", message="",
-                 provider="local", model="qubit-brain4"):
+                 provider="local", model="qubit-brain"):
         self.ok = ok
         self.text = text
         self.code = code

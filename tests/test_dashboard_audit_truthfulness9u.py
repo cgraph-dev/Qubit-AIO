@@ -112,7 +112,7 @@ def test_confirmed_refused_mutation_is_not_reported_executed(tmp_path,
 
     cfg = _cfg(tmp_path, monkeypatch)
     staged = OPS.run_op(cfg, "rollback_model_profile",
-                        {"profile_id": "qubit-brain4", "session": "s1"},
+                        {"profile_id": "qubit-brain", "session": "s1"},
                         actor="dashboard:user", session="dashboard")
     assert staged["state"] == "needs-confirm", staged
 

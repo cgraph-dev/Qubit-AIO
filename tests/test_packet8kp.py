@@ -192,10 +192,10 @@ def _valid_spec(**kw) -> P.ModelSpec:
 
 def test_model_bootstrap_offline_missing(tmp_path):
     paths = _paths(tmp_path)
-    spec = _valid_spec(id="qubit-brain4", source="ollama://qubit-brain4",
+    spec = _valid_spec(id="qubit-brain", source="ollama://qubit-brain",
                        revision="a" * 64, sha256="b" * 64, size_bytes=1024,
                        license="Apache-2.0", kind="ollama",
-                       local_path="qubit-brain4")
+                       local_path="qubit-brain")
     out = P.model_bootstrap(spec, paths, offline=True)
     assert out["state"] == "MISSING"
     assert out["target"].startswith(str(paths.model_dir))
@@ -1143,7 +1143,7 @@ def test_model_spec_rejects_unapproved_license():
 
 
 def test_model_spec_rejects_ollama_bad_digest():
-    spec = _valid_spec(source="ollama://qubit-brain4", revision="digest",
+    spec = _valid_spec(source="ollama://qubit-brain", revision="digest",
                        kind="ollama")
     errors = P._validate_spec(spec)
     assert any("provider digest" in e for e in errors)
@@ -1214,10 +1214,10 @@ def test_model_ollama_digest_mismatch_fails_closed(tmp_path, monkeypatch):
         P, "_preflight", lambda d: {"state": "OK", "disk_ok": True,
                                     "ram_ok": True})
     rec = {"state": "OK", "checksum": "f" * 64, "revision": "f" * 64,
-           "alias": "qubit-brain4"}
+           "alias": "qubit-brain"}
     monkeypatch.setattr("voicebridge.distribution.model_artifact_record",
                         lambda cfg: dict(rec))
-    spec = P.ModelSpec(id="qubit-brain4", source="ollama://qubit-brain4",
+    spec = P.ModelSpec(id="qubit-brain", source="ollama://qubit-brain",
                        revision="a" * 64, sha256="b" * 64, size_bytes=1024,
                        license="Apache-2.0", kind="ollama")
     out = P.model_bootstrap(spec, paths, dry_run=False, offline=False)

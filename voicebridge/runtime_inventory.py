@@ -37,7 +37,7 @@ def _agent_runtime(cfg: Any) -> Dict[str, Any]:
             "runtime": "qubit-native",
             "entry": "voicebridge.agent.turn",
             "model": str(get("agent", "model", default="") or
-                         "qubit-brain4"),
+                         "qubit-brain"),
             "enabled": bool(get("agent", "enabled", default=True))}
 
 
@@ -113,7 +113,7 @@ def _providers(cfg: Any) -> Dict[str, Any]:
     get = (lambda *p, default=None: cfg.get(*p, default=default)) \
         if hasattr(cfg, "get") else (lambda *p, default=None: default)
     return {"resident_alias": str(get("intent", "runner", "alias",
-                                      default="qubit-brain4")),
+                                      default="qubit-brain")),
             "frontier": "disabled by default (explicit allowlist + budgets)",
             "credentials": "env:/file: references only; values never shown"}
 

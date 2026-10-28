@@ -48,7 +48,7 @@ class Cfg:
                 node = node[p]
             return node
         if path == ("intent", "runner", "alias"):
-            return "qubit-brain4"
+            return "qubit-brain"
         return default
 
 
@@ -183,11 +183,11 @@ def test_local_turn_untouched_by_dead_model_gates(monkeypatch):
     monkeypatch.setattr(Gw, "_local_complete",
                         lambda *a, **k: Gw.ProviderResult(
                             ok=True, text="local answer", provider="local",
-                            model="qubit-brain4",
-                            identity="local/qubit-brain4",
+                            model="qubit-brain",
+                            identity="local/qubit-brain",
                             usage=Gw.UsageRecord(
-                                provider="local", model="qubit-brain4",
-                                identity="local/qubit-brain4", latency_ms=1)))
+                                provider="local", model="qubit-brain",
+                                identity="local/qubit-brain", latency_ms=1)))
     cfg = Cfg(_base_frontier())
     called = []
     res = G.run(ProviderRequest(prompt="hi", route="local"), cfg,
@@ -195,7 +195,7 @@ def test_local_turn_untouched_by_dead_model_gates(monkeypatch):
                 transport=lambda *a: (called.append(1), (400, {
                     "error": "ModelProtocolUnsupported"}))[1])
     assert called == []  # local performs no frontier request
-    assert res.ok and res.identity == "local/qubit-brain4"
+    assert res.ok and res.identity == "local/qubit-brain"
     assert res.code != "MODEL_UNAVAILABLE_TURN"
 
 

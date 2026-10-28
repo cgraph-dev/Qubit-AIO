@@ -197,14 +197,14 @@ def test_auth_logout_reaches_real_residue_scan(tmp_path, monkeypatch):
 def test_frontier_show_reads_real_policy_entry(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     res = _registry_receipt(
-        _run(cfg, "frontier_show", {"model_id": "local/qubit-brain4"}),
+        _run(cfg, "frontier_show", {"model_id": "local/qubit-brain"}),
         "frontier_show")
     assert res["provider"] == "local", res
-    assert res["model"] == "qubit-brain4", res
+    assert res["model"] == "qubit-brain", res
     assert res["allowed"] is False, res
     assert "disclosure" in res, res
 
-    said = _say(cfg, "qubit, show model local/qubit-brain4")
+    said = _say(cfg, "qubit, show model local/qubit-brain")
     assert said["state"] == "executed", said
     assert said["receipt"]["entry"] == "frontier_show"
     assert said["receipt"]["result"]["provider"] == "local", said

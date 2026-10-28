@@ -101,7 +101,7 @@ def test_session_select_and_clear_override(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
     cfg = _cfg(tmp_path, monkeypatch)
-    clone = _ops().clone_model_profile(cfg, "qubit-brain4", "local-copy",
+    clone = _ops().clone_model_profile(cfg, "qubit-brain", "local-copy",
                                        confirm=True)
     assert clone["state"] == "OK", clone
     sel = _ops().select_session_model(cfg, "s1", "local-copy", confirm=True)
@@ -129,7 +129,7 @@ def test_test_profile_typed_states(tmp_path, monkeypatch):
 
 def test_remove_in_use_refused_then_allowed(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
-    _ops().clone_model_profile(cfg, "qubit-brain4", "remove-me", confirm=True)
+    _ops().clone_model_profile(cfg, "qubit-brain", "remove-me", confirm=True)
     _ops().select_session_model(cfg, "s2", "remove-me", confirm=True)
     refused = _ops().remove_model_profile(cfg, "remove-me", confirm=True)
     assert refused["state"] == "REFUSED"
@@ -147,13 +147,13 @@ def test_rollback_selects_declared_target(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
     cfg = _cfg(tmp_path, monkeypatch)
-    _ops().clone_model_profile(cfg, "qubit-brain4", "rollback-child",
+    _ops().clone_model_profile(cfg, "qubit-brain", "rollback-child",
                                confirm=True)
     _ops().select_session_model(cfg, "s3", "rollback-child", confirm=True)
     back = _ops().rollback_model_profile(cfg, "rollback-child", session="s3",
                                          confirm=True)
-    assert back["state"] == "OK" and back["rollback_to"] == "qubit-brain4"
-    assert R.resolve(cfg, session="s3").profile_id == "qubit-brain4"
+    assert back["state"] == "OK" and back["rollback_to"] == "qubit-brain"
+    assert R.resolve(cfg, session="s3").profile_id == "qubit-brain"
     none = _ops().rollback_model_profile(cfg, _ops().DEFAULT_LOCAL_ID,
                                          session="s3", confirm=True)
     assert none["state"] == "REFUSED" and none["code"] == "NO_ROLLBACK", none
@@ -271,27 +271,27 @@ def test_every_model_profile_op_dispatches_through_the_production_route(
     cfg = _cfg(tmp_path, monkeypatch)
     assert OPS.run_op(cfg, "list_model_profiles", {})["state"] == "executed"
     assert OPS.run_op(cfg, "show_model_profile",
-                      {"profile_id": "qubit-brain4"})["state"] == "executed"
+                      {"profile_id": "qubit-brain"})["state"] == "executed"
     assert OPS.run_op(cfg, "test_model_profile",
-                      {"profile_id": "qubit-brain4"})["state"] == "executed"
+                      {"profile_id": "qubit-brain"})["state"] == "executed"
     assert OPS.run_op(
         cfg, "create_model_profile",
         {"profile_id": "proof-local", "kind": "local",
          "provider": "ollama", "model": "phi4"})["state"] == "needs-confirm"
     assert OPS.run_op(
         cfg, "clone_model_profile",
-        {"source_id": "qubit-brain4",
+        {"source_id": "qubit-brain",
          "new_id": "proof-clone"})["state"] == "needs-confirm"
     assert OPS.run_op(
         cfg, "select_session_model",
         {"session": "s1",
-         "profile_id": "qubit-brain4"})["state"] == "needs-confirm"
+         "profile_id": "qubit-brain"})["state"] == "needs-confirm"
     assert OPS.run_op(
         cfg, "clear_session_model",
         {"session": "s1"})["state"] == "needs-confirm"
     assert OPS.run_op(
         cfg, "rollback_model_profile",
-        {"profile_id": "qubit-brain4",
+        {"profile_id": "qubit-brain",
          "session": "s1"})["state"] == "needs-confirm"
     assert OPS.run_op(
         cfg, "remove_model_profile",

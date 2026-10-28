@@ -4,7 +4,7 @@ Layers:
   * deterministic unit tests      — must pass everywhere, no GPU/network
   * real-HTTP integration tests   — spin up the actual WebUI server + handler
   * live gates (item 1)           — hit the real ollama instance + baked
-                                    qubit-brain4; skipped ONLY if ollama/the
+                                    qubit-brain; skipped ONLY if ollama/the
                                     model is missing, enforced on this box.
 
 Run:  python -m pytest tests/test_steal_list_strict.py -v
@@ -85,7 +85,7 @@ def ui(tmp_path):
 
 
 # ===========================================================================
-# ITEM 1 — AirLLM: bigger smarter brain (qubit-brain4), less VRAM, no blanks
+# ITEM 1 — AirLLM: bigger smarter brain (qubit-brain), less VRAM, no blanks
 # ===========================================================================
 class TestItem1AirLLMUnit:
     """Deterministic: bake artifacts + fallback plumbing."""
@@ -124,8 +124,8 @@ class TestItem1AirLLMUnit:
 
     def test_repo_default_config_points_at_brain4(self):
         cfg = yaml.safe_load((ROOT / "config" / "voice.example.yaml").read_text())
-        assert cfg["intent"]["local_llm"]["model"] == "qubit-brain4"
-        assert cfg["summarizer"]["ollama_model"] == "qubit-brain4"
+        assert cfg["intent"]["local_llm"]["model"] == "qubit-brain"
+        assert cfg["summarizer"]["ollama_model"] == "qubit-brain"
 
     def test_extract_reply_never_speaks_thinking(self):
         # Packet 4B REVERSAL: under /no_think any thinking text is genuine
@@ -238,8 +238,8 @@ def test_g02_warm_latency_budget_logic_hermetic():
 
 
 @pytest.mark.live
-@pytest.mark.skipif(not _ollama_has_model("qubit-brain4"),
-                    reason="live gate: ollama or qubit-brain4 not available")
+@pytest.mark.skipif(not _ollama_has_model("qubit-brain"),
+                    reason="live gate: ollama or qubit-brain not available")
 class TestItem1AirLLMLive:
     """The steal doc's validation gauntlet, enforced against real ollama."""
 
@@ -250,7 +250,7 @@ class TestItem1AirLLMLive:
         from voicebridge.local_llm import SYSTEM_PROMPT
         from voicebridge.runner_contract import resolve
         _rc = resolve()
-        payload = {"model": "qubit-brain4", "stream": False,
+        payload = {"model": "qubit-brain", "stream": False,
                    "keep_alive": -1,
                    "options": {"num_ctx": _rc.num_ctx},
                    "messages": [
@@ -383,15 +383,15 @@ class TestItem1AirLLMLive:
         self._chat("warmup: say ready")          # guarantee OUR model is loaded
         with subprocess.Popen([OLLAMA, "ps"], stdout=subprocess.PIPE) as p:
             ps = p.communicate(timeout=15)[0].decode()
-        assert "qubit-brain4" in ps
+        assert "qubit-brain" in ps
         for old in ("qubit-brain:", "huihui_ai/llama3.2-abliterate", "qwen3-vl"):
             assert old not in ps, f"old brain resident alongside 4B: {old}"
 
     def test_g05_box_config_routes_to_brain4(self):
         cfg_path = Path.home() / ".config/qubit-voicebridge/voice.yaml"
         cfg = yaml.safe_load(cfg_path.read_text())
-        assert cfg["intent"]["local_llm"]["model"] == "qubit-brain4"
-        assert cfg["summarizer"]["ollama_model"] == "qubit-brain4"
+        assert cfg["intent"]["local_llm"]["model"] == "qubit-brain"
+        assert cfg["summarizer"]["ollama_model"] == "qubit-brain"
 
 
 # ===========================================================================
@@ -813,7 +813,7 @@ class TestItem6StreamTTS:
 
         s = Self()
         fn = VoiceOrchestrator._chat_local_reply.__get__(s)
-        llm_cfg = {"model": "qubit-brain4", "url": "http://127.0.0.1:11434",
+        llm_cfg = {"model": "qubit-brain", "url": "http://127.0.0.1:11434",
                    "timeout_s": 4.0, "max_tokens": 100}
         reply, spoke = fn("hi", "ctx", llm_cfg, "mem")
         return reply, spoke, spoken

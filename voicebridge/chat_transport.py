@@ -5,7 +5,7 @@ mirror of ``qubit --tui``). Qubit shell policy forbids a raw shell/PTY spawn,
 so that path is a typed ``PTY_NO_SHELL`` refusal and the page reconnect-loops.
 This module is the Qubit-safe equivalent: an agent-backed chat transport on the
 SAME backend every other surface uses — :func:`voicebridge.agent.turn` /
-``voicebridge.local_llm`` against the resident ``qubit-brain4`` model.
+``voicebridge.local_llm`` against the resident ``qubit-brain`` model.
 
 It provides, with no second listener and no shell:
 
@@ -39,7 +39,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 SCHEMA = "qubit-chat/1"
 SESSION_SCHEMA = "qubit-chat-session/1"
 DEFAULT_SESSION = "dashboard-chat"
-DEFAULT_MODEL = "qubit-brain4"
+DEFAULT_MODEL = "qubit-brain"
 MAX_TEXT_CHARS = 8000
 MAX_NAME_CHARS = 120
 MAX_MESSAGES = 5000
@@ -616,7 +616,7 @@ def local_brain_model(cfg: Any) -> Optional[str]:
        same path ``voicebridge.profiles`` and ``voicebridge.local_models``
        read), when set — but only when it is a genuinely chat-capable model.
        A configured id that resolves to a registered profile WITHOUT the
-       ``chat`` role (eg ``qubit-brain4``) is NOT returned: such a profile
+       ``chat`` role (eg ``qubit-brain``) is NOT returned: such a profile
        cannot answer (all output lands in ``thinking``), and pinning it as the
        default made every new ``/qubit-chat`` conversation unroutable. A
        configured id that is not a registered profile (an operator's own
@@ -648,7 +648,7 @@ def local_brain_model(cfg: Any) -> Optional[str]:
             if isinstance(configured, str) and configured.strip():
                 configured = configured.strip()
                 # The ``chat``-role gate must guard the CONFIGURED path too,
-                # not just the shipped-default fallback below. ``qubit-brain4``
+                # not just the shipped-default fallback below. ``qubit-brain``
                 # is the configured local brain (it runs the classifier /
                 # runner roles) but its registered record deliberately omits
                 # ``chat`` because it returns empty content. Returning it here
@@ -670,7 +670,7 @@ def local_brain_model(cfg: Any) -> Optional[str]:
         if (profile is not None and profile.enabled
                 and profile.locality == "local" and profile.model):
             # A profile that does NOT carry the ``chat`` role must never be the
-            # default for a NEW chat. The shipped ``qubit-brain4`` record
+            # default for a NEW chat. The shipped ``qubit-brain`` record
             # deliberately excludes ``chat`` (measured 2026-10-07: it emits all
             # output into ``thinking`` and returns empty content, and its Ollama
             # window is 4096 — under the 64K floor the agent requires). Returning
@@ -717,7 +717,7 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
 
     Returns the effective profile detail (provider/model/kind/route/locality/
     executable) for the runtime path. The shipped default local profile
-    (``qubit-brain4``) is used when nothing is requested. A ``requested`` value
+    (``qubit-brain``) is used when nothing is requested. A ``requested`` value
     may be a registered profile id from the canonical registry (local or
     approved API) or the configured/default local model; anything else is a
     typed ``MODEL_NOT_ALLOWED`` refusal so a bad model can never be silently
@@ -749,7 +749,7 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
     if not routed.get("ok"):
         # Upstream parity: hermes has NO model-profile registry — ``model.default``
         # is a plain string and a session's stored model is used as-is. Qubit's
-        # registry only ever shipped ONE profile (``qubit-brain4``), so every
+        # registry only ever shipped ONE profile (``qubit-brain``), so every
         # session or pick naming a real provider model (``deepseek-v4.1-flash``,
         # ``muse-spark-1.3-contributor``, ...) hit this refusal: resume, session
         # switching and the picker all returned MODEL_NOT_ALLOWED and the stored
@@ -776,6 +776,18 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
                     _routed["session_pinned_model"] = req
                     return _routed
             _base = _resolver.resolve_model(cfg, None, role=role, session=session)
+            # An unregistered id must not be silently patched onto the LOCAL
+            # brain. Preserve the typed refusal unless the id names a real
+            # registered profile/model (handled above) or the configured base
+            # is an external provider (upstream parity for provider ids).
+            if _by_model is None and (
+                    not _base.get("ok")
+                    or str(_base.get("locality") or "") == "local"):
+                denied = dict(routed)
+                denied["code"] = "MODEL_NOT_ALLOWED"
+                denied["detail"] = (
+                    f"model {req!r} is not a registered profile")
+                return denied
             if _base.get("ok"):
                 _routed = dict(_base)
                 _routed["model"] = req

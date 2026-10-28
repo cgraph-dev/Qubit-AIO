@@ -88,7 +88,7 @@ def _capture(monkeypatch):
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     reply = llm.chat_local("what demo project are we working on?", "",
-                           model="qubit-brain4", timeout_s=30,
+                           model="qubit-brain", timeout_s=30,
                            context="")
     p = captured.get("payload", {})
     msgs = p.get("messages", [])

@@ -9,7 +9,7 @@ D2 — the pending-approvals banner settled a staged ``cron.create`` on the
      ``ok`` key, so ``dashboard_ops.confirm_compat_op`` reported
      ``BACKEND_REFUSED`` although the job WAS created (a false failure).
 D3 — ``/model/info`` mixed the configured provider with a terminal session's
-     stored model id from a different profile (``iv-endpoint`` + ``qubit-brain4``).
+     stored model id from a different profile (``iv-endpoint`` + ``qubit-brain``).
 D4 — deleting a custom endpoint left its registered model profile + active
      pointer, so ``/model/info`` still targeted the deleted endpoint.
 """
@@ -86,10 +86,10 @@ def test_d3_model_info_session_profile_supplies_provider(tmp_path, monkeypatch):
     assert out.get("state") == "OK", out
     R.set_active_profile(cfg, "qa-endpoint", confirm=True)
     # A stale terminal session stores the shipped-default profile id instead.
-    CT.store(cfg).ensure(AG.canonical_session_id(cfg), model="qubit-brain4")
+    CT.store(cfg).ensure(AG.canonical_session_id(cfg), model="qubit-brain")
     code, info = HC.h_model_info(cfg, {}, {}, {})
     assert code == 200, info
-    assert info["model"] == "qubit-brain4"
+    assert info["model"] == "qubit-brain"
     # The provider must match the model's own profile, never the endpoint's.
     assert info["provider"] == "ollama", info
 

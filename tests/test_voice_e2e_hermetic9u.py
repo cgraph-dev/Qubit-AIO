@@ -65,7 +65,7 @@ def _stub_local(monkeypatch, reply="stub chat reply"):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
               reasoning=None):
         calls.append({"text": text, "model": model})
@@ -82,7 +82,7 @@ def _stub_local_stream(monkeypatch, reply="stub stream reply"):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
               should_stop=None, num_ctx=None, reasoning=None):
         calls.append({"text": text, "model": model, "context": context})
@@ -275,7 +275,7 @@ def test_input_engine_never_changes_the_canonical_operation(
 
     assert {r["path"] for r in receipts.values()} == {
         "voicebridge.chat_transport.stream_turn"}
-    assert {r["model"] for r in receipts.values()} == {"qubit-brain4"}
+    assert {r["model"] for r in receipts.values()} == {"qubit-brain"}
     assert all(r["runtime"] == "qubit-native" for r in receipts.values())
 
 
@@ -611,7 +611,7 @@ def test_stream_cancel_marks_cancelled_and_recovery_does_not_duplicate(
     started = threading.Event()
     release = threading.Event()
 
-    def _blocking(text, conversation_prompt="", model="qubit-brain4",
+    def _blocking(text, conversation_prompt="", model="qubit-brain",
                   timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
                   should_stop=None, num_ctx=None, reasoning=None):
         started.set()

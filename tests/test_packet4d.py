@@ -154,7 +154,7 @@ class _ScriptedHTTP:
         payload = json.loads(bytes(req.data or b"{}"))
         self.calls.append((url, payload))
         if url.endswith("/api/ps"):
-            models = ([{"name": "qubit-brain4:latest", "digest": "d94",
+            models = ([{"name": "qubit-brain:latest", "digest": "d94",
                         "context_length": 4096}]
                       if self.resident else [])
             return _FakeResp({"models": models})
@@ -174,7 +174,7 @@ def test_deep_tier_cycle_evicts_restores_and_reports(monkeypatch):
 
     ran = []
     result, report = deep_tier_cycle(
-        "http://x", "qubit-brain4", 4096,
+        "http://x", "qubit-brain", 4096,
         lambda: ran.append("deep-work"), poll_timeout_s=2)
 
     assert ran == ["deep-work"]
@@ -203,7 +203,7 @@ def test_deep_tier_restore_failure_is_typed(monkeypatch):
         return real_call(req, timeout=timeout)
 
     monkeypatch.setattr(urllib.request, "urlopen", flaky)
-    _, report = deep_tier_cycle("http://x", "qubit-brain4", 4096,
+    _, report = deep_tier_cycle("http://x", "qubit-brain", 4096,
                                 lambda: None, poll_timeout_s=1)
     assert report.restored is False
     assert report.detail == "restore failed"
@@ -214,7 +214,7 @@ def test_bakeoff_manifest_and_pins_are_recorded():
     src = (REPO_ROOT / "scripts" / "bakeoff_4d.py").read_text()
     assert "a06e946bb6b655725eafa393f4a9745d460374c9" in src
     assert "sha256" in src and "delete_command" in src
-    assert 'FROM qubit-brain4' not in src.replace(
+    assert 'FROM qubit-brain' not in src.replace(
         '"production_alias"', "").replace("production alias", ""), \
         "candidates must never be created FROM the production alias"
 

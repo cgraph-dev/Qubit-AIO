@@ -569,7 +569,7 @@ COMPLETE_EXAMPLES = {
     "webui_status": "qubit, dashboard status",
     "reports_list": "qubit, show my reports",
     "frontier_chat": "qubit, ask frontier why is the sky blue",
-    "frontier_show": "qubit, show model local/qubit-brain4",
+    "frontier_show": "qubit, show model local/qubit-brain",
     "commands_list": "qubit, what can you do",
     "device_enroll": "qubit, enroll this device",
     "branding_plan": "qubit, branding plan",
@@ -641,11 +641,11 @@ COMPLETE_EXAMPLES = {
     "local_models_catalog": "qubit, local model catalog",
     "local_models_jobs": "qubit, local model jobs",
     "local_models_runtime_install": "qubit, install local runtime",
-    "local_models_download": "qubit, download local model qubit-brain4",
+    "local_models_download": "qubit, download local model qubit-brain",
     "local_models_sideload": "qubit, sideload local model /tmp/model.gguf",
     "local_models_server": "qubit, start local model server",
-    "local_models_eject": "qubit, eject local model qubit-brain4",
-    "local_models_activate": "qubit, activate local model qubit-brain4",
+    "local_models_eject": "qubit, eject local model qubit-brain",
+    "local_models_activate": "qubit, activate local model qubit-brain",
     "local_models_quickstart": "qubit, local model quickstart",
     # --- Packet 8U OpenClaw backends: plugin host / inbound channels / ACP
     "plugins_status": "qubit, plugin runtime status",
@@ -1125,7 +1125,7 @@ def test_new_read_backends_execute_hermetic(tmp_path, monkeypatch):
                  "qubit, dashboard status", "qubit, what can you do",
                  "qubit, branding plan", "qubit, verify branding",
                  "qubit, check profile audio", "qubit, list config profiles",
-                 "qubit, show model local/qubit-brain4"):
+                 "qubit, show model local/qubit-brain"):
         res = VC.resolve(text)
         assert res.kind == VC.MATCH, (text, res.kind, res.speech)
         out = VC.execute(ctx, res)

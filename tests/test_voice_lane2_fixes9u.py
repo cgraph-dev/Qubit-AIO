@@ -162,7 +162,7 @@ def test_coding_task_unaffected_by_pre_router(monkeypatch):
         text = "Here is a sort function."
         code = ""
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
 
     monkeypatch.setattr(GW, "run_role", lambda *a, **k: R())
     out = svc.ask("write a python function to sort a list",

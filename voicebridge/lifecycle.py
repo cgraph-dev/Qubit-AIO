@@ -807,7 +807,7 @@ def capability_matrix(cfg: Any = None) -> Dict[str, Any]:
         pass
     return {
         "schema": LIFECYCLE_SCHEMA,
-        "local": {"model": local_model or "qubit-brain4 (default)",
+        "local": {"model": local_model or "qubit-brain (default)",
                   "availability": "READY when the inference provider answers",
                   "context": context or "bounded per-runner contract",
                   "structured_output": "typed compact decisions (bounded)",

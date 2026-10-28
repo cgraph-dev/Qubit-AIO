@@ -3019,7 +3019,7 @@ class VoiceOrchestrator:
         self.feed_push({"kind": "status", "text": f"system:{cmd or 'unknown'}", "route": "system", "detail": cmd or ""})
         if cmd == "status":
             route = self._route
-            model = self.cfg.get("agent", "model") or self._current_model() or "qubit-brain4"
+            model = self.cfg.get("agent", "model") or self._current_model() or "qubit-brain"
             duplex = self._duplex.state if self._duplex else "off"
             self.speak(f"Voice bridge is running. Route: {route}. "
                        f"PersonaPlex: {duplex}. Agent model: {model}.")
@@ -3360,7 +3360,7 @@ class VoiceOrchestrator:
                     ctx2.done.set()
                 self._remember_voice_exchange(
                     text, reply,
-                    model=str(llm_cfg.get("model", "qubit-brain4")))
+                    model=str(llm_cfg.get("model", "qubit-brain")))
                 # Mirror so legacy pollers (_web_wait_for_summary waiting on global) also see it
                 with self._web_lock:
                     self._last_web_summary = trimmed
@@ -3368,13 +3368,13 @@ class VoiceOrchestrator:
                 self.feed_push({"kind": "summary", "text": text[:300], "summary": trimmed,
                                 "route": "local", "detail": "conversation", "raw": reply[:50000]})
                 log_event("conversation.local.summary", text=text[:160], summary=reply[:160],
-                          model=llm_cfg.get("model", "qubit-brain4"))
+                          model=llm_cfg.get("model", "qubit-brain"))
                 try:
                     self.shared.append_assistant(reply, route="local", provider="local")
                 except Exception:
                     pass
                 log_event("conversation.local.full", text=text[:300], reply_len=len(reply), reply=reply[:2000],
-                          model=llm_cfg.get("model", "qubit-brain4"))
+                          model=llm_cfg.get("model", "qubit-brain"))
                 if not spoke:
                     self.speak(trim_spoken(reply, 500))
                 return

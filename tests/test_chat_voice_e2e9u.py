@@ -60,7 +60,7 @@ def _stub_local(monkeypatch, reply="stub chat reply"):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
               reasoning=None):
         calls.append({"text": text, "model": model,
@@ -78,7 +78,7 @@ def _stub_local_stream(monkeypatch, reply="stub stream reply"):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
               should_stop=None, num_ctx=None, reasoning=None):
         calls.append({"text": text, "model": model, "context": context})
@@ -128,7 +128,7 @@ def test_non_streaming_route_persists_turn_and_continuous_session(
 
     # One continuous session id across both turns (no fork, no new id).
     assert out1["session_id"] == out2["session_id"] == "e2e9u"
-    assert out1["receipt"]["model"] == "qubit-brain4"
+    assert out1["receipt"]["model"] == "qubit-brain"
 
     # Both turns land in the canonical store: user then assistant, twice.
     shown = CT.store(cfg).show("e2e9u")
@@ -172,7 +172,7 @@ def test_stream_route_typed_events_and_done_receipt(tmp_path, monkeypatch):
 
     done = [e for e in events if e["event"] == "done"][0]
     assert done["ok"] is True and done["reply"] == "Hello. World."
-    assert done["receipt"]["model"] == "qubit-brain4"
+    assert done["receipt"]["model"] == "qubit-brain"
     assert done["receipt"]["path"] == "voicebridge.chat_transport.stream_turn"
     assert done["receipt"]["streaming"] is True
 

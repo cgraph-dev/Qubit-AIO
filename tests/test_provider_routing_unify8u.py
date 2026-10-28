@@ -9,7 +9,7 @@ Focused regression tests for the wave-17 provider/routing slice:
   memory no longer issue their own Ollama requests);
 * A45 — a ``plugin`` provider kind and the OpenClaw Radius adapter, keyed by
   ``env:`` references and valid config-only without a present key;
-* PV-02 — no hard-coded ``qubit-brain4`` default-selection; the resolver
+* PV-02 — no hard-coded ``qubit-brain`` default-selection; the resolver
   answers the default;
 * PV-04 — the resolved provider/model/role identity reaches the receipt.
 
@@ -59,10 +59,10 @@ def test_agent_turn_executes_through_gateway(monkeypatch):
         calls.append(kw)
         return ProviderResult(
             ok=True, text="gateway reply", provider="local",
-            model="qubit-brain4", identity="local/qubit-brain4",
-            usage=UsageRecord(provider="local", model="qubit-brain4",
-                              identity="local/qubit-brain4", latency_ms=2),
-            details={"profile": "qubit-brain4", "role": "chat",
+            model="qubit-brain", identity="local/qubit-brain",
+            usage=UsageRecord(provider="local", model="qubit-brain",
+                              identity="local/qubit-brain", latency_ms=2),
+            details={"profile": "qubit-brain", "role": "chat",
                      "source": "role-default", "route": "local"})
 
     monkeypatch.setattr(GW, "run_role", _fake_run_role)
@@ -114,7 +114,7 @@ def test_gateway_local_adapter_still_reaches_chat_local(monkeypatch):
     monkeypatch.setattr(LL, "chat_local", _fake_chat_local)
     res = GW.run_role("hi", None, role="chat")
     assert res.ok and res.text == "local through gateway"
-    assert seen["model"] == "qubit-brain4"
+    assert seen["model"] == "qubit-brain"
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ def test_embedding_role_resolves_locally_without_changing_inventory():
     assert eff.kind == "local" and eff.route == "local"
     assert eff.executable is True
     # Adding the role must not change the shipped model-profile inventory.
-    assert [p.id for p in R.default_profiles()] == ["qubit-brain4"]
+    assert [p.id for p in R.default_profiles()] == ["qubit-brain"]
 
 
 def test_embedding_role_session_override(tmp_path, monkeypatch):
@@ -319,7 +319,7 @@ def test_chat_transport_receipt_keeps_local_identity(tmp_path, monkeypatch):
     res = CT.turn(cfg, "hi", session="ident")
     receipt = res["receipt"]
     assert res["ok"] is True
-    assert receipt["model"] == "qubit-brain4"
-    assert receipt["identity"] == "local/qubit-brain4"
-    assert receipt["profile"] == "qubit-brain4"
+    assert receipt["model"] == "qubit-brain"
+    assert receipt["identity"] == "local/qubit-brain"
+    assert receipt["profile"] == "qubit-brain"
     assert receipt["role"] == "chat"

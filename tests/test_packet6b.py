@@ -335,7 +335,7 @@ def _baseline(**overrides):
     s["baseline_metadata"] = {
         "packet": "6B", "mode": "unit", "generated_at": 1234.0,
         "git_commit": "base-sha", "git_tree_dirty": False,
-        "runner": {"alias": "qubit-brain4", "url": "http://127.0.0.1:11434",
+        "runner": {"alias": "qubit-brain", "url": "http://127.0.0.1:11434",
                    "num_ctx": 4096, "keep_alive": -1},
         "units": {"size": "bytes", "size_vram": "bytes",
                   "size_vram_mib": "mebibytes", "latency_ms": "milliseconds"},

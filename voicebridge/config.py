@@ -430,7 +430,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "agent": {
         "enabled": True,                # Qubit-native agent turns + worker sessions
-        "model": None,                  # None = Qubit default (qubit-brain4)
+        "model": None,                  # None = Qubit default (qubit-brain)
         "session_prefix": "voice",
         "skills_nudge": True,     # append "use your skills/tools" to every task
         "task_timeout_s": 900,
@@ -521,7 +521,7 @@ DEFAULTS: Dict[str, Any] = {
             "observe": True,
         },
         "ollama_url": "http://127.0.0.1:11434",
-        "ollama_model": "qubit-brain4",
+        "ollama_model": "qubit-brain",
         "classify_timeout_s": 8.0,
         "conversation_backend": "local",
         "templates_path": "~/.config/qubit-voicebridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
@@ -533,7 +533,7 @@ DEFAULTS: Dict[str, Any] = {
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
                                         # only tasks dispatch to Qubit/Qubit
-            "model": "qubit-brain4",  # baked EN-only brain, no-think template (3.2GB resident).
+            "model": "qubit-brain",  # baked EN-only brain, no-think template (3.2GB resident).
                                     # phi-4-mini-abliterated is smarter in EN but BROKEN at RO (echoes/
                                     # wrong dates/hallucinates) — kept as optional EN-only smart mode.
             "url": "http://127.0.0.1:11434",
@@ -630,7 +630,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "summarizer": {
         "provider": "ollama",   # ollama | extractive
-        "ollama_model": "qubit-brain4",
+        "ollama_model": "qubit-brain",
         "max_chars": 900,       # extractive/summarizer input budget
         "max_words": 40,         # HARD cap on every spoken response (save time)
     },

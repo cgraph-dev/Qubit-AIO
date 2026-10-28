@@ -119,7 +119,7 @@ def _state_cfg_path(tmp_path: Path) -> Path:
     p = tmp_path / "voice.yaml"
     p.write_text(
         "logging:\n  jsonl_path: '" + str(state) + "'\n"
-        "intent:\n  local_llm:\n    model: qubit-brain4\n")
+        "intent:\n  local_llm:\n    model: qubit-brain\n")
     return p
 
 

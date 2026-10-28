@@ -8,7 +8,7 @@ catalog entries, every local model fell through to ``DEFAULT_FALLBACK_CONTEXT``
 
 The registered values mirror what the runtime's own Ollama ``/api/show`` resolves
 live (``ollama show``): ``qubit-spark17`` / ``qubit-spark4`` advertise 1,048,576;
-``qubit-brain4`` is pinned to its Modelfile ``num_ctx 4096`` (GGUF max 40,960), the
+``qubit-brain`` is pinned to its Modelfile ``num_ctx 4096`` (GGUF max 40,960), the
 same value the resolver returns when it does have the endpoint. These are pure
 table lookups — no network.
 """
@@ -25,7 +25,7 @@ from agent.model_metadata import (
 EXPECTED_CONTEXT = {
     "qubit-spark17": 1_048_576,
     "qubit-spark4": 1_048_576,
-    "qubit-brain4": 4096,
+    "qubit-brain": 32768,
 }
 
 
@@ -49,9 +49,9 @@ def test_local_model_resolves_context_without_base_url(model, expected):
 
 
 def test_provider_prefixed_and_tagged_local_models_resolve():
-    """``local:qubit-brain4`` and the ``:latest`` tag are the same model."""
-    assert get_model_context_length("local:qubit-brain4", base_url="", provider="ollama") == 4096
-    assert get_model_context_length("qubit-brain4:latest", base_url="", provider="ollama") == 4096
+    """``local:qubit-brain`` and the ``:latest`` tag are the same model."""
+    assert get_model_context_length("local:qubit-brain", base_url="", provider="ollama") == 32768
+    assert get_model_context_length("qubit-brain:latest", base_url="", provider="ollama") == 32768
     assert get_model_context_length("qubit-spark17:latest", base_url="", provider="ollama") == 1_048_576
 
 

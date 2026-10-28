@@ -70,11 +70,11 @@ def _stub_gateway_role(monkeypatch, *, capture, text="stub reply"):
                 "level": kw["reasoning"],
                 "max_tokens": resolve_reasoning_budget(kw["reasoning"])}
         return Gw.ProviderResult(
-            ok=True, text=text, provider="local", model="qubit-brain4",
-            identity="local/qubit-brain4",
+            ok=True, text=text, provider="local", model="qubit-brain",
+            identity="local/qubit-brain",
             usage=Gw.UsageRecord(
-                provider="local", model="qubit-brain4",
-                identity="local/qubit-brain4", latency_ms=1),
+                provider="local", model="qubit-brain",
+                identity="local/qubit-brain", latency_ms=1),
             details=details)
 
     monkeypatch.setattr(Gw, "run_role", _fake)

@@ -156,13 +156,13 @@ def test_model_set_retry_settles_staged_approval(tmp_path):
     ui, port = _start(tmp_path)
     try:
         status, staged = _http(port, "POST", "/agent/api/model/set",
-                                {"model": "qubit-brain4", "scope": "main"})
+                                {"model": "qubit-brain", "scope": "main"})
         assert status == 409, (status, staged)
         assert staged.get("confirm_required") is True, staged
         _, before = _http(port, "GET", "/agent/api/ops/approvals")
         assert before["count"] == 1
         status, out = _http(port, "POST", "/agent/api/model/set",
-                             {"model": "qubit-brain4", "scope": "main",
+                             {"model": "qubit-brain", "scope": "main",
                               "confirm_expensive_model": True})
         # Either outcome proves the retry settled (not re-staged): the tmp
         # state has no such brain profile, so the backend honestly refuses.

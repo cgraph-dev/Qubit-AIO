@@ -116,7 +116,7 @@ def test_doctor_gpu_ok_state(tmp_path, monkeypatch):
 def test_model_artifact_has_revision_checksum_license(tmp_path):
     cfg = Config.load(tmp_path / "none.yaml")
     rec = D.model_artifact_record(cfg)
-    assert rec["alias"] == "qubit-brain4"
+    assert rec["alias"] == "qubit-brain"
     assert "license" in rec and rec["license"]
     assert "revision" in rec and "checksum" in rec
     assert rec["kind"] == "ollama-model"
@@ -180,7 +180,7 @@ class _FakeCfg:
         self.data = {"audio": {"output_device": "", "output_device_name": ""},
                      "webui": {"token": "super-secret-live-token-xyz",
                                "frontend_dir": "/home/example/custom"},
-                     "intent": {"local_llm": {"model": "qubit-brain4",
+                     "intent": {"local_llm": {"model": "qubit-brain",
                                               "url": "http://127.0.0.1:11434"}},
                      "safety": {"tool_broker": True},
                      "agent": {"key_file": "~/.config/qubit-voicebridge/agent.key"}}
@@ -411,7 +411,7 @@ def test_assert_device_compatible_rejects_missing_capabilities(tmp_path, monkeyp
         "gpu": "MISSING", "ollama": "OK", "audio": "OK", "openssl": "OK",
         "isolation": "OK", "ram": "OK", "disk": "OK", "browser_cdp": "OK"})
     with pytest.raises(Dev.DeviceNotEnrolledError):
-        Dev.assert_device_compatible(cfg, {"model_alias": "qubit-brain4"})
+        Dev.assert_device_compatible(cfg, {"model_alias": "qubit-brain"})
 
 
 def test_device_enrollment_never_copies_browser_or_secrets(tmp_path):
@@ -437,7 +437,7 @@ def _state_cfg_path(tmp_path: Path) -> Path:
     p = tmp_path / "voice.yaml"
     p.write_text(
         "logging:\n  jsonl_path: '" + str(state) + "'\n"
-        "intent:\n  local_llm:\n    model: qubit-brain4\n")
+        "intent:\n  local_llm:\n    model: qubit-brain\n")
     return p
 
 

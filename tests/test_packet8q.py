@@ -38,7 +38,7 @@ class Cfg:
                 node = node[p]
             return node
         if path == ("intent", "runner", "alias"):
-            return "qubit-brain4"
+            return "qubit-brain"
         return default
 
 
@@ -86,10 +86,10 @@ def _stub_local(monkeypatch, text="local answer"):
     monkeypatch.setattr(Gw, "_local_complete",
                         lambda *a, **k: Gw.ProviderResult(
                             ok=True, text=text, provider="local",
-                            model="qubit-brain4", identity="local/qubit-brain4",
+                            model="qubit-brain", identity="local/qubit-brain",
                             usage=Gw.UsageRecord(
-                                provider="local", model="qubit-brain4",
-                                identity="local/qubit-brain4", latency_ms=1)))
+                                provider="local", model="qubit-brain",
+                                identity="local/qubit-brain", latency_ms=1)))
 
 
 # --- defaults & disabled ----------------------------------------------------
@@ -116,7 +116,7 @@ def test_local_route_performs_no_network(monkeypatch):
                 catalog=_cat(),
                 transport=lambda *a: (called.append(1), (200, _ok_body()))[1])
     assert called == []
-    assert res.ok and res.identity == "local/qubit-brain4"
+    assert res.ok and res.identity == "local/qubit-brain"
 
 
 def test_untrusted_text_cannot_enable_cloud(monkeypatch):

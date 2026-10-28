@@ -1,8 +1,8 @@
 """Resumed /chat grants report the session's stored model + provider.
 
 Live 2026-10-05: the MODEL card said `deepseek` while the terminal ran
-`qubit-brain4`, and the picker showed a mismatched pair
-(`opencode-go / qubit-brain4`). Two causes, both fixed:
+`qubit-brain`, and the picker showed a mismatched pair
+(`opencode-go / qubit-brain`). Two causes, both fixed:
 
 1. The frontend never threaded `?resume=` into the ws-ticket mint, so the
    server could not overlay `sessions.model` (fixed in `api.wsTicket` +
@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO_ROOT))
 def test_infer_provider_maps_local_default_to_ollama():
     from voicebridge import pty_ws
 
-    assert pty_ws._infer_provider_for_model("qubit-brain4") == "ollama"
+    assert pty_ws._infer_provider_for_model("qubit-brain") == "ollama"
 
 
 def test_infer_provider_unknown_is_empty_never_fabricated():

@@ -46,7 +46,7 @@ def _stub_local(monkeypatch, reply="stub reply"):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
               reasoning=None):
         calls.append({"text": text, "model": model,

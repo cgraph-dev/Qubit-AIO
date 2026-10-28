@@ -65,9 +65,9 @@ def _configured_profiles(cfg: Any) -> List[str]:
     """Profiles to warm: the local tier always, the detail tier when distinct."""
     try:
         local = str(_read_cfg(cfg, "voice_edit", "local_profile",
-                             default="qubit-brain4") or "qubit-brain4")
+                             default="qubit-brain") or "qubit-brain")
     except Exception:
-        local = "qubit-brain4"
+        local = "qubit-brain"
     try:
         detail = str(_read_cfg(cfg, "voice_edit", "detail_model",
                               default="") or "")

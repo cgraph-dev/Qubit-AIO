@@ -159,12 +159,12 @@ def test_users_select_model_account(tmp_path, monkeypatch):
     reg = _registry()
 
     dry = reg.handle(cfg, "users.selectModelAccount",
-                     {"session": "t", "authProfileId": "qubit-brain4"})
+                     {"session": "t", "authProfileId": "qubit-brain"})
     assert dry["code"] == "USERS_MODEL_ACCOUNT_LOCAL_SELECT", dry
     assert dry.get("dry_run") is True, dry
 
     real = reg.handle(cfg, "users.selectModelAccount",
-                      {"session": "t", "authProfileId": "qubit-brain4",
+                      {"session": "t", "authProfileId": "qubit-brain",
                        "confirm": True})
     assert real["code"] == "USERS_MODEL_ACCOUNT_LOCAL_SELECT", real
     assert real.get("action") == "selected", real

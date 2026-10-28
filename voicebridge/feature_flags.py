@@ -64,7 +64,7 @@ FLAGS: List[FeatureFlag] = [
         rollback_value=False,
         category="phase4",
         description="Opt-in Q5 canary drives the SEPARATE qubit-cand-q5 alias. "
-                    "Never replaces qubit-brain4; flip off to rollback."),
+                    "Never replaces qubit-brain; flip off to rollback."),
     FeatureFlag(
         name="router_l0",
         config_path=("intent", "router", "enabled"),

@@ -75,7 +75,7 @@ def _service(monkeypatch, *, brain=None):
         text = (brain or {}).get("text", "")
         code = (brain or {}).get("code", "")
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
 
         def __init__(self):
             self.ok = (brain or {}).get("ok", True)

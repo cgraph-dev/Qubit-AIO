@@ -60,7 +60,7 @@ def test_default_resolves_to_shipped_local_brain(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     eff = R.resolve(cfg)
-    assert eff.profile_id == "qubit-brain4"
+    assert eff.profile_id == "qubit-brain"
     assert eff.kind == "local" and eff.route == "local"
     assert eff.locality == "local" and eff.egress_required is False
     assert eff.executable is True
@@ -70,12 +70,12 @@ def test_default_brain_is_replaceable_registry_data(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
     cfg = _cfg(tmp_path, monkeypatch)
-    assert [p.id for p in R.load_profiles(cfg)] == ["qubit-brain4"]
+    assert [p.id for p in R.load_profiles(cfg)] == ["qubit-brain"]
     # A loaded local profile may be cloned/edited; the default stays a record.
-    assert R.clone_model_profile(cfg, "qubit-brain4", "my-local",
+    assert R.clone_model_profile(cfg, "qubit-brain", "my-local",
                                  confirm=True)["state"] == "OK"
     assert R.get_profile(cfg, "my-local") is not None
-    assert R.get_profile(cfg, "qubit-brain4").default is True
+    assert R.get_profile(cfg, "qubit-brain").default is True
 
 
 def test_remove_default_is_refused(tmp_path, monkeypatch):
@@ -83,7 +83,7 @@ def test_remove_default_is_refused(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     with pytest.raises(R.ResolverError) as exc:
-        R.remove_model_profile(cfg, "qubit-brain4", confirm=True)
+        R.remove_model_profile(cfg, "qubit-brain", confirm=True)
     assert exc.value.code == "IMMUTABLE_DEFAULT"
 
 
@@ -150,9 +150,9 @@ def test_session_override_selects_and_clears(tmp_path, monkeypatch):
     eff = R.resolve(cfg, session="s1")
     assert eff.profile_id == "my-api" and eff.source == "session"
     # other sessions keep the default
-    assert R.resolve(cfg, session="s2").profile_id == "qubit-brain4"
+    assert R.resolve(cfg, session="s2").profile_id == "qubit-brain"
     R.clear_session_profile(cfg, "s1")
-    assert R.resolve(cfg, session="s1").profile_id == "qubit-brain4"
+    assert R.resolve(cfg, session="s1").profile_id == "qubit-brain"
 
 
 def test_remove_profile_in_use_is_refused(tmp_path, monkeypatch):
@@ -171,9 +171,9 @@ def test_fallback_chain_is_recorded(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     R.upsert_model_profile(cfg, R.ModelProfile(
         id="smart", kind="local", provider="ollama", model="phi4",
-        locality="local", fallback_to="qubit-brain4"), confirm=True)
+        locality="local", fallback_to="qubit-brain"), confirm=True)
     eff = R.resolve(cfg, profile_id="smart")
-    assert eff.fallback_chain == ("qubit-brain4",)
+    assert eff.fallback_chain == ("qubit-brain",)
 
 
 # ----------------------------------------------------- chat transport wiring
@@ -279,7 +279,7 @@ def test_turn_honors_role_selection(tmp_path, monkeypatch):
     assert CT.resolve_route(cfg, None, session="s1",
                             role="coding")["profile_id"] == "local-coder"
     assert CT.resolve_route(cfg, None,
-                            session="s1")["profile_id"] == "qubit-brain4"
+                            session="s1")["profile_id"] == "qubit-brain"
 
 
 # ------------------------------------------------- gateway execution (P2/PV-03)
@@ -335,7 +335,7 @@ def test_run_role_default_still_resolves_brain4(tmp_path, monkeypatch):
 
     res = GW.run_role("hi", cfg)
     assert res.ok and res.text == "brain reply"
-    assert captured["model"] == "qubit-brain4"
+    assert captured["model"] == "qubit-brain"
 
 
 def test_run_role_generate_mode_sends_profile_model_to_adapter(tmp_path,

@@ -304,7 +304,7 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
                 "num_predict": int(max_tokens)}
         if options:
             opts.update(options)
-        # Thinking models (e.g. qubit-brain4 = Qwen3-abliterated) default to
+        # Thinking models (e.g. qubit-brain = Qwen3-abliterated) default to
         # reasoning ON for a raw /api/chat call. Without an explicit ``think``
         # flag the whole ``num_predict`` budget is spent on the chain-of-thought
         # and the response returns content='' with done_reason=length. Mirror

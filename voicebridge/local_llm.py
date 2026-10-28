@@ -1,6 +1,6 @@
 """Tiny local LLM chat for short conversational turns.
 
-The resident brain is `qubit-brain4` (Qwen3-4B abliterated, /no_think
+The resident brain is `qubit-brain` (Qwen3-4B abliterated, /no_think
 switch applied by the shared payload builders; Packet 4B sanitized artifact). It answers brief utterances locally in ~0.3s with zero
 network; DeepSeek still handles long/complex/web asks. Falls back cleanly
 (returns "") when ollama is down or the model isn't pulled, so the caller
@@ -822,7 +822,7 @@ def _chat_payload(text: str, conversation_prompt: str, model: str,
 
 
 def chat_local(text: str, conversation_prompt: str = "",
-               model: str = "qubit-brain4", url: str = "http://127.0.0.1:11434",
+               model: str = "qubit-brain", url: str = "http://127.0.0.1:11434",
                timeout_s: float = 4.0, max_tokens: int = 100,
                context: str = "", num_ctx: Optional[int] = None,
                reasoning: Optional[str] = None, cancel: Any = None) -> str:
@@ -900,7 +900,7 @@ def chat_local(text: str, conversation_prompt: str = "",
 
 
 def chat_local_stream(text: str, conversation_prompt: str = "",
-                      model: str = "qubit-brain4", url: str = "http://127.0.0.1:11434",
+                      model: str = "qubit-brain", url: str = "http://127.0.0.1:11434",
                       timeout_s: float = 4.0, max_tokens: int = 100,
                       context: str = "", on_sentence=None,
                       should_stop=None, num_ctx: Optional[int] = None,

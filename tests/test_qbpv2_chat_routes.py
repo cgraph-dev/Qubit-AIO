@@ -32,7 +32,7 @@ def _cfg(tmp_path, monkeypatch):
 def _stub(monkeypatch, reply="route reply"):
     import voicebridge.local_llm as _llm
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
               reasoning=None):
         return reply
@@ -40,7 +40,7 @@ def _stub(monkeypatch, reply="route reply"):
     monkeypatch.setattr(_llm, "chat_local", _fake)
     monkeypatch.setattr(
         _llm, "chat_local_stream",
-        lambda text, conversation_prompt="", model="qubit-brain4", timeout_s=4.0,
+        lambda text, conversation_prompt="", model="qubit-brain", timeout_s=4.0,
         max_tokens=100, context="", on_sentence=None, should_stop=None,
         num_ctx=None, reasoning=None:
         (on_sentence and on_sentence(reply), reply)[1])
@@ -84,7 +84,7 @@ def test_turn_via_dispatch_persists_and_reloads(tmp_path, monkeypatch):
                             {"text": "hello route", "session": "route-chat"})
     assert code == 200 and out["ok"] is True, (code, out)
     assert out["reply"] == "the route answer"
-    assert out["receipt"]["model"] == "qubit-brain4"
+    assert out["receipt"]["model"] == "qubit-brain"
 
     listed = HC.dispatch(cfg, "GET", "/api/qubit/chat/sessions", {}, {})
     assert listed[0] == 200 and listed[1]["ok"] is True

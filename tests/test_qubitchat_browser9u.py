@@ -208,7 +208,7 @@ def test_qubitchat_browser_yes_without_pending_executes_nothing(monkeypatch):
                             "reason": "test-clarify"})
     monkeypatch.setattr(
         CT, "resolve_route",
-        lambda cfg, requested=None, **kw: {"ok": True, "model": "qubit-brain4",
+        lambda cfg, requested=None, **kw: {"ok": True, "model": "qubit-brain",
                                           "kind": "local"})
     monkeypatch.setattr(
         CT, "_generate",

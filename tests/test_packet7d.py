@@ -30,7 +30,7 @@ def _fast_latency(monkeypatch):
     monkeypatch.setenv("VOICE_BRIDGE_LATENCY_FAST", "1")
 
 
-def _cfg(tmp_path, model="qubit-brain4", stt="sherpa", tts="piper",
+def _cfg(tmp_path, model="qubit-brain", stt="sherpa", tts="piper",
          voice="en_US-amy-medium"):
     state = tmp_path / "state"
     state.mkdir(exist_ok=True)
@@ -53,7 +53,7 @@ def test_registry_has_verified_safe_defaults():
     kinds = {m.kind for m in reg}
     assert {"brain", "stt", "tts", "voice", "audio"} <= kinds
     by = {m.kind: m for m in reg if m.default}
-    assert by["brain"].id == "qubit-brain4"
+    assert by["brain"].id == "qubit-brain"
     assert by["stt"].id == "sherpa"
     assert by["tts"].id == "piper"
     assert by["voice"].id == "en_US-amy-medium"
@@ -77,7 +77,7 @@ def test_every_profile_records_all_required_metadata():
 def test_profile_list_resolves_active(tmp_path):
     cfg = _cfg(tmp_path)
     out = P.profiles_list(cfg)
-    assert out["active"]["brain"] == "qubit-brain4"
+    assert out["active"]["brain"] == "qubit-brain"
     assert out["active"]["stt"] == "sherpa"
     assert out["active"]["tts"] == "piper"
     assert out["active"]["voice"] == "en_US-amy-medium"
@@ -105,7 +105,7 @@ def test_checksum_mismatch_rejected():
 def test_vram_overflow_rejected():
     m = P.ProviderManifest(id="big", kind="brain", source="s", revision="r",
                            license="Apache-2.0", vram_mib=8 * 1024,
-                           rollback_to="qubit-brain4")
+                           rollback_to="qubit-brain")
     assert m.validate()["state"] == "FAILED"
     assert "ceiling" in m.validate()["detail"]
 
@@ -113,7 +113,7 @@ def test_vram_overflow_rejected():
 def test_unsupported_hardware_rejected():
     m = P.ProviderManifest(id="x", kind="brain", source="s", revision="r",
                            license="Apache-2.0", hardware="quantum",
-                           rollback_to="qubit-brain4")
+                           rollback_to="qubit-brain")
     assert m.validate()["state"] == "FAILED"
 
 
@@ -121,7 +121,7 @@ def test_profile_check_gates_typed(tmp_path, monkeypatch):
     from voicebridge import distribution as D
     cfg = _cfg(tmp_path)
     monkeypatch.setattr(D, "gpu_present", lambda: True)
-    out = P.profile_check(cfg, "brain", "qubit-brain4")
+    out = P.profile_check(cfg, "brain", "qubit-brain")
     assert out["state"] in ("OK", "PARTIAL")
     assert "gates" in out and "manifest" in out["gates"]
     # unknown profile -> MISSING
@@ -427,7 +427,7 @@ def test_cli_profile_list_show_check(tmp_path, capsys):
     rc = cli(["profile", "list", "--json", "--config", str(cfg_path)])
     assert rc == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["active"]["brain"] == "qubit-brain4"
+    assert out["active"]["brain"] == "qubit-brain"
     rc = cli(["profile", "show", "brain", "--config", str(cfg_path)])
     assert rc == 0
     capsys.readouterr()  # drain the show output

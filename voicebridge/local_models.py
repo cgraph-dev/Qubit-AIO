@@ -6,7 +6,7 @@ server/eject/activate/quickstart writes that pulled binaries and GGUF files
 from the network.
 
 Qubit has **no** managed local-runtime downloader. The Qubit-native local
-model is the resident Ollama ``qubit-brain4`` contract
+model is the resident Ollama ``qubit-brain`` contract
 (:mod:`voicebridge.local_llm`, :mod:`voicebridge.runner_contract`), and any
 runtime/image provisioning is the pinned, confined, brokered workflow in
 :mod:`voicebridge.runtime_images` (``qubit runtime ...``).
@@ -55,7 +55,7 @@ FALLBACK_SCHEMA = "qubit-local-models-fallback/1"
 
 PROVIDER = "ollama"
 BACKEND = "ollama-http"
-DEFAULT_MODEL = "qubit-brain4"
+DEFAULT_MODEL = "qubit-brain"
 DEFAULT_URL = "http://127.0.0.1:11434"
 
 # The probe is a bounded loopback read of the local runtime's model list.

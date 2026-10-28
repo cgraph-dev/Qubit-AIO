@@ -71,7 +71,7 @@ def test_real_model_smoke_with_payload_verification(tmp_path, monkeypatch):
     """REAL request to the production model; payload teed for verification."""
     from voicebridge.runner_contract import resolve
     rc = resolve()
-    assert rc.alias == "qubit-brain4"      # production alias, not a candidate
+    assert rc.alias == "qubit-brain"      # production alias, not a candidate
     store, compiler = _seed_store(tmp_path)
     monkeypatch.setattr(llm, "_configured_compiler",
                         lambda: ("5c", compiler, True))
@@ -155,7 +155,7 @@ def test_timeout_returns_typed_empty(tmp_path, monkeypatch):
                         lambda: ("5c", compiler, True))
     llm._reset_compiler_cache()
     reply = llm.chat_local("tell me a long story", "",
-                           model="qubit-brain4", timeout_s=0.01,
+                           model="qubit-brain", timeout_s=0.01,
                            context="")
     assert reply == ""   # caller falls back to cloud path
 
@@ -169,7 +169,7 @@ def test_4b_rollback_flag_real(tmp_path, monkeypatch):
                         lambda: ("4b", None, True))
     llm._reset_compiler_cache()
     captured = _tee(monkeypatch)
-    reply = llm.chat_local("what demo project?", "", model="qubit-brain4",
+    reply = llm.chat_local("what demo project?", "", model="qubit-brain",
                            timeout_s=60, context="demo about user")
     assert reply.strip()
     user = captured["payload"]["messages"][-1]["content"]

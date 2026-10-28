@@ -86,7 +86,7 @@ class FakeClient:
         if self._mode == "clarify":
             return {"ok": True, "mode": "clarify", "question": "Which change?"}
         return {"ok": True, "mode": "preview", "original": "hello world",
-                "proposed": "NEW TEXT", "model": "qubit-brain4",
+                "proposed": "NEW TEXT", "model": "qubit-brain",
                 "provider": "ollama", "privacy_mode": "local",
                 "detected": {"action": "shorten", "style": ""}}
 

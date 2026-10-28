@@ -69,7 +69,7 @@ def test_default_speech_out_is_local_piper_amy(tmp_path, monkeypatch):
     assert eff.route == "local" and eff.executable is True
     assert eff.settings["sample_rate"] == 22050
     # the model-profile default is untouched by the speech registry
-    assert R.resolve(cfg).profile_id == "qubit-brain4"
+    assert R.resolve(cfg).profile_id == "qubit-brain"
 
 
 def test_default_records_track_configured_values(tmp_path, monkeypatch):

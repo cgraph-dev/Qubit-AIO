@@ -156,7 +156,7 @@ def test_long_sentence_ask_bypass_dispatches_worker_with_full_text():
             return False
 
     cfg = FakeCfg({"voice_edit": {"enabled": True, "routing": "local",
-                                   "local_profile": "qubit-brain4"}})
+                                   "local_profile": "qubit-brain"}})
     audits = []
 
     def audit(op, actor, detail):

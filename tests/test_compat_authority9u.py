@@ -130,7 +130,7 @@ def test_model_capabilities_empty_on_registry_miss(tmp_path, monkeypatch):
 
     monkeypatch.setattr(models_dev, "get_model_capabilities",
                         lambda provider=None, model=None: None, raising=True)
-    caps = HC._model_capabilities("ollama", "qubit-brain4", 4096)
+    caps = HC._model_capabilities("ollama", "qubit-brain", 4096)
     # No fabricated capability booleans on a miss, but the N29 context
     # authority (context_window) is always reported so the dashboard context
     # badge does not vanish for a model models.dev does not know.

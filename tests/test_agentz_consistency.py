@@ -175,7 +175,7 @@ def test_model_info_reports_reasoning_capability_truthfully(
     assert local is not None
     # Catalog miss: no fabricated reasoning capability, but the N29 context
     # authority is still reported.
-    miss = HC._model_capabilities("ollama", "qubit-brain4", 4096)
+    miss = HC._model_capabilities("ollama", "qubit-brain", 4096)
     assert "supports_reasoning" not in miss
     assert miss["context_window"] == 4096
 

@@ -100,7 +100,7 @@ intent:
   local_llm:
     enabled: true         # bridge answers casual talk itself (<0.5s); rest -> worker sessions
                           # DeepSeek API handles long/complex/web asks
-    model: qubit-brain4  # Qwen3-4B abliterated (Packet 4B sanitized artifact; /no_think via payload builders)
+    model: qubit-brain  # Qwen3-4B abliterated (Packet 4B sanitized artifact; /no_think via payload builders)
     url: http://127.0.0.1:11434
     timeout_s: 8.0     # local model chat timeout (was 4s — journal showed real timeouts)
     max_tokens: 100
@@ -131,7 +131,7 @@ intent:
 # Qubit agent (native turns + worker sessions; the only task executor)
 agent:
   enabled: true
-  model: null             # null = Qubit default (qubit-brain4)
+  model: null             # null = Qubit default (qubit-brain)
   session_prefix: voice
   task_timeout_s: 900
   progress_updates: true
@@ -162,11 +162,11 @@ safety:
   dry_run_first: false          # true = coding tasks start as dry runs
   spoken_confirmation: true
 
-# Spoken summaries — the resident brain (qubit-brain4) compresses tool output into ≤40 words.
+# Spoken summaries — the resident brain (qubit-brain) compresses tool output into ≤40 words.
 summarizer:
   provider: ollama              # ollama (local model) | extractive (no model)
   ollama_url: http://127.0.0.1:11434
-  ollama_model: qubit-brain4  # the bridge's local chat model
+  ollama_model: qubit-brain  # the bridge's local chat model
   max_chars: 900
   max_words: 40             # HARD cap on every spoken response (save time)
 

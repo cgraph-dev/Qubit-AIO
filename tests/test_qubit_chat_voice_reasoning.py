@@ -31,9 +31,9 @@ class _FakeResult:
     def __init__(self, text: str = "stub voice reply") -> None:
         self.ok = True
         self.text = text
-        self.model = "qubit-brain4"
+        self.model = "qubit-brain"
         self.provider = "local"
-        self.identity = "local/qubit-brain4"
+        self.identity = "local/qubit-brain"
         self.details: dict = {}
         self.usage = None
 
@@ -64,7 +64,7 @@ def test_voice_turn_applies_persisted_reasoning(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     st = CT.store(cfg)
-    st.ensure("voice-reason", model="qubit-brain4")
+    st.ensure("voice-reason", model="qubit-brain")
     patched = st.meta_patch("voice-reason", {"reasoning": "medium"})
     assert patched["state"] == "OK", patched
 
@@ -81,7 +81,7 @@ def test_voice_turn_without_preference_passes_none(tmp_path, monkeypatch):
     from voicebridge import chat_transport as CT
 
     cfg = _cfg(tmp_path, monkeypatch)
-    CT.store(cfg).ensure("voice-plain", model="qubit-brain4")
+    CT.store(cfg).ensure("voice-plain", model="qubit-brain")
 
     capture = _stub_gateway(monkeypatch)
     _no_plan(monkeypatch)
@@ -99,7 +99,7 @@ def test_invalid_persisted_reasoning_degrades_not_brick(
 
     cfg = _cfg(tmp_path, monkeypatch)
     st = CT.store(cfg)
-    st.ensure("voice-corrupt", model="qubit-brain4")
+    st.ensure("voice-corrupt", model="qubit-brain")
     st.meta_patch("voice-corrupt", {"reasoning": "definitely-not-a-level"})
 
     capture = _stub_gateway(monkeypatch)

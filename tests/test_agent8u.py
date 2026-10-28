@@ -31,7 +31,7 @@ def stub_model(monkeypatch):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
               reasoning=None):
         calls.append({"text": text, "model": model})
@@ -55,7 +55,7 @@ def test_turn_receipt_native(stub_model):
     receipt = r["receipt"]
     assert receipt["runtime"] == "qubit-native"
     assert receipt["path"] == "voicebridge.agent.turn"
-    assert receipt["model"] == "qubit-brain4"
+    assert receipt["model"] == "qubit-brain"
     assert r["session"] == "voice"
     assert r["elapsed_ms"] >= 0
 

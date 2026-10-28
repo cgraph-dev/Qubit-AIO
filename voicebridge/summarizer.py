@@ -1,7 +1,7 @@
 """Spoken summaries: long tool outputs -> 2-3 short spoken sentences.
 
 Two providers:
-  * ollama   — the resident baked brain (qubit-brain4) via the raw local API
+  * ollama   — the resident baked brain (qubit-brain) via the raw local API
   * extractive — deterministic fallback (first + last sentences, key numbers)
 
 Always strips markdown/code-fence noise before speaking.
@@ -102,7 +102,7 @@ def summarize(text: str, cfg: Optional[dict] = None,
         cfg = cfg or {}
         provider = cfg.get("provider", "extractive")
         url = ollama_url or "http://127.0.0.1:11434"
-        model = ollama_model or cfg.get("ollama_model", "qubit-brain4")
+        model = ollama_model or cfg.get("ollama_model", "qubit-brain")
         max_chars = int(cfg.get("max_chars", 900))
         max_words = int(cfg.get("max_words", 40))
         if not text or not text.strip():

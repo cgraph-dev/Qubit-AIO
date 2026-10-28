@@ -137,7 +137,7 @@ SECRET = "s3cr3t-t0k3n-value-xyz"
 def test_health_inventory_redacts_secrets(tmp_path):
     cfg = _StubCfg({"webui": {"token": SECRET},
                     "agent": {"api_key": SECRET},
-                    "intent": {"local_llm": {"model": "qubit-brain4"}}})
+                    "intent": {"local_llm": {"model": "qubit-brain"}}})
     out = L.health_inventory(cfg, _paths(tmp_path), offline=True)
     blob = json.dumps(out)
     assert SECRET not in blob

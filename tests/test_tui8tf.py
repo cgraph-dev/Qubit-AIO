@@ -17,7 +17,7 @@ def _inventory():
         "product": {"public_identity": "Qubit Agent"},
         "agent": {"runtime": "qubit-native", "state": "READY"},
         "broker": {"emergency_stop": False},
-        "providers": {"resident_alias": "qubit-brain4", "route": "local"},
+        "providers": {"resident_alias": "qubit-brain", "route": "local"},
         "sessions": {"count": 3},
         "approvals": {"pending": 1},
         "auth": {"providers": [{"provider": "a"}, {"provider": "b"}]},

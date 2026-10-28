@@ -223,7 +223,7 @@ def _session_stored_model(session_id: str, cfg: Any = None
                 # No usage row (local models never bill): infer the provider
                 # from the profile registry so a local session reports the
                 # LOCAL provider, not the API default. Without this the grant
-                # said `opencode-go / qubit-brain4` — a mismatched pair that
+                # said `opencode-go / qubit-brain` — a mismatched pair that
                 # made the picker mark the wrong provider (2026-10-05).
                 provider = _infer_provider_for_model(model, cfg)
             return provider, model

@@ -371,11 +371,11 @@ def _declared_capabilities(cfg: Any) -> List[PowerCapability]:
         revocable=False, disableable=True, audit_status="config_declared"))
     try:
         profs = current_profiles(cfg)
-        brain = (profs.get("brain") or {}).get("selected") or "qubit-brain4"
+        brain = (profs.get("brain") or {}).get("selected") or "qubit-brain"
         stt = (profs.get("stt") or {}).get("selected") or "sherpa"
         tts = (profs.get("tts") or {}).get("selected") or "piper"
     except Exception:
-        brain, stt, tts = "qubit-brain4", "sherpa", "piper"
+        brain, stt, tts = "qubit-brain", "sherpa", "piper"
     # Model/STT/TTS: configured + present (AVAILABLE), never claimed running.
     caps.append(PowerCapability(
         domain="model", capability=f"model.brain:{brain}",

@@ -4958,7 +4958,7 @@ def _cmd_status(cfg) -> int:
         print(f"runtime inventory: UNAVAILABLE ({str(exc)[:100]})")
     w = inv.get("worker", {}) if isinstance(inv, dict) else {}
     print(f"worker route   : {w.get('route', 'local')}")
-    print(f"agent model    : {cfg.get('agent', 'model', default='') or 'qubit-brain4'}")
+    print(f"agent model    : {cfg.get('agent', 'model', default='') or 'qubit-brain'}")
     from .runtime_inventory import current_vram_mb
     print(f"free VRAM        : {current_vram_mb()} MiB")
     # Snap-confinement XDG redirects are LOUD, never silent: one line per
@@ -11942,7 +11942,7 @@ def _cmd_frontier(cfg, args) -> int:
                     "key_ref": redact_ref(str((v or {}).get("key_ref", "")))}
                 for k, v in policy.providers.items()
             },
-            "local_default": "local/qubit-brain4 (no network beyond Ollama)",
+            "local_default": "local/qubit-brain (no network beyond Ollama)",
             "spend_ledger": ("process-local (resets on restart; reported spend "
                              "is a lower bound after any restart)"),
             "terms": ("availability and price subject to provider account; "

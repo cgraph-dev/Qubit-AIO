@@ -1,7 +1,7 @@
 """The ``vision`` resolver role must resolve to a vision-capable model.
 
 Regression: ``resolver.resolve(cfg, role="vision")`` fell through to the shipped
-text-only chat default (``qubit-brain4``) and reported
+text-only chat default (``qubit-brain``) and reported
 ``capabilities.vision == False``. The vision role now has its own resolution
 ladder (configured aux pin → registered vision profile → installed local VLM →
 shipped local VLM) and never reports a text-only model. Other roles are

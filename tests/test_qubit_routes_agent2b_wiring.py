@@ -207,7 +207,7 @@ def test_qubit_frontdoor_typed_negatives(tmp_path, monkeypatch):
         lambda cfg, model="": {"state": "UNAVAILABLE", "code": LM.UNAVAILABLE_CODE,
                                "detail": "no local model observed"})
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/local-models/fallback",
-                            {"model": "qubit-brain4"}, {})
+                            {"model": "qubit-brain"}, {})
     assert code == 403 and out["ok"] is False, (code, out)
     assert out["code"] == LM.UNAVAILABLE_CODE, out
 

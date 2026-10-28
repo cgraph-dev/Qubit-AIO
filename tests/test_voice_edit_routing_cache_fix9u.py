@@ -49,7 +49,7 @@ class FakeCfg:
 
 class FakeResult:
     def __init__(self, text="", ok=True, code="", message="",
-                 provider="local", model="qubit-brain4", locality="local"):
+                 provider="local", model="qubit-brain", locality="local"):
         self.ok = ok
         self.text = text
         self.code = code
@@ -118,7 +118,7 @@ def _svc(cfg, **kw):
 
 
 def _ve_cfg(path=None, **over):
-    ve = {"enabled": True, "routing": "local", "local_profile": "qubit-brain4",
+    ve = {"enabled": True, "routing": "local", "local_profile": "qubit-brain",
           "allow_api": True, "confirm_before_replace": False,
           "brain_router": False}
     ve.update(over)
@@ -178,7 +178,7 @@ def test_ask_under_routing_local_uses_local_profile_no_escalation(monkeypatch):
     def fake_run_role(prompt, cfg, **kw):
         seen.update(kw)
         return FakeResult(text="local answer", provider="local",
-                          model="qubit-brain4")
+                          model="qubit-brain")
 
     monkeypatch.setattr(GW, "run_role", fake_run_role)
     cfg = _ve_cfg(routing="local", api_profile="", allow_api=True)
@@ -189,7 +189,7 @@ def test_ask_under_routing_local_uses_local_profile_no_escalation(monkeypatch):
     out = svc.ask("summarize this for me", request_id="r-local", mode="answer")
     assert out["ok"] is True and out["answer"] == "local answer"
     assert out["provider"] == "local"
-    assert seen.get("profile_id") == "qubit-brain4"
+    assert seen.get("profile_id") == "qubit-brain"
     assert not [op for op, _ in audits if op == "voice_edit.escalation"], \
         "routing=local must not record an escalation"
 
@@ -208,7 +208,7 @@ def test_stock_config_ask_takes_local_path_not_resolver_default(monkeypatch):
     def fake_run_role(prompt, cfg, **kw):
         seen.update(kw)
         return FakeResult(text="stock answer", provider="local",
-                          model="qubit-brain4")
+                          model="qubit-brain")
 
     monkeypatch.setattr(GW, "run_role", fake_run_role)
     cfg = _ve_cfg(routing="auto", api_profile="", allow_api=True)
@@ -217,7 +217,7 @@ def test_stock_config_ask_takes_local_path_not_resolver_default(monkeypatch):
     svc, audits = _svc(cfg, session_store=FakeStore())
     out = svc.ask("is the sky blue?", request_id="r-stock", mode="answer")
     assert out["ok"] is True and out["answer"] == "stock answer"
-    assert seen.get("profile_id") == "qubit-brain4"
+    assert seen.get("profile_id") == "qubit-brain"
     assert seen.get("profile_id") is not None
 
 
@@ -231,14 +231,14 @@ def test_escalated_ask_without_target_degrades_to_local(monkeypatch):
     def fake_run_role(prompt, cfg, **kw):
         seen.update(kw)
         return FakeResult(text="degraded answer", provider="local",
-                          model="qubit-brain4")
+                          model="qubit-brain")
 
     monkeypatch.setattr(GW, "run_role", fake_run_role)
     cfg = _ve_cfg(routing="api", api_profile="", allow_api=True)
     svc, audits = _svc(cfg, session_store=FakeStore())
     out = svc.ask("hello?", request_id="r-degrade", mode="chat")
     assert out["ok"] is True
-    assert seen.get("profile_id") == "qubit-brain4"
+    assert seen.get("profile_id") == "qubit-brain"
     esc = [d for op, d in audits if op == "voice_edit.escalation"]
     assert esc and esc[0]["reason"] == "no_api_profile"
     assert esc[0]["escalate"] is False
@@ -269,7 +269,7 @@ def test_style_cache_invalidated_on_llm_put(tmp_path, monkeypatch):
         monkeypatch.setattr(Config, "load",
                             classmethod(lambda cls, path=None: cfg))
         assert LLM._local_style() == (1.9, True)
-        payload = LLM._chat_payload("hi", "", "qubit-brain4", 100, "",
+        payload = LLM._chat_payload("hi", "", "qubit-brain", 100, "",
                                     False, num_ctx=4096)
         assert payload["options"]["temperature"] == 1.9
         assert payload["think"] is True

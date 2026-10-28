@@ -1,6 +1,6 @@
 """LLM-assisted intent classification via the local Ollama API.
 
-Uses the resident baked tier (qubit-brain4, no-think template) with strict
+Uses the resident baked tier (qubit-brain, no-think template) with strict
 JSON output. Falls back gracefully (returns None) when Ollama is down so the
 deterministic router still works.
 """

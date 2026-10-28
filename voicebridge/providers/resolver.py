@@ -44,14 +44,14 @@ EMBEDDING = "embedding"
 ROLES = ("chat", "hard", "coding", "tool", "summarize", "vision", "classify",
          EMBEDDING)
 DEFAULT_ROLE = "chat"
-DEFAULT_LOCAL_ID = "qubit-brain4"
+DEFAULT_LOCAL_ID = "qubit-brain"
 # The canonical embedding role resolves to a local Ollama embedding adapter.
 # It is a synthetic default (not listed in ``default_profiles``) so adding the
 # role never changes the shipped model-profile inventory/count.
 DEFAULT_EMBED_ID = "qubit-embed"
 DEFAULT_EMBED_MODEL = "nomic-embed-text"
 # The ``vision`` role must resolve to a model that can actually read pixels.
-# The shipped chat default (``qubit-brain4``) is text-only, so a plain
+# The shipped chat default (``qubit-brain``) is text-only, so a plain
 # role-default fallback would report a text model for image analysis. Like the
 # embedding role, the vision default is synthetic (not part of
 # ``default_profiles``) so the shipped model-profile inventory/count is stable.
@@ -60,7 +60,7 @@ DEFAULT_VISION_ID = "qubit-vision"
 #: Known vision-capable local (Ollama) models, in preference order. A local VLM
 #: that is actually installed is the safest target: no egress, no credential,
 #: and the same runner authority as every other local role.
-VISION_LOCAL_CANDIDATES = ("qwen3-vl:4b", "qwen3-vl:8b")
+VISION_LOCAL_CANDIDATES = ("qubit-brain",)
 VISION_LOCAL_PROVIDERS = ("ollama", "local", "llamacpp", "llama.cpp",
                           "llama-cpp")
 VISION_EXTERNAL_PROVIDERS = ("openrouter", "nous", "deepinfra", "anthropic",
@@ -244,25 +244,18 @@ def default_profiles() -> List[ModelProfile]:
         ModelProfile(
             id=DEFAULT_LOCAL_ID, kind=LOCAL, provider="ollama",
             model=DEFAULT_LOCAL_ID, locality="local", egress_consent="deny",
-            context_tokens=4096, supports_streaming=True,
-            # qubit-brain4 is a text-only Qwen3 4B: it must NOT declare the
-            # ``vision`` role (a text model offered for image analysis returns
-            # nothing useful). The vision role resolves through its own local
-            # VLM path (``default_vision_profile``), never this chat default.
-            #
-            # ``chat`` is ALSO excluded: measured 2026-10-07, the installed
-            # ``qubit-brain4`` emits ALL of its output into the ``thinking``
-            # field and returns ``content=''`` with ``done_reason=length`` — it
-            # cannot answer at all (see docs/QUBIT_LOCAL_MODEL_EMPTY_OUTPUT_2026-10-07.md).
-            # Offering it in the MODEL picker would present a model that loads,
-            # runs and returns nothing. Keep the record (it is the shipped
-            # default id / rollback target) but stop advertising it as a chat
-            # choice until its Modelfile renders assistant content.
+            context_tokens=32768, supports_streaming=True,
+            supports_vision=True,
+            # The shipped default is now the Qwen3.5-4B text+vision model
+            # (uncensored Huihui build). The voice/config path selects it
+            # explicitly; the shipped default record deliberately does not
+            # auto-claim the chat/vision roles, so a fresh /qubit-chat keeps
+            # the operator's active API profile (the old behavior).
             roles=[r for r in ROLES if r not in (EMBEDDING, VISION, DEFAULT_ROLE)],
             default=True,
             rollback_to=DEFAULT_LOCAL_ID,
-            provenance="ollama://qubit-brain4 (shipped default record)",
-            license="Apache-2.0 (Qwen3-4B-Instruct-2507-derived)"),
+            provenance="ollama://qubit-brain (Qwen3.5-4B Huihui abliterated)",
+            license="Apache-2.0 (Qwen3.5-4B; Huihui abliterated)"),
     ]
 
 
@@ -374,8 +367,6 @@ def load_profiles(cfg: Any) -> List[ModelProfile]:
 #: runtime — a registered-but-missing model would be a dead picker row.
 LOCAL_MODEL_SEEDS: Tuple[Tuple[str, str, Tuple[str, ...], bool], ...] = (
     # id                ollama model          roles                    vision
-    ("qubit-brain",      "qubit-brain",       ("chat",),               False),
-    ("qubit-brain-vision", "qubit-brain-vision", (VISION,),            True),
     ("qwen3-vl:4b",      "qwen3-vl:4b",       (VISION,),               True),
     ("qubit-cand-q4",    "qubit-cand-q4",     ("chat",),               False),
     ("qubit-cand-q5",    "qubit-cand-q5",     ("chat",),               False),

@@ -68,9 +68,9 @@ class UsageRecord:
 class ProviderResult:
     ok: bool
     text: str = ""
-    identity: str = "local/qubit-brain4"
+    identity: str = "local/qubit-brain"
     provider: str = "local"
-    model: str = "qubit-brain4"
+    model: str = "qubit-brain"
     code: str = ""  # "" on success, else one of FAIL_CODES
     message: str = ""
     usage: Optional[UsageRecord] = None

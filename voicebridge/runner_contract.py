@@ -20,7 +20,7 @@ from typing import Any, Optional
 
 from .logging_setup import log_event
 
-DEFAULT_ALIAS = "qubit-brain4"
+DEFAULT_ALIAS = "qubit-brain"
 DEFAULT_URL = "http://127.0.0.1:11434"
 # Measured choice (Packet 4B, docs/archive/2026-09-21/BENCHMARKS.md): smallest context that fits
 # the compiled-context budget plus output reserve with >=25% headroom.

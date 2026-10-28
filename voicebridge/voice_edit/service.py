@@ -685,7 +685,7 @@ class VoiceEditService:
                                             default=True)),
                 "local_profile": str(_read_cfg(
                     self.cfg, "voice_edit", "local_profile",
-                    default="qubit-brain4") or "qubit-brain4"),
+                    default="qubit-brain") or "qubit-brain"),
                 "api_profile": str(_read_cfg(self.cfg, "voice_edit",
                                              "api_profile", default="") or ""),
             },
@@ -1726,7 +1726,7 @@ class VoiceEditService:
     def _local_profile(self) -> str:
         """Configured local model profile for non-escalated turns."""
         return str(_read_cfg(self.cfg, "voice_edit", "local_profile",
-                             default="qubit-brain4") or "qubit-brain4")
+                             default="qubit-brain") or "qubit-brain")
 
     # -- sleep mode (Slice 4a) -------------------------------------------
     def sleeping(self) -> bool:

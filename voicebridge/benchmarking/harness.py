@@ -432,7 +432,7 @@ def resolve_caller_config(cfg: Any) -> Dict[str, Any]:
     _rc = _rc_resolve(cfg)
     llm = cfg.get("intent", "local_llm", default={}) or {}
     chat_model = llm.get("model") or cfg.get("intent", "ollama_model",
-                                             default="qubit-brain4")
+                                             default="qubit-brain")
     return {
         "url": _rc.url,
         "chat_model": chat_model,

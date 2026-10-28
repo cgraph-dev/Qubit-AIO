@@ -137,7 +137,7 @@ def test_helper_only_rebrands_served_fields_and_keeps_paths():
             "preview": "via Hermes",
             "cwd": "/home/trick/.hermes",
             "path": "/home/trick/.hermes/state.db",
-            "model": "qubit-brain4",
+            "model": "qubit-brain",
         }],
         "session": {
             "id": "s1", "name": "Fix Hermes", "cwd": "/home/trick/.hermes",
@@ -157,7 +157,7 @@ def test_helper_only_rebrands_served_fields_and_keeps_paths():
     # Real paths must stay intact — only the served identity fields change.
     assert row["cwd"] == "/home/trick/.hermes"
     assert row["path"] == "/home/trick/.hermes/state.db"
-    assert row["model"] == "qubit-brain4"
+    assert row["model"] == "qubit-brain"
 
     assert rebranded["session"]["name"] == "Fix Qubit"
     assert rebranded["session"]["cwd"] == "/home/trick/.hermes"

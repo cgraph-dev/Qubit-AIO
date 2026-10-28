@@ -147,11 +147,11 @@ def test_shipped_default_local_is_pickable(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as QC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    body = {"scope": "main", "provider": "ollama", "model": "qubit-brain4",
+    body = {"scope": "main", "provider": "ollama", "model": "qubit-brain",
             "confirm_expensive_model": True}
     code, out = QC.h_model_set(cfg, {}, body, {})
     assert code == 200 and out["ok"] is True, (code, out)
-    assert R.get_active_profile(cfg)["active"] == "qubit-brain4"
+    assert R.get_active_profile(cfg)["active"] == "qubit-brain"
 # ------------------------------------------------------- terminal follow
 def _executable_overrides(pid):
     return {pid: {"allowlisted": True, "policy_enabled": True}}

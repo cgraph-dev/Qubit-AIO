@@ -32,7 +32,7 @@ def _stub_chat_local(monkeypatch, reply="stub chat reply"):
 
     calls = []
 
-    def _fake(text, conversation_prompt="", model="qubit-brain4",
+    def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
               reasoning=None):
         calls.append({"text": text, "model": model,
@@ -43,7 +43,7 @@ def _stub_chat_local(monkeypatch, reply="stub chat reply"):
     monkeypatch.setattr(_llm, "chat_local", _fake)
     stream_calls = []
 
-    def _fake_stream(text, conversation_prompt="", model="qubit-brain4",
+    def _fake_stream(text, conversation_prompt="", model="qubit-brain",
                      timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
                      should_stop=None, num_ctx=None, reasoning=None):
         stream_calls.append({"text": text, "model": model})
@@ -142,7 +142,7 @@ def test_turn_persists_user_and_assistant(tmp_path, monkeypatch):
     res = CT.turn(cfg, "what is 2+2", session="math")
     assert res["ok"] is True, res
     assert res["reply"] == "the answer is 4"
-    assert res["receipt"]["model"] == "qubit-brain4"
+    assert res["receipt"]["model"] == "qubit-brain"
     assert stub.calls and stub.calls[0]["text"] == "what is 2+2"
 
     shown = CT.store(cfg).show("math")
@@ -168,10 +168,10 @@ def test_model_routing_defaults_to_qubit_brain4_and_refuses_unknown(
     from voicebridge import chat_transport as CT
 
     cfg = _cfg(tmp_path, monkeypatch)
-    assert CT.configured_model(cfg) == "qubit-brain4"
+    assert CT.configured_model(cfg) == "qubit-brain"
     ok = CT.resolve_model(cfg, None)
-    assert ok == {"ok": True, "model": "qubit-brain4"}
-    ok2 = CT.resolve_model(cfg, "qubit-brain4")
+    assert ok == {"ok": True, "model": "qubit-brain"}
+    ok2 = CT.resolve_model(cfg, "qubit-brain")
     assert ok2["ok"] is True
     bad = CT.resolve_model(cfg, "gpt-4o")
     assert bad["ok"] is False and bad["code"] == "MODEL_NOT_ALLOWED"
@@ -255,7 +255,7 @@ def test_stream_turn_emits_real_deltas_and_persists(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     import voicebridge.local_llm as _llm
 
-    def _fake_stream(text, conversation_prompt="", model="qubit-brain4",
+    def _fake_stream(text, conversation_prompt="", model="qubit-brain",
                      timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
                      should_stop=None, num_ctx=None, reasoning=None):
         for sentence in ("Hello.", " World."):
@@ -271,7 +271,7 @@ def test_stream_turn_emits_real_deltas_and_persists(tmp_path, monkeypatch):
     assert deltas == ["Hello.", " World."]
     done = [e for e in events if e["event"] == "done"]
     assert done and done[0]["reply"] == "Hello. World."
-    assert done[0]["receipt"]["model"] == "qubit-brain4"
+    assert done[0]["receipt"]["model"] == "qubit-brain"
     shown = CT.store(cfg).show("stream")
     assert shown["messages"][-1]["content"] == "Hello. World."
 
@@ -298,7 +298,7 @@ def test_stream_sse_frames_are_typed(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         _llm, "chat_local_stream",
-        lambda text, conversation_prompt="", model="qubit-brain4", timeout_s=4.0,
+        lambda text, conversation_prompt="", model="qubit-brain", timeout_s=4.0,
         max_tokens=100, context="", on_sentence=None, should_stop=None,
         num_ctx=None, reasoning=None: (on_sentence and on_sentence("Done."),
                                        "Done.")[1])
@@ -406,7 +406,7 @@ def test_stream_turn_records_session_activity_summary(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     import voicebridge.local_llm as _llm
 
-    def _fake_stream(text, conversation_prompt="", model="qubit-brain4",
+    def _fake_stream(text, conversation_prompt="", model="qubit-brain",
                      timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
                      should_stop=None, num_ctx=None, reasoning=None):
         if on_sentence:

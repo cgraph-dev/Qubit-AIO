@@ -28,7 +28,7 @@ import pytest
 def isolated_cfg(tmp_path, monkeypatch):
     """A private config dir so a test can never touch the owner's selection.
 
-    Only `qubit-brain4` SHIPS as a profile; everything else the owner can pick
+    Only `qubit-brain` SHIPS as a profile; everything else the owner can pick
     lives in their own registry, which isolation deliberately hides. So the
     fixture seeds one extra profile into the private registry -- the test needs
     a profile that is neither the immutable default nor absent.

@@ -40,7 +40,7 @@ OPENSSL_REQUIRED = "3.0.0"
 # the doctor from the running Ollama (`/api/show` digest) — never baked as a
 # fake value. The record here is the ACCEPTED alias + license contract.
 MODEL_ARTIFACT = {
-    "alias": "qubit-brain4",
+    "alias": "qubit-brain",
     "kind": "ollama-model",
     "license": "Apache-2.0 (Qwen3-4B-Instruct-2507-derived; see "
                "docs/archive/2026-09-21/UPSTREAM_REUSE.md)",
@@ -313,7 +313,7 @@ def clean_install_required_steps(cfg: Any) -> List[str]:
         "python >= 3.11 venv installed from pyproject.toml",
         "declared deps only (check_clean_imports / clean_venv_check --check)",
         "config present at ~/.config/qubit-voicebridge/voice.yaml",
-        "model artifact pulled: qubit-brain4 (digest recorded by doctor)",
+        "model artifact pulled: qubit-brain (digest recorded by doctor)",
         "piper voice downloaded under model_dir",
         "systemd user unit rendered with machine overrides preserved",
         "config doctor --static passes (no undeclared imports, no home paths)",

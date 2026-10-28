@@ -285,7 +285,7 @@ def test_l1_live_embedding_gates():
         with urllib.request.urlopen(req, timeout=5) as resp:
             models = json.loads(resp.read().decode()).get("models", [])
         for m in models:
-            if m.get("name", "").startswith("qubit-brain4"):
+            if m.get("name", "").startswith("qubit-brain"):
                 digest_before = m.get("digest")
     except Exception:
         pass
@@ -306,7 +306,7 @@ def test_l1_live_embedding_gates():
             models = json.loads(resp.read().decode()).get("models", [])
         names = [m.get("name", "") for m in models]
         for m in models:
-            if m.get("name", "").startswith("qubit-brain4"):
+            if m.get("name", "").startswith("qubit-brain"):
                 digest_after = m.get("digest")
     except Exception:
         pass

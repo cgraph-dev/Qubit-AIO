@@ -157,7 +157,7 @@ def test_examples_pin_current_model_and_safe_audio():
     ex = yaml.safe_load(_yaml("config/voice.example.yaml"))
     loc = yaml.safe_load(_yaml("config/voice.local.yaml"))
     for cfg, name in ((ex, "example"), (loc, "local")):
-        assert cfg["intent"]["local_llm"]["model"] == "qubit-brain4", name
+        assert cfg["intent"]["local_llm"]["model"] == "qubit-brain", name
         assert int(cfg["mic"]["channels"]) == 1, name
         assert float(cfg["mic"]["gain"]) <= 4.0, name
 

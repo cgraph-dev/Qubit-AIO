@@ -187,7 +187,7 @@ def test_local_models_fallback_chain(tmp_path, monkeypatch):
     assert rc == 0 and out["state"] == "OK"
     assert isinstance(out["chain"], list) and "runtime_observed" in out
 
-    rc, out, _ = _run(cfg, ["local-models", "fallback", "qubit-brain4"])
+    rc, out, _ = _run(cfg, ["local-models", "fallback", "qubit-brain"])
     assert rc in (0, 2)
     assert out["state"] in ("OK", "UNAVAILABLE") and "chain" in out
 

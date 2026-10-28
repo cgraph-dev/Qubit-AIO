@@ -150,7 +150,7 @@ def test_huge_request_escalates_when_configured_and_keeps_session(monkeypatch):
         if requested == "qubit-strong":
             return _routed("strong-1", "api", 32768, provider="openrouter",
                            pid="qubit-strong")
-        return _routed("qubit-brain4", "local", 4096)
+        return _routed("qubit-brain", "local", 4096)
 
     monkeypatch.setattr(CT, "resolve_route", _route)
 
@@ -183,7 +183,7 @@ def test_huge_request_fails_closed_without_escalation_target(monkeypatch):
     monkeypatch.setattr(CT, "_estop", lambda _cfg: False)
     monkeypatch.setattr(CT, "_agent_enabled", lambda _cfg: True)
     monkeypatch.setattr(CT, "resolve_route",
-                        lambda *a, **k: _routed("qubit-brain4", "local", 4096))
+                        lambda *a, **k: _routed("qubit-brain", "local", 4096))
     called = {"gen": False}
 
     def _gen(*a, **k):

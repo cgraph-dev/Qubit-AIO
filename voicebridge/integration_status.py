@@ -70,7 +70,7 @@ def worker_status(cfg: Any) -> Dict[str, Any]:
         "route": "local",
         "agent_enabled": bool(get("agent", "enabled", default=True)),
         "agent_model": str(get("agent", "model", default="") or
-                           "qubit-brain4"),
+                           "qubit-brain"),
         "queue": "see `qubit sessions` for active/queued work",
     }
 

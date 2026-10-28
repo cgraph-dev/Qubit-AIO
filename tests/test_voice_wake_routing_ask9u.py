@@ -84,7 +84,7 @@ def _service(monkeypatch, *, brain=None):
         code = (brain or {}).get("code", "")
         message = ""
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
 
     monkeypatch.setattr(GW, "run_role", lambda *a, **k: R())
     monkeypatch.setattr(svc, "_known_model_profile", lambda pid: True)

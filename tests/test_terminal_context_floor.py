@@ -512,8 +512,8 @@ def test_below_floor_refusal_is_journaled(tmp_path, monkeypatch):
         assert refusals, events
         rec = refusals[-1]
         assert rec["code"] == "TERMINAL_CONTEXT_BELOW_MINIMUM"
-        assert rec["profile_id"] == "qubit-brain4"
-        assert rec["model"] == "qubit-brain4"
+        assert rec["profile_id"] == "qubit-brain"
+        assert rec["model"] == "qubit-brain"
         assert rec["context_tokens"] == 4096
         assert rec["min_context_tokens"] == 65536
         assert rec["via"] == "ws-ticket"
@@ -579,7 +579,7 @@ def test_ws_serve_refusal_is_journaled(tmp_path, monkeypatch):
         assert refusals, events
         rec = refusals[-1]
         assert rec["code"] == "TERMINAL_CONTEXT_BELOW_MINIMUM"
-        assert rec["model"] == "qubit-brain4"
+        assert rec["model"] == "qubit-brain"
         assert rec["via"] == "ws-pty"
         assert rec["session"] == "s1"
     finally:

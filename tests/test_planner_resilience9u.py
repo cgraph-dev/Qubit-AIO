@@ -40,18 +40,18 @@ def _ok_result(tool="local.open_app", args=None, conf=0.9):
         ok=True,
         text=json.dumps(
             {"tool": tool, "arguments": args, "confidence": conf}),
-        provider="local", model="qubit-brain4",
-        identity="local/qubit-brain4",
-        usage=UsageRecord(provider="local", model="qubit-brain4",
-                          identity="local/qubit-brain4", latency_ms=1))
+        provider="local", model="qubit-brain",
+        identity="local/qubit-brain",
+        usage=UsageRecord(provider="local", model="qubit-brain",
+                          identity="local/qubit-brain", latency_ms=1))
 
 
 def _fail_result(code):
     return ProviderResult(
-        ok=False, text="", provider="local", model="qubit-brain4",
-        identity="local/qubit-brain4", code=code, message=code.lower(),
-        usage=UsageRecord(provider="local", model="qubit-brain4",
-                          identity="local/qubit-brain4", latency_ms=1))
+        ok=False, text="", provider="local", model="qubit-brain",
+        identity="local/qubit-brain", code=code, message=code.lower(),
+        usage=UsageRecord(provider="local", model="qubit-brain",
+                          identity="local/qubit-brain", latency_ms=1))
 
 
 def _scripted(monkeypatch, results, timeouts=None, sleeps=None):

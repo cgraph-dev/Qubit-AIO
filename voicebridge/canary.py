@@ -5,7 +5,7 @@ When OFF, the canary is inert: zero logging, zero behavior change, the
 production alias is never referenced. When ON, a bounded runner drives the
 SEPARATE qubit-cand-q5 alias through warm/cold latency, errors, planner
 decisions, safety denials and audio probes and appends one JSONL record per
-turn. Production alias qubit-brain4 is NEVER loaded, unloaded or modified;
+turn. Production alias qubit-brain is NEVER loaded, unloaded or modified;
 no promotion logic exists anywhere in this module.
 
 Rollback state is recorded per run (flag value, aliases seen, prod digest
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 CANARY_ALIAS = "qubit-cand-q5"
-PRODUCTION_ALIAS = "qubit-brain4"
+PRODUCTION_ALIAS = "qubit-brain"
 
 REQUIRED_FIELDS = ("alias", "timestamp", "warm_cold", "latency_ms",
                    "errors", "planner_decision", "safety_denied",

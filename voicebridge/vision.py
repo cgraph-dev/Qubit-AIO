@@ -160,7 +160,7 @@ def _runner(cfg: Any) -> Tuple[str, str, str, int]:
         rc = resolve(cfg)
         return rc.url or DEFAULT_URL, rc.alias, rc.num_ctx, rc.url or DEFAULT_URL
     except Exception:
-        return DEFAULT_URL, "qubit-brain4", 4096, DEFAULT_URL
+        return DEFAULT_URL, "qubit-brain", 4096, DEFAULT_URL
 
 
 def detect_format(head: bytes) -> Optional[str]:

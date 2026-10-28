@@ -1,23 +1,12 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-27 (P8 decision executed)
+## ▶ Resume point — 2026-10-28 (one local brain)
 
-**State:** `main` = the Wave 65 merge (worktree clean; `canonical/main` pushed). Live `qubit-gateway`, `qubit-voicebridge` and `qubit-voice-typing` active; `/chat?resume=20261019_094333_0a4efc` → **200**; Telegram `@QubitBot` polling. Preflight now works from the real launcher: `qubit agent roles` lists 8, `qubit connectors status` shows typed rows.
+**State:** `main` after the model consolidation; live `qubit-gateway`, `qubit-voicebridge`, `qubit-voice-typing` active; `/chat` **200**; active chat model **`opencode-go/deepseek-v4.1-flash`** (unchanged).
 
-**What changed:** the owner's P8 ruling is recorded (`docs/DECISIONS.md` ruling 12) and executed — D8 canonical+legacy plugin SDK dual-publish, D12 `qubit-gateway*` restart candidates, D21 audit (18 true write-only names, all kept), D16 website rebrand (469 files), D17/D18 comments/prose only, D19 evidence framing only. The preflight also exposed and fixed two launcher bugs: `qubit agent roles|run` was stripped to runtime `roles|run`, and `connectors` had no forward route.
+**Local stack:** one text+vision model, `qubit-brain` (uncensored Huihui Qwen3.5-4B Q4_K_M; 32k profile context; vision verified). `qubit-brain-vision`, spark/cand/brain4/pre4b and duplicate vision models are deleted; only `qubit-brain` + `nomic-embed-text` remain. The shipped default id is `qubit-brain`; the default profile is explicit-only so `/qubit-chat` keeps the API default. Voice config, summarizer, intent and vision all use `qubit-brain`.
 
-**Do next, in order:**
-1. Run the full gate with the canonical per-file runner after sleep:
-   `cd qubit_runtime && nice -n 10 python scripts/run_tests_parallel.py -j 6 --file-timeout 600 tests`
-2. Owner live test: one voice role ("simple mode: reply with exactly OK"), one Tk selection case ("make it uppercase"), one normal rewrite/Apply/Revert.
-3. Optional: build the vendored website (`qubit_runtime/website`) and click through; not built this session.
-4. P8 is now recorded; only the full matrix and live voice turn remain before a `VERIFIED` claim.
-
-**Known limits:** no full matrix/`VERIFIED`; no website build; `roles.model_tiers` still empty on this host; D21 count differs from the inventory (documented).
-
-**2026-10-27 hotfix:** a live rewrite returned `OK.` from the tiny local model; `transform.py` now rejects degenerate/truncated output, retries the API tier in `auto`, and types `VOICE_EDIT_DEGENERATE_OUTPUT` otherwise. Bridge restarted; `/chat` 200. Re-test "rewrite this clearly" live.
-
-**2026-10-27 hotfix 2:** "Rewrite this more clearly" now parses as rewrite+clear (it hit the clarify table); Revert now sets X input focus (`windowfocus`) and settles 80–150 ms before Ctrl+Z. 137 voice tests pass. Re-test Revert and the rewrite live.
+**Do next:** owner live rewrite/grammar/vision test; full matrix with the canonical per-file runner; decide whether `/qubit-chat` should also default to `qubit-brain` (currently API, by design). No `VERIFIED`.
 
 ## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
 

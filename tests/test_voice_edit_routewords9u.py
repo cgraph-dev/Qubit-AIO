@@ -47,7 +47,7 @@ class FakeDesktop:
 
 
 def _cfg(**ve):
-    base = {"enabled": True, "routing": "local", "local_profile": "qubit-brain4"}
+    base = {"enabled": True, "routing": "local", "local_profile": "qubit-brain"}
     base.update(ve)
     return FakeCfg({"voice_edit": base})
 
@@ -141,13 +141,13 @@ def test_ask_in_chat_strips_prefix_before_dispatch(monkeypatch):
 
     monkeypatch.setattr(svc, "_full_turn_answer", capture)
     monkeypatch.setattr(svc, "_escalate_for", lambda mode: (False, "t"))
-    monkeypatch.setattr(svc, "_local_profile", lambda: "qubit-brain4")
+    monkeypatch.setattr(svc, "_local_profile", lambda: "qubit-brain")
 
     class Res:
         ok = True
         text = "BRAIN_OK"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 
@@ -170,13 +170,13 @@ def test_ask_quick_disables_worker_fallback(monkeypatch):
 
     monkeypatch.setattr(svc, "_full_turn_answer", fail_full)
     monkeypatch.setattr(svc, "_escalate_for", lambda mode: (False, "t"))
-    monkeypatch.setattr(svc, "_local_profile", lambda: "qubit-brain4")
+    monkeypatch.setattr(svc, "_local_profile", lambda: "qubit-brain")
 
     class Res:
         ok = False
         text = ""
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = "BRAIN_EMPTY"
         message = "empty"
 

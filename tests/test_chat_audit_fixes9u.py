@@ -135,7 +135,7 @@ def test_configured_default_without_registered_profile_falls_back(
     # ...but never silently substituted into an unregistered model.
     out = R.resolve_model(cfg)
     assert out["ok"] is True
-    assert out["model"] == "qubit-brain4"
+    assert out["model"] == "qubit-brain"
     assert out["source"] != "configured-default"
 
 
@@ -190,7 +190,7 @@ def test_successful_escalation_still_persists_the_user_row(
                         lambda *a, **k: ("", {}, _Decision()), raising=True)
     monkeypatch.setattr(
         CT, "_escalation_route",
-        lambda *a, **k: {"ok": True, "model": "qubit-brain4", "kind": "local"},
+        lambda *a, **k: {"ok": True, "model": "qubit-brain", "kind": "local"},
         raising=True)
     monkeypatch.setattr(
         CT, "_generate",

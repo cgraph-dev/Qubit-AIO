@@ -40,7 +40,7 @@ class _Recorder:
     """Stub for ``gateway.run`` capturing the ProviderRequest + kwargs."""
 
     def __init__(self, text: str = "", ok: bool = True, code: str = "",
-                 identity: str = "local/qubit-brain4") -> None:
+                 identity: str = "local/qubit-brain") -> None:
         self.text = text
         self.ok = ok
         self.code = code
@@ -51,8 +51,8 @@ class _Recorder:
         self.calls.append({"req": req, "cfg": cfg, "kwargs": kwargs})
         return ProviderResult(
             ok=self.ok, text=self.text, provider="local",
-            model="qubit-brain4", identity=self.identity, code=self.code,
-            usage=UsageRecord(provider="local", model="qubit-brain4",
+            model="qubit-brain", identity=self.identity, code=self.code,
+            usage=UsageRecord(provider="local", model="qubit-brain",
                               identity=self.identity, latency_ms=1))
 
 
@@ -213,7 +213,7 @@ def test_run_role_route_matches_resolved_locality(monkeypatch):
     _no_direct_network(monkeypatch)
 
     res = GW.run_role("hi", None, role="chat")
-    assert res.ok and res.identity == "local/qubit-brain4"
+    assert res.ok and res.identity == "local/qubit-brain"
     assert rec.calls[0]["req"].route == "local"
 
 

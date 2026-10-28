@@ -64,7 +64,7 @@ def test_row_lists_local_chat_profiles(tmp_path, monkeypatch):
     assert row["slug"] == "ollama"
     # The shipped brain4 default always qualifies alongside the Spark tier.
     assert set(row["models"]) == {
-        "qubit-spark17", "qubit-spark4", "qubit-brain4"}
+        "qubit-spark17", "qubit-spark4", "qubit-brain"}
     assert row["total_models"] == 3
     assert row["authenticated"] is True
     assert row["is_current"] is False
@@ -75,7 +75,7 @@ def test_row_checkmark_follows_active_profile(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     _register_local(cfg, "qubit-spark17")
-    _register_local(cfg, "qubit-brain4")
+    _register_local(cfg, "qubit-brain")
     assert QC._ollama_options_row(cfg)["is_current"] is False
     assert R.set_active_profile(
         cfg, "qubit-spark17", confirm=True)["state"] == "OK"
@@ -91,11 +91,11 @@ def test_row_skips_ineligible_but_keeps_shipped_default(tmp_path,
     # empty in practice; custom rows that are disabled or not chat-eligible
     # must not leak into it.
     row = QC._ollama_options_row(cfg)
-    assert row is not None and row["models"] == ["qubit-brain4"], row
+    assert row is not None and row["models"] == ["qubit-brain"], row
     _register_local(cfg, "no-chat", roles=["embedding"])
     _register_local(cfg, "off", enabled=False)
     row = QC._ollama_options_row(cfg)
-    assert row is not None and row["models"] == ["qubit-brain4"], row
+    assert row is not None and row["models"] == ["qubit-brain"], row
 
 
 def test_local_activation_mirrors_runtime_slot(tmp_path, monkeypatch):

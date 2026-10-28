@@ -226,12 +226,12 @@ def test_ocd28_provider_accounts_and_fallback(tmp_path, monkeypatch):
     monkeypatch.setattr(
         LM, "_probe_local",
         lambda *_a, **_k: {"state": "OK", "models": [
-            {"id": "qubit-brain4:latest", "name": "qubit-brain4:latest",
+            {"id": "qubit-brain:latest", "name": "qubit-brain:latest",
              "size": 1}]})
     chain = LM.fallback_chain(cfg)
     assert chain["state"] == "OK" and chain["chain"]
     picked = LM.resolve_fallback(cfg)
-    assert picked["state"] == "OK" and picked["selected"] == "qubit-brain4"
+    assert picked["state"] == "OK" and picked["selected"] == "qubit-brain"
 
     assert BR.principal_add(cfg, "principal-a", "person", "P",
                             confirmed=True)["state"] == "OK"

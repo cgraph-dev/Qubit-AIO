@@ -43,7 +43,7 @@ class FakeCfg:
 
 class FakeResult:
     def __init__(self, text="", ok=True, code="", message="", provider="ollama",
-                 model="qubit-brain4", locality="local"):
+                 model="qubit-brain", locality="local"):
         self.ok = ok
         self.text = text
         self.code = code
@@ -325,7 +325,7 @@ def test_transform_local_routing_uses_local_profile():
     cmd = parser.parse("summarize", selected_text="hello")
     res = TransformEngine(runner=runner).transform(cfg, cmd)
     assert res.ok and res.text == "Rewritten."
-    assert seen["profile_id"] == "qubit-brain4"
+    assert seen["profile_id"] == "qubit-brain"
     assert res.locality == "local"
 
 
@@ -369,7 +369,7 @@ def test_transform_local_failure_does_not_silently_call_api():
     cmd = parser.parse("summarize", selected_text="hello")
     res = TransformEngine(runner=runner).transform(cfg, cmd)
     assert res.ok is False
-    assert calls == ["qubit-brain4"]  # never tried the API profile
+    assert calls == ["qubit-brain"]  # never tried the API profile
 
 
 def test_transform_auto_records_api_fallback():
@@ -377,7 +377,7 @@ def test_transform_auto_records_api_fallback():
 
     def runner(cfg, **kw):
         calls.append(kw["profile_id"])
-        if kw["profile_id"] in (None, "qubit-brain4"):
+        if kw["profile_id"] in (None, "qubit-brain"):
             return FakeResult(ok=False, code="MODEL_UNAVAILABLE", message="down")
         return FakeResult(text="api answer", provider="openai", model="gpt-x",
                           locality="external")
@@ -389,7 +389,7 @@ def test_transform_auto_records_api_fallback():
     assert "retried on configured API" in res.detail
     # Auto tries the explicit local default first (detail tier when set,
     # else the local profile), then the configured API on failure.
-    assert calls == ["qubit-brain4", "frontier-x"]
+    assert calls == ["qubit-brain", "frontier-x"]
 
 
 def test_transform_detects_dropped_facts():
@@ -542,7 +542,7 @@ def test_transform_too_long_refuses():
 # brain router
 # ---------------------------------------------------------------------------
 class _BrainResult:
-    def __init__(self, text, ok=True, code="", model="qubit-brain4",
+    def __init__(self, text, ok=True, code="", model="qubit-brain",
                  provider="ollama"):
         self.text = text
         self.ok = ok
@@ -1256,7 +1256,7 @@ def test_transform_narration_only_falls_back_to_api_in_auto():
     cmd = parser.parse("rewrite this", selected_text="hello world")
     res = TransformEngine(runner=runner).transform(cfg, cmd)
     assert res.ok and res.text == "Clean rewrite."
-    assert calls == ["qubit-brain4", "frontier-x"]
+    assert calls == ["qubit-brain", "frontier-x"]
     assert "narration" in res.detail.lower()
 
 
@@ -1311,7 +1311,7 @@ def test_transform_sure_only_falls_back_to_api_in_auto():
     cmd = parser.parse("rewrite this", selected_text="hello world")
     res = TransformEngine(runner=runner).transform(cfg, cmd)
     assert res.ok and res.text == "Clean rewrite."
-    assert calls == ["qubit-brain4", "frontier-x"]
+    assert calls == ["qubit-brain", "frontier-x"]
 
 
 def test_clarify_here_is_only_shares_guard():

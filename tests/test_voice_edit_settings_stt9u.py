@@ -147,7 +147,7 @@ def test_export_import_round_trips_stt_and_routing(tmp_path):
         "asr_device": "qubit_aec",
         "stt_engine": "nemotron-560ms",
         "routing": "api",
-        "local_profile": "qubit-brain4",
+        "local_profile": "qubit-brain",
         "api_profile": "openai",
         "allow_api": False,
         "confirm_before_replace": False,

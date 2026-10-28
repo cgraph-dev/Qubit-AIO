@@ -312,7 +312,7 @@ def test_ask_transform_engine_failure_falls_through_to_brain(monkeypatch):
         ok = True
         text = "brain answer"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 
@@ -323,7 +323,7 @@ def test_ask_transform_engine_failure_falls_through_to_brain(monkeypatch):
     out = svc.ask("summarize this for me", request_id="r-fallthrough",
                   mode="answer")
     assert out["ok"] is True and out["answer"] == "brain answer"
-    assert calls.get("profile_id") == "qubit-brain4"
+    assert calls.get("profile_id") == "qubit-brain"
 
 
 def test_ask_escalation_routes_to_a_known_api_profile(monkeypatch):
@@ -364,7 +364,7 @@ def test_ask_escalation_unknown_target_stays_local(monkeypatch):
         ok = True
         text = "local answer"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 
@@ -374,7 +374,7 @@ def test_ask_escalation_unknown_target_stays_local(monkeypatch):
     out = svc.ask("hello", request_id="r-3", mode="chat")
     # Unknown API target degrades to the local profile (never the resolver
     # default): ask() always passes an explicit profile_id now.
-    assert out["ok"] and calls.get("profile_id") == "qubit-brain4"
+    assert out["ok"] and calls.get("profile_id") == "qubit-brain"
     esc = [d for op, d in audits if op == "voice_edit.escalation"]
     assert esc and esc[-1].get("escalate") is False
     assert esc[-1].get("reason") == "unknown_api_target"
@@ -388,7 +388,7 @@ def test_ask_local_routing_never_escalates(monkeypatch):
         ok = True
         text = "local answer"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 
@@ -397,8 +397,8 @@ def test_ask_local_routing_never_escalates(monkeypatch):
                         lambda prompt, cfg, **kw: (calls.update(kw), FakeRes())[1])
     svc.ask("hello", request_id="r-4", mode="chat")
     # routing=local resolves the local profile explicitly (default
-    # qubit-brain4) instead of falling through to the resolver default.
-    assert calls.get("profile_id") == "qubit-brain4"
+    # qubit-brain) instead of falling through to the resolver default.
+    assert calls.get("profile_id") == "qubit-brain"
     assert not [d for op, d in audits if op == "voice_edit.escalation"]
 
 
@@ -582,7 +582,7 @@ def test_ask_weather_failure_falls_through_to_brain(monkeypatch):
         ok = True
         text = "brain fallback"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 
@@ -758,7 +758,7 @@ def test_ask_reply_verbs_fall_through_to_brain(monkeypatch):
         ok = True
         text = "brain handles replies"
         provider = "local"
-        model = "qubit-brain4"
+        model = "qubit-brain"
         code = ""
         message = ""
 

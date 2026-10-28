@@ -317,7 +317,7 @@ _GROUP_CURATED = {
     "auth_login": ("auth_login", {"provider": "xai"}, "read"),
     "auth_verify": ("auth_verify", {"provider": "xai"}, "read"),
     "frontier_chat": ("frontier_chat", {"prompt": "hi"}, "write"),
-    "frontier_show": ("frontier_show", {"model_id": "local/qubit-brain4"},
+    "frontier_show": ("frontier_show", {"model_id": "local/qubit-brain"},
                       "read"),
     "memory": ("memory_search", {"query": "invoices"}, "read"),
     "plugins_install": ("plugins_install", {"manifest": "/tmp/nope.json"},

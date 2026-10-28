@@ -231,9 +231,9 @@ def fake_ollama(monkeypatch):
 
 CCFG = {
     "url": "http://127.0.0.1:9999",
-    "chat_model": "qubit-brain4",
-    "classifier_model": "qubit-brain4",
-    "summary_model": "qubit-brain4",
+    "chat_model": "qubit-brain",
+    "classifier_model": "qubit-brain",
+    "summary_model": "qubit-brain",
     "timeout_s": 4.0,
     "max_tokens": 100,
     "num_ctx": 4096,
@@ -388,7 +388,7 @@ def test_unload_restore_cycle_with_fake_http(monkeypatch):
             state["resident"] = True
             return FakeResp({"message": {"content": "pong"}})
         if url.endswith("/api/ps"):
-            models = ([{"name": "qubit-brain4:latest",
+            models = ([{"name": "qubit-brain:latest",
                         "digest": "df22", "context_length": state["ctx"],
                         "size_vram": 3300000000}]
                       if state["resident"] else [])
@@ -396,10 +396,10 @@ def test_unload_restore_cycle_with_fake_http(monkeypatch):
         raise AssertionError(url)
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    assert H.resident_state("http://x", "qubit-brain4")["resident"] is True
-    H.unload_model("http://x", "qubit-brain4")
-    assert H.wait_until_unloaded("http://x", "qubit-brain4", deadline_s=1.5)
-    report = H.restore_residency("http://x", "qubit-brain4", prior_ctx=4096)
+    assert H.resident_state("http://x", "qubit-brain")["resident"] is True
+    H.unload_model("http://x", "qubit-brain")
+    assert H.wait_until_unloaded("http://x", "qubit-brain", deadline_s=1.5)
+    report = H.restore_residency("http://x", "qubit-brain", prior_ctx=4096)
     assert report["restored"] is True
     assert report["verified_ctx"] == 4096
     assert report["state_changed_from_prior_context"] is False
@@ -420,7 +420,7 @@ def test_resident_state_reports_correct_vram_units(monkeypatch):
     def fake_urlopen(req, timeout=None, **kwargs):
         url = req.full_url
         if url.endswith("/api/ps"):
-            return FakeResp({"models": [{"name": "qubit-brain4:latest",
+            return FakeResp({"models": [{"name": "qubit-brain:latest",
                                          "digest": "df22",
                                          "size": 3_400_000_000,
                                          "size_vram": 3_300_000_000,
@@ -428,7 +428,7 @@ def test_resident_state_reports_correct_vram_units(monkeypatch):
         raise AssertionError(url)
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    st = H.resident_state("http://x", "qubit-brain4")
+    st = H.resident_state("http://x", "qubit-brain")
     assert st["resident"] is True
     # raw byte values are preserved verbatim
     assert st["size_vram_bytes"] == 3_300_000_000

@@ -1,13 +1,13 @@
 """Context-length precedence for Qubit-local models.
 
-Regression for the reported reading ``get_model_context_length("ollama","qubit-brain4")``
+Regression for the reported reading ``get_model_context_length("ollama","qubit-brain")``
 returning 131072. The custom-endpoint fallback at
 ``agent/model_metadata.py::_resolve_custom_endpoint_context_length`` ends with
 ``_longest_key_match(DEFAULT_CONTEXT_LENGTHS, model.lower())``; because
 ``_catalog_key_matches`` was a bare substring test, the provider/runtime token
 ``ollama`` matched the ``llama`` family key (``"llama" in "ollama"``) and resolved
 to the llama family default (131,072) instead of leaving the real registration
-(``qubit-brain4`` -> 4,096, its Modelfile ``num_ctx``) authoritative.
+(``qubit-brain`` -> 4,096, its Modelfile ``num_ctx``) authoritative.
 
 The fix requires a catalog key to match at a token start, so a provider token can
 never shadow a registered model. These tests pin both the fixed collision and the
@@ -25,17 +25,17 @@ from agent.model_metadata import (
 
 
 def test_registered_local_model_value_is_authoritative():
-    """``qubit-brain4`` resolves to its Modelfile ``num_ctx`` (4,096), not a family default."""
-    assert _longest_key_match(DEFAULT_CONTEXT_LENGTHS, "qubit-brain4") == ("qubit-brain4", 4096)
-    assert get_model_context_length("qubit-brain4", base_url="", provider="ollama") == 4096
-    assert get_model_context_length("qubit-brain4", base_url="", provider="ollama") != DEFAULT_FALLBACK_CONTEXT
+    """``qubit-brain`` resolves to its Modelfile ``num_ctx`` (4,096), not a family default."""
+    assert _longest_key_match(DEFAULT_CONTEXT_LENGTHS, "qubit-brain") == ("qubit-brain", 4096)
+    assert get_model_context_length("qubit-brain", base_url="", provider="ollama") == 4096
+    assert get_model_context_length("qubit-brain", base_url="", provider="ollama") != DEFAULT_FALLBACK_CONTEXT
 
 
 def test_provider_token_does_not_claim_the_llama_family_default():
     """``ollama`` contains ``llama``; that mid-word match must never yield 131,072."""
     assert _longest_key_match(DEFAULT_CONTEXT_LENGTHS, "ollama") is None
-    assert get_model_context_length("ollama", "qubit-brain4") != DEFAULT_CONTEXT_LENGTHS["llama"]
-    assert get_model_context_length("ollama", "qubit-brain4") != 131072
+    assert get_model_context_length("ollama", "qubit-brain") != DEFAULT_CONTEXT_LENGTHS["llama"]
+    assert get_model_context_length("ollama", "qubit-brain") != 131072
 
 
 @pytest.mark.parametrize(

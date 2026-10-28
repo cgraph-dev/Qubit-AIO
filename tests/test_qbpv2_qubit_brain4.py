@@ -1,7 +1,7 @@
 """W2 — Brain4 proof + honest failure surfaces.
 
 The first test runs a REAL inference against the configured Qubit brain
-(``qubit-brain4`` via the local Ollama runner) through the production
+(``qubit-brain`` via the local Ollama runner) through the production
 ``chat_transport.turn`` path and asserts a non-empty reply is persisted. It
 skips only when Ollama is genuinely unreachable on this host.
 
@@ -46,8 +46,8 @@ def test_configured_brain_is_qubit_brain4(tmp_path, monkeypatch):
     from voicebridge import chat_transport as CT
 
     cfg = _cfg(tmp_path, monkeypatch)
-    assert CT.configured_model(cfg) == "qubit-brain4"
-    assert CT.resolve_model(cfg, None)["model"] == "qubit-brain4"
+    assert CT.configured_model(cfg) == "qubit-brain"
+    assert CT.resolve_model(cfg, None)["model"] == "qubit-brain"
 
 
 def test_live_brain4_inference_non_empty(tmp_path, monkeypatch):
@@ -69,7 +69,7 @@ def test_live_brain4_inference_non_empty(tmp_path, monkeypatch):
                   session="brain4-live")
     assert res["ok"] is True, res
     assert isinstance(res["reply"], str) and res["reply"].strip()
-    assert res["receipt"]["model"] == "qubit-brain4"
+    assert res["receipt"]["model"] == "qubit-brain"
     assert res["receipt"]["path"] == "voicebridge.agent.turn"
 
     shown = CT.store(cfg).show("brain4-live")
@@ -91,7 +91,7 @@ def test_live_brain4_route_reaches_real_handler(tmp_path, monkeypatch):
                              "session": "brain4-route"})
     assert code == 200 and out["ok"] is True, (code, out)
     assert out["reply"].strip()
-    assert out["receipt"]["model"] == "qubit-brain4"
+    assert out["receipt"]["model"] == "qubit-brain"
     print(f"\nROUTE_BRAIN4={out['reply']!r} ms={out['elapsed_ms']}")
 
 

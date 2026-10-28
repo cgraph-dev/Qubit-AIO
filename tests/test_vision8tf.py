@@ -62,7 +62,7 @@ class _Stub:
                     return self._json({"models": models})
                 if self.path == "/api/ps":
                     if stub.restored_seen:
-                        return self._json({"models": [{"name": "qubit-brain4:latest"}]})
+                        return self._json({"models": [{"name": "qubit-brain:latest"}]})
                     return self._json({"models": []})
                 self.send_response(404)
                 self.end_headers()
@@ -114,7 +114,7 @@ def _cfg(tmp_path, monkeypatch, stub=None, extra=""):
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n"
                  "intent:\n  runner:\n"
-                 f"    url: \"{url}\"\n    alias: \"qubit-brain4\"\n"
+                 f"    url: \"{url}\"\n    alias: \"qubit-brain\"\n"
                  "  vision:\n    model: \"stub-vision\"\n" + extra)
     return C.Config.load(p)
 

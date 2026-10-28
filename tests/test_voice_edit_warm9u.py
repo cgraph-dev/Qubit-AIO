@@ -284,7 +284,7 @@ def test_brain_failure_logs_timeout_and_model(monkeypatch):
 
     def runner(cfg, **kw):
         return types.SimpleNamespace(ok=False, code="MODEL_UNAVAILABLE",
-                                     model="qubit-brain4", text="")
+                                     model="qubit-brain", text="")
 
     assert brain_mod.BrainRouter(runner=runner).classify(
         _cfg(), "make this shorter", has_selection=True,
@@ -294,7 +294,7 @@ def test_brain_failure_logs_timeout_and_model(monkeypatch):
     assert name == "voice_edit.brain.error"
     assert fields["code"] == "MODEL_UNAVAILABLE"
     assert fields["timeout_s"] == 4.0
-    assert fields["model"] == "qubit-brain4"
+    assert fields["model"] == "qubit-brain"
 
 
 def test_brain_exception_logs_timeout(monkeypatch):

@@ -41,11 +41,11 @@ def test_status_and_catalog_surface_fallback_picker(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     monkeypatch.setattr(LM, "_probe_local",
                         lambda *_a, **_k: {"state": "OK", "models": [
-                            {"id": "qubit-brain4:latest", "name":
-                             "qubit-brain4:latest", "size": 1}]})
+                            {"id": "qubit-brain:latest", "name":
+                             "qubit-brain:latest", "size": 1}]})
     status = LM.status(cfg)
     assert status["fallback"]["state"] == "OK"
-    assert status["fallback"]["selected"] == "qubit-brain4"
+    assert status["fallback"]["selected"] == "qubit-brain"
     catalog = LM.catalog(cfg)
     assert any(row["available"] for row in catalog["fallback"])
     # No credentials are involved anywhere in the picker output.

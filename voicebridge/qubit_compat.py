@@ -1644,7 +1644,7 @@ def _qubit_model(cfg: Any) -> Dict[str, Any]:
     try:
         name = AG._model(cfg)
     except Exception:
-        name = "qubit-brain4"
+        name = "qubit-brain"
     ctx = 4096
     try:
         out = OPS.run_op(cfg, "prompt_budget", {}, actor="dashboard:user",
@@ -1653,7 +1653,7 @@ def _qubit_model(cfg: Any) -> Dict[str, Any]:
         ctx = int((res.get("prompt_budget", {}) or {}).get("num_ctx", 4096))
     except Exception:
         pass
-    return {"name": name or "qubit-brain4", "ctx": ctx}
+    return {"name": name or "qubit-brain", "ctx": ctx}
 
 
 def _resolved_model(cfg: Any) -> Dict[str, Any]:
@@ -1759,7 +1759,7 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     r = _resolved_model(cfg)
     # The default role's resolved selection is the answer. A stored model on
     # the old canonical session (e.g. the ``dashboard-chat`` fossil's
-    # ``qubit-brain4``) must NOT override it: since /chat opens fresh and the
+    # ``qubit-brain``) must NOT override it: since /chat opens fresh and the
     # /chat sidebar already prefers the live PTY grant, the fossil's opinion
     # kept every MODEL card pinned to a dead default after a switch (the D3
     # override this replaces). An explicit ``?model=`` below still reports a

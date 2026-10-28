@@ -6,7 +6,7 @@ each independently, with a versioned manifest that records source, revision,
 license, checksum/digest, hardware/language support, resource cost, latency,
 quality/safety evidence, and a rollback target.
 
-Safe defaults (verified, unchanged): qubit-brain4 reasoning model, CPU sherpa
+Safe defaults (verified, unchanged): qubit-brain reasoning model, CPU sherpa
 STT, Piper TTS with the configured voice, and the current HyperX audio rules
 (mono mic + empty output pins). A downloaded file or provider response is never
 trusted merely because it exists: install/select/upgrade run gates (license,
@@ -52,7 +52,7 @@ CONFIG_PATH = {
 
 # Default profile id per component (the verified current behavior).
 DEFAULTS = {
-    BRAIN: "qubit-brain4",
+    BRAIN: "qubit-brain",
     STT: "sherpa",
     TTS: "piper",
     VOICE: "en_US-amy-medium",
@@ -155,15 +155,15 @@ def default_manifests() -> List[ProviderManifest]:
     (itself for the default; a failed change never leaves it active)."""
     return [
         ProviderManifest(
-            id="qubit-brain4", kind=BRAIN, default=True,
-            source="ollama://qubit-brain4 (docs/archive/2026-09-21/UPSTREAM_REUSE.md R7)",
+            id="qubit-brain", kind=BRAIN, default=True,
+            source="ollama://qubit-brain (docs/archive/2026-09-21/UPSTREAM_REUSE.md R7)",
             revision="resolved-at-runtime (Ollama digest)",
             license="Apache-2.0 (Qwen3-4B-Instruct-2507-derived)",
             hardware="gpu", languages=["en"], vram_mib=3300, ram_mib=0,
             latency_ms=644.0, quality_evidence="docs/archive/2026-09-21/BAKEOFF_4D.md",
-            safety_evidence="docs/archive/2026-09-21/EVALUATION_6B.md", rollback_to="qubit-brain4",
+            safety_evidence="docs/archive/2026-09-21/EVALUATION_6B.md", rollback_to="qubit-brain",
             config_path=("intent", "local_llm", "model"),
-            config_value="qubit-brain4"),
+            config_value="qubit-brain"),
         ProviderManifest(
             id="sherpa", kind=STT, default=True,
             source="sherpa-onnx (CPU; declared dep)",

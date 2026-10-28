@@ -223,7 +223,7 @@ def test_canary_records_all_required_fields(tmp_path):
                                latency_ms=123.4, errors=["classify_no_decision"],
                                planner_decision="none", safety_denied=True,
                                audio_failure="tts boom"),
-                    {"flag_enabled": True, "prod_alias": "qubit-brain4"})
+                    {"flag_enabled": True, "prod_alias": "qubit-brain"})
     lines = (logger._path.read_text()).strip().splitlines()
     assert len(lines) == 1
     rec = json.loads(lines[0])
@@ -232,7 +232,7 @@ def test_canary_records_all_required_fields(tmp_path):
     assert rec["alias"] == "qubit-cand-q5"
     assert rec["safety_denied"] is True
     assert rec["audio_failure"] == "tts boom"
-    assert rec["rollback_state"]["prod_alias"] == "qubit-brain4"
+    assert rec["rollback_state"]["prod_alias"] == "qubit-brain"
 
 
 def test_canary_rollback_flips_flag(tmp_path):
@@ -249,5 +249,5 @@ def test_canary_rollback_flips_flag(tmp_path):
 def test_canary_alias_constants_never_prod():
     from voicebridge.canary import CANARY_ALIAS, PRODUCTION_ALIAS
     assert CANARY_ALIAS == "qubit-cand-q5"
-    assert PRODUCTION_ALIAS == "qubit-brain4"
+    assert PRODUCTION_ALIAS == "qubit-brain"
     assert CANARY_ALIAS != PRODUCTION_ALIAS

@@ -197,7 +197,7 @@ def test_doctor_reconcile_passes(tmp_path, monkeypatch):
     cfg_path.write_text(
         "mic:\n  channels: 1\n  gain: 3.0\n"
         "audio:\n  output_device: \"\"\n  output_device_name: \"\"\n"
-        "intent:\n  local_llm:\n    model: qubit-brain4\n")
+        "intent:\n  local_llm:\n    model: qubit-brain\n")
     from scripts import config_doctor as DOC
     cfg = DOC._load_config(str(cfg_path))
     results: list = []
