@@ -275,6 +275,11 @@ agent_runtime:
 #                             # hears the phrase (final beep stays on command)
 #     cue_on_speech: true     # cue at VAD speech onset for voices the spotter
 #                             # misses; any idle room speech also cues
+#     kws_normalize: true     # boost-only per-frame normalization for the
+#                             # spotter only (ASR audio is never touched)
+#     kws_target_peak: 0.5    # normalization target, clamped 0.05..0.9
+#     kws_max_gain: 6.0       # max normalization gain, clamped 1..16
+#     kws_input_gain: 1.0     # extra fixed spotter-only gain, clamped 1..16
 #
 # Local chat wording (applies to the voice brain; both configurable):
 # intent:
