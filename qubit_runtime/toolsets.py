@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Set, Optional, Tuple
 # (tui_gateway/server.py::_load_enabled_toolsets). HA, kanban and computer_use
 # entries are further gated by their tools' check_fns.
 _QUBIT_CORE_TOOLS = [
-    "web_search", "web_extract",
+    "web_search", "web_extract", "subscription_research",
     "terminal", "process_manage",
     "read_file", "write_file", "patch", "search_files",
     "vision_analyze", "image_generate",
@@ -83,7 +83,7 @@ CLIENT_SURFACE_TOOLSETS = frozenset({"project", "desktop_ui", "catalog"})
 # Core toolset definitions: individual tools or references to other toolsets.
 TOOLSETS = {
     # Basic toolsets - individual tool categories
-    "web": _ts("Web research and content extraction tools", ["web_search", "web_extract"]),
+    "web": _ts("Web research and content extraction tools", ["web_search", "web_extract", "subscription_research"]),
     "search": _ts("Web search only (no content extraction/scraping)", ["web_search"]),
     "x_search": _ts(
         "Search X (Twitter) posts and threads via xAI's built-in x_search Responses "
