@@ -189,6 +189,60 @@ def test_speak_silence_plays_through(monkeypatch):
     assert procs[0].waited is True, "playback must complete normally"
 
 
+def test_barge_in_stopped_status_returns_to_idle(monkeypatch):
+    """The HUD must not stay on "Stopped" forever after a barge-in.
+
+    A bare wake after an interrupted reply used to leave the status pill
+    stuck because nothing re-set it. The clear is idle-only and short.
+    """
+    import time
+
+    mic = FakeMic([_frame(0.01), _frame(0.60)])
+    procs = []
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), mic, procs)
+    helper._speak("hello there this is a long spoken reply with many words")
+    assert any(s == "interrupted" for s, _ in helper.overlay.statuses)
+    helper._schedule_interrupted_clear(0.05)
+    time.sleep(0.2)
+    assert helper.overlay.statuses[-1][0] == "idle"
+
+
+def test_barge_in_arms_wake_for_the_interrupting_utterance(monkeypatch):
+    """A barge-in opens the wake arm so its command is not discarded."""
+    from voicebridge import desktop_helper as DH
+
+    class FakeWake:
+        def __init__(self):
+            self.armed = []
+
+        def expect_reply(self, timeout_s=None):
+            self.armed.append(timeout_s)
+
+    mic = FakeMic([_frame(0.01), _frame(0.60)])
+    procs = []
+    helper = _helper(monkeypatch, _cfg(barge_in_threshold=0.20,
+                                       barge_in_ms=200), mic, procs)
+    helper._wake = FakeWake()
+    helper._speak("hello there this is a long spoken reply with many words")
+    assert helper._wake.armed == [8.0]
+
+
+def test_barge_in_shortens_the_tts_echo_guard(monkeypatch):
+    """After a barge-in the reply is gone; do not block wake for 5 s."""
+    from voicebridge import desktop_helper as DH
+
+    seen = {}
+    monkeypatch.setattr(DH, "recent_tts_speak",
+                        lambda path, window_s=5.0: seen.setdefault(
+                            "window_s", window_s) and False)
+    helper = _helper(monkeypatch, _cfg(), FakeMic([]), [])
+    helper._tts_echo_checked = 0.0
+    helper._barge_interrupted = True
+    helper._tts_echo_busy()
+    assert seen["window_s"] == 1.0
+
+
 def test_speak_barge_in_disabled_plays_through(monkeypatch):
     mic = FakeMic([_frame(0.90)] * 5)  # even loud speech must not interrupt
     procs = []

@@ -1428,6 +1428,11 @@ class DesktopHelper:
         if now - getattr(self, "_tts_echo_checked", 0.0) < 1.0:
             return bool(getattr(self, "_tts_echo_cached", False))
         busy = False
+        # After a barge-in the reply is already stopped, so the long echo
+        # guard is unnecessary and actively blocks the next wake for 5 s.
+        # Keep a short tail to avoid re-capturing the last syllable.
+        if getattr(self, "_barge_interrupted", False):
+            window_s = min(float(window_s), 1.0)
         try:
             from .config import canonical_state_dir
             busy = recent_tts_speak(canonical_state_dir() / "events.jsonl",
@@ -3587,6 +3592,29 @@ class DesktopHelper:
         except Exception:
             pass
 
+    def _schedule_interrupted_clear(self, delay_s: float = 1.2) -> None:
+        """Return the HUD from "Stopped" to Ready after a barge-in.
+
+        The barge-in status is useful for a moment, but it used to stay on
+        screen forever (the wake monitor did not emit a UI status for a bare
+        wake), so a later "hey qubit" looked stuck. This only clears while
+        the helper is genuinely idle and not speaking; a new turn owns its
+        own status. Never raises.
+        """
+        def _clear() -> None:
+            try:
+                if (self.state == self.IDLE
+                        and not getattr(self, "_speaking", False)):
+                    self._ui_status("idle", "ready")
+            except Exception:
+                pass
+        try:
+            t = threading.Timer(max(0.1, float(delay_s)), _clear)
+            t.daemon = True
+            t.start()
+        except Exception:
+            pass
+
     def _speak(self, text: str) -> None:
         """Speak the gist of ``text`` through the service's TTS, locally.
 
@@ -3675,6 +3703,18 @@ class DesktopHelper:
                 self._barge_interrupted = True
                 self._talk_emit("interrupt")
                 self._ui_status("interrupted", "stopped — speak again")
+                self._schedule_interrupted_clear()
+                # The barge-in watcher heard speech but the wake monitor
+                # was yielding the mic during TTS. Open the arm so the
+                # utterance's tail (or the next command) is accepted
+                # without requiring a second "hey qubit".
+                try:
+                    wake = getattr(self, "_wake", None)
+                    if wake is not None:
+                        wake.expect_reply(8.0)
+                        _trace("wake.barge_in_armed")
+                except Exception:
+                    pass
         except Exception as exc:  # never fatal
             _trace("speak_failed", detail=str(exc)[:120])
         finally:
