@@ -162,21 +162,35 @@ def _handle_subscription_research(args: dict[str, Any]) -> str:
         "temperature": 0.2,
         "stream": False,
     }
+    def _post(payload: dict) -> Any:
+        return _request(base, key, "/chat/completions", payload, timeout=150.0)
+
     try:
-        data = _request(base, key, "/chat/completions", payload, timeout=150.0)
-    except urllib.error.HTTPError as exc:
-        detail = ""
-        try:
-            detail = exc.read(4000).decode("utf-8", "replace")
-        except Exception:
-            pass
-        return tool_error(
-            f"OmniRoute returned HTTP {exc.code}", reason="provider_error",
-            engine=chosen, model=model, detail=detail[:1000])
-    except Exception as exc:  # noqa: BLE001
-        return tool_error(
-            f"OmniRoute request failed: {type(exc).__name__}",
-            reason="provider_unreachable", engine=chosen, model=model)
+        data = _post(payload)
+    except Exception as exc:  # noqa: BLE001 - auto may fall back below
+        if engine == "auto" and chosen == "gemini":
+            # A connected Gemini Web can still be temporarily unhealthy; auto
+            # must not fail when Perplexity is healthy.
+            chosen, model = "perplexity", _PERPLEXITY_MODEL
+            payload["model"] = model
+            try:
+                data = _post(payload)
+            except Exception as exc2:  # noqa: BLE001
+                return tool_error(
+                    "Both Gemini Web and Perplexity failed",
+                    reason="provider_error", engine="auto", model=model,
+                    detail=f"gemini={type(exc).__name__}; perplexity={type(exc2).__name__}")
+        else:
+            detail = ""
+            if isinstance(exc, urllib.error.HTTPError):
+                try:
+                    detail = exc.read(4000).decode("utf-8", "replace")
+                except Exception:
+                    pass
+            return tool_error(
+                f"OmniRoute request failed: {type(exc).__name__}",
+                reason="provider_error", engine=chosen, model=model,
+                detail=detail[:1000])
 
     choices = data.get("choices") if isinstance(data, dict) else None
     try:
@@ -185,8 +199,18 @@ def _handle_subscription_research(args: dict[str, Any]) -> str:
         answer = ""
     answer = answer.strip()
     if not answer:
-        return tool_error("OmniRoute returned an empty answer", reason="empty_answer",
-                          engine=chosen, model=model)
+        if engine == "auto" and chosen == "gemini":
+            chosen, model = "perplexity", _PERPLEXITY_MODEL
+            payload["model"] = model
+            try:
+                data = _post(payload)
+                choices = data.get("choices") if isinstance(data, dict) else None
+                answer = str((choices[0].get("message") or {}).get("content") or "").strip()
+            except Exception:
+                answer = ""
+        if not answer:
+            return tool_error("OmniRoute returned an empty answer", reason="empty_answer",
+                              engine=chosen, model=model)
     return tool_result({
         "source": "subscription_research",
         "engine": chosen,

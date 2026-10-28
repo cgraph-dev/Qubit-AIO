@@ -67,3 +67,21 @@ def test_query_is_required(monkeypatch):
     out = _body(tool._handle_subscription_research({"query": "  "}))
     assert "error" in out
     assert out["reason"] == "invalid_request"
+
+
+def test_auto_falls_back_to_perplexity_when_gemini_fails(monkeypatch):
+    monkeypatch.setattr(tool, "_omni_settings", lambda: ("http://127.0.0.1:20128/v1", "k"))
+    monkeypatch.setattr(tool, "_gemini_model", lambda base, key: ("gemini-web/gemini-3.1-pro", ""))
+    calls = []
+
+    def fake(base, key, path, payload=None, timeout=120.0):
+        calls.append(payload.get("model") if payload else None)
+        if payload and payload.get("model", "").startswith("gemini-web/"):
+            raise RuntimeError("503")
+        return {"model": "pplx-auto", "choices": [{"message": {"content": "fallback answer"}}]}
+
+    monkeypatch.setattr(tool, "_request", fake)
+    out = _body(tool._handle_subscription_research({"query": "what?", "engine": "auto"}))
+    assert out["engine"] == "perplexity"
+    assert out["answer"] == "fallback answer"
+    assert calls[:2] == ["gemini-web/gemini-3.1-pro", "perplexity-web/pplx-auto"]
