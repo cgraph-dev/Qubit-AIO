@@ -415,16 +415,23 @@ def test_activity_alias_redirects_to_logs(tmp_path, monkeypatch):
 
 
 def test_served_chat_chunk_opens_no_raw_pty_websocket():
-    """The built normal-chat chunks must not open a WebSocket or a raw
-    /api/pty path (that is what produced the code-1006 reconnect loop)."""
+    """The built normal-chat chunk must not name or open a raw PTY socket.
+
+    The chunk legitimately contains the voice-STT WebSocket (``sttWsUrl``);
+    that is not the code-1006 reconnect loop. The forbidden surface is the
+    raw ``/api/pty`` path / PTY ticket scope.
+    """
     dist = REPO_ROOT / "frontend" / "qubit-dist" / "assets"
     chunks = sorted(dist.glob("ChatPage-*.js"))
     if not chunks:
         pytest.skip("hermes-dist not built (npm build step)")
     blob = "\n".join(p.read_text(encoding="utf-8", errors="replace")
                      for p in chunks)
-    assert "new WebSocket" not in blob
     assert "/api/pty" not in blob
+    assert "agent/api/pty" not in blob
+    assert 'scope:"pty"' not in blob and "scope:'pty'" not in blob
+    # The only socket the chat chunk should open is the voice-STT one.
+    assert "sttWsUrl" in blob
 
 
 # --------------------------------------------- local_llm retry regression
