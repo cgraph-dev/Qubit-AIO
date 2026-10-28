@@ -40,15 +40,30 @@ def _cfg(tmp_path, monkeypatch, extra: str = ""):
     return C.Config.load(p)
 
 
+def _force_legacy_model_path(monkeypatch):
+    """Keep the typed turn on the stubbed legacy model path.
+
+    A general turn now prefers the vendored tool-capable agent (DECISIONS #26),
+    which bypasses the ``local_llm`` stub. Returning ``None`` from that seam
+    falls back to the same ``chat_transport`` model path whose prior-turn
+    prompt this file pins.
+    """
+    from voicebridge import chat_transport as CT
+
+    monkeypatch.setattr(CT, "_agent_chat", lambda *a, **k: None)
+
+
 def _stub_local(monkeypatch, reply="stub reply"):
     """Stub the local Brain4 call the gateway routes to (no Ollama/network)."""
     import voicebridge.local_llm as _llm
+
+    _force_legacy_model_path(monkeypatch)
 
     calls = []
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
+              reasoning=None, cancel=None, should_stop=None):
         calls.append({"text": text, "model": model,
                       "conversation_prompt": conversation_prompt,
                       "context": context})

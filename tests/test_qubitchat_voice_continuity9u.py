@@ -101,11 +101,13 @@ def test_branch_turns_emit_uniform_receipt_shape(monkeypatch):
 
     fake = _FakeStore()
     monkeypatch.setattr(CT, "_estop", lambda cfg: False)
+    # Free-first is the default web order, so the shared web branch reaches
+    # ``_ddg_web_fallback`` -- not the paid ``answer_web_query`` layer. Stub
+    # the layer that actually runs, so the test never touches the network.
     monkeypatch.setattr(
-        "voicebridge.orchestrator.answer_web_query",
-        lambda cfg, text, **kw: {"ok": True, "answer": "Aion 2 Q4.",
-                                 "sources": ["https://example/aion2"],
-                                 "code": "OK"})
+        CT, "_ddg_web_fallback",
+        lambda text: {"ok": True, "answer": "Aion 2 Q4.",
+                      "sources": ["https://example/aion2"]})
     monkeypatch.setattr(
         "voicebridge.summarizer.summarize",
         lambda reply, cfg=None: "Built it, summarized.")
