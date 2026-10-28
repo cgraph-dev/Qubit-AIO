@@ -14,7 +14,10 @@ literal sample (no change-detector on the totals):
 * a fixed sample of known refusals/guidance is ``guard`` and a fixed sample of
   known working bindings is ``real``, so the guard can never become vacuous.
 
-It writes nothing.
+``docs/generated/`` is gitignored, so a fresh worktree has no artifact: the
+artifact fixture is generated under ``tmp_path`` from the real
+``scripts.parity_inventory.build_controls()`` rows. Nothing in the repository
+is written.
 """
 from __future__ import annotations
 
@@ -30,7 +33,6 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 SCRIPTS = REPO / "scripts"
-ARTIFACT = REPO / "docs" / "generated" / "voice_coverage.json"
 
 RESOLUTIONS = ("real", "guard", "unresolved")
 
@@ -74,11 +76,22 @@ def mod():
 
 
 @pytest.fixture(scope="module")
-def artifact():
-    assert ARTIFACT.is_file(), (
-        "docs/generated/voice_coverage.json is missing; regenerate with "
-        "`python scripts/voice_inventory_coverage.py`")
-    return json.loads(ARTIFACT.read_text(encoding="utf-8"))
+def artifact(mod, tmp_path_factory):
+    """Render the coverage artifact into tmp_path from real parity rows."""
+    from scripts import parity_inventory as pi
+
+    rows = pi.build_controls()
+    assert rows, "parity inventory fixture is empty"
+    root = tmp_path_factory.mktemp("generated")
+    inventory = root / "parity_inventory.json"
+    inventory.write_text(
+        json.dumps({"schema": pi.SCHEMA, "rows": rows},
+                   indent=2, sort_keys=True) + "\n",
+        encoding="utf-8")
+    out = root / "voice_coverage.json"
+    assert mod.main(["--inventory", str(inventory), "--out", str(out)]) == 0
+    assert out.is_file(), "generator did not write the coverage artifact"
+    return json.loads(out.read_text(encoding="utf-8"))
 
 
 # ------------------------------------------- (a) known guards are never real

@@ -56,6 +56,7 @@ class GitSkillSource(SkillSource):
         return subprocess.run(
             ["git", "-C", str(self._cache_root), *args],
             capture_output=True, text=True, check=check,
+            stdin=subprocess.DEVNULL,
         )
 
     def sync(self) -> None:
@@ -79,6 +80,7 @@ class GitSkillSource(SkillSource):
         subprocess.run(
             ["git", "clone", "--depth", "1", self._repo_url, str(self._cache_root)],
             check=True, capture_output=True, text=True,
+            stdin=subprocess.DEVNULL,
         )
 
     def prepare(self) -> bool:

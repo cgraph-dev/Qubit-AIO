@@ -424,6 +424,7 @@ class OpenJarvisRuntime:
                 ["git", "-C", str(cwd), *args],
                 capture_output=True, text=True, errors="replace",
                 timeout=10, env=env, check=False,
+                stdin=subprocess.DEVNULL,
             )
         except (OSError, subprocess.SubprocessError, UnicodeError):
             return None
