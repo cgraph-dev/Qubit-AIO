@@ -268,6 +268,11 @@ agent_runtime:
 #   mic_gain: 12.0
 #   speak_answers: true       # speak replies aloud
 #   history_panel: true       # show the overlay history
+#   wake:
+#     hold_silence_ms: 900    # trailing silence once speech is established;
+#                             # lower is snappier but can split slow speech
+#     cue_on_kws: true        # immediate single-note cue when the spotter
+#                             # hears the phrase (final beep stays on command)
 #
 # Local chat wording (applies to the voice brain; both configurable):
 # intent:

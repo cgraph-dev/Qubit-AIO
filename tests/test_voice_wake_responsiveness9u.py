@@ -210,6 +210,9 @@ def test_hold_silence_round_trips_through_settings_view_and_put(tmp_path):
     assert settings_mod.settings_view(cfg)["wake"]["hold_silence_ms"] == 6000.0
     settings_mod.update_voice_edit(cfg, {"wake": {"hold_silence_ms": 50}})
     assert settings_mod.settings_view(cfg)["wake"]["hold_silence_ms"] == 300.0
+    assert settings_mod.settings_view(cfg)["wake"]["cue_on_kws"] is False
+    settings_mod.update_voice_edit(cfg, {"wake": {"cue_on_kws": True}})
+    assert settings_mod.settings_view(cfg)["wake"]["cue_on_kws"] is True
 
 
 def test_build_audio_segmenter_wires_hold_from_config(monkeypatch):

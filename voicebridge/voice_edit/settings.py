@@ -405,6 +405,11 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
                                    0.25),
             "asr_fallback": _read_cfg(cfg, "voice_edit", "wake",
                                         "asr_fallback", default=True) is not False,
+            # Immediate single-note cue at the spotter hit (the final
+            # ``wake`` beep still confirms an executed command). Default
+            # OFF: acoustic hits can be room noise/TV/music.
+            "cue_on_kws": _read_cfg(cfg, "voice_edit", "wake",
+                                    "cue_on_kws", default=False) is True,
             "asr_fallback_max_s": float(_read_cfg(
                 cfg, "voice_edit", "wake", "asr_fallback_max_s",
                 default=15.0) or 15.0),
@@ -611,6 +616,8 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                     from .schema import VoiceEditError
                     raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
                                          f"wake.{k} must be a number")
+        if "cue_on_kws" in wake:
+            clean_wake["cue_on_kws"] = bool(wake["cue_on_kws"])
         if "hold_silence_ms" in wake:
             try:
                 clean_wake["hold_silence_ms"] = float(wake["hold_silence_ms"])

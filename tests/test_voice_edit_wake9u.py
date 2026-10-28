@@ -300,6 +300,39 @@ def test_monitor_uses_injected_kws_engine():
     assert m.engine == "kws"
 
 
+def test_kws_cue_on_hit_is_opt_in(monkeypatch):
+    """An immediate spotter cue is available but off by default.
+
+    The final ``wake`` beep confirms an executed command after endpointing;
+    this cue only says "the spotter heard the phrase now". Default OFF
+    because acoustic false-fires exist.
+    """
+    import voicebridge.voice_edit.wake as wake_mod
+
+    beeps = []
+    monkeypatch.setattr(wake_mod, "beep",
+                        lambda cfg, kind="wake": beeps.append(kind) or True)
+
+    def run(cue):
+        kws = FakeKws(hits=1)
+        m = WakeMonitor(
+            FakeCfg(wake={"enabled": True, "cue_on_kws": cue,
+                          "vad": "energy"}),
+            on_command=lambda c: None,
+            is_busy=lambda: False,
+            mic_factory=lambda: SeqMic(
+                [loud_frame(), loud_frame()] + [silent_frame()] * 8),
+            transcribe=lambda pcm: "hey qubit what time is it",
+            kws=kws)
+        _run_loop(m, lambda: kws.seen >= 3)
+
+    run(True)
+    assert "ready" in beeps
+    beeps.clear()
+    run(False)
+    assert "ready" not in beeps
+
+
 def test_forced_segment_emits_command_from_kws():
     # Keyword fired; ASR rendered the wake phrase -> strip it.
     m, commands = _monitor(["hey qubit, type this for me: hello"])

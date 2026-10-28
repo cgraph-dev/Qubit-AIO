@@ -1,5 +1,11 @@
 # Qubit Office — session status (2026-10-24)
 
+**Wave 68 — Wake latency: shorter endpoint + immediate spotter cue (2026-10-28, `main`):** The wake beep was only emitted after a full command was endpointed and transcribed, and an established segment waited 1.8 s of trailing silence; that is why a one-breath "hey qubit, …" felt late while a bare "hey qubit" was fast.
+- **Code:** `voicebridge/voice_edit/wake.py` adds opt-in `wake.cue_on_kws` (default **off**) that plays the single-note `ready` cue at the KWS hit; the existing `wake` beep remains the one confirmation per executed command. `voice_edit/settings.py` exposes/validates it.
+- **Live config** (`~/.config/qubit-voicebridge/voice.yaml`, backup saved): `wake.hold_silence_ms: 900` (was implicit 1800) and `wake.cue_on_kws: true`; `config/voice.example.yaml` documents both. The helper (`qubit-voice-typing.service`) was restarted (pid 2380388) and the wake monitor reports `engine: kws`, `segmenter: silero`.
+- **Verified:** wake set (`test_voice_edit_wake9u.py`, `test_voice_wake_responsiveness9u.py`, `test_voice_wake_stall9u.py`, `test_voice_wake_settings9u.py`, `test_voice_wake_trailing9u.py`) **137 passed**; live wake still logs `kws.frames` and no errors. Not verified by a live spoken turn in this session.
+- **Not done / honest limit:** a wake during `PROCESSING`/TTS is still a `busy_skip`; making it cancel the current turn like Esc/Right-Ctrl needs a generation-fenced takeover and an echo-safe mic policy, so it was **not** enabled. No full matrix, no `VERIFIED`.
+
 **Wave 67 — One local brain: `qubit-brain` (Qwen3.5-4B, text+vision) (2026-10-28, `main`):** Consolidated the local stack on one model and removed the old alias.
 - **Model:** `qubit-brain` is now the uncensored Huihui Qwen3.5-4B abliterated (Q4_K_M, 4.21B, vision projector, 32k profile context). The old `qubit-brain4` id/model was renamed to `qubit-brain` across code defaults, config templates, live config, and tests. Default profile is explicit (not auto-selected for `/qubit-chat`) so the dashboard chat keeps its active API profile.
 - **One model for text+vision:** `auxiliary.vision`, `intent.vision`, `intent.local_llm`, `runner`, `summarizer`, and `voice_edit` all point to `qubit-brain`; `qubit-brain-vision` and the duplicate chat/vision models were deleted. Only `qubit-brain` and `nomic-embed-text` remain in Ollama.

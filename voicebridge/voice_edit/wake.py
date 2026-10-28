@@ -1271,12 +1271,16 @@ class WakeMonitor:
                         if self._kws.feed(samples):
                             kws_hit = True
                             _trace("kws.hit")
-                            # No beep here: the spotter fires on acoustics
-                            # alone and false-fires on room noise/TV/music.
-                            # The beep moved to actual emission (forced-path
-                            # full/trailing/custom picks and the unarmed full
-                            # match), so exactly one beep sounds per executed
-                            # command and silence otherwise.
+                            # The final ``wake`` beep stays on actual
+                            # emission (forced-path full/trailing/custom and
+                            # the unarmed full match), so exactly one beep
+                            # sounds per executed command. This optional
+                            # single-note cue is only immediate feedback
+                            # that the spotter heard the phrase; it is off by
+                            # default because acoustic hits can be room
+                            # noise/TV/music.
+                            if _wake_cue_on_kws(self.cfg):
+                                beep(self.cfg, "ready")
                     except Exception as exc:
                         now = time.monotonic()
                         if now - getattr(self, "_last_kws_err", 0.0) > 5.0:
@@ -1836,6 +1840,25 @@ def _wake_max_s(cfg: Any, default: float = 15.0) -> float:
     except Exception:
         v = default
     return max(2.0, min(v, 25.0))
+
+
+def _wake_cue_on_kws(cfg: Any, default: bool = False) -> bool:
+    """Whether a short "ready" cue fires the instant the KWS hears the phrase.
+
+    The final ``wake`` beep is deliberate: it confirms an *executed command*
+    after the whole utterance has been endpointed and transcribed. That is
+    why a one-breath "hey qubit, what's the time" can feel late even though
+    detection happened immediately. This opt-in cue gives immediate acoustic
+    feedback at the spotter hit, while the existing final beep stays the
+    single confirmation per executed command. Default OFF: the spotter can
+    false-fire on room noise, so a cue on every hit is not appropriate
+    everywhere. Never raises; an unreadable config uses the default.
+    """
+    try:
+        return bool(_cfg(cfg, "voice_edit", "wake", "cue_on_kws",
+                         default=default))
+    except Exception:
+        return default
 
 
 def _wake_hold_silence_ms(cfg: Any, default: float = 1800.0) -> float:
