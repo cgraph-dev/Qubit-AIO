@@ -228,8 +228,22 @@ def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
                 "num_predict": int(max_tokens)}
         if options:
             opts.update(options)
+        # Qwen3.5 and other thinking models default to reasoning ON for
+        # /api/generate too; without this flag the whole num_predict budget is
+        # spent on the thought trace (and the editor sees "Okay, let me...").
+        # Mirror the canonical local chat adapter: honor intent.local_llm.think
+        # (default False), with an explicit per-call override.
+        think = False
+        try:
+            think = bool(cfg.get("intent", "local_llm", "think", default=False))
+        except Exception:  # noqa: BLE001 - absent config keeps no-think default
+            think = False
+        if options and "think" in options:
+            think = bool(options["think"])
+        opts.pop("think", None)
         payload: dict = {
             "model": alias, "prompt": prompt, "stream": False,
+            "think": think,
             "keep_alive": rc.keep_alive if keep_alive is None else keep_alive,
             "options": opts}
         if system_prompt:

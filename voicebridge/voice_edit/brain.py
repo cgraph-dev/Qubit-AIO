@@ -48,7 +48,7 @@ def _runner_default(cfg: Any, *, system: str, user: str,
     return GW.run_role(
         user, cfg, role="classify", profile_id=profile_id or None,
         max_tokens=48, timeout_s=timeout_s, system_prompt=system,
-        local_mode="chat", reasoning="low")
+        local_mode="generate", reasoning="low")
 
 
 def _configured_model(cfg: Any) -> str:

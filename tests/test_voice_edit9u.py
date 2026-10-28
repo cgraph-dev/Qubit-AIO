@@ -884,7 +884,9 @@ def test_service_explicit_dictation_empty_payload_clarifies():
 
 
 def test_service_clarify_on_unknown_command():
-    svc, desktop, _ = _service()
+    # This pins the no-brain path: an unrecognised command must ask, not
+    # invent an action. The brain-router path is covered separately.
+    svc, desktop, _ = _service(brain_router=False)
     rid = svc.begin()["request_id"]
     svc.capture(rid)
     out = svc.transform(rid, "hello there friend")

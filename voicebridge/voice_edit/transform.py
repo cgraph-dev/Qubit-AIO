@@ -472,7 +472,7 @@ class TransformEngine:
         return GW.run_role(
             user, cfg, role="chat", profile_id=profile_id,
             max_tokens=4096, timeout_s=timeout_s,
-            system_prompt=system, local_mode="chat",
+            system_prompt=system, local_mode="generate",
             should_stop=cancel or (lambda: False),
             reasoning="low")
 

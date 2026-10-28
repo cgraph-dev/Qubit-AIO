@@ -200,7 +200,8 @@ DEFAULT_PROMPTS: Dict[str, PromptSpec] = {
             "Preserve the essential facts, requirements, constraints, "
             "decisions, and actions. Do not invent information and do not "
             "distort the meaning.\n\n"
-            "Return only the summary."),
+            "Return one short paragraph of plain prose. Do not use markdown, "
+            "bold, numbered lists, or bullets. Return only the summary."),
     ),
     "translate": PromptSpec(
         action="translate", title="Translate", version=PROMPT_VERSION,
