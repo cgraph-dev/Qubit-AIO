@@ -19,6 +19,7 @@ from connectors.google_calendar import (
     DEFAULT_LIMIT,
     MAX_ATTENDEE_COUNT,
     MAX_LIMIT,
+    MAX_PAGES,
     GoogleCalendarConnector,
     GoogleCalendarError,
 )
@@ -245,6 +246,20 @@ def test_list_stops_when_api_repeats_a_page_token(tmp_path):
     assert len(fake.calls) == 2
 
 
+def test_list_bounds_an_endless_stream_of_fresh_page_tokens(tmp_path):
+    class _EndlessGet:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def __call__(self, url, *, params, headers, timeout):
+            self.calls.append(dict(params))
+            return _Response(200, _items(next_page=f"page-{len(self.calls)}"))
+
+    fake = _EndlessGet()
+    assert _connector(tmp_path, fake).list_events(TIME_MIN, limit=10) == []
+    assert len(fake.calls) == MAX_PAGES
+
+
 def test_list_empty_result_is_empty_not_an_error(tmp_path):
     fake = _FakeGet(_Response(200, {"items": []}))
     assert _connector(tmp_path, fake).list_events(TIME_MIN) == []
@@ -356,6 +371,14 @@ def test_full_calendar_scope_satisfies_the_readonly_check(tmp_path):
     fake = _FakeGet(_Response(200, _items()))
     token = _write_token(tmp_path, scopes=(CALENDAR_FULL_SCOPE,))
     assert _connector(tmp_path, fake, token_path=token).list_events(TIME_MIN) == []
+
+
+def test_error_payload_with_http_200_is_typed(tmp_path):
+    fake = _FakeGet(_Response(200, {"error": {"code": 403, "message": "denied"}}))
+    with pytest.raises(GoogleCalendarError) as raised:
+        _connector(tmp_path, fake).list_events(TIME_MIN)
+    assert raised.value.reason == "http_error"
+    assert raised.value.status == 403
 
 
 def test_missing_scope_field_is_not_treated_as_a_silent_success(tmp_path):

@@ -39,6 +39,10 @@ DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 SEARCH_MAX_RESULTS = 30  # People API caps people:searchContacts at 30 results.
 LIST_PAGE_SIZE = 100
+# Hard cap on paginated requests. A well-behaved server needs one page for the
+# 100-result limit; this bounds an upstream that keeps returning fresh page
+# tokens with no usable connections (a request storm, not progress).
+MAX_PAGES = 20
 MAX_QUERY_CHARS = 256
 
 MAX_RESOURCE_CHARS = 128
@@ -505,7 +509,14 @@ class GoogleContactsConnector:
         contacts: list[Contact] = []
         page_token: Optional[str] = None
         seen_tokens: set[str] = set()
+        pages = 0
         while len(contacts) < limit:
+            if pages >= MAX_PAGES:
+                # Endless fresh page tokens with no usable rows must not loop.
+                logger.warning(
+                    "google_contacts: pagination stopped after %d pages", pages)
+                break
+            pages += 1
             page_params = dict(params)
             page_params["pageSize"] = max(1, min(limit - len(contacts), page_size_cap))
             if page_token:
@@ -600,6 +611,7 @@ __all__ = [
     "GoogleContactsConnector",
     "GoogleContactsError",
     "MAX_LIMIT",
+    "MAX_PAGES",
     "REASON_FORBIDDEN",
     "REASON_HTTP_ERROR",
     "REASON_INVALID_REQUEST",

@@ -35,6 +35,10 @@ TOKEN_FILENAME = "dropbox_token.json"
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 PAGE_LIMIT = 100
+# Hard cap on paginated requests. A well-behaved server needs one page for the
+# 100-result limit; this bounds an upstream that keeps returning fresh cursors
+# with no usable entries (a request storm, not progress).
+MAX_PAGES = 20
 MAX_QUERY_CHARS = 256
 MAX_PATH_CHARS = 1024
 MAX_NAME_CHARS = 255
@@ -425,6 +429,7 @@ class DropboxConnector:
 
         entries: list[DropboxEntry] = []
         seen_cursors: set[str] = set()
+        pages = 1
         while True:
             remaining = bounded - len(entries)
             if remaining <= 0:
@@ -439,7 +444,13 @@ class DropboxConnector:
             cursor = data.get("cursor")
             if not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
                 break
+            if pages >= MAX_PAGES:
+                # Fresh cursors with no usable entries must not loop forever.
+                logger.warning(
+                    "dropbox: pagination stopped after %d pages", pages)
+                break
             seen_cursors.add(cursor)
+            pages += 1
             data = self._post_json(
                 LIST_FOLDER_CONTINUE_URL, {"cursor": cursor}, token)
         return entries[:bounded]
@@ -498,6 +509,7 @@ __all__ = [
     "DropboxEntry",
     "DropboxError",
     "MAX_LIMIT",
+    "MAX_PAGES",
     "REASON_CONFLICT",
     "REASON_FORBIDDEN",
     "REASON_HTTP_ERROR",
