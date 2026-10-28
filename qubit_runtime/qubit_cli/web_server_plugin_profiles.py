@@ -150,8 +150,15 @@ def _in_process_api_file(name: str) -> Optional[Path]:
     from qubit_cli.web_server import _get_dashboard_plugins, app
     from qubit_cli.web_server_dashboard import _launch_profile_scope, _plugin_api_mounted
     if _plugin_api_mounted(app, name):
-        file = getattr(sys.modules.get(f"qubit_dashboard_plugin_{name}"), "__file__", None)
-        return Path(file).resolve() if file else None
+        # The import-time mount registers the module under the legacy
+        # ``hermes_dashboard_plugin_*`` name while the plugin host child uses the
+        # canonical ``qubit_dashboard_plugin_*`` name; accept either spelling so a
+        # secondary profile's bundled copy is recognised as in-process.
+        for module_name in (f"qubit_dashboard_plugin_{name}", f"hermes_dashboard_plugin_{name}"):
+            file = getattr(sys.modules.get(module_name), "__file__", None)
+            if file:
+                return Path(file).resolve()
+        return None
     with _launch_profile_scope():
         return plugin_api_path(_named(_get_dashboard_plugins(), name))
 
