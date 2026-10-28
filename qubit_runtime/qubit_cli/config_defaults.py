@@ -36,17 +36,10 @@ DEFAULT_CONFIG = {
     # Agent-role model tiers (`qubit agent run`). Keys are the role tiers
     # `local` / `detail` / `api`; each value is either a `{provider, model}`
     # mapping or a model-profile string (a model id run on the active
-    # provider). `local`/`detail` default to Qubit's resident local brain so
-    # role work stays local while `/chat` keeps the globally active model;
-    # `api` and an empty tier always use the active model. Set this map to `{}`
-    # to clear the defaults, or override individual tiers; a malformed entry
-    # reports `model_tier_applied: false` instead of failing a turn.
-    "roles": {
-        "model_tiers": {
-            "local": {"provider": "ollama", "model": "qubit-brain"},
-            "detail": {"provider": "ollama", "model": "qubit-brain"},
-        },
-    },
+    # provider). Empty = every role uses the globally active model, which is
+    # the historical behavior; an unmapped role reports `model_tier_applied:
+    # false` instead of failing.
+    "roles": {"model_tiers": {}},
     "fallback_providers": [],
     # min_switch_reset_seconds: opt-in (0 = off). When a rate-limited primary declares a reset
     # sooner than this many seconds, stay on it (the retry backoff rides out the window) instead
