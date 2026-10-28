@@ -2,9 +2,9 @@
 
 The terminal surface must never silently truncate, so its resolved profile is
 required to declare at least ``terminal.min_context_tokens`` (default 65536)
-context tokens. A short-context default (Brain4 declares 4096) is a typed
-configuration failure that lets the user select another provider/model, not a
-silent fall back.
+context tokens. A short-context profile is a typed configuration failure that
+lets the user select another provider/model, not a silent fall back. The
+shipped ``qubit-brain`` profile now serves 65,536 tokens.
 """
 from __future__ import annotations
 
@@ -50,14 +50,13 @@ _FRONTIER = ("intent:\n  frontier:\n    enabled: true\n"
              "    allowlist: ['opencode/big-model']\n")
 
 
-def test_default_brain4_below_floor_is_refused(tmp_path, monkeypatch):
+def test_default_brain_is_above_floor(tmp_path, monkeypatch):
     from voicebridge.providers import resolver as R
 
     cfg = _cfg(tmp_path, monkeypatch)
     out = R.terminal_context_guard(cfg)
-    assert out["ok"] is False
-    assert out["code"] == "TERMINAL_CONTEXT_BELOW_MINIMUM"
-    assert out["context_tokens"] == 4096
+    assert out["ok"] is True, out
+    assert out["context_tokens"] == 65536
     assert out["min_context_tokens"] == 65536
 
 
@@ -68,7 +67,7 @@ def test_context_floor_is_configurable(tmp_path, monkeypatch):
     assert R.terminal_min_context_tokens(cfg) == 4096
     out = R.terminal_context_guard(cfg)
     assert out["ok"] is True, out
-    assert out["context_tokens"] == 4096
+    assert out["context_tokens"] == 65536
 
 
 def test_profile_env_bridge_sets_model_and_provider(tmp_path, monkeypatch):
@@ -111,7 +110,7 @@ def test_profile_env_bridge_injects_file_secret(tmp_path, monkeypatch):
 def test_profile_env_bridge_empty_when_guard_fails(tmp_path, monkeypatch):
     from voicebridge.pty_ws import terminal_profile_env
 
-    cfg = _cfg(tmp_path, monkeypatch)
+    cfg = _cfg(tmp_path, monkeypatch, "terminal:\n  min_context_tokens: 200000\n")
     assert terminal_profile_env(cfg) == {}
 
 
@@ -144,7 +143,7 @@ def test_production_spawn_refuses_below_floor(tmp_path, monkeypatch):
 
     from voicebridge import pty_ws
 
-    cfg = _cfg(tmp_path, monkeypatch)
+    cfg = _cfg(tmp_path, monkeypatch, "terminal:\n  min_context_tokens: 200000\n")
     srv = pty_ws.PtyWsServer(cfg=cfg)
     with pytest.raises(pty_ws.TerminalContextError):
         srv._production_spawn(80, 24, "", "")
@@ -256,7 +255,7 @@ def test_resolve_model_exposes_context_tokens(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     out = R.resolve_model(cfg)
     assert out["ok"] is True
-    assert out["context_tokens"] == 4096
+    assert out["context_tokens"] == 65536
 
 
 def test_pty_production_spawn_enforces_the_floor(tmp_path, monkeypatch):
@@ -267,7 +266,8 @@ def test_pty_production_spawn_enforces_the_floor(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
     p = tmp_path / "voice.yaml"
-    p.write_text("logging:\n  jsonl: false\n")
+    p.write_text("logging:\n  jsonl: false\n"
+                 "terminal:\n  min_context_tokens: 200000\n")
     cfg = Config.load(p)
 
     class _FakeOrch:
@@ -304,7 +304,8 @@ def test_ws_ticket_mint_surfaces_the_context_error(tmp_path, monkeypatch):
     state.mkdir()
     p = tmp_path / "voice.yaml"
     p.write_text(f"logging:\n  jsonl_path: '{state}'\n"
-                 "webui:\n  token: test-token\n")
+                 "webui:\n  token: test-token\n"
+                 "terminal:\n  min_context_tokens: 200000\n")
     cfg = Config.load(p)
 
     class _FakeOrch:
@@ -495,7 +496,9 @@ def test_below_floor_refusal_is_journaled(tmp_path, monkeypatch):
     """GAP 1: the ws-ticket 409 writes a real, non-secret audit event."""
     from voicebridge import pty_ws as P
 
-    cfg = _cfg(tmp_path, monkeypatch, "webui:\n  token: test-token\n")
+    cfg = _cfg(tmp_path, monkeypatch,
+               "webui:\n  token: test-token\n"
+               "terminal:\n  min_context_tokens: 200000\n")
     state = tmp_path / "state"
     state.mkdir(exist_ok=True)
     events: list = []
@@ -514,8 +517,8 @@ def test_below_floor_refusal_is_journaled(tmp_path, monkeypatch):
         assert rec["code"] == "TERMINAL_CONTEXT_BELOW_MINIMUM"
         assert rec["profile_id"] == "qubit-brain"
         assert rec["model"] == "qubit-brain"
-        assert rec["context_tokens"] == 4096
-        assert rec["min_context_tokens"] == 65536
+        assert rec["context_tokens"] == 65536
+        assert rec["min_context_tokens"] == 200000
         assert rec["via"] == "ws-ticket"
         assert "key_ref" not in rec
         assert "base_url" not in rec
@@ -558,7 +561,9 @@ def test_ws_serve_refusal_is_journaled(tmp_path, monkeypatch):
     pytest.importorskip("websockets.sync.client")
     from websockets.sync.client import connect as ws_connect
 
-    cfg = _cfg(tmp_path, monkeypatch, "webui:\n  token: test-token\n")
+    cfg = _cfg(tmp_path, monkeypatch,
+               "webui:\n  token: test-token\n"
+               "terminal:\n  min_context_tokens: 200000\n")
     state = tmp_path / "state"
     state.mkdir(exist_ok=True)
     events: list = []

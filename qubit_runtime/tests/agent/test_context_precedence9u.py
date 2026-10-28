@@ -7,7 +7,7 @@ returning 131072. The custom-endpoint fallback at
 ``_catalog_key_matches`` was a bare substring test, the provider/runtime token
 ``ollama`` matched the ``llama`` family key (``"llama" in "ollama"``) and resolved
 to the llama family default (131,072) instead of leaving the real registration
-(``qubit-brain`` -> 4,096, its Modelfile ``num_ctx``) authoritative.
+(``qubit-brain`` -> 65,536, its Modelfile ``num_ctx``) authoritative.
 
 The fix requires a catalog key to match at a token start, so a provider token can
 never shadow a registered model. These tests pin both the fixed collision and the
@@ -25,9 +25,9 @@ from agent.model_metadata import (
 
 
 def test_registered_local_model_value_is_authoritative():
-    """``qubit-brain`` resolves to its Modelfile ``num_ctx`` (4,096), not a family default."""
-    assert _longest_key_match(DEFAULT_CONTEXT_LENGTHS, "qubit-brain") == ("qubit-brain", 4096)
-    assert get_model_context_length("qubit-brain", base_url="", provider="ollama") == 4096
+    """``qubit-brain`` resolves to its Modelfile ``num_ctx`` (65,536), not a family default."""
+    assert _longest_key_match(DEFAULT_CONTEXT_LENGTHS, "qubit-brain") == ("qubit-brain", 65536)
+    assert get_model_context_length("qubit-brain", base_url="", provider="ollama") == 65536
     assert get_model_context_length("qubit-brain", base_url="", provider="ollama") != DEFAULT_FALLBACK_CONTEXT
 
 

@@ -366,10 +366,12 @@ DEFAULT_CONTEXT_LENGTHS = {
     # paths build the agent without an endpoint URL, so the Ollama ``/api/show`` probes
     # (steps 2/5e/7) never run and an unlisted model fell through to the 256K fallback.
     # Values mirror what the runtime's own ``/api/show`` resolves live (``ollama show``):
-    # qubit-spark17 / qubit-spark4 advertise 1,048,576; qubit-brain is the Qwen3.5-4B text+vision model; the
-    # resolver profile declares 32,768 tokens, so the offline fallback matches it.
+    # qubit-spark17 / qubit-spark4 advertise 1,048,576; qubit-brain is the
+    # Qwen3.5-4B text+vision model. Its shipped Modelfile serves a 65,536-token
+    # window (above the 64K tool-use floor; the GGUF supports 262,144), so the
+    # offline fallback matches it.
     "qubit-spark17": 1_048_576, "qubit-spark4": 1_048_576,
-    "qubit-brain": 32768,
+    "qubit-brain": 65536,
 }
 # xAI Grok models that ACCEPT `reasoning.effort` (verified live against
 # /v1/responses). Unlisted Grok models still reason natively but 400 on the

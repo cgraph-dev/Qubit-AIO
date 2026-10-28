@@ -1,7 +1,8 @@
 """Role model tiers are real: mapped provider/model, honest fallback, CLI override.
 
 Everything here is hermetic: fake resolver/agent/backends, no model call and no
-network. The default map is empty, so no existing role changes behavior.
+network. The default local/detail tiers use the resident local brain; `api`/empty use
+the active model. Explicit overrides and a cleared `{}` map remain supported.
 """
 from __future__ import annotations
 
@@ -98,10 +99,13 @@ def _fake_agent_runtime(monkeypatch):
     return resolver_calls, agent_kwargs
 
 
-def test_default_config_has_an_empty_map():
+def test_default_config_local_tiers_use_the_local_brain():
     from qubit_cli.config_defaults import DEFAULT_CONFIG
 
-    assert DEFAULT_CONFIG["roles"]["model_tiers"] == {}
+    tiers = DEFAULT_CONFIG["roles"]["model_tiers"]
+    assert tiers["local"] == {"provider": "ollama", "model": "qubit-brain"}
+    assert tiers["detail"] == {"provider": "ollama", "model": "qubit-brain"}
+    assert "api" not in tiers
 
 
 def test_mapped_tier_sets_provider_and_model(monkeypatch):

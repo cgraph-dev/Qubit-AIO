@@ -244,7 +244,7 @@ def default_profiles() -> List[ModelProfile]:
         ModelProfile(
             id=DEFAULT_LOCAL_ID, kind=LOCAL, provider="ollama",
             model=DEFAULT_LOCAL_ID, locality="local", egress_consent="deny",
-            context_tokens=32768, supports_streaming=True,
+            context_tokens=65536, supports_streaming=True,
             supports_vision=True,
             # The shipped default is now the Qwen3.5-4B text+vision model
             # (uncensored Huihui build). The voice/config path selects it
