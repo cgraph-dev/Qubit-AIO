@@ -1,12 +1,16 @@
 # OPEN_THREADS.md — durable handoff ledger
 
-## ▶ Resume point — 2026-10-28 (one local brain)
+## ▶ Resume point — 2026-10-28 (W69 merged)
 
-**State:** `main` after the model consolidation; live `qubit-gateway`, `qubit-voicebridge`, `qubit-voice-typing` active; `/chat` **200**; active chat model **`opencode-go/deepseek-v4.1-flash`** (unchanged).
+**State:** `main` at `ce104699e` after the five-lane W69 merge; live `qubit-voice-typing` restarted on the merged wake/barge-in code (pid `3201624`), wake `engine: kws`, `segmenter: silero`, hotkey child healthy. `/chat` remains on the active API profile (`opencode-go/deepseek-v4.1-flash`); local model is still `qubit-brain` at 32k.
 
-**Local stack:** one text+vision model, `qubit-brain` (uncensored Huihui Qwen3.5-4B Q4_K_M; 32k profile context; vision verified). `qubit-brain-vision`, spark/cand/brain4/pre4b and duplicate vision models are deleted; only `qubit-brain` + `nomic-embed-text` remain. The shipped default id is `qubit-brain`; the default profile is explicit-only so `/qubit-chat` keeps the API default. Voice config, summarizer, intent and vision all use `qubit-brain`.
+**W69 outcome:** wake KWS conditioning + diagnostics, generation-fenced barge-in takeover, bounded connector pagination, and a broad matrix report (`docs/MATRIX-W69-2026-10-28.md`). Role tiers were briefly defaulted to local then **reverted** because `qubit-brain`'s 32,768 window is below the 64,000 tool-use floor; roles stay on the active model unless the owner maps them.
 
-**Do next:** owner live rewrite/grammar/vision test; full matrix with the canonical per-file runner; decide whether `/qubit-chat` should also default to `qubit-brain` (currently API, by design). No `VERIFIED`.
+**Do next (in order):**
+1. Decide the local tool-context question: raise `qubit-brain` to 64k (the model supports 262,144; a 64k override was validated on a real `simple` role turn) or keep roles on the API.
+2. Regenerate the two gitignored `docs/generated/*` artifacts so the 12 environment/artifact matrix failures can be re-run.
+3. Fix the 20 standalone matrix failures in bounded lanes (Codex originator, plugin manifests, kanban/telegram drift, three missing `stdin=` guards; see the matrix report).
+4. Full matrix with the canonical per-file runner; no `VERIFIED` until one clean pass.
 
 ## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
 
