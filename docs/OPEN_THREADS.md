@@ -7,10 +7,9 @@
 **W69 outcome:** wake KWS conditioning + diagnostics, generation-fenced barge-in takeover, bounded connector pagination, a broad matrix report (`docs/MATRIX-W69-2026-10-28.md`), and `qubit-brain` raised to a **65,536-token** window (GGUF max 262,144) so local `local`/`detail` role tiers clear the 64,000 tool-use floor. A real `qubit agent run simple` returned `CTX64_OK` on `ollama/qubit-brain`.
 
 **Do next (in order):**
-1. Regenerate the two gitignored `docs/generated/*` artifacts so the environment/artifact matrix failures can be re-run.
-2. Fix the remaining standalone matrix failures in bounded lanes (Codex originator, plugin manifests, kanban/telegram drift, three missing `stdin=` guards; see the matrix report).
-3. Re-run the 32k-context voice/chat tests; the guard no longer fires.
-4. Full matrix with the canonical per-file runner; no `VERIFIED` until one clean pass.
+1. Regenerate the gitignored `docs/generated/*` artifacts (the W70 tests no longer depend on them, but `test_qbpv2_agent4_tri_parity.py` does): `python scripts/rebuild_ledger_openclaw.py`.
+2. Run the full canonical matrix (qubit_runtime per-file runner + root + frontend where practical); no `VERIFIED` until one clean pass. The W70 repairs are merged and the originally failing files are green.
+3. Record the final matrix evidence in `docs/STATUS.md`; no milestone claims before it.
 
 ## Wave 65 — 2026-10-27 (P8 decision + CLI reachability)
 

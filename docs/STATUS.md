@@ -9,6 +9,15 @@
 - **Live:** helper restarted on the merged tree (pid `3201624`), wake monitor `engine: kws`, `segmenter: silero`, hotkey child healthy. `/chat` unchanged by config (active API profile). No full matrix, no `VERIFIED`.
 - **Next:** regenerate the two gitignored `docs/generated/*` artifacts and fix the 20 standalone matrix failures in bounded lanes (the 32k tool-use-floor group is now closed by the 64k raise).
 
+**Wave 70 — Matrix-failure repair (2026-10-28, `main`):** Four isolated worktrees fixed the 20 files / 42 tests that reproduced standalone after the W69 matrix; no full matrix was run yet (owner instruction).
+- **Voice/e2e/coverage (`78e0f6047`):** pinned the documented agent-fallback seam (persisted reasoning, chat↔voice prior-turn, hermetic e2e), split the live `/api/events` auth expectation to typed `401`, stubbed the actual DDG fallback (no Perplexity egress), added `office` to `CLI_COVERAGE` with a typed reason, declared three Obsidian editor routes dashboard-only, and warmed a synchronous achievements rescan before the voice-vs-dashboard comparison.
+- **Providers/plugins (`06cf5b28c`):** corrected the Codex originator expectation to the registered harness identity, added real manifests for `lmstudio`/`solstice`/`tencent-tokenhub`, restored the paired Mistral tool-call-id assertion, and fixed Telegram's cancelled error-handler claim cleanup.
+- **Kanban/runtime (`de79389e0`):** pinned the archived-board tombstone, accepted the legacy mounted plugin module name for secondary profiles, and made `NativeRuntime` report a non-dict turn result as an error instead of `completed=True`.
+- **Artifacts/guards (`20010a91c`):** generated parity rows into `tmp_path` (no gitignored dependency), removed the purged `OPERATIONS_7C.md` from the distributable manifest, and added `stdin=subprocess.DEVNULL` to the three guard-flagged calls.
+- **Extra:** restored the missing bundled `opencode-free` provider (`8bb68d3c3`) after the discovery test exposed it; regenerated `docs/generated/QUBIT_GAP_LEDGER.openclaw.json` before running `test_qbpv2_agent4_tri_parity.py`.
+- **Verified:** originally failing root set **139 passed, 1 skipped, 7 xfailed**; originally failing runtime set **270 passed**; `test_qbpv2_agent4_tri_parity.py` **16 passed**. Matrix rerun/full matrix still pending.
+- **Not done:** full matrix; `VERIFIED`.
+
 **Ops note — browser keyboard restored (2026-10-28):** Firefox/Chromium typing was dead while other apps worked. `ibus engine` returned `IBUS-CRITICAL ... assertion failed` / "No engine is set"; `ibus restart` restored `xkb:us::eng`, and synthetic typing then reached Chromium again. This was the IBus input framework, not Qubit code; the helper was restarted afterwards (pid `3287974`) and remains active.
 
 **Wave 68 — Wake latency: shorter endpoint + immediate spotter cue (2026-10-28, `main`):** The wake beep was only emitted after a full command was endpointed and transcribed, and an established segment waited 1.8 s of trailing silence; that is why a one-breath "hey qubit, …" felt late while a bare "hey qubit" was fast.
