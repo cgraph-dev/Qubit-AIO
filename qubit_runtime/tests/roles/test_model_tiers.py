@@ -98,10 +98,141 @@ def _fake_agent_runtime(monkeypatch):
     return resolver_calls, agent_kwargs
 
 
-def test_default_config_has_an_empty_map():
+def test_default_config_maps_local_and_detail_to_the_local_brain():
     from qubit_cli.config_defaults import DEFAULT_CONFIG
 
-    assert DEFAULT_CONFIG["roles"]["model_tiers"] == {}
+    tiers = DEFAULT_CONFIG["roles"]["model_tiers"]
+    assert tiers["local"] == {"provider": "ollama", "model": "qubit-brain"}
+    assert tiers["detail"] == {"provider": "ollama", "model": "qubit-brain"}
+    # api/empty are deliberately absent: they always mean "use the active model".
+    assert "api" not in tiers and "" not in tiers
+
+
+def _clear_config_caches() -> None:
+    import qubit_cli.config as config_mod
+
+    for name in ("_LOAD_CONFIG_CACHE", "_RAW_CONFIG_CACHE",
+                 "_LAST_EXPANDED_CONFIG_BY_PATH"):
+        getattr(config_mod, name).clear()
+
+
+@pytest.mark.parametrize("tiers_yaml,expected", [
+    ("{}", {}),
+    ("{local: {provider: custom, model: my-local}}",
+     {"local": {"provider": "custom", "model": "my-local"},
+      "detail": {"provider": "ollama", "model": "qubit-brain"}}),
+])
+def test_user_config_can_clear_or_override_the_default_map(
+        tmp_path, monkeypatch, tiers_yaml, expected):
+    import qubit_cli.config as config_mod
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    _clear_config_caches()
+    try:
+        (tmp_path / "config.yaml").write_text(
+            "model:\n"
+            "  provider: active-prov\n"
+            "  default: active-model\n"
+            "roles:\n"
+            f"  model_tiers: {tiers_yaml}\n",
+            encoding="utf-8")
+        loaded = config_mod.load_config()
+        assert loaded["roles"]["model_tiers"] == expected
+        # The active /chat model is untouched by either shape.
+        assert loaded["model"]["provider"] == "active-prov"
+        assert loaded["model"]["default"] == "active-model"
+    finally:
+        _clear_config_caches()
+
+
+def test_default_map_does_not_change_the_active_chat_model():
+    import copy
+
+    from qubit_cli.config_defaults import DEFAULT_CONFIG
+
+    config = {
+        "model": {"provider": "active-prov", "default": "active-model"},
+        "roles": copy.deepcopy(DEFAULT_CONFIG["roles"]),
+    }
+    before = copy.deepcopy(config["model"])
+
+    local = role_runner.resolve_model_selection(
+        _role("local"), config=config)
+    for tier in ("api", ""):
+        selection = role_runner.resolve_model_selection(
+            _role(tier), config=config)
+        assert selection["requested"] == "active-prov"
+        assert selection["target_model"] == "active-model"
+        assert selection["applied"] is True
+        assert selection["note"] == f"{tier or 'empty'} tier uses the active model"
+
+    assert local["requested"] == "ollama"
+    assert local["target_model"] == "qubit-brain"
+    assert local["applied"] is True
+    # The role map never rewrites the active model slot /chat reads.
+    assert config["model"] == before == {"provider": "active-prov",
+                                         "default": "active-model"}
+
+
+def test_default_local_tier_supplies_the_local_ollama_endpoint(monkeypatch):
+    from qubit_cli.config_defaults import DEFAULT_CONFIG
+
+    seen = {}
+
+    def resolve(**kwargs):
+        seen.update(kwargs)
+        return {"provider": "custom", "model": kwargs["target_model"],
+                "api_key": "no-key-required",
+                "base_url": kwargs.get("explicit_base_url")}
+
+    monkeypatch.setattr(
+        "qubit_cli.runtime_provider.resolve_runtime_provider", resolve)
+    monkeypatch.setattr(
+        "qubit_cli.models_local._get_ollama_base_url",
+        lambda: "http://127.0.0.1:11434")
+
+    role = _role("local")
+    selection = role_runner.resolve_model_selection(role, config=DEFAULT_CONFIG)
+    role_runner._resolve_role_runtime(selection, DEFAULT_CONFIG)
+
+    assert seen == {
+        "requested": "ollama",
+        "target_model": "qubit-brain",
+        "explicit_base_url": "http://127.0.0.1:11434/v1",
+    }
+
+
+def test_unresolvable_tier_map_falls_back_to_the_active_model(monkeypatch):
+    from qubit_cli.config_defaults import DEFAULT_CONFIG
+
+    calls = []
+
+    def resolve(**kwargs):
+        calls.append(kwargs)
+        if kwargs.get("requested") == "bogus-prov":
+            raise RuntimeError("no such provider")
+        return {"provider": kwargs["requested"], "model": kwargs["target_model"],
+                "api_key": "k", "base_url": "http://api"}
+
+    monkeypatch.setattr(
+        "qubit_cli.runtime_provider.resolve_runtime_provider", resolve)
+    monkeypatch.setattr(
+        "qubit_cli.models_local._get_ollama_base_url",
+        lambda: "http://127.0.0.1:11434")
+
+    config = {"model": {"provider": "active-prov", "default": "active-model"},
+              "roles": {"model_tiers": {"local": {"provider": "bogus-prov",
+                                                  "model": "x"}}}}
+    role = _role("local")
+    selection = role_runner.resolve_model_selection(role, config=config)
+    role_runner._resolve_role_runtime(selection, config)
+
+    assert selection["applied"] is False
+    assert selection["target_model"] == "active-model"
+    assert "could not resolve" in selection["note"]
+    assert "using the active model" in selection["note"]
+    assert calls[-1] == {"requested": "active-prov",
+                         "target_model": "active-model"}
 
 
 def test_mapped_tier_sets_provider_and_model(monkeypatch):

@@ -1566,6 +1566,37 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+#: Dotted maps with clear-vs-merge semantics. ``roles.model_tiers`` needs this
+#: so an explicit ``{}`` in config.yaml CLEARS the shipped default tiers (a
+#: recursive merge would silently keep every default key) while a non-empty
+#: user map still overrides individual entries and keeps the other defaults.
+_CLEARABLE_MAP_OVERRIDES = (("roles", "model_tiers"),)
+
+
+def _apply_whole_map_overrides(config: dict, user_config: dict) -> dict:
+    """Apply clear-or-merge rules for the maps listed above."""
+    for section, key in _CLEARABLE_MAP_OVERRIDES:
+        user_section = user_config.get(section)
+        if not isinstance(user_section, dict) or key not in user_section:
+            continue
+        value = user_section.get(key)
+        if not isinstance(value, dict):
+            continue
+        target = config.get(section)
+        if not isinstance(target, dict):
+            target = {}
+            config[section] = target
+        # ``{}`` is the documented "clear the defaults" spelling; anything else
+        # merges entry-by-entry over the shipped map.
+        target[key] = {} if not value else _deep_merge(target.get(key) or {}, value)
+    return config
+
+
+def _merge_user_config(defaults: dict, user_config: dict) -> dict:
+    """``_deep_merge`` plus the whole-map override rules above."""
+    return _apply_whole_map_overrides(_deep_merge(defaults, user_config), user_config)
+
+
 def _strip_dotted_keys(cfg: dict, dotted_keys: set) -> Tuple[dict, set]:
     """Remove dotted leaf keys from *cfg* in place -> ``(cfg, keys_actually_present)``.
     ``save_config`` drops managed-scope leaves this way so a bulk write never persists a user
@@ -2309,7 +2340,7 @@ def _last_known_good_fallback(config_path: Path, path_key: str, cache_sig, exc: 
         raw_good = load_newest_good_backup(config_path)
         if raw_good is not None:
             from qubit_cli.moa_config import apply_user_moa_presets
-            merged_good = _deep_merge(copy.deepcopy(DEFAULT_CONFIG), raw_good)
+            merged_good = _merge_user_config(copy.deepcopy(DEFAULT_CONFIG), raw_good)
             apply_user_moa_presets(merged_good, raw_good)
             normalized = _canonicalize_config(merged_good)
             expanded_good: Dict[str, Any] = _expand_env_vars(normalized)  # type: ignore[assignment]
@@ -2376,7 +2407,7 @@ def _load_config_cache_hit(path_key: str, cache_sig: Any) -> Optional[Dict[str, 
 def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
     snapshot = _worker_config_snapshot()
     if snapshot is not None:
-        return _deep_merge(copy.deepcopy(DEFAULT_CONFIG), snapshot)
+        return _merge_user_config(copy.deepcopy(DEFAULT_CONFIG), snapshot)
 
     # Lock-free fast path for cache hits — same publication contract as `_read_raw_config_impl`
     # above (whole-tuple replace, `_CONFIG_LOCK` only serializes rebuilds and writers). A hit costs
@@ -2421,7 +2452,7 @@ def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
                     user_config["agent"] = agent_user_config
                     user_config.pop("max_turns", None)
 
-                config = _deep_merge(config, user_config)
+                config = _merge_user_config(config, user_config)
                 from qubit_cli.moa_config import apply_user_moa_presets
                 apply_user_moa_presets(config, user_config)
                 # A copy of the file that just parsed is what a FRESH process falls back to when the
