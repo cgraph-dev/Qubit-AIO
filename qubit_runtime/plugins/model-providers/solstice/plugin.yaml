@@ -1,0 +1,5 @@
+name: solstice-provider
+kind: model-provider
+version: 1.0.0
+description: Solstice (per-user Gemini quota, OAuth through Nous Portal)
+author: Qubit Labs

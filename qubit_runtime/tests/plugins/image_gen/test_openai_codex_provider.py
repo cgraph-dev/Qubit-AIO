@@ -144,7 +144,9 @@ class TestGenerate:
         assert provider.generate("a cat")["success"] is True
         (request,) = codex_backend["requests"]
         assert str(request.url) == "https://chatgpt.com/backend-api/codex/images/generations"
-        assert request.headers["originator"] == "qubit"
+        # The official endpoint only accepts the originator the harness is registered under;
+        # custom proxies keep the codex_cli_rs compatibility identity. See agent/codex_headers.py.
+        assert request.headers["originator"] == "hermes-agent"
 
     def test_profile_scope_routes_each_request_without_borrowing_process_override(
         self, provider, codex_backend, monkeypatch,
