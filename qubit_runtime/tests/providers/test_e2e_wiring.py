@@ -61,11 +61,15 @@ class TestNvidiaProfileWiring:
             ollama_num_ctx=None,
         )
 
+        # A Mistral model on NIM gets 9-character tool ids (both sides map identically).
         assert kwargs["messages"][2] == {
             "role": "tool",
-            "tool_call_id": "call_1",
+            "tool_call_id": kwargs["messages"][1]["tool_calls"][0]["id"],
             "content": "ok",
         }
+        assert len(kwargs["messages"][2]["tool_call_id"]) == 9
+        assert kwargs["messages"][2]["tool_call_id"].isalnum()
+        assert msgs[1]["tool_calls"][0]["id"] == "call_1"
         assert msgs[2]["name"] == "terminal"
         assert msgs[2]["tool_name"] == "terminal"
 

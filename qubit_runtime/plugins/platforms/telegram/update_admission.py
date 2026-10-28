@@ -13,7 +13,7 @@ import json
 import logging
 import time
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import wraps
 
 from telegram import Update
@@ -100,6 +100,8 @@ class _Claim:
     completed: bool = False
     failed: bool = False
     owners: int = 1
+    tasks: list[asyncio.Task] = field(default_factory=list)
+    task_coroutines: dict[asyncio.Task, object] = field(default_factory=dict)
 
 
 class _ErrorCallback:
@@ -229,6 +231,13 @@ class TelegramApplication(Application):
         admitted_callback._telegram_admitted = True
         handler.callback = admitted_callback
 
+    async def stop(self):
+        await super().stop()
+        # PTB gathers the tasks it created without necessarily yielding to the done
+        # callbacks that release their admission claims. Drain that queue once so a
+        # task cancelled before its first step cannot outlive stop().
+        await asyncio.sleep(0)
+
     def add_error_handler(self, callback, block=_DEFAULT_BLOCK):
         if not isinstance(callback, _ErrorCallback):
             callback = _ErrorCallback(callback)
@@ -247,19 +256,41 @@ class TelegramApplication(Application):
         if claim is not None and claim.owners:
             # Pin scheduled work before callback entry, including cancellation before entry.
             claim.owners += 1
+            claim.tasks.append(task)
+            claim.task_coroutines[task] = coroutine
 
             def finished(done):
-                # PTB's task wrapper may never start, leaving its callback unawaited.
-                if done.cancelled() and asyncio.iscoroutine(coroutine):
-                    coroutine.close()
-                self._release_claim(claim, done)
+                self._release_task(claim, done)
 
             task.add_done_callback(finished)
         return task
 
-    def _release_claim(self, claim, task=None):
-        if task is not None and task.cancelled():
+    def _release_task(self, claim, task):
+        """Release one scheduled PTB task exactly once (done callback or dispatch sweep)."""
+        if task not in claim.task_coroutines:
+            return
+        coroutine = claim.task_coroutines.pop(task)
+        claim.tasks.remove(task)
+        if task.cancelled():
             claim.failed = True
+            # PTB's task wrapper may never start, leaving its callback unawaited.
+            if asyncio.iscoroutine(coroutine):
+                coroutine.close()
+        self._settle_claim(claim)
+
+    def _release_claim(self, claim, task=None):
+        if task is not None:
+            self._release_task(claim, task)
+            return
+        # A task cancelled before entry is already done, but its done callback may
+        # still be queued behind this dispatch frame (app.stop() cannot always yield).
+        # Reclaim those owners now so a failed pre-entry update never stays in flight.
+        for pending in list(claim.tasks):
+            if pending.done():
+                self._release_task(claim, pending)
+        self._settle_claim(claim)
+
+    def _settle_claim(self, claim):
         claim.owners -= 1
         if claim.owners:
             return
