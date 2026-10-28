@@ -6,13 +6,17 @@ pipeline and emits ``docs/generated/voice_coverage.json``. This test guards the
 report's *relationships*, not exact counts (no change-detector):
 
 * the report renders byte-identically across two in-process renders;
-* the on-disk artifact matches a fresh render;
+* a generated artifact matches a fresh render;
 * no voice entry references a dead backend (``dead_backends == 0``);
 * ``real + guard + unresolved == total`` per surface, overall, and per row.
 
 Scope note: this file is intentionally distinct from the existing
 ``tests/test_voice_inventory_coverage.py`` (which asserts the W7 alias bindings);
-this one only validates the regenerated artifact. It writes nothing.
+this one only validates the regenerated artifact. ``docs/generated/`` is
+gitignored, so a fresh worktree has no artifact: the parity rows are built by
+the real ``scripts.parity_inventory.build_controls()`` and both the inventory
+fixture and the coverage artifact are written under ``tmp_path``. Nothing in
+the repository is written.
 """
 from __future__ import annotations
 
@@ -26,7 +30,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
-ARTIFACT = REPO / "docs" / "generated" / "voice_coverage.json"
 
 RESOLUTIONS = ("real", "guard", "unresolved")
 
@@ -48,26 +51,42 @@ def mod():
 
 
 @pytest.fixture(scope="module")
-def report(mod):
-    return mod.render()
+def fixture_inventory(tmp_path_factory):
+    """A real parity inventory rendered to a tmp path (no repo artifact)."""
+    from scripts import parity_inventory as pi
+
+    rows = pi.build_controls()
+    assert rows, "parity inventory fixture is empty"
+    path = tmp_path_factory.mktemp("generated") / "parity_inventory.json"
+    path.write_text(
+        json.dumps({"schema": pi.SCHEMA, "rows": rows},
+                   indent=2, sort_keys=True) + "\n",
+        encoding="utf-8")
+    return path
+
+
+@pytest.fixture(scope="module")
+def report(mod, fixture_inventory):
+    return mod.render(fixture_inventory)
 
 
 # ------------------------------------------------------- (a) determinism
-def test_two_in_process_renders_are_byte_identical(mod):
-    first = mod.dumps(mod.render())
-    second = mod.dumps(mod.render())
+def test_two_in_process_renders_are_byte_identical(mod, fixture_inventory):
+    first = mod.dumps(mod.render(fixture_inventory))
+    second = mod.dumps(mod.render(fixture_inventory))
     assert first == second, "voice coverage render is nondeterministic"
 
 
-# --------------------------------------------- (b) on-disk artifact is fresh
-def test_on_disk_artifact_matches_a_fresh_render(mod, report):
-    assert ARTIFACT.is_file(), (
-        "docs/generated/voice_coverage.json is missing; regenerate with "
-        "`python scripts/voice_inventory_coverage.py`")
-    on_disk = ARTIFACT.read_text(encoding="utf-8")
+# --------------------------------------------- (b) generated artifact is fresh
+def test_on_disk_artifact_matches_a_fresh_render(
+        mod, report, fixture_inventory, tmp_path):
+    out = tmp_path / "voice_coverage.json"
+    rc = mod.main(["--inventory", str(fixture_inventory), "--out", str(out)])
+    assert rc == 0
+    assert out.is_file(), "generator did not write the coverage artifact"
+    on_disk = out.read_text(encoding="utf-8")
     assert on_disk == mod.dumps(report), (
-        "docs/generated/voice_coverage.json is stale; regenerate with "
-        "`python scripts/voice_inventory_coverage.py`")
+        "generated voice coverage artifact is stale")
     parsed = json.loads(on_disk)
     assert parsed["schema"] == mod.SCHEMA
     assert parsed["source"] == mod.DEFAULT_INVENTORY

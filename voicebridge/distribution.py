@@ -368,7 +368,6 @@ DISTRIBUTABLE_FILES = [
     ("config/voice.example.yaml", "config-template"),
     ("systemd/qubit-voicebridge.service", "systemd-template"),
     ("pyproject.toml", "metadata"),
-    ("docs/archive/2026-09-21/OPERATIONS_7C.md", "metadata"),
 ]
 
 

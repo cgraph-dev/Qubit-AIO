@@ -438,6 +438,12 @@ def test_distributable_files_exist_in_repo():
         assert (REPO / rel).exists(), f"required distributable file missing: {rel}"
 
 
+def test_distributable_manifest_does_not_require_purged_archive_docs():
+    """docs/archive/ markdown was purged (docs authority); never require it."""
+    assert not [rel for rel, _role in D.DISTRIBUTABLE_FILES
+                if rel.startswith("docs/archive/")]
+
+
 def test_launcher_and_install_from_outside_repo_and_home(tmp_path):
     """Prove the distributable can install and launch from a staging dir
     OUTSIDE the repository and OUTSIDE the developer home directory."""
