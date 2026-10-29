@@ -425,6 +425,7 @@ COMPLETE_EXAMPLES = {
     "browser_screenshot": "qubit, take a screenshot",
     "browser_find": "qubit, search this page invoices",
     "browser_open_browser": "qubit, open the browser",
+    "browser_cdp_open": "qubit, open browser",
     "browser_activate": "qubit, switch to tab inbox",
     "browser_open": "qubit, open page https://example.com",
     "browser_navigate": "qubit, navigate to https://example.com",

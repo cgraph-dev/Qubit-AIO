@@ -33,7 +33,11 @@ EXAMPLE_PHRASES: Dict[str, List[str]] = {
     "volume_mute": ["mute the speaker"],
     "mic_mute": ["mute the microphone"],
     "open_app": ["open the browser", "launch spotify"],
-    "open_project": ["open the website project in vscode"],
+    # Project names come from the operator's own ``project_roots``; a
+    # generic example cannot verify, and baking a personal name into the
+    # shipped catalog is not allowed. Advertise no example rather than a
+    # phrase that only works for one machine.
+    "open_project": [],
     "create_document": ["create a text document",
                         "make me a new note called shopping"],
     "open_website": ["open youtube", "go to github.com"],
@@ -62,7 +66,11 @@ EXAMPLE_PHRASES: Dict[str, List[str]] = {
     "empty_trash": ["empty the trash"],
     "bluetooth_toggle": ["toggle bluetooth"],
     "time_date": ["what time is it"],
-    "send_message": ["reply to Ana on messenger saying on my way"],
+    # The local action accepts only the internal staged draft
+    # (``reply|<channel>|<to>|<href>|<body>``); "reply to Ana on
+    # messenger saying on my way" is parsed by the service reply-draft
+    # path, not by this action, so it must not be advertised here.
+    "send_message": [],
 }
 
 

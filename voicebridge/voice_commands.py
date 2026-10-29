@@ -7053,7 +7053,10 @@ _E("computer_ops", "Desktop operation catalog",
    help="Bounded allowlisted desktop ops (launch/PiP/present); no shell, "
         "no argv, no window manager.")
 _E("computer_launch", "Launch an approved app",
-   ("launch app", "open app", "launch browser", "open the browser app",
+   # "launch browser" belongs to browser_cdp_open (it launches the real
+   # CDP-enabled profile); this entry launches generic approved apps and
+   # keeps its browser-capable form explicit as "launch app browser".
+   ("launch app", "open app", "open the browser app",
     "launch terminal"),
    "computer", ("computer-use",),
    args=(_R("app"), _S("target")), fixed=(("action", "launch"),), confirm=True,
@@ -9437,7 +9440,9 @@ _E("shares_purge", "Purge expired shares",
 # console; reads execute immediately, mutations stage the shared journal
 # confirmation. Every backend is the same module function the CLI calls.
 _E("browser_cdp_open", "Open browser for Qubit",
-   ("open browser", "launch browser", "open the browser",
+   # "open the browser" belongs to browser_open_browser (focus/handoff);
+   # this entry owns the launch phrasing and the bare "open browser".
+   ("open browser", "launch browser",
     "open chromium", "open chromium browser"),
    "browser_cdp", ("browser",), fixed=(("action", "open"),),
    examples=("qubit, open browser",),
