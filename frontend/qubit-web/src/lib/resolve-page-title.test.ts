@@ -86,6 +86,11 @@ describe("resolvePageTitle", () => {
     expect(resolvePageTitle("/webchat", t, [])).toBe("WebChat");
   });
 
+  it("resolves Qubit TV", () => {
+    expect(resolvePageTitle("/qubit-tv", t, [])).toBe("Qubit TV");
+    expect(resolvePageTitle("/qubit-tv/", t, [])).toBe("Qubit TV");
+  });
+
   it("resolves the Bot / Harness Router / Open Viking console titles", () => {
     // Integrator lane 3: page-documented paths, titles match each page's
     // own heading (the Viking children use their short h1s).

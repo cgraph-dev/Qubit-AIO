@@ -60,6 +60,7 @@ import {
   Sparkles,
   Star,
   Terminal,
+  Tv,
   Upload,
   Users,
   Webhook,
@@ -200,6 +201,9 @@ const AgentCardsPage = lazy(() => import("@/pages/AgentCardsPage"));
 const KitchenPage = lazy(() => import("@/pages/KitchenPage"));
 // OmniRoute: local AI-gateway console (status + wiring, dashboard opens out).
 const OmniRoutePage = lazy(() => import("@/pages/OmniRoutePage"));
+// Qubit TV: streaming launcher + YouTube embed (web variant of the MIT
+// HermesTV desktop plugin; DRM services open in the browser).
+const QubitTvPage = lazy(() => import("@/pages/QubitTvPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -346,6 +350,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/agent-cards": AgentCardsPage,
   "/kitchen": KitchenPage,
   "/omniroute": OmniRoutePage,
+  "/qubit-tv": QubitTvPage,
   "/qubit-office": () => <PluginPage name="qubit-office" />,
   "/qubit-office2": () => <PluginPage name="qubit-office2" />,
   "/qubit-office3": () => <PluginPage name="qubit-office3" />,
@@ -483,6 +488,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/computer", label: "Computer", icon: Monitor },
   { path: "/kitchen", label: "Kitchen", icon: ChefHat },
   { path: "/omniroute", label: "OmniRoute", icon: Network },
+  { path: "/qubit-tv", label: "Qubit TV", icon: Tv },
   { path: "/canvas", label: "Qubit Canvas", icon: Eye },
   { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
   { path: "/qubit-harness-router", label: "Harness Router", icon: Workflow },
