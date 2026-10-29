@@ -107,7 +107,7 @@ intent:
     # Packet 4B: personal facts come ONLY from the bounded context compiler
     # (user-local personal-knowledge.md via load_core_facts); raw file slices
     # are never injected. Legacy inject_memory key is no longer read.
-    num_ctx: 65536        # qubit-brain serves a 64K window (above the 64K tool-use floor)
+    num_ctx: 32768        # voice/local chat: 32K is faster; tool roles use the 64K model
 
   # EG2 L1.5 augmenter (template: OFF): UNKNOWN-only, with a hard high-risk veto.
   router:
