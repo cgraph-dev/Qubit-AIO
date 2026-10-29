@@ -1,0 +1,4751 @@
+QUBIT VOICE COMMANDS
+====================
+Editable catalog. Generated from the live registries on 2026-10-29.
+
+IMPORTANT: editing a phrase in this .txt does NOT change the running app.
+This file is the reference/plan. To make a new command live, see
+'HOW TO ADD A NEW COMMAND' at the bottom and give that to the implementing agent.
+
+Legend:
+  [immediate]  runs as soon as it is heard
+  [confirm]    Qubit asks 'say yes' before acting
+  [direct]     deterministic answer, no model
+  rx:          an advanced regex alias (not a normal spoken phrase)
+
+QUICK START
+-----------
+  hey qubit, open youtube
+  hey qubit, open messenger
+  hey qubit, what's the weather in Bucharest
+  hey qubit, stop brain while I'm playing
+  hey qubit, start the brain
+  hey qubit, switch tab to the second display
+  stop
+
+1. WAKE, STOP AND CONFIRMATION
+-------------------------------
+Wake phrases (say one, then the command):
+  - hey qubit
+  - hi qubit
+  - ok qubit
+  - okay qubit
+  - hey cubit
+  - hey qbit
+  - hey qubits
+  - a qubit
+  - a cubit
+  - eh qubit
+  - hey cupid
+  - hey cubid
+  - hey cue bit
+  - hey cube it
+  - hey quip it
+  - hi cupid
+  - ok cupid
+  - okay cupid
+  - a cupid
+  - hey cutie
+
+Stop / interrupt (no confirmation, stops speech and the in-flight turn):
+  - be quiet
+  - cancel
+  - cancel that
+  - enough
+  - halt
+  - never mind
+  - nevermind
+  - quiet
+  - shut up
+  - stop
+  - stop it
+  - stop now
+  - stop please
+  - stop talking
+  - stop that
+
+Confirmation words (only while Qubit is asking 'say yes'):
+  YES: confirm, confirm task, confirmed, do it, go ahead, ok, okay, proceed, run it, run the task, sure, yeah, yep, yes, yes please, yup
+  NO:  abort, cancel, dont, nah, never mind, nevermind, no, no thanks, nope, stop
+
+2. LOCAL PC COMMANDS
+--------------------
+These are the deterministic machine actions. No model call.
+
+[immediate] volume_up - raise speaker volume
+  Say: turn the volume up | raise the volume
+  Confirm: no
+
+[immediate] volume_down - lower speaker volume
+  Say: turn the volume down
+  Confirm: no
+
+[immediate] volume_mute - toggle speaker mute
+  Say: mute the speaker
+  Confirm: no
+
+[immediate] mic_mute - toggle microphone mute
+  Say: mute the microphone
+  Confirm: no
+
+[immediate] open_app - launch an application
+  Say: open the browser | launch spotify
+  Confirm: no
+
+[immediate] open_project - open a project in VS Code
+  Say: open the website project in vscode
+  Confirm: no
+
+[immediate] create_document - create and open a text document
+  Say: create a text document | make me a new note called shopping
+  Confirm: no
+
+[immediate] tab_new - open a new blank browser tab
+  Say: new tab | open a new tab
+  Confirm: no
+
+[immediate] tab_list - list the open browser tabs
+  Say: what tabs are open | list my tabs
+  Confirm: no
+
+[immediate] brain_unload - unload the local brain before gaming
+  Say: stop brain | free the VRAM | I'm going to game
+  Confirm: no
+
+[immediate] brain_warm - warm the local brain again
+  Say: wake up the brain | load the brain | start the brain | welcome to the brain
+  Confirm: no
+
+[immediate] display_switch - move the active window to a display
+  Say: switch tab to the second display | move this window to the first screen | send it to the first monitor
+  Confirm: no
+
+[immediate] tab_switch - switch to a browser tab
+  Say: switch to the inbox tab | go to the github tab
+  Confirm: no
+
+[immediate] tab_duplicate - duplicate a browser tab
+  Say: duplicate this tab | duplicate the current tab
+  Confirm: no
+
+[immediate] tab_close - close a browser tab
+  Say: close this tab | close the inbox tab
+  Confirm: no
+
+[confirm] window_close - close the active window
+  Say: close this window
+  Confirm: yes
+
+[immediate] open_website - open a website in the browser
+  Say: open youtube | go to github.com | open messenger | open instagram | open your tube
+  Confirm: no
+
+[immediate] open_folder - open Downloads/Documents in Files
+  Say: open the downloads folder | show documents folder
+  Confirm: no
+
+[confirm] repo_edit - stage/apply a voice change in a repo (confirm-gated)
+  Say: in repo qubit-voicebridge change the title
+  Confirm: yes
+
+[immediate] vscode_open - open a file in VS Code
+  Say: open main.py in VS Code | show app.tsx in code
+  Confirm: no
+
+[immediate] code_mcp_probe - probe the VS Code native MCP integration (read-only)
+  Say: check code mcp | is VS Code MCP available
+  Confirm: no
+
+[immediate] open_document - open a text document for writing
+  Say: open the text document | open my shopping note
+  Confirm: no
+
+[immediate] screenshot - take a screenshot
+  Say: take a screenshot
+  Confirm: no
+
+[immediate] clipboard - read the clipboard
+  Say: read the clipboard
+  Confirm: no
+
+[immediate] play_youtube - play a YouTube song/video
+  Say: play Never Gonna Give You Up | play lofi hip hop on youtube
+  Confirm: no
+
+[immediate] yt_mode - choose youtube play mode (tab vs background)
+  Say: in the background | in a windowed tab
+  Confirm: no
+
+[immediate] youtube_pause - pause youtube playback
+  Say: pause the music
+  Confirm: no
+
+[immediate] youtube_resume - resume youtube playback
+  Say: resume the music
+  Confirm: no
+
+[immediate] youtube_next - play the next youtube result
+  Say: next song
+  Confirm: no
+
+[immediate] youtube_stop - stop youtube playback and close tabs
+  Say: stop the music
+  Confirm: no
+
+[immediate] lock - lock the screen
+  Say: lock the screen
+  Confirm: no
+
+[immediate] brightness_up - raise screen brightness
+  Say: brightness up
+  Confirm: no
+
+[immediate] brightness_down - lower screen brightness
+  Say: brightness down
+  Confirm: no
+
+[immediate] system_stats - report CPU/RAM/disk stats
+  Say: how is the system
+  Confirm: no
+
+[immediate] timer - set a timer
+  Say: set a timer for five minutes
+  Confirm: no
+
+[immediate] quick_note - save a quick note
+  Say: note that the meeting is at three
+  Confirm: no
+
+[immediate] find_file - find a file by name
+  Say: find the file quarterly report
+  Confirm: no
+
+[confirm] empty_trash - empty the trash
+  Say: empty the trash
+  Confirm: yes
+
+[immediate] bluetooth_toggle - toggle bluetooth
+  Say: toggle bluetooth
+  Confirm: no
+
+[direct] time_date - say date and time
+  Say: what time is it
+  Confirm: no
+
+[confirm] compound - run two voice commands together, in order
+  Say: open YouTube and turn the volume up
+  Confirm: yes
+
+[confirm] send_message - send a staged voice-reply draft (confirm-gated)
+  Say: reply to Ana on messenger saying on my way
+  Confirm: yes
+
+3. ALL REGISTERED VOICE COMMANDS
+--------------------------------
+Every entry below resolves through the one voice pipeline. Aliases are
+spoken phrases; use any one. Entries marked [confirm] ask for 'yes'.
+
+--- CORE / CLI-PARITY (555) ---
+[confirm] experiments_abort - Abort experiment
+  abort experiment | stop experiment
+  e.g. qubit, abort experiment
+
+[confirm] bot_idea_accept - Accept a bot suggestion
+  accept bot idea | approve bot idea
+  e.g. qubit, accept bot idea kanban:1
+
+[confirm] pairing_accept - Accept setup code
+  accept setup code | redeem pairing setup code
+  e.g. qubit, accept setup code AB12CD
+
+[immediate] msg_link - Account link
+  check account | is linked | account status
+  e.g. qubit, check account team
+
+[immediate] acp_accept_hooks_refusal - ACP bypass flags
+  acp accept hooks | accept hooks mode
+  e.g. qubit, acp accept hooks
+
+[immediate] acp_serve_refusal - ACP serve
+  start acp server | serve acp
+  e.g. qubit, start acp server
+
+[immediate] actions_receipts - Action receipts
+  action receipts | list action receipts | recent actions
+  e.g. qubit, action receipts
+
+[immediate] guard_actions_prepare - Actions Prepare (voice guard)
+  prepare a structured action | prepare an action envelope
+  e.g. qubit, prepare a structured action
+
+[immediate] guard_actions_preview - Actions Preview (voice guard)
+  preview a structured action | preview an action envelope
+  e.g. qubit, preview a structured action
+
+[immediate] guard_actions_recover - Actions Recover (voice guard)
+  recover a structured action
+  e.g. qubit, recover a structured action
+
+[immediate] guard_actions_retry - Actions Retry (voice guard)
+  retry a structured action
+  e.g. qubit, retry a structured action
+
+[confirm] browser_activate - Activate a tab
+  activate tab | switch to tab | bring tab forward | switch tab
+  e.g. qubit, switch to tab inbox
+
+[immediate] local_models_activate - Activate local model
+  activate local model | set local model default | use local model
+  e.g. qubit, activate local model qubit-brain
+
+[immediate] recall_query - Active recall
+  recall memories | search active memory | active memory recall
+  e.g. qubit, recall memories invoices
+
+[immediate] recall_status - Active recall status
+  active recall status | recall status | active memory status
+  e.g. qubit, active recall status
+
+[immediate] insights - Activity summary
+  usage summary | activity summary | what did you do
+  e.g. qubit, activity summary
+
+[confirm] canvas_add - Add a canvas file
+  add canvas file | save canvas file
+  e.g. qubit, add canvas file notes.md hello
+
+[confirm] viking_memory_add - Add a Viking memory note
+  viking remember | viking add memory | save viking memory
+  e.g. qubit, viking remember the gate code
+
+[confirm] viking_resource_add - Add a Viking resource
+  viking add resource | add context resource | save viking resource
+  e.g. qubit, viking add resource https://example.com report
+
+[confirm] automation_flow_add - Add automation flow
+  add automation flow | create automation flow | add flow
+  e.g. qubit, add automation flow name=wake steps='[{"action":"notify","text":"up"}]'
+
+[confirm] kanban_widget_add - Add board widget
+  add board widget | add widget | new widget | add board note
+  e.g. qubit, add board widget shopping notes
+
+[confirm] brain_account_add - Add Brain account
+  add brain account | link brain account | bind account alias
+  e.g. qubit, add brain account
+
+[confirm] brain_principal_add - Add Brain principal
+  add brain principal | new brain person | register principal
+  e.g. qubit, add brain principal maria
+
+[confirm] gateway_add - Add gateway
+  add gateway | register gateway
+  e.g. qubit, add gateway main
+
+[confirm] automation_heartbeat_add - Add heartbeat
+  add heartbeat | create heartbeat | add heartbeat monitor
+  e.g. qubit, add heartbeat name=hb every=5 note=liveness
+
+[confirm] msg_account_add - Add messaging account
+  add messaging account | connect whatsapp | connect slack | register message account
+  e.g. qubit, add messaging account team
+
+[confirm] peer_add - Add peer
+  add peer | register peer gateway
+  e.g. qubit, add peer office
+
+[confirm] project_add_folder - Add project folder
+  add project folder | include folder in project
+  e.g. qubit, add project folder
+
+[confirm] automation_qa_add - Add QA scenario
+  add qa scenario | create qa scenario | add qa test
+  e.g. qubit, add qa scenario name=smoke scenario='[{"name":"ok","action":"check"}]'
+
+[confirm] automation_order_add - Add standing order
+  add standing order | create standing order | add auto reply | add autoresponder
+  e.g. qubit, add standing order name=greet match=hello reply=hi account=team to=C1
+
+[confirm] webhook_add - Add webhook
+  add webhook | subscribe webhook | new webhook
+  e.g. qubit, add webhook alerts
+
+[confirm] branding_migrate - Apply branding migration
+  apply migration | run migration
+  e.g. qubit, apply migration
+
+[confirm] update_apply - Apply update
+  apply update | install update | update now | run the update | apply the update | update apply
+  e.g. qubit, apply update
+
+[confirm] msg_approve - Approve draft
+  approve draft | approve message
+  e.g. qubit, approve draft
+
+[confirm] pairing_approve - Approve pairing
+  approve pairing code | pair with code | enter pairing code
+  e.g. qubit, pair with code AB12CD34
+
+[confirm] session_archive - Archive a session
+  archive session
+  e.g. qubit, archive session 12
+
+[confirm] projects_archive - Archive project
+  archive project | shelve project
+  e.g. qubit, archive project
+
+[confirm] kanban_archive - Archive task
+  archive task | shelve task
+  e.g. qubit, archive task 3
+
+[confirm] computer_screen_arrange - Arrange Control UI
+  arrange screen | arrange control ui | set screen panes
+  e.g. qubit, arrange screen main board
+
+[confirm] questions_ask - Ask a question
+  ask a question | ask me a question | create a question prompt
+  e.g. qubit, ask a question which branch
+
+[immediate] guard_ask_answer - Ask Answer (voice guard)
+  answer with structured answers | record structured answers
+  e.g. qubit, answer with structured answers
+
+[confirm] frontier_chat - Ask frontier model
+  ask frontier | frontier completion | ask cloud model
+  e.g. qubit, ask frontier why is the sky blue
+
+[confirm] kanban_assign - Assign task
+  assign task | give task to
+  e.g. qubit, assign task 3
+
+[immediate] audio - Audio devices
+  list audio devices | audio status | microphone status
+  e.g. qubit, list audio devices
+
+[immediate] automation_status - Automation status
+  automation status | standing orders status | automation report
+  e.g. qubit, automation status
+
+[immediate] autonomy_status - Autonomy status
+  autonomy status | who is pre-authorized | what can run unattended
+  e.g. qubit, autonomy status
+
+[confirm] skills_workshop_backup - Back up workshop
+  back up workshop | create workshop backup | backup skills
+  e.g. qubit, back up workshop
+
+[immediate] guard_backup_create - Backup Create (voice guard)
+  create an encrypted backup | make an encrypted backup
+  e.g. qubit, create an encrypted backup
+
+[immediate] backup_info - Backup guidance
+  backup info | how do i back up | back up my data
+  e.g. qubit, how do i back up
+
+[immediate] guard_backup_restore - Backup Restore (voice guard)
+  restore an encrypted backup | restore an encrypted bundle
+  e.g. qubit, restore an encrypted backup
+
+[confirm] project_bind_board - Bind board
+  bind board | link board to project
+  e.g. qubit, bind board
+
+[confirm] kanban_block - Block task
+  block task | mark task blocked
+  e.g. qubit, block task 3
+
+[immediate] kanban_log - Board log
+  board log | task history | kanban log
+  e.g. qubit, board log
+
+[immediate] kanban_stats - Board stats
+  board stats | task counts | kanban stats
+  e.g. qubit, board stats
+
+[immediate] bot_goals_list - Bot goals
+  list bot goals | bot goals | show bot goals
+  e.g. qubit, list bot goals
+
+[immediate] bot_ideas_list - Bot suggestion inbox
+  list bot ideas | bot ideas | bot suggestions
+  e.g. qubit, list bot ideas
+
+[immediate] guard_brain_onboard_apply - Brain Onboard Apply (voice guard)
+  apply brain onboarding answers | apply onboarding answers
+  e.g. qubit, apply brain onboarding answers
+
+[immediate] brain - Brain profiles
+  list profiles | show profile | my profile | brain status | list brain accounts
+  e.g. qubit, list profiles
+
+[immediate] brain_onboard_plan - Brain setup plan
+  brain setup plan | onboarding steps | how do i set up my profile
+  e.g. qubit, brain setup plan
+
+[immediate] branding_plan - Branding plan
+  branding plan | migration plan | rebrand status
+  e.g. qubit, branding plan
+
+[immediate] browser_doctor - Browser health
+  browser doctor | check browser health | browser bridge health
+  e.g. qubit, browser doctor
+
+[immediate] browser_profiles - Browser profiles
+  browser profiles | list browser profiles | managed browser profiles
+  e.g. qubit, list browser profiles
+
+[immediate] browser_status - Browser status
+  browser status | is the browser ready | chromium status | check the browser | check browser
+  e.g. qubit, check the browser
+
+[confirm] mcp_invoke - Call MCP tool
+  call mcp tool | invoke mcp | run mcp tool
+  e.g. qubit, call mcp tool cgraph-graft search
+
+[confirm] bot_task_cancel - Cancel a delegated worker
+  cancel delegated task | cancel bot task
+  e.g. qubit, cancel bot task sess_abc
+
+[confirm] actions_cancel - Cancel action
+  cancel action | stop action
+  e.g. qubit, cancel action
+
+[confirm] opencode_cancel - Cancel coding run
+  cancel coding run | stop coding run | abort opencode run
+  e.g. qubit, cancel coding run
+
+[confirm] ghost_cancel - Cancel Ghost action
+  cancel ghost action | stop ghost action
+  e.g. qubit, cancel ghost action
+
+[immediate] canvas_list - Canvas files
+  list canvas files | canvas files | show canvas
+  e.g. qubit, list canvas files
+
+[immediate] capability - Capability check
+  check capability | rx:is (.+) available
+  e.g. qubit, is whatsapp available
+
+[immediate] package_certify - Certify release
+  certify release | release checks | package certification
+  e.g. qubit, certify release
+
+[immediate] channels_catalog - Channel catalog
+  list channels | channel catalog | list inbound channels | channels catalog
+  e.g. qubit, list channels
+
+[immediate] actions_check - Check action
+  check action | can action run | action permission
+  e.g. qubit, check action
+
+[immediate] update_check - Check for updates
+  update check | is there an update | check the update | check the update status
+  e.g. qubit, update check
+
+[immediate] ghost_check - Check Ghost capability
+  check ghost capability | can ghost run
+  e.g. qubit, check ghost capability
+
+[immediate] msg_inbox - Check messages
+  check messages | any new messages | read inbox | show inbox | message status
+  e.g. qubit, check messages
+
+[immediate] opencode_check - Check OpenCode capability
+  check opencode capability | can opencode run
+  e.g. qubit, check opencode capability
+
+[immediate] profile_check - Check profile
+  check profile | validate profile | profile gates
+  e.g. qubit, check profile
+
+[confirm] checkpoints_write - Checkpoint write
+  create checkpoint | verify checkpoint | prune checkpoint
+  e.g. qubit, create checkpoint deploy
+
+[confirm] kanban_claim - Claim task
+  claim task | take task | assign me task
+  e.g. qubit, claim task 5
+
+[confirm] speech_profile_clear - Clear session speech profile
+  clear session speech | reset session speech profile | clear the session speech profile
+  e.g. qubit, clear session speech
+
+[confirm] themes_tweak_clear - Clear theme tweak
+  clear theme tweak | reset theme token
+  e.g. qubit, clear theme tweak
+
+[confirm] browser_click - Click an element
+  click | click button | press the button | click link
+  e.g. qubit, click sign in
+
+[confirm] ghost_click - Click this button
+  click this button | click the button | click it | press this button | click this link
+  e.g. qubit, click this button
+
+[confirm] speech_profile_clone - Clone speech profile
+  clone speech profile | copy speech profile | clone a speech profile
+  e.g. qubit, clone speech profile
+
+[confirm] browser_close_tab - Close a tab
+  close tab | close this tab | close the tab | close current tab | close that tab
+  e.g. qubit, close this tab
+
+[immediate] browser_close_refusal - Close browser profile
+  close browser profile | close the browser
+  e.g. qubit, close browser profile
+
+[confirm] browser_profile_close - Close managed profile
+  close managed profile | stop managed browser profile
+  e.g. qubit, close managed profile work
+
+[immediate] opencode_receipts - Coding receipts
+  coding receipts | list coding runs | opencode receipts | recent coding runs
+  e.g. qubit, list coding runs
+
+[confirm] kanban_comment - Comment on task
+  comment on task
+  e.g. qubit, comment on task 5
+
+[confirm] kanban_complete - Complete task
+  complete task | finish task | done with task | close task | kanban complete | complete kanban task | mark task complete
+  e.g. qubit, complete task 5
+
+[immediate] completions - Completion status
+  completion status | shell completions | are completions installed
+  e.g. qubit, shell completions
+
+[immediate] config_profiles - Config profiles
+  list config profiles | show config | configuration profiles | config status | show config profile
+  e.g. qubit, list config profiles
+
+[confirm] acp_client_configure - Configure harness
+  configure harness | register harness credential
+  e.g. qubit, configure harness claude-code env:acp_key
+
+[confirm] channels_configure - Configure inbound channel
+  configure channel | add inbound channel | set up channel
+  e.g. qubit, configure channel discord env:q8u_secret
+
+[immediate] channels_accounts - Configured channels
+  list configured channels | channel accounts | configured channels | channels accounts
+  e.g. qubit, list configured channels
+
+[immediate] computer_screen - Control UI layout
+  screen layout | show control ui layout | control ui panes
+  e.g. qubit, show control ui layout
+
+[immediate] computer_screen_panes - Control UI pane catalog
+  screen pane catalog | list screen panes | control ui pane catalog
+  e.g. qubit, list screen panes
+
+[confirm] kanban_boards_create - Create board
+  create board | new task board
+  e.g. qubit, create board home
+
+[confirm] kanban_tab_create - Create board tab
+  create board tab | new board tab | add board tab
+  e.g. qubit, create board tab invoices
+
+[confirm] browser_profile_create - Create browser profile
+  create browser profile | new browser profile
+  e.g. qubit, create browser profile work
+
+[confirm] projects_create - Create project
+  create project | new project | start project
+  e.g. qubit, create project shop
+
+[confirm] speech_profile_create - Create speech profile
+  create a speech profile | add a speech profile | register a speech profile
+  e.g. qubit, create a speech profile
+
+[confirm] kanban_create - Create task
+  create task | new task | add task
+  e.g. qubit, create task buy milk
+
+[confirm] automation_yield_handoff - Create yield handoff
+  yield handoff | create yield handoff | handoff session
+  e.g. qubit, create yield handoff session=sess-1 reason=review context=continue depth=1
+
+[immediate] auth_status - Credential status
+  auth status | credential status | provider status | credential check
+  e.g. qubit, credential status
+
+[immediate] webui_status - Dashboard status
+  dashboard status | is dashboard running | web dashboard | dashboard running | open the dashboard | show the dashboard | open dashboard page
+  e.g. qubit, open the dashboard
+
+[confirm] hooks_declare - Declare hook
+  declare hook | add hook | new event subscription
+  e.g. qubit, declare hook deploy
+
+[immediate] bot_task_show - Delegated task status
+  show delegated task | bot task status
+  e.g. qubit, show delegated task kanban:1
+
+[immediate] bot_tasks_list - Delegated worker tasks
+  list delegated tasks | bot tasks | list bot tasks
+  e.g. qubit, list delegated tasks
+
+[confirm] session_delete - Delete a session
+  delete session | forget session
+  e.g. qubit, delete session 12
+
+[confirm] taskflow_delete - Delete a task flow
+  delete task flow | remove task flow
+  e.g. qubit, delete task flow 2
+
+[confirm] kanban_tab_delete - Delete board tab
+  delete board tab | remove board tab
+  e.g. qubit, delete board tab archive
+
+[confirm] schedules_delete - Delete schedule
+  delete schedule | remove schedule | cancel schedule | cron delete | delete cron job | remove cron job
+  e.g. qubit, delete schedule 2
+
+[confirm] vision_describe - Describe image
+  describe image | analyze image | what is in | look at image | read image
+  e.g. qubit, describe image at /tmp/pic.png
+
+[immediate] computer_status - Desktop capability
+  desktop status | computer status | can you control the desktop
+  e.g. qubit, desktop status
+
+[immediate] computer_install_refusal - Desktop driver install
+  install desktop driver | enable computer control
+  e.g. qubit, install desktop driver
+
+[immediate] computer_doctor - Desktop health
+  desktop health | computer doctor | check desktop access
+  e.g. qubit, desktop health
+
+[immediate] computer_ops - Desktop operation catalog
+  desktop operations | list desktop operations | desktop op catalog | what desktop operations
+  e.g. qubit, list desktop operations
+
+[immediate] computer_permissions - Desktop permissions
+  desktop permissions | computer permissions | what can you touch
+  e.g. qubit, desktop permissions
+
+[immediate] device - Device status
+  device status | is this device enrolled | this device
+  e.g. qubit, device status
+
+[immediate] diagnostics - Diagnostic bundle
+  show diagnostics | dump diagnostics | diagnostic bundle
+  e.g. qubit, show diagnostics
+
+[immediate] doctor - Diagnostics
+  run diagnostics | check health | diagnose problems | doctor
+  e.g. qubit, run diagnostics
+
+[confirm] ghost_disable - Disable Ghost adapter
+  disable ghost | turn off ghost
+  e.g. qubit, disable ghost
+
+[confirm] skills_disable - Disable skill
+  disable skill | turn off skill
+  e.g. qubit, disable skill
+
+[confirm] automation_order_disable - Disable standing order
+  disable standing order | turn off standing order | disable auto reply
+  e.g. qubit, disable standing order name=greet
+
+[immediate] kanban_dispatch - Dispatch board
+  dispatch board | board daemon | board background task
+  e.g. qubit, dispatch board
+
+[immediate] node_host_dispatch - Dispatch node capability
+  dispatch node capability | run node capability | call node capability
+  e.g. qubit, dispatch node capability node_abc123 device.inventory
+
+[immediate] documents_kinds - Document kinds
+  list document kinds | supported documents | document kinds
+  e.g. qubit, list document kinds
+
+[immediate] documents_status - Document tools status
+  document status | document tools status | document extraction status
+  e.g. qubit, document status
+
+[immediate] pets_downloads_refusal - Download gallery pet
+  download pet | pet gallery | install pet | get a pet
+  e.g. qubit, pet gallery
+
+[immediate] local_models_download - Download local model
+  download local model | download a local model
+  e.g. qubit, download local model qubit-brain
+
+[confirm] browser_download - Download this page
+  download this page | save this page | download the document | save the current page
+  e.g. qubit, download this page to /tmp/page.html
+
+[confirm] msg_draft - Draft message
+  draft message to | text | send a message to | message
+  e.g. qubit, text sam saying running late
+
+[confirm] msg_draft_reply - Draft reply
+  draft reply | reply to message
+  e.g. qubit, draft reply
+
+[confirm] kanban_edit - Edit task
+  edit task | rename task | update task
+  e.g. qubit, edit task 3
+
+[immediate] acp - Editor checks
+  acp status | editor check | editor integration | acp check
+  e.g. qubit, editor check
+
+[immediate] ide_status - Editor status
+  editor status | which editor | ide status | what editor | is my editor ready
+  e.g. qubit, which editor
+
+[immediate] egress_check - Egress check
+  egress check | check egress host | is host allowed
+  e.g. qubit, egress check api.example.com
+
+[immediate] egress_status - Egress status
+  egress status | egress guard status | network egress status
+  e.g. qubit, egress status
+
+[immediate] local_models_eject - Eject local model
+  eject local model | unload local model
+  e.g. qubit, eject local model qubit-brain
+
+[immediate] hooks_emit - Emit hook event
+  emit hook event | emit lifecycle event
+  e.g. qubit, emit lifecycle event task.completed
+
+[confirm] ghost_enable - Enable Ghost adapter
+  enable ghost | turn on ghost
+  e.g. qubit, enable ghost
+
+[confirm] skills_enable - Enable skill
+  enable skill | turn on skill
+  e.g. qubit, enable skill
+
+[confirm] automation_order_enable - Enable standing order
+  enable standing order | turn on standing order | enable auto reply
+  e.g. qubit, enable standing order name=greet
+
+[immediate] enroll_voice - Enroll my voice
+  enroll my voice | voice enrollment | learn my voice
+  e.g. qubit, enroll my voice
+
+[confirm] node_host_enroll - Enroll paired node
+  enroll node | register node | pair a node | add paired node
+  e.g. qubit, enroll node desk http://127.0.0.1:8443/
+
+[confirm] device_enroll - Enroll this device
+  enroll this device | authorize device | trust this device
+  e.g. qubit, enroll this device
+
+[confirm] recall_escalate - Escalate memory
+  escalate memory | promote memory
+  e.g. qubit, escalate memory 3 reason important
+
+[immediate] experiments_evaluate - Evaluate experiment
+  evaluate experiment | score experiment
+  e.g. qubit, evaluate experiment
+
+[confirm] actions_execute - Execute action
+  execute action | run action
+  e.g. qubit, execute action
+
+[confirm] ghost_execute - Execute Ghost action
+  execute ghost action | run ghost action
+  e.g. qubit, execute ghost action
+
+[immediate] receipts_ledger - Execution receipts
+  execution receipts | verify receipts | receipt ledger
+  e.g. qubit, execution receipts
+
+[immediate] experiments_status - Experiment status
+  experiment status | experiments status | trial status
+  e.g. qubit, experiment status
+
+[immediate] autonomy_expire - Expire elapsed autonomy profiles
+  expire autonomy profiles | clean up autonomy profiles
+  e.g. qubit, expire autonomy profiles
+
+[immediate] kanban_export - Export board
+  export board | download tasks
+  e.g. qubit, export board
+
+[immediate] brain_profile_export - Export Brain profile
+  export brain profile | download brain profile
+  e.g. qubit, export brain profile
+
+[immediate] export_state_voice - Export state (voice refusal)
+  export my state | export state | export my data | export everything | back up everything | encrypt my state
+  e.g. qubit, export my state
+
+[confirm] documents_extract - Extract document
+  extract document | read document | extract pdf
+  e.g. qubit, extract document /tmp/work/notes.txt
+
+[immediate] flags - Feature flags
+  list flags | feature flags | flag status
+  e.g. qubit, list flags
+
+[immediate] web_fetch - Fetch a web page
+  fetch a web page | fetch the page | open the web page | read a web page
+  e.g. qubit, fetch a web page https://example.com
+
+[confirm] transfers_fetch - Fetch file chunk
+  fetch file chunk | download file chunk | fetch node file
+  e.g. qubit, fetch file chunk /tmp/work/notes.txt
+
+[immediate] guard_file_patch - File Patch (voice guard)
+  apply a file patch | apply a unified diff
+  e.g. qubit, apply a file patch
+
+[immediate] transfers_status - File transfer status
+  transfer status | file transfer status | node transfer status
+  e.g. qubit, transfer status
+
+[confirm] browser_fill - Fill this form
+  fill this form | fill the form | fill form | type into | fill in the form
+  e.g. qubit, fill form email bob@example.com
+
+[confirm] ghost_type - Fill this form
+  type into this field | fill this field | enter this text | dictate into this field
+  e.g. qubit, type into this field name hello
+
+[confirm] experiments_finish - Finish trial
+  finish trial | complete trial | fail trial
+  e.g. qubit, finish trial
+
+[confirm] hooks_fire - Fire hook
+  fire hook | trigger hook | run hook
+  e.g. qubit, fire hook deploy
+
+[immediate] product_first_run - First-run check
+  first run check | beginner setup status
+  e.g. qubit, first run check
+
+[confirm] brain_profile_forget - Forget Brain field
+  forget brain field | delete profile field | erase brain detail
+  e.g. qubit, forget brain field
+
+[confirm] memory_forget - Forget memory
+  forget memory | delete memory
+  e.g. qubit, forget memory 12
+
+[immediate] gateway_discovery - Gateway discovery
+  gateway discovery | discover gateways | find gateways
+  e.g. qubit, gateway discovery
+
+[immediate] gateway - Gateways
+  list gateways | gateway status
+  e.g. qubit, list gateways
+
+[confirm] media_gen_generate - Generate media
+  generate image | generate music | generate video | generate speech | create an image
+  e.g. qubit, generate image a red fox
+
+[immediate] guard_ghost_preview - Ghost Preview (voice guard)
+  preview a ghost action
+  e.g. qubit, preview a ghost action
+
+[immediate] ghost_receipts - Ghost receipts
+  ghost receipts | list ghost receipts
+  e.g. qubit, ghost receipts
+
+[immediate] ghost_status - Ghost status
+  ghost status | ghost adapter status
+  e.g. qubit, ghost status
+
+[immediate] git_status - Git status
+  git status | working tree status | what changed | uncommitted changes
+  e.g. qubit, git status
+
+[confirm] kanban_role_grant_voice - Grant board role
+  grant board role | give board access | share board with
+  e.g. qubit, grant board role editor to sam
+
+[confirm] ghost_grant - Grant Ghost session
+  grant ghost session | allow ghost capability
+  e.g. qubit, grant ghost session
+
+[confirm] opencode_grant - Grant OpenCode capability
+  grant opencode capability | allow opencode run | authorize coding run
+  e.g. qubit, allow opencode run
+
+[immediate] acp_client_catalog - Harness catalog
+  list harnesses | harness catalog | list agent harnesses
+  e.g. qubit, list harnesses
+
+[immediate] acp_client_status - Harness client status
+  harness status | acp client status | agent harness status
+  e.g. qubit, harness status
+
+[confirm] acp_client_handshake - Harness handshake
+  harness handshake | acp handshake | initialize harness
+  e.g. qubit, harness handshake claude-code
+
+[immediate] acp_client_receipts - Harness receipts
+  harness receipts | acp receipts | harness log
+  e.g. qubit, harness receipts
+
+[immediate] harness_list - Harness router status
+  harness router status | show harness router | router status
+  e.g. qubit, harness router status
+
+[immediate] harness_files - Harness session files
+  list harness files | harness session files
+  e.g. qubit, list harness files abc123
+
+[immediate] harness_kits - Harness starter kits
+  list starter kits | harness starter kits | show starter kits
+  e.g. qubit, list starter kits
+
+[immediate] harness_tasks - Harness tasks
+  list harness tasks | harness tasks | show harness tasks
+  e.g. qubit, list harness tasks
+
+[immediate] hooks_doctor - Hook health
+  hook health | hooks doctor | check hooks
+  e.g. qubit, hook health
+
+[immediate] hooks_test - Hook test plan
+  hook test plan | dry run hook | test hook
+  e.g. qubit, test hook deploy
+
+[immediate] import_refusal - Import foreign setup
+  import foreign setup | import agent setup | migrate foreign agent
+  e.g. qubit, import foreign setup
+
+[immediate] import_state_voice - Import state (voice refusal)
+  import my state | import state | restore my state | restore from backup | restore my data | import everything
+  e.g. qubit, import my state
+
+[immediate] channels_doctor - Inbound channel health
+  channels doctor | channel health | inbound channel health
+  e.g. qubit, channels doctor
+
+[immediate] channels_status - Inbound channel status
+  channels status | channel inbound status | inbound channel status
+  e.g. qubit, channels status
+
+[confirm] kanban_init - Init task board
+  init task board | create main board | set up kanban
+  e.g. qubit, init task board
+
+[immediate] import_inspect - Inspect foreign setup
+  inspect foreign setup | scan setup | import preview
+  e.g. qubit, inspect foreign setup
+
+[immediate] kanban_current - Inspect the current task
+  inspect the current task | show the current task | what is the current task | current task | inspect current task
+  e.g. qubit, inspect the current task
+
+[immediate] files_inspect - Inspect this project folder
+  inspect this project folder | inspect this folder | inspect project folder | show project folder | inspect the project folder | what is in this project
+  e.g. qubit, inspect this project folder
+
+[immediate] lsp_install_refusal - Install language server
+  install language server | download lsp server
+  e.g. qubit, install language server
+
+[immediate] local_models_runtime_install - Install local runtime
+  install local runtime | install model runtime
+  e.g. qubit, install local runtime
+
+[confirm] plugins_install - Install plugin
+  install plugin | add plugin | install skill from file | install this reviewed skill | install reviewed skill | install reviewed manifest
+  e.g. qubit, install plugin from manifest
+
+[confirm] product_install - Install product
+  install product | apply installation
+  e.g. qubit, install product
+
+[immediate] plugins_remote_refusal - Install remote plugin
+  install remote plugin | plugin from github | plugin from url | install plugin from git
+  e.g. qubit, install remote plugin
+
+[confirm] plugins_runtime_install - Install reviewed plugin
+  install reviewed plugin | install plugin runtime | install catalog plugin
+  e.g. qubit, install plugin runtime acme
+
+[confirm] runtime_install - Install runtime
+  install runtime | install container | set up runtime
+  e.g. qubit, install runtime opencode-binary
+
+[confirm] plugins_invoke - Invoke plugin
+  invoke plugin | run plugin | execute plugin
+  e.g. qubit, invoke plugin builtin.echo hello
+
+[confirm] verified_verdict - Judge verified skill
+  verify skill | refute skill | judge skill
+  e.g. qubit, verify skill
+
+[immediate] guard_kanban_import - Kanban Import (voice guard)
+  import a kanban snapshot | import a board snapshot
+  e.g. qubit, import a kanban snapshot
+
+[immediate] kanban_stores - Kanban stores
+  kanban stores | which kanban store | task board stores
+  e.g. qubit, which kanban store
+
+[immediate] lsp - Language servers
+  list language servers | lsp status | language server check
+  e.g. qubit, language server check
+
+[confirm] bot_task_launch - Launch a delegated task
+  launch delegated task | delegate a task | bot launch task
+  e.g. qubit, delegate a task summarize my notes
+
+[confirm] computer_launch - Launch an approved app
+  launch app | open app | launch browser | open the browser app | launch terminal
+  e.g. qubit, launch app browser
+
+[immediate] curator - Learning summary
+  learning summary | what did you learn | curator status | skill lessons | lessons learned
+  e.g. qubit, learning summary
+
+[confirm] brain_member_add - Link Brain member
+  link brain member | add employee to org | join organization
+  e.g. qubit, link brain member
+
+[immediate] gateway_link - Link gateway
+  link gateway | check gateway link
+  e.g. qubit, link gateway main
+
+[immediate] peer_link - Link peer
+  link peer | check peer link
+  e.g. qubit, link peer office
+
+[immediate] actions_list - List actions
+  list actions | show actions | what actions | action status
+  e.g. qubit, list actions
+
+[immediate] automation_flows - List automation flows
+  list automation flows | show automation flows | list flows
+  e.g. qubit, list automation flows
+
+[immediate] autonomy_list - List autonomy profiles
+  list autonomy profiles | show autonomy profiles | my autonomy profiles
+  e.g. qubit, list autonomy profiles
+
+[immediate] task_ledger_list - List background tasks
+  list background tasks | list ledger tasks | show task ledger
+  e.g. qubit, list background tasks
+
+[immediate] kanban_tab_list - List board tabs
+  list board tabs | show board tabs | board tabs
+  e.g. qubit, list board tabs
+
+[immediate] kanban_widget_list - List board widgets
+  list board widgets | show widgets | board widgets
+  e.g. qubit, list board widgets
+
+[immediate] kanban_boards - List boards
+  list boards | show boards | task boards
+  e.g. qubit, list boards
+
+[immediate] verified_bundled - List bundled skills
+  list bundled skills | bundled skills | built in skills
+  e.g. qubit, list bundled skills
+
+[immediate] kanban_snapshots - List canvas snapshots
+  list canvas snapshots | board snapshots | list snapshots | show canvas snapshots
+  e.g. qubit, list canvas snapshots
+
+[immediate] chat_sessions - List chat sessions
+  list chat sessions | show chat sessions | my chat history | list my chats | show my chats
+  e.g. qubit, list my chats
+
+[immediate] checkpoints_list - List checkpoints
+  list checkpoints | show checkpoints
+  e.g. qubit, list checkpoints
+
+[immediate] experiments_list - List experiments
+  list experiments | show experiments | list candidates | experiment candidates
+  e.g. qubit, list experiments
+
+[immediate] browser_favicon_cache - List favicon cache
+  list favicon cache | show cached favicons | favicon cache
+  e.g. qubit, list favicon cache
+
+[immediate] ghost_list - List Ghost capabilities
+  list ghost capabilities | ghost capabilities
+  e.g. qubit, list ghost capabilities
+
+[immediate] automation_heartbeats - List heartbeats
+  list heartbeats | show heartbeats | list heartbeat monitors
+  e.g. qubit, list heartbeats
+
+[immediate] hooks_list - List hooks
+  list hooks | show hooks | event subscriptions
+  e.g. qubit, list hooks
+
+[immediate] lessons_list - List lessons
+  list lessons | show lessons | what have you learned | pending reviews
+  e.g. qubit, list lessons
+
+[immediate] transfers_list - List node files
+  list node files | list transfer folder | list node directory
+  e.g. qubit, list node files /tmp/work
+
+[immediate] browser_tabs - List open tabs
+  list open tabs | show my tabs | what tabs are open | show open tabs | list tabs
+  e.g. qubit, list open tabs
+
+[immediate] opencode_list - List OpenCode capabilities
+  list opencode capabilities | opencode capabilities
+  e.g. qubit, list opencode capabilities
+
+[immediate] msg_list - List outbox
+  list outbox | show outbox | message queue
+  e.g. qubit, list outbox
+
+[immediate] node_host_list - List paired nodes
+  list nodes | list paired nodes | show paired nodes
+  e.g. qubit, list nodes
+
+[immediate] automation_yield_pending - List pending handoffs
+  list pending handoffs | show pending yields | pending handoffs
+  e.g. qubit, list pending handoffs
+
+[immediate] questions_pending - List pending questions
+  list pending questions | pending questions | list question prompts
+  e.g. qubit, list pending questions
+
+[immediate] plugins_list - List plugins
+  list plugins | plugin list | show plugins | list installed plugins
+  e.g. qubit, list plugins
+
+[immediate] files_list - List project files
+  list project files | show project files | list files here
+  e.g. qubit, list project files
+
+[immediate] projects_list - List projects
+  list projects | show projects | what projects | my projects | list my projects | show my projects
+  e.g. qubit, list my projects
+
+[immediate] automation_scenarios - List QA scenarios
+  list qa scenarios | show qa scenarios | qa lab scenarios
+  e.g. qubit, list qa scenarios
+
+[immediate] runtime_images - List runtime images
+  list runtime images | runtime images | container images | pinned images | list containers
+  e.g. qubit, list runtime images
+
+[immediate] schedules_list - List schedules
+  list schedules | show my schedules | what is scheduled | my schedules | list scheduled tasks | cron list | list cron jobs | cron jobs | show cron jobs
+  e.g. qubit, list schedules
+
+[immediate] shares_list - List session shares
+  list session shares | list shares | show session shares
+  e.g. qubit, list session shares
+
+[immediate] skills_list - List skills
+  list skills | show skills | what skills
+  e.g. qubit, list skills
+
+[immediate] speech_profile_list - List speech profiles
+  list speech profiles | list my speech profiles | what speech profiles are there
+  e.g. qubit, list speech profiles
+
+[immediate] automation_orders - List standing orders
+  list standing orders | show standing orders | list auto replies | list autoresponders
+  e.g. qubit, list standing orders
+
+[immediate] kanban_list - List tasks
+  list tasks | show tasks | my tasks | task list
+  e.g. qubit, list tasks
+
+[immediate] brain_vault_list - List vault references
+  list vault references | show vault | brain vault status
+  e.g. qubit, list vault references
+
+[immediate] verified_list - List verified skills
+  list verified skills | curated skills
+  e.g. qubit, list verified skills
+
+[immediate] websites_list - List websites
+  list websites | show websites | tracked sites
+  e.g. qubit, list websites
+
+[immediate] local_models_catalog - Local model catalog
+  local model catalog | list local models | local models
+  e.g. qubit, local model catalog
+
+[immediate] local_models_hardware - Local model hardware
+  local model hardware | gpu hardware status | local hardware status
+  e.g. qubit, local model hardware
+
+[immediate] local_models_jobs - Local model jobs
+  local model jobs | model install jobs | local download jobs
+  e.g. qubit, local model jobs
+
+[immediate] local_models_quickstart - Local model quickstart
+  local model quickstart | set up local model | quickstart local model
+  e.g. qubit, local model quickstart
+
+[immediate] local_models_server - Local model server
+  start local model server | stop local model server | local model server
+  e.g. qubit, start local model server
+
+[immediate] local_models_status - Local models status
+  local models status | local model status | local llm status
+  e.g. qubit, local models status
+
+[immediate] logbook_summary - Logbook summary
+  logbook summary | summarize logbook
+  e.g. qubit, logbook summary
+
+[immediate] auth_login - Login help
+  how do i log in | login help | enroll provider | connect provider
+  e.g. qubit, how do i log in xai
+
+[immediate] auth_logout - Logout check
+  logout check | credential cleanup | am i logged out
+  e.g. qubit, logout check
+
+[immediate] marketplace_discovery - Marketplace discovery
+  marketplace discovery | discover marketplace | browse marketplace
+  e.g. qubit, marketplace discovery
+
+[immediate] mcp - MCP servers
+  list mcp servers | mcp status | mcp inventory
+  e.g. qubit, list mcp servers
+
+[immediate] media_gen_status - Media generation status
+  media status | media generation status | image generation status
+  e.g. qubit, media status
+
+[immediate] media_gen_catalog - Media provider catalog
+  media catalog | list media providers | media providers
+  e.g. qubit, media catalog
+
+[immediate] memory_search - Memory search
+  search memory | what do you remember about | recall
+  e.g. qubit, what do you remember about invoices
+
+[confirm] peer_dm - Message peer
+  message peer | tell peer | ask peer
+  e.g. qubit, tell peer relay hello
+
+[immediate] msg_accounts - Messaging accounts
+  list messaging accounts | messaging accounts | whatsapp accounts | slack accounts
+  e.g. qubit, list messaging accounts
+
+[immediate] mic_help - Microphone help
+  test microphone | mic check | check microphone
+  e.g. qubit, check microphone
+
+[immediate] mic_test - Microphone test
+  microphone test | mic test | check mic levels
+  e.g. qubit, microphone test
+
+[confirm] product_migrate - Migrate install
+  migrate install | migrate legacy install
+  e.g. qubit, migrate install
+
+[confirm] kanban_migrate - Migrate kanban
+  migrate kanban | unify task boards | import kanban tasks
+  e.g. qubit, unify task boards
+
+[immediate] migrate_status - Migration status
+  migration status | is migrated | legacy status
+  e.g. qubit, migration status
+
+[immediate] local_models_fallback - Model fallback chain
+  model fallback chain | local model fallback | list fallbacks
+  e.g. qubit, model fallback chain
+
+[immediate] model - Model status
+  model status | which model | frontier status | current model
+  e.g. qubit, which model
+
+[confirm] monitor - Monitor check
+  run monitor check | inbox monitor | hourly check
+  e.g. qubit, run monitor check
+
+[confirm] kanban_widget_move_voice - Move canvas widget
+  move widget | reposition widget | resize widget
+  e.g. qubit, move widget 4 to 100 200
+
+[confirm] kanban_move - Move this task
+  move this task | move task | move the task | shift task | transfer task
+  e.g. qubit, move this task
+
+[confirm] browser_navigate - Navigate a tab
+  go to | navigate to | navigate tab
+  e.g. qubit, navigate to https://example.com
+
+[immediate] node_host_capabilities - Node capabilities
+  node capabilities | show node capabilities | what can this node do
+  e.g. qubit, node capabilities node_abc123
+
+[confirm] browser_open - Open a URL
+  open url | open page | open website | open link | rx:(?<!\w)open (.+) in the browser\b | rx:(?<!\w)open (.+) in browser\b
+  e.g. qubit, open page https://example.com
+
+[immediate] browser_cdp_open - Open browser for Qubit
+  open browser | launch browser | open the browser | open chromium | open chromium browser
+  e.g. qubit, open browser
+
+[confirm] browser_profile_open - Open browser profile
+  open browser profile | launch browser profile
+  e.g. qubit, open browser profile work
+
+[confirm] ide_open - Open my IDE
+  open my ide | open the ide | launch my editor | open editor | open ide
+  e.g. qubit, open my ide
+
+[immediate] projects_active - Open the active project
+  open my active project | open my project | show my active project | what is my active project | active project | my active project
+  e.g. qubit, open my active project
+
+[immediate] kanban_open - Open the board
+  open the board | show the board | open my board | show my board | board view
+  e.g. qubit, open the board
+
+[immediate] tui_help - Open the board
+  open dashboard | show dashboard | dashboard help
+  e.g. qubit, open dashboard
+
+[confirm] browser_open_browser - Open the browser
+  open the browser | launch the browser | show the browser | focus the browser
+  e.g. qubit, open the browser
+
+[immediate] guard_opencode_prepare - Opencode Prepare (voice guard)
+  prepare an in-project coding change | prepare an in-project coding workflow
+  e.g. qubit, prepare an in-project coding change
+
+[immediate] guard_opencode_run_confirmed - Opencode Run Confirmed (voice guard)
+  run a confirmed in-project coding change | apply a confirmed coding change
+  e.g. qubit, run a confirmed in-project coding change
+
+[immediate] opencode_status - OpenCode status
+  opencode status | coding adapter status
+  e.g. qubit, opencode status
+
+[immediate] package_status - Package status
+  package status | distribution status | release manifest
+  e.g. qubit, package status
+
+[immediate] node_host_status - Paired node host status
+  node host status | paired node status | node host
+  e.g. qubit, node host status
+
+[confirm] pairing_create - Pairing code
+  create pairing code | pair a device | new pairing code | pairing code
+  e.g. qubit, pair a device
+
+[immediate] pairing_list - Pairing codes
+  list pairing codes | show pairings | pairing status
+  e.g. qubit, list pairing codes
+
+[confirm] pairing_setup_code - Pairing setup code
+  generate pairing setup code | new setup code | pairing setup code
+  e.g. qubit, generate pairing setup code
+
+[confirm] bot_task_pause - Pause a delegated worker
+  pause delegated task | pause bot task
+  e.g. qubit, pause bot task sess_abc
+
+[confirm] taskflow_pause - Pause a task flow
+  pause task flow | pause flow
+  e.g. qubit, pause task flow 2
+
+[confirm] pause - Pause all work
+  pause everything | pause all work | emergency stop | stop everything
+  e.g. qubit, pause everything
+
+[confirm] autonomy_pause - Pause an autonomy profile
+  pause autonomy | suspend autonomy profile | pause my autonomy
+  e.g. qubit, pause autonomy nightly-uploads
+
+[confirm] schedules_pause - Pause schedule
+  pause schedule | stop schedule | unschedule | pause my schedule | cron pause | pause cron job
+  e.g. qubit, pause schedule 2
+
+[immediate] peer_list - Peers
+  list peers | show peers | peer status
+  e.g. qubit, list peers
+
+[immediate] approvals - Pending approvals
+  pending approvals | approval status | awaiting approval
+  e.g. qubit, pending approvals
+
+[immediate] permissions - Permission mode
+  permission mode | what are my permissions | permission status | am i restricted
+  e.g. qubit, permission mode
+
+[confirm] computer_pip - Picture-in-picture the desktop
+  picture in picture | open picture in picture | pip the desktop | show picture in picture
+  e.g. qubit, picture in picture
+
+[confirm] verified_pin - Pin verified skill
+  pin skill | pin verified skill
+  e.g. qubit, pin skill
+
+[confirm] transfers_plan - Plan file transfer
+  plan file transfer | plan file stream | plan file download
+  e.g. qubit, plan file transfer /tmp/work/notes.txt
+
+[immediate] plugins_catalog - Plugin install catalog
+  plugin catalog | list installable plugins | show plugin catalog | installable plugins
+  e.g. qubit, show plugin catalog
+
+[immediate] plugins_doctor - Plugin runtime health
+  plugin doctor | plugin health | plugin runtime health
+  e.g. qubit, plugin doctor
+
+[immediate] plugins_status - Plugin runtime status
+  plugin runtime status | plugin host status | plugins status | plugin status
+  e.g. qubit, plugin runtime status
+
+[confirm] policy_attest - Policy attestation
+  policy attest | attest conformance | attest policy
+  e.g. qubit, policy attest
+
+[immediate] policy_conformance - Policy conformance
+  policy conformance | check policy conformance | conformance doctor
+  e.g. qubit, policy conformance
+
+[immediate] power_status - Power profile
+  power status | capability states | what is authorized
+  e.g. qubit, power status
+
+[confirm] computer_present - Present the Control UI
+  present the screen | start presenting | enter presentation mode | present document
+  e.g. qubit, present the screen
+
+[immediate] computer_presentation_status - Presentation status
+  presentation status | am i presenting | show presentation status
+  e.g. qubit, presentation status
+
+[immediate] opencode_preview - Preview coding task
+  preview coding task | plan this coding task | preview opencode run | what would opencode do
+  e.g. qubit, preview coding task add tests
+
+[immediate] ghost_action_preview - Preview Ghost action
+  preview ghost action | preview desktop action | what would ghost do | ghost preview
+  e.g. qubit, preview ghost action
+
+[immediate] product_probe - Probe install
+  probe install | installation check | prereq check
+  e.g. qubit, probe install
+
+[immediate] product_status - Product status
+  product status | installation overview | install status | product capabilities
+  e.g. qubit, product status
+
+[confirm] experiments_promote - Promote experiment
+  promote experiment | approve experiment
+  e.g. qubit, promote experiment
+
+[confirm] lessons_promote - Promote lesson
+  promote lesson | approve lesson
+  e.g. qubit, promote lesson
+
+[immediate] prompt_budget - Prompt budget
+  prompt budget | context budget | context size
+  e.g. qubit, prompt budget
+
+[immediate] proxy_providers - Proxy providers
+  proxy providers | which providers need proxy
+  e.g. qubit, proxy providers
+
+[immediate] proxy - Proxy status
+  proxy status | forwarding status
+  e.g. qubit, proxy status
+
+[confirm] shares_publish - Publish session share
+  publish session share | share session | publish a session share
+  e.g. qubit, share session 12
+
+[confirm] shares_purge - Purge expired shares
+  purge expired shares | clean up session shares | purge shares
+  e.g. qubit, purge expired shares
+
+[immediate] questions_status - Question prompt status
+  question status | question prompt status | ask user status
+  e.g. qubit, question status
+
+[immediate] canvas_get - Read a canvas file
+  read canvas file | show canvas file
+  e.g. qubit, read canvas file notes.md
+
+[immediate] harness_artifact - Read a harness artifact
+  read harness artifact | harness artifact | show harness artifact
+  e.g. qubit, read harness artifact abc123 notes
+
+[immediate] viking_file - Read a Viking context file
+  viking file | read context file | show context file
+  e.g. qubit, viking file user/memories.md
+
+[immediate] files_read - Read project file
+  read project file | show me the file | read this file
+  e.g. qubit, read project file notes
+
+[immediate] ghost_read_tab - Read the browser tab
+  read the browser tab | ghost read this tab | read the tab | what is in the tab | list browser tabs
+  e.g. qubit, read the browser tab
+
+[immediate] browser_read - Read the current tab
+  read the current tab | read this tab | read current tab | what is on this page | read the page | read that tab
+  e.g. qubit, read the current tab
+
+[immediate] browser_favicon - Read this page's favicon
+  read this page favicon | get the page icon | show the site icon | what is this page's favicon
+  e.g. qubit, get the page icon
+
+[immediate] reasoning - Reasoning budgets
+  reasoning budget | reasoning levels | thinking budget
+  e.g. qubit, reasoning levels
+
+[confirm] kanban_reassign - Reassign task
+  reassign task | move task to
+  e.g. qubit, reassign task 3
+
+[immediate] verified_recall - Recall verified skills
+  recall skills for | find skill for | which skill handles
+  e.g. qubit, recall skills for pdf reports
+
+[immediate] channels_receive_refusal - Receive channel payload (refusal)
+  receive channel payload | ingest channel delivery | receive an inbound channel payload
+  e.g. qubit, receive an inbound channel payload
+
+[immediate] sessions - Recent action-receipt sessions
+  list sessions | recent sessions | show sessions | session history | show my sessions | list my sessions | my sessions
+  e.g. qubit, show my sessions
+
+[immediate] git_log - Recent commits
+  recent commits | git log | commit history | show commits
+  e.g. qubit, recent commits | qubit, recent commits 20
+
+[immediate] logs - Recent logs
+  show logs | recent errors | what happened | system logs
+  e.g. qubit, show logs
+
+[confirm] kanban_reclaim - Reclaim task
+  reclaim task | take back task
+  e.g. qubit, reclaim task 3
+
+[confirm] experiments_signal - Record signal
+  record signal | add trial signal
+  e.g. qubit, record signal
+
+[confirm] brain_vault_set - Record vault reference
+  record vault reference | store secret reference | add vault entry
+  e.g. qubit, record vault reference
+
+[confirm] opencode_recover - Recover coding run
+  recover coding run | roll back coding run | undo coding run
+  e.g. qubit, recover coding run
+
+[confirm] ghost_action_recover - Recover Ghost action
+  recover ghost action | undo ghost action | roll back ghost
+  e.g. qubit, recover ghost action
+
+[confirm] runtime_recover - Recover runtime
+  recover runtime | restore runtime install
+  e.g. qubit, recover runtime opencode-binary
+
+[confirm] experiments_register - Register candidate
+  register candidate | add experiment candidate
+  e.g. qubit, register candidate
+
+[confirm] plugins_register - Register plugin manifest
+  register plugin | register plugin manifest | record plugin manifest
+  e.g. qubit, register plugin manifest /tmp/acme.json
+
+[immediate] viking_related - Related Viking context
+  viking related | related context | what relates to this file
+  e.g. qubit, viking related user/memories.md
+
+[immediate] verify_release - Release verification
+  verify release | release check | is the release good
+  e.g. qubit, verify release
+
+[confirm] memory_remember - Remember
+  remember | remember this | take a note | note this
+  e.g. qubit, remember the gate code
+
+[confirm] canvas_remove - Remove a canvas file
+  remove canvas file | delete canvas file
+  e.g. qubit, remove canvas file notes.md
+
+[confirm] kanban_widget_remove - Remove board widget
+  remove board widget | delete widget | remove widget
+  e.g. qubit, remove board widget 2
+
+[confirm] brain_account_remove - Remove Brain account
+  remove brain account | unlink brain account | unbind account alias
+  e.g. qubit, remove brain account
+
+[confirm] browser_profile_remove - Remove browser profile
+  remove browser profile | delete managed browser profile
+  e.g. qubit, remove browser profile work
+
+[confirm] gateway_remove - Remove gateway
+  remove gateway | delete gateway
+  e.g. qubit, remove gateway main
+
+[confirm] hooks_remove - Remove hook
+  remove hook | delete hook
+  e.g. qubit, remove hook deploy
+
+[confirm] lessons_remove - Remove lesson
+  remove lesson | delete lesson | forget lesson
+  e.g. qubit, remove lesson
+
+[confirm] msg_account_remove - Remove messaging account
+  remove messaging account | disconnect whatsapp | disconnect slack
+  e.g. qubit, remove messaging account team
+
+[confirm] peer_remove - Remove peer
+  remove peer | delete peer
+  e.g. qubit, remove peer office
+
+[confirm] profile_remove - Remove profile
+  remove profile | delete profile
+  e.g. qubit, remove profile
+
+[confirm] project_remove_folder - Remove project folder
+  remove project folder | drop folder from project
+  e.g. qubit, remove project folder
+
+[confirm] runtime_remove - Remove runtime
+  remove runtime | remove container | uninstall runtime
+  e.g. qubit, remove runtime opencode-binary
+
+[confirm] skills_remove - Remove skill
+  remove skill | uninstall skill | delete skill
+  e.g. qubit, remove skill notes
+
+[confirm] speech_profile_remove - Remove speech profile
+  remove speech profile | delete speech profile | remove a speech profile
+  e.g. qubit, remove speech profile
+
+[confirm] automation_order_remove - Remove standing order
+  remove standing order | delete standing order | remove auto reply
+  e.g. qubit, remove standing order name=greet
+
+[confirm] brain_vault_remove - Remove vault reference
+  remove vault reference | delete vault entry
+  e.g. qubit, remove vault reference
+
+[confirm] webhook_remove - Remove webhook
+  remove webhook | delete webhook | unsubscribe webhook
+  e.g. qubit, remove webhook alerts
+
+[immediate] session_rename - Rename a session
+  rename session | name session
+  e.g. qubit, rename session 12 to invoices
+
+[confirm] kanban_tab_rename - Rename board tab
+  rename board tab
+  e.g. qubit, rename board tab main to overview
+
+[confirm] project_rename - Rename project
+  rename project | retitle project
+  e.g. qubit, rename project shop
+
+[confirm] kanban_tab_move - Reorder board tab
+  move board tab | reorder board tab
+  e.g. qubit, move board tab archive to position 2
+
+[confirm] product_repair - Repair install
+  repair install | fix installation
+  e.g. qubit, repair install
+
+[confirm] runtime_repair - Repair runtime state
+  repair runtime | fix runtime state
+  e.g. qubit, repair runtime
+
+[confirm] gateway_supervision_request - Request gateway supervision
+  request gateway supervision | supervise the gateway
+  e.g. qubit, request gateway supervision team start
+
+[confirm] ghost_reset - Reset Ghost adapter
+  reset ghost | restart ghost adapter
+  e.g. qubit, reset ghost
+
+[confirm] profile_reset - Reset profile
+  reset profile | restore default profile
+  e.g. qubit, reset profile
+
+[confirm] themes_reset - Reset theme
+  reset theme | default theme
+  e.g. qubit, reset theme
+
+[immediate] local_models_resolve - Resolve model fallback
+  resolve model fallback | pick fallback model
+  e.g. qubit, resolve model fallback
+
+[immediate] recall_resolve - Resolve recall context
+  resolve recall context | active recall context | resolve active memory
+  e.g. qubit, resolve recall context invoices
+
+[confirm] lsp_restart - Restart language servers
+  restart language servers | restart lsp
+  e.g. qubit, restart language servers
+
+[confirm] kanban_snapshot_restore_voice - Restore canvas snapshot
+  restore canvas snapshot | restore board snapshot | roll back canvas
+  e.g. qubit, restore canvas snapshot 7
+
+[confirm] project_restore - Restore project
+  restore project | unarchive project
+  e.g. qubit, restore project shop
+
+[confirm] kanban_restore - Restore task
+  restore task | unarchive task | bring back task
+  e.g. qubit, restore task 3
+
+[confirm] skills_workshop_restore - Restore workshop
+  restore workshop backup | restore workshop | restore skill backup
+  e.g. qubit, restore workshop backup abc123
+
+[confirm] bot_task_resume - Resume a delegated worker
+  resume delegated task | resume bot task
+  e.g. qubit, resume bot task sess_abc
+
+[confirm] session_resume - Resume a session
+  resume session | restore session
+  e.g. qubit, resume session 12
+
+[confirm] taskflow_resume - Resume a task flow
+  resume task flow | resume flow
+  e.g. qubit, resume task flow 2
+
+[confirm] webchat_resume - Resume a webchat session
+  resume web chat | reopen web chat
+  e.g. qubit, resume web chat abc123
+
+[confirm] autonomy_resume - Resume an autonomy profile
+  resume autonomy | unsuspend autonomy profile | resume my autonomy
+  e.g. qubit, resume autonomy nightly-uploads
+
+[immediate] transfers_resume - Resume file transfer
+  resume file transfer | resume transfer
+  e.g. qubit, resume file transfer xfer_abc
+
+[confirm] schedules_resume - Resume schedule
+  resume schedule | restart schedule | unpause schedule | cron resume | resume cron job
+  e.g. qubit, resume schedule 2
+
+[confirm] resume - Resume work
+  resume work | clear emergency stop | all clear | resume everything
+  e.g. qubit, resume work
+
+[confirm] automation_yield_resume - Resume yield handoff
+  resume yield handoff | consume yield handoff | resume handoff
+  e.g. qubit, resume yield handoff session=sess-1 consume=1
+
+[confirm] opencode_retry - Retry coding run
+  retry coding run | retry opencode run | try coding again
+  e.g. qubit, retry coding run
+
+[confirm] ghost_action_retry - Retry Ghost action
+  retry ghost action | retry desktop action | try ghost again
+  e.g. qubit, retry ghost action
+
+[confirm] msg_retry - Retry message
+  retry message | resend message
+  e.g. qubit, retry message
+
+[confirm] gateway_supervision_revert - Revert gateway supervision
+  revert gateway supervision | undo gateway supervision
+  e.g. qubit, revert gateway supervision team
+
+[confirm] autonomy_revoke - Revoke an autonomy profile
+  revoke autonomy | delete autonomy profile | cancel my autonomy
+  e.g. qubit, revoke autonomy nightly-uploads
+
+[confirm] kanban_role_revoke_voice - Revoke board role
+  revoke board role | remove board access | unshare board with
+  e.g. qubit, revoke board role from sam
+
+[confirm] ghost_revoke - Revoke Ghost grant
+  revoke ghost grant | remove ghost grant
+  e.g. qubit, revoke ghost grant
+
+[confirm] hooks_revoke - Revoke hook
+  revoke hook | disable hook
+  e.g. qubit, revoke hook deploy
+
+[confirm] opencode_revoke - Revoke OpenCode grant
+  revoke opencode grant | remove opencode grant
+  e.g. qubit, revoke opencode grant
+
+[confirm] node_host_revoke - Revoke paired node
+  revoke node | remove paired node | unpair node
+  e.g. qubit, revoke node node_abc123
+
+[confirm] pairing_revoke - Revoke pairing
+  revoke pairing | unpair | remove pairing
+  e.g. qubit, revoke pairing
+
+[confirm] shares_revoke - Revoke session share
+  revoke session share | revoke share | unshare session
+  e.g. qubit, revoke share shr_abc
+
+[confirm] sync_revoke_voice - Revoke sync offer
+  revoke sync offer | cancel sync offer | withdraw sync offer
+  e.g. qubit, revoke sync offer
+
+[confirm] file_patch_rollback - Roll back a file patch
+  roll back the patch | undo the patch | rollback file patch | revert the file patch
+  e.g. qubit, roll back the patch on /srv/project/app.py
+
+[confirm] product_rollback - Roll back product
+  roll back product | undo migration
+  e.g. qubit, roll back product
+
+[confirm] profile_rollback - Roll back profile
+  roll back profile | undo profile change
+  e.g. qubit, roll back profile
+
+[confirm] runtime_rollback - Roll back runtime
+  roll back runtime | rollback runtime | restore runtime | downgrade runtime
+  e.g. qubit, roll back runtime opencode-binary
+
+[confirm] update_rollback - Roll back update
+  roll back update | rollback update | undo the update | restore previous version | update rollback
+  e.g. qubit, roll back update
+
+[confirm] project_rollback - Rollback projects
+  rollback projects | restore project backup
+  e.g. qubit, rollback projects
+
+[confirm] skills_rollback - Rollback skill
+  rollback skill | restore skill
+  e.g. qubit, rollback skill notes
+
+[confirm] skills_workshop_rollback - Rollback workshop
+  rollback workshop | undo workshop restore
+  e.g. qubit, rollback workshop
+
+[confirm] automation_flow_run - Run automation flow
+  run automation flow | execute automation flow | run flow
+  e.g. qubit, run automation flow name=wake
+
+[confirm] peer_run - Run on peer
+  run on peer | peer run task
+  e.g. qubit, run on peer relay status
+
+[confirm] automation_qa_run - Run QA scenario
+  run qa scenario | execute qa scenario | run qa test
+  e.g. qubit, run qa scenario name=smoke
+
+[confirm] schedules_run_due - Run scheduled tasks
+  run scheduled tasks | run due schedules | run my schedules | run due jobs | cron run | run cron jobs | run due cron jobs
+  e.g. qubit, run due schedules
+
+[confirm] task_run - Run the task
+  run the task | run task | run that task | execute the task | do the task
+  e.g. qubit, run the task summarize my notes
+
+[confirm] opencode_run - Run this coding task
+  run this opencode task | code this with opencode | start opencode run | opencode this task | run coding task now
+  e.g. qubit, run this opencode task add tests
+
+[confirm] task_run_current - Run this task
+  run this task | run the current task | run my task | run current task | run this coding task
+  e.g. qubit, run this task
+
+[immediate] runtime_doctor - Runtime diagnosis
+  runtime doctor | diagnose runtimes | container doctor | check runtimes
+  e.g. qubit, diagnose runtimes
+
+[immediate] runtime_discovery - Runtime discovery
+  runtime discovery | discover runtime | runtime inventory discovery
+  e.g. qubit, runtime discovery
+
+[immediate] runtime_marketplace - Runtime marketplace
+  runtime marketplace | show runtime marketplace | plugin marketplace
+  e.g. qubit, runtime marketplace
+
+[immediate] runtime_status - Runtime status
+  runtime status | docker status | container status | runtime health | are runtimes ready
+  e.g. qubit, runtime status
+
+[immediate] runtime_history - Runtime update history
+  runtime update history | show runtime history
+  e.g. qubit, runtime update history
+
+[immediate] runtime_update_report - Runtime update report
+  runtime update report | show runtime update report | runtime recovery report
+  e.g. qubit, runtime update report
+
+[immediate] schedules_history - Schedule history
+  schedule history | show schedule runs | scheduled runs | cron history | cron job history
+  e.g. qubit, schedule history
+
+[confirm] schedules_create - Schedule this task
+  schedule this task | schedule this | schedule task | create schedule | new schedule | schedule for me | cron create | create cron job | new cron job | schedule a cron job
+  e.g. qubit, schedule this task daily 9am
+
+[immediate] browser_screenshot - Screenshot the current tab
+  take a screenshot | screenshot this page | capture the page | take a screenshot of this page | capture this tab
+  e.g. qubit, take a screenshot
+
+[immediate] chat_session_search - Search chat sessions
+  search chat sessions | find chat session | search my chats
+  e.g. qubit, search my chats invoice
+
+[immediate] sessions_search - Search sessions
+  search sessions | find session | search my sessions
+  e.g. qubit, search sessions invoice
+
+[immediate] web_search - Search the web
+  search the web | web search | look something up online
+  e.g. qubit, search the web for rust async
+
+[immediate] browser_find - Search this page
+  search this page | find on this page | search the page | find in page
+  e.g. qubit, search this page invoices
+
+[immediate] viking_search - Search Viking context
+  viking search | search context files | search viking
+  e.g. qubit, viking search invoices
+
+[immediate] secrets - Secret status
+  secret status | vault status | credential references
+  e.g. qubit, secret status
+
+[immediate] security - Security status
+  security status | run security check | security scan
+  e.g. qubit, security status
+
+[confirm] profile_select - Select profile
+  select profile | activate profile | switch profile
+  e.g. qubit, select profile
+
+[confirm] speech_profile_select - Select session speech profile
+  select speech profile for this session | use speech profile for this session | set session speech profile
+  e.g. qubit, select speech profile for this session
+
+[confirm] msg_send - Send message
+  send message | send draft | send it | send this message | send this draft
+  e.g. qubit, send draft
+
+[confirm] acp_client_send - Send to harness
+  send to harness | acp send | prompt harness
+  e.g. qubit, send to harness claude-code hello
+
+[immediate] shares_status - Session share status
+  share status | session share status | sharing status
+  e.g. qubit, share status
+
+[confirm] bot_goal_set - Set a bot goal
+  set bot goal | add bot goal
+  e.g. qubit, set bot goal inbox zero
+
+[confirm] brain_profile_set - Set Brain field
+  set brain field | store profile field | save brain detail
+  e.g. qubit, set brain field
+
+[confirm] project_set_primary - Set primary folder
+  set primary folder | main project folder
+  e.g. qubit, set primary folder
+
+[confirm] recall_policy_set - Set recall policy
+  set recall policy | turn active recall on | turn active recall off | recall policy on | recall policy off
+  e.g. qubit, turn active recall on
+
+[confirm] themes_set - Set theme
+  change theme | set theme | switch theme
+  e.g. qubit, set theme light
+
+[immediate] setup_check - Setup status
+  setup status | installation status | setup check
+  e.g. qubit, setup status
+
+[immediate] guard_shares_resolve - Shares Resolve (voice guard)
+  open a shared session | view a shared session
+  e.g. qubit, open a shared session
+
+[immediate] chat_session_show - Show a chat session
+  show chat session | show my chat | open chat session
+  e.g. qubit, show chat session abc123
+
+[immediate] harness_session_show - Show a harness session
+  show harness session | harness session
+  e.g. qubit, show harness session abc123
+
+[immediate] session_show - Show a session
+  show session | inspect session
+  e.g. qubit, show session 12
+
+[immediate] taskflow_show - Show a task flow
+  show task flow | describe task flow
+  e.g. qubit, show task flow 2
+
+[immediate] webchat_show - Show a webchat session
+  show web chat | open web chat
+  e.g. qubit, show web chat abc123
+
+[immediate] actions_show - Show action
+  show action | describe action | action details
+  e.g. qubit, show action
+
+[immediate] actions_receipt - Show action receipt
+  show action receipt | action receipt
+  e.g. qubit, show action receipt
+
+[immediate] autonomy_show - Show an autonomy profile
+  show autonomy profile | details of autonomy profile
+  e.g. qubit, show autonomy profile nightly-uploads
+
+[immediate] capabilities_list - Show available capabilities
+  show available capabilities | list capabilities | available capabilities | list my capabilities | what capabilities are available | show capabilities | list all capabilities
+  e.g. qubit, show available capabilities
+
+[immediate] task_ledger_show - Show background task
+  show ledger task | show background task | task ledger show
+  e.g. qubit, show background task kanban:1
+
+[immediate] kanban_layout_show - Show board layout
+  show board layout | board layout | board columns
+  e.g. qubit, show board layout
+
+[immediate] git_show - Show committed file
+  show committed file | git show file | file at head | last committed version
+  e.g. qubit, show committed file notes
+
+[immediate] profile_show - Show config profile
+  show config profile kind | describe profile kind
+  e.g. qubit, show config profile kind audio
+
+[immediate] experiments_show - Show experiment
+  show experiment | describe experiment
+  e.g. qubit, show experiment
+
+[immediate] gateway_show - Show gateway
+  show gateway | describe gateway
+  e.g. qubit, show gateway main
+
+[immediate] ghost_show - Show Ghost capability
+  show ghost capability | describe ghost action
+  e.g. qubit, show ghost capability
+
+[immediate] hooks_show - Show hook
+  show hook | describe hook
+  e.g. qubit, show hook deploy
+
+[immediate] msg_show - Show message
+  show message | message details
+  e.g. qubit, show message
+
+[immediate] msg_account_show - Show messaging account
+  show messaging account | describe message account
+  e.g. qubit, show messaging account team
+
+[immediate] frontier_show - Show model entry
+  show model | describe model | model details
+  e.g. qubit, show model
+
+[immediate] reports_list - Show my reports
+  show my reports | list my reports | show reports | my reports | list reports | what are my reports
+  e.g. qubit, show my reports
+
+[immediate] opencode_show - Show OpenCode capability
+  show opencode capability | describe opencode action
+  e.g. qubit, show opencode capability
+
+[immediate] node_host_show - Show paired node
+  show node | show paired node | node details
+  e.g. qubit, show node node_abc123
+
+[immediate] peer_show - Show peer
+  show peer | describe peer
+  e.g. qubit, show peer office
+
+[immediate] plugins_show - Show plugin
+  show plugin | inspect plugin | plugin details
+  e.g. qubit, show plugin builtin.echo
+
+[immediate] projects_show - Show project
+  show project | describe project | project details
+  e.g. qubit, show project
+
+[immediate] recall_policy_get - Show recall policy
+  show recall policy | active memory policy | recall policy status
+  e.g. qubit, show recall policy
+
+[immediate] schedules_show - Show schedule
+  show schedule | describe schedule | schedule details | cron show | show cron job | cron job details
+  e.g. qubit, show schedule 2
+
+[immediate] skills_show - Show skill
+  show skill | describe skill | skill info
+  e.g. qubit, describe skill
+
+[immediate] speech_profile_show - Show speech profile
+  show speech profile | show my speech profile | rx:show speech profile (.+)$
+  e.g. qubit, show speech profile
+
+[immediate] kanban_show - Show task
+  show task | task details | describe task
+  e.g. qubit, show task 5
+
+[immediate] git_diff - Show uncommitted diff
+  show diff | git diff | uncommitted diff | show changes
+  e.g. qubit, show diff
+
+[immediate] verified_show - Show verified skill
+  show verified skill | describe verified skill
+  e.g. qubit, show verified skill
+
+[immediate] webhook_show - Show webhook
+  show webhook | describe webhook
+  e.g. qubit, show webhook alerts
+
+[immediate] websites_show - Show website
+  show website | describe website
+  e.g. qubit, show website
+
+[immediate] local_models_sideload - Sideload local model
+  sideload local model | register local gguf | load local gguf
+  e.g. qubit, sideload local model /tmp/model.gguf
+
+[immediate] skills_workshop - Skill workshop
+  skill workshop | workshop collection | show skill workshop
+  e.g. qubit, skill workshop
+
+[confirm] experiments_snapshot - Snapshot experiments
+  snapshot experiments | back up experiments
+  e.g. qubit, snapshot experiments
+
+[immediate] tts_test - Speech test
+  speech test | test speech | test voice output
+  e.g. qubit, speech test
+
+[confirm] experiments_start - Start experiment
+  start experiment | begin experiment
+  e.g. qubit, start experiment
+
+[immediate] proxy_start_refusal - Start proxy
+  start proxy | run proxy server
+  e.g. qubit, start proxy
+
+[immediate] loop_start - Start the voice loop
+  start listening | start voice loop | begin push to talk
+  e.g. qubit, start listening
+
+[confirm] experiments_trial - Start trial
+  start trial | begin trial
+  e.g. qubit, start trial
+
+[confirm] ghost_estop - Stop Ghost adapter
+  stop ghost | ghost emergency stop
+  e.g. qubit, stop ghost
+
+[confirm] harness_submit - Submit a harness task
+  submit harness task | run harness task | harness submit
+  e.g. qubit, submit harness task check inbox
+
+[confirm] substitute_egress - Substitute egress secrets
+  substitute egress secrets | apply egress secret substitution | materialize egress request
+  e.g. qubit, substitute egress secrets api.example.com authorization {{secret:api}}
+
+[immediate] msg_summarize - Summarize message
+  summarize message | read message | what does message say
+  e.g. qubit, read message
+
+[immediate] gateway_supervision_refusal - Supervise gateway process
+  supervise gateway | start gateway server | restart gateway service | run gateway process
+  e.g. qubit, restart gateway service
+
+[immediate] kanban_swarm - Swarm board
+  swarm board | swarm the board
+  e.g. qubit, swarm board
+
+[confirm] brain_profile_sweep - Sweep expired Brain fields
+  sweep brain fields | delete expired brain data | brain expiry sweep
+  e.g. qubit, sweep brain fields
+
+[confirm] projects_use - Switch project
+  switch to project | use project | open project
+  e.g. qubit, switch to project
+
+[immediate] guard_sync_accept - Sync Accept (voice guard)
+  accept a sync bundle | accept a sync offer
+  e.g. qubit, accept a sync bundle
+
+[immediate] guard_sync_offer - Sync Offer (voice guard)
+  offer a sync bundle | create a sync offer
+  e.g. qubit, offer a sync bundle
+
+[immediate] sync_list - Sync offers
+  list sync offers | sync status | pending sync | show sync offer
+  e.g. qubit, sync status
+
+[immediate] status - System status
+  status | system status | how are you | health check | status report
+  e.g. qubit, system status
+
+[immediate] taskflow_hooks - Task flow hooks
+  list flow hooks | task flow hooks | show flow hooks
+  e.g. qubit, list flow hooks
+
+[immediate] taskflow_list - Task flows
+  list task flows | task flows | show task flows
+  e.g. qubit, list task flows
+
+[immediate] task_ledger_status - Task ledger status
+  task ledger status | background task status | task ledger
+  e.g. qubit, task ledger status
+
+[immediate] task_ledger_timeline - Task timeline
+  task timeline | ledger timeline | show task timeline
+  e.g. qubit, task timeline kanban:1
+
+[immediate] evaluation_telemetry - Telemetry status
+  telemetry status | evaluation telemetry | check telemetry
+  e.g. qubit, telemetry status
+
+[immediate] console_help - Terminal help
+  open terminal | terminal help | command line help
+  e.g. qubit, terminal help
+
+[immediate] speech_profile_test - Test speech profile
+  test my speech profile | test my voice profile | test the speech profile
+  e.g. qubit, test my speech profile
+
+[immediate] themes - Themes
+  list themes | what theme | show theme
+  e.g. qubit, what theme
+
+[immediate] tools - Tool inventory
+  list tools | tool status | what tools
+  e.g. qubit, list tools
+
+[immediate] asr_test - Transcription test
+  transcription test | test transcription
+  e.g. qubit, transcription test
+
+[immediate] guard_transfers_fetch_raw - Transfers Fetch Raw (voice guard)
+  read raw file bytes | speak raw file bytes | show raw file bytes
+  e.g. qubit, read raw file bytes
+
+[confirm] taskflow_trigger - Trigger a task flow
+  trigger task flow | run task flow now
+  e.g. qubit, trigger task flow 2
+
+[confirm] themes_tweak_set - Tweak theme color
+  tweak theme color | adjust theme token
+  e.g. qubit, tweak theme color
+
+[confirm] kanban_unblock - Unblock task
+  unblock task | mark task ready | kanban unblock | unblock kanban task
+  e.g. qubit, unblock task 3
+
+[confirm] acp_client_unconfigure - Unconfigure harness
+  unconfigure harness | remove harness credential
+  e.g. qubit, unconfigure harness claude-code
+
+[confirm] channels_unconfigure - Unconfigure inbound channel
+  unconfigure channel | remove inbound channel
+  e.g. qubit, unconfigure channel discord
+
+[confirm] brain_member_remove - Unlink Brain member
+  unlink brain member | remove employee from org | leave organization
+  e.g. qubit, unlink brain member
+
+[confirm] verified_unpin - Unpin verified skill
+  unpin skill | unpin verified skill
+  e.g. qubit, unpin skill
+
+[confirm] plugins_unregister - Unregister plugin
+  unregister plugin | deregister plugin | remove plugin registration
+  e.g. qubit, unregister plugin acme.tool
+
+[confirm] recall_update - Update active memory
+  update active memory | edit active memory | correct active memory
+  e.g. qubit, update active memory 3 the corrected fact
+
+[immediate] update_status - Update status
+  update status | check for updates | new version | uninstall info
+  e.g. qubit, update status
+
+[confirm] profile_upgrade - Upgrade profile
+  upgrade profile | update profile
+  e.g. qubit, upgrade profile
+
+[confirm] runtime_upgrade - Upgrade runtime
+  upgrade runtime | upgrade container | refresh runtime
+  e.g. qubit, upgrade runtime opencode-binary
+
+[immediate] usage_summary - Usage analytics
+  usage analytics | show usage | token usage | cost usage
+  e.g. qubit, usage analytics
+
+[immediate] hooks_validate - Validate hook
+  validate hook | check hook
+  e.g. qubit, validate hook deploy
+
+[immediate] branding_verify - Verify branding
+  verify branding | check migration
+  e.g. qubit, verify branding
+
+[immediate] verify_voice - Verify my voice
+  verify my voice | check my voice
+  e.g. qubit, verify my voice
+
+[immediate] auth_verify - Verify provider
+  verify provider | is configured | check provider | rx:is (.+) configured | rx:check (.+) provider
+  e.g. qubit, is xai configured
+
+[immediate] viking_sessions - Viking bot sessions
+  viking sessions | viking bot sessions | list viking sessions
+  e.g. qubit, viking sessions
+
+[immediate] viking_status - Viking context status
+  viking status | context status | viking engine status
+  e.g. qubit, viking status
+
+[immediate] viking_tree - Viking context tree
+  viking tree | context tree | show context tree
+  e.g. qubit, viking tree
+
+[immediate] viking_skills - Viking skills catalog
+  viking skills | list viking skills | context skills
+  e.g. qubit, viking skills
+
+[immediate] vision_status - Vision status
+  vision status | is vision ready | can you see
+  e.g. qubit, is vision ready
+
+[immediate] roundtrip_test - Voice self-test
+  voice self test | test yourself | self test
+  e.g. qubit, test yourself
+
+[immediate] wake_status - Wake-word status
+  wake word status | is wake word ready | wake status | hands free status | wake word
+  e.g. qubit, is wake word ready
+
+[immediate] kanban_watch - Watch board
+  watch board | watch the board
+  e.g. qubit, watch board
+
+[immediate] webchat_list - Webchat sessions
+  list web chats | webchat sessions | show web chats
+  e.g. qubit, list web chats
+
+[immediate] webhook_test - Webhook test plan
+  webhook test plan | test webhook
+  e.g. qubit, test webhook alerts
+
+[immediate] guard_webhook_verify - Webhook Verify (voice guard)
+  verify a webhook signature | verify a webhook payload
+  e.g. qubit, verify a webhook signature
+
+[immediate] webhooks - Webhooks
+  list webhooks | webhook status
+  e.g. qubit, list webhooks
+
+[immediate] commands_list - What can you do
+  what can you do | list voice commands | voice commands | help voice | available commands
+  e.g. qubit, what can you do
+
+[immediate] logbook_entries - Work logbook
+  work logbook | show logbook | logbook entries
+  e.g. qubit, work logbook
+
+[immediate] worker - Worker status
+  worker status | agent status | worker lane | is the worker ready | claw status
+  e.g. qubit, worker status
+
+[immediate] skills_workshop_backups - Workshop backups
+  workshop backups | list workshop backups | skill backups
+  e.g. qubit, workshop backups
+
+[immediate] skills_workshop_curator - Workshop curator
+  workshop curator | workshop curator status
+  e.g. qubit, workshop curator
+
+[confirm] worktree - Worktree cleanup
+  clean worktrees | worktree status | prune worktrees
+  e.g. qubit, clean worktrees
+
+--- PLUGIN FLEET (18) ---
+[immediate] achievements_scan_status - Achievement scan status
+  achievement scan status | achievements scan status | achievement scanner status | status of achievement scan
+  e.g. qubit, achievement scan status
+
+[immediate] plugin_fleet_list - List dashboard plugins
+  list dashboard plugins | show the plugin fleet | list the plugin fleet | which dashboard plugins
+  e.g. qubit, list dashboard plugins
+
+[immediate] achievements_recent - Recently unlocked achievements
+  recent achievements | show recent achievements | latest achievements | recently unlocked achievements
+  e.g. qubit, recent achievements
+
+[immediate] achievements_rescan - Rescan achievements
+  rescan achievements | recompute achievements | refresh achievements | rescan my badges
+  e.g. qubit, rescan achievements
+
+[confirm] achievements_reset - Reset achievements
+  reset my achievements | reset achievement progress | clear my achievements | reset achievements
+  e.g. qubit, reset my achievements
+
+[immediate] achievements_session_badges - Session badges
+  rx:achievements for session (.+) | rx:session badges for (.+)
+  e.g. qubit, achievements for session 12
+
+[immediate] achievements_list - Show achievements
+  show my achievements | list achievements | list my achievements | show achievements | what achievements do i have
+  e.g. qubit, show my achievements
+
+[immediate] kanban_fleet_assignees - Vendored kanban assignees
+  fleet kanban assignees | plugin kanban assignees
+  e.g. qubit, fleet kanban assignees
+
+[immediate] kanban_fleet_board - Vendored kanban board
+  fleet kanban board | show the vendored board | read the vendored board | show the plugin board
+  e.g. qubit, fleet kanban board
+
+[immediate] kanban_fleet_boards - Vendored kanban boards
+  fleet kanban boards | list vendored boards
+  e.g. qubit, fleet kanban boards
+
+[immediate] kanban_fleet_home_channels - Vendored kanban channels
+  fleet kanban channels | plugin kanban channels | fleet home channels
+  e.g. qubit, fleet kanban channels
+
+[immediate] kanban_fleet_config - Vendored kanban config
+  fleet kanban config | plugin kanban config
+  e.g. qubit, fleet kanban config
+
+[immediate] kanban_fleet_diagnostics - Vendored kanban diagnostics
+  fleet kanban diagnostics | plugin kanban diagnostics
+  e.g. qubit, fleet kanban diagnostics
+
+[immediate] kanban_fleet_model_options - Vendored kanban model options
+  fleet kanban model options | plugin kanban model options
+  e.g. qubit, fleet kanban model options
+
+[immediate] kanban_fleet_projects - Vendored kanban projects
+  fleet kanban projects | plugin kanban projects
+  e.g. qubit, fleet kanban projects
+
+[immediate] kanban_fleet_stats - Vendored kanban stats
+  fleet kanban stats | vendored kanban stats | plugin kanban stats
+  e.g. qubit, fleet kanban stats
+
+[immediate] kanban_fleet_task - Vendored kanban task
+  rx:fleet kanban task (.+) | rx:kanban task (.+)
+  e.g. qubit, fleet kanban task abc123
+
+[immediate] kanban_fleet_workers - Vendored kanban workers
+  fleet kanban workers | plugin kanban workers
+  e.g. qubit, fleet kanban workers
+
+--- MODEL PROFILES (8) ---
+[immediate] model_profile_active - Active model and voice
+  what model and voice are active | which model and voice are active | what model is active | what voice is active
+  e.g. qubit, what model and voice are active?
+
+[confirm] model_profile_local_only - Return to local-only mode
+  return to local only mode | return to local-only mode | go local only | local only mode | reset this session to defaults
+  e.g. qubit, return to local-only mode
+
+[confirm] model_profile_coding - Route this task with my coding model
+  run this task with my coding model | use my coding model for this task | run this with my coding model | switch to my coding model | use my coding model
+  e.g. qubit, run this task with my coding model
+
+[confirm] model_profile_set_active - Set the active provider profile
+  rx:set (?:my )?([a-z0-9_\-]+) as the active (?:provider )?profile$ | rx:make (?:my )?([a-z0-9_\-]+) the active (?:provider )?profile$
+  e.g. qubit, set research as the active provider profile
+
+[immediate] model_profile_test - Test model profile
+  test my model profile | test the model profile | test my brain profile
+  e.g. qubit, test my model profile
+
+[confirm] model_profile_research - Use a named model for this session
+  rx:use (?:my )?([a-z0-9_\-]+) model for this session$ | rx:switch to (?:my )?([a-z0-9_\-]+) model for this session$
+  e.g. qubit, use my research model for this session
+
+[confirm] model_profile_local - Use local brain
+  use my local brain | switch to my local brain | use the local brain | go back to my local brain
+  e.g. qubit, use my local brain
+
+[confirm] model_profile_realtime - Use realtime voice profile
+  use the realtime voice profile | use my realtime voice profile | switch to the realtime voice profile | use realtime voice
+  e.g. qubit, use the realtime voice profile
+
+--- CLI / ROLES / RECIPES / GUARDS (623) ---
+[immediate] cli_acp - ACP editor integration status
+  rx:^acp$
+  e.g. qubit, acp
+
+[immediate] cli_acp_client - ACP harness catalog
+  rx:^acp client catalog$
+  e.g. qubit, acp client catalog
+
+[immediate] cli_action_receipts - Action receipts
+  rx:^actions (receipts|receipt history)$
+  e.g. qubit, action receipts
+
+[immediate] guard_agent_plugins_activate - Activate a plugin go-live (voice guard)
+  activate plugin | activate a plugin | activate the plugin | activate plugins | bulk activate plugins | activate all plugins | go live with a plugin | plugin go live | agent plugins activate
+  e.g. qubit, activate plugin
+
+[immediate] cli_insights - Activity insights
+  rx:^insights$
+  e.g. qubit, insights
+
+[immediate] guard_plugins_adopt - Adopt a self-cloned plugin (voice guard)
+  plugins adopt | adopt a plugin | adopt plugin
+  e.g. qubit, plugins adopt my-plugin
+
+[immediate] cli_guard_approvals_suggest - approvals suggest (voice guard)
+  rx:^approvals\ suggest$
+  e.g. qubit, approvals suggest
+
+[immediate] cli_guard_approvals_test - approvals test (voice guard)
+  rx:^approvals\ test$
+  e.g. qubit, approvals test
+
+[immediate] cli_audio - Audio status
+  rx:^audio$
+  e.g. qubit, audio
+
+[immediate] cli_guard_auth_add - auth add (voice guard)
+  rx:^auth\ add$
+  e.g. qubit, auth add
+
+[immediate] cli_guard_auth_priority - auth priority (voice guard)
+  rx:^auth\ priority$
+  e.g. qubit, auth priority
+
+[immediate] cli_guard_auth_refresh - auth refresh (voice guard)
+  rx:^auth\ refresh$
+  e.g. qubit, auth refresh
+
+[immediate] cli_guard_auth_remove - auth remove (voice guard)
+  rx:^auth\ remove$
+  e.g. qubit, auth remove
+
+[immediate] cli_guard_auth_reset - auth reset (voice guard)
+  rx:^auth\ reset$
+  e.g. qubit, auth reset
+
+[immediate] cli_guard_auth_spotify - auth spotify (voice guard)
+  rx:^auth\ spotify$
+  e.g. qubit, auth spotify
+
+[immediate] cli_guard_auth_upgrade - auth upgrade (voice guard)
+  rx:^auth\ upgrade$
+  e.g. qubit, auth upgrade
+
+[immediate] cli_automation - Automation flows
+  rx:^automation flows$
+  e.g. qubit, automation flows
+
+[immediate] cli_guard_backup - backup (voice guard)
+  rx:^backup$
+  e.g. qubit, backup
+
+[immediate] guard_computer_use_screen_status - Bot Desktop screen status (voice guard)
+  computer-use screen status | computer use screen status | bot desktop screen status
+  e.g. qubit, computer-use screen status
+
+[immediate] cli_brain - Brain principals
+  rx:^brain$
+  e.g. qubit, brain
+
+[immediate] cli_branding_verify - Branding verification
+  rx:^branding verify$
+  e.g. qubit, branding verify
+
+[immediate] cli_guard_browser_close_refusal - browser close refusal (voice guard)
+  rx:^browser\ close\ refusal$
+  e.g. qubit, browser close refusal
+
+[immediate] cli_browser - Browser status
+  rx:^browser$
+  e.g. qubit, browser
+
+[immediate] cli_guard_bundles - bundles (voice guard)
+  rx:^bundles$
+  e.g. qubit, bundles
+
+[immediate] cli_guard_bundles_create - bundles create (voice guard)
+  rx:^bundles\ create$
+  e.g. qubit, bundles create
+
+[immediate] cli_guard_bundles_delete - bundles delete (voice guard)
+  rx:^bundles\ delete$
+  e.g. qubit, bundles delete
+
+[immediate] cli_guard_bundles_list - bundles list (voice guard)
+  rx:^bundles\ list$
+  e.g. qubit, bundles list
+
+[immediate] cli_guard_bundles_reload - bundles reload (voice guard)
+  rx:^bundles\ reload$
+  e.g. qubit, bundles reload
+
+[immediate] cli_guard_bundles_show - bundles show (voice guard)
+  rx:^bundles\ show$
+  e.g. qubit, bundles show
+
+[immediate] cli_channels - Channels status
+  rx:^channels$
+  e.g. qubit, channels
+
+[immediate] guard_plugins_check_updates - Check for plugin updates (voice guard)
+  plugins check-updates | check plugin updates | check for plugin updates
+  e.g. qubit, check for plugin updates
+
+[immediate] cli_guard_checkpoints_clear - checkpoints clear (voice guard)
+  rx:^checkpoints\ clear$
+  e.g. qubit, checkpoints clear
+
+[immediate] cli_guard_checkpoints_clear_legacy - checkpoints clear-legacy (voice guard)
+  rx:^checkpoints\ clear\-legacy$
+  e.g. qubit, checkpoints clear-legacy
+
+[immediate] cli_guard_claw - claw (voice guard)
+  rx:^claw$
+  e.g. qubit, claw
+
+[immediate] cli_guard_claw_cleanup - claw cleanup (voice guard)
+  rx:^claw\ cleanup$
+  e.g. qubit, claw cleanup
+
+[immediate] cli_guard_claw_migrate - claw migrate (voice guard)
+  rx:^claw\ migrate$
+  e.g. qubit, claw migrate
+
+[confirm] cli_acp_client_configure - Cli Acp Client Configure
+  rx:^acp client configure\b
+
+[confirm] cli_acp_client_handshake - Cli Acp Client Handshake
+  rx:^acp client handshake\b
+
+[immediate] cli_acp_client_receipts - Cli Acp Client Receipts
+  rx:^acp client receipts$
+
+[confirm] cli_acp_client_send - Cli Acp Client Send
+  rx:^acp client send\b
+
+[confirm] cli_acp_client_unconfigure - Cli Acp Client Unconfigure
+  rx:^acp client unconfigure\b
+
+[immediate] cli_acp_serve_refusal - Cli Acp Serve Refusal
+  rx:^acp serve refusal$
+
+[confirm] cli_actions_cancel - Cli Actions Cancel
+  rx:^actions cancel\b
+
+[immediate] cli_actions_check - Cli Actions Check
+  rx:^actions check\b
+
+[confirm] cli_actions_execute - Cli Actions Execute
+  rx:^actions execute\b
+
+[immediate] cli_actions_receipt - Cli Actions Receipt
+  rx:^actions receipt\b
+
+[confirm] cli_agent_profile_create - Cli Agent Profile Create
+  rx:^profile create\b
+
+[immediate] cli_agent_profile_describe - Cli Agent Profile Describe
+  rx:^profile describe\b
+
+[confirm] cli_agent_profile_rename - Cli Agent Profile Rename
+  rx:^profile rename\b
+
+[immediate] cli_asr_test - Cli Asr Test
+  rx:^asr test$
+
+[immediate] cli_auth_login - Cli Auth Login
+  rx:^auth login$
+
+[immediate] cli_auth_logout - Cli Auth Logout
+  rx:^auth logout$
+
+[immediate] cli_auth_verify - Cli Auth Verify
+  rx:^auth verify\b
+
+[confirm] cli_automation_flow_add - Cli Automation Flow Add
+  rx:^automation flow add\b
+
+[confirm] cli_automation_flow_run - Cli Automation Flow Run
+  rx:^automation flow run\b
+
+[confirm] cli_automation_heartbeat_add - Cli Automation Heartbeat Add
+  rx:^automation heartbeat add\b
+
+[immediate] cli_automation_heartbeats - Cli Automation Heartbeats
+  rx:^automation heartbeats$
+
+[confirm] cli_automation_order_add - Cli Automation Order Add
+  rx:^automation order add\b
+
+[confirm] cli_automation_order_disable - Cli Automation Order Disable
+  rx:^automation order disable\b
+
+[confirm] cli_automation_order_enable - Cli Automation Order Enable
+  rx:^automation order enable\b
+
+[confirm] cli_automation_order_remove - Cli Automation Order Remove
+  rx:^automation order remove\b
+
+[immediate] cli_automation_orders - Cli Automation Orders
+  rx:^automation orders$
+
+[confirm] cli_automation_qa_add - Cli Automation Qa Add
+  rx:^automation qa add\b
+
+[confirm] cli_automation_qa_run - Cli Automation Qa Run
+  rx:^automation qa run\b
+
+[immediate] cli_automation_scenarios - Cli Automation Scenarios
+  rx:^automation scenarios$
+
+[immediate] cli_automation_yield_pending - Cli Automation Yield Pending
+  rx:^automation yield pending$
+
+[confirm] cli_automation_yield_resume - Cli Automation Yield Resume
+  rx:^automation yield resume\b
+
+[immediate] cli_autonomy_expire - Cli Autonomy Expire
+  rx:^autonomy expire$
+
+[confirm] cli_autonomy_pause - Cli Autonomy Pause
+  rx:^autonomy pause\b
+
+[confirm] cli_autonomy_resume - Cli Autonomy Resume
+  rx:^autonomy resume\b
+
+[confirm] cli_autonomy_revoke - Cli Autonomy Revoke
+  rx:^autonomy revoke\b
+
+[immediate] cli_autonomy_show - Cli Autonomy Show
+  rx:^autonomy show\b
+
+[confirm] cli_brain_account_add - Cli Brain Account Add
+  rx:^brain account add\b
+
+[confirm] cli_brain_account_remove - Cli Brain Account Remove
+  rx:^brain account remove\b
+
+[confirm] cli_brain_member_add - Cli Brain Member Add
+  rx:^brain member add\b
+
+[confirm] cli_brain_member_remove - Cli Brain Member Remove
+  rx:^brain member remove\b
+
+[immediate] cli_brain_onboard_plan - Cli Brain Onboard Plan
+  rx:^brain onboard plan$
+
+[confirm] cli_brain_principal_add - Cli Brain Principal Add
+  rx:^brain principal add\b
+
+[immediate] cli_brain_profile_export - Cli Brain Profile Export
+  rx:^brain profile export\b
+
+[confirm] cli_brain_profile_forget - Cli Brain Profile Forget
+  rx:^brain profile forget\b
+
+[confirm] cli_brain_profile_set - Cli Brain Profile Set
+  rx:^brain profile set\b
+
+[confirm] cli_brain_profile_sweep - Cli Brain Profile Sweep
+  rx:^brain profile sweep\b
+
+[immediate] cli_brain_vault_list - Cli Brain Vault List
+  rx:^brain vault list$
+
+[confirm] cli_brain_vault_remove - Cli Brain Vault Remove
+  rx:^brain vault remove\b
+
+[confirm] cli_brain_vault_set - Cli Brain Vault Set
+  rx:^brain vault set\b
+
+[confirm] cli_branding_migrate - Cli Branding Migrate
+  rx:^branding migrate$
+
+[immediate] cli_browser_activate - Cli Browser Activate
+  rx:^browser activate\b
+
+[immediate] cli_browser_close_refusal - Cli Browser Close Refusal
+  rx:^browser close(?:-profile)?$
+
+[confirm] cli_browser_download - Cli Browser Download
+  rx:^browser download\b
+
+[immediate] cli_browser_favicon - Cli Browser Favicon
+  rx:^browser favicon$
+
+[confirm] cli_browser_fill - Cli Browser Fill
+  rx:^browser fill\b
+
+[immediate] cli_browser_find - Cli Browser Find
+  rx:^browser find\b
+
+[confirm] cli_browser_navigate - Cli Browser Navigate
+  rx:^browser navigate\b
+
+[confirm] cli_browser_profile_create - Cli Browser Profile Create
+  rx:^browser profile create\b
+
+[confirm] cli_browser_profile_open - Cli Browser Profile Open
+  rx:^browser profile open\b
+
+[confirm] cli_browser_profile_remove - Cli Browser Profile Remove
+  rx:^browser profile remove\b
+
+[immediate] cli_browser_read - Cli Browser Read
+  rx:^browser read$
+
+[immediate] cli_browser_screenshot - Cli Browser Screenshot
+  rx:^browser screenshot$
+
+[immediate] cli_browser_tabs - Cli Browser Tabs
+  rx:^browser tabs$
+
+[immediate] cli_capabilities_list - Cli Capabilities List
+  rx:^capabilities( list)?$
+
+[immediate] cli_capability - Cli Capability
+  rx:^capability\b
+
+[confirm] cli_channels_configure - Cli Channels Configure
+  rx:^channels configure\b
+
+[immediate] cli_channels_receive - Cli Channels Receive
+  rx:^channels receive refusal$
+
+[confirm] cli_channels_unconfigure - Cli Channels Unconfigure
+  rx:^channels unconfigure\b
+
+[immediate] cli_chat_session_search - Cli Chat Session Search
+  rx:^chat session search\b
+
+[immediate] cli_chat_session_show - Cli Chat Session Show
+  rx:^chat session show\b
+
+[immediate] cli_chat_sessions - Cli Chat Sessions
+  rx:^chat sessions$
+
+[confirm] cli_checkpoints_prune - Cli Checkpoints Prune
+  rx:^checkpoints prune\b
+
+[confirm] cli_checkpoints_write - Cli Checkpoints Write
+  rx:^checkpoints write\b
+
+[immediate] cli_computer_install_refusal - Cli Computer Install Refusal
+  rx:^computer(?:-use)? install(?: refusal)?$
+
+[confirm] cli_computer_launch - Cli Computer Launch
+  rx:^computer launch\b
+
+[immediate] cli_computer_ops - Cli Computer Ops
+  rx:^computer ops$
+
+[immediate] cli_computer_permissions - Cli Computer Permissions
+  rx:^computer-use permissions$
+
+[confirm] cli_computer_pip - Cli Computer Pip
+  rx:^computer pip$
+
+[confirm] cli_computer_present - Cli Computer Present
+  rx:^computer present$
+
+[immediate] cli_computer_screen - Cli Computer Screen
+  rx:^computer screen$
+
+[confirm] cli_computer_screen_arrange - Cli Computer Screen Arrange
+  rx:^computer screen arrange\b
+
+[immediate] cli_config_check - Cli Config Check
+  rx:^config check$
+
+[immediate] cli_config_edit_guard - Cli Config Edit Guard
+  rx:^config edit$
+
+[immediate] cli_config_env_path - Cli Config Env Path
+  rx:^config env-path$
+
+[immediate] cli_config_get - Cli Config Get
+  rx:^config get\b
+
+[immediate] cli_config_migrate_guard - Cli Config Migrate Guard
+  rx:^config migrate$
+
+[immediate] cli_config_path - Cli Config Path
+  rx:^config path$
+
+[confirm] cli_config_set - Cli Config Set
+  rx:^config set\b
+
+[confirm] cli_config_unset - Cli Config Unset
+  rx:^config unset\b
+
+[immediate] cli_console_help - Cli Console Help
+  rx:^console help$
+
+[immediate] cli_console_root - Cli Console Root
+  rx:^console$
+
+[confirm] cli_cron_remove - Cli Cron Remove
+  rx:^cron remove\b
+
+[immediate] cli_cron_root - Cli Cron Root
+  rx:^cron$
+
+[confirm] cli_device_enroll - Cli Device Enroll
+  rx:^device enroll$
+
+[confirm] cli_experiments_abort - Cli Experiments Abort
+  rx:^experiments abort\b
+
+[confirm] cli_experiments_evaluate - Cli Experiments Evaluate
+  rx:^experiments evaluate\b
+
+[confirm] cli_experiments_finish - Cli Experiments Finish
+  rx:^experiments finish\b
+
+[confirm] cli_experiments_promote - Cli Experiments Promote
+  rx:^experiments promote\b
+
+[confirm] cli_experiments_register - Cli Experiments Register
+  rx:^experiments register\b
+
+[confirm] cli_experiments_signal - Cli Experiments Signal
+  rx:^experiments signal\b
+
+[confirm] cli_experiments_snapshot - Cli Experiments Snapshot
+  rx:^experiments snapshot\b
+
+[confirm] cli_experiments_start - Cli Experiments Start
+  rx:^experiments start\b
+
+[confirm] cli_file_patch_rollback - Cli File Patch Rollback
+  rx:^file patch rollback\b
+
+[immediate] cli_files_list_cmd - Cli Files List Cmd
+  rx:^files? list\b
+
+[immediate] cli_files_read_cmd - Cli Files Read Cmd
+  rx:^files? read\b
+
+[confirm] cli_frontier_chat - Cli Frontier Chat
+  rx:^frontier chat\b
+
+[immediate] cli_frontier_show - Cli Frontier Show
+  rx:^frontier show\b
+
+[confirm] cli_gateway_add - Cli Gateway Add
+  rx:^gateway add\b
+
+[immediate] cli_gateway_link - Cli Gateway Link
+  rx:^gateway link\b
+
+[immediate] cli_gateway_list - Cli Gateway List
+  rx:^gateway list$
+
+[confirm] cli_gateway_remove - Cli Gateway Remove
+  rx:^gateway remove\b
+
+[immediate] cli_gateway_root - Cli Gateway Root
+  rx:^gateway$
+
+[immediate] cli_gateway_show - Cli Gateway Show
+  rx:^gateway show\b
+
+[immediate] cli_gateway_supervision_refusal - Cli Gateway Supervision Refusal
+  rx:^gateway supervision refusal$
+
+[confirm] cli_gateway_supervision_request - Cli Gateway Supervision Request
+  rx:^gateway supervision request$
+
+[confirm] cli_gateway_supervision_revert - Cli Gateway Supervision Revert
+  rx:^gateway supervision revert$
+
+[immediate] cli_ghost_action_preview - Cli Ghost Action Preview
+  rx:^ghost action preview\b
+
+[confirm] cli_ghost_action_recover - Cli Ghost Action Recover
+  rx:^ghost action recover\b
+
+[confirm] cli_ghost_action_retry - Cli Ghost Action Retry
+  rx:^ghost action retry\b
+
+[confirm] cli_ghost_cancel - Cli Ghost Cancel
+  rx:^ghost cancel\b
+
+[immediate] cli_ghost_check - Cli Ghost Check
+  rx:^ghost check\b
+
+[confirm] cli_ghost_disable - Cli Ghost Disable
+  rx:^ghost disable$
+
+[confirm] cli_ghost_enable - Cli Ghost Enable
+  rx:^ghost enable$
+
+[confirm] cli_ghost_estop - Cli Ghost Estop
+  rx:^ghost estop$
+
+[confirm] cli_ghost_execute - Cli Ghost Execute
+  rx:^ghost execute\b
+
+[confirm] cli_ghost_grant - Cli Ghost Grant
+  rx:^ghost grant\b
+
+[immediate] cli_ghost_read_tab - Cli Ghost Read Tab
+  rx:^ghost read tab$
+
+[confirm] cli_ghost_reset - Cli Ghost Reset
+  rx:^ghost reset$
+
+[confirm] cli_ghost_revoke - Cli Ghost Revoke
+  rx:^ghost revoke\b
+
+[immediate] cli_ghost_show - Cli Ghost Show
+  rx:^ghost show\b
+
+[confirm] cli_ghost_type - Cli Ghost Type
+  rx:^ghost type\b
+
+[confirm] cli_hooks_declare - Cli Hooks Declare
+  rx:^hooks declare\b
+
+[confirm] cli_hooks_emit - Cli Hooks Emit
+  rx:^hooks emit\b
+
+[confirm] cli_hooks_fire - Cli Hooks Fire
+  rx:^hooks fire\b
+
+[confirm] cli_hooks_remove - Cli Hooks Remove
+  rx:^hooks remove\b
+
+[confirm] cli_hooks_revoke - Cli Hooks Revoke
+  rx:^hooks revoke\b
+
+[immediate] cli_hooks_test - Cli Hooks Test
+  rx:^hooks test\b
+
+[immediate] cli_hooks_validate - Cli Hooks Validate
+  rx:^hooks validate\b
+
+[confirm] cli_ide_open - Cli Ide Open
+  rx:^ide open\b
+
+[immediate] cli_import_agent - Cli Import Agent
+  rx:^import-agent$
+
+[immediate] cli_import_inspect - Cli Import Inspect
+  rx:^import inspect$
+
+[immediate] cli_import_refusal - Cli Import Refusal
+  rx:^import refusal$
+
+[confirm] cli_kanban_archive - Cli Kanban Archive
+  rx:^kanban archive\b
+
+[confirm] cli_kanban_assign - Cli Kanban Assign
+  rx:^kanban assign\b
+
+[confirm] cli_kanban_block - Cli Kanban Block
+  rx:^kanban block\b
+
+[confirm] cli_kanban_boards_create - Cli Kanban Boards Create
+  rx:^kanban boards create\b
+
+[confirm] cli_kanban_claim - Cli Kanban Claim
+  rx:^kanban claim\b
+
+[confirm] cli_kanban_comment - Cli Kanban Comment
+  rx:^kanban comment\b
+
+[immediate] cli_kanban_current - Cli Kanban Current
+  rx:^kanban current$
+
+[immediate] cli_kanban_dispatch - Cli Kanban Dispatch
+  rx:^kanban (?:dispatch|daemon)$
+
+[confirm] cli_kanban_edit - Cli Kanban Edit
+  rx:^kanban edit\b
+
+[immediate] cli_kanban_export - Cli Kanban Export
+  rx:^kanban export$
+
+[confirm] cli_kanban_init - Cli Kanban Init
+  rx:^kanban init$
+
+[immediate] cli_kanban_layout_show - Cli Kanban Layout Show
+  rx:^kanban layout show$
+
+[immediate] cli_kanban_list - Cli Kanban List
+  rx:^kanban(?: list)?$
+
+[confirm] cli_kanban_migrate - Cli Kanban Migrate
+  rx:^kanban migrate$
+
+[immediate] cli_kanban_open - Cli Kanban Open
+  rx:^kanban open$
+
+[confirm] cli_kanban_reassign - Cli Kanban Reassign
+  rx:^kanban reassign\b
+
+[confirm] cli_kanban_reclaim - Cli Kanban Reclaim
+  rx:^kanban reclaim\b
+
+[confirm] cli_kanban_role_grant - Cli Kanban Role Grant
+  rx:^kanban role grant voice$
+
+[confirm] cli_kanban_role_revoke - Cli Kanban Role Revoke
+  rx:^kanban role revoke voice$
+
+[immediate] cli_kanban_show - Cli Kanban Show
+  rx:^kanban show\b
+
+[confirm] cli_kanban_snapshot_restore - Cli Kanban Snapshot Restore
+  rx:^kanban snapshot restore voice$
+
+[immediate] cli_kanban_snapshots - Cli Kanban Snapshots
+  rx:^kanban snapshots$
+
+[immediate] cli_kanban_swarm - Cli Kanban Swarm
+  rx:^kanban swarm$
+
+[confirm] cli_kanban_tab_create - Cli Kanban Tab Create
+  rx:^kanban tab create\b
+
+[confirm] cli_kanban_tab_delete - Cli Kanban Tab Delete
+  rx:^kanban tab delete\b
+
+[immediate] cli_kanban_tab_list - Cli Kanban Tab List
+  rx:^kanban tab list$
+
+[confirm] cli_kanban_tab_move - Cli Kanban Tab Move
+  rx:^kanban tab move\b
+
+[confirm] cli_kanban_tab_rename - Cli Kanban Tab Rename
+  rx:^kanban tab rename\b
+
+[immediate] cli_kanban_watch - Cli Kanban Watch
+  rx:^kanban watch$
+
+[confirm] cli_kanban_widget_add - Cli Kanban Widget Add
+  rx:^kanban widget add\b
+
+[immediate] cli_kanban_widget_list - Cli Kanban Widget List
+  rx:^kanban widget list$
+
+[confirm] cli_kanban_widget_move - Cli Kanban Widget Move
+  rx:^kanban widget move voice$
+
+[confirm] cli_kanban_widget_remove - Cli Kanban Widget Remove
+  rx:^kanban widget remove\b
+
+[immediate] cli_lessons_list - Cli Lessons List
+  rx:^lessons list$
+
+[confirm] cli_lessons_promote - Cli Lessons Promote
+  rx:^lessons promote\b
+
+[confirm] cli_lessons_remove - Cli Lessons Remove
+  rx:^lessons remove\b
+
+[immediate] cli_loop_start - Cli Loop Start
+  rx:^loop start$
+
+[immediate] cli_lsp_install_refusal - Cli Lsp Install Refusal
+  rx:^lsp install(?:-all)?$
+
+[confirm] cli_lsp_restart - Cli Lsp Restart
+  rx:^lsp restart\b
+
+[immediate] cli_lsp_which - Cli Lsp Which
+  rx:^lsp which\b
+
+[confirm] cli_mcp_add - Cli Mcp Add
+  rx:^mcp add\b
+
+[confirm] cli_mcp_install - Cli Mcp Install
+  rx:^mcp install\b
+
+[confirm] cli_mcp_invoke - Cli Mcp Invoke
+  rx:^mcp invoke\b
+
+[confirm] cli_mcp_remove - Cli Mcp Remove
+  rx:^mcp remove\b
+
+[immediate] cli_mcp_test - Cli Mcp Test
+  rx:^mcp test\b
+
+[confirm] cli_media_generate - Cli Media Generate
+  rx:^media gen generate\b
+
+[confirm] cli_memory_forget - Cli Memory Forget
+  rx:^memory forget\b
+
+[immediate] cli_memory_root - Cli Memory Root
+  rx:^memory$
+
+[immediate] cli_mic_help - Cli Mic Help
+  rx:^mic help$
+
+[confirm] cli_monitor - Cli Monitor
+  rx:^monitor( run)?$
+
+[confirm] cli_msg_account_add - Cli Msg Account Add
+  rx:^msg account add\b
+
+[confirm] cli_msg_account_remove - Cli Msg Account Remove
+  rx:^msg account remove\b
+
+[immediate] cli_msg_account_show - Cli Msg Account Show
+  rx:^msg account show\b
+
+[confirm] cli_msg_approve - Cli Msg Approve
+  rx:^msg approve\b
+
+[confirm] cli_msg_draft - Cli Msg Draft
+  rx:^msg draft\b
+
+[immediate] cli_msg_inbox - Cli Msg Inbox
+  rx:^msg inbox$
+
+[immediate] cli_msg_link - Cli Msg Link
+  rx:^msg link$
+
+[confirm] cli_msg_retry - Cli Msg Retry
+  rx:^msg retry\b
+
+[immediate] cli_msg_summarize - Cli Msg Summarize
+  rx:^msg summarize\b
+
+[confirm] cli_opencode_cancel - Cli Opencode Cancel
+  rx:^opencode cancel\b
+
+[immediate] cli_opencode_check - Cli Opencode Check
+  rx:^opencode check\b
+
+[confirm] cli_opencode_grant - Cli Opencode Grant
+  rx:^opencode grant\b
+
+[immediate] cli_opencode_preview - Cli Opencode Preview
+  rx:^opencode preview\b
+
+[confirm] cli_opencode_recover - Cli Opencode Recover
+  rx:^opencode recover\b
+
+[confirm] cli_opencode_retry - Cli Opencode Retry
+  rx:^opencode retry\b
+
+[confirm] cli_opencode_revoke - Cli Opencode Revoke
+  rx:^opencode revoke\b
+
+[immediate] cli_opencode_show - Cli Opencode Show
+  rx:^opencode show\b
+
+[immediate] cli_package_certify - Cli Package Certify
+  rx:^package certify$
+
+[confirm] cli_pairing_accept - Cli Pairing Accept
+  rx:^pairing accept\b
+
+[confirm] cli_pairing_approve - Cli Pairing Approve
+  rx:^pairing approve\b
+
+[confirm] cli_pairing_create - Cli Pairing Create
+  rx:^pairing create$
+
+[confirm] cli_pairing_revoke - Cli Pairing Revoke
+  rx:^pairing revoke\b
+
+[confirm] cli_pause - Cli Pause
+  rx:^pause$
+
+[confirm] cli_peer_add - Cli Peer Add
+  rx:^peer add\b
+
+[confirm] cli_peer_dm - Cli Peer Dm
+  rx:^peer dm\b
+
+[immediate] cli_peer_link - Cli Peer Link
+  rx:^peer link\b
+
+[confirm] cli_peer_remove - Cli Peer Remove
+  rx:^peer remove\b
+
+[confirm] cli_peer_run - Cli Peer Run
+  rx:^peer run\b
+
+[immediate] cli_pets_refusal - Cli Pets Refusal
+  rx:^pets downloads refusal$
+
+[immediate] cli_plugins_browse - Cli Plugins Browse
+  rx:^plugins browse$
+
+[confirm] cli_plugins_disable - Cli Plugins Disable
+  rx:^plugins disable\b
+
+[immediate] cli_plugins_doctor - Cli Plugins Doctor
+  rx:^plugins doctor$
+
+[confirm] cli_plugins_enable - Cli Plugins Enable
+  rx:^plugins enable\b
+
+[confirm] cli_plugins_install - Cli Plugins Install
+  rx:^plugins install\b
+
+[confirm] cli_plugins_invoke - Cli Plugins Invoke
+  rx:^plugins invoke\b
+
+[confirm] cli_plugins_register - Cli Plugins Register
+  rx:^plugins register\b
+
+[confirm] cli_plugins_runtime_install - Cli Plugins Runtime Install
+  rx:^plugins runtime install\b
+
+[immediate] cli_plugins_search - Cli Plugins Search
+  rx:^plugins search\b
+
+[immediate] cli_plugins_show - Cli Plugins Show
+  rx:^plugins show\b
+
+[confirm] cli_plugins_unregister - Cli Plugins Unregister
+  rx:^plugins (?:unregister|remove)\b
+
+[immediate] cli_plugins_validate - Cli Plugins Validate
+  rx:^plugins validate\b
+
+[immediate] cli_product_first_run - Cli Product First Run
+  rx:^product first run$
+
+[confirm] cli_product_migrate - Cli Product Migrate
+  rx:^product migrate$
+
+[immediate] cli_product_probe - Cli Product Probe
+  rx:^product probe$
+
+[confirm] cli_product_repair - Cli Product Repair
+  rx:^product repair$
+
+[confirm] cli_product_rollback - Cli Product Rollback
+  rx:^product rollback$
+
+[immediate] cli_profile_list - Cli Profile List
+  rx:^profile list$
+
+[confirm] cli_profile_remove - Cli Profile Remove
+  rx:^profile (?:remove|delete)\b
+
+[confirm] cli_profile_reset - Cli Profile Reset
+  rx:^profile reset\b
+
+[confirm] cli_profile_rollback - Cli Profile Rollback
+  rx:^profile rollback\b
+
+[immediate] cli_profile_root - Cli Profile Root
+  rx:^profile$
+
+[confirm] cli_profile_select - Cli Profile Select
+  rx:^profile (?:select|use)\b
+
+[immediate] cli_profile_show - Cli Profile Show
+  rx:^profile (?:show|info)\b
+
+[confirm] cli_profile_upgrade - Cli Profile Upgrade
+  rx:^profile (?:upgrade|update)\b
+
+[confirm] cli_project_add_folder - Cli Project Add Folder
+  rx:^project add(?: |-)?folder\b
+
+[confirm] cli_project_archive - Cli Project Archive
+  rx:^project archive\b
+
+[confirm] cli_project_bind_board - Cli Project Bind Board
+  rx:^project bind(?: |-)?board\b
+
+[confirm] cli_project_create - Cli Project Create
+  rx:^project create\b
+
+[confirm] cli_project_remove_folder - Cli Project Remove Folder
+  rx:^project remove(?: |-)?folder\b
+
+[confirm] cli_project_rename - Cli Project Rename
+  rx:^project rename\b
+
+[confirm] cli_project_restore - Cli Project Restore
+  rx:^project restore\b
+
+[confirm] cli_project_rollback - Cli Project Rollback
+  rx:^project rollback\b
+
+[immediate] cli_project_root - Cli Project Root
+  rx:^project$
+
+[confirm] cli_project_set_primary - Cli Project Set Primary
+  rx:^project set(?: |-)?primary\b
+
+[immediate] cli_project_show - Cli Project Show
+  rx:^project show\b
+
+[immediate] cli_projects_active - Cli Projects Active
+  rx:^projects active$
+
+[confirm] cli_projects_archive - Cli Projects Archive
+  rx:^projects archive\b
+
+[confirm] cli_projects_create - Cli Projects Create
+  rx:^projects create\b
+
+[immediate] cli_proxy_start_refusal - Cli Proxy Start Refusal
+  rx:^proxy start(?: refusal)?$
+
+[immediate] cli_reasoning - Cli Reasoning
+  rx:^reasoning$
+
+[immediate] cli_roundtrip_test - Cli Roundtrip Test
+  rx:^roundtrip test$
+
+[confirm] cli_runtime_install - Cli Runtime Install
+  rx:^runtime install\b
+
+[confirm] cli_runtime_recover - Cli Runtime Recover
+  rx:^runtime recover\b
+
+[confirm] cli_runtime_remove - Cli Runtime Remove
+  rx:^runtime remove\b
+
+[confirm] cli_runtime_rollback - Cli Runtime Rollback
+  rx:^runtime rollback\b
+
+[confirm] cli_runtime_upgrade - Cli Runtime Upgrade
+  rx:^runtime upgrade\b
+
+[confirm] cli_schedules_create - Cli Schedules Create
+  rx:^schedules create\b
+
+[confirm] cli_schedules_delete - Cli Schedules Delete
+  rx:^schedules delete\b
+
+[immediate] cli_schedules_history - Cli Schedules History
+  rx:^schedules history$
+
+[immediate] cli_schedules_list - Cli Schedules List
+  rx:^schedules list$
+
+[confirm] cli_schedules_pause - Cli Schedules Pause
+  rx:^schedules pause\b
+
+[confirm] cli_schedules_resume - Cli Schedules Resume
+  rx:^schedules resume\b
+
+[immediate] cli_schedules_root - Cli Schedules Root
+  rx:^schedules$
+
+[confirm] cli_schedules_run_due - Cli Schedules Run Due
+  rx:^schedules run due$
+
+[immediate] cli_schedules_show - Cli Schedules Show
+  rx:^schedules show\b
+
+[confirm] cli_session_archive - Cli Session Archive
+  rx:^sessions? archive\b
+
+[confirm] cli_session_delete - Cli Session Delete
+  rx:^sessions? delete\b
+
+[confirm] cli_session_resume - Cli Session Resume
+  rx:^sessions? resume\b
+
+[immediate] cli_session_show - Cli Session Show
+  rx:^sessions? show\b
+
+[confirm] cli_sessions_clean_markers - Cli Sessions Clean Markers
+  rx:^sessions? clean-markers$
+
+[immediate] cli_sessions_export - Cli Sessions Export
+  rx:^sessions export\b
+
+[confirm] cli_sessions_optimize - Cli Sessions Optimize
+  rx:^sessions? optimize$
+
+[confirm] cli_sessions_optimize_storage - Cli Sessions Optimize Storage
+  rx:^sessions? optimize-storage$
+
+[confirm] cli_sessions_pin - Cli Sessions Pin
+  rx:^sessions? pin\b
+
+[immediate] cli_sessions_pinned - Cli Sessions Pinned
+  rx:^sessions? pinned$
+
+[confirm] cli_sessions_prune - Cli Sessions Prune
+  rx:^sessions? prune$
+
+[confirm] cli_sessions_repair - Cli Sessions Repair
+  rx:^sessions? repair$
+
+[confirm] cli_sessions_repair_profiles - Cli Sessions Repair Profiles
+  rx:^sessions? repair-profiles$
+
+[confirm] cli_sessions_repair_routing - Cli Sessions Repair Routing
+  rx:^sessions? repair-routing$
+
+[confirm] cli_sessions_retitle_skills - Cli Sessions Retitle Skills
+  rx:^sessions? retitle-skills$
+
+[confirm] cli_sessions_unpin - Cli Sessions Unpin
+  rx:^sessions? unpin\b
+
+[confirm] cli_shares_publish_cmd - Cli Shares Publish Cmd
+  rx:^shares publish\b
+
+[confirm] cli_shares_purge_cmd - Cli Shares Purge Cmd
+  rx:^shares purge$
+
+[confirm] cli_shares_revoke_cmd - Cli Shares Revoke Cmd
+  rx:^shares revoke\b
+
+[confirm] cli_skills_disable - Cli Skills Disable
+  rx:^skills disable\b
+
+[confirm] cli_skills_enable - Cli Skills Enable
+  rx:^skills enable\b
+
+[confirm] cli_skills_remove - Cli Skills Remove
+  rx:^skills (?:remove|uninstall)\b
+
+[confirm] cli_skills_rollback - Cli Skills Rollback
+  rx:^skills rollback\b
+
+[immediate] cli_skills_root - Cli Skills Root
+  rx:^skills$
+
+[immediate] cli_skills_show - Cli Skills Show
+  rx:^skills (?:show|inspect)\b
+
+[immediate] cli_skills_workshop - Cli Skills Workshop
+  rx:^skills workshop$
+
+[confirm] cli_skills_workshop_backup - Cli Skills Workshop Backup
+  rx:^skills workshop backup$
+
+[confirm] cli_skills_workshop_restore - Cli Skills Workshop Restore
+  rx:^skills workshop restore$
+
+[confirm] cli_skills_workshop_rollback - Cli Skills Workshop Rollback
+  rx:^skills workshop rollback$
+
+[immediate] cli_skin - Cli Skin
+  rx:^skin$
+
+[confirm] cli_speech_profile_clear - Cli Speech Profile Clear
+  rx:^speech profile clear$
+
+[confirm] cli_speech_profile_clone - Cli Speech Profile Clone
+  rx:^speech profile clone\b
+
+[confirm] cli_speech_profile_create - Cli Speech Profile Create
+  rx:^speech profile create\b
+
+[immediate] cli_speech_profile_list - Cli Speech Profile List
+  rx:^speech profile list$
+
+[confirm] cli_speech_profile_remove - Cli Speech Profile Remove
+  rx:^speech profile remove\b
+
+[confirm] cli_speech_profile_select - Cli Speech Profile Select
+  rx:^speech profile select\b
+
+[immediate] cli_speech_profile_show - Cli Speech Profile Show
+  rx:^speech profile show\b
+
+[immediate] cli_speech_profile_test - Cli Speech Profile Test
+  rx:^speech profile test\b
+
+[confirm] cli_substitute_egress - Cli Substitute Egress
+  rx:^substitute egress$
+
+[immediate] cli_sync_list - Cli Sync List
+  rx:^sync list$
+
+[confirm] cli_sync_revoke - Cli Sync Revoke
+  rx:^sync revoke voice$
+
+[immediate] cli_sync_root - Cli Sync Root
+  rx:^sync$
+
+[confirm] cli_task_run_current - Cli Task Run Current
+  rx:^task run current$
+
+[confirm] cli_themes_reset - Cli Themes Reset
+  rx:^themes reset$
+
+[confirm] cli_themes_set - Cli Themes Set
+  rx:^themes set\b
+
+[confirm] cli_themes_tweak_clear - Cli Themes Tweak Clear
+  rx:^themes tweak clear\b
+
+[confirm] cli_themes_tweak_set - Cli Themes Tweak Set
+  rx:^themes tweak set\b
+
+[confirm] cli_tools_disable - Cli Tools Disable
+  rx:^tools disable\b
+
+[confirm] cli_tools_enable - Cli Tools Enable
+  rx:^tools enable\b
+
+[confirm] cli_transfers_fetch_cmd - Cli Transfers Fetch Cmd
+  rx:^transfers fetch\b
+
+[confirm] cli_transfers_plan_cmd - Cli Transfers Plan Cmd
+  rx:^transfers plan\b
+
+[immediate] cli_transfers_resume_cmd - Cli Transfers Resume Cmd
+  rx:^transfers resume\b
+
+[immediate] cli_tts_test - Cli Tts Test
+  rx:^tts test$
+
+[immediate] cli_tui_help - Cli Tui Help
+  rx:^tui help$
+
+[immediate] cli_verified_bundled - Cli Verified Bundled
+  rx:^verified bundled$
+
+[immediate] cli_verified_list_cmd - Cli Verified List Cmd
+  rx:^verified list$
+
+[confirm] cli_verified_pin - Cli Verified Pin
+  rx:^verified pin\b
+
+[immediate] cli_verified_show - Cli Verified Show
+  rx:^verified show\b
+
+[confirm] cli_verified_unpin - Cli Verified Unpin
+  rx:^verified unpin\b
+
+[immediate] cli_verified_verdict - Cli Verified Verdict
+  rx:^verified verdict\b
+
+[immediate] cli_verify - Cli Verify
+  rx:^verify$
+
+[confirm] cli_verify_voice - Cli Verify Voice
+  rx:^verify voice$
+
+[confirm] cli_vision_describe_cmd - Cli Vision Describe Cmd
+  rx:^vision describe\b
+
+[confirm] cli_webhook_add - Cli Webhook Add
+  rx:^webhook (?:add|subscribe)\b
+
+[immediate] cli_webhook_list - Cli Webhook List
+  rx:^webhook list$
+
+[confirm] cli_webhook_remove - Cli Webhook Remove
+  rx:^webhook remove\b
+
+[immediate] cli_webhook_root - Cli Webhook Root
+  rx:^webhook$
+
+[immediate] cli_webhook_show - Cli Webhook Show
+  rx:^webhook show\b
+
+[immediate] cli_webhook_test - Cli Webhook Test
+  rx:^webhook test\b
+
+[immediate] cli_websites_list - Cli Websites List
+  rx:^websites list$
+
+[immediate] cli_worktree_list - Cli Worktree List
+  rx:^worktree list$
+
+[confirm] cli_worktree_prune - Cli Worktree Prune
+  rx:^worktree prune$
+
+[confirm] role_openhands - Coding agent
+  fix this code | implement this | run the coding agent | open the coding agent | make this change
+  e.g. qubit, fix this code | qubit, implement this
+
+[immediate] cli_guard_computer_use - computer-use (voice guard)
+  rx:^computer\-use$
+  e.g. qubit, computer-use
+
+[confirm] cli_kanban_create - Create a task
+  rx:^kanban create\b
+  e.g. qubit, kanban create buy milk
+
+[immediate] cli_auth - Credential references
+  rx:^auth( list)?$
+  e.g. qubit, auth
+
+[immediate] cli_secrets - Credential references
+  rx:^secrets$
+  e.g. qubit, secrets
+
+[immediate] cli_guard_credentials_pool - credentials pool (voice guard)
+  rx:^credentials\ pool$
+  e.g. qubit, credentials pool
+
+[immediate] cli_guard_cron_blueprints - cron blueprints (voice guard)
+  rx:^cron\ blueprints$
+  e.g. qubit, cron blueprints
+
+[immediate] cli_guard_cron_blueprints_instantiate - cron blueprints instantiate (voice guard)
+  rx:^cron\ blueprints\ instantiate$
+  e.g. qubit, cron blueprints instantiate
+
+[immediate] cli_guard_cron_edit - cron edit (voice guard)
+  rx:^cron\ edit$
+  e.g. qubit, cron edit
+
+[immediate] cli_guard_cron_incidents - cron incidents (voice guard)
+  rx:^cron\ incidents$
+  e.g. qubit, cron incidents
+
+[immediate] cli_guard_cron_notepad - cron notepad (voice guard)
+  rx:^cron\ notepad$
+  e.g. qubit, cron notepad
+
+[immediate] cli_guard_cron_runs - cron runs (voice guard)
+  rx:^cron\ runs$
+  e.g. qubit, cron runs
+
+[immediate] cli_guard_cron_tick - cron tick (voice guard)
+  rx:^cron\ tick$
+  e.g. qubit, cron tick
+
+[immediate] cli_curator - Curator status
+  rx:^curator$
+  e.g. qubit, curator
+
+[immediate] cli_guard_debug - debug (voice guard)
+  rx:^debug$
+  e.g. qubit, debug
+
+[immediate] cli_guard_debug_delete - debug delete (voice guard)
+  rx:^debug\ delete$
+  e.g. qubit, debug delete
+
+[immediate] cli_guard_debug_share - debug share (voice guard)
+  rx:^debug\ share$
+  e.g. qubit, debug share
+
+[immediate] recipe_deep_research - Deep research
+  deep research | do deep research on | research this topic | make a researched brief on
+  e.g. qubit, deep research quantum error correction
+
+[immediate] cli_guard_desktop - desktop (voice guard)
+  rx:^desktop$
+  e.g. qubit, desktop
+
+[immediate] cli_device - Device status
+  rx:^device$
+  e.g. qubit, device
+
+[immediate] cli_diagnostics - Diagnostic bundle
+  rx:^diagnostics$
+  e.g. qubit, diagnostics
+
+[immediate] cli_documents - Document kinds
+  rx:^documents kinds$
+  e.g. qubit, documents kinds
+
+[immediate] cli_guard_dump - dump (voice guard)
+  rx:^dump$
+  e.g. qubit, dump
+
+[immediate] cli_guard_egress_config - egress config (voice guard)
+  rx:^egress\ config$
+  e.g. qubit, egress config
+
+[immediate] cli_guard_egress_disable - egress disable (voice guard)
+  rx:^egress\ disable$
+  e.g. qubit, egress disable
+
+[immediate] cli_egress - Egress guard status
+  rx:^egress$
+  e.g. qubit, egress
+
+[immediate] cli_guard_egress_install - egress install (voice guard)
+  rx:^egress\ install$
+  e.g. qubit, egress install
+
+[immediate] cli_guard_egress_reload - egress reload (voice guard)
+  rx:^egress\ reload$
+  e.g. qubit, egress reload
+
+[immediate] cli_guard_egress_restart - egress restart (voice guard)
+  rx:^egress\ restart$
+  e.g. qubit, egress restart
+
+[immediate] cli_guard_egress_setup - egress setup (voice guard)
+  rx:^egress\ setup$
+  e.g. qubit, egress setup
+
+[immediate] cli_guard_egress_start - egress start (voice guard)
+  rx:^egress\ start$
+  e.g. qubit, egress start
+
+[immediate] cli_guard_egress_stop - egress stop (voice guard)
+  rx:^egress\ stop$
+  e.g. qubit, egress stop
+
+[immediate] cli_guard_enroll_voice - enroll voice (voice guard)
+  rx:^enroll\ voice$
+  e.g. qubit, enroll voice
+
+[immediate] cli_guard_env_reveal - env reveal (voice guard)
+  rx:^env\ reveal$
+  e.g. qubit, env reveal
+
+[immediate] cli_env - Environment references
+  rx:^env$
+  e.g. qubit, env
+
+[immediate] cli_guard_events - events (voice guard)
+  rx:^events$
+  e.g. qubit, events
+
+[confirm] cli_documents_extract - Extract a document
+  rx:^documents? extract( .+)?$
+  e.g. qubit, documents extract /tmp/notes.txt
+
+[immediate] cli_flags - Feature flags
+  rx:^flags$
+  e.g. qubit, flags
+
+[immediate] cli_web_fetch - Fetch a web page
+  rx:^web fetch\b
+  e.g. qubit, web fetch https://example.com
+
+[immediate] cli_transfers_status - File transfer status
+  rx:^transfers( status)?$
+  e.g. qubit, transfers
+
+[immediate] cli_frontier - Frontier/model status
+  rx:^frontier$
+  e.g. qubit, frontier
+
+[immediate] cli_guard_gateway_enroll - gateway enroll (voice guard)
+  rx:^gateway\ enroll$
+  e.g. qubit, gateway enroll
+
+[immediate] cli_guard_gateway_install - gateway install (voice guard)
+  rx:^gateway\ install$
+  e.g. qubit, gateway install
+
+[immediate] cli_guard_gateway_migrate - gateway migrate (voice guard)
+  rx:^gateway\ migrate$
+  e.g. qubit, gateway migrate
+
+[immediate] cli_guard_gateway_migrate_legacy - gateway migrate-legacy (voice guard)
+  rx:^gateway\ migrate\-legacy$
+  e.g. qubit, gateway migrate-legacy
+
+[immediate] cli_guard_gateway_recover - gateway recover (voice guard)
+  rx:^gateway\ recover$
+  e.g. qubit, gateway recover
+
+[immediate] cli_guard_gateway_restart - gateway restart (voice guard)
+  rx:^gateway\ restart$
+  e.g. qubit, gateway restart
+
+[immediate] cli_guard_gateway_run - gateway run (voice guard)
+  rx:^gateway\ run$
+  e.g. qubit, gateway run
+
+[immediate] cli_guard_gateway_setup - gateway setup (voice guard)
+  rx:^gateway\ setup$
+  e.g. qubit, gateway setup
+
+[immediate] cli_guard_gateway_start - gateway start (voice guard)
+  rx:^gateway\ start$
+  e.g. qubit, gateway start
+
+[immediate] cli_guard_gateway_stop - gateway stop (voice guard)
+  rx:^gateway\ stop$
+  e.g. qubit, gateway stop
+
+[immediate] cli_guard_gateway_uninstall - gateway uninstall (voice guard)
+  rx:^gateway\ uninstall$
+  e.g. qubit, gateway uninstall
+
+[immediate] cli_guard_guard_actions_prepare - guard actions prepare (voice guard)
+  rx:^guard\ actions\ prepare$
+  e.g. qubit, guard actions prepare
+
+[immediate] cli_guard_guard_actions_preview - guard actions preview (voice guard)
+  rx:^guard\ actions\ preview$
+  e.g. qubit, guard actions preview
+
+[immediate] cli_guard_guard_actions_recover - guard actions recover (voice guard)
+  rx:^guard\ actions\ recover$
+  e.g. qubit, guard actions recover
+
+[immediate] cli_guard_guard_actions_retry - guard actions retry (voice guard)
+  rx:^guard\ actions\ retry$
+  e.g. qubit, guard actions retry
+
+[immediate] cli_guard_guard_ask_answer - guard ask answer (voice guard)
+  rx:^guard\ ask\ answer$
+  e.g. qubit, guard ask answer
+
+[immediate] cli_guard_guard_backup_create - guard backup create (voice guard)
+  rx:^guard\ backup\ create$
+  e.g. qubit, guard backup create
+
+[immediate] cli_guard_guard_backup_restore - guard backup restore (voice guard)
+  rx:^guard\ backup\ restore$
+  e.g. qubit, guard backup restore
+
+[immediate] cli_guard_guard_brain_onboard_apply - guard brain onboard apply (voice guard)
+  rx:^guard\ brain\ onboard\ apply$
+  e.g. qubit, guard brain onboard apply
+
+[immediate] cli_guard_guard_file_patch - guard file patch (voice guard)
+  rx:^guard\ file\ patch$
+  e.g. qubit, guard file patch
+
+[immediate] cli_guard_guard_kanban_import - guard kanban import (voice guard)
+  rx:^guard\ kanban\ import$
+  e.g. qubit, guard kanban import
+
+[immediate] cli_guard_guard_opencode_prepare - guard opencode prepare (voice guard)
+  rx:^guard\ opencode\ prepare$
+  e.g. qubit, guard opencode prepare
+
+[immediate] cli_guard_guard_opencode_run_confirmed - guard opencode run confirmed (voice guard)
+  rx:^guard\ opencode\ run\ confirmed$
+  e.g. qubit, guard opencode run confirmed
+
+[immediate] cli_guard_guard_shares_resolve - guard shares resolve (voice guard)
+  rx:^guard\ shares\ resolve$
+  e.g. qubit, guard shares resolve
+
+[immediate] cli_guard_guard_sync_accept - guard sync accept (voice guard)
+  rx:^guard\ sync\ accept$
+  e.g. qubit, guard sync accept
+
+[immediate] cli_guard_guard_sync_offer - guard sync offer (voice guard)
+  rx:^guard\ sync\ offer$
+  e.g. qubit, guard sync offer
+
+[immediate] cli_guard_guard_transfers_fetch_raw - guard transfers fetch raw (voice guard)
+  rx:^guard\ transfers\ fetch\ raw$
+  e.g. qubit, guard transfers fetch raw
+
+[immediate] cli_guard_guard_webhook_verify - guard webhook verify (voice guard)
+  rx:^guard\ webhook\ verify$
+  e.g. qubit, guard webhook verify
+
+[immediate] cli_files_inspect - Inspect a file
+  rx:^files? inspect\b
+  e.g. qubit, files inspect /tmp/x.log
+
+[confirm] skills_install - Install a skill manifest
+  skills install | install skill | install a skill | install a skill manifest
+  e.g. qubit, skills install
+
+[immediate] guard_computer_use_screen_install - Install the Bot Desktop screen (voice guard)
+  computer-use screen install | computer use screen install | install the bot desktop screen
+  e.g. qubit, computer-use screen install
+
+[immediate] cli_guard_journey - journey (voice guard)
+  rx:^journey$
+  e.g. qubit, journey
+
+[immediate] cli_guard_kanban_assignees - kanban assignees (voice guard)
+  rx:^kanban\ assignees$
+  e.g. qubit, kanban assignees
+
+[immediate] cli_guard_kanban_attach - kanban attach (voice guard)
+  rx:^kanban\ attach$
+  e.g. qubit, kanban attach
+
+[immediate] cli_guard_kanban_attach_rm - kanban attach-rm (voice guard)
+  rx:^kanban\ attach\-rm$
+  e.g. qubit, kanban attach-rm
+
+[immediate] cli_guard_kanban_attachments - kanban attachments (voice guard)
+  rx:^kanban\ attachments$
+  e.g. qubit, kanban attachments
+
+[immediate] cli_guard_kanban_context - kanban context (voice guard)
+  rx:^kanban\ context$
+  e.g. qubit, kanban context
+
+[immediate] cli_guard_kanban_decompose - kanban decompose (voice guard)
+  rx:^kanban\ decompose$
+  e.g. qubit, kanban decompose
+
+[immediate] cli_guard_kanban_diagnostics - kanban diagnostics (voice guard)
+  rx:^kanban\ diagnostics$
+  e.g. qubit, kanban diagnostics
+
+[immediate] cli_guard_kanban_gc - kanban gc (voice guard)
+  rx:^kanban\ gc$
+  e.g. qubit, kanban gc
+
+[immediate] cli_guard_kanban_heartbeat - kanban heartbeat (voice guard)
+  rx:^kanban\ heartbeat$
+  e.g. qubit, kanban heartbeat
+
+[immediate] guard_kanban_link - Kanban link (voice guard)
+  kanban link task | kanban link | link a kanban task | link kanban tasks
+  e.g. qubit, kanban link task
+
+[immediate] cli_guard_kanban_notify_list - kanban notify-list (voice guard)
+  rx:^kanban\ notify\-list$
+  e.g. qubit, kanban notify-list
+
+[immediate] cli_guard_kanban_notify_subscribe - kanban notify-subscribe (voice guard)
+  rx:^kanban\ notify\-subscribe$
+  e.g. qubit, kanban notify-subscribe
+
+[immediate] cli_guard_kanban_notify_unsubscribe - kanban notify-unsubscribe (voice guard)
+  rx:^kanban\ notify\-unsubscribe$
+  e.g. qubit, kanban notify-unsubscribe
+
+[immediate] cli_guard_kanban_promote - kanban promote (voice guard)
+  rx:^kanban\ promote$
+  e.g. qubit, kanban promote
+
+[immediate] guard_kanban_reopen_review - Kanban reopen review (voice guard)
+  kanban reopen review | kanban reopen-review | reopen review of a kanban task | reopen-review a kanban task
+  e.g. qubit, kanban reopen review
+
+[immediate] cli_guard_kanban_repair - kanban repair (voice guard)
+  rx:^kanban\ repair$
+  e.g. qubit, kanban repair
+
+[immediate] guard_kanban_request_changes - Kanban request changes (voice guard)
+  kanban request changes | kanban request-changes | request changes on a kanban task | request-changes a kanban task
+  e.g. qubit, kanban request changes
+
+[immediate] guard_kanban_request_review - Kanban request review (voice guard)
+  kanban request review | kanban request-review | request review of a kanban task | request-review a kanban task
+  e.g. qubit, kanban request review
+
+[immediate] cli_guard_kanban_runs - kanban runs (voice guard)
+  rx:^kanban\ runs$
+  e.g. qubit, kanban runs
+
+[immediate] cli_guard_kanban_schedule - kanban schedule (voice guard)
+  rx:^kanban\ schedule$
+  e.g. qubit, kanban schedule
+
+[immediate] cli_guard_kanban_set_model - kanban set-model (voice guard)
+  rx:^kanban\ set\-model$
+  e.g. qubit, kanban set-model
+
+[immediate] cli_guard_kanban_specify - kanban specify (voice guard)
+  rx:^kanban\ specify$
+  e.g. qubit, kanban specify
+
+[immediate] cli_guard_kanban_tail - kanban tail (voice guard)
+  rx:^kanban\ tail$
+  e.g. qubit, kanban tail
+
+[immediate] guard_kanban_unlink - Kanban unlink (voice guard)
+  kanban unlink task | kanban unlink | unlink a kanban task | unlink kanban tasks
+  e.g. qubit, kanban unlink task
+
+[immediate] cli_lsp - Language server status
+  rx:^lsp( list)?$
+  e.g. qubit, lsp
+
+[immediate] cli_actions_list - List actions
+  rx:^actions( list)?$
+  e.g. qubit, actions
+
+[immediate] cli_autonomy_list - List autonomy profiles
+  rx:^autonomy list$
+  e.g. qubit, autonomy list
+
+[immediate] cli_kanban_boards - List boards
+  rx:^kanban boards$
+  e.g. qubit, kanban boards
+
+[immediate] chat_workspaces - List chat workspaces
+  chat workspaces | list chat workspaces | show chat workspaces | chat workspace picker
+  e.g. qubit, chat workspaces
+
+[immediate] cli_checkpoints - List checkpoints
+  rx:^checkpoints( list)?$
+  e.g. qubit, checkpoints
+
+[immediate] cli_opencode_list - List coding actions
+  rx:^opencode( list)?$
+  e.g. qubit, opencode
+
+[immediate] cli_hooks - List event hooks
+  rx:^hooks( list)?$
+  e.g. qubit, hooks
+
+[immediate] cli_experiments_list - List experiments
+  rx:^experiments( list)?$
+  e.g. qubit, experiments
+
+[immediate] cli_peer_list - List gateway peers
+  rx:^peers?( list)?$
+  e.g. qubit, peers
+
+[immediate] cli_ghost_list - List Ghost actions
+  rx:^(ghost|ghost list)$
+  e.g. qubit, ghost
+
+[immediate] cli_mcp_list - List MCP servers
+  rx:^mcp( list)?$
+  e.g. qubit, mcp
+
+[immediate] cli_msg_accounts - List message accounts
+  rx:^msg accounts$
+  e.g. qubit, msg accounts
+
+[immediate] cli_transfers_list - List node files
+  rx:^transfers list( .+)?$
+  e.g. qubit, transfers list /tmp/work
+
+[immediate] cli_node_host - List paired nodes
+  rx:^(nodes|paired nodes)$
+  e.g. qubit, nodes
+
+[immediate] cli_pairing - List pairing codes
+  rx:^pairing( list)?$
+  e.g. qubit, pairing
+
+[immediate] cli_plugins_list - List plugins
+  rx:^plugins( list)?$
+  e.g. qubit, plugins
+
+[immediate] cli_projects - List projects
+  rx:^projects$
+  e.g. qubit, projects
+
+[immediate] cli_projects_list - List projects
+  rx:^projects? list$
+  e.g. qubit, project list
+
+[immediate] cli_reports - List reports
+  rx:^reports( list)?$
+  e.g. qubit, reports
+
+[immediate] cli_shares_list - List session shares
+  rx:^shares( list)?$
+  e.g. qubit, shares
+
+[immediate] cli_sessions - List sessions
+  rx:^sessions( list)?$
+  e.g. qubit, sessions
+
+[immediate] cli_skills - List skills
+  rx:^skills (list|catalog)$
+  e.g. qubit, skills list
+
+[immediate] cli_tools - List tools
+  rx:^tools( list)?$
+  e.g. qubit, tools
+
+[immediate] cli_verified_list - List verified skills
+  rx:^verified( skills)?$
+  e.g. qubit, verified
+
+[immediate] cli_commands - List voice commands
+  rx:^commands( list)?$
+  e.g. qubit, commands
+
+[immediate] cli_webhooks - List webhooks
+  rx:^webhooks$
+  e.g. qubit, webhooks
+
+[immediate] cli_guard_lsp_install_refusal - lsp install refusal (voice guard)
+  rx:^lsp\ install\ refusal$
+  e.g. qubit, lsp install refusal
+
+[immediate] cli_mcp_catalog - MCP catalog
+  rx:^mcp catalog$
+  e.g. qubit, mcp catalog
+
+[immediate] cli_guard_mcp_configure - mcp configure (voice guard)
+  rx:^mcp\ configure$
+  e.g. qubit, mcp configure
+
+[immediate] cli_guard_mcp_login - mcp login (voice guard)
+  rx:^mcp\ login$
+  e.g. qubit, mcp login
+
+[immediate] cli_guard_mcp_picker - mcp picker (voice guard)
+  rx:^mcp\ picker$
+  e.g. qubit, mcp picker
+
+[immediate] cli_guard_mcp_reauth - mcp reauth (voice guard)
+  rx:^mcp\ reauth$
+  e.g. qubit, mcp reauth
+
+[immediate] cli_guard_mcp_serve - mcp serve (voice guard)
+  rx:^mcp\ serve$
+  e.g. qubit, mcp serve
+
+[immediate] cli_media - Media catalog
+  rx:^media gen catalog$
+  e.g. qubit, media gen catalog
+
+[immediate] cli_guard_memory_off - memory off (voice guard)
+  rx:^memory\ off$
+  e.g. qubit, memory off
+
+[immediate] cli_guard_memory_reset - memory reset (voice guard)
+  rx:^memory\ reset$
+  e.g. qubit, memory reset
+
+[immediate] cli_guard_memory_setup - memory setup (voice guard)
+  rx:^memory\ setup$
+  e.g. qubit, memory setup
+
+[immediate] cli_guard_moa - moa (voice guard)
+  rx:^moa$
+  e.g. qubit, moa
+
+[immediate] cli_guard_moa_configure - moa configure (voice guard)
+  rx:^moa\ configure$
+  e.g. qubit, moa configure
+
+[immediate] cli_guard_moa_delete - moa delete (voice guard)
+  rx:^moa\ delete$
+  e.g. qubit, moa delete
+
+[immediate] cli_guard_moa_list - moa list (voice guard)
+  rx:^moa\ list$
+  e.g. qubit, moa list
+
+[immediate] cli_model - Model/frontier status
+  rx:^model$
+  e.g. qubit, model
+
+[immediate] cli_monitoring - Monitoring status
+  rx:^monitoring$
+  e.g. qubit, monitoring
+
+[immediate] recipe_morning_digest - Morning digest
+  give me my morning digest | morning digest | my morning digest | daily digest | run my morning digest | get my morning digest
+  e.g. qubit, give me my morning digest
+
+[immediate] role_digest - Morning digest
+  start my day
+  e.g. qubit, start my day
+
+[immediate] cli_guard_navigate_cron - navigate /cron (voice guard)
+  rx:^navigate\ /cron$
+  e.g. qubit, navigate /cron
+
+[immediate] cli_guard_navigate_docs - navigate /docs (voice guard)
+  rx:^navigate\ /docs$
+  e.g. qubit, navigate /docs
+
+[immediate] cli_guard_navigate_env - navigate /env (voice guard)
+  rx:^navigate\ /env$
+  e.g. qubit, navigate /env
+
+[confirm] role_operative - Operative
+  check my work | what is blocked | operations report
+  e.g. qubit, check my work | qubit, what is blocked
+
+[immediate] recipe_monitor_operative - Operative status
+  what's my operative status | operative status | monitor my work | status of my work | how is my work doing | monitor operative
+  e.g. qubit, what's my operative status
+
+[confirm] role_orchestrator - Orchestrator
+  orchestrate this | delegate this | plan and run this | break this into tasks and delegate | run this as an orchestration
+  e.g. qubit, orchestrate this | qubit, delegate this
+
+[immediate] cli_guard_pairing_clear_pending - pairing clear-pending (voice guard)
+  rx:^pairing\ clear\-pending$
+  e.g. qubit, pairing clear-pending
+
+[immediate] guard_local_models_download_pause - Pause a local model download (voice guard)
+  pause local model download | pause model download | pause the model download
+  e.g. qubit, pause local model download
+
+[immediate] cli_guard_peer_stop - peer stop (voice guard)
+  rx:^peer\ stop$
+  e.g. qubit, peer stop
+
+[immediate] cli_approvals - Pending approvals
+  rx:^approvals$
+  e.g. qubit, approvals
+
+[immediate] cli_questions_pending - Pending questions
+  rx:^questions pending$
+  e.g. qubit, questions pending
+
+[immediate] cli_permissions - Permission mode
+  rx:^permissions$
+  e.g. qubit, permissions
+
+[immediate] cli_plugins_catalog - Plugin catalog
+  rx:^plugins catalog$
+  e.g. qubit, plugins catalog
+
+[immediate] plugins_capabilities - Plugin host capabilities
+  plugins capabilities | plugin capabilities | list plugin capabilities | what capabilities do plugins have
+  e.g. qubit, plugins capabilities
+
+[immediate] cli_guard_plugins_compat - plugins compat (voice guard)
+  rx:^plugins\ compat$
+  e.g. qubit, plugins compat
+
+[immediate] cli_guard_plugins_pack - plugins pack (voice guard)
+  rx:^plugins\ pack$
+  e.g. qubit, plugins pack
+
+[immediate] cli_guard_plugins_remote_refusal - plugins remote refusal (voice guard)
+  rx:^plugins\ remote\ refusal$
+  e.g. qubit, plugins remote refusal
+
+[immediate] cli_guard_plugins_update - plugins update (voice guard)
+  rx:^plugins\ update$
+  e.g. qubit, plugins update
+
+[immediate] cli_guard_portal - portal (voice guard)
+  rx:^portal$
+  e.g. qubit, portal
+
+[immediate] cli_guard_portal_info - portal info (voice guard)
+  rx:^portal\ info$
+  e.g. qubit, portal info
+
+[immediate] cli_guard_portal_login - portal login (voice guard)
+  rx:^portal\ login$
+  e.g. qubit, portal login
+
+[immediate] cli_guard_portal_open - portal open (voice guard)
+  rx:^portal\ open$
+  e.g. qubit, portal open
+
+[immediate] cli_guard_portal_tools - portal tools (voice guard)
+  rx:^portal\ tools$
+  e.g. qubit, portal tools
+
+[immediate] cli_guard_profile_alias - profile alias (voice guard)
+  rx:^profile\ alias$
+  e.g. qubit, profile alias
+
+[immediate] cli_guard_profile_export - profile export (voice guard)
+  rx:^profile\ export$
+  e.g. qubit, profile export
+
+[immediate] cli_guard_profile_import - profile import (voice guard)
+  rx:^profile\ import$
+  e.g. qubit, profile import
+
+[immediate] cli_guard_profile_install - profile install (voice guard)
+  rx:^profile\ install$
+  e.g. qubit, profile install
+
+[immediate] cli_guard_profile_migrate_identity - profile migrate-identity (voice guard)
+  rx:^profile\ migrate\-identity$
+  e.g. qubit, profile migrate-identity
+
+[immediate] cli_profile_check - Profile preflight
+  rx:^profile check( brain| stt| tts| voice| audio)?$
+  e.g. qubit, profile check brain
+
+[immediate] cli_guard_profile_purge_identity - profile purge-identity (voice guard)
+  rx:^profile\ purge\-identity$
+  e.g. qubit, profile purge-identity
+
+[immediate] cli_prompt_size - Prompt budget
+  rx:^prompt[- ]size$
+  e.g. qubit, prompt size
+
+[immediate] cli_proxy - Proxy status
+  rx:^proxy$
+  e.g. qubit, proxy
+
+[immediate] cli_guard_pty - pty (voice guard)
+  rx:^pty$
+  e.g. qubit, pty
+
+[immediate] cli_guard_pub - pub (voice guard)
+  rx:^pub$
+  e.g. qubit, pub
+
+[confirm] role_react - React — reason, act, observe
+  reason step by step | work through this | react to this | think it through | step by step reasoning
+  e.g. qubit, reason step by step | qubit, work through this
+
+[immediate] cli_receipts - Receipt ledger
+  rx:^receipts( ledger)?$
+  e.g. qubit, receipts
+
+[confirm] cli_session_rename - Rename a session
+  rx:^sessions? rename\b
+  e.g. qubit, sessions rename 12 invoices
+
+[immediate] role_researcher - Researcher
+  look into this | cited research
+  e.g. qubit, look into this | qubit, cited research
+
+[immediate] guard_local_models_download_resume - Resume a local model download (voice guard)
+  resume local model download | resume model download | resume the model download
+  e.g. qubit, resume local model download
+
+[confirm] cli_resume - Resume after emergency stop
+  rx:^resume$
+  e.g. qubit, resume
+
+[confirm] cli_runtime_repair - Runtime repair
+  rx:^runtime repair$
+  e.g. qubit, runtime repair
+
+[immediate] cli_runtime - Runtime status
+  rx:^runtime$
+  e.g. qubit, runtime
+
+[immediate] cli_runtime_history - Runtime update history
+  rx:^runtime history$
+  e.g. qubit, runtime history
+
+[immediate] cli_memory_search - Search memory
+  rx:^(memory search|search my memory)\b
+  e.g. qubit, memory search invoices
+
+[immediate] cli_sessions_search - Search sessions
+  rx:^sessions? search\b
+  e.g. qubit, sessions search invoice
+
+[immediate] cli_security - Security status
+  rx:^security$
+  e.g. qubit, security
+
+[immediate] cli_sessions_stats - Session statistics
+  rx:^sessions? stats$
+  e.g. qubit, sessions stats
+
+[immediate] cli_guard_sessions_browse - sessions browse (voice guard)
+  rx:^sessions\ browse$
+  e.g. qubit, sessions browse
+
+[immediate] cli_guard_sessions_import - sessions import (voice guard)
+  rx:^sessions\ import$
+  e.g. qubit, sessions import
+
+[immediate] cli_guard_sessions_recover - sessions recover (voice guard)
+  rx:^sessions\ recover$
+  e.g. qubit, sessions recover
+
+[immediate] cli_guard_sessions_set_journal_mode - sessions set-journal-mode (voice guard)
+  rx:^sessions\ set\-journal\-mode$
+  e.g. qubit, sessions set-journal-mode
+
+[immediate] cli_guard_setup - setup (voice guard)
+  rx:^setup$
+  e.g. qubit, setup
+
+[immediate] cli_completion - Shell completions
+  rx:^completions?$
+  e.g. qubit, completions
+
+[immediate] cli_config - Show configuration profiles
+  rx:^config( show| profiles)?$
+  e.g. qubit, config
+
+[immediate] cli_logs - Show runtime logs
+  rx:^logs$
+  e.g. qubit, logs
+
+[immediate] cli_themes - Show theme
+  rx:^themes$
+  e.g. qubit, themes
+
+[immediate] role_simple - Simple
+  simple mode | quick answer | fast chat | just answer me
+  e.g. qubit, simple mode | qubit, quick answer
+
+[immediate] cli_guard_skills_audit - skills audit (voice guard)
+  rx:^skills\ audit$
+  e.g. qubit, skills audit
+
+[immediate] cli_guard_skills_browse - skills browse (voice guard)
+  rx:^skills\ browse$
+  e.g. qubit, skills browse
+
+[immediate] cli_guard_skills_check - skills check (voice guard)
+  rx:^skills\ check$
+  e.g. qubit, skills check
+
+[immediate] cli_guard_skills_config - skills config (voice guard)
+  rx:^skills\ config$
+  e.g. qubit, skills config
+
+[immediate] cli_guard_skills_diff - skills diff (voice guard)
+  rx:^skills\ diff$
+  e.g. qubit, skills diff
+
+[immediate] cli_guard_skills_list_modified - skills list-modified (voice guard)
+  rx:^skills\ list\-modified$
+  e.g. qubit, skills list-modified
+
+[immediate] cli_guard_skills_opt_in - skills opt-in (voice guard)
+  rx:^skills\ opt\-in$
+  e.g. qubit, skills opt-in
+
+[immediate] cli_guard_skills_opt_out - skills opt-out (voice guard)
+  rx:^skills\ opt\-out$
+  e.g. qubit, skills opt-out
+
+[immediate] cli_guard_skills_publish - skills publish (voice guard)
+  rx:^skills\ publish$
+  e.g. qubit, skills publish
+
+[immediate] cli_guard_skills_repair_official - skills repair-official (voice guard)
+  rx:^skills\ repair\-official$
+  e.g. qubit, skills repair-official
+
+[immediate] cli_guard_skills_reset - skills reset (voice guard)
+  rx:^skills\ reset$
+  e.g. qubit, skills reset
+
+[immediate] cli_guard_skills_search - skills search (voice guard)
+  rx:^skills\ search$
+  e.g. qubit, skills search
+
+[immediate] cli_guard_skills_snapshot - skills snapshot (voice guard)
+  rx:^skills\ snapshot$
+  e.g. qubit, skills snapshot
+
+[immediate] cli_guard_skills_tap - skills tap (voice guard)
+  rx:^skills\ tap$
+  e.g. qubit, skills tap
+
+[immediate] cli_guard_skills_trust - skills trust (voice guard)
+  rx:^skills\ trust$
+  e.g. qubit, skills trust
+
+[immediate] cli_guard_skills_untrust - skills untrust (voice guard)
+  rx:^skills\ untrust$
+  e.g. qubit, skills untrust
+
+[immediate] cli_guard_skills_update - skills update (voice guard)
+  rx:^skills\ update$
+  e.g. qubit, skills update
+
+[immediate] cli_guard_ssh_ownership - ssh ownership (voice guard)
+  rx:^ssh\ ownership$
+  e.g. qubit, ssh ownership
+
+[immediate] guard_computer_use_screen_start - Start the Bot Desktop screen (voice guard)
+  computer-use screen start | computer use screen start | start the bot desktop screen
+  e.g. qubit, computer-use screen start
+
+[immediate] guard_computer_use_screen_stop - Stop the Bot Desktop screen (voice guard)
+  computer-use screen stop | computer use screen stop | stop the bot desktop screen
+  e.g. qubit, computer-use screen stop
+
+[immediate] guard_display_ws - Stream the Desktop display (voice guard)
+  desktop display stream | list desktop displays | display websocket
+  e.g. qubit, desktop display stream
+
+[confirm] cli_project_use - Switch project
+  rx:^projects? use\b
+  e.g. qubit, project use shop
+
+[immediate] cli_guard_sync_device - sync device (voice guard)
+  rx:^sync\ device$
+  e.g. qubit, sync device
+
+[immediate] cli_guard_sync_disable - sync disable (voice guard)
+  rx:^sync\ disable$
+  e.g. qubit, sync disable
+
+[immediate] cli_guard_sync_enable - sync enable (voice guard)
+  rx:^sync\ enable$
+  e.g. qubit, sync enable
+
+[immediate] cli_guard_sync_now - sync now (voice guard)
+  rx:^sync\ now$
+  e.g. qubit, sync now
+
+[immediate] cli_guard_sync_propose - sync propose (voice guard)
+  rx:^sync\ propose$
+  e.g. qubit, sync propose
+
+[immediate] cli_guard_sync_pull - sync pull (voice guard)
+  rx:^sync\ pull$
+  e.g. qubit, sync pull
+
+[immediate] cli_guard_sync_push - sync push (voice guard)
+  rx:^sync\ push$
+  e.g. qubit, sync push
+
+[immediate] cli_telemetry - Telemetry status
+  rx:^telemetry$
+  e.g. qubit, telemetry
+
+[immediate] cli_guard_tools_post_setup - tools post-setup (voice guard)
+  rx:^tools\ post\-setup$
+  e.g. qubit, tools post-setup
+
+[immediate] guard_plugins_trust_update_url - Trust a plugin update URL (voice guard)
+  plugins trust-update-url | trust plugin update url | trust update url of a plugin
+  e.g. qubit, plugins trust-update-url my-plugin
+
+[immediate] cli_usage - Usage analytics
+  rx:^usage( report)?$
+  e.g. qubit, usage
+
+[immediate] cli_vision - Vision status
+  rx:^vision$
+  e.g. qubit, vision
+
+[immediate] cli_logbook - Work logbook
+  rx:^logbook$
+  e.g. qubit, logbook
+
+[immediate] cli_worker - Worker status
+  rx:^worker$
+  e.g. qubit, worker
+
+[immediate] cli_worktree - Worktree status
+  rx:^worktree$
+  e.g. qubit, worktree
+
+[immediate] cli_guard_ws - ws (voice guard)
+  rx:^ws$
+  e.g. qubit, ws
+
+4. YOUR CUSTOM COMMANDS
+-----------------------
+  (none configured)
+
+5. HOW TO ADD A NEW COMMAND
+---------------------------
+Add your planned commands in the blank area below, then give this file to
+the implementing agent. Editing this .txt alone does not install them.
+
+Option A - simple alias to an existing safe local action (easiest).
+  File: ~/.config/qubit-voicebridge/voice.yaml
+  Under voice_edit.custom_commands, add:
+    - phrase: "open my dashboard"
+      action: open_website
+      target: "http://127.0.0.1:8890/"
+  Allowed actions: open_website, play_youtube, open_app, open_document.
+
+Option B - a real local PC action with new behaviour.
+  File: voicebridge/local/actions.py
+  Add a handler and a LocalAction(name, description, handler, patterns=[...]).
+  Use confirm=True for anything destructive or irreversible.
+
+Option C - a CLI / agent / dashboard command.
+  File: voicebridge/voice_commands.py
+  Add an _E(...) core entry or _CB(...) bridge entry with aliases and help.
+
+Format for your planned commands (one per line):
+  PHRASE | ACTION | TARGET | NOTES
+Example:
+  open my dashboard | open_website | http://127.0.0.1:8890/ | no confirm
+  close all my windows | window_close | | confirm first
+
+=== MY NEW COMMANDS (edit below) ===
+
