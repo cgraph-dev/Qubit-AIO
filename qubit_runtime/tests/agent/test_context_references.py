@@ -571,95 +571,14 @@ def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, mon
 _SSH_WORKSPACE = "/srv/repos"  # the SSH host's workspace root; absent on the gateway
 
 
-def _stage_outside_workspace(tmp_path: Path, monkeypatch, name: str, subdir: str = "attachments") -> Path:
-    """Stage *name* under a QUBIT_HOME that lives outside the workspace (SSH topology)."""
-    qubit_home = tmp_path / "gateway-data"  # /opt/data inside the gateway container
-    (qubit_home / subdir).mkdir(parents=True)
-    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-    monkeypatch.setenv("TERMINAL_ENV", "ssh")
-    return qubit_home / subdir / name
 
 
-def test_ssh_backend_staged_text_attachment_still_expands(tmp_path: Path, monkeypatch):
-    """The gateway owns the bytes, so the ref must inline them, not refuse the path."""
-    from agent.context_references import format_reference_value, preprocess_context_references
-
-    payload = _stage_outside_workspace(
-        tmp_path, monkeypatch, "Pasted content (3-5.4 KB).txt", subdir="composer-pastes")
-    payload.write_text("pasted body\n", encoding="utf-8")
-
-    result = preprocess_context_references(
-        f"Summarize @file:{format_reference_value(str(payload))}",
-        cwd=_SSH_WORKSPACE,
-        allowed_root=_SSH_WORKSPACE,
-        context_length=100_000,
-    )
-
-    assert result.expanded
-    assert result.warnings == []
-    assert "pasted body" in result.message
 
 
-def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(tmp_path: Path, monkeypatch):
-    """Binaries stay on disk: the ref must render the path the ssh backend resolves (the
-    file-sync mirrors the staging dirs to ``~/.hermes`` on the remote; the remote home
-    name is the legacy spelling the ssh/daytona sync backends write)."""
-    from agent.context_references import preprocess_context_references
-
-    payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
-    payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
-
-    result = preprocess_context_references(
-        f"Read the attachment @file:{payload}",
-        cwd=_SSH_WORKSPACE,
-        allowed_root=_SSH_WORKSPACE,
-        context_length=100_000,
-    )
-
-    assert result.expanded
-    assert "binary file, not inlined" in result.message
-    assert "~/.hermes/attachments/archive.zip" in result.message
 
 
-def test_ref_outside_workspace_and_staging_dirs_is_still_refused(tmp_path: Path, monkeypatch):
-    """Staging dirs are the only widening: any other path outside the workspace stays blocked."""
-    from agent.context_references import preprocess_context_references
-
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "gateway-data"))
-    monkeypatch.setenv("TERMINAL_ENV", "ssh")
-    secret = tmp_path / "elsewhere" / "notes.txt"
-    secret.parent.mkdir(parents=True)
-    secret.write_text("not-for-the-agent\n", encoding="utf-8")
-
-    result = preprocess_context_references(
-        f"@file:{secret}",
-        cwd=_SSH_WORKSPACE,
-        allowed_root=_SSH_WORKSPACE,
-        context_length=100_000,
-    )
-
-    assert any("outside the allowed workspace" in warning for warning in result.warnings)
-    assert "not-for-the-agent" not in result.message
 
 
-def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, monkeypatch):
-    """Local backend: gateway and tools share a filesystem — no remote path rewrite."""
-    from agent.context_references import preprocess_context_references
-
-    payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
-    payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
-    monkeypatch.setenv("TERMINAL_ENV", "local")
-
-    result = preprocess_context_references(
-        f"Read the attachment @file:{payload}",
-        cwd=tmp_path / "workspace",
-        allowed_root=tmp_path / "workspace",
-        context_length=100_000,
-    )
-
-    assert result.expanded
-    assert "binary file, not inlined" in result.message
-    assert "~/.hermes/attachments/" not in result.message
 
 
 # ── Gateway container + Remote SSH execution backend (#110174) ───────────────
@@ -672,95 +591,14 @@ def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, mon
 _SSH_WORKSPACE = "/srv/repos"  # the SSH host's workspace root; absent on the gateway
 
 
-def _stage_outside_workspace(tmp_path: Path, monkeypatch, name: str, subdir: str = "attachments") -> Path:
-    """Stage *name* under a QUBIT_HOME that lives outside the workspace (SSH topology)."""
-    qubit_home = tmp_path / "gateway-data"  # /opt/data inside the gateway container
-    (qubit_home / subdir).mkdir(parents=True)
-    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-    monkeypatch.setenv("TERMINAL_ENV", "ssh")
-    return qubit_home / subdir / name
 
 
-def test_ssh_backend_staged_text_attachment_still_expands(tmp_path: Path, monkeypatch):
-    """The gateway owns the bytes, so the ref must inline them, not refuse the path."""
-    from agent.context_references import format_reference_value, preprocess_context_references
-
-    payload = _stage_outside_workspace(
-        tmp_path, monkeypatch, "Pasted content (3-5.4 KB).txt", subdir="composer-pastes")
-    payload.write_text("pasted body\n", encoding="utf-8")
-
-    result = preprocess_context_references(
-        f"Summarize @file:{format_reference_value(str(payload))}",
-        cwd=_SSH_WORKSPACE,
-        allowed_root=_SSH_WORKSPACE,
-        context_length=100_000,
-    )
-
-    assert result.expanded
-    assert result.warnings == []
-    assert "pasted body" in result.message
 
 
-def test_ssh_backend_staged_binary_attachment_points_at_the_synced_remote_path(tmp_path: Path, monkeypatch):
-    """Binaries stay on disk: the ref must render the path the ssh backend resolves (the
-    file-sync mirrors the staging dirs to ``~/.hermes`` on the remote; the remote home
-    name is the legacy spelling the ssh/daytona sync backends write)."""
-    from agent.context_references import preprocess_context_references
-
-    payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
-    payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
-
-    result = preprocess_context_references(
-        f"Read the attachment @file:{payload}",
-        cwd=_SSH_WORKSPACE,
-        allowed_root=_SSH_WORKSPACE,
-        context_length=100_000,
-    )
-
-    assert result.expanded
-    assert "binary file, not inlined" in result.message
-    assert "~/.hermes/attachments/archive.zip" in result.message
 
 
-def test_ref_outside_workspace_and_staging_dirs_is_still_refused(tmp_path: Path, monkeypatch):
-    """Staging dirs are the only widening: any other path outside the workspace stays blocked."""
-    from agent.context_references import preprocess_context_references
-
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "gateway-data"))
-    monkeypatch.setenv("TERMINAL_ENV", "ssh")
-    secret = tmp_path / "elsewhere" / "notes.txt"
-    secret.parent.mkdir(parents=True)
-    secret.write_text("not-for-the-agent\n", encoding="utf-8")
-
-    result = preprocess_context_references(
-        f"@file:{secret}",
-        cwd=_SSH_WORKSPACE,
-        allowed_root=_SSH_WORKSPACE,
-        context_length=100_000,
-    )
-
-    assert any("outside the allowed workspace" in warning for warning in result.warnings)
-    assert "not-for-the-agent" not in result.message
 
 
-def test_local_backend_staged_attachment_keeps_the_host_path(tmp_path: Path, monkeypatch):
-    """Local backend: gateway and tools share a filesystem — no remote path rewrite."""
-    from agent.context_references import preprocess_context_references
-
-    payload = _stage_outside_workspace(tmp_path, monkeypatch, "archive.zip")
-    payload.write_bytes(b"PK\x03\x04binary-zip-bytes")
-    monkeypatch.setenv("TERMINAL_ENV", "local")
-
-    result = preprocess_context_references(
-        f"Read the attachment @file:{payload}",
-        cwd=tmp_path / "workspace",
-        allowed_root=tmp_path / "workspace",
-        context_length=100_000,
-    )
-
-    assert result.expanded
-    assert "binary file, not inlined" in result.message
-    assert "~/.hermes/attachments/" not in result.message
 
 
 
