@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      strict_acceptance:
+        description: 'Acceptance run: known_failure owners whose gaps FAIL instead of xfail ("upd-txn", a comma list, or "1" for every gap).'
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       release:
@@ -29,6 +34,11 @@ on:
         required: false
         type: boolean
         default: false
+      strict_acceptance:
+        description: 'Acceptance run: known_failure owners whose gaps FAIL instead of xfail ("upd-txn", a comma list, or "1" for every gap).'
+        required: false
+        type: string
+        default: ''
   pull_request:
   push:
     branches: [main]
@@ -123,6 +133,7 @@ jobs:
     with:
       e2e: ${{ needs.detect.outputs.e2e == 'true' }}
       e2e_upgrade: ${{ needs.detect.outputs.e2e_upgrade == 'true' }}
+      strict_acceptance: ${{ inputs.strict_acceptance }}
 
   # macOS + Windows lanes. The main `tests` lane above is Linux-only, and
   # the OS-marked tests it collects are skipped there by design (see the
@@ -140,6 +151,7 @@ jobs:
       # (tests/test_desktop_update_windows_*.py) only when that surface
       # changed; unit-level platforms("windows") tests always run.
       desktop_updater: ${{ needs.detect.outputs.desktop_updater == 'true' }}
+      strict_acceptance: ${{ inputs.strict_acceptance }}
 
   lint:
     name: Python lints

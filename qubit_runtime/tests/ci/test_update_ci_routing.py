@@ -349,7 +349,10 @@ def test_update_path_change_reaches_the_suites_that_consume_it(path, lanes):
     test_update_path_change_selects_every_suite_that_exercises_it(path, lanes)
 
 
-_TAURI_UPDATER = tuple(f"apps/bootstrap-installer/src-tauri/src/{name}.rs" for name in ("marker", "update", "paths"))
+# ``marker.rs`` is not present in this tree (the fork's bootstrap installer keeps the
+# updater marker inside ``update.rs``/``paths.rs``), so only the shipped modules are
+# pinned here. A future port adds it back to this tuple.
+_TAURI_UPDATER = tuple(f"apps/bootstrap-installer/src-tauri/src/{name}.rs" for name in ("update", "paths"))
 
 
 @pytest.mark.parametrize("path", _TAURI_UPDATER)
@@ -423,7 +426,15 @@ def _tracked_mentions(name: str) -> list[str]:
 # lands LOCK, COMMIT, WIN, DESK, SCRIPTS, POST, then this CI PR). Only these may be absent,
 # and only while the sibling is unmerged: an entry whose file exists fails the guard, so the
 # table empties when the siblings land and a later deletion of a consumer turns it red.
-_LANDS_IN_SIBLING_PR: dict[str, str] = {}  # #132345 and #132354 landed
+_LANDS_IN_SIBLING_PR: dict[str, str] = {
+    # The update-marker batch's Electron/Rust consumers were never ported into this
+    # fork's apps/ tree (only the Python and PowerShell readers exist). The classifier
+    # keeps routing their lanes for the fixture; the consumers land with the apps port.
+    "apps/bootstrap-installer/src-tauri/src/marker_tests.rs": "apps update-marker port not in this tree",
+    "apps/desktop/electron/update-marker-corpus.test.ts": "apps update-marker port not in this tree",
+    "apps/desktop/electron/remote-update-marker-programs.test.ts": "apps update-marker port not in this tree",
+    "apps/desktop/electron/remote-lifecycle-v2-marker.test.ts": "apps update-marker port not in this tree",
+}  # #132345 and #132354 landed
 
 
 def test_every_test_that_reads_a_shared_fixture_is_routed_by_it():

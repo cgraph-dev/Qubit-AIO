@@ -13,6 +13,11 @@ on:
         type: boolean
         required: false
         default: true
+      strict_acceptance:
+        description: "Acceptance run: pass HERMES_E2E_STRICT_ACCEPTANCE to the e2e suites."
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -229,6 +234,7 @@ jobs:
           # corruption that passes on retry is still a corruption.
           HERMES_TEST_FILE_RETRIES: "0"
           HERMES_E2E_REQUIRE_TUI: "1"
+          HERMES_E2E_STRICT_ACCEPTANCE: ${{ inputs.strict_acceptance }}
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
@@ -365,6 +371,7 @@ jobs:
           # git I/O); cpu_count of them at once starves their deadlines.
           HERMES_TEST_WORKERS: "4"
           HERMES_TEST_FILE_TIMEOUT: "3000"
+          HERMES_E2E_STRICT_ACCEPTANCE: ${{ inputs.strict_acceptance }}
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
