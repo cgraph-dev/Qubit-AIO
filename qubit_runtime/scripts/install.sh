@@ -495,12 +495,23 @@ stage_prerequisites() {
     command -v curl >/dev/null 2>&1 || fail "curl is required. Install it with your system package manager." curl_missing
     # PM's Node on musl is the unofficial-builds musl archive, which links the
     # system libstdc++; without it every node/npm stage fails verification.
-    if [[ "$(uv_bootstrap_target 2>/dev/null)" == *-musl ]]; then
+    local _target
+    _target="$(uv_bootstrap_target 2>/dev/null)" || _target=""
+    if [[ "$_target" == *-musl ]]; then
         local _libdir _stdcxx=""
         for _libdir in /lib /usr/lib /usr/local/lib; do
             compgen -G "$_libdir/libstdc++.so.6*" >/dev/null && { _stdcxx=yes; break; }
         done
         [ -n "$_stdcxx" ] || fail "musl host: the Node.js runtime needs the system libstdc++. Install it (Alpine: apk add libstdc++, Void: xbps-install libstdc++) and re-run." libstdcxx_missing
+    fi
+    # glibc Node links libatomic.so.1, absent on minimal Debian/RHEL hosts. PM
+    # installs the distro package with `sudo -n` under its install lock, so
+    # cache sudo credentials now, while the terminal can answer the prompt.
+    if [ "$NON_INTERACTIVE" != true ] && [[ "$_target" == linux-* && "$_target" != *-musl ]] \
+        && [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && has_terminal \
+        && ! { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -q 'libatomic\.so\.1'; then
+        log "Node.js needs libatomic.so.1; sudo may ask for your password to install it"
+        sudo -v </dev/tty || log_warn "sudo failed; if Node.js fails, install libatomic (Debian/Ubuntu: libatomic1) and re-run"
     fi
     log_success "prerequisites ok (git, curl)"
 }

@@ -86,11 +86,13 @@ def test_core_quarantine_covers_core_packages_and_not_plugin_ones(layout, locked
                      environment=managed_environment(tmp / "env"))
 
     policy = tomllib.loads((root / "pyproject.toml").read_text())["tool"]["uv"]
-    assert "exclude-newer" not in policy
-    per_package = policy["exclude-newer-package"]
-    assert per_package == {name: False if name == "base-dep" else "14 days" for name in core_packages}
+    # The generated root carries no release-age cutoff at all (global or per
+    # package): core's lock already encodes the decision, and a per-package map
+    # would quarantine plugin-only deps on a machine without upload times.
+    assert "exclude-newer" not in policy and "exclude-newer-package" not in policy
+    assert "constraint-dependencies" not in policy
     locked = {p["name"] for p in tomllib.loads((root / "uv.lock").read_text())["package"]}
-    assert "member-dep" in locked and "member-dep" not in per_package
+    assert "member-dep" in locked
 
 
 

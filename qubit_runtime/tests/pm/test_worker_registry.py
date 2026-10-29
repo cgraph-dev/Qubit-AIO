@@ -23,6 +23,14 @@ from tests.pm._range_server import RangeHandler, dl_server, url  # noqa: F401
 
 @pytest.fixture(autouse=True)
 def restore_registry(monkeypatch):
+    # The built-ins register lazily on first read; a plain snapshot taken before
+    # that poisons later tests (pm.packages stays imported, so a restored empty
+    # registry never reloads). Register the built-ins into the live registry
+    # first, then snapshot the complete set for this test.
+    for module in registry._BUILTIN_MODULES:
+        sys.modules.pop(module, None)
+    registry._packages.clear()
+    registry._builtins_loaded()
     monkeypatch.setattr(registry, "_packages", dict(registry._packages))
 
 
