@@ -115,6 +115,32 @@ def _no_fts_rebuild_throttle(monkeypatch):
     monkeypatch.setattr(SessionDB, "_FTS_REBUILD_DUTY_FACTOR", 0.0)
 
 
+
+@pytest.fixture(autouse=True)
+def _fast_test_db_synchronous(monkeypatch):
+    """Skip fsync-per-DDL on the private temp state.db.
+
+    The linked SQLite on this host runs ``journal_mode=DELETE`` (the WAL-reset
+    guard), so every schema statement fsyncs and a fresh ``SessionDB`` costs
+    seconds under load. These tests never assert power-loss durability — the DB
+    lives in a throwaway tmp_path — so ``synchronous=OFF`` only removes dead
+    I/O wait, not coverage.
+    """
+    import qubit_state
+
+    original = qubit_state.apply_database_pragmas
+
+    def fast(conn, *args, **kwargs):
+        result = original(conn, *args, **kwargs)
+        try:
+            conn.execute("PRAGMA synchronous=OFF")
+        except Exception:
+            pass
+        return result
+
+    monkeypatch.setattr(qubit_state, "apply_database_pragmas", fast)
+
+
 @pytest.fixture(autouse=True)
 def _release_stale_header_probe_fds(tmp_path):
     """Release header-probe descriptors cached for *finished* tests in this file.
