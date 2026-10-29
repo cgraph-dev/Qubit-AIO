@@ -160,6 +160,9 @@ function writeCachedSkipped(value: boolean) {
   try {
     if (value) {
       window.localStorage.setItem(SKIP_CACHE_KEY, '1')
+      // Dual-publish: an older build in the same profile still reads the
+      // legacy key, so keep it in sync rather than stranding the skip.
+      window.localStorage.setItem(LEGACY_SKIP_CACHE_KEY, '1')
     } else {
       window.localStorage.removeItem(SKIP_CACHE_KEY)
       window.localStorage.removeItem(LEGACY_SKIP_CACHE_KEY)
