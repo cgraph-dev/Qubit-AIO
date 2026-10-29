@@ -704,31 +704,46 @@ def resolve_token(cfg: Any) -> str:
 #: the journal showed our own "say yes to run it ..." prompt transcribed
 #: back and executed as a command).
 #:
-#: The helper's own ``voice_edit.helper.speak`` start is deliberately NOT in
-#: this set: ``_speaking`` already covers the whole playback, and keying the
-#: guard on the START made wake deaf for 5 s after a SHORT reply ended (live
-#: 2026-10-29: "must wait for the assistant to finish and say it twice").
-#: Its ``speak_done`` end event is the post-playback tail instead (below).
-_TTS_ECHO_EVENTS = frozenset({"tts.speak", "tts.synthesize"})
+#: A speak START is covered only until the matching STOP event arrives; the
+#: guard then ends after a short tail. Keying the guard on the start alone
+#: made wake deaf for 5 s after a SHORT reply ended (live 2026-10-29: "must
+#: wait for the assistant to finish and say it twice").
+_TTS_ECHO_EVENTS = frozenset(
+    {"tts.speak", "tts.synthesize", "voice_edit.helper.speak",
+     "voice_edit.talk.playback.started"})
+#: Events proving the reply playback actually ENDED. Once one of these is
+#: newer than the last speak/start marker, only a short echo tail remains.
+_TTS_ECHO_STOP_EVENTS = frozenset(
+    {"voice_edit.helper.speak_done",
+     "voice_edit.talk.playback.stopped"})
 _HELPER_SPEAK_DONE = "voice_edit.helper.speak_done"
-#: Short echo tail after the helper's own playback ends. Covers the last
-#: syllable still in the room; long enough to avoid re-capturing it, short
-#: enough that the next "hey qubit" is never blocked for seconds.
+#: Short echo tail after playback ends. Covers the last syllable still in the
+#: room without blocking the next "hey qubit" for seconds.
 _HELPER_SPEAK_DONE_TAIL_S = 0.8
 
 
-def recent_tts_speak(events_path, window_s=5.0) -> bool:
-    """True when a TTS speak event landed in the journal within ``window_s``.
+def recent_tts_speak(events_path, window_s=5.0, *, tail_s=0.8) -> bool:
+    """True while our own TTS is audible (or in its short echo tail).
 
     Read-only tail scan (last 64 KiB, event-name prefilter); a missing or
     unreadable journal returns False (fail open: never wedge wake on a
     logging problem). Event ``ts`` is epoch seconds, same clock as
     :func:`time.time`.
+
+    The window is cut at the journaled playback END (helper ``speak_done`` /
+    talk ``playback.stopped``) so a completed reply blocks wake for only
+    ``tail_s``, not for the whole ``window_s`` measured from the start.
+    Without a stop marker (e.g. service-side speech) the original
+    ``window_s`` remains the conservative fallback.
     """
     try:
         window_s = float(window_s)
     except Exception:
         window_s = 5.0
+    try:
+        tail_s = float(tail_s)
+    except Exception:
+        tail_s = 0.6
     try:
         with open(str(events_path), "rb") as fh:
             fh.seek(0, os.SEEK_END)
@@ -738,24 +753,35 @@ def recent_tts_speak(events_path, window_s=5.0) -> bool:
     except OSError:
         return False
     now = time.time()
+    last_start = 0.0
+    last_stop = 0.0
     for line in tail.splitlines():
         line = line.strip()
-        if not line or ("tts" not in line and "helper.speak" not in line):
+        if not line or ("tts" not in line and "helper.speak" not in line
+                        and "playback.stopped" not in line):
             continue
         try:
             event = json.loads(line)
         except Exception:
             continue
-        if not isinstance(event, dict) \
-                or event.get("event") not in _TTS_ECHO_EVENTS:
+        if not isinstance(event, dict):
             continue
+        name = event.get("event")
         try:
-            spoken_at = float(event.get("ts", 0) or 0)
+            ts = float(event.get("ts", 0) or 0)
         except Exception:
             continue
-        if spoken_at and now - spoken_at < window_s:
-            return True
-    return False
+        if ts <= 0:
+            continue
+        if name in _TTS_ECHO_EVENTS:
+            last_start = max(last_start, ts)
+        elif name in _TTS_ECHO_STOP_EVENTS:
+            last_stop = max(last_stop, ts)
+    if last_start <= 0 or now - last_start >= window_s:
+        return False
+    if last_stop >= last_start:
+        return (now - last_stop) < max(0.0, tail_s)
+    return True
 
 
 def recent_helper_speak_done(events_path, window_s=_HELPER_SPEAK_DONE_TAIL_S) -> bool:
@@ -1612,6 +1638,14 @@ class DesktopHelper:
                 # timer). Read-only TTL mirror — never stages, settles, or
                 # clears; a broken read degrades to no-pending (False).
                 pending_probe=self._wake_has_live_pending,
+                # A fresh directed wake supersedes a stale staged
+                # confirmation (never runs it), so the yes/no prompt cannot
+                # latch every later wake command until its TTL.
+                pending_cancel=self._wake_cancel_pending,
+                # A bare wake shows the panel in its listening state: the
+                # next utterance is being captured even though no helper
+                # request has opened yet.
+                on_wake_armed=self._on_wake_armed,
                 # 2026-10-03 (silent-discard fix): route command-shaped
                 # unarmed discards to the heard-preview status line.
                 # Status line only — the hook never beeps/speaks/emits.
@@ -2623,6 +2657,53 @@ class DesktopHelper:
             except Exception:
                 pass
 
+    def _preempt_listening_for_wake(self, command: str = "") -> bool:
+        """Take the mic back from a stale Right-Ctrl capture for a wake.
+
+        A wake utterance can finish while an unrelated capture is still
+        LISTENING (live journal: ``wake.turn_refused state=listening`` right
+        after a key-down capture that was waiting on the warm model). The
+        directed wake is a fresh turn, so the stale capture is stopped,
+        its request cancelled, and its worker generation fenced — never
+        left to clobber the new turn. The staged confirmation is dropped
+        too (a fresh wake supersedes it; it is never run). Never raises.
+        """
+        try:
+            _trace("wake.preempt_listening", state=self.state,
+                   chars=len(command or ""))
+        except Exception:
+            pass
+        try:
+            self._stop.set()
+        except Exception:
+            pass
+        try:
+            self._gen += 1
+            self._turn_gen += 1
+        except Exception:
+            pass
+        try:
+            self._drop_pre_roll()
+        except Exception:
+            pass
+        rid = str(getattr(self, "request_id", "") or "")
+        if rid:
+            try:
+                self.client.cancel(rid)
+            except Exception:
+                pass
+        try:
+            worker = getattr(self, "_worker", None)
+            if worker is not None and worker.is_alive():
+                worker.join(timeout=1.0)
+        except Exception:
+            pass
+        self._pending_task = {}
+        self._active = False
+        self.state = self.IDLE
+        self._ui_status("idle", "ready")
+        return True
+
     def _capture_selection(self) -> bool:
         """Capture the focused window's selection (one service round-trip)."""
         try:
@@ -2738,9 +2819,24 @@ class DesktopHelper:
                     return
             except Exception:
                 pass
+        saved_route = self._wake_route_target
         if not self._open_request():
-            _trace("wake.turn_refused", state=self.state)
-            return
+            # A stale capture (Right-Ctrl key-down waiting on the warm model)
+            # must not swallow a fully transcribed wake command. Only a
+            # LISTENING turn is preempted; a PROCESSING turn is a real reply
+            # in flight and keeps the existing refusal (use STOP to cancel).
+            # ``_open_request`` consumes the route target, so restore it
+            # before the retry.
+            self._wake_route_target = saved_route
+            if (self.state == self.LISTENING
+                    and getattr(self, "_active", False)
+                    and not getattr(self, "_wake_turn_active", False)
+                    and self._preempt_listening_for_wake(cmd)
+                    and self._open_request()):
+                pass
+            else:
+                _trace("wake.turn_refused", state=self.state)
+                return
         # The wake utterance is already transcribed by the monitor — the
         # key-DOWN pump mic has no consumer on this path. Drop it (unsent)
         # rather than leaking an open capture.
@@ -2817,7 +2913,7 @@ class DesktopHelper:
                    request_id=self.request_id)
             self._ui_error("VOICE_EDIT_TURN_TIMEOUT",
                            "voice turn timed out — say it again")
-            self._finish_error()
+            self._finish_error(clear_pending=True)
         except Exception:
             pass
 
@@ -2863,11 +2959,17 @@ class DesktopHelper:
         are unaffected.
         """
         self._wake_turn_active = True
+        gen = self._gen
         try:
             self._capture_selection_local()
             _trace("wake.command", chars=len(cmd),
                     request_id=self.request_id,
                     **(_dbg.text_fields(self.cfg, command=cmd)))
+            if self._gen != gen:
+                # Cancelled/preempted while this worker was starting: a
+                # later turn owns the panel, so never land its state.
+                _trace("wake.turn_stale_discard", chars=len(cmd))
+                return
             self._transcript = cmd
             self._talk_emit("transcript.final", chars=len(cmd),
                             source="wake")
@@ -2876,7 +2978,7 @@ class DesktopHelper:
             _trace("wake.turn_error", detail=str(exc)[:160])
             self._talk_emit("error", code="VOICE_EDIT_WAKE_TURN_ERROR")
             try:
-                self._finish_error()
+                self._finish_error(clear_pending=True)
             except Exception:
                 pass
         finally:
@@ -2889,7 +2991,15 @@ class DesktopHelper:
                 pass
 
     def _transcribe(self) -> None:
-        _trace("transcribe.start", request_id=self.request_id)
+        gen = self._gen
+        rid = self.request_id
+
+        def _stale() -> bool:
+            # A wake may preempt a stale capture (new request generation);
+            # the old worker must never land status/preview/errors over it.
+            return self._gen != gen
+
+        _trace("transcribe.start", request_id=rid)
         mode = str(_read_cfg(self.cfg, "voice_edit", "stt_mode",
                              default="accurate") or "accurate").lower()
         accurate = mode == "accurate"
@@ -2937,11 +3047,13 @@ class DesktopHelper:
                 mic.start()
             except SttError as exc:
                 _trace("transcribe.mic_failed", code=exc.code)
-                self._on_stt_error(exc.code, exc.detail)
+                if not _stale():
+                    self._on_stt_error(exc.code, exc.detail)
                 return
             except Exception as exc:  # any capture-tool failure is a mic fault
                 _trace("transcribe.mic_failed", code="STT_MIC_UNAVAILABLE")
-                self._on_stt_error("STT_MIC_UNAVAILABLE", str(exc)[:160])
+                if not _stale():
+                    self._on_stt_error("STT_MIC_UNAVAILABLE", str(exc)[:160])
                 return
         try:
             ticket = self.client.mint_stt_ticket()
@@ -2952,7 +3064,8 @@ class DesktopHelper:
                 except Exception:
                     pass
             _trace("transcribe.ticket_failed", code=exc.code)
-            self._on_stt_error(exc.code, exc.detail)
+            if not _stale():
+                self._on_stt_error(exc.code, exc.detail)
             return
         _trace("transcribe.ticket_ok", ticket_len=len(ticket))
         _trace("transcribe.mic_started", stop_set=self._stop.is_set(),
@@ -2960,10 +3073,13 @@ class DesktopHelper:
         client = self._stt_factory(ticket)
         try:
             final = transcribe_once(
-                client, mic, self._stop, on_partial=self._on_partial,
-                on_ready=self._ready_cue,
-                on_status=lambda s: _trace("transcribe.status", state=s,
-                                           stop_set=self._stop.is_set()))
+                client, mic, self._stop,
+                on_partial=(lambda t: None if _stale()
+                            else self._on_partial(t)),
+                on_ready=(lambda: None if _stale() else self._ready_cue()),
+                on_status=lambda s: (None if _stale() else
+                                     _trace("transcribe.status", state=s,
+                                            stop_set=self._stop.is_set())))
         except Exception as exc:  # never crash the helper on an STT fault
             _trace("transcribe.client_error", detail=str(exc)[:120])
             final = ""
@@ -2972,6 +3088,9 @@ class DesktopHelper:
                 mic.stop()
             except Exception:
                 pass
+        if _stale():
+            _trace("transcribe.stale_discard", request_id=rid)
+            return
         stream_error = getattr(client, "error", None)
         pcm = getattr(mic, "pcm", b"") if hasattr(mic, "pcm") else b""
         # Accurate mode: decode the buffered utterance once with the local
@@ -3000,6 +3119,9 @@ class DesktopHelper:
                        reason=self._stt_fallback_reason)
         else:
             self._final_engine = "streaming"
+        if _stale():
+            _trace("transcribe.stale_discard", request_id=rid)
+            return
         _trace("transcribe.done", final_chars=len((final or "").strip()),
                engine=getattr(client, "engine_reported", ""),
                final_engine=self._final_engine,
@@ -3040,9 +3162,10 @@ class DesktopHelper:
     def _on_stt_error(self, code: str, detail: str) -> None:
         self._ui_error(code, detail)
         self._talk_emit("error", code=code)
-        self._finish_error()
+        self._finish_error(clear_pending=True)
 
-    def _finish_error(self, turn_gen: Optional[int] = None) -> None:
+    def _finish_error(self, turn_gen: Optional[int] = None, *,
+                      clear_pending: bool = False) -> None:
         # A worker whose turn was superseded by a wake-phrase barge-in must
         # never reset the interrupting turn to IDLE. Callers inside a turn
         # pass the generation they started with; the takeover bumps it.
@@ -3052,6 +3175,20 @@ class DesktopHelper:
             _trace("turn.stale_discard", where="finish_error",
                    turn_gen=turn_gen, current=current_gen)
             return
+        if clear_pending:
+            # An errored/cancelled turn must not leave a yes/no prompt
+            # latched: the wake gate would keep dropping every later
+            # command until its TTL. Dropped, never run.
+            try:
+                had = self._session_fsm().pending() is not None
+            except Exception:
+                had = False
+            try:
+                self._pending_task = {}
+            except Exception:
+                pass
+            if had:
+                _trace("pending.cleared_on_error")
         self._talk_emit("response.done")
         self._talk_end()
         self._active = False
@@ -3230,6 +3367,52 @@ class DesktopHelper:
             return not fsm.expired()
         except Exception:
             return False
+
+    def _wake_cancel_pending(self) -> bool:
+        """Drop a staged confirmation for a fresh wake (never run it).
+
+        The wake monitor calls this when a directed wake supersedes an open
+        yes/no prompt. Scoped to the current session; a failed clear reads
+        as False so the monitor keeps the old guarded behavior instead of
+        routing over a pending it could not cancel. Never raises.
+        """
+        try:
+            fsm = self._session_fsm()
+            had = fsm.pending() is not None
+            fsm.clear()
+            try:
+                if fsm.state == "awaiting_confirm":
+                    fsm.state = "idle"
+            except Exception:
+                pass
+            if had:
+                _trace("wake.pending_cancelled", session=fsm.session)
+            return True
+        except Exception:
+            return False
+
+    def _on_wake_armed(self) -> None:
+        """Show the panel listening after a bare wake armed the next turn.
+
+        The mic is the wake monitor's, so no helper request exists yet; only
+        the visible state changes. Never starts/ends capture and never
+        touches a preview the user may still apply. A turn that is already
+        capturing/processing or speaking owns the panel — this is a no-op
+        then. Never raises.
+        """
+        try:
+            if self.state not in (self.IDLE, self.PREVIEW):
+                return
+            if getattr(self, "_speaking", False):
+                return
+            self._safe_show()
+            if self.state == self.IDLE:
+                # New, empty turn: clear the previous live words/placeholder.
+                # A PREVIEW is left intact so the user can still apply it.
+                self._ui_live("", final=False)
+            self._ui_status("listening", "listening for your command…")
+        except Exception:
+            pass
 
     def _process_transcript(self, transcript: str = "") -> None:
         # New reply turn: bump the epoch. A stop marker from an earlier turn
@@ -4347,6 +4530,13 @@ class DesktopHelper:
 
     def cancel(self) -> None:
         self._stop.set()
+        # Fence any in-flight wake worker too: after an explicit cancel it
+        # must not land a PROCESSING/PREVIEW state over the idle panel.
+        try:
+            self._gen += 1
+            self._turn_gen += 1
+        except Exception:
+            pass
         self._drop_pre_roll()
         if self._worker is not None and self._worker.is_alive():
             self._worker.join(timeout=3.0)

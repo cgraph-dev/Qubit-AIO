@@ -125,6 +125,62 @@ def test_bare_wake_arms_next_utterance():
     assert commands == ["fix the grammar"]
 
 
+def test_bare_wake_notifies_panel_armed():
+    # A bare wake must visibly start the next turn: the helper shows the
+    # panel listening (no helper request exists yet).
+    import time as _t
+    commands = []
+    armed = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    transcribe=lambda pcm: "hey qubit",
+                    on_wake_armed=lambda: armed.append(1))
+    m._handle_segment(b"\x00" * 9600)
+    assert commands == []
+    assert armed == [1]
+    assert _t.monotonic() < m._armed_until
+
+
+def test_directed_wake_supersedes_a_stale_pending(monkeypatch):
+    # A staged confirmation must not latch every later wake command: an
+    # explicit "hey qubit" cancels the stale prompt (never runs it) and the
+    # new command routes. Unrelated speech still keeps the pending.
+    import voicebridge.voice_edit.wake as wake_mod
+    stages = []
+    monkeypatch.setattr(wake_mod, "_trace",
+                        lambda stage, **kw: stages.append(stage))
+    commands = []
+    cancelled = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    transcribe=lambda pcm: "",
+                    pending_probe=lambda: True,
+                    pending_cancel=lambda: cancelled.append(1) or True)
+    m._handle_transcript("open youtube")
+    assert commands == []
+    assert cancelled == []
+    assert "pending_guard" in stages, stages
+    m._handle_transcript("hey qubit, open youtube")
+    assert cancelled == [1]
+    assert commands == ["open youtube"]
+    assert "pending_superseded" in stages, stages
+
+
+def test_bare_wake_supersedes_pending_and_arms(monkeypatch):
+    import time as _t
+    commands = []
+    cancelled = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    transcribe=lambda pcm: "",
+                    pending_probe=lambda: True,
+                    pending_cancel=lambda: cancelled.append(1) or True)
+    m._handle_transcript("hey qubit")
+    assert cancelled == [1]
+    assert commands == []
+    assert _t.monotonic() < m._armed_until
+
+
 def test_short_segment_is_ignored():
     m, commands = _monitor(["hey qubit type this"])
     m._handle_segment(b"\x00" * 100)  # below min length

@@ -713,3 +713,106 @@ def test_bare_stop_interrupts_instead_of_staging(monkeypatch):
     assert h._turn_stopped_seq == h._turn_seq
     assert not any(c[0] == "transform" for c in client.calls), client.calls
     assert not any(c[0] == "task" for c in client.calls), client.calls
+
+
+# -- wake after a reply / stale capture (owner 2026-10-29) -------------------
+
+def test_recent_tts_speak_ends_at_playback_stop(tmp_path, monkeypatch):
+    # The full 5 s window measured from the START of a short reply made the
+    # first "Hey Qubit" after it look dead. A journaled playback END cuts
+    # the guard to a short echo tail.
+    import json as _json
+    import time as _t
+
+    fixed = _t.time()
+    monkeypatch.setattr(dh.time, "time", lambda: fixed)
+    p = tmp_path / "events.jsonl"
+
+    def write(*events):
+        p.write_text("".join(_json.dumps(e) + "\n" for e in events))
+
+    write({"event": "voice_edit.helper.speak", "ts": fixed - 4.0},
+          {"event": "voice_edit.helper.speak_done", "ts": fixed - 2.0})
+    assert dh.recent_tts_speak(p, window_s=5.0, tail_s=0.6) is False
+
+    write({"event": "voice_edit.helper.speak", "ts": fixed - 4.0})
+    assert dh.recent_tts_speak(p, window_s=5.0) is True
+
+    write({"event": "voice_edit.helper.speak", "ts": fixed - 4.0},
+          {"event": "voice_edit.talk.playback.stopped", "ts": fixed})
+    assert dh.recent_tts_speak(p, window_s=5.0, tail_s=0.6) is True
+
+
+def test_wake_busy_clears_after_journaled_playback_stop(tmp_path, monkeypatch):
+    import json as _json
+    import time as _t
+    import voicebridge.config as config_mod
+
+    fixed = _t.time()
+    monkeypatch.setattr(dh.time, "time", lambda: fixed)
+    monkeypatch.setattr(config_mod, "canonical_state_dir", lambda: tmp_path)
+    p = tmp_path / "events.jsonl"
+    p.write_text("".join(_json.dumps(e) + "\n" for e in (
+        {"event": "voice_edit.helper.speak", "ts": fixed - 4.0},
+        {"event": "voice_edit.helper.speak_done", "ts": fixed - 2.0})))
+
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._tts_echo_checked = 0.0
+    assert h._wake_busy() is False
+
+    p.write_text(_json.dumps(
+        {"event": "voice_edit.helper.speak", "ts": fixed - 1.0}) + "\n")
+    h._tts_echo_checked = 0.0
+    assert h._wake_busy() is True
+
+
+def test_wake_preempts_a_stale_listening_capture(monkeypatch):
+    # Live journal: wake.turn_refused state=listening right after a key-down
+    # capture waiting on the warm model — the fully transcribed wake command
+    # was lost and the owner had to repeat it. A directed wake now takes the
+    # microphone back from the stale capture.
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._active = True
+    h.state = h.LISTENING
+    h.request_id = "old-request"
+    h.on_wake_command("type this for me: hello world")
+    _join_wake_turn(h)
+    assert ("cancel", "old-request") in client.calls, client.calls
+    assert h.state == h.PREVIEW, h.state
+    assert ("begin",) in client.calls
+
+
+def test_wake_command_after_reply_is_accepted(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.state = h.PREVIEW
+    h._speaking = False
+    monkeypatch.setattr(h, "_tts_echo_busy", lambda: False)
+    h.on_wake_command("type this for me: hello world")
+    _join_wake_turn(h)
+    assert ("begin",) in client.calls
+    assert h.state == h.PREVIEW, h.state
+
+
+def test_stt_error_clears_pending_and_returns_idle(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._pending_task = {"text": "delete everything", "request_id": "r",
+                       "staged_at": time.monotonic()}
+    h._on_stt_error("VOICE_EDIT_NO_TRANSCRIPT", "empty")
+    assert h._pending_task == {}
+    assert h.state == h.IDLE
+    assert overlay.errors
+
+
+def test_errored_wake_turn_never_stays_non_idle(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._pending_task = {"text": "delete everything", "request_id": "r",
+                       "staged_at": time.monotonic()}
+
+    def _boom(_cmd=""):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(h, "_process_transcript", _boom)
+    h.on_wake_command("type this for me: hello world")
+    _join_wake_turn(h)
+    assert h.state == h.IDLE, h.state
+    assert h._pending_task == {}
