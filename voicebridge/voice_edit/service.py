@@ -2452,7 +2452,7 @@ class VoiceEditService:
             if not script.is_file():
                 return ""
             proc = _sp.run([_sys.executable, str(script), question],
-                           capture_output=True, text=True, timeout=10)
+                           capture_output=True, text=True, timeout=4)
             if proc.returncode != 0:
                 return ""
             return str(proc.stdout or "").strip()
@@ -2946,7 +2946,16 @@ class VoiceEditService:
         if not q:
             return ""
         if _re.search(r"\bweather\b|\bforecast\b|\btemperature\b|\btemp\b", q, _re.IGNORECASE):
-            return self._live_weather(q)
+            ans = self._live_weather(q)
+            if ans:
+                return ans
+            # Never fall through to the model for weather: a cold/unloaded
+            # brain made this a 30 s timeout plus retry, and the model then
+            # invented weather. Fail fast and honestly instead.
+            self._audit("voice_edit.weather.unavailable", {
+                "chars": len(q)})
+            return ("I couldn't reach the weather service right now. "
+                    "Try again in a moment.")
         # Lane 3 (2026-10-03): STT emits contractions ("What's the time in
         # Bucharest right now?", "What's the date now in Romania?") which
         # missed the contiguous "what time"/"what date" patterns and fell to

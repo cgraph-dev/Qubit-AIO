@@ -29,6 +29,11 @@ def test_brain_unload_routes(phrase):
 @pytest.mark.parametrize("phrase", [
     "wake up",
     "wake up the brain",
+    "start the brain",
+    "start brain",
+    "boot the brain",
+    "resume the brain",
+    "welcome to the brain",
     "load the brain",
     "load brain",
     "warm up the brain",
@@ -204,9 +209,9 @@ def test_ollama_ansi_noise_is_stripped():
 
 def test_bare_qubit_power_commands_can_execute():
     from voicebridge.voice_edit import wake
-    for phrase in ("qubit, wake up", "qubit, load the brain",
-                   "qubit, sleep", "qubit, I'm going to game",
-                   "qubit, stop brain"):
+    for phrase in ("qubit, wake up", "qubit, start the brain",
+                   "qubit, load the brain", "qubit, sleep",
+                   "qubit, I'm going to game", "qubit, stop brain"):
         remainder = wake.strip_wake(phrase)
         assert remainder, phrase
         assert wake.is_safe_bare_wake_command(remainder), (phrase, remainder)

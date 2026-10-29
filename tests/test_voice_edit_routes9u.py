@@ -352,3 +352,26 @@ def test_window_close_and_empty_trash_stay_confirm_gated(svc):
         out = svc.route(req["request_id"], phrase)
         assert out["mode"] == "task", (phrase, out)
         assert out.get("requires_confirmation") is True, (phrase, out)
+
+
+def test_weather_failure_is_fast_and_never_calls_model(svc, monkeypatch):
+    monkeypatch.setattr(svc, "_live_weather", lambda q: "")
+    called = []
+    import voicebridge.providers.gateway as GW
+    monkeypatch.setattr(GW, "run_role",
+                        lambda *a, **k: called.append(True) or None)
+    out = svc.ask("what is the weather in Bucharest right now?")
+    assert "couldn't reach the weather service" in out["answer"], out
+    assert called == [], called
+
+
+def test_weather_success_short_circuits_model(svc, monkeypatch):
+    monkeypatch.setattr(svc, "_live_weather",
+                        lambda q: "Bucharest: 10°C, Clear.")
+    called = []
+    import voicebridge.providers.gateway as GW
+    monkeypatch.setattr(GW, "run_role",
+                        lambda *a, **k: called.append(True) or None)
+    out = svc.ask("what is the weather in Bucharest?")
+    assert out["answer"] == "Bucharest: 10°C, Clear.", out
+    assert called == [], called
