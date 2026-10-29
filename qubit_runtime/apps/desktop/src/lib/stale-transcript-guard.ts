@@ -1,5 +1,5 @@
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
-import { getLatestSessionMessages, type ProfileScope } from '@/hermes'
+import { getLatestSessionMessages, type ProfileScope } from '@/qubit'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { knownSessionOwner, ownerLookupSessionRows } from '@/store/session'
 import type { SessionOwnerScope } from '@/store/session-request-router'
@@ -192,19 +192,6 @@ async function fetchRefreshedTranscript(
   } catch {
     return null
   }
-}
-
-/**
- * Read the authoritative latest page and return a refreshed transcript when
- * this view is behind. Null when current or the read fails — a missing
- * profile or a down backend must not soft-lock send.
- */
-export async function refreshIfTranscriptStale(
-  storedSessionId: string,
-  localMessages: ChatMessage[],
-  options?: { excludeMessageId?: string; profile?: ProfileScope }
-): Promise<ChatMessage[] | null> {
-  return fetchRefreshedTranscript(storedSessionId, localMessages, options)
 }
 
 /**

@@ -136,7 +136,7 @@ function persistKnownModels(known: Set<string>): void {
  *  allowlist" is ambiguous: a deliberate hide and a model that arrived after
  *  the user last curated look identical. Recording everything in the catalog
  *  as judged therefore strands catalog-present defaults behind a stale
- *  allowlist forever (https://github.com/NousResearch/qubit/issues/122053)
+ *  allowlist forever (https://github.com/NousResearch/hermes-agent/issues/122053)
  *  — so the curated defaults the old allowlist does NOT contain stay unknown,
  *  and the default rule re-admits them on the next resolve. The one-time cost
  *  is that a deliberately hidden default comes back once; the user's next save
