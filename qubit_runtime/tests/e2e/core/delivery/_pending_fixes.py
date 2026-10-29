@@ -31,6 +31,8 @@ from typing import Callable, Dict, Iterator, Optional
 
 import pytest
 
+from tests.e2e.core._pending_fixes import STRICT_ACCEPTANCE_ENV, strict_acceptance
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 _PRELUDE = "import json, os, sys\nsys.path.insert(0, os.getcwd())\n"
@@ -82,6 +84,10 @@ def known_failure(pattern: str, reason: str,
         yield
     except AssertionError as exc:
         if not re.search(pattern, str(exc)):
+            raise
+        if strict_acceptance(reason):
+            exc.add_note(f"{STRICT_ACCEPTANCE_ENV}={os.environ.get(STRICT_ACCEPTANCE_ENV, '').strip()}: "
+                         f"the known gap is not excused in this acceptance run ({reason})")
             raise
         if on_xfail is not None:
             on_xfail()
