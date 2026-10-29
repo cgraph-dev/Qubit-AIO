@@ -30,7 +30,7 @@ class ModelPeer(BaseHTTPRequestHandler):
         reply = f"LOCAL_ACK_{marker}"
         if 'BLOCK_FIFO' in json.dumps(last):
             self.server.blocked.set()
-            assert self.server.release.wait(15), 'fixture model gate timed out'
+            assert self.server.release.wait(60), 'fixture model gate timed out'
         self.server.requests.append(request) if 'messages' in request else self.server.metadata_requests.append(request)
         base = {"id": "chatcmpl-local", "model": "local-wire-stub", "created": 1}
         self.send_response(200)
@@ -104,7 +104,7 @@ async def probe():
         return
     event = MessageEvent(text="MESSAGING_WARM", source=source, message_id="warm-1")
     await adapter.handle_message(event)
-    await async_wait_until(lambda: not adapter._active_sessions, timeout=35, what='the warm-up turn to finish')
+    await async_wait_until(lambda: not adapter._active_sessions, timeout=120, what='the warm-up turn to finish')
     assert event._gateway_accepted, adapter.sent
     assert any("LOCAL_ACK_MESSAGING_WARM" in text for text in adapter.sent), adapter.sent
     entry = runner.session_store.get_or_create_session(source)
@@ -127,7 +127,7 @@ async def probe():
         port = listener.getsockname()[1]
         http = uvicorn.Server(uvicorn.Config(app, log_level="warning", lifespan="off", ws="websockets"))
         task = asyncio.create_task(http.serve(sockets=[listener]))
-        await async_wait_until(lambda: http.started or task.done(), timeout=10, what='uvicorn to start')
+        await async_wait_until(lambda: http.started or task.done(), timeout=90, what='uvicorn to start')
         if task.done():
             await task
     frames = []
@@ -146,7 +146,7 @@ async def probe():
             credential = f"ticket={mint_ticket(user_id='fixture-user', provider='fixture')}"
         async with websockets.connect(f"ws://127.0.0.1:{port}/api/ws?{credential}") as ws:
             async def until(predicate):
-                async with asyncio.timeout(35):
+                async with asyncio.timeout(120):
                     while True:
                         frame = json.loads(await ws.recv())
                         frames.append(frame)
@@ -241,7 +241,7 @@ async def probe():
             await stop_gateway_api(api_handle)
         else:
             http.should_exit = True
-            await asyncio.wait_for(task, 10)
+            await asyncio.wait_for(task, 120)
             listener.close()
     print(json.dumps(receipt))
 

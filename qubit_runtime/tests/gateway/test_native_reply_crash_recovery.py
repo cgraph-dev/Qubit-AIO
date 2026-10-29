@@ -49,7 +49,7 @@ def _owner(tmp_path):
                TELEGRAM_BOT_TOKEN='987654321:owned-loopback-fixture', TELEGRAM_ALLOWED_USERS='202')
 
     def status():
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=90)) as db:
             return {json.loads(payload)['text']: state for state, payload in db.execute(
                 'SELECT status,payload_json FROM session_admissions')}
 

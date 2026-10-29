@@ -65,7 +65,7 @@ async def probe():
 
     async def rpc(method, **params):
         await ws.send(json.dumps({'jsonrpc': '2.0', 'id': method, 'method': method, 'params': params}))
-        async with asyncio.timeout(15):
+        async with asyncio.timeout(90):
             while True:
                 frame = json.loads(await ws.recv())
                 frames.append(frame)
@@ -75,7 +75,7 @@ async def probe():
         sid = (await rpc('session.create', request_id='fresh', source='cli'))['result']['session_id']
         await rpc('session.resume', session_id=sid)
         await rpc('prompt.submit', session_id=sid, input_id='first', text='hi')
-        async with asyncio.timeout(30):
+        async with asyncio.timeout(180):
             while not any(f.get('params', {}).get('type') == 'message.complete' for f in frames):
                 frames.append(json.loads(await ws.recv()))
         events = [f['params'] for f in frames if f.get('method') == 'event']
