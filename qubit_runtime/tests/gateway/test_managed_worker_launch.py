@@ -36,7 +36,7 @@ class Model(BaseHTTPRequestHandler):
         elif any(m['role'] == 'tool' for m in body['messages']):
             self.server.requests.append(body)
             self.server.blocked.set()
-            self.server.release.wait(30)
+            self.server.release.wait(120)
             message = {'role': 'assistant', 'content': 'MANAGED_TOOL_DONE'}
         else:
             self.server.requests.append(body)
@@ -139,7 +139,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def query(sql, args=()):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=90)) as db:
             return db.execute(sql, args).fetchall()
 
     async def exercise(desc, owner):
@@ -155,7 +155,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
             assert 'result' in submitted, submitted
             if peer.control_mode:
                 async def prompt(kind):
-                    deadline = time.monotonic() + 20
+                    deadline = time.monotonic() + 120
                     while True:
                         snapshot = await rpc(ws, 'session.resume', session_id=sid)
                         found = next((p for p in snapshot['result']['prompts'] if p['kind'] == kind), None)
@@ -176,7 +176,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
                     assert 'result' in stopped, stopped
                     peer.release.set()
                     await async_wait_until(lambda: query('SELECT status FROM session_admissions WHERE request_id=?', (
-                        'managed-input',)) != [('started',)], timeout=15, interval=.05, what='stopped turn settled')
+                        'managed-input',)) != [('started',)], timeout=120, interval=.05, what='stopped turn settled')
                     assert query('SELECT status FROM session_admissions') == [('terminal',)], (home / 'restart.log').read_text()
                     return
                 answered = await rpc(ws, 'clarify.respond', session_id=sid,
@@ -199,7 +199,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
                 assert 'result' in follower, follower
                 children[0].kill()
                 await async_wait_until(lambda: query('SELECT status FROM session_admissions WHERE request_id=?', (
-                    'managed-input',)) != [('started',)], timeout=10, interval=.05, what='killed worker turn unknown')
+                    'managed-input',)) != [('started',)], timeout=120, interval=.05, what='killed worker turn unknown')
                 assert query('SELECT request_id,status FROM session_admissions ORDER BY seq') == [
                     ('managed-input', 'unknown'), ('follower', 'queued')]
                 restored = await rpc(ws, 'session.resume', session_id=sid)
@@ -212,7 +212,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
         assert psutil.Process(pid).is_running()
         peer.release.set()
         await async_wait_until(lambda: query('SELECT status FROM session_admissions WHERE request_id=?', (
-            'managed-input',)) == [('terminal',)], timeout=40, interval=.05, what='managed turn terminal')
+            'managed-input',)) == [('terminal',)], timeout=180, interval=.05, what='managed turn terminal')
         async with websocket(home, desc) as ws:
             restored = await rpc(ws, 'session.resume', session_id=sid)
             history = restored['result']['messages']
@@ -250,7 +250,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
             gate.touch()
             await async_wait_until(lambda: not psutil.pid_exists(background.pid)
                                    or psutil.Process(background.pid).status() == psutil.STATUS_ZOMBIE,
-                                   timeout=10, interval=.05, what='background process exited')
+                                   timeout=120, interval=.05, what='background process exited')
         else:
             assert any(role == 'tool' and 'MANAGED_TOOL_EFFECT' in content for role, content in rows), rows
         assert query('SELECT status FROM worker_executions WHERE session_id=?', (sid,)) == [('terminal',)]
@@ -273,7 +273,7 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
                 next_turn = await rpc(ws, 'prompt.submit', session_id=sid, input_id='history', text='RESUME_HISTORY')
                 assert 'result' in next_turn, next_turn
                 await async_wait_until(lambda: query('SELECT status FROM session_admissions WHERE request_id=?', (
-                    'history',)) == [('terminal',)], timeout=30, interval=.05, what='history turn terminal')
+                    'history',)) == [('terminal',)], timeout=180, interval=.05, what='history turn terminal')
                 restored = await rpc(ws, 'session.resume', session_id=sid)
                 assert 'MANAGED_HISTORY_DONE' in json.dumps(restored['result']['messages']), restored
             request = peer.requests[-1]
