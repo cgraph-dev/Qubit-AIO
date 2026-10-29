@@ -1402,6 +1402,8 @@ export type DesktopBootstrapEvent =
       docsUrl: string
     }
 
+export type QubitApiRequest = HermesApiRequest
+
 export interface HermesApiRequest {
   path: string
   method?: string

@@ -28,6 +28,8 @@ export const PROMPT_SUBMIT_REQUEST_TIMEOUT_MS = 1_800_000
 
 export const GATEWAY_NOT_CONNECTED_MESSAGE = 'Qubit gateway is not connected'
 
+export { HermesGateway as QubitGateway }
+
 export class HermesGateway extends JsonRpcGatewayClient {
   constructor() {
     super({

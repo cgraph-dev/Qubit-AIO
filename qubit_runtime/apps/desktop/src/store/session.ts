@@ -1551,6 +1551,9 @@ export const setCurrentModel = (next: Updater<string>) => {
   }
 }
 
+export const setCurrentModelTransient = (next: Updater<string>) => updateAtom($currentModel, next)
+export const setCurrentProviderTransient = (next: Updater<string>) => updateAtom($currentProvider, next)
+
 export const setCurrentProvider = (next: Updater<string>) => {
   updateAtom($currentProvider, next)
   const key = composerSelectionKey(COMPOSER_PROVIDER_KEY)
