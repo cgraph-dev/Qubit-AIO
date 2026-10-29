@@ -155,8 +155,15 @@ if _HERMES_EXPORTED_TMP:
 
 from qubit_state_guard import _real_platform_state_root
 
-_real_test_root = _real_platform_state_root() or (Path.home() / ".hermes").resolve()
-_guarded_tmp_roots = [_real_test_root]
+_real_test_root = _real_platform_state_root() or (Path.home() / ".qubit").resolve()
+# The legacy read-old root is still a production root: a shell launched from a
+# pre-rebrand install exports TMPDIR under ~/.hermes/cache/scratch, and honoring
+# it would put every temp file inside the guarded home.
+try:
+    _legacy_test_root = _legacy_platform_default_qubit_home().resolve()
+except Exception:
+    _legacy_test_root = (Path.home() / ".hermes").resolve()
+_guarded_tmp_roots = [_real_test_root, _legacy_test_root]
 _custom_test_home = os.environ.get("QUBIT_HOME")
 if _custom_test_home:
     _guarded_tmp_roots.append(Path(_custom_test_home).expanduser().resolve())
