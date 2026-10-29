@@ -41,7 +41,7 @@ import {
   setPreviewTabPinned
 } from './preview'
 import { $activeSessionId, $selectedStoredSessionId, $sessions } from './session'
-import { dropSessionState, publishSessionState } from './session-states'
+import { clearAllSessionStates, dropSessionState, publishSessionState } from './session-states'
 
 function fileTarget(source: string): PreviewTarget {
   return { kind: 'file', label: source, path: source, previewKind: 'html', source, url: `file://${source}` }
@@ -408,6 +408,15 @@ describe('preview store', () => {
 })
 
 describe('preview session scoping (#73890)', () => {
+  beforeEach(() => {
+    $activeSessionId.set(null)
+    $sessions.set([])
+    clearAllSessionStates()
+    $selectedStoredSessionId.set(null)
+    closeRightRail()
+    window.localStorage.clear()
+  })
+
   afterEach(() => {
     $selectedStoredSessionId.set(null)
     closeRightRail()
@@ -987,6 +996,15 @@ describe('preview session scoping (#73890)', () => {
 })
 
 describe('preview session scoping (#73890)', () => {
+  beforeEach(() => {
+    $activeSessionId.set(null)
+    $sessions.set([])
+    clearAllSessionStates()
+    $selectedStoredSessionId.set(null)
+    closeRightRail()
+    window.localStorage.clear()
+  })
+
   afterEach(() => {
     $selectedStoredSessionId.set(null)
     closeRightRail()
