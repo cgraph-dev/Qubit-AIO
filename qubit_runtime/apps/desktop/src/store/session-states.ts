@@ -35,6 +35,7 @@ import type { WorkspaceMode } from '@/contrib/types'
 import { finalizeInterruptedMessages, sealOpenToolParts, type ChatMessage } from '@/lib/chat-messages'
 import type { ErrorSurface } from '@/lib/error-surface'
 import { stableArray } from '@/lib/stable-array'
+import { tileFocusStampOnFocusChange } from '@/lib/session-timer-since'
 import { readJson, writeJson } from '@/lib/storage'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -70,6 +71,7 @@ import {
   setAwaitingResponse,
   setBusy,
   setSessions,
+  setTileSessionFocusStartedAt,
   setTurnStartedAt
 } from './session'
 import { secondaryProfileOwnerForEvent } from './session-event-provenance'
@@ -2928,7 +2930,22 @@ $focusedStoredSessionId.listen(focused => {
     markSessionRead(focused)
     ackStoredSessionId(focused)
   }
+
+  stampTileSessionFocus(focused)
 })
+
+stampTileSessionFocus($focusedStoredSessionId.get())
+
+// Statusbar timer: stamp "focused since" for non-primary tiles so they share
+// the primary's contract instead of the row's durable started_at (#103123).
+// Primary focus leaves the stamp alone; the next tile focus re-stamps.
+function stampTileSessionFocus(focused: null | string) {
+  const stamp = tileFocusStampOnFocusChange(focused, $selectedStoredSessionId.get(), Date.now())
+
+  if (stamp) {
+    setTileSessionFocusStartedAt(stamp)
+  }
+}
 
 // Cold-start restore is the one selection change that is NOT a navigation: the
 // route already pointed at the primary session before the window loaded, and
