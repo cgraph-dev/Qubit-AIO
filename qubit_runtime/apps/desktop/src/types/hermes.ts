@@ -1507,6 +1507,12 @@ export interface BackendUpdateCheckResponse {
   update_command: string | null
   message: string | null
   commits?: BackendUpdateCommit[]
+  // Newer backend fields (optional on older responses).
+  branch?: null | string
+  channel?: null | string
+  held?: boolean | null
+  rollback_to?: null | string
+  source_version?: null | string
 }
 
 export interface AuxiliaryTaskAssignment {

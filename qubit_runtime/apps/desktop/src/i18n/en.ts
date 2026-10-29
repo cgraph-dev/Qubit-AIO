@@ -2391,6 +2391,10 @@ export const en: Translations = {
     skillArchivedMessage: 'Restorable via qubit curator restore.',
     tabPlugins: 'Plugins',
     plugins: {
+      toolsetOn: (name: string, profile: string) => `${name} agent tools enabled for ${profile}`,
+      toolsetOff: (name: string, profile: string) => `${name} agent tools disabled for ${profile}`,
+      toolsetToggleFailed: (name: string) =>
+        `Could not toggle the ${name} agent tools; the Desktop panel was left unchanged`,
       agentTitle: 'Agent plugins',
       agentBlurb:
         'Extend the agent for the selected profile — tools, hooks, providers. Take effect after a gateway restart.',
@@ -3897,6 +3901,7 @@ export const en: Translations = {
     goalWaiting: 'Goal waiting',
     subagents: count => `${count} Subagent${count === 1 ? '' : 's'}`,
     todos: (done, total) => `Tasks ${done}/${total}`,
+    previousTodos: (done, total) => `Previous tasks ${done}/${total}`,
     running: 'Running',
     stop: 'Stop',
     dismiss: 'Dismiss',
@@ -4535,6 +4540,7 @@ export const en: Translations = {
       releaseAvailable: (tag: string) => `Version ${tag} is available.`,
       desktopVersion: version => `Qubit Desktop v${version}`,
       backendVersion: version => `Backend v${version}`,
+      compressions: count => `Compressions: ${count}`,
       clientLabel: version => `client v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `Remote: ${host}`,
@@ -4798,6 +4804,7 @@ export const en: Translations = {
   },
 
   zones: {
+    zoneMenuLabel: title => `Zone options for ${title}`,
     showTabStrip: 'Show tabs',
     hideTabStrip: 'Hide tabs',
     showStripTab: title => `Show ${title}`,
@@ -5381,6 +5388,8 @@ export const en: Translations = {
     deleteFailed: 'Delete failed',
     archived: 'Archived',
     archiveFailed: 'Archive failed',
+    restored: 'Restored',
+    unarchiveFailed: 'Unarchive failed',
     cwdChangeFailed: 'Working directory change failed',
     cwdStagedTitle: 'Working directory staged',
     cwdStagedMessage: 'Restart the desktop backend to apply cwd changes to this active session.',

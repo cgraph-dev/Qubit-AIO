@@ -137,7 +137,7 @@ import type { SessionCreateResponse, SessionMessage, SessionResumeResult, UsageS
 
 import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '../../../routes'
 import type { ClientSessionState, SidebarNavItem } from '../../../types'
-import { sessionContextDrift } from '../session-context-drift'
+import { pinStoredSessionForOwner, releaseStoredSessionPins, sessionContextDrift } from '../session-context-drift'
 import { singleFlightSessionResume } from '../use-prompt-actions/single-flight-resume'
 
 import { sessionCreateOverrideParams, type SessionCreateOverrides, type SessionSeedMessage } from './create-overrides'
@@ -204,6 +204,16 @@ interface SessionActionsOptions {
     updater: (state: ClientSessionState) => ClientSessionState,
     storedSessionId?: string | null
   ) => ClientSessionState
+}
+
+export interface BranchLoadedSessionOptions {
+  busy: boolean
+  contextDrift?: () => null | string
+  cwd?: string
+  messageId?: string
+  messages: ChatMessage[]
+  runtimeId: null | string
+  storedSessionId: null | string
 }
 
 // Stored ids created in THIS renderer run. A brand-new session lives only in the
@@ -808,6 +818,59 @@ export function useSessionActions({
       resetViewSync,
       selectedStoredSessionIdRef,
       updateSessionState
+    ]
+  )
+
+  // Atomic new-session submit used by Quick Entry: creates the session, submits
+  // the first message to the exact created runtime id, then re-homes the view.
+  const submitTextToNewSession = useCallback(
+    async (text: string, owner?: string): Promise<{ runtimeSessionId: string; sessionId: string }> => {
+      const startingRouteToken = getRouteToken()
+      const startingSelectedStoredId = selectedStoredSessionIdRef.current
+      const params = await desktopSessionCreateParams(resolveNewSessionCwd())
+      const created = await requestGateway<SessionCreateResponse>('session.create', params)
+      const stored = created.stored_session_id
+
+      if (!stored) {
+        throw new Error('The new session did not return a stored id.')
+      }
+
+      const drift = sessionContextDrift({
+        startRouteToken: startingRouteToken,
+        nowRouteToken: getRouteToken(),
+        startSelectedStoredId: startingSelectedStoredId,
+        nowSelectedStoredId: selectedStoredSessionIdRef.current,
+        submitTargetStoredId: stored
+      })
+
+      if (drift) {
+        console.warn('[submit-drift-abort]', drift, { phase: 'quick-entry-new' })
+        throw new Error(`Quick Entry destination changed mid-create: ${drift}`)
+      }
+
+      const pinOwner = owner ?? `new-session-${created.session_id}`
+      pinStoredSessionForOwner(pinOwner, stored)
+
+      try {
+        createdThisRun.add(stored)
+        runtimeIdByStoredSessionIdRef.current.set(stored, created.session_id)
+        ensureSessionState(created.session_id, stored)
+        upsertOptimisticSession(created, stored, null, text.trim())
+        await requestGateway('prompt.submit', { session_id: created.session_id, text })
+        navigate(sessionRoute(stored), { replace: true })
+
+        return { runtimeSessionId: created.session_id, sessionId: stored }
+      } finally {
+        releaseStoredSessionPins(pinOwner)
+      }
+    },
+    [
+      ensureSessionState,
+      getRouteToken,
+      navigate,
+      requestGateway,
+      runtimeIdByStoredSessionIdRef,
+      selectedStoredSessionIdRef
     ]
   )
 
@@ -2609,6 +2672,79 @@ export function useSessionActions({
     ]
   )
 
+  // Branch a session whose live transcript is already loaded in this renderer.
+  // Both the main chat and session tiles use this path so a clicked message id
+  // is resolved against the exact message array that rendered the action bar.
+  const branchLoadedSession = useCallback(
+    async ({
+      busy,
+      contextDrift,
+      cwd,
+      messageId,
+      messages,
+      runtimeId,
+      storedSessionId
+    }: BranchLoadedSessionOptions): Promise<boolean> => {
+      if (!runtimeId) {
+        notify({ kind: 'warning', title: copy.nothingToBranch, message: copy.branchNeedsChat })
+
+        return false
+      }
+
+      if (busy) {
+        notify({ kind: 'warning', title: copy.sessionBusy, message: copy.branchStopCurrent })
+
+        return false
+      }
+
+      let authoritativeMessages: ChatMessage[] | null = null
+      const profile = await resolveSessionProfile(storedSessionId)
+      const ownerRoute = storedSessionId ? sessionOwnerRouteFromRow(cachedSessionRow(storedSessionId)) : undefined
+
+      if (messageId && storedSessionId) {
+        try {
+          const persisted = await getAllSessionMessages(storedSessionId, ownerRoute ?? profile)
+          const hydrated = toChatMessages(persisted.messages)
+
+          if (hydrated.length) {
+            authoritativeMessages = hydrated
+          }
+        } catch {
+          // The branch RPC has a backend-side display projection fallback.
+        }
+      }
+
+      const drift = contextDrift?.()
+
+      if (drift) {
+        console.warn('[branch-drift-abort]', drift, { phase: 'transcript-hydration' })
+
+        return false
+      }
+
+      const branchMessages = messageId ? selectBranchMessages(messages, authoritativeMessages, messageId) : []
+
+      if (messageId && !branchMessages.length) {
+        notify({ kind: 'warning', title: copy.nothingToBranch, message: copy.branchNoText })
+
+        return false
+      }
+
+      clearNotifications()
+
+      return forkBranch(
+        branchMessages,
+        runtimeId,
+        storedSessionId,
+        cwd?.trim(),
+        profile,
+        messageId ? branchMessages.length : undefined,
+        ownerRoute
+      )
+    },
+    [copy, forkBranch]
+  )
+
   // Branch the open chat — optionally from a specific message — off its live transcript.
   const branchCurrentSession = useCallback(
     async (messageId?: string): Promise<boolean> => {
@@ -2975,9 +3111,37 @@ export function useSessionActions({
     ]
   )
 
+  const unarchiveSession = useCallback(
+    async (storedSessionId: string) => {
+      clearNotifications()
+
+      const archived = $archivedSessions.get().find(session => sessionMatchesStoredId(session, storedSessionId))
+      const profile = archived?.profile?.trim() || undefined
+
+      try {
+        await setSessionArchived(storedSessionId, false, profile)
+
+        $archivedSessions.set(
+          $archivedSessions.get().filter(session => !sessionMatchesStoredId(session, storedSessionId))
+        )
+
+        if (archived) {
+          untombstoneSessions([storedSessionId, archived._lineage_root_id])
+          restoreListedSession({ ...archived, archived: false })
+        }
+
+        notify({ durationMs: 2_000, kind: 'success', message: copy.restored })
+      } catch (err) {
+        notifyError(err, copy.unarchiveFailed)
+      }
+    },
+    [copy]
+  )
+
   return {
     archiveSession,
     branchCurrentSession,
+    branchLoadedSession,
     branchStoredSession,
     closeSettings,
     createBackendSessionForSend,
@@ -2986,6 +3150,8 @@ export function useSessionActions({
     removeSession,
     resumeSession,
     selectSidebarItem,
-    startFreshSessionDraft
+    submitTextToNewSession,
+    startFreshSessionDraft,
+    unarchiveSession
   }
 }

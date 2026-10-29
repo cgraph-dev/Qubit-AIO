@@ -25,6 +25,39 @@ import {
 
 import { hermesConfigCacheWriter, useHermesConfigRecord } from '../../hooks/use-config-record'
 
+interface RealProfilePromptGate {
+  claim: null | string
+  configLoaded: boolean
+  connection: null | { mode?: string }
+  dismissed: boolean
+  enabled: boolean
+  muted: boolean
+  tabId: string
+}
+
+/**
+ * Whether this pane should offer the real-profile consent prompt.
+ *
+ * Only for a backend on THIS machine: real-profile mode snapshots the
+ * backend host's default browser, and the prompt promises "your" profile and
+ * "nothing leaves this computer". Over a remote/SSH/cloud connection that is
+ * another machine's browser (often a headless box with none), and "Enable"
+ * would write `browser.use_real_profile` into the remote config.yaml — which
+ * unregisters its browser tools and re-appears after every reset (#119398).
+ * An unresolved connection fails closed. Remote users can still opt in from
+ * the Capabilities → Tools → Browser toggle.
+ */
+export function shouldOfferRealProfilePrompt(gate: RealProfilePromptGate): boolean {
+  return (
+    gate.connection?.mode === 'local' &&
+    gate.configLoaded &&
+    !gate.enabled &&
+    !gate.dismissed &&
+    !gate.muted &&
+    gate.claim === gate.tabId
+  )
+}
+
 interface RealProfileConsentDialogProps {
   /** The Browser tab this pane renders — used only to claim the prompt so
    *  several mounted Browser panes never stack duplicate dialogs. */

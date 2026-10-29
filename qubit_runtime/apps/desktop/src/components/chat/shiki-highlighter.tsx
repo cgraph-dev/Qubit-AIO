@@ -12,6 +12,9 @@ import { CopyButton } from '@/components/ui/copy-button'
 import { useI18n } from '@/i18n'
 import { isLikelyProseCodeBlock } from '@/lib/markdown-code'
 
+import { hasHttpUrlHost } from '@/app/chat/composer/url-refs'
+import { referenceRe, unquoteReferenceValue } from '@/components/assistant-ui/reference-kinds'
+
 import type { CachedShikiBlockProps } from './shiki-block'
 import { PlainShiki } from './shiki-plain'
 export { SHIKI_COLOR_REPLACEMENTS, SHIKI_THEME } from '@/components/chat/shiki-config'
@@ -61,6 +64,15 @@ export const LazyShiki: FC<CachedShikiBlockProps> = ({ language, code, theme, co
     <ShikiBlock code={code} colorReplacements={colorReplacements} language={language} theme={theme} />
   </Suspense>
 )
+
+/** Convert URL references back to literal URLs for code-block clipboard text. */
+export function copyableCodeText(code: string): string {
+  return code.replace(referenceRe(), (directive, kind: string, value: string) => {
+    const url = unquoteReferenceValue(value)
+
+    return kind === 'url' && hasHttpUrlHost(url) ? url : directive
+  })
+}
 
 export function exceedsHighlightBudget(code: string): boolean {
   if (code.length > MAX_HIGHLIGHT_CHARS) {
