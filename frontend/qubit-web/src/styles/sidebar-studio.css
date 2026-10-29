@@ -1,120 +1,526 @@
-/* Shared app navigation uses the same live theme surface as /qubit-chat. */
+/* ==========================================================================
+   Qubit navigation rail — theme-derived "instrument panel"
+   --------------------------------------------------------------------------
+   Everything here reads the ACTIVE theme's tokens (--background-base,
+   --midground-base, --color-border, --theme-font-*, --radius). Earlier passes
+   hardcoded a navy palette that survived every theme switch and made the rail
+   look like a different application. Rule for this file: no literal colour
+   except pure-white/black used at low alpha for light/dark agnostic shading,
+   and the semantic status tokens the rest of the dashboard already uses.
+   ========================================================================== */
+
 .qagent-sidebar {
-  --qsidebar-accent: var(--color-primary, var(--midground-base));
-  --qsidebar-active: color-mix(in srgb, #b89aff 78%, var(--qsidebar-accent));
-  --qsidebar-surface: var(--color-card, color-mix(in srgb, var(--midground-base) 4%, var(--background-base)));
-  --qsidebar-wash: color-mix(in srgb, var(--qsidebar-accent) 9%, transparent);
-  --qsidebar-muted: color-mix(in srgb, var(--midground-base) 66%, var(--background-base));
-  --qsidebar-line: var(--color-border, color-mix(in srgb, var(--qsidebar-accent) 17%, transparent));
-  background: var(--background-base) !important;
-  border-color: var(--qsidebar-line) !important;
-  color: var(--midground-base);
-  font-family: var(--theme-font-sans, sans-serif);
+  /* Derived surface ladder: panel is the sidebar well, rail is the leaning
+     edge of every row, wash is the hover tint. All three mix the theme's own
+     background + midground, so a light theme stays light. */
+  --qrail-panel: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --qrail-sunk: color-mix(in srgb, var(--background-base) 92%, #000);
+  --qrail-wash: color-mix(in srgb, var(--midground-base) 7%, transparent);
+  --qrail-wash-strong: color-mix(in srgb, var(--midground-base) 13%, transparent);
+  --qrail-rule: color-mix(in srgb, var(--midground-base) 14%, transparent);
+  --qrail-rule-soft: color-mix(in srgb, var(--midground-base) 7%, transparent);
+  --qrail-ink: color-mix(in srgb, var(--midground-base) 96%, var(--background-base));
+  --qrail-muted: color-mix(in srgb, var(--midground-base) 62%, var(--background-base));
+  --qrail-faint: color-mix(in srgb, var(--midground-base) 38%, var(--background-base));
+  --qrail-radius: calc(var(--theme-radius, 0.5rem) * 0.75);
+  /* The rail's own vertical rhythm — one number that sets the whole scale. */
+  --qrail-row: 2.05rem;
+
+  position: relative;
+  isolation: isolate;
+  color: var(--qrail-ink) !important;
+  background: var(--qrail-panel) !important;
+  border-color: var(--qrail-rule) !important;
+  font-family: var(--theme-font-sans, system-ui, sans-serif);
+  /* Tooltips/flyouts are portalled to <body>; they read these. */
+  --qrail-flyout-bg: color-mix(in srgb, var(--qrail-sunk) 96%, transparent);
 }
+
+/* Faint horizontal engineering ruling behind the whole rail. */
+.qagent-sidebar::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0 23px,
+    color-mix(in srgb, var(--midground-base) 4%, transparent) 23px 24px
+  );
+  content: "";
+}
+
+/* Right edge: a single lit hairline that reads as the panel seam. */
+.qagent-sidebar::after {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--midground-base) 32%, transparent) 12%,
+    color-mix(in srgb, var(--midground-base) 18%, transparent) 88%,
+    transparent
+  );
+  content: "";
+}
+
+/* ---------------------------------------------------------------- brand --- */
+
 .qagent-sidebar .qagent-sidebar__brand-row {
-  border-bottom-color: var(--qsidebar-line);
-  background: var(--qsidebar-surface);
+  min-height: 3.9rem;
+  padding-inline: 1rem;
+  border-bottom: 1px solid var(--qrail-rule) !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--midground-base) 5%, transparent),
+    transparent
+  ) !important;
 }
-.qagent-sidebar .qagent-sidebar__brand-row > div:first-child { min-width: 0; }
-.qagent-sidebar .qagent-sidebar__brand-row svg { color: var(--qsidebar-accent); }
-/* The wordmark must not inherit the monospace nav face: in "Qubit AiO" a
- * monospace O reads as a zero ("Ai0"), which misstates the product name. */
-.qagent-sidebar .qagent-sidebar__brand-name { font-family: var(--theme-font-display, var(--theme-font-sans, sans-serif)); }
-.qagent-sidebar .qagent-sidebar__brand-name { display: inline-flex !important; }
+
+.qagent-sidebar .qagent-sidebar__brand-row .qubit-brandmark {
+  display: none !important;
+}
+
+.qagent-sidebar .qagent-sidebar__brand-name {
+  display: inline-flex !important;
+  color: var(--qrail-ink) !important;
+  font-family: var(--theme-font-display, var(--theme-font-sans, sans-serif));
+  font-size: 1.14rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* Status dot on the brand row — the rail's one always-visible truth. */
+.qagent-sidebar .qagent-sidebar__pulse {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-success, #34d399);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success, #34d399) 16%, transparent);
+}
+.qagent-sidebar .qagent-sidebar__pulse[data-tone="warning"] {
+  background: var(--color-warning, #fbbf24);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-warning, #fbbf24) 16%, transparent);
+}
+.qagent-sidebar .qagent-sidebar__pulse[data-tone="destructive"] {
+  background: var(--color-destructive, #f04438);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-destructive, #f04438) 16%, transparent);
+}
+.qagent-sidebar .qagent-sidebar__pulse[data-tone="muted"] {
+  background: var(--qrail-faint);
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .qagent-sidebar .qagent-sidebar__pulse[data-tone="success"] {
+    animation: qrail-pulse 2.8s ease-in-out infinite;
+  }
+}
+@keyframes qrail-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success, #34d399) 14%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-success, #34d399) 4%, transparent); }
+}
+
+/* ----------------------------------------------------- section headings --- */
+
+.qagent-sidebar .qagent-sidebar__section {
+  margin-top: 0.55rem;
+}
+
+.qagent-sidebar .qagent-sidebar__section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0.55rem;
+  padding: 0.5rem 0.35rem 0.3rem;
+  border-top: 1px solid var(--qrail-rule-soft);
+  /* Readable, not decorative: a section heading is navigation, so it has to
+     clear AA contrast against the rail on every theme, including light ones. */
+  color: color-mix(in srgb, var(--midground-base) 74%, var(--background-base));
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.qagent-sidebar .qagent-sidebar__section-index {
+  color: color-mix(in srgb, var(--midground-base) 46%, var(--background-base));
+  font-variant-numeric: tabular-nums;
+}
+
+/* The rules either side of a heading: technical, not decorative. */
+.qagent-sidebar .qagent-sidebar__section-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--midground-base) 16%, transparent),
+    transparent
+  );
+}
+
+/* -------------------------------------------------------------- nav rows --- */
+
 .qagent-sidebar .qagent-sidebar__nav {
-  border-top-color: var(--qsidebar-line);
-  scrollbar-color: var(--qsidebar-line) transparent;
+  padding-block: 0.35rem;
+  border-top: 0 !important;
+  /* Flyouts are portalled, so this only has to clip the rail itself. */
   scrollbar-width: thin;
+  scrollbar-color: var(--qrail-rule) transparent;
 }
-.qagent-sidebar .qagent-sidebar__nav > ul { gap: .1rem; padding: .2rem .25rem; }
-.qagent-sidebar .qagent-sidebar__nav [role="group"] { border-top-color: var(--qsidebar-line); }
+
+.qagent-sidebar .qagent-sidebar__nav > ul {
+  padding: 0 0.5rem;
+}
+
 .qagent-sidebar .qagent-sidebar__link {
   position: relative;
-  min-height: 2.55rem;
-  margin: .1rem .2rem;
-  padding: .58rem .72rem;
-  gap: .72rem;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  min-height: var(--qrail-row);
+  margin: 0.06rem 0;
+  padding: 0.44rem 0.55rem 0.44rem 0.6rem;
+  gap: 0.62rem;
   border: 1px solid transparent;
-  border-radius: var(--theme-radius, .55rem);
-  color: var(--qsidebar-muted);
-  font-family: var(--theme-font-sans, sans-serif);
-  font-size: .84rem;
-  font-weight: 550;
-  letter-spacing: var(--theme-letter-spacing, 0);
+  border-radius: var(--qrail-radius) !important;
+  color: var(--qrail-muted) !important;
+  background: transparent !important;
+  font-family: var(--theme-font-sans, system-ui, sans-serif);
+  font-size: 0.795rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
   text-transform: none;
-  text-decoration: none;
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease,
-    box-shadow 150ms ease, transform 150ms ease;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+  clip-path: none !important;
 }
+
+/* Vertical hairline that every row sits on — the "rack" the icons plug in. */
+.qagent-sidebar .qagent-sidebar__link::before {
+  position: absolute;
+  top: 50%;
+  left: 0.02rem;
+  width: 3px;
+  height: 0;
+  border-radius: 2px;
+  background: var(--midground-base);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: height 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 140ms ease;
+  content: "";
+}
+.qagent-sidebar .qagent-sidebar__link:hover:not([aria-current="page"])::before {
+  height: 44%;
+  opacity: 0.45;
+}
+
 .qagent-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) {
-  border-color: var(--qsidebar-line);
-  background: var(--qsidebar-surface);
-  color: var(--midground-base);
+  border-color: var(--qrail-rule-soft);
+  background: var(--qrail-wash) !important;
+  color: var(--qrail-ink) !important;
 }
+
 .qagent-sidebar .qagent-sidebar__link[aria-current="page"] {
-  border-color: color-mix(in srgb, var(--qsidebar-accent) 29%, transparent);
-  background: var(--qsidebar-wash);
-  color: var(--midground-base);
-  box-shadow: inset 2px 0 var(--qsidebar-accent);
+  border-color: color-mix(in srgb, var(--midground-base) 26%, transparent);
+  /* Hard-tinted block + inset lift: the "energised module" of the panel. */
+  background:
+    linear-gradient(
+      92deg,
+      color-mix(in srgb, var(--midground-base) 15%, transparent),
+      color-mix(in srgb, var(--midground-base) 5%, transparent)
+    ) !important;
+  color: var(--qrail-ink) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--midground-base) 10%, transparent),
+    inset 3px 0 0 var(--midground-base);
 }
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"]::before {
+  height: 100%;
+  opacity: 1;
+}
+
+.qagent-sidebar .qagent-sidebar__link:active {
+  transform: none;
+}
+
 .qagent-sidebar .qagent-sidebar__link:focus-visible {
   z-index: 2;
-  outline: 2px solid var(--qsidebar-accent);
+  outline: 2px solid var(--midground-base) !important;
   outline-offset: 1px;
 }
-.qagent-sidebar .qagent-sidebar__link > svg,
-.qagent-sidebar .qagent-sidebar__link-label { position: relative; z-index: 1; }
-.qagent-sidebar .qagent-sidebar__link > svg { width: 1rem; height: 1rem; color: inherit; opacity: .78; }
-.qagent-sidebar .qagent-sidebar__link[aria-current="page"] > svg { color: var(--qsidebar-accent); opacity: 1; }
-.qagent-sidebar .qagent-sidebar__link-label { min-width: 0; font: inherit; }
-.qagent-sidebar .qagent-sidebar__hover-wash { display: none; }
-.qagent-sidebar .qagent-sidebar__active-rail { display: none; }
-.qagent-sidebar .qagent-sidebar__link--nested { margin-left: .55rem; padding-left: 1.8rem; font-size: .79rem; }
-.qagent-sidebar .qagent-sidebar__nav [id="qubit-sidebar-plugin-nav-heading"] {
-  padding: .85rem .8rem .35rem;
-  color: var(--qsidebar-muted);
-  font-family: var(--theme-font-display, var(--theme-font-sans));
-  font-size: .68rem;
-  font-weight: 650;
-  letter-spacing: .025em;
+
+.qagent-sidebar .qagent-sidebar__link > svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  opacity: 0.82;
+  transition: opacity 140ms ease, color 140ms ease;
 }
+.qagent-sidebar .qagent-sidebar__link:hover > svg {
+  opacity: 1;
+}
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"] > svg {
+  color: var(--midground-base);
+  opacity: 1;
+}
+
+.qagent-sidebar .qagent-sidebar__link-label {
+  min-width: 0;
+  overflow: hidden;
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nested (submenu) rows: indent to the label gutter, quieter type. */
+.qagent-sidebar .qagent-sidebar__link--nested {
+  min-height: calc(var(--qrail-row) - 0.2rem);
+  margin-left: 1.15rem;
+  padding-left: 0.55rem;
+  font-size: 0.755rem;
+  color: color-mix(in srgb, var(--qrail-muted) 88%, transparent) !important;
+}
+.qagent-sidebar .qagent-sidebar__link--nested::after {
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  width: 0.42rem;
+  height: 1px;
+  background: var(--qrail-rule);
+  content: "";
+}
+
+/* Active dot on the right — only on top-level rows with room for it. */
+.qagent-sidebar .qagent-sidebar__link[aria-current="page"]::after {
+  position: absolute;
+  right: 0.6rem;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: var(--midground-base);
+  content: "";
+}
+.qagent-sidebar .qagent-sidebar__link--nested[aria-current="page"]::after {
+  position: absolute;
+  right: auto;
+  left: -0.5rem;
+  top: 50%;
+  width: 0.42rem;
+  height: 1px;
+  border-radius: 0;
+  background: var(--midground-base);
+}
+
+/* Legacy overlay spans the React tree still renders — neutralised so they
+   cannot double-paint against the states above. */
+.qagent-sidebar .qagent-sidebar__hover-wash,
+.qagent-sidebar .qagent-sidebar__active-rail {
+  display: none !important;
+}
+
+/* Disclosure chevron for group parents. */
+.qagent-sidebar .qagent-sidebar__chevron {
+  margin-left: auto;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--qrail-faint);
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), color 140ms ease;
+}
+.qagent-sidebar .qagent-sidebar__link:hover .qagent-sidebar__chevron {
+  color: var(--qrail-muted);
+}
+
+/* --------------------------------------------------- system / footer area --- */
+
+.qagent-sidebar .qagent-sidebar__system {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.5rem 0.25rem;
+  border-top: 1px solid var(--qrail-rule) !important;
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--midground-base) 4%, transparent),
+    transparent
+  );
+}
+
+/* Status readout: label/value rows on a hairline grid. */
+.qagent-sidebar .qagent-sidebar__telemetry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin: 0.15rem 0.05rem 0.35rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid var(--qrail-rule-soft);
+  border-radius: var(--qrail-radius);
+  background: color-mix(in srgb, var(--background-base) 55%, transparent);
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+.qagent-sidebar .qagent-sidebar__telemetry-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.qagent-sidebar .qagent-sidebar__telemetry-key {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--qrail-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 0.6rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.qagent-sidebar .qagent-sidebar__telemetry-value {
+  flex: 0 0 auto;
+  color: var(--qrail-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Action rows in the system block share the nav row anatomy but stay
+   secondary: no fill on hover, just the leaning rule. */
+.qagent-sidebar .qagent-sidebar__action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  width: 100%;
+  min-height: calc(var(--qrail-row) - 0.15rem);
+  padding: 0.38rem 0.55rem 0.38rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--qrail-radius);
+  color: var(--qrail-muted);
+  font-family: var(--theme-font-sans, system-ui, sans-serif);
+  font-size: 0.755rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+.qagent-sidebar .qagent-sidebar__action:hover:not(:disabled) {
+  border-color: var(--qrail-rule-soft);
+  background: var(--qrail-wash);
+  color: var(--qrail-ink);
+}
+.qagent-sidebar .qagent-sidebar__action:disabled {
+  color: var(--qrail-faint);
+  cursor: not-allowed;
+}
+.qagent-sidebar .qagent-sidebar__action:focus-visible {
+  outline: 2px solid var(--midground-base);
+  outline-offset: 1px;
+}
+.qagent-sidebar .qagent-sidebar__action > svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+/* Utility strip (theme / language / profile) — one bordered group. */
+.qagent-sidebar .qagent-sidebar__utility {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0.5rem 0.35rem;
+  padding: 0.22rem;
+  border: 1px solid var(--qrail-rule-soft);
+  border-radius: var(--qrail-radius);
+  background: color-mix(in srgb, var(--background-base) 45%, transparent);
+}
+
+/* Version / org footer. */
+.qagent-sidebar .qagent-sidebar__colophon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--qrail-rule-soft);
+  color: var(--qrail-faint);
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------- collapsed --- */
+
 @media (min-width: 1024px) {
-  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link {
-    width: calc(100% - .3rem);
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link,
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__action {
     justify-content: center;
-    margin-inline: .15rem;
-    padding-inline: .2rem;
+    padding-inline: 0.2rem;
     gap: 0;
   }
-  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested { margin-left: .15rem; }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested {
+    margin-left: 0;
+  }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link--nested::after,
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"]::after {
+    display: none;
+  }
+  /* Section headings collapse to a centred index rule. */
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__section-head {
+    justify-content: center;
+    margin: 0.35rem 0.6rem 0.1rem;
+    padding: 0.45rem 0 0.2rem;
+    font-size: 0.55rem;
+  }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__section-index {
+    letter-spacing: 0.04em;
+  }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__section-rule {
+    display: none;
+  }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"] {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--midground-base) 26%, transparent);
+  }
+  .qagent-sidebar[data-collapsed="true"] .qagent-sidebar__link[aria-current="page"]::before {
+    height: 52%;
+    left: -0.15rem;
+  }
 }
+
+/* ---------------------------------------------------------------- mobile --- */
+
 @media (max-width: 1023px) {
-  .qagent-sidebar .qagent-sidebar__link { min-height: 2.8rem; margin-inline: .4rem; padding-inline: .8rem; }
+  .qagent-sidebar { position: fixed !important; }
+  .qagent-sidebar .qagent-sidebar__link,
+  .qagent-sidebar .qagent-sidebar__action {
+    min-height: 2.6rem;
+  }
+  /* Touch has no hover: every row needs its label, no tooltip contract. */
+  .qagent-sidebar .qagent-sidebar__link--nested {
+    margin-left: 1rem;
+  }
 }
+
+/* --------------------------------------------------------- reduced motion --- */
+
 @media (prefers-reduced-motion: reduce) {
-  .qagent-sidebar .qagent-sidebar__link { transition-duration: .01ms !important; }
+  .qagent-sidebar::before { display: none; }
+  .qagent-sidebar .qagent-sidebar__link,
+  .qagent-sidebar .qagent-sidebar__link::before,
+  .qagent-sidebar .qagent-sidebar__action,
+  .qagent-sidebar .qagent-sidebar__chevron {
+    transition: none !important;
+  }
+  .qagent-sidebar .qagent-sidebar__pulse[data-tone="success"] {
+    animation: none;
+  }
 }
-
-/* Qubit navigation: compact control-room rail, still driven by the active theme. */
-.qagent-sidebar { position: relative; isolation: isolate; background: color-mix(in srgb, var(--background-base) 94%, var(--qsidebar-accent)) !important; }
-.qagent-sidebar::before { position: absolute; z-index: -1; inset: 4.6rem 0 0; content: ""; background: radial-gradient(ellipse at 0 8%, color-mix(in srgb, var(--qsidebar-accent) 9%, transparent), transparent 46%), radial-gradient(circle, color-mix(in srgb, var(--qsidebar-accent) 26%, transparent) 0 1px, transparent 1.4px); background-size: auto, 29px 29px; mask-image: linear-gradient(180deg, #000, transparent 75%); pointer-events: none; opacity: .42; }
-.qagent-sidebar .qagent-sidebar__brand-row { min-height: 4.6rem; padding-inline: .95rem; background: color-mix(in srgb, var(--qsidebar-surface) 92%, transparent); }
-.qagent-sidebar .qagent-sidebar__brand-name { font-size: 1.35rem; font-weight: 750; letter-spacing: .03em; }
-.qagent-sidebar .qagent-sidebar__nav { padding-block: .55rem; }
-.qagent-sidebar .qagent-sidebar__nav > ul { gap: .2rem; padding-inline: .45rem; }
-.qagent-sidebar .qagent-sidebar__link { min-height: 2.45rem; margin: .06rem .15rem; padding: .5rem .62rem; gap: .62rem; border-radius: calc(var(--theme-radius, .55rem) + .1rem); font-family: var(--theme-font-mono, ui-monospace, monospace); font-size: .69rem; font-weight: 620; letter-spacing: .045em; }
-.qagent-sidebar .qagent-sidebar__link:hover:not([aria-current="page"]) { transform: translateX(2px); }
-.qagent-sidebar .qagent-sidebar__link[aria-current="page"] { border-color: color-mix(in srgb, var(--qsidebar-active) 36%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--qsidebar-active) 13%, transparent), color-mix(in srgb, var(--qsidebar-active) 5%, transparent)); box-shadow: inset 2px 0 var(--qsidebar-active), 0 5px 18px color-mix(in srgb, var(--qsidebar-active) 7%, transparent); }
-.qagent-sidebar .qagent-sidebar__link[aria-current="page"]::after { position: absolute; right: .58rem; width: .34rem; height: .34rem; border-radius: 50%; background: var(--qsidebar-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--qsidebar-accent) 48%, transparent); content: ""; }
-.qagent-sidebar .qagent-sidebar__link > svg { width: .95rem; height: .95rem; }
-.qagent-sidebar .qagent-sidebar__link--nested { font-size: .66rem; }
-.qagent-sidebar .qagent-sidebar__nav [id="qubit-sidebar-plugin-nav-heading"] { margin: .35rem .35rem .2rem; padding: .6rem .5rem .38rem; border-top: 1px solid var(--qsidebar-line); font-family: var(--theme-font-mono, ui-monospace, monospace); font-size: .57rem; letter-spacing: .12em; text-transform: uppercase; }
-@media (prefers-reduced-motion: reduce) { .qagent-sidebar::before { display: none; } }
-
-/* Remove the legacy slot wordmark beside the canonical Qubit brand. */
-.qagent-sidebar .qagent-sidebar__brand-row .qubit-brandmark { display: none !important; }
-.qagent-sidebar { background: var(--background-base) !important; }
-.qagent-sidebar::before { display: none; }
-.qagent-sidebar .qagent-sidebar__link[aria-current="page"]::after { display: none; }
-@media (max-width: 1023px) { .qagent-sidebar { position: fixed !important; } }
