@@ -15,6 +15,8 @@
 import { pluginRest, type PluginRestOptions, pluginSocket } from '@/hermes'
 import { createPluginI18n, type PluginI18n } from '@/i18n'
 import { readKey, writeKey } from '@/lib/storage'
+import { createDesktopMedia } from '@/sdk/desktop-media'
+import type { DesktopMedia } from '@/sdk/desktop-media'
 import { dispatchPluginNativeNotification, type PluginNativeNotificationInput } from '@/store/native-notifications'
 
 import { type GatewayEventListener, onGatewayEvent } from './events'
@@ -23,6 +25,7 @@ import type { Contribution } from './types'
 
 export type { PluginRestOptions } from '@/hermes'
 export type { HermesOpenTarget } from '@/lib/hermes-open-target'
+export type { DesktopMedia, DesktopMediaSurfaceProps, MediaPlayerController } from '@/sdk/desktop-media'
 export type { PluginNativeNotificationInput, PluginNotificationAction } from '@/store/native-notifications'
 
 /** A contribution as a plugin author writes it — provenance + id scoping are
@@ -123,6 +126,13 @@ export interface PluginContext {
   /** Plugin-scoped i18n: ship + register locale bundles under this plugin,
    *  resolved against the app's active locale — no core `en.ts` edit. */
   i18n: PluginI18n
+  /**
+   * Optional proposed host-owned native media surface. It is exposed only when
+   * the plugin declares `capabilities: ['media.player']`; feature-detect before
+   * use. The plugin's existing activation decision is the trust gate, and
+   * linking a chat to the player remains a separate explicit action.
+   */
+  readonly media?: DesktopMedia
 }
 
 export interface HermesPlugin {
@@ -136,6 +146,10 @@ export interface HermesPlugin {
    *  for opt-in plugins: they inventory in Capabilities ▸ Plugins, off until the
    *  user flips the switch. */
   defaultEnabled?: boolean
+  /** Sensitive doors this plugin uses, declared up front so the app can show
+   *  them and gate them. Proposed `'media.player'` exposes `ctx.media` only
+   *  when declared. */
+  capabilities?: readonly string[]
   /** Called once at load; wire contributions through `ctx`. */
   register: (ctx: PluginContext) => void
 }
@@ -270,11 +284,24 @@ function createPluginLifetime(track: (dispose: () => void) => () => void) {
   }
 }
 
+/** The declared capabilities of a plugin export, strings only. */
+export function declaredCapabilities(plugin: Pick<HermesPlugin, 'capabilities'>): string[] {
+  return Array.isArray(plugin.capabilities)
+    ? plugin.capabilities.filter((entry): entry is string => typeof entry === 'string')
+    : []
+}
+
 /** Build the scoped context handed to a plugin's `register`. `onDispose`
- *  receives every registration's disposer (the loader's unload/reload hook). */
-export function createPluginContext(pluginId: string, onDispose?: (dispose: () => void) => void): PluginContext {
+ *  receives every registration's disposer (the loader's unload/reload hook);
+ *  `capabilities` is what the plugin declared (`declaredCapabilities`). */
+export function createPluginContext(
+  pluginId: string,
+  onDispose?: (dispose: () => void) => void,
+  capabilities: readonly string[] = []
+): PluginContext {
   const source = `plugin:${pluginId}`
   const scope = (c: PluginContribution): Contribution => ({ ...c, id: `${pluginId}:${c.id}`, source })
+  let media: DesktopMedia | undefined
 
   const track = (dispose: () => void) => {
     onDispose?.(dispose)
@@ -293,6 +320,11 @@ export function createPluginContext(pluginId: string, onDispose?: (dispose: () =
     socket: (path, onMessage) => track(pluginSocket(pluginId, path, onMessage)),
     os: createPluginOs(pluginId),
     storage: createPluginStorage(pluginId),
-    i18n: createPluginI18n(pluginId, track)
+    i18n: createPluginI18n(pluginId, track),
+    get media() {
+      if (!capabilities.includes('media.player')) {return undefined}
+
+      return (media ??= createDesktopMedia(pluginId, track))
+    }
   }
 }

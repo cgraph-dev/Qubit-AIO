@@ -1806,6 +1806,8 @@ export type {
   PluginRestOptions,
   PluginStorage
 } from '@/contrib/plugin'
+export { createDesktopMedia } from '@/sdk/desktop-media'
+export type { DesktopMedia, DesktopMediaSurfaceProps, MediaPlayerController } from '@/sdk/desktop-media'
 /** Mount-scoped contribution: while the rendering component is mounted, its
  *  children render in the target area's slot; unmount disposes it. Use for
  *  page-owned chrome (a page's titlebar control leaves with the page) —
