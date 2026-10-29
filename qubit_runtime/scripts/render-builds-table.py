@@ -62,7 +62,8 @@ DEFAULT_REPO = "NousResearch/hermes-agent"
 # Asset name shapes (electron-builder artifactName in
 # apps/desktop/electron-builder.config.cjs):
 #   Qubit-0.28.0-mac-arm64.dmg        (bundled)
-#   QubitBundled-0.28.0-win-x64.msix  (bundled)
+#   QubitBundled-0.28.0-win-x64.msix  (bundled; current builds still emit
+#                                      HermesBundled-* from product-identity.cjs)
 _ASSET_RE = re.compile(
     r"^(?P<app>QubitBundled|QubitLight)-(?P<version>[^-]+)"
     r"-(?P<os>mac|win|linux)-(?P<arch>x64|arm64)\.(?P<ext>dmg|msix|AppImage)$"
@@ -176,19 +177,19 @@ def filter_names_for_version(names: list[str], version: str) -> list[str]:
 # A row needs a unique receipt-listed artifact and its uploaded object.
 _COMMIT_EXPECTED = [
     ("Windows x64 (MSIX)", "win32-x64",
-     r"^QubitBundled-[^-]+-win-x64\.msix$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-win-x64\.msix$"),
     ("Windows ARM64 (MSIX)", "win32-arm64",
-     r"^QubitBundled-[^-]+-win-arm64\.msix$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-win-arm64\.msix$"),
     ("Windows universal bundle (MSIXBUNDLE)", "windows-universal",
-     r"^QubitBundled-[^-]+-win\.msixbundle$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-win\.msixbundle$"),
     ("macOS Apple Silicon (DMG)", "darwin-arm64",
-     r"^QubitBundled-[^-]+-mac-arm64\.dmg$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-mac-arm64\.dmg$"),
     ("macOS Intel (DMG)", "darwin-x64",
-     r"^QubitBundled-[^-]+-mac-x64\.dmg$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-mac-x64\.dmg$"),
     ("macOS Apple Silicon (ZIP)", "darwin-arm64",
-     r"^QubitBundled-[^-]+-mac-arm64\.zip$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-mac-arm64\.zip$"),
     ("macOS Intel (ZIP)", "darwin-x64",
-     r"^QubitBundled-[^-]+-mac-x64\.zip$"),
+     r"^(?:Qubit|Hermes)Bundled-[^-]+-mac-x64\.zip$"),
     ("Termux aarch64 (.deb)", "termux", r"^.*\.deb$"),
 ]
 
