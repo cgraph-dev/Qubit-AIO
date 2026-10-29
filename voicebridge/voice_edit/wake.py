@@ -1201,7 +1201,7 @@ class WakeMonitor:
                         agc=bool(_cfg(self.cfg, "voice_edit", "agc",
                                       default=True)))
 
-    def _do_transcribe(self, pcm: bytes) -> str:
+    def _do_transcribe(self, pcm: bytes, *, prefer_streaming: bool = False) -> str:
         # Honest consumer of ``voice_edit.noise_suppression``: the software
         # NS/AGC stage runs on the captured utterance before either STT path
         # (accurate or streaming). OFF → pcm unchanged (see _maybe_ns_filter).
@@ -1213,7 +1213,7 @@ class WakeMonitor:
         # unavailable or yields nothing.
         mode = str(_cfg(self.cfg, "voice_edit", "stt_mode",
                         default="accurate") or "accurate").lower()
-        if mode == "accurate":
+        if mode == "accurate" and not prefer_streaming:
             norm = _normalize_pcm(
                 pcm, target_peak=_mic_target_peak(self.cfg))
             # Browser-local STT parity: decode with the configured Sherpa
@@ -1446,8 +1446,13 @@ class WakeMonitor:
                         # emits through the same strip/arm path as asr-engine
                         # mode, and a miss is discarded, never typed.
                         if _asr_fallback_allows(self.cfg, pcm):
-                            _trace("asr_fallback_probe", bytes=len(pcm))
-                            self._handle_segment(pcm, forced=False)
+                            _trace("asr_fallback_probe", bytes=len(pcm),
+                                   prefer="streaming")
+                            # KWS missed: use the streaming engine for the
+                            # wake phrase (it hears "Hey Qubit" reliably;
+                            # moonshine misheard it as "Hate your bit").
+                            self._handle_segment(
+                                pcm, forced=False, prefer_streaming=True)
                         else:
                             _trace("asr_fallback_skip", bytes=len(pcm))
                         continue
@@ -1583,14 +1588,16 @@ class WakeMonitor:
         except Exception:
             return False
 
-    def _handle_segment(self, pcm: bytes, *, forced: bool = False) -> None:
+    def _handle_segment(self, pcm: bytes, *, forced: bool = False,
+                        prefer_streaming: bool = False) -> None:
         if len(pcm) < 4800:
             _trace("segment_too_short", bytes=len(pcm))
             return
         _trace("segment", bytes=len(pcm), forced=forced,
                engine=self.engine, capped=_segment_capped(self.cfg, len(pcm)))
         try:
-            text = self._do_transcribe(pcm).strip()
+            text = self._do_transcribe(
+                pcm, prefer_streaming=prefer_streaming).strip()
         except Exception as exc:
             self.last_error = str(exc)[:160]
             _trace("transcribe_error", detail=self.last_error)
