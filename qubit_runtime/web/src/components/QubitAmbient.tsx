@@ -139,7 +139,7 @@ function Floor() {
   );
 }
 
-class AmbientBoundary extends Component<
+export class AmbientBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
 > {

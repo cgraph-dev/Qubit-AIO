@@ -1,4 +1,5 @@
 import {
+  Component,
   lazy,
   Suspense,
   useCallback,
@@ -12,8 +13,34 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { QubitAmbient } from "./components/QubitAmbient";
 import { stageChrome, stageRoute } from "./lib/stageReveal";
+// The ambient scene pulls in three.js (~1 MB). It is deliberately Route-split
+// behind React.lazy so a slow or failed 3D chunk can never block or break the
+// shell mount — Suspense(null) simply leaves the backdrop empty.
+
+const QubitAmbient = lazy(() =>
+  import("./components/QubitAmbient").then((m) => ({ default: m.QubitAmbient })),
+);
+
+/**
+ * Non-lazy on purpose: it must exist even when the 3D chunk itself fails to
+ * load, so a broken/slow three.js download degrades to an empty backdrop
+ * instead of unmounting the shell.
+ */
+class AmbientFailSafe extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 import {
   Routes,
   Route,
@@ -540,7 +567,11 @@ export default function App() {
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0"
       >
-        <QubitAmbient />
+        <Suspense fallback={null}>
+          <AmbientFailSafe>
+            <QubitAmbient />
+          </AmbientFailSafe>
+        </Suspense>
         <PluginSlot name="backdrop" />
       </div>
 

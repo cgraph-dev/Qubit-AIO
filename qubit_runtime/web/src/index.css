@@ -293,18 +293,6 @@ body,
   background-color: var(--scan-canvas) !important;
 }
 
-.bg-card,
-.bg-popover,
-[class*="bg-card/"],
-[class*="bg-accent"] {
-  background-color: rgb(10 17 28 / 82%) !important;
-  backdrop-filter: blur(6px);
-}
-
-[class*="bg-card/"]:hover {
-  background-color: rgb(16 26 42 / 88%) !important;
-}
-
 /* Hairline grid instead of the default soft borders. */
 .border-border,
 .border-input,
@@ -410,39 +398,23 @@ textarea:focus {
   text-shadow: 0 0 14px rgb(127 212 255 / 45%);
 }
 
-/* Cards and panels: glow ring + corner brackets, drawn with pseudo elements so
-   no markup changes. Anything already using ::before/::after keeps its own. */
+/* Cards and panels pick up the dossier glow ring on hover only — no
+   pseudo-element overlays, so nothing can misplace against unpositioned
+   ancestors. */
 [class*="bg-card"],
 [class*="bg-popover"] {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+[class*="bg-card"]:hover {
+  border-color: var(--scan-hairline-strong) !important;
   box-shadow: var(--scan-glow);
-}
-
-[class*="bg-card"]::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) top left /
-      10px 1px no-repeat,
-    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) top left /
-      1px 10px no-repeat,
-    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) bottom right /
-      10px 1px no-repeat,
-    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) bottom right /
-      1px 10px no-repeat;
-  opacity: 0.55;
-  transition: opacity 160ms ease;
-}
-
-[class*="bg-card"]:hover::after {
-  opacity: 1;
 }
 
 /* Route transitions already run through GSAP; keep CSS out of the way. */
 @media (prefers-reduced-motion: reduce) {
-  [class*="bg-card"]::after {
+  [class*="bg-card"],
+  [class*="bg-popover"] {
     transition: none;
   }
 }
