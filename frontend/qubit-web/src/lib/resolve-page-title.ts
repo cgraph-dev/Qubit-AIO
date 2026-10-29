@@ -96,6 +96,9 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/kitchen": "Kitchen",
   // OmniRoute: local AI-gateway console (status + wiring page).
   "/omniroute": "OmniRoute Gateway",
+  // Qubit TV: streaming launcher + YouTube embed (web variant of the MIT
+  // HermesTV desktop plugin).
+  "/qubit-tv": "Qubit TV",
 };
 
 export function resolvePageTitle(
