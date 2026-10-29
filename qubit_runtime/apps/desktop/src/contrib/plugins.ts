@@ -1,7 +1,7 @@
 /**
  * Plugin discovery — both delivery modes:
  *
- *  - BUNDLED: every `src/plugins/<name>/plugin.{js,ts,tsx}` default-exporting
+ *  - BUNDLED: every `src/plugins/<name>/plugin.{js,jsx,ts,tsx}` default-exporting
  *    a `HermesPlugin` registers automatically (vite glob — drop a folder in).
  *    `hermes-bots` (Bot Mode) ships in-tree and is ON by default; other
  *    reference/demo plugins live in the companion `hermes-example-plugins`
@@ -18,7 +18,7 @@ import { createPluginContext, declaredCapabilities, type HermesPlugin } from './
 import { pluginActive, publishPlugin } from './plugins-store'
 import { watchRuntimePlugins } from './runtime-loader'
 
-const modules = import.meta.glob<{ default: HermesPlugin }>('../plugins/*/plugin.{js,ts,tsx}', { eager: true })
+const modules = import.meta.glob<{ default: HermesPlugin }>('../plugins/*/plugin.{js,jsx,ts,tsx}', { eager: true })
 
 // One-shot init guard. Contributions themselves register by id (re-registering
 // is idempotent), but the disk-door watcher setup below (watchRuntimePlugins)
