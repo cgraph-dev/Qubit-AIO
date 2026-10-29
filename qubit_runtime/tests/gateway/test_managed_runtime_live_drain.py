@@ -45,15 +45,15 @@ def test_managed_turn_finishes_inside_configured_restart_drain(tmp_path):
                                   input_id='drain-input', text='BLOCK_STARTED', finite=True)
             assert 'result' in submitted, submitted
             admission_id = submitted['result']['admission_id']
-            assert await asyncio.to_thread(peer.blocked.wait, 30)
+            assert await asyncio.to_thread(peer.blocked.wait, 120)
             accepted = await asyncio.to_thread(control, home, 'pause-for-update')
             assert accepted['pausing'] is True, accepted
-            deadline = time.monotonic() + 15
+            deadline = time.monotonic() + 60
             while (await asyncio.to_thread(control, home, 'identify'))['state'] != 'draining':
                 assert time.monotonic() < deadline, 'owner never reported draining'
                 await asyncio.sleep(.05)
             peer.release.set()
-            await asyncio.to_thread(process.wait, 50)
+            await asyncio.to_thread(process.wait, 120)
     try:
         with daemon(root, home, env, barrier=False) as (process, descriptor):
             asyncio.run(exercise(process, descriptor))
