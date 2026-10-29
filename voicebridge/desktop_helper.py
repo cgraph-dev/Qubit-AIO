@@ -704,7 +704,8 @@ def resolve_token(cfg: Any) -> str:
 #: the journal showed our own "say yes to run it ..." prompt transcribed
 #: back and executed as a command).
 _TTS_ECHO_EVENTS = frozenset(
-    {"tts.speak", "tts.synthesize", "voice_edit.helper.speak"})
+    {"tts.speak", "tts.synthesize", "voice_edit.helper.speak",
+     "voice_edit.talk.playback.started"})
 
 #: Events proving the reply playback actually ENDED. Once one of these is
 #: newer than the last speak/start marker, only a short echo tail remains —
