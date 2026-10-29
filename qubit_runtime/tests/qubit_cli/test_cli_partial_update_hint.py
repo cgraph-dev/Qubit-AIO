@@ -59,10 +59,6 @@ def _missing_config_name_error(name: str = "resolve_turn_limit") -> ImportError:
     return exc
 
 
-def _install_boom(monkeypatch, boom):
-    """``qubit chat`` runs main's ``cli.main``; ``-z`` keeps the gateway transport launcher."""
-    monkeypatch.setitem(sys.modules, "cli", types.SimpleNamespace(main=lambda **_kw: boom(None)))
-    monkeypatch.setattr("qubit_cli.gateway_chat.launch_from_args", boom)
 
 
 @pytest.fixture

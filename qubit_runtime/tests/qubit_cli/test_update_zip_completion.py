@@ -18,9 +18,6 @@ import qubit_yaml
 from qubit_cli import update_cmd_fleet_verify
 
 
-def _swap_leftovers(root):
-    """Staging/backup siblings and the journal; the swap lock is a stable sidecar that stays (one inode)."""
-    return [p for p in root.glob("*.hermes-update-*") if p.name != ".qubit-update-zip-swap.lock"]
 
 
 @pytest.fixture
