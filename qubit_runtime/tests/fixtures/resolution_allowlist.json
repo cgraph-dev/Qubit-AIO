@@ -10,11 +10,6 @@
     "kind": "bare_which"
   },
   {
-    "path": "agent/anthropic_credentials.py",
-    "symbol": "run_oauth_setup_token",
-    "kind": "bare_which"
-  },
-  {
     "path": "agent/lsp/cli.py",
     "symbol": "_backend_warnings",
     "kind": "bare_which"
@@ -127,11 +122,6 @@
   {
     "path": "qubit_cli/_subprocess_compat.py",
     "symbol": "resolve_node_command",
-    "kind": "bare_which"
-  },
-  {
-    "path": "qubit_cli/auth.py",
-    "symbol": "_external_process_spec",
     "kind": "bare_which"
   },
   {
@@ -255,11 +245,6 @@
     "kind": "bare_which"
   },
   {
-    "path": "qubit_cli/main.py",
-    "symbol": "_exec_in_container",
-    "kind": "bare_which"
-  },
-  {
     "path": "qubit_cli/main_desktop.py",
     "symbol": "_desktop_linux_sandbox_fixup",
     "kind": "bare_which"
@@ -282,11 +267,6 @@
   {
     "path": "qubit_cli/main_desktop.py",
     "symbol": "_desktop_macos_relaunchable_fixup",
-    "kind": "bare_which"
-  },
-  {
-    "path": "qubit_cli/main_desktop.py",
-    "symbol": "_desktop_macos_setup_tcc_identity",
     "kind": "bare_which"
   },
   {
@@ -357,11 +337,6 @@
   {
     "path": "qubit_cli/setup_tts.py",
     "symbol": "_install_neutts_deps",
-    "kind": "bare_which"
-  },
-  {
-    "path": "qubit_cli/source_build.py",
-    "symbol": "build_update_products",
     "kind": "bare_which"
   },
   {
@@ -682,6 +657,86 @@
   {
     "path": "tools/file_operations_lint.py",
     "symbol": "LintMixin._run_managed_node_linter",
+    "kind": "bare_which"
+  },
+  {
+    "path": "agent/runtime_openjarvis.py",
+    "symbol": "OpenJarvisRuntime._absolute_binary",
+    "kind": "bare_which"
+  },
+  {
+    "path": "agent/runtime_openjarvis.py",
+    "symbol": "OpenJarvisRuntime._resolve_uncached",
+    "kind": "bare_which"
+  },
+  {
+    "path": "pm/libatomic.py",
+    "symbol": "_command_plan",
+    "kind": "bare_which"
+  },
+  {
+    "path": "pm/libatomic.py",
+    "symbol": "_host_install_command",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/_early_recovery.py",
+    "symbol": "_git_executable",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/_early_recovery.py",
+    "symbol": "_held_open_lsof",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/_early_recovery.py",
+    "symbol": "_ps_git_holder",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/main_container.py",
+    "symbol": "exec_in_container",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/main_desktop_tcc.py",
+    "symbol": "_desktop_macos_setup_tcc_identity",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/source_build.py",
+    "symbol": "_build_desktop_product",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/source_check.py",
+    "symbol": "_installed_git",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/update_cmd_commit.py",
+    "symbol": "_absolute_git",
+    "kind": "bare_which"
+  },
+  {
+    "path": "qubit_cli/update_pause_record.py",
+    "symbol": "_git_executable",
+    "kind": "bare_which"
+  },
+  {
+    "path": "tools/apple_connectors_tool.py",
+    "symbol": "apple_music_configured",
+    "kind": "bare_which"
+  },
+  {
+    "path": "tools/mcp_tool_config.py",
+    "symbol": "_outside_package",
+    "kind": "bare_which"
+  },
+  {
+    "path": "tools/mcp_tool_config.py",
+    "symbol": "_packaged_npx_entry",
     "kind": "bare_which"
   }
 ]
