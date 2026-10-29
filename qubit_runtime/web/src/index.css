@@ -253,3 +253,196 @@ html[dir="rtl"] {
   direction: rtl;
 }
 
+
+/* ==========================================================================
+   Qubit Scanline — global interface layer.
+
+   Applied through the classes the pages actually use (Tailwind utilities are
+   literal in the markup) plus the theme's own variables, so every route, card,
+   button, panel and dialog picks it up without touching component code. The
+   embedded terminal (/chat) paints its own opaque xterm surface and is left
+   intentionally alone — see the `--scan-terminal` guard at the end.
+   ========================================================================== */
+
+:root {
+  --scan-accent: #7fd4ff;
+  --scan-accent-dim: #4fa8dc;
+  --scan-ink: #d7e9ff;
+  --scan-muted: #8fa8c8;
+  --scan-faint: #55677f;
+  --scan-hairline: rgb(127 212 255 / 16%);
+  --scan-hairline-strong: rgb(127 212 255 / 38%);
+  --scan-canvas: #04070d;
+  --scan-panel: #0a111c;
+  --scan-panel-raised: #101a2a;
+  --scan-glow: 0 0 0 1px rgb(127 212 255 / 10%), 0 18px 44px rgb(0 0 0 / 46%);
+}
+
+/* Sharp, dossier-grade corners everywhere (radius utilities read these). */
+html {
+  --theme-radius: 2px !important;
+  --radius-lg: 2px !important;
+  --radius-md: 2px !important;
+  --radius-sm: 2px !important;
+  --radius-xl: 3px !important;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+body,
+.bg-background-base {
+  background-color: var(--scan-canvas) !important;
+}
+
+.bg-card,
+.bg-popover,
+[class*="bg-card/"],
+[class*="bg-accent"] {
+  background-color: rgb(10 17 28 / 82%) !important;
+  backdrop-filter: blur(6px);
+}
+
+[class*="bg-card/"]:hover {
+  background-color: rgb(16 26 42 / 88%) !important;
+}
+
+/* Hairline grid instead of the default soft borders. */
+.border-border,
+.border-input,
+[class*="border-current"],
+[class*="border-border/"] {
+  border-color: var(--scan-hairline) !important;
+}
+
+/* ------------------------------------------------------------------- text */
+.text-midground,
+.text-foreground {
+  color: var(--scan-ink) !important;
+}
+.text-text-secondary,
+.text-muted-foreground {
+  color: var(--scan-muted) !important;
+}
+.text-text-primary {
+  color: #eaf4ff !important;
+}
+
+/* Micro-labels read as terminal readouts. */
+[class*="tracking-[0.1"],
+[class*="tracking-[0.12"],
+[class*="tracking-[0.05"],
+[class*="uppercase"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- controls */
+button,
+[role="button"],
+a[class*="border"],
+input,
+select,
+textarea {
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+button:hover,
+[role="button"]:hover {
+  border-color: var(--scan-hairline-strong) !important;
+}
+
+button:active,
+[role="button"]:active {
+  transform: scale(0.985);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 1px solid var(--scan-accent) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(127 212 255 / 12%);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--scan-accent-dim) !important;
+  box-shadow: inset 0 0 0 1px rgb(127 212 255 / 18%);
+}
+
+/* ------------------------------------------------------- shell chrome skin */
+#app-sidebar {
+  background:
+    linear-gradient(180deg, rgb(10 17 28 / 96%), rgb(4 7 13 / 98%)) !important;
+  box-shadow: inset -1px 0 0 var(--scan-hairline), 0 0 60px rgb(0 0 0 / 55%);
+}
+
+#app-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(127 212 255 / 4%) 0 1px,
+    transparent 1px 4px
+  );
+  opacity: 0.5;
+}
+
+#app-sidebar a[data-stage-row="nav"] {
+  position: relative;
+  letter-spacing: 0.14em;
+}
+
+#app-sidebar a[data-stage-row="nav"]:hover {
+  background: linear-gradient(90deg, rgb(127 212 255 / 9%), transparent 72%);
+}
+
+#app-sidebar a[aria-current="page"] {
+  text-shadow: 0 0 14px rgb(127 212 255 / 45%);
+}
+
+/* Cards and panels: glow ring + corner brackets, drawn with pseudo elements so
+   no markup changes. Anything already using ::before/::after keeps its own. */
+[class*="bg-card"],
+[class*="bg-popover"] {
+  box-shadow: var(--scan-glow);
+}
+
+[class*="bg-card"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) top left /
+      10px 1px no-repeat,
+    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) top left /
+      1px 10px no-repeat,
+    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) bottom right /
+      10px 1px no-repeat,
+    linear-gradient(var(--scan-accent-dim), var(--scan-accent-dim)) bottom right /
+      1px 10px no-repeat;
+  opacity: 0.55;
+  transition: opacity 160ms ease;
+}
+
+[class*="bg-card"]:hover::after {
+  opacity: 1;
+}
+
+/* Route transitions already run through GSAP; keep CSS out of the way. */
+@media (prefers-reduced-motion: reduce) {
+  [class*="bg-card"]::after {
+    transition: none;
+  }
+}

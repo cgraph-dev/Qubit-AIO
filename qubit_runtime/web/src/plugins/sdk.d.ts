@@ -178,6 +178,8 @@ declare global {
   interface Window {
     __HERMES_PLUGIN_SDK__?: HermesPluginSDK;
     __HERMES_PLUGINS__?: PluginRegistry;
+    __QUBIT_PLUGIN_SDK__?: HermesPluginSDK;
+    __QUBIT_PLUGINS__?: PluginRegistry;
   }
 }
 

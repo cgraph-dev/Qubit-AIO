@@ -12,6 +12,8 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { QubitAmbient } from "./components/QubitAmbient";
+import { stageChrome, stageRoute } from "./lib/stageReveal";
 import {
   Routes,
   Route,
@@ -403,6 +405,20 @@ export default function App() {
   const isDocsRoute = pathname === "/docs" || pathname === "/docs/";
   const normalizedPath = pathname.replace(/\/$/, "") || "/";
   const isChatRoute = normalizedPath === "/chat";
+  const stageRef = useRef<HTMLDivElement>(null);
+  const chromeRef = useRef<HTMLElement>(null);
+
+  // GSAP: pages arrive instead of snapping. The embedded terminal owns its own
+  // painting surface, so it is deliberately excluded.
+  useEffect(() => {
+    if (isChatRoute) return;
+    stageRoute(stageRef.current);
+  }, [isChatRoute, normalizedPath]);
+
+  // GSAP: the nav stack settles in once on first paint.
+  useEffect(() => {
+    stageChrome(chromeRef.current);
+  }, []);
   const embeddedChat = isDashboardEmbeddedChatEnabled();
   // Defer mounting the persistent chat host (and its xterm chunk) until the
   // user has actually opened /chat at least once. Sticky after that so the
@@ -524,6 +540,7 @@ export default function App() {
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0"
       >
+        <QubitAmbient />
         <PluginSlot name="backdrop" />
       </div>
 
@@ -585,6 +602,7 @@ export default function App() {
         <div className="flex min-h-0 min-w-0 flex-1">
           <aside
             id="app-sidebar"
+            ref={chromeRef}
             aria-label={t.app.navigation}
             className={cn(
               "fixed top-0 left-0 z-50 flex h-dvh max-h-dvh w-64 min-h-0 flex-col font-sans",
@@ -771,6 +789,7 @@ export default function App() {
             >
               <PluginSlot name="pre-main" />
               <div
+                ref={stageRef}
                 className={cn(
                   "w-full min-w-0",
                   !isChatRoute &&
@@ -883,6 +902,7 @@ function SidebarNavLink({
         to={path}
         end={path === "/sessions"}
         onClick={closeMobile}
+        data-stage-row="nav"
         aria-label={collapsed ? navLabel : undefined}
         onFocus={collapsed ? showTooltip : undefined}
         onBlur={collapsed ? hideTooltip : undefined}
