@@ -29,7 +29,8 @@ import { type DesktopTheme, isValidTheme } from './types'
 // resolve a persisted skin pick synchronously, like a built-in or a user
 // install. Without it the stored name failed `resolveTheme` on every launch
 // and the app silently painted the default until the next `skin.changed`.
-const BACKEND_THEMES_KEY = 'hermes-desktop-backend-themes-v1'
+const BACKEND_THEMES_KEY = 'qubit-desktop-backend-themes-v1'
+const LEGACY_BACKEND_THEMES_KEY = 'hermes-desktop-backend-themes-v1'
 
 // Electron reads the active local `display.skin` before it creates the
 // renderer. Seed it alongside the existing cache so an unreachable primary
@@ -49,7 +50,8 @@ const cacheable = (name: string) => !BUILTIN_THEMES[name] && !RETIRED_SKINS.has(
 // build cached the CLI `default` skin as a second "Classic Hermes") is gone from
 // disk on the first launch, not only hidden until the next registry change.
 const readCached = (): Record<string, DesktopTheme> => {
-  const stored = Object.entries(readJson<Record<string, unknown>>(BACKEND_THEMES_KEY) ?? {})
+  const raw = readJson<Record<string, unknown>>(BACKEND_THEMES_KEY) ?? readJson<Record<string, unknown>>(LEGACY_BACKEND_THEMES_KEY) ?? {}
+  const stored = Object.entries(raw)
 
   const kept = Object.fromEntries(
     stored.filter((entry): entry is [string, DesktopTheme] => cacheable(entry[0]) && isValidTheme(entry[1]))
@@ -57,6 +59,7 @@ const readCached = (): Record<string, DesktopTheme> => {
 
   if (Object.keys(kept).length !== stored.length) {
     writeJson(BACKEND_THEMES_KEY, kept)
+    writeJson(LEGACY_BACKEND_THEMES_KEY, kept)
   }
 
   return kept
@@ -65,7 +68,10 @@ const readCached = (): Record<string, DesktopTheme> => {
 /** Skins pushed by the backend, keyed by name. Merged by `listAllThemes`. */
 export const $backendThemes = atom<Record<string, DesktopTheme>>(typeof window === 'undefined' ? {} : readCached())
 
-$backendThemes.listen(themes => writeJson(BACKEND_THEMES_KEY, themes))
+$backendThemes.listen(themes => {
+  writeJson(BACKEND_THEMES_KEY, themes)
+  writeJson(LEGACY_BACKEND_THEMES_KEY, themes)
+})
 
 /** Custom CSS carried by a user skin whose name is `default` or a desktop
  *  built-in. The palette policy keeps built-in palettes (a user `mono.yaml`
