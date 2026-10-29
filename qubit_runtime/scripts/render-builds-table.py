@@ -62,9 +62,9 @@ DEFAULT_REPO = "NousResearch/hermes-agent"
 # Asset name shapes (electron-builder artifactName in
 # apps/desktop/electron-builder.config.cjs):
 #   Qubit-0.28.0-mac-arm64.dmg        (bundled)
-#   QubitBundled-0.28.0-win-x64.msix  (bundled)
+#   HermesBundled-0.28.0-win-x64.msix  (bundled)
 _ASSET_RE = re.compile(
-    r"^(?P<app>QubitBundled|QubitLight)-(?P<version>[^-]+)"
+    r"^(?P<app>HermesBundled|HermesLight)-(?P<version>[^-]+)"
     r"-(?P<os>mac|win|linux)-(?P<arch>x64|arm64)\.(?P<ext>dmg|msix|AppImage)$"
 )
 
@@ -89,7 +89,7 @@ def parse_assets(names: list[str]) -> dict[str, dict[tuple[str, str], tuple[str,
     the basename, but the stored name keeps the full key so the download
     link points at the object's real location.
     """
-    out: dict[str, dict[tuple[str, str], tuple[str, str]]] = {"QubitBundled": {}, "QubitLight": {}}
+    out: dict[str, dict[tuple[str, str], tuple[str, str]]] = {"HermesBundled": {}, "HermesLight": {}}
     for name in names:
         base = name.rsplit("/", 1)[-1]
         m = _ASSET_RE.match(base)
@@ -105,7 +105,7 @@ def table_rows(assets_by_app: dict) -> list[tuple[str, list[tuple[str, str, str,
     a row exists only for an object that is actually in the bucket.
     """
     sections: list[tuple[str, list[tuple[str, str, str, str]]]] = []
-    for app, title in (("QubitBundled", "Qubit Desktop"), ("QubitLight", "Qubit Light (remote-only client)")):
+    for app, title in (("HermesBundled", "Qubit Desktop"), ("HermesLight", "Qubit Light (remote-only client)")):
         rows = []
         for key in _ROW_ORDER:
             entry = assets_by_app.get(app, {}).get(key)
@@ -176,19 +176,19 @@ def filter_names_for_version(names: list[str], version: str) -> list[str]:
 # A row needs a unique receipt-listed artifact and its uploaded object.
 _COMMIT_EXPECTED = [
     ("Windows x64 (MSIX)", "win32-x64",
-     r"^QubitBundled-[^-]+-win-x64\.msix$"),
+     r"^HermesBundled-[^-]+-win-x64\.msix$"),
     ("Windows ARM64 (MSIX)", "win32-arm64",
-     r"^QubitBundled-[^-]+-win-arm64\.msix$"),
+     r"^HermesBundled-[^-]+-win-arm64\.msix$"),
     ("Windows universal bundle (MSIXBUNDLE)", "windows-universal",
-     r"^QubitBundled-[^-]+-win\.msixbundle$"),
+     r"^HermesBundled-[^-]+-win\.msixbundle$"),
     ("macOS Apple Silicon (DMG)", "darwin-arm64",
-     r"^QubitBundled-[^-]+-mac-arm64\.dmg$"),
+     r"^HermesBundled-[^-]+-mac-arm64\.dmg$"),
     ("macOS Intel (DMG)", "darwin-x64",
-     r"^QubitBundled-[^-]+-mac-x64\.dmg$"),
+     r"^HermesBundled-[^-]+-mac-x64\.dmg$"),
     ("macOS Apple Silicon (ZIP)", "darwin-arm64",
-     r"^QubitBundled-[^-]+-mac-arm64\.zip$"),
+     r"^HermesBundled-[^-]+-mac-arm64\.zip$"),
     ("macOS Intel (ZIP)", "darwin-x64",
-     r"^QubitBundled-[^-]+-mac-x64\.zip$"),
+     r"^HermesBundled-[^-]+-mac-x64\.zip$"),
     ("Termux aarch64 (.deb)", "termux", r"^.*\.deb$"),
 ]
 

@@ -172,7 +172,7 @@ sys.path.insert(0, str(root))
 from pm.lock import Facts, Lockfile
 from pm.packages import Venv
 from pm.environments import install_state_dir, runtime_facts_path, site_packages
-from qubit_cli._launchers import ensure_install_launchers
+from qubit_cli._launchers import ensure_install_launchers, mint_launcher
 lock = Lockfile(root / 'pm/lock.json')
 lock.set_pin('node', 'fixture', {})
 lock.save()
@@ -189,6 +189,8 @@ site.parent.mkdir(parents=True)
 site.symlink_to(deps, target_is_directory=True)
 Facts(runtime_facts_path(root)).record_state('venv', Venv(root).expected_stamp([]), [], environment=selected)
 ensure_install_launchers(root, root / '.hermes/bin')
+# The fixture exercises the pre-rebrand launcher name as a read-old alias.
+assert mint_launcher('hermes', root, root / '.hermes/bin', Path(sys.executable), None)
 '''
     subprocess.run([sys.executable, "-I", "-B", "-c", setup, str(root), str(store), node,
                     sysconfig.get_path("purelib")], env=env, cwd=tmp_path, check=True, timeout=60)

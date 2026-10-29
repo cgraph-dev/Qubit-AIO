@@ -14,7 +14,8 @@ def test_stamp_uses_built_commit_even_with_dispatch_sha_and_refuses_mismatch(tmp
     repo = tmp_path / 'repo'
     repo.mkdir()
     for relative in ('scripts/write_install_stamp.py',
-                     'qubit_cli/__init__.py', 'qubit_cli/update_channel.py', 'qubit_cli/release_channels.py',
+                     'qubit_cli/__init__.py', 'qubit_cli/install_source.py', 'qubit_cli/update_channel.py',
+                     'qubit_cli/release_channels.py',
                      'pm/paths.py', 'pm/environments.py', 'qubit_cli/steward.py', 'qubit_constants.py'):
         dest = repo / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
