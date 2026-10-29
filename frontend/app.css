@@ -639,3 +639,53 @@ body:has(.workspace-shell) .quiet-action:hover { border-color: var(--line) !impo
   .typed-command #textsend { width: 100%; margin-top: 8px; }
   .empty-session { align-items: flex-start; }
 }
+
+/* ---- Scan-terminal UX layer (additive; no existing rule touched) -----------
+ * CRT-dossier dressing for the Talk console: scanlines, signal pulses,
+ * phosphor glow, terminal readouts. Everything is variable-driven so all
+ * `theme` presets inherit it; the global prefers-reduced-motion guard above
+ * already neutralises the new animations. Pure CSS: no markup, route, or
+ * behavior change.
+ */
+body:has(.workspace-shell)::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 2.2%) 0 1px,
+    transparent 1px 3px
+  );
+  mix-blend-mode: overlay;
+}
+.status-dot, .session-dot, .live-pulse span, .rail-footer-dot {
+  animation: signal-ping 2.6s ease-in-out infinite;
+}
+@keyframes signal-ping {
+  0%, 100% { box-shadow: 0 0 0 3px rgb(127 212 255 / 8%); }
+  50% { box-shadow: 0 0 0 7px rgb(127 212 255 / 2%), 0 0 12px rgb(127 212 255 / 35%); }
+}
+.talk-glyph {
+  animation: phosphor-breathe 5s ease-in-out infinite;
+  text-shadow: 0 0 14px rgb(127 212 255 / 45%);
+}
+@keyframes phosphor-breathe {
+  0%, 100% { box-shadow: 0 0 0 8px rgb(127 212 255 / 5%), 0 16px 38px rgb(0 0 0 / 38%); }
+  50% { box-shadow: 0 0 0 11px rgb(127 212 255 / 9%), 0 0 34px rgb(127 212 255 / 22%), 0 16px 38px rgb(0 0 0 / 38%); }
+}
+.section-meta::before { content: "> "; }
+.section-meta, .live-pulse, .status-label, .rail-heading {
+  font-variant-numeric: tabular-nums;
+}
+.status-card .status, .typed-command input {
+  font-variant-numeric: tabular-nums;
+}
+code, .msg .raw, #transcript .msg {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (forced-colors: active) {
+  body:has(.workspace-shell)::after { display: none; }
+  .talk-glyph { text-shadow: none; animation: none; }
+}
