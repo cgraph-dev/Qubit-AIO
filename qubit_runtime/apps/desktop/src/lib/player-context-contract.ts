@@ -78,7 +78,7 @@ export interface PlayerAgentRequest {
   operation: PlayerAgentOperation
 }
 
-/** Sent only by an explicitly activated, trusted Hermes renderer. */
+/** Sent only by an explicitly activated, trusted Qubit renderer. */
 export interface PlayerAwarenessLinkState {
   linked: boolean
   /** Native-generated opaque link identifier; never accepted as an input. */
