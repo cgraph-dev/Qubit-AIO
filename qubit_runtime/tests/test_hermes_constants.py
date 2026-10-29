@@ -1,5 +1,6 @@
 """Tests for qubit_constants module."""
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -612,6 +613,15 @@ class TestProjectVenvDirOutOfTree:
 
     @staticmethod
     def _running_from(monkeypatch, checkout, venv):
+        # An install records its source tree in the installed distribution; without
+        # that record project_venv_dir refuses a foreign interpreter's venv.
+        from pm.environments import site_packages
+        dist_info = site_packages(venv) / "qubit-1.0.0.dist-info"
+        dist_info.mkdir(parents=True, exist_ok=True)
+        (dist_info / "METADATA").write_text(
+            "Metadata-Version: 2.1\nName: qubit\nVersion: 1.0.0\n", encoding="utf-8")
+        (dist_info / "direct_url.json").write_text(
+            json.dumps({"url": checkout.as_uri()}), encoding="utf-8")
         monkeypatch.setattr(qubit_constants, "__file__", str(checkout / "qubit_constants.py"))
         monkeypatch.setattr(sys, "prefix", str(venv))
         monkeypatch.setattr(sys, "base_prefix", str(checkout / "no-such-base"))

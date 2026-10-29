@@ -81,8 +81,9 @@ def phase_jobs(selected: dict[str, bool], phase: str, *, skip_tests: bool = Fals
     """
     required = ["validate"]
     if phase == "publish":
-        # stable-store is not required: a Store failure never blocks publication.
-        return required + ["stable-publish"]
+        # Publication is not gated on the Store (stable-store needs stable-publish), but a
+        # failed Store submission still fails the phase verdict: the phase includes it.
+        return required + ["stable-publish", "stable-store"]
     if phase != "candidate":
         raise ValueError(f"Unknown release phase: {phase}")
     smokes: dict[str, tuple[str, ...]] = dict(GROUP_SMOKES)

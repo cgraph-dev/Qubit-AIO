@@ -31,6 +31,7 @@ main = _mod.main
 DEFAULT = {
     "python": True,
     "python_prod": True,
+    "catalog": True,
     "frontend": True,
     "docker": True,
     "docker_meta": True,
@@ -47,12 +48,13 @@ DEFAULT = {
     "bootstrap": True,
     "desktop_updater": True,
     "rust": True,
+    "remote_backends": True,
 }
 
 SLOW_LANES = {"docker", "nix", "e2e", "e2e_upgrade", "e2e_desktop_core", "e2e_desktop_update"}
 
 
-def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_lock=False, npm_lock=False, bootstrap=False, desktop_updater=False, rust=False, docker_meta=False, python_prod=None, nix=False, docker=None, e2e=False, e2e_upgrade=False, e2e_desktop_core=False, e2e_desktop_update=False) -> dict[str, bool]:
+def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_lock=False, npm_lock=False, bootstrap=False, desktop_updater=False, rust=False, docker_meta=False, python_prod=None, nix=False, docker=None, e2e=False, e2e_upgrade=False, e2e_desktop_core=False, e2e_desktop_update=False, catalog=False, remote_backends=False) -> dict[str, bool]:
     # python_prod tracks python except for tests-only diffs; default it to
     # python so the majority of cases don't need to spell it out.
     #
@@ -64,6 +66,7 @@ def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_
     return {
         "python": python,
         "python_prod": _python_prod,
+        "catalog": catalog,
         "docker": docker_meta if docker is None else docker,
         "nix": nix,
         "e2e": e2e,
@@ -80,6 +83,7 @@ def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_
         "bootstrap": bootstrap,
         "desktop_updater": desktop_updater,
         "rust": rust,
+        "remote_backends": remote_backends,
     }
 
 

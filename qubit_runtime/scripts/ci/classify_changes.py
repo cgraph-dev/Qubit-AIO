@@ -352,6 +352,7 @@ _UPDATE_DEPENDENCIES = (
     "qubit_cli/steward.py",
     "qubit_cli/observability/shared_metrics_update.py",
     "qubit_cli/main_install_repair.py",
+    "qubit_dir_acl.py",  # update_windows_acl repairs the home ACL after an elevated update
     "qubit_logging.py",
     "qubit_platform/host/__init__.py",
     "qubit_platform/host/facts.py",

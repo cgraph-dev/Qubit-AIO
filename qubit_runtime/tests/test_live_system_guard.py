@@ -10,8 +10,13 @@ guard regression cannot kill anything.
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
+
+# ``tests.conftest`` is the suite's own (qubit_runtime/tests), so the probe must
+# run from the project root regardless of the caller's cwd.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_argv_arguments_are_not_treated_as_executables(tmp_path):
@@ -75,7 +80,7 @@ def test_custom_home_tmpdir_is_relocated_before_pytest_uses_it(tmp_path):
     env.pop("HERMES_SCRATCH_DIR", None)
     result = subprocess.run(
         [sys.executable, "-c", "import tempfile, tests.conftest; print(tempfile.gettempdir())"],
-        env=env, capture_output=True, text=True, check=True,
+        env=env, cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
     )
     assert not result.stdout.strip().startswith(str(home))
 
@@ -90,6 +95,6 @@ def test_default_home_unmarked_tmpdir_is_relocated_before_pytest_uses_it(tmp_pat
     env.pop("HERMES_SCRATCH_DIR", None)
     result = subprocess.run(
         [sys.executable, "-c", "import tempfile, tests.conftest; print(tempfile.gettempdir())"],
-        env=env, capture_output=True, text=True, check=True,
+        env=env, cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
     )
     assert not result.stdout.strip().startswith(str(operator_home / ".hermes"))

@@ -291,28 +291,6 @@ class _FakeAuthority:
             live._write(root / f"{delivery_id}.json", record)
 
 
-def _canonical_target(monkeypatch, *targets):
-    """Every ``targets`` profile home has a ready authority; any other home has none.
-
-    A local Bot Chat delivery is admitted by the profile authority (the pinned contract:
-    no live authority is a typed ``runtime_unavailable`` refusal, never a CLI fallback), so
-    the hand-off/runner-shape tests install this stand-in before messaging a local target.
-    """
-    from tools import bot_live_delivery as live
-
-    homes = {t.resolve() for t in targets}
-
-    def owner_of(home):
-        home = Path(home).resolve()
-        if home not in homes:
-            return None
-        return dict(profile_home=str(home), session_id="local-bot", canonical=True,
-                    lease_id="authority-1", live_session_id="local-bot")
-
-    monkeypatch.setattr(live, "find_canonical_live_owner", owner_of)
-    authority = _FakeAuthority()
-    monkeypatch.setattr(live, "authority_delivery", authority)
-    return authority
 
 
 def test_local_delivery_command_and_ack(tmp_path, monkeypatch):

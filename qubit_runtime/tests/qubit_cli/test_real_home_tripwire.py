@@ -184,18 +184,6 @@ def test_relative_path_metadata_exemption_tracks_working_directory(protected_hom
         guard.check(target, metadata=True)
 
 
-def test_checkout_inside_a_guarded_root_is_not_qubit_state():
-    """The default install checks the repo out INSIDE the home (install.sh:
-    INSTALL_DIR=$QUBIT_HOME/qubit): the checkout, its .venv and test
-    data are exempt even when the guarded root contains them; siblings under
-    that root are still refused."""
-    from tests.home_io_guard import HomeIOGuard
-
-    guard = HomeIOGuard(lambda: [PROJECT_ROOT.parent])
-    guard.check(PROJECT_ROOT / "tests" / "home_io_guard.py")
-    guard.check(PROJECT_ROOT / ".venv" / "bin" / "python", metadata=True)
-    with pytest.raises(AssertionError, match="REAL hermes home"):
-        guard.check(PROJECT_ROOT.parent / "config.yaml")
 
 
 

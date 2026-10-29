@@ -1384,6 +1384,23 @@ prompt_caching:
 
 The 1h tier writes at 2x the base input price (5m writes at 1.25x) and only pays off when your turns are more than five minutes apart — otherwise every tool result is written at the dearer rate for retention nobody uses. `"auto"` picks the tier per session from who paces it: `1h` for sessions a person types into (CLI, TUI, Desktop, Telegram/Discord/Slack and the other messaging platforms), `5m` for machine-paced ones (subagents, cron, `qubit -q` one-shots, webhooks, Kanban workers, the API server, tool-invoked and batch runs). On an install where interactive sessions are parked and resumed through the day, `auto` cut the interactive cache-write bill by roughly 40% while leaving fan-out subagent spend untouched. Delegated subagents are always clamped to `5m`, whatever the setting.
 
+## Agent Roles
+
+`qubit agent run <role>` selects a native role (orchestrator, react, operative, openhands, simple, researcher, and the digest/monitor recipe aliases). A role's `model_tier` is a hint that resolves through `roles.model_tiers`; an unmapped tier uses the active model and reports `model_tier_applied: false` instead of pretending.
+
+```yaml
+roles:
+  model_tiers:
+    local:                       # local/voice turns
+      provider: ollama
+      model: qubit-brain
+    detail:                      # detail transforms and other auxiliary-style work
+      provider: ollama
+      model: qubit-brain
+```
+
+`qubit agent run <role> --model/--provider` overrides the tier for one turn.
+
 ## Auxiliary Models
 
 Qubit uses "auxiliary" models for side tasks like image analysis, browser screenshot analysis, session-title generation, and context compression. By default (`auxiliary.*.provider: "auto"`), Qubit routes every auxiliary task to your **main chat model** — the same provider/model you picked in `qubit model`. You don't need to configure anything to get started, but be aware that on expensive reasoning models (Opus, MiniMax M2.7, etc.) auxiliary tasks add meaningful cost. If you want cheap-and-fast side tasks regardless of your main model, set `auxiliary.<task>.provider` and `auxiliary.<task>.model` explicitly (for example, Gemini Flash on OpenRouter for vision). (Web extraction is not an auxiliary task: `web_extract` and browser snapshots truncate long content deterministically and store the full text for `read_file` paging — no LLM involved.)
@@ -2749,6 +2766,10 @@ browser:
   # Optional CDP override — when set, Qubit attaches directly to your own
   # Chromium-family browser (via /browser connect) rather than starting a headless browser.
   cdp_url: ""
+  # Chromium user-data-dir for `qubit browser open`; empty = auto-detect the
+  # installed profile. Kept beside cdp_url so the dashboard can show which real
+  # profile a CDP browser belongs to.
+  profile_dir: ""
   # Dialog supervisor — controls how native JS dialogs (alert / confirm / prompt)
   # are handled when a CDP backend is attached (Browserbase, local Chromium-family
   # browser via /browser connect). Ignored on Camofox and default local agent-browser mode.

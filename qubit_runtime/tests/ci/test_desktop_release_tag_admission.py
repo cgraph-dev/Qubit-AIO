@@ -180,7 +180,12 @@ def _run_admission(clone: Path, tag: str, claim_tag: str) -> subprocess.Complete
         RELEASE_CLAIM_OBJECT=_git("rev-parse", f"refs/tags/{claim_tag}", cwd=clone),
         GITHUB_OUTPUT=str(gh_output),
         RELEASE_PHASE="candidate",
-        GITHUB_REF=f"refs/tags/{claim_tag}",
+        # The admission command requires the default-branch controller identity
+        # (stable-release.yml@refs/heads/main); the claim tag is a separate ref.
+        GITHUB_REPOSITORY="acme/qubit",
+        GITHUB_EVENT_NAME="workflow_dispatch",
+        GITHUB_REF="refs/heads/main",
+        GITHUB_WORKFLOW_REF="acme/qubit/.github/workflows/stable-release.yml@refs/heads/main",
         GITHUB_SHA=_git("rev-parse", "HEAD", cwd=clone),
         PYTHONPATH=str(_REPO),
     )
@@ -288,7 +293,6 @@ def test_downloadable_native_builds_refuse_to_ship_unsigned(tmp_path: Path):
         partial = run(**{name: "x" for name in names if name != "AZURE_CLIENT_ID"})
         assert partial.returncode != 0 and "AZURE_CLIENT_ID" in partial.stdout
 
-@pytest.mark.xfail(strict=True, reason="wave-24 short-port: stable admission requires the default-branch controller workflow")
 def test_claim_on_a_release_branch_is_admitted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     origin, clone = _seed_repo(tmp_path)
     # A hotfix lands on origin's release/0.1.2 only; main never sees it.
