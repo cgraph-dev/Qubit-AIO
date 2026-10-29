@@ -1238,10 +1238,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .qchat *, .qchat *::before, .qchat *::after {
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
     scroll-behavior: auto !important;
-    transition-duration: .01ms !important;
+    transition: none !important;
   }
   .qchat__session-row--active { box-shadow: inset var(--qchat-rail) 0 var(--qchat-signal) !important; }
 }
