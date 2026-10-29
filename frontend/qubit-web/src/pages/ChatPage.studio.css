@@ -65,15 +65,8 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    var(--qchat-signal) 0 34px,
-    transparent 34px 40px,
-    var(--qchat-violet) 40px 0
-  );
-  background-size: calc(50% - .35rem) 100%;
-  background-repeat: no-repeat;
-  background-position: 0 0, 100% 0;
+  background: var(--qchat-signal);
+  width: 34px;
   opacity: .85;
   pointer-events: none;
 }
@@ -109,8 +102,7 @@
   position: absolute;
   inset: 0;
   border: 1px solid var(--qchat-line);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #1a2635 30%, transparent), transparent 26%);
+  background: transparent;
   pointer-events: none;
 }
 .qchat__conversation > * { position: relative; z-index: 1; }
