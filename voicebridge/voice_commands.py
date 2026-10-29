@@ -5293,6 +5293,29 @@ def _b_browser_profiles(ctx, args):
     raise ValueError(f"unknown browser profiles action {action!r}")
 
 
+def _b_browser_cdp(ctx, args):
+    """Launch the same real Chromium profile with CDP for Qubit.
+
+    Delegates to the one voicebridge CLI implementation so voice, terminal,
+    and dashboard all use the same profile selection and readiness checks.
+    """
+    import json
+    from types import SimpleNamespace
+
+    from . import cli as CLI
+
+    _rc, text = _cli_stdout(
+        CLI._cmd_browser, ctx.cfg,
+        SimpleNamespace(browser_command="open", url="", port=0,
+                        profile_dir="", browser="", dry_run=False,
+                        confirm=False))
+    try:
+        out = json.loads(text)
+    except Exception:
+        out = {"ok": False, "error": text.strip()[:300]}
+    return {"browser_cdp": out}
+
+
 def _b_computer_screen(ctx, args):
     """Control-UI pane arrangement (same ``computer_use`` module the CLI
     uses). Reads are free; arranging persists only the Qubit Control UI
@@ -5603,6 +5626,7 @@ _BACKENDS: Dict[str, Callable] = {
     "question_prompt": _b_question_prompt,
     "session_share": _b_session_share,
     "browser_profiles": _b_browser_profiles,
+    "browser_cdp": _b_browser_cdp,
     "computer_screen": _b_computer_screen,
     "egress": _b_egress,
     "workshop": _b_workshop,
@@ -9411,6 +9435,12 @@ _E("shares_purge", "Purge expired shares",
 # One op id per capability, exposed to voice AND (Tier 1) the dashboard
 # console; reads execute immediately, mutations stage the shared journal
 # confirmation. Every backend is the same module function the CLI calls.
+_E("browser_cdp_open", "Open browser for Qubit",
+   ("open browser", "launch browser", "open the browser",
+    "open chromium", "open chromium browser"),
+   "browser_cdp", ("browser",), fixed=(("action", "open"),),
+   examples=("qubit, open browser",),
+   help="Launch the same real Chromium profile with CDP so Qubit can use it.")
 _E("browser_profiles", "Browser profiles",
    ("browser profiles", "list browser profiles", "managed browser profiles"),
    "browser_profiles", ("browser",), fixed=(("action", "list"),),
