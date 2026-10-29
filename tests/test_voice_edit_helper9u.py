@@ -695,3 +695,21 @@ def test_wake_hint_wired_to_heard_status_path(monkeypatch):
              transcribe=lambda pcm: "Redo this text for me.")
     m._handle_segment(b"\x00" * 9600)
     assert commands == []
+
+
+def test_bare_stop_phrase_set():
+    assert dh.is_bare_stop("Stop.")
+    assert dh.is_bare_stop("stop it")
+    assert dh.is_bare_stop("Never mind.")
+    assert not dh.is_bare_stop("stop the brain")
+    assert not dh.is_bare_stop("stop brain")
+
+
+def test_bare_stop_interrupts_instead_of_staging(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.state = h.PROCESSING
+    h._process_transcript("Stop.")
+    assert h.state == h.IDLE
+    assert h._turn_stopped_seq == h._turn_seq
+    assert not any(c[0] == "transform" for c in client.calls), client.calls
+    assert not any(c[0] == "task" for c in client.calls), client.calls

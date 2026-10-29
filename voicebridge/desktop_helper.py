@@ -300,6 +300,25 @@ def verbatim_transcript(text: Any, cfg_or_enabled: Any = False) -> str:
         return raw
 
 
+#: Bare utterances that mean "stop the current reply/turn", never a task.
+#: Exact matches only: "stop the brain" is a model-power command and must not
+#: be intercepted here.
+_BARE_STOP_PHRASES = frozenset({
+    "stop", "stop it", "stop that", "stop now", "stop talking", "stop please",
+    "cancel", "cancel that", "never mind", "nevermind", "be quiet", "quiet",
+    "shut up", "halt", "enough",
+})
+
+
+def is_bare_stop(text: Any) -> bool:
+    """True when the utterance is an exact bare stop/interrupt phrase."""
+    try:
+        low = " ".join(re.sub(r"[^a-z0-9 ]", " ", str(text or "").lower()).split())
+    except Exception:
+        return False
+    return bool(low and low in _BARE_STOP_PHRASES)
+
+
 #: Speak-time legacy-brand substitution (lane 4, 2026-10-03): the brain
 #: stitches legacy self-reference tokens from memory context / skill prose
 #: (e.g. today's journal: helper.answer spoke "I'll use Hermes agent
@@ -3211,6 +3230,15 @@ class DesktopHelper:
             self._speak("You have a pending confirmation. "
                         "Say yes to run it, no to cancel.")
             self._await_reply("say yes, no, or cancel")
+            self._finish_error(turn_gen)
+            return
+        if is_bare_stop(text):
+            # A bare "stop" is an interrupt, never a staged task. Staging it
+            # ("say yes to run Stop.") left a pending confirmation that then
+            # blocked every later wake command until the panel's Cancel.
+            _trace("stop_command", chars=len(text), state=self.state)
+            self.stop_speaking()
+            self._ui_status("idle", "stopped")
             self._finish_error(turn_gen)
             return
         self.state = self.PROCESSING
