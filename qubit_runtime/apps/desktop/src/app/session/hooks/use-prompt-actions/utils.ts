@@ -418,18 +418,43 @@ export function imageFilenameFromPath(filePath: string): string {
   return filePath.split(/[\\/]/).filter(Boolean).pop() || 'image.png'
 }
 
+// A `previewUrl` is only reusable when it still holds the FULL original bytes as
+// a base64 image data URL. `attachImagePath` keeps the full file there until a
+// bounded thumbnail replaces it (then only `thumbnailUrl` survives and
+// `previewUrl` is dropped), so a data-URL preview is the same bytes the disk
+// read would return — no second read/IPC round-trip. A non-data preview (a
+// gateway media URL, a blob:) carries no bytes and must fall back to disk.
+const FULL_IMAGE_DATA_URL_RE = /^data:image\/[a-z0-9.+-]+;base64,/i
+
+function imageBase64FromPreview(previewUrl: string | undefined): string {
+  const preview = previewUrl?.trim() ?? ''
+
+  if (!FULL_IMAGE_DATA_URL_RE.test(preview)) {
+    return ''
+  }
+
+  return base64FromDataUrl(preview)
+}
+
 // Remote gateway: the local composer-image file lives on THIS machine's disk,
 // not the gateway's, so read the bytes here and upload them via
 // image.attach_bytes. Returns null when the file can't be read.
 //
-// Always re-reads from disk rather than trusting `attachment.previewUrl` as a
-// cache: once a thumbnail is generated, `attachImagePath` keeps only the
-// bounded (≤512px) `thumbnailUrl` and drops `previewUrl` — so a cached
-// `previewUrl` is never guaranteed to be the full-resolution bytes the model
-// needs, and trusting it here would risk silently uploading a downscaled copy.
+// Prefer the chip's full-size base64 preview when it has one (see
+// imageBase64FromPreview); otherwise read from disk. Once a thumbnail is
+// generated a non-data preview is not authoritative, so it is never trusted
+// as the model-facing bytes.
 export async function readImageForRemoteAttach(
-  filePath: string
+  filePath: string,
+  previewUrl?: string
 ): Promise<{ contentBase64: string; filename: string } | null> {
+  const filename = imageFilenameFromPath(filePath)
+  const previewBase64 = imageBase64FromPreview(previewUrl)
+
+  if (previewBase64) {
+    return { contentBase64: previewBase64, filename }
+  }
+
   const dataUrl = await window.hermesDesktop?.readFileDataUrl(filePath)
 
   if (isReadFileErrorResult(dataUrl)) {
@@ -438,7 +463,7 @@ export async function readImageForRemoteAttach(
 
   const contentBase64 = dataUrl ? base64FromDataUrl(dataUrl) : ''
 
-  return contentBase64 ? { contentBase64, filename: imageFilenameFromPath(filePath) } : null
+  return contentBase64 ? { contentBase64, filename } : null
 }
 
 // Read a non-image file as a data URL for upload via file.attach. Returns null

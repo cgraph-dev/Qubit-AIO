@@ -59,11 +59,10 @@ describe('uploadComposerAttachment image cache contract', () => {
     vi.restoreAllMocks()
   })
 
-  it('always re-reads the image from disk, even when a stale previewUrl is cached', async () => {
-    // attachImagePath drops `previewUrl` as soon as a thumbnail exists, so a
-    // populated `previewUrl` here does not mean it holds full-resolution
-    // bytes (#93324) — the upload must never trust it and must always read
-    // the on-disk file for the bytes the model receives.
+  it('re-reads the image from disk when the cached previewUrl carries no bytes', async () => {
+    // Only a full-resolution base64 image data URL is authoritative for the
+    // model-facing bytes. A non-data preview (a gateway media URL, a blob:)
+    // carries none, so the upload must still read the on-disk file.
     const readFileDataUrl = vi.fn(async () => 'data:image/png;base64,ZnJvbS1kaXNr')
     Object.defineProperty(window, 'hermesDesktop', {
       configurable: true,
@@ -84,7 +83,7 @@ describe('uploadComposerAttachment image cache contract', () => {
         kind: 'image',
         label: 'shot.png',
         path: '/local/shot.png',
-        previewUrl: 'data:image/png;base64,c3RhbGUtY2FjaGVk'
+        previewUrl: 'blob:stale-preview'
       },
       { remote: true, requestGateway, sessionId: RUNTIME_SESSION_ID }
     )
