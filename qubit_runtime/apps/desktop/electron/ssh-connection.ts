@@ -207,7 +207,7 @@ function defaultControlDir(): string {
     return path.join(os.tmpdir(), 'hermes-desktop-ssh')
   }
 
-  const homeDir = path.join(platformDefaultHermesHome(os.homedir()), 'desktop-ssh')
+  const homeDir = path.join(platformDefaultQubitHome(os.homedir()), 'desktop-ssh')
 
   // Include the filename and OpenSSH's temporary-listener suffix in the byte budget.
   return Buffer.byteLength(path.join(homeDir, '0123456789abcdef.sock.0123456789abcdef')) <= 104
