@@ -736,7 +736,9 @@ def test_recent_tts_speak_ends_at_playback_stop(tmp_path, monkeypatch):
     assert dh.recent_tts_speak(p, window_s=5.0, tail_s=0.6) is False
 
     write({"event": "voice_edit.helper.speak", "ts": fixed - 4.0})
-    assert dh.recent_tts_speak(p, window_s=5.0) is True
+    # The helper's own playback is gated by ``_speaking``; its journal START
+    # must not hold the generic echo guard for the full 5 s window.
+    assert dh.recent_tts_speak(p, window_s=5.0) is False
 
     write({"event": "voice_edit.helper.speak", "ts": fixed - 4.0},
           {"event": "voice_edit.talk.playback.stopped", "ts": fixed})
@@ -763,7 +765,9 @@ def test_wake_busy_clears_after_journaled_playback_stop(tmp_path, monkeypatch):
     p.write_text(_json.dumps(
         {"event": "voice_edit.helper.speak", "ts": fixed - 1.0}) + "\n")
     h._tts_echo_checked = 0.0
-    assert h._wake_busy() is True
+    # ``_speaking`` owns the helper's own playback; the journal START alone is
+    # not a wake-busy signal once the reply has ended.
+    assert h._wake_busy() is False
 
 
 def test_wake_preempts_a_stale_listening_capture(monkeypatch):

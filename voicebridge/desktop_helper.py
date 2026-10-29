@@ -709,13 +709,13 @@ def resolve_token(cfg: Any) -> str:
 #: made wake deaf for 5 s after a SHORT reply ended (live 2026-10-29: "must
 #: wait for the assistant to finish and say it twice").
 _TTS_ECHO_EVENTS = frozenset(
-    {"tts.speak", "tts.synthesize", "voice_edit.helper.speak",
-     "voice_edit.talk.playback.started"})
+    {"tts.speak", "tts.synthesize", "voice_edit.talk.playback.started"})
 #: Events proving the reply playback actually ENDED. Once one of these is
 #: newer than the last speak/start marker, only a short echo tail remains.
 _TTS_ECHO_STOP_EVENTS = frozenset(
     {"voice_edit.helper.speak_done",
      "voice_edit.talk.playback.stopped"})
+_HELPER_SPEAK = "voice_edit.helper.speak"
 _HELPER_SPEAK_DONE = "voice_edit.helper.speak_done"
 #: Short echo tail after playback ends. Covers the last syllable still in the
 #: room without blocking the next "hey qubit" for seconds.
@@ -754,6 +754,7 @@ def recent_tts_speak(events_path, window_s=5.0, *, tail_s=0.8) -> bool:
         return False
     now = time.time()
     last_start = 0.0
+    helper_speak_start = 0.0
     last_stop = 0.0
     for line in tail.splitlines():
         line = line.strip()
@@ -775,8 +776,14 @@ def recent_tts_speak(events_path, window_s=5.0, *, tail_s=0.8) -> bool:
             continue
         if name in _TTS_ECHO_EVENTS:
             last_start = max(last_start, ts)
+        elif name == _HELPER_SPEAK:
+            helper_speak_start = max(helper_speak_start, ts)
         elif name in _TTS_ECHO_STOP_EVENTS:
             last_stop = max(last_stop, ts)
+    # The helper's own playback is gated by ``_speaking``; its journal START
+    # only counts when a journaled STOP follows (the short post-playback tail).
+    if last_start <= 0 and helper_speak_start > 0 and last_stop >= helper_speak_start:
+        last_start = helper_speak_start
     if last_start <= 0 or now - last_start >= window_s:
         return False
     if last_stop >= last_start:
