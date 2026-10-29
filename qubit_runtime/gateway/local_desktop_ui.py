@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 # Agent attributes ``wire`` installs for one local-viewer turn (restored by ``local_viewer_events``).
 CALLBACK_ATTRS = ("read_terminal_callback", "read_preview_callback", "drive_preview_callback",
+                  "player_agent_callback",
                   "read_window_below_callback", "theme_callback", "tour_callback", "setup_beat_callback")
 
 # main: tui_gateway/agent_callbacks.py ``_read_block`` budgets and tui_gateway/server.py's preview.act ladder.
@@ -195,6 +196,15 @@ def _ask(turn, agent, method, params, timeout):
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
 
+def _player_request(turn, agent, operation) -> str:
+    """One closed player operation through this turn's revocable lease (never a legacy fallback)."""
+    from gateway import local_player
+    result = local_player.request(str(getattr(agent, "session_id", "") or ""), dict(operation or {}))
+    if result is None:
+        return json.dumps({"error": "desktop-player-unavailable"})
+    return result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+
+
 def _read_block(turn, agent, method, timeout):
     return lambda start=None, count=None: _ask(
         turn, agent, method, {k: v for k, v in (("start", start), ("count", count)) if v is not None}, timeout)
@@ -247,14 +257,18 @@ def wire(turn, agent):
     agent.theme_callback = lambda payload: _theme(turn, agent, dict(payload or {}))
     agent.tour_callback = lambda payload: _tour(turn, agent, dict(payload or {}))
     agent.setup_beat_callback = lambda payload: _setup_beat(turn, agent, dict(payload or {}))
-    return key, publish
+    agent.player_agent_callback = lambda operation: _player_request(turn, agent, operation)
+    from gateway import local_player
+    return key, publish, local_player.bind(turn, agent)
 
 
 def release(token) -> None:
     """Drop this turn's routing entry, unless a newer turn of the same session already replaced it."""
     if not token:
         return
-    key, publish = token
+    key, publish, player_token = token
+    from gateway import local_player
+    local_player.release(player_token)
     with _lock:
         if _turns.get(key) is publish:
             _turns.pop(key, None)
