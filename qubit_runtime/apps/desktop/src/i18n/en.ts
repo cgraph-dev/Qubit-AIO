@@ -4474,7 +4474,12 @@ export const en: Translations = {
     noAuthenticatedProviders: 'No authenticated providers.',
     addProvider: 'Add provider…',
     addCustomModel: 'Add custom model',
-    removeCustomModel: 'Remove custom model'
+    removeCustomModel: 'Remove custom model',
+    resetToDefaults: 'Reset to defaults',
+    resetConfirm: 'Reset model visibility to defaults?',
+    resetDescription:
+      'Your shown and hidden model choices are cleared and every provider’s default list comes back. Custom models you added are kept and shown.',
+    resetAction: 'Reset'
   },
 
   shell: {
@@ -4485,8 +4490,17 @@ export const en: Translations = {
       search: 'Search models',
       noModels: 'No models found',
       editModels: 'Edit models…',
+      followDefault: 'Use Settings default',
       refreshModels: 'Refresh models',
-      fast: 'Fast'
+      favorites: 'Favorites',
+      addFavorite: 'Add to favorites',
+      removeFavorite: 'Remove from favorites',
+      favoriteShortcut: '⇧ Click',
+      fast: 'Fast',
+      free: 'free',
+      cacheRead: 'cached read',
+      priceTitle: (input: string, output: string, cache: string) =>
+        `Input ${input}/Mtok · Output ${output}/Mtok` + (cache ? ` · Cached read ${cache}/Mtok` : '')
     },
     modelOptions: {
       noOptions: 'No options for this model',

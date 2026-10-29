@@ -54,7 +54,12 @@ const { clearBotAttentionMock, hostMock, noteBotAttentionMock, UnboundedCache } 
   }
 }))
 
-vi.mock('@qubit/plugin-sdk', () => ({ host: hostMock, LruCache: UnboundedCache }))
+// relay.ts imports ./shared, which holds the $pendingBotOpen atom.
+vi.mock('@qubit/plugin-sdk', async () => {
+  const { atom } = await import('nanostores')
+
+  return { atom, host: hostMock, LruCache: UnboundedCache }
+})
 
 vi.mock('./data', () => ({
   botHandle: (name: string) => (name === 'default' ? 'hermes' : name),
