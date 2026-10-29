@@ -57,6 +57,14 @@ def _caller_summary(limit=8):
     return ' <- '.join(frames)
 
 
+# A worker's persistence calls are answered by the owner's single asyncio loop. On
+# a loaded host that loop can be blocked for tens of seconds behind a synchronous
+# commit or lock acquisition, so a short deadline turns a slow owner into a spurious
+# "worker_receipt_timeout" and loses the turn. Keep the call bounded, but budget for
+# a genuinely busy owner rather than only an idle one.
+WORKER_RPC_TIMEOUT_S = 120.0
+
+
 class _OwnerLink:
     """One owner WebSocket and the only thread that reads it. Events the owner broadcasts to every
     transport are discarded as they arrive, idle or not: left queued, websockets' bounded receive
@@ -174,7 +182,7 @@ class WorkerRPC:
                     self._drop()
                     link = self._connection()
                     link.send(request_id, message)
-                response = link.receive(20)
+                response = link.receive(WORKER_RPC_TIMEOUT_S)
             except BaseException:
                 # Outcome unknown once sent: surface the error and never resend; the next call redials.
                 self._drop()
