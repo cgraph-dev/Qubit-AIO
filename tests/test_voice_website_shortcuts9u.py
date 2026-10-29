@@ -82,3 +82,9 @@ def test_asr_opa_shapes_open_the_site():
     assert _url("Opa, YouTube!") == "https://www.youtube.com"
     assert _url("opa messenger") == "https://www.messenger.com"
     assert _url("opah instagram") == "https://www.instagram.com"
+
+
+def test_asr_your_tube_shapes_open_youtube():
+    assert _url("open your tube") == "https://www.youtube.com"
+    assert _url("Open your tool stop stop") == "https://www.youtube.com"
+    assert _url("open you tube") == "https://www.youtube.com"

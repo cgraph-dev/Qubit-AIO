@@ -633,6 +633,12 @@ def _a_create_document(params: Dict[str, Any]) -> str:
 _SITE_SHORTCUTS = {
     "youtube music": "https://music.youtube.com",
     "youtube": "https://www.youtube.com",
+    # ASR commonly renders "YouTube" as "you tube", "your tube" or even
+    # "your tool" in short commands. Map those to the same site.
+    "you tube": "https://www.youtube.com",
+    "your tube": "https://www.youtube.com",
+    "youtub": "https://www.youtube.com",
+    "your tool": "https://www.youtube.com",
     "gmail": "https://mail.google.com",
     "mail": "https://mail.google.com",
     "messenger": "https://www.messenger.com",
@@ -2385,7 +2391,7 @@ ACTIONS: Dict[str, LocalAction] = {
                          patterns=[r"\bclose (this |the |current )?window\b"]),
     "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
                                 patterns=[r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
-                                            r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b[,\s]+(?:the\s+)?(youtube music|youtube|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
+                                            r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b[,\s]+(?:the\s+)?(youtube music|youtube|you\s*tube|your\s*tube|youtub|your\s*tool|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
     "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
                              patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
                                        r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),
