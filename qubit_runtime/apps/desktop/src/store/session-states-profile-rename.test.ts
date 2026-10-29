@@ -76,7 +76,7 @@ describe('migrateTilesForProfile', () => {
   it('leaves owner hints of a same-named profile on another connection alone', async () => {
     const storage = await import('@/lib/storage')
     const remote = { connectionId: 'remote-1', profile: 'webdesign_bhp', targetProfile: 'webdesign_bhp' }
-    storage.writeJson('qubit.desktop.sessionOwnerHints.v1', [
+    storage.writeJson('hermes.desktop.sessionOwnerHints.v1', [
       ['s-1', { connectionId: 'local', profile: 'webdesign_bhp', targetProfile: 'webdesign_bhp' }],
       ['s-9', remote]
     ])
@@ -90,6 +90,6 @@ describe('migrateTilesForProfile', () => {
     ])
     // The rename ran on the local backend; the remote profile still has its old name.
     expect(sessionStore.getSessionOwnerHints('s-9')).toEqual([remote])
-    expect(storage.readJson<unknown[]>('qubit.desktop.sessionOwnerHints.v1')).toContainEqual(['s-9', remote])
+    expect(storage.readJson<unknown[]>('hermes.desktop.sessionOwnerHints.v1')).toContainEqual(['s-9', remote])
   })
 })
