@@ -628,6 +628,7 @@ def _a_create_document(params: Dict[str, Any]) -> str:
 
 #: Spoken site names -> canonical URLs (generic, operator-neutral).
 _SITE_SHORTCUTS = {
+    "youtube music": "https://music.youtube.com",
     "youtube": "https://www.youtube.com",
     "gmail": "https://mail.google.com",
     "mail": "https://mail.google.com",
@@ -635,6 +636,11 @@ _SITE_SHORTCUTS = {
     "instagram": "https://www.instagram.com",
     "facebook": "https://www.facebook.com",
     "github": "https://github.com",
+    "opencode": "https://opencode.ai",
+    "opencode.ai": "https://opencode.ai",
+    "qubit dashboard": "http://127.0.0.1:8890/",
+    "qubit web dashboard": "http://127.0.0.1:8890/",
+    "qubit": "http://127.0.0.1:8890/",
     "google": "https://www.google.com",
     "duckduckgo": "https://duckduckgo.com",
     "wikipedia": "https://www.wikipedia.org",
@@ -657,7 +663,7 @@ def _normalize_website_url(raw: str) -> str:
     m_scheme = _re.search(r"\b([a-z][a-z0-9+.-]*)://", low)
     if m_scheme and m_scheme.group(1) not in ("http", "https"):
         return ""
-    m = _re.search(r"(https?://\S+|www\.\S+|[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)", low)
+    m = _re.search(r"(https?://\S+|www\.\S+|[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|ai|eu|uk|de|fr|md|gov|edu)\b\S*)", low)
     if not m:
         return ""
     url = m.group(1).strip("\"'.,)")
@@ -2084,7 +2090,7 @@ ACTIONS: Dict[str, LocalAction] = {
                          patterns=[r"\bclose (this |the |current )?window\b"]),
     "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
                                 patterns=[r"\b(?:open|launch|go to|visit)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
-                                            r"\b(?:open|launch|go to|visit) (the )?(youtube|gmail|mail|messenger|instagram|facebook|github|google|duckduckgo|wikipedia|dexonline)\b"]),
+                                            r"\b(?:open|launch|go to|visit) (the )?(youtube music|youtube|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
     "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
                              patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
                                        r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),
