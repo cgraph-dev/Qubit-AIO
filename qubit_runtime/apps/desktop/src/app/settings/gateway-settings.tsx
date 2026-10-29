@@ -550,7 +550,7 @@ function GatewayConnectionSettings({ embedded, standalone }: { embedded: boolean
           sshUser: state.sshUser.trim(),
           sshPort: state.sshPort,
           sshKeyPath: state.sshKeyPath.trim(),
-          sshRemoteQubitPath: state.sshRemoteQubitPath.trim(),
+          sshRemoteHermesPath: state.sshRemoteHermesPath.trim(),
           // A blank clears an existing remote-profile mapping.
           sshRemoteProfile: state.sshRemoteProfile.trim()
         }),

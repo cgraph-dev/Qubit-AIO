@@ -47,6 +47,7 @@ import { onGatewayEvent } from '@/contrib/events'
 import { registry } from '@/contrib/registry'
 import type { WorkspaceMode } from '@/contrib/types'
 import { deleteProfile, getLogs, getStatus, hermesApi, type HermesGateway } from '@/hermes'
+import { traceIdentityChange } from '@/lib/identity-trace'
 import { completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
 import {
   $gateway,
@@ -378,6 +379,8 @@ let openSessionGeneration = 0
 let gatewaySwapTargetOwnerGeneration: number | null = null
 
 export interface PluginOpenSessionOptions {
+  /** Re-use the live view instead of opening a fresh tab, when supported. */
+  refreshInPlace?: boolean
   awaitHydration?: boolean
   expectHistory?: boolean
   /** Always request a sequenced session.resume after the open, even when the
@@ -650,6 +653,8 @@ async function awaitProfileActivation(
 }
 
 export const host = {
+  /** Change-only desktop.log line for multi-connection identity diagnostics. */
+  traceIdentityChange,
   state: {
     /** Runtime id of the active chat session (null on a fresh draft). */
     activeSessionId: readonlyAtom<null | string>($activeSessionId),
@@ -1823,6 +1828,30 @@ export { Contribute, type ContributeProps } from '@/contrib/react/contribute'
 export type { Contribution } from '@/contrib/types'
 /** The live gateway instance type — for typing the `gateway` prop `ConnectorsTab`
  *  takes; obtain the instance from `host.getGateway()`. */
+/** Compact session row returned by the gateway's session list. */
+export interface SessionListRow {
+  id: string
+  resolved_id?: null | string
+  title?: string
+  preview?: string
+  started_at?: number
+  message_count?: number
+  live_message_count?: null | number
+  source?: string
+  _lineage_root_id?: null | string
+}
+
+/** Newest human-facing session of a profile (rosters use this for activity). */
+export interface ProfileSessionPreview {
+  id?: string
+  title?: string
+  preview?: string
+  started_at?: number
+  last_active?: number
+  message_count?: number
+  live_message_count?: null | number
+}
+
 export type { HermesGateway } from '@/hermes'
 /** Grab-to-pan for overflow containers (boards, timelines, wide tables) —
  *  the shared scrub primitive; don't hand-roll drag-to-scroll. */

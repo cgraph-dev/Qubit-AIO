@@ -83,6 +83,7 @@ function Harness() {
     getRoutedStoredSessionId: () => routedStoredId,
     navigate: navigate as never,
     requestGateway,
+    routedSessionId: routedStoredId,
     selectedStoredSessionId
   })
 

@@ -36,6 +36,7 @@ function publishGuide(storedSessionId: string, visible = true) {
     needsInput: false,
     turnStartedAt: null,
     turnLive: false,
+    runtimeStartedAt: 0,
     usage: null
   }
 

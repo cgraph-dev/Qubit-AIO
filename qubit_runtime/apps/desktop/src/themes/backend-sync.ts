@@ -105,7 +105,11 @@ export function __resetBackendSkinSync(): void {
  * change. Built-in names keep the desktop's own palette but can still be applied.
  */
 export function ingestBackendSkin(skin: HermesSkin | undefined | null, { apply }: { apply: boolean }): void {
-  const name = (skin && typeof skin === 'object' ? (skin.name ?? '') : '').trim()
+  if (!skin || typeof skin !== 'object') {
+    return
+  }
+
+  const name = (skin.name ?? '').trim()
 
   if (!name) {
     return
@@ -120,7 +124,7 @@ export function ingestBackendSkin(skin: HermesSkin | undefined | null, { apply }
   // Built-in names (mono/slate/…) already have a hand-tuned desktop palette — we
   // never shadow it, but the name is still a valid apply target.
   if (cacheable(name)) {
-    const theme = skinToDesktopTheme(skin as QubitSkin)
+    const theme = skinToDesktopTheme(skin)
 
     if (!theme) {
       return

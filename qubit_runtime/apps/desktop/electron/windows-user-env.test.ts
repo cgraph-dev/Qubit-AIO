@@ -12,7 +12,7 @@ test('parseRegQueryValue extracts a REG_SZ value', () => {
 })
 
 test('parseRegQueryValue matches the name case-insensitively', () => {
-  const out = 'HKEY_CURRENT_USER\\Environment\r\n    Hermes_Home    REG_EXPAND_SZ    %USERPROFILE%\\h\r\n'
+  const out = 'HKEY_CURRENT_USER\\Environment\r\n    Qubit_Home    REG_EXPAND_SZ    %USERPROFILE%\\h\r\n'
   assert.equal(parseRegQueryValue(out, 'QUBIT_HOME'), '%USERPROFILE%\\h')
 })
 

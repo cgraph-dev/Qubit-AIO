@@ -64,6 +64,7 @@ interface CommandCenterViewProps {
   // Accepted for call-site parity; navigation lives in the global Cmd+K palette.
   onNavigateRoute?: (path: string) => void
   onOpenSession: (sessionId: string) => void
+  onLoadMoreSessions?: () => Promise<void>
 }
 
 function formatTimestamp(value?: number | null): string {

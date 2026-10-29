@@ -15,7 +15,11 @@ export interface ClarifyRequest {
   /** Local receipt time (Unix seconds), used to reject stale resume cleanup. */
   receivedAt?: number
   sessionId: string | null
-  questions: ClarifyQuestion[]
+  questions?: ClarifyQuestion[]
+  /** Legacy single-question shape (older producers and tool args). */
+  question?: string
+  choices?: null | string[]
+  multiSelect?: boolean
   /** Answers already locked server-side (reconnect replay): qid → answer, null = skipped. */
   lockedAnswers?: Record<string, null | string>
 }
@@ -57,6 +61,13 @@ export function normalizeChoices(choices: unknown): string[] {
   return choices.filter(
     (c): c is string => typeof c === 'string' && c.trim().length > 0 && bareChoice(c).length <= MAX_CHOICE_CHARS
   )
+}
+
+/** Diagnostics for a choices array that was normalized away (never user-facing). */
+export function warnDroppedChoices(source: string, question: string, raw: unknown): void {
+  if (typeof console !== 'undefined') {
+    console.warn(`[clarify] dropped invalid choices from ${source}: ${question}`, raw)
+  }
 }
 
 /**

@@ -55,6 +55,7 @@ function renderTile(
   renderHook(() =>
     useSessionTileDelegate({
       archiveSession: vi.fn(async () => undefined),
+      branchLoadedSession: vi.fn(async () => undefined) as never,
       branchStoredSession: vi.fn(async () => undefined),
       executeSlashCommand: vi.fn(async () => undefined) as never,
       removeSession: vi.fn(async () => undefined),

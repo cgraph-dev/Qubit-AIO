@@ -503,7 +503,7 @@ export function mapBackendCheck(res: BackendUpdateCheckResponse): DesktopUpdateS
     updateAvailable: res.update_available,
     behind: behind === null || behind < 0 ? null : behind,
     currentVersion: res.current_version,
-    channel: res.channel,
+    channel: res.channel ?? undefined,
     branch: res.branch ?? undefined,
     latestTag: res.source_version && !res.rollback_to ? `v${res.source_version}` : undefined,
     targetSha: res.update_available ? `backend:${res.current_version}` : undefined,
