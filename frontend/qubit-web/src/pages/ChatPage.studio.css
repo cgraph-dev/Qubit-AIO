@@ -40,7 +40,15 @@
   background: var(--background-base);
   box-shadow: 0 16px 44px rgb(0 0 0 / .14), inset 0 1px rgb(255 255 255 / .025);
 }
-.qchat__conversation::before { position: absolute; z-index: 0; inset: 0; content: ""; background: radial-gradient(ellipse at 7% 11%, color-mix(in srgb, var(--qchat-violet) 13%, transparent), transparent 39%), radial-gradient(ellipse at 94% 84%, color-mix(in srgb, var(--qchat-cyan) 10%, transparent), transparent 37%), linear-gradient(132deg, color-mix(in srgb, var(--qchat-violet) 3%, transparent), transparent 42%, color-mix(in srgb, var(--qchat-amber) 3%, transparent)); pointer-events: none; }
+/* The conversation stays a flat enamel plate. No decorative wash behind text. */
+.qchat__conversation::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  content: "";
+  background: transparent;
+  pointer-events: none;
+}
 .qchat__conversation > * { position: relative; z-index: 1; }
 .qchat__header {
   display: flex;
