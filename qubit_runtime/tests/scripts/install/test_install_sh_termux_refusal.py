@@ -16,7 +16,7 @@ def test_termux_host_is_refused_before_any_stage_with_apt_hint(tmp_path, marker)
     result = subprocess.run(["bash", INSTALL_SH.as_posix(), "--stage", "prerequisites"],
                             env=env, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
-    assert "pkg install hermes-agent" in result.stderr
+    assert "pkg install qubit" in result.stderr
     assert not (tmp_path / "install").exists()
 
 

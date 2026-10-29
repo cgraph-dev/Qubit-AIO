@@ -8,6 +8,13 @@ import sys
 
 import pytest
 
+# PM's manager runtime pins CPython 3.14 (pm/pyproject.toml requires-python
+# >=3.14,<3.15) and uv refuses to sync it on an older interpreter.
+pytestmark = pytest.mark.skipif(
+    sys.version_info < (3, 14),
+    reason=f"PM runtime pins CPython 3.14; test interpreter is {sys.version.split()[0]}",
+)
+
 
 def _exercise_relocated_pm_runtime(tmp_path, monkeypatch):
     from scripts.bundles import native

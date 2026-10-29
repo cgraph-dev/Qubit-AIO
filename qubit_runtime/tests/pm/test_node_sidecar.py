@@ -48,7 +48,11 @@ def test_real_npm_uses_paired_node_with_empty_ambient_path(tmp_path, monkeypatch
         pytest.skip("requires npm and Node outside the real Hermes home")
     # npm's real JS entrypoint uses /usr/bin/env node. Its paired Node lives
     # in a different PATH entry, just as the two PM packages do.
-    npm_cli = next(iter(Path(npm).resolve().parent.parent.glob("lib/npm*/bin/npm-cli.js")), Path(npm).resolve())
+    npm_root = Path(npm).resolve().parent.parent
+    npm_cli = next((candidate for candidate in (
+        npm_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+        *npm_root.glob("lib/npm*/bin/npm-cli.js"),
+    ) if candidate.is_file()), Path(npm).resolve())
     npm_bin, node_bin = tmp_path / "npm/bin", tmp_path / "node/bin"
     npm_bin.mkdir(parents=True)
     node_bin.mkdir(parents=True)

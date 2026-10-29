@@ -40,7 +40,7 @@ def test_unrelated_destination_is_refused_untouched(tmp_path, shape):
     before = sorted(str(p.relative_to(dest)) for p in dest.rglob("*")) if dest.is_dir() else dest.read_text()
     result = _stage_repository(tmp_path, dest)
     assert result.returncode != 0
-    assert "not a Hermes git checkout" in result.stderr
+    assert "not a Qubit git checkout" in result.stderr
     after = sorted(str(p.relative_to(dest)) for p in dest.rglob("*")) if dest.is_dir() else dest.read_text()
     assert after == before, "refusal must not nest a tree/ inside or alter the destination"
     assert not (dest / "tree").exists()

@@ -17,7 +17,7 @@ def test_invalid_journal_cannot_write_outside_home(tmp_path, monkeypatch):
     state.mkdir(parents=True)
     journal = state / "publication.json"
     journal.write_text(json.dumps({"config": str(outside), "previous": "eA==", "facts_before": None}))
-    with runtime_lock(repo), pytest.raises(RuntimeError, match="outside Hermes state"):
+    with runtime_lock(repo), pytest.raises(RuntimeError, match="outside Qubit state"):
         recover_publication(repo)
     assert outside.read_text() == "untouched"
     assert journal.exists()

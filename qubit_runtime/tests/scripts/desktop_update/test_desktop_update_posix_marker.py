@@ -103,7 +103,7 @@ def _install(tmp_path: Path, *, legacy: bool = False) -> tuple[Path, Path]:
 
 
 def _run(tmp_path: Path, home: Path, install: Path, *args: str, **env: str) -> subprocess.CompletedProcess:
-    full_env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    full_env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home), "QUBIT_HOME": str(home),
                 "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
                 "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0", **env}
     for key in ("PYTHONPATH", "PYTHONHOME", "HERMES_UPDATE_STARTED_AT"):
@@ -264,7 +264,7 @@ def test_handoff_interrupted_while_a_committed_update_finishes_is_still_installe
     passed the commit point. The hand-off's own interruption is then an owed follow-up."""
     home, install = _install(tmp_path)
     hold = tmp_path / "release-update"
-    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home), "QUBIT_HOME": str(home),
            "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
            "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0", "HANDOFF_HOLD": str(hold), "HANDOFF_EXIT": "130",
            "HANDOFF_RECEIPT": "interrupted"}
@@ -340,7 +340,7 @@ def test_script_killed_right_after_spawning_the_update_leaves_a_live_marker(tmp_
     home, install = _install(tmp_path)
     hold = tmp_path / "release-update"
     marker = home / ".hermes-update-in-progress"
-    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home), "QUBIT_HOME": str(home),
            "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
            "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0", "HANDOFF_HOLD": str(hold)}
     for key in ("PYTHONPATH", "PYTHONHOME", "HERMES_UPDATE_STARTED_AT"):

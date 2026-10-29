@@ -158,8 +158,9 @@ def _isolated_checkout(tmp_path: Path) -> Path:
     root.mkdir()
     shutil.copytree(REPO_ROOT / "pm", root / "pm", ignore=shutil.ignore_patterns("__pycache__"))
     (root / "qubit_cli").mkdir()
-    for relative in ("activate", "activate.ps1", "qubit_constants.py", "qubit_cli/__init__.py",
-                     "pm/environments.py", "qubit_cli/runtime_state.py"):
+    (root / "scripts").mkdir()
+    for relative in ("activate", "activate.ps1", "scripts/_activation.sh", "qubit_constants.py",
+                     "qubit_cli/__init__.py", "pm/environments.py", "qubit_cli/runtime_state.py"):
         shutil.copy2(REPO_ROOT / relative, root / relative)
     # Environment-only tests do not exercise provisioning; the runtime tests
     # replace these stubs with a publisher that records and applies each sync.

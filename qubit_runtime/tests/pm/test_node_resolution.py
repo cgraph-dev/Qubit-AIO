@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 
@@ -21,8 +23,12 @@ _REAL_HERMES_HOME = Path.home() / ".hermes"  # Captured before per-test HOME iso
 
 def _register_installed_tool(name, executable, companions=()):
     executable = Path(executable)
+    # Some distributions (mise, asdf) ship npm as a `#!/usr/bin/env bash`
+    # wrapper: the probe needs the system PATH, not only the toolchain dir.
+    probe_env = {**os.environ, "PATH": os.pathsep.join(
+        [str(executable.parent), os.defpath])}
     version = subprocess.run([str(executable), "--version"], capture_output=True, text=True,
-                             check=True, timeout=10).stdout.strip().removeprefix("v")
+                             env=probe_env, check=True, timeout=10).stdout.strip().removeprefix("v")
     package, target, store = get_package(name), current_target(), paths.store_root()
     entry = store / package.store_entry(version, target)
     binary = package.binary(entry, target)
@@ -115,14 +121,15 @@ def test_passive_discovery_never_installs_or_repairs_a_legacy_tree(tmp_path, mon
     assert {p.relative_to(home): p.read_bytes() for p in home.rglob("*") if p.is_file()} == before
     assert not (home / "tools").exists()
 
-    # A user-owned PATH toolchain remains usable without acquiring a PM one.
+    # A user-owned PATH toolchain is never selected by a managed name:
+    # Qubit runs only PM's copy (mixing ABIs breaks native addons).
     external = tmp_path / "external"
     external.mkdir()
     npm = external / "npm"
     npm.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     npm.chmod(0o755)
     monkeypatch.setenv("PATH", str(external))
-    assert qubit_constants.find_node_executable("npm") == str(npm)
+    assert qubit_constants.find_node_executable("npm") is None
     assert attempts == []
     assert not (home / "tools").exists()
 
@@ -136,12 +143,34 @@ def test_explicit_node_path_is_not_replaced_by_managed_name(node_store):
 
 
 @pytest.mark.platforms("posix")
+def _node_cli_shim(tmp_path: Path, executable: Path, name: str) -> Path:
+    """A shell wrapper around npm/npx's JS entrypoint.
+
+    Some distributions (mise/asdf) ship the launcher as a bash script that needs
+    the ambient PATH. PM's child environment contains only its own Node dirs, so
+    the real JS entrypoint is what a PM install would publish; test with that.
+    """
+    resolved = executable.resolve()
+    if resolved.suffix != ".js":
+        candidate = executable.parent.parent / "lib" / "node_modules" / "npm" / "bin" / f"{name}-cli.js"
+        if not candidate.is_file():
+            return executable
+        resolved = candidate
+    shim = tmp_path / "npm-shim" / name
+    shim.parent.mkdir(parents=True, exist_ok=True)
+    shim.write_text(f'#!/bin/sh\nexec node {shlex.quote(str(resolved))} "$@"\n', encoding="utf-8")
+    shim.chmod(0o755)
+    return shim
+
+
 def test_npm_and_npx_use_the_paired_pm_entry(node_store, monkeypatch):
     home, node, external = node_store
     npm = Path(external).with_name("npm")
     npx = Path(external).with_name("npx")
     if not npm.is_file() or not npx.is_file():
         pytest.skip("requires already-installed npm and npx")
+    npm = _node_cli_shim(node_store[0], npm, "npm")
+    npx = _node_cli_shim(node_store[0], npx, "npx")
     binary = _register_installed_tool("npm", npm, [npx])
     companion = binary.with_name("npx")
     legacy = home / "node" / "bin" / "npm"
@@ -169,12 +198,12 @@ def test_npm_and_npx_use_the_paired_pm_entry(node_store, monkeypatch):
 
 
 @pytest.mark.platforms("windows")
-def test_windows_path_prefers_launchable_npm_cmd(tmp_path, monkeypatch):
+def test_windows_explicit_path_to_npm_cmd_is_kept(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "absent-store"))
     monkeypatch.setenv("PATH", str(tmp_path))
-    for name in ("npm", "npm.ps1", "npm.cmd"):
-        (tmp_path / name).write_text("@exit /b 0\n", encoding="utf-8")
-    assert qubit_constants.find_node_executable("npm") == str(tmp_path / "npm.cmd")
+    (tmp_path / "npm.cmd").write_text("@exit /b 0\n", encoding="utf-8")
+    # Explicit paths remain caller-owned even for a managed name.
+    assert qubit_constants.find_node_executable(str(tmp_path / "npm.cmd")) == str(tmp_path / "npm.cmd")
 
 
 @pytest.fixture
@@ -363,7 +392,7 @@ def test_lsp_node_server_inherits_pm_runtime_and_preserves_overrides(node_store,
     script.chmod(0o755)
     monkeypatch.setenv("PATH", "")
     ctx = ServerContext(
-        workspace_root=str(tmp_path), install_strategy="off",
+        workspace_root=str(tmp_path), install_strategy="off", trusted=True,
         binary_overrides={"typescript": [str(script)]},
         env_overrides={"typescript": {"LSP_FLAG": "project-value"}},
     )

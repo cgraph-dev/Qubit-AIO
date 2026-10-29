@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Optional
 
+from pm.filesystem import native
+
 if TYPE_CHECKING:
     from pm.store import Store
 
@@ -31,11 +33,11 @@ def compose_env(diffs: list[dict], base: Optional[dict] = None) -> dict[str, str
         for key, value in diff.items():
             if key == "PATH":
                 dirs = value if isinstance(value, list) else [value]
-                path_dirs.extend(str(d) for d in dirs if str(d) not in path_dirs)
+                path_dirs.extend(native(d) for d in dirs if native(d) not in path_dirs)
     for diff in diffs:
         for key, value in diff.items():
             if key != "PATH":
-                env[key] = str(value)
+                env[key] = native(str(value))
     if path_dirs:
         key = next((k for k in env if k.upper() == "PATH"), "PATH")
         existing = env.get(key, "")

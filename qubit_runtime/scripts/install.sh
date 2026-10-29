@@ -22,8 +22,9 @@ export UV_NO_CONFIG=1
 
 REPO_URL="${HERMES_REPO_URL:-https://github.com/NousResearch/hermes-agent.git}"
 BRANCH="main"
+CHANNEL="${QUBIT_INSTALL_CHANNEL:-${HERMES_INSTALL_CHANNEL:-}}"
 INSTALL_COMMIT=""
-INSTALL_DIR="${HERMES_INSTALL_DIR:-}"
+INSTALL_DIR="${QUBIT_INSTALL_DIR:-${HERMES_INSTALL_DIR:-}}"
 QUBIT_HOME="${QUBIT_HOME:-$HOME/.qubit}"
 STAGE=""
 WANT_MANIFEST=false
@@ -36,7 +37,7 @@ SKIP_COMPUTER_USE=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --branch|-Branch|--commit|-Commit|--dir|--hermes-home|-QubitHome|--stage|-Stage)
+        --branch|-Branch|--commit|-Commit|--dir|--hermes-home|-QubitHome|--stage|-Stage|--channel|-Channel)
             option="$1"
             if [ $# -lt 2 ] || [ -z "$2" ] || [[ "$2" == -* ]]; then
                 printf '%s needs a value\n' "$option" >&2
@@ -44,6 +45,7 @@ while [ $# -gt 0 ]; do
             fi
             case "$option" in
                 --branch|-Branch) BRANCH="$2" ;;
+                --channel|-Channel) CHANNEL="$2" ;;
                 --commit|-Commit) INSTALL_COMMIT="$2" ;;
                 --dir) INSTALL_DIR="$2" ;;
                 --hermes-home|-QubitHome) QUBIT_HOME="$2" ;;
@@ -59,7 +61,7 @@ while [ $# -gt 0 ]; do
         --include-desktop|-IncludeDesktop) INCLUDE_DESKTOP=true; shift ;;
         --verbose|-Verbose) VERBOSE=true; shift ;;
         -h|--help)
-            echo "Usage: install.sh [--branch NAME] [--commit SHA] [--dir PATH]"
+            echo "Usage: install.sh [--branch NAME] [--channel NAME] [--commit SHA] [--dir PATH]"
             echo "                  [--hermes-home PATH]"
             echo "                  [--manifest] [--stage NAME] [--json]"
             echo "                  [--non-interactive] [--include-desktop] [--verbose]"
@@ -158,6 +160,72 @@ chosen_channel() {
             if (depth == 4 && key[1] == "update" && key[2] == "installs" && key[3] == id \
                 && key[4] == "channel") { print bare(substr(line, colon + 1)); exit }
         }' "$config" | grep -E '^[a-z0-9]+(-[a-z0-9]+)*$' || :
+}
+
+# The latest published stable release tag for the repository this installer
+# clones. A fresh install of the official checkout starts there, not on main's
+# tip; `--channel main` opts out. Prints the tag or returns non-zero.
+latest_stable_tag() {
+    local repo json tag
+    repo="$(github_repository)" || return 1
+    command -v curl >/dev/null 2>&1 || return 1
+    json="$(curl -fsSL --max-time 20 -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null)" || return 1
+    tag="$(printf '%s\n' "$json" \
+        | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+    [ -n "$tag" ] || return 1
+    # The stable shape is v<major>.<minor>.<patch>; a canary/preview tag is not
+    # a stable release and must never become the default install target.
+    printf '%s' "$tag" | grep -Eq '^v(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || return 1
+    printf '%s' "$tag"
+}
+
+# owner/repo from the clone URL (the API authority for the release lookup).
+github_repository() {
+    local url="${REPO_URL%.git}"
+    case "$url" in
+        https://github.com/*/*|http://github.com/*/*) printf '%s' "${url#*github.com/}" ;;
+        git@github.com:*) printf '%s' "${url#git@github.com:}" ;;
+        *) return 1 ;;
+    esac
+}
+
+# Only the official source checkout follows published stable releases; a fork,
+# mirror or local-path origin keeps following its branch (same rule as
+# `qubit_cli.update_channel.default_channel`).
+is_official_repository() {
+    local repo
+    repo="$(github_repository)" || return 1
+    [ "${repo,,}" = "nousresearch/hermes-agent" ]
+}
+
+# True when a clone URL names the official source repository.
+official_origin_url() {
+    case "$1" in
+        https://github.com/NousResearch/hermes-agent|https://github.com/NousResearch/hermes-agent.git) return 0 ;;
+        http://github.com/NousResearch/hermes-agent|http://github.com/NousResearch/hermes-agent.git) return 0 ;;
+        git@github.com:NousResearch/hermes-agent.git) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Move a checkout onto the release tag. A fresh clone always lands on the
+# release; a rerun only moves forward, so an install already past the release
+# (or on a divergent line) is never rolled back. A dirty checkout is left alone.
+select_stable_release() {
+    local tag="$1" fresh="$2" target head
+    if ! git -C "$INSTALL_DIR" rev-parse --verify --quiet "refs/tags/$tag" >/dev/null 2>&1; then
+        run_logged "Fetching $tag" git -C "$INSTALL_DIR" fetch --force origin \
+            "+refs/tags/$tag:refs/tags/$tag" || return 1
+    fi
+    target="$(git -C "$INSTALL_DIR" rev-parse --verify "$tag^{commit}")" || return 1
+    head="$(git -C "$INSTALL_DIR" rev-parse HEAD)" || return 1
+    if [ "$fresh" = true ] || git -C "$INSTALL_DIR" merge-base --is-ancestor HEAD "$target"; then
+        if [ "$head" != "$target" ]; then
+            run_logged "Checking out $tag" git -C "$INSTALL_DIR" checkout --force --detach "$target" || return 1
+        fi
+    fi
+    return 0
 }
 
 print_banner() {
@@ -495,18 +563,29 @@ stage_prerequisites() {
     command -v curl >/dev/null 2>&1 || fail "curl is required. Install it with your system package manager." curl_missing
     # PM's Node on musl is the unofficial-builds musl archive, which links the
     # system libstdc++; without it every node/npm stage fails verification.
-    if [[ "$(uv_bootstrap_target 2>/dev/null)" == *-musl ]]; then
+    local _target
+    _target="$(uv_bootstrap_target 2>/dev/null)" || _target=""
+    if [[ "$_target" == *-musl ]]; then
         local _libdir _stdcxx=""
         for _libdir in /lib /usr/lib /usr/local/lib; do
             compgen -G "$_libdir/libstdc++.so.6*" >/dev/null && { _stdcxx=yes; break; }
         done
         [ -n "$_stdcxx" ] || fail "musl host: the Node.js runtime needs the system libstdc++. Install it (Alpine: apk add libstdc++, Void: xbps-install libstdc++) and re-run." libstdcxx_missing
     fi
+    # glibc Node links libatomic.so.1, absent on minimal Debian/RHEL hosts. PM
+    # installs the distro package with `sudo -n` under its install lock, so
+    # cache sudo credentials now, while the terminal can answer the prompt.
+    if [ "$NON_INTERACTIVE" != true ] && [[ "$_target" == linux-* && "$_target" != *-musl ]] \
+        && [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && has_terminal \
+        && ! { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -q 'libatomic\.so\.1'; then
+        log "Node.js needs libatomic.so.1; sudo may ask for your password to install it"
+        sudo -v </dev/tty || log_warn "sudo failed; if Node.js fails, install libatomic (Debian/Ubuntu: libatomic1) and re-run"
+    fi
     log_success "prerequisites ok (git, curl)"
 }
 
 stage_repository() {
-    local pinned=false
+    local pinned=false release_tag=""
     # An interrupted clone from an older installer can leave a .git with no
     # initial commit, where stash/checkout abort ("You do not have the
     # initial commit yet", #40998). Move it aside -- never delete it, it may
@@ -517,16 +596,52 @@ stage_repository() {
         log_warn "$INSTALL_DIR has no commits (interrupted clone); moving it aside to $broken"
         mv "$INSTALL_DIR" "$broken" || fail "cannot move $INSTALL_DIR aside" filesystem_error
     fi
+    # A chosen channel (stable, a preview) owns where this checkout sits:
+    # `qubit update` moves it. Switching it to the installer's branch would
+    # leave it on main while its channel still says otherwise, and the next
+    # check would offer the release as an update. An explicit --commit pin
+    # outranks the choice.
+    local chosen=""
+    [ -n "$INSTALL_COMMIT" ] || chosen="$(chosen_channel)"
+    if [ -n "$chosen" ] && [ "$chosen" != main ]; then
+        log "Keeping its checkout: \`qubit update\` moves it (\`qubit update --set-channel main\` follows main)"
+        return 0
+    fi
+    # An unconfigured install of the official checkout starts on the latest
+    # published stable release, not main's tip. `--channel main` opts out.
+    # The existing checkout's own origin decides (a local/fork origin stays on
+    # its branch); a fresh clone is judged by the URL it will clone.
+    local channel="${CHANNEL:-${chosen:-main}}" official=false
+    if [ -z "$CHANNEL" ] && [ -z "$chosen" ]; then
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            local origin_url=""
+            origin_url="$(git -C "$INSTALL_DIR" config --get remote.origin.url 2>/dev/null)" || origin_url=""
+            official_origin_url "$origin_url" && official=true
+        else
+            is_official_repository && official=true
+        fi
+        [ "$official" = true ] && channel=stable
+    fi
+    if [ -z "$INSTALL_COMMIT" ] && [ "$channel" = stable ]; then
+        release_tag="$(latest_stable_tag)" || release_tag=""
+        if [ -z "$release_tag" ]; then
+            if [ -d "$INSTALL_DIR/.git" ]; then
+                # A rerun never publishes a different checkout because the
+                # release lookup is unavailable; it keeps what it has.
+                log_warn "Could not resolve the latest stable release; keeping the current checkout"
+                return 0
+            fi
+            fail "Could not resolve the latest stable release; no checkout published" release_lookup_failed
+        fi
+    fi
     if [ -d "$INSTALL_DIR/.git" ]; then
-        # A chosen channel (stable, a preview) owns where this checkout sits:
-        # `qubit update` moves it. Switching it to the installer's branch would
-        # leave it on main while its channel still says otherwise, and the next
-        # check would offer the release as an update. An explicit --commit pin
-        # outranks the choice.
-        local channel=""
-        [ -n "$INSTALL_COMMIT" ] || channel="$(chosen_channel)"
-        if [ -n "$channel" ] && [ "$channel" != main ]; then
-            log "Keeping its checkout: \`qubit update\` moves it (\`qubit update --set-channel main\` follows main)"
+        if [ -n "$release_tag" ]; then
+            if [ -n "$(git -C "$INSTALL_DIR" status --porcelain)" ]; then
+                log_warn "Local changes present; keeping the current checkout instead of moving to $release_tag"
+                return 0
+            fi
+            select_stable_release "$release_tag" false \
+                || log_warn "Could not move $INSTALL_DIR to $release_tag; keeping the current checkout"
             return 0
         fi
         log "Updating $INSTALL_DIR ($BRANCH)"
@@ -687,6 +802,22 @@ stage_repository() {
                 fail "could not check out $INSTALL_COMMIT; no checkout published" git_checkout_failed
             fi
         fi
+        if [ -n "$release_tag" ]; then
+            # Verify and select the release BEFORE publishing: an unavailable
+            # tag must leave no checkout behind, exactly like a failed clone.
+            if ! git -C "$staged/tree" rev-parse --verify --quiet "refs/tags/$release_tag" >/dev/null 2>&1; then
+                if ! run_logged "Fetching $release_tag" git -C "$staged/tree" fetch --force origin \
+                    "+refs/tags/$release_tag:refs/tags/$release_tag"; then
+                    rm -rf "$staged"
+                    fail "release tag $release_tag is not available; no checkout published" release_lookup_failed
+                fi
+            fi
+            if ! run_logged "Checking out $release_tag" \
+                git -C "$staged/tree" checkout --force --detach "$release_tag^{commit}"; then
+                rm -rf "$staged"
+                fail "could not check out release $release_tag; no checkout published" release_checkout_failed
+            fi
+        fi
         if ! mv "$staged/tree" "$INSTALL_DIR"; then
             rm -rf "$staged"
             fail "cannot publish cloned checkout" filesystem_error
@@ -703,6 +834,9 @@ stage_repository() {
         git -C "$INSTALL_DIR" config fetch.writeCommitGraph false \
             || log_warn "could not disable fetch.writeCommitGraph in $INSTALL_DIR"
         log_success "Qubit Agent cloned"
+        if [ -n "$release_tag" ]; then
+            log_success "Qubit Agent on stable release $release_tag"
+        fi
     fi
     if [ -n "$INSTALL_COMMIT" ] && [ "$pinned" = false ]; then
         # A pin must come from the branch being installed: the complete
