@@ -88,3 +88,14 @@ def test_asr_your_tube_shapes_open_youtube():
     assert _url("open your tube") == "https://www.youtube.com"
     assert _url("Open your tool stop stop") == "https://www.youtube.com"
     assert _url("open you tube") == "https://www.youtube.com"
+
+
+def test_qubit_tv_and_streaming_services_open():
+    assert _url("open qubit tv") == "http://127.0.0.1:8890/qubit-tv"
+    assert _url("open netflix") == "https://www.netflix.com/"
+    assert _url("open disney plus") == "https://www.disneyplus.com/"
+    assert _url("open prime video") == "https://www.primevideo.com/"
+    assert _url("open hbo max") == "https://www.hbomax.com/"
+    assert _url("open apple tv") == "https://tv.apple.com/"
+    assert _url("open peacock") == "https://www.peacocktv.com/"
+    assert _url("open paramount plus") == "https://www.paramountplus.com/"

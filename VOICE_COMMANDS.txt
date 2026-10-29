@@ -24,7 +24,20 @@ QUICK START
   hey qubit, stop brain while I'm playing
   hey qubit, start the brain
   hey qubit, switch tab to the second display
+  hey qubit, open qubit tv
   stop
+
+QUBIT TV
+--------
+  open qubit tv
+  open netflix
+  open prime video
+  open disney plus
+  open hulu
+  open hbo max
+  open apple tv
+  open peacock
+  open paramount plus
 
 VERIFICATION STATUS (measured 2026-10-29)
 -----------------------------------------
@@ -164,7 +177,7 @@ These are the deterministic machine actions. No model call.
   Confirm: yes
 
 [immediate] open_website - open a website in the browser
-  Say: open youtube | go to github.com
+  Say: open youtube | go to github.com | open qubit tv | open netflix | open disney plus | open prime video
   Confirm: no
 
 [immediate] open_folder - open Downloads/Documents in Files
