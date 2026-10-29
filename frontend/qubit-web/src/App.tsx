@@ -1,4 +1,5 @@
 import {
+  Component,
   lazy,
   Suspense,
   useCallback,
@@ -12,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { stageChrome, stageRoute } from "@/lib/stageReveal";
 import {
   Routes,
   Route,
@@ -90,6 +92,27 @@ import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import "@/styles/sidebar-studio.css";
 import "@/styles/qubit-mark.css";
+
+// The ambient scene pulls in three.js (~1 MB). Keep it behind React.lazy so a
+// slow/failed 3D chunk can never block or break the shell mount.
+const QubitAmbient = lazy(() =>
+  import("@/components/QubitAmbient").then((m) => ({ default: m.QubitAmbient })),
+);
+
+class AmbientFailSafe extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 // Route pages are lazy-loaded so the initial dashboard shell does not pay for
 // every admin surface (and heavy deps like xterm) up front.
@@ -670,6 +693,20 @@ export default function App() {
   const isDocsRoute = pathname === "/docs" || pathname === "/docs/";
   // Both chat routes render the one persistent ChatPage host.
   const isChatRoute = isChatPath(pathname);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const chromeRef = useRef<HTMLElement>(null);
+
+  // GSAP: pages arrive instead of snapping. The embedded terminal owns its own
+  // painting surface, so it is deliberately excluded.
+  useEffect(() => {
+    if (isChatRoute) return;
+    stageRoute(stageRef.current);
+  }, [isChatRoute, pathname]);
+
+  // GSAP: the nav stack settles in once on first paint.
+  useEffect(() => {
+    stageChrome(chromeRef.current);
+  }, []);
   // Full-bleed console pages (WebChat, Qubit Bot) own the viewport and scroll
   // internally; without this their `height: 100%` resolves against an
   // auto-height block ancestor and the page grows to its content.
@@ -788,6 +825,11 @@ export default function App() {
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0"
       >
+        <Suspense fallback={null}>
+          <AmbientFailSafe>
+            <QubitAmbient />
+          </AmbientFailSafe>
+        </Suspense>
         <PluginSlot name="backdrop" />
       </div>
 
@@ -848,6 +890,7 @@ export default function App() {
         <div className="flex min-h-0 min-w-0 flex-1">
           <aside
             id="app-sidebar"
+            ref={chromeRef}
             data-collapsed={isDesktopCollapsed}
             aria-label={t.app.navigation}
             className={cn(
@@ -1050,6 +1093,7 @@ export default function App() {
             >
               <PluginSlot name="pre-main" />
               <div
+                ref={stageRef}
                 className={cn(
                   "w-full min-w-0",
                   !isChatRoute &&
@@ -1168,6 +1212,7 @@ function SidebarNavLink({
       <NavLink
         to={path}
         end={item.exactEnd ?? path === "/sessions"}
+        data-stage-row="nav"
         onClick={() => {
           closeMobile();
           onNavigate?.();
