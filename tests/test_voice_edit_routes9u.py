@@ -334,7 +334,8 @@ def test_site_shortcuts_run_without_confirmation(svc, monkeypatch):
         return {"state": "OK", "reply": f"Opened {text} in the browser."}
 
     monkeypatch.setattr(TT, "run_tool_task", _run)
-    for phrase in ("open youtube", "open messenger", "open instagram"):
+    for phrase in ("open youtube", "open your tube", "open messenger",
+                   "open instagram"):
         req = svc.begin()
         rid = req["request_id"]
         out = svc.route(rid, phrase)
@@ -342,7 +343,7 @@ def test_site_shortcuts_run_without_confirmation(svc, monkeypatch):
         assert not out.get("requires_confirmation"), (phrase, out)
         ans = svc.ask(phrase, request_id=rid, mode="answer")
         assert phrase in ans["answer"], (phrase, ans)
-    assert len(calls) == 3, calls
+    assert len(calls) == 4, calls
     assert all(c[1].get("confirmed") is True for c in calls), calls
 
 
