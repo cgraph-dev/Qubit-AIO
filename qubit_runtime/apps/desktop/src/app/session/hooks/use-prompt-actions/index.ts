@@ -54,6 +54,8 @@ import type {
   SessionRedirectResponse
 } from '../../../types'
 
+import type { CreateBackendSessionForSend } from '../use-session-actions/create-overrides'
+
 import {
   appendMidTurnUserMessage,
   applyBranchVisibility,
@@ -238,7 +240,7 @@ interface PromptActionsOptions {
   activeSessionIdRef: MutableRefObject<string | null>
   busyRef: MutableRefObject<boolean>
   branchCurrentSession: () => Promise<boolean>
-  createBackendSessionForSend: (preview?: string | null) => Promise<string | null>
+  createBackendSessionForSend: CreateBackendSessionForSend
   getRoutedStoredSessionId: () => null | string
   getRuntimeIdForStoredSession: (storedSessionId: string) => null | string
   getRouteToken: () => string
