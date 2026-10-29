@@ -1,7 +1,7 @@
 name: qubit-tv
 version: 0.2.0
-description: QubitTV desktop player and seven session-scoped media tools (context, control, transcript, download, jobs) adapted from the MIT-licensed HermesTV experimental preview.
-author: Qubit adaptation of HermesTV (MIT, Copyright (c) 2025 Nous Research)
+description: QubitTV desktop player and seven session-scoped media tools (context, control, transcript, download, jobs).
+author: Qubit
 entrypoint: __init__.py
 provides_tools:
   - qubit_tv_context
