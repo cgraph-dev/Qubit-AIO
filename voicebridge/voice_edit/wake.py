@@ -1214,14 +1214,24 @@ class WakeMonitor:
         mode = str(_cfg(self.cfg, "voice_edit", "stt_mode",
                         default="accurate") or "accurate").lower()
         if mode == "accurate":
+            norm = _normalize_pcm(
+                pcm, target_peak=_mic_target_peak(self.cfg))
+            # Browser-local STT parity: decode with the configured Sherpa
+            # engine (parakeet) first. The streaming nemotron is the fast
+            # fallback, not the primary short-command decoder.
+            try:
+                from .asr_accurate import transcribe_sherpa
+                text, fail = transcribe_sherpa(self.cfg, norm)
+            except Exception as exc:
+                text, fail = "", str(exc)[:160] or "sherpa failed"
+            if text.strip():
+                return text
             ready, reason = _accurate_ready(self.cfg)
             if ready:
                 text, fail = "", ""
                 try:
                     from .stt_client import transcribe_accurate
-                    text, fail = transcribe_accurate(
-                        self.cfg, _normalize_pcm(
-                            pcm, target_peak=_mic_target_peak(self.cfg)))
+                    text, fail = transcribe_accurate(self.cfg, norm)
                 except Exception as exc:
                     fail = str(exc)[:160] or "accurate failed"
                 if text.strip():

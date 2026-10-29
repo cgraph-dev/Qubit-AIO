@@ -76,3 +76,9 @@ def test_voice_edit_stages_the_website_tool_not_vscode():
     assert propose_tool(None, "Pop on messenger.") == {
         "tool": "local.open_website",
         "args": {"url": "https://www.messenger.com"}}
+
+
+def test_asr_opa_shapes_open_the_site():
+    assert _url("Opa, YouTube!") == "https://www.youtube.com"
+    assert _url("opa messenger") == "https://www.messenger.com"
+    assert _url("opah instagram") == "https://www.instagram.com"

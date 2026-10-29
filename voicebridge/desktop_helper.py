@@ -1580,7 +1580,12 @@ class DesktopHelper:
                 self._warm_state = "warming"
                 try:
                     from .voice_edit import asr_accurate
-                    if asr_accurate.is_available(self.cfg):
+                    # Prefer the browser-local Sherpa engine (parakeet): the
+                    # same decoder the dashboard's local STT uses. Fall back
+                    # to faster-whisper only when Sherpa is not configured.
+                    if asr_accurate.prewarm_sherpa(self.cfg):
+                        self._warm_state = "warm"
+                    elif asr_accurate.is_available(self.cfg):
                         if asr_accurate.prewarm(self.cfg):
                             self._warm_state = "warm"
                         else:
@@ -2915,8 +2920,11 @@ class DesktopHelper:
         # and the fallback reason is always surfaced (never silent).
         if accurate:
             if pcm:
-                from .voice_edit.stt_client import transcribe_accurate
-                acc_text, reason = transcribe_accurate(self.cfg, pcm)
+                from .voice_edit.asr_accurate import transcribe_sherpa
+                acc_text, reason = transcribe_sherpa(self.cfg, pcm)
+                if not acc_text:
+                    from .voice_edit.stt_client import transcribe_accurate
+                    acc_text, reason = transcribe_accurate(self.cfg, pcm)
                 if acc_text:
                     final = acc_text
                     self._final_engine = "accurate"

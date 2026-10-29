@@ -180,6 +180,99 @@ def _default_loader(cfg: Any, model_name: str, pcm: bytes,
                           engine=f"faster-whisper-{name}", device=str(device))
 
 
+#: Cached whole-utterance Sherpa recognizers (the browser local-STT engine).
+_SHERPA_CACHE: Dict[Tuple[str, str, str, str], Any] = {}
+_SHERPA_LOCK = threading.Lock()
+
+
+def _asr_section(cfg: Any) -> Dict[str, Any]:
+    try:
+        got = cfg.section("asr")
+        return got if isinstance(got, dict) else {}
+    except Exception:
+        return {}
+
+
+def _sherpa_key(cfg: Any, engine: str, provider_ep: str) -> Tuple[str, str, str, str]:
+    try:
+        path = str(getattr(cfg, "path", "") or id(cfg))
+    except Exception:
+        path = str(id(cfg))
+    try:
+        models = str(cfg.model_dir())
+    except Exception:
+        models = ""
+    return (path, engine, provider_ep, models)
+
+
+def _sherpa_settings(cfg: Any) -> Tuple[str, str, Dict[str, Any]]:
+    """(engine, provider_ep, asr-section) or ('', '', {}) when not usable."""
+    asr = _asr_section(cfg)
+    if str(asr.get("provider", "sherpa") or "sherpa").lower() != "sherpa":
+        return "", "", {}
+    engine = str(asr.get("engine", "") or "").strip().lower()
+    if engine not in ("parakeet", "moonshine"):
+        return "", "", {}
+    return engine, str(asr.get("provider_ep", "cpu") or "cpu"), asr
+
+
+def _get_sherpa(cfg: Any, engine: str, provider_ep: str,
+                asr: Dict[str, Any]) -> Any:
+    key = _sherpa_key(cfg, engine, provider_ep)
+    with _SHERPA_LOCK:
+        inst = _SHERPA_CACHE.get(key)
+        if inst is None:
+            from ..asr.sherpa import SherpaASR
+            inst = SherpaASR(
+                engine=engine, model_dir=cfg.model_dir(),
+                provider=provider_ep,
+                num_threads=int(asr.get("num_threads", 4) or 4),
+                language=asr.get("language"),
+                hotwords=str(asr.get("hotwords", "") or ""),
+                hotwords_score=float(asr.get("hotwords_score", 1.5) or 1.5))
+            _SHERPA_CACHE[key] = inst
+        return inst
+
+
+def prewarm_sherpa(cfg: Any) -> bool:
+    """Load the configured Sherpa decoder now (never raises)."""
+    engine, provider_ep, asr = _sherpa_settings(cfg)
+    if not engine:
+        return False
+    try:
+        _get_sherpa(cfg, engine, provider_ep, asr).load()
+        return True
+    except Exception:
+        return False
+
+
+def transcribe_sherpa(cfg: Any, pcm: bytes, *,
+                      sample_rate: int = 16000) -> Tuple[str, str]:
+    """Whole-utterance decode with the configured Sherpa engine (parakeet).
+
+    This is the same offline path the browser's local STT uses. Returns
+    ``(text, "")`` on success or ``("", reason)``; never raises.
+    """
+    if not pcm:
+        return "", "empty audio"
+    engine, provider_ep, asr = _sherpa_settings(cfg)
+    if not engine:
+        return "", "sherpa engine not configured"
+    try:
+        inst = _get_sherpa(cfg, engine, provider_ep, asr)
+        import numpy as np
+        audio = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
+        text = str(inst.decode_pcm(audio, sample_rate) or "").strip()
+        return (text, "") if text else ("", "empty sherpa transcript")
+    except Exception as exc:
+        return "", _reason(f"sherpa transcribe failed: {exc}")
+
+
+def reset_sherpa_cache() -> None:
+    with _SHERPA_LOCK:
+        _SHERPA_CACHE.clear()
+
+
 class AccurateTranscriber:
     """Whole-utterance accurate decoder with a model singleton per config."""
 
@@ -264,5 +357,6 @@ def prewarm(cfg: Any) -> bool:
 __all__ = [
     "ACCURATE_MODELS", "DEFAULT_ACCURATE_MODEL", "AccurateResult",
     "AccurateTranscriber", "get_transcriber", "reset_transcribers",
+    "transcribe_sherpa", "reset_sherpa_cache", "prewarm_sherpa",
     "is_available", "prewarm",
 ]

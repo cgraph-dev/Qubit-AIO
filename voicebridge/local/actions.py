@@ -650,13 +650,13 @@ _SITE_SHORTCUTS = {
     "dexonline": "https://dexonline.ro",
 }
 
-_OPEN_VERBS = r"(?:open|launch|go to|visit|pop on|pull up|bring up)"
+_OPEN_VERBS = r"(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)"
 
 # ASR commonly writes "opencode" as "open code" (and may split the wake word:
 # "Open, open code."). That shape used to reach open_app's bare "code" alias
 # and launch VS Code. Keep explicit VS Code/editor phrasings on open_app.
 _OPENCODE_RE = re.compile(
-    r"\b(?:open|launch|go to|visit|pop on|pull up|bring up)\b"
+    r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b"
     r"[\s,]+(?:the\s+)?(?:opencode|open\s*code|code)(?:\.ai)?\b",
     re.IGNORECASE)
 _VSCODE_CONTEXT_RE = re.compile(
@@ -2384,8 +2384,8 @@ ACTIONS: Dict[str, LocalAction] = {
     "window_close": LocalAction("window_close", "close the active window", _a_window_close,
                          patterns=[r"\bclose (this |the |current )?window\b"]),
     "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
-                                patterns=[r"\b(?:open|launch|go to|visit|pop on|pull up|bring up)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
-                                            r"\b(?:open|launch|go to|visit|pop on|pull up|bring up) (the )?(youtube music|youtube|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
+                                patterns=[r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
+                                            r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b[,\s]+(?:the\s+)?(youtube music|youtube|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
     "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
                              patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
                                        r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),
