@@ -41,7 +41,7 @@ MARKER_SH = POSIX.with_name("marker.sh")
 
 
 def _env(tmp_path: Path, home: Path, **extra: str) -> dict:
-    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home), "QUBIT_HOME": str(home),
            "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
            "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0"}
     for key in ("PYTHONPATH", "PYTHONHOME", "HERMES_UPDATE_STARTED_AT", "MARKER_LOCK_TOOL"):

@@ -61,11 +61,11 @@ def test_sidecar_timeout_never_releases_the_parked_update(tmp_path):
         # Lock timeout is the actual production 10-second deadline, not a
         # shortened/mocked predicate. Let the caller process the refused write.
         deadline = time.monotonic() + 5
-        while script.poll() is None and "hermes update exit code:" not in log.read_text():
+        while script.poll() is None and "qubit update exit code:" not in log.read_text():
             assert time.monotonic() < deadline
             time.sleep(0.02)
         assert not any(call.startswith("update --yes") for call in _calls(tmp_path)), _calls(tmp_path)
-        assert "hermes update exit code: 3" in log.read_text()
+        assert "qubit update exit code: 3" in log.read_text()
         assert "delegate:" not in marker.read_text()
     finally:
         if lock_fd is not None:
