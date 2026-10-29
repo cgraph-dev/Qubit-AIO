@@ -121,7 +121,12 @@ def _try_lazy_install_stt() -> bool:
 _CUDA_LIB_ERROR_MARKERS = (
     "libcublas", "libcudnn", "libcudart", "cannot be loaded", "cannot open shared object",
     "no kernel image is available", "CUBLAS_STATUS_NOT_SUPPORTED", "no CUDA-capable device",
-    "CUDA driver version is insufficient")
+    "CUDA driver version is insufficient",
+    # Invalid ordinal = the "auto" picker committed to a CUDA device the process
+    # cannot open (live 2026-10-29: "parallel_for failed: cudaErrorInvalidDevice:
+    # invalid device ordinal" aborted the accurate rescore and the wake path fell
+    # back to the streaming decoder). CPU retry is the correct recovery.
+    "cudaErrorInvalidDevice", "invalid device ordinal")
 
 
 def _looks_like_cuda_lib_error(exc: BaseException) -> bool:
