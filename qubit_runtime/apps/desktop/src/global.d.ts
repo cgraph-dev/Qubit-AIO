@@ -9,6 +9,7 @@ import type { HermesNotification } from '../electron/notification-types'
 import type { PoolLimits } from '../electron/pool-limits'
 import type { GrowRequest } from '../electron/window-growth'
 
+import type { PlayerBridge } from './lib/player-contract'
 import type { WakeIndicatorState } from './lib/wake-indicator'
 import type {
   PetOverlayBounds,
@@ -304,6 +305,9 @@ declare global {
       }) => Promise<null | string>
       writeClipboard: (text: string) => Promise<boolean>
       readClipboard: () => Promise<string>
+      /** Native QubitTV player bridge (Electron WebContentsView). Absent on
+       *  shells older than the player port; feature-detect before use. */
+      player?: PlayerBridge
       saveGatewayFile?: (payload: {
         connectionId?: null | string
         path: string
