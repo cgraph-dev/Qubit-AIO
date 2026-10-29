@@ -166,3 +166,10 @@ def test_display_switch_removes_and_restores_maximized(monkeypatch):
     assert any(c[:6] == ["wmctrl", "-i", "-r", "0x3039", "-b",
                          "add,maximized_vert,maximized_horz"]
                for c in calls), calls
+
+
+def test_display_switch_catalog_examples_are_verified():
+    from voicebridge.voice_edit import custom_commands as CC
+    examples = CC._verified_examples("display_switch", LA.match)
+    assert examples, examples
+    assert all(e["verified"] for e in examples), examples
