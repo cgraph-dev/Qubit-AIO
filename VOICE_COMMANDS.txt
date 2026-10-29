@@ -50,7 +50,7 @@ VERIFICATION STATUS (measured 2026-10-29)
     resolve to needs-arguments:       725
     ambiguous:                          4
   Local actions:                       42
-    example phrases routing:           54
+    example phrases routing:           56
     stale examples:                     2
       - open_project: needs a configured project root in local-actions.yaml
       - send_message: natural 'reply to ...' is the service reply-draft path;
