@@ -1580,9 +1580,10 @@ class DesktopHelper:
                 self._warm_state = "warming"
                 try:
                     from .voice_edit import asr_accurate
-                    # Prefer the browser-local Sherpa engine (parakeet): the
-                    # same decoder the dashboard's local STT uses. Fall back
-                    # to faster-whisper only when Sherpa is not configured.
+                    # Prefer the browser-local English Sherpa engine
+                    # (moonshine): the same decoder the dashboard's local STT
+                    # uses. Fall back to faster-whisper only when Sherpa is
+                    # not configured.
                     if asr_accurate.prewarm_sherpa(self.cfg):
                         self._warm_state = "warm"
                     elif asr_accurate.is_available(self.cfg):

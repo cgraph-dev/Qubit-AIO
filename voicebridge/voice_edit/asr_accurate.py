@@ -206,12 +206,19 @@ def _sherpa_key(cfg: Any, engine: str, provider_ep: str) -> Tuple[str, str, str,
 
 
 def _sherpa_settings(cfg: Any) -> Tuple[str, str, Dict[str, Any]]:
-    """(engine, provider_ep, asr-section) or ('', '', {}) when not usable."""
+    """(engine, provider_ep, asr-section) or ('', '', {}) when not usable.
+
+    Prefer the configured streaming-window engine (moonshine on this host):
+    it is English-only and stable for short commands. Parakeet is
+    multilingual and misdetected short English commands as Portuguese
+    (live 2026-10-29: "Opõe no YouTube.", "Acompanhe YouTube."). Do not use
+    it for this path unless explicitly configured as the window engine.
+    """
     asr = _asr_section(cfg)
     if str(asr.get("provider", "sherpa") or "sherpa").lower() != "sherpa":
         return "", "", {}
-    engine = str(asr.get("engine", "") or "").strip().lower()
-    if engine not in ("parakeet", "moonshine"):
+    engine = str(asr.get("streaming_window_engine", "") or "").strip().lower()
+    if engine != "moonshine":
         return "", "", {}
     return engine, str(asr.get("provider_ep", "cpu") or "cpu"), asr
 

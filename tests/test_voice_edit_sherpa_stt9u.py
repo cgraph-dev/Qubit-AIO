@@ -9,7 +9,7 @@ class Cfg:
 
     def __init__(self, asr=None):
         self._asr = asr if asr is not None else {
-            "provider": "sherpa", "engine": "parakeet",
+            "provider": "sherpa", "streaming_window_engine": "moonshine",
             "provider_ep": "cpu", "num_threads": 2,
             "language": "en", "hotwords": "Qubit",
             "hotwords_score": 1.5,
@@ -34,7 +34,7 @@ class FakeSherpa:
         return "open youtube"
 
 
-def test_transcribe_sherpa_uses_configured_parakeet(monkeypatch):
+def test_transcribe_sherpa_uses_configured_moonshine(monkeypatch):
     import voicebridge.asr.sherpa as S
     A.reset_sherpa_cache()
     FakeSherpa.created = 0
@@ -42,7 +42,7 @@ def test_transcribe_sherpa_uses_configured_parakeet(monkeypatch):
     text, reason = A.transcribe_sherpa(Cfg(), b"\x00\x00" * 1600)
     assert (text, reason) == ("open youtube", "")
     assert FakeSherpa.created == 1
-    assert FakeSherpa.kwargs["engine"] == "parakeet"
+    assert FakeSherpa.kwargs["engine"] == "moonshine"
     assert FakeSherpa.kwargs["provider"] == "cpu"
 
 
