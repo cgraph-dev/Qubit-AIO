@@ -1635,6 +1635,9 @@ export { SidebarRowLead } from '@/app/chat/sidebar/chrome'
 export { ConnectionGlyph } from '@/app/chat/sidebar/connection-glyph'
 export { SIDEBAR_ROW_LEAD, SIDEBAR_TRUNCATED_LEADING } from '@/app/chat/sidebar/row-geometry'
 export { PALETTE_AREA, type PaletteContribution } from '@/app/command-palette/contrib'
+/** Page-owned header control: projected into the workspace page header when the
+ *  page renders in the workspace pane, and rendered inline anywhere else. */
+export { WorkspacePageHeaderControl } from '@/app/contrib/workspace-page-header'
 /** THE overdue test for a cron job's `next_run_at`: non-null once the stored slot
  *  sits past the scheduler grace and the job is expected to fire. Every surface
  *  that prints a next run switches its label on this (`t.cron.next` →
@@ -1865,6 +1868,7 @@ export {
   type SurfaceModelSwitchConfirmOptions
 } from '@/lib/guarded-model-switch'
 export { triggerHaptic as haptic } from '@/lib/haptics'
+export { catalogProviderMatches } from '@/lib/model-options'
 export type { HermesOpenTarget } from '@/lib/hermes-open-target'
 /** The app's lucide icon set (RefreshCw, LayoutDashboard, Activity, …). */
 export * as icons from '@/lib/icons'
@@ -1987,6 +1991,10 @@ export type { DisplayLease, DisplayObserveResult, DisplayStatus, DisplayThumbnai
 /** THE compact-number formatter — every user-facing count/token figure goes
  *  through here (1230 → "1.2k", 1_500_000 → "1.5M"). Don't hand-roll `/1000`. */
 export { compactNumber } from '@qubit/shared'
+/** Client deadline for `approval.respond`: matches the backend's
+ *  `approvals.timeout` (300s) so a plugin answering an approval never rejects
+ *  its own RPC while the backend still applies the decision. */
+export { APPROVAL_RESPOND_TIMEOUT_MS } from '@qubit/shared'
 /** Qubit' reasoning levels, so a plugin surfacing a thinking depth uses the
  *  same scale as the rest of the app (labels: `reasoningEffortLabel`). */
 export {

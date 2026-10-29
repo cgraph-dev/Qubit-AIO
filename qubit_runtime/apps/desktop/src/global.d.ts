@@ -1544,6 +1544,9 @@ export interface HermesRepoStatus {
 // turn began.
 export type HermesReviewScope = 'branch' | 'lastTurn' | 'uncommitted'
 
+// Qubit-branded alias kept for newer UI imports.
+export type QubitReviewScope = HermesReviewScope
+
 // One changed file in the review pane (status letter, +/- lines, staged flag).
 export interface HermesReviewFile {
   path: string

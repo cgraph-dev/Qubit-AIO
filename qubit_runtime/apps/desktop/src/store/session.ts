@@ -12,6 +12,7 @@ import {
   rescopeConnectionScopedStores
 } from '@/lib/connection-scoped'
 import { isMessagingSource } from '@/lib/session-source'
+import type { TileSessionFocusStamp } from '@/lib/session-timer-since'
 import { persistBoolean, persistString, readJson, storedBoolean, storedString, writeJson } from '@/lib/storage'
 import type { SessionInfo, UsageStats } from '@/types/hermes'
 
@@ -860,6 +861,44 @@ export function touchSessionActivity(
   })
 }
 
+/** Patch a session's title across EVERY sidebar slice, matching the row by
+ *  any id the conversation has answered to (`sessionMatchesStoredId`) — a
+ *  compression tip, its root, and a middle segment all name the same chat.
+ *  A rename writes one title; every surface that renders the row (recents,
+ *  cron, messaging) must show it without waiting for a profile switch to
+ *  force a refetch. Reference-stable per slice when nothing matched or the
+ *  title is already current. */
+export function applySessionTitle(storedSessionId: string | null | undefined, title: string | null): void {
+  const id = storedSessionId?.trim()
+
+  if (!id) {
+    return
+  }
+
+  const next = title?.trim() || null
+
+  const patch = (rows: SessionInfo[]): SessionInfo[] => {
+    let changed = false
+
+    const mapped = rows.map(session => {
+      if (!sessionMatchesStoredId(session, id) || session.title === next) {
+        return session
+      }
+
+      changed = true
+
+      return { ...session, title: next }
+    })
+
+    return changed ? mapped : rows
+  }
+
+  setSessions(patch)
+  setCronSessions(patch)
+  setMessagingSessions(patch)
+  setUnlistedSessionOwnerRows(patch)
+}
+
 export const $connection = atom<HermesConnection | null>(null)
 export const $gatewayState = atom<ConnectionState>('idle')
 export const $sessions = atom<SessionInfo[]>([])
@@ -1343,6 +1382,9 @@ export const $currentUsage = atom<UsageStats>({
   total: 0
 })
 export const $sessionStartedAt = atom<number | null>(null)
+// $sessionStartedAt is primary-only; tiles get their own "focused since" stamp
+// for the statusbar timer, set when a tile becomes the focused surface.
+export const $tileSessionFocusStartedAt = atom<null | TileSessionFocusStamp>(null)
 export const $turnStartedAt = atom<number | null>(null)
 export const $introPersonality = atom('')
 export const $currentPersonality = atom('')
@@ -1725,6 +1767,8 @@ export const workspaceCwdForNewSession = (): string => {
 export const setCurrentBranch = (next: Updater<string>) => updateAtom($currentBranch, next)
 export const setCurrentUsage = (next: Updater<UsageStats>) => updateAtom($currentUsage, next)
 export const setSessionStartedAt = (next: Updater<number | null>) => updateAtom($sessionStartedAt, next)
+export const setTileSessionFocusStartedAt = (next: Updater<null | TileSessionFocusStamp>) =>
+  updateAtom($tileSessionFocusStartedAt, next)
 export const setTurnStartedAt = (next: Updater<number | null>) => updateAtom($turnStartedAt, next)
 export const setIntroPersonality = (next: Updater<string>) => updateAtom($introPersonality, next)
 export const setCurrentPersonality = (next: Updater<string>) => updateAtom($currentPersonality, next)

@@ -265,6 +265,14 @@ interface RestoreMessageTarget {
   userOrdinal?: number | null
 }
 
+// The gateway reports a stale truncation target when the row or ordinal the
+// cached plan addressed was compressed away. Shared with session tiles so both
+// surfaces retry-and-reload on the same condition.
+const isStaleTargetError = (err: unknown) =>
+  /no longer in session history|not in session history/i.test(err instanceof Error ? err.message : String(err))
+
+export { isStaleTargetError }
+
 export function usePromptActions({
   activeSessionId,
   activeSessionIdRef,
@@ -1129,9 +1137,6 @@ export function usePromptActions({
       setBusy(true)
       setAwaitingResponse(true)
       updateSessionState(sessionId, state => applyRewindOptimistic(state, plan.sourceIndex, plan.editedMessage))
-
-      const isStaleTargetError = (err: unknown) =>
-        /no longer in session history|not in session history/i.test(err instanceof Error ? err.message : String(err))
 
       const isCompressedAwayError = (err: unknown) => {
         if (!(err instanceof JsonRpcGatewayError) || err.code !== 4018) {

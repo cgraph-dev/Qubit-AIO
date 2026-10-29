@@ -37,7 +37,7 @@ import {
   workspaceCwdForNewSession
 } from '@/store/session'
 import { $removedSessionIds, $sessionMutationsInFlight } from '@/store/session-removal'
-import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
+import type { ProjectInfo, ProjectsPayload, SessionInfo } from '@/types/hermes'
 
 // First-class, per-profile Projects (named, multi-folder workspaces). State is
 // served by the live gateway's `projects.*` JSON-RPC methods, which wrap the
@@ -594,6 +594,87 @@ export async function fetchProjectSessions(
 
     throw error
   }
+}
+
+// Mirror a successful rename into the cached project surfaces, the same
+// optimistic-layer contract as moveSessionToProject: the backend row IS
+// renamed, but the tree snapshot (overview previews + counts) still carries
+// the old title until its next refresh — and the sidebar overlays live rows
+// only where a live twin exists, so a snapshot-only row in the entered
+// project kept the stale title until a profile switch. Patch every cached copy
+// by lineage id, then re-pull the authoritative tree.
+export function applyRenamedSessionTitle(sessionId: string, title: string | null): void {
+  const next = title?.trim() || null
+
+  const tree = $projectTree.get()
+  let changed = false
+
+  const renamedTree = tree.map(project => {
+    const renamed = renameProjectSessions(project, sessionId, next)
+
+    changed ||= renamed !== project
+
+    return renamed
+  })
+
+  if (changed) {
+    $projectTree.set(renamedTree)
+  }
+
+  void refreshProjectTree()
+}
+
+/** Patch every cached copy of the renamed conversation inside one project
+ *  node (lane rows + overview previews), keeping the node's reference when
+ *  nothing matched — the tree keeps unchanged nodes by reference so the
+ *  drill-in doesn't refetch on a no-op. */
+function renameProjectSessions(
+  project: SidebarProjectTree,
+  sessionId: string,
+  next: string | null
+): SidebarProjectTree {
+  let changed = false
+
+  const rename = (sessions: SessionInfo[]): SessionInfo[] =>
+    sessions.map(session => {
+      if (!sessionMatchesStoredId(session, sessionId) || session.title === next) {
+        return session
+      }
+
+      changed = true
+
+      return { ...session, title: next }
+    })
+
+  const repos = project.repos.map(repo => {
+    let repoChanged = false
+
+    const groups = repo.groups.map(group => {
+      const sessions = rename(group.sessions)
+
+      if (sessions === group.sessions) {
+        return group
+      }
+
+      repoChanged = true
+
+      return { ...group, sessions }
+    })
+
+    if (!repoChanged) {
+      return repo
+    }
+
+    return { ...repo, groups, sessionCount: groups.reduce((n, g) => n + g.sessions.length, 0) }
+  })
+
+  const previewSessions = project.previewSessions ? rename(project.previewSessions) : project.previewSessions
+
+  if (!changed) {
+    return project
+  }
+
+  return { ...project, previewSessions, repos, sessionCount: repos.reduce((n, repo) => n + repo.sessionCount, 0) }
 }
 
 interface WorkspaceMovePayload {
