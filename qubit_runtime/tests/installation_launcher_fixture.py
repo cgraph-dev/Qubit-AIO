@@ -23,5 +23,12 @@ def publish_fixture_launcher(root: Path, main_source: str) -> Path:
     out.mkdir(parents=True)
     launcher = mint_launcher("hermes", root, out, Path(sys.executable), None)
     assert launcher is not None
+    # The canonical launcher lives beside the read-old alias; the installer and
+    # the completion tail invoke `.qubit/bin/qubit`, so the fixture publishes
+    # both names from the same checkout (dual-publish, not a rename).
+    canonical_out = root / ".qubit" / "bin"
+    canonical_out.mkdir(parents=True, exist_ok=True)
+    canonical = mint_launcher("qubit", root, canonical_out, Path(sys.executable), None)
+    assert canonical is not None
     assert not (root / "venv").exists()
     return launcher
