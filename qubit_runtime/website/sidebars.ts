@@ -276,6 +276,7 @@ const sidebars: SidebarsConfig = {
                     'user-guide/skills/bundled/research/research-competitor-news-monitor',
                     'user-guide/skills/bundled/research/research-grounded-citations',
                     'user-guide/skills/bundled/research/research-llm-wiki',
+                    'user-guide/skills/bundled/research/research-subscription-research',
                   ],
                 },
                 {
