@@ -99,3 +99,8 @@ def test_qubit_tv_and_streaming_services_open():
     assert _url("open apple tv") == "https://tv.apple.com/"
     assert _url("open peacock") == "https://www.peacocktv.com/"
     assert _url("open paramount plus") == "https://www.paramountplus.com/"
+
+
+def test_qubit_tv_spellings_open_the_dashboard_page():
+    assert _url("open qubit tv") == "http://127.0.0.1:8890/qubit-tv"
+    assert _url("open qubit-tv") == "http://127.0.0.1:8890/qubit-tv"
