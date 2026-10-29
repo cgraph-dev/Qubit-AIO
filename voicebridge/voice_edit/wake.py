@@ -1201,7 +1201,7 @@ class WakeMonitor:
                         agc=bool(_cfg(self.cfg, "voice_edit", "agc",
                                       default=True)))
 
-    def _do_transcribe(self, pcm: bytes, *, prefer_streaming: bool = False) -> str:
+    def _do_transcribe(self, pcm: bytes) -> str:
         # Honest consumer of ``voice_edit.noise_suppression``: the software
         # NS/AGC stage runs on the captured utterance before either STT path
         # (accurate or streaming). OFF → pcm unchanged (see _maybe_ns_filter).
@@ -1210,15 +1210,19 @@ class WakeMonitor:
             return self._transcribe(pcm)
         # Accurate whole-utterance pass first (default); the streaming socket
         # remains the live path and the fallback when the accurate engine is
-        # unavailable or yields nothing.
+        # unavailable or yields nothing. The wake fallback uses this SAME
+        # decoder as Right-Ctrl: the streaming nemotron heard "open GitHub"
+        # as "One GitHub" (live 2026-10-29), so it must never be the primary
+        # decoder for a wake command.
         mode = str(_cfg(self.cfg, "voice_edit", "stt_mode",
                         default="accurate") or "accurate").lower()
-        if mode == "accurate" and not prefer_streaming:
+        if mode == "accurate":
             norm = _normalize_pcm(
                 pcm, target_peak=_mic_target_peak(self.cfg))
-            # Browser-local STT parity: decode with the configured Sherpa
-            # engine (parakeet) first. The streaming nemotron is the fast
-            # fallback, not the primary short-command decoder.
+            # Browser-local STT parity: decode with the configured accurate
+            # Sherpa engine first (same as Right-Ctrl). The streaming
+            # nemotron is the fast fallback, not the primary short-command
+            # decoder.
             try:
                 from .asr_accurate import transcribe_sherpa
                 text, fail = transcribe_sherpa(self.cfg, norm)
@@ -1447,12 +1451,14 @@ class WakeMonitor:
                         # mode, and a miss is discarded, never typed.
                         if _asr_fallback_allows(self.cfg, pcm):
                             _trace("asr_fallback_probe", bytes=len(pcm),
-                                   prefer="streaming")
-                            # KWS missed: use the streaming engine for the
-                            # wake phrase (it hears "Hey Qubit" reliably;
-                            # moonshine misheard it as "Hate your bit").
-                            self._handle_segment(
-                                pcm, forced=False, prefer_streaming=True)
+                                   prefer="accurate")
+                            # KWS missed: decode with the same accurate/English
+                            # decoder Right-Ctrl uses. The streaming engine is
+                            # only the internal last resort inside
+                            # ``_do_transcribe`` (accurate empty/unavailable);
+                            # as the primary it heard "open GitHub" as
+                            # "One GitHub" (live 2026-10-29).
+                            self._handle_segment(pcm, forced=False)
                         else:
                             _trace("asr_fallback_skip", bytes=len(pcm))
                         continue
@@ -1588,16 +1594,14 @@ class WakeMonitor:
         except Exception:
             return False
 
-    def _handle_segment(self, pcm: bytes, *, forced: bool = False,
-                        prefer_streaming: bool = False) -> None:
+    def _handle_segment(self, pcm: bytes, *, forced: bool = False) -> None:
         if len(pcm) < 4800:
             _trace("segment_too_short", bytes=len(pcm))
             return
         _trace("segment", bytes=len(pcm), forced=forced,
                engine=self.engine, capped=_segment_capped(self.cfg, len(pcm)))
         try:
-            text = self._do_transcribe(
-                pcm, prefer_streaming=prefer_streaming).strip()
+            text = self._do_transcribe(pcm).strip()
         except Exception as exc:
             self.last_error = str(exc)[:160]
             _trace("transcribe_error", detail=self.last_error)
