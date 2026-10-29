@@ -163,3 +163,6 @@ graphify-out.*/
 # runtime cron markers written at the repo root by the live gateway
 /cron-heartbeat
 /cron-started
+
+# bunshin/impeccable run state (local only)
+.bunshin/
