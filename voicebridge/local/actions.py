@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from ..logging_setup import get_logger, log_event
+from . import brain_warm as _brain_warm_mod
 
 log = get_logger()
 
@@ -1754,6 +1755,127 @@ def _display_name(which: int) -> str:
     return {1: "first", 2: "second", 3: "third"}.get(which, f"number {which}")
 
 
+#: Local models the "brain off" command releases before gaming. The
+#: embedding models are optional (only stopped when actually loaded).
+_BRAIN_MODEL = _brain_warm_mod.MODEL
+_BRAIN_EMBED_MODELS = ("embeddinggemma", "nomic-embed-text")
+_BRAIN_MODELS = (_BRAIN_MODEL,) + _BRAIN_EMBED_MODELS
+_BRAIN_KEEPALIVE = _brain_warm_mod.KEEPALIVE
+_BRAIN_NUM_CTX = _brain_warm_mod.NUM_CTX
+
+
+def _ollama_loaded_models(timeout: float = 3.0) -> Optional[set]:
+    """Full names currently loaded in Ollama, or ``None`` when unreachable."""
+    if not shutil.which("ollama"):
+        return None
+    try:
+        proc = subprocess.run(["ollama", "ps"], capture_output=True,
+                              text=True, timeout=timeout)
+    except Exception:
+        return None
+    out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    if proc.returncode != 0 or "could not connect" in out.lower():
+        return None
+    loaded = set()
+    for line in (proc.stdout or "").splitlines()[1:]:
+        parts = line.split()
+        if parts:
+            loaded.add(parts[0])
+    return loaded
+
+
+def _loaded_base(name: str) -> str:
+    return str(name or "").split(":")[0]
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def _clean_ollama_detail(text: str) -> str:
+    return _ANSI_RE.sub("", str(text or "")).strip()[:120]
+
+
+def _brain_stop(model: str) -> tuple[bool, str]:
+    try:
+        proc = subprocess.run(["ollama", "stop", model], capture_output=True,
+                              text=True, timeout=10)
+    except Exception as exc:
+        return False, str(exc)[:120]
+    if proc.returncode != 0:
+        return False, _clean_ollama_detail(
+            proc.stderr or proc.stdout or "ollama stop failed")
+    return True, ""
+
+
+def _brain_installed(model: str) -> bool:
+    try:
+        proc = subprocess.run(["ollama", "show", model], capture_output=True,
+                              text=True, timeout=3)
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def _brain_warm_payload() -> Dict[str, Any]:
+    """One-token warm request at the voice context (never a real answer)."""
+    return _brain_warm_mod.payload()
+
+
+def _brain_spawn_warm() -> bool:
+    """Warm ``qubit-brain`` in a detached process (never blocks the bridge)."""
+    try:
+        script = str(Path(__file__).with_name("brain_warm.py"))
+        subprocess.Popen(
+            [sys.executable, script],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, start_new_session=True)
+        return True
+    except Exception:
+        return False
+
+
+def _a_brain_unload(_: Dict[str, Any]) -> str:
+    """Unload the local brain (and embedding model) without calling it."""
+    loaded = _ollama_loaded_models()
+    if loaded is None:
+        return "Ollama isn't running, so there's nothing to unload."
+    loaded_bases = {_loaded_base(m) for m in loaded}
+    present = [m for m in _BRAIN_MODELS if m in loaded_bases]
+    if not present:
+        return "The brain isn't loaded, so there's nothing to unload."
+    stopped = []
+    failed = []
+    for base in present:
+        full = next((m for m in loaded if _loaded_base(m) == base), base)
+        ok, detail = _brain_stop(full)
+        if ok:
+            stopped.append(base)
+        else:
+            failed.append(f"{base}: {detail}")
+    if failed:
+        done = f" ({', '.join(stopped)} unloaded)" if stopped else ""
+        return f"I couldn't unload the brain{done}: {failed[0]}"
+    if _BRAIN_MODEL in stopped and any(m in stopped for m in _BRAIN_EMBED_MODELS):
+        return "Brain and embeddings unloaded."
+    if _BRAIN_MODEL in stopped:
+        return "Brain unloaded."
+    return "Embeddings unloaded."
+
+
+def _a_brain_warm(_: Dict[str, Any]) -> str:
+    """Warm ``qubit-brain`` with a one-token prompt; ack immediately."""
+    loaded = _ollama_loaded_models()
+    if loaded is None:
+        return "Ollama isn't running, so I can't load the brain."
+    if _BRAIN_MODEL in {_loaded_base(m) for m in loaded}:
+        return "The brain is already loaded."
+    if not _brain_installed(_BRAIN_MODEL):
+        return f"The {_BRAIN_MODEL} model isn't installed."
+    if not _brain_spawn_warm():
+        return "I couldn't start loading the brain."
+    return "Warming the brain."
+
+
 def _a_display_switch(params: Dict[str, Any]) -> str:
     """Move the ACTIVE window to the requested physical display.
 
@@ -2233,6 +2355,20 @@ ACTIONS: Dict[str, LocalAction] = {
                                    r"\bwhich tabs( are open)?\b",
                                    r"\blist (my |open |browser )?tabs\b",
                                    r"\bshow (me )?(my |open |browser |all )?tabs\b"]),
+    "brain_unload": LocalAction("brain_unload", "unload the local brain before gaming", _a_brain_unload,
+                            patterns=[r"\b(?:stop|unload|release|drop|clear|free|kill)\b.{0,32}?\b(?:brain|brian|model|v\s*ram|vram|gpu|graphics\s+card)\b",
+                                      r"\b(?:free|clear)\s+(?:the\s+)?(?:v\s*ram|vram|gpu|graphics\s+card)\b",
+                                      r"\bi(?:'m| am)\s+(?:going|about)\s+to\s+(?:game|games|gaming|play\s+(?:a\s+)?game)\b",
+                                      r"\bi(?:'m| am)\s+going\s+gaming\b",
+                                      r"\bi(?:'m| am)\s+(?:about\s+to|going\s+to)\s+game\b",
+                                      r"\b(?:go\s+to\s+sleep|brain\s+(?:off|sleep))\b",
+                                      r"^\s*sleep\s*[.!?]*$"]),
+    "brain_warm": LocalAction("brain_warm", "warm the local brain again", _a_brain_warm,
+                          patterns=[r"\b(?:wake\s*up|wakeup|load|warm|reload|restart|bring\s+back)\b.{0,24}?\b(?:brain|brian|model|gpu|v\s*ram|vram)\b",
+                                    r"^\s*wake\s*up\s*[.!?]*$",
+                                    r"\bbrain\s+(?:on|up)\b",
+                                    r"\bbring\s+(?:the\s+)?(?:brain|brian)\s+back\b",
+                                    r"\bi(?:'m| am)\s+(?:done|finished)\s+(?:gaming|playing)\b"]),
     "display_switch": LocalAction("display_switch", "move the active window to a display", _a_display_switch,
                          patterns=[r"\b(?:switch|move|send|put|shift|throw)\b.{0,30}?\b(?:tabs?|window|screen|it|this)\b.{0,20}?\b(?:to|on|onto)\b.{0,20}?\b(?:(?:first|second|third|1st|2nd|3rd|primary)\s+(?:display|monitor|screen)|(?:display|monitor|screen)\s*(?:number\s*)?\d)\b",
                                    r"\b(?:switch|move|send|put|shift|throw)\b.{0,30}?\b(?:to|on|onto)\b.{0,25}?\b(?:(?:first|second|third|1st|2nd|3rd|primary)\s+(?:display|monitor|screen)|(?:display|monitor|screen)\s*(?:number\s*)?\d)\b",

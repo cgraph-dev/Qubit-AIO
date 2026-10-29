@@ -153,6 +153,27 @@ def wake_match_kind(text: str,
     return None
 
 
+#: Bare "qubit," wake phrases that may execute despite the weak-evidence
+#: drop. They only change local model power (free VRAM / warm it), so a
+#: misheard room phrase is harmless and reversible.
+_SAFE_BARE_WAKE_ACTIONS = frozenset({"brain_unload", "brain_warm"})
+
+
+def is_safe_bare_wake_command(text: str) -> bool:
+    """True for the explicit bare-wake model-power commands.
+
+    "qubit, wake up", "qubit, load the brain", "qubit, sleep", "qubit,
+    I'm going to game" are spoken without "hey" by design. All other bare
+    "qubit, ..." phrasing keeps the room-chatter drop.
+    """
+    try:
+        from ..local import actions as _la
+        hit = _la.match(text)
+    except Exception:
+        return False
+    return bool(hit is not None and hit.name in _SAFE_BARE_WAKE_ACTIONS)
+
+
 #: Trailing address ("open youtube, qubit"): the wake name at the very end,
 #: preceded by a COMMA. The comma gate is deliberate — OpenClaw's
 #: activation-name matcher requires a strong boundary at the edge, and a
@@ -1781,6 +1802,13 @@ class WakeMonitor:
             self._maybe_hint(text)
             return  # not a wake phrase: discard, never type it
         if wake_match_kind(text, aliases=aliases) == "bare":
+            if is_safe_bare_wake_command(remainder):
+                _trace("bare_wake_power", chars=len(remainder))
+                if not self._cue_segment:
+                    beep(self.cfg, "wake")
+                self._reset_continuous()
+                self._emit(remainder)
+                return
             # Weak evidence on the unarmed fallback path: a bare "Qubit"
             # without hey is as likely room chatter (or our own TTS echo)
             # as direction, so drop it silently — no beep, no arm, no

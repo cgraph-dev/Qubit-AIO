@@ -54,6 +54,8 @@ EXAMPLE_PHRASES: Dict[str, List[str]] = {
     "quick_note": ["note that the meeting is at three"],
     "timer": ["set a timer for five minutes"],
     "window_close": ["close this window"],
+    "brain_unload": ["stop brain", "free the VRAM", "I'm going to game"],
+    "brain_warm": ["wake up the brain", "load the brain"],
     "display_switch": ["switch tab to the second display",
                        "move this window to the first screen"],
     "find_file": ["find the file quarterly report"],
