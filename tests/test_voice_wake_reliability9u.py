@@ -211,6 +211,7 @@ def _barge_helper(monkeypatch, mic, procs):
             return self._inner.wait(timeout=timeout)
 
     monkeypatch.setattr("subprocess.Popen", FakePopen)
+    monkeypatch.setattr(dh, "_trace", lambda *a, **k: None)
     helper._wake = BargeWake()
     return helper
 
