@@ -19,7 +19,7 @@ import { emptyStage, QuestionBlock } from './core/question-block'
 import { CLARIFY_ICON_CLASS, ClarifyShell } from './core/shell'
 import { useClarifyKeys } from './core/use-clarify-keys'
 import type { ClarifyArgs } from './parse'
-import { handleClarifySubmitShortcut } from './submit-shortcut'
+import { handleClarifySubmitShortcut } from '../clarify-submit-shortcut'
 import { UndeliveredNotice } from './undelivered-notice'
 
 /** Live batch card: all questions at once, staged locally, ONE confirm.
