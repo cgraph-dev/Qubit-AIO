@@ -1215,6 +1215,7 @@ class VoiceOrchestrator:
         self._ptt_released = threading.Event()
         self._ptt_hold = False
         self._ptt_supported = False
+        self._hotkey_yielded = False
         self._events: queue.Queue = queue.Queue()  # hotkey/manual events
 
         # layers (lazy)
@@ -1593,6 +1594,7 @@ class VoiceOrchestrator:
         # press start two sessions and fire two beeps ("starts twice / two
         # voices"). The helper publishes a heartbeat; yield to it.
         _hk_yield = (not self.no_hotkey) and self._desktop_helper_live()
+        self._hotkey_yielded = bool(_hk_yield)
         log_event("hotkey.decision", no_hotkey=self.no_hotkey,
                   helper_live=self._desktop_helper_live(), yield_to_helper=_hk_yield)
         if not self.no_hotkey and not _hk_yield:
@@ -4253,6 +4255,8 @@ class VoiceOrchestrator:
         if self._ptt_supported:
             hold = self.cfg.get("hotkey", "hold_key", default="ctrl_r")
             print(f"  Hold {hold} and speak. Esc cancels. Ctrl+C to quit.")
+        elif self._hotkey_yielded:
+            print("  Right-Ctrl is handled by the desktop helper.")
         else:
             print("  Hotkeys unavailable (no X). Press Enter to start/stop recording.")
         print(f"  ASR: {self._asr.name}  |  TTS: {self._tts.name}  |  Agent route: {self._route}")

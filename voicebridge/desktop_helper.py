@@ -796,6 +796,22 @@ def _mic_peak(frame: Any) -> float:
         return 0.0
 
 
+def _empty_transcript_reason(pcm: bytes, fallback: str = "") -> str:
+    """Human reason for an empty transcript (silent mic vs. unrecognised speech).
+
+    ``accurate empty`` is an internal rescore label, not a diagnosis. When the
+    buffered capture is silent/near-silent, say so; otherwise the microphone
+    did deliver audio and the model simply found no words.
+    """
+    reason = str(fallback or "").strip()
+    if reason not in ("", "accurate empty", "empty audio", "no buffered audio"):
+        return reason
+    if not pcm or _mic_peak(pcm) < 0.002:
+        return ("No microphone signal - check the mic input, gain, "
+                "and 48V phantom power.")
+    return "No speech recognised."
+
+
 def publish_mic_level(frame: Any) -> float:
     """Record one captured frame's peak; return the clamped level.
 
@@ -2874,11 +2890,11 @@ class DesktopHelper:
             except Exception:
                 pass
         stream_error = getattr(client, "error", None)
+        pcm = getattr(mic, "pcm", b"") if hasattr(mic, "pcm") else b""
         # Accurate mode: decode the buffered utterance once with the local
         # faster-whisper provider. The streaming final is only the fallback,
         # and the fallback reason is always surfaced (never silent).
         if accurate:
-            pcm = getattr(mic, "pcm", b"") if hasattr(mic, "pcm") else b""
             if pcm:
                 from .voice_edit.stt_client import transcribe_accurate
                 acc_text, reason = transcribe_accurate(self.cfg, pcm)
@@ -2912,9 +2928,11 @@ class DesktopHelper:
                chars=len(self._transcript),
                **(_dbg.text_fields(self.cfg, text=self._transcript)))
         if not self._transcript:
-            self._ui_status("error", self._stt_fallback_reason
-                            or "no speech recognised")
-            self._talk_emit("error", code="VOICE_EDIT_NO_TRANSCRIPT")
+            reason = _empty_transcript_reason(
+                pcm, self._stt_fallback_reason or "no speech recognised")
+            self._ui_status("error", reason)
+            self._talk_emit("error", code="VOICE_EDIT_NO_TRANSCRIPT",
+                            detail=reason)
             self._finish_error()
             return
         self._talk_emit("transcript.final", chars=len(self._transcript))
