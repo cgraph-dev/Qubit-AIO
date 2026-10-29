@@ -470,6 +470,7 @@ export interface Translations {
       retryingRemoteBackend: string
       startingDesktopConnection: string
       startingHermesDesktop: string
+      startingQubitDesktop?: string
     }
     errors: {
       backgroundExited: string
@@ -1404,6 +1405,9 @@ export interface Translations {
       sshKeyTitle: string
       sshKeyDesc: string
       sshHermesPathTitle: string
+      sshQubitPathTitle?: string
+      sshQubitPathDesc?: string
+      sshQubitPathPlaceholder?: string
       sshHermesPathDesc: string
       sshHermesPathPlaceholder: string
       sshTestConnection: string
@@ -4421,7 +4425,7 @@ export interface Translations {
       hideNames: string
       skill: (name: string) => string
       kind: { plugin: string; skill: string }
-      tier: { official: string; community: string }
+      tier: { official: string; community: string; verified: string }
       targetProfile: (profile: string) => string
       sendFailed: string
       commitLabel: string

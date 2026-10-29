@@ -12,6 +12,7 @@ interface UseComposerDropArgs {
   onAttachDroppedItems: ChatBarProps['onAttachDroppedItems']
   recordUndoPoint: () => void
   requestMainFocus: () => void
+  sessionId?: ChatBarProps['sessionId']
 }
 
 /**

@@ -1,6 +1,6 @@
 import ignore from 'ignore'
 
-import type { HermesReadDirEntry, HermesReadDirResult } from '@/global'
+import type { HermesReadDirEntry, HermesReadDirResult, QubitReadDirEntry } from '@/global'
 import { desktopFsCacheKey, desktopGitRoot, readDesktopDir, readDesktopFileDataUrl } from '@/lib/desktop-fs'
 import { ALWAYS_EXCLUDED, SHOW_IGNORED_EXCLUDED } from '@/lib/excluded-paths'
 import { cleanPath, comparisonPath, isUnderPath } from '@/lib/path-compare'

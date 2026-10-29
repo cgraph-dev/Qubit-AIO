@@ -8,6 +8,7 @@ import type { MachineProfile } from '../electron/machine-profile'
 import type { HermesNotification } from '../electron/notification-types'
 import type { PoolLimits } from '../electron/pool-limits'
 import type { GrowRequest } from '../electron/window-growth'
+import type { UpdateRunReport } from '../electron/updater/update-metrics'
 
 import type { PlayerBridge } from './lib/player-contract'
 import type { WakeIndicatorState } from './lib/wake-indicator'
@@ -51,6 +52,8 @@ declare global {
       // optional profile list is used only by the single-local v1 fallback;
       // endpoint and auth material never crosses the IPC boundary.
       getProfileRoutes: (profiles: string[]) => Promise<DesktopPluginProfileRoute[]>
+      // Loopback origin serving the embedded player wrapper.
+      getEmbedHostOrigin?: () => Promise<string>
       // Reconnect-after-wake recovery: liveness-probe the cached PRIMARY backend
       // and drop it if a remote one has gone unreachable, so the next
       // getConnection() rebuilds a reachable descriptor instead of the renderer
@@ -79,7 +82,7 @@ declare global {
       // a running subagent's session.
       openSessionWindow: (
         sessionId: string,
-        opts?: { profile?: null | string; watch?: boolean }
+        opts?: { profile?: null | string; watch?: boolean; connectionId?: null | string }
       ) => Promise<{ ok: boolean; error?: string }>
       // Resume this session in the user's own terminal emulator (`qubit --tui
       // --resume <id>`) — the external terminal, not the in-app pane.
@@ -95,6 +98,11 @@ declare global {
       // `tabId` is the `$previewTabs` id; closing the window fires
       // `onBrowserPopoutClosed` so the caller can dock the tab again.
       openBrowserWindow: (tabId: string) => Promise<{ ok: boolean; error?: string }>
+      // Cross-window renderer relay (pop-out Browser ↔ chat windows).
+      windowRelay?: {
+        send: (payload: unknown) => void
+        onMessage: (callback: (payload: unknown) => void) => () => void
+      }
       onBrowserPopoutClosed: (callback: (tabId: string) => void) => () => void
       // Claim a one-shot cross-window ambient cue (turn-end sound / spoken
       // reply). Resolves true for the first window to claim a key, false for
@@ -244,7 +252,10 @@ declare global {
       sshConfigHosts: () => Promise<DesktopSshHostsResult>
       sshResolveHost: (host: string) => Promise<DesktopSshResolveResult>
       probeConnectionConfig: (remoteUrl: string) => Promise<DesktopConnectionProbeResult>
-      oauthLoginConnectionConfig: (remoteUrl: string) => Promise<DesktopOauthLoginResult>
+      oauthLoginConnectionConfig: (
+        remoteUrl: string,
+        options?: DesktopOauthLoginOptions
+      ) => Promise<DesktopOauthLoginResult>
       oauthLogoutConnectionConfig: (remoteUrl: string) => Promise<DesktopOauthLogoutResult>
       // Qubit Cloud: one portal login powers discovery + silent per-agent
       // sign-in (cloud-auto-discovery Phase 3).
@@ -269,6 +280,8 @@ declare global {
         set: (name: string | null) => Promise<DesktopActiveProfile>
       }
       api: <T>(request: HermesApiRequest) => Promise<T>
+      /** Launch -> ready ms for the first caller per app launch, null afterwards. */
+      claimStartupLatency?: () => Promise<null | number>
       notify: (payload: HermesNotification) => Promise<boolean>
       requestMicrophoneAccess: () => Promise<boolean>
       /** read_window_below tool: metadata for the OS window directly underneath this one (never pixels). */
@@ -390,6 +403,8 @@ declare global {
         }) => void
       ) => () => void
       setPreviewShortcutActive?: (active: boolean) => void
+      /** Tell main a preview guest is off screen, so focused-guest gestures skip it. */
+      setPreviewGuestHidden?: (webContentsId: number, hidden: boolean) => void
       openExternal: (url: string) => Promise<void>
       onExternalOpenFailed?: (callback: (payload: ExternalOpenFailedPayload) => void) => () => void
       /** One-shot loopback callback listener for MCP OAuth against remote
@@ -446,7 +461,7 @@ declare global {
       /** Refresh unified packages' desktop halves and return the touched paths. */
       reconcileDesktopPlugins?: () => Promise<string[]>
       /** LOCAL `<QUBIT_HOME>/logs` (profile-aware) — error card "Open Logs". */
-      logsRoot?: () => Promise<string>
+      logsRoot?: (profile?: null | string) => Promise<string>
       // Local AGENT-plugin root (<QUBIT_HOME>/plugins), same Electron-local
       // resolution. The disk door also scans it for `<name>/desktop/plugin.js`
       // so one agent-plugin package can ship a desktop UI half. Optional:
@@ -584,6 +599,8 @@ declare global {
       onBatteryChanged?: (callback: (onBattery: boolean) => void) => () => void
       onBootProgress: (callback: (payload: DesktopBootProgress) => void) => () => void
       getBootstrapState: () => Promise<DesktopBootstrapState>
+      /** Resolve This device without starting an install. Missing on an older preload. */
+      probeLocalBackend?: () => Promise<{ bootstrapNeeded: boolean }>
       continueBootstrapLocal: () => Promise<{ ok: boolean }>
       recycleBackend?: (profile?: null | string) => Promise<{ ok: boolean }>
       resetBootstrap: () => Promise<{ ok: boolean }>
@@ -605,6 +622,21 @@ declare global {
         getBranch: () => Promise<{ branch: string }>
         setBranch: (name: string) => Promise<{ branch: string }>
         onProgress: (callback: (payload: DesktopUpdateProgress) => void) => () => void
+        /** Claim the pending packaged self-update run (null when none or already claimed). */
+        takePendingRun?: () => Promise<UpdateRunReport | null>
+        /** `sent` deletes the claimed record; false keeps it for the next attach. */
+        ackPendingRun?: (sent: boolean) => Promise<void>
+        onPendingRun?: (callback: () => void) => () => void
+      }
+      desktopMetrics?: {
+        /** Mirror this window's focused profile and its opt-in. */
+        setEnabled?: (on: boolean, profile: string) => Promise<void>
+        /** Claim this window's profile's pending renderer-crash reasons. */
+        takeRendererCrashes?: () => Promise<{ reasons: Array<'crash' | 'killed' | 'oom' | 'other'> } | null>
+        /** `sent` drops the claimed reasons; false keeps them for the next attach. */
+        ackRendererCrashes?: (sent: boolean) => Promise<void>
+        /** Report a renderer error for this window's focused profile. */
+        report?: (reason: 'crash' | 'killed' | 'oom' | 'other', message?: string) => void
       }
       uninstall: {
         summary: () => Promise<DesktopUninstallSummary>
@@ -1157,6 +1189,7 @@ export interface DesktopAgentRoster {
     kind: DesktopConnectionKind
     reachable: boolean
     error?: string
+    needsSignIn?: boolean
     // Stable backend identity (/api/status install_id) when known.
     installId?: string
   }[]
@@ -1238,6 +1271,18 @@ export interface DesktopConnectionProbeResult {
 export interface ExternalOpenFailedPayload {
   url: string
   message?: string
+  code?: string
+}
+
+export interface DesktopOauthLoginOptions {
+  /** Registry-draft identity for a sign-in that runs before the draft is saved. */
+  connectionId?: null | string
+  /** Draft label — used to mint the id when `connectionId` is absent. */
+  label?: string
+  /** Draft entry kind the save will persist. */
+  kind?: DesktopConnectionKind
+  /** Draft auth mode ('oauth' | 'token') the save will persist. */
+  authMode?: 'oauth' | 'token'
 }
 
 export interface DesktopOauthLoginResult {
@@ -1245,6 +1290,8 @@ export interface DesktopOauthLoginResult {
   baseUrl: string
   connected: boolean
   error?: string
+  /** The connection id the session was written for, when the shell reports one. */
+  connectionId?: string
 }
 
 export interface DesktopOauthLogoutResult {
@@ -1443,7 +1490,7 @@ export interface HermesPreviewTarget {
   language?: string
   mimeType?: string
   path?: string
-  previewKind?: 'binary' | 'html' | 'image' | 'pdf' | 'text'
+  previewKind?: 'binary' | 'directory' | 'html' | 'image' | 'missing' | 'pdf' | 'text'
   renderMode?: 'preview' | 'source'
   source: string
   url: string
@@ -1546,6 +1593,14 @@ export type HermesReviewScope = 'branch' | 'lastTurn' | 'uncommitted'
 
 // Qubit-branded alias kept for newer UI imports.
 export type QubitReviewScope = HermesReviewScope
+export type QubitConnection = HermesConnection
+export type QubitGitBaseBranch = HermesGitBaseBranch
+export type QubitReviewFile = HermesReviewFile
+export type QubitRepoStatus = HermesRepoStatus
+export type QubitReadDirEntry = HermesReadDirEntry
+export type QubitReadDirResult = HermesReadDirResult
+export type QubitSkin = HermesSkin
+export type QubitConfigRecord = Record<string, unknown>
 
 // One changed file in the review pane (status letter, +/- lines, staged flag).
 export interface HermesReviewFile {

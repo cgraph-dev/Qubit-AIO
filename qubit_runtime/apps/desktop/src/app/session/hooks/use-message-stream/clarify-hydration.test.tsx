@@ -123,7 +123,7 @@ describe('clarify request stream hydration', () => {
       request_id: 'req-multi'
     })
 
-    expect($clarifyRequests.get()[SID]?.questions[0]?.multiSelect).toBe(true)
+    expect($clarifyRequests.get()[SID]?.questions?.[0]?.multiSelect).toBe(true)
 
     const part = clarifyParts()[0]
     expect(part?.type).toBe('tool-call')

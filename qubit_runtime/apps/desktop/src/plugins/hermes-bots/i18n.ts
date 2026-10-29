@@ -37,6 +37,9 @@ import { getPluginCtx } from './shared'
 type BotsMessages = {
   /** Left rail: the bot + group-chat roster. */
   editor: {
+    needsModel: string
+    configureModel: string
+    shareKeysOn: (target: string) => string
     fullConfigHint: string
     liveCapabilities: string
     editSoul: string
@@ -162,6 +165,7 @@ type BotsMessages = {
   }
   /** Creating, editing and removing a bot. */
   bot: {
+    openingChat?: string
     newTitle: string
     editTitle: string
     editMenu: string
@@ -381,6 +385,12 @@ type BotsMessages = {
     portalNotInstalled: string
     portalUnsupported: string
     portalUnavailable: string
+    portalUnavailableManaged?: string
+    imageSwitchTitle?: string
+    imageSwitchBody: (current: string, target: string) => string
+    imageSwitchApprove?: string
+    imageSwitchKeep?: string
+    placementSandbox: (placement: string) => string
     unavailableTitle: string
     autoOpenMenu: string
     autoOpenOnToast: (name: string) => string
@@ -503,6 +513,9 @@ const en: BotsMessages = {
     inheritedModel: 'inherited from launch profile',
     soul: 'SOUL.md (optional — replaces the generated persona)',
     shareKeys: 'Share keys & accounts with the main profile',
+    shareKeysOn: (target: string) => `Share keys & accounts with ${target}`,
+    needsModel: 'This bot has no model yet',
+    configureModel: 'Configure model',
     shareKeysHint:
       'Subscriptions, OAuth logins, and API keys stay shared (not copied), so token refreshes never invalidate each other. Uncheck for an isolated snapshot copy.',
     createEmpty: 'Create empty (skip bundled skills)',
@@ -809,6 +822,12 @@ const en: BotsMessages = {
     portalNotInstalled: 'Not installed on host',
     portalUnsupported: 'Not available on this host',
     portalUnavailable: 'Update the bot\u2019s Qubit to use Screen',
+    portalUnavailableManaged: 'Screen is not available on this managed Qubit release yet',
+    imageSwitchTitle: 'Switch Screen image',
+    imageSwitchBody: (current: string, target: string) => `Switch from ${current} to ${target}?`,
+    imageSwitchApprove: 'Switch',
+    imageSwitchKeep: 'Keep current',
+    placementSandbox: (placement: string) => `Sandbox: ${placement}`,
     unavailableTitle: 'Screen needs a newer Qubit',
     autoOpenMenu: 'Open Screen when the bot uses it',
     autoOpenOnToast: name => `${name}’s Screen opens when it starts using its desktop`,
@@ -928,6 +947,9 @@ const ja: BotsMessages = {
     inheritedModel: '起動時のプロファイルから継承',
     soul: 'SOUL.md（任意 — 生成された人格を置き換えます）',
     shareKeys: 'メインプロファイルとキー・アカウントを共有',
+    shareKeysOn: (target: string) => `${target} とキー・アカウントを共有`,
+    needsModel: 'このボットにはまだモデルがありません',
+    configureModel: 'モデルを設定',
     shareKeysHint:
       'サブスクリプション、OAuth ログイン、API キーをコピーせず共有するため、トークン更新で互いに無効になりません。チェックを外すと独立したスナップショットをコピーします。',
     createEmpty: '空のプロファイルを作成（同梱スキルを除外）',
@@ -1237,6 +1259,8 @@ const ja: BotsMessages = {
     portalNotInstalled: 'ホストに未インストール',
     portalUnsupported: 'このホストでは利用できません',
     portalUnavailable: 'Screen を使うにはボットの Qubit を更新してください',
+    imageSwitchBody: (current: string, target: string) => `${current} から ${target} に切り替えますか？`,
+    placementSandbox: (placement: string) => `サンドボックス: ${placement}`,
     unavailableTitle: 'Screen には新しい Qubit が必要です',
     autoOpenMenu: 'ボットが画面を使い始めたら Screen を開く',
     autoOpenOnToast: name => `${name} がデスクトップを使い始めると Screen が開きます`,
@@ -1354,6 +1378,9 @@ const zh: BotsMessages = {
     inheritedModel: '继承启动时的配置档案',
     soul: 'SOUL.md（可选，将替换生成的人格）',
     shareKeys: '与主配置档案共享密钥和账户',
+    shareKeysOn: (target: string) => `与 ${target} 共享密钥和账户`,
+    needsModel: '此机器人还没有模型',
+    configureModel: '配置模型',
     shareKeysHint:
       '订阅、OAuth 登录和 API 密钥保持共享而非复制，令牌刷新不会使另一方失效。取消勾选则创建隔离的快照副本。',
     createEmpty: '创建空配置（跳过内置技能）',
@@ -1650,6 +1677,8 @@ const zh: BotsMessages = {
     portalNotInstalled: '主机未安装',
     portalUnsupported: '此主机不可用',
     portalUnavailable: '更新机器人的 Qubit 以使用屏幕',
+    imageSwitchBody: (current: string, target: string) => `从 ${current} 切换到 ${target}？`,
+    placementSandbox: (placement: string) => `沙盒：${placement}`,
     unavailableTitle: '屏幕需要更新版的 Qubit',
     autoOpenMenu: '机器人使用屏幕时自动打开',
     autoOpenOnToast: name => `${name} 开始使用桌面时会自动打开屏幕`,
@@ -1767,6 +1796,9 @@ const zhHant: BotsMessages = {
     inheritedModel: '繼承啟動時的設定檔',
     soul: 'SOUL.md（選填，將取代產生的人格）',
     shareKeys: '與主要設定檔共用金鑰和帳戶',
+    shareKeysOn: (target: string) => `與 ${target} 共用金鑰和帳戶`,
+    needsModel: '此機器人尚無模型',
+    configureModel: '設定模型',
     shareKeysHint:
       '訂閱、OAuth 登入和 API 金鑰保持共用而非複製，權杖更新不會使另一方失效。取消勾選則建立隔離的快照副本。',
     createEmpty: '建立空白設定（略過內建技能）',
@@ -2063,6 +2095,8 @@ const zhHant: BotsMessages = {
     portalNotInstalled: '主機未安裝',
     portalUnsupported: '此主機不可用',
     portalUnavailable: '更新機器人的 Qubit 以使用螢幕',
+    imageSwitchBody: (current: string, target: string) => `從 ${current} 切換到 ${target}？`,
+    placementSandbox: (placement: string) => `沙盒：${placement}`,
     unavailableTitle: '螢幕需要較新版的 Qubit',
     autoOpenMenu: '機器人使用螢幕時自動開啟',
     autoOpenOnToast: name => `${name} 開始使用桌面時會自動開啟螢幕`,

@@ -75,7 +75,7 @@ export function guidedOnboardingActive(): boolean {
   return isOnboardingEnabled() && (phase === 'cinematic' || phase === 'guided' || phase === 'handoff')
 }
 
-export function beginOnboardingFlow(): void {
+export function beginOnboardingFlow(_firstRunSkipped?: boolean): void {
   if (isOnboardingEnabled() && $onboardingGate.get().phase === 'idle' && !hasSeenIntroReveal()) {
     setPhase('cinematic')
   }

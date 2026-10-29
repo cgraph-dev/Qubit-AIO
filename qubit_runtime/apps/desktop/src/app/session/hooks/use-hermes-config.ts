@@ -169,5 +169,8 @@ export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
     [activeSessionIdRef]
   )
 
-  return { refreshHermesConfig, sttEnabled, voiceMaxRecordingSeconds }
+  return { refreshHermesConfig, refreshQubitConfig: refreshHermesConfig, sttEnabled, voiceMaxRecordingSeconds }
 }
+
+/** Canonical alias for the Qubit-named import path; same hook, same behavior. */
+export const useQubitConfig = useHermesConfig
