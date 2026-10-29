@@ -55,6 +55,26 @@ _NEGATIVE = frozenset({
     "nevermind", "abort", "no thanks",
 })
 
+# ASR often repeats a confirmation ("Yeah, yes.", "Yes, yes.") or pads it
+# ("yes please do it"). Accept a short all-affirmative token sequence, while
+# still refusing an unrelated sentence that merely starts with "yes".
+_AFFIRMATIVE_CORE = frozenset({
+    "yes", "yeah", "yep", "yup", "confirm", "confirmed", "ok", "okay",
+    "sure", "proceed",
+})
+_AFFIRMATIVE_FILLER = frozenset({
+    "yes", "yeah", "yep", "yup", "confirm", "confirmed", "ok", "okay",
+    "sure", "proceed", "please", "do", "it", "go", "ahead", "run", "the",
+    "task", "now", "and",
+})
+_NEGATIVE_CORE = frozenset({
+    "no", "nope", "nah", "cancel", "stop", "dont", "nevermind", "abort",
+})
+_NEGATIVE_FILLER = frozenset({
+    "no", "nope", "nah", "cancel", "stop", "dont", "nevermind", "abort",
+    "thanks", "thank", "you", "please",
+})
+
 #: Fallback session name for a missing/blank session id (fail-soft, deterministic).
 DEFAULT_SESSION = "default"
 
@@ -88,6 +108,14 @@ def classify_confirmation(text: Any) -> str:
         return "affirm"
     if low in _NEGATIVE:
         return "deny"
+    tokens = low.split()
+    if tokens:
+        if all(t in _AFFIRMATIVE_FILLER for t in tokens) and any(
+                t in _AFFIRMATIVE_CORE for t in tokens):
+            return "affirm"
+        if all(t in _NEGATIVE_FILLER for t in tokens) and any(
+                t in _NEGATIVE_CORE for t in tokens):
+            return "deny"
     return "other"
 
 

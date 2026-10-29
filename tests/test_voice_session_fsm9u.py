@@ -189,19 +189,20 @@ def test_classify_confirmation_affirmatives():
     for text in ("yes", "Yes.", "YES!", "yeah", "yep", "yup", "confirm",
                  "confirmed", "do it", "go ahead", "run it", "ok", "okay",
                  "sure", "proceed", "yes please", "Yes, please.",
-                 "confirm task", "run the task"):
+                 "confirm task", "run the task", "Yeah, yes.", "Yes, yes.",
+                 "yeah yep", "yes please do it", "yes do it now"):
         assert classify_confirmation(text) == "affirm", text
 
 
 def test_classify_confirmation_negatives():
     for text in ("no", "No.", "nope", "nah", "cancel", "stop", "dont",
                  "don't", "never mind", "nevermind", "abort", "no thanks",
-                 "NO, THANKS."):
+                 "NO, THANKS.", "No, no.", "no no"):
         assert classify_confirmation(text) == "deny", text
 
 
 def test_classify_confirmation_other():
-    for text in ("", None, "what is the weather", "yes please do it now",
+    for text in ("", None, "what is the weather",
                  "cancel the subscription please", "maybe later", 42, object()):
         assert classify_confirmation(text) == "other", repr(text)
 
@@ -230,3 +231,10 @@ def test_a_broken_clock_seam_never_raises():
     assert action.staged_at == 0.0
     assert fsm.expired() is False
     assert fsm.resolve("yes") == ("run", action)
+
+
+def test_chat_transport_affirmative_uses_the_shared_classifier():
+    from voicebridge.chat_transport import _is_affirmative
+    assert _is_affirmative("Yeah, yes.") is True
+    assert _is_affirmative("Yes, yes.") is True
+    assert _is_affirmative("cancel the subscription please") is False

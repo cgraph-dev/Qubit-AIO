@@ -1397,7 +1397,15 @@ def _is_affirmative(text: Any) -> bool:
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     if not cleaned or len(cleaned) > 40:
         return False
-    return cleaned in _AFFIRMATIVE_PHRASES
+    if cleaned in _AFFIRMATIVE_PHRASES:
+        return True
+    # Keep this predicate in lock-step with the voice FSM's classifier so
+    # repeats like "Yeah, yes." settle through the SAME vocabulary.
+    try:
+        from .voice_edit.session_fsm import classify_confirmation
+        return classify_confirmation(text) == "affirm"
+    except Exception:
+        return False
 
 
 def _classify_confirmation(text: Any) -> str:
