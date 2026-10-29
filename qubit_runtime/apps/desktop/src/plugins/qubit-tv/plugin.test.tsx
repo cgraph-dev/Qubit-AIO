@@ -99,8 +99,8 @@ function mount(ctxMedia?: unknown) {
   if (!palette?.data) throw new Error('QubitTV did not register its palette command')
   palette.data.run()
   const options = mocks.openWorkspace.mock.calls.at(-1)?.[1] as { render: () => React.ReactNode }
-  render(options.render())
-  return { contributions, disposers, close }
+  const view = render(options.render())
+  return { contributions, disposers, close, options, view }
 }
 
 beforeEach(() => {
@@ -195,5 +195,130 @@ describe('bundled QubitTV plugin', () => {
     mount(undefined)
 
     expect(screen.getByText('QubitTV needs host media support')).toBeTruthy()
+  })
+
+  it('does not mount the native Surface when the player bridge is unavailable', () => {
+    let surfaces = 0
+    const player = controller({ available: false, snapshot: null, canLink: false, linked: false })
+    const custom = {
+      usePlayer: () => player,
+      Surface: () => {
+        surfaces += 1
+        return React.createElement('div', null, 'native view')
+      }
+    }
+
+    mount(custom)
+
+    expect(screen.getByText(/player bridge is unavailable/)).toBeTruthy()
+    expect(surfaces).toBe(0)
+  })
+
+  it('links the session and runs context, transcript, jobs, cancel and clear-data', async () => {
+    const context = {
+      source: 'youtube',
+      contextToken: 'opaque-test-token',
+      navigationGeneration: 3,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      metadata: { identity: 'youtube-watch' }
+    }
+    const job = {
+      id: 'job1',
+      kind: 'transcript',
+      state: 'running',
+      progress: 0.2,
+      error: null,
+      transcript: null,
+      artifact: null
+    }
+    const request = vi.fn(async (operation: { type: string }) => {
+      if (operation.type === 'context') return { operation: 'context', context }
+      if (operation.type === 'transcript.start') return { operation: operation.type, job }
+      if (operation.type === 'jobs.list') return { operation: operation.type, jobs: [job] }
+      if (operation.type === 'job.cancel') return { operation: operation.type, job: { ...job, state: 'cancelled' } }
+      return { operation: operation.type }
+    })
+    const player = controller({
+      linked: false,
+      link: vi.fn(async () => {
+        player.linked = true
+      }),
+      request
+    })
+    const { options, view } = mount(media(player))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Link session' }))
+    await waitFor(() => expect(player.link).toHaveBeenCalled())
+    view.rerender(options.render())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh context' }))
+    await waitFor(() => expect(request).toHaveBeenCalledWith({ type: 'context' }))
+    await waitFor(() => expect(screen.getByText(/Context expires/)).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transcript' }))
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith({ type: 'transcript.start', contextToken: 'opaque-test-token' })
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'List jobs' }))
+    await waitFor(() => expect(screen.getByText(/transcript · running · 20%/)).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(request).toHaveBeenCalledWith({ type: 'job.cancel', jobId: 'job1' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local data' }))
+    expect(screen.getByText('Clear QubitTV local data?')).toBeTruthy()
+    const clear = screen
+      .getAllByRole('button', { name: 'Clear local data' })
+      .at(-1) as HTMLButtonElement
+    fireEvent.click(clear)
+    await waitFor(() => expect(player.clearLocalData).toHaveBeenCalled())
+  })
+
+  it('expires the context and blocks transcript until it is refreshed', async () => {
+    const request = vi.fn(async (operation: { type: string }) => ({
+      operation: operation.type,
+      context: {
+        source: 'youtube',
+        contextToken: 'opaque-test-token',
+        navigationGeneration: 1,
+        expiresAt: new Date(Date.now() + 30).toISOString(),
+        metadata: { identity: 'youtube-watch' }
+      }
+    }))
+    mount(media(controller({ request })))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh context' }))
+    await waitFor(() => expect(request).toHaveBeenCalledWith({ type: 'context' }))
+
+    await waitFor(
+      () =>
+        expect(
+          (screen.getByRole('button', { name: 'Transcript' }) as HTMLButtonElement).disabled
+        ).toBe(true),
+      { timeout: 2_000 }
+    )
+    expect(screen.getByText(/Media context expired|Context expired/)).toBeTruthy()
+  })
+
+  it('coalesces Ask Qubit while the prompt acknowledgement is pending', async () => {
+    let resolvePrompt: ((value: boolean) => void) | undefined
+    const seedPrompt = vi.fn(
+      () =>
+        new Promise<boolean>(resolve => {
+          resolvePrompt = resolve
+        })
+    )
+    mount(media(controller({ seedPrompt })))
+
+    const ask = screen.getByRole('button', { name: 'Ask Qubit' }) as HTMLButtonElement
+    fireEvent.click(ask)
+    fireEvent.click(ask)
+
+    expect(seedPrompt).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Adding prompt…')).toBeTruthy()
+
+    resolvePrompt?.(true)
+    await waitFor(() => expect(screen.getByText('Prompt added to the chat.')).toBeTruthy())
   })
 })
