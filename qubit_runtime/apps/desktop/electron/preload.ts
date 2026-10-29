@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
+import type { PlayerBridge } from '../src/lib/player-contract'
+
 import type { DesktopProfileRoute } from './desktop-profile'
 import type { HudModifierApi, HudModifierStatus } from './hud-modifier-types'
 import { customWindowControlsEnabled } from './window-controls'
@@ -36,6 +38,21 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   // Launch-flag fact: skip the first-run film (HERMES_SKIP_INTRO=1 or
   // --skip-intro). Rehearsal aid for the guided chat behind it.
   skipIntro: launchFlags?.skipIntro === true,
+  player: {
+    request: command => ipcRenderer.invoke('qubit:player:request', command),
+    onState: callback => {
+      const listener = (_event, snapshot) => callback(snapshot)
+      ipcRenderer.on('qubit:player:state', listener)
+
+      return () => ipcRenderer.removeListener('qubit:player:state', listener)
+    },
+    linkAwareness: scope => ipcRenderer.invoke('qubit:player:link-awareness', scope),
+    unlinkAwareness: () => ipcRenderer.invoke('qubit:player:unlink-awareness'),
+    agentRequest: request => ipcRenderer.invoke('qubit:player:agent-request', request),
+    setupMediaHelpers: () => ipcRenderer.invoke('qubit:player:setup-media-helpers'),
+    revealMediaJob: (scope, jobId) => ipcRenderer.invoke('qubit:player:reveal-media-job', { scope, jobId }),
+    clearLocalData: () => ipcRenderer.invoke('qubit:player:clear-local-data')
+  } satisfies PlayerBridge,
   getConnection: (profile, opts) => ipcRenderer.invoke('hermes:connection', profile, opts),
   // Registry-scoped backend resolution: { connectionId, profile } → descriptor.
   getConnectionFor: payload => ipcRenderer.invoke('hermes:connection:for', payload),

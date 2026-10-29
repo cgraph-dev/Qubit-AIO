@@ -352,6 +352,7 @@ import { createParentStartMarkerResolver, parentWatchdogEnv } from './parent-pro
 import { bundledPayload, installIdForRoot, type PayloadInfo } from './payload-backend'
 import { petOverlayClickThrough } from './pet-overlay'
 import { placePetOverlay, registerPetOverlayIpc } from './pet-overlay-ipc'
+import { createDesktopPlayerHost } from './player/desktop-host'
 import {
   pendingNotice as pendingPluginCompatNotice,
   recordDismissed as recordPluginCompatDismissed
@@ -581,6 +582,8 @@ if (USER_DATA_OVERRIDE || process.env.HERMES_DATA_DIR_SUFFIX) {
   fs.mkdirSync(resolvedUserData, { recursive: true })
   app.setPath('userData', resolvedUserData)
 }
+
+const desktopPlayer = createDesktopPlayerHost()
 
 const DEV_SERVER = process.env.HERMES_DESKTOP_DEV_SERVER
 const IS_PACKAGED = app.isPackaged || Boolean(process.env.HERMES_DESKTOP_IS_PACKAGED)
@@ -13030,6 +13033,7 @@ function spawnSecondaryWindow({
   // Chat-surface registration: applyWindowTranslucency swaps this window's
   // backing between opaque-themed and alpha-0 when glass toggles.
   minimizeToTray.registerWindow(win)
+  desktopPlayer.registerOwner(win, DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString())
   translucencyBackedWindows.add(win)
 
   if (IS_MAC) {
@@ -13225,6 +13229,7 @@ function createInstanceWindow(
 
   instanceWindows.add(win)
   minimizeToTray.registerWindow(win)
+  desktopPlayer.registerOwner(win, DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString())
   recordWindowConnectionRoute(win.webContents, { ...route, registryScoped: route.connectionId !== null })
 
   // Chat-surface registration: see applyWindowTranslucency.
@@ -14304,6 +14309,7 @@ function createWindow() {
 
   const createdMainWindow = mainWindow
   minimizeToTray.registerWindow(createdMainWindow, { closeToTray: true })
+  desktopPlayer.registerOwner(createdMainWindow, DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString())
   const defaultRoute = desktopProfilePreferences.getDefault()
 
   if (defaultRoute) {
@@ -18209,6 +18215,12 @@ app.on('before-quit', event => {
   if (heldQuitForActiveWork(event)) {
     return
   }
+
+  // Dispose the player as soon as this quit is committed. A pinned service
+  // guest can keep the app alive and prevent will-quit from ever firing. The
+  // host is idempotent because teardown can re-enter before-quit for this same
+  // committed shutdown.
+  desktopPlayer.dispose()
 
   minimizeToTray.beginQuit()
   mainProcessLagWatchdog.stop()
