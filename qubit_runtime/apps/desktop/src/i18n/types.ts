@@ -2367,6 +2367,7 @@ export interface Translations {
     mcpServers: string
     archivedChats: string
     sections: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
+    sectionDescriptions: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
     nav: Record<'newChat' | 'settings' | 'capabilities' | 'messaging' | 'artifacts', { title: string; detail: string }>
     sectionEntries: Record<'sessions' | 'system' | 'usage', { title: string; detail: string }>
     providerNavigate: string
@@ -3999,6 +4000,7 @@ export interface Translations {
         title: string
         tokenSummary: (used: string, max: string) => string
       }
+      session: string
       focusedSince: string
       focusedSinceTitle: string
       yoloOn: string
@@ -4395,10 +4397,15 @@ export interface Translations {
       skip: string
       skipped: string
       noAnswer: string
+      continueLabel: string
       confirmAndContinueLabel: string
       singleSelectHint: string
       multiSelectHint: string
       questionProgress: (answered: number, total: number) => string
+      answeredBadge: string
+      lateAnswer: (question: string, choice: string) => string
+      lateAnswerTip: string
+      lateAnswerHint: string
       notDelivered: string
     }
     catalogInstall: {

@@ -7,7 +7,11 @@ export const en: Translations = {
     title: 'Couldn’t open this link',
     message: 'No browser is registered to open this address. Copy the link and open it manually.',
     copyUrl: 'Copy link',
-    close: 'Close'
+    close: 'Close',
+    missing: {
+      title: 'File not found',
+      message: 'This file does not exist — it may have been deleted or moved, or it lives on another machine.'
+    }
   },
   sharedMetrics: {
     consentTitle: 'Help improve Qubit?',
@@ -518,6 +522,10 @@ export const en: Translations = {
     backendOutOfDateMessage:
       'Your Qubit backend is older than this desktop build and may not work correctly. Update to align them.',
     installMethodUnsupportedTitle: 'Unsupported install method',
+    desktopOutOfDateTitle: 'Qubit app out of date',
+    desktopOutOfDateMessage:
+      'This Qubit app is older than the backend it is connected to and may not work correctly. Update the app to align them.',
+    updateDesktopApp: 'Update app',
     updateHermes: 'Update Qubit',
     updateReadyTitle: 'Update ready',
     updateReadyMessage: count => `${count} new change${count === 1 ? '' : 's'} available.`,
@@ -1086,6 +1094,9 @@ export const en: Translations = {
     },
     appearance: {
       title: 'Appearance',
+      chatTextScaleTitle: 'Chat Text Size',
+      chatTextScaleDesc:
+        'Scales conversation text and the message editor relative to UI Scale. Sidebars and controls stay the same size.',
       intro: 'Desktop-only. Mode is brightness; theme is palette and chat chrome.',
       colorMode: 'Color Mode',
       colorModeDesc: 'Pick a fixed mode or let Qubit follow your system setting.',
@@ -1159,6 +1170,8 @@ export const en: Translations = {
       introSplashTitle: 'Intro Splash',
       introSplashDesc: 'The wordmark and prompt shown on an empty chat.',
       reactionsTitle: 'Message Reactions',
+      modelPricingTitle: 'Model Pricing',
+      modelPricingDesc: 'Show input, output, and cache-read prices per million tokens in the model picker.',
       reactionsDesc: 'iMessage-style emoji tapbacks — react to messages, and Qubit can react to yours.',
       tipsTitle: 'In-App Tips',
       tipsDesc:
@@ -1169,6 +1182,9 @@ export const en: Translations = {
         'Let Qubit spotlight each step as it guides you through the app. Turns off automatically after your first 30 days; you can turn it back on.',
       composerPopoutTitle: 'Floating Composer',
       composerPopoutDesc: 'Allow dragging the composer out of its dock. Turn this off to keep it locked at the bottom.',
+      fileBrowserTitle: 'File Browser',
+      fileBrowserDesc:
+        'Show the file browser beside the chat when a workspace is open. The titlebar toggle changes this too.',
       vibeHeartsTitle: 'Vibe Hearts',
       vibeHeartsDesc:
         'Floating hearts when you say thanks, ily, good bot, or send a heart. Separate from Message Reactions above.',
@@ -1755,6 +1771,7 @@ export const en: Translations = {
       auxiliaryTitle: 'Auxiliary models',
       resetAllToMain: 'Reset all to main',
       auxiliaryDesc: 'Helper tasks run on the main model by default. Assign a dedicated model to any task to override.',
+      staleAuxDismiss: "Don't show again",
       setToMain: 'Set to main',
       change: 'Change',
       autoUseMain: 'auto · use main model',
@@ -2477,6 +2494,7 @@ export const en: Translations = {
         connected: 'connected',
         app_not_running: 'app not running',
         endpoint_unavailable: 'endpoint unavailable',
+        qubit_not_connected: 'MCP connection missing',
         no_interactive_session: 'no interactive session',
         version_too_old: 'version too old',
         missing_app: 'app missing',
@@ -2775,6 +2793,7 @@ export const en: Translations = {
     hermesActiveSessions: (version, count) => `Qubit ${version} · Active sessions ${count}`,
     restartGateway: 'Restart gateway',
     openBrowser: 'Open browser',
+    toggleBrowser: 'Toggle browser',
     gatewayRestartFailed: 'Gateway restart failed.',
     sharedGatewayRestartTitle: 'Restart the shared gateway?',
     sharedGatewayRestartDescription: bots => `All bots on this device reconnect: ${bots}`,
@@ -2859,6 +2878,13 @@ export const en: Translations = {
   messaging: {
     search: 'Search messaging...',
     loading: 'Loading messaging platforms...',
+    statusFilter: {
+      all: 'All',
+      bad: 'Errors',
+      good: 'Connected',
+      muted: 'Inactive',
+      warn: 'Needs attention'
+    },
     loadFailed: 'Messaging platforms failed to load',
     states: {
       connected: 'Connected',
@@ -3139,7 +3165,17 @@ export const en: Translations = {
       gatewayUnreachable: gateway => `${gateway} · unreachable`,
       onGateway: (name, gateway) => `${name} · ${gateway}`,
       switchTo: (name, gateway) => `Switch to ${name} on ${gateway}`,
-      deleteOn: gateway => ` on ${gateway}`
+      deleteOn: gateway => ` on ${gateway}`,
+      localDevice: 'This device (local backend — installs Qubit if missing, otherwise opens a fresh session)',
+      switchDeviceTitle: 'Switch to This device?',
+      switchDeviceDesc:
+        'This opens a fresh session on this computer. The conversation you are in stays on the other gateway.',
+      switchDeviceConfirm: 'Switch',
+      installDeviceTitle: 'Switch to This device?',
+      installDeviceDesc:
+        'This will install Qubit locally, then open a fresh session on this computer. Nothing is installed until you confirm.',
+      installDeviceConfirm: 'Install locally',
+      connectExistingInstead: 'Connect to existing instead'
     },
     status: {
       unread: (count: number) => (count === 1 ? '1 unread session' : `${count} unread sessions`),
@@ -3208,6 +3244,8 @@ export const en: Translations = {
     skillsLabel: 'Skills',
     notSet: 'Not set',
     soulDesc: 'The system prompt and persona instructions baked into this profile.',
+    soulMissing:
+      'No SOUL.md file exists for this profile yet. Add instructions below and save to create one. Personality presets in config.yaml are managed separately.',
     soulOptional: 'optional',
     soulPlaceholder: mode => `The system prompt / persona for this profile.\nLeave blank to keep the ${mode} default.`,
     soulPlaceholderCloned: 'cloned',
@@ -3269,6 +3307,8 @@ export const en: Translations = {
     count: count => `${count} ${count === 1 ? 'job' : 'jobs'}`,
     search: 'Search cron jobs...',
     loading: 'Loading cron jobs...',
+    scriptLabel: 'Script',
+    scriptBadge: 'script',
     states: {
       enabled: 'enabled',
       scheduled: 'scheduled',
@@ -3579,6 +3619,8 @@ export const en: Translations = {
       copyPath: 'Copy path',
       removeFromSidebar: 'Hide from sidebar',
       createFailed: 'Could not create project',
+      createdInPreviousContext:
+        "Project created on the previous connection or profile. Switch back to find it; IDEA.md wasn't written.",
       staleBackend:
         'Update the Qubit backend to create projects — your backend is older than this desktop app (Settings → Updates → Backend).',
       deleteConfirm: 'This removes the saved project from Qubit. Files, git repos, and worktrees stay untouched.',
@@ -3637,6 +3679,7 @@ export const en: Translations = {
       branchFrom: 'Branch',
       rename: 'Rename…',
       archive: 'Archive',
+      unarchive: 'Unarchive',
       newWindow: 'New window',
       openInTerminal: 'Open in terminal',
       hideTabBar: 'Hide tab bar',
@@ -3651,6 +3694,7 @@ export const en: Translations = {
       backgroundRunning: 'Background task running',
       draftSession: 'Draft — nothing sent yet',
       handoffOrigin: platform => `Handed off from ${platform}`,
+      continuationOrigin: 'Automatic continuation — this conversation was compressed and continued',
       ownedByProfile: profile => `Profile: ${profile}`,
       renamed: 'Renamed',
       renameFailed: 'Rename failed',
@@ -3849,6 +3893,8 @@ export const en: Translations = {
     restoredDraftUndo: 'Undo',
     queueEdit: 'Edit',
     queueSendNext: 'Next',
+    queueExpand: 'Expand',
+    queueCollapse: 'Collapse',
     queueSteer: 'Steer — redirect the live turn now',
     queueSend: 'Send',
     queueDelete: 'Delete',
@@ -3856,6 +3902,14 @@ export const en: Translations = {
     queueResumeTip: 'Paused by Stop — resume sending the queued turns',
     queueStuckTitle: 'Queued message not sent',
     queueStuckBody: 'A queued turn kept failing to send. It is still in the queue — try sending it again.',
+    queueDroppedTitle: 'Queued prompt dropped',
+    queueDroppedBody:
+      'This background queue entry was dropped because its session could not be resumed after repeated attempts. Nothing else in the queue was affected.',
+    terminalSelectionMissingTitle: 'Terminal selection unavailable',
+    terminalSelectionMissingBody:
+      'Re-select the terminal lines (Ctrl/Cmd+L) before sending — this chip has no original text.',
+    queuedTerminalSelectionExpiredBody:
+      'This queued terminal selection is no longer available. Re-select the lines (Ctrl/Cmd+L) and queue the message again.',
     previewUnavailable: 'Preview unavailable',
     previewLabel: label => `Preview ${label}`,
     couldNotPreview: label => `Could not preview ${label}`,
@@ -4072,6 +4126,7 @@ export const en: Translations = {
       scopeBranch: 'Branch',
       scopeLastTurn: 'Last turn',
       commit: 'Commit',
+      readOnlyScope: 'Read-only view — stage, revert, and commit apply to Uncommitted',
       commitAndPush: 'Commit & Push',
       commitPlaceholder: shortcut => `Message (${shortcut} to commit)`,
       generateCommitMessage: 'Generate commit message',
@@ -4138,6 +4193,10 @@ export const en: Translations = {
     maybeLater: 'Maybe later',
     moreChanges: count => `+ ${count} more change${count === 1 ? '' : 's'} included.`,
     manualTitle: 'Update from your terminal',
+    copyFullLog: 'Copy full changelog',
+    manualUnavailableTitle: "Can't update from here",
+    manualBodyBackend: 'The Qubit backend is managed outside this app. Run this on the server that hosts it:',
+    manualPickedUpBackend: 'The backend picks up the new version after the update completes.',
     manualBody: 'You installed Qubit from the command line, so updates run there too. Paste this into your terminal:',
     manualPickedUp: 'Qubit will pick up the new version next time you launch it.',
     guiSkewTitle: 'Update the desktop app',
@@ -4686,6 +4745,8 @@ export const en: Translations = {
       },
       session: 'Session',
       yoloOn: 'YOLO on — auto-approving dangerous commands. Shift+click toggles globally.',
+      focusedSince: 'Focused since',
+      focusedSinceTitle: 'Time since this chat was focused — not how long a turn has been running',
       yoloOff: 'YOLO off. Shift+click toggles globally.',
       modelNone: 'none',
       noModel: 'no model',
@@ -4699,6 +4760,10 @@ export const en: Translations = {
 
   rightSidebar: {
     aria: 'Right sidebar',
+    terminalReadOnly: 'Read-only output',
+    terminalReadOnlyHelp:
+      'To answer prompts, stop the background command and run it in a new terminal. The new terminal opens a separate shell; it does not connect to this process.',
+    terminalOpenInteractive: 'Open new terminal',
     panelsAria: 'Right sidebar panels',
     files: 'File system',
     terminal: 'Terminal',
@@ -4743,10 +4808,16 @@ export const en: Translations = {
 
   preview: {
     tab: 'Preview',
+    pin: 'Pin to workspace',
+    unpin: 'Unpin from workspace',
     closePane: 'Close preview pane',
     loading: 'Loading preview',
     unavailable: 'Preview unavailable',
     opening: 'Opening...',
+    missingTarget: 'That path does not exist on this computer',
+    missingTitle: 'File no longer exists',
+    missingBody: label =>
+      `${label} was deleted, moved, or its temporary location was cleared. This tab will not be restored on the next launch.`,
     hide: 'Hide',
     openPreview: 'Open preview',
     openInBrowser: 'Open in browser',
@@ -4771,6 +4842,7 @@ export const en: Translations = {
     editing: 'Editing',
     unsavedChanges: 'Unsaved changes',
     saveFailed: message => `Couldn't save: ${message}`,
+    saveScopeChanged: 'Switch back to the original connection and profile to save this draft.',
     diskChangedTitle: 'File changed on disk',
     diskChangedBody:
       'This file changed since you opened it. Overwrite it with your version, or discard your edits and reload?',
@@ -4964,6 +5036,9 @@ export const en: Translations = {
       branchNewChat: 'Branch in new chat',
       react: 'React',
       dismissError: 'Dismiss error',
+      responseStopped: 'Response stopped',
+      copyFullResponse: 'Copy full response',
+      readAloudFullResponseHint: 'Read the whole response aloud',
       errorLayers: {
         auth: 'Sign-in problem',
         billing: 'Out of credits',
@@ -5187,6 +5262,7 @@ export const en: Translations = {
       run: 'Run',
       command: 'Command',
       moreOptions: 'More approval options',
+      commandDetails: 'Command details',
       allowSession: 'Allow this session',
       alwaysAllowMenu: 'Always allow…',
       jumpToApproval: 'Approval needed',
@@ -5205,13 +5281,18 @@ export const en: Translations = {
       placeholder: 'Type your answer…',
       skip: 'Skip',
       skipped: 'Skipped',
+      noAnswer: 'No answer',
       continueLabel: 'Continue',
+      singleSelectHint: 'Pick one',
+      multiSelectHint: 'Select all that apply',
       confirmAndContinueLabel: 'Confirm and continue',
       answeredBadge: 'Answered',
       questionProgress: (answered, total) => `${answered} of ${total} answered`,
       lateAnswer: (question, choice) => `Re: "${question}" — my answer: ${choice}`,
       lateAnswerTip: 'Draft this answer as a follow-up message',
-      lateAnswerHint: 'This prompt is no longer waiting. Pick an option to draft it as a follow-up message.'
+      lateAnswerHint: 'This prompt is no longer waiting. Pick an option to draft it as a follow-up message.',
+      notDelivered:
+        "This question didn't reach the app, so it can't be answered here. Press Stop to end the turn, then reply in chat."
     },
     catalogInstall: {
       preparing: 'Preparing the install…',
@@ -5411,11 +5492,17 @@ export const en: Translations = {
     providerCredentialRequired: 'Add a provider credential before sending your first message.',
     emptySlashCommand: 'empty slash command',
     desktopCommands: 'Desktop commands',
+    slashCommandIgnoredTitle: 'Command not sent',
+    slashCommandIgnoredBody:
+      'Slash commands cannot be combined with attachments. Remove the attachment or send the command separately.',
     skillCommandsAvailable: count => `${count} skill commands available.`,
     warningLine: message => `warning: ${message}`,
     yoloArmed: 'YOLO armed for this chat',
     yoloOff: 'YOLO off',
     yoloSystem: active => `YOLO ${active ? 'on' : 'off'} for this session`,
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    resetZoom: 'Reset zoom',
     yoloTitle: 'YOLO',
     yoloToggleFailed: 'Could not toggle YOLO',
     profileStatus: current =>
@@ -5561,6 +5648,11 @@ export const en: Translations = {
   ui: {
     search: {
       clear: 'Clear search'
+    },
+    logs: {
+      bottom: 'Bottom of log',
+      search: 'Search logs…',
+      top: 'Top of log'
     },
     pagination: {
       label: 'pagination',
