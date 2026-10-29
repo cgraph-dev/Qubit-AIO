@@ -65,3 +65,20 @@ tool schema.
 - **Live playback proof.** The port is covered by focused unit tests; a live
   packaged Electron run was not performed in this environment. Ordinary
   eligible YouTube navigation is the only path the upstream preview validates.
+
+## Verification
+
+- Desktop QubitTV focused suite: **105 passed** (renderer contracts, bridge/decoder,
+  tool-media, capability gate, pane, server-request handler, Electron player/IPC/
+  media-jobs, preload bridge).
+- Python QubitTV/contract suite: **59 passed** (`test_qubit_tv_plugin.py`,
+  `test_plugin_desktop_capability.py`, `test_player_agent_route.py`,
+  `test_generated.py`); real bundled-plugin discovery registered all seven
+  `qubit_tv_*` tools.
+- Two full runtime matrices: 64,037 passed / 321 failed (before fixes) and
+  64,297 passed / 319 failed (after fixes). Every QubitTV test passed in both.
+  The remaining failures are pre-existing CI/PM/install/desktop-update/website
+  and live-timeout issues, not QubitTV.
+- Not verified: a live packaged Electron playback run. The desktop app build is
+  currently blocked by pre-existing missing exports in the vendored tree,
+  unrelated to the player port. Protected playback remains unavailable.
