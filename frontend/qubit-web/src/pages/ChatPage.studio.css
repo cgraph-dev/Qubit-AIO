@@ -318,9 +318,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background:
-    linear-gradient(90deg, var(--qchat-line-hard) 0 1px, transparent 1px) 0 0 / 20% 100%,
-    linear-gradient(0deg, var(--qchat-line-hard), var(--qchat-line-hard)) 0 50% / 100% 1px no-repeat;
+  background: repeating-linear-gradient(90deg, var(--qchat-line-hard) 0 1px, transparent 1px 20%);
 }
 .qchat__rank-meter > span {
   display: block;
@@ -489,10 +487,7 @@
   right: 0;
   top: calc(.55rem + .5rem);
   bottom: calc(.3rem + .95rem);
-  background:
-    linear-gradient(var(--qchat-violet), var(--qchat-violet)) 0 0 / 100% 2px no-repeat,
-    linear-gradient(var(--qchat-cyan), var(--qchat-cyan)) 0 50% / 100% 2px no-repeat,
-    linear-gradient(var(--qchat-amber), var(--qchat-amber)) 0 100% / 100% 2px no-repeat;
+  background: repeating-linear-gradient(to bottom, var(--qchat-violet) 0 2px, transparent 2px calc(50% - 1px), var(--qchat-cyan) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px) calc(100% - 2px), var(--qchat-amber) calc(100% - 2px) 100%);
   opacity: .55;
   pointer-events: none;
 }
@@ -836,12 +831,7 @@
   font: 550 .64rem/1.2 var(--qchat-mono);
   letter-spacing: .06em;
   appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--qchat-faint) 50%),
-    linear-gradient(135deg, var(--qchat-faint) 50%, transparent 50%);
-  background-position: calc(100% - .75rem) 52%, calc(100% - .5rem) 52%;
-  background-size: .25rem .25rem, .25rem .25rem;
-  background-repeat: no-repeat;
+  background-image: none;
 }
 .qchat__composer select:hover { border-color: var(--qchat-line-hard); color: var(--qchat-ink); }
 /* Action buttons: flat, square, mono, hairline. */
@@ -1103,9 +1093,7 @@
   display: block;
   height: .42rem;
   border-radius: 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--qchat-ink) 4%, transparent), color-mix(in srgb, var(--qchat-ink) 11%, transparent) 48%, color-mix(in srgb, var(--qchat-ink) 4%, transparent));
-  background-size: 200% 100%;
-  animation: qchat-skeleton 1.5s ease-in-out infinite;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--qchat-ink) 8%, transparent) 0 4px, transparent 4px 8px);
 }
 .qchat__skeleton-message > span:first-child { width: 60%; }
 .qchat__skeleton-message > span:nth-child(2) { width: 94%; }
@@ -1137,7 +1125,6 @@
 .qchat__model-skeleton > span:first-child { width: 40%; grid-column: 1 / -1; height: .3rem; }
 .qchat__model-skeleton > span:nth-child(2) { width: 62%; }
 .qchat__model-skeleton > .qchat__skeleton-control { width: 3.4rem; height: 1.1rem; }
-@keyframes qchat-skeleton { to { background-position: -200% 0; } }
 
 /* ── Focus: red ring everywhere, consistent with the signal marker ────── */
 .qchat button, .qchat a {
