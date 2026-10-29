@@ -344,6 +344,7 @@ jobs:
       - catalog-tests
       - bootstrap-installer
       - e2e-desktop
+      - e2e-desktop-update
       - e2e-desktop-core
       - docs-site
       - history-check
