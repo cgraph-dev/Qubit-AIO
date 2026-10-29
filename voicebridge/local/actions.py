@@ -15,6 +15,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -1701,6 +1702,147 @@ def _a_timer(params: Dict[str, Any]) -> str:
             f"(fires ~{when}).")
 
 
+#: Margin kept between a moved window and the display edges (pixels).
+_DISPLAY_MARGIN = 12
+
+
+def _query_displays() -> List[Any]:
+    """Connected outputs (orb monitor parser, fail-closed to [])."""
+    try:
+        from ..orb.monitors import query_outputs
+        return list(query_outputs() or [])
+    except Exception:
+        return []
+
+
+def _display_run(args: List[str], timeout: float = 10.0) -> Any:
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+
+
+def _display_ordinal(text: str) -> int:
+    """Target display number from 'first display' / 'display 2'. 0 = none."""
+    low = (text or "").lower()
+    hits: List[tuple] = []
+    words = {"first": 1, "1st": 1, "primary": 1, "main": 1,
+             "second": 2, "2nd": 2, "third": 3, "3rd": 3}
+    for m in re.finditer(r"\b(first|1st|primary|main|second|2nd|third|3rd)\b", low):
+        hits.append((m.start(), words[m.group(1)]))
+    for m in re.finditer(r"\b(?:display|monitor|screen)\s*(?:number\s*)?(\d+)\b", low):
+        hits.append((m.start(), int(m.group(1))))
+    for m in re.finditer(r"\b(\d+)(?:st|nd|rd|th)?\s+(?:display|monitor|screen)\b", low):
+        hits.append((m.start(), int(m.group(1))))
+    return max(hits)[1] if hits else 0
+
+
+def _pick_display(outputs: List[Any], which: int) -> Any:
+    """Display 1 is the primary (else leftmost); 2+ are the others by x."""
+    try:
+        ordered = sorted(outputs, key=lambda o: (int(o.x), int(o.y)))
+    except Exception:
+        return None
+    if not ordered:
+        return None
+    primary = next((o for o in ordered if bool(getattr(o, "primary", False))), None)
+    if which == 1:
+        return primary or ordered[0]
+    others = [o for o in ordered if o is not primary] if primary else ordered[1:]
+    idx = which - 2
+    return others[idx] if 0 <= idx < len(others) else None
+
+
+def _display_name(which: int) -> str:
+    return {1: "first", 2: "second", 3: "third"}.get(which, f"number {which}")
+
+
+def _a_display_switch(params: Dict[str, Any]) -> str:
+    """Move the ACTIVE window to the requested physical display.
+
+    Safe and reversible: it only repositions/resizes the focused window and
+    re-activates it. Fullscreen and maximized state are preserved (removed for
+    the move, restored afterwards). No application state is touched.
+    """
+    which = int((params or {}).get("display") or 0)
+    if which <= 0:
+        return "Which display — the first or the second?"
+    if not os.environ.get("DISPLAY"):
+        return "I need an X11 display to move windows between screens."
+    if not shutil.which("wmctrl") or not shutil.which("xdotool"):
+        return "I need wmctrl and xdotool to move windows between screens."
+    outputs = _query_displays()
+    if not outputs:
+        return "I couldn't read the display layout."
+    target = _pick_display(outputs, which)
+    if target is None:
+        if len(outputs) <= 1:
+            return "I only see one display connected."
+        return f"I don't see a {_display_name(which)} display connected."
+    try:
+        win = _display_run(["xdotool", "getactivewindow"]).stdout.strip()
+    except Exception as exc:
+        return f"I couldn't find the active window: {exc}"
+    if not win:
+        return "I couldn't find the active window."
+    try:
+        win_id = int(win)
+    except ValueError:
+        return "I couldn't read the active window id."
+    win_hex = hex(win_id)
+    try:
+        geo = _display_run(
+            ["xdotool", "getwindowgeometry", "--shell", win]).stdout
+    except Exception:
+        geo = ""
+    dims: Dict[str, int] = {}
+    for line in geo.splitlines():
+        key, sep, val = line.partition("=")
+        if sep and val.strip().lstrip("-").isdigit():
+            dims[key.strip()] = int(val.strip())
+    max_w = max(320, int(target.w) - 2 * _DISPLAY_MARGIN)
+    max_h = max(240, int(target.h) - 2 * _DISPLAY_MARGIN)
+    width = min(dims.get("WIDTH") or max_w, max_w)
+    height = min(dims.get("HEIGHT") or max_h, max_h)
+    x = int(target.x) + _DISPLAY_MARGIN
+    y = int(target.y) + _DISPLAY_MARGIN
+    try:
+        state = _display_run(
+            ["xprop", "-id", win_hex, "_NET_WM_STATE"]).stdout
+    except Exception:
+        state = ""
+    was_fullscreen = "FULLSCREEN" in state
+    was_max_v = "_NET_WM_STATE_MAXIMIZED_VERT" in state
+    was_max_h = "_NET_WM_STATE_MAXIMIZED_HORZ" in state
+    remove = ["fullscreen"] if was_fullscreen else []
+    if was_max_v:
+        remove.append("maximized_vert")
+    if was_max_h:
+        remove.append("maximized_horz")
+    try:
+        if remove:
+            _display_run(["wmctrl", "-i", "-r", win_hex,
+                          "-b", "remove," + ",".join(remove)])
+            # The WM applies state changes asynchronously; moving too early
+            # lets a maximized/fullscreen window snap back to the old output.
+            time.sleep(0.15)
+        moved = _display_run(
+            ["wmctrl", "-i", "-r", win_hex, "-e",
+             f"0,{x},{y},{width},{height}"])
+        if moved.returncode != 0:
+            detail = (moved.stderr or moved.stdout or "wmctrl failed").strip()
+            return f"I couldn't move the window: {detail[:160]}"
+        restore = ["fullscreen"] if was_fullscreen else []
+        if not was_fullscreen and was_max_v:
+            restore.append("maximized_vert")
+        if not was_fullscreen and was_max_h:
+            restore.append("maximized_horz")
+        if restore:
+            _display_run(["wmctrl", "-i", "-r", win_hex,
+                          "-b", "add," + ",".join(restore)])
+        _display_run(["wmctrl", "-i", "-a", win_hex])
+    except Exception as exc:
+        return f"I couldn't move the window: {exc}"
+    return f"Switched to the {_display_name(which)} display."
+
+
 def _a_window_close(_: Dict[str, Any]) -> str:
     if shutil.which("xdotool"):
         _run(["xdotool", "key", "Alt+F4"])
@@ -2091,6 +2233,10 @@ ACTIONS: Dict[str, LocalAction] = {
                                    r"\bwhich tabs( are open)?\b",
                                    r"\blist (my |open |browser )?tabs\b",
                                    r"\bshow (me )?(my |open |browser |all )?tabs\b"]),
+    "display_switch": LocalAction("display_switch", "move the active window to a display", _a_display_switch,
+                         patterns=[r"\b(?:switch|move|send|put|shift|throw)\b.{0,30}?\b(?:tabs?|window|screen|it|this)\b.{0,20}?\b(?:to|on|onto)\b.{0,20}?\b(?:(?:first|second|third|1st|2nd|3rd|primary)\s+(?:display|monitor|screen)|(?:display|monitor|screen)\s*(?:number\s*)?\d)\b",
+                                   r"\b(?:switch|move|send|put|shift|throw)\b.{0,30}?\b(?:to|on|onto)\b.{0,25}?\b(?:(?:first|second|third|1st|2nd|3rd|primary)\s+(?:display|monitor|screen)|(?:display|monitor|screen)\s*(?:number\s*)?\d)\b",
+                                   r"\b(?:switch|change)\s+(?:the\s+)?(?:display|monitor|screen)\s+(?:to\s+)?(?:the\s+)?(?:first|second|third|1st|2nd|3rd)\b"]),
     "tab_switch": LocalAction("tab_switch", "switch to a browser tab", _a_tab_switch,
                          patterns=[r"\b(switch to|go to|show|bring|focus)\b.{0,40}?\btabs?\b",
                                    r"\bswitch (to|back|tabs?)\b(?!\S*\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b)"]),
@@ -2460,6 +2606,8 @@ def _match_single(text: str) -> Optional[ActionMatch]:
                         params["editor"] = "vscode"
                     else:
                         params["editor"] = ""
+                elif name == "display_switch":
+                    params["display"] = _display_ordinal(low)
                 elif name in ("tab_close", "tab_duplicate", "tab_switch"):
                     import re as _re
                     if name == "tab_close" and _re.search(r"\ball\b", low) \
