@@ -1826,6 +1826,7 @@ function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) {
   return createPortal(
     <span
       className={cn(
+        "qagent-sidebar__tooltip",
         "fixed z-[100] pointer-events-none",
         "px-2 py-1",
         "bg-background-base border border-current/20 shadow-lg",
