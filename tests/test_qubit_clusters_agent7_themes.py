@@ -30,7 +30,8 @@ def _cfg(tmp_path, monkeypatch):
 def test_themes_show_lists_and_defaults(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     listed = {t["name"] for t in TH.list_themes()["themes"]}
-    assert listed == {"qubit-dark", "qubit-light", "qubit-contrast"}
+    assert listed == {"qubit-dark", "qubit-light", "qubit-contrast",
+                       "qubit-terminal"}
     out = TH.show(cfg)
     assert out["theme"] == TH.DEFAULT_THEME and out["tweaks"] == {}
     assert out["css_href"] == "/static/theme.css"

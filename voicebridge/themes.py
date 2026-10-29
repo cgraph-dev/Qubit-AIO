@@ -82,6 +82,19 @@ THEMES: Dict[str, Dict[str, Any]] = {
             "--danger": "#ff8178", "--focus": "#e8ff8f",
         },
     },
+    "qubit-terminal": {
+        "label": "Qubit Terminal",
+        "description": "Phosphor-periwinkle scan-terminal dossier theme.",
+        "overrides": {
+            "--bg": "#04070d", "--surface": "#0a111c",
+            "--surface-raised": "#101a2a", "--surface-soft": "#060b14",
+            "--text": "#d7e9ff", "--muted": "#8fa8c8", "--faint": "#55677f",
+            "--line": "#1c2c44", "--line-strong": "#3a5a86",
+            "--primary": "#7fd4ff", "--primary-strong": "#4fa8dc",
+            "--success": "#7dffa8", "--warning": "#f0c56b",
+            "--danger": "#ff7a90", "--focus": "#bfe9ff",
+        },
+    },
 }
 
 

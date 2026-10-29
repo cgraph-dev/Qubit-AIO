@@ -1642,7 +1642,8 @@ def _b_themes(ctx, args):
     if action == "set":
         name = str(args.get("name", "")).strip().lower()
         short = {"light": "qubit-light", "dark": "qubit-dark",
-                 "contrast": "qubit-contrast", "high contrast": "qubit-contrast"}
+                 "contrast": "qubit-contrast", "high contrast": "qubit-contrast",
+                 "terminal": "qubit-terminal", "scan": "qubit-terminal"}
         name = short.get(name, name)
         if name == "reset":
             return TH.reset(ctx.cfg, requested_by="voice:user", confirmed=True)
@@ -6621,11 +6622,11 @@ _E("themes", "Themes",
 _E("themes_set", "Set theme",
    ("change theme", "set theme", "switch theme"),
    "themes", ("pets/skin",),
-   args=(_C("name", ("qubit-dark", "qubit-light", "qubit-contrast", "reset",
-                     "dark", "light", "contrast")),),
+   args=(_C("name", ("qubit-dark", "qubit-light", "qubit-contrast", "qubit-terminal", "reset",
+                     "dark", "light", "contrast", "terminal")),),
    fixed=(("action", "set"),), confirm=True,
    examples=("qubit, set theme light",),
-   help="Switch preset (confirmed; light/dark/contrast/reset).")
+   help="Switch preset (confirmed; light/dark/contrast/terminal/reset).")
 _E("proxy", "Proxy status",
    ("proxy status", "forwarding status"),
    "proxy", ("proxy",),
