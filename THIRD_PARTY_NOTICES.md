@@ -807,3 +807,52 @@ vendored, imported, or required at runtime, and DSPy is not a dependency.**
   upstream DSPy-style loop (prompt proposal, model calls, iterative search) is
   **not ported and not run**; `qubit evals run` continues to report
   optimization as unavailable.
+
+## HermesTV — QubitTV web launcher concept (MIT)
+
+Qubit's QubitTV page adapts the *service list and launcher UI concept* of
+[asimons81/hermestv](https://github.com/asimons81/hermestv), reviewed at pinned
+commit `fbd445b381ff5f371bf46bdc96a7d79362d9510f` (2026-10-25, MIT,
+`Copyright (c) 2025 Nous Research`; the upstream `LICENSE` carries the full
+text). **No HermesTV source is vendored, imported, or required at runtime.**
+
+- Reference source: `plugin-source/` — `desktop/src/plugin.jsx` (the service
+  grid: YouTube, YouTube TV, Netflix, Prime Video, Disney+, Hulu, HBO Max,
+  Apple TV+, Peacock, Paramount+), `plugin.yaml` (the `hermestv` plugin
+  manifest) and `__init__.py` (the session-scoped `hermestv_*` tool set).
+- Local adaptation: a web launcher in the Qubit dashboard that presents the
+  same service list as links/tiles. Qubit's page, routing, styling and any
+  state are original.
+- Not vendored: the native desktop plugin SDK, the `ctx.media` /
+  `ctx.desktop.media_request` host capability, the embedded/Dock player, the
+  transcript/download job runner, and the custom HermesTV backend. The upstream
+  plugin is a native Electron media plugin and is **not** a stock Hermes or web
+  plugin; it requires the independent HermesTV host and native media SDK.
+- Native-DRM limitation: the upstream preview only validates ordinary eligible
+  YouTube playback; signed-in DRM services (Netflix, HBO Max, Apple TV+,
+  Peacock) are untested upstream and require the native player/CDM, which Qubit
+  does not ship. QubitTV therefore launched these services as web links only;
+  it does **not** claim in-page, native, or DRM playback.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2025 Nous Research
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
