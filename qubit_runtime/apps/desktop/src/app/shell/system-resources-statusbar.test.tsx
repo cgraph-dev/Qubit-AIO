@@ -20,7 +20,7 @@ const { getLocalHardware } = vi.hoisted(() => ({
   })
 }))
 
-vi.mock('@/qubit', () => ({ getLocalHardware }))
+vi.mock('@/hermes', () => ({ getLocalHardware }))
 
 import { useSystemResourcesStatusbarItem } from './system-resources-statusbar'
 

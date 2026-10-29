@@ -35,6 +35,7 @@ import type { WorkspaceMode } from '@/contrib/types'
 import { finalizeInterruptedMessages, sealOpenToolParts, type ChatMessage } from '@/lib/chat-messages'
 import type { ErrorSurface } from '@/lib/error-surface'
 import { stableArray } from '@/lib/stable-array'
+import { tileFocusStampOnFocusChange } from '@/lib/session-timer-since'
 import { readJson, writeJson } from '@/lib/storage'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -75,7 +76,9 @@ import {
   setActiveSessionStoredIdRotation,
   setAwaitingResponse,
   setBusy,
-  setSessions
+  setSessions,
+  setTileSessionFocusStartedAt,
+  setTurnStartedAt
 } from './session'
 import { secondaryProfileOwnerForEvent } from './session-event-provenance'
 import { turnHasReply, withNoReplyNotice } from './session-no-reply'
@@ -188,6 +191,15 @@ export function liveSessionScopes(): Set<string> {
 
     if (scope) {
       scopes.add(scope)
+      continue
+    }
+
+    // Local secondary sockets prove a profile-only owner (no connectionId):
+    // the keep-set speaks bare profile names for them (#121865).
+    const owner = sessionOwnerByRuntimeId.get(runtimeId)
+
+    if (typeof owner === 'string' && owner.trim()) {
+      scopes.add(normalizeProfileKey(owner))
     }
   }
 
@@ -308,7 +320,45 @@ export function foregroundSessionScopes(): Set<string> {
     }
   }
 
-  addRuntimeScope($activeSessionId.get() ?? undefined)
+  const addOwnerScope = (owner: SessionOwnerScope) => {
+    if (!owner) {
+      return
+    }
+
+    if (isSessionOwnerRoute(owner)) {
+      const connectionId = owner.connectionId?.trim()
+      const profile = owner.profile?.trim()
+
+      if (connectionId && profile) {
+        scopes.add(registryBackendScopeKey(connectionId, normalizeProfileKey(profile)))
+      } else if (profile) {
+        scopes.add(normalizeProfileKey(profile))
+      }
+
+      return
+    }
+
+    if (typeof owner === 'string' && owner.trim()) {
+      scopes.add(normalizeProfileKey(owner))
+    }
+  }
+
+  const activeRuntimeId = $activeSessionId.get() ?? undefined
+
+  addRuntimeScope(activeRuntimeId)
+
+  // A foreground session can be owned by a local secondary profile whose
+  // events have not arrived yet; the runtime is bound but its event scope is
+  // unknown. Resolve the owner through the durable ladder (tile / hint / row)
+  // so its gateway socket survives the foreground handoff (#121865). The
+  // selected stored thread stands in for the active runtime in that gap.
+  const activeOwner = knownOwnerForSession(activeRuntimeId)
+
+  addOwnerScope(activeOwner)
+
+  if (activeRuntimeId && !activeOwner) {
+    addOwnerScope(knownOwnerForSession($selectedStoredSessionId.get() ?? undefined))
+  }
 
   for (const tile of $sessionTiles.get()) {
     addRuntimeScope(tile.runtimeId)
@@ -1020,6 +1070,7 @@ export function clearAllSessionStates() {
  *  alone — a background socket says nothing about the primary composer. */
 export function reconcileBusyStatesOnReconnect(scope?: string) {
   const states = $sessionStates.get()
+  const activeRuntimeId = $activeSessionId.get() ?? undefined
 
   // Only the primary socket has a confirm producer for a parked completion
   // (the active profile's `session.active_list` poll); a scoped reconcile
@@ -1028,13 +1079,24 @@ export function reconcileBusyStatesOnReconnect(scope?: string) {
 
   try {
     for (const [runtimeId, state] of Object.entries(states)) {
-      if (!state || (!state.busy && !state.awaitingResponse)) {
+      if (!state || (!state.busy && !state.awaitingResponse && !state.turnLive && state.turnStartedAt === null)) {
         continue
       }
 
       const recorded = sessionScopeByRuntimeId.get(runtimeId)
 
-      if (scope === undefined ? recorded !== undefined : recorded !== scope) {
+      // Local secondary sockets record a profile-only owner, not a composite
+      // scope. The primary reconcile must leave those alone (a different
+      // profile's socket is still healthy); its own scoped reconcile clears
+      // them (#121865).
+      const profileOnlyOwner = sessionOwnerByRuntimeId.get(runtimeId)
+      const profileOnlyScope = typeof profileOnlyOwner === 'string' ? normalizeProfileKey(profileOnlyOwner) : undefined
+
+      if (scope === undefined) {
+        if (recorded !== undefined || profileOnlyScope !== undefined) {
+          continue
+        }
+      } else if (recorded !== scope && profileOnlyScope !== normalizeProfileKey(scope)) {
         continue
       }
 
@@ -1043,8 +1105,19 @@ export function reconcileBusyStatesOnReconnect(scope?: string) {
       // Re-read — the write path may have republished (and released) this entry.
       const published = $sessionStates.get()[runtimeId]
 
-      if (published?.busy || published?.awaitingResponse) {
-        publishSessionState(runtimeId, { ...published, awaitingResponse: false, busy: false })
+      if (published && (published.busy || published.awaitingResponse || published.turnLive || published.turnStartedAt !== null)) {
+        publishSessionState(runtimeId, {
+          ...published,
+          awaitingResponse: false,
+          busy: false,
+          turnLive: false,
+          turnStartedAt: null
+        })
+      }
+
+      // A retired turn must not leave the focused view's clock running.
+      if (runtimeId === activeRuntimeId) {
+        setTurnStartedAt(null)
       }
     }
   } finally {
@@ -2872,7 +2945,22 @@ $focusedStoredSessionId.listen(focused => {
     markSessionRead(focused)
     ackStoredSessionId(focused)
   }
+
+  stampTileSessionFocus(focused)
 })
+
+stampTileSessionFocus($focusedStoredSessionId.get())
+
+// Statusbar timer: stamp "focused since" for non-primary tiles so they share
+// the primary's contract instead of the row's durable started_at (#103123).
+// Primary focus leaves the stamp alone; the next tile focus re-stamps.
+function stampTileSessionFocus(focused: null | string) {
+  const stamp = tileFocusStampOnFocusChange(focused, $selectedStoredSessionId.get(), Date.now())
+
+  if (stamp) {
+    setTileSessionFocusStartedAt(stamp)
+  }
+}
 
 // Cold-start restore is the one selection change that is NOT a navigation: the
 // route already pointed at the primary session before the window loaded, and
