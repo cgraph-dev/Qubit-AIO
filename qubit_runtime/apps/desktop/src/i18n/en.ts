@@ -9,6 +9,41 @@ export const en: Translations = {
     copyUrl: 'Copy link',
     close: 'Close'
   },
+  sharedMetrics: {
+    consentTitle: 'Help improve Qubit?',
+    consentBody:
+      'Shared metrics contain only bounded counters. Never prompts, files, paths or error text. Collection is local. Sending them to Nous is a separate opt-in.',
+    whatIsCollected: 'What is collected',
+    collectedIntro: 'Only bounded counters:',
+    collectedActivity: 'Activity, session length, outcomes and error classes',
+    collectedModels: 'Model routes and token totals',
+    collectedNames: 'Built-in tool, command and catalog names',
+    collectedMilestones: 'Bucketed setup counts',
+    collectedReliability: 'Update results and timing, crashes, startup and reply speed, messaging-platform health',
+    collectedUsage:
+      'How Qubit gets used: agent accuracy and efficiency (edit matches, loops, recoveries, tokens and tool calls per task, cache breaks), active time per surface and Desktop mode, which app areas, actions and settings are used, closed quickly or switched off, and provider setup outcomes',
+    collectedMachine:
+      'Coarse machine facts: RAM range, GPU type, Qubit version age and release channel, updates behind, whether a local model server is used',
+    installId:
+      'Sending uploads each daily package to the Nous telemetry service. Packages carry this profile’s install ID: a stable random UUID with no personal information, reset by deleting the shared-metrics directory.',
+    consentWindow:
+      'Only packages whose entire collection period falls inside a recorded consent window are ever sent — data from before you opt in, or from any gap while sending was off, stays on this machine. Sending can be turned off again at any time.',
+    readDocs: 'Read the full details',
+    share: 'Collect and send to Nous',
+    local: 'Collect locally only',
+    off: 'No thanks',
+    changeLater: 'You can change this any time in Settings → Safety.',
+    saveFailed: 'Couldn’t save your choice',
+    collectLabel: 'Collect usage stats',
+    collectDesc: 'Bounded counters kept on this device. Never prompts, files, paths or error text.',
+    sendLabel: 'Send usage stats to Nous',
+    sendDesc:
+      'Upload each daily package to the Nous telemetry service. Only data from inside a consent window is sent. Needs collection on.',
+    unavailable: 'Update the Qubit backend to change this setting.',
+    stripBody: 'Bounded counters only, never prompts or files.',
+    stripChoices: { share: 'Send to Nous', local: 'Local only', off: 'No thanks' },
+    stripDetails: 'Details'
+  },
   // English editorial copy stays in the shipped JSONL; other locales override it.
   intro: { stock: {}, custom: () => [] },
   connectors: {
@@ -1706,6 +1741,8 @@ export const en: Translations = {
       provider: 'Provider',
       model: 'Model',
       applying: 'Applying...',
+      mainAppliedTitle: 'Main model updated',
+      mainAppliedMessage: model => `New sessions will use ${model}.`,
       defaultsLabel: 'Defaults',
       reasoning: 'Reasoning',
       reasoningOff: 'Off',
@@ -1885,11 +1922,11 @@ export const en: Translations = {
       usageLabel: label => `${label} usage`,
       freeTier: {
         signIn: 'Sign in',
-        title: "You're on the Qubit free tier",
+        title: "You're on the Nous free tier",
         message: 'Sign in with a Qubit account to unlock more models and tools.',
         caption:
           'Runs on nous/welcome with connectors included. Signing in keeps your connectors and adds the tools that need an account and every other model.',
-        name: 'Qubit · free tier',
+        name: 'Nous · free tier',
         footnote:
           'The free tier has no balance and nothing to pay. Payment and usage appear when you sign in with a Qubit account.',
         plan: 'Free tier',
@@ -1999,7 +2036,7 @@ export const en: Translations = {
       state: {
         notice: {
           loggedOut: {
-            title: 'Connect your Qubit account',
+            title: 'Connect your Nous account',
             message: 'Sign in with your Qubit account to see your balance, plan and usage here.',
             action: 'Sign in'
           },
@@ -4378,7 +4415,7 @@ export const en: Translations = {
   },
 
   freeTier: {
-    providerRowTitle: 'Qubit · free tier',
+    providerRowTitle: 'Nous · free tier',
     providerRowPitch: 'Sign in with a Qubit account to unlock more models and tools.',
     readyTitle: 'Qubit is ready.',
     readyCaption: 'Free · connectors included',
