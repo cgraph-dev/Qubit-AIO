@@ -148,7 +148,7 @@ it('a failed hand-off spawn keeps the app alive and reports the failure in plain
       await createCheckoutStrategy(deps).apply()
 
     expect(result).toMatchObject({ ok: false, error: 'updater-spawn-failed' })
-    expect(result.message).toMatch(/Hermes keeps running/)
+    expect(result.message).toMatch(/Qubit keeps running/)
     expect(result.message).toMatch(/Details: .*ENOENT/)
     expect(result.message?.indexOf('Details:')).toBeGreaterThan(0)
     expect(deps.quit).not.toHaveBeenCalled()

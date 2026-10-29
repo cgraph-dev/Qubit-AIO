@@ -413,6 +413,12 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   },
   setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
+  onExternalOpenFailed: callback => {
+    const listener = (_event, payload) => callback(payload)
+    ipcRenderer.on('qubit:external-open-failed', listener)
+
+    return () => ipcRenderer.removeListener('qubit:external-open-failed', listener)
+  },
   mcpOauth: {
     // One-shot loopback listener for MCP OAuth against remote backends: bind
     // on this machine, hand redirectUri to mcp.servers.oauth.start, then wait

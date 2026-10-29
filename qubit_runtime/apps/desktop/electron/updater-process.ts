@@ -1,4 +1,4 @@
-import { spawn, type SpawnOptions, spawnSync, type SpawnSyncReturns } from 'node:child_process'
+import { spawn, type SpawnOptions, spawnSync, type SpawnSyncOptions, type SpawnSyncReturns } from 'node:child_process'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -29,13 +29,15 @@ export function resolveInstallationLauncher(
   isWindows: boolean = process.platform === 'win32',
   hermesHome: string = process.env.QUBIT_HOME ?? ''
 ): string | null {
-  const names: string[] = isWindows ? ['hermes.exe', 'hermes.cmd'] : ['hermes']
+  const names: string[] = launcherNames(isWindows)
 
-  for (const name of names) {
-    const candidate: string = path.join(updateRoot, '.hermes', 'bin', name)
+  for (const dir of ['.qubit', '.hermes']) {
+    for (const name of names) {
+      const candidate: string = path.join(updateRoot, dir, 'bin', name)
 
-    if (stagedFileExists(candidate)) {
-      return candidate
+      if (stagedFileExists(candidate)) {
+        return candidate
+      }
     }
   }
 
@@ -65,54 +67,121 @@ export function resolveInstallationLauncher(
 
   // An old shim is a migration rung, never a damaged PM install fallback.
   if (!existsSync(path.join(updateRoot, 'pm'))) {
-    const legacy: string = path.join(updateRoot, 'venv', isWindows ? 'Scripts' : 'bin', names[0])
+    for (const name of names) {
+      const legacy: string = path.join(updateRoot, 'venv', isWindows ? 'Scripts' : 'bin', name)
 
-    if (stagedFileExists(legacy)) {
-      return legacy
+      if (stagedFileExists(legacy)) {
+        return legacy
+      }
     }
   }
 
   return null
 }
 
+// Canonical launcher names first, then the pre-rebrand aliases: an install
+// published before the rename is still a valid installation identity.
+function launcherNames(isWindows: boolean): string[] {
+  return isWindows ? ['qubit.exe', 'qubit.cmd', 'hermes.exe', 'hermes.cmd'] : ['qubit', 'hermes']
+}
+
 // cmd.exe re-parses its command line, so a launcher path carrying any of
 // these would change the command instead of naming a file.
 const CMD_UNSAFE_PATH: RegExp = /["%&|<>^\r\n]/
 
-export function launcherTargetsInstallation(launcher: string, root: string): boolean {
-  try {
-    // Node refuses to exec a .cmd directly (CVE-2024-27980), and `shell:true`
-    // would hand an interpolated path to cmd.exe wholesale. Invoke cmd.exe
-    // explicitly instead: a fixed argv, the path quoted verbatim and screened
-    // for cmd metacharacters, and nothing else for the shell to interpret.
-    const viaCmd: boolean = process.platform === 'win32' && /\.cmd$/i.test(launcher)
+/** The exact argv a launcher `--version` probe runs, screened for cmd.exe. */
+function launcherVersionProbe(
+  launcher: string,
+  cwd?: string
+): { command: string; args: string[]; options: SpawnSyncOptions } | null {
+  // Node refuses to exec a .cmd directly (CVE-2024-27980), and `shell:true`
+  // would hand an interpolated path to cmd.exe wholesale. Invoke cmd.exe
+  // explicitly instead: a fixed argv, the path quoted verbatim and screened
+  // for cmd metacharacters, and nothing else for the shell to interpret.
+  const viaCmd: boolean = process.platform === 'win32' && /\.cmd$/i.test(launcher)
 
-    if (viaCmd && CMD_UNSAFE_PATH.test(launcher)) {
-      return false
-    }
+  if (viaCmd && CMD_UNSAFE_PATH.test(launcher)) {
+    return null
+  }
 
-    const command: string = viaCmd ? (process.env.ComSpec ?? 'cmd.exe') : launcher
-    const args: string[] = viaCmd ? ['/d', '/s', '/c', `""${launcher}" --version"`] : ['--version']
-
-    const probe: SpawnSyncReturns<string> = spawnSync(command, args, {
-      cwd: root,
-      encoding: 'utf8',
+  return {
+    command: viaCmd ? (process.env.ComSpec ?? 'cmd.exe') : launcher,
+    args: viaCmd ? ['/d', '/s', '/c', `""${launcher}" --version"`] : ['--version'],
+    options: {
+      cwd,
+      encoding: 'utf8' as const,
       timeout: 15000,
       windowsHide: true,
       windowsVerbatimArguments: viaCmd,
-      env: { ...process.env, HERMES_INSTALL_ROOT: root }
-    })
+      env: cwd ? { ...process.env, HERMES_INSTALL_ROOT: cwd } : process.env
+    }
+  }
+}
 
-    if (probe.error || probe.status !== 0) {
-      return false
+/** The install directory a launcher's `--version` surface reports, if any. */
+function launcherInstallDirectory(launcher: string, cwd?: string): string | null {
+  const probe = launcherVersionProbe(launcher, cwd)
+
+  if (!probe) {
+    return null
+  }
+
+  try {
+    const result: SpawnSyncReturns<string | Buffer> = spawnSync(probe.command, probe.args, probe.options)
+
+    if (result.error || result.status !== 0) {
+      return null
     }
 
-    const reported: string | undefined = /^Install directory: (.+)$/m.exec(probe.stdout)?.[1]?.trim()
+    return /^Install directory: (.+)$/m.exec(String(result.stdout))?.[1]?.trim() ?? null
+  } catch {
+    return null
+  }
+}
 
-    return reported !== undefined && realpathSync(reported) === realpathSync(root)
+export function launcherTargetsInstallation(launcher: string, root: string): boolean {
+  try {
+    const reported: string | null = launcherInstallDirectory(launcher, root)
+
+    return reported !== null && realpathSync(reported) === realpathSync(root)
   } catch {
     return false
   }
+}
+
+/**
+ * A source install outside the canonical root (install.sh --dir, a setup-qubit.sh
+ * clone) is reachable only through the user-bin launcher it published. A
+ * Finder/Dock launch inherits a PATH without ~/.local/bin, so the fixed
+ * locations must be probed directly. The returned root is still resolved and
+ * probed by the caller like any other installed runtime.
+ */
+export function userLauncherInstallRoot(
+  isWindows: boolean = process.platform === 'win32',
+  hermesHome: string = process.env.QUBIT_HOME ?? ''
+): { launcher: string; root: string } | null {
+  for (const launcher of userBinLaunchers(isWindows, hermesHome)) {
+    const root: string | null = launcherInstallDirectory(launcher)
+
+    if (root && (existsSync(path.join(root, 'qubit_cli', 'main.py')) || existsSync(path.join(root, 'hermes_cli', 'main.py')))) {
+      return { launcher, root }
+    }
+  }
+
+  return null
+}
+
+/** Published user-bin launchers at fixed locations: a GUI launch's PATH may omit them. */
+function userBinLaunchers(isWindows: boolean, hermesHome: string, extraDirs: string[] = []): string[] {
+  const defaultHome: string = platformDefaultHermesHome(os.homedir(), process.env, isWindows ? 'win32' : 'linux')
+
+  const dirs: string[] = isWindows
+    ? [path.join(hermesHome || defaultHome, 'bin'), path.join(defaultHome, 'bin'), ...extraDirs]
+    : [path.join(os.homedir(), '.local', 'bin'), path.join(hermesHome || defaultHome, 'bin'), ...extraDirs]
+
+  return [...new Set(dirs)]
+    .flatMap((dir: string): string[] => launcherNames(isWindows).map((name: string): string => path.join(dir, name)))
+    .filter(stagedFileExists)
 }
 
 /** File prerequisites only: dependency recovery remains reachable through update. */

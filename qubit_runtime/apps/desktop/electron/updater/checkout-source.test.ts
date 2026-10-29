@@ -326,6 +326,10 @@ urllib.request.build_opener = local_build
     vi.stubEnv('PYTHONPATH', path.join(temporary, 'wrong-checkout'))
     vi.stubEnv('PYTHONHOME', path.join(temporary, 'wrong-python'))
     vi.stubEnv('HERMES_INSTALL_ROOT', origin)
+    // The wire fixtures use the upstream asset host; pin the publication base
+    // so this channel-protocol test does not depend on the product default.
+    vi.stubEnv('QUBIT_RELEASE_ASSETS_BASE_URL', 'https://hermes-assets.nousresearch.com')
+    vi.stubEnv('QUBIT_REPOSITORY', 'NousResearch/hermes-agent')
 
     const environment: NodeJS.ProcessEnv = {
       ...process.env,
