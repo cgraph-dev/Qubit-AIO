@@ -373,6 +373,16 @@ class PluginContext:
         logger.info("Plugin '%s' registered %s: %s", self.manifest.name, label, registry_name)
         return handle
 
+    @cached_property
+    def desktop(self):
+        """Narrow desktop media capability facade for plugins.
+
+        Availability means the desktop event sink is reachable; each request
+        still checks the live session and transport authority in the gateway.
+        """
+        from qubit_cli.plugin_desktop import DesktopPluginCapability
+        return DesktopPluginCapability()
+
     @property
     def llm(self) -> Any:
         """Host-owned :class:`agent.plugin_llm.PluginLlm` facade: completions on the user's active
