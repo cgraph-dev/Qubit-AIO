@@ -98,7 +98,8 @@ export interface PreviewTab {
   pinned?: boolean
 }
 
-const TABS_STORAGE_KEY = 'hermes.desktop.previewTabs.v2'
+const TABS_STORAGE_KEY = 'qubit.desktop.previewTabs.v2'
+const LEGACY_TABS_STORAGE_KEY = 'hermes.desktop.previewTabs.v2'
 /** Superseded by the tab list above; cleared so it can't leak forever. */
 const LEGACY_SESSION_REGISTRY_KEY = 'hermes.desktop.sessionPreviews.v1'
 
@@ -185,8 +186,12 @@ type TabsByProfile = Record<string, PreviewTab[]>
  *  than dropped — tabs the user can see are the tabs that must survive. */
 let pendingLegacyTabs: PreviewTab[] | null = null
 
+function readStoredTabs(): unknown {
+  return readJson<unknown>(TABS_STORAGE_KEY) ?? readJson<unknown>(LEGACY_TABS_STORAGE_KEY)
+}
+
 function loadTabsByProfile(): TabsByProfile {
-  const stored = readJson<unknown>(TABS_STORAGE_KEY)
+  const stored = readStoredTabs()
 
   if (Array.isArray(stored)) {
     pendingLegacyTabs = parseTabList(stored)
@@ -234,12 +239,14 @@ function persistTabs() {
   // `dataUrl` holds inline bytes that cannot be restored; drop the key wherever
   // it survives the filter above (an image tab). An empty map removes the key
   // rather than storing `{}`, matching the tiles store.
-  writeKey(
-    TABS_STORAGE_KEY,
+  const payload =
     Object.keys(buckets).length === 0
       ? null
       : JSON.stringify(buckets, (key, value) => (key === 'dataUrl' ? undefined : value))
-  )
+
+  writeKey(TABS_STORAGE_KEY, payload)
+  // Dual-publish for a build that still reads the legacy key.
+  writeKey(LEGACY_TABS_STORAGE_KEY, payload)
 }
 
 // Tabs are scoped to THE CHAT ON SCREEN, not to the window's gateway socket.
@@ -703,7 +710,7 @@ export function adoptPersistedBrowserTab(tabId: string) {
   }
 
   try {
-    const stored = readJson<unknown>(TABS_STORAGE_KEY)
+    const stored = readStoredTabs()
 
     if (!stored) {
       return

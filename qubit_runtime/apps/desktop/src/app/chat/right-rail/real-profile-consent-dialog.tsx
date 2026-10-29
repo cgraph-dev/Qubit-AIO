@@ -22,6 +22,7 @@ import {
   claimRealProfilePrompt,
   releaseRealProfilePrompt
 } from '@/store/real-profile-consent'
+import { $connection } from '@/store/session'
 
 import { hermesConfigCacheWriter, useHermesConfigRecord } from '../../hooks/use-config-record'
 
@@ -83,6 +84,7 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
   const dismissed = useStore($realProfilePromptDismissed)
   const muted = useStore($realProfilePromptMuted)
   const claim = useStore($realProfilePromptClaim)
+  const connection = useStore($connection)
   const { data: config, writeScope } = useHermesConfigRecord()
   const setConfig = hermesConfigCacheWriter()
   const [busy, setBusy] = useState(false)
@@ -127,7 +129,15 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
   // Config not loaded yet, feature already on, opted out, or another pane
   // owns the prompt — render nothing. `enabled` flipping true after a
   // successful save is also what closes the dialog.
-  const open = Boolean(config) && !enabled && !dismissed && !muted && claim === tabId
+  const open = shouldOfferRealProfilePrompt({
+    claim,
+    configLoaded: Boolean(config),
+    connection,
+    dismissed,
+    enabled,
+    muted,
+    tabId
+  })
 
   if (!open) {
     return null
