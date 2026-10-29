@@ -216,10 +216,17 @@ _QUESTION_STARTERS = (
 _SLEEP_COMMAND_RE = _re_module.compile(
     r"\bgoing\s+to\s+sleep\b", _re_module.IGNORECASE)
 
-#: Local actions that execute immediately, without the "say yes" staging.
-#: Both only change local model power (unload/free VRAM, or warm it) and are
-#: reversible; the spoken ack is the feedback.
-_IMMEDIATE_LOCAL_ACTIONS = frozenset({"brain_unload", "brain_warm"})
+#: Local actions that always keep the "say yes" staging even though their
+#: registry ``confirm`` flag may be false: they can lose data or cannot be
+#: undone (close a window, empty trash, send a message, edit a repo, or a
+#: compound utterance that may contain one of those).
+_CONFIRM_LOCAL_ACTIONS = frozenset({
+    "repo_edit", "send_message", "window_close", "empty_trash", "compound",
+})
+
+#: Local actions that keep their richer deterministic answer path (the clock
+#: wording and sleep-mode handling live in ``_direct_fact_answer``).
+_DIRECT_LOCAL_ACTIONS = frozenset({"time_date"})
 
 
 #: Dashboard waveform visibility (voice-final lane): "show waveform" /
@@ -1998,7 +2005,15 @@ class VoiceEditService:
         tool = str((proposal or {}).get("tool") or "")
         if not tool.startswith("local."):
             return None
-        if tool[len("local."):] not in _IMMEDIATE_LOCAL_ACTIONS:
+        name = tool[len("local."):]
+        if name in _CONFIRM_LOCAL_ACTIONS or name in _DIRECT_LOCAL_ACTIONS:
+            return None
+        try:
+            from ..local import actions as _la
+            act = _la.ACTIONS.get(name)
+            if act is None or bool(getattr(act, "confirm", False)):
+                return None
+        except Exception:
             return None
         return proposal
 
@@ -3017,6 +3032,11 @@ class VoiceEditService:
         self._require_estop_clear()
         if self._ask_stopped(_cancel):
             return self._ask_cancelled(request_id, mode)
+        if self.sleeping() and self._is_directed_wake(question):
+            self.set_sleep_mode(False)
+            self._audit("voice_edit.sleep.cleared", {
+                "request_id": request_id, "mode": mode,
+                "chars": len(question)})
         if self._immediate_local_action(question) is not None:
             return self._run_immediate_local(
                 question, request_id=request_id, mode=mode)
@@ -3038,11 +3058,6 @@ class VoiceEditService:
             return {"ok": True, "answer": answer, "mode": "sleep",
                     "provider": "local", "model": "sleep-mode",
                     "spoken": False}
-        if self.sleeping() and self._is_directed_wake(question):
-            self.set_sleep_mode(False)
-            self._audit("voice_edit.sleep.cleared", {
-                "request_id": request_id, "mode": mode,
-                "chars": len(question)})
         # Dashboard waveform visibility (voice-final lane): waveform commands
         # flip the setting through the canonical writer.
         # This turn is on-request: answered, remembered, spoken like any

@@ -323,3 +323,32 @@ def test_bare_sleep_unloads_instead_of_entering_sleep_mode(svc, monkeypatch):
     ans = svc.ask("go to sleep", request_id=req["request_id"], mode="answer")
     assert ans["answer"] == "Brain unloaded.", ans
     assert svc.sleeping() is False
+
+
+def test_site_shortcuts_run_without_confirmation(svc, monkeypatch):
+    import voicebridge.voice_edit.tool_task as TT
+    calls = []
+
+    def _run(cfg, text, **kw):
+        calls.append((text, kw))
+        return {"state": "OK", "reply": f"Opened {text} in the browser."}
+
+    monkeypatch.setattr(TT, "run_tool_task", _run)
+    for phrase in ("open youtube", "open messenger", "open instagram"):
+        req = svc.begin()
+        rid = req["request_id"]
+        out = svc.route(rid, phrase)
+        assert out["mode"] == "answer", (phrase, out)
+        assert not out.get("requires_confirmation"), (phrase, out)
+        ans = svc.ask(phrase, request_id=rid, mode="answer")
+        assert phrase in ans["answer"], (phrase, ans)
+    assert len(calls) == 3, calls
+    assert all(c[1].get("confirmed") is True for c in calls), calls
+
+
+def test_window_close_and_empty_trash_stay_confirm_gated(svc):
+    for phrase in ("close this window", "empty the trash"):
+        req = svc.begin()
+        out = svc.route(req["request_id"], phrase)
+        assert out["mode"] == "task", (phrase, out)
+        assert out.get("requires_confirmation") is True, (phrase, out)
