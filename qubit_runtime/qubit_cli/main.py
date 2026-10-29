@@ -776,6 +776,12 @@ try:
                 _early_redact = _early_sec_cfg.get("redact_secrets")
                 if _early_redact is not None:
                     os.environ["HERMES_REDACT_SECRETS"] = str(_early_redact).lower()
+                    # This module's top-level subcommand imports (recipes -> agent.file_safety)
+                    # may already have imported agent.redact, whose launch snapshot is
+                    # import-time; refresh it from the env value we just bridged.
+                    _redact_mod = sys.modules.get("agent.redact")
+                    if _redact_mod is not None:
+                        _redact_mod.apply_env_snapshot()
         _early_net_cfg = _early_cfg_raw.get("network", {})
         if isinstance(_early_net_cfg, dict) and _early_net_cfg.get("force_ipv4"):
             _FORCE_IPV4_EARLY = True

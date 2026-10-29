@@ -153,10 +153,12 @@ if _HERMES_EXPORTED_TMP:
             del os.environ[_key]
     del os.environ[SCRATCH_DIR_MARKER_ENV]
 
-from qubit_state_guard import _real_platform_state_root
+from qubit_state_guard import _legacy_platform_state_root, _real_platform_state_root
 
 _real_test_root = _real_platform_state_root() or (Path.home() / ".hermes").resolve()
-_guarded_tmp_roots = [_real_test_root]
+# Both the canonical ``.qubit`` root and the read-old legacy ``.hermes`` root are
+# production state: a TMPDIR under either must be relocated before pytest uses it.
+_guarded_tmp_roots = [root for root in (_real_test_root, _legacy_platform_state_root()) if root]
 _custom_test_home = os.environ.get("QUBIT_HOME")
 if _custom_test_home:
     _guarded_tmp_roots.append(Path(_custom_test_home).expanduser().resolve())

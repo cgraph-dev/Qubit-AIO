@@ -1325,24 +1325,6 @@ class _FakeAuthority:
             live._write(root / f"{delivery_id}.json", record)
 
 
-def _canonical_target(monkeypatch, *targets: Path) -> _FakeAuthority:
-    """Every ``targets`` profile home has a ready authority (its Bot Chat is admitted canonically);
-    any other home has none, so a DM there falls through to the runner hand-off."""
-    from tools import bot_live_delivery as live
-
-    homes = {t.resolve() for t in targets}
-
-    def owner_of(home):
-        home = Path(home).resolve()
-        if home not in homes:
-            return None
-        return dict(profile_home=str(home), session_id="local-bot", canonical=True,
-                    lease_id="authority-1", live_session_id="local-bot")
-
-    monkeypatch.setattr(live, "find_canonical_live_owner", owner_of)
-    authority = _FakeAuthority()
-    monkeypatch.setattr(live, "authority_delivery", authority)
-    return authority
 
 def test_delivery_main_local_refusal_retains_payload(tmp_path, monkeypatch, capsys):
     dm_file = tmp_path / "message.txt"

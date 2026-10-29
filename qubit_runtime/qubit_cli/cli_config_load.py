@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import List, Dict, Any
 from utils import fast_safe_load
@@ -169,6 +170,9 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
         redact = security_config.get("redact_secrets")
         if redact is not None:
             os.environ["HERMES_REDACT_SECRETS"] = str(redact).lower()
+            _redact_mod = sys.modules.get("agent.redact")
+            if _redact_mod is not None:
+                _redact_mod.apply_env_snapshot()
 
     # Session-search index knobs (qubit_state reads the env carriers).
     sessions_config = defaults.get("sessions", {})

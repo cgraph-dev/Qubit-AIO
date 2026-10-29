@@ -57,18 +57,15 @@ def _omni_settings() -> tuple[str, str]:
             key = ""
     if not key:
         # The dashboard/gateway loader normally populates the environment; a
-        # direct CLI/tool call may not have run it yet. Read the profile .env
-        # without logging the value.
+        # direct CLI/tool call may not have run it yet. Use the canonical
+        # reader: it resolves the profile .env AND returns nothing for a
+        # frozen-policy worker (ignore-user-config / safe mode), which must
+        # never open the profile's secrets file.
         try:
-            from qubit_constants import get_qubit_home
-            env_path = get_qubit_home() / ".env"
-            for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-                line = line.strip()
-                if line.startswith(f"{key_env}="):
-                    key = line.split("=", 1)[1].strip().strip("'\"")
-                    break
+            from qubit_cli.config import load_env
+            key = str(load_env().get(key_env, "") or "").strip()
         except Exception:
-            pass
+            key = ""
     return (base or _DEFAULT_BASE_URL).rstrip("/"), key
 
 

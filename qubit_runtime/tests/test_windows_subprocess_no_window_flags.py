@@ -62,8 +62,9 @@ def _make_fake_popen(spawns, *, stdout="ok\n", returncode=0):
             if _is_git_spawn(cmd):
                 spawns.append((cmd, kwargs))
             self.returncode = returncode
+            self.pid = -1
 
-        def communicate(self, timeout=None):
+        def communicate(self, input=None, timeout=None):
             return (stdout, "")
 
         def kill(self):  # pragma: no cover - never reached on the fast path

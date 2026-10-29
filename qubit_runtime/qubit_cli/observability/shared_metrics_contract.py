@@ -558,7 +558,8 @@ EXTENSION_FAILURE_CLASSES = (
 # (bundled restores, plugin and MCP rows), ``unresolved`` = a hub lookup no adapter answered,
 # ``other`` = an adapter id this list does not name.
 EXTENSION_REGISTRY_IDS = frozenset({
-    "browse-sh", "clawhub", "github", "hermes-index", "lobehub", "official", "skills-sh", "url", "well-known",
+    "browse-sh", "clawhub", "github", "hermes", "hermes-index", "lobehub", "official", "openclaw",
+    "skills-sh", "url", "well-known",
 })
 EXTENSION_REGISTRIES = EXTENSION_REGISTRY_IDS | frozenset({"none", "other", "unresolved"})
 # ---- end iuf c1 ----
@@ -1187,7 +1188,8 @@ EXTENSION_FAILURE_CLASSES = (
 # (bundled restores, plugin and MCP rows), ``unresolved`` = a hub lookup no adapter answered,
 # ``other`` = an adapter id this list does not name.
 EXTENSION_REGISTRY_IDS = frozenset({
-    "browse-sh", "clawhub", "github", "hermes-index", "lobehub", "official", "skills-sh", "url", "well-known",
+    "browse-sh", "clawhub", "github", "hermes", "hermes-index", "lobehub", "official", "openclaw",
+    "skills-sh", "url", "well-known",
 })
 EXTENSION_REGISTRIES = EXTENSION_REGISTRY_IDS | frozenset({"none", "other", "unresolved"})
 # ---- end iuf c1 ----

@@ -34,6 +34,12 @@ _NON_MIRROR_DIRS = {
     "fakes", "fixtures", "install", "integration", "manual",
     "monitoring", "openviking_plugin", "perf_guards", "scripts", "secret_sources",
     "security", "skills", "verify", "website", "computer_use", "qubit_state",
+    # "honcho_plugin": the honcho memory provider lives at plugins/memory/honcho,
+    # not as a top-level package.
+    "honcho_plugin",
+    # "runtime": the engine-port suite spans agent/runtime_* + recipes/roles;
+    # there is no single top-level ``runtime`` package to mirror.
+    "runtime",
 }
 
 # Root-level modules whose tests sit directly in tests/ (no package to mirror).

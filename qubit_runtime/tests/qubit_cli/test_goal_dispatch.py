@@ -9,6 +9,32 @@ import pytest
 from qubit_cli import goals
 
 
+
+@pytest.fixture(autouse=True)
+def _fast_test_db_synchronous(monkeypatch):
+    """Skip fsync-per-DDL on the private temp state.db.
+
+    The linked SQLite on this host runs ``journal_mode=DELETE`` (the WAL-reset
+    guard), so every schema statement fsyncs and a fresh ``SessionDB`` costs
+    seconds under load. These tests never assert power-loss durability — the DB
+    lives in a throwaway tmp_path — so ``synchronous=OFF`` only removes dead
+    I/O wait, not coverage.
+    """
+    import qubit_state
+
+    original = qubit_state.apply_database_pragmas
+
+    def fast(conn, *args, **kwargs):
+        result = original(conn, *args, **kwargs)
+        try:
+            conn.execute("PRAGMA synchronous=OFF")
+        except Exception:
+            pass
+        return result
+
+    monkeypatch.setattr(qubit_state, "apply_database_pragmas", fast)
+
+
 def _surface(surface, mgr, monkeypatch, prompts=None):
     prompts = prompts if prompts is not None else []
     if surface == "cli":

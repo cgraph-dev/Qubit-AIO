@@ -616,12 +616,31 @@ class TestProjectVenvDirOutOfTree:
         monkeypatch.setattr(sys, "prefix", str(venv))
         monkeypatch.setattr(sys, "base_prefix", str(checkout / "no-such-base"))
 
+    @staticmethod
+    def _install_metadata(venv, checkout):
+        """Record a real editable-install ``direct_url.json`` for *checkout* in *venv*.
+
+        ``_venv_installs_checkout`` refuses to adopt an interpreter whose venv does
+        not prove it installs this checkout (a dev tree must not rewrite another
+        install's venv), so the fixture must carry that metadata.
+        """
+        import json
+
+        site = venv / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+        dist_info = site / "qubit-1.0.0.dist-info"
+        dist_info.mkdir(parents=True)
+        (dist_info / "METADATA").write_text(
+            "Metadata-Version: 2.1\nName: qubit\nVersion: 1.0.0\n", encoding="utf-8")
+        (dist_info / "direct_url.json").write_text(
+            json.dumps({"url": checkout.as_uri()}), encoding="utf-8")
+
     def test_out_of_tree_install_resolves_the_running_interpreter_venv(self, monkeypatch, tmp_path):
         checkout = tmp_path / "hermes-agent"
         checkout.mkdir()
         venv = tmp_path / "venvs" / "hermes"
         qubit_constants.venv_python_path(venv).parent.mkdir(parents=True)
         qubit_constants.venv_python_path(venv).write_text("", encoding="utf-8")
+        self._install_metadata(venv, checkout)
         self._running_from(monkeypatch, checkout, venv)
 
         assert qubit_constants.project_venv_dir(checkout) == venv

@@ -134,8 +134,4 @@ def test_cmd_chat_still_reraises_unrelated_import_errors(main_mod, monkeypatch):
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-def _install_boom(monkeypatch, boom):
-    """``hermes chat`` runs main's ``cli.main``; ``-z`` keeps the gateway transport launcher."""
-    monkeypatch.setitem(sys.modules, "cli", types.SimpleNamespace(main=lambda **_kw: boom(None)))
-    monkeypatch.setattr("qubit_cli.gateway_chat.launch_from_args", boom)
 

@@ -369,8 +369,8 @@
                 "grok",
                 "kimi",
                 "llama",
-                "minimax",
                 "mimo",
+                "minimax",
                 "mistral",
                 "nemotron",
                 "nova",
@@ -1193,12 +1193,12 @@
             },
             "ram_bucket": {
               "enum": [
-                "lt_8g",
-                "8g_to_16g",
                 "16g_to_32g",
                 "32g_to_64g",
                 "64g_to_128g",
+                "8g_to_16g",
                 "gte_128g",
+                "lt_8g",
                 "unknown"
               ]
             },
@@ -1212,10 +1212,10 @@
             },
             "version_age_bucket": {
               "enum": [
-                "lt_7d",
-                "7d_to_30d",
                 "30d_to_90d",
+                "7d_to_30d",
                 "gte_90d",
+                "lt_7d",
                 "unknown"
               ]
             }
@@ -1824,10 +1824,12 @@
                     "browse-sh",
                     "clawhub",
                     "github",
+                    "hermes",
                     "hermes-index",
                     "lobehub",
                     "none",
                     "official",
+                    "openclaw",
                     "other",
                     "skills-sh",
                     "unresolved",
@@ -2600,11 +2602,11 @@
             },
             "window_bucket": {
               "enum": [
-                "lt_32k",
-                "32k_to_128k",
                 "128k_to_256k",
                 "256k_to_1m",
+                "32k_to_128k",
                 "gte_1m",
+                "lt_32k",
                 "unknown"
               ]
             }
@@ -2643,12 +2645,12 @@
           "properties": {
             "latency_bucket": {
               "enum": [
-                "lt_500ms",
-                "500ms_to_1s",
                 "1s_to_2s",
                 "2s_to_5s",
+                "500ms_to_1s",
                 "5s_to_10s",
-                "gte_10s"
+                "gte_10s",
+                "lt_500ms"
               ]
             },
             "surface": {
@@ -2869,6 +2871,7 @@
                   "enum": [
                     "failed",
                     "noop",
+                    "partial",
                     "refused",
                     "success"
                   ]
@@ -3356,12 +3359,12 @@
               "enum": [
                 "0",
                 "1",
-                "2",
-                "3_to_5",
-                "6_to_10",
                 "11_to_25",
+                "2",
                 "26_to_50",
+                "3_to_5",
                 "51_to_100",
+                "6_to_10",
                 "gte_101"
               ]
             },
@@ -3383,12 +3386,12 @@
             },
             "tokens_bucket": {
               "enum": [
-                "lt_2k",
-                "2k_to_10k",
                 "10k_to_50k",
-                "50k_to_200k",
                 "200k_to_1m",
+                "2k_to_10k",
+                "50k_to_200k",
                 "gte_1m",
+                "lt_2k",
                 "unknown"
               ]
             },
@@ -3396,12 +3399,12 @@
               "enum": [
                 "0",
                 "1",
-                "2",
-                "3_to_5",
-                "6_to_10",
                 "11_to_25",
+                "2",
                 "26_to_50",
+                "3_to_5",
                 "51_to_100",
+                "6_to_10",
                 "gte_101"
               ]
             }
@@ -3458,12 +3461,12 @@
             },
             "tokens_bucket": {
               "enum": [
-                "lt_2k",
-                "2k_to_10k",
                 "10k_to_50k",
-                "50k_to_200k",
                 "200k_to_1m",
+                "2k_to_10k",
+                "50k_to_200k",
                 "gte_1m",
+                "lt_2k",
                 "unknown"
               ]
             }
@@ -3503,12 +3506,12 @@
           "properties": {
             "original_size_bucket": {
               "enum": [
-                "lt_1k",
-                "1k_to_10k",
-                "10k_to_50k",
-                "50k_to_100k",
                 "100k_to_500k",
+                "10k_to_50k",
+                "1k_to_10k",
+                "50k_to_100k",
                 "gte_500k",
+                "lt_1k",
                 "unknown"
               ]
             },
@@ -3564,12 +3567,12 @@
             "tool_schema_tokens_bucket": {
               "enum": [
                 "0",
-                "lt_2k",
-                "2k_to_5k",
-                "5k_to_10k",
                 "10k_to_20k",
                 "20k_to_40k",
-                "gte_40k"
+                "2k_to_5k",
+                "5k_to_10k",
+                "gte_40k",
+                "lt_2k"
               ]
             }
           },
@@ -3607,6 +3610,10 @@
           "properties": {
             "toolset": {
               "enum": [
+                "apple_calendar",
+                "apple_contacts",
+                "apple_health",
+                "apple_music",
                 "bot_room",
                 "browser",
                 "catalog",
@@ -3623,9 +3630,17 @@
                 "desktop_ui",
                 "discord",
                 "discord_admin",
+                "dropbox",
                 "feishu_doc",
                 "feishu_drive",
                 "file",
+                "google_calendar",
+                "google_contacts",
+                "homeassistant",
+                "image_gen",
+                "kanban",
+                "memory",
+                "project",
                 "qubit-acp",
                 "qubit-api-server",
                 "qubit-bluebubbles",
@@ -3636,6 +3651,7 @@
                 "qubit-email",
                 "qubit-feishu",
                 "qubit-gateway",
+                "qubit-homeassistant",
                 "qubit-matrix",
                 "qubit-mattermost",
                 "qubit-qqbot",
@@ -3649,11 +3665,6 @@
                 "qubit-weixin",
                 "qubit-whatsapp",
                 "qubit-yuanbao",
-                "image_gen",
-                "kanban",
-                "memory",
-                "onboarding",
-                "project",
                 "safe",
                 "search",
                 "session_search",
@@ -3769,11 +3780,11 @@
             "active_minutes_bucket": {
               "enum": [
                 "0",
-                "lt_5m",
-                "5m_to_30m",
-                "30m_to_2h",
                 "2h_to_6h",
-                "gte_6h"
+                "30m_to_2h",
+                "5m_to_30m",
+                "gte_6h",
+                "lt_5m"
               ]
             },
             "active_profile_count_bucket": {
@@ -3833,11 +3844,11 @@
             "active_minutes_bucket": {
               "enum": [
                 "0",
-                "lt_5m",
-                "5m_to_30m",
-                "30m_to_2h",
                 "2h_to_6h",
-                "gte_6h"
+                "30m_to_2h",
+                "5m_to_30m",
+                "gte_6h",
+                "lt_5m"
               ]
             },
             "surface": {
@@ -3896,9 +3907,9 @@
             "turns_before_switch_bucket": {
               "enum": [
                 "1",
+                "11_to_30",
                 "2_to_3",
                 "4_to_10",
-                "11_to_30",
                 "gte_31"
               ]
             }
@@ -4138,6 +4149,10 @@
                 "first_message",
                 "free_tier_ready",
                 "guide",
+                "guide_connectors",
+                "guide_first_build",
+                "guide_layout",
+                "guide_look",
                 "guide_skip",
                 "model_pick",
                 "provider_api_key",
@@ -4599,6 +4614,10 @@
             "tool_name": {
               "enum": [
                 "annotate_preview",
+                "apple_calendar",
+                "apple_contacts",
+                "apple_health",
+                "apple_music",
                 "browser_back",
                 "browser_cdp",
                 "browser_click",
@@ -4627,6 +4646,7 @@
                 "discord",
                 "discord_admin",
                 "drive_preview",
+                "dropbox",
                 "execute_code",
                 "feishu_doc_read",
                 "feishu_drive_add_comment",
@@ -4634,7 +4654,13 @@
                 "feishu_drive_list_comments",
                 "feishu_drive_reply_comment",
                 "focus_pane",
+                "google_calendar",
+                "google_contacts",
                 "gui_tour",
+                "ha_call_service",
+                "ha_get_state",
+                "ha_list_entities",
+                "ha_list_services",
                 "image_generate",
                 "kanban_attach",
                 "kanban_attach_url",
@@ -4665,6 +4691,7 @@
                 "skill_manage",
                 "skill_view",
                 "skills_list",
+                "subscription_research",
                 "terminal",
                 "text_to_speech",
                 "todo_list",

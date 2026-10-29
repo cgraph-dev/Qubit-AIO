@@ -110,6 +110,20 @@ _REDACT_ENABLED_BY_HOME: dict = {}
 _REDACT_ENABLED_LOCK = threading.Lock()
 
 
+def apply_env_snapshot() -> None:
+    """Re-read ``HERMES_REDACT_SECRETS`` into the launch snapshot.
+
+    Startup config bridges (``config.yaml`` -> env) can run after this module
+    was imported transitively, which would leave the import-time snapshot stale.
+    Only those bridges call this; a live ``os.environ`` mutation at runtime must
+    never be able to disable redaction mid-session.
+    """
+    global _REDACT_ENABLED
+    _REDACT_ENABLED = os.getenv("HERMES_REDACT_SECRETS", "true").lower() in {"1", "true", "yes", "on"}
+    with _REDACT_ENABLED_LOCK:
+        _REDACT_ENABLED_BY_HOME.clear()
+
+
 def _redact_enabled() -> bool:
     """Effective redaction switch for the active profile (launch snapshot when no override)."""
     from qubit_constants import get_qubit_home_override, qubit_home_key
