@@ -1299,6 +1299,13 @@ export const $currentFastMode = atom(storedBoolean(COMPOSER_FAST_KEY, false))
 export const $yoloActive = atom(false)
 export const $currentCwd = atom(getRememberedWorkspaceCwd())
 
+// True only when the next new chat's cwd is a deliberate workspace choice (#52589).
+// The desktop otherwise seeds a chat's cwd from its app-global workspace; the
+// gateway must treat that as an inherited default — NOT an explicit pick.
+export const $currentCwdExplicit = atom(false)
+
+export const setCurrentCwdExplicit = (next: Updater<boolean>) => updateAtom($currentCwdExplicit, next)
+
 // Which conversation the live `$currentCwd` is known to describe. Three
 // inhabitants, and the difference between the last two is load-bearing:
 // a stored-session id (that conversation owns the path), `null` (the fresh-draft

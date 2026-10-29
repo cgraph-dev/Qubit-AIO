@@ -283,7 +283,7 @@ declare global {
           title: string
         } | null
       } | null>
-      readFileDataUrl: (filePath: string) => Promise<string>
+      readFileDataUrl: (filePath: string) => Promise<string | HermesReadFileErrorResult>
       /** Remote non-image attach: higher dedicated cap than preview/Settings default. */
       readFileDataUrlForAttach?: (filePath: string) => Promise<string>
       /** Settings → Chat: max size for local files loaded as data URLs (attach/preview). */
@@ -291,7 +291,7 @@ declare global {
         get: () => Promise<{ defaultMaxMb: number; maxBytes: number; maxMb: number }>
         set: (maxMb: number) => Promise<{ defaultMaxMb: number; maxBytes: number; maxMb: number }>
       }
-      readFileText: (filePath: string) => Promise<HermesReadFileTextResult>
+      readFileText: (filePath: string) => Promise<HermesReadFileTextResult | HermesReadFileErrorResult>
       /** Full-source read for runtime desktop plugins (readFileText truncates
        *  at the 512 KiB preview cap). Absent on older shells — callers fall
        *  back to readFileText and must reject a `truncated` result. */
@@ -1445,6 +1445,13 @@ export interface HermesPreviewTarget {
   renderMode?: 'preview' | 'source'
   source: string
   url: string
+}
+
+export interface HermesReadFileErrorResult {
+  ok: false
+  error: string
+  message: string
+  path?: string
 }
 
 export interface HermesReadFileTextResult {

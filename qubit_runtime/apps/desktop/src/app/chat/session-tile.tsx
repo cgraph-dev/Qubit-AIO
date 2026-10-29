@@ -43,6 +43,7 @@ import { $activeGatewayProfile } from '@/store/profile'
 import { $projectTree } from '@/store/projects'
 import { sessionAwaitingInput } from '@/store/prompts'
 import {
+  $connection,
   $cronSessions,
   $gatewayState,
   $messagingSessions,
@@ -81,10 +82,81 @@ import { ChatView } from '.'
 
 const NO_MESSAGES: ChatMessage[] = []
 
+export const WRONG_BACKEND_TILE_ERROR =
+  'Wrong backend — this session lives on another connection. Reconnect to that backend to open it.'
+
+/** Whether a tile's owning connection differs from the one that just became
+ *  active. An unknown owner or active connection never counts as a change. */
+export function tileBackendIdentityChanged(
+  ownerConnectionId: string | null | undefined,
+  activeConnection: { connectionId?: string | null; mode?: string | null } | null | undefined
+): boolean {
+  const owner = String(ownerConnectionId || '').trim()
+
+  if (!owner || !activeConnection) {
+    return false
+  }
+
+  const active =
+    String(activeConnection.connectionId || '').trim() || (activeConnection.mode === 'local' ? 'local' : '')
+
+  return Boolean(active) && owner !== active
+}
+
+/** Drop persisted tile bindings that belong to a different backend than the
+ *  one that just became active, and latch the wrong-backend error so a later
+ *  resume cannot turn a cross-backend 404 into the durable-session retry copy. */
+export function unbindTilesForBackendIdentityChange<
+  T extends { error?: string; ownerRoute?: { connectionId?: string }; runtimeId?: string }
+>(
+  tiles: readonly T[],
+  activeConnection: { connectionId?: string | null; mode?: string | null } | null | undefined
+): T[] {
+  let changed = false
+
+  const next = tiles.map(tile => {
+    if (!tileBackendIdentityChanged(tile.ownerRoute?.connectionId, activeConnection)) {
+      return tile
+    }
+
+    if (!tile.runtimeId && tile.error === WRONG_BACKEND_TILE_ERROR) {
+      return tile
+    }
+
+    changed = true
+    const unbound = { ...tile, error: WRONG_BACKEND_TILE_ERROR }
+    delete unbound.runtimeId
+
+    return unbound
+  })
+
+  return changed ? next : (tiles as T[])
+}
+
+/** Watch the active connection and drop tile bindings that belong to another
+ *  backend. Returns the listener disposer. */
+export function startTileBackendIdentityGuard(activeConnection = () => $connection.get()): () => void {
+  const run = () => {
+    const connection = activeConnection()
+    const tiles = $sessionTiles.get()
+    const next = unbindTilesForBackendIdentityChange(tiles, connection)
+
+    if (next !== tiles) {
+      $sessionTiles.set(next)
+    }
+  }
+
+  const off = $connection.listen(run)
+  run()
+
+  return off
+}
+
 export function sessionTileResumeFailure(
   message: string,
   durableSessionFound: boolean | undefined,
-  tileStillUnbound: boolean
+  tileStillUnbound: boolean,
+  backendIdentityChanged = false
 ): string | undefined {
   if (!tileStillUnbound) {
     return undefined
@@ -92,6 +164,10 @@ export function sessionTileResumeFailure(
 
   if (!/session not found|\b404\b/i.test(message)) {
     return message
+  }
+
+  if (backendIdentityChanged) {
+    return WRONG_BACKEND_TILE_ERROR
   }
 
   if (durableSessionFound) {
@@ -473,7 +549,13 @@ export function SessionTilePane({ storedSessionId }: { storedSessionId: string }
         // reconnect-time lookup.
         const durableSession = await resolveStoredSession(storedSessionId, ownerRoute).catch(() => undefined)
         const current = $sessionTiles.get().find(candidate => candidate.storedSessionId === storedSessionId)
-        const error = sessionTileResumeFailure(message, Boolean(durableSession), Boolean(current && !current.runtimeId))
+        const identityChanged = tileBackendIdentityChanged(ownerRoute?.connectionId, $connection.get())
+        const error = sessionTileResumeFailure(
+          message,
+          Boolean(durableSession),
+          Boolean(current && !current.runtimeId),
+          identityChanged
+        )
 
         if (error) {
           patchSessionTile(storedSessionId, { error })
