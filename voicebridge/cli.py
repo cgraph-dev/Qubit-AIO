@@ -2074,8 +2074,17 @@ def build_parser() -> argparse.ArgumentParser:
     br_act.add_argument("target", help="tab id")
     br_act.add_argument("--confirm", action="store_true")
     br_open = br_sub.add_parser("open", parents=[common],
-                                help="open a URL in a new tab (needs --confirm)")
-    br_open.add_argument("url", help="http(s) URL, no credentials")
+                                help="open a URL in a new tab (needs --confirm), "
+                                     "or launch the real Chromium profile with CDP "
+                                     "when no URL is given")
+    br_open.add_argument("url", nargs="?", default="",
+                         help="http(s) URL, no credentials; omit to launch CDP")
+    br_open.add_argument("--port", type=int, default=0,
+                         help="CDP port when no URL is given (default: configured/9222)")
+    br_open.add_argument("--profile-dir", default="",
+                         help="Chromium user-data-dir for CDP (default: browser.profile_dir)")
+    br_open.add_argument("--browser", default="",
+                         help="Chromium key for CDP (chromium/chrome/brave/edge)")
     br_open.add_argument("--confirm", action="store_true")
     br_ob = br_sub.add_parser("open-browser", parents=[common],
                               help="focus the browser on the current tab (needs --confirm)")
@@ -8125,6 +8134,39 @@ def _cmd_browser(cfg, args) -> int:
     _MUTATING = {"activate", "open", "open-browser", "navigate", "fill",
                  "click", "close", "download"}
     try:
+        if cmd == "open" and not str(getattr(args, "url", "") or "").strip():
+            import sys as _sys
+            from pathlib import Path as _Path
+            _runtime = str(_Path(__file__).resolve().parents[1] / "qubit_runtime")
+            if _runtime not in _sys.path:
+                _sys.path.insert(0, _runtime)
+            from qubit_cli.config import load_config
+            from qubit_cli.subcommands.browser import launch_cdp_browser
+            from qubit_cli.browser_connect import (
+                detect_default_chromium, real_profile_data_dir)
+
+            rcfg = load_config()
+            rcfg = rcfg if isinstance(rcfg, dict) else {}
+            bcfg = rcfg.get("browser") if isinstance(rcfg.get("browser"), dict) else {}
+            port = int(getattr(args, "port", 0) or 0)
+            if not port:
+                url = str(bcfg.get("cdp_url") or "")
+                for token in url.split(":")[::-1]:
+                    if token.isdigit():
+                        port = int(token)
+                        break
+            port = port or 9222
+            browser = (getattr(args, "browser", "") or
+                       detect_default_chromium() or "chromium")
+            profile = (getattr(args, "profile_dir", "") or
+                       str(bcfg.get("profile_dir") or "") or
+                       real_profile_data_dir(browser) or "")
+            ok, message = launch_cdp_browser(browser, profile, port)
+            print(_json.dumps({
+                "ok": bool(ok), "message": message, "port": port,
+                "profile_dir": profile,
+            }, indent=2))
+            return 0 if ok else 1
         if cmd in _MUTATING and BT.estop_engaged(cfg):
             print(_json.dumps(BT.refuse_estop(f"browser {cmd}"), indent=2))
             return 3
