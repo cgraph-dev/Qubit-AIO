@@ -814,7 +814,8 @@ Qubit's QubitTV page adapts the *service list and launcher UI concept* of
 [asimons81/hermestv](https://github.com/asimons81/hermestv), reviewed at pinned
 commit `fbd445b381ff5f371bf46bdc96a7d79362d9510f` (2026-10-25, MIT,
 `Copyright (c) 2025 Nous Research`; the upstream `LICENSE` carries the full
-text). **No HermesTV source is vendored, imported, or required at runtime.**
+text). **The dashboard launcher vendors no HermesTV source; the native desktop
+renderer port is recorded below.**
 
 - Reference source: `plugin-source/` — `desktop/src/plugin.jsx` (the service
   grid: YouTube, YouTube TV, Netflix, Prime Video, Disney+, Hulu, HBO Max,
@@ -833,6 +834,26 @@ text). **No HermesTV source is vendored, imported, or required at runtime.**
   Peacock) are untested upstream and require the native player/CDM, which Qubit
   does not ship. QubitTV therefore launched these services as web links only;
   it does **not** claim in-page, native, or DRM playback.
+
+### Native desktop player renderer (same pin)
+
+The Qubit desktop player renderer adapts these upstream files at the same pin
+(`fbd445b381ff5f371bf46bdc96a7d79362d9510f`):
+
+- `apps/desktop/src/sdk/desktop-media.tsx` ->
+  `qubit_runtime/apps/desktop/src/sdk/desktop-media.tsx`
+- `apps/desktop/src/lib/player-agent-bridge.ts` ->
+  `qubit_runtime/apps/desktop/src/lib/player-agent-bridge.ts`
+- `apps/desktop/src/lib/tool-media-renderers.ts` ->
+  `qubit_runtime/apps/desktop/src/lib/tool-media-renderers.ts`
+- the matching focused tests alongside each file.
+
+Local changes: package specifiers use `@qubit/shared`; user-facing strings say
+QubitTV rather than HermesTV; the plugin door is gated on the
+`media.player` capability; and the private bridge is read through
+`window.hermesDesktop?.player` with feature detection. The native Electron
+WebContentsView host, media SDK/DRM stack and backend remain unported; this is
+the renderer contract only.
 
 MIT License text requirement: include the copyright notice and this permission
 statement in distributions:
