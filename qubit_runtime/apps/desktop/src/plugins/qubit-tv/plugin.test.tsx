@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -299,6 +302,19 @@ describe('bundled QubitTV plugin', () => {
       { timeout: 2_000 }
     )
     expect(screen.getByText(/Media context expired|Context expired/)).toBeTruthy()
+  })
+
+  it('runtime bundle imports only the SDK and React singletons', () => {
+    const code = readFileSync(
+      path.resolve(process.cwd(), '../../plugins/qubit-tv/desktop/plugin.js'),
+      'utf8'
+    )
+    const imports = [...code.matchAll(/^\s*import\s+(?:[^'"\n]+\s+from\s+)?['"]([^'"]+)['"]/gm)].map(
+      match => match[1]
+    )
+
+    expect([...new Set(imports)].sort()).toEqual(['@qubit/plugin-sdk', 'react', 'react/jsx-runtime'])
+    expect(code).not.toMatch(/HermesTV/)
   })
 
   it('coalesces Ask Qubit while the prompt acknowledgement is pending', async () => {
