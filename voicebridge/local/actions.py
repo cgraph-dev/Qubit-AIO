@@ -10,6 +10,7 @@ Each action returns a short spoken status string.
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -647,7 +648,18 @@ _SITE_SHORTCUTS = {
     "dexonline": "https://dexonline.ro",
 }
 
-_OPEN_VERBS = r"(?:open|launch|go to|visit)"
+_OPEN_VERBS = r"(?:open|launch|go to|visit|pop on|pull up|bring up)"
+
+# ASR commonly writes "opencode" as "open code" (and may split the wake word:
+# "Open, open code."). That shape used to reach open_app's bare "code" alias
+# and launch VS Code. Keep explicit VS Code/editor phrasings on open_app.
+_OPENCODE_RE = re.compile(
+    r"\b(?:open|launch|go to|visit|pop on|pull up|bring up)\b"
+    r"[\s,]+(?:the\s+)?(?:opencode|open\s*code|code)(?:\.ai)?\b",
+    re.IGNORECASE)
+_VSCODE_CONTEXT_RE = re.compile(
+    r"\b(?:vs\s*code|visual\s+studio(?:\s+code)?|code\s+editor|"
+    r"in\s+code|with\s+code)\b", re.IGNORECASE)
 
 
 def _normalize_website_url(raw: str) -> str:
@@ -2089,8 +2101,8 @@ ACTIONS: Dict[str, LocalAction] = {
     "window_close": LocalAction("window_close", "close the active window", _a_window_close,
                          patterns=[r"\bclose (this |the |current )?window\b"]),
     "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
-                                patterns=[r"\b(?:open|launch|go to|visit)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
-                                            r"\b(?:open|launch|go to|visit) (the )?(youtube music|youtube|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
+                                patterns=[r"\b(?:open|launch|go to|visit|pop on|pull up|bring up)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
+                                            r"\b(?:open|launch|go to|visit|pop on|pull up|bring up) (the )?(youtube music|youtube|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|google|duckduckgo|wikipedia|dexonline)\b"]),
     "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
                              patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
                                        r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),
@@ -2307,6 +2319,12 @@ def _match_single(text: str) -> Optional[ActionMatch]:
     if _re.match(r"^reply\|(gmail|messenger|instagram)\|", low):
         return ActionMatch(name="send_message", params={"draft": text.strip()},
                            text=text)
+    # "open code" is the usual ASR rendering of "opencode". Resolve it to the
+    # website before open_app's bare "code" alias can launch VS Code. Explicit
+    # "vs code"/"visual studio code"/"code editor" phrasings stay VS Code.
+    if _OPENCODE_RE.search(low) and not _VSCODE_CONTEXT_RE.search(low):
+        return ActionMatch(name="open_website",
+                           params={"url": "https://opencode.ai"}, text=text)
     # Youtube CONTROL verbs (pause/stop/resume/next/close + music/youtube) take
     # priority over "play youtube": "pause the youtube music" must not be routed
     # to play_youtube (which also matches the bare 'youtube music' substring).

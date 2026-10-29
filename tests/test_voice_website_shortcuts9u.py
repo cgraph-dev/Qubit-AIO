@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from voicebridge.local.actions import match
 from voicebridge.router.l0 import route
+from voicebridge.voice_edit.tool_task import propose_tool
 
 
 def _url(phrase: str) -> str:
@@ -48,3 +49,30 @@ def test_site_shortcuts_are_l0_local_actions():
         assert decision is not None, phrase
         assert decision.kind == "local", (phrase, decision.kind)
         assert decision.params.get("action") == "open_website", phrase
+
+
+def test_asr_opencode_shapes_open_the_website_not_vscode():
+    assert _url("Open code.") == "https://opencode.ai"
+    assert _url("Open, open code.") == "https://opencode.ai"
+    assert _url("Open opencode.") == "https://opencode.ai"
+
+
+def test_asr_pop_on_messenger_opens_the_site():
+    assert _url("Pop on messenger.") == "https://www.messenger.com"
+    assert _url("pop on messenger.") == "https://www.messenger.com"
+
+
+def test_explicit_vscode_phrasings_still_use_open_app():
+    hit = match("open code in vscode")
+    assert hit is not None and hit.name == "open_app"
+    assert hit.params.get("app") == "vscode"
+    hit = match("open code editor")
+    assert hit is not None and hit.name == "open_app"
+
+
+def test_voice_edit_stages_the_website_tool_not_vscode():
+    assert propose_tool(None, "Open code.") == {
+        "tool": "local.open_website", "args": {"url": "https://opencode.ai"}}
+    assert propose_tool(None, "Pop on messenger.") == {
+        "tool": "local.open_website",
+        "args": {"url": "https://www.messenger.com"}}
