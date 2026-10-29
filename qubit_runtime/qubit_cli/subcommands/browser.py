@@ -107,8 +107,9 @@ def build_browser_parser(subparsers) -> None:
 
     def _dispatch_browser(_args):
         from qubit_cli.browser_connect import (
-            UNSUPPORTED_CHANNEL, chromium_executable, close_browser_holding_profile,
-            detect_default_chromium, real_profile_data_dir)
+            UNSUPPORTED_CHANNEL, best_real_profile_dir, chromium_executable,
+            close_browser_holding_profile, detect_default_chromium,
+            real_profile_data_dir)
         from qubit_cli.config import load_config
 
         action = getattr(_args, "browser_action", None)
@@ -131,7 +132,7 @@ def build_browser_parser(subparsers) -> None:
                 return 1
             profile = (getattr(_args, "profile_dir", "")
                        or str((cfg.get("browser") or {}).get("profile_dir") or "")
-                       or real_profile_data_dir(browser))
+                       or best_real_profile_dir(browser))
             ok, msg = launch_cdp_browser(browser, profile, port,
                                          str(getattr(_args, "url", "") or ""))
             print(("✓ " if ok else "✗ ") + msg)

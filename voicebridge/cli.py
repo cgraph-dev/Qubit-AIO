@@ -8143,7 +8143,8 @@ def _cmd_browser(cfg, args) -> int:
             from qubit_cli.config import load_config
             from qubit_cli.subcommands.browser import launch_cdp_browser
             from qubit_cli.browser_connect import (
-                detect_default_chromium, real_profile_data_dir)
+                best_real_profile_dir, detect_default_chromium,
+                real_profile_data_dir)
 
             rcfg = load_config()
             rcfg = rcfg if isinstance(rcfg, dict) else {}
@@ -8160,7 +8161,7 @@ def _cmd_browser(cfg, args) -> int:
                        detect_default_chromium() or "chromium")
             profile = (getattr(args, "profile_dir", "") or
                        str(bcfg.get("profile_dir") or "") or
-                       real_profile_data_dir(browser) or "")
+                       best_real_profile_dir(browser) or "")
             ok, message = launch_cdp_browser(browser, profile, port)
             print(_json.dumps({
                 "ok": bool(ok), "message": message, "port": port,

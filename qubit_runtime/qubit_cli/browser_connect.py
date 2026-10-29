@@ -202,6 +202,49 @@ def real_profile_data_dir(browser: str, system: str | None = None) -> str | None
     return next((c for c in candidates if os.path.isdir(c)), candidates[0])
 
 
+def best_real_profile_dir(browser: str, system: str | None = None) -> str | None:
+    """Pick the active profile root, including snap/Flatpak candidates.
+
+    ``real_profile_data_dir`` returns the native path first; on this host the
+    active Chromium may be the snap build while the native directory exists but
+    has no Cookies. Prefer a root with the newest ``Default/Cookies`` (or
+    ``Local State``), falling back to the first existing candidate.
+    """
+    from pathlib import Path as _Path
+    candidates: list[str] = []
+    native = real_profile_data_dir(browser, system)
+    if native:
+        candidates.append(native)
+    b = _BROWSER_BY_KEY.get(browser)
+    if b is not None and (system or platform.system()) == "Linux":
+        home = _Path.home()
+        parts = _LINUX_SNAP_PROFILE_PARTS.get(browser)
+        if parts:
+            candidates.append(str(home.joinpath(*parts)))
+        flatpak = _LINUX_FLATPAK_IDS.get(browser)
+        if flatpak:
+            candidates.append(str(_Path(home, ".var", "app", flatpak, "config",
+                                        *b.linux_config.split("/"))))
+    existing = [c for c in dict.fromkeys(candidates) if os.path.isdir(c)]
+    if not existing:
+        return candidates[0] if candidates else None
+
+    def score(root: str) -> tuple[float, int]:
+        root_p = _Path(root)
+        ts = 0.0
+        found = 0
+        for rel in ("Default/Cookies", "Default/Network/Cookies", "Local State"):
+            try:
+                stat = (root_p / rel).stat()
+                ts = max(ts, stat.st_mtime)
+                found += 1
+            except OSError:
+                pass
+        return (ts, found)
+
+    return max(existing, key=score)
+
+
 def _first_present(paths) -> str | None:
     return next((p for p in paths if p and os.path.isfile(p)), None)
 
