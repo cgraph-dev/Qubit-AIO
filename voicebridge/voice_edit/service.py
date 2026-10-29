@@ -216,6 +216,12 @@ _QUESTION_STARTERS = (
 _SLEEP_COMMAND_RE = _re_module.compile(
     r"\bgoing\s+to\s+sleep\b", _re_module.IGNORECASE)
 
+#: Local actions that execute immediately, without the "say yes" staging.
+#: Both only change local model power (unload/free VRAM, or warm it) and are
+#: reversible; the spoken ack is the feedback.
+_IMMEDIATE_LOCAL_ACTIONS = frozenset({"brain_unload", "brain_warm"})
+
+
 #: Dashboard waveform visibility (voice-final lane): "show waveform" /
 #: "hide waveform" flips ``voice_edit.waveform_visible`` through the SAME
 #: ask-stage mechanism as sleep mode (deterministic, audited, remembered —
@@ -1305,6 +1311,10 @@ class VoiceEditService:
             out["decision"] = decision_wire
             return out
         if decision.mode in ("answer", "chat"):
+            immediate = self._immediate_answer_mode(
+                transcript, decision_wire, req.request_id)
+            if immediate is not None:
+                return immediate
             # Lane-3 net (2026-10-03): the intent classifier misses
             # tool-shaped utterances ("Set THE timer for one minute." reached
             # ask() as conversation and the brain narrated an unsettleable
@@ -1332,6 +1342,10 @@ class VoiceEditService:
                     "decision": decision_wire,
                     "request_id": req.request_id}
         if decision.mode == "task":
+            immediate = self._immediate_answer_mode(
+                transcript, decision_wire, req.request_id)
+            if immediate is not None:
+                return immediate
             task = self.propose_task(request_id, transcript)
             task["decision"] = decision_wire
             return task
@@ -1973,6 +1987,63 @@ class VoiceEditService:
             return str(msgs[-1].get("content") or "").strip(), "repeat"
         except Exception:
             return "", ""
+
+    def _immediate_local_action(self, text: str) -> Optional[Dict[str, Any]]:
+        """Proposal for an immediate (no-confirm) local action, or None."""
+        try:
+            from .tool_task import propose_tool as _propose
+            proposal = _propose(self.cfg, (text or "").strip())
+        except Exception:
+            return None
+        tool = str((proposal or {}).get("tool") or "")
+        if not tool.startswith("local."):
+            return None
+        if tool[len("local."):] not in _IMMEDIATE_LOCAL_ACTIONS:
+            return None
+        return proposal
+
+    def _immediate_answer_mode(self, text: str, decision_wire: Any,
+                               request_id: str) -> Optional[Dict[str, Any]]:
+        """Route an immediate local action to the answer lane (no staging)."""
+        if self._immediate_local_action(text) is None:
+            return None
+        return {"ok": True, "mode": "answer",
+                "question": (text or "").strip(),
+                "decision": decision_wire,
+                "request_id": request_id}
+
+    def _run_immediate_local(self, text: str, *, request_id: str,
+                             mode: str) -> Dict[str, Any]:
+        """Run one immediate local action through the shared broker."""
+        clean = (text or "").strip()
+        self._audit("voice_edit.local.immediate", {
+            "request_id": request_id, "mode": mode, "chars": len(clean),
+            **(_dbg.text_fields(self.cfg, task=clean))})
+        try:
+            from .tool_task import run_tool_task
+            res = run_tool_task(
+                self.cfg, clean, confirmed=True,
+                session=self._request_session(request_id) or "")
+        except Exception as exc:
+            detail = str(exc)[:200] or "the local action failed"
+            return {"ok": False, "answer": detail,
+                    "code": "VOICE_EDIT_LOCAL_ACTION_FAILED",
+                    "detail": detail, "mode": "local-action",
+                    "provider": "local", "model": "local-action",
+                    "spoken": False}
+        reply = str(res.get("reply") or "").strip()
+        if str(res.get("state") or "").upper() == "OK" and reply:
+            self._remember_ask_exchange(clean, reply, model="local-action")
+            return {"ok": True, "answer": reply, "mode": "local-action",
+                    "provider": "local", "model": "local-action",
+                    "spoken": False}
+        detail = str(res.get("detail") or res.get("code")
+                     or "the local action failed")[:200]
+        return {"ok": False, "answer": detail,
+                "code": str(res.get("code") or "VOICE_EDIT_LOCAL_ACTION_FAILED"),
+                "detail": detail, "mode": "local-action",
+                "provider": "local", "model": "local-action",
+                "spoken": False}
 
     def _tool_shaped_proposal(self, text: str) -> Optional[Dict[str, Any]]:
         """Deterministic local tool for ``text``, or None (Lane-3 net).
@@ -2946,6 +3017,9 @@ class VoiceEditService:
         self._require_estop_clear()
         if self._ask_stopped(_cancel):
             return self._ask_cancelled(request_id, mode)
+        if self._immediate_local_action(question) is not None:
+            return self._run_immediate_local(
+                question, request_id=request_id, mode=mode)
         self._maybe_prune_voice_sessions(request_id)
         # Slice 4a — manual sleep mode (owner decision 2026-10-03 §5 #1/#2).
         # "going to sleep" sets the mode (this turn is on-request: answered,

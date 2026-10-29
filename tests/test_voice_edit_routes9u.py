@@ -271,3 +271,55 @@ def test_estop_route_423(tmp_path, monkeypatch):
     monkeypatch.setattr(routes, "service_for", lambda c: service)
     status, payload = routes.handle(cfg, "POST", "/api/voice-edit/session", {})
     assert status == 423 and payload["code"] == "EMERGENCY_STOP"
+
+
+def test_brain_power_actions_run_without_confirmation(svc, monkeypatch):
+    import voicebridge.voice_edit.tool_task as TT
+    calls = []
+
+    def _run(cfg, text, **kw):
+        calls.append((text, kw))
+        return {"state": "OK", "reply": "Brain unloaded."}
+
+    monkeypatch.setattr(TT, "run_tool_task", _run)
+
+    req = svc.begin()
+    rid = req["request_id"]
+    out = svc.route(rid, "stop brain while I'm playing")
+    assert out["mode"] == "answer", out
+    assert not out.get("requires_confirmation"), out
+
+    ans = svc.ask("stop brain while I'm playing",
+                  request_id=rid, mode="answer")
+    assert ans["answer"] == "Brain unloaded.", ans
+    assert calls and calls[0][0] == "stop brain while I'm playing", calls
+    assert calls[0][1].get("confirmed") is True, calls
+
+
+def test_brain_warm_runs_without_confirmation(svc, monkeypatch):
+    import voicebridge.voice_edit.tool_task as TT
+    calls = []
+
+    def _run(cfg, text, **kw):
+        calls.append((text, kw))
+        return {"state": "OK", "reply": "Warming the brain."}
+
+    monkeypatch.setattr(TT, "run_tool_task", _run)
+    req = svc.begin()
+    rid = req["request_id"]
+    out = svc.route(rid, "wake up the brain")
+    assert out["mode"] == "answer", out
+    ans = svc.ask("wake up the brain", request_id=rid, mode="answer")
+    assert ans["answer"] == "Warming the brain.", ans
+    assert calls and calls[0][1].get("confirmed") is True, calls
+
+
+def test_bare_sleep_unloads_instead_of_entering_sleep_mode(svc, monkeypatch):
+    import voicebridge.voice_edit.tool_task as TT
+    monkeypatch.setattr(TT, "run_tool_task",
+                        lambda cfg, text, **kw: {"state": "OK",
+                                                 "reply": "Brain unloaded."})
+    req = svc.begin()
+    ans = svc.ask("go to sleep", request_id=req["request_id"], mode="answer")
+    assert ans["answer"] == "Brain unloaded.", ans
+    assert svc.sleeping() is False
