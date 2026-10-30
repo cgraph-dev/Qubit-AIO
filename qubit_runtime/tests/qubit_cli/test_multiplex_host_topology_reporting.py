@@ -50,7 +50,7 @@ def test_cron_status_names_the_host_gateway_for_a_served_profile(served_host, ca
     assert f"PID {os.getpid()}" in out and "served" in out
     assert "not running" not in out.lower()
     # Never route the user to a SECOND host process: per-profile install is legacy-only remediation.
-    assert "hermes gateway install" not in out
+    assert "qubit gateway install" not in out
     assert "sudo hermes gateway install --system" not in out
 
 

@@ -359,7 +359,7 @@ class TestProjectionStopsReheal:
             _arh._empty_heal_user_notified.add(_live_key)
             _arh._empty_heal_pending_notice[_live_key] = (
                 "⚠️ Your session transcript required repeated repair — "
-                "run /debug share or `hermes doctor`."
+                "run /debug share or `qubit doctor`."
             )
 
         warned = []

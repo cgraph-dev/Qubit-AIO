@@ -254,7 +254,7 @@ def test_old_process_new_git_tree_completes_in_fresh_python(transition, tmp_path
 
 
 def _run_cmd_update(monkeypatch, request, capsys):
-    """``hermes update --gateway`` whose impl hands this request to the real post-commit completion."""
+    """``qubit update --gateway`` whose impl hands this request to the real post-commit completion."""
     from types import SimpleNamespace
     from qubit_cli import main, update_cmd, update_receipt
 
@@ -523,7 +523,7 @@ def test_failed_build_after_commit_is_a_followup_and_later_steps_still_run(trans
     assert result["receipt"]["outcome"] == "success"
     # The failure is not silent: it is a named receipt follow-up.
     assert [f["step"] for f in result["receipt"]["followups"]] == ["build"]
-    # The tail obligation stays armed so the next launch / `hermes update` rebuilds.
+    # The tail obligation stays armed so the next launch / `qubit update` rebuilds.
     assert (Path(request["home"]) / "completion-pending").read_text() == "owed"
     events = [json.loads(line)["name"] for line in (root / "events.jsonl").read_text().splitlines()]
     # Was "not in": the failed build no longer skips maintenance (config migration) ...

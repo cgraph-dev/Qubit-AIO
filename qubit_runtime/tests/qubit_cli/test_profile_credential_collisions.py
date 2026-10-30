@@ -1,5 +1,5 @@
 """Regression for #118388: a platform singleton secret (``TELEGRAM_BOT_TOKEN``) duplicated across
-local profile homes was invisible to ``hermes doctor`` / ``hermes gateway status``; the only signal
+local profile homes was invisible to ``qubit doctor`` / ``qubit gateway status``; the only signal
 was the losing standalone gateway's log. Doctor, status and the migrate preflight now share one
 duplicate-credential helper, so all three name the same profiles + key names (never the value)."""
 

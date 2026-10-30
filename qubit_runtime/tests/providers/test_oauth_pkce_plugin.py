@@ -139,7 +139,7 @@ def test_spent_refresh_token_is_grant_dead_and_marks_the_pool_row_dead(idp, monk
 
 
 def test_alias_login_stores_the_row_under_the_canonical_profile_name(idp, monkeypatch, tmp_path, request):
-    """hermes auth add <alias> must write the pool under ProviderProfile.name, not the typed alias."""
+    """qubit auth add <alias> must write the pool under ProviderProfile.name, not the typed alias."""
     from agent.credential_pool import load_pool
 
     alias = "example-pkce-alias"

@@ -1,4 +1,4 @@
-"""A plugin profile's mirrored ``hermes auth`` registry row: shape, place, and env auto-detect.
+"""A plugin profile's mirrored ``qubit auth`` registry row: shape, place, and env auto-detect.
 
 A provider that leaves core keeps its registry row by declaring it on its profile
 (``registry_auth_type``, ``base_url_env_var``, ``registry_after``), and the alias keys the mirror
@@ -61,7 +61,7 @@ def test_ambient_plugin_is_not_env_auto_detected_under_its_aliases(plugin, monke
 
 def test_profile_declares_its_registry_row_shape_and_place(plugin, monkeypatch, capsys):
     """registry_auth_type / base_url_env_var / registry_after produce the row a built-in would have
-    had, and `hermes auth add` takes the api-key path instead of demanding an auth_handler."""
+    had, and `qubit auth add` takes the api-key path instead of demanding an auth_handler."""
     from qubit_cli import auth
     from qubit_cli.auth_commands import auth_add_command
 

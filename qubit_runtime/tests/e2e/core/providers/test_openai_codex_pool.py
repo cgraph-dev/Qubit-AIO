@@ -14,7 +14,7 @@ and a seeded two-login pool in ``auth.json``. Two vendor boundaries are faked:
   shipped.
 
 The pool is the #120741 layout: login A is the singleton plus its seeded ``device_code`` row
-(fresh), login B is an independently authorized ``manual:device_code`` row (``hermes auth
+(fresh), login B is an independently authorized ``manual:device_code`` row (``qubit auth
 add``) whose access token is about to expire, so every selection defers a refresh of B.
 """
 

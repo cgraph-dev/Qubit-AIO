@@ -1,8 +1,8 @@
 """The paused-gateway record survives an update that runs under a partner's claim.
 
-A real checkout (a clone of the commit under test) and real processes: a ``hermes update``
+A real checkout (a clone of the commit under test) and real processes: a ``qubit update``
 stand-in that recorded a paused set is SIGKILLed; the next update runs the way Desktop/Tauri
-drives it — the orchestrator holds the marker and the ``hermes update`` child takes the checkout
+drives it — the orchestrator holds the marker and the ``qubit update`` child takes the checkout
 lock and adopts the orchestrator's claim. That update must adopt the orphaned set and fold it into
 its own record, never treat its own partner as "another update" and overwrite the record.
 """

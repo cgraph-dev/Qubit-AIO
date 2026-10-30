@@ -33,7 +33,7 @@ def _git(cwd, *args, env=None):
     (False, None, "", False, None),            # release tag unreachable: fail, publish nothing
     (False, "before", "", False, "before"),    # ... a rerun keeps its checkout instead
     # The release cut on a release branch, main past the fork point (v0.22.2's shape): main moves
-    # back only through `hermes update`, whose downgrade guard the installer cannot run.
+    # back only through `qubit update`, whose downgrade guard the installer cannot run.
     (True, "tip", "", True, "tip"),
     (True, "tip", "stable", True, "tip"),
     (True, "before", "", True, "release"),

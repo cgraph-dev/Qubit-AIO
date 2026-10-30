@@ -1,6 +1,6 @@
 """A new or rerun install of the official repository lands on the latest stable release.
 
-`hermes update` already follows stable for an official checkout that never chose a channel;
+`qubit update` already follows stable for an official checkout that never chose a channel;
 the installer has to put a fresh install there too, or new users start on main's tip. The
 official URL is redirected to a local origin and `curl` answers the release lookup.
 """
@@ -32,7 +32,7 @@ def _git(cwd, *args, env=None):
     (False, None, [], False, None),                     # release tag unreachable: fail, publish nothing
     (False, "before", [], False, "before"),             # ... a rerun keeps its checkout instead
     # The release cut on a release branch, main past the fork point (v0.22.2's shape): main moves
-    # back only through `hermes update`, whose downgrade guard the installer cannot run.
+    # back only through `qubit update`, whose downgrade guard the installer cannot run.
     (True, "tip", [], True, "tip"),
     (True, "tip", ["--channel", "stable"], True, "tip"),
     (True, "before", [], True, "release"),

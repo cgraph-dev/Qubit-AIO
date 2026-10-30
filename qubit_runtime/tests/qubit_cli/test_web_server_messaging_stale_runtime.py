@@ -56,7 +56,7 @@ def test_stopped_gateway_does_not_report_stale_platform_error(client):
 
 
 def test_operator_stopped_gateway_does_not_report_retained_startup_failure(client):
-    """``hermes gateway stop`` keeps the last ``startup_failed`` + ``exit_reason`` on disk with
+    """``qubit gateway stop`` keeps the last ``startup_failed`` + ``exit_reason`` on disk with
     ``desired_state: stopped``; the Channels page must read that as stopped, exactly like
     ``/api/status`` does, not wear a "Start failed" badge with the stale reason (#112517)."""
     from qubit_constants import get_qubit_home

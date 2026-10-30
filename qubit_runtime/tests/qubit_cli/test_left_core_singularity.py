@@ -130,14 +130,14 @@ def test_without_the_plugin_the_backend_error_names_the_install_command(tmp_path
     assert backends._check_plugin_requirements({"env_type": "singularity"}) is False
     reason = backends.terminal_backend_unavailable_reason()
     assert "moved out of core into the 'singularity' plugin" in reason
-    assert "hermes plugins install singularity" in reason
-    with pytest.raises(ValueError, match="hermes plugins install singularity"):
+    assert "qubit plugins install singularity" in reason
+    with pytest.raises(ValueError, match="qubit plugins install singularity"):
         backends._create_environment("singularity", image="", cwd="/root", timeout=10)
     assert lcm.terminal_backend_install_hint("acmebox") == ""
 
 
 def test_config_unset_removes_the_env_copy_core_used_to_write(tmp_path, monkeypatch):
-    # While core shipped the backend, `hermes config set terminal.singularity_image` also wrote
+    # While core shipped the backend, `qubit config set terminal.singularity_image` also wrote
     # TERMINAL_SINGULARITY_IMAGE to .env, and the plugin still falls back to it: unset must remove both,
     # or the old image comes back instead of the default.
     home = _home(tmp_path, env="TERMINAL_SINGULARITY_IMAGE=docker://old:1\n",
@@ -150,7 +150,7 @@ def test_config_unset_removes_the_env_copy_core_used_to_write(tmp_path, monkeypa
 
 
 def test_config_set_and_get_still_recognize_the_image_key(tmp_path, monkeypatch, capsys):
-    # The plugin reads terminal.singularity_image and its setup text says `hermes config set
+    # The plugin reads terminal.singularity_image and its setup text says `qubit config set
     # terminal.singularity_image <image>`; leaving DEFAULT_CONFIG must not make it an unknown key.
     home = _home(tmp_path, config="terminal:\n  backend: singularity\n")
     monkeypatch.setenv("QUBIT_HOME", str(home))

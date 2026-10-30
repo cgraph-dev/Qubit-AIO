@@ -306,7 +306,7 @@ class TestFreeTierCooldownCutoff:
             clear_session_vars(tokens)
 
     def test_a_gateway_admitted_finite_cli_turn_keeps_waiting(self):
-        """``hermes chat -q`` over the daemon carries its one-shot fact on the admission, not in env."""
+        """``qubit chat -q`` over the daemon carries its one-shot fact on the admission, not in env."""
         from agent.turn_recovery import free_tier_cooldown_ends_turn
         from gateway.session_finite import finite_turn_scope
         with finite_turn_scope(True):

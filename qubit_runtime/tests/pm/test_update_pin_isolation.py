@@ -5,7 +5,7 @@ resolution bug or one target's rolling-pool 404), so `lockfile.save()`
 never ran and every unrelated package stayed un-updated. Pins are now
 isolated per package: successes are pinned and saved, failures are
 reported and summarized, exit stays non-zero, and the latest pm receipt
-(`hermes pm status`, the desktop) records the run as failed.
+(`qubit pm status`, the desktop) records the run as failed.
 """
 
 import pytest

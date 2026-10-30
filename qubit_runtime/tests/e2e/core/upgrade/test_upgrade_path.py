@@ -1,6 +1,6 @@
-"""Upgrade-path E2E: a real release N-1 git install updated to HEAD by the real `hermes update`.
+"""Upgrade-path E2E: a real release N-1 git install updated to HEAD by the real `qubit update`.
 
-Class C6 (bricked installs, stale code, lost state after `hermes update`). Each leg:
+Class C6 (bricked installs, stale code, lost state after `qubit update`). Each leg:
 
 1. stages a local bare ``origin`` (``--shared`` onto this repository, so no network and no
    object copy) with ``main`` parked at release N-1 (``git describe --tags --abbrev=0 HEAD~1``);
@@ -12,7 +12,7 @@ Class C6 (bricked installs, stale code, lost state after `hermes update`). Each 
    job, and a hand-edited config.yaml at the N-1 schema version with comments, long quoted
    unicode values and a legacy MCP ``disabled: true`` entry (the one documented N-1 -> HEAD
    migration);
-4. moves ``origin/main`` to HEAD and runs the real ``hermes update --yes --branch main``
+4. moves ``origin/main`` to HEAD and runs the real ``qubit update --yes --branch main``
    non-interactively. A branch-explicit update follows the historical git-source path,
    without depending on the separately published R2 channel record.
 
@@ -25,7 +25,7 @@ live gap fixed by #120339); ``kill_before_deps``
 
 Invariants after every leg (fresh processes only): the final update's exit code matches reality
 (0 and HEAD checked out and the editable install serves HEAD's tree, or non-zero and nothing
-changed); ``hermes --version``, ``hermes doctor`` and a one-shot turn succeed; state.db and the
+changed); ``hermes --version``, ``qubit doctor`` and a one-shot turn succeed; state.db and the
 profile's state.db pass ``integrity_check`` with unchanged row counts and byte-identical
 pre-existing messages (also after HEAD's first real use of the DB); the cron job survives; the
 venv satisfies HEAD's dependency set; config.yaml of both profiles equals exactly what HEAD's own
@@ -68,7 +68,7 @@ from tests.fakes.fake_llm_provider import FakeLLMServer
 pytestmark = [
     pytest.mark.platforms("linux"),
     # The real updater runs against a throwaway local origin + install inside the sandbox, never
-    # this checkout (the guard this bypasses exists to stop `hermes update` on the real repo).
+    # this checkout (the guard this bypasses exists to stop `qubit update` on the real repo).
     pytest.mark.live_system_guard_bypass,
     pytest.mark.skipif(H.sandbox_required_reason() is not None, reason=str(H.sandbox_required_reason())),
     pytest.mark.skipif(shutil.which("git") is None, reason="git required"),
@@ -209,7 +209,7 @@ QUICK_CMD = "echo 'deploy: step one' && echo \"step two # still a string\" && pr
 
 def user_config(base_url: str, version: int) -> str:
     return (
-        "# Hand-edited by the user. Every comment and value below must survive `hermes update`.\n"
+        "# Hand-edited by the user. Every comment and value below must survive `qubit update`.\n"
         "model:\n"
         "  provider: custom\n"
         f"  base_url: {base_url}  # local fake provider\n"
@@ -465,7 +465,7 @@ def migrate_oracle(leg: Leg, name: str, before: bytes) -> bytes:
 def assert_healthy_at_head(leg: Leg, provider: FakeLLMServer, final: subprocess.CompletedProcess) -> None:
     before = leg.snapshot
     # 1. exit code matches reality
-    assert final.returncode == 0, "final `hermes update` failed:\n" + H.describe(final)
+    assert final.returncode == 0, "final `qubit update` failed:\n" + H.describe(final)
     assert _git("rev-parse", "HEAD", cwd=leg.install) == _refs().head, "update exited 0 but HEAD is not the target"
     assert not (leg.install / ".git" / "index.lock").exists(), "update left .git/index.lock behind"
     # The active interpreter must serve the pulled tree (stale editable finder, #119466):
@@ -688,9 +688,9 @@ def test_kill_mid_pull_then_retry_heals(leg, provider, torn):
     final = _update(leg)
     # Merge-order safe (see _pending_fixes.known_failure): only the import-time death excuses torn-tree.
     gate = known_failure(
-        r"(?s)^final `hermes update` failed:.*(cannot import name|No module named)",
+        r"(?s)^final `qubit update` failed:.*(cannot import name|No module named)",
         "#120339 (merged; passes once N-1 is a release carrying it): a fast-forward killed half-way leaves a prefix of the changed files at HEAD while "
-        "HEAD still names N-1; every entry point, including `hermes update`, then dies at import (cannot import "
+        "HEAD still names N-1; every entry point, including `qubit update`, then dies at import (cannot import "
         "name ... from 'utils'), so nothing can heal the install without manual git") if torn else contextlib.nullcontext()
     with gate:
         assert_healthy_at_head(leg, provider, final)

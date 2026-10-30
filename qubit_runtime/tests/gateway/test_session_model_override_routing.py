@@ -108,7 +108,7 @@ fallback_providers:
                                       target_model=None):
         if requested in {None, "", "openai-codex"}:
             from qubit_cli.auth import AuthError
-            raise AuthError("No Codex credentials stored. Run `hermes auth` to authenticate.")
+            raise AuthError("No Codex credentials stored. Run `qubit auth` to authenticate.")
         assert requested == "openrouter"
         # The fallback rung is resolved against the model it will send, not the primary default.
         assert target_model == "minimax/minimax-m2.7"

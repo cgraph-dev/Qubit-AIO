@@ -5,7 +5,7 @@ with profile A's terminal settings", "my secondary profile answered with the lau
 "deleting a profile killed the shared gateway", "a restart re-pinned one profile's env for all"
 (#89315, #101719, #105396, #111151, #102769, #107692).
 
-Harness: a real ``hermes gateway run`` child process with ``gateway.multiplex_profiles: true`` serving
+Harness: a real ``qubit gateway run`` child process with ``gateway.multiplex_profiles: true`` serving
 the launch profile ``default`` plus ``alpha`` and ``beta``. Each profile owns its own loopback provider
 (accepting only its own key), and a distinct value for EVERY per-profile knob: provider key (same env
 var NAME, different value), API-server key, a non-secret .env marker, model id, MEMORY.md, SOUL.md,

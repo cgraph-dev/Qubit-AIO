@@ -42,7 +42,7 @@ def _td(name: str, description: str = "", properties: Dict[str, Any] | None = No
 class TestConfigParsing:
 
     def test_defer_default_is_the_registered_list_and_a_user_list_replaces_it(self, caplog):
-        """#116404: the curated deferral set lives in DEFAULT_CONFIG (so ``hermes config set``
+        """#116404: the curated deferral set lives in DEFAULT_CONFIG (so ``qubit config set``
         recognizes the key); a user list replaces it wholesale, [] keeps every tool eager, and a
         scalar is warned about (naming the expected shape) before falling back to the default."""
         from qubit_cli.config_defaults import DEFAULT_CONFIG

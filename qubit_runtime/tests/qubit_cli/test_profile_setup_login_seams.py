@@ -1,11 +1,11 @@
 """Provider-profile setup/sign-in seams (``providers.base`` L6 block) through the real routes.
 
 A model-provider plugin installed in ONE profile's home declares an in-app device-code login, an
-Accounts card and a ``hermes model`` step; core drives them with no provider-specific code:
+Accounts card and a ``qubit model`` step; core drives them with no provider-specific code:
   * ``/api/providers/oauth`` lists the card as ``device_code`` for that profile only;
   * ``/start`` + ``/poll`` run the profile's start/poll hooks and save inside that profile's scope;
   * a cancel before approval never saves;
-  * ``hermes model`` dispatch and the effort picker consult the profile.
+  * ``qubit model`` dispatch and the effort picker consult the profile.
 """
 
 from __future__ import annotations

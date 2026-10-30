@@ -2,7 +2,7 @@
 
 Three real input paths a Windows user hits:
 
-* ``hermes chat -q "<text>"`` — argv (CreateProcessW) into the oneshot turn; the reply,
+* ``qubit chat -q "<text>"`` — argv (CreateProcessW) into the oneshot turn; the reply,
   with its own emoji, is printed back through a pipe (Windows code-page territory).
 * the TUI gateway's stdio JSON-RPC — UTF-8 frames from the Ink TUI (Node writes literal
   non-ASCII, never ``\\u`` escapes).

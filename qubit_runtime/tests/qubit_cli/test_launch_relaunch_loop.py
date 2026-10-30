@@ -92,7 +92,7 @@ def _syncs(tmp_path: Path) -> int:
 def test_backed_off_failed_sync_boots_on_the_previous_dependencies(tmp_path, monkeypatch, argv):
     """#139952 records a failed launch sync so relaunches back off. A launch inside that backoff
     (or past the cap) has run no repair, so relaunching it would re-enter the same decision and
-    exec again forever; it must boot on the previous dependencies, and `hermes update` (the
+    exec again forever; it must boot on the previous dependencies, and `qubit update` (the
     remedy every backed-off launch names) still tries the repair; its report-only `--check` does not."""
     from qubit_cli import venv_sync
 
@@ -111,7 +111,7 @@ def test_backed_off_failed_sync_boots_on_the_previous_dependencies(tmp_path, mon
     assert _syncs(tmp_path) == expected, "a backed-off launch re-ran the failing repair"
 
     if not argv:
-        # Past the cap, at any age: still one generation, and one pointer at `hermes update`.
+        # Past the cap, at any age: still one generation, and one pointer at `qubit update`.
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
         record = venv_sync._completion_attempts_path(root)
         assert record.is_file(), "the failed syncs were not recorded where completion_retry_state reads"

@@ -150,7 +150,7 @@ def test_count_db_holders_sees_open_connection_linux(populated_db):
 
 @pytest.mark.platforms("macos")
 def test_count_db_holders_sees_open_connection_macos(populated_db):
-    # #109641: the doctor's holder count was Linux-only, so `hermes doctor` on the platform with
+    # #109641: the doctor's holder count was Linux-only, so `qubit doctor` on the platform with
     # every reporter in the deleted-WAL cluster printed no holder row at all.
     _assert_sees_own_open_connection(populated_db)
 

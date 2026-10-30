@@ -1,7 +1,7 @@
 """Behavior tests for the Windows desktop-exe integrity gate (#69179).
 
 The desktop self-update chain (Desktop → hermes-setup --update →
-``hermes update`` → ``hermes desktop --build-only`` → relaunch) rebuilds
+``qubit update`` → ``hermes desktop --build-only`` → relaunch) rebuilds
 Hermes.exe on the end user's machine. Before this gate, "build succeeded" was
 just "the file exists", so a truncated PE (corrupt cached Electron zip), a
 non-PE file, or a wrong-architecture tree shipped as the new app — Windows

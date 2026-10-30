@@ -98,7 +98,7 @@ class TestResolveProvider:
 
     def test_alias_chatgpt_every_alias_table(self):
         """Issue #95794: the runtime (providers.py), the /model parser (models_catalog_static via
-        parse_model_input) and ``hermes auth login`` all resolve the ChatGPT alias, not just auth."""
+        parse_model_input) and ``qubit auth login`` all resolve the ChatGPT alias, not just auth."""
         from qubit_cli.providers import normalize_provider
         from qubit_cli.models import parse_model_input
         from qubit_cli.auth_commands import _normalize_provider

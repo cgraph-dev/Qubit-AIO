@@ -721,7 +721,7 @@ class CodexRun:
 
 def run_codex_scenario(root: Path, turns: list[dict], runs: list[dict], *, config: Optional[dict] = None,
                        **scenario: Any) -> CodexRun:
-    """Real ``hermes chat -q`` runs (``--resume`` after the first) against a fresh fake codex install.
+    """Real ``qubit chat -q`` runs (``--resume`` after the first) against a fresh fake codex install.
 
     ``runs``: ``{"prompt", "args": [...], "then": {scenario changes applied after this run}}``."""
     from tests.e2e.core.providers._native_helpers import latest_session, make_home, run_chat

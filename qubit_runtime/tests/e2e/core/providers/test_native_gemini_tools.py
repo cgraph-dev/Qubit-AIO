@@ -1,6 +1,6 @@
 """Gemini native wire conformance: the tool loop and thought-signature replay across ``--resume``.
 
-Real ``hermes chat -q`` subprocesses talk to Google AI Studio's native ``streamGenerateContent``
+Real ``qubit chat -q`` subprocesses talk to Google AI Studio's native ``streamGenerateContent``
 dialect; only the vendor is faked (``tests/fakes/providers/gemini_native.py``, a TLS-terminating
 loopback proxy that validates every request like Google and rejects it with a 400 when it would).
 

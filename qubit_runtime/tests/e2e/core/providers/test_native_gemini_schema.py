@@ -3,7 +3,7 @@
 An MCP server (a tiny stdio JSON-RPC process) exposes one tool whose ``inputSchema`` uses JSON
 Schema keywords that Google's ``FunctionDeclaration`` parser does not accept (``$schema``,
 ``$ref``/``$defs``, ``additionalProperties``, ``oneOf``, ``const``, list-valued ``type``, integer
-``enum``, a ``required`` entry naming no property). A real ``hermes chat -q`` turn declares it to
+``enum``, a ``required`` entry naming no property). A real ``qubit chat -q`` turn declares it to
 the fake Google endpoint, which rejects anything Google would (HTTP 400 INVALID_ARGUMENT) and
 then drives a call to the tool so the round trip is proven end to end.
 

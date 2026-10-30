@@ -1,4 +1,4 @@
-"""``hermes chat -Q`` as a dispatcher's re-run of a failed bot delivery (#111721).
+"""``qubit chat -Q`` as a dispatcher's re-run of a failed bot delivery (#111721).
 
 A failed delivery turn persists its user row before the provider call; the policy-gated re-run
 replays the same session and payload in a fresh process. Told so via HERMES_RESUME_UNANSWERED_TURN,

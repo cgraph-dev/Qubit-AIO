@@ -1,6 +1,6 @@
-"""OAuth-shaped model-provider plugins are first-class in `hermes auth` (#116408).
+"""OAuth-shaped model-provider plugins are first-class in `qubit auth` (#116408).
 
-The seam: ``ProviderProfile.auth_handler``. These tests drive the real ``hermes auth`` argparse
+The seam: ``ProviderProfile.auth_handler``. These tests drive the real ``qubit auth`` argparse
 surface against a plugin discovered from an isolated QUBIT_HOME, so they fail if the dispatch is
 dropped, reordered after the built-in paths, or the registry stops admitting non-api-key profiles.
 """
@@ -102,7 +102,7 @@ def install_provider(tmp_path, monkeypatch):
 
 
 def _parse_auth_args(argv: list[str]) -> argparse.Namespace:
-    """Parse `hermes auth <argv>` through the real subcommand parser."""
+    """Parse `qubit auth <argv>` through the real subcommand parser."""
     from qubit_cli.subcommands.auth import build_auth_parser
 
     parser = argparse.ArgumentParser()
@@ -132,7 +132,7 @@ def _log(tmp_path: Path) -> list[dict]:
     ],
 )
 def test_oauth_plugin_owns_every_auth_action(tmp_path, install_provider, capsys, argv, expected):
-    """An oauth_external plugin registers and `hermes auth <action>` reaches its handler, args included,
+    """An oauth_external plugin registers and `qubit auth <action>` reaches its handler, args included,
     before any built-in path (nothing printed, nothing written to the pool)."""
     install_provider()
 

@@ -5,7 +5,7 @@ replays. Two homes can run identical selectorless argv, their environment pickin
 readiness predicate must also match the home the paused runtime ran on: otherwise home B's gateway,
 already back after a partial recovery, retires home A's debt while A stays down.
 
-Real processes (argv shaped like ``hermes gateway run``, each under its own ``QUBIT_HOME``) and the
+Real processes (argv shaped like ``qubit gateway run``, each under its own ``QUBIT_HOME``) and the
 real predicate; the fleet discovery that hands it candidate PIDs is the only thing bypassed. The
 replay restores that home too: the respawn's ``QUBIT_HOME`` is the paused runtime's, not the updater's.
 """

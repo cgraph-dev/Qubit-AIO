@@ -2,8 +2,8 @@
 
 Hand-edited or legacy config.yaml files hold scalars where a migration step expects a
 mapping. Each step must guard the shapes it indexes, and ``run_migrations`` must isolate
-a step that still raises so one bad value cannot wedge ``hermes config migrate`` /
-``hermes update`` and leave the config unversioned.
+a step that still raises so one bad value cannot wedge ``qubit config migrate`` /
+``qubit update`` and leave the config unversioned.
 """
 
 import logging
@@ -63,7 +63,7 @@ def test_malformed_nested_value_is_migrated_not_crashed(tmp_path, current_ver, c
 
 
 def test_failing_step_is_skipped_with_warning_and_config_still_migrates(tmp_path, caplog):
-    """``migrate_config`` (the ``hermes config migrate`` / ``hermes update`` path) keeps going
+    """``migrate_config`` (the ``qubit config migrate`` / ``qubit update`` path) keeps going
     past a raising step, records the skip in ``warnings`` and stamps the latest version. The
     quiet path (profile creation, unattended update) discards ``results``, so the skip must
     also reach the log or it is silent and, once stamped, permanent."""

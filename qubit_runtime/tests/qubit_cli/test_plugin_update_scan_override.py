@@ -1,5 +1,5 @@
 """Updating a git-installed plugin scans the new code on every surface, and a caution verdict can be
-overridden: ``hermes plugins update NAME`` asks ``Update anyway? [y/N]`` (``--force`` skips the question),
+overridden: ``qubit plugins update NAME`` asks ``Update anyway? [y/N]`` (``--force`` skips the question),
 and Desktop/dashboard get the findings back and retry with ``force``. Before this, update blocked a caution
 verdict with no way past it and told the user to pass a ``--force`` flag the command did not have."""
 from __future__ import annotations

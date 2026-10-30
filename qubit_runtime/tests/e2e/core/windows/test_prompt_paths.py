@@ -3,7 +3,7 @@
 * Subdirectory hints: after a terminal command touches ``backend\\src``, the tool result the
   model receives carries ``backend/AGENTS.md`` — for the forward-slash spelling AND the
   native backslash spelling a model emits on Windows (#121150).
-* AGENTS.md chain: ``hermes chat -q`` launched in ``pkg\\inner`` of a git repo loads all
+* AGENTS.md chain: ``qubit chat -q`` launched in ``pkg\\inner`` of a git repo loads all
   three AGENTS.md files and labels them ``../../AGENTS.md`` / ``../AGENTS.md`` / ``AGENTS.md``
   — one spelling on every OS (#121015).
 * ``@folder:`` references through the TUI gateway (the Ink TUI's process): the listing

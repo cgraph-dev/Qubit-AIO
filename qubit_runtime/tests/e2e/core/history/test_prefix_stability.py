@@ -2,7 +2,7 @@
 
 One durable session is driven for 10+ turns through fresh processes of the real entrypoints that
 can continue it — the ``tui_gateway`` stdio JSON-RPC server (what the TUI/Desktop spawn) and the
-``hermes chat -q --resume`` oneshot CLI — switching process and working directory between turns,
+``qubit chat -q --resume`` oneshot CLI — switching process and working directory between turns,
 with a parallel tool batch and (gateway journeys) one manual ``session.compress`` on the way.
 
 Invariants over the fake provider's recorded request stream:

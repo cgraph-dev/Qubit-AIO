@@ -6,7 +6,7 @@ A seeded property / matrix layer over every surface that writes ``config.yaml`` 
       one key changes that key's line(s) only (comments, quoting, unicode, ``${VAR}`` templates,
       explicit-default values, dotted provider names and nulls all survive);
 * P2  "set one key" changes exactly one key, on every writer: in-process ``set_config_value`` over
-      EVERY documented scalar leaf of ``DEFAULT_CONFIG``, the real ``hermes config set`` CLI
+      EVERY documented scalar leaf of ``DEFAULT_CONFIG``, the real ``qubit config set`` CLI
       subprocess, a real ``python -m tui_gateway.entry`` stdio JSON-RPC process (``config.set``),
       and the dashboard/Desktop ``PUT /api/config`` (partial bodies, like Desktop sends);
 * P3  a failed read never results in a clobbering write: for every single config read an
@@ -637,7 +637,7 @@ def test_p2_env_lock_refusal_is_not_reported_as_success(key, tmp_path):
     r = _cli(env, "config", "set", key, "c18-new")
     wrote = _read(hh / ".env") != env_before
     with known_failure(r"^`config set \w+` exit=0 but \.env unchanged|^a refused env write still rewrote config\.yaml",
-                       "#119928 (fix PR #119929): when the managed-scope .env pins a key, `hermes config set` "
+                       "#119928 (fix PR #119929): when the managed-scope .env pins a key, `qubit config set` "
                        "prints the refusal, then '✓ Set', exits 0, and the credential route still rewrites config.yaml"):
         assert (r.returncode == 0) == wrote, (
             f"`config set {key}` exit={r.returncode} but .env {'changed' if wrote else 'unchanged'}:\n{r.stdout}{r.stderr}")

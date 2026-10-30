@@ -1,4 +1,4 @@
-"""Every `hermes update` exit before the apply step names its closed reason (hermes.update.run
+"""Every `qubit update` exit before the apply step names its closed reason (hermes.update.run
 ``failure_class``), in-process and through the parked copy alike; exits that fire before the
 receipt opens still count once; a run that committed and owes work never reads ``failed``."""
 
@@ -131,7 +131,7 @@ def _marker(home, *lines: str) -> None:
 def test_an_exit_before_the_receipt_reads_desktop_only_under_its_own_hand_off(rows, monkeypatch):
     """Invariant: a pre-receipt exit carries the initiator its receipt would: ``desktop`` when the
     marker names this process as the hand-off's delegate or names its hand-off partner, ``cli`` when
-    the marker belongs to some other update (a terminal `hermes update` refused by a Desktop run)."""
+    the marker belongs to some other update (a terminal `qubit update` refused by a Desktop run)."""
     import os
 
     from qubit_cli.update_cmd_common import _record_stop

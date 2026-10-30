@@ -1,4 +1,4 @@
-"""`hermes sessions export` JSONL — the documented backup format — must round-trip a compacted
+"""`qubit sessions export` JSONL — the documented backup format — must round-trip a compacted
 session: import restores the turns in-place compaction archived, still archived (#122679 fixed
 only the console export; the primary CLI kept the live-only projection). That backup materializes
 every stored row in memory, so it is bounded per session by ``sessions.max_export_messages``, as the

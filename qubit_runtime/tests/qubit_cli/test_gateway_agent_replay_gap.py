@@ -1,4 +1,4 @@
-"""Classic CLI (`hermes`, `hermes chat` -> GatewayAgent) across a ``session.replay_gap``: it re-attaches, shows
+"""Classic CLI (`hermes`, `qubit chat` -> GatewayAgent) across a ``session.replay_gap``: it re-attaches, shows
 the settled reply once and never leaves a later turn waiting on a retired subscription. A recovery belongs
 to its turn: a session switch, a later turn or Ctrl-C's settle bound ends it before it sends or paints."""
 import asyncio

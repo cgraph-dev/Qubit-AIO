@@ -1,4 +1,4 @@
-"""``hermes auth upgrade``: the free tier signs into a Nous account, keeping its connectors.
+"""``qubit auth upgrade``: the free tier signs into a Nous account, keeping its connectors.
 
 Driven through a fake portal covering the device-code endpoints plus the promotion intent/status
 surface, so the wire contract (both codes in the intent, status-driven outcome, token grant

@@ -1,8 +1,8 @@
-"""Linux/macOS ``hermes update`` pauses this install's gateways before the first checkout move.
+"""Linux/macOS ``qubit update`` pauses this install's gateways before the first checkout move.
 
 One real HEAD install (``_git_world``: the real ``scripts/install.sh`` over real smart HTTP, every
 command in a ``bwrap`` sandbox) is shared by the cells. A credential-free, platform-less (cron-only)
-``hermes gateway run`` lives in the same PID namespace as the updater (``handoff._nshost``), as on a
+``qubit gateway run`` lives in the same PID namespace as the updater (``handoff._nshost``), as on a
 user's machine. What is asserted is what the user sees: which gateway process serves the checkout
 (its control-socket ``identify``: pid + ``code_sha``), the update's exit code and transcript, HEAD,
 and the durable pause record ``update_pause_record`` keeps in the root hermes home.
@@ -24,7 +24,7 @@ and the durable pause record ``update_pause_record`` keeps in the root hermes ho
     preparation raises while a toggle exists and changes ``uv.lock``'s bytes (the dependency stamp),
     so the venv is stale at the new HEAD. The update exits 0 with a ``dependencies`` follow-up and
     the paused gateway stays stopped (the tree gate holds it: it would boot new code on stale
-    dependencies). A ``hermes gateway run`` launched then (the replayed argv) syncs the owed
+    dependencies). A ``qubit gateway run`` launched then (the replayed argv) syncs the owed
     dependencies in its own launch before serving; the next ``hermes`` launch adopts that gateway
     instead of starting a twin, and the record is discharged.
 (i) the checkout move itself fails before the commit point (the release adds a file under a
@@ -32,7 +32,7 @@ and the durable pause record ``update_pause_record`` keeps in the root hermes ho
     update's exit code and receipt outcome equal those of the same failing update run with no
     gateway at all.
 (h) the Desktop hand-off (``scripts/desktop-update/posix.sh``, what the Desktop app spawns before it
-    quits) runs the same ``hermes update --gateway``: the gateway is paused and restarted on the new
+    quits) runs the same ``qubit update --gateway``: the gateway is paused and restarted on the new
     commit, and the hand-off's result file reports success.
 """
 

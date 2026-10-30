@@ -1,16 +1,16 @@
-"""One ``hermes update`` owns an installed checkout on native Windows, and its whole tree.
+"""One ``qubit update`` owns an installed checkout on native Windows, and its whole tree.
 
 Failure class: concurrent updates of one install (contract C1.7). The update lock lives on the
 install's git dir (an msvcrt byte lock on ``<install>/.git/hermes-update.lock``), not in HERMES_HOME, so a
-second ``hermes update`` from ANOTHER home cannot mutate the checkout while the first runs. On
+second ``qubit update`` from ANOTHER home cannot mutate the checkout while the first runs. On
 Windows a child cannot inherit that lock, so the owner binds every update-tree child into a
 kill-on-close job: ``taskkill /F`` of the owner kills the child too, and only then is the lock free.
 
 One install (install.ps1), then, with NEXT published:
 (a) an update owner holds the lock from another HERMES_HOME with a bound child running; the real
-    ``hermes update`` of the installed checkout must exit 2 and leave the checkout at HEAD;
+    ``qubit update`` of the installed checkout must exit 2 and leave the checkout at HEAD;
 (b) ``taskkill /F`` of the owner (not ``/T``) must take the bound child down with it;
-(c) with the tree gone the lock is free: the real ``hermes update`` lands NEXT.
+(c) with the tree gone the lock is free: the real ``qubit update`` lands NEXT.
 
 A second install proves the other direction of the job: a gateway the update RESTARTS is started
 with ``CREATE_BREAKAWAY_FROM_JOB`` and must leave the job, so it outlives a successful update.
@@ -119,7 +119,7 @@ def test_second_home_update_is_refused_while_the_checkout_is_held(journey) -> No
     assert journey["held_status"] == "", fail_with(
         m, f"the held update lock shows in `git status` (autostash would take it): {journey['held_status']!r}")
     assert run.returncode == 2 and REFUSAL in run.stdout and journey["a_head"] == m.head, fail_with(
-        m, f"a second `hermes update` of one checkout ran while another home's update held it "
+        m, f"a second `qubit update` of one checkout ran while another home's update held it "
            f"(rc={run.returncode}, checkout {journey['a_head']} vs HEAD {m.head}, "
            f"install-root lock in this tree: {journey['root_lock']})", run)
 
@@ -132,7 +132,7 @@ def test_killed_owner_takes_its_update_tree_down(journey) -> None:
 def test_free_lock_lets_the_next_update_land(journey) -> None:
     m, run = journey["machine"], journey["c_update"]
     assert run.returncode == 0 and journey["c_head"] == m.next, fail_with(
-        m, f"after the whole update tree exited, `hermes update` did not land NEXT "
+        m, f"after the whole update tree exited, `qubit update` did not land NEXT "
            f"(rc={run.returncode}, checkout {journey['c_head']}, NEXT {m.next})", run)
 
 
@@ -163,8 +163,8 @@ def gateway_journey(tmp_path_factory):
 
 def test_restarted_gateway_outlives_the_update(gateway_journey) -> None:
     m, run, pid = gateway_journey["machine"], gateway_journey["update"], gateway_journey["relaunched"]
-    assert run.returncode == 0, fail_with(m, f"`hermes update` with a running gateway exited {run.returncode}", run)
+    assert run.returncode == 0, fail_with(m, f"`qubit update` with a running gateway exited {run.returncode}", run)
     status = gateway_journey["status"]
     assert gateway_journey["alive_after"] and str(pid) in status.stdout, fail_with(
         m, f"the gateway the update restarted (pid {pid}) died with the update's job: alive "
-           f"{SURVIVAL_SECONDS}s after `hermes update` exited = {gateway_journey['alive_after']}", status)
+           f"{SURVIVAL_SECONDS}s after `qubit update` exited = {gateway_journey['alive_after']}", status)

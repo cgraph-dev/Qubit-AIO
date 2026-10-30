@@ -1,4 +1,4 @@
-"""The real terminal tool on native Windows, driven by a model turn through ``hermes chat -q``.
+"""The real terminal tool on native Windows, driven by a model turn through ``qubit chat -q``.
 
 On Windows the terminal tool runs every command through Git Bash (``_find_bash``). The
 model reaches native shells from there, so each case is one scripted turn:

@@ -202,18 +202,18 @@ class TestToolProgressDispatch:
         bridge(_item_started({
             "type": "webSearch",
             "id": "ws-1",
-            "query": "hermes agent docs",
+            "query": "qubit agent docs",
         }))
         bridge(_item_completed({
             "type": "webSearch",
             "id": "ws-1",
-            "query": "hermes agent docs",
+            "query": "qubit agent docs",
         }))
         calls = agent.tool_progress_callback.call_args_list
         assert [c.args[0] for c in calls] == ["tool.started", "tool.completed"]
         assert calls[0].args[1] == "web_search"
-        assert calls[0].args[2] == "hermes agent docs"
-        assert calls[0].args[3] == {"query": "hermes agent docs"}
+        assert calls[0].args[2] == "qubit agent docs"
+        assert calls[0].args[3] == {"query": "qubit agent docs"}
 
 class TestAgentMessageInterimDispatch:
     def test_completed_agent_message_emits_interim(self):

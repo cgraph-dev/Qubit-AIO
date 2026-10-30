@@ -1,6 +1,6 @@
 """Vertex AI documented errors through the real CLI: retried per semantics or surfaced exactly once.
 
-Each scenario is one ``hermes chat -q`` turn against its own fake (``tests/fakes/providers/vertex.py``);
+Each scenario is one ``qubit chat -q`` turn against its own fake (``tests/fakes/providers/vertex.py``);
 all run concurrently. Vertex's OpenAI-compatible endpoint returns google.rpc errors in a list-wrapped
 envelope (``[{"error": {"code", "message", "status"}}]``); the fake uses exactly that.
 

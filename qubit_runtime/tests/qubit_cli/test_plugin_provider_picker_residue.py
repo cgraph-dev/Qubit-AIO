@@ -1,6 +1,6 @@
 """An admitted plugin provider is selectable and status-accurate on every surface (#116408).
 
-Residue after picker admission: `hermes model` had no flow for a plugin profile (selection was a silent
+Residue after picker admission: `qubit model` had no flow for a plugin profile (selection was a silent
 no-op), OAuth-shaped plugins had no ``_STATUS_BY_AUTH_TYPE`` builder (``authenticated`` stayed False with
 a live pool entry) and external-process sign-in evidence existed for one bundled vendor only, so the
 Desktop ``explicit_only`` picker hid out-of-tree ACP rows.
@@ -54,7 +54,7 @@ def _pool_entry(provider: str, **fields):
 
 
 def test_qubit_model_routes_registered_plugin_profiles_to_the_generic_flow(plugin, monkeypatch, tmp_path):
-    """Selecting an admitted external-process or OAuth plugin in `hermes model` persists config.model;
+    """Selecting an admitted external-process or OAuth plugin in `qubit model` persists config.model;
     an api_key profile still takes the api-key flow and an unknown slug stays a no-op."""
     import qubit_cli.main as main
     from qubit_cli import auth
@@ -92,7 +92,7 @@ def test_qubit_model_routes_registered_plugin_profiles_to_the_generic_flow(plugi
 def test_oauth_plugin_status_follows_the_credential_pool(plugin):
     """``get_auth_status``/``authenticated`` for an OAuth-shaped plugin read the pool: live token →
     logged in; expired token with refresh material → needs_refresh; nothing → signed out with the
-    `hermes auth add` hint. Bundled OAuth providers never reach this builder."""
+    `qubit auth add` hint. Bundled OAuth providers never reach this builder."""
     from qubit_cli import auth, models
 
     plugin(ProviderProfile(name="example-oauth", auth_type="oauth_external",

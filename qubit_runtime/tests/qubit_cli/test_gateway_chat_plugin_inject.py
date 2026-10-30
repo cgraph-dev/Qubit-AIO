@@ -1,5 +1,5 @@
 """`ctx.inject_message(text)` with no session_key/origin (plugins.md "Active CLI conversation") reaches
-the attached classic `hermes chat` session as a prompt.submit, from a plugin's own thread (B2-11)."""
+the attached classic `qubit chat` session as a prompt.submit, from a plugin's own thread (B2-11)."""
 import asyncio
 import threading
 

@@ -1,4 +1,4 @@
-"""``hermes sessions refresh-prompts``: a continuing session adopts updated prompt sources once.
+"""``qubit sessions refresh-prompts``: a continuing session adopts updated prompt sources once.
 
 Operators push SOUL.md / skill / AGENTS.md changes into a profile while users keep one long
 gateway conversation. The stored system prompt is reused verbatim every turn (prefix cache), so

@@ -84,7 +84,7 @@ def test_historical_payload_maps_to_takeover_request_schema(tmp_path, desktop, r
 
 @pytest.mark.live_system_guard_bypass
 def test_shipped_post_swap_argv_enters_takeover_before_current_cli(tmp_path):
-    """The 2026.9.21 updater starts HEAD as ``hermes update <flags> --post-swap FILE``.
+    """The 2026.9.21 updater starts HEAD as ``qubit update <flags> --post-swap FILE``.
 
     That command must reach the historical takeover before current launch preparation or
     argparse: both belong to the replacement updater and may require dependencies the old
@@ -629,7 +629,7 @@ def test_a_takeover_debt_another_profile_cannot_see_is_never_silent(tmp_path, mo
         lock_dir.chmod(0o700)
 
     assert (homes["coder"] / "fleet_restart_pending").is_file()
-    assert "hermes gateway restart" in capsys.readouterr().err
+    assert "qubit gateway restart" in capsys.readouterr().err
 
 
 def test_a_historical_updater_arms_the_host_record_under_the_current_mutex(tmp_path, monkeypatch):

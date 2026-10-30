@@ -534,4 +534,4 @@ def test_gateway_status_skips_pending_source_update_completion(tmp_path, monkeyp
 
     assert venv_sync.prepare_launch(root, ["gateway", "status"]) is None
     assert completion_tail == []
-    assert pending.is_file(), "a status query must leave the update tail for `hermes gateway restart`"
+    assert pending.is_file(), "a status query must leave the update tail for `qubit gateway restart`"

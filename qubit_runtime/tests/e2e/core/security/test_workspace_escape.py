@@ -11,7 +11,7 @@ Hermes documents three file-tool boundaries (website/docs/user-guide/security.md
 There is no read confinement to a workspace (reads outside the cwd are allowed), so none is asserted.
 Each boundary is judged on the RESOLVED target, so spelling the same file through ``../``, an absolute
 path, a symlink inside the workspace, or a symlinked parent directory must get the same verdict as the
-direct spelling. Everything runs through the real agent tool path: ``hermes chat -q`` with the loopback
+direct spelling. Everything runs through the real agent tool path: ``qubit chat -q`` with the loopback
 model issuing the tool calls; outcomes are read on disk and in the tool results Hermes sent back.
 """
 

@@ -1,4 +1,4 @@
-"""RFC 8628 device-code login: the real ``hermes auth add nous`` CLI against a fake portal.
+"""RFC 8628 device-code login: the real ``qubit auth add nous`` CLI against a fake portal.
 
 The portal base URL override (``--portal-url``) is the product's documented
 channel; the fake portal is the only thing not ours. Poll arrival times are

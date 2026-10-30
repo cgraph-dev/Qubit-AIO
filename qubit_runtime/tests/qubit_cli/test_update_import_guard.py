@@ -1,4 +1,4 @@
-"""Tests for the post-update *import* guard in ``hermes update``.
+"""Tests for the post-update *import* guard in ``qubit update``.
 
 ``_validate_critical_files_syntax`` only parses files, so it cannot detect a
 partially-updated tree: when one package is refreshed and a sibling is not,

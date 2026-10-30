@@ -591,7 +591,7 @@ class TestDuplicateNamesAgreeAcrossSurfaces:
         parts = _load_cron_skill_parts({"id": "j"}, ["dup-demo", "xdup"])
         assert ambiguous in parts[0] and "LOCAL XDUP" in "\n".join(parts)
 
-        # Disabling a duplicate by the exact path its row shows (what `hermes skills` / the web toggle
+        # Disabling a duplicate by the exact path its row shows (what `qubit skills` / the web toggle
         # save) hides it from list and index and refuses the load — but not an unrelated, uniquely named
         # skill in another tier that merely sits at the same relative path.
         _make_skill(ext, "other", category="a", body="UNRELATED OTHER")

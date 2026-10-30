@@ -58,7 +58,7 @@ def _suppress_concurrent_qubit_gate(request, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _source_channels_resolve_locally(request, monkeypatch):
-    """Every unflagged ``hermes update`` resolves its channel through R2; tests must
+    """Every unflagged ``qubit update`` resolves its channel through R2; tests must
     not reach the network for that. Default every channel to a ``source-branch``
     record delivering ``origin/<name>`` through the documented seam. Channel tests
     that model records themselves re-patch ``_resolve_channel`` after this runs;

@@ -1,5 +1,5 @@
 """A managed worker (every Kanban run, opt-in CLI sessions) builds its agent with the session's
-provider routing and service tier, as ``hermes chat`` did on main (``HermesCLI._init_agent``):
+provider routing and service tier, as ``qubit chat`` did on main (``HermesCLI._init_agent``):
 ``provider_routing.ignore``/``data_collection`` and a static ``agent.service_tier`` reach AIAgent."""
 import json
 import threading

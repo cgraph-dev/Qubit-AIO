@@ -266,7 +266,7 @@ async def test_run_restart_excluded_from_stop_cancel_loop():
 @pytest.mark.asyncio
 async def test_restart_from_served_profile_chat_restarts_the_host_gateway(monkeypatch):
     """A /restart handled inside a served profile's runtime scope restarts the HOST gateway: the
-    detached watcher relaunches `hermes gateway restart` under the launch home (under a named
+    detached watcher relaunches `qubit gateway restart` under the launch home (under a named
     profile's home it exits 78 and nothing comes back), and stop() - which flushes pending
     messages under get_qubit_home() - runs outside the requester's profile scope."""
     from agent.secret_scope import current_secret_scope
@@ -477,7 +477,7 @@ def _live_agent(idle_seconds: float = 1.0) -> MagicMock:
 async def test_request_restart_skips_wait_when_only_wedged_turns(monkeypatch):
     """A turn idle past agent.gateway_timeout must not defer the restart.
 
-    Regression: a WhatsApp turn wedged for 30+ min pinned `hermes update`
+    Regression: a WhatsApp turn wedged for 30+ min pinned `qubit update`
     in "draining" for the full restart_after_turn_timeout cap — the
     after-turn wait counted the wedged agent as active work even though
     the inactivity watchdog had already declared it dead (Aug 2026).
@@ -553,7 +553,7 @@ def test_wedged_agent_count_ignores_sentinels_and_bad_summaries(monkeypatch):
 async def test_request_restart_skips_wait_for_cron_run_past_inflight_allowance(monkeypatch, tmp_path):
     """A cron run older than the scheduler's stale-inflight allowance is wedged: the restart proceeds.
 
-    #115469 Defect B: a no-agent job whose delivery hung pinned ``hermes update`` in "draining" for the
+    #115469 Defect B: a no-agent job whose delivery hung pinned ``qubit update`` in "draining" for the
     full ``restart_after_turn_timeout`` because ``_wedged_agent_count`` only ever looked at chat agents,
     so the cron unit was structurally un-skippable ("0 wedged and excluded").
     """

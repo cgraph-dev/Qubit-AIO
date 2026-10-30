@@ -8,7 +8,7 @@ reported ``partial`` with "Could not restart the gateway" — on an install
 whose code, deps and builds had all succeeded (observed in an update
 rehearsal on a real macOS host, Sep 2026).
 
-``refresh_launchd_plist_if_needed()`` (the ``hermes gateway start`` /
+``refresh_launchd_plist_if_needed()`` (the ``qubit gateway start`` /
 ``gateway install`` repair path) already knows how to rewrite a stale plist
 and bootout/bootstrap it; the contract pinned here is that ``launchd_restart``
 runs it BEFORE any kickstart, and that a refresh which could not re-register

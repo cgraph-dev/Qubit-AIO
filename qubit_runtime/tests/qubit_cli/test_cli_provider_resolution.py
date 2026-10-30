@@ -621,7 +621,7 @@ def test_startup_fallback_re_resolves_reasoning_for_the_fallback_model(monkeypat
 
 
 def test_custom_entry_model_swap_re_resolves_reasoning(monkeypatch):
-    """`hermes chat --model <custom-provider-name>`: the runtime's explicit `model` replaces the
+    """`qubit chat --model <custom-provider-name>`: the runtime's explicit `model` replaces the
     slug, so the CLI-level reasoning_config must follow to that model's per-model override."""
     cli = _import_cli()
     monkeypatch.setattr(cli, "_cprint", lambda *a, **k: None)

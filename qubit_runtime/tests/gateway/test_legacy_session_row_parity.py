@@ -1,7 +1,7 @@
 """Resuming a session main created leaves its row as main would (TUI parity, PR #106742 row 35).
 
 Adoption binds the old transcript to the owner; it must not rewrite the row's ``source`` label
-(``hermes sessions list --source tui``, ``-c`` / ``_resolve_last_session`` key on it) nor clear the
+(``qubit sessions list --source tui``, ``-c`` / ``_resolve_last_session`` key on it) nor clear the
 ``end_reason`` / ``ended_at`` stamp on a mere mount. The first admitted turn reopens the row
 (``reopen_local_session``), exactly as main's sidecar did.
 """

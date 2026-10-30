@@ -422,7 +422,7 @@ def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypat
 
 @pytest.mark.parametrize("enabled", [False, True])
 def test_update_rebuilds_the_webapp_bundle_a_home_serves(tmp_path, monkeypatch, enabled):
-    """``hermes update`` rebuilds ``apps/desktop/dist-webapp``, with the function ``hermes webapp``
+    """``qubit update`` rebuilds ``apps/desktop/dist-webapp``, with the function ``hermes webapp``
     uses, when any home sharing this install has ``webapp.enabled``: that home's gateway serves the
     bundle as built, so an old one would talk to the updated backend. Otherwise it is left alone."""
     import qubit_cli.left_core_migration as left_core
@@ -455,7 +455,7 @@ def test_update_rebuilds_the_webapp_bundle_a_home_serves(tmp_path, monkeypatch, 
 
 @pytest.mark.parametrize("built", [True, False])
 def test_a_failed_webapp_rebuild_in_update_marks_the_served_bundle_out_of_date(tmp_path, monkeypatch, capsys, built):
-    """When ``hermes update`` cannot rebuild the Webapp bundle a home serves, the previous bundle
+    """When ``qubit update`` cannot rebuild the Webapp bundle a home serves, the previous bundle
     stays on disk but is marked out of date: its gateway reports the Webapp unavailable and says to
     run ``hermes webapp`` (which rebuilds it) instead of serving it against the updated backend. The
     update still reports the failure. With no bundle built there is nothing to mark."""

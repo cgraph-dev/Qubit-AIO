@@ -1,4 +1,4 @@
-"""`hermes sessions prune` while the always-on gateway owns state.db (live smoke LS-F7).
+"""`qubit sessions prune` while the always-on gateway owns state.db (live smoke LS-F7).
 
 The gateway is always up, so a CLI prune that refuses whenever a process holds the store (and
 deletes under it with ``--force``) is unusable or a second writer. With a ready owner the CLI only

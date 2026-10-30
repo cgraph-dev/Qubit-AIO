@@ -360,7 +360,7 @@ def test_cached_snapshot_is_only_served_to_the_login_that_fetched_it(monkeypatch
 
 def test_cached_snapshot_survives_a_token_refresh_but_not_an_account_or_org_switch(monkeypatch):
     """A refresh (new token, same user + org) between the fetch and a picker's read must not hide the
-    snapshot: ``hermes model`` refreshes runtime credentials right after its account fetch."""
+    snapshot: ``qubit model`` refreshes runtime credentials right after its account fetch."""
     from qubit_cli.nous_account import cached_nous_portal_account_info
 
     def token(sub: str, org: str, n: int) -> str:

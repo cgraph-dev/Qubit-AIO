@@ -3,7 +3,7 @@
 The Windows ``hermes`` command is a staged launcher whose canonical home is
 the managed binary dir ``QUBIT_HOME\\bin`` — OUTSIDE the git checkout —
 because the earlier in-checkout home (``hermes-agent\\bin``) was swept by
-``hermes update``'s autostash (``git stash push --include-untracked``) and,
+``qubit update``'s autostash (``git stash push --include-untracked``) and,
 with the desktop updater's ``--keep-stash``, never restored: ``hermes``
 stopped resolving in every new terminal (``venv\\Scripts`` itself must stay
 off PATH — it shadows the user's ``python``, #83797).
@@ -13,10 +13,10 @@ launchers that boot the pm STORE python with ``PYTHONPATH=repo;site-packages``
 — never ``venv\\Scripts\\python.exe`` (``pyvenv.cfg`` is inert dead config).
 When the store interpreter has not materialized yet, a runtime-resolving
 ``.cmd`` delegator is staged that finds the store python at boot and fails
-with a clear message until ``hermes pm install`` lands it; legacy copied
+with a clear message until ``qubit pm install`` lands it; legacy copied
 venv trampolines (detected by their embedded interpreter path) are replaced.
 ``migrate_windows_bin_path`` moves an existing install's PATH to the
-canonical layout from the ``hermes update`` tail. Platform verdict, PATH
+canonical layout from the ``qubit update`` tail. Platform verdict, PATH
 values, and registry I/O are injected parameters (same pattern as
 ``qubit_constants.venv_bin_dir``), so these tests are host-independent
 input→output checks, not host fakes.
@@ -179,7 +179,7 @@ def test_healthy_canonical_layout_with_placeholder_cmds_gets_upgraded(
     tmp_path, monkeypatch
 ):
     """Placeholder .cmd delegators from the fresh install are upgraded to
-    store-python launchers once `hermes pm install` materialized the store."""
+    store-python launchers once `qubit pm install` materialized the store."""
     home, root = _make_managed(tmp_path, monkeypatch)
     bin_dir = home / "bin"
     bin_dir.mkdir()
@@ -269,7 +269,7 @@ def test_no_staging_litter_left_behind(managed_install):
 
 
 # ---------------------------------------------------------------------------
-# migrate_windows_bin_path — the `hermes update` tail migration
+# migrate_windows_bin_path — the `qubit update` tail migration
 # ---------------------------------------------------------------------------
 
 
@@ -398,7 +398,7 @@ def test_repo_gitignores_the_legacy_bin_dir():
     """Transition safety: legacy in-checkout launchers must not be stash-swept.
 
     Until every install has migrated, pre-migration checkouts still carry
-    launchers at ``<checkout>/bin``. ``hermes update`` autostashes with
+    launchers at ``<checkout>/bin``. ``qubit update`` autostashes with
     ``git stash push --include-untracked``; anything untracked and NOT
     ignored inside the checkout gets swept off disk. Exercises git's real
     ignore machinery rather than reading .gitignore text.

@@ -67,7 +67,7 @@ def stranded(tmp_path, monkeypatch):
             _write_live_gateway(root, ["default", "coder", "ops"])
 
     import gateway.status as status
-    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
+    monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "qubit gateway run")
     monkeypatch.setattr(gm, "_installed_services", lambda home: [])
     monkeypatch.setattr(gm, "_service_op", _service_op)
     monkeypatch.setattr(gm, "_host_supports_migration", lambda: None)

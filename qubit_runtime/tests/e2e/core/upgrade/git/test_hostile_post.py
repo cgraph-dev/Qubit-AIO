@@ -1,4 +1,4 @@
-"""Once ``hermes update`` has committed the new code, the update never fails (contract C3).
+"""Once ``qubit update`` has committed the new code, the update never fails (contract C3).
 
 One real HEAD install (``_git_world``: the real ``scripts/install.sh`` over real smart HTTP, every
 command in a ``bwrap`` sandbox) is shared by the cells. Each cell publishes a hostile upstream
@@ -23,13 +23,13 @@ release and breaks something that runs AFTER the checkout moved, for real:
     completion child in its own session or reparented to the namespace init).
 (d) a sticky profile (``hermes profile use e2epost``) must not move update.log / update receipts off
     the root hermes home, and ``hermes logs update`` under that profile reads the root's update.log;
-    pm's own sync receipts stay where pm writes them and ``hermes pm status`` there still shows them.
+    pm's own sync receipts stay where pm writes them and ``qubit pm status`` there still shows them.
 (e) the dependency sync fails after the tree moved (contract amendment A6): the release's
     ``pm.client.ensure_tools_for_sync`` raises while ``$HOME/.e2e-break-deps-sync`` exists; it runs in
     the completion bootstrap from the NEW tree, after the checkout moved. Exit 0, a ``dependencies``
     follow-up, the tail obligation armed; the next update completes it.
 (f) Ctrl-C after the commit point: SIGINT (what a terminal's Ctrl-C delivers to the foreground
-    ``hermes update``; the completion child runs in its own session) while the slow web build runs.
+    ``qubit update``; the completion child runs in its own session) while the slow web build runs.
     The user must read that the new code is in place and the rest is owed, never a failure.
 
 What is asserted is what the user sees: the exit code, ``⚠`` lines, the receipt at
@@ -253,7 +253,7 @@ def _publish_web_release(w: G.World, tag: str) -> str:
 
 
 def _publish_gateway_fault_release(w: G.World, tag: str) -> str:
-    """A release whose ``hermes gateway run`` refuses to boot while the toggle exists."""
+    """A release whose ``qubit gateway run`` refuses to boot while the toggle exists."""
     text = _head_file(w, "qubit_cli/gateway.py")
     if _GATEWAY_MARK not in text:
         m = re.search(r"^def run_gateway\(.*?\):\n    \"\"\".*?\"\"\"\n", text, re.S | re.M)
@@ -372,7 +372,7 @@ def test_failed_web_build_after_commit_is_a_followup_not_a_failed_update(w):
 
     assert w.head() == target, f"premise: the release never committed, so this is no post-commit cell:\n{diag}"
     assert WEB_FAULT_TEXT in out + log, f"premise: the hostile web build never ran (web UI not seen stale?):\n{diag}"
-    assert cp.returncode == 0, f"the code committed, yet a failed web build failed `hermes update`:\n{diag}"
+    assert cp.returncode == 0, f"the code committed, yet a failed web build failed `qubit update`:\n{diag}"
     assert _warn_lines(out), f"the failed web build was not surfaced with a ⚠ line:\n{diag}"
     assert rec.get("outcome") == "success", f"receipt outcome is not success after the commit:\n{diag}"
     assert "build" in _followup_steps(rec), f"receipt followups do not name the failed `build` step:\n{diag}"
@@ -423,7 +423,7 @@ def test_gateway_that_cannot_reboot_is_an_owed_restart_not_a_failed_update(w):
 
             assert w.head() == target, f"premise: the release never committed:\n{diag}"
             assert not _serving(w, target), f"premise: a gateway serves the new commit; the restart fault never fired:\n{diag}"
-            assert cp.returncode == 0, f"the code committed, yet a failed gateway restart failed `hermes update`:\n{diag}"
+            assert cp.returncode == 0, f"the code committed, yet a failed gateway restart failed `qubit update`:\n{diag}"
             assert _warn_lines(out), f"the failed gateway restart was not surfaced with a ⚠ line:\n{diag}"
             assert rec.get("outcome") == "success", f"receipt outcome is not success after the commit:\n{diag}"
             assert "gateway_restart" in _followup_steps(rec), \
@@ -550,13 +550,13 @@ def test_sticky_profile_update_logs_and_receipts_land_in_the_root_home(w):
             f"pm's sync receipt for this update is missing from the profile home {prof_receipts}:\n{diag}"
         pm_cp = w.sb.cli("pm", "status", timeout=300)
         assert pm_cp.returncode == 0 and json.loads(pm_cp.stdout).get("update_id") == rec.get("update_id"), \
-            f"`hermes pm status` under the profile does not show this run's newest receipt:\n{H.describe(pm_cp)}\n{diag}"
+            f"`qubit pm status` under the profile does not show this run's newest receipt:\n{H.describe(pm_cp)}\n{diag}"
         assert log1 > log0, f"the root update.log did not grow:\n{diag}"
         assert rec.get("update_id") != prev.get("update_id") and rec.get("outcome") == "success", \
             f"root latest.json is not this run's success:\n{diag}"
         # The readers follow the writers: `hermes logs update` under the profile shows the root log.
         logs_cp = w.sb.cli("logs", "update", "-n", "400", timeout=300)
-        assert logs_cp.returncode == 0 and "hermes update started" in G.output(logs_cp), \
+        assert logs_cp.returncode == 0 and "qubit update started" in G.output(logs_cp), \
             f"`hermes logs update` under the sticky profile does not show the root update.log:\n{H.describe(logs_cp)}\n{diag}"
     finally:
         w.sb.cli("profile", "use", "default", timeout=300)
@@ -577,7 +577,7 @@ def test_dependency_sync_failure_after_commit_is_a_followup_not_a_failed_update(
 
     assert w.head() == target, f"premise: the release never committed, so this is no post-commit cell:\n{diag}"
     assert DEPS_FAULT_TEXT in out, f"premise: the hostile dependency sync never ran:\n{diag}"
-    assert cp.returncode == 0, f"the code committed, yet a failed dependency sync failed `hermes update`:\n{diag}"
+    assert cp.returncode == 0, f"the code committed, yet a failed dependency sync failed `qubit update`:\n{diag}"
     assert any(DEPS_OWED in line for line in _warn_lines(out)), \
         f"no ⚠ line says the dependencies are not installed yet:\n{diag}"
     assert rec.get("outcome") == "success", f"receipt outcome is not success after the commit:\n{diag}"

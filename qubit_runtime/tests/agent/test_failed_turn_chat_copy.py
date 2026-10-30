@@ -95,7 +95,7 @@ def test_oauth_rejection_chat_text_names_the_provider_slug_and_the_failing_profi
     assert "`qubit -p codex auth add openai-codex --type oauth`" in text
     assert "<provider>" not in text
     assert "token_revoked" in text  # the raw error survives for the judge to quote
-    # The CLI 💡 hint names the same command; it no longer sends the user to a bare `hermes auth`.
+    # The CLI 💡 hint names the same command; it no longer sends the user to a bare `qubit auth`.
     cli_hint = "\n".join(hints)
     assert "`qubit -p codex auth add openai-codex --type oauth`" in cli_hint, cli_hint
     assert "`qubit auth`" not in cli_hint, cli_hint

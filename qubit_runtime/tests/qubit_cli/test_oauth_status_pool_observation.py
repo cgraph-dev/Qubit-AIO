@@ -1,7 +1,7 @@
 """A status snapshot observes the credential pool; it never leases (refreshes / rotates) an entry.
 
 ``get_codex_auth_status`` / ``get_xai_oauth_auth_status`` back every credential-gated listing
-(``/model`` picker, ``hermes doctor``, dashboard cards). When that read ran ``pool.select()`` it
+(``/model`` picker, ``qubit doctor``, dashboard cards). When that read ran ``pool.select()`` it
 refreshed an expiring single-use token, and a *transient* failure of that speculative POST benched
 the entry with a persisted cooldown — the picker then rendered the provider as unconfigured
 ("needs setup" / "0 models") while the runtime resolver kept serving the same credential.
@@ -154,7 +154,7 @@ def _singleton_tokens(home) -> dict:
 
 def test_status_snapshot_never_adopts_codex_cli_tokens(tmp_path, monkeypatch):
     """#68004: a Hermes store missing its refresh_token is recovery-eligible on the runtime path, but
-    ``hermes status`` / ``hermes doctor`` must not import the Codex CLI's single-use token family."""
+    ``qubit status`` / ``qubit doctor`` must not import the Codex CLI's single-use token family."""
     from qubit_cli.auth import resolve_codex_runtime_credentials
 
     stale = {"access_token": _jwt_with_exp(-60)}

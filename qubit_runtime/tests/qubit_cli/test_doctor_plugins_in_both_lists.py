@@ -1,4 +1,4 @@
-"""`hermes doctor` reports a plugin listed in both plugins.enabled and plugins.disabled.
+"""`qubit doctor` reports a plugin listed in both plugins.enabled and plugins.disabled.
 
 Such a plugin loads nowhere because the disable wins. Older updates left plugins in that state when
 they had to turn them off (#131216), and nothing else said so.
@@ -23,4 +23,4 @@ def test_plugin_in_both_lists_is_an_issue_with_the_command_that_settles_it(tmp_p
     finding = _check_plugins_in_both_lists(False)
 
     assert len(finding.manual_issues) == 1
-    assert "hermes plugins enable obs/intake" in finding.manual_issues[0]
+    assert "qubit plugins enable obs/intake" in finding.manual_issues[0]

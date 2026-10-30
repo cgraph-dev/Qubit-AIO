@@ -1,4 +1,4 @@
-"""Secrets never reach disk or the next provider request through the classic CLI (``hermes chat -q``).
+"""Secrets never reach disk or the next provider request through the classic CLI (``qubit chat -q``).
 
 Contract under test (``security.redact_secrets``, on by default; website/docs/user-guide/configuration.md
 § Security, qubit_logging.py, user-guide/sessions.md § Export Sessions):
@@ -8,7 +8,7 @@ Contract under test (``security.redact_secrets``, on by default; website/docs/us
   masks credential-shaped assignments whatever the value looks like;
 * the model's own answer is redacted at the storage boundary (history / state.db / exports / replay);
 * every log file (agent.log, errors.log, gateway.log) goes through ``RedactingFormatter``;
-* ``hermes sessions export --redact`` masks message content AND tool-call arguments.
+* ``qubit sessions export --redact`` masks message content AND tool-call arguments.
 
 NOT COVERED (raw by design, so not asserted): a tool argument and the user's own prompt stay exactly as
 executed in state.db, in the default (non ``--redact``) export and in the provider replay of the

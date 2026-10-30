@@ -16,8 +16,8 @@ FIXTURE_ANTHROPIC_401 = (
     "'message': 'Your API key is invalid, blocked or out of funds...'}}"
 )
 FIXTURE_NO_PROVIDER = (
-    "agent init failed: No LLM provider configured. Run `hermes model` to select "
-    "a provider, or run `hermes setup` for first-time configuration."
+    "agent init failed: No LLM provider configured. Run `qubit model` to select "
+    "a provider, or run `qubit setup` for first-time configuration."
 )
 FIXTURE_NO_TOKEN = "agent init failed: No access token found for Nous Portal login."
 # Target-scope spawn refusals, verbatim from a relay ledger (the named-secret spelling is built live).

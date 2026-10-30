@@ -637,7 +637,7 @@ class TestWatchUpdateProgress:
 
 class TestUpdateCommandInstallMethodRefusal:
     """/update on a non-git install refuses with the steward's own update
-    command instead of attempting a git-based `hermes update`."""
+    command instead of attempting a git-based `qubit update`."""
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("method", ["docker", "nix"])

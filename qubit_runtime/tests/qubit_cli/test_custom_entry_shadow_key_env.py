@@ -101,7 +101,7 @@ def test_shadowing_entry_inline_api_key_beats_builtin_env(tmp_path, monkeypatch)
 
 
 def test_shadowing_entry_manual_pool_row_still_wins(tmp_path, monkeypatch):
-    """``hermes auth add deepseek`` rows are the operator's credential for the slug and keep
+    """``qubit auth add deepseek`` rows are the operator's credential for the slug and keep
     their precedence over key_env, exactly like a non-shadowing keyed entry."""
     manual = {"id": "m1", "label": "manual", "auth_type": "api_key", "priority": 0, "source": "manual",
               "access_token": MANUAL_KEY}
@@ -317,7 +317,7 @@ SIBLING_KEY = "sibling-key-C-0123456789"
 
 
 def _two_entries_on_one_url(tmp_path, monkeypatch):
-    """``alpha`` (with a ``hermes auth add alpha`` row) and ``beta`` share ENDPOINT; beta is the primary."""
+    """``alpha`` (with a ``qubit auth add alpha`` row) and ``beta`` share ENDPOINT; beta is the primary."""
     home = _home(tmp_path, monkeypatch, "alpha", "ALPHA_KEY_VAR", entry_extra={"key_env": "ALPHA_KEY_VAR"},
                  pool={"alpha": [{"id": "m1", "label": "manual", "auth_type": "api_key", "priority": 0,
                                   "source": "manual", "access_token": MANUAL_KEY}]})
@@ -474,7 +474,7 @@ def _drop_declaration(home, key):
 @pytest.mark.parametrize("builder", SNAPSHOT_BUILDERS)
 def test_restore_keeps_the_frozen_owner_after_its_endpoint_moves(tmp_path, monkeypatch, builder):
     """beta's live endpoint moves off the shared URL: the named lookup misses, and the URL-only
-    fallback used to hand the session alpha's ``hermes auth add`` key."""
+    fallback used to hand the session alpha's ``qubit auth add`` key."""
     home = _two_entries_on_one_url(tmp_path, monkeypatch)
     from qubit_cli import runtime_provider as rp
 
@@ -528,7 +528,7 @@ def test_a_snapshot_without_recorded_ownership_keeps_its_own_credential(tmp_path
 
 @pytest.mark.parametrize("builder", SNAPSHOT_BUILDERS)
 def test_restore_still_reselects_the_owners_own_pool_row(tmp_path, monkeypatch, builder):
-    """Recorded ownership scopes the pool, it doesn't drop it: the entry's ``hermes auth add`` row
+    """Recorded ownership scopes the pool, it doesn't drop it: the entry's ``qubit auth add`` row
     replaces a stale snapshot key on restore, and the built-in's row stays out."""
     manual = {"id": "m1", "label": "manual", "auth_type": "api_key", "priority": 0, "source": "manual",
               "access_token": MANUAL_KEY}

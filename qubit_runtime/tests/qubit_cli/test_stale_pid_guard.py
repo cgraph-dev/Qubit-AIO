@@ -218,7 +218,7 @@ class TestHermesHomeForPid:
 
     # REGRESSION (#116906): a systemd/launchd unit with a scrubbed environment exports no HOME.
     # The target resolves its own default home from the password database, so attributing it to
-    # the INSPECTING process's home named another user's directory — and `hermes update` /
+    # the INSPECTING process's home named another user's directory — and `qubit update` /
     # `--stop` then acted on the wrong profile root.
     def _posix_scrubbed_unit(self, monkeypatch, tmp_path, passwd_home):
         """A unit whose environment carries neither HOME nor QUBIT_HOME, on the POSIX branch."""

@@ -1,9 +1,9 @@
 """The state.db write-guard sees a live foreign holder on native Windows.
 
-``hermes sessions optimize-storage`` rewrites the store (FTS rebuild + VACUUM). Run under a
+``qubit sessions optimize-storage`` rewrites the store (FTS rebuild + VACUUM). Run under a
 live writer, it is how every agent ends up refusing turns (#110054), so it refuses while
 another process holds ``state.db`` or its WAL sidecars. The holder here is the realistic
-one: a real ``hermes gateway run`` for the same profile. Control: the same command succeeds
+one: a real ``qubit gateway run`` for the same profile. Control: the same command succeeds
 once the gateway is stopped, so a refusal is about the holder and nothing else.
 """
 

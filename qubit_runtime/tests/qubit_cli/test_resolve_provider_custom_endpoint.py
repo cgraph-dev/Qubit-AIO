@@ -4,7 +4,7 @@ Regression for #108383: ``resolve_provider("auto")`` recognised only registry pr
 ``model.provider``, so the boot inventory (``free_tier_bootstrap``) read a llama.cpp / vLLM /
 ollama install as "nothing configured" and ``setup.status`` reported ``provider_configured:
 False`` — the dashboard's Ink chat parked every new session on "Setup Required" while
-``hermes chat`` (which resolves the runtime directly) worked against the same config.
+``qubit chat`` (which resolves the runtime directly) worked against the same config.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def isolated_home(tmp_path, monkeypatch):
             id="provider-openrouter-mirror",
         ),
         # A bare ``model.provider`` naming a ``providers:`` entry is explicit intent too:
-        # has_named_custom_provider() already routes it at runtime (``hermes chat`` works), so the
+        # has_named_custom_provider() already routes it at runtime (``qubit chat`` works), so the
         # boot inventory must not discard the bare name.
         pytest.param(
             "model:\n  default: test-model\n  provider: CPA\n\n"
@@ -122,7 +122,7 @@ def test_a_provider_configured_after_boot_flips_the_stale_setup_record(isolated_
     """A serve process whose boot inventory found nothing keeps that record for its lifetime;
     ``setup.status`` reads it (``wait_for_record``), so the dashboard chat stayed on "Setup
     Required" after the user configured a provider — from the Models page, a picker key, or
-    ``hermes setup`` in another process. A ``False`` record is reconciled with the config files
+    ``qubit setup`` in another process. A ``False`` record is reconciled with the config files
     on read: it flips (+ one ``setup.ready``) once something carries inference, and a blank
     machine stays ``False`` with no broadcast."""
     from qubit_cli import free_tier_bootstrap as fb

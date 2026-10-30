@@ -1,7 +1,7 @@
 """Steward detection reads the install stamp beside the code, not markers.
 
 ``qubit_cli.steward`` decides whether a steward owns this tree (and
-therefore whether ``hermes update`` and the uninstaller must refuse code
+therefore whether ``qubit update`` and the uninstaller must refuse code
 mutation). That is a fact about the INSTALL, so it comes from the two
 facts the tree itself carries: ``.git`` (a checkout we own) and the
 install stamp that ships with the code (``install-stamp.json``, written by

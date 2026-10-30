@@ -4,7 +4,7 @@ The retained desktop stage used to call helpers deleted by the PM
 consolidation (Resolve-UvCmd, Test-Node, the electron-dist recovery set) —
 runtime failures under `-Stage desktop`. The stage must use the CURRENT
 path: the shared completion tail (source_completion.py --desktop) that
-`hermes update` also runs. The $Stages table must be
+`qubit update` also runs. The $Stages table must be
 the ONE list: -Manifest prints it and the no-flag ladder runs it, so
 -IncludeDesktop affects the real loop exactly as the manifest advertises.
 `-Stage desktop` stays directly dispatchable without the flag (the
@@ -222,7 +222,7 @@ def test_complete_stage_writes_pinned_install_marker(tmp_path: Path) -> None:
 def test_desktop_stage_uses_pm_sync_and_product_cli(tmp_path: Path) -> None:
     """-Stage desktop (without -IncludeDesktop — the standalone contract)
     runs the CURRENT path: the shared completion tail (source_completion.py
-    --desktop, the same call `hermes update` makes) builds the products; the produced
+    --desktop, the same call `qubit update` makes) builds the products; the produced
     artifact is probed, ACL-granted, and shortcut-ed — with icacls,
     ie4uinit.exe, and WScript.Shell intercepted in the wrapper boundary so
     nothing outside the temp dirs is touched."""

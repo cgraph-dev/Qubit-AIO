@@ -1549,7 +1549,7 @@ def _processes_with_hermes_home_under(roots) -> list[int]:
 def _reap_session_hermes_processes(config) -> list[int]:
     """SIGTERM every process still running against a Hermes home this session created.
 
-    Tests that run a real ``hermes chat -q`` child get a grandchild ``gateway run`` (detached, own
+    Tests that run a real ``qubit chat -q`` child get a grandchild ``gateway run`` (detached, own
     session) that no per-test subprocess patch can see, and pytest's tmp cleanup removes only
     directories: each one used to outlive the run at ~250 MB. The session basetemp and the session
     sandbox home bound exactly what this run created, so nothing else is ever signalled.

@@ -1,4 +1,4 @@
-"""`hermes chat -Q` must not leak presentation output into stdout (#93220)."""
+"""`qubit chat -Q` must not leak presentation output into stdout (#93220)."""
 
 from __future__ import annotations
 

@@ -40,7 +40,7 @@ def test_default_profile_launch_may_multiplex(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_verdict_precedes_replacing_a_running_gateway(tmp_path, monkeypatch):
-    """``hermes gateway run --replace`` on a named profile with the flag must exit EX_CONFIG while the
+    """``qubit gateway run --replace`` on a named profile with the flag must exit EX_CONFIG while the
     healthy gateway it would have replaced keeps running."""
     from gateway import run_bootstrap
     from gateway.config import GatewayConfig

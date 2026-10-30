@@ -1,7 +1,7 @@
 """Copilot ACP wire conformance, part 2: ACP error responses and agent crashes.
 
 The agent (``tests/fakes/providers/copilot_acp.py``) answers ``session/prompt`` with JSON-RPC errors from
-the ACP / JSON-RPC 2.0 error space or dies mid-stream. Each row drives one real ``hermes chat -q`` and
+the ACP / JSON-RPC 2.0 error space or dies mid-stream. Each row drives one real ``qubit chat -q`` and
 asserts the retry semantics the user sees:
 
 * transient failures (``-32603`` internal error, a crash after a partial chunk) are retried with a

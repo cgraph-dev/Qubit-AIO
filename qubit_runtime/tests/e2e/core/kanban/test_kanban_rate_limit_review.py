@@ -2,7 +2,7 @@
 card's later review handoff (#119070).
 
 Real processes end to end: every tick is a real ``hermes kanban dispatch`` process, every worker a
-real ``hermes chat -q`` process spawned by it, talking to the recording fake provider (the only
+real ``qubit chat -q`` process spawned by it, talking to the recording fake provider (the only
 fake — it stands in for the vendor HTTP API). The fake plays two roles, told apart structurally:
 the scratch home carries its own ``sdlc-review`` skill whose body holds a unique marker, and the
 review lane preloads that skill into the worker it spawns, so only a reviewer's prompt carries it.

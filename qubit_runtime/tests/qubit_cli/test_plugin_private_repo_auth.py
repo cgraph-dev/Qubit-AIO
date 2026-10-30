@@ -122,7 +122,7 @@ def test_public_clone_attempts_anonymously_when_credential_resolves(tmp_path, mo
 @pytest.mark.parametrize("outcome", ["ok", "refused", "not_found"])
 def test_ref_fetch_and_update_pull_attach_credential_only_after_anonymous_refusal(
         tmp_path, monkeypatch, verb, outcome):
-    """The pinned-ref fetch (``--ref`` install) and ``hermes plugins update``'s pull are the
+    """The pinned-ref fetch (``--ref`` install) and ``qubit plugins update``'s pull are the
     clone's siblings: with a stored GitHub credential resolvable they still run anonymously
     against a public remote, attach the credential only after the remote refuses, and surface a
     failure that is not about credentials (missing repo, bad commit, network) as-is — the stored

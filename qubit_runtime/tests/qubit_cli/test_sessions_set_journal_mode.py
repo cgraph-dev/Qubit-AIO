@@ -1,4 +1,4 @@
-"""`hermes sessions set-journal-mode` converts an existing WAL store offline and refuses under a foreign holder.
+"""`qubit sessions set-journal-mode` converts an existing WAL store offline and refuses under a foreign holder.
 
 #100896 (@ruangraung): `database.journal_mode: delete` never self-applies to a store that is already WAL because
 open never live-downgrades; this command is the sanctioned offline path and must fail closed while any other

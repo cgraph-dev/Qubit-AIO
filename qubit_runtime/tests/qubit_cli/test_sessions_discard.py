@@ -1,4 +1,4 @@
-"""`hermes sessions discard`: a script can clear a turn lost in a gateway crash without a REPL."""
+"""`qubit sessions discard`: a script can clear a turn lost in a gateway crash without a REPL."""
 import argparse
 import asyncio
 import json

@@ -1,6 +1,6 @@
-"""A killed or failed ``hermes update`` never strands — or wrongly starts — a paused gateway.
+"""A killed or failed ``qubit update`` never strands — or wrongly starts — a paused gateway.
 
-Failure class: Windows pause durability. ``hermes update`` stops every running gateway before it
+Failure class: Windows pause durability. ``qubit update`` stops every running gateway before it
 touches the checkout. Cell (a): the updater is killed (``taskkill /F /T`` — console closed, Desktop
 kill) right after the pause; the next plain ``hermes`` command must bring the gateway back.
 Cell (c): a successful update brings the paused gateway back and it outlives the updater (the
@@ -59,7 +59,7 @@ def _running_gateway(machine, not_pid: int, timeout: float) -> dict | None:
 
 
 def _update_killed_after_pause(machine) -> tuple[bool, str]:
-    """Start ``hermes update`` and ``taskkill /F /T`` it the moment it reports the pause."""
+    """Start ``qubit update`` and ``taskkill /F /T`` it the moment it reports the pause."""
     log = machine.logs / "update-killed.log"
     proc = subprocess.Popen([str(machine.hermes_exe), "update", "--yes"], cwd=machine.profile,
                             env=machine.env(), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -177,7 +177,7 @@ def test_successful_update_gateway_outlives_the_updater(journey) -> None:
         m, f"premise: the update did not complete (rc={run.returncode}, HEAD {journey['c_pre']} -> {journey['c_head']})", run)
     assert journey["c_after"] is not None, fail_with(m, "the paused gateway was not restarted by a successful update", run)
     assert journey["c_alive_30s"], fail_with(
-        m, f"the restarted gateway (pid {journey['c_after'].get('pid')}) died after `hermes update` exited", run)
+        m, f"the restarted gateway (pid {journey['c_after'].get('pid')}) died after `qubit update` exited", run)
     assert not journey["c_record"], fail_with(m, "a fully resumed pause left its record behind", run)
 
 
@@ -204,5 +204,5 @@ def test_failed_pull_does_not_start_gateway_on_torn_tree(journey) -> None:
     assert journey["b_after"] is not None, fail_with(
         m, f"the updater restored the pre-update tree but left the paused gateway stopped ({state})", run)
     assert journey["b_alive_15s"], fail_with(
-        m, f"the gateway restarted on the restored tree (pid {pid}) died after `hermes update` exited", run)
+        m, f"the gateway restarted on the restored tree (pid {pid}) died after `qubit update` exited", run)
     assert not journey["b_record"], fail_with(m, "a fully resumed pause left its record behind", run)

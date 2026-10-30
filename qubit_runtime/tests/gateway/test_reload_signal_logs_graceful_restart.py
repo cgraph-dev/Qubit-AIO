@@ -1,4 +1,4 @@
-"""SIGUSR1 (systemd ``ExecReload`` / ``hermes gateway restart``) is a graceful restart, and the
+"""SIGUSR1 (systemd ``ExecReload`` / ``qubit gateway restart``) is a graceful restart, and the
 gateway says so in its log when the signal lands (#117267)."""
 
 from __future__ import annotations

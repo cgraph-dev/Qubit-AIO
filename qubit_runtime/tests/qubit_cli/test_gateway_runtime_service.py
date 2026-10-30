@@ -403,7 +403,7 @@ def test_s6_command_timeout_ends_at_the_runtime_deadline(tmp_path, monkeypatch):
 def test_windows_startup_folder_entry_still_restarts_a_stopped_owner(tmp_path, monkeypatch):
     """The Startup-folder fallback is login persistence only (no start verb, no identity): with it
     present and no Scheduled Task registered, ensure takes the same detached direct spawn manual
-    `hermes gateway start` uses instead of refusing until the next login."""
+    `qubit gateway start` uses instead of refusing until the next login."""
     from types import SimpleNamespace
     from qubit_cli import gateway_runtime as runtime, gateway_runtime_service as service, gateway_runtime_start as start
     from qubit_cli import gateway_windows

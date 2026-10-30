@@ -6,7 +6,7 @@ detached), and the desktop's Update button (Tauri updater → install-mode
 bootstrap on its failure screen). Before the shared lock, two of them could run
 concurrently and rewrite source under a live interpreter — observed in the wild
 as an installer ``git checkout`` rewinding the checkout ~9k commits while a
-dashboard-spawned ``hermes update`` was mid-``npm install``, which then failed
+dashboard-spawned ``qubit update`` was mid-``npm install``, which then failed
 against the rewound tree's manifests.
 
 These exercise the real marker file against a temp home — no mocks — because
@@ -262,7 +262,7 @@ def test_v2_marker_whose_pid_was_reused_is_reclaimed(marker, other_pid):
 
 
 def test_delegate_keeps_the_claim_live_after_the_partner_dies(marker, monkeypatch, other_pid):
-    """Rule 6: `hermes update` adopting a hand-off claim names itself on line 4, restores
+    """Rule 6: `qubit update` adopting a hand-off claim names itself on line 4, restores
     lines 1-3 byte-identical on exit, and is what keeps the claim visible if the partner dies."""
     _claim_v2(marker, other_pid)
     base = marker.read_bytes()
@@ -511,7 +511,7 @@ time.sleep(120)
 
 @pytest.mark.platforms("posix")
 def test_checkout_lock_excludes_an_update_from_another_home(tmp_path):
-    """Two `hermes update` runs on one checkout from different homes exclude each other (V3)."""
+    """Two `qubit update` runs on one checkout from different homes exclude each other (V3)."""
     install = tmp_path / "checkout"
     install.mkdir()
     holder = subprocess.Popen(
@@ -623,7 +623,7 @@ def test_unwritable_install_root_refuses(tmp_path):
 
 
 class TestHandoffFromOrchestratingUpdater:
-    """The Tauri updater holds the marker, then spawns ``hermes update``.
+    """The Tauri updater holds the marker, then spawns ``qubit update``.
 
     The regression: the child saw its own parent's live marker and exited 2,
     so every GUI update failed with "Hermes is still running" and retrying
@@ -709,7 +709,7 @@ class TestAncestryHandoff:
     def test_grandchild_adopts_orchestrator_marker_without_psutil(self, marker, tmp_path):
         """Regression: the desktop hand-off's grandchild refused its own orchestrator.
 
-        The posix shim (grandparent) holds the marker and spawns ``hermes update``
+        The posix shim (grandparent) holds the marker and spawns ``qubit update``
         (direct child — adopts via getppid). An old-updater update into a PM tree
         then hands off again: ``_old_updater._run_child`` spawns
         ``_update_takeover.py`` as ``python -I -S -B``, where psutil cannot import
