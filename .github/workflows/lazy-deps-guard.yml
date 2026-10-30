@@ -1,0 +1,35 @@
+name: Lazy-deps import guard
+
+# Rejects any tracked production code that imports tools/lazy_deps.py.
+# The pm migration reduced it to an old-updater stub that only raises or
+# stops for relaunch (pm.extras — available / ensure_import /
+# ensure_and_bind — is the only lazy-install surface), so a production
+# import never gets its dependencies.
+#
+# Runs unconditionally (no change-classifier gate): the stub
+# must stay unimported on every change, in any kind of PR.
+
+on:
+  workflow_call:
+    inputs:
+      commit:
+        description: Commit to test and build. Empty keeps the triggering commit.
+        type: string
+        default: ''
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lazy-deps-guard:
+    name: No production imports of the tools.lazy_deps stub
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+
+      - name: Check tools.lazy_deps imports in tracked production code
+        run: python3 qubit_runtime/scripts/ci/check_lazy_deps_imports.py
