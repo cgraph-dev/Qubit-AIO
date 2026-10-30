@@ -4,7 +4,7 @@ Behavioral contracts for the /docs/plugins catalog extractor:
 
 1. Reads ``plugin-catalog/*.yaml`` entries (skipping ``removed.yaml``) and
    emits ``plugins.json`` rows carrying name/repo/sha/tier/capabilities plus
-   a synthesized ``hermes plugins install <name>`` command.
+   a synthesized ``qubit plugins install <name>`` command.
 2. Entries missing any of name/repo/sha are skipped (logged, not fatal).
 3. A missing ``plugin-catalog/`` directory degrades gracefully: empty
    catalog list, zero counts in the meta sidecar, exit 0 — the docs build
@@ -91,7 +91,7 @@ def test_valid_entry_is_extracted_with_install_command(mod, tmp_path):
     assert e["capabilities"]["providesTools"] == ["do_thing"]
     assert e["capabilities"]["providesHooks"] == ["on_start"]
     assert e["capabilities"]["requiresEnv"] == ["EXAMPLE_TOKEN"]
-    assert e["installCommand"] == "hermes plugins install example-plugin"
+    assert e["installCommand"] == "qubit plugins install example-plugin"
 
 
 def test_entries_missing_required_fields_are_skipped(mod, tmp_path, capsys):
@@ -199,7 +199,7 @@ def test_main_writes_catalog_and_meta(mod, tmp_path):
     assert [p["name"] for p in plugins] == ["gamma", "beta", "alpha"]  # stars desc, unknown stars last
     assert {p["name"]: p["stars"] for p in plugins} == {"alpha": None, "gamma": 50, "beta": 3}
     assert meta["total"] == 3
-    assert meta["byTier"] == {"official": 1, "community": 2}
+    assert meta["byTier"] == {"official": 1, "verified": 0, "community": 2}
     assert {p["name"]: p["category"] for p in plugins} == {"alpha": "memory", "beta": "desktop", "gamma": "desktop"}
     assert meta["byCategory"] == {"desktop": 2, "memory": 1}
     assert meta["starsFetchedAt"] == "2026-09-15T00:00:00+00:00"
@@ -212,6 +212,29 @@ def test_main_writes_catalog_and_meta(mod, tmp_path):
     assert live["removed"] == [{"name": "gone"}]
 
 
+def test_curated_featured_ranks_are_stamped_from_the_curation_file(mod, tmp_path, monkeypatch):
+    catalog = tmp_path / "plugin-catalog"
+    catalog.mkdir()
+    for name in ("alpha", "beta", "gamma"):
+        _write_entry(catalog, name)
+    curation = tmp_path / "apps" / "shared" / "src" / "catalog-curation.json"
+    curation.parent.mkdir(parents=True)
+    curation.write_text(json.dumps({"featured": {"plugins": ["gamma", "missing", "alpha"]}}), encoding="utf-8")
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+
+    assert mod.main(catalog_dir=catalog, output_dir=tmp_path / "api") == 0
+
+    plugins = {p["name"]: p for p in json.loads((tmp_path / "api" / "plugins.json").read_text(encoding="utf-8"))}
+    # Rank is the position in the curated list, so a pick missing from the catalog keeps its slot.
+    assert plugins["gamma"]["featured"] == 1
+    assert plugins["alpha"]["featured"] == 3
+    assert "featured" not in plugins["beta"]
+
+
+def test_missing_curation_file_features_nothing(mod, tmp_path):
+    assert mod.load_featured(tmp_path / "absent.json") == []
+
+
 def test_missing_catalog_dir_degrades_to_empty_outputs_exit_zero(mod, tmp_path):
     out_dir = tmp_path / "api"
 
@@ -222,7 +245,7 @@ def test_missing_catalog_dir_degrades_to_empty_outputs_exit_zero(mod, tmp_path):
     meta = json.loads((out_dir / "plugins-meta.json").read_text(encoding="utf-8"))
     assert plugins == []
     assert meta["total"] == 0
-    assert meta["byTier"] == {"official": 0, "community": 0}
+    assert meta["byTier"] == {"official": 0, "verified": 0, "community": 0}
     assert meta["removedCount"] == 0
 
 
@@ -242,6 +265,7 @@ def test_script_exits_zero_as_subprocess_when_catalog_missing(tmp_path):
         capture_output=True,
         text=True,
         timeout=60,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
     assert (out_dir / "plugins.json").exists()

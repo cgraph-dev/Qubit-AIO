@@ -655,6 +655,69 @@ class PluginDispatchMixin:
             return ()
         return tuple(self._hooks.get(hook_name, ()))
 
+    def _run_hook_callbacks(self, hook_name: str, callbacks: Any, kwargs: dict,
+                            failed: Optional[list] = None) -> list:
+        """:meth:`invoke_hook`'s loop over ``callbacks``; each one that raised or timed out is
+        appended to ``failed`` when given."""
+        from qubit_cli.plugins import _resolve_hook_callback_timeout
+        results: list = []
+        timeout = _resolve_hook_callback_timeout()
+        use_timeout = _hook_uses_callback_timeout(hook_name, timeout)
+        fail_closed = hook_name in _HOOK_TIMEOUT_FAIL_CLOSED_HOOKS
+        for cb in callbacks:
+            try:
+                if use_timeout:
+                    ret = self._run_hook_callback_bounded(hook_name, cb, kwargs, timeout)
+                    if ret is _HOOK_SKIPPED:
+                        if failed is not None:
+                            failed.append(cb)
+                        if fail_closed:
+                            results.append({"action": "block", "message": _PRE_TOOL_CALL_TIMEOUT_BLOCK_MESSAGE})
+                        continue
+                else:
+                    ret = self._invoke_hook_callback(cb, kwargs)
+                if ret is not None:
+                    results.append(ret)
+            except (Exception, SystemExit) as exc:
+                self._report_hook_failure(hook_name, cb, kwargs, exc)
+                if failed is not None:
+                    failed.append(cb)
+                if fail_closed:
+                    results.append(_policy_error_block_directive(hook_name, cb, exc))
+        return results
+
+    def holds_stream(self) -> bool:
+        """True while a loaded plugin's ``transform_llm_output`` registration declared ``hold_stream``.
+        Read under the discovery lock: a reload empties the ledger before plugins re-register, and a
+        turn deciding in that window would stream text the plugin must rewrite first."""
+        with self._discovery_lock:
+            return any(getattr(r, "hold_stream", False) for owned in self._ownership_ledger.values() for r in owned)
+
+    def held_transforms(self) -> tuple[Callable, ...]:
+        """The ``transform_llm_output`` callbacks a turn that holds its stream must run, captured with
+        the hold decision under the discovery lock; ``()`` when nothing holds. A reload during the turn
+        empties ``_hooks`` before plugins re-register, so the held turn keeps the set it started with
+        (:meth:`run_held_transforms`)."""
+        with self._discovery_lock:
+            if not any(getattr(r, "hold_stream", False) for owned in self._ownership_ledger.values() for r in owned):
+                return ()
+            return tuple(self._hooks.get(STREAM_HOLDING_HOOK, []))
+
+    def run_held_transforms(self, callbacks: tuple, **kwargs: Any) -> tuple:
+        """Run a held turn's snapshotted transforms: ``(rewrite, failed)``. ``rewrite`` is the first
+        non-empty string; ``failed`` is True when none came back and a callback raised or timed out,
+        so the caller must not deliver the original."""
+        from agent.safe_worker_policy import safe_worker_enabled
+
+        if safe_worker_enabled():
+            return None, False
+        kwargs.setdefault("telemetry_schema_version", OBSERVER_SCHEMA_VERSION)
+        failed: list = []
+        for ret in self._run_hook_callbacks(STREAM_HOLDING_HOOK, callbacks, kwargs, failed):
+            if isinstance(ret, str) and ret:
+                return ret, False
+        return None, bool(failed)
+
     def render_system_prompt_sections(
         self, session_info: Mapping[str, Any]
     ) -> list[RenderedPluginSystemPromptSection]:

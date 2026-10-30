@@ -57,6 +57,27 @@ def _suppress_concurrent_qubit_gate(request, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _private_repo_checkout_lock(monkeypatch, tmp_path_factory):
+    """``cmd_update`` locks the checkout it runs from: in tests, this repository, whose git
+    common dir every parallel test process (and, from a linked worktree, the live install's
+    ``hermes update``) shares. Give each test its own lock file for THIS repo; lock tests on
+    fixture checkouts are unaffected."""
+    from pathlib import Path
+
+    from qubit_cli import update_lock
+
+    repo = Path(update_lock.__file__).resolve().parents[1]
+    real = update_lock.checkout_lock_path
+    private = tmp_path_factory.mktemp("checkout-lock") / "hermes-update.lock"
+
+    def checkout_lock_path(install_root=None):
+        root = Path(install_root) if install_root else repo
+        return private if root.resolve() == repo else real(install_root)
+
+    monkeypatch.setattr(update_lock, "checkout_lock_path", checkout_lock_path)
+
+
+@pytest.fixture(autouse=True)
 def _source_channels_resolve_locally(request, monkeypatch):
     """Every unflagged ``hermes update`` resolves its channel through R2; tests must
     not reach the network for that. Default every channel to a ``source-branch``
@@ -76,6 +97,18 @@ def _source_channels_resolve_locally(request, monkeypatch):
         return ChannelResolution(record, record, None)
 
     monkeypatch.setattr(source_releases, "_resolve_channel", resolve)
+    # stable reads GitHub releases directly; keep it off the network the same way.
+    monkeypatch.setattr(source_releases, "_resolve_stable", lambda repository, *_: source_releases.SourceTarget(
+        "stable", "stable", repository, branch="stable"))
+
+
+@pytest.fixture(autouse=True)
+def _no_detached_commit_graph_writer(monkeypatch):
+    """The update's maintenance starts a detached ``git commit-graph write`` on the checkout it ran
+    from: in a test, this repository or a tmp copy deleted under it. In-process runs never spawn it."""
+    from qubit_cli import git_commit_graph
+
+    monkeypatch.setattr(git_commit_graph, "spawn_commit_graph_refresh", lambda root: False)
 
 
 @pytest.fixture(autouse=True)
@@ -154,24 +187,3 @@ def probe_root(tmp_path):
     """
     (tmp_path / "qubit_bootstrap.py").write_text("", encoding="utf-8")
     return tmp_path
-
-@pytest.fixture(autouse=True)
-def _private_repo_checkout_lock(monkeypatch, tmp_path_factory):
-    """``cmd_update`` locks the checkout it runs from: in tests, this repository, whose git
-    common dir every parallel test process (and, from a linked worktree, the live install's
-    ``qubit update``) shares. Give each test its own lock file for THIS repo; lock tests on
-    fixture checkouts are unaffected."""
-    from pathlib import Path
-
-    from qubit_cli import update_lock
-
-    repo = Path(update_lock.__file__).resolve().parents[1]
-    real = update_lock.checkout_lock_path
-    private = tmp_path_factory.mktemp("checkout-lock") / "qubit-update.lock"
-
-    def checkout_lock_path(install_root=None):
-        root = Path(install_root) if install_root else repo
-        return private if root.resolve() == repo else real(install_root)
-
-    monkeypatch.setattr(update_lock, "checkout_lock_path", checkout_lock_path)
-

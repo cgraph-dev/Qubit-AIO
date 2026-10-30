@@ -197,7 +197,7 @@ CASES = {
     # its tests spawn the real script and poll its loopback server. They run
     # when the script, the Electron side that launches it, or their own test
     # files change — not on every qubit_state.py PR. The script runs a real
-    # `qubit update`, and the Windows crash cells that kill it mid-run live in
+    # `hermes update`, and the Windows crash cells that kill it mid-run live in
     # the install + update journey, so it starts e2e_upgrade as well.
     "windows.ps1 → desktop_updater": (
         ["scripts/desktop-update/windows.ps1"],
@@ -321,8 +321,8 @@ CASES = {
         ["scripts/install.sh"],
         _lanes(python=True, bootstrap=True, python_prod=True, e2e_upgrade=True, e2e_desktop_update=True),
     ),
-    "setup-qubit.sh → bootstrap lane": (
-        ["setup-qubit.sh"],
+    "setup-hermes.sh → bootstrap lane": (
+        ["setup-hermes.sh"],
         _lanes(python=True, bootstrap=True, python_prod=True, e2e_upgrade=True),
     ),
     "tauri installer source → bootstrap + rust": (
@@ -339,6 +339,24 @@ CASES = {
     ),
     # Slow lanes on a pull request: an ordinary product change starts none of
     # them; the suite, its harness, or the code it guards starts its own.
+    # Real SSH/Docker backend lane: the backends, the terminal tool, the real tests
+    # and their sshd harness start it; neighbouring tools code does not.
+    "ssh backend → remote_backends": (
+        ["tools/environments/ssh.py"], _lanes(python=True, scan=True, remote_backends=True)),
+    "docker backend → remote_backends": (
+        ["tools/environments/docker.py"], _lanes(python=True, scan=True, remote_backends=True)),
+    "terminal tool sibling → remote_backends": (
+        ["tools/terminal_tool_backends.py"], _lanes(python=True, scan=True, remote_backends=True)),
+    "real docker backend test → remote_backends": (
+        ["tests/tools/test_docker_backend_real.py"],
+        _lanes(python=True, python_prod=False, scan=True, remote_backends=True)),
+    "mocked docker unit test → no remote_backends": (
+        ["tests/tools/test_docker_environment.py"], _lanes(python=True, python_prod=False, scan=True)),
+    "sshd harness → remote_backends": (
+        ["scripts/ci/start_test_sshd.sh"], _lanes(python=True, remote_backends=True)),
+    "sshd container setup → remote_backends": (
+        ["scripts/ci/test_sshd_container_setup.sh"], _lanes(python=True, remote_backends=True)),
+    "other tool → no remote_backends": (["tools/file_tools.py"], _lanes(python=True, scan=True)),
     "gateway python → no slow lane": (["gateway/run.py", "agent/x.py"], _lanes(python=True, scan=True)),
     "desktop renderer → no slow lane": (["apps/desktop/src/app/chat/composer.tsx"], _lanes(frontend=True)),
     "python e2e suite → e2e only": (
@@ -357,7 +375,7 @@ CASES = {
     "PM → e2e_upgrade + docker": (["pm/environments.py"], _lanes(python=True, scan=True, e2e_upgrade=True, docker=True)),
     # The update pipeline lives beyond the update_* family too: the entry
     # point, launch-time recovery, the gateway restart/pause surface.
-    # main.py is also `qubit desktop --build-only`, the update's Desktop rebuild.
+    # main.py is also `hermes desktop --build-only`, the update's Desktop rebuild.
     "cmd_update entry → both update suites": (
         ["qubit_cli/main.py"], _lanes(python=True, scan=True, e2e_upgrade=True, e2e_desktop_update=True),
     ),
@@ -442,7 +460,6 @@ def test_run_e2e_label_turns_every_slow_lane_on_and_nothing_else(files):
         {k: v for k, v in unlabelled.items() if k not in SLOW_LANES}
 
 
-@pytest.mark.skip(reason="upstream desktop/CI paths (apps/desktop, qubit_cli/config_backend.py) are not vendored in this fork")
 def test_every_slow_lane_path_matches_a_tracked_file():
     """A renamed file silently stops starting its lane on pull requests.
 
@@ -455,7 +472,8 @@ def test_every_slow_lane_path_matches_a_tracked_file():
     if tracked.returncode != 0:
         pytest.skip("not a git checkout")
     files = tracked.stdout.splitlines()
-    tables = {**_mod._E2E_LANES, "docker": _mod._DOCKER_PATHS, "nix": _mod._NIX_LANE_PATHS}
+    tables = {**_mod._E2E_LANES, "docker": _mod._DOCKER_PATHS, "nix": _mod._NIX_LANE_PATHS,
+              "remote_backends": _mod._REMOTE_BACKEND_PATHS}
     dead = {
         (lane, prefix)
         for lane, prefixes in tables.items()
@@ -465,7 +483,7 @@ def test_every_slow_lane_path_matches_a_tracked_file():
     assert dead == set()
 
 
-# Every file the `qubit update` pipeline runs on the update path (the step
+# Every file the `hermes update` pipeline runs on the update path (the step
 # tables of the updater audit's cli-update and desktop-update code maps). A
 # PR that edits only one of these must start the real-update suite that would
 # catch the regression; before, main.py / _early_recovery.py / relaunch.py /
@@ -510,7 +528,7 @@ _DESKTOP_UPDATE_PATH_FILES = (
     "apps/desktop/electron/handoff-result.ts",
     "apps/desktop/electron/desktop-installation.ts",
     "apps/desktop/electron/backend-discovery.ts",
-    "apps/desktop/electron/host-backend-attach.ts",
+    "apps/desktop/electron/local-gateway.ts",
     "scripts/desktop-update/windows.ps1",
     "scripts/desktop-update/posix.sh",
     "qubit_cli/desktop_update_verify.py",
@@ -538,7 +556,6 @@ def _yaml(rel: str) -> dict:
     return yaml.safe_load((_REPO / rel).read_text(encoding="utf-8-sig"))
 
 
-@pytest.mark.skip(reason="the upstream composite action .github/actions/detect-changes is not vendored in this fork")
 def test_every_lane_reaches_the_composite_action():
     """The action is the one surface every consumer reads, so it must carry all
     of them — ci.yaml, nix.yml and docker.yml each re-export a different subset.
@@ -599,14 +616,6 @@ _REAL_UPDATE_LANES = (
 )
 
 
-@pytest.mark.xfail(
-    reason="CI-WORKFLOW PORT GAP: the frozen target's _REAL_UPDATE_LANES table names CI job "
-    "wiring Qubit's .github/workflows/ does not have yet — tests-os.yml has jobs "
-    "os-tests/e2e-windows (no 'install-update-e2e'), and e2e-desktop-update.yml is absent, so "
-    "the caller_jobs[job] lookups raise KeyError. The merge-gating wiring the test pins is not "
-    "ported. (Not core product code.)",
-    strict=False,
-)
 @pytest.mark.parametrize("caller,job,called,lane", _REAL_UPDATE_LANES)
 def test_real_update_suites_gate_the_merge_when_their_lane_fires(caller, job, called, lane):
     """A real-update suite that runs but cannot fail the merge is decoration.
@@ -626,14 +635,20 @@ def test_real_update_suites_gate_the_merge_when_their_lane_fires(caller, job, ca
         assert not body.get("continue-on-error"), f"{called}::{name} cannot fail the merge"
 
 
-@pytest.mark.xfail(
-    reason="CI-WORKFLOW STALE ENTRY (real gap the test catches): windows-venv-e2e.yml:70 lists "
-    "the node selector tests/qubit_cli/test_runtime_repair.py::TestWindowsRuntimeSelfLock, but "
-    "neither that file nor that class exists anywhere in qubit_runtime/ — run_tests.sh drops the "
-    "missing path wordlessly, so this shard silently stops running on every wine2e push. Fix "
-    "the workflow (or add the test), not this test.",
-    strict=False,
-)
+def test_remote_backends_lane_runs_test_files_that_exist_and_start_it():
+    """The lane's test list and its path gate must agree: a renamed test file would
+    otherwise drop silently out of the run (run_tests.sh skips a missing path) or stop
+    starting the lane on the PR that edits it."""
+    text = (_REPO / ".github/workflows/remote-backends.yml").read_text(encoding="utf-8-sig")
+    paths = sorted(set(re.findall(r"(tests/[\w/.-]+\.py)", text)))
+    assert paths
+    assert [p for p in paths if not (_REPO / p).is_file()] == []
+    assert [p for p in paths if not classify([p])["remote_backends"]] == []
+    # A skip there is a missing host, not a pass; the runner, not a grep over its
+    # progress line, decides that.
+    assert "scripts/run_tests.sh --fail-on-skip" in text
+
+
 def test_windows_venv_e2e_runs_only_test_files_that_exist():
     """``run_tests.sh`` drops a missing path (or a ``::node`` selector) without
     a word, so a stale entry silently stops running on every wine2e push."""
@@ -713,7 +728,7 @@ def test_main_recovers_pr_files_instead_of_fail_open(monkeypatch, capsys):
 
 
 def test_main_still_fail_opens_when_recovery_is_empty(monkeypatch, capsys):
-    monkeypatch.setattr(_mod, "pull_request_changed_files", lambda: [])
+    monkeypatch.setattr(_mod, "pull_request_changed_files", list)
     monkeypatch.setattr(sys, "stdin", io.StringIO(""))
     monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
 
