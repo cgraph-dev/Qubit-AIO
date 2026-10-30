@@ -1,12 +1,14 @@
 """Shared utility functions for Qubit."""
 
 import errno
+import hashlib
 import json
 import logging
 import os
 import re
 import shutil
 import stat
+import sys
 import tempfile
 import threading
 import time
@@ -78,6 +80,45 @@ RACY_MTIME_WINDOW_NS = 2_000_000_000
 def mtime_is_racy(mtime_ns: int) -> bool:
     """True while ``mtime_ns`` is too recent to rule out a same-tick write after the stat."""
     return time.time_ns() - mtime_ns < RACY_MTIME_WINDOW_NS
+
+
+def content_digest(data: bytes) -> str:
+    """Short digest of ``data`` for cache keys (not a security primitive)."""
+    return hashlib.blake2b(data, digest_size=16).hexdigest()
+
+
+def _frozen_config_worker(path: str | Path) -> bool:
+    """True for a ``config.yaml`` read inside a worker whose config is a frozen snapshot: such a
+    worker never opens a profile config file, so a cache key there stays stat-only."""
+    if Path(path).name != "config.yaml":
+        return False
+    policy = sys.modules.get("agent.safe_worker_policy")  # binding a snapshot imports it first
+    return policy is not None and policy.worker_config_snapshot() is not None
+
+
+def _file_digest(path: str | Path) -> str:
+    """:func:`content_digest` of the file's bytes. A file that stats but cannot be read here
+    (permission, removed since the stat, a directory) gets ``<ErrorName>``, which no hex digest
+    matches: the key differs from any cached one, so the caller's own read runs and meets the error
+    in its normal recovery, as it did when the key was stat-only and never opened the file."""
+    try:
+        with open(path, "rb") as f:
+            return content_digest(f.read())
+    except OSError as exc:
+        return f"<{type(exc).__name__}>"
+
+
+def racy_content_digest(path: str | Path, sig: tuple[int, int, int, int]) -> str:
+    """``""`` once the :func:`file_signature` ``sig`` has settled; while it is racy, a digest of the
+    file's bytes (:func:`_file_digest`, so it never raises). A cache keyed on a stat signature appends
+    it, because two same-size in-place writes in one timestamp tick share mtime, ctime, size and inode
+    (kernels without multigrain timestamps). Racy is judged on the later of mtime and ctime: userland
+    can restore an older mtime after a write (``cp -p``, ``rsync --inplace -t``), never ctime. Read
+    before the parse it guards: a write in between then costs one re-parse instead of pinning the
+    older content."""
+    if not mtime_is_racy(max(sig[0], sig[3])) or _frozen_config_worker(path):
+        return ""
+    return _file_digest(path)
 
 
 def _preserve_file_mode(path: Path) -> int | None:
