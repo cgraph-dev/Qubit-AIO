@@ -191,7 +191,7 @@ def _checklist_toolset_keys(platform: str) -> set[str]:
 
 def _platform_default_toolset(platform: str) -> str:
     """Composite toolset a platform falls back to (plugin platforms derive ``qubit-<platform>``)."""
-    return PLATFORMS[platform]["default_toolset"] if platform in PLATFORMS else f"qubit-{platform}"
+    return PLATFORMS[platform]["default_toolset"] if platform in PLATFORMS else f"hermes-{platform}"
 
 
 def _cfg_section(config: dict, key: str) -> dict:
