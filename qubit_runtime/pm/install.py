@@ -580,6 +580,8 @@ def ensure(
     ``progress(stage, done, total, label)`` reports the slow parts of an
     install to a UI, including ordered multi-archive labels.
     """
+    from pm.defaults import canonical_default_name
+    name = canonical_default_name(name)
     if isinstance(get_package(name), StatePackage):
         if _operation is not None:
             # Python construction can provision tools itself. Drop both the

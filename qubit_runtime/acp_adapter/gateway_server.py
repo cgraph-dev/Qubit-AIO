@@ -64,6 +64,65 @@ def _tools_changed_notice(payload):
     return f"Editor MCP tools changed (servers: {servers}); the new tool list applies from the next turn.\n"
 
 
+def _submit_fingerprint(session_id, text, attachments):
+    """Identity of one staged ACP prompt: session, text and the bytes of every staged attachment.
+
+    A retry of the same prompt (same staged bytes) keeps the first submit's input id; changed bytes,
+    text or session are new work. Kept on this module because the gateway bridge prepares the prompt.
+    """
+    import hashlib
+    from pathlib import Path
+    digest = hashlib.sha256()
+    digest.update(text.encode())
+    for attachment in attachments or ():
+        digest.update(str(attachment.get("mime") or "").encode())
+        try:
+            digest.update(Path(attachment["path"]).read_bytes())
+        except (KeyError, OSError):
+            digest.update(b"")
+    return session_id, digest.hexdigest()
+
+
+def _stage_user_content(content):
+    """Stage image parts of an OpenAI-style content payload beside the profile image cache.
+
+    Returns ``(text, attachments)``. The admitted type and the staged extension come from the
+    sniffed bytes, never a client-declared MIME. Text-only content returns the string unchanged.
+    """
+    if isinstance(content, str):
+        return content, []
+    import base64
+    import binascii
+    from gateway.platforms.base import cache_image_from_bytes
+    from gateway.session_ingress_media import _ATTACHMENT_LIMIT, _IMAGE_EXT, sniff_image_mime
+    texts, attachments = [], []
+    for part in content:
+        if part.get("type") == "text":
+            texts.append(part["text"])
+            continue
+        url = part["image_url"]["url"]
+        if len(attachments) >= _ATTACHMENT_LIMIT:
+            raise ValueError("acp_content_invalid")
+        if not url.startswith("data:"):
+            texts.append(f"[Image attached: {url}]")
+            continue
+        try:
+            raw = base64.b64decode(url.partition(",")[2], validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("acp_content_invalid") from exc
+        mime = sniff_image_mime(raw)
+        if mime is None:
+            texts.append("[Image omitted: unsupported image format]")
+            continue
+        try:
+            path = cache_image_from_bytes(raw, _IMAGE_EXT[mime])
+        except ValueError as exc:
+            texts.append(f"[Image omitted: {exc}]")
+            continue
+        attachments.append({"path": path, "mime": mime})
+    return "\n".join(texts), attachments
+
+
 class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
     def __init__(self):
         self._conn = None
@@ -771,16 +830,8 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         """``(retry_key, input_id, (text, attachments))`` for one ACP prompt, or None when the editor's Stop
         arrived while it was staged."""
         from acp_adapter.content import _content_blocks_to_openai_user_content
-        from acp_adapter.gateway_media import stage_user_content, submit_fingerprint
+        from acp_adapter.gateway_media import stage_user_content
         content = _content_blocks_to_openai_user_content(prompt)
-        retry_key = submit_fingerprint(session_id, content)
-        # Only this session's very next prompt may be the editor's retry of an un-acked submit; any
-        # prompt (slash work included) retires the retained identity, so a later repeat is new work.
-        retained = self._unacked.pop(session_id, None)
-        if retained is not None and retained[0] == retry_key:
-            # The retry resends what the owner may already hold: the staged content and input_id are
-            # reused, never prepared (a remote image fetched) a second time.
-            return retained
         # The editor's Stop during staging (a remote image download) is held like one during the
         # submit itself, and the prompt then ends without being sent.
         self._submitting.add(session_id)
@@ -788,10 +839,21 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
             staged = await stage_user_content(content, self._home)
         finally:
             self._submitting.discard(session_id)
+        text, attachments = staged if isinstance(staged, tuple) else (staged, [])
+        retry_key = _submit_fingerprint(session_id, text, attachments)
+        # Only this session's very next prompt may be the editor's retry of an un-acked submit; any
+        # prompt (slash work included) retires the retained identity, so a later repeat is new work.
+        retained = self._unacked.pop(session_id, None)
+        if retained is not None and retained[0] == retry_key:
+            # The retry resends what the owner may already hold: the staged content and input_id are
+            # reused, never submitted a second time. A retained identity may be the two-field form.
+            if len(retained) == 3:
+                return retained
+            return retained[0], retained[1], (text, attachments)
         if session_id in self._pending_cancels:
             self._pending_cancels.discard(session_id)
             return None
-        return retry_key, uuid.uuid4().hex, staged
+        return retry_key, uuid.uuid4().hex, (text, attachments)
 
     async def _after_ack(self, session_id, admission_id, link, resumes):
         """A gap re-attach whose resume left after this submit covers it. The pump owns recovery: it
