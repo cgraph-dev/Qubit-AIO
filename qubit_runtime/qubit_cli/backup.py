@@ -32,17 +32,14 @@ from qubit_cli.home_data_layout import PM_RUNTIME_ROOT_DIRS, profile_root_entry
 from qubit_cli.sizefmt import format_bytes as _format_size
 
 from qubit_cli.backup_restore import (
-    _count_cron_jobs,
     _count_session_rows,
     _default_new_file_mode,
     _detect_prefix,
     _extract_member_atomically,
-    _get_config_path_value,
     _import_db_member,
     _restore_auth_json,
     _restore_destination_epoch,
     _safe_restore_db,
-    _set_config_path_value,
     _validate_backup_zip,
 )
 
