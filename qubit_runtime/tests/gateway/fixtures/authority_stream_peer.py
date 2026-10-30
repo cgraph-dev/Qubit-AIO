@@ -152,7 +152,7 @@ async def probe(peer, target):
             async with websockets.connect(uri):
                 raise AssertionError('unauthenticated observer accepted')
         except websockets.exceptions.InvalidStatus as exc:
-            assert exc.response.status_code == 403
+            assert exc.response.status_code == 403, exc.response.status_code
         a, b = await connect(), await connect()
         snapshot = await a.rpc('session.resume')
         await b.rpc('session.resume')
