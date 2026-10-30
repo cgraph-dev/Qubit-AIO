@@ -25,6 +25,9 @@ class RuntimeStoreError(ValueError):
         super().__init__(reason)
 
 
+ADMITTED_REQUEST_CONFLICT = {'field': 'request_id', 'detail': 'this request id was already admitted with another payload'}
+
+
 def _one_line(value, limit):
     """A refusal's ``field``/``detail`` as the log line and the client frame carry it: either may hold
     client text, so whitespace collapses to single spaces, other non-printables drop (no forged log
