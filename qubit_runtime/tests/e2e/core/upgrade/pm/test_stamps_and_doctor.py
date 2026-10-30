@@ -163,7 +163,7 @@ def test_failed_dependency_update_is_an_owed_followup(updated):
     up = P.update(sb)
     receipt = json.loads(P.ok(sb.cli("pm", "status")).stdout)
     assert up.returncode == 0, (
-        "`qubit update` failed although the code committed; a dependency sync after the tree moved "
+        "`hermes update` failed although the code committed; a dependency sync after the tree moved "
         "is an owed follow-up (A6)\n" + P.diagnostics(sb, up))
     assert I.git("rev-parse", "HEAD", cwd=sb.checkout) == target, "the code update did not land\n" + P.diagnostics(sb, up)
     assert re.search(r"⚠ Update follow-up 'dependencies' did not finish: .*dependencies not installed yet",

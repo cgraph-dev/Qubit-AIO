@@ -1006,8 +1006,8 @@ class TestAuthFailureAborts:
         # env var (#114405 / #78996) and must classify as permanent, not be retried.
         oauth_err = RuntimeError(
             "Provider 'minimax-oauth' is set in config.yaml but no credentials were found. "
-            "Run `qubit auth add minimax-oauth` to sign in, or switch to a different provider "
-            "with `qubit model`."
+            "Run `hermes auth add minimax-oauth` to sign in, or switch to a different provider "
+            "with `hermes model`."
         )
         assert _is_summary_access_or_quota_error(oauth_err) is True
 

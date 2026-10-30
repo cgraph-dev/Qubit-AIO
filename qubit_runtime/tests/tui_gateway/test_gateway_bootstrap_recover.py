@@ -2,7 +2,7 @@
 
 Main's TUI owned its own sidecar and never depended on an external daemon, so an open TUI must come
 back on its own after ANY end of the shared gateway: a crash, its idle exit, or a planned
-`qubit gateway stop` while the TUI is open. The bounded recovery slot (gatewayClient.ts
+`hermes gateway stop` while the TUI is open. The bounded recovery slot (gatewayClient.ts
 OWNER_RECOVERY_LIMIT) is what keeps a crash-looping owner from being respawned forever."""
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def _load_bootstrap():
 
 @pytest.mark.parametrize("record", [
     {"gateway_state": "running", "pid": 999999},  # SIGKILL / OOM: dead process still claims live
-    {"gateway_state": "stopped", "pid": 999999},  # `qubit gateway stop` while the TUI is open
+    {"gateway_state": "stopped", "pid": 999999},  # `hermes gateway stop` while the TUI is open
     {"gateway_state": "running", "desired_state": "stopped"},  # durable operator stop intent
     {"gateway_state": "stopped", "exit_reason": "auto-started gateway idle for 600s "
      "(gateway.unmanaged_idle_exit_seconds)"},

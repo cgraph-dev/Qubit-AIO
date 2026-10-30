@@ -1,6 +1,6 @@
 """User-installed platform plugins feed OPTIONAL_ENV_VARS like bundled ones (#46600, redo of #46964).
 
-The Desktop Gateway form and ``qubit config`` render env fields from ``OPTIONAL_ENV_VARS``; before
+The Desktop Gateway form and ``hermes config`` render env fields from ``OPTIONAL_ENV_VARS``; before
 this, only ``plugins/platforms/*`` in the repo was scanned, so a third-party platform's
 ``requires_env`` prompts/descriptions/password flags never reached the UI.
 """

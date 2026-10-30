@@ -144,7 +144,7 @@ def _add_pooled_key(key, label):
 
 
 def test_pooled_credential_enables_the_backend(monkeypatch, tmp_path):
-    """A key added only with ``qubit auth add openrouter`` serves chat and image_gen; video must use it too."""
+    """A key added only with ``hermes auth add openrouter`` serves chat and image_gen; video must use it too."""
     _add_pooled_key("sk-or-pool", "pool")
     provider = _provider(monkeypatch, [_VEO])
     assert provider.is_available() is True

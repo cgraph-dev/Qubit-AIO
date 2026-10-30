@@ -14,7 +14,7 @@ home's ``.env`` exactly as a user configures them.
   ``api_server`` platform enabled (loopback, free port, strong key); one
   non-streaming ``POST /v1/chat/completions``.
 
-Both stop through the normal operator path of ``qubit gateway stop``: write the
+Both stop through the normal operator path of ``hermes gateway stop``: write the
 planned-stop marker for the gateway PID, then SIGTERM (a bare SIGTERM is treated
 as an unexpected kill and exits non-zero on purpose so supervisors revive it).
 """
@@ -89,7 +89,7 @@ def _log_tail(proc: subprocess.Popen, n: int = 4000) -> str:
 
 
 def _stop(ph: ParityHome, proc: subprocess.Popen) -> bool:
-    """``qubit gateway stop`` semantics (planned-stop marker for the PID, then SIGTERM),
+    """``hermes gateway stop`` semantics (planned-stop marker for the PID, then SIGTERM),
     in its worst-case interleaving: the SIGTERM lands only AFTER the gateway's
     planned-stop watcher has already consumed the marker. Any interleaving of the
     CLI's two steps must still be a clean planned exit (exit 0; a non-zero exit

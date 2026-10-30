@@ -118,7 +118,7 @@ def _close_log(log):
 
 
 def start_daemon(mux, timeout=180):
-    """Boot the multiplexer the way ``qubit gateway run`` does; the canonical gateway command-line
+    """Boot the multiplexer the way ``hermes gateway run`` does; the canonical gateway command-line
     matcher (``gateway.status.looks_like_gateway_command_line``) is what the CLI's liveness probes
     apply to the recorded PID, so the fixture must spawn a recognisable launcher."""
     log = mux['log'].open('a+', encoding='utf-8', errors='replace')

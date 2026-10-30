@@ -207,7 +207,7 @@ class TestAtexitStopSwallowsInterrupt:
 
 class TestAtexitOriginUnimportable:
     def test_hooks_stay_silent_when_origin_fresh_import_fails(self, monkeypatch):
-        """Mid-`qubit update` the on-disk tree can be half-new (new config.py importing
+        """Mid-`hermes update` the on-disk tree can be half-new (new config.py importing
         a name the old utils.py lacks yet); the fresh import in origin_module then raises
         and the atexit hooks must stay silent (#112437)."""
         import tools.browser_tool_origin as origin_mod

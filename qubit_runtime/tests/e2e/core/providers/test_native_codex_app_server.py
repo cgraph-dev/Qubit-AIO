@@ -1,4 +1,4 @@
-"""codex_app_server wire conformance: real ``qubit chat -q`` against a fake ``codex app-server``.
+"""codex_app_server wire conformance: real ``hermes chat -q`` against a fake ``codex app-server``.
 
 The fake (``tests/fakes/providers/codex_app_server.py``) speaks newline-delimited JSON-RPC over stdio,
 validates every request/response Hermes sends against the codex-cli 0.147 app-server schema (serde-style

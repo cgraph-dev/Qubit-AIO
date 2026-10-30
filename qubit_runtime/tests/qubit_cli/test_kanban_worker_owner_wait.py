@@ -1,4 +1,4 @@
-"""A Kanban worker spawned while `qubit update` drains the owner waits for it instead of failing.
+"""A Kanban worker spawned while `hermes update` drains the owner waits for it instead of failing.
 
 The dispatcher keeps spawning workers during an update window; the owner answers ``draining``
 until the update releases the install. Exiting 1 there books a crash against the card, and two

@@ -1,4 +1,4 @@
-"""``qubit chat -q``/``-Q`` runs give plugins the CLI reference like the interactive loop does.
+"""``hermes chat -q``/``-Q`` runs give plugins the CLI reference like the interactive loop does.
 
 Only ``HermesCLI.run()`` set ``PluginManager._cli_ref``, so a plugin tool dispatched from a one-shot
 turn saw ``_cli_ref is None`` and ``PluginContext.dispatch_tool`` injected no ``parent_agent`` (#67597).

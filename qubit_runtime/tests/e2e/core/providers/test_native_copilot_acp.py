@@ -3,7 +3,7 @@
 ``provider: copilot-acp`` makes Hermes spawn an external ACP agent (``copilot --acp --stdio``) per model
 call and speak the Agent Client Protocol to it over stdio. Here the agent is
 ``tests/fakes/providers/copilot_acp.py``, a fake that validates every request against the published
-ACP schema and replays scripted turns. Everything on the Hermes side is real: the ``qubit chat -q``
+ACP schema and replays scripted turns. Everything on the Hermes side is real: the ``hermes chat -q``
 process, runtime resolution from ``config.yaml`` + the profile ``.env`` (``HERMES_COPILOT_ACP_COMMAND``
 / ``HERMES_COPILOT_ACP_ARGS``), the ACP client, the agent loop, the ``read_file`` tool and ``state.db``.
 

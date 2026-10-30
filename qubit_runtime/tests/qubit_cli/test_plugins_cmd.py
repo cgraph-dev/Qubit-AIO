@@ -1,4 +1,4 @@
-"""Tests for qubit_cli.plugins_cmd — the ``qubit plugins`` CLI subcommand."""
+"""Tests for qubit_cli.plugins_cmd — the ``hermes plugins`` CLI subcommand."""
 
 from __future__ import annotations
 
@@ -899,7 +899,7 @@ def test_portable_manifest_is_visible_to_plugin_cli(tmp_path):
 def test_autostash_dirty_tree_promotes_intent_to_add_entries(tmp_path):
     """A plugin checkout holding `git add -N` entries must still autostash.
 
-    Same class as the `qubit update` autostash: an intent-to-add entry is never "uptodate", so
+    Same class as the `hermes update` autostash: an intent-to-add entry is never "uptodate", so
     `git stash push` refuses it. A plugin install is patched in place often enough that this state is
     ordinary rather than exotic, and the failure would abort the plugin update with a confusing error.
     """
@@ -932,8 +932,8 @@ def test_autostash_dirty_tree_promotes_intent_to_add_entries(tmp_path):
 
 
 def test_toggle_plugin_toolset_rewrites_a_list_literal_string_platform_entry(tmp_path, monkeypatch):
-    """``qubit plugins enable`` must reach a platform whose ``platform_toolsets`` entry is the
-    list-literal string an older ``qubit config set`` stored, and re-save it as a real list —
+    """``hermes plugins enable`` must reach a platform whose ``platform_toolsets`` entry is the
+    list-literal string an older ``hermes config set`` stored, and re-save it as a real list —
     the runtime already reads that string as the user's selection (follow-up to #115866)."""
 
     from qubit_cli import plugins_cmd

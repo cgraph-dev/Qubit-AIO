@@ -119,7 +119,7 @@ def test_doctor_blocks_live_network(tmp_path: Path) -> None:
 def test_doctor_default_target_does_not_copy_cwd(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """``qubit plugins doctor`` with no argument defaults to ``.``.
+    """``hermes plugins doctor`` with no argument defaults to ``.``.
 
     Before the manifest guard, that copied the whole working directory into
     a temporary QUBIT_HOME — running it from ``$HOME`` copied the home

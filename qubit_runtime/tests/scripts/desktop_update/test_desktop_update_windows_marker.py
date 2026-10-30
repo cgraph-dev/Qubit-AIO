@@ -308,7 +308,7 @@ def _parent_pid(pid: int) -> int:
 @pytest.mark.platforms('windows')
 def test_script_killed_right_after_spawning_the_update_leaves_a_live_marker(tmp_path: Path) -> None:
     """C1 rule 6, written by the script itself: windows.ps1 is killed (taskkill /F, no /T) while
-    its `qubit update` child is only starting up and has not taken the update lock. The marker
+    its `hermes update` child is only starting up and has not taken the update lock. The marker
     must still read LIVE through the child named on line 4 -- also to an old packaged Desktop,
     which judges line 1 alone, so line 1 names the hand-off's custodian before the update starts
     and the first old-reader read right after the kill (the marker lock held, so nothing can

@@ -1,4 +1,4 @@
-"""``qubit sessions repair-profiles``: the backward-looking half of the per-profile store model.
+"""``hermes sessions repair-profiles``: the backward-looking half of the per-profile store model.
 
 The forward-only fixes (#88734 store routing, the #88381 inheritance fence, #76423 topic labels,
 #75198 voice keys) put NEW state in the right place; nothing settled what earlier releases left

@@ -1,4 +1,4 @@
-"""Hostile-concurrency cells for the update lock, with real ``qubit update`` processes.
+"""Hostile-concurrency cells for the update lock, with real ``hermes update`` processes.
 
 A real git checkout (a clone of the commit under test, served by a local bare origin) is updated
 by real ``python -m qubit_cli.main update`` processes inside the bwrap sandbox. A ``git`` shim
@@ -247,7 +247,7 @@ def test_reused_pid_marker_is_reclaimed(rig):
 
 
 def test_killed_owner_keeps_the_checkout_locked_while_its_tree_runs(rig):
-    """(d) SIGKILL `qubit update` while its completion child runs: the child inherited the locked
+    """(d) SIGKILL `hermes update` while its completion child runs: the child inherited the locked
     fd, so a new update (any home) is refused until the child exits; never starts mid-mutation."""
     r = rig.driver("kill-mid-completion", timeout=600)
     assert r["child_seen"] and r["child_alive_before"], f"no completion child outlived the owner: {r}"
@@ -257,7 +257,7 @@ def test_killed_owner_keeps_the_checkout_locked_while_its_tree_runs(rig):
 
 
 def test_orphaned_update_tree_reads_as_in_progress(rig):
-    """(e) SIGKILL `qubit update` mid-completion and lose its marker: the completion child still
+    """(e) SIGKILL `hermes update` mid-completion and lose its marker: the completion child still
     holds the checkout lock, so every "is an update running" reader must still say yes."""
     r = rig.driver("orphan-reader", timeout=600)
     assert r["child_seen"] and r["child_alive_after"], f"premise: no completion child outlived the owner: {r}"

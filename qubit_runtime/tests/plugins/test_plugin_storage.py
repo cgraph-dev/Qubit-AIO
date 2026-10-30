@@ -29,7 +29,7 @@ def test_data_dir_lives_outside_the_install_tree(qubit_home):
     assert root == qubit_home / "plugin-data" / "my-plugin"
     assert root.is_dir()
     # The invariant that motivated the module: data must not live under the
-    # install tree that `qubit plugins remove` deletes.
+    # install tree that `hermes plugins remove` deletes.
     assert (qubit_home / "plugins") not in root.parents
 
 

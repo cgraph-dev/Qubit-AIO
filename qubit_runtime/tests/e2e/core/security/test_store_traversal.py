@@ -11,7 +11,7 @@ Two operator/agent-facing name lookups must stay inside the thing they name:
 * ``skill_manage delete`` (#120528) must refuse a pinned skill and the essential ``hermes-agent`` skill
   whatever spelling names it: bare (``my-skill``) or categorized (``research/my-skill``). The pin is set
   with the real ``hermes curator pin`` CLI; the deletes are real tool calls in real agent turns on the
-  same backend (``qubit chat -q`` does not offer ``skill_manage``: one-shot runs hide it).
+  same backend (``hermes chat -q`` does not offer ``skill_manage``: one-shot runs hide it).
 
 Every breach asserts on disk (victim bytes, skill dir, MEMORY.md) and on the command output.
 """

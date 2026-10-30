@@ -781,7 +781,7 @@ def test_delivery_runner_surfaces_live_owner_refusal(tmp_path, capsys):
 
 
 def test_local_turn_reemits_empty_stdout_for_a_bare_silence_marker(tmp_path, capsys):
-    """#110782: the one-shot ``qubit chat -c "Bot Chat"`` transport applies the gateway's
+    """#110782: the one-shot ``hermes chat -c "Bot Chat"`` transport applies the gateway's
     silence rule — a successful bare marker reaches the sender as "", prose stays verbatim."""
     dm_file = tmp_path / "message.txt"
     dm_file.write_text("thanks, bye", encoding="utf-8")

@@ -1,7 +1,7 @@
 """Transcript-ledger harness for the conversation-history (C3) and prompt-cache (C17) suites.
 
 Everything real except the model: a real ``AIAgent`` + ``SessionDB`` on disk in-process, the
-real ``tui_gateway`` stdio JSON-RPC server and the real ``qubit chat -q`` oneshot CLI as
+real ``tui_gateway`` stdio JSON-RPC server and the real ``hermes chat -q`` oneshot CLI as
 subprocesses, all pointed at one recording ``FakeLLMServer``. The invariants below read the
 three durable/observable projections of a conversation and cross-check them:
 
@@ -359,7 +359,7 @@ _SID_RE = re.compile(r"^session_id:\s*(\S+)\s*$", re.M)
 
 def run_oneshot(env: dict[str, str], cwd: Path, prompt: str, spawned: Spawned, *,
                 resume: str | None = None, timeout: float = 180.0) -> tuple[str, str]:
-    """``qubit chat -q PROMPT -Q [--resume SID]`` in a fresh process -> (stdout, durable sid)."""
+    """``hermes chat -q PROMPT -Q [--resume SID]`` in a fresh process -> (stdout, durable sid)."""
     cmd = [sys.executable, "-m", "qubit_cli.main", "chat", "-q", prompt, "-Q"]
     if resume:
         cmd += ["--resume", resume]

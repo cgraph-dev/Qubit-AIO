@@ -10,7 +10,7 @@ from tests.gateway.test_display_config import assert_keeps_platform_display_defa
 
 
 def _config_edit(tmp_path, monkeypatch, cfg, *, template):
-    """`qubit config edit` on a home with no config.yaml (seeds via seed_config_file, like `doctor --fix`)."""
+    """`hermes config edit` on a home with no config.yaml (seeds via seed_config_file, like `doctor --fix`)."""
     monkeypatch.setenv("EDITOR", "true")
     monkeypatch.setattr(cfg.subprocess, "run", lambda *a, **k: None)
     if not template:
@@ -19,7 +19,7 @@ def _config_edit(tmp_path, monkeypatch, cfg, *, template):
 
 
 def _setup_agent_enter(tmp_path, monkeypatch, cfg):
-    """`qubit setup agent` on a fresh home, pressing Enter (the offered default) on every prompt."""
+    """`hermes setup agent` on a fresh home, pressing Enter (the offered default) on every prompt."""
     import qubit_cli.setup as setup
 
     monkeypatch.setattr(setup, "prompt", lambda question, default=None, *a, **k: default or "")
@@ -43,7 +43,7 @@ def _blank_slate(tmp_path, monkeypatch, cfg):
 
 
 def _doctor_fix(tmp_path, monkeypatch, cfg):
-    """`qubit doctor --fix` on a home with no config.yaml: the real config-file check, fix enabled."""
+    """`hermes doctor --fix` on a home with no config.yaml: the real config-file check, fix enabled."""
     import qubit_cli.doctor as doctor
     from qubit_cli.doctor_config import _check_config_file
 

@@ -13,7 +13,7 @@ fixture server, launched from a portable package under ``<QUBIT_HOME>/plugins/<d
   profile's ``.env`` (#120526), with the native ``mcp_servers`` path as the passing control, and
   that same enabled server is not called an unknown toolset at startup (#119457);
 * two user plugin dirs declaring the same manifest name: the dir named like the manifest (not the
-  ``.bak-*`` copy next to it) is what ``qubit plugins list`` shows and what a real turn runs,
+  ``.bak-*`` copy next to it) is what ``hermes plugins list`` shows and what a real turn runs,
   and the collision is reported (#121078).
 
 Open bugs are run-time gated through ``KNOWN`` (``known_gate`` around the bug's own assertion; drop
@@ -70,10 +70,10 @@ KNOWN: dict[str, tuple[str, str]] = {
         r"^the portable plugin's server received the literal placeholder: ENV:NO-CANARY:\$\{E2E_PORTABLE_KEY\}",
         "#120526 portable mcp.json env ${VAR} reaches the server literally"),
     "test_enabled_portable_plugin_server_is_not_reported_as_an_unknown_toolset": (
-        r"^`qubit chat` warned about the enabled plugin's MCP server: \[.*Unknown toolsets: .*\bplug\b",
+        r"^`hermes chat` warned about the enabled plugin's MCP server: \[.*Unknown toolsets: .*\bplug\b",
         "#119457 startup 'Unknown toolsets' warning names a plugin-provided MCP server"),
     "test_same_name_backup_dir_does_not_shadow_the_live_plugin": (
-        r"^(`qubit plugins list` shows the backup copy instead of plugins/foo \(v2\.0\.0\)"
+        r"^(`hermes plugins list` shows the backup copy instead of plugins/foo \(v2\.0\.0\)"
         r"|a real turn ran the backup dir's MCP server, not plugins/foo's)",
         "#121078 the later-sorting plugins/foo.bak-* wins a same-name user collision"),
     "test_same_name_plugin_collision_is_reported": (
@@ -214,7 +214,7 @@ def test_resource_only_plugin_activated_live_is_reported_connected(tmp_path: Pat
 
 @pytest.fixture(scope="module")
 def env_echo_results(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
-    """One ``qubit chat -q`` turn calling ``env_echo`` on a portable-plugin server AND a native
+    """One ``hermes chat -q`` turn calling ``env_echo`` on a portable-plugin server AND a native
     ``mcp_servers`` server, each told to echo a var whose value is ``${VAR}`` from the profile .env.
     Returns ``{server: tool result, "output": the process's stdout+stderr}``."""
     root = tmp_path_factory.mktemp("env_interp")
@@ -269,7 +269,7 @@ def test_enabled_portable_plugin_server_is_not_reported_as_an_unknown_toolset(en
     startup warning calling it an unknown toolset is a false alarm the user sees on every launch."""
     warned = [line for line in env_echo_results["output"].splitlines() if "Unknown toolsets" in line]
     with known_gate(KNOWN, request.node.name, raises=KnownSymptom):
-        symptom(not warned, f"`qubit chat` warned about the enabled plugin's MCP server: {warned}")
+        symptom(not warned, f"`hermes chat` warned about the enabled plugin's MCP server: {warned}")
 
 
 # 4. #121078 same manifest name in two user plugin dirs ------------------------------------------
@@ -278,7 +278,7 @@ def test_enabled_portable_plugin_server_is_not_reported_as_an_unknown_toolset(en
 @pytest.fixture(scope="module")
 def name_collision(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     """``plugins/foo`` (the upgraded copy, v2) next to ``plugins/foo.bak-x`` (the old copy, v1), both
-    declaring ``name: foo``; ``foo`` enabled. Reads ``qubit plugins list``, runs one turn calling the
+    declaring ``name: foo``; ``foo`` enabled. Reads ``hermes plugins list``, runs one turn calling the
     plugin's MCP tool, and collects the process logs."""
     root = tmp_path_factory.mktemp("name_collision")
     with provider(script((tool_name("srv", "ro_probe"), {"nonce": "dup"}))) as srv:
@@ -316,14 +316,14 @@ def test_same_name_backup_dir_does_not_shadow_the_live_plugin(name_collision: di
     assert rows, name_collision["listing"]
     with known_gate(KNOWN, request.node.name, raises=KnownSymptom):
         symptom("2.0.0" in rows[0],
-                f"`qubit plugins list` shows the backup copy instead of plugins/foo (v2.0.0): {rows}")
+                f"`hermes plugins list` shows the backup copy instead of plugins/foo (v2.0.0): {rows}")
         symptom(any("RO:CANARY-LIVE:dup" in r for r in name_collision["results"]),
                 f"a real turn ran the backup dir's MCP server, not plugins/foo's: {name_collision['results']}")
 
 
 def test_same_name_plugin_collision_is_reported(name_collision: dict[str, Any], request: pytest.FixtureRequest) -> None:
     live, backup = str(name_collision["live"]), str(name_collision["backup"])
-    surfaces = {"qubit plugins list": name_collision["listing"], "logs/*.log": name_collision["logs"]}
+    surfaces = {"hermes plugins list": name_collision["listing"], "logs/*.log": name_collision["logs"]}
     named_both = [where for where, text in surfaces.items() if live in text and backup in text]
     with known_gate(KNOWN, request.node.name, raises=KnownSymptom):
         symptom(named_both, f"two user plugin dirs declare the same name 'foo' ({live} and {backup}) but no "

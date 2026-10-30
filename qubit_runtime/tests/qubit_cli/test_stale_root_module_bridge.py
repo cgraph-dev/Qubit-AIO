@@ -1,4 +1,4 @@
-"""Bridge for pre-hand-off ``qubit update``: a stale root ``utils`` must not kill restart.
+"""Bridge for pre-hand-off ``hermes update``: a stale root ``utils`` must not kill restart.
 
 Updaters up to v2026.9.14 finish the post-pull phases in the pre-pull interpreter and
 purge only package prefixes, so root ``utils`` stays cached without ``file_signature``;

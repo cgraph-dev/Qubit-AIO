@@ -198,7 +198,7 @@ class TestDeletedProfileTombstone:
     def test_marker_less_shell_is_not_a_profile(self, profile_env):
         """A ``profiles/<name>`` dir with no identity file (a pre-tombstone ghost shell left by a
         cron ticker, or a stray infrastructure dir) is not listed, served, or seeded with the
-        default install's ``.env`` — that seeding is what legitimised ghosts on ``qubit update``
+        default install's ``.env`` — that seeding is what legitimised ghosts on ``hermes update``
         (#95188 path D, #94823, #99392). ``profile create`` may take the name back."""
         default_env = profile_env / ".hermes" / ".env"
         default_env.write_text("OPENAI_API_KEY=sk-real\n", encoding="utf-8")

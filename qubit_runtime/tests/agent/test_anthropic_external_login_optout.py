@@ -3,7 +3,7 @@
 Claude Code's OAuth refresh token is single-use: once Hermes borrows and refreshes it, Hermes and
 Claude Code hold one token family and whichever refreshes first logs the other out. With the opt-out
 set, Hermes must neither read nor refresh ``~/.claude/.credentials.json``, must drop the pool row an
-earlier adopting process persisted, and must say so in ``qubit auth list``.
+earlier adopting process persisted, and must say so in ``hermes auth list``.
 """
 from __future__ import annotations
 

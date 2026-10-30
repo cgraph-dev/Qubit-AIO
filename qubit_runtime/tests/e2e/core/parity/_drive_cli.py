@@ -39,7 +39,7 @@ def drive_oneshot(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResul
 
 def drive_chat_q(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult:
     proc = _run_cli(ph, "chat", "-q", prompt, "-Q")
-    assert proc.returncode == 0, f"qubit chat -q exited {proc.returncode}: {proc.stderr[-2000:]}"
+    assert proc.returncode == 0, f"hermes chat -q exited {proc.returncode}: {proc.stderr[-2000:]}"
     return DriveResult(final_text=proc.stdout.strip(), toolset="hermes-cli")
 
 

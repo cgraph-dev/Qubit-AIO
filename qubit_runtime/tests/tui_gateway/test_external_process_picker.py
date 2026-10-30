@@ -2,7 +2,7 @@
 
 Drives a fake process profile (registered like a ``$QUBIT_HOME/plugins/<name>`` model-provider plugin
 would) through ``list_available_providers``, ``provider_model_ids``, the TUI/Desktop ``model.options``
-RPC, the ``qubit model`` setup picker and a session-scoped ``config.set model`` switch.
+RPC, the ``hermes model`` setup picker and a session-scoped ``config.set model`` switch.
 """
 import shutil
 import sys

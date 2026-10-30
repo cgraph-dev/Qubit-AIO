@@ -1,4 +1,4 @@
-"""`qubit sessions repair --check-only` must fail (non-zero) when the store is unhealthy.
+"""`hermes sessions repair --check-only` must fail (non-zero) when the store is unhealthy.
 
 Automation gates on the exit status; printing the reason and exiting 0 read as "healthy"
 (#63386, PR #103321).

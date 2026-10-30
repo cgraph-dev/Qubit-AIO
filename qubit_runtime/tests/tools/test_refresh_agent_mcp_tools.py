@@ -341,7 +341,7 @@ def test_resume_on_another_surface_restores_the_pinned_tool_bytes(monkeypatch, t
     bytes for the SAME tools (tool_search's per-surface deferred catalog, per-surface dynamic
     PARAMETERS like delegate_task's, the one-shot footprint pruning skill_manage). tools[] heads
     every request, so a pin written by the same code hands back exactly what the session sent;
-    one written by other code (``qubit update``) takes the current definitions instead."""
+    one written by other code (``hermes update``) takes the current definitions instead."""
     from qubit_state import SessionDB
     from tools import registry as registry_mod
 

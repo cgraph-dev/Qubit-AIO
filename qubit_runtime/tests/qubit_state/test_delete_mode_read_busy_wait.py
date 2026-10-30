@@ -2,7 +2,7 @@
 
 Under rollback-journal mode a reader needs a SHARED lock that a sibling process's commit blocks for
 the length of its journal+db fsyncs. Readers used to fail after the writer connection's 1 s busy
-timeout, so the dashboard's /api/sessions returned 503 and ``qubit sessions list`` crashed while a
+timeout, so the dashboard's /api/sessions returned 503 and ``hermes sessions list`` crashed while a
 gateway was writing. The holder here is a separate process, as in production.
 """
 

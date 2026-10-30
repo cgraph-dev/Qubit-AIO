@@ -52,6 +52,6 @@ def test_interpreter_kill_rejection_names_the_owned_process_route(tmp_path, monk
     assert "proc_" in json.loads(run("pkill -9 python3"))["error"]
     assert run("taskkill /F /IM agent-browser.exe /T") is None
     assert run("taskkill /F /PID 46544") is None
-    # Absence on the wrong side: a plain foreground `qubit gateway run` carries no launch marker.
+    # Absence on the wrong side: a plain foreground `hermes gateway run` carries no launch marker.
     monkeypatch.delenv("HERMES_SUPERVISED_CHILD")
     assert run("pkill -9 python3") is None

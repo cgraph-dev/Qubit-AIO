@@ -34,7 +34,7 @@ def _home(tmp_path: Path, name: str = "home", *, env: str = "", config: str = ""
 
 # The uncommented platform_toolsets block cli-config.yaml.example carried (the homeassistant row from
 # 1aa7badb3c until fb9fc8a3dd). The installers (install.sh, install.ps1, the Docker hook) and
-# `qubit doctor` seed config.yaml from that file, so the block alone says nothing about use.
+# `hermes doctor` seed config.yaml from that file, so the block alone says nothing about use.
 _EXAMPLE_PLATFORM_TOOLSETS = (
     "platform_toolsets:\n"
     "  cli: [hermes-cli]\n"
@@ -365,7 +365,7 @@ def test_spotify_in_use_is_a_stored_login_or_the_toolset(tmp_path, auth_json, co
 
 
 def test_old_spotify_commands_point_at_the_plugin(tmp_path, monkeypatch):
-    """`qubit auth spotify` / `hermes spotify` name the new command and how to get it for this home."""
+    """`hermes auth spotify` / `hermes spotify` name the new command and how to get it for this home."""
     home = _home(tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
     hint = lcm.moved_command_hint("qubit auth", "spotify", "status")

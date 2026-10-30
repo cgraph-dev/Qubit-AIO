@@ -252,7 +252,7 @@ def test_relay_instrumentation_off_keeps_the_receipt_instead_of_latching_it_unre
 
 
 def test_every_opt_out_answer_purges_pending_receipts(marks, monkeypatch):
-    """A "No" from setup, the pre-chat offer, the dashboard banner or `qubit config` goes through
+    """A "No" from setup, the pre-chat offer, the dashboard banner or `hermes config` goes through
     save_consent; none of them starts a process that purges, so the answer itself must."""
     from qubit_cli.observability import shared_metrics_consent as consent
     from qubit_cli.observability import shared_metrics_update as update_metrics
@@ -284,7 +284,7 @@ except KeyboardInterrupt:
 
 def _ctrl_c_ladder(tmp_path: Path, child_exit: int) -> tuple[int, str, list[dict]]:
     """The real install.sh main block and traps, with every stage body a no-op except python-deps,
-    whose child catches Ctrl-C like pm.cli / `qubit setup` do. Ctrl-C reaches the whole process
+    whose child catches Ctrl-C like pm.cli / `hermes setup` do. Ctrl-C reaches the whole process
     group, as from a terminal."""
     script = INSTALL_SH.read_text(encoding="utf-8-sig")
     assert script.count(_MAIN_GUARD) == 1
@@ -329,7 +329,7 @@ def test_a_ctrl_c_the_stage_handles_lets_the_install_finish(tmp_path):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="runs the real install.sh")
 def test_a_user_abort_the_child_turns_into_exit_1_is_recorded_as_interrupted(tmp_path):
-    """pm.cli / source_completion / `qubit setup` catch KeyboardInterrupt and exit 1, which reaches the
+    """pm.cli / source_completion / `hermes setup` catch KeyboardInterrupt and exit 1, which reaches the
     stage's `|| fail ... deps_install_failed`; the receipt must still say the user stopped it."""
     rc, out, receipts = _ctrl_c_ladder(tmp_path, child_exit=1)
     assert rc != 0 and "stage complete ok" not in out

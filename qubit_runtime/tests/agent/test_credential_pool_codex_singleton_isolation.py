@@ -1,7 +1,7 @@
 """Codex pool entries and the auth.json singleton: who may adopt whose tokens.
 
 ``manual:device_code`` is ambiguous — a legacy alias of the singleton or an independent account
-added with ``qubit auth add openai-codex``. Adopting the singleton into an independent account
+added with ``hermes auth add openai-codex``. Adopting the singleton into an independent account
 silently turned two logins into one (both then hit the same usage limit; salvaged from #100423 and
 #106788, cluster #92198 / #95297, issue #106705).
 """

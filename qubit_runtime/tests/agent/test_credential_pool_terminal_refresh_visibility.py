@@ -3,7 +3,7 @@
 The pool quarantines a dead ``openai-codex`` / ``xai-oauth`` / ``nous`` / ``anthropic`` refresh
 token — for the user this is the moment the login is lost, and a debug-only line made it look like
 "I signed in once and Hermes keeps failing" (#113023). Two invariants: the WARNING carries the
-``qubit auth add <provider>`` hint, and a row the quarantine does not drop (an independent
+``hermes auth add <provider>`` hint, and a row the quarantine does not drop (an independent
 ``manual:*`` login) is marked DEAD so it leaves rotation instead of re-firing the WARNING on every
 later refresh attempt.
 """

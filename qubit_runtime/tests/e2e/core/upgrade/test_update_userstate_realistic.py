@@ -1,4 +1,4 @@
-"""`qubit update` on a realistic user home: everything the user owns survives, sessions resume.
+"""`hermes update` on a realistic user home: everything the user owns survives, sessions resume.
 
 One real install (HEAD's ``scripts/install.sh`` into an empty sandbox HOME, git redirected to a
 local bare origin), then a home built the way users build it, mostly through the real CLI:
@@ -13,7 +13,7 @@ local bare origin), then a home built the way users build it, mostly through the
 * two broken profiles next to them (a dangling symlink, a profile whose config.yaml is not YAML);
 * local files the user dropped inside the checkout (an untracked notes file and an extension dir).
 
-Upstream then publishes a new commit and the user runs ``qubit update --yes``. A second leg
+Upstream then publishes a new commit and the user runs ``hermes update --yes``. A second leg
 publishes a commit that touches a file the user edited in the checkout (the autostash cannot be
 restored cleanly) while an untracked extension dir sits in the tree (#120179).
 
@@ -172,7 +172,7 @@ def world(tmp_path_factory, provider):
 
 def test_update_on_a_realistic_home_exits_clean_at_the_new_commit(world):
     sb, up = world["sb"], world["update"]
-    assert up.returncode == 0, "qubit update failed on a realistic home:\n" + I.describe(up)
+    assert up.returncode == 0, "hermes update failed on a realistic home:\n" + I.describe(up)
     assert I.TRACEBACK not in up.stdout + up.stderr, I.describe(up)
     assert I.git("rev-parse", "HEAD", cwd=sb.checkout) == world["target"], "update exited 0 but HEAD is not the target"
     assert not (sb.checkout / ".git" / "index.lock").exists()

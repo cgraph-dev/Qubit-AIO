@@ -149,7 +149,7 @@ async def _peer_minted(headless):
 
 def _local_owner(authority):
     """The Desktop/CLI's own connection: an interactive ticket redeemed on the loopback socket
-    (``gateway/run_api.py``), the identity ``qubit chat``, the Desktop and ``bot_relay.deliver`` use."""
+    (``gateway/run_api.py``), the identity ``hermes chat``, the Desktop and ``bot_relay.deliver`` use."""
     from gateway.runtime_bootstrap import _PURPOSE_CAPABILITIES
     from gateway.session_controls import AuthorityConnection
     return AuthorityConnection(authority, object(), {

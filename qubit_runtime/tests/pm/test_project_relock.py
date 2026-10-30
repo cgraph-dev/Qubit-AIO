@@ -1,4 +1,4 @@
-"""`qubit pm lock` with no arguments relocks uv.lock through PM and nothing else."""
+"""`hermes pm lock` with no arguments relocks uv.lock through PM and nothing else."""
 from __future__ import annotations
 
 from argparse import Namespace

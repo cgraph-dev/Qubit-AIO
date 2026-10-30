@@ -259,7 +259,7 @@ def test_load_qubit_env_bridges_config_yaml_scalars(tmp_path, monkeypatch):
 
     This mirrors the gateway/run.py bootstrap behavior: without this, running
     ``hermes send`` from a fresh shell cannot resolve the home channel
-    because ``TELEGRAM_HOME_CHANNEL`` (saved by ``qubit config set``) lives
+    because ``TELEGRAM_HOME_CHANNEL`` (saved by ``hermes config set``) lives
     in config.yaml, not in .env — and the gateway's config loader reads via
     ``os.getenv(...)``.
     """

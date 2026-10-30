@@ -42,7 +42,7 @@ def test_endpoint_matches_served_home_under_any_canonical_spelling(tmp_path):
 
 def test_ready_endpoint_carries_the_owner_boot_commit(tmp_path):
     """`gateway ensure --json` publishes the code the owner BOOTED from, so Desktop can restart a
-    gateway that outlived `qubit update` instead of re-attaching it forever (503 Restart required)."""
+    gateway that outlived `hermes update` instead of re-attaching it forever (503 Restart required)."""
     from qubit_cli.gateway_runtime import _endpoint
     home = tmp_path / 'home'
     home.mkdir()

@@ -1,6 +1,6 @@
 """Vertex AI wire conformance: OAuth minting, multi-turn tools, thought-signature replay after resume.
 
-The real ``qubit chat -q`` CLI talks to Vertex through the standard ``HTTPS_PROXY`` +
+The real ``hermes chat -q`` CLI talks to Vertex through the standard ``HTTPS_PROXY`` +
 ``SSL_CERT_FILE`` channel; the fake (``tests/fakes/providers/vertex.py``) terminates TLS for
 ``us-central1-aiplatform.googleapis.com``, validates every request against the Vertex
 OpenAI-compatibility contract, and mints tokens for the REAL ``google-auth`` JWT exchange.

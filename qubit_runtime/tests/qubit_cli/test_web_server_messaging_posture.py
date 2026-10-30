@@ -52,7 +52,7 @@ def client(monkeypatch, _isolate_qubit_home):
     # only while its probed command line matches the home being asked about
     # (``_command_line_belongs_to_profile``). The worker test below re-points the
     # faked command line at ``-p worker`` before its request.
-    cmdline = {"current": "qubit gateway run"}
+    cmdline = {"current": "hermes gateway run"}
     monkeypatch.setattr(
         _gw_status, "_read_process_cmdline", lambda pid: cmdline["current"]
     )
@@ -172,7 +172,7 @@ def test_profile_scoped_posture_ignores_root_env_and_reports_profile_grants(
     # run" belongs to the default profile, so the worker's liveness probe needs the
     # ``-p worker`` command line (same identity check ``hermes -p worker status`` runs).
     monkeypatch.setattr(
-        _gw_status, "_read_process_cmdline", lambda pid: "qubit gateway run -p worker"
+        _gw_status, "_read_process_cmdline", lambda pid: "hermes gateway run -p worker"
     )
 
     payload = _test(client, profile="worker")

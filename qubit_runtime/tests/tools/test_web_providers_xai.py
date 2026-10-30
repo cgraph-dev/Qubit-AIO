@@ -436,7 +436,7 @@ class TestXAIBackendWiring:
 
 class TestXAIProviderOAuthPath:
     """Verifies the provider works when credentials come from the OAuth
-    credential pool (``qubit auth`` sign-in) rather than an env-var key.
+    credential pool (``hermes auth`` sign-in) rather than an env-var key.
     The full ``tools.xai_http.resolve_xai_http_credentials`` chain is exercised
     against a temporary auth store.
     """

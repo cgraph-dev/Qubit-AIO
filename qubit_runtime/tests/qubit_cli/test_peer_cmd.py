@@ -221,7 +221,7 @@ def test_dm_creates_bot_chat_then_chats(monkeypatch, capsys, fake_peer_server):
 def test_dm_hides_a_bare_silence_marker_from_the_sending_agent(monkeypatch, capsys, fake_peer_server):
     """A successful bare NO_REPLY/[SILENT] marker is a delivery decision, not
     a message — same rule as the gateway's live Bot Chat completion, the
-    Desktop bot_relay.deliver RPC and the one-shot local `qubit chat -Q`
+    Desktop bot_relay.deliver RPC and the one-shot local `hermes chat -Q`
     transport (tools/bot_mode_dm.py::_run_local_turn). `hermes peer dm` is a
     4th Bot Mode delivery door and, before this fix, printed the raw marker
     to the sending agent as if it were a real reply."""

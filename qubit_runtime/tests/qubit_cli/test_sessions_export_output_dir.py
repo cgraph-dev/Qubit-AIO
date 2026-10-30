@@ -1,4 +1,4 @@
-"""`qubit sessions export` single-file formats accept a directory as OUTPUT."""
+"""`hermes sessions export` single-file formats accept a directory as OUTPUT."""
 
 import json
 import sys

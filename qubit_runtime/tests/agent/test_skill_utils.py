@@ -70,7 +70,7 @@ skills:
 
 
 class TestParseConfigStringList:
-    """#86661: `qubit config set` and JSON-mode editor saves store lists as
+    """#86661: `hermes config set` and JSON-mode editor saves store lists as
     quoted strings (e.g. '["a","b"]'). Treating such a string as a single name
     made curated disabled lists silently filter nothing."""
 
@@ -81,7 +81,7 @@ class TestParseConfigStringList:
         ]
 
     def test_python_literal_array_string_parses(self):
-        # `qubit config set` can persist single-quoted Python-literal forms.
+        # `hermes config set` can persist single-quoted Python-literal forms.
         assert parse_config_string_list("['skill-a']") == ["skill-a"]
 
     def test_scalar_string_means_one_name(self):

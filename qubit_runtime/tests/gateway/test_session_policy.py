@@ -262,7 +262,7 @@ def test_provider_alias_spelling_and_auto_pick_keep_the_profiles_route(tmp_path,
 
 def test_unlimited_max_turns_spellings_create_an_uncapped_session(tmp_path):
     """`--max-turns 0` / -1 / none / unlimited meant "no cap" before the gateway cutover: session.create
-    freezes them as the unlimited budget, and `qubit chat` sends 0 instead of dropping it as falsy."""
+    freezes them as the unlimited budget, and `hermes chat` sends 0 instead of dropping it as falsy."""
     import argparse
     import sys
     from gateway.session_policy import build_policy
@@ -469,7 +469,7 @@ def test_lazy_info_reports_the_free_tier_pinned_model(tmp_path, monkeypatch):
 
 
 def test_run_budget_is_a_frozen_launch_option(tmp_path):
-    """`qubit chat --run-budget N` (main: AIAgent(run_budget_seconds=N)): frozen as the session's
+    """`hermes chat --run-budget N` (main: AIAgent(run_budget_seconds=N)): frozen as the session's
     agent.run_budget_seconds; the profile's own value applies without the flag; junk is refused."""
     from gateway.session_policy import build_policy
     from qubit_state_runtime import RuntimeStoreError
@@ -493,7 +493,7 @@ def test_run_budget_passes_the_session_create_contract():
 
 
 def test_verbose_is_a_frozen_launch_option(tmp_path):
-    """`qubit chat -v` (main: AIAgent(quiet_mode=False)): the session agent's status lines are not quieted."""
+    """`hermes chat -v` (main: AIAgent(quiet_mode=False)): the session agent's status lines are not quieted."""
     from gateway.session_policy import build_policy
     from qubit_state_runtime import RuntimeStoreError
     assert build_policy(dict(cwd=str(tmp_path), verbose=True), {}).verbose is True

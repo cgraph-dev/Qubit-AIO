@@ -93,7 +93,7 @@ class TestNamedProfileMultiplexerGuard:
         (tmp_path / "gateway.pid").write_text(str(os.getpid()), encoding="utf-8")
         (tmp_path / "gateway_state.json").write_text(json.dumps(
             {"pid": os.getpid(), "hermes_home": str(tmp_path), "gateway_state": "running"}))
-        monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "qubit gateway run")
+        monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
 
     def test_unset_allowlist_preserves_historical_guard(self, monkeypatch, tmp_path):
         self._fake_running_default_gateway(monkeypatch, tmp_path)

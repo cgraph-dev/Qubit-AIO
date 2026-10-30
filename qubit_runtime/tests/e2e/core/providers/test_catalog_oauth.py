@@ -176,7 +176,7 @@ DEVICE_INTERVAL = 2
 
 @pytest.fixture(scope="module")
 def device_login(tmp_path_factory):
-    """One real ``qubit auth add nous --type oauth`` device-code login against the fake Portal."""
+    """One real ``hermes auth add nous --type oauth`` device-code login against the fake Portal."""
     root = tmp_path_factory.mktemp("nous-device")
     with CatalogFake() as sentinel, OAuthFake(device_interval=DEVICE_INTERVAL, poll_script=DEVICE_SCRIPT) as fake:
         home = Home(root, sentinel, "nous", "oauth-e2e/model")

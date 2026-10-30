@@ -29,7 +29,7 @@ LAUNCH_ENV = {
 
 @pytest.fixture
 def fleet(tmp_path, monkeypatch):
-    """A root-profile gateway (``qubit gateway run``) and a second profile to deliver into."""
+    """A root-profile gateway (``hermes gateway run``) and a second profile to deliver into."""
     root = tmp_path / "hermes"
     beta = root / "profiles" / "beta"
     beta.mkdir(parents=True)

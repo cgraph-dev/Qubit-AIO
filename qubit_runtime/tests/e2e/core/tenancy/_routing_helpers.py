@@ -5,7 +5,7 @@ identity, each accepting only its own randomly minted key. ``check_routing`` is 
 invariant every scenario shares: a request on a host the scenario did not select, or a
 selected host receiving any bearer other than its own, is a credential leak.
 
-Hermes itself runs for real in child processes (``qubit chat -q`` / ``hermes -z`` /
+Hermes itself runs for real in child processes (``hermes chat -q`` / ``hermes -z`` /
 ``python -m tui_gateway.entry``) with HOME and QUBIT_HOME inside the test's tmp dir,
 every credential/endpoint env var stripped, and only these fake hosts configured.
 """

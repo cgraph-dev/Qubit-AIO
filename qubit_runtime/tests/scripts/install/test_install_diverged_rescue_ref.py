@@ -4,7 +4,7 @@ Re-running ``install.sh`` / ``install.ps1`` over an existing checkout (desktop
 bootstrap and its update retry do this) falls back to
 ``reset --hard origin/<branch>`` when a fast-forward fails. Commits made on that
 branch must survive behind a ``refs/hermes-update-backups/`` rescue ref, the same
-namespace ``qubit update`` uses, and the installer must print the ref.
+namespace ``hermes update`` uses, and the installer must print the ref.
 """
 
 from __future__ import annotations

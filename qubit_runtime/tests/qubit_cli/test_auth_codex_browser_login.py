@@ -1,4 +1,4 @@
-"""``qubit auth add openai-codex --browser``: opt-in loopback authorization-code + PKCE (#95743).
+"""``hermes auth add openai-codex --browser``: opt-in loopback authorization-code + PKCE (#95743).
 
 Exercises the real loopback listener and a real token endpoint (both stdlib servers on ephemeral
 ports); only the system browser is replaced by an HTTP client following the authorize redirect.

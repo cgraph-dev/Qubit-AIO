@@ -2,7 +2,7 @@
 
 The single-query signal handler in cli.py (``_signal_handler_q``) raises
 ``KeyboardInterrupt`` to unwind the main thread on SIGTERM/SIGHUP. That works
-for interactive ``qubit chat -q`` invocations, but kanban workers spawned by
+for interactive ``hermes chat -q`` invocations, but kanban workers spawned by
 the dispatcher are likely to have a non-daemon thread alive (terminal_tool's
 ``_wait_for_process``, custom plugin background workers, etc.). With
 ``KeyboardInterrupt`` only the main thread unwinds; the non-daemon thread

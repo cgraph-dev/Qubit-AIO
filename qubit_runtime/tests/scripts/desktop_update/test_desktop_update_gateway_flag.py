@@ -1,6 +1,6 @@
 """The hand-off's `--gateway` flag, exercised against the real posix script.
 
-`qubit update --gateway` (re)starts the local messaging gateway after the
+`hermes update --gateway` (re)starts the local messaging gateway after the
 update. A Desktop served by a remote gateway (#117529) must not ask for that:
 the restarted local gateway shares the remote host's channel credentials and
 becomes a competing long-poll consumer — Telegram answers the conflict by
@@ -53,7 +53,7 @@ def test_every_owed_followup_reaches_the_desktop_result(tmp_path, step):
     assert result["exit_code"] == 0 and result["ok"] is True
     assert result["manual"] is True
     assert step in result["message"]
-    assert ("qubit gateway restart" in result["message"]) is (step == "gateway_restart")
+    assert ("hermes gateway restart" in result["message"]) is (step == "gateway_restart")
 @requires_posix_handoff
 @pytest.mark.xfail(reason="wave-23 short-port: local desktop-update followup contract differs from the pin")
 def test_a_clean_update_stays_plain_success(tmp_path):

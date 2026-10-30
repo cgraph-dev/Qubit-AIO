@@ -1,4 +1,4 @@
-"""Regression for #117276: ``qubit doctor``'s exit status must agree with its unresolved findings."""
+"""Regression for #117276: ``hermes doctor``'s exit status must agree with its unresolved findings."""
 from types import SimpleNamespace
 
 import pytest

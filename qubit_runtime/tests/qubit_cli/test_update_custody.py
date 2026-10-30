@@ -247,7 +247,7 @@ def test_a_refused_build_join_is_logged_and_noted_in_the_receipt(tmp_path, monke
 
 def test_a_swallowed_refusal_is_what_the_update_reports(tmp_path, monkeypatch, capsys):
     """R8 m2: readers swallow an OSError (``_git_stdout``, ``_capture_head_sha``), so a refused
-    child used to end ``qubit update`` as whatever error followed downstream. The refusal is
+    child used to end ``hermes update`` as whatever error followed downstream. The refusal is
     receipted and kept for the run, and the command's failure path prints it, actionably."""
     import contextlib
     from types import SimpleNamespace

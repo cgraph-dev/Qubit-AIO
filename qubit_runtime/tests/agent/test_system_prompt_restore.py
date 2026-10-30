@@ -309,7 +309,7 @@ class TestStoredPromptReuse:
             assert json.loads(db.get_session("test-session-id")["tool_names"])["tools"] == pinned
 
     def test_a_swept_pin_row_is_re_pinned_on_the_next_turn(self, tmp_path):
-        """``qubit sessions recover`` from an older build deleted pin rows it did not know about,
+        """``hermes sessions recover`` from an older build deleted pin rows it did not know about,
         leaving ``tool_names`` a hash that resolves to itself. The next turn must pin what it sends,
         or every later surface hop re-derives tools[] for the rest of the session."""
         from qubit_state import SessionDB

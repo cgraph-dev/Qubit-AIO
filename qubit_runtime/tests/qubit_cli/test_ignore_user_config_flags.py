@@ -1,4 +1,4 @@
-"""Tests for --ignore-user-config and --ignore-rules flags on `qubit chat`.
+"""Tests for --ignore-user-config and --ignore-rules flags on `hermes chat`.
 
 Ported from openai/codex#18646 (`feat: add --ignore-user-config and --ignore-rules`).
 Codex's flags fully isolate a run from user-level config and exec-policy .rules

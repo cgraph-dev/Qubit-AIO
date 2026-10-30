@@ -45,7 +45,7 @@ async def test_foreign_compressed_root_survives_import_and_delete_of_a_child(tmp
         assert db.get_session('att2')['parent_session_id'] is None
         assert (await mutate(attacker, 'att', 'delete', 'delete', {}))['deleted_ids'] == ['att']
 
-        # Links forged before this guard (or by an offline ``qubit sessions import``) never carry a
+        # Links forged before this guard (or by an offline ``hermes sessions import``) never carry a
         # delete into a chain the actor is not authorized for: the walk stops at the foreign row.
         db._execute_write(lambda c: c.execute("UPDATE sessions SET parent_session_id='v_root' WHERE id='att2'"))
         assert (await mutate(attacker, 'att2', 'delete2', 'delete', {}))['deleted_ids'] == ['att2']

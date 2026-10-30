@@ -59,7 +59,7 @@ def test_required_references_are_present_and_routed(skill, references):
     (QUESTIONNAIRE, ("## Context", "## How to answer", "## Anything else?",
                      "decision-questionnaire-<slug>.md", "Interview the Send"),
      ("claude", "slash command", "disable-model-invocation")),
-    (ACTUAL, ("--provider actual",), ("qubit config set providers.actual.api ", "key_env")),
+    (ACTUAL, ("--provider actual",), ("hermes config set providers.actual.api ", "key_env")),
     (MEETING, ("never invent", "before creating anything", "`unresolved`"), (r"\bLinear\b",)),
     (PRICE, ("Setup (foreground, once)", "Tick (each scheduled run)", "cronjob(action=",
              "Do not schedule until one foreground fetch works",

@@ -187,7 +187,7 @@ def test_prefer_api_key_honors_profile_scope_only_key(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# #116155: `qubit auth remove xai` suppresses env:XAI_API_KEY, but a stale value
+# #116155: `hermes auth remove xai` suppresses env:XAI_API_KEY, but a stale value
 # still inherited by the gateway process environment overrode the working
 # xai-oauth grant for x_search (prefer_api_key=True).
 # ---------------------------------------------------------------------------

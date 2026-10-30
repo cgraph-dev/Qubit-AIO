@@ -1,4 +1,4 @@
-"""The classic CLI is main's HermesCLI again: `hermes` / `qubit chat` (interactive and -q) reach
+"""The classic CLI is main's HermesCLI again: `hermes` / `hermes chat` (interactive and -q) reach
 ``cli.main``; only stream-json and the safe-mode bypass keep the gateway transport client."""
 import argparse
 import sys

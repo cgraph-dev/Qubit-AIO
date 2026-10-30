@@ -1,4 +1,4 @@
-"""Auto-decompose billing bounds, proven against a REAL ``qubit gateway run`` embedded dispatcher.
+"""Auto-decompose billing bounds, proven against a REAL ``hermes gateway run`` embedded dispatcher.
 
 The gateway (no messaging platforms -> a kanban/cron-only process) ticks the embedded dispatcher
 every second; each tick auto-decomposes triage cards through the auxiliary model, which is the

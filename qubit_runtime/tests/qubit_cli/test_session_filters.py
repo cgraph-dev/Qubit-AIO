@@ -1,5 +1,5 @@
 """Tests for qubit_cli.session_filters — CLI time/filter parsing for
-`qubit sessions prune` / `qubit sessions archive`."""
+`hermes sessions prune` / `hermes sessions archive`."""
 
 import time
 from argparse import Namespace

@@ -2,7 +2,7 @@
 SessionDB for a profile whose gateway is live (#110405).
 
 The gateway stand-in is a real subprocess: it takes the same ``flock(LOCK_EX)`` on
-``gateway.lock`` that ``gateway.status`` uses, runs under a ``qubit gateway run``
+``gateway.lock`` that ``gateway.status`` uses, runs under a ``hermes gateway run``
 command line and is recorded in ``gateway.pid``, so ``_check_gateway_running``
 decides on kernel lock state plus live process identity rather than a patched
 predicate.

@@ -1,8 +1,8 @@
 """Orphaned update-autostash surfacing (#63717 problem 6).
 
-``qubit update`` can legitimately leave an autostash behind (--keep-stash
+``hermes update`` can legitimately leave an autostash behind (--keep-stash
 parks it; a conflicted restore preserves it), but nothing ever mentioned those
-entries again — they persisted invisibly for weeks. ``qubit update`` now
+entries again — they persisted invisibly for weeks. ``hermes update`` now
 warns about ``hermes-update-autostash-*`` entries older than the threshold.
 Behavioral tests use real git repos; no production mocking of the code under
 test.

@@ -85,7 +85,7 @@ def test_a_test_owned_unit_can_be_cleaned_up_but_no_other(request):
         subprocess.run(["systemctl", "--user", "stop", "hermes-worker-kanban-other-run-1.scope"], check=False)
 @pytest.mark.xfail(reason="wave-23 short-port: local live-system guard verb/unit coverage diverges from the pin")
 def test_host_gateway_start_blocked_but_container_exec_allowed():
-    """A host-side ``qubit gateway start`` spawns a real runtime; the same words addressed to
+    """A host-side ``hermes gateway start`` spawns a real runtime; the same words addressed to
     a container via ``docker exec`` stay inside it and are the Docker harness's business."""
     with pytest.raises(RuntimeError, match="REAL hermes gateway runtime"):
         subprocess.run(["hermes", "-p", "p", "gateway", "start"], check=False)

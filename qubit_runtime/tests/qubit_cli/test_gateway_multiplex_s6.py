@@ -1,5 +1,5 @@
 """s6 container: the unset multiplex default resolves ON when the boot has parked every named
-slot, ``qubit gateway migrate --multiplex`` folds an UP slot in-process, a guard refusal on a
+slot, ``hermes gateway migrate --multiplex`` folds an UP slot in-process, a guard refusal on a
 multi-profile host is loud, and the resolved default is written back to config.yaml."""
 from __future__ import annotations
 
@@ -115,7 +115,7 @@ def test_resolved_default_is_written_once_and_never_on_a_guard(s6_host):
     assert "# my config" in text and "multiplex_profiles: true" in text  # comment-preserving writer
     assert mode.persist_resolved_default(on, root) is False  # already explicit: once
     # A retired ``false`` is rewritten in place, never silently: the one-time notice reaches the
-    # gateway start (log_multiplex_decision prints it) and the next ``qubit update`` summary.
+    # gateway start (log_multiplex_decision prints it) and the next ``hermes update`` summary.
     (root / "config.yaml").write_text("# my config\ngateway:\n  multiplex_profiles: false\n", encoding="utf-8")
     from gateway.config import GatewayConfig
     decision = mode.resolve_multiplex_mode(GatewayConfig.from_dict({"gateway": {"multiplex_profiles": False}}))

@@ -1,6 +1,6 @@
 """PR #69118: a named profile served by the default multiplexer reports as running.
 
-``qubit gateway status`` / ``gateway list`` / ``profile list`` keyed liveness
+``hermes gateway status`` / ``gateway list`` / ``profile list`` keyed liveness
 off the profile's own gateway.pid, so a satellite profile served by the default
 multiplexer showed "not running" even though the multiplexer was its live
 inbound process. All three now consult the same

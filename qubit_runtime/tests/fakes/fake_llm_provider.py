@@ -32,8 +32,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Union
 
-from qubit_cli.observability.shared_metrics_consent import OFFER_VERSION
-
 MODEL_ID = "fake-model"
 
 

@@ -1,6 +1,6 @@
 """Bedrock Converse / ConverseStream wire conformance: tools, signed reasoning, resume, compaction.
 
-Real ``qubit chat -q`` subprocesses with ``model.provider: bedrock`` talk to the real boto3
+Real ``hermes chat -q`` subprocesses with ``model.provider: bedrock`` talk to the real boto3
 ``bedrock-runtime`` client, redirected by botocore's documented ``AWS_ENDPOINT_URL_BEDROCK_RUNTIME``
 override to the loopback fake in ``tests/fakes/providers/bedrock_converse.py``. The fake verifies the
 SigV4 signature, validates each body against the botocore service model plus Converse's conversation

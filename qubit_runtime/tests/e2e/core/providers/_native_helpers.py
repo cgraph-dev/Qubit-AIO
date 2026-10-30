@@ -119,7 +119,7 @@ class ChatResult:
 
 def run_chat(nh: NativeHome, prompt: str, *, resume: str | None = None, env: dict[str, str] | None = None,
              args: tuple[str, ...] = (), timeout: float = TURN_TIMEOUT) -> ChatResult:
-    """One real ``qubit chat -q`` turn (optionally ``--resume <id>``) against the fake provider."""
+    """One real ``hermes chat -q`` turn (optionally ``--resume <id>``) against the fake provider."""
     argv = [sys.executable, "-m", "qubit_cli.main", "chat", "-q", prompt, "-Q", *args]
     if resume:
         argv += ["--resume", resume]

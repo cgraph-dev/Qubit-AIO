@@ -1,6 +1,6 @@
 """Plugin-registered auxiliary tasks reach the dashboard/Desktop Models settings.
 
-``PluginContext.register_auxiliary_task`` already puts a plugin task in the ``qubit model``
+``PluginContext.register_auxiliary_task`` already puts a plugin task in the ``hermes model``
 picker (``main_provider_setup._all_aux_tasks``), but the REST surface behind the Desktop
 Settings → Models page enumerated only the built-in ``_AUX_TASK_SLOTS``: ``GET
 /api/model/auxiliary`` never listed the task, ``POST /api/model/set`` rejected it with

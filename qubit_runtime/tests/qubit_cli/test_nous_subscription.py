@@ -195,7 +195,7 @@ def test_logged_in_entitled_account_yields_a_state_for_every_feature(monkeypatch
     """The logged-in + entitled branch must produce a state for EVERY feature, including
     those with no config selection field (modal). Regression: the managed-availability
     table indexed the selection map by every feature key and raised KeyError('modal'),
-    crashing `qubit status`, `hermes tools`, and the dashboard toolsets API."""
+    crashing `hermes status`, `hermes tools`, and the dashboard toolsets API."""
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _pool_account())
     monkeypatch.setattr(ns, "is_managed_tool_gateway_ready", lambda gateway: True)
     monkeypatch.setattr(ns, "get_env_value", lambda name: "")
@@ -249,7 +249,7 @@ def test_get_gateway_eligible_tools_treats_explicit_backend_as_configured(monkey
     """A keyless local backend (e.g. searxng) has no credentials to detect,
     but an explicit non-nous selection must still keep it out of
     'unconfigured' — regression for #92647, where it was pre-checked and a
-    single Enter during `qubit model` overwrote it to `web.backend: nous`.
+    single Enter during `hermes model` overwrote it to `web.backend: nous`.
     """
     monkeypatch.setattr(ns, "get_nous_portal_account_info", lambda **kw: _account(logged_in=True, paid=True))
     monkeypatch.setattr(
@@ -445,7 +445,7 @@ def test_pool_account_keeps_the_fal_image_default(monkeypatch):
 
 
 def test_first_run_gateway_acceptance_writes_the_krea_image_model():
-    """`qubit setup --portal` stores selections through apply_gateway_defaults, not the managed-defaults
+    """`hermes setup --portal` stores selections through apply_gateway_defaults, not the managed-defaults
     pass, so the Krea default must apply there too; an existing model and the free pool are left on FAL."""
     paid, pool = _account(logged_in=True, paid=True), _pool_account()
     fresh = {}

@@ -140,7 +140,7 @@ class TestCreateSession:
         assert (seen[1]["enabled_toolsets"], seen[1]["disabled_toolsets"]) == (["hermes-acp", "mcp-acp-server"], ["browser"])
 
     @pytest.mark.parametrize("config, offered, withheld", [
-        # agent.disabled_toolsets, in the JSON-string shape `qubit config set` stores (#74582).
+        # agent.disabled_toolsets, in the JSON-string shape `hermes config set` stores (#74582).
         ({"agent": {"disabled_toolsets": "['code_execution']"}}, "file", "code_execution"),
         # platform_toolsets.acp narrows the surface like every other platform (#79516).
         ({"platform_toolsets": {"acp": ["file"]}}, "file", "code_execution"),
@@ -209,11 +209,11 @@ class TestCreateSession:
         first-run "No LLM provider configured" text; the operator must get the swallowed cause
         instead. The fallback still stands when the bare build succeeds."""
         def _no_creds(**_kw):
-            raise RuntimeError("No Codex credentials stored. Run `qubit auth add openai-codex`")
+            raise RuntimeError("No Codex credentials stored. Run `hermes auth add openai-codex`")
 
         class BareFails:
             def __init__(self, **kwargs):
-                raise RuntimeError("No LLM provider configured. Run `qubit setup`")
+                raise RuntimeError("No LLM provider configured. Run `hermes setup`")
 
         class BareWorks:
             def __init__(self, **kwargs):

@@ -1,4 +1,4 @@
-"""Worker-side board contracts through the real dispatcher and a real ``qubit chat -q`` worker.
+"""Worker-side board contracts through the real dispatcher and a real ``hermes chat -q`` worker.
 
 * ``kanban_complete(artifacts=[...])``: a declared file inside the task workspace is staged as a
   ``task_attachments`` row; a declared file OUTSIDE the workspace must be reported (attached or the

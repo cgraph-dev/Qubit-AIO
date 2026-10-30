@@ -9,7 +9,7 @@
   spawned (found by ownership of the scratch profile, not by parent links, which a
   detached grandchild does not keep) and a fresh backend boots again over the leftover
   host records.
-* ``qubit gateway run`` + ``qubit gateway stop`` — the Windows graceful-stop IPC (stop
+* ``hermes gateway run`` + ``hermes gateway stop`` — the Windows graceful-stop IPC (stop
   marker, not TerminateProcess) drains the gateway: it exits on its own, records
   ``stopped``, removes its pid file, and nothing it spawned survives.
 """

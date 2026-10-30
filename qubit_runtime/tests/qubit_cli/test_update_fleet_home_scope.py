@@ -1,4 +1,4 @@
-"""#93349 — ``qubit update`` restarts only the gateways of the home it is updating.
+"""#93349 — ``hermes update`` restarts only the gateways of the home it is updating.
 
 ``hermes-gateway*`` units and ``gateway run`` processes are host-wide namespaces shared by every
 Hermes install under the account. A scratch home's update used to drain and restart the account's

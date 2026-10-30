@@ -1,4 +1,4 @@
-"""``qubit doctor`` validates a configured GITHUB_TOKEN/GH_TOKEN against api.github.com (#115257).
+"""``hermes doctor`` validates a configured GITHUB_TOKEN/GH_TOKEN against api.github.com (#115257).
 
 An expired PAT left in ``.env`` used to be reported as "GitHub token configured" while every
 git-auth clone failed with a Git-level message that never named the token. The doctor now sends

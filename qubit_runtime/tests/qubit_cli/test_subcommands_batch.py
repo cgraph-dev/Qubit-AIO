@@ -29,7 +29,7 @@ def _h(name):
 
 
 def test_config_get_unset_subcommands_parse():
-    """`qubit config get/unset` parse key args (and --json for get)."""
+    """`hermes config get/unset` parse key args (and --json for get)."""
     parser = argparse.ArgumentParser(prog="hermes")
     sub = parser.add_subparsers(dest="command")
     handler = _h("config")
@@ -52,8 +52,8 @@ def test_config_get_unset_subcommands_parse():
 # ── deprecated `hermes login` fails gracefully, not with argparse error ────
 #
 # `hermes login` is a removed command; its handler (`login_command` in
-# `qubit_cli/auth.py`) prints a deprecation notice pointing at `qubit auth` /
-# `qubit model` and exits 0.  Two behavior contracts guard the UX:
+# `qubit_cli/auth.py`) prints a deprecation notice pointing at `hermes auth` /
+# `hermes model` and exits 0.  Two behavior contracts guard the UX:
 #   1. ANY `--provider <value>` (including ones the user actually wants, like
 #      `anthropic`) must parse and reach the handler — never crash in argparse
 #      with `invalid choice` before the friendly redirect is printed (#24756).

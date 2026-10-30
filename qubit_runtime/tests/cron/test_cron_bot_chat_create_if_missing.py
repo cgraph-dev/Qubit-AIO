@@ -1,6 +1,6 @@
 """Cron Bot Chat delivery creates the profile's canonical Bot Chat when it does not exist yet.
 
-Main's lane was ``qubit chat -c "Bot Chat" --create-if-missing``; the canonical authority
+Main's lane was ``hermes chat -c "Bot Chat" --create-if-missing``; the canonical authority
 door must keep that semantics, or a fresh profile's very first ``deliver: bot-chat`` job is
 recorded as failed with nowhere to land.
 """

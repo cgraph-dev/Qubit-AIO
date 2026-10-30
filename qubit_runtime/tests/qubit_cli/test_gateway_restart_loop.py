@@ -148,7 +148,7 @@ class TestGatewayLifecyclePattern:
         'launchctl bootout gui/501/ai.hermes."gateway"',
         # Same class on the systemctl and hermes-CLI branches.
         'systemctl re"start" hermes-gateway',
-        'qubit gateway re"start"',
+        'hermes gateway re"start"',
     ])
     def test_shell_token_spliced_lifecycle_verbs(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
@@ -184,17 +184,17 @@ class TestGatewayLifecyclePattern:
     @pytest.mark.parametrize("text", [
         "restart the server application",
         "hermes cron list",
-        "qubit update",
-        "qubit config set model claude",
+        "hermes update",
+        "hermes config set model claude",
         "echo 'just a normal cron job'",
         "run the backup script",
         "gateway is running fine",
-        # `qubit gateway start` is benign — starting a gateway from inside a
+        # `hermes gateway start` is benign — starting a gateway from inside a
         # gateway is a no-op / "already running", and a legit cron job may
         # start a sibling profile's gateway. Only restart/stop/kill are the
         # foot-gun (#30719 lists only those).
-        "qubit gateway start",
-        "qubit gateway start --all",
+        "hermes gateway start",
+        "hermes gateway start --all",
         # Tightened launchctl/systemctl branches: ops on NON-gateway hermes
         # services must not be falsely blocked (the old `.*hermes` matched any
         # hermes token).
@@ -235,15 +235,15 @@ class TestGatewayLifecyclePattern:
 
     @pytest.mark.parametrize("text", [
         # Trailing-boundary fix must not weaken real commands.
-        "qubit gateway restart",
-        "qubit gateway restart; echo done",
-        "qubit gateway stop && echo stopped",
+        "hermes gateway restart",
+        "hermes gateway restart; echo done",
+        "hermes gateway stop && echo stopped",
         # #77173 command-position anchor must not weaken separator/subshell
         # forms either.
         "true;hermes gateway restart",
         "true && hermes gateway stop",
         "echo $(hermes gateway restart)",
-        "echo `qubit gateway restart`",
+        "echo `hermes gateway restart`",
     ])
     def test_boundary_fix_still_blocks_real_commands(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
@@ -377,7 +377,7 @@ class TestProfileFlagGatewayLifecycle:
 
         monkeypatch.setattr(lifecycle_guard, "_current_profile_name", lambda: None)
         assert not _contains_gateway_lifecycle_command("hermes -p zeus gateway restart")
-        assert _contains_gateway_lifecycle_command("qubit gateway restart")
+        assert _contains_gateway_lifecycle_command("hermes gateway restart")
 
 
 class TestCronCreateLifecycleBlock:
@@ -532,8 +532,8 @@ class TestTerminalToolGatewayLifecycleGuard:
         "systemctl restart hermes-gateway",
         "systemctl --user restart hermes-gateway",
         "systemctl stop hermes-gateway.service",
-        "qubit gateway restart",
-        "qubit gateway uninstall",
+        "hermes gateway restart",
+        "hermes gateway uninstall",
         "launchctl kickstart gui/501/ai.hermes.gateway",
         "launchctl bootout gui/501/ai.hermes.gateway",
         # #62891 exact reported shape and its bootstrap sibling.
@@ -677,10 +677,10 @@ class TestTerminalToolGatewayLifecycleGuard:
             tt, "_check_all_guards", lambda cmd, env, **kwargs: {"approved": True}
         )
 
-        result = json.loads(tt.terminal_tool(command="qubit gateway restart"))
+        result = json.loads(tt.terminal_tool(command="hermes gateway restart"))
 
         assert result["exit_code"] == 0
-        assert calls == ["qubit gateway restart"]
+        assert calls == ["hermes gateway restart"]
 
     def test_blocks_launchctl_submit_hidden_in_referenced_script(
         self, monkeypatch, tmp_path
@@ -1034,7 +1034,7 @@ class TestLifecycleGuardModule:
         by the direct regex scan."""
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
         script = tmp_path / "evil.py"
-        script.write_text('import os\nos.system("qubit gateway restart")\n', encoding="utf-8")
+        script.write_text('import os\nos.system("hermes gateway restart")\n', encoding="utf-8")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("clean prompt", str(script))
 
@@ -1281,7 +1281,7 @@ class TestLifecycleGuardModule:
         monkeypatch.setattr(lg, "_contains_unsafe_gateway_action", _boom)
         # Direct scan still blocks a literal lifecycle command...
         assert lg.contains_gateway_lifecycle_command_or_referenced_script(
-            "qubit gateway restart"
+            "hermes gateway restart"
         ) is True
         # ...and a benign command fails open instead of crashing.
         assert lg.contains_gateway_lifecycle_command_or_referenced_script(
@@ -1515,8 +1515,8 @@ class TestRelativePathDoesNotDisableDataExemption:
 
     @pytest.mark.parametrize("command", [
         "grep -r 'systemctl restart hermes-gateway' .",
-        "grep -rn 'qubit gateway restart' ./logs",
-        "rg 'qubit gateway restart' ../archive",
+        "grep -rn 'hermes gateway restart' ./logs",
+        "rg 'hermes gateway restart' ../archive",
         "grep -c 'systemctl stop hermes-gateway' ./var/log/syslog",
         "sqlite3 ./stats.db \"SELECT restart_reason FROM hermes_gateway_restarts\"",
     ])
@@ -1529,9 +1529,9 @@ class TestRelativePathDoesNotDisableDataExemption:
         'sqlite3 ./db ".shell hermes gateway restart"',
         'sqlite3 ./db ".system systemctl restart hermes-gateway"',
         'psql ./x -c "\\! systemctl restart hermes-gateway"',
-        "grep -r 'qubit gateway restart' . | sh",
-        "grep -r 'qubit gateway restart' ./logs | bash",
-        "grep -r 'qubit gateway restart' . | sudo sh",
+        "grep -r 'hermes gateway restart' . | sh",
+        "grep -r 'hermes gateway restart' ./logs | bash",
+        "grep -r 'hermes gateway restart' . | sudo sh",
         "grep -r 'x' . ; hermes gateway restart",
         "grep -r 'x' . && systemctl restart hermes-gateway",
         'grep -r "$(hermes gateway restart)" .',
@@ -1751,7 +1751,7 @@ class TestLifecycleGuardDataArgumentExemption:
         "'systemctl stop hermes-gateway'\"",
         # grep/rg pattern arguments hunting for the lifecycle string.
         "grep -c 'systemctl restart hermes-gateway' /var/log/syslog",
-        "rg 'qubit gateway restart' /home/user/.hermes/logs/",
+        "rg 'hermes gateway restart' /home/user/.hermes/logs/",
         "journalctl -u hermes-gateway --grep 'systemctl restart hermes-gateway'",
         # SQL with stop/restart column/value words but no command shape.
         'sqlite3 stats.db "SELECT stop_time, restart_reason FROM '
@@ -1772,7 +1772,7 @@ class TestLifecycleGuardDataArgumentExemption:
         "grep 'restart' log; systemctl restart hermes-gateway",
         'sqlite3 db "SELECT 1"; hermes gateway stop',
         # Plain lifecycle commands are unaffected by the exemption.
-        "qubit gateway restart",
+        "hermes gateway restart",
         "sudo systemctl stop hermes-gateway",
     ])
     def test_command_position_lifecycle_still_blocked(self, command):

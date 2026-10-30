@@ -530,7 +530,7 @@ Path(sys.argv[3]).write_text(str(child.pid), encoding="utf-8")
 
 @posix_only
 def test_a_refusal_over_a_dead_updaters_lock_uses_the_held_wording(tmp_path):
-    """m6: `qubit update`, launch repair and source completion refuse through the lock's
+    """m6: `hermes update`, launch repair and source completion refuse through the lock's
     holder record. Its updater is dead and a child it started holds the lock: say so, never
     name the dead process."""
     from qubit_cli import update_lock

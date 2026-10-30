@@ -1,4 +1,4 @@
-"""Bedrock Converse / ConverseStream fault semantics through the real ``qubit chat -q`` CLI.
+"""Bedrock Converse / ConverseStream fault semantics through the real ``hermes chat -q`` CLI.
 
 Each scenario owns a loopback Bedrock fake (``tests/fakes/providers/bedrock_converse.py``) that the real
 boto3 client reaches via ``AWS_ENDPOINT_URL_BEDROCK_RUNTIME``; faults are the service's documented ones

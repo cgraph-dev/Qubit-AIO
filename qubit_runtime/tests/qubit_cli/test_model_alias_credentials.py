@@ -615,7 +615,7 @@ class TestAliasCacheIsProfileScoped:
 
 
 class TestOneShotUsesTheSameHostInvariant:
-    """`qubit chat -m <alias>` must not trust the alias's provider label.
+    """`hermes chat -m <alias>` must not trust the alias's provider label.
 
     These exercise the REAL resolver — the leak lives inside
     resolve_runtime_provider's provider-specific branches, so stubbing it
@@ -723,7 +723,7 @@ class TestDirectAliasHostGating:
 
 class TestOneshotPassesAliasCredential:
     def test_alias_api_key_is_passed_to_the_resolver(self, monkeypatch):
-        """``qubit chat -m theta`` must hand the alias's key to
+        """``hermes chat -m theta`` must hand the alias's key to
         resolve_runtime_provider, not leave it to env fallbacks."""
         from qubit_cli.model_switch import DirectAlias
         import qubit_cli.model_switch as ms

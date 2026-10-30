@@ -1,4 +1,4 @@
-"""``qubit config set telegram.allowed_chats '["a","b"]'`` stores a JSON-encoded *string*; every
+"""``hermes config set telegram.allowed_chats '["a","b"]'`` stores a JSON-encoded *string*; every
 Telegram allowlist reader must decode it instead of comma-splitting the brackets onto the ids."""
 
 from types import SimpleNamespace

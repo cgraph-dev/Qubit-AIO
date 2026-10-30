@@ -74,7 +74,7 @@ def test_an_invalid_toolset_name_reports_that_name(tmp_path):
 
 @pytest.mark.parametrize('name', ['deadserver', 'mcp-deadserver'])
 def test_an_explicit_pick_of_a_configured_mcp_server_builds_before_it_connects(tmp_path, name):
-    """`qubit chat -t terminal,<server>` names a configured MCP server whose toolset registers only
+    """`hermes chat -t terminal,<server>` names a configured MCP server whose toolset registers only
     after its first connect; an offline server is inactive, not a typo (#138748, #139154). The gateway
     accepts what the CLI's own validator accepts, and either spelling selects that server alone."""
     servers = {'deadserver': {'command': str(tmp_path / 'absent')}, 'other': {'command': str(tmp_path / 'absent')}}

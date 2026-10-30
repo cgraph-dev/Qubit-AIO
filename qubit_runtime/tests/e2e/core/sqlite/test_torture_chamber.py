@@ -6,7 +6,7 @@ version probe in every child, see ``_helpers``); every role is its own OS proces
 ``SessionDB``:
 a gateway-like writer, a TUI-like writer, a dashboard-like reader that opens at startup and lives across
 episodes, short-lived openers (production ``SessionDB`` and bare ``sqlite3``, plus the real
-``qubit sessions list`` / ``sessions stats`` CLI), FTS rebuild/optimize maintenance, and
+``hermes sessions list`` / ``sessions stats`` CLI), FTS rebuild/optimize maintenance, and
 ``repair_state_db_schema``. Each episode injects one fault class — ``kill -9`` mid-write, SIGTERM graceful
 close, POSIX lock cancellation by a stray in-process open/close, chmod flips, concurrent FTS rebuilds,
 repair against a live and an offline store, FTS corruption, a whole-fleet SIGKILL — and then asserts the

@@ -1,6 +1,6 @@
 """Vertex AI recovery paths: compaction in a signed reasoning session, and a mid-stream drop.
 
-Real ``qubit chat -q`` turns against the fake Vertex (``tests/fakes/providers/vertex.py``), which
+Real ``hermes chat -q`` turns against the fake Vertex (``tests/fakes/providers/vertex.py``), which
 rejects exactly what Gemini 3 rejects after history surgery: orphaned tool results, unanswered
 calls, and a current-turn function call without its thought signature (or with a signature it
 never issued). Scenarios run concurrently in a module fixture:

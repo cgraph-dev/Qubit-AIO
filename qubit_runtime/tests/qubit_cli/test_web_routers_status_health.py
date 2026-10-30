@@ -2,7 +2,7 @@
 
 Desktop's host-backend-attach.ts (``fetchBackendCodeIdentity``) reads ``commit`` from the public
 health probe and refuses to attach to a backend whose BOOT commit differs from its checkout, so a
-``serve`` that outlived ``qubit update`` is never re-adopted. The field must always be present
+``serve`` that outlived ``hermes update`` is never re-adopted. The field must always be present
 (``null`` off git) and must come from ``get_version_info().commit``.
 """
 

@@ -1,4 +1,4 @@
-"""``qubit plugins doctor`` warns when Desktop runs a stale copy of a unified package's desktop half."""
+"""``hermes plugins doctor`` warns when Desktop runs a stale copy of a unified package's desktop half."""
 
 from __future__ import annotations
 
