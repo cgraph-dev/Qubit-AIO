@@ -947,8 +947,8 @@ class ResponsesApiTransport(ProviderTransport):
         return status == "incomplete" and str(raw_reason or "").strip().lower() == "content_filter"
 
     def preflight_kwargs(
-        self, api_kwargs: Any, *, allow_stream: bool = False, is_github_responses: bool = False,
-        sanitize_harmony_tokens: bool = False,
+        self, api_kwargs: Any, *, allow_stream: bool = False, drop_replay_item_ids: bool = False,
+        is_github_responses: bool = False, sanitize_harmony_tokens: bool = False,
     ) -> dict:
         """Validate and sanitize Codex API kwargs before the call.
 
@@ -957,7 +957,7 @@ class ResponsesApiTransport(ProviderTransport):
         from agent.codex_responses_adapter import _preflight_codex_api_kwargs
 
         normalized = _preflight_codex_api_kwargs(
-            api_kwargs, allow_stream=allow_stream, is_github_responses=is_github_responses,
+            api_kwargs, allow_stream=allow_stream, drop_replay_item_ids=drop_replay_item_ids,
             sanitize_harmony_tokens=sanitize_harmony_tokens,
         )
         _bound_prompt_cache_key_field(normalized)
