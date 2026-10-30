@@ -1413,7 +1413,7 @@ class OpenVikingMemoryProvider(MemoryProvider):
         self._env_refresh_enabled = True
         self._session_id = session_id
         self._turn_count = 0
-        self._qubit_home = str(kwargs.get("hermes_home") or "").strip() or str(get_qubit_home())
+        self._qubit_home = str(kwargs.get("qubit_home") or kwargs.get("hermes_home") or "").strip() or str(get_qubit_home())
         self._acquire_run_lock()
         self._profile_prefetched_sessions.clear()
 

@@ -172,7 +172,7 @@ class ByteRoverMemoryProvider(MemoryProvider):
 
     def initialize(self, session_id: str, **kwargs) -> None:
         # Bind to the profile the manager names, not the ambient one (multiplexing contract, MemoryProvider).
-        home = kwargs.get("hermes_home")
+        home = kwargs.get("qubit_home") or kwargs.get("hermes_home")
         cwd = Path(home) / "byterover" if home else _get_brv_cwd()
         self._cwd, self._session_id, self._turn_count = str(cwd), session_id, 0
         Path(self._cwd).mkdir(parents=True, exist_ok=True)
