@@ -96,5 +96,5 @@ def test_config_edit_refusal_without_a_config_file_exits_nonzero(tmp_path, monke
     with pytest.raises(SystemExit) as exc:
         cfg.edit_config()
     assert exc.value.code == 1
-    assert "hermes config set" in capsys.readouterr().err
+    assert "qubit config set" in capsys.readouterr().err
     assert not (tmp_path / "config.yaml").exists()
