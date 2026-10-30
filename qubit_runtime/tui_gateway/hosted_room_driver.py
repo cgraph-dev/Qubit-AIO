@@ -9,6 +9,7 @@ sessions reuse ``Group: <room_id>`` so a local-to-hosted migration keeps one tra
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
@@ -19,6 +20,8 @@ from pathlib import Path
 from typing import Any, ContextManager, Protocol, cast
 
 from gateway import hosted_room_driver as state
+
+logger = logging.getLogger(__name__)
 
 _CANCEL_ROUTE_RETRIES = 8
 _STOP_ACK_STATUSES = {"cancelled", "interrupted"}
@@ -644,7 +647,9 @@ class HostedRoomRuntime:
                         attempt, f"was not admitted; queued for retry in {delay:g}s")
             elif submit_attempted:
                 self._mark_ambiguous(binding, attempt)
-                self._record_task_error(attempt, f"observation failed after submit: {exc}")
+                reason = str(getattr(exc, "reason", "") or "")
+                safe = reason if reason.isidentifier() and reason.islower() and len(reason) <= 64 else "attempt_failed"
+                self._record_task_error(attempt, f"observation failed after submit: {safe}")
             else:
                 self._settle_failure_if_current(attempt, exc)
         finally:
@@ -920,6 +925,13 @@ class HostedRoomRuntime:
 
     def _record_task_error(self, attempt: state.TaskAttempt, message: str) -> None:
         self._record_error(f"task {attempt.identity.task_id} {message}")
+        # A fixed code only: the exception body may carry prompt text or credentials.
+        reason = "attempt_failed"
+        for code in ("request_too_large", "not_admitted", "fenced"):
+            if code in message:
+                reason = code
+                break
+        logger.warning("hosted room task %s failed: %s", attempt.identity.task_id, reason)
 
     def _record_error(self, message: str) -> None:
         with self._status_lock:
