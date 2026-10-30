@@ -478,6 +478,10 @@ async def ssrf_redirect_guard(response):
         raise ValueError(f"Blocked redirect to private/internal address: {safe_url_for_log(redirect_url)}")
 
 
+# Read-old alias: sibling adapters written against the fork spelling keep resolving.
+_ssrf_redirect_guard = ssrf_redirect_guard
+
+
 # Inbound images are cached locally for the vision tool (platform URLs are ephemeral).
 # Import-time default; tests monkeypatch it, getters re-resolve per call.
 IMAGE_CACHE_DIR = get_qubit_dir("cache/images", "image_cache")
