@@ -262,8 +262,8 @@ def _deliver_fd_transcript(text: str) -> None:
         is_stop = is_voice_stop_phrase(text)
     except Exception:
         is_stop = False
-    if is_stop:  # turn already interrupted / TTS cut at trip time; now end the chat
-        _end_voice_chat(stop_loop=True, stop_tts=False)
+    if is_stop:  # turn already interrupted / TTS cut at trip time; now end this session's chat
+        _end_session_voice_chat(_voice_event_sid, stop_loop=True, stop_tts=False)
     _voice_emit("voice.transcript", {"stop_phrase": True, "text": text} if is_stop else {"text": text})
 
 
@@ -707,9 +707,9 @@ def _vr_transcript(payload: dict) -> None:
 
 
 def _vr_on_stop_phrase(t):
-    # A SPOKEN bare stop phrase: end the chat like /voice off and emit a distinct signal so
+    # A SPOKEN bare stop phrase: end this session's chat like /voice off and emit a distinct signal so
     # clients end the conversation instead of treating it as a no-speech timeout.
-    _end_voice_chat(stop_loop=False, stop_tts=True)
+    _end_session_voice_chat(_voice_capture_sid, stop_loop=False, stop_tts=True)
     _vr_transcript({"stop_phrase": True, "text": t})
 
 
@@ -731,18 +731,24 @@ def _(rid, params: dict) -> dict:
     wake_owner, _surface = _wake_owner_snapshot()
     if wake_owner is not None and wake_owner is not transport:
         return _ok(rid, {"status": "busy", "reason": "wake_owned"})
+    global _voice_event_sid, _voice_event_transport, _voice_wake_owner, _voice_capture_sid, _voice_capture_gen
+    sid = params.get("session_id") or _voice_event_sid
     try:
-        global _voice_event_sid, _voice_event_transport, _voice_wake_owner
-        if action == "start" and not _voice_mode_enabled():
+        if action == "start" and not _session_voice_enabled(sid):
             return _err(rid, 4015, "voice mode is off — enable with /voice on")
         with _voice_sid_lock:
-            _voice_event_sid = params.get("session_id") or _voice_event_sid
+            if action == "start" and _capture_live() and _voice_capture_sid and _voice_capture_sid != sid:
+                return _err(rid, 4016, "another session is recording; stop it before starting this one")
+            _voice_event_sid = sid
             _voice_event_transport = transport
         if action == "stop":
             from qubit_cli.voice import stop_continuous
             stop_continuous(force_transcribe=True)
             _resume_voice_wake()
             return _ok(rid, {"status": "stopped"})
+        with _voice_sid_lock:
+            _voice_capture_sid = sid
+            _voice_capture_gen += 1
         # PTT barge-in (#40010): arming the mic cuts in-flight TTS so a stale
         # reply can't talk over the user — mirrors the CLI record-key handler.
         # user_barge=True also marks the speech interrupted for the next turn's
@@ -770,12 +776,14 @@ def _(rid, params: dict) -> dict:
             with _voice_sid_lock:
                 _voice_wake_owner = transport
         started = start_continuous(
-            on_transcript=lambda t: _vr_transcript({"text": t}), on_status=_vr_on_status,
-            on_silent_limit=lambda: _vr_transcript({"no_speech_limit": True}),
+            on_transcript=_voice_capture_callback(lambda t: _vr_transcript({"text": t})),
+            on_status=_voice_capture_callback(_vr_on_status),
+            on_silent_limit=_voice_capture_callback(_vr_on_silent_limit),
             silence_threshold=_voice_cfg_number(voice_cfg.get("silence_threshold"), 200),
             silence_duration=_voice_cfg_number(voice_cfg.get("silence_duration"), 3.0),
             auto_restart=False, max_recording_seconds=max_rec if max_rec > 0 else 0.0,
-            on_stop_phrase=_vr_on_stop_phrase, on_partial=lambda t: _voice_emit("voice.partial", {"text": t}))
+            on_stop_phrase=_voice_capture_callback(_vr_on_stop_phrase),
+            on_partial=_voice_capture_callback(lambda t: _voice_emit("voice.partial", {"text": t})))
         if started is False:
             _resume_voice_wake()
         return _ok(rid, {"status": "busy" if started is False else "recording"})

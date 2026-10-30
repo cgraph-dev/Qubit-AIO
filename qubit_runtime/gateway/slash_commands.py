@@ -692,6 +692,9 @@ class GatewaySlashCommandsMixin(
         def _set_mode(mode: str) -> None:
             self._voice_mode[voice_key] = mode
             self._save_voice_modes()
+            # A local session's /voice off also ends the push-to-talk capture it started (shared owner).
+            from gateway.session_config import local_voice_transition
+            local_voice_transition(event.source, mode)
             if not adapter:
                 return
             if mode == "off":
