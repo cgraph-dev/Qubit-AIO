@@ -7,6 +7,7 @@ from __future__ import annotations
 import itertools
 import threading
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Mapping, Sequence
 
@@ -27,9 +28,13 @@ class HostedRoomSessionError(RuntimeError):
 class HostedRoomServerRPC:
     """Normalize the installed server handlers for :class:`HostedRoomRuntime`."""
 
-    def __init__(self, server: ModuleType) -> None:
+    def __init__(self, server: ModuleType, *, db_path: Path | str | None = None) -> None:
         self.server = server
         self._ids = itertools.count(1)
+        # Event-bound files resolve from the room store, as on the gateway route; without the
+        # store there is nothing to resolve them from, so the driver refuses the turn by name.
+        self.db_path = Path(db_path) if db_path is not None else None
+        self.accepts_attachments = self.db_path is not None
 
     def _call(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         envelope = self.server._methods[method](f"hosted-room-{next(self._ids)}", params)
