@@ -149,9 +149,19 @@ def _browser_connect(rid, params: dict) -> dict:
                       else parsed._replace(path="", params="", query="", fragment="").geturl())
         # Reap BEFORE publishing the new env (an in-flight tool call sees the old supervisor closed)
         # and AFTER (the default task's cached supervisor drains against the new URL).
+        # Reap this profile (multiplexed gateway: another profile's browser must survive) and the
+        # process-wide caches, BEFORE publishing the new endpoint and AFTER, so the supervisor swap
+        # window cannot re-attach to the old CDP endpoint.
+        _reap_profile_browsers()
         cleanup_all_browsers()
         os.environ["BROWSER_CDP_URL"] = normalized
+        # The per-profile live endpoint is what browser sessions/supervisors resolve and what the
+        # generation counter watches: publish it too so a multiplexed gateway never answers another
+        # profile's connect from the launch process env.
+        from tools.browser_session_cdp import set_live_cdp_override
+        set_live_cdp_override(normalized)
         cleanup_all_browsers()
+        _reap_profile_browsers()
     except Exception as e:
         return _err(rid, 5031, str(e))
     return _ok(rid, {"connected": True, "url": normalized,
@@ -159,14 +169,24 @@ def _browser_connect(rid, params: dict) -> dict:
 
 
 def _browser_disconnect(rid) -> dict:
-    # Reap, drop the override, reap again — same swap window as ``_browser_connect``.
+    # Reap, drop the override, reap again — same swap window as ``/browser connect``. The live
+    # endpoint is per profile; an operator's ``BROWSER_CDP_URL`` (one that differs from the live
+    # connect) is not ours to drop.
+    from tools.browser_session_cdp import live_cdp_override, set_live_cdp_override
+
     def reap() -> None:
         with contextlib.suppress(Exception):
             from tools.browser_tool_lifecycle import cleanup_all_browsers
             cleanup_all_browsers()
+        with contextlib.suppress(Exception):
+            _reap_profile_browsers()
 
+    live = live_cdp_override()
+    operator_env = os.environ.get("BROWSER_CDP_URL", "")
     reap()
-    os.environ.pop("BROWSER_CDP_URL", None)
+    if not (live and operator_env and operator_env != live):
+        os.environ.pop("BROWSER_CDP_URL", None)
+    set_live_cdp_override(None)
     reap()
     return _ok(rid, {"connected": False})
 

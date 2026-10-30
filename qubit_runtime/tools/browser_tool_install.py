@@ -69,7 +69,12 @@ def _find_agent_browser(*, validate: bool = True) -> str:
 
     termux = _is_termux_environment()
     if not termux:
-        installed = pm.installed_package("agent-browser")
+        try:
+            installed = pm.installed_package("agent-browser")
+        except (KeyError, ValueError):
+            # agent-browser is retired in favour of PM's Chromium; an install whose registry no
+            # longer defines it still runs an external/PATH agent-browser if one is present.
+            installed = None
         if installed and installed.binary is not None:
             return str(installed.binary)
     usable = agent_browser_runnable if validate else _agent_browser_candidate_present
@@ -85,7 +90,13 @@ def _find_agent_browser(*, validate: bool = True) -> str:
             pm.ensure("agent-browser")
         except (pm.InstallError, OSError) as exc:
             raise FileNotFoundError(f"{hint}\n{exc}") from exc
-        installed = pm.installed_package("agent-browser")
+        except (KeyError, ValueError) as exc:
+            # Retired package: no PM acquisition path exists, so an external CLI is the only one.
+            raise FileNotFoundError(f"{hint}\n{exc}") from exc
+        try:
+            installed = pm.installed_package("agent-browser")
+        except (KeyError, ValueError):
+            installed = None
         if installed and installed.binary is not None:
             return str(installed.binary)
     raise FileNotFoundError(hint)
