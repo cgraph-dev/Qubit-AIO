@@ -785,7 +785,7 @@ def _explicit_api_key_provider(provider, pconfig, requested_provider, model_cfg,
 # Providers with a dedicated explicit-credential builder; everything else goes through the
 # registry ``api_key`` path (or None when the provider takes no explicit creds).
 _EXPLICIT_RESOLVERS: Dict[str, Callable[..., Dict[str, Any]]] = {
-    "anthropic": _explicit_anthropic, "openai-codex": _explicit_codex, "nous": _explicit_nous,
+    "anthropic": _explicit_anthropic, "openai-codex": _explicit_codex, "nous": _explicit_nous, "qwen-oauth": lambda rq, mc, key, url, tm: _explicit_qwen(rq, mc, key, url, tm),
     "azure-foundry": lambda rq, mc, key, url, tm: _resolve_azure_foundry_runtime(requested_provider=rq, model_cfg=mc,
                                                                                  explicit_api_key=key, explicit_base_url=url),
 }
