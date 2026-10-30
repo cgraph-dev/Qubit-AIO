@@ -1864,10 +1864,19 @@ class FeishuAdapter(BasePlatformAdapter):
 
     async def send_voice(
         self, chat_id: str, audio_path: str, caption: Optional[str] = None, reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None, **kwargs,
+        metadata: Optional[Dict[str, Any]] = None, is_voice: Optional[bool] = None, **kwargs,
     ) -> SendResult:
         """Native voice message (Feishu only accepts Opus): non-opus audio is transcoded via ffmpeg
-        first; without ffmpeg the original file goes out as a file attachment."""
+        first; without ffmpeg the original file goes out as a file attachment.
+
+        A plain audio MEDIA file (``is_voice=False``: music, a sound effect) is not a voice
+        intent — it is uploaded under its own name and sent as a ``file`` attachment, never
+        transcoded into a voice note (even for ``.ogg``/``.opus`` sources)."""
+        if is_voice is False:
+            return await self._send_uploaded_file_message(
+                chat_id=chat_id, file_path=audio_path, reply_to=reply_to, metadata=metadata,
+                caption=caption, outbound_message_type="file", force_file=True,
+            )
         transcoded_path: Optional[str] = None
         ext = Path(audio_path).suffix.lower()
         if ext not in _FEISHU_OPUS_UPLOAD_EXTENSIONS:
@@ -3696,6 +3705,7 @@ class FeishuAdapter(BasePlatformAdapter):
     async def _send_uploaded_file_message(
         self, *, chat_id: str, file_path: str, reply_to: Optional[str], metadata: Optional[Dict[str, Any]],
         caption: Optional[str] = None, file_name: Optional[str] = None, outbound_message_type: str = "file",
+        force_file: bool = False,
     ) -> SendResult:
         if not self._client:
             return SendResult(success=False, error="Not connected")
@@ -3706,6 +3716,10 @@ class FeishuAdapter(BasePlatformAdapter):
         upload_file_type, resolved_message_type = self._resolve_outbound_file_routing(
             file_path=display_name, requested_message_type=outbound_message_type,
         )
+        if force_file:
+            # Explicit attachment intent wins over extension-based voice routing: a plain audio
+            # file keeps its name and goes out as a ``file``, never as a native voice note.
+            upload_file_type, resolved_message_type = _FEISHU_FILE_UPLOAD_TYPE, "file"
         try:
             duration_ms = self._get_audio_duration_ms(file_path) if upload_file_type == "opus" else 0
             with open(file_path, "rb") as file_obj:
@@ -4363,7 +4377,7 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
             last_result = await adapter.send(chat_id, message, metadata=metadata)
             if not last_result.success:
                 return send_error(f"Feishu send failed: {last_result.error}")
-        for media_path, _is_voice in media_files or []:
+        for media_path, is_voice in media_files or []:
             if not os.path.exists(media_path):
                 return send_error(f"Media file not found: {media_path}")
             ext = os.path.splitext(media_path)[1].lower()
@@ -4371,11 +4385,12 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
                 sender = adapter.send_image_file
             elif ext in _MIGRATION_VIDEO_EXTS:
                 sender = adapter.send_video
-            elif ext in _MIGRATION_AUDIO_EXTS:  # voice + non-voice audio both go out as voice
+            elif ext in _MIGRATION_AUDIO_EXTS:  # voice intent -> native voice; plain audio -> named file
                 sender = adapter.send_voice
             else:
                 sender = adapter.send_document
-            last_result = await sender(chat_id, media_path, metadata=metadata)
+            send_kwargs = {"is_voice": bool(is_voice)} if ext in _MIGRATION_AUDIO_EXTS else {}
+            last_result = await sender(chat_id, media_path, metadata=metadata, **send_kwargs)
             if not last_result.success:
                 return send_error(f"Feishu media send failed: {last_result.error}")
         if last_result is None:
@@ -4526,8 +4541,9 @@ PLATFORM_HINT = (
     "You are in a Feishu (Lark) workspace communicating with your user. Feishu renders Markdown in "
     "messages \\u2014 bold, italic, code blocks, and links are supported. You can send media files "
     "natively: include MEDIA:/absolute/path/to/file in your response. Images (.jpg, .png, .webp) are "
-    "uploaded and displayed inline, audio files as native voice messages (non-Opus formats are transcoded"
-    " automatically; without ffmpeg they fall back to file attachments), and other files as attachments."
+    "uploaded and displayed inline, audio files are sent as named file attachments unless the reply "
+    "includes [[audio_as_voice]] on its own line (then non-Opus formats are transcoded automatically, "
+    "falling back to a file attachment without ffmpeg), and other files as attachments."
 )
 
 def register(ctx) -> None:
