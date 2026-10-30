@@ -476,5 +476,9 @@ def recover_local_sessions(authority, *, schedule=False):
             if any(row['status'] == 'unknown' for row in list_session_admissions(authority.db, session_id=sid)):
                 # A hard-killed owner's turn: the drain pauses on it, so the close resolves it.
                 track_mutation(authority, settle_viewer_close(authority, sid))
-        from gateway.session_viewer_close import arm_startup_orphan_closes
-        arm_startup_orphan_closes(authority, orphans)
+        try:  # lane 3 owns the orphan-close subsystem; skip until it lands
+            from gateway.session_viewer_close import arm_startup_orphan_closes
+        except ImportError:
+            pass
+        else:
+            arm_startup_orphan_closes(authority, orphans)
