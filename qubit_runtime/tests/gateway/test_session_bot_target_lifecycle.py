@@ -23,7 +23,7 @@ async def bot(tmp_path, monkeypatch):
 
     monkeypatch.setenv('QUBIT_HOME', str(tmp_path))
     monkeypatch.setattr(run, '_load_gateway_config',
-                        lambda: {'platform_toolsets': {'cli': []}, 'model': {'default': 'fixture'}})
+                        lambda *_path: {'platform_toolsets': {'cli': []}, 'model': {'default': 'fixture'}})
     store = SessionStore(tmp_path / 'sessions', GatewayConfig())
     store._db = SessionDB(db_path=tmp_path / 'state.db')
     runner = SimpleNamespace(session_store=store, _session_db=store._db, adapters={}, _draining=False,

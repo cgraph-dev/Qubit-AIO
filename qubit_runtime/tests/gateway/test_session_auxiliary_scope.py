@@ -33,4 +33,7 @@ def test_policy_scope_binds_the_sessions_auxiliary_section():
 
     source = inspect.getsource(session_policy.policy_scope)
     assert "session_auxiliary_scope(" in source
-    assert "aux_scope" in source.split("with editor_scope")[1]
+    # The scope is entered in the same ``with`` tuple as the editor/MCP scopes, after them.
+    scopes = source.split("with (", 1)[1]
+    assert "editor_scope(policy)" in scopes
+    assert scopes.index("editor_scope(policy)") < scopes.index("aux_scope")

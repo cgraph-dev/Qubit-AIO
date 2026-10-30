@@ -7,6 +7,7 @@ import asyncio
 import atexit
 import concurrent.futures
 import contextlib
+import functools
 import hmac
 import os
 import re
