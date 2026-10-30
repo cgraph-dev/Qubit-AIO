@@ -311,4 +311,4 @@ class SlashCommandsMixin:
     def _cmd_version(self, args: str, state: SessionState) -> str:
         from qubit_cli.version_info import get_version_info
 
-        return f"Hermes Agent v{get_version_info().derived_version}"
+        return f"Qubit Agent v{get_version_info().derived_version}"

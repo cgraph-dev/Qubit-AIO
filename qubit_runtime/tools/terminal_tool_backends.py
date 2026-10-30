@@ -135,7 +135,7 @@ def _build_local_env(*, cwd, timeout, local_config=None, **_):
     # exported-env carry-over (TERMINAL_LOCAL_PERSISTENT). Without this the knob reached the
     # creator and stopped there.
     return _LocalEnvironment(cwd=cwd, timeout=timeout,
-                             persist_env=bool((local_config or {}).get("persistent", True)))
+                             persistent=bool((local_config or {}).get("persistent", True)))
 
 
 def _build_docker_env(*, image, cwd, timeout, cc, task_id, host_cwd, **_):

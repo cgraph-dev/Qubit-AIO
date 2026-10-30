@@ -45,16 +45,16 @@ def _slash_command(text):
 
 def _bypass_route():
     """--safe-mode / --ignore-user-config read no profile default route, so the session freezes the
-    launch's explicit one (``hermes -m <model> --provider <name> --safe-mode acp``). Both, refused at
+    launch's explicit one (``qubit -m <model> --provider <name> --safe-mode acp``). Both, refused at
     session/new: a model alone is accepted by the owner, then its first turn cannot build the agent."""
     model = (os.environ.get("HERMES_MODEL") or os.environ.get("HERMES_INFERENCE_MODEL") or "").strip()
     if not model:
         raise GatewayClientError("--safe-mode / --ignore-user-config read no profile default model: launch "
-                                 "with one, e.g. hermes -m <model> --provider <provider> --safe-mode acp")
+                                 "with one, e.g. qubit -m <model> --provider <provider> --safe-mode acp")
     provider = os.environ.get("HERMES_INFERENCE_PROVIDER", "").strip()
     if not provider:
         raise GatewayClientError("--safe-mode / --ignore-user-config read no profile provider: launch with "
-                                 "--provider too, e.g. hermes -m <model> --provider <provider> --safe-mode acp")
+                                 "--provider too, e.g. qubit -m <model> --provider <provider> --safe-mode acp")
     return {"model": model, "provider": provider}
 
 
@@ -153,6 +153,9 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         # never arrived. The editor's retry (that session's next prompt, same content) reuses it, so the authority
         # returns the same admission.
         self._unacked = {}
+        # Session -> the prompt's PRE-staging identity, kept beside ``_unacked`` so a retry of a remote
+        # image matches before its URL is fetched a second time.
+        self._pre_stage = {}
         # Admissions whose terminal reply one path (the pump's message.complete or a retry's
         # terminal receipt) is delivering right now; the other path yields to the claim.
         self._settling = set()
@@ -832,6 +835,19 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         from acp_adapter.content import _content_blocks_to_openai_user_content
         from acp_adapter.gateway_media import stage_user_content
         content = _content_blocks_to_openai_user_content(prompt)
+        from acp_adapter.gateway_media import submit_fingerprint
+        pre_key = submit_fingerprint(session_id, content)
+        # Only this session's very next prompt may be the editor's retry of an un-acked submit; any
+        # prompt (slash work included) retires the retained identity, so a later repeat is new work.
+        retained = self._unacked.pop(session_id, None)
+        pre_retained = self._pre_stage.pop(session_id, None)
+        if retained is not None and (retained[0] == pre_key or pre_retained == pre_key):
+            if retained[0] != pre_key:
+                # The retained key was staged; the pre-stage identity proves it is the same prompt.
+                pass
+            if len(retained) == 3:
+                return retained
+            return retained[0], retained[1], retained[2] if len(retained) > 2 else None
         # The editor's Stop during staging (a remote image download) is held like one during the
         # submit itself, and the prompt then ends without being sent.
         self._submitting.add(session_id)
@@ -841,9 +857,6 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
             self._submitting.discard(session_id)
         text, attachments = staged if isinstance(staged, tuple) else (staged, [])
         retry_key = _submit_fingerprint(session_id, text, attachments)
-        # Only this session's very next prompt may be the editor's retry of an un-acked submit; any
-        # prompt (slash work included) retires the retained identity, so a later repeat is new work.
-        retained = self._unacked.pop(session_id, None)
         if retained is not None and retained[0] == retry_key:
             # The retry resends what the owner may already hold: the staged content and input_id are
             # reused, never submitted a second time. A retained identity may be the two-field form.
@@ -853,6 +866,7 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         if session_id in self._pending_cancels:
             self._pending_cancels.discard(session_id)
             return None
+        self._pre_stage[session_id] = pre_key
         return retry_key, uuid.uuid4().hex, (text, attachments)
 
     async def _after_ack(self, session_id, admission_id, link, resumes):
