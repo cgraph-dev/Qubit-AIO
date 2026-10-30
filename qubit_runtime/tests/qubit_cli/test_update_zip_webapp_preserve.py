@@ -19,15 +19,18 @@ def _git(root, *args):
 def clean_install(tmp_path):
     # Keep the real ignore rules and tracked root entries without copying a full checkout
     # or committing fixture source. Git objects are read-only shared with the test checkout.
-    root = tmp_path / "install"
+    outer = tmp_path / "install"
     repo = Path(__file__).resolve().parents[3]
     subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", "--template=",
-                    str(repo), str(root)], check=True)
-    _git(root, "config", "core.sparseCheckout", "true")
-    (root / ".git/info").mkdir(exist_ok=True)
-    (root / ".git/info/sparse-checkout").write_text(
-        "/.gitignore\n/apps/desktop/package.json\n", encoding="utf-8")
-    _git(root, "read-tree", "-mu", "HEAD")
+                    str(repo), str(outer)], check=True)
+    _git(outer, "config", "core.sparseCheckout", "true")
+    (outer / ".git/info").mkdir(exist_ok=True)
+    # The Qubit runtime lives in the ``qubit_runtime`` subtree of the repo; its own
+    # .gitignore and tracked desktop entry are the ones the update swap reads.
+    (outer / ".git/info/sparse-checkout").write_text(
+        "/qubit_runtime/.gitignore\n/qubit_runtime/apps/desktop/package.json\n", encoding="utf-8")
+    _git(outer, "read-tree", "-mu", "HEAD")
+    root = outer / "qubit_runtime"
     assert _git(root, "status", "--porcelain", "--untracked-files=all") == ""
     for dist in (root / "apps/desktop/dist", webapp_dist_dir(root)):
         dist.mkdir(parents=True)
