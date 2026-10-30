@@ -522,19 +522,24 @@ def load_agent_plugin(plugin_root: Path, data_root: Path) -> AgentPluginPackage:
     )
 
 
-def manifest_qubit_extension(manifest: Any) -> dict:
+def manifest_hermes_extension(manifest: Any) -> dict:
     """``extensions.com.nousresearch.hermes`` of a parsed ``plugin.json`` (Agent Plugins v1 forbids
     unknown top-level fields, so Qubit-specific fields such as ``config_keys`` live here), else ``{}``."""
     extensions = manifest.get("extensions") if isinstance(manifest, dict) else None
-    qubit = extensions.get(_HERMES_EXTENSION) if isinstance(extensions, dict) else None
-    return qubit if isinstance(qubit, dict) else {}
+    namespace = extensions.get(_HERMES_EXTENSION) if isinstance(extensions, dict) else None
+    return namespace if isinstance(namespace, dict) else {}
+
+
+def manifest_qubit_extension(manifest: Any) -> dict:
+    """Qubit-canonical alias of :func:`manifest_hermes_extension` (read-old spelling)."""
+    return manifest_hermes_extension(manifest)
 
 
 def manifest_config_schema(manifest: Any) -> Any:
     """Raw ``extensions.com.nousresearch.hermes.config_schema`` of a parsed ``plugin.json``, else
     ``None``. Unvalidated: the settings form filters it, the loader and ``plugins validate`` report
     what is malformed."""
-    return manifest_qubit_extension(manifest).get("config_schema")
+    return manifest_hermes_extension(manifest).get("config_schema")
 
 
 def read_agent_plugin_manifest(plugin_root: Path) -> tuple[dict, tuple[AgentPluginDiagnostic, ...]]:

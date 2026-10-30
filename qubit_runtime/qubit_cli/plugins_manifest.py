@@ -515,7 +515,7 @@ def requires_qubit_error(manifest: PluginManifest | Mapping[str, Any]) -> Option
 
 def portable_plugin_manifest(child: Path, source: str, prefix: str) -> PluginManifest:
     """Build the manifest for a portable Agent Plugin directory (``plugin.json``); diagnostics warn."""
-    from qubit_cli.agent_plugins import manifest_config_schema, manifest_qubit_extension, read_agent_plugin_manifest
+    from qubit_cli.agent_plugins import manifest_config_schema, manifest_hermes_extension, read_agent_plugin_manifest
     data, diagnostics = read_agent_plugin_manifest(child)
     for diagnostic in diagnostics:
         logger.warning("Agent Plugin '%s': %s", child, diagnostic.message)
@@ -525,7 +525,7 @@ def portable_plugin_manifest(child: Path, source: str, prefix: str) -> PluginMan
         author=_display_author(data.get("author", "")), source=source, path=str(child), key=key,
         portable=True, data_namespace=_portable_data_namespace(key),
         config_schema=_config_schema_entries(key, manifest_config_schema(data)),
-        config_keys=manifest_config_keys(manifest_qubit_extension(data), key),
+        config_keys=manifest_config_keys(manifest_hermes_extension(data), key),
     )
 
 
