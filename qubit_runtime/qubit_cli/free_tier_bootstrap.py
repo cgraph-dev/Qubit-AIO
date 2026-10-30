@@ -1,14 +1,14 @@
-"""Serve-start bootstrap for the Qubit free tier: the ONE place a free-tier identity is created.
+"""Record of who carries inference, for ``setup.status`` and ``setup.ready``.
 
-Every Qubit process that may need the free tier runs this once at boot (``qubit serve`` on a
-daemon thread beside the other background boots; the CLI first-run guard synchronously). It
-inventories credentials cheap-first, creates the identity only when the launch gate is open
-(:func:`qubit_cli.anon_auth.guest_enabled`), resolves which provider carries inference, records
-the answer in process memory, and tells every connected client with one ``setup.ready`` event.
-
-Nothing else mints. ``free_tier.status`` and ``setup.status`` read the record; provider resolution
-never reaches the portal; a dead credential is replaced by the explicit re-mint in
-``auth_nous.resolve_nous_runtime_credentials``. Ruling: NS-845 Q1.2 (recorded on NS-847).
+It runs once per process on a daemon thread: at ``qubit serve`` boot, and on the gateway when the
+local Desktop first connects (``tui_gateway.methods_onboarding.begin_local_desktop_boot``). It never
+creates an identity: the desktop's welcome-trial claim (``qubit_cli.welcome_trial``) and the first
+hosted connector action are the only creators. For the desktop's local backend it first records a
+fresh install's onboarding decision (``onboarding_run.latch_first_install``) and settles a claim cut
+off before its marker write (``welcome_trial.settle_interrupted_claim``). Then it inventories
+credentials cheap-first, resolves which provider carries inference, records the answer in process
+memory, and tells every connected client with one ``setup.ready`` event. ``free_tier.status`` and
+``setup.status`` read the record; provider resolution never reaches the portal.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class SetupRecord:
     provider_configured: bool      # some provider can carry inference (free tier included)
     inference_provider: str        # ``resolve_provider("auto")``'s answer, "" when nothing resolves
     free_tier_account: bool        # the identity that exists is the free tier AND the tier is on
-    has_identity: bool             # a Nous identity (free tier or account) is on disk
+    has_identity: bool             # a Qubit identity (free tier or account) is on disk
     other_providers: bool          # the inventory found something usable BESIDES the free tier
     error: str = ""                # why the mint did not happen, when it did not; "" otherwise
     # The mint memo's verdict, verbatim (``anon_auth.MintFailure.as_payload``):
@@ -64,6 +64,8 @@ _lock = threading.Lock()
 _record: Optional[SetupRecord] = None
 _done = threading.Event()
 _started = False
+_settled = False  # the bootstrap recorded the install and settled the claim (``_settle_install``)
+_resettle_lock = threading.Lock()
 # ``(mtime_ns, size)`` of the files the inventory reads, taken by the inventory that built the
 # current record; ``reconcile_record`` re-inventories only when they moved.
 _inventory_stamp: Optional[tuple] = None
@@ -118,22 +120,23 @@ def reconcile_record() -> Optional[SetupRecord]:
 
 
 def reset_for_tests() -> None:
-    global _record, _started, _inventory_stamp
+    global _record, _started, _settled, _inventory_stamp
     with _lock:
         _record = None
         _started = False
+        _settled = False
         _inventory_stamp = None
         _done.clear()
 
 
 def _config_stamp() -> tuple:
     from qubit_cli.config import get_qubit_home
+    from utils import file_cache_version
     home = get_qubit_home()
     stamp = []
     for name in _INVENTORY_FILES:
         try:
-            st = (home / name).stat()
-            stamp.append((st.st_mtime_ns, st.st_size))
+            stamp.append(file_cache_version(home / name, always_digest=True))
         except OSError:
             stamp.append(None)
     return tuple(stamp)
@@ -212,14 +215,10 @@ def _build_record(*, other: bool, mint: bool = False, force: bool = False) -> Se
 
 
 def run_bootstrap(*, announce: bool = True) -> SetupRecord:
-    """Grandfather an existing free-model guest -> inventory -> resolve inference -> record -> broadcast.
-
-    Never creates an identity: the desktop's welcome-trial claim (``welcome_trial``) and the
-    explicit ``retry_bootstrap_mint`` are the creators. Idempotent per process: a second call
-    returns the existing record. Never raises. ``announce=False`` skips the ``setup.ready`` event:
-    the plain CLI has no client to tell and its stdout is the user's terminal.
-    """
-    global _record, _started
+    """Settle an interrupted claim -> inventory -> resolve inference -> record ->
+    broadcast. Idempotent per process: a second call returns the existing record. Never raises.
+    ``announce=False`` skips the ``setup.ready`` event."""
+    global _record, _started, _settled
     with _lock:
         if _record is not None:
             return _record
@@ -229,26 +228,53 @@ def run_bootstrap(*, announce: bool = True) -> SetupRecord:
                 return _record
         _started = True
 
+    settled = _settle_install()
+    record = _build_record(other=_inventory_other_providers())
+    with _lock:
+        _record, _settled = record, settled
+        _done.set()
+    if announce:
+        _broadcast(record)
+    return record
+
+
+def _settle_install() -> bool:
+    """Record a fresh install and settle the guest's claim; True when neither step failed. A failure is
+    logged: onboarding.state still answers live, and the record still says who carries inference."""
+    settled = True
     try:
         from qubit_cli import anon_auth
         from qubit_cli.onboarding_run import latch_first_install
         if anon_auth.on_local_desktop_backend():
             latch_first_install()
-    except Exception:  # the next boot tries again; onboarding.state still answers live
+    except Exception:
+        settled = False
         logger.warning("onboarding: could not record the first-install decision", exc_info=True)
     try:
-        from qubit_cli.welcome_trial import grandfather_existing_guest, settle_interrupted_claim
+        from qubit_cli.welcome_trial import settle_interrupted_claim
         settle_interrupted_claim()
-        grandfather_existing_guest()
-    except Exception:  # the record still says who carries inference without it
-        logger.warning("free tier: could not check for an existing free-model guest", exc_info=True)
-    record = _build_record(other=_inventory_other_providers())
+    except Exception:
+        settled = False
+        logger.warning("free tier: could not settle an interrupted claim", exc_info=True)
+    return settled
+
+
+def resettle_after_failed_boot() -> None:
+    """The local Desktop connected again to a process whose bootstrap could not settle the install:
+    try those steps again and rebuild the record when they pass. Nothing before the bootstrap
+    finished or once it settled."""
+    global _settled
     with _lock:
-        _record = record
-        _done.set()
-    if announce:
-        _broadcast(record)
-    return record
+        unsettled = _record is not None and not _settled
+    if not unsettled or not _resettle_lock.acquire(blocking=False):  # one retry at a time
+        return
+    try:
+        if _settle_install():
+            with _lock:
+                _settled = True
+            refresh_record()
+    finally:
+        _resettle_lock.release()
 
 
 # Background retries after a boot-time mint failure: the memo's cooldown decides WHEN (a server
@@ -315,25 +341,9 @@ def _broadcast(record: SetupRecord) -> None:
         logger.debug("setup.ready not broadcast: %s", exc)
 
 
-def _due_changed() -> None:
-    from qubit_cli import onboarding_due
-
-    onboarding_due.invalidate()
-
-
-def refresh_record(*, announce: bool = True) -> Optional[SetupRecord]:
-    """Rebuild the launch profile's record after the identity changed (a trial claim), so
-    ``setup.status`` and the ``setup.ready`` listeners move with it. None before the first bootstrap."""
-    global _record
-    if _record is None:
-        return None
-    record = _build_record(other=_inventory_other_providers())
-    with _lock:
-        _record = record
-    _due_changed()
-    if announce:
-        _broadcast(record)
-    return record
+def start_background_bootstrap() -> threading.Thread:
+    """Run on a daemon thread so the inventory never delays the socket."""
+    from agent.memory_provider import spawn_context_thread
 
 
 def start_background_bootstrap() -> threading.Thread:
