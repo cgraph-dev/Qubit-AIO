@@ -12,6 +12,7 @@ import json
 import logging
 import re
 import threading
+import time
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional
@@ -19,11 +20,14 @@ from typing import Any, Callable, Dict, List, Optional
 from agent.redact import redact_for_egress
 
 from agent.memory_caller_scope import bound_scope, caller_scope, claim_instance, in_owner_home, refused_tool_message
-# Moved to agent.memory_context; still importable here because agent.memory_manager is a public
+# Moved to agent.memory_context / agent.memory_manager_tools; still importable here because agent.memory_manager is a public
 # module for plugins (qubit_cli/plugin_validate_private_imports.py).
 from agent.memory_context import StreamingContextScrubber, build_memory_context_block, sanitize_context
+from agent.memory_manager_tools import (inject_memory_provider_tools, memory_provider_tools_enabled,
+                                        memory_provider_tools_exposed, normalize_tool_schema)
 from agent.memory_provider import MemoryProvider, PRE_COMPRESS_CHECKPOINT_API_VERSION, ctx_bound, spawn_context_thread
 from agent.skill_commands import extract_user_instruction_from_skill_message
+from qubit_constants import qubit_home_key
 from tools.hook_output_spill import get_spill_config, spill_if_oversized
 from tools.registry import tool_error
 
@@ -36,6 +40,21 @@ _LEGACY_PRE_COMPRESS_API_VERSION = 1
 # blocks interpreter exit.
 _SYNC_DRAIN_TIMEOUT_S = 5.0
 _EXTERNAL_PREFETCH_TIMEOUT_S = 8.0
+# A background provider call (sync_turn / queue_prefetch) running longer than this is treated as
+# stuck. Well above the shutdown drain bound and the prefetch timeout so a slow-but-healthy backend
+# is never counted.
+_BACKGROUND_CALL_STALL_S = 30.0
+# Admission for external provider calls per (home, provider); see _StuckCallGate. Python cannot stop a
+# thread, so every stuck call pins one until it returns. New calls stop once this many calls that started
+# after the provider's last successful return are overdue; older orphans belong to an outage it has
+# since recovered from.
+_MAX_STUCK_CALLS = 4
+# While the gate is closed, one call per interval goes through, so a recovered backend proves itself
+# without waiting for an orphan to return.
+_PROBE_INTERVAL_S = 60.0
+# Hard cap on calls in flight per (home, provider), orphans included: failed probes pin one more thread
+# each, so admission (probes too) stops here and a backend that stays wedged pins a bounded number.
+_MAX_INFLIGHT_CALLS = 16
 
 
 # -- Signature introspection (providers are duck-typed; call shapes vary) -----
@@ -64,104 +83,6 @@ def _accepts_require_checkpoint(fn: Callable[..., Any]) -> bool:
     kind = getattr(params.get("require_checkpoint"), "kind", None)
     return _has_var_kwargs(params) or kind in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
 
-
-# -- Tool-schema plumbing -----------------------------------------------------
-
-def normalize_tool_schema(schema: Any) -> Optional[Dict[str, Any]]:
-    """Return a bare function-tool dict with a resolvable top-level ``name``, else None.
-
-    Providers should return ``{"name", "description", "parameters"}`` but some return the
-    wrapped OpenAI form; wrapping that twice yields a nameless ``function`` and strict
-    providers (DeepSeek) reject the ENTIRE request, so both shapes are normalized here.
-    """
-    if not isinstance(schema, dict):
-        return None
-    if schema.get("type") == "function" and isinstance(schema.get("function"), dict):
-        schema = schema["function"]
-    name = schema.get("name", "")
-    return schema if name and isinstance(name, str) else None
-
-
-def memory_provider_tools_enabled(enabled_toolsets: Optional[List[str]], disabled_toolsets: Optional[List[str]] = None,
-                                  *, memory_tool_present: bool = False) -> bool:
-    """Return whether external memory-provider tools should be exposed."""
-    if disabled_toolsets and "memory" in disabled_toolsets:
-        return False
-    if memory_tool_present or enabled_toolsets is None:
-        return True
-    if not enabled_toolsets:
-        return False
-    if "memory" in enabled_toolsets:
-        return True
-    try:
-        from toolsets import resolve_toolset
-
-        return any("memory" in resolve_toolset(name) for name in enabled_toolsets)
-    except Exception:
-        logger.debug("Failed to resolve enabled toolsets for memory-provider tools", exc_info=True)
-        return False
-
-
-def _tool_name(tool: Any) -> Any:
-    return tool.get("function", {}).get("name") if isinstance(tool, dict) else None
-
-
-def memory_provider_tools_exposed(agent: Any) -> bool:
-    """Whether external memory-provider tools are exposed on ``agent``.
-
-    Same gate as ``inject_memory_provider_tools`` so a provider's ``system_prompt_block()``
-    never advertises tools absent from the tool surface.
-    """
-    tools = getattr(agent, "tools", None)
-    present = isinstance(tools, (list, tuple)) and any(_tool_name(t) == "memory" for t in tools)
-    enabled, disabled = getattr(agent, "enabled_toolsets", None), getattr(agent, "disabled_toolsets", None)
-    return memory_provider_tools_enabled(enabled, disabled, memory_tool_present=present)
-
-
-def inject_memory_provider_tools(agent: Any) -> int:
-    """Append external memory-provider tool schemas to an agent tool surface; return count added."""
-    memory_manager = getattr(agent, "_memory_manager", None)
-    tools = getattr(agent, "tools", None)
-    if not memory_manager or tools is None:
-        return 0
-
-    if not memory_provider_tools_exposed(agent):
-        # Say so once: a silent 0 leaves the provider looking "half on" with no clue which
-        # config key (platform_toolsets / disabled_toolsets) gated it.
-        # See #81014.
-        _providers = [p for p in getattr(memory_manager, "providers", None) or []
-                      if getattr(p, "name", "") != "builtin"]
-        if _providers:
-            logger.info(
-                "Memory provider(s) %s configured but the 'memory' toolset is "
-                "gated off for this session (platform_toolsets / "
-                "agent.disabled_toolsets) — provider tools and system-prompt "
-                "block are both withheld.",
-                [getattr(p, "name", type(p).__name__) for p in _providers],
-            )
-        return 0
-
-    get_schemas = getattr(memory_manager, "get_all_tool_schemas", None)
-    if not callable(get_schemas):
-        return 0
-
-    if getattr(agent, "valid_tool_names", None) is None:
-        agent.valid_tool_names = set()
-    existing_tool_names = {_tool_name(tool) for tool in tools if isinstance(tool, dict)}
-    added = 0
-    for raw_schema in get_schemas():
-        schema = normalize_tool_schema(raw_schema)
-        if schema is None:
-            logger.warning(
-                "Memory provider returned a tool schema with no resolvable "
-                "name; skipping to avoid poisoning the request (%r)", raw_schema,
-            )
-        elif schema["name"] not in existing_tool_names:
-            tools.append({"type": "function", "function": schema})
-            agent.valid_tool_names.add(schema["name"])
-            existing_tool_names.add(schema["name"])
-            added += 1
-    return added
 
 # -- Provider egress scrubbing -----------------------------------------------
 
@@ -214,8 +135,62 @@ def _redact_for_provider(*values: Any) -> Any:
     return scrubbed[0] if len(scrubbed) == 1 else tuple(scrubbed)
 
 
-def _redact_messages_for_egress(messages: Optional[List[Any]]) -> Optional[List[Any]]:
+def _redact_messages_for_egress(messages: Optional[list[Any]]) -> Optional[list[Any]]:
     return None if messages is None else list(_redact_for_provider(messages))
+
+
+class _StuckCallGate:
+    """Process-wide admission for one kind of external provider call, keyed by (Hermes home, provider).
+
+    A new MemoryManager is built per agent, so a per-instance view would let every fresh manager start
+    one more call against a hung backend and pin one more thread. Shared, the gate closes once
+    _MAX_STUCK_CALLS calls that started after the key's last successful return are past their deadline,
+    admits one half-open probe per _PROBE_INTERVAL_S while closed, and never lets more than
+    _MAX_INFLIGHT_CALLS be in flight. Calls not yet overdue are not counted, so healthy concurrent
+    sessions run side by side. Each call removes only its own entry.
+    """
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.calls: dict[tuple[str, str], dict[object, tuple[float, float]]] = {}  # token -> (start, deadline)
+        self.last_ok: dict[tuple[str, str], float] = {}
+        self.probe_at: dict[tuple[str, str], float] = {}  # interval start: gate close, then each probe
+        self.skips: dict[tuple[str, str], int] = {}
+
+    def enter(self, key: tuple[str, str], token: object, timeout: float) -> Optional[tuple[int, int, int]]:
+        """Register ``token`` and return None, or ``(stuck, in_flight, skips)`` when the call is skipped."""
+        now = time.monotonic()
+        with self.lock:
+            calls = self.calls.setdefault(key, {})
+            last_ok = self.last_ok.get(key, float("-inf"))
+            stuck = sum(start > last_ok and now > deadline for start, deadline in calls.values())
+            if len(calls) >= _MAX_INFLIGHT_CALLS:
+                admit = False
+            elif stuck < _MAX_STUCK_CALLS:
+                admit = True
+                self.probe_at.pop(key, None)
+                self.skips.pop(key, None)  # gate open: the next outage warns on its first skip
+            else:
+                admit = now - self.probe_at.setdefault(key, now) >= _PROBE_INTERVAL_S
+                if admit:
+                    self.probe_at[key] = now
+            if not admit:
+                skips = self.skips[key] = self.skips.get(key, 0) + 1
+                return stuck, len(calls), skips
+            calls[token] = (now, now + timeout)
+            return None
+
+    def leave(self, key: tuple[str, str], token: object, *, ok: bool) -> None:
+        with self.lock:
+            calls = self.calls.get(key)
+            if calls is None or calls.pop(token, None) is None:
+                return
+            if calls:
+                if ok:
+                    self.last_ok[key] = time.monotonic()
+                return
+            for state in (self.calls, self.last_ok, self.probe_at, self.skips):
+                state.pop(key, None)
 
 
 class MemoryManager:
@@ -225,38 +200,45 @@ class MemoryManager:
     swallows per-provider exceptions.
     """
 
+    # External prefetch threads (#134392) and background sync_turn / queue_prefetch calls. The home is
+    # part of the key because one gateway process can serve several profiles, each with its own config
+    # and credentials for a same-named provider: one profile's hung backend must not silence another's.
+    _PREFETCH_GATE = _StuckCallGate()
+    _BACKGROUND_GATE = _StuckCallGate()
+
     def __init__(self, *, external_prefetch_timeout: Optional[float] = None) -> None:
-        self._providers: List[MemoryProvider] = []
-        self._tool_to_provider: Dict[str, MemoryProvider] = {}
-        self._external_prefetch_spill_config: Optional[Dict[str, Any]] = None
+        self._providers: list[MemoryProvider] = []
+        self._tool_to_provider: dict[str, MemoryProvider] = {}
+        self._external_prefetch_spill_config: Optional[dict[str, Any]] = None
         self._has_external: bool = False
         timeout = external_prefetch_timeout
         timeout = _EXTERNAL_PREFETCH_TIMEOUT_S if timeout is None else float(timeout)
         if timeout <= 0:
             raise ValueError("external_prefetch_timeout must be positive")
         self._external_prefetch_timeout = timeout
-        self._external_prefetch_threads: Dict[str, threading.Thread] = {}
-        self._external_prefetch_lock = threading.Lock()
+        # Captured at build time, inside the profile scope the agent is built for.
+        self._home_key = qubit_home_key()
         # Single-worker background executor for end-of-turn sync/prefetch, created lazily so
         # the builtin-only path spawns no threads; one worker serializes a provider's writes.
         self._sync_executor: Optional[ThreadPoolExecutor] = None
         self._sync_executor_lock = threading.Lock()
         # Futures by durability class ("write" / "prefetch") so shutdown can drain FIFO
         # within a bound, then report exactly what it abandoned.
-        self._background_futures: Dict[Future, str] = {}
+        self._background_futures: dict[Future, str] = {}
         self._shutting_down = False
-        self._shutdown_drain_state: Dict[str, Any] = {
+        self._teardown_claim: Optional[str] = None  # see claim_teardown()
+        self._shutdown_drain_state: dict[str, Any] = {
             "status": "not_started", "abandoned_writes": 0, "abandoned_prefetches": 0, "active_tasks": 0,
         }
         # The profile ``initialize_all`` bound the providers to; tool calls must come from it (#140058).
-        self._bound_scope: Optional[Dict[str, Any]] = None
-        self._tool_call_keywords_cache: Dict[int, Optional[frozenset]] = {}
+        self._bound_scope: Optional[dict[str, Any]] = None
+        self._tool_call_keywords_cache: dict[int, Optional[frozenset[str]]] = {}
 
     def _each_provider(self, label: str, call: Callable[[MemoryProvider], Any], *, level: int = logging.DEBUG,
-                       providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False) -> List[Any]:
+                       providers: Optional[list[MemoryProvider]] = None, exc_info: bool = False) -> list[Any]:
         """Call ``call(provider)`` per provider, logging+swallowing failures; returns successes in order.
         ``label`` completes the log line ``Memory provider '<name>' <label>: <exc>``."""
-        results: List[Any] = []
+        results: list[Any] = []
         for provider in self._providers if providers is None else providers:
             try:
                 results.append(call(provider))
@@ -269,7 +251,7 @@ class MemoryManager:
         for (#140058; see ``agent/memory_caller_scope.py``). Nothing to reach, nothing to refuse."""
         return not self._providers or caller_scope(self._bound_scope, f"hook {hook}") is not None
 
-    def _tool_call_keywords(self, provider: MemoryProvider) -> Optional[frozenset]:
+    def _tool_call_keywords(self, provider: MemoryProvider) -> Optional[frozenset[str]]:
         """The keywords ``provider.handle_tool_call`` declares; None when it takes any (``**kwargs``, or
         a signature that can't be read). Worked out once per provider, not on every tool call."""
         if id(provider) not in self._tool_call_keywords_cache:
@@ -345,7 +327,7 @@ class MemoryManager:
         logger.info("Memory provider '%s' registered (%d tools)", provider.name, len(schemas))
 
     @property
-    def providers(self) -> List[MemoryProvider]:
+    def providers(self) -> list[MemoryProvider]:
         return list(self._providers)
 
     def get_provider(self, name: str) -> Optional[MemoryProvider]:
@@ -374,38 +356,44 @@ class MemoryManager:
 
     def _prefetch_provider(self, provider: MemoryProvider, query: str, *, session_id: str = "") -> str:
         """Run one provider's prefetch; external providers are bounded by a timeout. A stuck external
-        call keeps running on its daemon thread and the provider is skipped on later turns until it returns."""
+        call keeps running on its daemon thread; _PREFETCH_GATE decides whether later turns call again."""
         if provider.name == "builtin":
             return provider.prefetch(query, session_id=session_id)
 
-        result_box: Dict[str, Any] = {}
+        result_box: dict[str, Any] = {}
+
+        key = self._registry_key(provider)
 
         def _run() -> None:
             try:
                 result_box["value"] = provider.prefetch(query, session_id=session_id) or ""
             except Exception as exc:  # pragma: no cover - re-raised by caller
                 result_box["error"] = exc
+            finally:
+                self._PREFETCH_GATE.leave(key, thread, ok="error" not in result_box)
 
         thread = spawn_context_thread(_run, name=f"memory-prefetch-{provider.name}")
-        with self._external_prefetch_lock:
-            existing = self._external_prefetch_threads.get(provider.name)
-            if existing is not None and existing.is_alive():
-                logger.debug("Memory provider '%s' prefetch is still running; skipping this turn", provider.name)
-                return ""
-            self._external_prefetch_threads[provider.name] = thread
+        skipped = self._PREFETCH_GATE.enter(key, thread, self._external_prefetch_timeout)
+        if skipped:
+            logger.debug("Memory provider '%s' prefetch skipped (%d stuck, %d in flight)",
+                         provider.name, *skipped[:2])
+            return ""
+        try:
             thread.start()
+        except RuntimeError:
+            # Never started, so its finally never runs: drop the entry or it would count forever.
+            self._PREFETCH_GATE.leave(key, thread, ok=False)
+            raise
 
         thread.join(self._external_prefetch_timeout)
         if thread.is_alive():
             logger.warning(
-                "Memory provider '%s' prefetch timed out after %.1fs; skipping it until "
-                "the stuck call returns", provider.name, self._external_prefetch_timeout,
+                "Memory provider '%s' prefetch timed out after %.1fs; the call keeps running in the "
+                "background (later turns may skip it while the provider stays stuck)", provider.name,
+                self._external_prefetch_timeout,
             )
             return ""
 
-        with self._external_prefetch_lock:
-            if self._external_prefetch_threads.get(provider.name) is thread:
-                self._external_prefetch_threads.pop(provider.name, None)
         if "error" in result_box:
             raise result_box["error"]
         result = result_box.get("value", "")
@@ -421,7 +409,7 @@ class MemoryManager:
     def describe_recall(self) -> str:
         """Deterministic recall indicator line (e.g. ``"🧠 Provider — recalled 3 memories"``); ``""`` if none.
         Call right after :meth:`prefetch_all` so the user SEES memory was used even if the model is silent."""
-        segments: List[str] = []
+        segments: list[str] = []
         for status in self._each_provider("recall_status failed (non-fatal)", lambda p: p.recall_status()):
             if status is None:
                 continue
@@ -439,7 +427,8 @@ class MemoryManager:
             return
         clean_query = _redact_for_provider(clean_query)
         self._submit_background(lambda: self._each_provider(
-            "queue_prefetch failed (non-fatal)", lambda p: p.queue_prefetch(clean_query, session_id=session_id),
+            "queue_prefetch failed (non-fatal)",
+            lambda p: self._call_unless_stalled(p, lambda: p.queue_prefetch(clean_query, session_id=session_id)),
             providers=providers,
         ), kind="prefetch")
 
@@ -450,8 +439,8 @@ class MemoryManager:
         return params is None or _has_var_kwargs(params) or keyword in params
 
     def sync_all(self, user_content: str, assistant_content: str, *, session_id: str = "",
-                 messages: Optional[List[Dict[str, Any]]] = None,
-                 turn_author: Optional[Dict[str, Any]] = None) -> None:
+                 messages: Optional[list[dict[str, Any]]] = None,
+                 turn_author: Optional[dict[str, Any]] = None) -> None:
         """Sync a completed turn to all providers on the background worker.
 
         Never inline: a provider's ``sync_turn`` may block for minutes, which kept ``run_conversation``
@@ -471,11 +460,12 @@ class MemoryManager:
         optional_kwargs = {"messages": redacted_messages, "turn_author": turn_author}
 
         def _sync(provider: MemoryProvider) -> None:
-            kwargs: Dict[str, Any] = {"session_id": session_id}
+            kwargs: dict[str, Any] = {"session_id": session_id}
             for keyword, value in optional_kwargs.items():
                 if value is not None and self._provider_sync_accepts(provider, keyword):
                     kwargs[keyword] = value
-            provider.sync_turn(clean_user_content, assistant_content, **kwargs)
+            self._call_unless_stalled(
+                provider, lambda: provider.sync_turn(clean_user_content, assistant_content, **kwargs))
 
         self._submit_background(
             lambda: self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
@@ -520,6 +510,37 @@ class MemoryManager:
         except Exception as e:  # pragma: no cover - fn guards internally
             logger.debug("Inline memory background task failed: %s", e)
 
+    def _call_unless_stalled(self, provider: MemoryProvider, call: Callable[[], Any]) -> None:
+        """Run a background provider call unless _BACKGROUND_GATE skips it (the provider has stuck calls);
+        skipping costs that turn's write/prefetch but stops a wedged backend from pinning one more
+        thread per fresh manager. The builtin provider is never gated."""
+        if provider.name == "builtin":
+            call()
+            return
+        key = self._registry_key(provider)
+        token = object()
+        skipped = self._BACKGROUND_GATE.enter(key, token, _BACKGROUND_CALL_STALL_S)
+        if skipped:
+            stuck, in_flight, skips = skipped
+            if skips == 1 or skips % 100 == 0:
+                logger.warning(
+                    "Memory provider '%s' has %d background calls stuck for over %.0fs (%d in flight); "
+                    "skipping its sync/prefetch until it recovers (%d skipped)", provider.name, stuck,
+                    _BACKGROUND_CALL_STALL_S, in_flight, skips,
+                )
+            return
+        ok = False
+        try:
+            call()
+            ok = True
+        finally:
+            self._BACKGROUND_GATE.leave(key, token, ok=ok)
+
+    def _registry_key(self, provider: MemoryProvider) -> tuple[str, str]:
+        """Process-wide registry key: the home the providers were bound to (``initialize_all``, which may
+        name another profile than the one this manager was built in), else the build-time home."""
+        return ((self._bound_scope or {}).get("home_key") or self._home_key, provider.name)
+
     def _forget_background_future(self, future: Future) -> None:
         with self._sync_executor_lock:
             self._background_futures.pop(future, None)
@@ -536,12 +557,12 @@ class MemoryManager:
             return isinstance(e, RuntimeError)  # executor already shut down — nothing pending
         return True
 
-    def get_all_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_all_tool_schemas(self) -> list[dict[str, Any]]:
         """Collect deduplicated tool schemas from all providers; reserved core tool names are
         skipped because :meth:`add_provider` refuses to route them."""
         from toolsets import _QUBIT_CORE_TOOLS
 
-        schemas: List[Dict[str, Any]] = []
+        schemas: list[dict[str, Any]] = []
         seen = set()
 
         def _collect(provider: MemoryProvider) -> None:
@@ -565,7 +586,7 @@ class MemoryManager:
     def has_tool(self, tool_name: str) -> bool:
         return tool_name in self._tool_to_provider
 
-    def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
+    def handle_tool_call(self, tool_name: str, args: dict[str, Any], **kwargs) -> str:
         """Route a tool call to its provider; returns a JSON string (tool_error on failure)."""
         provider = self._tool_to_provider.get(tool_name)
         if provider is None:
@@ -602,14 +623,14 @@ class MemoryManager:
 
         self._each_provider("on_turn_start failed", _tick)
 
-    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+    def on_session_end(self, messages: list[dict[str, Any]]) -> None:
         if not self._owner_allows("on_session_end"):
             return
         messages = _redact_messages_for_egress(messages or [])
         self._each_provider("on_session_end failed", lambda p: p.on_session_end(messages), level=logging.WARNING,
                             exc_info=True)
 
-    def commit_session_boundary_async(self, messages: List[Dict[str, Any]], *, new_session_id: str,
+    def commit_session_boundary_async(self, messages: list[dict[str, Any]], *, new_session_id: str,
                                       parent_session_id: str = "", reason: str = "new_session") -> None:
         """Queue old-session extraction + provider rebinding as ONE serialized task.
 
@@ -647,7 +668,7 @@ class MemoryManager:
         """Notify providers that ``AIAgent.session_id`` rotated without teardown
         (``/resume``, ``/branch``, ``/reset``, ``/new``, compression). ``rewound=True``
         (``/undo``): same id, truncated transcript."""
-        if not new_session_id:
+        if not new_session_id or not self._owner_allows("on_session_switch"):
             return
         if rewound:  # forward only when set so it never pollutes providers' **kwargs
             kwargs["rewound"] = True
@@ -669,8 +690,8 @@ class MemoryManager:
         versions = (self._checkpoint_api_version(p) for p in self._providers)
         return any(v is not None and v >= api_version for v in versions)
 
-    def on_pre_compress(self, messages: List[Dict[str, Any]], *,
-                        evidence_messages: Optional[List[Dict[str, Any]]] = None, require_checkpoint: bool = False,
+    def on_pre_compress(self, messages: list[dict[str, Any]], *,
+                        evidence_messages: Optional[list[dict[str, Any]]] = None, require_checkpoint: bool = False,
                         checkpoint_api_version: int = PRE_COMPRESS_CHECKPOINT_API_VERSION) -> str:
         """Notify providers before compression; return their combined summary-prompt text.
 
@@ -680,7 +701,7 @@ class MemoryManager:
         """
         if not self._owner_allows("on_pre_compress"):
             if require_checkpoint:  # the caller keeps the uncompressed transcript
-                raise RuntimeError("Memory pre-compress checkpoint refused; see `qubit logs errors`")
+                raise RuntimeError("Memory pre-compress checkpoint refused; see `hermes logs errors`")
             return ""
         parts = []
         checkpoint_succeeded = False
@@ -692,7 +713,7 @@ class MemoryManager:
             is_checkpoint_provider = version >= checkpoint_api_version
             use_evidence = is_checkpoint_provider and evidence_messages is not None
             provider_messages = evidence_messages if use_evidence else messages
-            kwargs: Dict[str, Any] = {}
+            kwargs: dict[str, Any] = {}
             # v1 providers and bare-shape v2 providers never see the signal.
             if is_checkpoint_provider and _accepts_require_checkpoint(provider.on_pre_compress):
                 kwargs["require_checkpoint"] = require_checkpoint
@@ -721,7 +742,7 @@ class MemoryManager:
         return "positional" if accepted >= 4 else "legacy"
 
     def on_memory_write(self, action: str, target: str, content: str,
-                        metadata: Optional[Dict[str, Any]] = None) -> None:
+                        metadata: Optional[dict[str, Any]] = None) -> None:
         """Notify external providers when the built-in memory tool writes (skips builtin, the source)."""
         if not self._owner_allows("on_memory_write"):
             return
@@ -754,8 +775,8 @@ class MemoryManager:
                 return False
         return isinstance(result, dict) and result.get("success") is True and result.get("staged") is not True
 
-    def notify_memory_tool_write(self, tool_result: Any, tool_args: Dict[str, Any], *,
-                                 build_metadata: Optional[Callable[[], Dict[str, Any]]] = None) -> None:
+    def notify_memory_tool_write(self, tool_result: Any, tool_args: dict[str, Any], *,
+                                 build_metadata: Optional[Callable[[], dict[str, Any]]] = None) -> None:
         """Mirror a built-in memory tool call to external providers.
 
         Gates on a committed write, expands single-op and batched ``operations`` shapes, keeps only
@@ -814,6 +835,26 @@ class MemoryManager:
             lambda p: p.on_delegation(task, result, child_session_id=child_session_id, **kwargs),
         )
 
+    def claim_teardown(self, *, session_end: bool) -> bool:
+        """Claim extraction + ``shutdown_all()`` for end-of-session shutdown or soft release. The first
+        claimer wins and the loser skips, so the two never overlap and providers (no idempotency
+        contract) are never shut down twice. Session-end callers may re-claim (the gateway claims before
+        its flush, then ``shutdown_memory_provider`` claims again); a soft release is once-only and also
+        loses to a manager another owner is already draining."""
+        with self._sync_executor_lock:
+            if self._teardown_claim is None and (session_end or not self._shutting_down):
+                self._teardown_claim = "session_end" if session_end else "soft_release"
+                return True
+            return session_end and self._teardown_claim == "session_end"
+
+    def release_soft(self) -> None:
+        """Soft release (cache eviction, CLI agent rebuild): stop provider writer threads, which otherwise leak
+        one per evicted agent, WITHOUT on_session_end(): sweeps commit first and a pending session end owns
+        both. Flush first, since shutdown_all()'s short drain would cancel writes the old worker finished."""
+        if self.claim_teardown(session_end=False):
+            self.flush_pending(timeout=10)
+            self.shutdown_all()
+
     def shutdown_all(self) -> None:
         """Drain the background executor (bounded), then shut providers down in reverse order."""
         self._drain_sync_executor()
@@ -821,7 +862,7 @@ class MemoryManager:
                             providers=self._providers[::-1])
 
     @property
-    def shutdown_drain_state(self) -> Dict[str, Any]:
+    def shutdown_drain_state(self) -> dict[str, Any]:
         """Snapshot of the most recent bounded shutdown drain outcome."""
         with self._sync_executor_lock:
             return dict(self._shutdown_drain_state)
@@ -871,7 +912,7 @@ class MemoryManager:
         for provider in (p for p in before if not any(p is kept for kept in self._providers)):
             message = (f"⚠ Memory provider {provider.name!r} is disabled for this profile: it handed out the "
                        "provider instance another profile already uses. Built-in memory still works; the "
-                       "operator can see why with `qubit logs errors`.")
+                       "operator can see why with `hermes logs errors`.")
             (say or logger.warning)(message)
         return self._has_external
 
