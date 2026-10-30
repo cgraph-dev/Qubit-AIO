@@ -312,7 +312,8 @@ def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
     return None, "ticket-subprotocol"
 
 
-def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
+def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
+                    socket: Optional[str] = None) -> tuple[Optional[str], str]:
     """Validate WS-upgrade auth; return ``(reason, credential)``.
 
     ``reason`` is None when accepted, else a short token (``no_credential``,
@@ -338,6 +339,12 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
     """
     from qubit_cli.dashboard_auth.native_http import HEADER, authenticate_native_ws
     from qubit_cli.web_server import _SESSION_TOKEN, app
+    from qubit_cli.web_session_sockets import OWN_TICKET_SOCKETS
+    if socket in OWN_TICKET_SOCKETS:
+        # No standing credential (the session token, a native grant, a login's access token) opens it.
+        reject = _audit_ws_rejection if getattr(app.state, "auth_required", False) else _ignore_rejection
+        return _consume_ws_ticket(ws, reject, socket, auth_required=bool(
+            getattr(app.state, "auth_required", False))) or ("no_credential", "none")
     if HEADER in ws.headers:
         grant = authenticate_native_ws(ws)
         if grant is None:
@@ -370,6 +377,10 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
 
         internal = ws.query_params.get("internal", "")
         if internal:
+            webapp = getattr(app.state, "ui_surface", None) == "webapp"
+            if webapp and not allow_internal:
+                _reject("internal: endpoint not allowed")
+                return "internal_not_allowed", "internal"
             try:
                 _stamp_identity(consume_internal_credential(internal))
                 return None, "internal"
@@ -377,28 +388,9 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
                 _reject(f"internal: {exc}")
                 return "internal_invalid", "internal"
 
-        protocol_ticket, protocol_reason = _gateway_ws_ticket_from_subprotocol(ws)
-        if protocol_reason == "invalid":
-            return "ticket_invalid", "ticket-subprotocol"
-        ticket = protocol_ticket or ws.query_params.get("ticket", "")
-        if ticket:
-            try:
-                info = consume_ticket(ticket)
-                if info.get("provider") == "bot-desktop":
-                    # A display ticket admits one RFB bridge on /api/display/ws (a watch-only
-                    # capability handed to a screen viewer); it must not double as a login here.
-                    raise TicketInvalid("display ticket presented as a gateway login")
-                _stamp_identity(info)
-                if protocol_ticket:
-                    # Select only the stable public protocol during accept. The
-                    # ticket-bearing protocol is a credential and must never be
-                    # reflected back to the browser or retained after admission.
-                    ws._qubit_ws_subprotocol = _GATEWAY_WS_PROTOCOL
-                    return None, "ticket-subprotocol"
-                return None, "ticket"
-            except TicketInvalid as exc:
-                _reject(str(exc))
-                return "ticket_invalid", "ticket"
+        consumed = _consume_ws_ticket(ws, _reject, socket, auth_required=True)
+        if consumed is not None:
+            return consumed
 
         # A user session access token (``?token=``) is verified against the
         # dashboard auth session providers — the SAME ``verify_session`` seam
@@ -455,9 +447,10 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
     return "token_mismatch", "token"
 
 
-def _ws_auth_ok(ws: WebSocket) -> bool:
+def _ws_auth_ok(ws: WebSocket, *, allow_internal: bool = False,
+                socket: Optional[str] = None) -> bool:
     """True when the WS-upgrade credential is accepted. See _ws_auth_reason."""
-    return _ws_auth_reason(ws)[0] is None
+    return _ws_auth_reason(ws, allow_internal=allow_internal, socket=socket)[0] is None
 
 
 def _ws_close_reason(text: str) -> str:

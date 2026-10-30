@@ -1581,10 +1581,10 @@ def scratch_prune_spawns(monkeypatch):
     """No test starts a real detached scratch prune (one would outlive the test, and get any
     Popen mock the test installed): ``spawn_prune`` only records the scratch dir it was given.
     A test that needs the real child runs a launcher in a subprocess."""
-    import hermes_constants_scratch_detach
+    import qubit_constants_scratch_detach
 
     spawned: list = []
-    monkeypatch.setattr(hermes_constants_scratch_detach, "spawn_prune", spawned.append)
+    monkeypatch.setattr(qubit_constants_scratch_detach, "spawn_prune", spawned.append)
     return spawned
 
 

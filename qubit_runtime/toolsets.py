@@ -284,6 +284,7 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[dict[st
     ``_get_platform_tools`` uses False so that a tool registered into a toolset but absent from a platform's
     static composite does not drop the whole toolset from inference. See issue #49622.
     """
+    name = canonical_toolset_name(name)
     toolset = TOOLSETS.get(name)
     if not include_registry:
         return {**toolset, "tools": list(toolset.get("tools", [])), "includes": list(toolset.get("includes", []))} if toolset else None
@@ -486,7 +487,7 @@ def agent_tool_surface(agent: Any, tools: list[dict[str, Any]]) -> list[dict[str
 
 
 def validate_toolset(name: str) -> bool:
-    return (name in {"all", "*"} or name in TOOLSETS
+    return (name in {"all", "*"} or canonical_toolset_name(name) in TOOLSETS
             or name in _get_plugin_toolset_names() or name in _get_registry_toolset_aliases())
 
 
@@ -529,7 +530,7 @@ def canonical_toolset_name(name: str) -> str:
         if key.lower() == folded:
             return key
     if folded.startswith("qubit-"):
-        candidate = "qubit-" + folded[len("qubit-"):]
+        candidate = "hermes-" + folded[len("qubit-"):]
         if candidate in TOOLSETS:
             return candidate
     return name
