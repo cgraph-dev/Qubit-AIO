@@ -403,26 +403,22 @@ class SessionGatewayMixin:
         self._write_sql("DELETE FROM gateway_routing WHERE scope = ? AND session_key = ?", doomed, many=True)
         return len(doomed)
 
-    def retire_gateway_routes(self, session_ids) -> None:
-        """Publish deletion fences for *session_ids* in THIS (routing) database and drop the
-        routes naming them, in one transaction. Routing saves skip any entry whose session id
-        carries a marker here, so a whole-index snapshot taken before a delete in another
-        profile's store cannot restore the route when it is saved after it."""
+    def retire_gateway_routes(self, session_ids, *, namespace, expiring=()) -> None:
+        """Publish routing fences for *session_ids*, retired in the profile whose routing keys use
+        *namespace*, in THIS (routing) database and drop that profile's routes naming them, in one
+        transaction (``fence_shared_routes``). Routing saves skip a fenced route, so a whole-index
+        snapshot taken before a delete in another profile's store cannot restore it when it is
+        saved after it. The fence is not this store's own deletion marker: this profile's creates,
+        binds and generation walks stay free. *expiring* ids (a sweep's) age out at the horizon."""
         ids = sorted({str(sid) for sid in session_ids if sid})
         if not ids:
             return
 
         def _do(conn):
-            from qubit_state_mutation_retirement import RETIRED_PREFIX, entry_session_id
-            retired = json.dumps({"retired_at": time.time()})
-            conn.executemany("INSERT OR REPLACE INTO state_meta(key,value) VALUES(?,?)",
-                             [(RETIRED_PREFIX + sid, retired) for sid in ids])
-            targets = set(ids)
-            doomed = [(row[0], row[1]) for row in conn.execute(
-                "SELECT scope, session_key, entry_json FROM gateway_routing").fetchall()
-                if entry_session_id(row[2]) in targets]
-            conn.executemany("DELETE FROM gateway_routing WHERE scope = ? AND session_key = ?", doomed)
+            from qubit_state_mutation_retirement import fence_shared_routes
+            fence_shared_routes(conn, namespace, ids, expiring=expiring)
         self._execute_write(_do)
+
 
     def prune_never_active_keyed_sessions(
         self, *, older_than_days: float, sessions_dir: Optional[Path] = None,

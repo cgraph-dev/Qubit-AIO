@@ -1,8 +1,10 @@
 """SQLite-backed store for Responses API state (``previous_response_id`` chaining, named conversations)."""
 
+import asyncio
 import json
 import logging
 import sqlite3
+import threading
 import time
 from contextlib import closing, suppress
 from pathlib import Path
@@ -40,6 +42,7 @@ class ResponseStore:
                  max_identities: Optional[int] = None):
         self._max_size = max_size
         self._max_identities = max_identities
+        self._lock = threading.RLock()
         if db_path is None:
             db_path = ":memory:"
             with suppress(Exception):
@@ -83,6 +86,18 @@ class ResponseStore:
         self._evict_and_commit()
         # Conversation history lives here: owner-only perms, once at init (not per commit).
         self._tighten_file_permissions()
+
+    def atomically(self, fn, /, *args, **kwargs):
+        """Run ``fn`` (a sequence of this store's calls) as one unit no other caller interleaves."""
+        with self._lock:
+            return fn(*args, **kwargs)
+
+    async def off_loop(self, fn, /, *args, **kwargs):
+        """``atomically`` on a worker thread. Every read or write an event-loop handler makes goes
+        through here: ``put`` serialises the whole chained conversation_history and commits, which on
+        the loop stalled every other request for as long as it took (#142641). Awaited, so a handler
+        still sees its own write before it answers: a response id it returns is readable at once."""
+        return await asyncio.to_thread(self.atomically, fn, *args, **kwargs)
 
     def _tighten_file_permissions(self) -> None:
         """Force owner-only permissions on the DB and SQLite sidecars."""

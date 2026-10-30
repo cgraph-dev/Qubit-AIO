@@ -50,6 +50,43 @@ class SessionPersistenceMixin:
             for sid in targets:
                 self._session_owner_hints.pop(sid, None)
 
+    def fence_retired_routes(self, session_ids, *, namespace, expiring=()) -> None:
+        """Durably retire *session_ids* in the routing index's own database (fences + route
+        drop in one transaction). A delete committed in another profile's store fences only that
+        store; the shared index lives in the launch home, so its saves need the fence here too,
+        keyed by the deleting profile's routing *namespace* (``retire_gateway_routes``).
+        Raises when the routing store cannot take the fence: the delete must not report success."""
+        retire = self._routing_db_method("retire_gateway_routes")
+        if retire is None:
+            raise RuntimeError("routing store unavailable for deletion fence")
+        retire(session_ids, namespace=namespace, expiring=expiring)
+
+    def strip_retired_mirror_routes(self, session_ids=None) -> None:
+        """Drop from an existing sessions.json every route a routing save now skips as retired
+        (``route_retired``, the check ``replace_gateway_routing_entries`` applies), only those naming
+        *session_ids* when given. Runs whatever ``write_sessions_json`` says and never creates the
+        file: the mirror is derived, and a retired route left in it would come back through the
+        next start's legacy import once a prune's fence ages out."""
+        db = self._routing_db
+        sessions_file = self.sessions_dir / "sessions.json"
+        if db is None or not sessions_file.exists():
+            return
+        from qubit_state_mutation_retirement import route_retired
+        targets = None if session_ids is None else set(session_ids)
+        with self._lazy("_save_lock", threading.Lock):  # never interleaves with a full save's write
+            with open(sessions_file, "r", encoding="utf-8-sig") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                return
+            kept = {}
+            for key, entry in data.items():
+                sid = entry.get("session_id") if isinstance(entry, dict) else None
+                if (key.startswith("_") or not isinstance(sid, str) or (targets is not None and sid not in targets)
+                        or not route_retired(db, key, json.dumps({"session_id": sid}))):
+                    kept[key] = entry
+            if len(kept) < len(data):
+                atomic_json_write(sessions_file, kept, mode=0o600)
+
     def _open_session_db_for_active_scope(self, db_path: Optional[Path] = None):
         """SessionDB for the active profile scope. ``db_path`` pins the store; otherwise
         ``_default_db_path()`` follows the context-local QUBIT_HOME (resolved per call so
