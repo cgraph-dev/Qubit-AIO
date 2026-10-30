@@ -568,7 +568,8 @@ def is_hosted_object(obj: Any) -> bool:
     """``obj`` is a proxy for a plugin object whose code runs in the plugin host (``plugins.isolation:
     host``): its methods run there and anything they return that is not plain data arrives as an
     :class:`Opaque` placeholder."""
-    return "__hermes_plugin_host_ref__" in vars(type(obj))
+    attrs = vars(type(obj))
+    return "__qubit_plugin_host_ref__" in attrs or "__hermes_plugin_host_ref__" in attrs
 
 
 def _run_on_gateway_loop(coro: Any) -> Any:

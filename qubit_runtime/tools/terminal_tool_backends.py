@@ -284,6 +284,8 @@ def _create_environment(env_type: str, image: str, cwd: str, timeout: int,
                   ssh_config=ssh_config, local_config=local_config, host_cwd=host_cwd, probe_only=probe_only)
     if builder is not None:
         env = builder(**kwargs)
+    elif env_type in _SANDBOX_ROWS:
+        env = _build_sandbox_env(env_type=env_type, **kwargs)
     else:
         env = _build_plugin_env(env_type=env_type, **kwargs)
     # Backend tag for consumers that only hold the instance (cwd sanitizers on
