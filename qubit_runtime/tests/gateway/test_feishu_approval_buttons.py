@@ -35,11 +35,12 @@ def _ensure_feishu_mocks():
             sys.modules["lark_oapi"] = MagicMock()
     if "lark_oapi" in sys.modules:
         mod = sys.modules["lark_oapi"]
-        for name in (
-            "lark_oapi.api.im.v1",
-            "lark_oapi.event", "lark_oapi.event.callback_type",
-        ):
-            sys.modules.setdefault(name, mod)
+        if isinstance(mod, MagicMock) or getattr(mod, "__spec__", None) is None:
+            for name in (
+                "lark_oapi.api.im.v1",
+                "lark_oapi.event", "lark_oapi.event.callback_type",
+            ):
+                sys.modules.setdefault(name, mod)
     if "aiohttp" not in sys.modules:
         try:
             installed = importlib.util.find_spec("aiohttp") is not None
