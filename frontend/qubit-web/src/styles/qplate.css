@@ -1,0 +1,334 @@
+/* ==========================================================================
+   Shared instrument tokens — the ONE surface ladder for chrome panels.
+   --------------------------------------------------------------------------
+   The nav rail and the chat right-hand panel are siblings in the same visual
+   system: both are narrow chrome plates carrying rows, hairline rules,
+   key/value readouts and a small monospace label register. They kept drifting
+   apart because each declared its own palette, and each ended up hardcoded to
+   a navy that ignored the theme.
+
+   This file declares that ladder ONCE, from the active theme's own tokens:
+
+     --qplate-panel    the plate's own surface (barely lifted off the page)
+     --qplate-sunk     recessed well for input/telemetry blocks
+     --qplate-raised   one step up: hovered row, selected chip
+     --qplate-wash     hover tint over the plate
+     --qplate-rule     hairline between modules
+     --qplate-rule-soft  hairline between rows inside one module
+     --qplate-ink      primary text on the plate
+     --qplate-muted    secondary text / inactive rows
+     --qplate-faint    labels, metadata, section indices
+
+   Rule: NO literal colour in here except pure black at low alpha for shading
+   that must darken on a light theme too. Everything else is a color-mix over
+   --background-base / --midground-base, which ThemeProvider rewrites inline
+   when the user switches theme. That is what makes a light theme stay light.
+
+   Consumers apply the class `.qplate` (or read the vars directly if they are
+   already inside one) and get the whole ladder for free.
+   ========================================================================== */
+
+:root {
+  /* Declared at :root because this is THEME state, not per-element state:
+     chrome that lives at :root scope (the --scan-* text utilities in
+     index.css) reads these same steps, and a .qplate-scoped copy would be
+     invisible to it. --qplate-contrast is written here by ThemeProvider. */
+  --qplate-contrast: #ffffff;
+  --qplate-panel: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --qplate-sunk: color-mix(in srgb, var(--background-base) 92%, #000);
+  --qplate-raised: color-mix(in srgb, var(--midground-base) 9%, var(--background-base));
+  --qplate-wash: color-mix(in srgb, var(--midground-base) 7%, transparent);
+  --qplate-wash-strong: color-mix(in srgb, var(--midground-base) 13%, transparent);
+  --qplate-rule: color-mix(in srgb, var(--midground-base) 14%, transparent);
+  --qplate-rule-soft: color-mix(in srgb, var(--midground-base) 7%, transparent);
+  /* The text ladder. Ranking contract, enforced by measurement across all
+     eight shipped themes: ink > muted > faint in contrast, and every step
+     clears WCAG AA (4.5:1) for small text on the panel.
+     
+     Why the mix targets: `--qplate-contrast` is the direction AWAY from the
+     canvas (black on a light theme, white on a dark one). Pulling the
+     midground 22% toward it darkens a saturated accent enough that Qubit
+     Blue's #0053FD clears 6.85:1 on its cream plate instead of 4.80:1, and
+     identical rules then measure 9–12:1 on the dark themes. Mixing toward the
+     BACKGROUND instead — the previous rule — inverted the ladder (faint came
+     out lighter than ink) and collapsed to 1.9:1 on the light theme. */
+  --qplate-ink: color-mix(in srgb, var(--midground-base) 68%, var(--qplate-contrast));
+  /* 98% / 96% is a deliberately SMALL step on purpose. Text is drawn as the
+     ink colour at this alpha over the panel, and on the light theme every
+     percent of fade costs roughly 0.1 of contrast ratio — at 72%/58% the muted
+     and faint steps fell to 3.89:1 and 2.89:1 and both failed AA. These values
+     were solved against all eight themes: worst case is 7.45:1 (Qubit Blue
+     faint) and the ink > muted > faint ordering still holds everywhere. */
+  --qplate-muted: color-mix(in srgb, var(--qplate-ink) 98%, transparent);
+  --qplate-faint: color-mix(in srgb, var(--qplate-ink) 96%, transparent);
+
+  /* Geometry, shared so the two plates have the same rhythm. */
+  --qplate-radius: calc(var(--theme-radius, 0.5rem) * 0.75);
+  --qplate-row: 2.05rem;
+  --qplate-gutter: 0.55rem;
+
+  /* Type registers. Titles are wide-tracked mono uppercase; body is the
+     theme's sans at a UI size. */
+  --qplate-font-mono: var(--theme-font-mono, ui-monospace, monospace);
+  --qplate-font-sans: var(--theme-font-sans, system-ui, sans-serif);
+  --qplate-label-size: 0.6rem;
+  --qplate-label-tracking: 0.15em;
+  --qplate-body-size: 0.795rem;
+}
+
+/* ---------------------------------------------------------------- module ---
+   A module is one titled block inside a plate: a label row, then content,
+   separated by a hairline. The rail's sections and the chat panel's modules
+   are the same primitive. */
+
+.qplate-module + .qplate-module {
+  border-top: 1px solid var(--qplate-rule-soft);
+}
+
+.qplate-module__head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem var(--qplate-gutter) 0.3rem;
+  color: var(--qplate-faint);
+  font-family: var(--qplate-font-mono);
+  font-size: var(--qplate-label-size);
+  font-weight: 600;
+  letter-spacing: var(--qplate-label-tracking);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The trailing rule that runs to the module's edge. */
+.qplate-module__rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--qplate-rule), transparent);
+}
+
+/* Optional two-digit index, tabular so a stack of modules lines up. */
+.qplate-module__index {
+  /* Same ladder step the rail's section index uses — one definition, so the
+     two plates cannot drift apart on contrast. */
+  color: var(--qplate-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- readout ---
+   Key/value rows on a hairline grid — gateway status, latency, token counts. */
+
+.qplate-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-family: var(--qplate-font-mono);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+.qplate-readout__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.qplate-readout__key {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--qplate-faint);
+  font-size: var(--qplate-label-size);
+  letter-spacing: 0.09em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.qplate-readout__value {
+  flex: 0 0 auto;
+  color: var(--qplate-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------- row ---
+   A clickable row: icon + label, optional trailing affordance. The rail's nav
+   links and the chat panel's list rows share this shape. */
+
+.qplate-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  min-height: var(--qplate-row);
+  padding: 0.44rem var(--qplate-gutter);
+  border: 1px solid transparent;
+  border-radius: var(--qplate-radius);
+  color: var(--qplate-muted);
+  background: transparent;
+  font-family: var(--qplate-font-sans);
+  font-size: var(--qplate-body-size);
+  font-weight: 500;
+  text-align: left;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.qplate-row:hover:not(:disabled):not([aria-current="page"]) {
+  border-color: var(--qplate-rule-soft);
+  background: var(--qplate-wash);
+  color: var(--qplate-ink);
+}
+
+.qplate-row:focus-visible {
+  outline: 2px solid var(--midground-base);
+  outline-offset: 1px;
+}
+
+.qplate-row:disabled {
+  color: var(--qplate-faint);
+  cursor: not-allowed;
+}
+
+.qplate-row[aria-current="page"],
+.qplate-row[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--midground-base) 26%, transparent);
+  background: linear-gradient(
+    92deg,
+    color-mix(in srgb, var(--midground-base) 15%, transparent),
+    color-mix(in srgb, var(--midground-base) 5%, transparent)
+  );
+  color: var(--qplate-ink);
+  box-shadow: inset 3px 0 0 var(--midground-base);
+}
+
+/* Reduced motion: the shared rows stop easing everywhere at once. */
+@media (prefers-reduced-motion: reduce) {
+  .qplate-row {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Side panel (chat rails) — /chat and /qubit-chat
+   --------------------------------------------------------------------------
+   Lived in ChatPage.studio.css, which /chat never loads, so the terminal
+   chat's panel rendered unstyled. It belongs with the plate tokens: the
+   panel is the rail's sibling and must look identical on both surfaces.
+   ========================================================================== */
+
+/* ── Side panel: modules on the shared plate ──────────────────────────────
+   The panel is a `.qplate` sibling of the nav rail. Modules are separated by
+   hairlines from the ladder, never by per-module backgrounds, and each module
+   can carry a `.qplate-module__head` label like the rail's sections. */
+.qchat__side.qchat__side {
+  display: flex;
+  width: 19rem;
+  min-width: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border-left: 1px solid var(--qplate-rule);
+  background: var(--qplate-panel);
+}
+/* Each side module is one block on the plate. */
+.qchat__side > div {
+  min-width: 0;
+  padding: 0.55rem var(--qplate-gutter);
+  border-bottom: 1px solid var(--qplate-rule-soft);
+}
+.qchat__side > div > * { position: relative; }
+/* Module headings reuse the rail's label register. */
+.qchat__side .qchat__side-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0 0.35rem;
+  color: var(--qplate-faint);
+  font-family: var(--qplate-font-mono);
+  font-size: var(--qplate-label-size);
+  font-weight: 600;
+  letter-spacing: var(--qplate-label-tracking);
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.qchat__side .qchat__side-head > span:first-child { flex: 0 0 auto; }
+.qchat__side .qchat__side-head-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--qplate-rule), transparent);
+}
+/* Kit Cards inside the rail join the plate instead of stacking as cards. */
+.qchat__side [class*="rounded"] { border-radius: var(--qplate-radius) !important; }
+.qchat__side .qchat__model-panel > div { height: auto !important; gap: .5rem !important; overflow: visible; }
+.qchat__side .qchat__model-panel > div > * {
+  border-color: var(--qplate-rule-soft) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.qchat__side .qchat__model-panel > div > *:first-child {
+  padding: .1rem 0 .4rem !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--qplate-rule-soft) !important;
+}
+/* Model name is a board reading; its label is a route name. */
+.qchat__side .qchat__model-panel [class*="text-display"] {
+  color: var(--qplate-faint) !important;
+  font: 600 var(--qplate-label-size)/1 var(--qplate-font-mono) !important;
+  letter-spacing: var(--qplate-label-tracking) !important;
+  text-transform: uppercase;
+}
+.qchat__side .qchat__model-panel button {
+  color: var(--qplate-ink) !important;
+  font: 600 .84rem/1.25 var(--qplate-font-mono) !important;
+  letter-spacing: .01em !important;
+}
+.qchat__side .qchat__model-panel button:hover {
+  color: var(--qchat-signal, var(--qplate-ink)) !important;
+}
+.qchat__side .qchat__tools-card {
+  gap: .5rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+.qchat__side .qchat__tools-card > span:first-child {
+  color: var(--qplate-faint) !important;
+  font: 600 var(--qplate-label-size)/1 var(--qplate-font-mono) !important;
+  letter-spacing: var(--qplate-label-tracking) !important;
+  text-transform: uppercase;
+}
+.qchat__tools-row { gap: .12rem !important; }
+.qchat__tools-row > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qchat__tools-row > span,
+.qchat__tools-row [class*="text-[0.6875rem]"] { color: var(--qplate-muted) !important; }
+.qchat__tools-row > div { min-height: 1rem; }
+.qchat__side details {
+  padding: .35rem 0 !important;
+  border: 0 !important;
+  border-top: 1px solid var(--qplate-rule-soft) !important;
+  background: transparent !important;
+}
+.qchat__side details > summary {
+  display: flex;
+  min-height: 1.6rem;
+  align-items: center;
+  color: var(--qplate-muted);
+  font: 600 var(--qplate-label-size)/1 var(--qplate-font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.qchat__side details > summary:hover { color: var(--qchat-ink, var(--qplate-ink)); }

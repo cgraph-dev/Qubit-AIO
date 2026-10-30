@@ -10,21 +10,21 @@
    ========================================================================== */
 
 .qagent-sidebar {
-  /* Derived surface ladder: panel is the sidebar well, rail is the leaning
-     edge of every row, wash is the hover tint. All three mix the theme's own
-     background + midground, so a light theme stays light. */
-  --qrail-panel: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
-  --qrail-sunk: color-mix(in srgb, var(--background-base) 92%, #000);
-  --qrail-wash: color-mix(in srgb, var(--midground-base) 7%, transparent);
-  --qrail-wash-strong: color-mix(in srgb, var(--midground-base) 13%, transparent);
-  --qrail-rule: color-mix(in srgb, var(--midground-base) 14%, transparent);
-  --qrail-rule-soft: color-mix(in srgb, var(--midground-base) 7%, transparent);
-  --qrail-ink: color-mix(in srgb, var(--midground-base) 96%, var(--background-base));
-  --qrail-muted: color-mix(in srgb, var(--midground-base) 62%, var(--background-base));
-  --qrail-faint: color-mix(in srgb, var(--midground-base) 38%, var(--background-base));
-  --qrail-radius: calc(var(--theme-radius, 0.5rem) * 0.75);
-  /* The rail's own vertical rhythm — one number that sets the whole scale. */
-  --qrail-row: 2.05rem;
+  /* `.qplate` supplies the shared surface ladder (--qplate-*); the rail only
+     aliases it into its own namespace so the rules below read naturally. A
+     second palette here is exactly how the rail drifted off-theme before. */
+  --qrail-panel: var(--qplate-panel);
+  --qrail-sunk: var(--qplate-sunk);
+  --qrail-raised: var(--qplate-raised);
+  --qrail-wash: var(--qplate-wash);
+  --qrail-wash-strong: var(--qplate-wash-strong);
+  --qrail-rule: var(--qplate-rule);
+  --qrail-rule-soft: var(--qplate-rule-soft);
+  --qrail-ink: var(--qplate-ink);
+  --qrail-muted: var(--qplate-muted);
+  --qrail-faint: var(--qplate-faint);
+  --qrail-radius: var(--qplate-radius);
+  --qrail-row: var(--qplate-row);
 
   position: relative;
   isolation: isolate;
@@ -32,8 +32,6 @@
   background: var(--qrail-panel) !important;
   border-color: var(--qrail-rule) !important;
   font-family: var(--theme-font-sans, system-ui, sans-serif);
-  /* Tooltips/flyouts are portalled to <body>; they read these. */
-  --qrail-flyout-bg: color-mix(in srgb, var(--qrail-sunk) 96%, transparent);
 }
 
 /* Faint horizontal engineering ruling behind the whole rail. */
@@ -139,9 +137,9 @@
   margin: 0 0.55rem;
   padding: 0.5rem 0.35rem 0.3rem;
   border-top: 1px solid var(--qrail-rule-soft);
-  /* Readable, not decorative: a section heading is navigation, so it has to
-     clear AA contrast against the rail on every theme, including light ones. */
-  color: color-mix(in srgb, var(--midground-base) 74%, var(--background-base));
+  /* Ladder step, not a bespoke mix — heading text is navigation, so it clears
+     AA on every theme instead of fading the accent into its own plate. */
+  color: var(--qrail-faint);
   font-family: var(--theme-font-mono, ui-monospace, monospace);
   font-size: 0.6rem;
   font-weight: 600;
@@ -152,7 +150,9 @@
 }
 
 .qagent-sidebar .qagent-sidebar__section-index {
-  color: color-mix(in srgb, var(--midground-base) 46%, var(--background-base));
+  /* Ladder step, not a bespoke mix: the old `46% midground` failed AA (3.66:1)
+     on every theme because it faded the accent into its own plate. */
+  color: var(--qrail-muted);
   font-variant-numeric: tabular-nums;
 }
 

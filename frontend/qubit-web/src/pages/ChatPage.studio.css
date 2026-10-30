@@ -13,31 +13,44 @@
      page keeps its night register under any skin without fighting it.
    ─────────────────────────────────────────────────────────────────────── */
 .qchat {
-  /* Enamel, lettering, gauges. */
-  --qchat-ink: var(--midground-base, #eef1f5);
-  --qchat-enamel: var(--background-base, #0b1018);
-  --qchat-slab: color-mix(in srgb, #101a26 58%, var(--qchat-enamel));
-  --qchat-raised: color-mix(in srgb, #16212e 60%, var(--qchat-enamel));
-  --qchat-muted: color-mix(in srgb, var(--qchat-ink) 66%, var(--qchat-enamel));
-  --qchat-faint: color-mix(in srgb, var(--qchat-ink) 40%, var(--qchat-enamel));
-  /* Light hairlines do not survive on navy as a darkened theme border. */
-  --qchat-line: color-mix(in srgb, #a7bbd3 15%, transparent);
-  --qchat-line-hard: color-mix(in srgb, #a7bbd3 34%, transparent);
+  /* Enamel, lettering, gauges.
+     The surface ladder is the SHARED one from styles/qplate.css — the chat
+     panel and the nav rail are the same primitive, so they must not carry two
+     palettes. `--qchat-*` below are aliases plus the panel's semantic route
+     colours; nothing here hardcodes a chrome surface any more. */
+  --qchat-ink: var(--qplate-ink);
+  --qchat-enamel: var(--qplate-sunk);
+  --qchat-slab: var(--qplate-panel);
+  --qchat-raised: var(--qplate-raised);
+  --qchat-muted: var(--qplate-muted);
+  --qchat-faint: var(--qplate-faint);
+  /* Hairlines come from the ladder: a light steel literal vanished on the
+     light theme and read as a grey scratch on navy. */
+  --qchat-line: var(--qplate-rule-soft);
+  --qchat-line-hard: var(--qplate-rule);
   --qchat-accent: var(--color-primary, #7f8ea3);
-  /* Semantic route colours: red = the live line and every decision point. */
-  --qchat-signal: color-mix(in srgb, #ff4b3e 92%, var(--qchat-ink));
-  --qchat-violet: color-mix(in srgb, #b89aff 78%, var(--qchat-ink));
-  --qchat-cyan: color-mix(in srgb, #63c7d8 88%, var(--qchat-ink));
-  --qchat-amber: color-mix(in srgb, #e6b25a 90%, var(--qchat-ink));
-  --qchat-ok: color-mix(in srgb, #6fbf8f 88%, var(--qchat-ink));
-  --qchat-signal-wash: color-mix(in srgb, var(--qchat-signal) 14%, transparent);
+  /* Semantic route colours: red = the live line and every decision point.
+     Mixed with the theme ink so they stay legible on light and dark alike. */
+  --qchat-signal: color-mix(in srgb, #ff4b3e 82%, var(--midground-base));
+  --qchat-violet: color-mix(in srgb, #b89aff 78%, var(--midground-base));
+  --qchat-cyan: color-mix(in srgb, #63c7d8 78%, var(--midground-base));
+  --qchat-amber: color-mix(in srgb, #e6b25a 88%, var(--midground-base));
+  --qchat-ok: color-mix(in srgb, #6fbf8f 84%, var(--midground-base));
+  /* The "you are here" wash: the accent at low alpha OVER the plate, so it
+     lightens a dark theme and darkens a light one instead of stamping a dark
+     maroon band on a pale panel. */
+  --qchat-signal-wash: color-mix(
+    in srgb,
+    var(--qchat-signal) 16%,
+    var(--qplate-panel)
+  );
   --qchat-wash: color-mix(in srgb, var(--qchat-accent) 12%, transparent);
   /* Rail width shared by every "you are here" spine. */
   --qchat-rail: 3px;
-  --qchat-radius: 2px;
-  --qchat-mono: var(--theme-font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  --qchat-radius: var(--qplate-radius);
+  --qchat-mono: var(--qplate-font-mono);
   --qchat-display: var(--theme-font-display, var(--theme-font-sans, system-ui, sans-serif));
-  --qchat-sans: var(--theme-font-sans, system-ui, sans-serif);
+  --qchat-sans: var(--qplate-font-sans);
 
   display: flex;
   position: relative;
@@ -926,91 +939,9 @@
 .qchat__session-actions > a:last-child { color: var(--qchat-cyan); }
 .qchat__session-actions > button:disabled { opacity: .45; }
 
-/* ── Side panel: the line diagram legend ──────────────────────────────── */
-.qchat__side.qchat__side {
-  display: flex;
-  width: 19rem;
-  min-width: 0;
-  min-height: 0;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 0;
-  overflow: hidden;
-  padding: 0;
-  border-left: 1px solid var(--qchat-line-hard);
-  background: color-mix(in srgb, #141d29 26%, transparent);
-}
-/* Each side module is a numbered "line" in the legend. */
-.qchat__side > div {
-  min-width: 0;
-  padding: .7rem .85rem;
-  border-bottom: 1px solid var(--qchat-line);
-}
-.qchat__side > div > * { position: relative; }
-/* Kill kit Cards inside the rail so the modules sit on the same plate. */
-.qchat__side [class*="rounded"] { border-radius: 0 !important; }
-.qchat__side .qchat__model-panel > div { height: auto !important; gap: .5rem !important; overflow: visible; }
-.qchat__side .qchat__model-panel > div > * {
-  border-color: var(--qchat-line) !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.qchat__side .qchat__model-panel > div > *:first-child {
-  padding: .2rem 0 .45rem !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--qchat-line) !important;
-}
-/* Model name is a board reading; its label is a route name. */
-.qchat__side .qchat__model-panel [class*="text-display"] {
-  color: var(--qchat-faint) !important;
-  font: 650 .56rem/1 var(--qchat-mono) !important;
-  letter-spacing: .2em !important;
-  text-transform: uppercase;
-}
-.qchat__side .qchat__model-panel button {
-  color: var(--qchat-ink) !important;
-  font: 600 .84rem/1.25 var(--qchat-mono) !important;
-  letter-spacing: .01em !important;
-}
-.qchat__side .qchat__model-panel button:hover { color: var(--qchat-signal) !important; }
-.qchat__side .qchat__tools-card {
-  gap: .5rem !important;
-  padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-}
-.qchat__side .qchat__tools-card > span:first-child {
-  color: var(--qchat-faint) !important;
-  font: 650 .56rem/1 var(--qchat-mono) !important;
-  letter-spacing: .2em !important;
-  text-transform: uppercase;
-}
-.qchat__tools-row { gap: .12rem !important; }
-.qchat__tools-row > span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.qchat__tools-row > span,
-.qchat__tools-row [class*="text-[0.6875rem]"] { color: var(--qchat-muted) !important; }
-.qchat__tools-row > div { min-height: 1rem; }
-.qchat__side details {
-  padding: .35rem 0 !important;
-  border: 0 !important;
-  border-top: 1px solid var(--qchat-line) !important;
-  background: transparent !important;
-}
-.qchat__side details > summary {
-  display: flex;
-  min-height: 1.6rem;
-  align-items: center;
-  color: var(--qchat-muted);
-  font: 600 .6rem/1 var(--qchat-mono);
-  letter-spacing: .14em;
-  text-transform: uppercase;
-}
-.qchat__side details > summary:hover { color: var(--qchat-ink); }
+/* The side panel's own styling moved to styles/qplate.css so /chat — which
+   does not load this page stylesheet — gets the same plate. Only the page's
+   own surface rules stay here. */
 
 /* Reports + session list */
 .qchat__reports {

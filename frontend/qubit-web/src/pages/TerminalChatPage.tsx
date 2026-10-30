@@ -30,6 +30,7 @@ import {
   FRESH_CHAT_SESSION_ID,
 } from "@/components/ChatSessionList";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
+import { PlateModuleHead } from "@/components/PlateModuleHead";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
 import { PluginSlot } from "@/plugins";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -1429,9 +1430,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             id="chat-side-panel"
             role="complementary"
             aria-label={modelToolsLabel}
-            className="flex max-h-[50vh] min-h-0 shrink-0 flex-col gap-3 overflow-hidden lg:h-full lg:max-h-none lg:w-60"
+            className="qchat__side qplate flex max-h-[50vh] min-h-0 shrink-0 flex-col overflow-hidden lg:h-full lg:max-h-none lg:w-60"
           >
-            <div className="flex shrink-0 items-center justify-end">
+            <div className="flex shrink-0 items-center justify-end px-2 pt-1.5">
               <Button
                 ghost
                 size="icon"
@@ -1444,7 +1445,17 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 <PanelRightClose className="h-4 w-4" />
               </Button>
             </div>
-            <div className="shrink-0">
+            {/* Module heads + the shared plate come from styles/qplate.css, so
+                this panel and /qubit-chat's are one system, not two skins. */}
+            <section
+              aria-labelledby="terminal-module-model"
+              className="shrink-0"
+            >
+              <PlateModuleHead
+                id="terminal-module-model"
+                index="01"
+                label={t.app.modelToolsSheetTitle}
+              />
               <Suspense fallback={<div aria-hidden="true" className="h-24" />}>
                 {/* The MODEL card must show the model the terminal actually
                     resolved (the PTY grant), not config.yaml's default role. */}
@@ -1483,15 +1494,23 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                   }
                 />
               </Suspense>
-            </div>
+            </section>
             {/* Read-only summary of the real tools/skills/plugins/MCP
                 registries (the panel /qubit-chat has). Restored after the
                 2026-09-30 checkpoint dropped it from /chat: the registries
                 are independent of the PTY child, so a failed fetch renders a
                 short note and never blocks the terminal. */}
-            <div className="shrink-0">
+            <section
+              aria-labelledby="terminal-module-tools"
+              className="shrink-0"
+            >
+              <PlateModuleHead
+                id="terminal-module-tools"
+                index="02"
+                label={t.app.modelToolsSheetSubtitle}
+              />
               <ChatToolsSummary profile={scopedProfile} />
-            </div>
+            </section>
             {/* Session artifacts (drafts / comments / CI) for the open
                 session — the card /qubit-chat's panel has. A fresh chat has
                 no session id yet, so nothing is read. */}

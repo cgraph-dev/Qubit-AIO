@@ -98,7 +98,26 @@ function paletteVars(palette: ThemePalette): Record<string, string> {
     ...layerVars("background", palette.background),
     ...layerVars("midground", palette.midground),
     ...layerVars("foreground", palette.foreground),
+    // Which end of the scale pushes a colour AWAY from the canvas: white on a
+    // dark theme, black on a light one. CSS cannot branch on luminance, so the
+    // plate's muted/faint steps need this decided here. Without it a pale
+    // surface has no darker direction to mix toward and its labels collapse.
+    "--qplate-contrast": isLightHex(palette.background.hex) ? "#000000" : "#ffffff",
   };
+}
+
+/** True when the colour is closer to white than to black (WCAG luminance). */
+function isLightHex(hex: string): boolean {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const lin = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * lin(ch[0]) + 0.7152 * lin(ch[1]) + 0.0722 * lin(ch[2]);
+  return L > 0.179;
 }
 
 const DENSITY_MULTIPLIERS: Record<ThemeDensity, string> = {

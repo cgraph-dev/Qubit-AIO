@@ -89,6 +89,7 @@ import { useChatLiveEvents } from "@/hooks/useChatLiveEvents";
 import { type ChatSessionFrame } from "@/lib/chatLiveEvents";
 import { shouldRemountSessionList } from "@/components/chatLiveListPolicy";
 import { ChatWorkPanel } from "@/components/ChatWorkPanel";
+import { PlateModuleHead } from "@/components/PlateModuleHead";
 import { ReadAloudButton } from "@/components/ReadAloudButton";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ReportList } from "@/components/ReportList";
@@ -2012,7 +2013,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const modelToolsLabel = `${t.app.modelToolsSheetTitle} ${t.app.modelToolsSheetSubtitle}`;
 
   return (
-    <div className="qchat flex min-h-0 flex-1 flex-col gap-2">
+    <div className="qchat qplate flex min-h-0 flex-1 flex-col gap-2">
       <PluginSlot name="chat:top" />
 
       <div className="qchat__workspace flex min-h-0 flex-1 flex-col">
@@ -3029,9 +3030,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             id="chat-side-panel"
             role="complementary"
             aria-label={modelToolsLabel}
-            className="qchat__side flex min-h-0 shrink-0 flex-col gap-3 overflow-hidden lg:h-full lg:w-60"
+            className="qchat__side flex min-h-0 shrink-0 flex-col overflow-hidden lg:h-full lg:w-60"
           >
-            <div className="qchat__model-panel shrink-0">
+            {/* Module heads use the shared plate primitive so this panel and
+                the nav rail read as one system, not two skins. */}
+            <section
+              aria-labelledby="qchat-module-model"
+              className="qchat__model-panel shrink-0"
+            >
+              <PlateModuleHead
+                id="qchat-module-model"
+                index="01"
+                label={t.app.modelToolsSheetTitle}
+              />
               <Suspense fallback={
                 <div className="qchat__model-skeleton" role="status" aria-label="Loading model controls">
                   <span /><span /><span className="qchat__skeleton-control" />
@@ -3053,17 +3064,34 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   onSessionModelChange={setSessionModel}
                 />
               </Suspense>
-            </div>
-            <div className="qchat__tools shrink-0">
+            </section>
+            <section
+              aria-labelledby="qchat-module-tools"
+              className="qchat__tools shrink-0"
+            >
+              <PlateModuleHead
+                id="qchat-module-tools"
+                index="02"
+                label={t.app.modelToolsSheetSubtitle}
+              />
               <ChatToolsSummary
                 profile={scopedProfile}
                 onMention={insertToolMention}
               />
-            </div>
-            <div className="qchat__artifacts shrink-0">
+            </section>
+            <section className="qchat__artifacts shrink-0">
               <ChatSessionArtifacts key={session} sessionId={session} />
-            </div>
-            <div className="qchat__sessions min-h-0 flex-1 overflow-hidden">
+            </section>
+            <section
+              aria-labelledby="qchat-module-sessions"
+              className="qchat__sessions min-h-0 flex-1 overflow-hidden"
+            >
+              <PlateModuleHead
+                id="qchat-module-sessions"
+                index="03"
+                label={t.app.nav.sessions}
+                className="px-3 pt-2"
+              />
               <ChatSessionList
                 key={sessionListNonce}
                 // The panel lists the store this page's transcript actually
@@ -3089,7 +3117,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 profile={scopedProfile}
                 onNewChat={startFresh}
               />
-            </div>
+            </section>
           </div>
         )}
       </div>

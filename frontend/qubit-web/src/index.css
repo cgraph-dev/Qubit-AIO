@@ -421,9 +421,14 @@ html[dir="rtl"] {
 :root {
   --scan-accent: #7fd4ff;
   --scan-accent-dim: #4fa8dc;
-  --scan-ink: #d7e9ff;
-  --scan-muted: #8fa8c8;
-  --scan-faint: #55677f;
+  /* These three are the TEXT colours for `.text-text-secondary` /
+     `.text-midground` below, which apply them with `!important`. Hardcoded
+     light values meant every one of those call sites stayed near-white on the
+     light theme (~2:1 on a cream panel). They now read the plate ladder, which
+     the ThemeProvider computes per theme — see styles/qplate.css. */
+  --scan-ink: var(--qplate-ink, #d7e9ff);
+  --scan-muted: var(--qplate-muted, #8fa8c8);
+  --scan-faint: var(--qplate-faint, #55677f);
   --scan-hairline: rgb(127 212 255 / 16%);
   --scan-hairline-strong: rgb(127 212 255 / 38%);
   --scan-canvas: #04070d;

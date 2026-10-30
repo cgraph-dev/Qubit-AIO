@@ -92,6 +92,7 @@ import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 import { SidebarTooltip } from "@/components/SidebarTooltip";
 import { navDescription, sectionizeNav } from "@/lib/sidebar-sections";
+import "@/styles/qplate.css";
 import "@/styles/sidebar-studio.css";
 import "@/styles/qubit-mark.css";
 
@@ -922,6 +923,7 @@ export default function App() {
             aria-label={t.app.navigation}
             className={cn(
               "qagent-sidebar",
+              "qplate",
               "fixed top-0 left-0 z-50 flex h-dvh max-h-dvh w-64 min-h-0 flex-col font-sans",
               "border-r border-current/20",
               "bg-background-base",
