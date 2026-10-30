@@ -804,6 +804,8 @@ const sidebars: SidebarsConfig = {
             'developer-guide/gateway-session-lifecycle',
             'developer-guide/gateway-classic-cli',
             'developer-guide/gateway-command-parity',
+            'developer-guide/gateway-local-sessions',
+            'developer-guide/hosted-profile-owners',
             'developer-guide/multiplexing-gateway',
             'developer-guide/completion-backlog-delivery',
             'developer-guide/session-storage',
