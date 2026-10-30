@@ -43,6 +43,8 @@ def _(rid, params: dict) -> dict:
         from qubit_cli import free_tier_offer
         if (nudge_due_in := free_tier_offer.offer_due_in()) is not None:
             payload["nudge_due_in"] = nudge_due_in
+        if (connector_due_in := free_tier_offer.offer_due_in(free_tier_offer.CONNECTOR)) is not None:
+            payload["connector_nudge_due_in"] = connector_due_in
         if enabled and not has_guest:
             # Why there is no identity, when the last attempt to make one failed:
             # ``{error, error_code, retryable, retry_after}`` (the mint memo's verdict).
@@ -103,7 +105,8 @@ def _(rid, params: dict) -> dict:
                 except Exception as exc:   # memoised by the primitive before it re-raised
                     logger.info("free tier provisioning failed: %s", exc)
         has_guest = anon_auth.has_guest()
-        enabled = guest_on or _trial_claimable()
+        # A just-claimed trial is a live free-tier identity even though the one-shot claim is spent.
+        enabled = guest_on or _trial_claimable() or has_guest
         payload = {"has_guest": has_guest, "enabled": enabled}
         if enabled and not has_guest:
             payload.update(anon_auth.last_mint_failure() or {})

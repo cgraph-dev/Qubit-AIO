@@ -1898,7 +1898,7 @@ def _resolve_nous_access_token(
                                   headers={"Accept": "application/json"}, verify=verify) as client:
                     minted = refresh_guest_state(state, client, purpose="connectors")
                 persist()
-                _write_shared_nous_state(state)
+                _write_shared_nous_state(state, renewal=False)
                 return _memo(minted)
 
             merged_shared = _merge_shared_nous_oauth_state(state)
@@ -1933,7 +1933,7 @@ def _resolve_nous_access_token(
             state["client_id"] = client_id
             state["tls"] = _tls_state_from_verify(verify)
             persist()
-            _write_shared_nous_state(state)
+            _write_shared_nous_state(state, renewal=True)
             return _memo(state["access_token"])
 
 

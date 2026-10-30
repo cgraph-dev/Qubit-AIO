@@ -63,7 +63,9 @@ def _eligible(kind: str) -> bool:
     guests are still allowed (``nous.guest``), and no trial makes its own offer."""
     from qubit_cli import anon_auth
     if kind == TRIAL:
-        return anon_auth.free_inference_active()
+        # Any free-tier identity carrying inference gets the sign-in offer (the welcome trial or a
+        # guest whose exchange carries the inference grant).
+        return anon_auth.free_inference_active() or anon_auth.guest_carries_inference()
     state = anon_auth.current_nous_state()
     return (anon_auth.is_guest_state(state) and state.get(CONNECTED_APP_FLAG) is True and anon_auth.guest_allowed()
             and not anon_auth.free_inference_active(state))

@@ -548,7 +548,7 @@ def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any], 
     }
     _store_provider_state(auth_store, "nous", state, set_active=False)
     _save_auth_store(auth_store)
-    _write_shared_nous_state(state)
+    _write_shared_nous_state(state, renewal=False)
     logger.info("Qubit free tier ready (identity minted)")
     return state
 
@@ -680,7 +680,7 @@ def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
                 return state
             if profile_state:
                 if not shared:
-                    _write_shared_nous_state(profile_state)
+                    _write_shared_nous_state(profile_state, renewal=False)
                 return profile_state
             # A caller queued on these locks behind a mint that just failed waits out its cooldown.
             failure = _mint_failure_for_profile()
@@ -701,7 +701,7 @@ def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
 
 def ensure_portal_identity(
     *, explicit: bool, timeout_seconds: float = GUEST_MINT_TIMEOUT_SECONDS, force: bool = False,
-    welcome_claim: bool = False,
+    welcome_claim: bool = False, allow_gated: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Make sure this profile has a Qubit identity (guest or account); mint a guest only if the shared
     store has none. Returns the ``providers.qubit`` state, or None (disabled / failed once already).
@@ -723,7 +723,12 @@ def ensure_portal_identity(
     """
     if not explicit:
         raise ValueError("ensure_portal_identity: only explicit creators may call this (explicit=True)")
-    if not guest_enabled():
+    # The welcome trial is its own opt-in (the desktop's local backend), so it respects only the
+    # ``nous.guest`` switch; the launch gate (HERMES_GUEST_ONBOARDING) governs ordinary guests.
+    if welcome_claim:
+        if not guest_allowed():
+            return None
+    elif not guest_enabled() and not allow_gated:
         return None
     failure = _mint_failure_for_profile()
     if failure and not force and not current_nous_state() and time.monotonic() < failure.not_before:
@@ -1048,7 +1053,7 @@ def stamp_legacy_guest_claim() -> Optional[dict[str, Any]]:
             return None
         state = {**state, WELCOME_CLAIM_FLAG: True}
         _save_guest_state(auth_store, state, source_path)
-        _write_shared_nous_state(state)
+        _write_shared_nous_state(state, renewal=False)
     return state
 
 
