@@ -25,6 +25,7 @@ import urllib.parse
 from qubit_cli.install_identity import get_install_id as _shared_get_install_id
 from qubit_cli.process_identity import is_desktop_owned_backend
 from qubit_cli.pty_session import run_reaper
+from qubit_cli import web_server_file_tickets as _file_tickets
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -330,6 +331,8 @@ _QUERY_TOKEN_API_PATHS: frozenset[str] = frozenset({"/api/files/download"})
 
 
 def _has_valid_query_token(request: Request, path: str) -> bool:
+    if _file_tickets.redeem(request):
+        return True
     if path not in _QUERY_TOKEN_API_PATHS:
         return False
     token = request.query_params.get("token", "")

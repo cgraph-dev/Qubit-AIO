@@ -93,24 +93,16 @@ def update_tree(tmp_path, monkeypatch):
 
 
 def _publish_stable(monkeypatch, t):
-    """Publishing the R2 ``stable`` record pins ``t.wanted`` (v1.1.0) in this fork.
+    """Publishing the stable record pins ``t.wanted`` (v1.1.0) in this fork.
 
-    Deliberate divergence from upstream: upstream's helper patches the GitHub
-    ``source_releases._resolve_stable`` returned object; this fork's stable channel is an R2
-    ``ChannelRecord`` resolved through ``source_releases._resolve_channel``, so the same helper
-    seam publishes the record and the manifest that names the wanted commit.
+    Stable resolves through the R2 ``ChannelRecord`` under ``_resolve_stable``; the
+    conftest keeps that reader off the network, so a channel test replaces it with the
+    pinned target the record would produce.
     """
     from qubit_cli import source_releases
-    from qubit_cli.release_channels import ChannelResolution
 
-    record = {"schema": 1, "name": "stable", "repository": OFFICIAL,
-              "policy": "stable-release", "state": "active", "identity": {}, "nextSequence": 2,
-              "head": {"buildId": "build-fixture", "sequence": 1}}
-    manifest = {"schema": 1, "request": {"buildId": "build-fixture", "channel": "stable", "sequence": 1,
-                "repository": OFFICIAL, "commit": t.wanted, "sourceVersion": "1.1.0",
-                "version": "0.0.1", "identity": {}, "bundleEnv": {}}, "packages": []}
-    monkeypatch.setattr(source_releases, "_resolve_channel",
-                        lambda name, repository: ChannelResolution(record, record, manifest))
+    monkeypatch.setattr(source_releases, "_resolve_stable", lambda repository, *_: source_releases.SourceTarget(
+        "stable", "stable", repository, commit=t.wanted, version="1.1.0"))
 
 
 @pytest.mark.parametrize('case', ['main', 'explicit', 'missing', 'no-move', 'wrong-branch',

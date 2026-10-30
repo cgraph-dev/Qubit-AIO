@@ -52,7 +52,7 @@ _ACTION_LOG_TAIL_MAX_BYTES = 256 * 1024
 _ACTION_LOG_TAIL_INITIAL_CHUNK_BYTES = 8 * 1024
 _ACTION_LOG_TAIL_MAX_CHUNK_BYTES = 64 * 1024
 
-_UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== hermes-update completed ([0-9a-f]{32}) ===$")
+_UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== (?:hermes|qubit)-update completed ([0-9a-f]{32}) ===$")
 _UPDATE_ACTION_STARTED_RE = re.compile(r"^=== hermes-update started .* ([0-9a-f]{32}) ===$")
 
 _MANAGED_EXTERNALLY_MESSAGE = "Hermes updates are managed outside this dashboard in containerized environments."
@@ -238,7 +238,7 @@ def _update_refused(error: str, message: str, update_command: str) -> dict[str, 
     }
 
 
-@router.post("/api/hermes/update")
+@router.post("/api/qubit/update")
 async def update_hermes():
     """Kick off ``hermes update`` in the background."""
     if is_commit_build(_server_path("PROJECT_ROOT")):
@@ -286,7 +286,7 @@ def _source_release_label(status: dict[str, Any]) -> str:
     return f"{status.get('channel') or 'stable'} release" + (f" v{version}" if version else "")
 
 
-@router.get("/api/hermes/update/check")
+@router.get("/api/qubit/update/check")
 async def check_qubit_update(force: bool = False, profile: Optional[str] = None):
     """Report whether a Hermes update is available, without applying it.
 
@@ -408,7 +408,7 @@ async def get_action_status(name: str, lines: int = 200):
             # completion never certifies the action this dashboard started.
             durable_update_action_id = None
         if durable_update_action_id:
-            marker = f"=== hermes-update completed {durable_update_action_id} ==="
+            marker = f"=== qubit-update completed {durable_update_action_id} ==="
             if marker not in tail:
                 tail = [*tail, marker][-requested_lines:]
         # The update receipt is the durable, structured truth about the last
@@ -488,7 +488,7 @@ def _latest_update_receipt_summary(action_id: Optional[str] = None) -> Optional[
         return None
 
 
-@status_router.get("/api/hermes/update/receipt")
+@status_router.get("/api/qubit/update/receipt")
 async def get_update_receipt():
     """The FULL latest update receipt (steps, skips, gateway restart outcome, fleet
     matrix) plus a compact ``summary``; 404 when no update has run since receipts landed.
