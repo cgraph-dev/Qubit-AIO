@@ -7526,6 +7526,7 @@ PLATFORM_HINT = (
 
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
+    from . import gateway_env  # env -> GatewayConfig bridge (gateway.config_env)
     from .send_targets import SEND_ENTRY_KWARGS
     from . import gateway_env  # env -> GatewayConfig bridge (gateway.config_env)
 
@@ -7555,4 +7556,4 @@ def register(ctx) -> None:
         emoji="🎮",
         allow_update_command=True, platform_hint=PLATFORM_HINT,
         env_overrides=gateway_env.ENV_OVERRIDES,
-        env_enable_credentials=gateway_env.ENV_ENABLE_CREDENTIALS, **gateway_env.AUTHZ,)
+        env_enable_credentials=gateway_env.ENV_ENABLE_CREDENTIALS, **gateway_env.AUTHZ)

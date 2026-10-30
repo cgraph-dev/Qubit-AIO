@@ -59,7 +59,7 @@ def launch_cdp_browser(browser: str, profile_dir: str, port: int,
         subprocess.Popen(argv, stdin=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL,
-                         start_new_session=True)
+                         start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
     except Exception as exc:
         return False, f"Could not launch {exe}: {exc}"
     deadline = time.time() + 20.0

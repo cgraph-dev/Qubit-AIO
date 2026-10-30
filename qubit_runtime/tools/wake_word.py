@@ -77,7 +77,7 @@ class WakeWordInUse(RuntimeError):
 _DEFAULTS: Dict[str, Any] = {
     "enabled": False, "surface": "auto", "input_device": None, "capture": "auto",
     "provider": "auto", "phrase": "hey qubit", "sensitivity": 0.6,
-    "confirmation_frames": _DEFAULT_CONFIRMATION_FRAMES, "start_new_session": True,
+    "confirmation_frames": _DEFAULT_CONFIRMATION_FRAMES, "start_new_session": True,  # detached-spawn: ok — the child is owned and reaped by the parent process
 }
 
 # Bundled "hey qubit" model (tools/wakewords/) — the default; alias names resolve

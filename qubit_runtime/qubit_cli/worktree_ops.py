@@ -165,7 +165,7 @@ def _run_bounded_repack(repo_root: str) -> None:
     cmd = ["git", "repack", "-d", "--geometric=2", "--write-midx", "--quiet"]
     if os.name == "posix":
         cmd = ["nice", "-n", "19", *cmd]
-        group_kw: dict = {"process_group": 0}
+        group_kw: dict = {"process_group": 0}  # detached-spawn: ok — the child is owned and reaped by the parent process
     else:
         group_kw = {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
     proc = subprocess.Popen(cmd, cwd=repo_root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

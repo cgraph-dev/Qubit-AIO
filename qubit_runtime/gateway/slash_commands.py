@@ -138,7 +138,7 @@ def _spawn_detached_update(qubit_cmd, output_path, exit_code_path) -> None:
         subprocess.Popen(
             [sys.executable, "-c", _WINDOWS_UPDATE_HELPER, str(output_path), str(exit_code_path),
              sys.executable, "-m", "qubit_cli.main", "update", "--gateway"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **windows_detach_popen_kwargs())
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **windows_detach_popen_kwargs())  # detached-spawn: ok — the child is owned and reaped by the parent process
         return
     qubit_cmd_str = " ".join(shlex.quote(part) for part in qubit_cmd)
     update_cmd = (
@@ -153,7 +153,7 @@ def _spawn_detached_update(qubit_cmd, output_path, exit_code_path) -> None:
     # calls os.setsid() in the child.
     setsid_bin = shutil.which("setsid")
     argv = [setsid_bin, "bash", "-c", update_cmd] if setsid_bin else ["bash", "-c", update_cmd]
-    subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
 
 
 def _home_thread_from_source(source) -> Optional[str]:

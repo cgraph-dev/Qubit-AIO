@@ -381,7 +381,7 @@ class SupermemoryMemoryProvider(MemoryProvider):
 
     def initialize(self, session_id: str, **kwargs) -> None:
         from qubit_constants import get_qubit_home
-        self._qubit_home = kwargs.get("hermes_home") or str(get_qubit_home())
+        self._qubit_home = kwargs.get("qubit_home") or kwargs.get("hermes_home") or str(get_qubit_home())
         self._session_id, self._turn_count, self._pending_turns = session_id, 0, []
         config = _load_supermemory_config(self._qubit_home)
         self._api_key = get_secret("SUPERMEMORY_API_KEY", "") or ""

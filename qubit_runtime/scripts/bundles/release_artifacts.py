@@ -283,6 +283,11 @@ def publish(manifest: dict, root: Path, public_base: str) -> None:
     from scripts.releases.r2 import put
 
     materialize(manifest, root, public_base=public_base)
+    windows = [row for row in manifest["packages"] if row["platform"] == "windows"]
+    if windows:
+        paths = {item["url"]: item["path"] for item in manifest["files"]}
+        (universal,) = {paths[row["artifact"]["url"]] for row in windows}
+        validate_windows_bundle(root / universal, windows)
     for file in (root / "apt").rglob("*"):
         rel = file.relative_to(root / "apt").as_posix()
         if file.is_file() and (rel.startswith("pool/") or "/by-hash/" in rel):
@@ -351,11 +356,19 @@ def promote(manifest: dict, root: Path, public_base: str) -> None:
     apt = root / "apt"
     indexes = sorted(p for p in apt.rglob("*") if p.is_file() and not p.relative_to(apt).as_posix().startswith("pool/") and "/by-hash/" not in p.relative_to(apt).as_posix())
     indexes.sort(key=lambda p: p.name == "InRelease")
-    if not any(p.name == "InRelease" for p in indexes):
+    # Termux is opt-in: a release that did not build it leaves the APT channel
+    # on the previous Termux release, and ships no indexes to publish.
+    termux = any(row["platform"] == "termux" for row in manifest["packages"])
+    if termux and not any(p.name == "InRelease" for p in indexes):
         raise ValueError("Missing signed APT index")
+    if not termux and indexes:
+        raise ValueError("APT indexes staged for a release without a Termux candidate")
     # Every package and index must exist before the first channel write.
     # The merged feed points at the attempt archive; the version stays plain.
-    finalize(tag=manifest["tag"], dir=root, archive=manifest["archive"])
+    # macOS Intel is opt-in: without it the feed carries the arm64 leg alone.
+    arches = tuple(arch for arch in ("arm64", "x64")
+                   if any(row["platform"] == "macos" and row["arch"] == arch for row in manifest["packages"]))
+    finalize(tag=manifest["tag"], dir=root, archive=manifest["archive"], arches=arches, verify_bytes=False)
     def publish_pointer(key, file):
         put(tag=manifest["tag"], key=key, file=file, key_is_full=True)
         digest = hashlib.sha256()

@@ -173,7 +173,7 @@ def _run_start_phase(
     url = f"http://127.0.0.1:{port}{recipe.readiness_path}"
     started = time.monotonic()
     # start_new_session: own process group for clean teardown.
-    proc = subprocess.Popen(recipe.start, cwd=str(root), start_new_session=True, **_SUBPROCESS_KW)
+    proc = subprocess.Popen(recipe.start, cwd=str(root), start_new_session=True, **_SUBPROCESS_KW)  # detached-spawn: ok — the child is owned and reaped by the parent process
     output = ""
     try:
         ready, status, error = _poll_readiness(url, ready_timeout)

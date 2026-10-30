@@ -56,7 +56,7 @@ _BUILD_MARKERS = ("the build backend returned an error",)
 # and hints the version was filtered, so that case needs both lines.
 _UNDATED_PIN = "has no publish time"
 _UNDATED_FILE = ("is missing an upload date", "was filtered by `exclude-newer")
-UNDATED_INDEX_HINT = ("the package index did not report upload times, which locking Qubit's "
+UNDATED_INDEX_HINT = ("the package index did not report upload times, which locking Hermes's "
                       "dependencies needs for its 3-day release-age check. Use https://pypi.org/simple "
                       "or a mirror that serves upload times (pip.conf index-url / UV_INDEX_URL), then retry.")
 
@@ -272,7 +272,7 @@ def managed_environment(destination: Path, *, python: Path | None = None,
 
 
 @contextmanager
-def _fresh_build(environment: PythonEnvironment, *, sealed: bool) -> Iterator[None]:
+def _fresh_build(environment: PythonEnvironment, *, sealed: bool, lock: Path | None = None) -> Iterator[None]:
     """Own only the output claimed by this build, including failed validation."""
     out = environment.destination
     # A concurrent creator wins intact: never enter cleanup before mkdir succeeds.
@@ -280,7 +280,7 @@ def _fresh_build(environment: PythonEnvironment, *, sealed: bool) -> Iterator[No
     try:
         environment.create()
         yield
-        environment.check()
+        environment.check(lock)
         if sealed:
             prune_site_pth(out)
     except BaseException:
@@ -321,6 +321,8 @@ class PythonEnvironment:
             from pm.index_config import is_index_redirect
 
             env = {key: value for key, value in env.items() if not is_index_redirect(key)}
+        # uv is a child: it gets the ordinary spelling of store paths (pm.filesystem.native),
+        # or the venv it writes would record the extended-length one in pyvenv.cfg.
         env.update(UV_PYTHON=native(self.python), UV_PROJECT_ENVIRONMENT=native(self.destination),
                    UV_CACHE_DIR=native(self.cache), UV_PYTHON_DOWNLOADS="never")
         with tempfile.TemporaryDirectory(prefix="pm-uv-config-") as config:
@@ -357,7 +359,7 @@ class PythonEnvironment:
                         tail.close(result.returncode == 0)
                     return result
                 return subprocess.run(command, cwd=native(cwd), env=env, capture_output=True,
-                                      text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                                      text=True, encoding="utf-8", errors="replace", timeout=timeout, check=False)
             except subprocess.TimeoutExpired as exc:
                 from pm.index_config import TIMEOUT_HINT
 
@@ -449,19 +451,33 @@ class PythonEnvironment:
         if result.returncode:
             raise classify_uv_failure("export", result.returncode, result.stderr or result.stdout)
 
-    def install_requirements(self, requirements: Sequence[str], *, wheelhouse: Path | None = None) -> None:
+    def install_requirements(self, requirements: Sequence[str], *, wheelhouse: Path | None = None,
+                             lock: Path | None = None) -> None:
         if not requirements:
             return
         # A file avoids command-line length limits and shell/marker quoting.
         with tempfile.TemporaryDirectory(prefix="pm-requirements-") as temporary:
             requirements_file = Path(temporary) / "requirements.txt"
             requirements_file.write_text("\n".join(requirements) + "\n", encoding="utf-8")
-            self._install_requirements_file(requirements_file, wheelhouse=wheelhouse)
+            self._install_requirements_file(requirements_file, wheelhouse=wheelhouse, lock=lock)
 
     def _install_requirements_file(self, requirements: Path, *, wheelhouse: Path | None = None,
-                                   timeout: int = 1800) -> None:
+                                   lock: Path | None = None, timeout: int = 1800) -> None:
+        """Install *requirements*; *lock* is the uv.lock they were exported from.
+
+        `uv pip install` re-resolves the export, so the lock's manifest overrides
+        must come back as `--overrides` or the graph the lock resolved is rejected.
+        """
         command = ["pip", "install", "--no-config", "--python", str(self.executable),
                    "--requirements", str(requirements)]
+        if lock is not None:
+            from pm.pip_check import override_requirements
+
+            overrides = override_requirements(lock)
+            if overrides:
+                overrides_file = requirements.with_name("overrides.txt")
+                overrides_file.write_text("\n".join(overrides) + "\n", encoding="utf-8")
+                command += ["--overrides", str(overrides_file)]
         if wheelhouse is not None:
             command += ["--no-index", "--only-binary", ":all:",
                         "--find-links", str(wheelhouse.absolute())]
@@ -473,8 +489,9 @@ class PythonEnvironment:
         """Install rebuilt wheels whose hashes the bundle manifest owns, not uv.lock."""
         requirements = source / "requirements.txt"
         self.export_requirements(source, requirements, timeout=timeout)
-        self._install_requirements_file(requirements, wheelhouse=wheelhouse, timeout=timeout)
-        self.check()
+        self._install_requirements_file(requirements, wheelhouse=wheelhouse, lock=source / "uv.lock",
+                                        timeout=timeout)
+        self.check(source / "uv.lock")
 
     def prune_cache(self, *, ci: bool = False) -> None:
         command = ["cache", "prune", "--no-config"]
@@ -488,6 +505,8 @@ class PythonEnvironment:
         """`uv pip check` the environment; *lock* is the uv.lock it was installed from.
 
         Mismatches the lock's manifest overrides account for are expected (pm.pip_check).
+        The check is a quiet step, so it runs captured even for a streaming environment:
+        a streamed run keeps only the output's tail, which can drop the report's head.
         """
         result = replace(self, output=None)._run(
             # Forced colour (FORCE_COLOR/CLICOLOR_FORCE) would wrap the report in ANSI pm.pip_check cannot read.

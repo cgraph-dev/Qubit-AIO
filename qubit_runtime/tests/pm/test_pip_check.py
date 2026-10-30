@@ -103,13 +103,13 @@ def test_overrides_round_trip_as_requirement_lines(lock):
 
 
 def test_stdlib_fallback_reads_the_real_lock_like_tomllib(monkeypatch):
-    """The bootstrap runner may lack tomllib; its parser must agree on Qubit's own lock."""
+    """The bootstrap runner may lack tomllib; its parser must agree on Hermes's own lock."""
     with_tomllib = overridden_versions(REPO_LOCK)
     requirements = override_requirements(REPO_LOCK)
     monkeypatch.setitem(sys.modules, "tomllib", None)
     assert overridden_versions(REPO_LOCK) == with_tomllib
     assert override_requirements(REPO_LOCK) == requirements
-    assert with_tomllib, "Qubit's lock declares overrides; an empty read means the parser missed them"
+    assert with_tomllib, "Hermes's lock declares overrides; an empty read means the parser missed them"
 
 
 @pytest.fixture
@@ -143,7 +143,7 @@ def _overridden_project(tmp_path, overridden, extra_wheels=(), extra_dependencie
     home.mkdir()
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(("UV_", "PYTHON")) and key != "VIRTUAL_ENV"}
-    env.update(HOME=str(home), USERPROFILE=str(home), QUBIT_HOME=str(home / ".qubit"),
+    env.update(HOME=str(home), USERPROFILE=str(home), QUBIT_HOME=str(home / ".hermes"),
                UV_CACHE_DIR=str(tmp_path / "cache"), UV_PYTHON=sys.executable, UV_OFFLINE="1")
     _run([uv, "lock", "--python", sys.executable], cwd=source, env=env)
     return source, env

@@ -138,6 +138,22 @@ class ReasoningParamsMixin:
             return False
         return bool(_cached_probe(self, "_ollama_thinking_cache", ollama_model_supports_thinking, None, lambda v: v is not None))
 
+    def _github_models_reasoning_extra_body(self) -> dict | None:
+        """Format reasoning payload for GitHub Models/OpenAI-compatible routes."""
+        try:
+            from qubit_cli.models import clamp_github_reasoning_effort, github_model_reasoning_efforts
+        except Exception:
+            return None
+
+        supported = github_model_reasoning_efforts(self.model)
+        if not supported:
+            return None
+
+        cfg = self.reasoning_config if isinstance(self.reasoning_config, dict) else {}
+        if cfg.get("enabled") is False:
+            return None
+        return {"effort": clamp_github_reasoning_effort(cfg.get("effort"), supported)}
+
     def _reasoning_endpoint_profile(self):
         """The profile claiming this endpoint (``providers.profile_for_host``) that gates its reasoning, or None.
         Endpoints core gates itself (Nous Portal, Vercel AI Gateway, LM Studio, Ollama Cloud, OpenRouter) keep

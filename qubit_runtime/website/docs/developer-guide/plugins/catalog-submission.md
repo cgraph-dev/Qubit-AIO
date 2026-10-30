@@ -111,7 +111,7 @@ the gallery. There is no separate listing to maintain.
    `Object.defineProperty(...prototype`), which reviewers check by hand (the
    lint does not); a bundled library setting fields on classes it declares
    itself (three.js and the like) is fine,
-   no `eval`/`new Function`, no `import()` of anything but `@hermes/plugin-sdk`
+   no `eval`/`new Function`, no `import()` of anything but `@qubit/plugin-sdk`
    / `react` (app bundle chunks, blob or http URLs included), no script-tag
    injection, no reaching into the app's internal stores or its own markup
    (querying `data-slot` / `data-tour` / `data-sidebar` / `data-testid`

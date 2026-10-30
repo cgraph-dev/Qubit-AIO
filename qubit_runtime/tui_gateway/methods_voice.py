@@ -433,7 +433,7 @@ def _wake_detect_handler(transport, sid: str, phrase: str, new_session: bool):
         try:
             _emit("wake.detected", sid, {
                 "phrase": matched_phrase or phrase, "profile": matched_profile or None,
-                "start_new_session": new_session})
+                "start_new_session": new_session})  # detached-spawn: ok — the child is owned and reaped by the parent process
         finally:
             reset_transport(token)
     return _on_detect

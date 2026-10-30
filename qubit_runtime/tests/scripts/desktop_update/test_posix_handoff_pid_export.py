@@ -1,9 +1,9 @@
 """A later generation of a POSIX Desktop hand-off's update adopts the hand-off's own claim.
 
-``qubit update`` adopts an existing claim only when a live partner is its own pid, the
+``hermes update`` adopts an existing claim only when a live partner is its own pid, the
 ``HERMES_UPDATE_HANDOFF_PID`` value, or an ancestor (``update_lock.UpdateLock._is_partner``).
 ``posix.sh`` hands marker line 1 to a custodian before any update work starts; the custodian is a
-sibling of the update, never an ancestor. The first ``qubit update`` is named on the delegate
+sibling of the update, never an ancestor. The first ``hermes update`` is named on the delegate
 line, but a later generation (a relaunch or a takeover detached from it) has a new pid, so the
 hand-off pid is its only way to recognise the custodian. Naming the script there made those
 updates refuse their own claim with exit 2 (#134268, #134602).
@@ -59,8 +59,7 @@ def test_a_later_update_generation_adopts_the_handoffs_claim(tmp_path):
     (install / "qubit_cli" / "main.py").write_text(SECOND_GENERATION + FAKE_CLI, encoding="utf-8")
     out = tmp_path / "gen2.json"
 
-    result = _run(tmp_path, home, install, GEN2_OUT=str(out), GEN2_REPO=str(REPOSITORY),
-                   QUBIT_HOME=str(home))
+    result = _run(tmp_path, home, install, GEN2_OUT=str(out), GEN2_REPO=str(REPOSITORY))
 
     custodian = _custodian(home)
     assert custodian, "the hand-off never named a custodian"

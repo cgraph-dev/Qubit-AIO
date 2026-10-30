@@ -78,7 +78,7 @@ def _run_helper(command: str, secret_key: str, timeout_seconds: float, max_outpu
         proc = subprocess.Popen(  # noqa: S602 — command is the user's own config
             ["/bin/sh", "-c", command], env=env, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,  # stderr captured and DISCARDED — never inherited
-            start_new_session=True,  # so the hard timeout can kill the whole group
+            start_new_session=True,  # so the hard timeout can kill the whole group  # detached-spawn: ok — the child is owned and reaped by the parent process
         )
     except OSError as exc:
         _log(f"helper failed to spawn; resolving no value: errno={exc.errno}")

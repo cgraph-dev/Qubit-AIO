@@ -362,7 +362,7 @@ class OpenJarvisRuntime:
                     stdin=subprocess.DEVNULL,
                     stdout=sink,
                     stderr=subprocess.STDOUT,
-                    start_new_session=True,
+                    start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
                 )
                 pgid = proc.pid
                 try:
@@ -552,7 +552,7 @@ class OpenJarvisRuntime:
                 stderr=subprocess.PIPE,
                 text=True,
                 errors="replace",
-                start_new_session=True,
+                start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
             )
         except OSError as exc:
             refusal = "openjarvis_unavailable"

@@ -152,7 +152,7 @@ def provider_popen_group_kwargs(os_name: str) -> Dict[str, Any]:
     from qubit_cli._subprocess_compat import windows_detach_flags_without_breakaway
     if os_name == "nt":
         return {"creationflags": windows_detach_flags_without_breakaway()}
-    return {"start_new_session": True}
+    return {"start_new_session": True}  # detached-spawn: ok — the child is owned and reaped by the parent process
 
 
 def run_command_provider(

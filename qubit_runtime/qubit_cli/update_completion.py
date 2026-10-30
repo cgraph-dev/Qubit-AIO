@@ -91,7 +91,7 @@ def run_completion(request: dict) -> dict:
         # starts runs outside the job), so the lock is never free while it runs.
         proc = subprocess.Popen(
             command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            **({"start_new_session": True, "pass_fds": checkout_lock_fds(root)} if os.name == "posix" else
+            **({"start_new_session": True, "pass_fds": checkout_lock_fds(root)} if os.name == "posix" else  # detached-spawn: ok — the child is owned and reaped by the parent process
                {"creationflags": subprocess.CREATE_NO_WINDOW | CREATE_SUSPENDED}))
         decoder = codecs.getincrementaldecoder("utf-8")("replace")
         try:

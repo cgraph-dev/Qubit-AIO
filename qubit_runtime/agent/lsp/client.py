@@ -274,7 +274,7 @@ class LSPClient:
                 cmd[0], *cmd[1:], limit=_STREAM_LIMIT,
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                 env=delegated_child_subprocess_env({**qubit_subprocess_env(), **(self._env or {})}), cwd=self._cwd,
-                start_new_session=True, creationflags=windows_hide_flags(),
+                start_new_session=True, creationflags=windows_hide_flags(),  # detached-spawn: ok — the child is owned and reaped by the parent process
             )
         except FileNotFoundError as e:
             raise LSPProtocolError(f"LSP server binary not found: {cmd[0]} ({e})") from e

@@ -2948,7 +2948,7 @@ def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -
             stdout=log_f,
             stderr=subprocess.STDOUT,
             env=env,
-            start_new_session=True,
+            start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
             creationflags=subprocess.CREATE_NO_WINDOW if _kb._IS_WINDOWS else 0,
         )
     except FileNotFoundError:

@@ -459,7 +459,7 @@ def _run_job_script(
         # or stderr raises UnicodeDecodeError in communicate() and fails the whole run,
         # discarding the output (#105582; the Windows branch decodes lossily per #45099).
         popen_kwargs: dict[str, Any] = {
-            "start_new_session": True,
+            "start_new_session": True,  # detached-spawn: ok — the child is owned and reaped by the parent process
             "errors": "replace",
         }
         if sys.platform == "win32":

@@ -488,8 +488,7 @@ def require_parseable_user_config(*, ignore_user_config: bool = False) -> None:
 
     config_path = get_config_path()
     try:
-        with open(config_path, encoding="utf-8-sig") as f:
-            data = fast_safe_load(f)
+        data = read_config_doc(config_path)
     except FileNotFoundError:
         return
     except Exception as exc:
@@ -652,7 +651,7 @@ from qubit_cli.personality import (  # noqa: E402,F401
 # because callers and tests import these from qubit_cli.config)
 
 from qubit_cli.config_version_stamp import (  # noqa: E402,F401
-    check_config_version, read_config_version_stamp)
+    check_config_version, note_first_stamp, read_config_version_stamp, stamp_missing_config)
 
 
 # ---- Config Migration System ----
@@ -1304,9 +1303,13 @@ def _persist_migration(config: Dict[str, Any]) -> None:
     persist values that DIFFER from the schema default, plus explicit removals/renames of user
     data. Every migration step MUST write through here (``save_config`` with default-stripping
     ON, no ``merge_existing``) so the invariant cannot regress one migration at a time. A migration
-    is Qubit' own write, never a user turning a feature off."""
+    is Qubit' own write, never a user turning a feature off. A backend without file tooling
+    migrates in memory on read and never writes back (D12)."""
     from qubit_cli.observability.shared_metrics_disabled import qubit_applied_write
 
+    if not supports_file_tooling():
+        get_config_backend().apply_in_memory(get_config_path().parent, config)
+        return
     with qubit_applied_write():
         save_config(config)
 
@@ -2310,9 +2313,9 @@ def apply_terminal_config_to_env(
     return target
 
 
-def _load_config_cache_sig(config_path: Path) -> Tuple[Optional[Tuple[int, int, int, int]], Optional[Tuple[int, ...]]]:
-    """Return ``(user_sig, cache_sig)`` for ``_LOAD_CONFIG_CACHE``.
-    The managed config file's signature is folded in ((0, 0, 0, 0) = none) so editing it invalidates
+def _load_config_cache_sig(config_path: Path) -> Tuple[Optional[Tuple[Any, ...]], Optional[Tuple[Any, ...]]]:
+    """Return ``(user_sig, cache_sig)`` for ``_LOAD_CONFIG_CACHE`` (racy-clean guarded, see ``config_cache_version``).
+    The managed config file's signature is folded in (zeros = none) so editing it invalidates
     the merged result. ``cache_sig`` is None only when neither file exists (nothing to cache on)."""
     try:
         user_sig: Optional[Tuple[Any, ...]] = config_cache_version(config_path)
@@ -2600,8 +2603,7 @@ def save_config(
         from qubit_cli.config_worker_save import rebase_for_save  # frozen-worker writes + merge_existing
         config = rebase_for_save(config, _raw_for_paths, merge_existing, replace_keys)
 
-        current_normalized = _canonicalize_config(config)
-        normalized = current_normalized
+        normalized = current_normalized = _canonicalize_config(config)
         if _raw_for_paths:
             normalized = _preserve_env_ref_templates(
                 normalized, _canonicalize_config(_raw_for_paths),
@@ -3307,7 +3309,7 @@ def edit_config():
         _exit_invalid("`qubit config edit` opens the local config file, and this config backend has none. "
                       "Use `qubit config set <key> <value>` instead.")
     config_path = get_config_path()
-    if not config_path.exists():
+    if not config_path.exists():  # config-reader: ok — file tooling, gated on supports_file_tooling()
         seed_config_file(config_path)
         print(f"Created {config_path}")
 
@@ -3676,6 +3678,11 @@ def _exit_if_key_managed(key: str, action: str) -> None:
             f"Cannot {action} '{key}': it is managed by your administrator ({_managed_source('config.yaml')}) "
             f"and cannot be changed. Contact your administrator to modify it.", file=sys.stderr)
         sys.exit(1)
+    level = get_config_backend().locked(get_config_path().parent, key)  # remote locks, prefix-aware (D7)
+    if level:
+        print(f"Cannot {action} '{key}': it is locked by the {level} level of Remote Config and cannot be "
+              "changed from this agent.", file=sys.stderr)
+        sys.exit(1)
 
 
 def _touch_skin_file(key: str, value: Any) -> None:
@@ -3837,7 +3844,9 @@ def set_config_value(key: str, value: str, force: bool = False):
         user_config = _normalize_root_model_keys(user_config)
         key = "model.base_url"
         print("  (note: 'api_base' is an alias — saved as model.base_url)")
-    _write_user_config(config_path, user_config)
+    from qubit_cli.config_backend import pinning_keys
+    with pinning_keys(key):  # an explicit set is stored even when it equals the inherited value
+        _write_user_config(config_path, user_config)
 
     # Keep .env in sync: terminal_tool reads TERMINAL_ENV etc. directly from env vars.
     env_var = terminal_config_env_var_for_key(key)
@@ -3855,7 +3864,7 @@ def set_config_value(key: str, value: str, force: bool = False):
     if _is_secret_config_key(key) and isinstance(value, str) and value:
         from agent.redact import mask_secret
         _display_value = mask_secret(value)
-    print(f"✓ Set {key} = {_display_value} in {config_path}")
+    print(f"✓ Set {key} = {_display_value} in {config_destination(config_path)}")
     if _route_notice:
         print(_route_notice)
 
@@ -3972,7 +3981,7 @@ def unset_config_value(key: str):
         _exit_invalid(f"Config key not set: {key}")
 
     _write_user_config(config_path, user_config)
-    print(f"✓ Unset {key} from {config_path}")
+    print(f"✓ Unset {key} from {config_destination(config_path)}")
 
 
 # ---- Command handler ----
@@ -4168,7 +4177,11 @@ def config_command(args):
     subcmd = getattr(args, 'config_command', None)
     handler = _CONFIG_SUBCOMMANDS.get(subcmd)
     if handler is not None:
-        handler(args)
+        try:
+            handler(args)
+        except ConfigWriteError as exc:  # a backend refusal (a remote lock, a secret literal): nothing changed
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
         return
     print(f"Unknown config command: {subcmd}")
     print()

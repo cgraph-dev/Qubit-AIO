@@ -271,7 +271,7 @@ def windows_detach_popen_kwargs() -> dict:
     """
     if IS_WINDOWS:
         return {"creationflags": windows_detach_flags()}
-    return {"start_new_session": True}
+    return {"start_new_session": True}  # detached-spawn: ok — the child is owned and reaped by the parent process
 
 
 # Read-only probes must never lazy-fetch. In a partial (blobless/treeless) clone a missing object makes
@@ -828,7 +828,7 @@ def bounded_probe_run(
     ``Get-CimInstance Win32_Process`` gateway scan hit exactly this during ``qubit update`` on slow-WMI
     machines (#87134); the git probes hit it first (#68609 / #66037).
     """
-    _popen_kwargs: dict = {"creationflags": windows_hide_flags()} if IS_WINDOWS else {"process_group": 0}
+    _popen_kwargs: dict = {"creationflags": windows_hide_flags()} if IS_WINDOWS else {"process_group": 0}  # detached-spawn: ok — the child is owned and reaped by the parent process
     job = None
     try:
         # Windows: contain the probe in a Job Object. `taskkill /T` walks LIVE parent pids, and a

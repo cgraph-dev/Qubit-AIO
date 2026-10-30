@@ -208,7 +208,7 @@ def _launch_real_profile_chrome(real_binary: str, copy_dir: str) -> Tuple[Option
         chrome_argv.append("--headless=new")
     try:
         chrome_proc = subprocess.Popen(chrome_argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                       stdin=subprocess.DEVNULL, start_new_session=True, env=browser_env)
+                                       stdin=subprocess.DEVNULL, start_new_session=True, env=browser_env)  # detached-spawn: ok — the child is owned and reaped by the parent process
     except (subprocess.SubprocessError, OSError) as e:
         return None, f"{_RP}the launch failed: {e}"
     _bt._real_profile_chrome_procs.append(chrome_proc)

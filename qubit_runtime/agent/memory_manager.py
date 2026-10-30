@@ -918,13 +918,16 @@ class MemoryManager:
 
     def initialize_all(self, session_id: str, **kwargs) -> None:
         """Initialize all providers, injecting ``qubit_home`` so they resolve profile-scoped paths."""
-        if "hermes_home" not in kwargs:
-            from qubit_constants import get_qubit_home
-            kwargs["hermes_home"] = str(get_qubit_home())
-        self._bound_scope = bound_scope(kwargs["hermes_home"], kwargs.get("agent_identity"))
+        from qubit_constants import get_qubit_home
+        home = str(kwargs.get("qubit_home") or kwargs.get("hermes_home") or get_qubit_home())
+        # Publish both spellings: new providers read ``qubit_home``; pre-rename peaks still read
+        # the legacy name, and one commit must not orphan either side.
+        kwargs["qubit_home"] = home
+        kwargs["hermes_home"] = home
+        self._bound_scope = bound_scope(home, kwargs.get("agent_identity"))
         # One instance, one profile: never rebind an instance another profile's manager bound (#140058).
         for provider in [p for p in self._providers if p.name != "builtin"]:
-            if not claim_instance(provider, kwargs["hermes_home"]):
+            if not claim_instance(provider, home):
                 self._drop_provider(provider)
         self._each_provider("initialize failed", lambda p: p.initialize(session_id=session_id, **kwargs),
                             level=logging.WARNING)

@@ -13,6 +13,13 @@ import pytest
 
 from pm import Store, get_package
 
+# agent-browser was retired in favour of chromium; this file is retained for a
+# tree that still carries the npm package definition.
+try:
+    get_package("agent-browser")
+except KeyError:
+    pytest.skip("agent-browser is retired (chromium is the browser default)", allow_module_level=True)
+
 
 def _npm_tarball(path, names):
     with tarfile.open(path, "w:gz") as tar:

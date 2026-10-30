@@ -101,7 +101,7 @@ export QUBIT_HOME HERMES_HOME="$QUBIT_HOME"
 MARKER="$QUBIT_HOME/.hermes-update-in-progress"
 LOG_DIR="$QUBIT_HOME/logs"; mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/desktop-update-handoff.log"
-RESULT="$HOME_DIR/.hermes-update-result.json"
+RESULT="$QUBIT_HOME/.hermes-update-result.json"
 STATUS="${TMPDIR:-/tmp}/hermes-update-status.$$"
 STARTED_AT="$(date +%s)"  # the shim's elapsed clock; see serve-ui.py
 # Separate identity from both heartbeat time and adopt-only HANDOFF_RUN.
@@ -122,6 +122,19 @@ APP_REBUILD_FAILED=0
 log() {
   if [ -n "$MARKER_OP" ]; then echo "$(date +%Y-%m-%dT%H:%M:%S%z) $1" >> "$LOG" 2>/dev/null
   else echo "$(date +%Y-%m-%dT%H:%M:%S%z) $1" | tee -a "$LOG" 2>/dev/null; fi
+}
+
+update_output_tail() { # $OUT -> the updater's last non-empty output lines, one line each
+  # The shim window and the next-boot result dialog are the only surfaces a
+  # user can reach when the update failed; the exit code alone never names
+  # the failing layer (#137327). $OUT is the run's slice of the hand-off log,
+  # which interleaves our own log() lines (a leading ISO timestamp) with the
+  # updater's output — keep only the updater's, strip progress escapes (ANSI;
+  # of a CR-overwritten progress line only the final state the terminal
+  # showed), and bound it: three lines of at most 120 characters each.
+  printf '%s' "$OUT" | awk '{ sub(/\r+$/, ""); n = split($0, seg, "\r"); print seg[n] }' | sed "s/$(printf '\033')\[[0-9;?]*[A-Za-z]//g" \
+    | grep -v -e '^[[:space:]]*$' -e '^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T' | tail -n 3 \
+    | while IFS= read -r _tail_line; do printf '%s\n' "${_tail_line:0:120}"; done
 }
 
 owed_followup_steps() { # $OUT -> the distinct owed steps, space-separated, in print order
@@ -709,6 +722,7 @@ launch_app() { # attempted BEFORE the terminal event (launch acceptance is
     # within the window and downgrades to manual instead of lying.
     (cd "${RELAUNCH_CWD:-/}" 2>/dev/null || cd /
      # The relaunched app must not inherit the hand-off's update env.
+     restore_user_proxy_env
      env -u HERMES_UPDATE_STATUS_FILE -u HERMES_UPDATE_STARTED_AT -u HERMES_UPDATE_HANDOFF_PID -u PYTHONUNBUFFERED \
        setsid "$RELAUNCH_TARGET" ${RELAUNCH_ARGS[@]+"${RELAUNCH_ARGS[@]}"} >/dev/null 2>&1 &
      echo $! > "$STATUS.launchpid") || { log "WARNING: relaunch spawn failed"; return 1; }
@@ -1292,7 +1306,15 @@ if [ "$CODE" -eq 0 ]; then FINAL_CODE=0 FINAL_MSG="Update complete." UPDATE_COMM
   # end as a plain "Update complete." (review regression 1).
   OWED_STEPS="$(owed_followup_steps)"
   if [ -n "$OWED_STEPS" ]; then
+    # A gateway_restart owed only for serve/dashboard units (the reason then starts with
+    # "serve/dashboard ") names their own command in the log. The hint drops only when EVERY
+    # gateway_restart line is serve-only; any other reason keeps it (#141071).
     case " $OWED_STEPS " in *" gateway_restart "*) OWED_HINT=" Run qubit gateway restart to move the messaging gateway onto the new code now." ;; *) OWED_HINT="" ;; esac
+    GW_REASONS="$(printf '%s\n' "$OUT" | grep "Update follow-up 'gateway_restart' did not finish: ")"
+    if [ -n "$GW_REASONS" ] && ! printf '%s\n' "$GW_REASONS" | grep -vq "did not finish: serve/dashboard " \
+      && ! printf '%s\n' "$GW_REASONS" | grep -q "qubit gateway restart"; then
+      OWED_HINT=""
+    fi
     if [ -n "$DONE_NOTE" ]; then DONE_NOTE="$DONE_NOTE Follow-up steps still owed: $OWED_STEPS.$OWED_HINT"
     else DONE_NOTE="Qubit was updated, but some follow-up steps did not finish ($OWED_STEPS). The next launch or qubit update retries them; the update log has the details.$OWED_HINT"; fi
     add_warning "followup" "owed by the committed update: $OWED_STEPS"

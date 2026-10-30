@@ -15,6 +15,7 @@ from qubit_cli.web_routers._common import (
     REDACTED_CREDENTIAL_WRITE_DETAIL, http_failure, is_redacted_credential_preview,
     redacted_credential_preview, scoped_to_thread,
 )
+from qubit_cli.config_backend import refusing_locked_omissions
 from qubit_cli.web_deps import LateState, late
 from qubit_cli.web_server_config import (
     _apply_main_model_assignment, _denormalize_config_from_web, _normalize_config_for_web, _schema_with_dynamic_provider_options,
@@ -889,7 +890,10 @@ def upsert_custom_endpoint(body: CustomEndpointUpdate, profile: Optional[str] = 
             created = _resolve_custom_endpoint_entry(
                 providers if isinstance(providers, dict) else {}, body.id or body.name)[1] is None
             endpoint_id, _entry = _write_custom_endpoint(cfg, body)
-            save_config(cfg)
+            # make_default: the model route and the provider definition it names are one change,
+            # so a lock on either refuses both (never a model.provider naming an omitted entry).
+            with refusing_locked_omissions(*_ROUTE_SECTIONS) if body.make_default else contextlib.nullcontext():
+                save_config(cfg)
             response = _custom_endpoint_response(cfg)
             from qubit_constants import get_qubit_home
             home = get_qubit_home()
@@ -955,7 +959,8 @@ def activate_custom_endpoint(endpoint_id: str, profile: Optional[str] = None):
                 else:
                     model_cfg["api_key"] = entry["api_key"]
             cfg["model"] = model_cfg
-            save_config(cfg)
+            with refusing_locked_omissions(*_ROUTE_SECTIONS):
+                save_config(cfg)
         return {"ok": True, "provider": provider_key, "model": model}
 
 
