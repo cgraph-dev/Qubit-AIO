@@ -39,7 +39,7 @@ def _run(tmp_path: Path, body: str, *, env: dict | None = None, **kwargs) -> sub
     script = f"source {shlex.quote(INSTALL_SH.as_posix())} --manifest\nsleep() {{ :; }}\n{body}\n"
     full_env = dict(os.environ, HOME=tmp_path.as_posix(), QUBIT_HOME=(tmp_path / "home").as_posix(),
                     HERMES_INSTALL_DIR=(tmp_path / "install").as_posix(), **(env or {}))
-    return subprocess.run(["bash", "-c", script], env=full_env, capture_output=True, text=True, timeout=60, **kwargs)
+    return subprocess.run(["bash", "-c", script], env=full_env, capture_output=True, text=True, timeout=60, **kwargs)  # noqa: PLW1510 -- forwarding wrapper: callers pass subprocess kwargs via **kwargs (check may arrive through it); an explicit check=False would raise TypeError
 
 
 def _stage(tmp_path: Path, origin: Path, *, commit: str = "", extra_env: dict | None = None,
@@ -51,7 +51,7 @@ def _stage(tmp_path: Path, origin: Path, *, commit: str = "", extra_env: dict | 
 def test_piped_one_liner_runs_the_installer():
     """`curl ... | bash` has an empty BASH_SOURCE; under `set -u` the entry guard must still run main."""
     result = subprocess.run(["bash", "-s", "--", "--manifest"], input=INSTALL_SH.read_bytes(),
-                            capture_output=True, timeout=30)
+                            capture_output=True, timeout=30, check=False)
     assert result.returncode == 0, result.stderr.decode()
     assert json.loads(result.stdout)["protocol_version"] == 1
 
@@ -95,101 +95,6 @@ def test_commit_pin_must_come_from_the_installed_branch(tmp_path):
     pinned = _stage(tmp_path, origin, commit=on_branch)
     assert pinned.returncode == 0, pinned.stdout + pinned.stderr
     assert _git(tmp_path / "install", "rev-parse", "HEAD") == on_branch
-
-
-def test_commitless_checkout_is_moved_aside_and_recloned(tmp_path):
-    origin = _origin(tmp_path / "origin")
-    install = tmp_path / "install"
-    install.mkdir()
-    _git(install, "init", "-q")
-    (install / "keep").write_text("user file")
-    result = _stage(tmp_path, origin)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert (install / "README").read_text() == "one"
-    [broken] = tmp_path.glob("install.broken-*")
-    assert (broken / "keep").read_text() == "user file"
-
-
-def test_unmerged_index_is_cleared_then_stashed(tmp_path):
-    origin = _origin(tmp_path / "origin")
-    assert _stage(tmp_path, origin).returncode == 0
-    install = tmp_path / "install"
-    _git(install, "checkout", "-qb", "conflict")
-    _commit(install, "theirs")
-    _git(install, "checkout", "-q", "main")
-    _commit(install, "ours")
-    subprocess.run(["git", "-C", str(install), "-c", "user.email=t@t", "-c", "user.name=t", "merge", "conflict"],
-                   capture_output=True)
-    assert _git(install, "ls-files", "--unmerged")
-    _commit(origin, "two")
-    result = _stage(tmp_path, origin)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert (install / "README").read_text() == "two"
-    assert not _git(install, "ls-files", "--unmerged")
-
-
-def test_rerun_follows_an_explicit_repo_url(tmp_path):
-    first = _origin(tmp_path / "first")
-    assert _stage(tmp_path, first).returncode == 0
-    moved = tmp_path / "moved"
-    subprocess.run(["git", "clone", "-q", str(first), str(moved)], check=True)
-    tip = _commit(moved, "moved")
-    result = _stage(tmp_path, moved)
-    assert result.returncode == 0, result.stdout + result.stderr
-    install = tmp_path / "install"
-    assert _git(install, "rev-parse", "HEAD") == tip
-    assert _git(install, "remote", "get-url", "origin") == moved.as_posix()
-
-
-def test_path_uv_is_never_used_even_when_newer_than_the_pin(tmp_path):
-    bindir = tmp_path / "bin"
-    bindir.mkdir()
-    fake = bindir / "uv"
-    fake.write_text("#!/bin/sh\necho 'uv 99.0.0'\n")
-    fake.chmod(0o755)
-    # No pinned target: with the PATH uv ignored, the install must fail rather than adopt it.
-    body = 'uv_bootstrap_target() { return 1; }\nensure_uv\necho "UV_CMD=$UV_CMD"'
-    result = _run(tmp_path, body, env={"PATH": f"{bindir}:{os.environ['PATH']}"})
-    assert result.returncode != 0
-    assert f"UV_CMD={fake}" not in result.stdout
-
-
-def test_interactive_stages_skip_without_a_terminal(tmp_path):
-    install = tmp_path / "install"
-    (install / ".hermes" / "bin").mkdir(parents=True)
-    marker = tmp_path / "ran"
-    hermes = install / ".hermes" / "bin" / "hermes"
-    hermes.write_text(f"#!/bin/sh\ntouch {shlex.quote(marker.as_posix())}\n")
-    hermes.chmod(0o755)
-    # A new session has no controlling terminal, so opening /dev/tty fails.
-    result = _run(tmp_path, "NON_INTERACTIVE=false\nstage_setup\nstage_gateway", start_new_session=True,
-                  stdin=subprocess.DEVNULL)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert not marker.exists()
-    assert "no terminal" in result.stdout + result.stderr
-
-
-def test_rerun_marks_partial_clone_packs_when_the_fetch_crashes(tmp_path):
-    """git 2.53+ aborts fetches into a partial clone with unmarked packs (#124272); the installer
-    rerun is the recovery for installs whose own updater cannot fetch, so it marks them first."""
-    origin = _origin(tmp_path / "origin")
-    assert _stage(tmp_path, origin).returncode == 0
-    install = tmp_path / "install"
-    _git(install, "config", "remote.origin.promisor", "true")
-    _git(install, "repack", "-adq")
-    packs = list((install / ".git" / "objects" / "pack").glob("pack-*.pack"))
-    assert packs and not any(p.with_suffix(".promisor").exists() for p in packs)
-    _commit(origin, "two")
-    # Stand-in for the git 2.53+ index-pack crash: any fetch while an unmarked pack exists dies.
-    crashing_fetch = (
-        'git() { if [ "${3:-}" = fetch ]; then for p in "$2"/.git/objects/pack/pack-*.pack; do '
-        '[ -e "${p%.pack}.promisor" ] || { echo "BUG: should_include_obj" >&2; return 128; }; done; fi; '
-        'command git "$@"; }'
-    )
-    result = _stage(tmp_path, origin, prelude=crashing_fetch)
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert (install / "README").read_text() == "two"
-    assert all(p.with_suffix(".promisor").exists() for p in packs)
 
 
 def test_pinned_fresh_clone_never_materializes_the_branch_tip(tmp_path):
@@ -239,3 +144,106 @@ def test_pinned_fresh_clone_publishes_nothing_when_the_pin_fails(tmp_path):
     assert "no checkout published" in failed.stdout + failed.stderr
     assert not (tmp_path / "install").exists()
     assert not list(tmp_path.glob(".hermes-clone-*"))
+
+
+@pytest.mark.parametrize("damage", ["commitless", "lost_head", "dangling_gitdir_file"])
+def test_unusable_checkout_is_moved_aside_and_recloned(tmp_path, damage):
+    """An interrupted clone, or a .git a killed update left unreadable (the state `qubit update`
+    tells the user to repair by rerunning the installer): moved aside, never deleted, then cloned."""
+    origin = _origin(tmp_path / "origin")
+    install = tmp_path / "install"
+    install.mkdir()
+    if damage == "dangling_gitdir_file":
+        (install / ".git").write_text(f"gitdir: {tmp_path / 'gone'}\n")
+    else:
+        _git(install, "init", "-q")
+        if damage == "lost_head":
+            (install / ".git" / "HEAD").unlink()
+    (install / "keep").write_text("user file")
+    result = _stage(tmp_path, origin)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (install / "README").read_text() == "one"
+    [broken] = tmp_path.glob("install.broken-*")
+    assert (broken / "keep").read_text() == "user file"
+
+
+def test_unmerged_index_is_cleared_then_stashed(tmp_path):
+    origin = _origin(tmp_path / "origin")
+    assert _stage(tmp_path, origin).returncode == 0
+    install = tmp_path / "install"
+    _git(install, "checkout", "-qb", "conflict")
+    _commit(install, "theirs")
+    _git(install, "checkout", "-q", "main")
+    _commit(install, "ours")
+    subprocess.run(["git", "-C", str(install), "-c", "user.email=t@t", "-c", "user.name=t", "merge", "conflict"],
+                   capture_output=True, check=False)
+    assert _git(install, "ls-files", "--unmerged")
+    _commit(origin, "two")
+    result = _stage(tmp_path, origin)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (install / "README").read_text() == "two"
+    assert not _git(install, "ls-files", "--unmerged")
+
+
+def test_rerun_follows_an_explicit_repo_url(tmp_path):
+    first = _origin(tmp_path / "first")
+    assert _stage(tmp_path, first).returncode == 0
+    moved = tmp_path / "moved"
+    subprocess.run(["git", "clone", "-q", str(first), str(moved)], check=True)
+    tip = _commit(moved, "moved")
+    result = _stage(tmp_path, moved)
+    assert result.returncode == 0, result.stdout + result.stderr
+    install = tmp_path / "install"
+    assert _git(install, "rev-parse", "HEAD") == tip
+    assert _git(install, "remote", "get-url", "origin") == moved.as_posix()
+
+
+def test_path_uv_is_never_used_even_when_newer_than_the_pin(tmp_path):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    fake = bindir / "uv"
+    fake.write_text("#!/bin/sh\necho 'uv 99.0.0'\n")
+    fake.chmod(0o755)
+    # No pinned target: with the PATH uv ignored, the install must fail rather than adopt it.
+    body = 'uv_bootstrap_target() { return 1; }\nensure_uv\necho "UV_CMD=$UV_CMD"'
+    result = _run(tmp_path, body, env={"PATH": f"{bindir}:{os.environ['PATH']}"})
+    assert result.returncode != 0
+    assert f"UV_CMD={fake}" not in result.stdout
+
+
+def test_interactive_stages_skip_without_a_terminal(tmp_path):
+    install = tmp_path / "install"
+    (install / ".hermes" / "bin").mkdir(parents=True)
+    marker = tmp_path / "ran"
+    qubit = install / ".hermes" / "bin" / "hermes"
+    hermes.write_text(f"#!/bin/sh\ntouch {shlex.quote(marker.as_posix())}\n")
+    hermes.chmod(0o755)
+    # A new session has no controlling terminal, so opening /dev/tty fails.
+    result = _run(tmp_path, "NON_INTERACTIVE=false\nstage_setup\nstage_gateway", start_new_session=True,
+                  stdin=subprocess.DEVNULL)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not marker.exists()
+    assert "no terminal" in result.stdout + result.stderr
+
+
+def test_rerun_marks_partial_clone_packs_when_the_fetch_crashes(tmp_path):
+    """git 2.53+ aborts fetches into a partial clone with unmarked packs (#124272); the installer
+    rerun is the recovery for installs whose own updater cannot fetch, so it marks them first."""
+    origin = _origin(tmp_path / "origin")
+    assert _stage(tmp_path, origin).returncode == 0
+    install = tmp_path / "install"
+    _git(install, "config", "remote.origin.promisor", "true")
+    _git(install, "repack", "-adq")
+    packs = list((install / ".git" / "objects" / "pack").glob("pack-*.pack"))
+    assert packs and not any(p.with_suffix(".promisor").exists() for p in packs)
+    _commit(origin, "two")
+    # Stand-in for the git 2.53+ index-pack crash: any fetch while an unmarked pack exists dies.
+    crashing_fetch = (
+        'git() { if [ "${3:-}" = fetch ]; then for p in "$2"/.git/objects/pack/pack-*.pack; do '
+        '[ -e "${p%.pack}.promisor" ] || { echo "BUG: should_include_obj" >&2; return 128; }; done; fi; '
+        'command git "$@"; }'
+    )
+    result = _stage(tmp_path, origin, prelude=crashing_fetch)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (install / "README").read_text() == "two"
+    assert all(p.with_suffix(".promisor").exists() for p in packs)

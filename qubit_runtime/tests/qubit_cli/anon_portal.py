@@ -1,7 +1,7 @@
 """The fake NAS anonymous surface shared by the free-tier tests.
 
 One ``FakePortal`` and one ``install_portal`` behind every ``portal`` fixture: the wire contract is
-exercised through Hermes' real client code, never mocked away. Scenarios flip its behaviour
+exercised through Qubit' real client code, never mocked away. Scenarios flip its behaviour
 (``gate_closed``, ``dead_tokens``, a canned ``create_response`` / ``token_response``, or a
 ``raise_transport`` that makes the wire itself fail).
 """
@@ -49,11 +49,11 @@ class FakePortal:
         self.challenge_statuses: list[str] = []
         # Status polls answered with this HTTP error first (a 429 / 5xx blip), one per entry.
         self.challenge_status_errors: list[int] = []
-        # NAS since qubit-portal#1516: ``purpose: "connectors"`` mints a ``connectors:invoke``-only
-        # JWT with any CHALLENGE rule waived. False = an older NAS that drops the unknown key.
-        self.honours_purpose = True
         self.challenge_url = f"{PORTAL}/challenge?code=ticket"
         self.optional_challenge = False
+        # NAS since hermes-portal#1516: ``purpose: "connectors"`` mints a ``connectors:invoke``-only
+        # JWT with any CHALLENGE rule waived. False = an older NAS that drops the unknown key.
+        self.honours_purpose = True
         self.token_requests: list[dict] = []
         self.create_requests: list[dict] = []
 
@@ -113,7 +113,7 @@ class FakePortal:
 
 
 def install_portal(monkeypatch, tmp_path, fake: FakePortal | None = None) -> FakePortal:
-    """Route every Nous HTTP client at *fake*, isolate the stores, and reset the per-process memos.
+    """Route every Qubit HTTP client at *fake*, isolate the stores, and reset the per-process memos.
 
     One transport seam: ``httpx.Client`` itself, which ``auth_nous._nous_http_client`` and
     ``resolve_nous_access_token`` both construct."""
@@ -124,7 +124,6 @@ def install_portal(monkeypatch, tmp_path, fake: FakePortal | None = None) -> Fak
     monkeypatch.setenv("HERMES_PORTAL_BASE_URL", PORTAL)
     monkeypatch.setenv("HERMES_ANON_API_SECRET", "test-secret")
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     real_client = httpx.Client
@@ -149,9 +148,18 @@ def install_portal(monkeypatch, tmp_path, fake: FakePortal | None = None) -> Fak
 
 
 def as_local_desktop_backend(monkeypatch) -> None:
-    """This process is the backend the desktop spawned on this machine (the local spawn's credential)."""
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
-    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "test-spawn-token")
+    """Every activity in this test is work for the local Desktop (``process_identity.serving_local_desktop``),
+    threads included."""
+    from contextvars import ContextVar
+    from qubit_cli import process_identity
+    monkeypatch.setattr(process_identity, "_SERVING_LOCAL_DESKTOP", ContextVar("serving_local_desktop_test", default=True))
+
+
+def off_local_desktop(monkeypatch) -> None:
+    """From here on the activity is not the local Desktop's: a CLI shell beside it, another client."""
+    from contextvars import ContextVar
+    from qubit_cli import process_identity
+    monkeypatch.setattr(process_identity, "_SERVING_LOCAL_DESKTOP", ContextVar("serving_local_desktop_test", default=False))
 
 
 def claimed_trial(monkeypatch) -> dict:
