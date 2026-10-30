@@ -313,7 +313,6 @@ def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
     return None, "ticket-subprotocol"
 
 
-def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False, socket: Optional[str] = None) -> tuple[Optional[str], str]:
 def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
                     socket: Optional[str] = None) -> tuple[Optional[str], str]:
     """Validate WS-upgrade auth; return ``(reason, credential)``.

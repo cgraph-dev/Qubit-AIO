@@ -10,6 +10,7 @@ import inspect  # noqa: F401  (split modules)
 import json
 import logging
 import os
+import signal
 import queue
 import re
 import subprocess
@@ -52,6 +53,8 @@ from tui_gateway.transport import (FanoutTransport, StdioTransport, Transport, b
                                    current_transport, reset_transport)
 
 logger = logging.getLogger(__name__)
+
+from qubit_cli.process_identity import release_process_group_once_empty, spawn_owned  # noqa: E402
 
 _qubit_home = _QUBIT_HOME_AT_IMPORT = get_qubit_home()
 load_qubit_dotenv(qubit_home=_qubit_home, project_env=Path(__file__).parent.parent / ".env")
@@ -3779,6 +3782,7 @@ from .mcp_rpc_helpers import summarize_server as _mcp_summarize_server  # noqa: 
 # ── Split @method handler modules (see method_ctx.py): imported last so every global the handlers close
 # over exists; register() rebinds them onto this namespace.
 from . import (  # noqa: E402
+    slash_worker_client as _slash_worker_client,
     methods_voice as _methods_voice, methods_browser as _methods_browser, methods_slash as _methods_slash,
     methods_complete_helpers as _methods_complete_helpers, session_auto_continue as _session_auto_continue,
     plugin_inject as _plugin_inject,
@@ -3807,7 +3811,7 @@ from . import (  # noqa: E402
     methods_plugin_catalog as _methods_plugin_catalog, player_agent as _player_agent)
 
 for _m in (
-    _session_transports, _session_reaper, _session_lifecycle, _session_registry, _agent_factory, _session_workdir, _compute_host_bridge, _model_switch,
+    _slash_worker_client, _session_transports, _session_reaper, _session_lifecycle, _session_registry, _agent_factory, _session_workdir, _compute_host_bridge, _model_switch,
     _session_compression, _change_watcher, _tool_progress, _session_notifications,
     _prompt_attachments, _session_history, _agent_callbacks, _session_auto_continue, _plugin_inject, _rpc_dispatch,
     _methods_complete_helpers, _methods_slash, _methods_voice, _methods_browser,

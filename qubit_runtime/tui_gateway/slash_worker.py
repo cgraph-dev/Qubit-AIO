@@ -174,21 +174,21 @@ def main():
     args = p.parse_args()
     os.environ["HERMES_SESSION_KEY"] = args.session_key
     os.environ["HERMES_INTERACTIVE"] = "1"
-    # Start before the (hundreds-of-ms) HermesCLI build — that window is itself an orphan risk if the
-    # gateway dies mid-spawn.
-    _start_parent_death_watchdog(_watchdog_parent(args.parent_pid, is_windows=sys.platform == "win32"))
-    # Keep the heavyweight CLI import behind the watchdog (importing it at module
-    # load left a reparenting window before main() could snapshot PPID), but ahead
-    # of MCP discovery: importing cli loads ~/.qubit/.env and sets HERMES_QUIET,
+    # Before the heavy cli import, so a legacy parent dying during startup is still noticed.
+    _start_legacy_parent_watchdog(args.parent_pid)
+    # Import cli ahead of MCP discovery: importing it loads ~/.qubit/.env and sets HERMES_QUIET,
     # which MCP ``${VAR}`` interpolation in the runtime prep depends on.
-    from cli import QubitCLI as HermesCLI
+    from cli import HermesCLI
     _prepare_slash_worker_runtime()
+
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         # --provider pins the CLI to the parent agent's resolved provider (a MoA session's virtual
         # "moa" provider included). Without it HermesCLI re-resolves from config and dispatches the
         # MoA preset NAME to the configured real provider (#57283).
         cli = HermesCLI(model=args.model or None, provider=args.provider or None,
                         compact=True, resume=args.session_key, verbose=False)
+    cli._slash_metrics_surface = None  # the TUI/Desktop client already counted the typed command
+    cli.is_slash_worker = True
     # Spurious stdin-EOF recovery (same shared-file-description O_NONBLOCK issue as the gateway entry
     # point — any child inheriting fd 0 can flip the flag).
     _sw_recovery_times: list[float] = []

@@ -1565,7 +1565,7 @@ def _run_no_agent_job_scoped(
     script_path = job.get("script")
     # Legacy/hand-edited no_agent job without a script: pause it, or it re-fires every tick.
     if not str(script_path or "").strip():
-        from cron.jobs import NO_AGENT_WITHOUT_SCRIPT_ERROR
+        from cron.jobs_invariants import NO_AGENT_WITHOUT_SCRIPT_ERROR
 
         return _block_and_pause_job(job_id, job_name, NO_AGENT_WITHOUT_SCRIPT_ERROR)
 
@@ -4221,14 +4221,19 @@ _last_dead_owner_reap_at: Dict[str, float] = {}
 
 # Worktree prune throttle: the cron tick is the only reliably periodic process on gateway boxes.
 _WORKTREE_MAINTENANCE_INTERVAL_SECONDS = 6 * 3600.0
-_last_worktree_maintenance_at: Optional[float] = None
+_last_worktree_maintenance_at: Optional[dict] = None  # profile home -> monotonic stamp
 _worktree_maintenance_lock = threading.Lock()
 
 
-def _worktree_maintenance_repos() -> List[str]:
-    """Repos whose ``.worktrees/`` to keep pruned: the qubit checkout plus job workdir repo roots,
-    filtered to those that actually have a ``.worktrees/`` dir."""
+def _worktree_maintenance_repos() -> list[str]:
+    """Repos whose ``.worktrees/`` to keep pruned: the qubit checkout, job workdir repo roots and
+    every repo this profile created a worktree in (``worktree_registry``), filtered to those that
+    actually have a ``.worktrees/`` dir."""
     repos: set = set()
+
+    with contextlib.suppress(Exception):
+        from qubit_cli.worktree_registry import registered_repos
+        repos.update(registered_repos())
 
     # Qubit source checkout (git installs only; wheel installs have no .git).
     with contextlib.suppress(Exception):
@@ -4258,35 +4263,32 @@ def _worktree_maintenance_repos() -> List[str]:
 
 def _maybe_run_worktree_maintenance() -> None:
     """Throttled worktree prune from the cron tick, on a daemon thread so the tick never waits on
-    git. Same conservative pruner as ``qubit -w`` startup (dirty/unpushed/locked trees untouched).
-    Errors never propagate: GC is hygiene, not scheduling."""
+    git. Same pruner as ``qubit -w`` startup (idle dirty/unpushed trees archived before removal,
+    live trees untouched). Discovery is throttled per profile home, the prune once per repo across
+    served profiles, and ``cron.scheduler_worktree_maintenance`` runs one sweep at a time per
+    process. Runs in a copy of the caller's context (profile-home override); never raises."""
     global _last_worktree_maintenance_at
+    import contextvars
+
+    from qubit_constants import get_qubit_home
+
+    home = str(get_qubit_home())
     now = time.monotonic()
     with _worktree_maintenance_lock:
-        if (
-            _last_worktree_maintenance_at is not None
-            and now - _last_worktree_maintenance_at
-            < _WORKTREE_MAINTENANCE_INTERVAL_SECONDS
-        ):
+        stamps = _last_worktree_maintenance_at or {}
+        last = stamps.get(home)
+        if last is not None and now - last < _WORKTREE_MAINTENANCE_INTERVAL_SECONDS:
             return
-        _last_worktree_maintenance_at = now
+        _last_worktree_maintenance_at = {**stamps, home: now}
 
     def _run() -> None:
-        try:
-            repos = _worktree_maintenance_repos()
-            if not repos:
-                return
-            from qubit_cli.worktree_ops import _prune_stale_worktrees
+        from cron.scheduler_worktree_maintenance import run_sweep
 
-            for repo in repos:
-                try:
-                    _prune_stale_worktrees(repo)
-                except Exception:
-                    logger.debug("Cron worktree maintenance failed for %s", repo, exc_info=True)
-        except Exception:
-            logger.debug("Cron worktree maintenance skipped", exc_info=True)
+        run_sweep(_worktree_maintenance_repos,
+                  interval_seconds=_WORKTREE_MAINTENANCE_INTERVAL_SECONDS)
 
-    threading.Thread(target=_run, name="cron-worktree-prune", daemon=True).start()
+    threading.Thread(target=contextvars.copy_context().run, args=(_run,), name="cron-worktree-prune",
+                     daemon=True).start()
 
 
 def _acquire_tick_lock(lock_file):
