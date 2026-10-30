@@ -23,7 +23,7 @@ def _account_method(params_model=None, *, invalid="", invalid_reason=ConnectorEr
             from tui_gateway.contracts.connectors import ConnectorErrorReason
 
             with _desktop_page_vars():
-                if gate_error := _account_gate_closed(rid) or _account_identity_error(rid):
+                if gate_error := _account_gate_closed(rid):
                     return gate_error
                 try:
                     request = params if params_model is None else params_model.model_validate(params)
@@ -79,9 +79,9 @@ def _(rid, _params):
     from tools.connectors.portal.client import PortalConnectorClient
     from tui_gateway.contracts.connectors import ConnectorsCatalogResult
 
+    from tools.managed_gateway_auth import read_nous_access_token
     client = PortalConnectorClient()
-    client.require_authentication()
-    catalog = client.catalog()
+    catalog = client.catalog() if read_nous_access_token() else client.public_catalog()
     return _ok(rid, ConnectorsCatalogResult.model_validate(catalog, from_attributes=True).model_dump(mode="json"))
 
 
@@ -97,7 +97,8 @@ def _(rid, request):
     from tools.connectors.portal.client import PortalConnectorClient
     from tui_gateway.contracts.connectors import ConnectorAccountRow, ConnectorAccountsResult
 
-    accounts = PortalConnectorClient().list_accounts()
+    from tools.managed_gateway_auth import read_nous_access_token
+    accounts = PortalConnectorClient().list_accounts() if read_nous_access_token() else []
     rows = [account for account in accounts if request.connector is None or account["connector"] == request.connector]
     result = ConnectorAccountsResult(accounts=[_account_row(account) for account in rows])
     return _ok(rid, result.model_dump(mode="json"))

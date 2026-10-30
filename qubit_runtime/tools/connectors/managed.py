@@ -51,7 +51,7 @@ DESKTOP_PAGE = "desktop_page"
 CARD_RETRY = "card_retry"
 
 
-def managed_client(*, creates_guest: bool, initiator: Optional[str] = AGENT_TOOL, call: Optional[Any] = None):
+def managed_client(*, creates_guest: bool = True, initiator: Optional[str] = AGENT_TOOL, call: Optional[Any] = None):
     """The real gateway client for a user action. ``creates_guest`` is the caller's declaration that
     it may create the guest identity when the user has none (a connect, an explicit list); a page
     read passes False and holds a token already. ``initiator`` names who asked, so every link the

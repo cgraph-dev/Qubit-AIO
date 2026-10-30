@@ -124,6 +124,27 @@ class PortalConnectorClient:
         response, status, route = self._request("GET", "/api/v1/connectors/catalog")
         return self._parse(ConnectorCatalogResponse, response, status, route, PortalConnectorUnavailable, "portal catalog unavailable")
 
+    def public_catalog(self) -> ConnectorCatalogResponse:
+        """The public catalog route: no bearer, no account, safe to read before an identity exists."""
+        path = "/api/v1/connectors/catalog/public"
+        url = f"{self.origin()}{path}"
+        headers = {"Accept": "application/json", **connector_headers()}
+        try:
+            response = self._transport.request("GET", url, headers=headers, json=None, timeout=DEFAULT_TIMEOUT_SECONDS)
+        except Exception as exc:
+            log_connector_outcome(_route_key(path), None, code="TRANSPORT_ERROR")
+            raise PortalConnectorUnavailable(
+                "portal connector metadata unavailable", code="TRANSPORT_ERROR", retryable=True) from exc
+        status = int(getattr(response, "status_code", 0))
+        request_id = response_request_id(response)
+        if not 200 <= status < 300 and status != 304:
+            error = parse_gateway_error(status, _safe_json(response), getattr(response, "headers", None))
+            error.request_id = error.request_id or request_id
+            log_connector_outcome(_route_key(path), status, code=error.code, request_id=error.request_id)
+            raise error
+        return self._parse(ConnectorCatalogResponse, response, status, _route_key(path),
+                           PortalConnectorUnavailable, "portal catalog unavailable")
+
     def list_accounts(self) -> list[dict[str, Any]]:
         response, status, route = self._request("GET", "/api/v1/connectors/accounts")
         inventory = self._parse(ConnectorAccountsResponse, response, status, route, PortalConnectorUnavailable, "portal accounts unavailable")
