@@ -41,7 +41,7 @@ def _redact_terminal_error_text(value: Any) -> str:
 
 from tools.registry import tool_error
 from tools.terminal_tool_lifecycle import (
-    _call_in_flight, _cleanup_inactive_envs, _create_configured_env,
+    _call_in_flight, _check_disk_usage_warning, _cleanup_inactive_envs, _create_configured_env,
     _evict_environment_for_task, cleanup_all_environments, ensure_task_env,
 )
 from tools.terminal_tool_config import (
@@ -75,6 +75,9 @@ def _safe_parse_import_env(name: str, default: Any, converter, type_label: str):
 
 # Hard cap on foreground timeout; override via TERMINAL_MAX_FOREGROUND_TIMEOUT env var.
 FOREGROUND_MAX_TIMEOUT = _safe_parse_import_env("TERMINAL_MAX_FOREGROUND_TIMEOUT", 600, int, "integer")
+
+# Disk usage warning threshold (in GB)
+DISK_USAGE_WARNING_THRESHOLD_GB = _safe_parse_import_env("TERMINAL_DISK_WARNING_GB", 500.0, float, "number")
 
 
 # Approval / sudo-prompt UI callbacks (CLI registers prompt_toolkit-aware
@@ -1281,6 +1284,8 @@ def _acquire_env(plan: _ExecPlan, task_id: Optional[str]) -> Any:
         if env is not None:
             return env
 
+        if env_type == "singularity":
+            _check_disk_usage_warning()
         logger.info("Creating new %s environment for task %s...", env_type, eff[:8])
         try:
             new_env = _create_configured_env(
