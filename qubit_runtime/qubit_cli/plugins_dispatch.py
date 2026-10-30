@@ -641,3 +641,29 @@ class PluginDispatchMixin:
                 # Runs once per tool call like a hook, so a mis-declared callback floods identically.
                 self._report_hook_failure(kind, cb, kwargs, exc, surface="Middleware")
         return results
+
+
+# --- ported from upstream 088f657ecf ---
+
+_HOOK_CALL_IDENTITY_FIELDS: dict[str, tuple[str, ...]] = {
+    "pre_command": ("session_key",), "post_compaction": ("session_id",),
+}
+
+
+STREAM_HOLDING_HOOK = "transform_llm_output"
+
+
+def stream_held() -> bool:
+    """True when a plugin loaded in the active profile registered ``transform_llm_output`` with
+    ``hold_stream=True``: that profile's replies reach the user only as the rewritten final.
+    Lazy-discovers first, like ``has_hook``."""
+    from qubit_cli.plugins import _delivery_manager
+
+    return _delivery_manager().holds_stream()
+
+
+def held_stream_transforms() -> tuple[Callable, ...]:
+    """:meth:`PluginDispatchMixin.held_transforms` of the active profile's manager (lazy-discovers)."""
+    from qubit_cli.plugins import _delivery_manager
+
+    return _delivery_manager().held_transforms()

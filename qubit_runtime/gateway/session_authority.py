@@ -1228,3 +1228,40 @@ async def initialize_session_authority(runner, *, profile_id, instance_id, db=No
     from gateway.session_local_recovery import recover_local_sessions
     recover_local_sessions(authority)
     return authority
+
+
+# --- ported from upstream 088f657ecf ---
+
+messaging_admission = ContextVar('messaging_admission', default=None)
+
+
+async def keyed_turn(table, key, *, queued=None):
+    """One FIFO turn per *key*: ``table[key]`` is ``[asyncio.Lock(), holder + waiters]``, created on
+    first use and deleted when the last one leaves. asyncio's Lock is FIFO and a cancelled waiter gives
+    up only its own place. *queued* runs (before waiting) when an earlier turn holds or awaits the key."""
+    entry = table.setdefault(key, [asyncio.Lock(), 0])
+    entry[1] += 1
+    if queued is not None and entry[1] > 1:
+        queued()
+    try:
+        async with entry[0]:
+            yield
+    finally:
+        entry[1] -= 1
+        if not entry[1]:
+            del table[key]
+
+
+def backfill_compression_created_sources(db):
+    """List conversations compressed before write-time stamping under their surface again: a chain
+    root without a created_source takes its nearest stamped continuation's. Idempotent and never
+    overwrites a known value, so every start runs it, like the owner backfill above."""
+    import logging
+    try:
+        stamped = db.stamp_legacy_compression_chains()
+    except Exception:
+        logging.getLogger(__name__).warning('Compression created_source repair failed for %s', db.db_path, exc_info=True)
+        return 0
+    if stamped:
+        logging.getLogger(__name__).info('Stamped created_source on %d compressed session row(s)', stamped)
+    return stamped

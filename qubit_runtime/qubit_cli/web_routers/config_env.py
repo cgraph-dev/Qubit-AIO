@@ -1245,3 +1245,8 @@ async def reveal_env_var(
 
     _log.info("env/reveal: %s", body.key)
     return {"key": body.key, "value": value}
+
+
+# --- ported from upstream 088f657ecf ---
+
+_ROUTE_SECTIONS = ("model", "providers", "custom_providers")

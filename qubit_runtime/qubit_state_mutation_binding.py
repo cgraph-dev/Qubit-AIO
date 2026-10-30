@@ -93,3 +93,33 @@ def same_history_owner(conn, anchor_id, session_id):
         return False
     return binding is not None or (
         row['source'] in _history_sources() and _owner_user(row) in (None, '', anchor['user_id']))
+
+
+# --- ported from upstream 088f657ecf ---
+
+def binding_names(saved, profile_id, subject):
+    """Whether a stored ``[profile_id, subject]`` binding names *subject* in *profile_id*: same profile,
+    and the same owner (a binding a Webapp login stored belongs to the machine owner,
+    gateway.owner_identity.same_owner). Every reader of a binding asks this, never a string compare."""
+    try:
+        saved_profile, saved_subject = json.loads(saved)
+    except (TypeError, ValueError):
+        return False
+    from gateway.owner_identity import same_owner
+    return saved_profile == profile_id and same_owner(saved_subject, subject)
+
+
+def _bound_to(saved, actor):
+    return binding_names(saved, actor.profile_id, actor.subject)
+
+
+def _bindings_agree(first, second):
+    """Two stored bindings name the same owner (both absent agrees; one absent does not)."""
+    if first == second or first is None or second is None:
+        return first == second
+    try:
+        (first_profile, first_subject), (profile_id, subject) = json.loads(first), json.loads(second)
+    except (TypeError, ValueError):
+        return False
+    from gateway.owner_identity import owners_agree
+    return first_profile == profile_id and owners_agree(first_subject, subject)

@@ -4,6 +4,8 @@ Reuse upstream authority-only value shapes; these overrides do not widen METHODS
 """
 from typing import Literal
 
+from pydantic import RootModel
+
 from .base import JsonValue, Params, Result
 from .common import ProfileParams, TranscriptMessage
 from .canonical import AdmissionStatus, CanonicalSessionRef, PromptResponseResult, SessionInventoryFields
@@ -308,3 +310,28 @@ canonical_method('prompt.replace_queued', params=CanonicalReplaceQueuedParams, r
                      "at the back of the FIFO, in one write bound to the replaced admission. "
                      "Refusals: admission_started, admission_conflict (the submission_id replaced "
                      "another admission), queue_full, unsupported_control, not_found.")
+
+
+# --- ported from upstream 088f657ecf ---
+
+class CanonicalVoiceStopped(Result):
+    """A bare stop phrase typed while the session's voice chat is on: the chat ended, nothing was
+    admitted (TUI-26)."""
+
+    voice_stopped: Literal[True]
+
+
+class CanonicalSubmitResult(RootModel):
+    """``prompt.submit``: the admission receipt, or ``{voice_stopped: true}``."""
+
+    root: AdmissionStatus | CanonicalVoiceStopped
+
+
+class CanonicalCorrectionAck(Result):
+    status: Literal['queued', 'redirected', 'rejected']
+    text: str
+    execution_generation: int
+    authority_epoch: int
+    # Only on a 'rejected' no agent ever saw (none was live): safe to admit as the next prompt. A plain
+    # 'rejected' may follow delivery (a Codex steer whose ACK timed out), so clients never re-send it.
+    delivered: Literal[False] | None = None

@@ -1541,3 +1541,24 @@ class OpenAICompatRoutesMixin:
             from gateway.platforms.api_server_response_identity import identify_output
             return identify_output(items, response_id)
         return items
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _matching_replay(store, key, binding):
+    """-> ``(binding matches, stored replay record or None)``, read as one store unit."""
+    if not store.request_key_matches(key, binding):
+        return False, None
+    return True, store.get(key)
+
+
+def _store_nonstream_response(store, snapshot, replay_record, conversation, terminal_replay):
+    """Non-streaming /v1/responses persistence as one store unit: body, conversation pointer, replay record."""
+    if snapshot is not None:
+        response_id, data = snapshot
+        advance = conversation and (not terminal_replay or store.get_conversation(conversation) in (None, response_id))
+        store.put(response_id, data)
+        if advance:
+            store.set_conversation(conversation, response_id)
+    if replay_record is not None:
+        store.put(*replay_record)

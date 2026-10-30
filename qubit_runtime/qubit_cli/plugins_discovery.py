@@ -426,3 +426,16 @@ def gate_manifest(
             return _placeholder(error, logging.WARNING, "Refusing to load plugin '%s' — %s; run `qubit plugins remove`",
                                 error)
     return ManifestGate("load")
+
+
+# --- ported from upstream 088f657ecf ---
+
+IN_BOTH_LISTS = "listed in both plugins.enabled and plugins.disabled — disabled wins"
+
+
+def plugins_in_both_lists() -> list[str]:
+    """Keys of the plugins the loader skips because both lists name them, by the loader's own
+    config read and name matching (path key, bare leaf, manifest name)."""
+    winners = resolve_manifest_winners(collect_directory_manifests())
+    disabled, enabled = _get_disabled_plugins(), _get_enabled_plugins()
+    return [key for key, manifest in winners.items() if gate_manifest(manifest, disabled, enabled).error == IN_BOTH_LISTS]

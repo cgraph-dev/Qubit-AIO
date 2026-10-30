@@ -3028,3 +3028,8 @@ def run_daemon(
 from qubit_cli import kanban_db as _kb  # noqa: E402
 from qubit_cli import kanban_db_connect as _kbc  # noqa: E402
 from qubit_cli import kanban_db_workspace as _kbw  # noqa: E402
+
+
+# --- ported from upstream 088f657ecf ---
+
+WORKER_OUTPUT_SEP = " Worker's last output: "

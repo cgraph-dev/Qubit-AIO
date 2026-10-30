@@ -396,3 +396,10 @@ def recorded_standalone_warning_lines() -> list[str]:
     if not reason:
         return []
     return standalone_warning_lines(MultiplexDecision(False, "guard", reason))
+
+
+# --- ported from upstream 088f657ecf ---
+
+AUTO_MIGRATION_OPTED_OUT_REASON = (
+    "gateway.auto_multiplex_migration is false, so this gateway serves only its own profile; "
+    "run `hermes gateway migrate --multiplex` to serve every profile")

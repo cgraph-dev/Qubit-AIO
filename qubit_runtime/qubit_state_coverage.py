@@ -262,3 +262,34 @@ class SessionCoverageMixin:
             if need <= width or width >= len(covered_active):
                 return window
             width = need
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _holds_as_block(inner: str, outer: str) -> bool:
+    """True when *inner* sits in *outer* as whole lines: the compressor adds only whole blocks around a carried
+    row's text (header, markers, summary), so a hit that starts or ends mid-line is the row losing text instead.
+    Blanks beside the hit count as line edges: the load lens strips the stored text, never the copy inside."""
+    start = outer.find(inner)
+    while start != -1:
+        end = start + len(inner)
+        if not outer[:start].rpartition("\n")[2].strip() and not outer[end:].partition("\n")[0].strip():
+            return True
+        start = outer.find(inner, start + 1)
+    return False
+
+
+def _images_replaced(stored: Any, held: Any) -> bool:
+    """True when *held* is *stored* with at least one image part swapped for a text part, all else equal."""
+    from agent.context_compressor import _is_image_part
+
+    if not (isinstance(stored, list) and isinstance(held, list)) or len(stored) != len(held):
+        return False
+    swapped = False
+    for was, now in zip(stored, held):
+        if was == now:
+            continue
+        if not (_is_image_part(was) and isinstance(now, dict) and now.get("type") == "text"):
+            return False
+        swapped = True
+    return swapped

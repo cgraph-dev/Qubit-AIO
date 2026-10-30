@@ -1665,3 +1665,84 @@ registry.register(
     emoji="💻",
     max_result_size_chars=100_000,
 )
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _container_profile() -> str:
+    """Profile whose persistent container a session-bound command uses: the bound home's profile when it is not
+    the session's own (a profile-routed subagent runs in its target's home while the session, and the delivery
+    identity HERMES_SESSION_PROFILE carries, stay the parent's; that target may be the launch profile, reached
+    from a routed profile's chat), else the session's. A session with no profile name is the launch profile's,
+    so the launch home's own work keeps the session's key whatever the launch profile is named."""
+    from qubit_constants import get_qubit_home_override, profile_name_for_home
+    from tools.environments.local import _is_routed_home
+
+    override = get_qubit_home_override()
+    session = _current_session_profile()
+    bound = profile_name_for_home(override) if override else None
+    if bound and (bound != session if session else _is_routed_home(override)):
+        return bound
+    return session or "default"
+
+
+_calls_in_flight: dict[str, int] = {}
+
+
+def _is_isolation_override_key(key: str) -> bool:
+    """An image (``docker_image``, a plugin backend's ``<backend>_image``) or ``env_type`` override."""
+    return key == "env_type" or key.endswith("_image")
+
+
+def workspace_key_for(cwd: str) -> str:
+    """The ``:ws:`` digest of a host workspace: computed ONCE when the session binds it
+    (``gateway.session_policy.bind_turn_workspace``), so container keying never depends on live
+    filesystem state at lookup time."""
+    import hashlib
+    resolved = os.path.realpath(os.path.expanduser(cwd))
+    return hashlib.sha256(resolved.encode("utf-8")).hexdigest()[:16]
+
+
+def _workspace_container_key(base: str, task_id: Optional[str]) -> str:
+    """Persistent Docker key for a session that registered a workspace: one container per
+    (profile, workspace), not per profile (#140665).
+
+    A gateway-owned CLI/Desktop session registers its client cwd as a ``cwd_source: "session"``
+    override (``gateway.session_policy.bind_turn_workspace``). Keyed by profile alone, every
+    concurrent session shared the container bound to whichever workspace created it first; sessions
+    in the same folder still share one. Sessions with no registered workspace keep the profile key.
+
+    Idempotent: an already-resolved ``<base>:ws:<digest>`` key maps to itself (``ensure_task_env``
+    hands the resolved key to ``get_active_env``, which resolves again). A ``delegate_task`` child has
+    only a container alias to its parent (``register_container_alias``), so the alias chain is
+    followed: the child runs in its parent's workspace container, never the profile's.
+    Reads the raw table (not :func:`resolve_task_overrides`, which calls back into key resolution).
+    """
+    if not task_id:
+        return base
+    if task_id.startswith(f"{base}:ws:"):
+        return task_id
+    for key in dict.fromkeys((task_id, _resolve_container_alias(task_id))):
+        overrides = _task_env_overrides.get(_qualify_task_key(key))
+        if not overrides or overrides.get("cwd_source") != "session":
+            continue
+        digest = overrides.get("workspace_key")
+        cwd = overrides.get("cwd")
+        if not digest and isinstance(cwd, str) and cwd.strip() and "\0" not in cwd:
+            digest = workspace_key_for(cwd)
+        if digest:
+            return f"{base}:ws:{digest}"
+    return base
+
+
+def _backend_default_cwd(env_type: str) -> str:
+    if env_type == "local":
+        return _safe_getcwd()
+    if env_type in _DEFAULT_CWD_BY_BACKEND:
+        return _DEFAULT_CWD_BY_BACKEND[env_type]
+    declared = _plugin_env_flag(env_type, "default_cwd", None)
+    # "~" is each sandbox's own home, expanded inside it; otherwise only an absolute in-sandbox path
+    # (a relative value would be anchored on the host).
+    if isinstance(declared, str) and (declared == "~" or declared.startswith("/")):
+        return declared
+    return "/root"

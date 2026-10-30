@@ -7,7 +7,11 @@ button can never disagree:
 * a full gauge with scope ``all`` (day / week / month / any new one) blocks every paid model;
 * a full ``top_tier`` gauge blocks the models the gateway marks top tier.
 
+<<<<<<< HEAD
 Qubit never switches model on its own. When a request is refused, :func:`limit_hit` describes the
+=======
+Hermes never switches model on its own. When a request is refused, :func:`limit_hit` describes the
+>>>>>>> port/repin-lane-10
 limit and names up to two models from the plan's recommended list (in order) that still
 work. Each surface renders that as buttons where it already has them, otherwise as a sentence.
 

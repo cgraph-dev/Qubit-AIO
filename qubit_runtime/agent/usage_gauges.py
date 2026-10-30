@@ -1,11 +1,19 @@
 """Usage-window allowances as the server sends them: one list, in display order.
 
 The Portal account (``usage_window.gauges``) and the API (``x-nous-credits-window-gauges``, also on the 402)
+<<<<<<< HEAD
 send the same shape, so Qubit draws whatever arrives and a new allowance needs no Qubit release.
 ``scope`` says which models a full gauge stops: ``all`` = every paid model, ``top_tier`` = the models the
 gateway marks top tier. Free models draw on nothing.
 
 Qubit keeps only its own words for the ids it knows (they are translated and fitted to each surface);
+=======
+send the same shape, so Hermes draws whatever arrives and a new allowance needs no Hermes release.
+``scope`` says which models a full gauge stops: ``all`` = every paid model, ``top_tier`` = the models the
+gateway marks top tier. Free models draw on nothing.
+
+Hermes keeps only its own words for the ids it knows (they are translated and fitted to each surface);
+>>>>>>> port/repin-lane-10
 any other id shows the server's ``label``.
 """
 
@@ -49,7 +57,11 @@ class WindowGauge:
 def parse_gauges(value: Any) -> Optional[tuple[WindowGauge, ...]]:
     """The wire list (a JSON array, or its string form from a header) → gauges in order. None when absent,
     unreadable or empty. An entry with an unknown scope, a repeated id or a bad percent is dropped: an
+<<<<<<< HEAD
     older Qubit must never misread a kind of limit it does not know."""
+=======
+    older Hermes must never misread a kind of limit it does not know."""
+>>>>>>> port/repin-lane-10
     if isinstance(value, tuple) and all(isinstance(g, WindowGauge) for g in value):
         return value or None
     if isinstance(value, str):

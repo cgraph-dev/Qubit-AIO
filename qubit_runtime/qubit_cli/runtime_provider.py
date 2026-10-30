@@ -1194,3 +1194,57 @@ def resolve_runtime_with_fallback(config: Optional[Dict[str, Any]], *, requested
                            primary_failure_wording(primary_exc)[0], primary_exc, provider, model)
             return runtime, entry
         raise primary_exc
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _per_model_profile(provider: str) -> Any:
+    """The provider's profile when it routes ``api_mode`` per model (``ProviderProfile.api_mode_for_model``)."""
+    from providers import get_provider_profile
+    from providers.base import ProviderProfile
+
+    profile = get_provider_profile(provider) if provider else None
+    if profile is None or type(profile).api_mode_for_model is ProviderProfile.api_mode_for_model:
+        return None
+    return profile
+
+
+def _profile_runtime_api_mode(provider: str, model_cfg: dict[str, Any], api_key: str, *,
+                              target_model: Optional[str] = None) -> str:
+    """api_mode for a provider that routes per model: its hard per-model wire wins over a stale persisted
+    ``codex_responses`` (pure check, no network); otherwise the profile decides with the live key."""
+    from agent.provider_route_hooks import model_api_mode
+    profile = _per_model_profile(provider)
+    configured_mode = _configured_api_mode(provider, model_cfg)
+    # Use the model being resolved, not the persisted default: a Claude MoA slot inheriting
+    # codex_responses from a GPT-5 default fails with "model ... does not support Responses API".
+    model_name = str(_effective_model(model_cfg, target_model)).strip()
+    if configured_mode:
+        # A stale explicit ``codex_responses`` (written by setup for the model first picked, kept after a
+        # switch to a chat-only model) must not override the provider's per-model requirement: the
+        # Responses request silently succeeds but returns no reasoning content (#46527).
+        if (configured_mode == "codex_responses" and model_name and profile is not None
+                and model_api_mode(profile, model_name) == "chat_completions"):
+            return "chat_completions"
+        return configured_mode
+    if profile is None:
+        return "chat_completions"
+    declared = profile.api_mode or "chat_completions"  # the hook's None means "keep the static api_mode"
+    return (model_api_mode(profile, model_name, api_key=api_key) or declared) if model_name else declared
+
+
+def _explicit_qwen(requested_provider, model_cfg, api_key, explicit_base_url, target_model):
+    # A supplied token is the credential: the Qwen CLI login is read only when none was given.
+    api_key, base_url, expires_at_ms = _creds_fallback(api_key, explicit_base_url, explicit_base_url or _qwen_base_url(),
+                                                       None, "expires_at_ms", resolve_qwen_runtime_credentials)
+    return _runtime("qwen-oauth", "chat_completions", base_url, api_key, source="explicit", expires_at_ms=expires_at_ms,
+                    requested_provider=requested_provider)
+
+
+def _qwen_base_url() -> str:
+    """Qwen CLI base URL (lane3 owns qubit_cli/auth_qwen.py; fall back to the declared default)."""
+    try:
+        from qubit_cli.auth_qwen import _qwen_base_url as _impl
+        return _impl()
+    except Exception:
+        return DEFAULT_QWEN_BASE_URL

@@ -281,3 +281,21 @@ def _batch_next(groups: dict, covered: dict) -> list[str]:
         tips.append(f"{len(groups['human'])} parked human task(s): present via `tasks` at end of run "
                     "(do not re-scan or re-queue them).")
     return tips
+
+
+# --- ported from upstream 088f657ecf ---
+
+def runnable_for(subject_dossier: dict, brokers_list: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(runnable, unsearchable) split of the broker list for THIS subject.
+
+    A broker with zero runnable search vectors (e.g. a name-only site in a phone-led run
+    with no name on file) cannot be scanned at all -- exclude it up front instead of
+    leaving it wedged in `unscanned` forever.
+    """
+    runnable: list[dict] = []
+    unsearchable: list[dict] = []
+    for b in brokers_list:
+        if b.get("defunct"):
+            continue  # dead domains are neither runnable nor unsearchable: they are absent
+        (runnable if vectors_mod.search_vectors(subject_dossier, b) else unsearchable).append(b)
+    return runnable, unsearchable
