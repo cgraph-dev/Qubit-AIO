@@ -171,6 +171,7 @@ class TestCrossPlatformDelivery:
         mock_tg_adapter.send = AsyncMock(return_value=SendResult(success=True))
 
         mock_runner = MagicMock()
+        mock_runner._profile_name_for_source.return_value = None
         mock_runner.adapters = {Platform.TELEGRAM: mock_tg_adapter}
         mock_runner._authorization_adapter = lambda platform, profile=None: mock_runner.adapters.get(platform)
         mock_runner.config = GatewayConfig(
@@ -187,13 +188,13 @@ class TestCrossPlatformDelivery:
                 headers={"X-GitHub-Delivery": "alert-001"},
             )
             assert resp.status == 202
-
-        # The adapter should have stored delivery info under the event's opaque session identity.
-        assert len(adapter._delivery_info) == 1
-        chat_id = next(iter(adapter._delivery_info))
-
-        # Now call send() as if the agent has finished
-        result = await adapter.send(chat_id, "I've acknowledged the alert.")
+            runner = adapter._message_handler.__self__
+            runner.adapters[Platform.TELEGRAM] = mock_tg_adapter
+            adapter.gateway_runner = runner
+            # The adapter stored delivery info under the event's opaque session identity.
+            assert len(adapter._delivery_info) == 1
+            chat_id = next(iter(adapter._delivery_info))
+            result = await adapter.send(chat_id, "I've acknowledged the alert.")
 
         assert result.success is True
         mock_tg_adapter.send.assert_awaited_once_with(
