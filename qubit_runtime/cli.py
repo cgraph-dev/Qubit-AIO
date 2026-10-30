@@ -836,11 +836,14 @@ class _VoiceInputMessage:
 class _SeededQueryMessage:
     """Sentinel for a ``-q`` prompt seeded into an interactive session; treated LITERALLY (no slash/!/file-drop)."""
 
-    __slots__ = ("text", "images")
+    __slots__ = ("admission_id", "images", "text")
 
-    def __init__(self, text: str, images=None):
+    def __init__(self, text: str, images=None, admission_id=None):
         self.text = text or ""
         self.images = list(images or [])
+        # A ``/queue`` admission the gateway is running: ``run_conversation`` pumps that
+        # admission by this id, never by comparing the (sanitized) text.
+        self.admission_id = admission_id
 
     def __str__(self) -> str:
         return self.text

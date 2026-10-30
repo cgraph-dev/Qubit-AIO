@@ -164,7 +164,7 @@ def test_adopt_names_the_upgrade_for_a_store_no_newer_qubit_has_opened(tmp_path,
     status, out, err = _refused_adopt(capsys, monkeypatch, home, *argv)
 
     assert status == 1 and out == '', out
-    assert len(err.splitlines()) == 1 and 'older' in err and '`hermes sessions repair`' in err, err
+    assert len(err.splitlines()) == 1 and 'older' in err and '`qubit sessions repair`' in err, err
     assert _store_files(home) == before
 
 

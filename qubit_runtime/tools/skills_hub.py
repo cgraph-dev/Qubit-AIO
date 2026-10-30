@@ -381,6 +381,21 @@ class HubLockFile(_JsonStateFile):
     def list_installed(self) -> List[dict]:
         return [{"name": name, **entry} for name, entry in self.load()["installed"].items()]
 
+    def by_identifier(self) -> dict[str, dict]:
+        """Installed entries keyed by identifier. A ClawHub row is also keyed by the
+        ``clawhub/<slug>`` id a catalog card installs, since the lock records ``@owner/slug``.
+        That alias names its source, so a ClawHub install never answers for another source's
+        id. Exact identifiers win."""
+        from tools.skills_hub_clawhub import ClawHubSource
+
+        rows = [entry for entry in self.list_installed() if entry.get("identifier")]
+        installed = {entry["identifier"]: entry for entry in rows}
+        for entry in rows:
+            if entry.get("source") == "clawhub":
+                if alias := ClawHubSource.catalog_identifier(entry["identifier"]):
+                    installed.setdefault(alias, entry)
+        return installed
+
 
 def installed_entry(installed: dict[str, dict], identifier: str,
                     source: Optional[str] = None) -> Optional[dict]:
