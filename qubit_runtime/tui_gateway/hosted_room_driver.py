@@ -248,9 +248,17 @@ class HostedRoomRuntime:
             "cancel kept losing races with task transitions "
             f"(last observed state '{final['status']}')")
 
-    def retry_indeterminate(self, identity: state.TaskIdentity) -> dict[str, Any]:
-        """Explicitly retry one uncertain attempt under the current room lease."""
+    def retry_indeterminate(self, identity: state.TaskIdentity, *,
+                            execution_generation: int | None = None) -> dict[str, Any]:
+        """Explicitly retry one uncertain attempt under the current room lease.
+
+        *execution_generation* is the row the caller saw: a Retry that lands after another attempt
+        advanced the task must not requeue the newer work."""
         task = state.get_task(self.db_path, identity)
+        if (execution_generation is not None
+                and task["execution_generation"] != execution_generation):
+            raise state.StaleTaskError(
+                f"task advanced to execution generation {task['execution_generation']}")
         if task["status"] not in {"indeterminate", "deferred"}:
             raise state.InvalidTaskTransitionError(f"cannot retry task in state '{task['status']}'")
         binding = self._binding_for_room(identity.room_id)
