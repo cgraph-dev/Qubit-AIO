@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -18,11 +19,34 @@ from qubit_cli.doctor_live import (
     maybe_run_live_checks,
     run_live_checks,
 )
-from tools import browser_tool_install as bt_install
 
 # Captured before the autouse fixture below stubs doctor_live._browser_available
-# to a constant, so TestBrowserAvailableNpxRung can exercise the real function.
+# to a constant, so TestBrowserAvailable can exercise the real function.
 _real_browser_available = doctor_live._browser_available
+
+# The exact environment Clash Verge / mihomo exports (issue #118159): a bracketed-IPv6
+# NO_PROXY entry that httpx 0.28.1 cannot parse into a proxy mount.
+_CLASH_NO_PROXY = "127.0.0.1,localhost,::1,[::1]"
+
+
+@pytest.fixture
+def clash_env(monkeypatch):
+    for key in ("NO_PROXY", "no_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("NO_PROXY", _CLASH_NO_PROXY)
+    monkeypatch.setenv("no_proxy", _CLASH_NO_PROXY)
+
+
+class _Probes(BaseHTTPRequestHandler):
+    """Minimal 200-origin for live-path tests; every request is a bare metadata GET."""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        pass  # keep test output clean
 
 
 def _args(live: bool = True) -> argparse.Namespace:
@@ -36,7 +60,7 @@ def _clean_env(monkeypatch):
                 "ELEVENLABS_API_KEY", "GROQ_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     # Default: empty config, no MCP servers, local tts/stt.
-    monkeypatch.setattr("qubit_cli.config.load_config_readonly", lambda: {})
+    monkeypatch.setattr("qubit_cli.config.load_config_readonly", dict)
     # Default: browser not installed.
     monkeypatch.setattr(doctor_live, "_browser_available", lambda: False)
 
@@ -157,129 +181,6 @@ class TestConfiguredOnlySelection:
         assert results["Browser"].status == "pass"
 
 
-class TestBrowserAvailable:
-    """Live probes use the same passive selection as browser execution."""
-
-    def _block_path_and_node_modules_checks(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("shutil.which", lambda *a, **k: None)
-        monkeypatch.setattr("qubit_cli.doctor.QUBIT_HOME", tmp_path / "home")
-        monkeypatch.setattr("qubit_cli.doctor.PROJECT_ROOT", tmp_path / "root")
-
-    def test_true_when_installed_browser_resolves(self, monkeypatch, tmp_path):
-        self._block_path_and_node_modules_checks(monkeypatch, tmp_path)
-
-        monkeypatch.setattr(bt_install, "_find_agent_browser", lambda **_kw: "/pm/agent-browser")
-
-        assert _real_browser_available() is True
-
-    def test_false_when_nothing_resolves(self, monkeypatch, tmp_path):
-        self._block_path_and_node_modules_checks(monkeypatch, tmp_path)
-
-        def _raise(**_kw):
-            raise FileNotFoundError("agent-browser CLI not found")
-
-        monkeypatch.setattr(bt_install, "_find_agent_browser", _raise)
-
-        assert _real_browser_available() is False
-
-
-class TestFailureIsolation:
-    def test_one_probe_raising_does_not_stop_others(self, monkeypatch):
-        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
-        monkeypatch.setenv("FAL_KEY", "fal-test")
-
-        def _get(url, headers=None, timeout=None):
-            if "firecrawl" in url:
-                raise RuntimeError("connection reset")
-            return SimpleNamespace(status_code=200)
-
-        monkeypatch.setattr(doctor_live, "_http_get", _get)
-        issues: list[str] = []
-        results = {r.name: r for r in run_live_checks(issues)}
-        assert results["Firecrawl"].status == "fail"
-        assert results["FAL"].status == "pass"
-
-    def test_mcp_probe_failure_isolated_per_server(self, monkeypatch):
-        monkeypatch.setattr(
-            "qubit_cli.config.load_config_readonly",
-            lambda: {"mcp_servers": {"bad": {"url": "https://x"},
-                                     "good": {"url": "https://y"}}})
-
-        def _probe(name, cfg, timeout):
-            if name == "bad":
-                raise ConnectionError("refused")
-            return [("tool", "desc")]
-
-        monkeypatch.setattr(doctor_live, "_probe_mcp_server", _probe)
-        results = {r.name: r for r in run_live_checks([])}
-        assert results["MCP: bad"].status == "fail"
-        assert results["MCP: good"].status == "pass"
-
-
-class TestTimeoutHandling:
-    def test_timeout_reported_as_fail(self, monkeypatch):
-        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
-
-        def _slow(*a, **k):
-            raise TimeoutError("timed out")
-
-        monkeypatch.setattr(doctor_live, "_http_get", _slow)
-        results = {r.name: r for r in run_live_checks([])}
-        assert results["Firecrawl"].status == "fail"
-        assert "time" in (results["Firecrawl"].detail or "").lower()
-
-    def test_probe_timeout_bounded_and_configurable(self, monkeypatch):
-        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
-        monkeypatch.setattr(
-            "qubit_cli.config.load_config_readonly",
-            lambda: {"doctor": {"live_probe_timeout": 3}})
-        seen = {}
-
-        def _get(url, headers=None, timeout=None):
-            seen["timeout"] = timeout
-            return SimpleNamespace(status_code=200)
-
-        monkeypatch.setattr(doctor_live, "_http_get", _get)
-        run_live_checks([])
-        assert seen["timeout"] == 3
-
-
-
-class TestReadOnly:
-
-    def test_skips_never_append_issues(self, capsys):
-        issues: list[str] = []
-        run_live_checks(issues)
-        assert issues == []
-
-
-
-# ── Clash/mihomo bracketed-IPv6 NO_PROXY sanitization (#118159) ───────────────
-
-
-_CLASH_NO_PROXY = "127.0.0.1,localhost,::1,[::1]"
-
-
-@pytest.fixture
-def clash_env(monkeypatch):
-    for key in ("NO_PROXY", "no_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
-                "http_proxy", "https_proxy", "all_proxy"):
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("NO_PROXY", _CLASH_NO_PROXY)
-    monkeypatch.setenv("no_proxy", _CLASH_NO_PROXY)
-
-
-class _Probes(BaseHTTPRequestHandler):
-    """Minimal 200-origin for live-path tests; every request is a bare metadata GET."""
-
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-
-    def log_message(self, format, *args):
-        pass  # keep test output clean
-
-
 @pytest.mark.parametrize("kind", ["NO_PROXY", "no_proxy"])
 @pytest.mark.parametrize("entry", ["[::1]", "[::1]:8080", "::1/128"])
 def test_http_get_sanitizes_bracketed_ipv6_no_proxy(monkeypatch, kind, entry):
@@ -352,3 +253,112 @@ def test_run_live_checks_leaves_a_clean_environment_untouched(monkeypatch):
             httpd.shutdown()
             thread.join(timeout=5)
     assert os.environ["NO_PROXY"] == "example.com,10.0.0.0/8"
+
+
+class TestBrowserAvailable:
+    """Live probes use the launcher's own Chromium selection."""
+
+    @pytest.mark.parametrize("found,available", [("/pm/chromium/chrome", True), (None, False)])
+    def test_follows_chromium_selection(self, monkeypatch, found, available):
+        monkeypatch.setattr(doctor_live, "chromium_executable", lambda **_kw: found)
+
+        assert _real_browser_available() is available
+
+
+class TestLaunchBrowserProbe:
+    """The probe launches through browser_exec's launcher and always stops what it started."""
+
+    def _fake_launcher(self, monkeypatch, result):
+        calls = []
+        fake = ModuleType("tools.browser_launcher")
+        fake.launch_chromium = lambda key, **kw: calls.append(("launch", key, kw)) or result
+        fake.stop_browser = lambda key: calls.append(("stop", key))
+        monkeypatch.setitem(sys.modules, "tools.browser_launcher", fake)
+        return calls
+
+    def test_success_stops_the_browser(self, monkeypatch):
+        calls = self._fake_launcher(monkeypatch, (SimpleNamespace(cdp_url="ws://x"), None))
+
+        ok, detail = doctor_live._launch_browser_probe(5.0)
+
+        assert ok is True and "CDP ready" in detail
+        assert [c[0] for c in calls] == ["launch", "stop"]
+        assert calls[0][2]["timeout"] == 5.0 and calls[0][2]["ephemeral"] is True
+
+    def test_launch_error_is_reported_and_still_stopped(self, monkeypatch):
+        calls = self._fake_launcher(monkeypatch, (None, "Chromium exited: missing libnss3"))
+
+        ok, detail = doctor_live._launch_browser_probe(5.0)
+
+        assert ok is False and "libnss3" in detail
+        assert [c[0] for c in calls] == ["launch", "stop"]
+
+
+class TestFailureIsolation:
+    def test_one_probe_raising_does_not_stop_others(self, monkeypatch):
+        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+        monkeypatch.setenv("FAL_KEY", "fal-test")
+
+        def _get(url, headers=None, timeout=None):
+            if "firecrawl" in url:
+                raise RuntimeError("connection reset")
+            return SimpleNamespace(status_code=200)
+
+        monkeypatch.setattr(doctor_live, "_http_get", _get)
+        issues: list[str] = []
+        results = {r.name: r for r in run_live_checks(issues)}
+        assert results["Firecrawl"].status == "fail"
+        assert results["FAL"].status == "pass"
+
+    def test_mcp_probe_failure_isolated_per_server(self, monkeypatch):
+        monkeypatch.setattr(
+            "qubit_cli.config.load_config_readonly",
+            lambda: {"mcp_servers": {"bad": {"url": "https://x"},
+                                     "good": {"url": "https://y"}}})
+
+        def _probe(name, cfg, timeout):
+            if name == "bad":
+                raise ConnectionError("refused")
+            return [("tool", "desc")]
+
+        monkeypatch.setattr(doctor_live, "_probe_mcp_server", _probe)
+        results = {r.name: r for r in run_live_checks([])}
+        assert results["MCP: bad"].status == "fail"
+        assert results["MCP: good"].status == "pass"
+
+
+class TestTimeoutHandling:
+    def test_timeout_reported_as_fail(self, monkeypatch):
+        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+
+        def _slow(*a, **k):
+            raise TimeoutError("timed out")
+
+        monkeypatch.setattr(doctor_live, "_http_get", _slow)
+        results = {r.name: r for r in run_live_checks([])}
+        assert results["Firecrawl"].status == "fail"
+        assert "time" in (results["Firecrawl"].detail or "").lower()
+
+    def test_probe_timeout_bounded_and_configurable(self, monkeypatch):
+        monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-test")
+        monkeypatch.setattr(
+            "qubit_cli.config.load_config_readonly",
+            lambda: {"doctor": {"live_probe_timeout": 3}})
+        seen = {}
+
+        def _get(url, headers=None, timeout=None):
+            seen["timeout"] = timeout
+            return SimpleNamespace(status_code=200)
+
+        monkeypatch.setattr(doctor_live, "_http_get", _get)
+        run_live_checks([])
+        assert seen["timeout"] == 3
+
+
+
+class TestReadOnly:
+
+    def test_skips_never_append_issues(self, capsys):
+        issues: list[str] = []
+        run_live_checks(issues)
+        assert issues == []

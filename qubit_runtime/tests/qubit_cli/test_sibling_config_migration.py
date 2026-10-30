@@ -1,6 +1,6 @@
 """Fleet-wide config migration (#91277 Phase 2 — #20438/#54926/#79048 class).
 
-`qubit update` migrated only the active profile's config.yaml; sibling
+`hermes update` migrated only the active profile's config.yaml; sibling
 profiles silently drifted config versions until their gateway hit a config
 the new code couldn't read. `_migrate_sibling_profile_configs()` runs the
 same non-interactive safe migration for every sibling home, scoped via the
@@ -13,8 +13,8 @@ only the profile-root location is pointed at tmp_path.
 import qubit_yaml as yaml
 from pathlib import Path
 
-import qubit_cli.update_cmd as update_cmd
-import qubit_cli.update_cmd_config as update_cmd_config
+from qubit_cli import update_cmd
+from qubit_cli import update_cmd_config
 
 
 def _write_profile(root: Path, name: str, version: int) -> Path:
@@ -38,7 +38,7 @@ def _setup(monkeypatch, tmp_path, active_home: Path, *, default_home: Path | Non
 
     monkeypatch.setattr(profiles_mod, "_get_profiles_root", lambda: tmp_path / "profiles")
     # Default lives at the install root, not under profiles/; absent unless a test passes it,
-    # so no test can reach the real ~/.qubit.
+    # so no test can reach the real ~/.hermes.
     missing = tmp_path / "no-such-default-home"
     monkeypatch.setattr(
         profiles_mod,
@@ -165,3 +165,28 @@ def test_default_active_still_migrates_named_siblings(monkeypatch, tmp_path):
     on_disk = yaml.safe_load((sibling / "config.yaml").read_text())
     assert on_disk["_config_version"] == _latest_version()
     assert yaml.safe_load((default_home / "config.yaml").read_text())["_config_version"] == _latest_version()
+
+
+def test_sibling_step_notices_reach_the_update_output(monkeypatch, tmp_path, capsys):
+    """A sibling migrates quietly; what its steps changed (v52: `backend: off` gone, and how to turn
+    browsing off now) is printed under its profile line, as for the active profile. New default keys
+    are not changes and stay out."""
+    active = _write_profile(tmp_path / "profiles", "active", _latest_version())
+    work = tmp_path / "profiles" / "work"
+    work.mkdir(parents=True)
+    (work / "config.yaml").write_text("_config_version: 51\nbrowser:\n  backend: off\n", encoding="utf-8")
+    _setup(monkeypatch, tmp_path, active)
+    monkeypatch.setenv("QUBIT_HOME", str(active))
+    monkeypatch.setattr(update_cmd_config, "_restore_snapshot_safety_nets", lambda _sid: None)
+    monkeypatch.setattr("qubit_cli.config.get_missing_env_vars", lambda **_: [])
+    monkeypatch.setattr("qubit_cli.config.get_missing_config_fields", lambda: [{"key": "display.new_option"}])
+
+    update_cmd_config._check_and_apply_config_migration()
+
+    out = capsys.readouterr().out
+    profile_line = out.index("Profile 'work': config format updated (v51")
+    notice = out.index("removed browser.backend: off")
+    assert profile_line < notice
+    assert "`browser` toolset in `hermes tools`" in out[notice:]
+    assert "display.new_option" not in out[profile_line:]
+    assert "backend" not in (yaml.safe_load((work / "config.yaml").read_text()).get("browser") or {})

@@ -10,12 +10,13 @@ The live profile on disk must stay untouched.
 """
 
 import tarfile
+from pathlib import Path
 
 import pytest
 
 from agent.file_safety import HOME_CREDENTIAL_DIRS
-from plugins.teams_pipeline.store import DEFAULT_TEAMS_PIPELINE_STORE_FILENAME
 from qubit_cli.profiles import export_profile
+from plugins.teams_pipeline.store import DEFAULT_TEAMS_PIPELINE_STORE_FILENAME
 
 # Long enough to match agent.redact prefix patterns (sk- + 10+ chars).
 _LEAKED_KEY = "sk-or-v1-reallyLongSecretKeyValue12345678"
@@ -25,6 +26,42 @@ def _patch_named_profile(monkeypatch, profiles_root, profile_dir):
     monkeypatch.setattr("qubit_cli.profiles._get_profiles_root", lambda: profiles_root)
     monkeypatch.setattr("qubit_cli.profiles.get_profile_dir", lambda n: profile_dir)
     monkeypatch.setattr("qubit_cli.profiles.validate_profile_name", lambda n: None)
+
+
+# Stores named here as well as in PROFILE_CREDENTIAL_PATHS, so dropping one from the list fails a test:
+# the loaders' and writers' own file names (.op.env and npmrc have no suffix the scrub edits).
+_EXTRA_STORES = {
+    ".op.env", "npmrc", "honcho.json", "google_chat_user_token.json", "google_chat_user_oauth_pending",
+    "workspace/meetings/node_token.json", "weixin/accounts", ".copilot_jwt.json", "proxy", "chrome-debug",
+    "home/.git-credentials", "home/.config/gh/hosts.yml", "backups", "state-snapshots",
+    DEFAULT_TEAMS_PIPELINE_STORE_FILENAME, "mem0.json",
+    "browser-profiles/live/Default/Cookies", "browser_profiles/default/Default/Login Data",
+    "mcp-tokens/srv.json", "vault/vault.key", "platforms/pairing/approved.json", "slack_tokens.json",
+    "webhook_subscriptions.json", ".ssh/id_rsa", ".aws/credentials", ".gnupg/x", ".kube/config", ".envrc",
+    "webapp/session-token",  # the Webapp browser's credential (gateway.webapp_listener.TOKEN_PATH)
+    "webapp/native-sign-in-tokens.json",  # its listener's grants to native apps (webapp_sign_in.RECORD_PATH)
+    "webapp/sign-in-registration.json",  # the Portal callback its Web Access registered (webapp_access)
+}
+# Single-file stores whose name has no dot; every other dotless store is a token directory.
+_DOTLESS_FILES = {"npmrc", "webapp/session-token"}
+# Dot-named stores that are directories: the OS credential dirs shared with file_safety.
+_DOT_DIRS = set(HOME_CREDENTIAL_DIRS)
+
+
+def _seed_stores(root):
+    """Lay every credential store into a profile-shaped tree at *root*; returns their paths."""
+    from qubit_cli.profiles import PROFILE_CREDENTIAL_PATHS
+
+    stores = _EXTRA_STORES | PROFILE_CREDENTIAL_PATHS
+    (root / "platforms").mkdir(parents=True)
+    (root / "config.yaml").write_text("model: gpt-4\n")
+    (root / "platforms" / "keep.json").write_text("{}")
+    for rel in stores:
+        is_dir = rel in _DOT_DIRS or ("." not in rel.rsplit("/", 1)[-1] and rel not in _DOTLESS_FILES)
+        target = root / rel / "store" if is_dir else root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("fake-credential")
+    return stores
 
 
 class TestCredentialExclusion:
@@ -58,10 +95,11 @@ class TestCredentialExclusion:
         assert not any(".env" in n for n in names), ".env must NOT be in export"
 
     def test_named_export_ships_no_credential_store_or_copy_of_one(self, tmp_path, monkeypatch):
-        """Every credential store — and every recovery copy of one (pre-update zip, update snapshot,
-        config backup, migration .bak, corrupt auth.json) — reaches a named-profile export. .op.env,
-        npmrc, home/ CLI stores and the .bak copies have no suffix the scrub edits, so exclusion is
-        their only guard; a hand-named config copy is the user's and ships scrubbed."""
+        """No credential store (any case spelling) and no copy Hermes' own writers leave of one
+        (pre-update zip, update snapshot, config backup, migration .bak, corrupt auth.json) reaches a
+        named-profile export. .op.env, npmrc, home/ CLI stores and the .bak copies have no suffix the
+        scrub edits, so exclusion is their only guard; a hand-named config copy is the user's and
+        ships scrubbed."""
         from qubit_cli.auth import _load_auth_store
         from qubit_cli.backup import create_pre_update_backup, create_quick_snapshot
         from qubit_cli.config_backups import backup_config
@@ -125,8 +163,8 @@ class TestCredentialExclusion:
         )
 
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        (tmp_path / ".qubit").mkdir()
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+        (tmp_path / ".hermes").mkdir()
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         stores = _seed_stores(tmp_path / "v1") | {"auth.json.corrupt", ".env.bak-20260928T084018Z",
                                                   "config.yaml.bak-20260928T084018Z"}
         for copy in ("auth.json.corrupt", ".env.bak-20260928T084018Z", "config.yaml.bak-20260928T084018Z"):
@@ -252,32 +290,51 @@ class TestExportSecretScrub:
         assert link.is_symlink()
 
 
-_EXTRA_STORES = {
-    ".op.env", "npmrc", "honcho.json", "google_chat_user_token.json", "google_chat_user_oauth_pending",
-    "workspace/meetings/node_token.json", "weixin/accounts", ".copilot_jwt.json", "proxy", "chrome-debug",
-    "home/.git-credentials", "home/.config/gh/hosts.yml", "backups", "state-snapshots",
-    DEFAULT_TEAMS_PIPELINE_STORE_FILENAME, "mem0.json",
-    "browser-profiles/live/Default/Cookies", "browser_profiles/default/Default/Login Data",
-    "mcp-tokens/srv.json", "vault/vault.key", "platforms/pairing/approved.json", "slack_tokens.json",
-    "webhook_subscriptions.json", ".ssh/id_rsa", ".aws/credentials", ".gnupg/x", ".kube/config", ".envrc",
-}
-# Single-file stores whose name has no dot; every other dotless store is a token directory.
-_DOTLESS_FILES = {"npmrc"}
-# Dot-named stores that are directories: the OS credential dirs shared with file_safety.
-_DOT_DIRS = set(HOME_CREDENTIAL_DIRS)
+@pytest.fixture()
+def profile_env(tmp_path, monkeypatch):
+    """Point the home folder and QUBIT_HOME into tmp_path, as test_profiles.py does."""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    default_home = tmp_path / ".hermes"
+    default_home.mkdir(exist_ok=True)
+    monkeypatch.setenv("QUBIT_HOME", str(default_home))
+    return tmp_path
 
 
-def _seed_stores(root):
-    """Lay every credential store into a profile-shaped tree at *root*; returns their paths."""
-    from qubit_cli.profiles import PROFILE_CREDENTIAL_PATHS
+def test_clone_all_does_not_share_the_source_webapp_browser_credential(profile_env):
+    """The Webapp's browser credential belongs to one gateway: a clone mints its own on first
+    use, so signing one profile's browsers out never leaves them signed in to the other."""
+    from gateway.webapp_listener import TOKEN_PATH, browser_session_token
+    from qubit_cli.profiles import create_profile
 
-    stores = _EXTRA_STORES | PROFILE_CREDENTIAL_PATHS
-    (root / "platforms").mkdir(parents=True)
-    (root / "config.yaml").write_text("model: gpt-4\n")
-    (root / "platforms" / "keep.json").write_text("{}")
-    for rel in stores:
-        is_dir = rel in _DOT_DIRS or ("." not in rel.rsplit("/", 1)[-1] and rel not in _DOTLESS_FILES)
-        target = root / rel / "store" if is_dir else root / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("fake-credential")
-    return stores
+    default_home = profile_env / ".hermes"
+    (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
+    source_token = browser_session_token(default_home)
+
+    profile_dir = create_profile("coder", clone_all=True, no_alias=True)
+
+    assert not (profile_dir / TOKEN_PATH).exists()
+    assert browser_session_token(profile_dir) != source_token
+    assert browser_session_token(default_home) == source_token
+
+
+def test_clone_all_leaves_the_source_gateways_webapp_sign_in_state_behind(profile_env):
+    """Everything in ``webapp/`` belongs to the source's gateway: besides its browser credential, the
+    record of the provider tokens its listener gave native apps (which its gated Webapp accepts on their
+    own) and the Portal callback its Web Access registered for its own address. A ``--clone-all`` clone
+    gets none of it, so the clone's gated Webapp honours no native sign-in made on the source, and the
+    clone's Web Access registers its own callback."""
+    from qubit_cli.profiles import create_profile
+    from qubit_cli.webapp_sign_in import RECORD_PATH
+
+    default_home = profile_env / ".hermes"
+    (default_home / "config.yaml").write_text("model: test", encoding="utf-8")
+    (default_home / RECORD_PATH).parent.mkdir(parents=True)
+    (default_home / RECORD_PATH).write_text('{"' + "d" * 64 + '": 4102444800}\n', encoding="utf-8")
+    (default_home / "webapp" / "sign-in-registration.json").write_text(
+        '{"portal": "https://portal.example.test", "client_id": "c1", '
+        '"callback": "http://192.168.1.50:9120/auth/callback"}\n', encoding="utf-8")
+
+    profile_dir = create_profile("coder", clone_all=True, no_alias=True)
+
+    assert not (profile_dir / "webapp").exists(), sorted(p.name for p in (profile_dir / "webapp").iterdir())
+    assert (default_home / RECORD_PATH).exists()

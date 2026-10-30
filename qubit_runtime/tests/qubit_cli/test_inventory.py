@@ -178,16 +178,16 @@ def test_include_unconfigured_appends_canonical_skeletons():
     with _list_auth_returning(rows):
         payload = build_models_payload(ctx, include_unconfigured=True)
     # All canonical providers other than openrouter should appear as
-    # skeleton rows. MoA is virtual/opt-in and excluded from unconfigured.
+    # skeleton rows. MoA is virtual/opt-in and excluded from unconfigured;
+    # so is a pre-release provider the user has not signed into.
     from qubit_cli.models_catalog_static import listed_canonical_providers
 
     seen_slugs = {r["slug"] for r in payload["providers"]}
-    # Listed canonical set: pre-release profiles the user has not opted into are
-    # deliberately hidden from provider lists (solstice invariant).
     for entry in listed_canonical_providers():
         if entry.slug == "moa":
             continue  # virtual; only shown when explicitly configured
         assert entry.slug in seen_slugs, f"missing {entry.slug}"
+    assert "solstice" not in seen_slugs
     # Skeletons have empty models and source='canonical'.
     skeletons = [r for r in payload["providers"]
                  if r.get("source") == "canonical"]
@@ -199,16 +199,16 @@ def test_explicit_only_filters_ambient_credentials_but_keeps_current_and_custom_
     rows = [
         {"slug": "openai-codex", "name": "OpenAI Codex", "models": ["gpt-5.4"],
          "total_models": 1, "is_current": True, "is_user_defined": False,
-         "source": "qubit"},
+         "source": "hermes"},
         {"slug": "gemini", "name": "Gemini", "models": ["gemini-2.5-pro"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
          "source": "built-in"},
         {"slug": "copilot", "name": "Copilot", "models": ["gpt-5.4"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "qubit"},
+         "source": "hermes"},
         {"slug": "nous", "name": "Nous", "models": ["anthropic/claude-sonnet-5"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "qubit"},
+         "source": "hermes"},
         {"slug": "custom:lab", "name": "Lab", "models": ["lab-1"],
          "total_models": 1, "is_current": False, "is_user_defined": True,
          "source": "user-config"},
@@ -246,10 +246,10 @@ def test_explicit_only_keeps_anthropic_row_with_oauth_credentials():
     rows = [
         {"slug": "anthropic", "name": "Anthropic", "models": ["claude-sonnet-5"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "qubit"},
+         "source": "hermes"},
         {"slug": "copilot", "name": "Copilot", "models": ["gpt-5.4"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "qubit"},
+         "source": "hermes"},
     ]
     ctx = _empty_ctx(provider="opencode-go", model="glm-5.3")
     with (
@@ -280,7 +280,7 @@ def test_explicit_only_drops_anthropic_row_without_oauth_credentials():
     rows = [
         {"slug": "anthropic", "name": "Anthropic", "models": ["claude-sonnet-5"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "qubit"},
+         "source": "hermes"},
     ]
     ctx = _empty_ctx(provider="opencode-go", model="glm-5.3")
     with (
@@ -425,7 +425,7 @@ def test_canonical_order_with_unconfigured_preserves_full_universe():
     custom rows trailing. MoA is excluded from unconfigured skeletons
     (virtual, opt-in only — issue #63353).
     """
-    from qubit_cli.models_catalog_static import listed_canonical_providers
+    from qubit_cli.models import CANONICAL_PROVIDERS
 
     rows = [
         {"slug": "custom:Ollama", "name": "Ollama", "models": [],
@@ -441,12 +441,15 @@ def test_canonical_order_with_unconfigured_preserves_full_universe():
             canonical_order=True,
         )
     slugs = [r["slug"] for r in payload["providers"]]
-    # First row: first LISTED canonical provider in declaration order.
-    listed = listed_canonical_providers()
-    assert slugs[0] == listed[0].slug
+    # First row: first canonical provider in declaration order.
+    assert slugs[0] == CANONICAL_PROVIDERS[0].slug
     # Custom row trails all visible canonical rows. MoA is virtual/opt-in
-    # so it is excluded from the unconfigured skeleton set.
-    visible_canonical_count = sum(1 for e in listed if e.slug != "moa")
+    # so it is excluded from the unconfigured skeleton set, and so is an
+    # unlisted pre-release provider.
+    from qubit_cli.models_catalog_static import listed_canonical_providers
+    visible_canonical_count = sum(
+        1 for e in listed_canonical_providers() if e.slug != "moa"
+    )
     assert slugs.index("custom:Ollama") >= visible_canonical_count
 
 
@@ -684,7 +687,7 @@ def test_picker_metadata_uses_one_config_read_for_real_models_dev_lookups(tmp_pa
     from agent import models_dev
     from qubit_cli import config as config_module
 
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     (home / "config.yaml").write_text(
         "providers:\n"
@@ -737,16 +740,14 @@ def test_picker_metadata_uses_one_config_read_for_real_models_dev_lookups(tmp_pa
     assert snapshot_result == baseline
 
     def _rows(model_ids):
-        # A routing aggregator: only those get a featured shortlist (user-defined rows are
-        # explicit allow-lists now).
         return [{
-            "slug": "openrouter",
-            "name": "OpenRouter",
+            "slug": "custom:lab",
+            "name": "Lab",
             "models": model_ids,
             "total_models": len(model_ids),
             "is_current": False,
-            "is_user_defined": False,
-            "source": "built-in",
+            "is_user_defined": True,
+            "source": "user-config",
         }]
 
     def _build_and_count(model_ids):
@@ -793,4 +794,27 @@ def test_picker_metadata_uses_one_config_read_for_real_models_dev_lookups(tmp_pa
         model: {"fast": False, "reasoning": model.startswith("openai/")}
         for model in models[:3]
     }
-    assert large_row["featured_models"] == models
+    # #120217: ``providers.lab`` is a user-defined row, so its models: list is an explicit
+    # allow-list and is never shortlisted — the constant-read invariant above is now carried
+    # by the capabilities lookups alone.
+    assert large_row["featured_models"] == []
+
+
+def test_apply_limits_skips_window_plan_rows():
+    """A window plan says its limits in ``plan_usage``; the credential-cooldown chip would add a second,
+    unrelated reset time, so ``_apply_limits`` leaves that row alone. Other pooled rows keep it."""
+    from qubit_cli import inventory
+
+    class _Pool:
+        def limit_state(self, models):
+            return {"scope": "account", "resets_at": 1_800_000_000}
+
+    rows = [
+        {"slug": "nous", "models": ["a/b"], "plan_usage": {"kind": "usage_window"}},
+        {"slug": "example", "models": ["a/b"]},
+    ]
+    with patch("qubit_cli.auth.read_credential_pool", return_value={"nous": [{}], "example": [{}]}), \
+            patch("agent.credential_pool.load_pool", return_value=_Pool()):
+        inventory._apply_limits(rows)
+    assert "limit" not in rows[0]
+    assert rows[1]["limit"]["scope"] == "account"
