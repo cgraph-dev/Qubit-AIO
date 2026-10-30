@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import qubit_state_runtime as rt
-from qubit_cli import main, source_releases, update_cmd
+from qubit_cli import install_source, main, source_releases, update_cmd
 from qubit_cli.subcommands.update import build_update_parser
 from qubit_cli.update_channel import set_install_channel
 from qubit_state import SessionDB
@@ -86,12 +86,13 @@ def _ledgered(home):
 
 
 def _channel_publishes(monkeypatch, source, name):
-    record = {"schema": 1, "name": name, "repository": "NousResearch/hermes-agent", "policy": "preview",
+    repository = install_source.official_repository()
+    record = {"schema": 1, "name": name, "repository": repository, "policy": "preview",
               "state": "active", "identity": {}, "nextSequence": 2,
               "head": {"buildId": "build-fixture", "sequence": 1}}
     result = SimpleNamespace(requested=deepcopy(record), terminal=record, manifest={
         "schema": 1, "request": {"buildId": "build-fixture", "channel": name, "sequence": 1,
-        "repository": "NousResearch/hermes-agent", "commit": source.release, "sourceVersion": "1.2.3",
+        "repository": repository, "commit": source.release, "sourceVersion": "1.2.3",
         "version": "0.0.1", "identity": {}, "bundleEnv": {},
         "publicBase": "https://hermes-assets.nousresearch.com"}, "packages": []})
     monkeypatch.setattr(source_releases, "_resolve_channel", lambda n, repository: deepcopy(result),
@@ -111,7 +112,7 @@ def test_a_channel_release_older_than_the_runtime_holds_the_install_and_exits_cl
     assert git(source.root, "rev-parse", "HEAD") == source.installed
     assert "Refusing" not in out and "Downgrading is unsupported" not in out
     assert f"This build is newer than the {name} release {source.release[:12]}" in out
-    assert "hermes update --set-channel main" in out
+    assert "qubit update --set-channel main" in out
     assert len(source.completed) == 1 and source.completed[0]["expected_sha"] == source.installed
     # A held install is not up to date with its channel: the closing line says it was held.
     assert source.completed[0]["completion_message"] == f"✓ Holding at this build until a newer {name} release ships."
