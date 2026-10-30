@@ -696,7 +696,8 @@ class TestBundledDiscovery:
         mgr.discover_and_load()
         loaded = mgr._plugins["disk-cleanup"]
         assert not loaded.enabled
-        assert loaded.error == "disabled via config"
+        from qubit_cli.plugins_discovery import IN_BOTH_LISTS
+        assert loaded.error == IN_BOTH_LISTS
 
     def test_memory_and_context_engine_subdirs_skipped(self, _isolate_env):
         """Bundled scan must NOT pick up plugins/memory or plugins/context_engine
