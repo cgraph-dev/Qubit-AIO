@@ -31,6 +31,7 @@ from qubit_constants import display_qubit_home, get_qubit_home
 from cron.constants import CLAIM_TTL_INACTIVITY_HEADROOM, FIRE_CLAIM_SKEW_SECONDS, FIRE_CLAIM_TTL_SECONDS
 from cron.env_settings import cron_env_setting
 from cron import store_health
+from cron.jobs_model_pin import _main_model_pin
 from qubit_cli.observability.shared_metrics_gateway import record_cron_missed
 from typing import Optional, Dict, List, Any, Callable, Set, Tuple, Union, Collection
 
@@ -1666,26 +1667,6 @@ def _normalize_workdir(workdir: Optional[str]) -> Optional[str]:
     if not resolved.is_dir():
         raise ValueError(f"Cron workdir is not a directory: {resolved}")
     return str(resolved)
-
-
-def _main_model_pin() -> Tuple[Optional[str], Optional[str]]:
-    """``(provider, model)`` the main agent runs on right now (``model.default`` + the provider it
-    resolves to), for ``pinned=True`` jobs: the lock is a plain per-job pin, so the scheduler needs
-    no second precedence axis. ``(None, None)`` when nothing is configured (the job stays unpinned)."""
-    from qubit_cli.config_effective import load_user_config_effective
-
-    cfg_path = get_qubit_home() / "config.yaml"
-    cfg = load_user_config_effective(cfg_path) if cfg_path.exists() else {}
-    model_cfg = cfg.get("model") or {}
-    model = model_cfg.get("default") or model_cfg.get("model") if isinstance(model_cfg, dict) else model_cfg
-    model = _normalize_job_optional_text(model)
-    if not model:
-        return None, None
-    provider = None
-    with contextlib.suppress(Exception):
-        from qubit_cli.runtime_provider import resolve_runtime_provider
-        provider = _normalize_job_optional_text(resolve_runtime_provider(requested=None).get("provider"))
-    return (provider.lower() if provider else None), model
 
 
 def _normalize_job_optional_text(

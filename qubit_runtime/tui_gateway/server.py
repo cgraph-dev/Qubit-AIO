@@ -27,6 +27,7 @@ from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, s
 from qubit_constants import (
     get_qubit_home, get_qubit_home_override, get_process_qubit_home, profile_name_for_home,
     reset_qubit_home_override, set_qubit_home_override)
+from qubit_cli.config_backend import ConfigBackendUnavailable, config_exists
 from qubit_cli.env_loader import load_qubit_dotenv
 from utils import file_signature, is_truthy_value
 from qubit_state_ids import new_session_id
@@ -701,10 +702,13 @@ def _profile_configured_cwd(profile_home: Path | None) -> str | None:
     """
     if profile_home is None:
         return None
-    with contextlib.suppress(Exception):
-        from qubit_cli.config_effective import load_user_config_effective
-        p = Path(profile_home) / "config.yaml"
-        return _configured_cwd_from_cfg(load_user_config_effective(p)) if p.exists() else None
+    try:
+        with contextlib.suppress(Exception):
+            from qubit_cli.config_effective import load_user_config_effective
+            p = Path(profile_home) / "config.yaml"
+            return _configured_cwd_from_cfg(load_user_config_effective(p)) if config_exists(p) else None
+    except ConfigBackendUnavailable as exc:  # a SystemExit: the agent build reports it; the cwd is a hint
+        logger.warning("terminal.cwd of %s unavailable: %s", profile_home, exc.code)
     return None
 
 
@@ -1236,9 +1240,15 @@ def _start_agent_build(sid: str, session: dict) -> None:
             # MCP fleet, and live-transport sessions are never reaped, so fleets would accumulate.
             notify_registered = _wire_session_agent(sid, key, agent)
             _announce_built_agent(sid, key, current, agent)
-        except Exception as e:
+        except (Exception, ConfigBackendUnavailable) as e:  # health: allow BLE001 -- reported as agent_error + error event
+            from agent.auxiliary_unavailable import ProviderNotConfiguredError
             current["agent_error"] = str(e)
-            _emit("error", sid, {"message": agent_init_failed_message(e)})
+            # A client can route "no provider is set up" to its setup flow instead of a dead-end
+            # error toast — but only if it can tell. The sentence is for the reader, the code is
+            # for the client; older clients keep matching the text.
+            _emit("error", sid, {
+                "message": agent_init_failed_message(e),
+                **({"code": "provider_not_configured"} if isinstance(e, ProviderNotConfiguredError) else {})})
         finally:
             _finish_agent_build(
                 sid, key, current, notify_registered=notify_registered, scopes=scopes, session_db=session_db)
@@ -1327,16 +1337,20 @@ def _load_cfg_raw() -> dict:
     expansion applied here would be persisted on the next save). Behavioral reads use :func:`_load_cfg`.
     Cache keyed on the resolved path so profiles don't clobber."""
     global _cfg_cache, _cfg_sig, _cfg_path
+    from qubit_cli.config_backend import ConfigBackendUnavailable, config_cache_version, config_exists
     from qubit_cli.config import read_user_config_raw
     from qubit_cli.config_read_errors import FailedConfigRead
     try:
         p = _active_config_path()
-        sig = file_signature(p.stat()) if p.exists() else None
+        try:
+            sig = config_cache_version(p)
+        except FileNotFoundError:  # absent; any other stat error is a failed read, never "no config"
+            sig = None
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)
-        data = read_user_config_raw(p) if p.exists() else {}
-    except Exception as exc:
+        data = read_user_config_raw(p) if config_exists(p) else {}
+    except (Exception, ConfigBackendUnavailable) as exc:  # health: allow BLE001 -- served as a FailedConfigRead, refused by _save_cfg
         return FailedConfigRead(error=exc)  # readable as {}, refused by _save_cfg
     with _cfg_lock:  # cache the RAW config: _save_cfg writes _cfg_cache back to disk
         _cfg_cache, _cfg_sig, _cfg_path = copy.deepcopy(data), sig, p
@@ -1360,12 +1374,18 @@ def _save_cfg(cfg: dict, *, allow_deletions: bool = False):
     omission-refusing writer otherwise catches a partial-config mistake."""
     global _cfg_cache, _cfg_sig, _cfg_path
     from qubit_cli.config import atomic_config_replace, atomic_config_write
+    from qubit_cli.config_backend import config_cache_version, supports_file_tooling
     path = _active_config_path()
     (atomic_config_replace if allow_deletions else atomic_config_write)(path, cfg)
+    if not supports_file_tooling():
+        # The backend saves what it accepts (a bulk save omits locked keys), not what was proposed:
+        # drop the cache so the next raw read returns the accepted document.
+        _drop_cfg_cache()
+        return
     with _cfg_lock:
         _cfg_cache, _cfg_path = copy.deepcopy(cfg), path
         try:
-            _cfg_sig = file_signature(path.stat())
+            _cfg_sig = config_cache_version(path)
         except Exception:
             _cfg_sig = None
 

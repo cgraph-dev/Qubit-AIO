@@ -73,7 +73,7 @@ def test_process_exits_non_zero_when_plane_is_down(plane_env, monkeypatch):
     plane.fail_status = 403  # a refusal is not retried, so this is fast
     proc = _run([sys.executable, "-m", "qubit_cli.main", "config", "get", "display.personality"], env)
     assert proc.returncode != 0
-    assert "Hermes does not start without its remote config" in proc.stderr
+    assert "Qubit does not start without its remote config" in proc.stderr
     assert "concise" not in proc.stdout  # no default or cached value was served
 
 

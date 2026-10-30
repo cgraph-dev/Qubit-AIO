@@ -746,10 +746,10 @@ def _profile_file_signature(path: Path) -> Optional[tuple]:
     return (stat.st_mtime_ns, stat.st_size, stat.st_ino)
 
 
-def _cached_profile_read(path: Path, kind: str, compute):
-    """``compute()``'s value, reused while *path* has not changed. A missing file is never cached:
-    reading it costs nothing, and one created later must be picked up."""
-    signature = _profile_file_signature(path)
+def _cached_profile_read(path: Path, kind: str, compute, signature_of=_profile_file_signature):
+    """``compute()``'s value, reused while ``signature_of(path)`` is unchanged. A missing file is never
+    cached: reading it costs nothing, and one created later must be picked up."""
+    signature = signature_of(path)
     if signature is None:
         return compute()
     key = (str(path), kind)
@@ -777,7 +777,8 @@ def _read_distribution_meta(profile_dir: Path) -> tuple:
 def _read_config_model(profile_dir: Path) -> tuple:
     """Read model/provider from a profile's config.yaml. Returns (model, provider)."""
     config_path = profile_dir / "config.yaml"
-    if not config_path.exists():
+    from qubit_cli.config_backend import config_cache_version_or_none, config_exists
+    if not config_exists(config_path):
         return None, None
 
     def _read() -> tuple:
@@ -793,7 +794,8 @@ def _read_config_model(profile_dir: Path) -> tuple:
             pass
         return None, None
 
-    return _cached_profile_read(config_path, "config-model", _read)
+    # The user layer changes through the config backend, not necessarily on local disk.
+    return _cached_profile_read(config_path, "config-model", _read, config_cache_version_or_none)
 
 
 def _seed_model_config(profile_dir: Path) -> None:
