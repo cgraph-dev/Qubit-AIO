@@ -519,12 +519,22 @@ def _qubit_cli() -> str:
     """
     # Do not select batch shims: cmd.exe reinterprets otherwise literal argv
     # (for example an ampersand in a query-file path), even with shell=False.
-    name = "qubit.exe" if sys.platform == "win32" else "qubit"
-    published = Path(__file__).resolve().parents[1] / ".qubit" / "bin" / name
-    if published.is_file():
-        return str(published)
-    sibling = Path(sys.executable or "").parent / name
-    return str(sibling) if sibling.is_file() else shutil.which("qubit") or "qubit"
+    ext = ".exe" if sys.platform == "win32" else ""
+    root = Path(__file__).resolve().parents[1]
+    bin_dir = Path(sys.executable or "").parent
+    # Canonical first; the legacy entrypoint stays a read-old fallback so an install that predates
+    # the rename (or a developer venv that only publishes the old console script) still delivers.
+    for name in ("qubit", "hermes"):
+        published = root / ".qubit" / "bin" / f"{name}{ext}"
+        if published.is_file():
+            return str(published)
+        sibling = bin_dir / f"{name}{ext}"
+        if sibling.is_file():
+            return str(sibling)
+    legacy_published = root / ".hermes" / "bin" / f"hermes{ext}"
+    if legacy_published.is_file():
+        return str(legacy_published)
+    return shutil.which("qubit") or shutil.which("hermes") or "qubit"
 
 
 def local_delivery_command(profile: str, query_file: str) -> list[str]:

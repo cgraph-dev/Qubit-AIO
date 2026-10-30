@@ -352,6 +352,7 @@ def _check_lightpanda() -> None:
                         ("Lightpanda selected but binary not found", "(browser tools will fail until it is installed)")):
         check_info(LIGHTPANDA_INSTALL_HINT)
 
+
 @doctor_check()
 def _check_node_and_browser(should_fix: bool, f: Finding) -> None:
     """Node.js, the Chromium browser_exec launches, Lightpanda engine."""
@@ -361,8 +362,11 @@ def _check_node_and_browser(should_fix: bool, f: Finding) -> None:
     elif _is_termux():
         check_info("Node.js not found (optional; install on Termux with: pkg install nodejs)")
     else:
-        check_warn("Node.js not found", "(optional; run: qubit pm install node)")
-    _check_chromium(should_fix)
+        check_warn("Node.js not found", "(optional; PM agent-browser is a native executable)")
+    # agent-browser is retired in favour of PM's Chromium (pm.defaults.RETIRED_DEFAULTS), so the
+    # Chromium row is independent of it: browser_exec launches Chromium directly.
+    if not _is_termux():
+        _check_chromium(should_fix)
     _check_lightpanda()
 
 

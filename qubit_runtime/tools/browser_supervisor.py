@@ -34,6 +34,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _current_home_key() -> str:
+    """The profile home key that owns a supervisor started in the current scope."""
+    try:
+        from qubit_constants import qubit_home_key
+
+        return qubit_home_key()
+    except Exception:  # health: allow BLE001 -- ownership is best-effort, never a start blocker
+        return ""
+
+
 # Browserbase can transiently drop a CDP socket while a short-lived client
 # reconnects.  A locally owned browser endpoint, however, is gone for good
 # once its process exits; leave enough room for the former without leaking a
@@ -504,6 +515,9 @@ class _SupervisorRegistry:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._by_task: Dict[str, CDPSupervisor] = {}
+        # task_id -> profile home key (``qubit_home_key()``) that owns it. A multiplexed gateway
+        # serves every profile from one process, so reaping one profile must not close another's.
+        self._home_by_task: Dict[str, str] = {}
 
     def get(self, task_id: str) -> Optional[CDPSupervisor]:
         with self._lock:
@@ -511,6 +525,7 @@ class _SupervisorRegistry:
 
     def _pop(self, task_id: str) -> Optional[CDPSupervisor]:
         with self._lock:
+            self._home_by_task.pop(task_id, None)
             return self._by_task.pop(task_id, None)
 
     def capture(self, task_id: str, *, timeout: float = 10.0) -> "CapturedCDP":
@@ -532,6 +547,7 @@ class _SupervisorRegistry:
                 if existing.cdp_url == cdp_url and healthy:
                     return existing
                 self._by_task.pop(task_id, None)
+                self._home_by_task.pop(task_id, None)
         if existing is not None:
             existing.stop()
 
@@ -545,6 +561,7 @@ class _SupervisorRegistry:
                 supervisor.stop()
                 return already
             self._by_task[task_id] = supervisor
+            self._home_by_task[task_id] = _current_home_key()
         return supervisor
 
     def stop(self, task_id: str) -> None:
@@ -552,11 +569,26 @@ class _SupervisorRegistry:
         if supervisor is not None:
             supervisor.stop()
 
+    def stop_home(self, home_key: str) -> None:
+        """Stop only the supervisors owned by one profile home (``/browser connect`` on a
+        multiplexed gateway). Other profiles' supervisors stay running."""
+        with self._lock:
+            tasks = [task for task, home in self._home_by_task.items() if home == home_key]
+            items = []
+            for task in tasks:
+                self._home_by_task.pop(task, None)
+                supervisor = self._by_task.pop(task, None)
+                if supervisor is not None:
+                    items.append(supervisor)
+        for supervisor in items:
+            supervisor.stop()
+
     def stop_all(self) -> None:
         """Stop every running supervisor. For shutdown / test teardown."""
         with self._lock:
             items = list(self._by_task.values())
             self._by_task.clear()
+            self._home_by_task.clear()
         for supervisor in items:
             supervisor.stop()
 
