@@ -52,6 +52,7 @@ class GatewayChatView:
         self.finite_admission = None
         self._finite_events = []
         self.streams = {}
+        self.mine = {}
         self.completions = {}
         self.changed = asyncio.Event()
         self.failure = None

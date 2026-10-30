@@ -61,6 +61,7 @@ from qubit_cli.plugins_dispatch import (  # noqa: F401 — re-exported
     is_valid_system_prompt_section_id,
 )
 from qubit_cli.plugins_ledger import PluginLedgerMixin, PluginRegistration
+from qubit_cli.plugins_registrars import _SCOPED_PROVIDER_REGISTRARS, make_scoped_provider_registrar
 from qubit_cli.plugins_state import (
     PluginState, _locked_plugin_state, _nested_plugin_mapping, _nested_plugin_value,
     _plugin_relative_segments, _plugin_settings_entry, save_plugin_setting,
@@ -620,6 +621,23 @@ class PluginContext:
         from qubit_cli.plugin_session import context_surface
         return context_surface(self._manager)
 
+    def post_message(self, text: str) -> Any:
+        """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
+        place. Never raises (``ok=False`` + ``error`` with no conversation): ``plugin_messages.py``."""
+        from qubit_cli.plugin_messages import post
+        return post(self, text)
+
+    async def apost_message(self, text: str) -> Any:
+        """``post_message`` for async code on the gateway loop (edit with ``await handle.aedit``)."""
+        from qubit_cli.plugin_messages import apost
+        return await apost(self, text)
+
+    def ask_choice(self, question: str, choices: list) -> Optional[str]:
+        """From a sync slash-command handler: ask its user to pick one of *choices* (``str`` or
+        ``{value, label?, description?}``); the value, or None if unanswerable: ``plugin_choices.py``."""
+        from qubit_cli.plugin_choices import ask_choice
+        return ask_choice(question, choices)
+
     def _gateway_injection_allowed(self) -> bool:
         """Return whether this plugin may trigger gateway session turns (read from the plugin's
         own profile config, never the calling thread's ambient home)."""
@@ -1018,83 +1036,9 @@ class PluginContext:
 # type-check, register in the scope-keyed process-global registry, lease the slot so unload restores
 # the displaced entry. Rows: (method, kind, registry module, base-class module:attr, label, docstring,
 # options). ``normalize``: ``strip`` (default), ``lower`` (strip+lowercase) or ``None`` (raw name).
-_SCOPED_PROVIDER_REGISTRARS: Tuple[Tuple[str, str, str, str, str, str, Dict[str, Any]], ...] = (
-    ("register_image_gen_provider", "image_gen_provider", "agent.image_gen_registry",
-     "agent.image_gen_provider:ImageGenProvider", "image_gen provider",
-     "Register an :class:`agent.image_gen_provider.ImageGenProvider`; "
-     "``provider.name`` is matched by ``image_gen.provider``.", {"article": "an"}),
-    ("register_video_gen_provider", "video_gen_provider", "agent.video_gen_registry",
-     "agent.video_gen_provider:VideoGenProvider", "video_gen provider",
-     "Register an :class:`agent.video_gen_provider.VideoGenProvider`; "
-     "``provider.name`` is matched by ``video_gen.provider``.", {}),
-    ("register_web_search_provider", "web_search_provider", "agent.web_search_registry",
-     "agent.web_search_provider:WebSearchProvider", "web provider",
-     "Register an :class:`agent.web_search_provider.WebSearchProvider`; "
-     "``provider.name`` is matched by ``web.search_backend`` / ``web.extract_backend`` / ``web.backend``.",
-     {}),
-    ("register_browser_provider", "browser_provider", "agent.browser_registry",
-     "agent.browser_provider:BrowserProvider", "browser provider",
-     "Register an :class:`agent.browser_provider.BrowserProvider`; "
-     "``provider.name`` is matched by ``browser.cloud_provider`` (consulted by "
-     "``tools.browser_tool_cloud._get_cloud_provider``).", {}),
-    ("register_terminal_environment_provider", "terminal_environment_provider",
-     "agent.terminal_env_registry", "agent.terminal_env_provider:TerminalEnvironmentProvider",
-     "terminal environment provider",
-     "Register a :class:`agent.terminal_env_provider.TerminalEnvironmentProvider`; ``provider.name`` "
-     "is matched by ``terminal.backend`` when no built-in backend has that name. Built-in names (local, "
-     "docker, singularity, modal, daytona, vercel_sandbox, ssh) are rejected — plugins never shadow "
-     "in-tree backends.",
-     {"normalize": "lower", "reject_message": "Plugin '%s' terminal environment provider rejected: %s"}),
-    ("register_secret_source", "secret_source", "agent.secret_sources.registry",
-     "agent.secret_sources.base:SecretSource", "secret source",
-     "Register a :class:`agent.secret_sources.base.SecretSource`, run by ``load_qubit_dotenv()`` "
-     "(after ``~/.hermes/.env``, before credentials are read) when ``secrets.<name>`` is enabled. The "
-     "orchestrator owns ordering/precedence/provenance; the source only fetches. Since dotenv usually "
-     "loads before discovery, the manager re-pulls enabled plugin sources afterwards.",
-     {"normalize": None, "register": "register_source", "param": "source"}),
-    ("register_tts_provider", "tts_provider", "agent.tts_registry",
-     "agent.tts_provider:TTSProvider", "TTS provider",
-     "Register an :class:`agent.tts_provider.TTSProvider`; ``provider.name`` is matched by "
-     "``tts.provider`` unless it is a built-in name (rejected with a warning) or a "
-     "``tts.providers.<name>: type: command`` entry shares it (command-providers win).",
-     {"normalize": "lower"}),
-    ("register_transcription_provider", "transcription_provider", "agent.transcription_registry",
-     "agent.transcription_provider:TranscriptionProvider", "transcription provider",
-     "Register an :class:`agent.transcription_provider.TranscriptionProvider`; ``provider.name`` is "
-     "matched by ``stt.provider`` unless it is a built-in name (rejected) or a ``stt.providers.<name>: "
-     "type: command`` entry shares it (command-providers win).", {"normalize": "lower"}),
-)
-
-_NAME_NORMALIZERS: Dict[Optional[str], Optional[Callable[[str], str]]] = {
-    "strip": lambda n: n.strip(), "lower": lambda n: n.strip().lower(), None: None,
-}
-
-
-def _make_scoped_provider_registrar(method_name, kind, registry_mod, base_ref, label, doc, options):
-    """Build one ``register_<category>_provider`` method from a ``_SCOPED_PROVIDER_REGISTRARS`` row."""
-    base_mod, base_attr = base_ref.split(":")
-    normalize_fn = _NAME_NORMALIZERS[options.get("normalize", "strip")]
-    register_name = options.get("register")
-
-    def register(self, provider) -> Optional[PluginRegistration]:
-        registry = importlib.import_module(registry_mod)
-        return self._register_scoped_provider(
-            provider, kind=kind, base_class=getattr(importlib.import_module(base_mod), base_attr),
-            registry=registry, label=label, article=options.get("article", "a"), normalize=normalize_fn,
-            register=getattr(registry, register_name) if register_name else None,
-            reject_message=options.get("reject_message"),
-        )
-
-    def register_source(self, source) -> Optional[PluginRegistration]:  # secret sources: ``source``
-        return register(self, source)
-
-    method = register_source if options.get("param") == "source" else register
-    method.__name__, method.__qualname__, method.__doc__ = method_name, f"PluginContext.{method_name}", doc
-    return _serialized_replacement(method)
-
-
+# One generated ``register_<category>_provider`` method per row of plugins_registrars.py's table.
 for _row in _SCOPED_PROVIDER_REGISTRARS:
-    setattr(PluginContext, _row[0], _make_scoped_provider_registrar(*_row))
+    setattr(PluginContext, _row[0], make_scoped_provider_registrar(*_row))
 del _row
 
 

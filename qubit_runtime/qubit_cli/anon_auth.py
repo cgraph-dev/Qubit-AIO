@@ -248,11 +248,11 @@ def free_tier_route() -> bool:
 
 
 def on_local_desktop_backend() -> bool:
-    """This process is the backend the desktop app spawned on this machine: never an SSH, URL or
-    cloud backend, and never a gateway or shell the desktop merely launched."""
-    from qubit_cli.anon_challenge import client_surface
-    from qubit_cli.process_identity import is_local_desktop_backend
-    return client_surface() == "desktop" and is_local_desktop_backend()
+    """This activity is work for the Desktop app on this machine: a request from, or a turn of a chat
+    created by, a connection ``process_identity.local_desktop_client`` accepted. Never an SSH, URL or
+    cloud backend, a shell the desktop launched, or the gateway's other clients."""
+    from qubit_cli.process_identity import serves_local_desktop_now
+    return serves_local_desktop_now()
 
 
 def _on_local_desktop_backend_uncapped() -> bool:

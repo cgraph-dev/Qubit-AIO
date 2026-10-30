@@ -14,15 +14,8 @@ def _resolve_browser_cdp_url() -> str:
     """Configured browser CDP override without network I/O (``/browser status`` must be fast;
     ``tools.browser_tool_cdp._get_cdp_override`` HTTP-probes discovery URLs). Same precedence (env,
     then ``browser.cdp_url``) minus WS resolution; ``browser_navigate`` normalizes on the next call."""
-    if env_url := os.environ.get("BROWSER_CDP_URL", "").strip():
-        return env_url
-    with contextlib.suppress(Exception):
-        from qubit_cli.config import read_raw_config
-        cfg = read_raw_config()
-        browser_cfg = cfg.get("browser", {}) if isinstance(cfg, dict) else {}
-        if isinstance(browser_cfg, dict):
-            return str(browser_cfg.get("cdp_url", "") or "").strip()
-    return ""
+    from tools.browser_session_cdp import get_cdp_override_raw
+    return get_cdp_override_raw()
 
 
 def _is_default_local_cdp(parsed) -> bool:
