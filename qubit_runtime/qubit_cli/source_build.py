@@ -26,7 +26,7 @@ def source_product_current(project_root: Path, product: str, out: Path) -> bool:
         return False
 
 
-def source_build_env(base_env: dict | None = None, *, explicit: bool = False) -> dict[str, str]:
+def source_build_env(base_env: dict | None = None, *, explicit: bool = False, verify: bool = True) -> dict[str, str]:
     from pm import ensure
     from pm.environments import project_python, running_from_selected_environment
     from pm.paths import repo_root
@@ -39,11 +39,17 @@ def source_build_env(base_env: dict | None = None, *, explicit: bool = False) ->
     python = str(project_python(root)) if running_from_selected_environment(root) else sys.executable
     env = {**os.environ, **(base_env or {}), "CI": "1", "HERMES_PYTHON": python,
            "PYTHON": python}
+    # Electron's installer unpacks its binary with a native module that imports
+    # VCRUNTIME140.dll, which a fresh Windows lacks. Our Python ships one, and
+    # scripts/build/electron-runtime.mjs copies it beside that module.
+    vc_runtime = Path(sys.base_prefix) / "vcruntime140.dll"
+    if vc_runtime.is_file():
+        env["HERMES_VC_RUNTIME"] = str(vc_runtime)
     env.pop("ESBUILD_BINARY_PATH", None)
     npmrc = get_qubit_home() / "npmrc"
     if npmrc.is_file():
         env.setdefault("NPM_CONFIG_USERCONFIG", str(npmrc))
-    return ensure("npm", base_env=env, explicit=explicit).env
+    return ensure("npm", base_env=env, explicit=explicit, verify=verify).env
 
 
 def run_in_custody(project_root: Path, command: list, label: str, **kwargs):
@@ -67,13 +73,17 @@ def run_source_script(project_root: Path, script: str, *args: str, env: dict, la
                    indent="  ", cwd=project_root, env=env)
 
 
-def prepare_source_dependencies(project_root: Path, workspaces: tuple[str, ...], *, env: dict,
-                                explicit: bool = False) -> None:
+def _install_args(explicit: bool) -> tuple[str, ...]:
     from pm import lazy_installs_allowed
 
+    return () if explicit or lazy_installs_allowed() else ("--no-install",)
+
+
+def prepare_source_dependencies(project_root: Path, workspaces: tuple[str, ...], *, env: dict,
+                                explicit: bool = False) -> None:
     run_source_script(
         project_root, "scripts/build/node-deps.mjs", "--source", str(project_root), "--reuse",
-        *(() if explicit or lazy_installs_allowed() else ("--no-install",)),
+        *_install_args(explicit),
         *(arg for workspace in workspaces for arg in ("--workspace", workspace)), env=env,
         label="Preparing Node dependencies",
     )
@@ -104,6 +114,12 @@ def build_source_web(project_root: Path, *, env: dict, icons: Path | None = None
     run_source_script(project_root, "scripts/build/web.mjs", "--source", str(project_root),
                       "--icons", str(icons), "--out", str(project_root / "qubit_cli/web_dist"), env=env,
                       label="Building the web UI")
+
+
+def build_source_webapp(project_root: Path, *, env: dict, explicit: bool = False) -> None:
+    """Browser renderer; its dependencies live in a private workspace, never the checkout's."""
+    run_source_script(project_root, "apps/desktop/scripts/build-webapp.mjs", *_install_args(explicit),
+                      env=env, label="Building the Webapp renderer")
 
 
 def source_frontends(project_root: Path) -> tuple[str, ...]:
@@ -143,6 +159,7 @@ def build_update_products(project_root: Path, *, desktop: bool) -> None:
     from qubit_cli.update_stage import publish_stage
 
     failures: list[tuple[str, BaseException]] = []
+    publish_stage("Building the apps")
 
     def attempt(name: str, step) -> bool:
         try:
@@ -165,7 +182,7 @@ def build_update_products(project_root: Path, *, desktop: bool) -> None:
             # Acquiring npm is part of this step: its failure must be reported like the install's.
             # A recorded install is trusted as at startup (re-hashing node+npm costs ~2 s per
             # tail); a missing one is still installed explicitly.
-            env.update(source_build_env(explicit=True))
+            env.update(source_build_env(explicit=True, verify=False))
             prepare_source_dependencies(project_root, selected, env=env, explicit=True)
 
         # Every product compiles from these node_modules: without them there is nothing to build.
@@ -181,7 +198,7 @@ def build_update_products(project_root: Path, *, desktop: bool) -> None:
                 failures.append(("desktop dependencies", failed[1]))
         desktop_reason = failures[-1][0] if failures else ""
         if desktop and (desktop_skipped or _headless_linux()):
-            print("  ⓘ If this host never runs the desktop app, `qubit uninstall --gui` removes it "
+            print("  ⓘ If this host never runs the desktop app, `hermes uninstall --gui` removes it "
                   "and future updates stop building it.")
         if prepared:
             # An update that changed no TUI/web input reuses the receipted output, as the
@@ -208,6 +225,9 @@ def build_update_products(project_root: Path, *, desktop: bool) -> None:
             # One whole line the Desktop hand-off scripts match: the follow-up text is truncated
             # and names whichever products failed first, so it cannot say if THIS app was rebuilt.
             print(f"  Desktop app build owed: {desktop_reason} failed")
+    if (project_root / "apps/desktop/scripts/build-webapp.mjs").is_file():
+        # Its dependencies live in a private workspace, so it never waits on the union above.
+        attempt("Webapp build", lambda: _rebuild_served_webapp(project_root, publish_stage))
     # A configured memory provider that no longer ships in core is installed from the
     # catalog for every profile home sharing this venv (config, data and tool names
     # unchanged). The update must finish even if the migration blows up.
@@ -229,18 +249,45 @@ def build_update_products(project_root: Path, *, desktop: bool) -> None:
         raise ProductBuildError(failures)
 
 
+def _rebuild_served_webapp(project_root: Path, publish_stage) -> None:
+    """The Webapp bundle (``apps/desktop/dist-webapp``), when a home sharing this install serves it
+    (``webapp.enabled``): its gateway serves the bundle as built, so one older than the updated
+    backend would talk to it with an outdated contract. Built with the function ``hermes webapp``
+    uses, which reuses a current bundle. A failed build leaves the previous bundle on disk, marked
+    out of date: its gateways report the Webapp unavailable until ``hermes webapp`` rebuilds it."""
+    from gateway.webapp_listener import webapp_settings
+    from qubit_cli.webapp import mark_webapp_stale, prepare_webapp_renderer
+    from pm.plugins_state import dependency_homes
+
+    if not any(webapp_settings(home).enabled for home in dependency_homes()):
+        return
+    publish_stage("Building the Webapp")
+    try:
+        prepare_webapp_renderer(project_root, explicit=True)
+    except BaseException:
+        try:
+            if mark_webapp_stale(project_root):
+                print("  ⓘ The Webapp stays unavailable until `hermes webapp` rebuilds it.")
+        except OSError as exc:
+            print(f"  ⚠ Could not mark the Webapp out of date: {exc}")
+        raise
+
+
 def _build_desktop_product(project_root: Path, env: dict, publish_stage) -> None:
+    from qubit_cli.desktop_build_reuse import packaged_desktop_reusable
     from qubit_cli.main_desktop import (
         _packaged_desktop_current_for_head, _refresh_installed_desktop_apps, build_prepared_desktop)
 
     desktop_dir = project_root / "apps/desktop"
     if _packaged_desktop_current_for_head(desktop_dir, project_root):
         print("  ✓ Desktop app is up to date")
+    elif built_from := packaged_desktop_reusable(desktop_dir, project_root, env):
+        print(f"  ✓ Desktop app is up to date: no desktop build input changed since {built_from[:12]}")
     else:
         publish_stage("Building the desktop app")
         # The desktop build mutates checkout-scoped node_modules and
         # apps/desktop/release; serialize it against a concurrent manual
-        # `qubit desktop` (#93940). The update path waits rather than exits:
+        # `hermes desktop` (#93940). The update path waits rather than exits:
         # the in-flight build it queues behind produces the same fresh tree
         # this update needs.
         from qubit_cli.desktop_build_lock import DesktopBuildLock
