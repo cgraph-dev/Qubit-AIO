@@ -1,8 +1,8 @@
-# FROZEN TARGET: upstream `43faacfb8de7`
+# FROZEN TARGET: upstream `088f657ecf`
 
-**Re-frozen 2026-10-16** (owner ruling, in force until hermes is retired). This is the
-revision Qubit must match before hermes is retired. It is NOT "upstream's latest" — that
-moves. It is the finish line.
+**Re-frozen 2026-10-30** (owner ruling 13). This is the revision Qubit must match
+before hermes is retired. It is NOT "upstream's latest" — that moves. It is the finish
+line. The previous pin was `43faacfb8de7` (2026-10-16).
 
 > **History:** the previous `docs/FROZEN_TARGET.md` (pin `ad12263a5ed4`, frozen 2026-10-07)
 > was deleted in `eafb54e26` together with 673 other docs under the owner's English-only
@@ -13,21 +13,23 @@ moves. It is the finish line.
 > disagree, the script is authoritative and this note is stale.
 
 ```
-target commit : 43faacfb8de7b29548547a7fbdedad0cc6e7391c
-subject       : Merge pull request #139613 from NousResearch/fix/pkg2-provider-override-route
-date          : 2026-10-16
-previous pin  : 517b5e10febd (2026-10-08, drifted 4,218 commits / 5,434 files behind)
+target commit : 088f657ecf77674c7b8e2ededf4e3576d82e042c
+subject       : plugin-catalog: huddo 0.10.1
+date          : 2026-10-29T20:29:59Z
+previous pin  : 43faacfb8de7 (2026-10-16, 5,689 commits / 5,940 files behind)
 ```
 
 ## Why a freeze, not "follow HEAD"
 
-Chasing live HEAD is a treadmill: upstream moves (~66 commits/day measured) faster than this
-campaign closes symbols, so "same commit as them" never arrives and hermes is never retired.
-The freeze makes the finish line reachable.
+Chasing live HEAD is a treadmill: upstream moves (~400 commits/day measured at this
+re-freeze) faster than this campaign closes symbols, so "same commit as them" never arrives
+and hermes is never retired. The freeze makes the finish line reachable.
 
 **Post-freeze upstream commits get ported AFTER hermes is deleted.** Measured at the
-re-freeze: the pin is 1,094 commits behind upstream `origin/main` as of 2026-10-17 — that
-backlog is explicitly out of scope until retirement.
+2026-10-30 re-freeze: the new pin is 5,689 commits / 5,940 files ahead of the previous pin,
+but the real code gap is **1,968 production missing** — 244 absent production files plus
+1,724 behind-head production symbols across 497 files. Tests add 1,908 non-blocking missing
+symbols. That is the gap to close; the commit count is release/CI/docs churn as well as code.
 
 ## Platform scope (owner ruling, 2026-10-25)
 
@@ -39,8 +41,8 @@ existing cross-platform code paths) remain in scope.
 
 ## The rule
 
-- Measure EVERYTHING against `43faacfb8de7b29548547a7fbdedad0cc6e7391c`. Never `origin/main`.
-- Every audit passes `--rev 43faacfb8de7b29548547a7fbdedad0cc6e7391c` explicitly.
+- Measure EVERYTHING against `088f657ecf77674c7b8e2ededf4e3576d82e042c`. Never `origin/main`.
+- Every audit passes `--rev 088f657ecf77674c7b8e2ededf4e3576d82e042c` explicitly.
 - Ports are 1:1 and literal against this revision — including upstream features this fork
   dropped on purpose (owner ruling 2026-10-19): no symbol is skipped as "out of scope", and
   no typed refusal is written in a symbol's place. Exclusions are pruned by the owner after
@@ -49,7 +51,7 @@ existing cross-platform code paths) remain in scope.
   (currently exactly one, `_gateway_lock_handle`), verify, then retire hermes. The instrument
   always prints that one row, so literal zero is not the gate; the owner may prune the row
   instead of waiting for a zero it will never print.
-- Do not move this pin until hermes is gone.
+- Do not move this pin again until this gap closes (owner ruling 13).
 
 ## Declared exclusions (deliberate, do NOT re-port)
 
