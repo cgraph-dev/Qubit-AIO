@@ -68,6 +68,8 @@ from qubit_state_dbfile import (
     RetiredGenerationCaptureError, capture_retired_wal_generation, refuse_deleted_wal_generation,
 )
 from qubit_state_messages import SessionMessagesMixin
+from qubit_state_api_content import SessionApiContentMixin
+from qubit_state_prune_rewrite import SessionPruneRewriteMixin
 from qubit_state_coverage import SessionCoverageMixin
 from qubit_state_rewind import SessionRewindMixin
 from qubit_state_wal import (

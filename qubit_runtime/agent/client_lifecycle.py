@@ -810,6 +810,24 @@ class ClientLifecycleMixin:
             logger.info("Vertex AI OAuth token refreshed")
         return ok
 
+    def _try_refresh_provider_runtime_credentials(self, *, reason: str) -> bool:
+        """Re-mint the live credential through the provider profile's ``refresh_runtime_credentials``
+        and rebuild the shared client (caller enforces the single-shot guard). ``reason``:
+        ``unauthorized`` (401) or ``stale`` (a non-auth error the profile reads as a stale credential)."""
+        from agent.conversation_loop import _credential_refresh_profile
+        from agent.provider_route_hooks import ask_on_error_path
+        profile = _credential_refresh_profile(self)
+        refreshed = ask_on_error_path(profile, "refresh_runtime_credentials", None, reason=reason) if profile else None
+        if not (isinstance(refreshed, (tuple, list)) and len(refreshed) == 2 and refreshed[0]):
+            return False
+        token, base_url = refreshed
+        self.api_key = token
+        if base_url:
+            self.base_url = base_url.rstrip("/")
+        self._sync_client_kwargs_credentials()
+        self._apply_client_headers_for_base_url(str(self.base_url or ""))
+        return self._replace_primary_openai_client(reason=f"{profile.name}_credential_{reason}")
+
     def _apply_copilot_token(self, token: str, enterprise_base_url: Any, *, reason: str) -> bool:
         self.api_key = token
         if enterprise_base_url:

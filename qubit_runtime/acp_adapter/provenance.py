@@ -1,12 +1,12 @@
 """Derive ACP session-provenance metadata from the existing compression chain.
 
-Additive Qubit extension under ACP ``_meta.hermes`` (unknown to other clients,
+Additive Hermes extension under ACP ``_meta.hermes`` (unknown to other clients,
 so ignored). No new persisted state: everything is derived from the ``sessions``
 table (``parent_session_id`` / ``end_reason``), which already models
 compression-continuation chains.
 
 The ACP/editor ``session_id`` stays the stable public handle; when compression
-rotates the internal Qubit head, ``build_session_provenance`` exposes the
+rotates the internal Hermes head, ``build_session_provenance`` exposes the
 previous/current internal ids and lineage root without parsing status text.
 """
 
@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional
 _MAX_WALK = 100
 
 
-def _get_row(db: Any, session_id: str) -> Optional[Dict[str, Any]]:
+def _get_row(db: Any, session_id: str) -> Optional[dict[str, Any]]:
     try:
         return db.get_session(session_id)
     except Exception:
@@ -31,7 +31,7 @@ def _is_compression_end(row: Any) -> bool:
 
 def build_session_provenance(
     db: Any, acp_session_id: str, current_qubit_session_id: str, *, previous_qubit_session_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Build ``_meta.hermes.sessionProvenance`` for an ACP session.
 
     ``db`` must expose ``get_session``. ``current_qubit_session_id`` is the live
@@ -62,7 +62,7 @@ def build_session_provenance(
     # A continuation is a session whose immediate parent ended with end_reason='compression'.
     is_continuation = bool(parent_id) and _is_compression_end(_get_row(db, parent_id))
 
-    provenance: Dict[str, Any] = {
+    provenance: dict[str, Any] = {
         "acpSessionId": acp_session_id, "currentHermesSessionId": current_qubit_session_id,
         "rootHermesSessionId": root_id, "parentHermesSessionId": parent_id,
         "sessionKind": "continuation" if is_continuation else "root", "compressionDepth": compression_depth,
@@ -79,7 +79,7 @@ def build_session_provenance(
 
 def session_provenance_meta(
     db: Any, acp_session_id: str, current_qubit_session_id: str, *, previous_qubit_session_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Return a ready ``_meta`` payload: ``{"hermes": {"sessionProvenance": ...}}``."""
     prov = build_session_provenance(db, acp_session_id, current_qubit_session_id,
                                     previous_qubit_session_id=previous_qubit_session_id)

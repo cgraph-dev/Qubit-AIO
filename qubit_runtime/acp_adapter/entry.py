@@ -1,27 +1,27 @@
 """CLI entry point for the hermes-agent ACP adapter.
 
-Loads ``~/.qubit/.env``, routes logging to stderr (stdout is reserved for ACP
+Loads ``~/.hermes/.env``, routes logging to stderr (stdout is reserved for ACP
 JSON-RPC), and starts the ACP agent server.
 
 Usage::
 
-    python -m acp_adapter.entry   # or: qubit acp
+    python -m acp_adapter.entry   # or: hermes acp / hermes-acp
 """
 
 # IMPORTANT: qubit_bootstrap must be the very first import — UTF-8 stdio
 # on Windows.  No-op on POSIX.  See qubit_bootstrap.py for full rationale.
 try:
-    import qubit_bootstrap  # noqa: F401
+    import qubit_bootstrap
 except ModuleNotFoundError as exc:
-    # Partial ``qubit update`` (git-reset landed, ``uv pip install -e .`` did not).
+    # Partial ``hermes update`` (git-reset landed, ``uv pip install -e .`` did not).
     if exc.name != "qubit_bootstrap":
         raise  # the bootstrap exists but cannot load: skipping it would skip PM activation
 else:
-    # Stop a ``utils/``/``proxy/``/``ui/`` package in the launch cwd from shadowing Qubit modules.
+    # Stop a ``utils/``/``proxy/``/``ui/`` package in the launch cwd from shadowing Hermes modules.
     qubit_bootstrap.harden_import_path()
 
-# `hermes-acp` runs without qubit_cli.main: repair a `qubit update` killed mid-pull here, before
-# importing anything else from the checkout (a no-op under `qubit acp`, which already did).
+# `hermes-acp` runs without qubit_cli.main: repair a `hermes update` killed mid-pull here, before
+# importing anything else from the checkout (a no-op under `hermes acp`, which already did).
 from qubit_cli import _early_recovery
 
 if _early_recovery.restore_interrupted_pull():
@@ -79,7 +79,7 @@ def _setup_logging() -> None:
 
 
 def _load_env() -> None:
-    """Load .env from QUBIT_HOME (default ``~/.qubit``)."""
+    """Load .env from QUBIT_HOME (default ``~/.hermes``)."""
     from qubit_cli.env_loader import load_qubit_dotenv
 
     qubit_home = get_qubit_home()
@@ -92,13 +92,13 @@ def _load_env() -> None:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="qubit-acp", description="Run Qubit Agent as an ACP stdio server.")
-    parser.add_argument("--version", action="store_true", help="Print Qubit version and exit")
+    parser = argparse.ArgumentParser(prog="hermes-acp", description="Run Hermes Agent as an ACP stdio server.")
+    parser.add_argument("--version", action="store_true", help="Print Hermes version and exit")
     parser.add_argument("--check", action="store_true", help="Verify ACP dependencies and adapter imports, then exit")
     parser.add_argument("--setup", action="store_true",
-                        help="Run interactive Qubit provider/model setup for ACP terminal auth")
+                        help="Run interactive Hermes provider/model setup for ACP terminal auth")
     parser.add_argument("--setup-browser", action="store_true",
-                        help="Prepare PM's pinned browser tools and Chromium.")
+                        help="Prepare PM's pinned Chromium for browser_exec.")
     parser.add_argument("--yes", "-y", action="store_true", dest="assume_yes",
                         help="Accept setup prompts.")
     return parser.parse_args(argv)
@@ -111,10 +111,10 @@ def _print_version() -> None:
 
 
 def _run_check() -> None:
-    import acp  # noqa: F401
-    from acp_adapter.server import HermesACPAgent  # noqa: F401
+    import acp
+    from acp_adapter.server import HermesACPAgent
 
-    print("Qubit ACP check OK")
+    print("Hermes ACP check OK")
 
 
 def _run_setup() -> None:
@@ -132,7 +132,7 @@ def _run_setup() -> None:
     if not sys.stdin.isatty():
         return
     try:
-        reply = input("\nInstall browser tools? Downloads the pinned browser and "
+        reply = input("\nInstall browser tools? Downloads the pinned "
                       "Chromium through PM. [y/N] ").strip().lower()
     except (EOFError, KeyboardInterrupt):
         return
@@ -141,11 +141,11 @@ def _run_setup() -> None:
 
 
 def _run_setup_browser(assume_yes: bool = False) -> int:
-    """The setup command is an explicit request for PM's browser closure."""
+    """The setup command is an explicit request for PM's Chromium (browser_exec's local browser)."""
     import pm
 
     try:
-        pm.ensure("agent-browser", explicit=True)
+        pm.ensure("chromium", explicit=True)
     except (pm.InstallError, OSError) as exc:
         print(f"Browser setup failed: {exc}", file=sys.stderr)
         return 1
@@ -175,7 +175,7 @@ def main(argv: list[str] | None = None) -> None:
     _load_env()
 
     logger = logging.getLogger(__name__)
-    logger.info("Starting Qubit Agent ACP adapter")
+    logger.info("Starting hermes-agent ACP adapter")
 
     # Ensure the project root is on sys.path so ``from run_agent import AIAgent`` works
     project_root = str(Path(__file__).resolve().parent.parent)

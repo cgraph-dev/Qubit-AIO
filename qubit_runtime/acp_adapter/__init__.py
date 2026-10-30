@@ -1,1 +1,1 @@
-"""ACP (Agent Communication Protocol) adapter for Qubit Agent."""
+"""ACP (Agent Communication Protocol) adapter for hermes-agent."""

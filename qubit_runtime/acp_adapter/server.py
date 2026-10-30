@@ -1,9 +1,9 @@
-"""ACP agent server — exposes Qubit Agent via the Agent Client Protocol."""
+"""ACP agent server — exposes Hermes Agent via the Agent Client Protocol."""
 
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import contextlib
 import contextvars
 import logging
@@ -32,6 +32,7 @@ from acp_adapter.events import (
     make_message_cb, make_step_cb, make_thinking_cb, make_tool_progress_cb,
 )
 from acp_adapter.model_catalog import build_model_state, encode_model_choice
+from acp_adapter import modes as _modes
 from acp_adapter.permissions import make_approval_callback
 from acp_adapter.provenance import session_provenance_meta
 from acp_adapter.session import SessionManager, SessionState, _expand_acp_enabled_toolsets
@@ -231,25 +232,15 @@ class _TurnCallbacks:
 
 
 class HermesACPAgent(SlashCommandsMixin, acp.Agent):
-    """ACP Agent implementation wrapping Qubit AIAgent."""
+    """ACP Agent implementation wrapping Hermes AIAgent."""
 
-    _EDIT_APPROVAL_POLICY_CONFIG_ID = "edit_approval_policy"
-    _EDIT_APPROVAL_POLICY_DEFAULT = "ask"
-    _MODE_DEFAULT = "default"
-    # mode id -> (edit approval policy, display name, description)
-    _MODES: dict[str, tuple[str, str, str]] = {
-        "default": ("ask", "Default", "Ask before edits."),
-        "accept_edits": (
-            "workspace_session",
-            "Accept Edits",
-            "Auto-allow workspace and temp-dir edits; still asks for sensitive paths.",
-        ),
-        "dont_ask": (
-            "session", "Don't Ask", "Auto-allow file edits for this session except sensitive paths."
-        ),
-    }
-    _MODE_TO_EDIT_APPROVAL_POLICY = {mode: spec[0] for mode, spec in _MODES.items()}
-    _EDIT_APPROVAL_POLICY_TO_MODE = {spec[0]: mode for mode, spec in _MODES.items()}
+    # mode id -> (edit approval policy, display name, description): ``acp_adapter/modes.py``
+    _EDIT_APPROVAL_POLICY_CONFIG_ID = _modes.EDIT_APPROVAL_POLICY_CONFIG_ID
+    _EDIT_APPROVAL_POLICY_DEFAULT = _modes.DEFAULT_EDIT_APPROVAL_POLICY
+    _MODE_DEFAULT = _modes.DEFAULT_MODE
+    _MODES = _modes.MODES
+    _MODE_TO_EDIT_APPROVAL_POLICY = _modes.MODE_TO_EDIT_APPROVAL_POLICY
+    _EDIT_APPROVAL_POLICY_TO_MODE = _modes.EDIT_APPROVAL_POLICY_TO_MODE
 
     def __new__(cls, session_manager=None):
         if session_manager is None:
@@ -302,8 +293,8 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         return policy, state.cwd
 
     def _build_model_state(self, state: SessionState) -> SessionModelState | None:
-        """Authenticated providers + models, from the shared Qubit inventory (same substrate
-        as ``qubit model``/TUI/dashboard) so the selector isn't just the current curated list."""
+        """Authenticated providers + models, from the shared Hermes inventory (same substrate
+        as ``hermes model``/TUI/dashboard) so the selector isn't just the current curated list."""
         model = str(state.model or getattr(state.agent, "model", "") or "").strip()
         provider = getattr(state.agent, "provider", None) or detect_provider() or "openrouter"
         try:
@@ -332,12 +323,12 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         from qubit_cli.model_switch import switch_model
         from qubit_cli.models import parse_model_input
 
-        current_provider = getattr(state.agent, "provider", None)
+        current_provider, current_model = getattr(state.agent, "provider", None), str(state.model or "")
         explicit_provider, model_input = parse_model_input(raw_model, "")
         cfg = load_config()
         result = switch_model(
             raw_input=model_input, explicit_provider=explicit_provider,
-            current_provider=current_provider or "openrouter", current_model=str(state.model or ""),
+            current_provider=current_provider or "openrouter", current_model=current_model,
             current_base_url=str(getattr(state.agent, "base_url", "") or ""),
             current_api_key=str(getattr(state.agent, "api_key", "") or ""),
             user_providers=cfg.get("providers") if isinstance(cfg.get("providers"), dict) else {},
@@ -362,6 +353,11 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         # working model instead of a model/agent mismatch that persists via save_session.
         state.agent, state.model = agent, new_model
         self.session_manager.save_session(state.session_id)
+        from qubit_cli.observability.shared_metrics_events import record_model_switch
+
+        record_model_switch(
+            from_provider=current_provider, to_provider=target_provider, surface="acp", from_model=current_model,
+            session_id=state.session_id)
         return current_provider, target_provider, new_model
 
     @staticmethod
@@ -416,7 +412,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         update = SessionInfoUpdate(
             session_update="session_info_update",
             title=title if isinstance(title, str) and title.strip() else None,
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             field_meta=self._provenance_meta(
                 session_id, current_qubit_session_id or session_id, previous_qubit_session_id
             ),
@@ -449,13 +445,15 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
             return
         try:
             from model_tools import get_tool_definitions
-            from agent.memory_manager import inject_memory_provider_tools
+            from agent.memory_manager_tools import inject_memory_provider_tools
 
             agent = state.agent
             agent.enabled_toolsets = _expand_acp_enabled_toolsets(
                 getattr(agent, "enabled_toolsets", None),
                 mcp_server_names=[s.name for s in mcp_servers],
             )
+            from agent.delegation_backends import saved_backend
+            agent._delegation_backend = saved_backend()  # the session routes on what its delegate_task is built from
             agent.tools = get_tool_definitions(
                 enabled_toolsets=agent.enabled_toolsets,
                 disabled_toolsets=getattr(agent, "disabled_toolsets", None), quiet_mode=True,
@@ -655,11 +653,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
             state.cancel_event.set()
             try:
                 if state.agent:
-                    request_hard_interrupt(state.agent)
-                    # Background delegations are detached from the turn's fan-out; they end with the cancel.
-                    from tools.async_delegation import interrupt_for_session
-                    interrupt_for_session(parent_session_id=str(getattr(state.agent, "session_id", "") or ""),
-                                          reason="acp_cancel")
+                    request_hard_interrupt(state.agent)  # this turn only: background delegations keep running
             except Exception:
                 logger.debug("Failed to interrupt ACP session %s", session_id, exc_info=True)
         logger.info("Cancelled session %s", session_id)
@@ -767,7 +761,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         with contextlib.ExitStack() as stack:
             # HERMES_SESSION_KEY scopes per-session caches (interactive sudo password) to this
             # session, not the reused thread. ``cwd`` pins what the system prompt reports as the
-            # working directory — otherwise it advertises the Qubit workspace while tools are
+            # working directory — otherwise it advertises the Hermes workspace while tools are
             # rooted at the client's project and edits land outside it. ``cron_session=""`` masks
             # any leaked process-global HERMES_CRON_SESSION.
             def _session_context() -> Callable[[], None]:
@@ -817,7 +811,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
                 return {"final_response": f"Error: {e}", "messages": state.history}
 
     async def prompt(self, prompt: list[PromptBlock], session_id: str, **kwargs: Any) -> PromptResponse:
-        """Run Qubit on the user's prompt and stream events back to the editor."""
+        """Run Hermes on the user's prompt and stream events back to the editor."""
         state = await asyncio.to_thread(self.session_manager.get_session, session_id)
         if state is None:
             logger.error("prompt: session %s not found", session_id)
@@ -900,13 +894,13 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         """Install the ACP streaming callbacks on the session agent for one turn."""
         cbs = _TurnCallbacks()
         if conn:
-            tool_call_ids: dict[str, Deque[str]] = defaultdict(deque)
+            tool_call_ids: dict[str, deque[str]] = defaultdict(deque)
             tool_call_meta: dict[str, dict[str, Any]] = {}
             cbs.tool_call_ids, cbs.tool_call_meta = tool_call_ids, tool_call_meta
             # Shared with the step callback so a runtime that projects
             # ``tool.completed`` closes each call once, not twice.
             turn_state: dict[str, Any] = {}
-            policy_getter = lambda: self._edit_approval_policy_for_state(state)  # noqa: E731
+            policy_getter = lambda: self._edit_approval_policy_for_state(state)
             cbs.tool_progress_cb = make_tool_progress_cb(
                 conn, session_id, loop, tool_call_ids, tool_call_meta, edit_approval_policy_getter=policy_getter,
                 turn_state=turn_state,
@@ -926,7 +920,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
 
             cbs.stream_delta_cb = stream_delta_cb
             # Closes the synthetic permission-request bubble once the user has answered.
-            send_update = lambda update: _send_update(conn, session_id, loop, update)  # noqa: E731
+            send_update = lambda update: _send_update(conn, session_id, loop, update)
             cbs.approval_cb = make_approval_callback(conn.request_permission, loop, session_id, send_update=send_update)
             try:
                 from acp_adapter.edit_approval import make_acp_edit_approval_requester
@@ -1041,7 +1035,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
                     self._switch_model, state, model_id, keep_endpoint=True)
             except ModelRejected as exc:
                 # A model no provider can serve is a bad ``modelId`` param (-32602), not an agent
-                # internal error (-32603): the client attributes it to the request, not to Qubit (#72439).
+                # internal error (-32603): the client attributes it to the request, not to Hermes (#72439).
                 # Only the switch_model rejection maps here; a ValueError from the rebuild itself
                 # (disabled provider, context window below the floor) stays on the -32603 path.
                 from acp.exceptions import RequestError
@@ -1075,7 +1069,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
     async def set_config_option(
         self, config_id: str, session_id: str, value: str, **kwargs: Any
     ) -> SetSessionConfigOptionResponse | None:
-        """Accept ACP config option updates even when Qubit has no typed ACP config surface yet."""
+        """Accept ACP config option updates even when Hermes has no typed ACP config surface yet."""
         state = await asyncio.to_thread(self.session_manager.get_session, session_id)
         if state is None:
             logger.warning("Session %s: config update requested for missing session", session_id)
@@ -1092,40 +1086,3 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         self.session_manager.save_session(session_id)
         logger.info("Session %s: config option %s updated", session_id, config_id)
         return SetSessionConfigOptionResponse(config_options=[])
-
-
-# ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----
-# Names external plugins imported from this module before the Sep 2026 decomposition.
-# Internal code MUST NOT use these (scripts/check_compat_pointers.py fails CI if it does).
-# The whole block is removed by reverting the commit that added it.
-from acp.schema import AgentThoughtChunk  # noqa: F401,E402
-from acp.schema import AudioContentBlock  # noqa: F401,E402
-from acp.schema import AvailableCommand  # noqa: F401,E402
-from acp.schema import AvailableCommandsUpdate  # noqa: F401,E402
-from acp.schema import BlobResourceContents  # noqa: F401,E402
-from acp.schema import EmbeddedResourceContentBlock  # noqa: F401,E402
-from acp.schema import ImageContentBlock  # noqa: F401,E402
-from pathlib import Path  # noqa: F401,E402
-from acp.schema import ResourceContentBlock  # noqa: F401,E402
-from acp.schema import TextResourceContents  # noqa: F401,E402
-from acp.schema import UnstructuredCommandInput  # noqa: F401,E402
-import base64  # noqa: F401,E402
-import json  # noqa: F401,E402
-from urllib.parse import unquote  # noqa: F401,E402
-from urllib.parse import urlparse  # noqa: F401,E402
-
-
-_PLUGIN_COMPAT_LAZY = {
-    'ACP_MAX_MODELS_PER_PROVIDER': ('acp_adapter.model_catalog', 'ACP_MAX_MODELS_PER_PROVIDER'),
-}
-
-
-def __getattr__(name):  # PEP 562 — lazy so no import cycles
-    target = _PLUGIN_COMPAT_LAZY.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-    from qubit_cli.plugin_compat import warn_once
-    warn_once(__name__, name, *target)
-    return getattr(importlib.import_module(target[0]), target[1])
-# ---- END PLUGIN-COMPAT ----

@@ -1,6 +1,6 @@
 """Strict gateway identity against a REAL process holding ``gateway.lock``.
 
-``qubit update`` on Windows maps live gateways to profiles through
+``hermes update`` on Windows maps live gateways to profiles through
 ``get_running_pid_identity_strict``. A live gateway whose ``gateway.pid`` was
 unlinked still holds its runtime lock, and the lock carries the same identity
 record, so the updater must identify it from the lock instead of aborting the
@@ -27,6 +27,7 @@ import psutil
 import pytest
 
 from gateway import status
+from tests.waiting import wait_until
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -77,7 +78,7 @@ def _spawn_lock_holder(
     bin_dir: Path, home: Path, *, as_gateway: bool,
 ) -> tuple[subprocess.Popen[str], psutil.Process]:
     bin_dir.mkdir(parents=True, exist_ok=True)
-    script = bin_dir / ("qubit" if as_gateway else "holder.py")
+    script = bin_dir / ("hermes" if as_gateway else "holder.py")
     script.write_text(_HOLDER.format(root=str(PROJECT_ROOT)), encoding="utf-8")
     argv = [sys.executable, str(script), *(["gateway", "run"] if as_gateway else [])]
     proc = subprocess.Popen(
@@ -96,6 +97,23 @@ def _make_home(root: Path) -> Path:
     home.mkdir()
     (home / "config.yaml").write_text("{}\n", encoding="utf-8")
     return home
+
+
+def _exited_pid() -> int:
+    """A PID whose process has already exited: a leftover PID file, not a rival gateway."""
+    child = subprocess.run([sys.executable, "-c", "import os; print(os.getpid())"],
+                           capture_output=True, text=True, timeout=60, check=False)
+    pid = int(child.stdout.strip())
+    wait_until(lambda: not psutil.pid_exists(pid), what=f"exited child {pid} to leave the process table")
+    return pid
+
+
+def _write_previous_gateway_pid_file(home: Path, pid: int) -> None:
+    """The PID file a replaced gateway left behind (#143331): its own PID and an earlier start."""
+    record = json.loads((home / "gateway.pid").read_text(encoding="utf-8-sig"))
+    record["pid"] = pid
+    record["start_time"] = max(1, int(record["start_time"]) - 500)
+    (home / "gateway.pid").write_text(json.dumps(record), encoding="utf-8")
 
 
 @pytest.fixture(scope="class")
@@ -125,7 +143,7 @@ def home(gateway_holder, monkeypatch):
 
 
 # The class-scoped holder spawns before the per-test live-system guard is armed; the mark
-# documents the `qubit gateway run` lookalike and covers it if the fixture is ever narrowed.
+# documents the `hermes gateway run` lookalike and covers it if the fixture is ever narrowed.
 @pytest.mark.spawns_gateway_lookalike
 class TestStrictIdentityWithLiveLock:
     def test_missing_pid_file_resolves_from_the_lock_record(self, home, gateway_holder):
@@ -155,6 +173,44 @@ class TestStrictIdentityWithLiveLock:
         (home / "gateway.pid").write_text(json.dumps(record), encoding="utf-8")
 
         with pytest.raises(RuntimeError, match="disagree"):
+            status.get_running_pid_identity_strict(home / "gateway.pid")
+
+    def test_stale_pid_file_beside_a_held_lock_resolves_from_the_lock_record(
+        self, home, gateway_holder,
+    ):
+        _write_previous_gateway_pid_file(home, _exited_pid())
+
+        identity = status.get_running_pid_identity_strict(home / "gateway.pid")
+
+        assert identity is not None
+        assert identity[0] == gateway_holder[1]
+
+    def test_updater_discovery_maps_the_profile_with_a_stale_pid_file(
+        self, home, gateway_holder, monkeypatch,
+    ):
+        from qubit_cli.gateway import find_profile_gateway_processes
+
+        monkeypatch.setattr("qubit_cli.profiles._get_default_qubit_home", lambda: home)
+        monkeypatch.setattr("qubit_cli.profiles._get_profiles_root", lambda: home / "no-profiles")
+        _write_previous_gateway_pid_file(home, _exited_pid())
+
+        procs = find_profile_gateway_processes(strict=True)
+
+        assert [(Path(p.path).resolve(), p.pid) for p in procs] == [(home.resolve(), gateway_holder[1])]
+
+    def test_previous_gateway_pid_recycled_by_a_live_process_resolves_from_the_lock(
+        self, home, gateway_holder,
+    ):
+        _write_previous_gateway_pid_file(home, os.getpid())
+
+        identity = status.get_running_pid_identity_strict(home / "gateway.pid")
+
+        assert identity is not None and identity[0] == gateway_holder[1]
+
+    def test_malformed_pid_file_beside_a_held_lock_still_aborts(self, home):
+        (home / "gateway.pid").write_text("not a record", encoding="utf-8")
+
+        with pytest.raises(RuntimeError, match="malformed"):
             status.get_running_pid_identity_strict(home / "gateway.pid")
 
     def test_garbled_lock_record_without_pid_file_still_aborts(self, home):

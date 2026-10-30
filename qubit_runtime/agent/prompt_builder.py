@@ -24,7 +24,7 @@ from agent.model_metadata import CHARS_PER_TOKEN
 from agent.runtime_cwd import resolve_agent_cwd
 from agent.skill_utils import (
     EXCLUDED_SKILL_DIRS, ORG_ACTIVE_MARKER, ORG_MIRROR_DIR_NAME, ORG_PROVENANCE_FILE, SKILL_SUPPORT_DIRS,
-    TIER_LOCAL, extract_skill_conditions, extract_skill_description, get_disabled_skill_names, get_skill_search_roots,
+    TIER_LOCAL, clip_skill_description, extract_skill_conditions, extract_skill_description, get_disabled_skill_names, get_skill_search_roots,
     iter_skill_index_files, parse_frontmatter, read_active_org_id, skill_matches_apps, skill_matches_environment,
     skill_matches_platform, skill_matches_platform_list,
 )
@@ -1371,7 +1371,7 @@ def _label_visible_entries(visible_entries: list[dict], skills_by_category: dict
 
 
 def _render_skills_index(
-    skills_by_category: dict[str, list[tuple[str, str]]], category_descriptions: dict[str, str],
+    skills_by_category: dict[str, list[tuple[str, str]]], category_descriptions: dict[str, str] | None,
     compact_categories: frozenset[str] | None, available_tools: set[str] | None, unloadable: list[str] = (),
 ) -> str:
     """Render the ## Skills block; "" when there is nothing to list. *unloadable* names (different skills
@@ -1398,13 +1398,15 @@ def _render_skills_index(
         if category in demoted:
             index_lines.append(f"  {category} [names only]: {', '.join(sorted({n for n, _ in entries}))}")
             continue
-        cat_desc = category_descriptions.get(category, "")
-        index_lines.append(f"  {category}: {cat_desc}" if cat_desc else f"  {category}:")
-        seen = set()
+        rows: dict[str, str] = {}
         for name, desc in sorted(entries, key=lambda x: x[0]):  # stable: first entry per name wins
-            if name not in seen:
-                seen.add(name)
-                index_lines.append(f"    - {name}: {desc}" if desc else f"    - {name}")
+            rows.setdefault(name, clip_skill_description(desc) if desc else desc)
+        # A one-skill category is a single top-level row: its header would only repeat what the row
+        # says (a skill at the top of the tree is its own category, so the name printed twice).
+        indent = "  " if len(rows) == 1 else "    "
+        if len(rows) > 1:
+            index_lines.append(f"  {category}:")
+        index_lines.extend(f"{indent}- {name}: {desc}" if desc else f"{indent}- {name}" for name, desc in rows.items())
     from agent.oneshot_footprint import ONESHOT_SKILLS_LOAD_GUIDANCE, is_single_query_session
     if is_single_query_session():
         return (
@@ -1424,16 +1426,9 @@ def _render_skills_index(
         "code review, planning, and testing — load them even for tasks you already know how to do, because "
         "the skill defines how it should be done here.\n"
         "If a skill has issues, fix it with skill_manage(action='patch').\n"
-        "After difficult/iterative tasks, offer to save as a skill. If a skill you loaded was missing steps, "
-        "had wrong commands, or needed pitfalls you discovered, update it before finishing.\n"
-        "\n"
-        "<available_skills>\n"
-        + "\n".join(index_lines) + "\n"
-        "</available_skills>\n\n"
-        "Only proceed without loading a skill if genuinely none are relevant to the task."
+        "\n<available_skills>\n" + "\n".join(index_lines) + "\n</available_skills>"
         + hidden_note
     )
-
 
 def _oneshot_prompt_variant() -> bool:
     from agent.oneshot_footprint import is_single_query_session
