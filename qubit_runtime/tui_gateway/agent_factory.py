@@ -448,6 +448,12 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
         return None
 
 
+def _onboarding_toolsets(enabled, db, session_id):
+    """The session-gated ``onboarding`` toolset folded into an active first-run chat's toolsets."""
+    from agent.onboarding_session import onboarding_toolsets
+    return onboarding_toolsets(enabled, db, session_id)
+
+
 def _load_disabled_toolsets() -> list[str] | None:
     """``agent.disabled_toolsets`` from config.yaml, or ``None``.
 
