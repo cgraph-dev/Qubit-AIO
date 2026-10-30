@@ -13,6 +13,11 @@ from qubit_state_common import _RESET_CHILD_SQL, _sql_json_extract
 # Same logger the code used before extraction (record parity).
 _log = logging.getLogger("qubit_cli.web_server")
 
+# One-shot schema-heal bookkeeping shared with the sidebar reader. The heal is attempted once
+# per store; these sets let a later poll distinguish "not healed yet" from "gave up".
+_session_db_heal_exhausted: set[str] = set()
+_session_db_heal_warned: set[str] = set()
+
 _DESCENDANTS_SQL = f"""
             WITH RECURSIVE descendants(id, parent_session_id, started_at) AS (
                 SELECT id, parent_session_id, started_at FROM sessions WHERE id = ?

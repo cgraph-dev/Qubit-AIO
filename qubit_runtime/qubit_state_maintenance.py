@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from qubit_state_common import (
     AUTO_VACUUM_MIN_FREELIST_RATIO, _id_chunks, _non_continuation_child_sql, _placeholders, _sql_session_last_active,
-    escape_like as _escape_like
+    escape_like as _escape_like, emit_session_deleted,
 )
 from qubit_startup_watchdog import report_startup_progress
 
@@ -25,7 +25,7 @@ def _like(value: str) -> str:
     return f"%{_escape_like(value.lower())}%"
 
 
-def _cwd_prefix_filter(value: str) -> Tuple[List[str], list]:
+def _cwd_prefix_filter(value: str) -> tuple[list[str], list]:
     from qubit_state_sessions import _cwd_prefix_clause
     clause, params = _cwd_prefix_clause(value)
     return [clause], list(params)
@@ -132,6 +132,9 @@ class SessionMaintenanceMixin:
                 self._delete_unreferenced_system_prompts(conn)
             return ids
         removed_ids = self._execute_write(_do) or []
+        emit_session_deleted(self, removed_ids, reason="ghost_prune", sessions_dir=sessions_dir)
+        from qubit_state_media import collect_retired_media
+        collect_retired_media(self)
         for sid in removed_ids if sessions_dir else ():
             self._remove_session_files(sessions_dir, sid)
         return len(removed_ids)
@@ -155,11 +158,11 @@ class SessionMaintenanceMixin:
         return False
 
     def sweep_orphaned_sessions(
-        self, *, max_idle_seconds: float, sources: Tuple[str, ...] = ("tui", "desktop", "subagent"),
-        exclude_ids: Tuple[str, ...] = (), exclude_pinned: bool = False,
+        self, *, max_idle_seconds: float, sources: tuple[str, ...] = ("tui", "desktop", "subagent"),
+        exclude_ids: tuple[str, ...] = (), exclude_pinned: bool = False,
         heartbeat_staleness_seconds: Optional[float] = None,
         heartbeat_ownership_grace_seconds: Optional[float] = None, respect_gateway_heartbeats: bool = True,
-    ) -> List[str]:
+    ) -> list[str]:
         """Close session rows orphaned by a dead gateway process (its in-process disconnect grace timer died
         with it, leaving ``ended_at IS NULL`` forever).  Rows of ``sources`` whose ``started_at`` AND
         canonical last activity are both older than ``max_idle_seconds`` get
@@ -190,7 +193,7 @@ class SessionMaintenanceMixin:
         cutoff = (now := time.time()) - max_idle_seconds
         pin_scope = f" AND {_not_pinned_sql('sessions')}" if exclude_pinned else ""
         orphan_predicate = f"started_at < ? AND {_sql_session_last_active('sessions')} < ?"
-        heartbeat_params: Tuple[float, ...] = ()
+        heartbeat_params: tuple[float, ...] = ()
         if respect_gateway_heartbeats:
             orphan_predicate += (" AND NOT EXISTS (SELECT 1 FROM gateway_heartbeats h WHERE"
                                  " h.last_heartbeat >= ? AND h.started_at <= sessions.started_at + ?)")
@@ -216,7 +219,7 @@ class SessionMaintenanceMixin:
     @staticmethod
     def _prune_filter_where(*, archived: Optional[bool] = None, include_pinned: bool = False,
                             lineage_tips_only: bool = False, include_open: bool = False,
-                            **filters) -> Tuple[str, list]:
+                            **filters) -> tuple[str, list]:
         """Shared WHERE clause for bulk prune/archive selection (alias ``s``): ``_PRUNE_FILTERS``
         AND together, only ended sessions are ever candidates, ``archived`` is tri-state
         (None = both), ``*_like`` are case-insensitive substrings, the rest exact.
@@ -246,7 +249,7 @@ class SessionMaintenanceMixin:
             clauses.append(_not_pinned_sql())
         return " AND ".join(clauses), params
 
-    def _prune_where(self, older_than_days, source, filters, *, whole_lineages: bool = False) -> Tuple[str, list]:
+    def _prune_where(self, older_than_days, source, filters, *, whole_lineages: bool = False) -> tuple[str, list]:
         """Translate the legacy age window into the shared activity filter, then build WHERE.
         ``whole_lineages`` (prune) keeps a compression ancestor while any continuation after it
         is unmatched."""
@@ -327,6 +330,37 @@ class SessionMaintenanceMixin:
             self._auto_archive_lineage(row[0])
         return len(rows)
 
+    def maybe_auto_archive(
+        self, idle_days: float = 3, min_interval_hours: int = 24, exclude_pinned: bool = True,
+    ) -> dict[str, Any]:
+        """Idempotent, non-destructive auto-archive of sessions idle for ``idle_days``; state_meta
+        ``last_auto_archive`` gates runs within ``min_interval_hours``. Never raises."""
+        result: dict[str, Any] = {"skipped": False, "archived": 0}
+        try:
+            now = time.time()
+            try:
+                last = float(self.get_meta("last_auto_archive") or 0.0)
+            except (TypeError, ValueError):
+                last = 0.0  # corrupt meta; treat as no prior run
+            if last and now - last < min_interval_hours * 3600:
+                result["skipped"] = True
+                return result
+            # Startup-watchdog lease: the archive sweep is I/O-bound (near-zero CPU),
+            # which the watchdog's CPU fallback misreads as a parked deadlock.
+            # No-op when the watchdog is not armed; never raises.
+            report_startup_progress(900.0, phase="state_db_auto_archive")
+            archived = result["archived"] = self.archive_stale_sessions(idle_days, exclude_pinned=exclude_pinned)
+            # Record even a zero-archive run so we don't re-sweep every call.
+            self.set_meta("last_auto_archive", str(now))
+            if archived > 0:
+                logger.info(
+                    "state.db auto-archive: archived %d session(s) idle >= %s days", archived, idle_days,
+                )
+        except Exception as exc:
+            logger.warning("state.db auto-archive failed: %s", exc)
+            result["error"] = str(exc)
+        return result
+
     def prune_sessions(self, older_than_days: Optional[float] = 90, source: str | None = None,
                        sessions_dir: Optional[Path] = None, exclude_active_write_guards: bool = False,
                        deleted_ids: Optional[list] = None, **filters) -> int:
@@ -365,6 +399,8 @@ class SessionMaintenanceMixin:
             self._delete_unreferenced_system_prompts(conn)
             return len(session_ids)
         count = self._execute_write(_do)
+        if count:
+            emit_session_deleted(self, removed_ids, reason="prune", sessions_dir=sessions_dir)
         from qubit_state_media import collect_retired_media
         collect_retired_media(self)
         for sid in removed_ids:
@@ -373,7 +409,7 @@ class SessionMaintenanceMixin:
             deleted_ids.extend(removed_ids)
         return count
 
-    def _page_pragmas(self, names: Tuple[str, ...], fail_msg: str) -> Optional[list]:
+    def _page_pragmas(self, names: tuple[str, ...], fail_msg: str) -> Optional[list]:
         """Integer PRAGMAs over the existing connection (never a byte probe); None + debug log on failure."""
         try:
             with self._read_ctx() as conn:
@@ -443,7 +479,7 @@ class SessionMaintenanceMixin:
         self, retention_days: int = 90, min_interval_hours: int = 24, vacuum: bool = True,
         sessions_dir: Optional[Path] = None, min_vacuum_interval_days: int = 30,
         min_vacuum_freelist_ratio: float = AUTO_VACUUM_MIN_FREELIST_RATIO,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Idempotent startup auto-maintenance (never raises): prune inactive sessions, reap stale open
         state-owned rows, optional VACUUM.  Runs at most once per ``min_interval_hours``; VACUUM has its own
         ``min_vacuum_interval_days`` throttle and also requires ``freelist_count / page_count`` >
@@ -463,7 +499,7 @@ class SessionMaintenanceMixin:
         Messaging and UI sources are never touched here. See #54189.
         """
         from qubit_state_repair import _release_auto_maintenance_lock, _try_acquire_auto_maintenance_lock
-        result: Dict[str, Any] = {"skipped": False, "pruned": 0, "closed": 0, "vacuumed": False}
+        result: dict[str, Any] = {"skipped": False, "pruned": 0, "closed": 0, "vacuumed": False}
         if retention_days is None or retention_days < 0:
             # A negative retention would build a future cutoff and match every ended
             # session; auto_prune=false is the disable switch, not a negative bound.
