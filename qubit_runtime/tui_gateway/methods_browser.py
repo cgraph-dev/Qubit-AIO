@@ -166,8 +166,6 @@ def _browser_disconnect(rid) -> dict:
         with contextlib.suppress(Exception):
             _reap_profile_browsers()
 
-    live = live_cdp_override()
-    operator_env = os.environ.get("BROWSER_CDP_URL", "")
     reap()
     set_live_cdp_override(None)
     reap()
