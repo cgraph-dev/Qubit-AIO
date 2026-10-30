@@ -396,7 +396,7 @@ def test_a_qubit_home_at_a_deleted_profile_is_refused_like_its_profile_flag(worl
     _use_home(world, gone)
     assert launcher.cmd_webapp(_args(**action)) == 1
     refused = capsys.readouterr()
-    assert "Error: Profile 'gone' does not exist. Create it with: hermes profile create gone" in refused.err
+    assert "Error: Profile 'gone' does not exist. Create it with: qubit profile create gone" in refused.err
     assert "Signed out" not in refused.out
     assert (world["calls"]["control"], world["calls"]["ensure"], world["calls"]["build"]) == ([], [], 0)
     assert (world["root"] / TOKEN_PATH).read_text().strip() == before
