@@ -28,7 +28,8 @@ def _read_dm_role_auth_guild() -> Optional[int]:
 # Discord interaction tokens expire at ~15 minutes, so 900s is the practical ceiling.
 _DISCORD_PROMPT_TIMEOUT_DEFAULT = 300
 _DISCORD_PROMPT_TIMEOUT_MIN = 30
-_DISCORD_PROMPT_TIMEOUT_MAX = 900
+from agent.deadline import MAX_SAFE_TIMEOUT_S
+_DISCORD_PROMPT_TIMEOUT_MAX = int(MAX_SAFE_TIMEOUT_S)
 
 
 def _read_discord_prompt_timeout() -> int:

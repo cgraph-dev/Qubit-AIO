@@ -8,6 +8,7 @@ fails, the hook answers with the lobby-recovery topic instead (#139136).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Awaitable, Callable, Optional
 
@@ -31,6 +32,8 @@ async def apply_root_dm_topic_transfer(adapter: Any, event: MessageEvent) -> Non
     source = getattr(event, "source", None)
     if transfer is None or source is None or getattr(source, "chat_type", None) != "dm":
         return
+    if str(getattr(source, "thread_id", None) or "").strip():
+        return  # already routed to a topic (a redispatch must not open another)
     if getattr(event, "allow_gateway_control", False):
         coerce_plaintext_gateway_command(event)  # "restart gateway" is a lobby command too (idempotent)
     if getattr(event, "internal", False) or event.get_command():
@@ -39,18 +42,28 @@ async def apply_root_dm_topic_transfer(adapter: Any, event: MessageEvent) -> Non
         return
     if adapter._is_sender_authorized(source.user_id, source.chat_type, source.chat_id) is False:
         return
-    try:
-        decided = await transfer(source)
-    except Exception:
-        logger.debug("telegram topic transfer hook failed", exc_info=True)
-        return
-    if not decided:
-        return
-    thread_id, created = decided
-    if not created:
-        event.source = replace_source(source, thread_id=str(thread_id))
-        return
-    # The root-DM message lives outside the new topic, so it cannot anchor the reply there: an empty
-    # override plus no source.message_id sends the first reply by message_thread_id alone.
-    event.source = replace_source(source, thread_id=str(thread_id), message_id=None)
-    event.reply_anchor_override = ""
+    # Serialize transfers per chat: a second root-DM chunk arriving while ``createForumTopic`` for
+    # the first is in flight must wait and get its own topic, never cancel the first flush or race
+    # it into a duplicate creation.
+    locks = getattr(adapter, "_topic_transfer_locks", None)
+    if locks is None:
+        locks = adapter._topic_transfer_locks = {}
+    lock = locks.setdefault(str(source.chat_id), asyncio.Lock())
+    async with lock:
+        if str(getattr(source, "thread_id", None) or "").strip():
+            return  # the chunk ahead of us in this chat already routed it
+        try:
+            decided = await transfer(source)
+        except Exception:
+            logger.debug("telegram topic transfer hook failed", exc_info=True)
+            return
+        if not decided:
+            return
+        thread_id, created = decided
+        if not created:
+            event.source = replace_source(source, thread_id=str(thread_id))
+            return
+        # The root-DM message lives outside the new topic, so it cannot anchor the reply there: an empty
+        # override plus no source.message_id sends the first reply by message_thread_id alone.
+        event.source = replace_source(source, thread_id=str(thread_id), message_id=None)
+        event.reply_anchor_override = ""

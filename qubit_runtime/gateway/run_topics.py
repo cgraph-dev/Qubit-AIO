@@ -182,6 +182,32 @@ class GatewayTopicThreadsMixin:
         """The key is on and ``source`` is a ``/topic``-mode root DM (reads state.db: call off-loop)."""
         return self._telegram_dm_topic_auto_transfer_configured(source) and self._is_telegram_topic_root_lobby(source)
 
+
+    async def _transfer_telegram_root_dm(self, source: SessionSource) -> Optional[tuple[str, bool]]:
+        """Adapter-ingress transfer hook for an opted-in root-DM message (#139136).
+
+        ``(thread_id, True)``: a fresh topic was created and the turn runs there. ``(thread_id, False)``:
+        creating it failed, so the message falls back to lobby recovery (the last bound topic).
+        ``None``: not applicable (key off, not a topic-mode root DM) or nothing to recover to.
+        """
+        if (not source.chat_id or not self._telegram_dm_topic_auto_transfer_configured(source)
+                or not await asyncio.to_thread(self._is_telegram_topic_root_lobby, source)):
+            return None
+        adapter = self._delivery_adapter_for(source)
+        create_topic = getattr(adapter, "_create_dm_topic", None) if adapter is not None else None
+        thread_id = None
+        if callable(create_topic):
+            try:
+                thread_id = await create_topic(int(source.chat_id), t("gateway.topic.default_title"))
+            except Exception:
+                logger.debug("Failed to auto-transfer Telegram root DM into a new topic", exc_info=True)
+        if thread_id:
+            logger.info("telegram topic auto-transfer: chat=%s user=%s root -> new topic %s",
+                        source.chat_id, source.user_id, thread_id)
+            return str(thread_id), True
+        recovered = await asyncio.to_thread(self._recover_telegram_lobby_thread_id, source)
+        return (recovered, False) if recovered else None
+
     def _recover_telegram_lobby_thread_id(self, source: SessionSource) -> Optional[str]:
         """Pin lobby-shaped topic-mode DM replies (missing ``message_thread_id`` or General) to the
         user's most-recent bound topic. Never rewrite a non-lobby, unbound thread id: a brand-new DM
