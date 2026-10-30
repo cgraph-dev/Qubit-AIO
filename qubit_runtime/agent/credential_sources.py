@@ -217,6 +217,22 @@ def _remove_codex_device_code(provider: str, removed) -> RemovalResult:
     return result
 
 
+def _remove_copilot_gh(provider: str, removed) -> RemovalResult:
+    """The same Copilot token is seeded as gh_cli AND env:<VAR> rows, so suppress
+    every variant or the duplicates resurrect the entry. gh CLI and shell state
+    are left untouched."""
+    from qubit_cli.auth import suppress_credential_source
+
+    suppress_credential_source(provider, "gh_cli")
+    for env_var in ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"):
+        suppress_credential_source(provider, f"env:{env_var}")
+    return RemovalResult(hints=[
+        "Suppressed all copilot token sources (gh_cli + env vars) — they will not be re-seeded.",
+        "Note: Your gh CLI / shell environment is unchanged.",
+        "Run `qubit auth add copilot` to re-enable if needed.",
+    ])
+
+
 def _suppress_only(*hints: str) -> Callable[..., RemovalResult]:
     """remove_fn for sources whose backing file/config belongs to another tool
     (Claude Code, Qwen CLI, config.yaml): never delete it, just suppress and
@@ -229,6 +245,12 @@ def _suppress_only(*hints: str) -> Callable[..., RemovalResult]:
 # ORDER MATTERS — ``find_removal_step`` returns the first match (after a provider profile's own
 # ``remove_credential_source`` claim, so a profile's ``env:*`` rows skip the generic .env removal).
 _REGISTRY: list[RemovalStep] = [
+    RemovalStep(
+        provider="copilot", source_id="gh_cli",
+        match_fn=lambda src: src == "gh_cli" or src.startswith("env:"),
+        remove_fn=_remove_copilot_gh,
+        description="gh auth token / COPILOT_GITHUB_TOKEN / GH_TOKEN",
+    ),
     RemovalStep(
         provider="*", source_id="env:",
         match_fn=lambda src: src.startswith("env:"),

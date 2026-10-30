@@ -16,8 +16,7 @@ import pytest
 
 from qubit_cli import anon_auth
 from qubit_cli.auth import _load_auth_store, resolve_provider
-from tests.qubit_cli.anon_portal import PORTAL, WELCOME, install_portal, make_jwt as _jwt  # noqa: F401
-from tests.qubit_cli.anon_portal import claimed_trial
+from tests.qubit_cli.anon_portal import PORTAL, WELCOME, claimed_trial, install_portal, make_jwt as _jwt, off_local_desktop
 
 
 @pytest.fixture
@@ -89,26 +88,17 @@ class TestIdentityLifecycle:
         with pytest.raises(anon_auth.AuthError):
             resolve_provider("auto")
 
-    def test_launch_gate_off_means_no_free_tier_at_all(self, portal, monkeypatch):
-        """Without ``HERMES_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
-        traffic, ``nous.guest``'s default is never consulted, and an identity already on disk is
-        not treated as enabled. The env var is the only lever; ``0``/``true``/anything but ``1`` is off."""
-        monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
-        for raw in ("", "0", "true", "yes", "new"):
-            monkeypatch.setenv(anon_auth.GUEST_ONBOARDING_ENV, raw)
-            assert anon_auth.guest_enabled() is False
-            assert anon_auth.ensure_portal_identity(explicit=True) is None
-        assert portal.calls == []
-        with pytest.raises(anon_auth.AuthError):
-            resolve_provider("auto")
-        monkeypatch.setenv(anon_auth.GUEST_ONBOARDING_ENV, "1")
-        assert anon_auth.guest_enabled() is True
+    def test_a_claimed_trial_carries_inference_on_every_surface(self, portal, monkeypatch):
+        claimed_trial(monkeypatch)
+        off_local_desktop(monkeypatch)     # a CLI shell beside the desktop
+        assert anon_auth.free_inference_active() is True
+        assert resolve_provider("auto") == "nous"
 
 
 class TestExplicitProvision:
-    """``ensure_portal_identity(explicit=True)`` is the one creator (the boot bootstrap and the desktop
-    retry call it). It mints once; every later caller adopts that identity through the shared store,
-    so two boots never create two identities. ``nous.guest: false`` still wins."""
+    """``ensure_portal_identity(explicit=True)`` is the creator under both the welcome-trial claim and
+    the connectors path. It mints once; every later caller adopts that identity through the shared
+    store, so two callers never create two identities. ``nous.guest: false`` still wins."""
 
     def test_provision_mints_once_then_everything_adopts(self, portal, monkeypatch, tmp_path):
         assert anon_auth.is_guest_state(claimed_trial(monkeypatch))
@@ -128,18 +118,29 @@ class TestExplicitProvision:
         assert adopted and adopted["anon_token"] == token
         assert portal.minted == 1
 
-    def test_retired_identity_is_replaced(self, portal, monkeypatch):
-        first = claimed_trial(monkeypatch)["anon_token"]
-        portal.dead_tokens.add(first)
-        from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-        assert resolve_nous_runtime_credentials(force_refresh=True)["api_key"]   # replaced, not refused
-        assert _load_auth_store()["providers"]["nous"]["anon_token"] != first
-        assert portal.minted == 2
-
     def test_guest_off_beats_an_explicit_provision(self, portal, monkeypatch):
         _write_config(monkeypatch, guest=False)
         assert anon_auth.ensure_portal_identity(explicit=True) is None
         assert portal.minted == 0
+
+    @pytest.mark.parametrize("raw, body", [
+        ("true", {"preview_full_connectors": True}),
+        ("1", {"preview_full_connectors": True}),
+        ("false", {"preview_full_connectors": False}),
+        ("0", {"preview_full_connectors": False}),
+        (None, {}),
+        ("yes", {}),
+    ])
+    def test_preview_full_connectors_rides_the_create_call(self, portal, monkeypatch, raw, body):
+        """The cohort reaches the account service on the one call that creates the account, as a
+        real boolean. "1" and "true" turn it on, "0" and "false" off; an unrecognised value leaves the
+        body empty (the service default)."""
+        if raw is None:
+            monkeypatch.delenv(anon_auth.PREVIEW_FULL_CONNECTORS_ENV, raising=False)
+        else:
+            monkeypatch.setenv(anon_auth.PREVIEW_FULL_CONNECTORS_ENV, raw)
+        anon_auth.ensure_portal_identity(explicit=True)
+        assert portal.create_requests == [body]
 
 
 class TestResolverIsUnchanged:
@@ -209,15 +210,16 @@ class TestTokenAcquisitionSeam:
         assert creds["base_url"].rstrip("/") == WELCOME
         assert "quarantine" not in json.dumps(_load_auth_store())
 
-    def test_dead_credential_is_replaced_by_a_fresh_identity(self, portal, monkeypatch):
+    def test_dead_credential_is_retired_and_never_replaced(self, portal, monkeypatch):
+        """The trial is claimed once per OS user: a guest NAS no longer knows is cleared and the
+        error surfaces; inference never mints a replacement."""
         first = claimed_trial(monkeypatch)
         portal.dead_tokens.add(first["anon_token"])
         from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-        creds = resolve_nous_runtime_credentials(force_refresh=True)
-        assert creds["api_key"]
-        state = _load_auth_store()["providers"]["nous"]
-        assert state["anon_token"] != first["anon_token"]
-        assert portal.minted == 2
+        with pytest.raises(anon_auth.AnonCredentialDead):
+            resolve_nous_runtime_credentials(force_refresh=True)
+        assert "nous" not in _load_auth_store().get("providers", {})
+        assert portal.minted == 1
 
     def test_tool_gateway_token_path_reexchanges(self, portal):
         anon_auth.ensure_portal_identity(explicit=True)
@@ -313,89 +315,6 @@ class TestRotationNeverRewritesTheConversationModel:
         assert ok is True and agent.model == anon_auth.GUEST_MODEL
 
 
-class TestIdentityOfRecordIsTheSharedStore:
-    def test_stale_profile_guest_adopts_a_newer_shared_account(self, portal, tmp_path):
-        anon_auth.ensure_portal_identity(explicit=True)
-        # A sibling profile signed in: the shared store now holds a real account.
-        from qubit_cli.auth_nous import _write_shared_nous_state
-        _write_shared_nous_state({"access_token": _jwt(client_id="qubit-cli", account_tier="free"),
-                                  "refresh_token": "rt-sibling", "expires_at": "2030-01-01T00:00:00+00:00",
-                                  "auth_method": "oauth_device_code"})
-        state = anon_auth.ensure_portal_identity(explicit=True)
-        assert not anon_auth.is_guest_state(state)
-        assert state["refresh_token"] == "rt-sibling"
-        assert _load_auth_store()["providers"]["nous"]["refresh_token"] == "rt-sibling"
-        assert _shared_store(tmp_path)["refresh_token"] == "rt-sibling", "the profile must never overwrite the shared account"
-
-    def test_mint_persists_before_any_exchange_and_first_use_exchanges_once(self, portal, monkeypatch):
-        first = claimed_trial(monkeypatch)
-        assert anon_auth.is_guest_state(first) and "access_token" not in first
-        assert [p for _, p in portal.calls] == ["/api/anonymous/create"], "mint alone; exchange is lazy"
-        from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-        creds = resolve_nous_runtime_credentials()
-        assert creds["api_key"]
-        assert portal.minted == 1, "a stored credential is exchanged, never re-minted"
-        assert [p for _, p in portal.calls].count("/api/anonymous/token") == 1
-
-    def test_clearing_a_dead_guest_leaves_a_sibling_identity_alone(self, portal, tmp_path):
-        anon_auth.ensure_portal_identity(explicit=True)
-        from qubit_cli.auth_nous import _write_shared_nous_state
-        _write_shared_nous_state({"access_token": _jwt(client_id="qubit-cli"), "refresh_token": "rt-sibling",
-                                  "expires_at": "2030-01-01T00:00:00+00:00", "auth_method": "oauth_device_code"})
-        anon_auth.clear_dead_guest("test")
-        assert "nous" not in _load_auth_store().get("providers", {})
-        assert _shared_store(tmp_path)["refresh_token"] == "rt-sibling"
-
-    def test_lock_order_is_profile_then_shared(self, portal, monkeypatch):
-        order = []
-        from qubit_cli import auth as auth_mod, auth_nous
-        real_profile, real_shared = auth_mod._auth_store_lock, auth_nous._nous_shared_store_lock
-        from contextlib import contextmanager
-
-        @contextmanager
-        def profile(*a, **k):
-            order.append("profile")
-            with real_profile(*a, **k):
-                yield
-
-        @contextmanager
-        def shared(*a, **k):
-            order.append("shared")
-            with real_shared(*a, **k):
-                yield
-        monkeypatch.setattr(auth_mod, "_auth_store_lock", profile)
-        monkeypatch.setattr(auth_nous, "_nous_shared_store_lock", shared)
-        anon_auth.ensure_portal_identity(explicit=True)
-        assert order[:2] == ["profile", "shared"]
-
-
-class TestConnectorTokenPath:
-    def test_opt_out_hides_the_free_tier_from_connectors_including_cached_tokens(self, portal, monkeypatch):
-        claimed_trial(monkeypatch)
-        from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-        resolve_nous_runtime_credentials()  # now a cached, valid JWT exists
-        from tools import managed_tool_gateway as mtg
-        assert mtg.read_nous_access_token()
-        _write_config(monkeypatch, guest=False)
-        assert mtg.peek_nous_access_token() is None
-        assert mtg.read_nous_access_token() is None
-
-    def test_connector_path_replaces_a_dead_credential_once(self, portal):
-        first = anon_auth.ensure_portal_identity(explicit=True)
-        from qubit_cli.auth import _auth_store_lock, _save_auth_store
-        with _auth_store_lock():
-            store = _load_auth_store()
-            store["providers"]["nous"]["expires_at"] = "2000-01-01T00:00:00+00:00"
-            store["providers"]["nous"]["access_token"] = _jwt(exp=1)
-            _save_auth_store(store)
-        portal.dead_tokens.add(first["anon_token"])
-        from tools import managed_tool_gateway as mtg
-        token = mtg.read_nous_access_token()
-        assert token and token != _jwt(exp=1)
-        assert _load_auth_store()["providers"]["nous"]["anon_token"] != first["anon_token"]
-        assert portal.minted == 2
-
-
 class TestBootstrapNeverCreates:
     """``free_tier_bootstrap.run_bootstrap`` only records who carries inference: it never mints.
     The welcome-trial claim and the connectors path are the creators; every other site is a read."""
@@ -447,3 +366,101 @@ class TestBootstrapNeverCreates:
         assert portal.calls == [], "no read path may reach the portal"
         with pytest.raises(ValueError):
             anon_auth.ensure_portal_identity(explicit=False)
+
+class TestIdentityOfRecordIsTheSharedStore:
+    def test_stale_profile_guest_adopts_a_newer_shared_account(self, portal, tmp_path):
+        anon_auth.ensure_portal_identity(explicit=True)
+        # A sibling profile signed in: the shared store now holds a real account.
+        from qubit_cli.auth_nous import _write_shared_nous_state
+        _write_shared_nous_state({"access_token": _jwt(client_id="qubit-cli", account_tier="free"),
+                                  "refresh_token": "rt-sibling", "expires_at": "2030-01-01T00:00:00+00:00",
+                                  "auth_method": "oauth_device_code"}, renewal=False)
+        state = anon_auth.ensure_portal_identity(explicit=True)
+        assert not anon_auth.is_guest_state(state)
+        assert state["refresh_token"] == "rt-sibling"
+        assert _load_auth_store()["providers"]["nous"]["refresh_token"] == "rt-sibling"
+        assert _shared_store(tmp_path)["refresh_token"] == "rt-sibling", "the profile must never overwrite the shared account"
+
+    def test_mint_persists_before_any_exchange_and_first_use_exchanges_once(self, portal, monkeypatch):
+        first = claimed_trial(monkeypatch)
+        assert anon_auth.is_guest_state(first) and "access_token" not in first
+        assert [p for _, p in portal.calls] == ["/api/anonymous/create"], "mint alone; exchange is lazy"
+        from qubit_cli.auth_nous import resolve_nous_runtime_credentials
+        creds = resolve_nous_runtime_credentials()
+        assert creds["api_key"]
+        assert portal.minted == 1, "a stored credential is exchanged, never re-minted"
+        assert [p for _, p in portal.calls].count("/api/anonymous/token") == 1
+
+    def test_clearing_a_dead_guest_leaves_a_sibling_identity_alone(self, portal, tmp_path):
+        anon_auth.ensure_portal_identity(explicit=True)
+        from qubit_cli.auth_nous import _write_shared_nous_state
+        _write_shared_nous_state({"access_token": _jwt(client_id="qubit-cli"), "refresh_token": "rt-sibling",
+                                  "expires_at": "2030-01-01T00:00:00+00:00", "auth_method": "oauth_device_code"},
+                                 renewal=False)
+        anon_auth.clear_dead_guest("test")
+        assert "nous" not in _load_auth_store().get("providers", {})
+        assert _shared_store(tmp_path)["refresh_token"] == "rt-sibling"
+
+    def test_lock_order_is_profile_then_shared(self, portal, monkeypatch):
+        order = []
+        from qubit_cli import auth as auth_mod, auth_nous
+        real_profile, real_shared = auth_mod._auth_store_lock, auth_nous._nous_shared_store_lock
+        from contextlib import contextmanager
+
+        @contextmanager
+        def profile(*a, **k):
+            order.append("profile")
+            with real_profile(*a, **k):
+                yield
+
+        @contextmanager
+        def shared(*a, **k):
+            order.append("shared")
+            with real_shared(*a, **k):
+                yield
+        monkeypatch.setattr(auth_mod, "_auth_store_lock", profile)
+        monkeypatch.setattr(auth_nous, "_nous_shared_store_lock", shared)
+        anon_auth.ensure_portal_identity(explicit=True)
+        assert order[:2] == ["profile", "shared"]
+
+
+class TestConnectorTokenPath:
+    def test_opt_out_hides_the_free_tier_from_connectors_including_cached_tokens(self, portal, monkeypatch):
+        anon_auth.ensure_portal_identity(explicit=True)
+        from tools import managed_tool_gateway as mtg
+        assert mtg.read_nous_access_token()  # now a cached, valid JWT exists
+        _write_config(monkeypatch, guest=False)
+        assert mtg.peek_nous_access_token() is None
+        assert mtg.read_nous_access_token() is None
+
+    def test_connector_path_replaces_a_dead_credential_once(self, portal):
+        first = anon_auth.ensure_portal_identity(explicit=True)
+        from qubit_cli.auth import _auth_store_lock, _save_auth_store
+        with _auth_store_lock():
+            store = _load_auth_store()
+            store["providers"]["nous"]["expires_at"] = "2000-01-01T00:00:00+00:00"
+            store["providers"]["nous"]["access_token"] = _jwt(exp=1)
+            _save_auth_store(store)
+        portal.dead_tokens.add(first["anon_token"])
+        from tools import managed_tool_gateway as mtg
+        token = mtg.read_nous_access_token()
+        assert token and token != _jwt(exp=1)
+        assert _load_auth_store()["providers"]["nous"]["anon_token"] != first["anon_token"]
+        assert portal.minted == 2
+
+
+class TestLaunchGate:
+    def test_launch_gate_off_means_no_free_tier_at_all(self, portal, monkeypatch):
+        """Without ``HERMES_GUEST_ONBOARDING=1`` the free tier does not exist: no mint, no portal
+        traffic, ``nous.guest``'s default is never consulted, and an identity already on disk is
+        not treated as enabled. The env var is the only lever; ``0``/``true``/anything but ``1`` is off."""
+        monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
+        for raw in ("", "0", "true", "yes", "new"):
+            monkeypatch.setenv(anon_auth.GUEST_ONBOARDING_ENV, raw)
+            assert anon_auth.guest_enabled() is False
+            assert anon_auth.ensure_portal_identity(explicit=True) is None
+        assert portal.calls == []
+        with pytest.raises(anon_auth.AuthError):
+            resolve_provider("auto")
+        monkeypatch.setenv(anon_auth.GUEST_ONBOARDING_ENV, "1")
+        assert anon_auth.guest_enabled() is True

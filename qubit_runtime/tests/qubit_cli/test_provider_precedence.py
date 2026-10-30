@@ -25,12 +25,12 @@ def _config(monkeypatch, model_cfg):
 
 def _no_aws(monkeypatch):
     # Neutralize any ambient AWS creds so Bedrock auto-detect can't interfere.
-    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
+    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
 
 
 def _clear_provider_env(monkeypatch):
     for var in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "GLM_API_KEY", "ZAI_API_KEY",
-                "KIMI_API_KEY", "MINIMAX_API_KEY", "QUBIT_INFERENCE_PROVIDER"):
+                "KIMI_API_KEY", "MINIMAX_API_KEY", "HERMES_INFERENCE_PROVIDER"):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -81,9 +81,25 @@ class TestProviderPrecedence:
         assert resolve_provider("auto") == "openrouter"
 
 
-def _logged_out(monkeypatch):
-    monkeypatch.setattr("qubit_cli.auth._load_auth_store", lambda: {})
-    monkeypatch.setattr("qubit_cli.auth.get_auth_status", lambda p: {"logged_in": False})
+@pytest.fixture
+def portal(monkeypatch, tmp_path):
+    from tests.qubit_cli.anon_portal import install_portal
+    return install_portal(monkeypatch, tmp_path)
+
+
+def _never_mint(monkeypatch):
+    """The resolver is a READ: any call into the creator from inside it is a bug."""
+    monkeypatch.setattr("qubit_cli.anon_auth.ensure_portal_identity",
+                        lambda **kw: (_ for _ in ()).throw(AssertionError("resolve_provider must not mint")))
+
+
+def _claimed_trial_with_aws(monkeypatch):
+    """A claimed welcome trial on the desktop's local backend, then a leftover ~/.aws profile."""
+    from tests.qubit_cli.anon_portal import claimed_trial
+    _clear_provider_env(monkeypatch)
+    claimed_trial(monkeypatch)
+    _never_mint(monkeypatch)
+    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: True)
 
 
 class TestFreeTierBeatsImplicitHostCredentials:
@@ -110,14 +126,11 @@ class TestFreeTierBeatsImplicitHostCredentials:
             _config(monkeypatch, {"provider": config_provider, "default": "some-model"})
         assert resolve_provider("auto") == expected
 
-    def test_on_the_cli_surface_a_claimed_guest_never_resolves_to_nous(self, portal, monkeypatch):
+    def test_on_the_cli_surface_a_claimed_guest_still_beats_host_credentials(self, portal, monkeypatch):
+        from tests.qubit_cli.anon_portal import off_local_desktop
         _claimed_trial_with_aws(monkeypatch)
-        monkeypatch.delenv("HERMES_DESKTOP", raising=False)
-        monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
-        assert resolve_provider("auto") == "bedrock"
-        monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: False)
-        with pytest.raises(AuthError):
-            resolve_provider("auto")
+        off_local_desktop(monkeypatch)
+        assert resolve_provider("auto") == "nous"
 
     def test_skip_free_tier_answers_what_else_would_carry_inference(self, portal, monkeypatch):
         """With the free tier hidden, a claimed trial is not an answer and the ladder falls through
@@ -127,26 +140,3 @@ class TestFreeTierBeatsImplicitHostCredentials:
         assert resolve_provider("auto") == "nous"
         with pytest.raises(AuthError):
             resolve_provider("auto", skip_free_tier=True)
-
-
-@pytest.fixture
-def portal(monkeypatch, tmp_path):
-    from tests.qubit_cli.anon_portal import install_portal
-    return install_portal(monkeypatch, tmp_path)
-
-
-# --- ported from upstream pin (wave 25 short-port) ---
-def _claimed_trial_with_aws(monkeypatch):
-    """A claimed welcome trial on the desktop's local backend, then a leftover ~/.aws profile."""
-    from tests.qubit_cli.anon_portal import claimed_trial
-    _clear_provider_env(monkeypatch)
-    claimed_trial(monkeypatch)
-    _never_mint(monkeypatch)
-    monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda *_a, **_kw: True)
-
-
-def _never_mint(monkeypatch):
-    """The resolver is a READ: any call into the creator from inside it is a bug."""
-    monkeypatch.setattr("qubit_cli.anon_auth.ensure_portal_identity",
-                        lambda **kw: (_ for _ in ()).throw(AssertionError("resolve_provider must not mint")))
-

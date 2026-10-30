@@ -83,7 +83,7 @@ def _config_decided(key: str, current: Any) -> bool:
 _BACKEND_REASONS = {
     "browser-use": "browser_exec (Browser Use mode) is the only browser now",
     "agent-browser": "agent-browser left Hermes; browser_exec is the browser now",
-    "camofox": "Camofox is now the camofox plugin (`hermes plugins install camofox`)",
+    "camofox": "Camofox is now the camofox plugin (`qubit plugins install camofox`)",
     "local": "browser_exec launches Hermes's packaged Chromium itself (browser.cloud_provider: local)",
     **dict.fromkeys(("browserbase", "firecrawl", "nous"),
                     "a cloud browser is chosen with browser.cloud_provider (`hermes tools` → Browser Automation)"),

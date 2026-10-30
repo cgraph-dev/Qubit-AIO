@@ -46,7 +46,7 @@ class TestNasRefusalCodes:
         nas.create_response = httpx.Response(404, json={"error": "not_found"})
         err = _mint_error(nas)
         assert err.code == anon_auth.ANON_GATE_CLOSED and err.retryable is False
-        assert "Qubit account" in str(err) and "free" in str(err)
+        assert "Nous account" in str(err) and "free" in str(err)
         # Terminal: no later attempt this process, whatever the clock says.
         assert anon_auth.ensure_portal_identity(explicit=True) is None
         assert nas.creates() == 1
@@ -231,7 +231,7 @@ class TestSignInFailures:
         (anon_auth.ANON_RATE_LIMITED, 45, True, "busy"),
         (anon_auth.ANON_GATE_PAUSED, 0, True, "busy"),
         (anon_auth.ANON_UNREACHABLE, 0, True, "internet connection"),
-        (anon_auth.ANON_GATE_CLOSED, 0, False, "Qubit account"),
+        (anon_auth.ANON_GATE_CLOSED, 0, False, "Nous account"),
         (anon_auth.ANON_POW_REQUIRED, 0, False, "proof of work"),
     ])
     def test_a_service_verdict_keeps_its_code_wait_and_copy(self, code, retry_after, retryable, needle):

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-10-23T22:39:36Z",
+  "updated_at": "2026-10-30T05:50:57Z",
   "metadata": {
     "source": "qubit repo",
     "docs": "https://qubit.nousresearch.com/docs/reference/model-catalog"
@@ -49,6 +49,10 @@
           "description": ""
         },
         {
+          "id": "anthropic/claude-haiku-5.5",
+          "description": ""
+        },
+        {
           "id": "anthropic/claude-haiku-4.5",
           "description": ""
         },
@@ -82,6 +86,10 @@
         },
         {
           "id": "openai/gpt-6.1-sol-pro",
+          "description": ""
+        },
+        {
+          "id": "openai/gpt-6.1-terra",
           "description": ""
         },
         {
@@ -170,7 +178,8 @@
         },
         {
           "id": "z-ai/glm-5.3",
-          "description": ""
+          "description": "default",
+          "default": true
         },
         {
           "id": "z-ai/glm-5.3-flash",
@@ -182,8 +191,7 @@
         },
         {
           "id": "z-ai/glm-5.2",
-          "description": "default",
-          "default": true
+          "description": ""
         },
         {
           "id": "xiaomi/mimo-v2.6-pro",
@@ -323,6 +331,9 @@
           "id": "anthropic/claude-sonnet-5"
         },
         {
+          "id": "anthropic/claude-haiku-5.5"
+        },
+        {
           "id": "anthropic/claude-haiku-4.5"
         },
         {
@@ -348,6 +359,9 @@
         },
         {
           "id": "openai/gpt-6.1-sol-pro"
+        },
+        {
+          "id": "openai/gpt-6.1-terra"
         },
         {
           "id": "openai/gpt-6-sol"
@@ -413,7 +427,8 @@
           "id": "minimax/minimax-m3"
         },
         {
-          "id": "z-ai/glm-5.3"
+          "id": "z-ai/glm-5.3",
+          "default": true
         },
         {
           "id": "z-ai/glm-5.3-flash"
@@ -422,8 +437,7 @@
           "id": "z-ai/glm-5.3-flashx"
         },
         {
-          "id": "z-ai/glm-5.2",
-          "default": true
+          "id": "z-ai/glm-5.2"
         },
         {
           "id": "xiaomi/mimo-v2.6-pro"

@@ -131,12 +131,12 @@ def persist_personality(value: Any) -> bool:
     name = normalize_personality_name(value)
     try:
         from qubit_constants import get_qubit_home
-        from utils import atomic_roundtrip_yaml_update
+        from qubit_cli.config_backend import write_config_key
 
         config_path = get_qubit_home() / "config.yaml"
         from qubit_constants import mkdir_under_qubit_home
         mkdir_under_qubit_home(config_path.parent)
-        atomic_roundtrip_yaml_update(config_path, "display.personality", name)
+        write_config_key(config_path, "display.personality", name)
         try:
             os.chmod(config_path, 0o600)
         except (OSError, NotImplementedError):

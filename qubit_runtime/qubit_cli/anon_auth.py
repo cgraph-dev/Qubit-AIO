@@ -114,12 +114,12 @@ ANON_UNREACHABLE_CODES = frozenset({ANON_UNREACHABLE, ANON_SERVER_ERROR})
 # what is unavailable is using Qubit without signing in, and signing in is free.
 _SIGNIN_IS_FREE = "Signing in is free."
 ANON_FAILURE_COPY = {
-    ANON_GATE_CLOSED: f"This version can't be used without a Qubit account. {_SIGNIN_IS_FREE}",
+    ANON_GATE_CLOSED: f"This version can't be used without a Nous account. {_SIGNIN_IS_FREE}",
     ANON_GATE_PAUSED: f"Using Qubit without signing in is paused for a moment. {_SIGNIN_IS_FREE}",
     ANON_RATE_LIMITED: "Lots of people are getting started right now. Try again in {wait}. "
                        "Signing in is free and skips the wait.",
-    ANON_POW_REQUIRED: "The Qubit server asked for a proof of work, but that isn't implemented in your "
-                       "Agent yet. Sign in with a Qubit account to continue.",
+    ANON_POW_REQUIRED: "The Nous server asked for a proof of work, but that isn't implemented in your "
+                       "Agent yet. Sign in with a Nous account to continue.",
     # ``ANON_CHALLENGE_REQUIRED`` / ``ANON_SIGNIN_REQUIRED`` copy is upstream's verbatim: it names no
     # product (no guest / anonymous / credential), so the hermes->qubit rebrand does not touch it.
     ANON_CHALLENGE_REQUIRED: "Finish the quick check in your browser, then try again.",
@@ -263,11 +263,11 @@ def _on_local_desktop_backend_uncapped() -> bool:
 
 
 def free_inference_active(state: Any = None) -> bool:
-    """The welcome trial carries inference here: a guest that claimed it (or was grandfathered),
-    guests still allowed, and this is the desktop's local backend. *state* defaults to the profile's."""
+    """The welcome trial carries inference: a guest that claimed it and guests
+    still allowed. Only the claim is the local Desktop's (``welcome_trial``); once claimed, every
+    surface of the install runs on it. *state* defaults to the profile's."""
     state = current_nous_state() if state is None else state
-    return (is_guest_state(state) and state.get(WELCOME_CLAIM_FLAG) is True and guest_allowed()
-            and on_local_desktop_backend())
+    return is_guest_state(state) and state.get(WELCOME_CLAIM_FLAG) is True and guest_allowed()
 
 
 def trial_model() -> str:
@@ -394,9 +394,9 @@ def _raise_for_anon_status(
 
 def mint_request_body() -> Dict[str, Any]:
     """The ``/api/anonymous/create`` body: ``{"preview_full_connectors": bool}`` when the env var is
-    exactly ``true`` / ``false``, else ``{}``."""
+    ``1`` / ``true`` or ``0`` / ``false``, else ``{}``."""
     raw = (os.environ.get(PREVIEW_FULL_CONNECTORS_ENV) or "").strip()
-    return {"preview_full_connectors": raw == "true"} if raw in ("true", "false") else {}
+    return {"preview_full_connectors": raw in ("1", "true")} if raw in ("1", "true", "0", "false") else {}
 
 
 def mint_guest(client: httpx.Client, portal_base_url: str) -> Dict[str, Any]:
@@ -548,7 +548,7 @@ def _mint_locked(client: httpx.Client, portal: str, auth_store: Dict[str, Any], 
     }
     _store_provider_state(auth_store, "nous", state, set_active=False)
     _save_auth_store(auth_store)
-    _write_shared_nous_state(state)
+    _write_shared_nous_state(state, renewal=False)
     logger.info("Qubit free tier ready (identity minted)")
     return state
 
@@ -680,7 +680,7 @@ def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
                 return state
             if profile_state:
                 if not shared:
-                    _write_shared_nous_state(profile_state)
+                    _write_shared_nous_state(profile_state, renewal=False)
                 return profile_state
             # A caller queued on these locks behind a mint that just failed waits out its cooldown.
             failure = _mint_failure_for_profile()
@@ -1048,7 +1048,7 @@ def stamp_legacy_guest_claim() -> Optional[dict[str, Any]]:
             return None
         state = {**state, WELCOME_CLAIM_FLAG: True}
         _save_guest_state(auth_store, state, source_path)
-        _write_shared_nous_state(state)
+        _write_shared_nous_state(state, renewal=False)
     return state
 
 

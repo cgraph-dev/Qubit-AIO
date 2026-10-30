@@ -46,7 +46,12 @@ from qubit_constants import (  # noqa: F401
     apply_secure_dir_policy, get_managed_system)
 # Re-export from qubit_constants — canonical definition lives there.
 from qubit_constants import get_qubit_home, get_process_qubit_home  # noqa: F401
-from utils import atomic_replace, fast_safe_load, file_signature, mkstemp_beside
+from utils import atomic_replace, fast_safe_load, file_cache_version, file_signature, mkstemp_beside
+from qubit_cli.config_backend import (  # noqa: E402,F401
+    ConfigWriteError, config_cache_version, config_destination, config_exists, config_version,
+    get_config_backend, probe_config_readable, read_config_doc, supports_file_tooling,
+    write_config_document,
+)
 from qubit_cli.config_read_errors import (
     _CONFIG_PARSE_FAILURES, _FIX_PERMS, _FIX_YAML, FailedConfigRead, _backups_dir_display,
     _refuse_failed_read, _refuse_overwrite, _warn_config_parse_failure, _yaml_error_details,
@@ -1329,8 +1334,9 @@ def migrate_config(interactive: bool = True, quiet: bool = False) -> Dict[str, A
     """Migrate config to latest version, prompting for new required fields."""
     results = {"env_added": [], "config_added": [], "warnings": []}
 
-    # Validate config.yaml before any migration side effect: sanitize_env_file() rewrites .env,
-    # which must not happen when the migration will be refused for malformed YAML.
+    from qubit_cli.config_version_stamp import stamp_missing_config
+    stamp_missing_config()  # a missing config.yaml reads as current below: stamp its legacy browser settings
+    # Validate before any side effect: sanitize_env_file() rewrites .env, never for refused (malformed) YAML.
     stamp, latest_ver = read_config_version_stamp(raise_on_parse_error=True)
     current_ver = 0 if stamp is None else stamp
 
@@ -1991,7 +1997,7 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
     # every cached read for the duration). A lost race just falls through to the locked re-check.
     try:
         config_path = get_config_path()
-        cache_key = file_signature(config_path.stat())
+        cache_key = config_cache_version(config_path)
         hit = _raw_config_cache_hit(str(config_path), cache_key)
         if hit is not None:
             return copy.deepcopy(hit) if want_deepcopy else hit
@@ -2001,7 +2007,7 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
     with _CONFIG_LOCK:
         config_path = get_config_path()
         try:
-            cache_key = file_signature(config_path.stat())
+            cache_key = config_cache_version(config_path)
         except FileNotFoundError:
             return {}
         except OSError as e:
@@ -2013,8 +2019,7 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
             return copy.deepcopy(hit) if want_deepcopy else hit
 
         try:
-            with open(config_path, encoding="utf-8-sig") as f:
-                data = fast_safe_load(f) or {}
+            data = read_config_doc(config_path) or {}
         except Exception as e:
             _warn_config_parse_failure(config_path, e)
             return FailedConfigRead(error=e)
@@ -2048,8 +2053,7 @@ def read_user_config_raw(config_path: Optional[Path] = None) -> Dict[str, Any]:
     if config_path is None:
         config_path = get_config_path()
     try:
-        with open(config_path, encoding="utf-8-sig") as f:
-            data = fast_safe_load(f) or {}
+        data = read_config_doc(config_path) or {}
     except FileNotFoundError:
         return {}
     return data if isinstance(data, dict) else {}
@@ -2075,15 +2079,14 @@ def require_readable_config_before_write(config_path: Optional[Path] = None) -> 
             return copy.deepcopy(snapshot)
         config_path = get_config_path()
     try:
-        config_path.stat()
+        config_version(config_path)
     except FileNotFoundError:
         return {}
     except OSError as exc:
         raise _refuse_overwrite(config_path, "cannot be accessed", exc, _FIX_PERMS) from exc
 
     try:
-        with open(config_path, encoding="utf-8-sig") as f:
-            loaded = fast_safe_load(f)
+        loaded = read_config_doc(config_path)
     except OSError as exc:
         raise _refuse_overwrite(config_path, "cannot be read", exc, _FIX_PERMS) from exc
     except Exception as exc:
@@ -2131,11 +2134,12 @@ def _write_config_state(
     extra_content_on_create: Optional[str] = None,
 ) -> None:
     """Shared comment-preserving config writer; omission policy is selected by the public wrapper."""
-    from utils import atomic_roundtrip_yaml_save
-
     _refuse_failed_read(config_path, data)
     if not allow_omissions:
-        existing = require_readable_config_before_write(config_path)
+        # A guard read, not the caller's read: *data* came from the caller's own earlier read, so a
+        # Remote Config save must still be diffed against THAT read, not a poll that landed since.
+        from qubit_cli.config_backend import keeping_read_base
+        existing = keeping_read_base(lambda: require_readable_config_before_write(config_path))
         omitted = _omitted_config_paths(existing, data)
         if omitted:
             shown = ", ".join(omitted[:12])
@@ -2149,7 +2153,7 @@ def _write_config_state(
                 "Pass the complete current config, or use atomic_config_replace() only when "
                 "deletion by omission is deliberate.",
             ) from exc
-    atomic_roundtrip_yaml_save(config_path, data, extra_content_on_create=extra_content_on_create)
+    write_config_document(config_path, data, extra_content_on_create=extra_content_on_create)
 
 
 def atomic_config_write(
@@ -2311,19 +2315,17 @@ def _load_config_cache_sig(config_path: Path) -> Tuple[Optional[Tuple[int, int, 
     The managed config file's signature is folded in ((0, 0, 0, 0) = none) so editing it invalidates
     the merged result. ``cache_sig`` is None only when neither file exists (nothing to cache on)."""
     try:
-        st = config_path.stat()
-        user_sig: Optional[Tuple[int, int, int, int]] = file_signature(st)
+        user_sig: Optional[Tuple[Any, ...]] = config_cache_version(config_path)
     except FileNotFoundError:
         user_sig = None
     managed_dir = managed_scope.get_managed_dir()
     try:
-        mst = (managed_dir / "config.yaml").stat() if managed_dir else None
-        managed_sig = file_signature(mst) if mst else (0, 0, 0, 0)
+        managed_sig = file_cache_version(managed_dir / "config.yaml") if managed_dir else (0, 0, 0, 0, "")
     except OSError:
-        managed_sig = (0, 0, 0, 0)
-    if user_sig is None and managed_sig == (0, 0, 0, 0):
+        managed_sig = (0, 0, 0, 0, "")
+    if user_sig is None and managed_sig == (0, 0, 0, 0, ""):
         return None, None
-    return user_sig, (*(user_sig or (0, 0, 0, 0)), *managed_sig)
+    return user_sig, (*(user_sig or (0, 0, 0, 0, "")), *managed_sig)
 
 
 def _last_known_good_fallback(config_path: Path, path_key: str, cache_sig, exc: Exception) -> Optional[Dict[str, Any]]:
@@ -2392,19 +2394,21 @@ def _load_config_cache_hit(path_key: str, cache_sig: Any) -> Optional[Dict[str, 
     pin unexpanded literals (e.g. auxiliary.<task>.api_key) for the process lifetime (#58514).
     Shared by the lock-free fast path and the locked re-check of ``_load_config_impl``."""
     cached = _LOAD_CONFIG_CACHE.get(path_key)
-    if cached is None or cache_sig is None or cached[:8] != cache_sig:
+    if cached is None or cache_sig is None:
         return None
-    hit = cached[8]
+    n = len(cache_sig)  # the backend's version tuple + the managed file's signature
+    if cached[:n] != cache_sig:
+        return None
+    hit = cached[n]
     if isinstance(hit, FailedConfigRead) and isinstance(hit.read_error, OSError):
         # A read error (EMFILE/EIO/sharing violation) can clear without touching the file's
         # signature: serve the fallback only while the file still cannot be read.
         try:
-            with open(path_key, "rb") as f:
-                f.read()
-            return None
+            probe_config_readable(path_key)
         except OSError:
             return hit
-    env_snapshot = cached[9] if len(cached) > 9 else {}
+        return None
+    env_snapshot = cached[n + 1] if len(cached) > n + 1 else {}
     if all(_env_ref_lookup(k) == v for k, v in env_snapshot.items()):
         return hit
     return None
@@ -2447,8 +2451,7 @@ def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
 
         if user_sig is not None:
             try:
-                with open(config_path, encoding="utf-8-sig") as f:
-                    user_config = fast_safe_load(f) or {}
+                user_config = read_config_doc(config_path) or {}
                 _CONFIG_PARSE_FAILURES.pop(path_key, None)  # the file reads now (a transient error left the record)
 
                 if "max_turns" in user_config:
@@ -2592,7 +2595,8 @@ def save_config(
         # fail-closed read is the single authority here: ``read_raw_config()`` is cached and
         # swallows transient stat/open errors into ``{}``, and a ``{}`` at this point makes the
         # strip pass drop every user section whose value matches a default (#113301).
-        _raw_for_paths = require_readable_config_before_write(config_path)
+        from qubit_cli.config_backend import keeping_read_base
+        _raw_for_paths = keeping_read_base(lambda: require_readable_config_before_write(config_path))
         from qubit_cli.config_worker_save import rebase_for_save  # frozen-worker writes + merge_existing
         config = rebase_for_save(config, _raw_for_paths, merge_existing, replace_keys)
 
@@ -2608,6 +2612,8 @@ def save_config(
             effective_preserve_keys = _explicit_config_paths(_raw_for_paths) | set(preserve_keys or ())
             normalized = _strip_default_values(normalized, DEFAULT_CONFIG, preserve_keys=effective_preserve_keys)
 
+        from qubit_cli.config_version_stamp import note_first_stamp
+        note_first_stamp(config_path.parent, _raw_for_paths, normalized)
         atomic_config_replace(config_path, normalized, extra_content_on_create=_commented_sections_for_save(normalized))
         _secure_file(config_path)
         _RAW_CONFIG_CACHE.pop(str(config_path), None)
@@ -3295,6 +3301,11 @@ def edit_config():
     if is_managed():
         managed_error("edit configuration")
         return
+    if not supports_file_tooling():
+        # Exits 1 (unlike the managed refusal above, which every managed_error caller shares):
+        # a script must not read this refusal as a successful edit.
+        _exit_invalid("`qubit config edit` opens the local config file, and this config backend has none. "
+                      "Use `qubit config set <key> <value>` instead.")
     config_path = get_config_path()
     if not config_path.exists():
         seed_config_file(config_path)
@@ -3312,7 +3323,7 @@ def edit_config():
         return
 
     print(f"Opening {config_path} in {editor}...")
-    subprocess.run([editor, str(config_path)])
+    subprocess.run([editor, str(config_path)], check=False)
 
 
 def _default_value_for_key(dotted_key: str):
@@ -3369,8 +3380,8 @@ def _suggest_closest_key(key: str, candidates: set[str], cutoff: float = 0.6) ->
     return next(iter(difflib.get_close_matches(key, sorted(candidates), n=1, cutoff=cutoff)), None)
 
 
-def _validate_config_key(key: str) -> tuple[bool, Optional[str]]:
-    """Validate a dotted config-key path against the known schema -> ``(is_known, suggestion)``.
+def _validate_schema_key(key: str) -> tuple[bool, Optional[str]]:
+    """Schema walk for a dotted config-key path -> ``(is_known, suggestion)``.
 
     Headline case from #34067: ``gateway.discord.gateway_restart_notification`` was silently written, even
     though ``gateway`` only has 4 known sub-keys (``strict``, ``media_delivery_allow_dirs``,
@@ -3386,7 +3397,11 @@ def _validate_config_key(key: str) -> tuple[bool, Optional[str]]:
 
     # A leading underscore on the FIRST segment marks an intentionally non-schema internal key
     # (test harnesses/tooling); only the first segment is exempt so ``agent._max_turns`` is caught.
-    if top.startswith("_") or top in _PLATFORM_CONTAINER_KEYS:
+    try:
+        from qubit_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
+    except ModuleNotFoundError:
+        LEFT_CORE_TERMINAL_KEYS = {"terminal.singularity_image": "TERMINAL_SINGULARITY_IMAGE"}
+    if top.startswith("_") or top in _PLATFORM_CONTAINER_KEYS or key in LEFT_CORE_TERMINAL_KEYS:
         return True, None
 
     known = _known_top_level_keys()
@@ -3434,19 +3449,14 @@ def _validate_config_key(key: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def _validate_schema_key(key: str) -> tuple[bool, Optional[str]]:
-    """Schema validation for a dotted config-key path, including the legacy left-core terminal
-    keys that are read at runtime but deliberately absent from ``DEFAULT_CONFIG``. Delegates the
-    structural walk to :func:`_validate_config_key`."""
-    if not key:
-        return False, None
-    try:
-        from qubit_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
-    except ModuleNotFoundError:
-        LEFT_CORE_TERMINAL_KEYS = {"terminal.singularity_image": "TERMINAL_SINGULARITY_IMAGE"}
-    if key in LEFT_CORE_TERMINAL_KEYS:
-        return True, None
-    return _validate_config_key(key)
+def _validate_config_key(key: str) -> tuple[bool, Optional[str]]:
+    """Dotted config-key path -> ``(is_known, suggestion)``: the schema walk, then (only for a refused
+    key) the runtime-read keys DEFAULT_CONFIG leaves unseeded (config_runtime_keys)."""
+    known, suggestion = _validate_schema_key(key)
+    if known or not key:
+        return known, suggestion
+    from qubit_cli.config_runtime_keys import is_runtime_read_key
+    return (True, None) if is_runtime_read_key(".".join(_split_key_path(key))) else (False, suggestion)
 
 
 def _is_wrong_prefix_suggestion(key: str, suggestion: Optional[str]) -> bool:

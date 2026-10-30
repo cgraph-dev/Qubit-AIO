@@ -1679,6 +1679,14 @@ def _opencode_api_mode(provider: str, model: str, api_key: str) -> str:
     return opencode_model_api_mode(provider, model)
 
 
+def _copilot_api_mode(provider: str, model: str, api_key: str) -> str:
+    # Copilot's Claude models run on the OpenAI-compatible chat endpoint while GPT-5.x uses the
+    # Responses API, so a same-provider /model switch must re-derive the mode from the new model
+    # instead of carrying the previous runtime mode forward.
+    from qubit_cli.models import copilot_model_api_mode
+    return copilot_model_api_mode(model)
+
+
 def _nous_api_mode(provider: str, model: str, api_key: str) -> str:
     # Portal serves anthropic/* on /v1/messages and everything else on /chat/completions;
     # re-derive from the FINAL model so alias clears / empty fallbacks cannot leave Claude on the
@@ -1690,6 +1698,7 @@ def _nous_api_mode(provider: str, model: str, api_key: str) -> str:
 # Per-provider api_mode overrides applied after validation, keyed on the final target provider
 # (the key sets are disjoint, so exactly one — or none — fires).
 _PROVIDER_API_MODE_OVERRIDES: dict[str, Any] = {
+    "copilot": _copilot_api_mode,
     **dict.fromkeys(("opencode-zen", "opencode-go", "opencode"), _opencode_api_mode),
     **dict.fromkeys(("nous", "nous-portal", "nousresearch"), _nous_api_mode)}
 

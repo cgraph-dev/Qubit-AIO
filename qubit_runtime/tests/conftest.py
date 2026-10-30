@@ -1609,7 +1609,7 @@ def _no_live_nous_services(request, monkeypatch):
             raise socket.gaierror(
                 socket.EAI_NONAME,
                 f"test fence: {host!r} is a live Nous service; stub the HTTP layer "
-                "(tests/hermes_cli/anon_portal.py) or mark the test live")
+                "(tests/qubit_cli/anon_portal.py) or mark the test live")
         return real_getaddrinfo(host, *args, **kwargs)
 
     monkeypatch.setattr(socket, "getaddrinfo", fenced_getaddrinfo)
