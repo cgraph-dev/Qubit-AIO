@@ -22,6 +22,7 @@ from typing import Any
 REPO = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO))
 import qubit_yaml as yaml
+from qubit_cli import install_source  # noqa: E402
 
 DOCS = REPO / "website" / "docs"
 SKILLS_PAGES = DOCS / "user-guide" / "skills"
@@ -235,7 +236,7 @@ def rewrite_relative_links(body: str, meta: dict[str, Any]) -> str:
     pointing to the file in the repo.
     """
     source_dir = "skills" if meta["source_kind"] == "bundled" else "optional-skills"
-    base = f"https://github.com/NousResearch/hermes-agent/blob/main/{source_dir}/{meta['rel_path']}"
+    base = f"{install_source.base_url()}/blob/{install_source.branch()}/{source_dir}/{meta['rel_path']}"
 
     def sub_link(m: re.Match) -> str:
         text = m.group(1)

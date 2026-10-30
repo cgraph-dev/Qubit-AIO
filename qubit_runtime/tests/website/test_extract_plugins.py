@@ -91,7 +91,7 @@ def test_valid_entry_is_extracted_with_install_command(mod, tmp_path):
     assert e["capabilities"]["providesTools"] == ["do_thing"]
     assert e["capabilities"]["providesHooks"] == ["on_start"]
     assert e["capabilities"]["requiresEnv"] == ["EXAMPLE_TOKEN"]
-    assert e["installCommand"] == "hermes plugins install example-plugin"
+    assert e["installCommand"] == "qubit plugins install example-plugin"
 
 
 def test_entries_missing_required_fields_are_skipped(mod, tmp_path, capsys):
@@ -199,7 +199,7 @@ def test_main_writes_catalog_and_meta(mod, tmp_path):
     assert [p["name"] for p in plugins] == ["gamma", "beta", "alpha"]  # stars desc, unknown stars last
     assert {p["name"]: p["stars"] for p in plugins} == {"alpha": None, "gamma": 50, "beta": 3}
     assert meta["total"] == 3
-    assert meta["byTier"] == {"official": 1, "community": 2}
+    assert meta["byTier"] == {"official": 1, "community": 2, "verified": 0}
     assert {p["name"]: p["category"] for p in plugins} == {"alpha": "memory", "beta": "desktop", "gamma": "desktop"}
     assert meta["byCategory"] == {"desktop": 2, "memory": 1}
     assert meta["starsFetchedAt"] == "2026-09-15T00:00:00+00:00"
@@ -222,7 +222,7 @@ def test_missing_catalog_dir_degrades_to_empty_outputs_exit_zero(mod, tmp_path):
     meta = json.loads((out_dir / "plugins-meta.json").read_text(encoding="utf-8"))
     assert plugins == []
     assert meta["total"] == 0
-    assert meta["byTier"] == {"official": 0, "community": 0}
+    assert meta["byTier"] == {"official": 0, "community": 0, "verified": 0}
     assert meta["removedCount"] == 0
 
 
@@ -279,12 +279,12 @@ def test_git_dates_added_is_first_commit_updated_is_last_and_renames_keep_added(
 
     dates = mod.load_git_dates(catalog)
 
-    assert dates["alpha.yaml"] == {"addedAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-02-01T00:00:00Z"}
-    assert dates["new-name.yaml"] == {"addedAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-03-01T00:00:00Z"}
+    assert dates["alpha.yaml"] == {"addedAt": "2026-01-01T00:00:00+00:00", "updatedAt": "2026-02-01T00:00:00+00:00"}
+    assert dates["new-name.yaml"] == {"addedAt": "2026-01-01T00:00:00+00:00", "updatedAt": "2026-03-01T00:00:00+00:00"}
     entries = mod.load_catalog_entries(catalog, dates=dates)
     by_name = {e["name"]: e for e in entries}
-    assert by_name["alpha"]["addedAt"] == "2026-01-01T00:00:00Z"
-    assert by_name["alpha"]["updatedAt"] == "2026-02-01T00:00:00Z"
+    assert by_name["alpha"]["addedAt"] == "2026-01-01T00:00:00+00:00"
+    assert by_name["alpha"]["updatedAt"] == "2026-02-01T00:00:00+00:00"
 
 
 def test_git_dates_are_null_outside_a_repository(mod, tmp_path):
