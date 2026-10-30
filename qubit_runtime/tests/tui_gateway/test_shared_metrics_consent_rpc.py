@@ -35,6 +35,13 @@ def _shared_metrics(home: Path) -> dict:
     return (cfg.get("telemetry") or {}).get("shared_metrics") or {}
 
 
+def _offer_version() -> int:
+    # Qubit records the offer version beside both opt-ins so a pre-version "No thanks"
+    # can be re-asked once; the pinned upstream test predates that key.
+    from qubit_cli.observability.shared_metrics_consent import OFFER_VERSION
+    return OFFER_VERSION
+
+
 def _windows(home: Path) -> list[tuple]:
     db = home / "telemetry" / "shared_metrics" / "metrics.sqlite3"
     with sqlite3.connect(db) as conn:
@@ -52,7 +59,8 @@ def test_send_without_collection_is_normalized_off_and_closes_the_consent_window
     # send=true alone is refused: collection off withdraws send consent, in config AND in the store.
     assert _call("shared_metrics.set", {"profile": "code", "enabled": False, "send": True}) == {
         "enabled": False, "send": False, "decided": True, "reask": False}
-    assert _shared_metrics(worker) == {"enabled": False, "send": False}
+    assert _shared_metrics(worker) == {
+        "enabled": False, "send": False, "offer_version": _offer_version()}
     [(_, closed)] = _windows(worker)
     assert closed is not None
 
