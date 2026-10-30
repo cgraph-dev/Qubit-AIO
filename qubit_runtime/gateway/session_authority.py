@@ -276,11 +276,18 @@ class SessionAuthority:
         self.authorize(actor, ref, 'session:read')
         return self._handle(ref)
 
-    async def attach(self, actor, ref):
+    async def attach(self, actor, ref, *, history=True, replay_from=None):
+        """Join *ref*'s event stream and snapshot it.
+
+        ``history=False``: the snapshot carries no transcript, for a viewer that pages it itself.
+        ``replay_from`` is accepted for the reconnect replay contract; the local event stream has
+        no catch-up journal, so a reconnect re-attaches from the current watermark.
+        """
         self.authorize(actor, ref, 'session:read')
         live = self.sessions[ref.session_id]
-        from gateway.session_local_recovery import local_history
+        from gateway.session_local_recovery import local_history, prepare_history
         from gateway.session_queued_controls import pending_rows
+        prepared = await prepare_history(self, ref) if history else None
         with live.event_stream.lock:
             subscription = next((key for key, member in live.subscribers.items()
                                  if member == actor), None) or uuid.uuid4().hex
@@ -296,8 +303,8 @@ class SessionAuthority:
             active_generation = handle.execution_generation if handle.execution_state == "running" else None
             prompts = live.controls.snapshot(ref.session_id, active_generation)
             epoch, sequence = live.event_stream.watermark()
-            snapshot = SubscriptionSnapshot(subscription, handle, epoch,
-                                        sequence, tuple(local_history(self, ref)),
+            snapshot = SubscriptionSnapshot(subscription, handle, epoch, sequence,
+                                        tuple(local_history(self, ref, prepared)) if history else (),
                                         tuple(self._pending_receipt(r) for r in pending_rows(self, ref)), prompts)
         from gateway.session_viewer_close import cancel_persisted_close
         await asyncio.to_thread(cancel_persisted_close, self, ref.session_id)  # the viewer cancels it

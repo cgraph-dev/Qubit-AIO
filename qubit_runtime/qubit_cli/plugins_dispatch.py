@@ -490,6 +490,41 @@ class PluginDispatchMixin:
             return False
         return bool(self._hooks.get(hook_name))
 
+    def holds_stream(self) -> bool:
+        """True while a loaded plugin's ``transform_llm_output`` registration declared ``hold_stream``.
+        Read under the discovery lock: a reload empties the ledger before plugins re-register, and a
+        turn deciding in that window would stream text the plugin must rewrite first."""
+        with self._discovery_lock:
+            return any(r.hold_stream for owned in self._ownership_ledger.values() for r in owned)
+
+    def held_transforms(self) -> tuple[Callable, ...]:
+        """The ``transform_llm_output`` callbacks a turn that holds its stream must run, captured with
+        the hold decision under the discovery lock; ``()`` when nothing holds."""
+        with self._discovery_lock:
+            if not any(r.hold_stream for owned in self._ownership_ledger.values() for r in owned):
+                return ()
+            return tuple(self._hooks.get(STREAM_HOLDING_HOOK, []))
+
+    def run_held_transforms(self, callbacks: tuple[Callable, ...], **kwargs: Any) -> tuple[Optional[str], bool]:
+        """Run a held turn's snapshotted transforms: ``(rewrite, failed)``. ``rewrite`` is the first
+        non-empty string; ``failed`` is True when none came back and a callback raised, so the caller
+        must not deliver the original."""
+        from agent.safe_worker_policy import safe_worker_enabled
+
+        if safe_worker_enabled():
+            return None, False
+        kwargs.setdefault("telemetry_schema_version", OBSERVER_SCHEMA_VERSION)
+        failed = False
+        for callback in callbacks:
+            try:
+                ret = self._invoke_hook_callback(callback, kwargs)
+            except (Exception, SystemExit):
+                failed = True
+                continue
+            if isinstance(ret, str) and ret:
+                return ret, False
+        return None, failed
+
     async def ainvoke_hook(self, hook_name: str, **kwargs: Any) -> List[Any]:
         """:meth:`invoke_hook` for callers that are already on an event loop.
 

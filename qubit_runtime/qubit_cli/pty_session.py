@@ -599,7 +599,10 @@ class PtySessionRegistry:
         private one)."""
         self._closed = False
 
-    async def close_all(self) -> None:
+    async def close_all(self, *, keep_detached: bool = False) -> None:
+        # ``keep_detached`` is accepted for the voicebridge lease-shim wrapper, which owns the
+        # detached-session bookkeeping; the registry itself closes every session.
+        del keep_detached
         self._closed = True
         # Wait for any admitted spawn before snapshotting shutdown ownership.
         async with self._spawn_lock:

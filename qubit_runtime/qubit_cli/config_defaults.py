@@ -2336,6 +2336,9 @@ DEFAULT_CONFIG = {
         # Max active messages per session for in-memory export (`qubit sessions export`); checked
         # per session, so full-DB backups of small sessions work.
         "max_export_messages": 20000,
+        # Seconds before a local session with no viewer is ended (resumable) once its turn settles; 0 = never;
+        # after a restart also >= 6h idle.
+        "orphan_end_grace_s": 300.0,
     },
     # First-touch onboarding hints (agent/onboarding.py). Each hint shows once and is latched under
     # `seen`; wipe the section to re-see all hints.

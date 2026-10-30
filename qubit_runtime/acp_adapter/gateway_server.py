@@ -239,9 +239,21 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
                 self._snapshots.pop(session_id, None)
                 continue
             self._snapshots[session_id] = snapshot
+            await self._request_live_reasoning(gateway, session_id)
             for pending in snapshot.get("prompts", []):
                 self._permission(session_id, pending)
             await self._notify_unknown(session_id)
+
+    async def _request_live_reasoning(self, client, session_id):
+        """Ask the owner to stream this session's reasoning (``show_reasoning``), as the CLI does.
+
+        The owner publishes ``reasoning.delta`` only for a live session whose flag a viewer set, and a
+        restarted owner's sessions start without it, so every attach and re-attach asks. A display
+        flag must never fail the attach."""
+        try:
+            await client.rpc("config.set", session_id=session_id, key="show_reasoning", value="1", _timeout=10)
+        except Exception:
+            logger.debug("ACP session %s keeps its reasoning hidden", session_id, exc_info=True)
 
     async def _notify_unknown(self, session_id):
         """The classic chat's resume notice: say why the next prompt will be refused and how to recover."""
@@ -301,6 +313,7 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         if mcp_servers:
             self._editor_mcp[session_id] = {
                 "mcp_servers": [s.model_dump(by_alias=True) for s in mcp_servers]}
+        await self._request_live_reasoning(client, session_id)
         info = snapshot.get("info") or await client.rpc("session.info", session_id=session_id)
         return NewSessionResponse(session_id=session_id, **await self._session_fields(session_id, info, session_id))
 
@@ -389,6 +402,7 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
         for pending in snapshot.get("prompts", []):
             self._permission(session_id, pending)
         await self._notify_unknown(session_id)
+        await self._request_live_reasoning(client, session_id)
         return await self._session_fields(session_id, {**info, **(snapshot.get("info") or {})}, held_id)
 
     @staticmethod
@@ -471,6 +485,7 @@ class GatewayACPAgent(GatewayReplyMixin, acp.Agent):
             self._editor_mcp[child] = payload or self._editor_mcp[session_id]
         self._mutations.acknowledge(session_id, 'branch', payload)
         info = self._snapshots[child].get('info') or await client.rpc('session.info', session_id=child)
+        await self._request_live_reasoning(client, child)
         return ForkSessionResponse(session_id=child, **await self._session_fields(child, info, child))
 
     async def set_session_model(self, model_id, session_id, **kwargs):
