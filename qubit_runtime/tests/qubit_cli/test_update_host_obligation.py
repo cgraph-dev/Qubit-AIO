@@ -234,7 +234,7 @@ def test_one_installs_completed_restart_never_erases_another_installs_debt(tmp_p
     from pathlib import Path
 
     source = Path(__file__).resolve().parents[2]
-    files = ("qubit_constants.py", "hermes_dir_acl.py", "qubit_cli/__init__.py", "qubit_cli/update_host_obligation.py",
+    files = ("qubit_constants.py", "qubit_dir_acl.py", "qubit_cli/__init__.py", "qubit_cli/update_host_obligation.py",
              "qubit_cli/update_restart_recovery.py", "qubit_cli/update_lock.py")
     roots = {}
     for name in ("install-a", "install-b"):

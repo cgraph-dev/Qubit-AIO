@@ -62,7 +62,7 @@ def test_sessions_delete_with_unfinished_turn_points_to_discard(tmp_path, monkey
         main_mod.main()
     output = capsys.readouterr().out
     assert exited.value.code == 1
-    assert ('hermes sessions discard s1' in output) == (status == 'unknown'), output
+    assert ('qubit sessions discard s1' in output) == (status == 'unknown'), output
     assert 'queued or running turn' in output or status == 'unknown', output
     reopened = SessionDB(tmp_path / 'state.db')
     assert reopened.get_session('s1') is not None

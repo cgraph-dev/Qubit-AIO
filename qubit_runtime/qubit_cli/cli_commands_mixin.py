@@ -32,7 +32,7 @@ from qubit_state_ids import new_session_id as mint_session_id
 from agent.i18n import t
 from agent.message_metadata import message_identity
 from agent.turn_context import extract_api_content_sidecar
-from qubit_cli.cli_agent_setup_mixin import _retire_agent
+from qubit_cli.cli_agent_setup_mixin import _gateway_open, _retire_agent
 from qubit_cli.browser_connect import (
     DEFAULT_BROWSER_CDP_URL, discover_local_cdp_url, find_free_debug_port, is_browser_debug_ready,
     launch_chrome_debug, local_port_in_use, manual_chrome_debug_command)
@@ -992,6 +992,12 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         from qubit_cli.kanban_resume_guard import kanban_resume_refusal
         if (kanban_refusal := kanban_resume_refusal(self._session_db, target_id)):
             return _cp(f"  {kanban_refusal}")
+        # One session.resume, before anything changes: it subscribes the target and names its receipt
+        # owner; a target the gateway refuses this viewer stops the switch, so the current session is
+        # neither ended nor swapped for one whose next prompt would be refused.
+        read_id, (target_id, refusal) = target_id, _gateway_open(self._session_db, target_id)
+        if refusal:
+            return _cp(f"  {_gt('resume.switch_failed')} {target_id} ({refusal})")
         if target_id == self.session_id:
             return _cp(f"  {_t('resume.already_on')}")
         old_session_id = self.session_id
@@ -1000,7 +1006,7 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         _sync_process_session_id(target_id)
         # One lineage SELECT, two projections: model_history is alternation-repaired for live
         # replay (heals a durable user;user once); display_history is verbatim (as startup --resume).
-        model_history, display_history = self._session_db.get_resume_conversations(target_id)
+        model_history, display_history = self._session_db.get_resume_conversations(read_id)
         self.conversation_history = _without_session_meta(model_history)
         self._resume_display_history = _without_session_meta(display_history)
         with suppress(Exception):  # re-open the target session so it's not marked as ended

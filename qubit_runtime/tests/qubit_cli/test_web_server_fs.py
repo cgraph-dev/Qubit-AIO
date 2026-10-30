@@ -713,7 +713,7 @@ def test_a_down_ssh_host_is_unavailable_on_workspace_file_routes(client, monkeyp
 
         def execute(self, command, **_options):
             code, rc = ("EACCES", 46) if "/srv/secret" in command else ("ENOENT", 44)
-            return {"returncode": rc, "output": f"__HERMES_FS_ERROR__:{code}\n"}
+            return {"returncode": rc, "output": f"__QUBIT_FS_ERROR__:{code}\n"}
 
         def cleanup(self):
             pass

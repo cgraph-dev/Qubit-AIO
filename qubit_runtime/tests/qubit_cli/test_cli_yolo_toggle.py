@@ -30,6 +30,7 @@ import pytest
 
 import tools.approval as approval_module
 from tools import approval_context
+from tools.approval_yolo import transfer_session_yolo
 from cli import HermesCLI
 
 
@@ -188,7 +189,7 @@ class TestSessionRotationTransfersYolo:
             approval_module.enable_session_yolo("old-id")
             assert approval_module.is_session_yolo_enabled("old-id") is True
 
-            HermesCLI._transfer_session_yolo(stand_in, "old-id", "new-id")
+            transfer_session_yolo("old-id", "new-id")
 
             assert approval_module.is_session_yolo_enabled("new-id") is True
             assert approval_module.is_session_yolo_enabled("old-id") is False
@@ -202,8 +203,8 @@ class TestSessionRotationTransfersYolo:
         stand_in = _make_stand_in(session_id="x")
         # Both directions of empty input should be safe no-ops; nothing
         # to transfer from "" / to "".
-        HermesCLI._transfer_session_yolo(stand_in, "", "new")
-        HermesCLI._transfer_session_yolo(stand_in, "old", "")
+        transfer_session_yolo("", "new")
+        transfer_session_yolo("old", "")
         # Neither key should have been touched.
         assert approval_module.is_session_yolo_enabled("new") is False
         assert approval_module.is_session_yolo_enabled("old") is False

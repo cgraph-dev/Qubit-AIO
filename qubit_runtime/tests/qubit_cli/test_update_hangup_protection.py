@@ -118,7 +118,7 @@ class TestInstallHangupProtection:
 
 
     def test_non_fatal_if_log_setup_fails(self, monkeypatch):
-        """If get_qubit_home() raises, stdio must be left untouched but SIGHUP still handled."""
+        """If get_default_qubit_root() raises, stdio must be left untouched but SIGHUP still handled."""
         prev_out, prev_err = sys.stdout, sys.stderr
 
         def _boom():
@@ -126,7 +126,7 @@ class TestInstallHangupProtection:
 
         # Patch the import inside _install_hangup_protection.
         monkeypatch.setattr(
-            "qubit_cli.config.get_qubit_home", _boom, raising=True
+            "qubit_constants.get_default_qubit_root", _boom, raising=True
         )
 
         original_handler = (

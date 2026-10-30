@@ -299,7 +299,6 @@ class SessionUsageMixin:
         values = dict(locals())
         values.pop('self')
         values.pop('session_id')
-        values.pop('source')
         # Ensure the row exists: under concurrent load create_session() may have failed on
         # locking, and the UPDATE would silently affect 0 rows. When this guard is the first
         # writer it must carry the agent's real source: the turn lease treats an existing row as
@@ -314,6 +313,7 @@ class SessionUsageMixin:
         actual_cost_usd: Optional[float]=None, cost_status: Optional[str]=None, cost_source: Optional[str]=None,
         pricing_version: Optional[str]=None, billing_provider: Optional[str]=None, billing_base_url: Optional[str]=None,
         billing_mode: Optional[str]=None, api_call_count: int=0, absolute: bool=False, task: str="",
+        source: Optional[str]=None,
     ) -> None:
         usage = {k: v for k, v in locals().items() if k in _MODEL_USAGE_FIELDS}
         sql = _TOKEN_UPDATE_ABSOLUTE_SQL if absolute else _TOKEN_UPDATE_DELTA_SQL
@@ -358,6 +358,17 @@ class SessionUsageMixin:
         conn.execute(sql, params)
         if record_model_usage:
             self._record_model_usage(conn, session_id, task=task, **usage)
+        # The usage write that heals a compression tip also stamps the NULL ancestors of its
+        # chain, so a list filtered on the root's created_source still shows the conversation.
+        if not task and source:
+            from gateway.session_policy import created_surface
+            from qubit_state_compression import _UNSET_CREATED_SQL, stamp_compression_ancestors
+            if surfaced := created_surface(source):
+                conn.execute(
+                    "UPDATE sessions SET created_source=? WHERE id=? AND "
+                    + _UNSET_CREATED_SQL.format(col="created_source"),
+                    (surfaced, session_id))
+                stamp_compression_ancestors(conn, session_id)
 
     def _record_model_usage(
         self, conn, session_id: str, *, model: Optional[str]=None, billing_provider: Optional[str]=None,

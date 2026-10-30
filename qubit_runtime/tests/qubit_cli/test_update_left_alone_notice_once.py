@@ -2,7 +2,7 @@
 
 The pre-swap pause and the post-swap restart phase both scope the host-wide gateway list, and the
 restart phase runs in a fresh completion process, so every foreign gateway used to be listed twice
-("↷ PID N: gateway process of another Hermes home (...) — left alone"). The run's receipt is the
+("↷ PID N: gateway process of another Qubit home (...) — left alone"). The run's receipt is the
 only state both processes share (the completion request carries it as JSON).
 """
 
@@ -34,4 +34,4 @@ def test_left_alone_notice_prints_once_across_the_completion_handoff(monkeypatch
     assert contextvars.Context().run(completion_process) == []
     out = capsys.readouterr().out
     for pid, home in homes.items():
-        assert out.count(f"↷ PID {pid}: gateway process of another Hermes home ({home})") == 1, out
+        assert out.count(f"↷ PID {pid}: gateway process of another Qubit home ({home})") == 1, out

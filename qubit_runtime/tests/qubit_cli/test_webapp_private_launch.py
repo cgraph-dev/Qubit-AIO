@@ -1,4 +1,4 @@
-"""``hermes webapp`` where nothing checks who redeems a one-use launch link (macOS, the BSDs, illumos, WSL).
+"""``qubit webapp`` where nothing checks who redeems a one-use launch link (macOS, the BSDs, illumos, WSL).
 
 The gateway marks such a link private (``gateway.webapp_listener._one_use_links_work``). The command never
 hands it to a browser launcher, whose command line other local users can read, and never prints it when it
@@ -56,17 +56,17 @@ def test_a_private_link_reaches_the_browser_in_a_page_only_the_user_can_read(pri
     out = capsys.readouterr().out
     assert "Opened the Webapp in your browser" in out and "ticket=" not in out
     # macOS can report a browser that opened where the user never sees it (osascript over SSH).
-    assert "If no browser opened, run `hermes webapp --no-open` for a link." in out
+    assert "If no browser opened, run `qubit webapp --no-open` for a link." in out
 
 
 @pytest.mark.platforms("posix")
 @pytest.mark.parametrize(("flag", "sticky", "command"), [
-    ("work", None, "hermes -p work webapp --no-open"),
-    ("default", "work", "hermes -p default webapp --no-open"),
-    ("work", "work", "hermes webapp --no-open"),
+    ("work", None, "qubit -p work webapp --no-open"),
+    ("default", "work", "qubit -p default webapp --no-open"),
+    ("work", "work", "qubit webapp --no-open"),
 ])
 def test_the_no_open_hint_keeps_the_profile_a_bare_rerun_would_not_pick(private, capsys, flag, sticky, command):
-    """``-p`` re-homes only this process: a bare ``hermes webapp --no-open`` gets the sticky profile."""
+    """``-p`` re-homes only this process: a bare ``qubit webapp --no-open`` gets the sticky profile."""
     private["monkeypatch"].setattr(cli_main, "_explicit_cli_profile", flag)
     if sticky:
         (private["root"] / "active_profile").write_text(sticky + "\n", encoding="utf-8")

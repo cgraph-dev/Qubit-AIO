@@ -44,7 +44,7 @@ def test_glyph_layout_scrollback_is_width_independent(monkeypatch, modern):
     start = rows.index("**Planning the change**")
     assert rows[start - 1] == "─" * 40 and rows[start + 1] == "I will read calc.py first.", rows
     assert rows[start + 2] == thought[0], rows
-    assert rows[next(i for i, r in enumerate(rows) if r.startswith("☤ Hermes")) - 1] == "─" * 40, rows
+    assert rows[next(i for i, r in enumerate(rows) if r.startswith("☤ Qubit")) - 1] == "─" * 40, rows
     assert any("Added multiply to calc.py." in line for line in rows)
 
 

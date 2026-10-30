@@ -163,7 +163,7 @@ def test_field_case_forwards_the_declined_unit_and_blames_only_the_dashboard(mon
     (followup,) = receipt["followups"]
     assert followup["step"] == "gateway_restart"  # Desktop hand-offs parse the step id
     assert "hermes-dashboard were not restarted onto the new code" in followup["reason"]
-    assert "hermes gateway restart" not in followup["reason"]
+    assert "qubit gateway restart" not in followup["reason"]
     assert "gateways may still run" not in capsys.readouterr().out
     # The obligation stays armed: a stale dashboard unit is still owed (contract unchanged).
     assert update_cmd_fleet._fleet_restart_obligation_armed() is True
@@ -181,7 +181,7 @@ def test_gateway_debt_still_names_gateway_restart(monkeypatch, case):
         restart.phase_errors.append("boom")
     _refreshed, receipt = _verify(monkeypatch, restart, fleet_state=state)
     reason = receipt["followups"][0]["reason"]
-    assert "hermes gateway restart" in reason and "hermes-dashboard" in reason
+    assert "qubit gateway restart" in reason and "hermes-dashboard" in reason
 
 
 def test_is_serve_unit_matches_the_fleet_loop_gate():
@@ -198,7 +198,7 @@ def test_dashboard_stopped_and_not_brought_back_is_not_called_still_running(monk
                                   dashboards_down={4242})
     reason = receipt["followups"][0]["reason"]
     assert "4242 were stopped during the update and not brought back" in reason
-    assert "still run pre-update code" not in reason and "hermes gateway restart" not in reason
+    assert "still run pre-update code" not in reason and "qubit gateway restart" not in reason
 
 
 def test_incomplete_run_never_settles_the_host_obligation_mid_verification(monkeypatch):
@@ -326,7 +326,7 @@ def _producer_reason(*, gateway_owed=False, units=(), down=(), stale=()):
     ([_producer_reason(units=["hermes-dashboard"]), "RuntimeError: boom"], True),
 ])
 def test_desktop_handoffs_add_the_gateway_hint_only_when_gateways_are_blamed(capsys, reasons, hinted):
-    """#141071: both Desktop hand-offs keyed the "Run hermes gateway restart" hint on the step id alone.
+    """#141071: both Desktop hand-offs keyed the "Run qubit gateway restart" hint on the step id alone.
     Now the hint drops only when every gateway_restart reason the producer prints is serve/dashboard-only.
     Runs the real posix.sh block in bash, and windows.ps1's two patterns with its per-line rule."""
     import re
@@ -346,7 +346,7 @@ def test_desktop_handoffs_add_the_gateway_hint_only_when_gateways_are_blamed(cap
     ps = (scripts / "windows.ps1").read_text(encoding="utf-8")
     line_pat = re.search(r'\$_ -cmatch "(Update follow-up [^"]+)"', ps).group(1)
     serve_pat = re.search(r'\$_ -cnotmatch "([^"]+)"', ps).group(1)
-    gw_pat = re.search(r'\(\$_ -cmatch "(hermes gateway restart)"\)', ps).group(1)
+    gw_pat = re.search(r'\(\$_ -cmatch "(qubit gateway restart)"\)', ps).group(1)
     lines = [ln for ln in out.splitlines() if re.search(line_pat, ln)]
     serve_only = bool(lines) and not [ln for ln in lines if not re.search(serve_pat, ln) or re.search(gw_pat, ln)]
     assert (not serve_only) is hinted

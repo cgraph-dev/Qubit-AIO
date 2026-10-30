@@ -2,6 +2,7 @@
 client/origin/auth gates, chat argv resolution, gateway/sidecar URL building.
 """
 
+import functools
 import logging
 import asyncio
 import atexit
@@ -237,21 +238,24 @@ def _gateway_ws_ticket_from_subprotocol(ws: WebSocket) -> tuple[str, str]:
     return (ticket, "ok") if ticket else ("", "invalid")
 
 
-def _ws_request_view(ws: WebSocket) -> Request:
+def _ws_request_view(ws: WebSocket, app) -> Request:
     """A ``Request`` facade over a ``WebSocket`` for the auth helpers.
 
     ``_verify_access_token`` only touches ``request.headers`` (X-Forwarded-For
     via ``client_ip``) and ``request.client`` on this path (``audit=False``,
-    no cookie/redirect work), so a lightweight duck-typed stand-in avoids
+    no cookie/redirect work), and ``webapp_sign_in.token_works_alone`` reads
+    ``request.app.state``, so a lightweight stand-in carrying *app* avoids
     constructing a real ASGI request inside the upgrade. ``scan_session_providers``
     itself never sees the request — only the provider callbacks do.
+    ``webapp_sign_in.token_works_alone`` reads the listener's state from *app*.
     """
     from fastapi import Request
 
     return Request({
         "type": "http",
+        "app": app,
         "headers": [(k.lower().encode("latin-1"), v.encode("latin-1"))
-                    for k, v in getattr(ws.headers, "items", lambda: {})()],
+                    for k, v in getattr(ws.headers, "items", dict)()],
         "client": (ws.client.host, 0) if ws.client else None,
         "server": None,
         "scheme": "ws",
@@ -339,7 +343,7 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
     must not grant access.
 
     Either mode: a local Desktop (no static token) presents the private one-use
-    ``X-Qubit-Gateway-Ticket`` grant its REST calls use (``authenticate_native_ws``).
+    ``X-Hermes-Gateway-Ticket`` grant its REST calls use (``authenticate_native_ws``).
     A socket that sends that header is judged by it alone: on a core socket
     (``/api/ws``, ``/api/pty``, the audio streams) the grant is refused
     (``native_invalid``) even when a valid ``token`` query credential rides along.
@@ -421,7 +425,7 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
         # login's tokens work only as its cookies, which sign-out ends.
         token = ws.query_params.get("token", "")
         if token:
-            from hermes_cli import webapp_sign_in
+            from qubit_cli import webapp_sign_in
             from qubit_cli.dashboard_auth.base import ProviderError
             from qubit_cli.dashboard_auth.middleware import _verify_access_token
 

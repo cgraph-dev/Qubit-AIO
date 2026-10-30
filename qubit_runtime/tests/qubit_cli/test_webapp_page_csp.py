@@ -50,7 +50,7 @@ def page(monkeypatch, tmp_path):
     app.state.auth_required = False
     app.state.web_dist = tmp_path
     monkeypatch.setattr(server, "app", app)
-    monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+    monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
     mount_spa(app)
     return app
 
@@ -70,7 +70,7 @@ def test_page_allows_its_scripts_and_chunks_but_locks_privileged_execution(page,
     assert not {"'unsafe-inline'", "'unsafe-eval'", "https:", "http:", "*"}.intersection(scripts)
     parsed = Scripts(response.text)
     assert parsed.external == ["/qubit/assets/app.js"]
-    assert any("__HERMES_BASE_PATH__" in script for script in parsed.inline)
+    assert any("__QUBIT_BASE_PATH__" in script for script in parsed.inline)
     for script in parsed.inline:
         digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
         assert f"'sha256-{digest}'" in scripts
@@ -98,7 +98,7 @@ def test_every_spelling_of_the_entry_document_gets_the_policy(page, tmp_path, pa
     response = TestClient(page).get(path)
     assert response.status_code == 200
     assert "'sha256-" in response.headers["content-security-policy"]
-    assert "__HERMES_BASE_PATH__" in response.text
+    assert "__QUBIT_BASE_PATH__" in response.text
 
 
 def test_dashboard_keeps_its_existing_document_headers(page):

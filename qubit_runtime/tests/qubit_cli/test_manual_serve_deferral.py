@@ -7,6 +7,7 @@ import pytest
 
 from qubit_cli import process_identity
 from qubit_cli import update_cmd_fleet as fleet
+from qubit_cli import update_cmd_fleet_verify as fleet_verify
 from qubit_cli import update_receipt
 from qubit_cli.update_inventory import RuntimeRecord, UpdatePlan
 from qubit_cli.update_serve_obligations import defer_manual_serve, retain_receipt_manual_serves
@@ -20,7 +21,7 @@ def test_manual_deferral_survives_receipt_rotation(monkeypatch, capsys, kind, co
     plan = UpdatePlan(runtimes=[runtime])
     monkeypatch.setattr(process_identity, "_pid_alive_matches", lambda *a: True)
     monkeypatch.setattr(process_identity, "ledger_entries", lambda: [{"pid": 900, "purpose": kind, "create_time": 1000.0}])
-    monkeypatch.setattr(fleet, "_print_legacy_units_warning", lambda: None)
+    monkeypatch.setattr(fleet_verify, "_print_legacy_units_warning", lambda: None)
     monkeypatch.setattr("qubit_cli.update_cmd._finish_dashboard_update_cleanup", lambda *a, **k: None)
     monkeypatch.setattr("qubit_cli.gateway_migrate.maybe_auto_migrate_after_update", lambda: None)
     monkeypatch.setattr(update_receipt, "collect_fleet_versions", lambda **k: [])
@@ -39,12 +40,12 @@ def test_manual_deferral_survives_receipt_rotation(monkeypatch, capsys, kind, co
     if condition != "alive":
         # Contract C3: an unresolved manual-serve obligation records a follow-up and leaves
         # the fleet marker armed; it never fails the already-committed update.
-        fleet._verify_fleet_after_update(restart, _pre_update_plan=plan, _windows_gateway_resume=None, update_complete=True)
+        fleet_verify._verify_fleet_after_update(restart, _pre_update_plan=plan, _windows_gateway_resume=None, update_complete=True)
         assert restart.incomplete is True
         assert fleet._fleet_restart_obligation_armed()
         assert update_receipt.read_latest_receipt()["outcome"] == "success"
         return
-    fleet._verify_fleet_after_update(restart, _pre_update_plan=plan, _windows_gateway_resume=None, update_complete=True)
+    fleet_verify._verify_fleet_after_update(restart, _pre_update_plan=plan, _windows_gateway_resume=None, update_complete=True)
     receipt = update_receipt.read_latest_receipt()
     assert receipt["runtime_outcomes"][0]["outcome"] == "deferred"
     assert not fleet._fleet_restart_obligation_armed()

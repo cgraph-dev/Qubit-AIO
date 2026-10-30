@@ -20,7 +20,7 @@ def clean_install(tmp_path):
     # Keep the real ignore rules and tracked root entries without copying a full checkout
     # or committing fixture source. Git objects are read-only shared with the test checkout.
     root = tmp_path / "install"
-    repo = Path(__file__).resolve().parents[2]
+    repo = Path(__file__).resolve().parents[3]
     subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", "--template=",
                     str(repo), str(root)], check=True)
     _git(root, "config", "core.sparseCheckout", "true")

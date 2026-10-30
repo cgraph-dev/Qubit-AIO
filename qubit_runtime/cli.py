@@ -836,11 +836,14 @@ class _VoiceInputMessage:
 class _SeededQueryMessage:
     """Sentinel for a ``-q`` prompt seeded into an interactive session; treated LITERALLY (no slash/!/file-drop)."""
 
-    __slots__ = ("text", "images")
+    __slots__ = ("admission_id", "images", "text")
 
-    def __init__(self, text: str, images=None):
+    def __init__(self, text: str, images=None, admission_id=None):
         self.text = text or ""
         self.images = list(images or [])
+        # A ``/queue`` admission the gateway is running: ``run_conversation`` pumps that
+        # admission by this id, never by comparing the (sanitized) text.
+        self.admission_id = admission_id
 
     def __str__(self) -> str:
         return self.text
@@ -1554,9 +1557,6 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
             toolsets_list = coding_selection(platform="cli", config=CLI_CONFIG)
         except Exception:
             toolsets_list = None
-        if toolsets_list is None:
-            from qubit_cli.tools_config import _get_platform_tools
-            toolsets_list = sorted(_get_platform_tools(CLI_CONFIG, "cli"))
 
     parsed_skills = _parse_skills_argument(skills)
 
