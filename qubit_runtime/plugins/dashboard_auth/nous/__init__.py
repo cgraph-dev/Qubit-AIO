@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, Optional
 
-from qubit_cli.dashboard_auth import LoginStart, ProviderError, Session
+from qubit_cli.dashboard_auth import LoginStart, ProviderError, Session, listener_client
 from plugins.dashboard_auth._shared import (
     DEFAULT_TOKEN_LEEWAY_SECONDS,
     JwtOAuthProvider,
@@ -131,6 +131,10 @@ def _load_config_oauth_section() -> dict:
 def _settings() -> dict:
     """Resolve NousDashboardAuthProvider kwargs; the skip reason names BOTH configuration surfaces."""
     section = _load_config_oauth_section()
+    own = listener_client.current()  # a plugin reload while the listener uses its own client keeps it
+    if own is not None:
+        return {"client_id": own[0], "portal_url": own[1],
+                "token_leeway": parse_leeway(section.get("token_leeway"))}
     client_id = resolve_env_or_cfg("HERMES_DASHBOARD_OAUTH_CLIENT_ID", section.get("client_id", ""))
     portal_url = resolve_env_or_cfg("HERMES_DASHBOARD_PORTAL_URL", section.get("portal_url", "")) or _DEFAULT_PORTAL_URL
     if not client_id:
@@ -155,6 +159,7 @@ def _settings() -> dict:
 def register(ctx) -> None:
     """Register ``NousDashboardAuthProvider`` when a client_id is configured."""
     global LAST_SKIP_REASON
+    listener_client.offer(_swap_provider)
     LAST_SKIP_REASON = ""
     kwargs, LAST_SKIP_REASON = register_provider(ctx, logger, _TAG, NousDashboardAuthProvider, _settings)
     if kwargs is not None:

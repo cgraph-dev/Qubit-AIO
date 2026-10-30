@@ -293,6 +293,12 @@ def _ssh_runtime_intact() -> bool:
 # share one testable seam.
 _DASHBOARD_EMBEDDED_CHAT_ENABLED = True
 
+from qubit_cli.web_upload_limit import ChatFileUploadLimitMiddleware
+
+# Inside every auth/Host middleware: those checks run before body ingestion,
+# and the receive limit runs before FastAPI can spool a multipart attachment.
+app.add_middleware(ChatFileUploadLimitMiddleware)
+
 # Desktop file.attach sends a whole base64 data URL in one JSON-RPC frame;
 # uvicorn's 16 MiB default rejects files under the 256 MiB raw attach cap.
 _DESKTOP_ATTACHMENT_WS_MAX_BYTES = 384 * 1024 * 1024
@@ -888,10 +894,22 @@ from qubit_cli.web_routers import (  # noqa: E402
     chat_ws as _chat_ws_routes,
     chat_workspaces as _chat_workspaces_routes,
     dashboard_ui as _dashboard_ui_routes,
+    webapp as _webapp_routes,
     shared_metrics as _shared_metrics_routes,
+    delegation as _delegation_routes,
+    webapp_access as _webapp_access_routes,
+    ui_preferences as _ui_preferences_routes,
 )
 
+import qubit_cli.web_routers.desktop_plugins as _desktop_plugin_routes
+import qubit_cli.web_routers.uploads as _upload_routes
+from fastapi import Depends as _Depends
+from qubit_cli.web_server_surface import route_on as _route_on
+
 app.include_router(_files_routes.router)
+# The Webapp's routes exist only on the surfaces whose policy names them (404 elsewhere).
+app.include_router(_upload_routes.router, dependencies=[_Depends(_route_on("browser_files"))])
+app.include_router(_desktop_plugin_routes.router, dependencies=[_Depends(_route_on("desktop_plugins"))])
 app.include_router(_git_routes.router)
 app.include_router(_local_models_routes.router)
 app.include_router(_status_routes.router)
@@ -921,7 +939,11 @@ app.include_router(_analytics_routes.router)
 app.include_router(_chat_ws_routes.router)
 app.include_router(_chat_workspaces_routes.router)
 app.include_router(_dashboard_ui_routes.router)
+app.include_router(_webapp_routes.router)
 app.include_router(_shared_metrics_routes.router)
+app.include_router(_delegation_routes.router)
+app.include_router(_webapp_access_routes.router, dependencies=[_Depends(_route_on("web_access"))])
+app.include_router(_ui_preferences_routes.router, dependencies=[_Depends(_route_on("ui_preferences"))])
 
 # Plugin API routes and the dashboard auth routes (/login, /auth/*, /api/auth/*)
 # mount before the SPA catch-all so /{full_path:path} doesn't swallow them. Auth

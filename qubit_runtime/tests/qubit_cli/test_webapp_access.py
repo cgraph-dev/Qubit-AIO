@@ -310,7 +310,7 @@ def test_a_failed_build_turns_nothing_on_and_says_how_to_build(client, restarts,
     response = client.post("/api/webapp-access/start", json={"mode": "lan"})
     assert response.status_code == 400
     assert "npm exited 1" in response.json()["detail"]
-    assert "hermes webapp --build-only" in response.json()["detail"]
+    assert "qubit webapp --build-only" in response.json()["detail"]
     assert nous == []
     assert restarts == []
     assert not _config()["webapp"]["enabled"]
