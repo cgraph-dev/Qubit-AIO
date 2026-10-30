@@ -194,6 +194,11 @@ def _room_method(
 
     def dec(fn):
         def handler(rid, params: dict) -> dict:
+            # A room handed to a ready gateway is answered by that owner, never written locally.
+            from tui_gateway import methods_groups_forward
+            forwarded = methods_groups_forward.forward_bound(rid, name, params)
+            if forwarded is not None:
+                return forwarded
             args = (rid, params)
             if service_code is not None:
                 service = get_hosted_room_service()
@@ -218,6 +223,10 @@ def _room_method(
 @method("groups.capabilities")
 def _(rid, params: dict, _catalog=_local_catalog, _methods=_METHODS) -> dict:
     """Describe the hosted-room protocol implemented by this gateway."""
+    from tui_gateway import methods_groups_forward
+    forwarded = methods_groups_forward.forward_bound(rid, "groups.capabilities", params)
+    if forwarded is not None:
+        return forwarded
     from gateway.hosted_rooms import MAX_LOG_LIMIT, PROTOCOL_VERSION, local_authority_gateway_id
     service = get_hosted_room_service()
     driver_ready = bool(service and service.runtime.status()["running"])
@@ -471,8 +480,11 @@ def _(rid, params: dict, service) -> dict:
 @_room_method("groups.retry", code=5118, service_code=4115)
 def _(rid, params: dict, service) -> dict:
     """Retry one indeterminate room task after explicit user confirmation."""
+    generation = params.get("execution_generation")
     task = service.retry_room_task(
-        str(params.get("room_id") or ""), task_id=str(params.get("task_id") or ""))
+        str(params.get("room_id") or ""), task_id=str(params.get("task_id") or ""),
+        member_id=(str(params.get("member_id")) if params.get("member_id") is not None else None),
+        execution_generation=(int(generation) if generation is not None else None))
     if not isinstance(task, dict):
         task = {}
     identity = task.get("identity")

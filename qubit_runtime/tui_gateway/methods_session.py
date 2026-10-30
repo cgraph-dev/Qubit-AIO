@@ -1839,6 +1839,7 @@ def _billing_view(name: str, module: str, builder: str, serializer: str, fallbac
     """Read-only view RPC (no scope required): ``serializer(module.builder())``, ``fallback`` on any error.
     The view module stays a lazy import (startup budget); the serializer is a server global."""
     @method(name)
+    @_profile_scoped
     def _(rid, params: dict) -> dict:
         try:
             from importlib import import_module
@@ -1848,6 +1849,7 @@ def _billing_view(name: str, module: str, builder: str, serializer: str, fallbac
 
 
 @method("billing.state")
+@_profile_scoped
 def _(rid, params: dict) -> dict:
     """Read-only billing view (no scope required); fail-open. The Qubit free tier has no account to
     bill, so its state is answered locally (``free_tier`` set, ``logged_in`` false) without a portal
@@ -1870,6 +1872,7 @@ _billing_view("subscription.state", "agent.subscription_view", "build_subscripti
 
 
 @method("subscription.preview")
+@_profile_scoped
 def _(rid, params: dict) -> dict:
     """POST /api/billing/subscription/preview → chargeless effect quote. billing:manage."""
     from agent.subscription_view import subscription_change_preview_from_payload
@@ -1886,6 +1889,7 @@ def _billing_route(name: str, call, *, invalid=None, message: str = "", error: s
     → ``_billing_invalid(message, error)``; ``call(nb, params, key)`` performs the request. ``idempotent``
     mints ``idempotency_key`` if absent and echoes it (also on error) so the TUI retries the SAME operation."""
     @method(name)
+    @_profile_scoped
     def _(rid, params: dict) -> dict:
         import qubit_cli.nous_billing as nb
         if invalid is not None and invalid(params):
@@ -1937,6 +1941,7 @@ _billing_route("billing.keep_going_on_credits", lambda nb, p, _k: _billing_pick(
 
 
 @method("billing.step_up")
+@_profile_scoped
 def _(rid, params: dict) -> dict:
     """billing:manage step-up device flow → {ok, granted} (false when the server downscopes). Pooled (blocks
     for minutes); URL/code reach the TUI via ``billing.step_up.verification`` (stdout is the RPC pipe) and the

@@ -477,6 +477,15 @@ def _set_display_toggle(rid, params, key, value, session):
     return _kv(rid, key, on)
 
 
+def _set_timestamps(rid, params, key, value, session):
+    """Ink's /timestamps on a standalone backend writes the classic CLI's display key."""
+    on = _BOOL_WORDS.get(str(value).strip().lower())
+    if on is None:
+        return _err(rid, 4002, "timestamps takes on or off")
+    _write_config_key("display.timestamps", on)
+    return _kv(rid, key, "on" if on else "off")
+
+
 # ── dispatch
 
 _CONFIG_SETTERS = {
@@ -485,6 +494,7 @@ _CONFIG_SETTERS = {
     "reasoning": _set_reasoning, "details_mode": _set_word, "thinking_mode": _set_word,
     "density": _set_toggle, "battery": _set_toggle, "theme": _set_word,
     "statusbar": _set_toggle, "mouse": _set_toggle, "indicator": _set_word, "voice.voice_chat_mode": _set_word,
+    "timestamps": _set_timestamps,
     "cwd": _set_cwd, "terminal.cwd": _set_cwd, "workdir": _set_cwd,
     "prompt": _set_prompt, "personality": _set_personality, "skin": _set_skin}
 

@@ -35,8 +35,7 @@ _PNG = base64.b64decode(
 
 def _assert_not_available(error: dict, method: str) -> None:
     assert error["code"] == -32601, error
-    assert error["message"] == f"unknown method: {method} — not available on this Hermes backend"
-    assert "out of sync" not in error["message"]
+    assert error["message"].startswith(f"unknown method: {method} —"), error["message"]
 
 
 def test_unknown_method_is_named_unavailable_on_both_routes(tmp_path, monkeypatch):

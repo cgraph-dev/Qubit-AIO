@@ -73,7 +73,10 @@ async def test_unaccepted_card_is_reoffered_on_reattach_without_replaying_its_an
     await _settle(agent)
     assert len(editor.cards) == 2, "the unanswered prompt must be shown again"
     # The earlier answer is never auto-sent again; only the user's fresh choice reaches the owner.
-    assert gateway.responses == sent_first + [(method, value)]
+    # The re-attach also asks the owner to stream this session's reasoning (config.set).
+    answers = [r for r in gateway.responses if r[0] != "config.set"]
+    assert answers == sent_first + [(method, value)]
+    assert [r for r in gateway.responses if r[0] == "config.set"] == [("config.set", None)]
     await agent._reattach(gateway)  # accepted now: the owner's settle retires it, never a third card
     await _settle(agent)
     assert len(editor.cards) == 2

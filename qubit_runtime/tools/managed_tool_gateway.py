@@ -52,9 +52,11 @@ def _read_nous_provider_state() -> Optional[dict]:
         nous_provider = get_provider_auth_state("nous")
         if not isinstance(nous_provider, dict):
             return None
-        from qubit_cli.anon_auth import guest_enabled, is_guest_state
+        from qubit_cli.anon_auth import guest_allowed, is_guest_state
 
-        if is_guest_state(nous_provider) and not guest_enabled():
+        # A connectors-only guest survives the free-tier launch gate (that gate is about inference);
+        # ``nous.guest: false`` is the switch that hides it.
+        if is_guest_state(nous_provider) and not guest_allowed():
             return None
         return nous_provider
     except Exception:

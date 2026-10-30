@@ -250,6 +250,9 @@ def _terminal_task_cwd_with_source(session: dict | None) -> tuple[str, str]:
             return raw, "process"
         if backend == "ssh":
             return "~", "process"
+        if not _host_cwd_is_terminal_cwd(profile_home):
+            # A sandbox's own backend default applies; the host launch dir does not exist there.
+            return "", "process"
     if session and session.get("cwd"):
         return str(session["cwd"]), "session"
     return _completion_cwd(), "process"
@@ -301,7 +304,8 @@ def _persisted_session_cwd(session: dict) -> str | None:
     """The cwd to stamp on the session's DB row, or None to leave it unset (launch-dir rule: ``_ensure_session_db_row``)."""
     if session.get("explicit_cwd"):
         return _session_cwd(session)
-    if _session_source(session) in _LAUNCH_CWD_NOT_A_WORKSPACE or _is_remote_launch_cwd(session):
+    if (_session_source(session) in _LAUNCH_CWD_NOT_A_WORKSPACE or _is_remote_launch_cwd(session)
+            or not _host_cwd_is_terminal_cwd(session.get("profile_home"))):
         return None
     return str(session.get("cwd") or "") or None  # the session's OWN dir, never _session_cwd's gateway-wide fallback
 
@@ -361,6 +365,20 @@ def _resumable_stored_cwd(cwd, profile_home) -> str:
     cwd = str(cwd or "")
     if cwd and _cwd_is_remote(profile_home) and _is_qubit_owned_cwd(cwd, profile_home):
         return ""
+    # A sandbox row may hold the gateway's launch dir (the OS home or /) from before the fix: that
+    # host path is not a workspace inside the target. ssh's remote / is a legitimate pick.
+    if (cwd and _bound_terminal_backend(profile_home) not in {"local", "docker", "ssh"}
+            and not _host_cwd_is_terminal_cwd(profile_home)):
+        # Exactly a launch directory is not a workspace; a folder the user picked under the root is.
+        from qubit_constants import get_default_qubit_root
+        try:
+            resolved = Path(cwd).expanduser().resolve()
+            root = get_default_qubit_root(home=Path(profile_home) if profile_home else None).resolve()
+            launch_dirs = {Path("/").resolve(), Path.home().resolve(), root, root / "home"}
+        except (OSError, RuntimeError):
+            resolved, launch_dirs = None, set()
+        if resolved is None or resolved in launch_dirs:
+            return ""
     if cwd and _is_other_profiles_cwd(cwd, profile_home):
         return ""
     return cwd

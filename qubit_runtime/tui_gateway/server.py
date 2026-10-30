@@ -751,11 +751,23 @@ def _event_frame(event: str, sid: str, payload: dict | None = None) -> dict:
     return {"jsonrpc": "2.0", "method": "event", "params": params}
 
 
+from tui_gateway import stream_segments  # noqa: E402
+
+
 def _emit(event: str, sid: str, payload: dict | None = None) -> bool:
     from agent.notification_presentation import event_presentation_muted
     if event_presentation_muted(event, sid):
         return False
-    return write_json(_event_frame(event, sid, payload))
+    session = _sessions.get(sid)
+    if session is not None and event == "message.start":
+        session[stream_segments.SESSION_KEY] = stream_segments.TurnSegments()
+    if session is not None:
+        payload = stream_segments.stamp_session_frame(session, event, payload)
+    try:
+        return write_json(_event_frame(event, sid, payload))
+    finally:
+        if session is not None and event in {"message.complete", "error"}:
+            session.pop(stream_segments.SESSION_KEY, None)
 
 
 from tui_gateway import server_requests as _server_requests  # noqa: E402
@@ -1334,7 +1346,11 @@ def _load_cfg_raw() -> dict:
     from qubit_cli.config_read_errors import FailedConfigRead
     try:
         p = _active_config_path()
-        sig = file_signature(p.stat()) if p.exists() else None
+        from qubit_cli import config_backend
+        try:
+            sig = config_backend.config_version(p)
+        except FileNotFoundError:
+            sig = None
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)
@@ -1368,7 +1384,8 @@ def _save_cfg(cfg: dict, *, allow_deletions: bool = False):
     with _cfg_lock:
         _cfg_cache, _cfg_path = copy.deepcopy(cfg), path
         try:
-            _cfg_sig = file_signature(path.stat())
+            from qubit_cli import config_backend
+            _cfg_sig = config_backend.config_version(path)
         except Exception:
             _cfg_sig = None
 
@@ -1611,7 +1628,8 @@ def _resolve_model() -> str:
     with contextlib.suppress(Exception):
         from qubit_cli.models import get_preferred_silent_default_model
         return get_preferred_silent_default_model()
-    return "z-ai/glm-5.2"
+    from qubit_cli.models_catalog_static import PREFERRED_SILENT_DEFAULT_MODEL
+    return PREFERRED_SILENT_DEFAULT_MODEL
 
 
 def _resolve_session_platform() -> str:
@@ -1620,6 +1638,12 @@ def _resolve_session_platform() -> str:
     desktop = is_truthy_value(os.environ.get("HERMES_DESKTOP") or os.environ.get("QUBIT_DESKTOP"))
     terminal = os.environ.get("HERMES_DESKTOP_TERMINAL") or os.environ.get("QUBIT_DESKTOP_TERMINAL")
     return "desktop" if desktop and not is_truthy_value(terminal) else "tui"
+
+
+def _sanitize_client_source(source) -> str:
+    """A client-named source, kept only when it is a known local surface; else the TUI default."""
+    text = str(source or "").strip().lower()
+    return text if text in {"tui", "desktop", "cli", "acp", "gui", "oneshot"} else "tui"
 
 
 def _resolve_session_source(explicit: str | None) -> str:
@@ -2844,7 +2868,7 @@ def _hydrate_session_cwd(sid: str, key: str, session_db, profile_home: str | Non
                 with _sessions_lock:
                     if sid in _sessions:
                         _sessions[sid]["cwd"] = row["cwd"]
-                        if remote:
+                        if remote or not _host_cwd_is_terminal_cwd(profile_home):
                             _sessions[sid]["explicit_cwd"] = True
                 # Lazy desktop rows already carry their explicitly chosen cwd, so they never reach the fresh-cwd
                 # branch below. Claim a generation before probing to keep an older probe from overwriting a later
@@ -3799,7 +3823,8 @@ from . import (  # noqa: E402
     methods_complete as _methods_complete, methods_config as _methods_config,
     methods_config_set as _methods_config_set, methods_images as _methods_images,
     methods_profiles as _methods_profiles, methods_prompt as _methods_prompt, methods_session as _methods_session,
-    methods_tools as _methods_tools, prompt_turn as _prompt_turn, billing_view as _billing_view,
+    methods_tools as _methods_tools, methods_tools_plugin_servers as _methods_tools_plugin_servers,
+    prompt_turn as _prompt_turn, billing_view as _billing_view,
     methods_projects as _methods_projects, methods_session_foreign as _methods_session_foreign,
     methods_session_control as _methods_session_control, methods_subagents as _methods_subagents,
     methods_vault as _methods_vault, methods_free_tier as _methods_free_tier,
@@ -3816,7 +3841,8 @@ for _m in (
     _prompt_attachments, _session_history, _agent_callbacks, _session_auto_continue, _plugin_inject, _rpc_dispatch,
     _methods_complete_helpers, _methods_slash, _methods_voice, _methods_browser,
     _methods_browser_control, _methods_session, _methods_prompt, _methods_config,
-    _methods_config_set, _methods_complete, _methods_tools, _methods_profiles, _methods_images,
+    _methods_config_set, _methods_complete, _methods_tools, _methods_tools_plugin_servers,
+    _methods_profiles, _methods_images,
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
     _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors,
     _methods_connectors_account, _methods_display, _methods_display_watch, _methods_onboarding,

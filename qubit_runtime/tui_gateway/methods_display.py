@@ -160,8 +160,18 @@ def _(rid, params: dict) -> dict:
         if _bd_runtime.rfb_socket_path() is None and not _bd_runtime.sandbox_screen_running():
             return _err(rid, _DISPLAY_ERR, "this profile's Bot Desktop is not running; call display.start first")
         viewer_id = _mint_viewer_id(str(params.get("viewer_id") or "").strip())
-        ticket = mint_ticket(user_id=f"display:{viewer_id}", provider="bot-desktop",
-                             extra={"hermes_home": str(get_qubit_home()), "viewer_id": viewer_id})
+        extra = {"hermes_home": str(get_qubit_home()), "viewer_id": viewer_id}
+        # The asking browser tab's credential generation rides the ticket so signing out that tab
+        # closes this viewer too; a native client (no tracked socket) carries none.
+        try:
+            from qubit_cli import web_session_sockets
+            ws = getattr(_caller_transport(), "ws", None)
+            admitted = web_session_sockets.admission_of(ws) if ws is not None else None
+        except Exception:
+            admitted = None
+        if admitted is not None:
+            extra["admitted_with"] = admitted
+        ticket = mint_ticket(user_id=f"display:{viewer_id}", provider="bot-desktop", extra=extra)
         return _ok(rid, {"ticket": ticket, "path": "/api/display/ws", "viewer_id": viewer_id,
                          **_display_snapshot()})
     except Exception as e:
@@ -240,6 +250,10 @@ def _(rid, params: dict) -> dict:
         return _err(rid, _DISPLAY_ERR, "viewer_id required")
     if (refused := _foreign_viewer_id(rid, viewer_id)) is not None:
         return refused
+    # A takeover is use of the screen: stamp activity before the transition becomes visible, so the
+    # idle stop never reads a just-acquired lease against the previous viewer's stale stamp.
+    from tools.bot_desktop import runtime as _bd_runtime
+    _bd_runtime.touch_activity()
     lease = _bd_lease.acquire(viewer_id, reason=str(params.get("reason") or ""))
     return _ok(rid, {"lease": _bd_lease.public_view(lease)})
 

@@ -701,7 +701,7 @@ def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
 
 def ensure_portal_identity(
     *, explicit: bool, timeout_seconds: float = GUEST_MINT_TIMEOUT_SECONDS, force: bool = False,
-    welcome_claim: bool = False,
+    welcome_claim: bool = False, allow_gated: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Make sure this profile has a Qubit identity (guest or account); mint a guest only if the shared
     store has none. Returns the ``providers.qubit`` state, or None (disabled / failed once already).
@@ -723,7 +723,12 @@ def ensure_portal_identity(
     """
     if not explicit:
         raise ValueError("ensure_portal_identity: only explicit creators may call this (explicit=True)")
-    if not guest_enabled():
+    # The welcome trial is its own opt-in (the desktop's local backend), so it respects only the
+    # ``nous.guest`` switch; the launch gate (HERMES_GUEST_ONBOARDING) governs ordinary guests.
+    if welcome_claim:
+        if not guest_allowed():
+            return None
+    elif not guest_enabled() and not allow_gated:
         return None
     failure = _mint_failure_for_profile()
     if failure and not force and not current_nous_state() and time.monotonic() < failure.not_before:

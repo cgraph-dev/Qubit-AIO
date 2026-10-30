@@ -26,7 +26,9 @@ def root(tmp_path, monkeypatch) -> Path:
     monkeypatch.setattr(server, "_db", None)
     monkeypatch.setattr("agent.onboarding_facts.read_facts", lambda **kw: FACTS)
     (home / ".env").write_text("OPENROUTER_API_KEY=sk-or-test\n", encoding="utf-8")  # a model to run on
-    return home
+    from qubit_cli import process_identity
+    with process_identity.serving_local_desktop(True):
+        yield home
 
 
 @pytest.fixture

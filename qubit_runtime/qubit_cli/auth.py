@@ -1902,7 +1902,7 @@ def _resolve_nous_access_token(
                                   headers={"Accept": "application/json"}, verify=verify) as client:
                     minted = refresh_guest_state(state, client, purpose="connectors")
                 persist()
-                _write_shared_nous_state(state, renewal=True)
+                _write_shared_nous_state(state, renewal=False)
                 return _memo(minted)
 
             merged_shared = _merge_shared_nous_oauth_state(state)

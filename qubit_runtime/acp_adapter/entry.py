@@ -145,7 +145,7 @@ def _run_setup_browser(assume_yes: bool = False) -> int:
     import pm
 
     try:
-        pm.ensure("chromium", explicit=True)
+        pm.ensure("agent-browser", explicit=True)
     except (pm.InstallError, OSError) as exc:
         print(f"Browser setup failed: {exc}", file=sys.stderr)
         return 1

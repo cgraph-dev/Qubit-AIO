@@ -117,7 +117,8 @@ class CanonicalSnapshotInfo(SessionInventoryFields):
     profile_id: str | None = None
     profile_name: str | None = None
     cwd: str | None = None
-    edit_approval_policy: Literal['ask', 'workspace_session', 'session'] | None = None
+    # An ACP session's edit approval policy (``session.mutate edit_policy``): ask / workspace_session / session.
+    edit_approval_policy: Literal["ask", "workspace_session", "session"] | None = None
     launch_request: dict[str, JsonValue] | None = None
     reasoning_effort: str | None = None
     reasoning_effort_wire: str | None = None

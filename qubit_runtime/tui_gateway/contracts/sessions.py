@@ -723,6 +723,7 @@ method("terminal.resize", params=TerminalResizeParams, result=TerminalResizeResu
 
 class SessionEventsSinceParams(SessionParams):
     last_seen: int | None = None
+    replay_epoch: str | None = None
 
 
 class SessionEventsSinceResult(Result):

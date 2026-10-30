@@ -24,8 +24,12 @@ def _bot_mode_delivery_text(response: Any, *, successful: bool) -> Any:
     Mode delivery boundary.  Failed turns intentionally fail open so their
     diagnostic text is never swallowed.
     """
-    from gateway.response_filters import is_intentional_silence_response
-    return "" if successful and is_intentional_silence_response(response) else response
+    from gateway.response_filters import is_intentional_silence_response, strip_trailing_silence_marker
+    if successful:
+        if is_intentional_silence_response(response):
+            return ""
+        return strip_trailing_silence_marker(response)
+    return response
 
 
 def _is_bot_mode_session(session: dict) -> bool:
@@ -116,7 +120,7 @@ def _plan_goal_compression_recovery(
 def _admit_prompt_turn(
     sid: str, session: dict, text: Any, image_paths: list[str] | None,
     queued_prompt_generation: int | None, display_kind: str | None,
-    display_metadata: dict | None) -> tuple[list[str], Any] | None:
+    display_metadata: dict | None, report_ownership_refusal: bool = True) -> tuple[list[str], Any] | None:
     """Ownership + liveness gate every turn source must cross; ``(images, agent)`` or None.
     Synthesized turns (auto-continue, wake-ups) call ``_run_prompt_submit`` directly — the
     bypass that once let a second backend run a duplicate turn."""
@@ -130,7 +134,8 @@ def _admit_prompt_turn(
         with session["history_lock"]:
             session["running"] = False
             session.pop("_submit_user_row", None)  # no turn runs: the submit-time row stays as the send
-        _emit("error", sid, {"message": str(ownership_refusal)})
+        if report_ownership_refusal:
+            _emit("error", sid, {"message": str(ownership_refusal)})
         return None
     with session["history_lock"]:
         if session.get("_closing") or (
@@ -744,20 +749,15 @@ def _invoke_agent(
     agent = st.agent
     st.compression_count = getattr(getattr(agent, "context_compressor", None), "compression_count", None)
     # Bot Chat mirrors gateway.stream_consumer: deltas are withheld while the streamed buffer
-    # could still resolve to a silence marker ("NO"->"NO_REPLY"), so a bare marker is never
-    # shown and then retracted (the client keeps streamed text when message.complete is "").
-    hold = {"buf": "", "held": ""} if _is_bot_mode_session(session) else None
+    # could still resolve to a silence marker ("NO"->"NO_REPLY") or while its LAST line could,
+    # so a bare marker is never shown and then retracted (the client keeps streamed text when
+    # message.complete is ""). A held last line that never became one arrives in full at finish.
+    hold = None
+    if _is_bot_mode_session(session):
+        from gateway.response_filters import SilenceMarkerStreamHold
+        hold = SilenceMarkerStreamHold()
 
-    def _stream(delta):
-        if getattr(agent, "_mute_notification_reply", False):
-            return
-        if hold is not None and isinstance(delta, str):
-            from gateway.response_filters import is_partial_silence_marker
-            hold["buf"] += delta
-            if is_partial_silence_marker(hold["buf"]):
-                hold["held"] += delta
-                return
-            delta, hold["held"] = hold["held"] + delta, ""
+    def _emit_delta(delta):
         with session["history_lock"]:
             _append_inflight_delta(session, delta)
         payload = {"text": delta}
@@ -766,6 +766,15 @@ def _invoke_agent(
         if st.tts_queue is not None and isinstance(delta, str):
             st.tts_queue.put(delta)
         _emit("message.delta", sid, payload)
+
+    def _stream(delta):
+        if getattr(agent, "_mute_notification_reply", False):
+            return
+        if hold is not None and isinstance(delta, str):
+            delta = hold.feed(delta)
+            if not delta:
+                return
+        _emit_delta(delta)
 
     # Interim assistant text (commentary beside tool calls, pre-nudge final answer) is sealed
     # by the desktop as its own segment instead of being lost to message.complete.
@@ -819,6 +828,10 @@ def _invoke_agent(
         # roll the client's usage back to a stale snapshot (unbounded join: same worst case).
         _usage_stop.set()
         _usage_thread.join()
+        if hold is not None:
+            tail = hold.finish()
+            if tail:
+                _emit_delta(tail)
 
 
 def _absorb_turn_result(
@@ -947,10 +960,12 @@ def _complete_turn_payload(session: dict, st: _TurnRun, status_note: str | None,
         except Exception:
             _error_surface = None
     raw, status, last_reasoning = _turn_outcome(result, _error_surface)
+    stored_raw = raw
     if _is_bot_mode_session(session):
         raw = _bot_mode_delivery_text(raw, successful=status == "complete")
     payload = {"text": raw, "usage": _get_usage(agent), "status": status}
-    if receipt := _persisted_turn_receipt(st, raw, status):
+    # The stored row keeps the marker; the receipt binds it by the body that was persisted.
+    if receipt := _persisted_turn_receipt(st, stored_raw, status):
         payload["persisted_turn"] = receipt
     if last_reasoning:
         payload["reasoning"] = last_reasoning
@@ -1133,7 +1148,7 @@ def _run_prompt_submit(
     display_metadata: dict | None = None, image_paths: list[str] | None = None,
     queued_prompt_generation: int | None = None,
     terminal_callback: Callable[[dict[str, Any]], None] | None = None,
-    turn_author: dict | None = None) -> bool:
+    turn_author: dict | None = None, report_ownership_refusal: bool = True) -> bool:
     # Every dispatch binds the session's own row (session_key, real source) before the turn writes:
     # the synthesized turns that enter here directly (crash auto-continue, queued-prompt drain,
     # wake-ups) bypass prompt.submit's persist, and a row-less turn is otherwise materialized by
@@ -1143,7 +1158,8 @@ def _run_prompt_submit(
             "prompt dispatch: session store unavailable for %s — this turn may not persist",
             session.get("session_key") or sid)
     admitted = _admit_prompt_turn(
-        sid, session, text, image_paths, queued_prompt_generation, display_kind, display_metadata)
+        sid, session, text, image_paths, queued_prompt_generation, display_kind, display_metadata,
+        report_ownership_refusal=report_ownership_refusal)
     if admitted is None:
         return False
     images, agent = admitted

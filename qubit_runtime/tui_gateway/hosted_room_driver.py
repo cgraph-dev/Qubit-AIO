@@ -251,14 +251,17 @@ class HostedRoomRuntime:
             "cancel kept losing races with task transitions "
             f"(last observed state '{final['status']}')")
 
-    def retry_indeterminate(
-        self, identity: state.TaskIdentity, *, execution_generation: int | None = None) -> dict[str, Any]:
-        """Explicitly retry one uncertain attempt under the current room lease."""
+    def retry_indeterminate(self, identity: state.TaskIdentity, *,
+                            execution_generation: int | None = None) -> dict[str, Any]:
+        """Explicitly retry one uncertain attempt under the current room lease.
+
+        *execution_generation* is the row the caller saw: a Retry that lands after another attempt
+        advanced the task must not requeue the newer work."""
         task = state.get_task(self.db_path, identity)
-        # The write below fences on this re-read generation, so pinning it to the
-        # caller's selected attempt keeps a stale Retry off a newer attempt.
-        if execution_generation not in (None, task["execution_generation"]):
-            raise state.StaleTaskError("task attempt changed before retry")
+        if (execution_generation is not None
+                and task["execution_generation"] != execution_generation):
+            raise state.StaleTaskError(
+                f"task advanced to execution generation {task['execution_generation']}")
         if task["status"] not in {"indeterminate", "deferred"}:
             raise state.InvalidTaskTransitionError(f"cannot retry task in state '{task['status']}'")
         binding = self._binding_for_room(identity.room_id)
@@ -653,7 +656,9 @@ class HostedRoomRuntime:
                         attempt, f"was not admitted; queued for retry in {delay:g}s")
             elif submit_attempted:
                 self._mark_ambiguous(binding, attempt)
-                self._record_task_error(attempt, f"observation failed after submit: {exc}")
+                reason = str(getattr(exc, "reason", "") or "")
+                safe = reason if reason.isidentifier() and reason.islower() and len(reason) <= 64 else "attempt_failed"
+                self._record_task_error(attempt, f"observation failed after submit: {safe}")
             else:
                 self._settle_failure_if_current(attempt, exc)
         finally:
@@ -929,6 +934,13 @@ class HostedRoomRuntime:
 
     def _record_task_error(self, attempt: state.TaskAttempt, message: str) -> None:
         self._record_error(f"task {attempt.identity.task_id} {message}")
+        # A fixed code only: the exception body may carry prompt text or credentials.
+        reason = "attempt_failed"
+        for code in ("request_too_large", "not_admitted", "fenced"):
+            if code in message:
+                reason = code
+                break
+        logger.warning("hosted room task %s failed: %s", attempt.identity.task_id, reason)
 
     def _record_error(self, message: str) -> None:
         with self._status_lock:

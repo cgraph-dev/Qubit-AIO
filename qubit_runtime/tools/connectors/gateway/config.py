@@ -141,15 +141,11 @@ def ensure_guest_identity() -> Optional[str]:
     a refusal, a rate limit or an unreachable portal, with the wait when there is one."""
     if not guest_identity_pending():
         return None
-    from qubit_cli.anon_auth import ensure_portal_identity, guest_enabled
-    if not guest_enabled():
-        # No identity may be created on this process (the launch gate is off): nothing to set up,
-        # and no failure to report — connectors remain usable only if an identity already exists.
-        return None
+    from qubit_cli.anon_auth import ensure_portal_identity
     from qubit_cli.auth_constants import AuthError
 
     try:
-        if ensure_portal_identity(explicit=True) is not None:
+        if ensure_portal_identity(explicit=True, allow_gated=True) is not None:
             return None
     except AuthError as exc:
         return _SETUP_FAILED + str(exc)

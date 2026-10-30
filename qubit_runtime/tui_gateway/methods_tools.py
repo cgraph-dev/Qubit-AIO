@@ -1708,6 +1708,9 @@ def _plugin_rows() -> list[dict]:
     # "Update to <pin>" affordance; titles feed the server sentence).
     pins, versions, _titles = cat.catalog_rows_maps()
     ref_pins = pc._read_install_metadata()  # ``--ref`` installs: pinned_sha so the desktop can show the pin
+    # ``tools``: exactly what each plugin's own code registered (never a manifest claim); a portable
+    # package owns its own MCP servers' tools, live or lazily cached.
+    ownership = _plugin_tool_ownership()
     out = []
     active = pc._category_active_names()
     for name, version, desc, source, _dir, key in sorted(pc._discover_all_plugins()):
@@ -1721,9 +1724,10 @@ def _plugin_rows() -> list[dict]:
         portable = pc._is_portable_plugin_dir(_dir)
         out.append({
             "name": name, "key": key, "version": str(version or ""), "description": desc or "",
-            "source": source, "status": status, "portable": portable,
+            "source": source, "status": status, "portable": portable, "tools": ownership.get(key, []),
             "install_dir": str(_dir_path) if _dir_path else "",
-            "has_desktop_half": bool(_dir_path and (_dir_path / "desktop" / "plugin.js").is_file()),
+            "has_desktop_half": bool(_dir_path and (
+                (_dir_path / "desktop" / "plugin.js").is_file() or (_dir_path / "plugin.js").is_file())),
             # Manifest ``config_schema`` + current values: the Plugins hub renders these as a form.
             "settings_schema": _tools_mod("qubit_cli.plugins_settings").plugin_settings_fields(key, _dir_path),
             "servers": _plugin_server_rows(_dir_path, key, portable=portable),
@@ -1863,6 +1867,8 @@ def _plugins_settings(rid, params):
             canonical, Path(str(plugin_dir)) if plugin_dir else None, values)
     except (ValueError, PermissionError) as e:
         return _err(rid, 4021, str(e))
+    # A portable package's Desktop half applies a settings change without polling.
+    _broadcast_global_event(f"plugin.{canonical}.settings.changed", {"written": written})
     row = next((r for r in _plugin_rows() if r["key"] == canonical), None)
     return _ok(rid, {"ok": True, "name": canonical, "written": written, "plugin": row})
 
@@ -1979,3 +1985,11 @@ def _portable_server_names(plugin_dir: Path, key: str) -> set[str]:
     package = _tools_mod("qubit_cli.agent_plugins").load_agent_plugin(plugin_dir, plugin_dir)
     name_for = _tools_mod("qubit_cli.plugins_manifest").portable_mcp_server_name
     return {name_for(key, server) for server in package.mcp_servers}
+
+
+# Read-only inspect + desktop-half install/remove are dispatched actions too (ported 088f).
+_PLUGINS_ACTIONS.update({
+    "inspect": _plugins_inspect,
+    "install_desktop": _plugins_install_desktop,
+    "remove_desktop": _plugins_remove_desktop,
+})

@@ -21,7 +21,8 @@ def _resolve_model() -> str:
     with contextlib.suppress(Exception):
         from qubit_cli.models import get_preferred_silent_default_model
         return get_preferred_silent_default_model()
-    return "z-ai/glm-5.2"
+    from qubit_cli.models_catalog_static import PREFERRED_SILENT_DEFAULT_MODEL
+    return PREFERRED_SILENT_DEFAULT_MODEL
 
 
 def _resolve_session_platform() -> str:
@@ -446,6 +447,18 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
         if fallback_notice is not None:
             _tui_notice("[tui] no valid HERMES_TUI_TOOLSETS entries and configured CLI toolsets could not be loaded; enabling all toolsets")
         return None
+
+
+def _carry_onboarding_toolset(enabled, agent):
+    """A tool refresh keeps the onboarding toolset the agent was built with."""
+    from agent.onboarding_session import carry_onboarding_toolset
+    return carry_onboarding_toolset(enabled, agent)
+
+
+def _onboarding_toolsets(enabled, db, session_id):
+    """The session-gated ``onboarding`` toolset folded into an active first-run chat's toolsets."""
+    from agent.onboarding_session import onboarding_toolsets
+    return onboarding_toolsets(enabled, db, session_id)
 
 
 def _load_disabled_toolsets() -> list[str] | None:

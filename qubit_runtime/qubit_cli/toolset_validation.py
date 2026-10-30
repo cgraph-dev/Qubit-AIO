@@ -33,7 +33,7 @@ def parse_platform_toolsets_value(value: object) -> Optional[list[str]]:
 
 def _platform_default_toolset(platform: object) -> str:
     info = PLATFORMS.get(platform)
-    return info.default_toolset if info is not None else f"qubit-{platform}"
+    return info.default_toolset if info is not None else f"hermes-{platform}"
 
 
 @cache

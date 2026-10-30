@@ -188,6 +188,10 @@ def _list(server, rid, home, params: dict) -> dict | None:
     handed = handed_room_ids(default_db_path()) if default_db_path().is_file() else set()
     root_endpoint = owner_endpoint(root) if handed and home.resolve() != root.resolve() else None
     if endpoint is None and root_endpoint is None:
+        if handed:
+            # Rooms handed to the gateway are fenced here: with its gateway down the standalone
+            # listing must not show a frozen copy of them.
+            return server._ok(rid, {"rooms": [], "next_offset": None})
         return None  # the local listing (gateway-less) is the whole list
     if endpoint is None:
         reply = server._ok(rid, {"rooms": [], "next_offset": None})
