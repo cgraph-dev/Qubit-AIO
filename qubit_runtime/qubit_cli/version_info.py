@@ -303,6 +303,16 @@ def get_version_info() -> VersionInfo:
     return info
 
 
+def hermes_user_agent(product: str = "qubit-cli") -> str:
+    """``<product>/<base version>`` for an outbound request.
+
+    Call it where the request is built, never at module level: a source checkout resolves the
+    release from git, so a module-level read made every Qubit start pay that walk whether or not
+    it ever sent the request.
+    """
+    return f"{product}/{get_version_info().base_version}"
+
+
 def get_code_identity(refresh: bool = False) -> dict:
     """Return the running install's code identity as a flat dict.
 
