@@ -35,10 +35,10 @@ async def test_cancel_uses_observed_generation_and_mutations_fail_explicitly(tmp
         await agent.set_session_model(session_id="shared", model_id="new-model")
     methods = [method for method, _ in calls]
     assert methods and set(methods) <= {"session.resume", "session.mutate"}, methods
-    # Edit-policy mode is still unsupported and must not reach the authority at all.
+    # An unknown edit-policy mode is refused before the authority is touched.
     before = len(calls)
-    with pytest.raises(GatewayClientError, match="unavailable"):
-        await agent.set_session_mode(session_id="shared", mode_id="dont_ask")
+    with pytest.raises(GatewayClientError, match="invalid_params"):
+        await agent.set_session_mode(session_id="shared", mode_id="yolo")
     assert len(calls) == before, "Unsupported operations must not reach an alternate writer"
 
 
