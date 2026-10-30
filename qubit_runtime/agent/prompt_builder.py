@@ -29,7 +29,7 @@ from agent.skill_utils import (
     skill_matches_platform, skill_matches_platform_list,
 )
 from tools.threat_patterns import scan_for_threats as _scan_for_threats
-from utils import atomic_json_write, file_signature
+from utils import atomic_json_write, file_cache_version, file_signature
 
 logger = logging.getLogger(__name__)
 
@@ -1128,7 +1128,7 @@ def _build_skills_manifest(skills_dir: Path) -> dict[str, list[int]]:
     org_root = os.path.join(skills_dir_str, ORG_MIRROR_DIR_NAME)
     try:
         st = os.stat(os.path.join(org_root, ORG_ACTIVE_MARKER))
-        manifest[ORG_MIRROR_DIR_NAME + "/" + ORG_ACTIVE_MARKER] = list(file_signature(st))
+        manifest[ORG_MIRROR_DIR_NAME + "/" + ORG_ACTIVE_MARKER] = list(file_cache_version(os.path.join(org_root, ORG_ACTIVE_MARKER), st, always_digest=True))
     except OSError:
         pass
     for root, dirs, files in os.walk(skills_dir_str, followlinks=True):
@@ -1143,7 +1143,7 @@ def _build_skills_manifest(skills_dir: Path) -> dict[str, list[int]]:
             try:
                 if filename in files:
                     st = os.stat(path)
-                    manifest[path[prefix_len:]] = list(file_signature(st))
+                    manifest[path[prefix_len:]] = list(file_cache_version(path, st, always_digest=True))
             except OSError:
                 pass
     return manifest

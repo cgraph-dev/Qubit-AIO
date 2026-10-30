@@ -449,6 +449,14 @@ class ClientLifecycleMixin:
         # No SDK retry loop: the outer loop owns retries/rotation/fallback, and SDK retries stretch a hung
         # request ~3x past our stale detector.
         request_kwargs["max_retries"] = 0
+        if self._api_kwargs_have_image_parts(api_kwargs or {}):
+            # Image requests get the route's image client headers on a request-scoped client (cache-keyed apart).
+            from agent.provider_route_hooks import route_answer
+            image_headers = route_answer("client_headers", provider=self.provider or "", scope=self,
+                                         base_url=str(request_kwargs.get("base_url", "")),
+                                         api_key=str(request_kwargs.get("api_key", "") or ""), has_images=True)
+            if image_headers:
+                request_kwargs["default_headers"] = {**(request_kwargs.get("default_headers") or {}), **image_headers}
         is_copilot = base_url_host_matches(str(request_kwargs.get("base_url", "")), "githubcopilot.com")
         if is_copilot and self._api_kwargs_have_image_parts(api_kwargs or {}):
             from qubit_cli.copilot_auth import copilot_request_headers
