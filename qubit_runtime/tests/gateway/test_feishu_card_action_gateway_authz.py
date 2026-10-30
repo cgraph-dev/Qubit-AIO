@@ -14,14 +14,29 @@ import pytest
 
 
 def _ensure_feishu_mocks():
-    if importlib.util.find_spec("lark_oapi") is None and "lark_oapi" not in sys.modules:
-        mod = MagicMock()
-        for name in ("lark_oapi", "lark_oapi.api.im.v1", "lark_oapi.event", "lark_oapi.event.callback_type"):
+    # Another gateway test module may have already installed a plain mock for lark_oapi.
+    # Such a stub has no ``__spec__``, and ``find_spec`` raises ValueError on it — so check
+    # sys.modules first and treat an existing (unloadable) stub as the mock it is.
+    if "lark_oapi" not in sys.modules:
+        try:
+            installed = importlib.util.find_spec("lark_oapi") is not None
+        except (ImportError, ValueError):
+            installed = False
+        if not installed:
+            sys.modules["lark_oapi"] = MagicMock()
+    if "lark_oapi" in sys.modules:
+        mod = sys.modules["lark_oapi"]
+        for name in ("lark_oapi.api.im.v1", "lark_oapi.event", "lark_oapi.event.callback_type"):
             sys.modules.setdefault(name, mod)
-    if importlib.util.find_spec("aiohttp") is None and "aiohttp" not in sys.modules:
-        aio = MagicMock()
-        sys.modules.setdefault("aiohttp", aio)
-        sys.modules.setdefault("aiohttp.web", aio.web)
+    if "aiohttp" not in sys.modules:
+        try:
+            installed = importlib.util.find_spec("aiohttp") is not None
+        except (ImportError, ValueError):
+            installed = False
+        if not installed:
+            aio = MagicMock()
+            sys.modules["aiohttp"] = aio
+            sys.modules.setdefault("aiohttp.web", aio.web)
 
 
 _ensure_feishu_mocks()
