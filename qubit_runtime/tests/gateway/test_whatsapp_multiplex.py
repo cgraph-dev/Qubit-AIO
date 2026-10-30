@@ -9,6 +9,7 @@ from gateway.config import Platform, PlatformConfig
 from gateway.run import _platform_has_bot_credential, _profile_runtime_scope
 from plugins.platforms.whatsapp.adapter import WhatsAppAdapter
 
+
 def test_credentials_follow_profile_home(tmp_path):
     a, b = tmp_path / "a", tmp_path / "b"
     for home in (a, b):
@@ -23,10 +24,10 @@ def test_credentials_follow_profile_home(tmp_path):
     from qubit_cli import gateway_multiplex_served as served
     from unittest.mock import patch
     write_runtime_status(platform="work:whatsapp", platform_state="disabled",
-                         error_code="whatsapp_unpaired", error_message="pair it: qubit -p work whatsapp")
+                         error_code="whatsapp_unpaired", error_message="pair it: hermes -p work whatsapp")
     with patch.object(served, "live_default_gateway_pid", return_value=os.getpid()):
         assert served.served_profile_unserved_platforms("work") == {
-            "whatsapp": "pair it: qubit -p work whatsapp"}
+            "whatsapp": "pair it: hermes -p work whatsapp"}
 
 
 @pytest.mark.asyncio
@@ -88,6 +89,37 @@ def _hold_port():
     sock.bind(("127.0.0.1", 0))
     sock.listen()
     return sock, sock.getsockname()[1]
+
+
+@pytest.mark.platforms("posix")  # POSIX TIME-WAIT bind semantics
+def test_time_wait_leftovers_are_not_a_foreign_listener(tmp_path):
+    """Real kernel TIME-WAIT, no mocks: the stopped bridge closed its accepted connection first, so
+    the port carries a TIME-WAIT entry and no listener. The ownership check must call it free (#139425),
+    while a real listener on the same port still fails closed."""
+    from plugins.platforms.whatsapp.bridge_ownership import check_secondary_ownership, port_is_free
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    port = listener.getsockname()[1]
+    client = socket.create_connection(("127.0.0.1", port))
+    accepted, _ = listener.accept()
+    accepted.close()  # server side closes first -> TIME-WAIT lands on the bridge port
+    client.recv(1)
+    client.close()
+    listener.close()
+    session = tmp_path / "session"
+    session.mkdir()
+    assert port_is_free(port)
+    assert check_secondary_ownership(session, port) == "free"
+    sock = socket.socket()
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("127.0.0.1", port))
+    sock.listen()
+    with sock:
+        assert not port_is_free(port)
+        with pytest.raises(ValueError, match="does not own"):
+            check_secondary_ownership(session, port)
 
 
 def test_allocation_skips_ports_recorded_by_siblings(tmp_path):

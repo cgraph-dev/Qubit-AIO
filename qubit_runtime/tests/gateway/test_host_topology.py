@@ -19,12 +19,8 @@ def host_gateway(tmp_path, monkeypatch):
     locks.mkdir()
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(locks))
     monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
-    # A real publishing gateway CLAIMS the host lock before it publishes its record, and
-    # ``record_names_live_owner`` treats a free lock as falsifying the record (a recycled PID must
-    # not read as a live owner). Publishing without the claim therefore models a state the runtime
-    # can never reach.
-    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
-    assert exc is None, f"claim_host_lock failed: {exc}"
+    # A live owner holds the host lock for its lifetime (run.py claims before it publishes).
+    assert hr.claim_host_lock(hr.ROLE_GATEWAY)[0] is hr.HostLockOutcome.ACQUIRED
     hr.publish_record(hr.ROLE_GATEWAY, profiles=("default", "coder"))
     yield root
     hr.release_host_lock(hr.ROLE_GATEWAY)
@@ -81,7 +77,7 @@ def test_record_without_createtime_is_never_the_host_gateway(host_gateway, monke
     assert host_topology.host_gateway_topology() is None
 
 
-def test_topology_ignores_another_tenants_record_and_reads_the_launch_homes_state(tmp_path, monkeypatch):
+def test_topology_ignores_another_tenants_record_and_reads_the_launch_homes_state(tmp_path, monkeypatch, request):
     """#121352 reporting half: a record from ANOTHER Hermes root is not this tenant's host gateway
     (doctor / cron status / the dashboard ladder), and a NAMED-hosted multiplexer's platforms are read
     from the home that launched it, not from a stale standalone record at the default root."""
@@ -91,18 +87,16 @@ def test_topology_ignores_another_tenants_record_and_reads_the_launch_homes_stat
     from gateway import host_rendezvous as hr
     from gateway import host_topology, status
 
-    root_a, root_b = tmp_path / "qubit-a", tmp_path / "qubit-b"
+    root_a, root_b = tmp_path / "hermes-a", tmp_path / "hermes-b"
     argus = root_b / "profiles" / "argus"
     argus.mkdir(parents=True)
-    monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.setenv("QUBIT_HOME", str(root_b))
     monkeypatch.setattr("qubit_constants._default_qubit_root_memo", None)
 
-    # Same reason as the host_gateway fixture: a record only names a live owner while its role's
-    # host lock is held, and claiming is what the real publishing gateway does first.
-    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
-    assert exc is None, f"claim_host_lock failed: {exc}"
-
+    # A live owner holds the host lock for its lifetime (run.py claims before it publishes).
+    assert hr.claim_host_lock(hr.ROLE_GATEWAY)[0] is hr.HostLockOutcome.ACQUIRED
+    request.addfinalizer(lambda: hr.release_host_lock(hr.ROLE_GATEWAY))
     hr.publish_record(hr.ROLE_GATEWAY, profiles=("default", "coder"), home=str(root_a))
     assert host_topology.host_gateway_topology() is None
 
@@ -118,3 +112,39 @@ def test_topology_ignores_another_tenants_record_and_reads_the_launch_homes_stat
     resolved = status.multiplexer_liveness_for_profile(root_b)
     assert resolved is not None and resolved[0] == os.getpid()
     assert set(resolved[1]["platforms"]) == {"telegram"}
+
+
+def test_a_live_looking_pid_with_a_free_host_lock_is_not_the_host_gateway(tmp_path, monkeypatch):
+    """#133744 start-tick collision: createTime matches a recycled pid after a reboot, yet nothing
+    holds the host lock. Topology/status (and the update/shutdown multiplex checks that share the
+    predicate) must not report that pid as the running host gateway."""
+    import json
+    import subprocess
+    import sys
+
+    from gateway import host_rendezvous as hr
+    from gateway import host_topology
+    from gateway.status import get_process_start_time
+
+    root = tmp_path / "hermes"
+    root.mkdir()
+    monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("QUBIT_HOME", str(root))
+    monkeypatch.setattr("qubit_constants._default_qubit_root_memo", None)
+    monkeypatch.setattr("qubit_cli.gateway_multiplex_served.live_default_gateway_pid", lambda: None)
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        hr.ensure_host_state_dir()
+        hr.record_path(hr.ROLE_GATEWAY).write_text(json.dumps({
+            "role": hr.ROLE_GATEWAY, "home": str(root), "pid": child.pid,
+            "createTime": hr.process_create_time(child.pid),
+            "startTime": get_process_start_time(child.pid), "host": "", "port": None,
+            "protocolVersion": hr.HOST_PROTOCOL_VERSION, "tokenFingerprint": "",
+            "profiles": ["default", "coder"], "updatedAt": "",
+        }), encoding="utf-8")
+        record = hr.read_record(hr.ROLE_GATEWAY)
+        assert record is not None and hr.liveness_is_proven(record)  # the pid really looks alive
+        assert host_topology.host_gateway_topology() is None
+    finally:
+        child.kill()
+        child.wait(timeout=10)
