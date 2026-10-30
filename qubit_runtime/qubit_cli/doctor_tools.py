@@ -373,14 +373,13 @@ def _check_chromium(should_fix: bool) -> None:
         check_info(chromium_missing_hint())
 
 def _check_lightpanda() -> None:
-    """Lightpanda engine (browser.engine / AGENT_BROWSER_ENGINE); independent of Node since Browser Use mode spawns ``lightpanda serve`` itself."""
+    """Lightpanda engine (browser.engine); browser_exec spawns ``lightpanda serve`` itself."""
     try:
-        from tools.browser_tool_lightpanda_fallback import _using_lightpanda_engine, lightpanda_engine_status
-        from tools.browser_lightpanda import LIGHTPANDA_INSTALL_HINT, find_lightpanda_binary
-    except Exception:
+        from tools.browser_lightpanda import (
+            LIGHTPANDA_INSTALL_HINT, find_lightpanda_binary, lightpanda_engine_status, using_lightpanda_engine)
+    except ImportError:  # a broken browser module is surfaced by the tool-availability rows
         return
-    # _using_lightpanda_engine() is a cached config read — a failure there is exceptional, not hidden.
-    if not _using_lightpanda_engine():
+    if not using_lightpanda_engine():
         return
     try:
         used, reason = lightpanda_engine_status()
@@ -393,8 +392,6 @@ def _check_lightpanda() -> None:
                         ("Lightpanda selected but binary not found", "(browser tools will fail until it is installed)")):
         check_info(LIGHTPANDA_INSTALL_HINT)
 
-
-@doctor_check()
 def _check_node_and_browser(should_fix: bool, f: Finding) -> None:
     """Node.js, agent-browser resolution, Playwright Chromium, Lightpanda engine."""
     # Only PM's Node counts; Termux's APT distribution is the one that relies on `pkg install nodejs`.
