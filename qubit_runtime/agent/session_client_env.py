@@ -27,10 +27,10 @@ except ImportError:  # local fallback: same rule as the secret policy's substrin
 
 
 # What main's CLI read per process and the gateway otherwise reads daemon-wide.
-BEHAVIOUR_ENV = ('QUBIT_EPHEMERAL_SYSTEM_PROMPT', 'QUBIT_PREFILL_MESSAGES_FILE', 'QUBIT_INFERENCE_PROVIDER',
-                 'QUBIT_ENABLE_PROJECT_PLUGINS')
+BEHAVIOUR_ENV = ('HERMES_EPHEMERAL_SYSTEM_PROMPT', 'HERMES_PREFILL_MESSAGES_FILE', 'HERMES_INFERENCE_PROVIDER',
+                 'HERMES_ENABLE_PROJECT_PLUGINS')
 # Behaviour values that name the client's host: a path, or the opt-in that inspects the client's folder.
-HOST_BEHAVIOUR = ('QUBIT_PREFILL_MESSAGES_FILE', 'QUBIT_ENABLE_PROJECT_PLUGINS')
+HOST_BEHAVIOUR = ('HERMES_PREFILL_MESSAGES_FILE', 'HERMES_ENABLE_PROJECT_PLUGINS')
 TOOL_ENV = ('PATH', 'VIRTUAL_ENV', 'GOPATH', 'GOROOT', 'CARGO_HOME', 'RUSTUP_HOME', 'JAVA_HOME')
 TOOL_ENV_PREFIXES = ('CONDA_', 'NODE_', 'NVM_', 'PYENV_')
 # ``terminal.client_env_passthrough`` names more non-secret toolchain variables for a profile.
@@ -58,7 +58,7 @@ def _travels(name: str, secret=None) -> bool:
     or a Qubit control name (a delegated child's markers, Kanban pins). ``secret``: a session's frozen
     copy of that policy's substrings."""
     hidden = is_secret_env_name(name) if secret is None else any(s in name.upper() for s in secret)
-    return not hidden and not name.startswith('QUBIT_')
+    return not hidden and not name.startswith('HERMES_')
 
 
 def client_env_rules(config, *, local=True) -> dict:
