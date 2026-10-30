@@ -43,7 +43,7 @@ def _constants_stage(tmp_path, *, with_acl: bool) -> Path:
     repo = Path(__file__).resolve().parents[2]
     stage = tmp_path / "stage"
     stage.mkdir()
-    names = ["qubit_constants.py", "hermes_dir_acl.py"] if with_acl else ["qubit_constants.py"]
+    names = ["qubit_constants.py", "qubit_dir_acl.py"] if with_acl else ["qubit_constants.py"]
     for name in names:
         shutil.copy2(repo / name, stage / name)
     return stage
@@ -57,7 +57,7 @@ def _mkdir_in_stage(stage: Path, home: Path) -> subprocess.CompletedProcess:
 
 
 def test_home_mkdir_carries_the_acl_module_in_the_closure(tmp_path):
-    """hermes_dir_acl is stdlib-only and ships beside qubit_constants: the two together create a
+    """qubit_dir_acl is stdlib-only and ships beside qubit_constants: the two together create a
     home dir, and qubit_constants still imports alone (the import is lazy)."""
     home = tmp_path / "home"
     home.mkdir()
@@ -77,7 +77,7 @@ def test_home_mkdir_never_silently_skips_the_elevated_grant(tmp_path):
                            timeout=15, check=False)
     assert alone.returncode == 0, alone.stderr
     result = _mkdir_in_stage(stage, home)
-    assert result.returncode != 0 and "hermes_dir_acl" in result.stderr, result.stdout + result.stderr
+    assert result.returncode != 0 and "qubit_dir_acl" in result.stderr, result.stdout + result.stderr
 
 
 def test_managed_python_signing_import_needs_no_pm_or_application(tmp_path):

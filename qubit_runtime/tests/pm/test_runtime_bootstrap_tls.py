@@ -9,17 +9,16 @@ import subprocess
 import sys
 
 import pytest
+from datetime import UTC
 
 
 @pytest.mark.platforms("posix")
 def test_staged_uv_prepares_pm_before_any_tool_download(tmp_path):
     from pm.packages import Uv
     from pm.store import current_target
-    from tests.pm._fixtures import require_pm_runtime_python
 
     uv = shutil.which("uv")
     assert uv, "this bootstrap contract requires real uv"
-    require_pm_runtime_python()
     repo = Path(__file__).resolve().parents[2]
     stage = tmp_path / "source"
     for name in ("pm", "qubit_cli"):
@@ -55,12 +54,12 @@ print(result.stdout)
     probe = tmp_path / "probe.py"
     probe.write_text("import json, truststore; print(json.dumps({'tls': truststore.__file__}))")
     command = [sys.executable, "-I", "-S", "-c", code, str(stage), str(probe)]
-    result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=180)
+    result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=180, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert Path(json.loads(result.stdout)["tls"]).is_relative_to(home)
     assert "Preparing the isolated Hermes runtime" in result.stderr
     assert "must-not-fetch.invalid" not in result.stderr
-    warm = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
+    warm = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30, check=False)
     assert warm.returncode == 0, warm.stdout + warm.stderr
     assert "Preparing the isolated Hermes runtime" not in warm.stderr
     assert warm.stdout == result.stdout
@@ -86,7 +85,6 @@ def test_pm_cli_verifies_tls_with_platform_trust(tmp_path, monkeypatch):
     from cryptography.x509.oid import NameOID
 
     from pm.runtime import prepare_runtime, runtime_environment
-    from tests.pm._fixtures import require_pm_runtime_python
     from tests.pm._range_server import RangeHandler
 
     home = tmp_path / "home"
@@ -95,7 +93,6 @@ def test_pm_cli_verifies_tls_with_platform_trust(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_RUNTIME_DIR", str(home / "tools"))
     uv = shutil.which("uv")
     assert uv
-    require_pm_runtime_python()
     python = prepare_runtime(Path(uv), Path(sys.executable), tmp_path / "runtime")
     source = Path(__file__).resolve().parents[2]
     repo = tmp_path / "source"
@@ -104,7 +101,7 @@ def test_pm_cli_verifies_tls_with_platform_trust(tmp_path, monkeypatch):
     shutil.copy2(source / "qubit_constants.py", repo / "qubit_constants.py")
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "PM test CA")])
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
             .public_key(key.public_key()).serial_number(x509.random_serial_number())
             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=1))
@@ -164,13 +161,13 @@ raise SystemExit(module['main']())
         command = [str(python), "-I", "-B", "-c", driver, str(tmp_path / "missing-ca"),
                    str(repo / "pm" / "launch.py"), str(repo), "install", "tls-test"]
         rejected = subprocess.run(command, cwd=tmp_path, env=env,
-                                  capture_output=True, text=True, timeout=60)
+                                  capture_output=True, text=True, timeout=60, check=False)
         assert rejected.returncode == 1, rejected.stdout + rejected.stderr
         assert "CERTIFICATE_VERIFY_FAILED" in rejected.stdout + rejected.stderr
         assert not list((home / "tools").glob("tls-test-*/payload.txt"))
         command[5] = str(bundle)
         result = subprocess.run(command, cwd=tmp_path, env=env,
-                                capture_output=True, text=True, timeout=60)
+                                capture_output=True, text=True, timeout=60, check=False)
         assert result.returncode == 0, result.stdout + result.stderr
         installed = list((home / "tools").glob("tls-test-*/payload.txt"))
         assert len(installed) == 1, result.stdout + result.stderr
@@ -190,9 +187,6 @@ def test_importing_launch_does_not_patch_ssl_context():
     )
     assert child.returncode == 0, child.stderr
 
-
-# --- ported from upstream pin (wave 25 short-port) ---
-from datetime import UTC
 
 
 def test_cold_downloader_trusts_a_stored_intermediate_without_its_root(tmp_path):
@@ -285,4 +279,3 @@ Download([Source(sys.argv[2], dest, sys.argv[4])], partials_dir=dest.parent / "p
     assert (tmp_path / "stored" / "tool").read_bytes() == payload
     assert "CERTIFICATE_VERIFY_FAILED" in results["unrelated"].stderr
     assert not (tmp_path / "unrelated" / "tool").exists()
-

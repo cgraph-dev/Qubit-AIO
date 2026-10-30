@@ -58,6 +58,9 @@ class PythonDeclaration:
     requirements: tuple[str, ...]
     manifest: dict
     requires_python: str | None = None
+    # The pyproject itself installs something: the plugin as a package, or extras/dependency groups
+    # (``uv sync --all-packages`` installs a member's default groups as well as its dependencies).
+    pyproject_installs: bool = False
 
     @property
     def external(self) -> bool:
@@ -68,24 +71,23 @@ class PythonDeclaration:
         return () if self.external else applicable_requirements(self.requirements)
 
     @property
-    def is_member(self) -> bool:
-        return not self.external and (self.pyproject is not None or bool(self.install_requirements))
-
-    @property
     def installs_packages(self) -> bool:
-        """Admission would put packages into the shared environment (dependency consent/workspace)."""
-        return self.is_member
+        """Admission would put packages into the shared environment: what dependency consent asks
+        about and what makes the plugin a workspace member. ``dependencies = []`` installs nothing,
+        so like no pyproject it asks no consent and stays out of the environment stamp, which hashes
+        a member's whole tree (each enable or update would build a generation for nothing)."""
+        return not self.external and (bool(self.install_requirements) or self.pyproject_installs)
 
     def python_error(self, version: str) -> str | None:
         """Why this member cannot join a workspace built for *version*; uv intersects every
         member's requires-python, so one excluding member fails the whole lock."""
         from packaging.specifiers import SpecifierSet
 
-        if not self.is_member or not self.requires_python:
+        if not self.installs_packages or not self.requires_python:
             return None
         if SpecifierSet(self.requires_python).contains(version, prereleases=True):
             return None
-        return f"requires Python {self.requires_python}, but Qubit runs on Python {version}"
+        return f"requires Python {self.requires_python}, but Hermes runs on Python {version}"
 
     def __post_init__(self) -> None:
         if not self.external:
@@ -95,19 +97,15 @@ class PythonDeclaration:
 def applicable_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     """Index requirements only; let uv evaluate markers for the target interpreter.
 
-    The application checkout supplies Qubit itself. Installing it from an index
+    The application checkout supplies Hermes itself. Installing it from an index
     would replace that checkout; direct URLs bypass the reviewed package source.
     Markers must survive snapshots built for a different Python or platform.
     """
     from packaging.requirements import Requirement
     from packaging.utils import canonicalize_name
 
-    # The application checkout supplies Qubit itself under either its distribution
-    # name (``qubit-agent``) or the bare product name. ``hermes-agent`` stays filtered
-    # as the pre-rebrand read-old alias.
-    own = {"qubit", "qubit-agent", "hermes-agent"}
     return tuple(spec for spec in specs
-                 if not (req := Requirement(spec)).url and canonicalize_name(req.name) not in own)
+                 if not (req := Requirement(spec)).url and canonicalize_name(req.name) != "hermes-agent")
 
 
 def unsupported_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, ...]:
@@ -153,7 +151,12 @@ def read_python_declaration(plugin_dir: Path) -> PythonDeclaration:
             requires_python = document.get("project", {}).get("requires-python")
             if requires_python is not None and not isinstance(requires_python, str):
                 raise ValueError(f"invalid project.requires-python: {project}")
-            return PythonDeclaration(tuple(files), project, tuple(specs), manifest, requires_python)
+            uv = document.get("tool", {}).get("uv", {})
+            installs = ("build-system" in document or uv.get("package") is True
+                        or any(document.get("project", {}).get("optional-dependencies", {}).values())
+                        or any(document.get("dependency-groups", {}).values())
+                        or bool(uv.get("dev-dependencies")))
+            return PythonDeclaration(tuple(files), project, tuple(specs), manifest, requires_python, installs)
     specs = []
     for key in ("pip_dependencies", "python_dependencies"):
         values = manifest.get(key, [])

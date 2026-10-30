@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-import pm.paths as paths
-import pm.registry as registry
+from pm import paths
+from pm import registry
 from pm.lock import Facts, Lockfile
 from pm.package import InstallError, compose_env
 from pm.packages import BinaryPackage, Venv
 from pm.store import Store, current_target
-from tests.pm._fixtures import make_tar, served as served
+from tests.pm._fixtures import make_tar, served as served  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
 
 
 class FakeTool(BinaryPackage):
@@ -89,7 +89,7 @@ def pm_env(tmp_path, served, monkeypatch):
     lockfile_path = lock_dir / "lock.json"
     monkeypatch.setattr(paths, "lockfile_path", lambda: lockfile_path)
 
-    name, digest = make_tar(docroot, "faketool-1.0.tar.gz", {"bin/faketool": "#!x"})
+    _name, digest = make_tar(docroot, "faketool-1.0.tar.gz", {"bin/faketool": "#!x"})
     lockfile = Lockfile(lockfile_path)
     lockfile.set_pin(
         "faketool", "1.0", {"any": {"url": f"{base_url}/faketool-1.0.tar.gz", "sha256": digest}}
@@ -177,9 +177,9 @@ def test_deps_compose_dependents_win(pm_env):
     from pm.install import ensure
 
     lockfile_path, _, docroot, _ = pm_env
-    name, digest = make_tar(docroot, "deptool-1.0.tar.gz", {"bin/faketool": "y"})
+    _name, digest = make_tar(docroot, "deptool-1.0.tar.gz", {"bin/faketool": "y"})
     _pin(lockfile_path, "deptool", "1.0", digest)
-    name, digest = make_tar(docroot, "toptool-1.0.tar.gz", {"bin/faketool": "z"})
+    _name, digest = make_tar(docroot, "toptool-1.0.tar.gz", {"bin/faketool": "z"})
     _pin(lockfile_path, "toptool", "1.0", digest)
 
     runner = ensure("toptool", base_env={})
@@ -338,7 +338,7 @@ def test_version_bump_selects_the_new_tool(pm_env):
     lockfile_path, _, docroot, _ = pm_env
 
     ensure("faketool", base_env={})
-    name, digest = make_tar(docroot, "faketool-2.0.tar.gz", {"bin/faketool": "#!2"})
+    _name, digest = make_tar(docroot, "faketool-2.0.tar.gz", {"bin/faketool": "#!2"})
     _pin(lockfile_path, "faketool", "2.0", digest)
     runner = ensure("faketool", base_env={})
     assert "faketool-2.0" in runner.env["PATH"]
@@ -356,7 +356,7 @@ def test_lazy_installs_disabled(pm_env, monkeypatch):
 def test_missing_platform_is_declared(pm_env):
     from pm.install import ensure
 
-    lockfile_path, *_ = pm_env
+    _lockfile_path, *_ = pm_env
     pkg = registry._packages["faketool"]
     pkg.gaps = {current_target(): "no artifact for this platform"}
     try:
@@ -382,7 +382,7 @@ def test_concurrent_installs_do_not_clobber(pm_env):
     from pm.install import ensure, is_installed
 
     lockfile_path, _, docroot, _ = pm_env
-    name, digest = make_tar(docroot, "deptool-1.0.tar.gz", {"bin/faketool": "y"})
+    _name, digest = make_tar(docroot, "deptool-1.0.tar.gz", {"bin/faketool": "y"})
     _pin(lockfile_path, "deptool", "1.0", digest)
 
     errors = []
@@ -474,7 +474,7 @@ def test_gc_keeps_used_removes_orphans(pm_env):
 def _hold(monkeypatch, *prefixes):
     """Model a Windows hold (a running process mapping the old interpreter's
     DLLs): removal under these names fails past every retry; rename still works."""
-    import pm.install as install
+    from pm import install
 
     real_remove = install._remove_entry
     held = {"on": True}
@@ -513,11 +513,41 @@ def test_held_replaced_entry_does_not_fail_reinstall_and_is_reclaimed(pm_env, mo
     assert (runtime / entry_name / "bin/faketool").is_file()
 
 
+@pytest.mark.platforms("posix")
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores directory modes")
+def test_unremovable_replaced_entry_on_posix_is_set_aside_without_touching_outside(pm_env, tmp_path):
+    """A POSIX permission failure inside the replaced entry (an unreadable dir, an
+    unwritable dir holding a symlink) sets the tree aside as before; cleanup never
+    raises past that and never chmods the symlink's target outside the tree."""
+    from pm.install import ensure
+
+    _, runtime, *_ = pm_env
+    ensure("faketool", base_env={})
+    entry = runtime / Facts(runtime / "facts.json").get("faketool")["entry"]
+    outside = tmp_path / "outside.txt"
+    outside.write_text("keep", encoding="utf-8")
+    outside.chmod(0o644)
+    (entry / "sealed").mkdir()
+    (entry / "pinned").mkdir()
+    (entry / "pinned" / "link").symlink_to(outside)
+    (entry / "sealed").chmod(0)
+    (entry / "pinned").chmod(0o500)
+    try:
+        (entry / "bin/faketool").unlink()
+        ensure("faketool", base_env={})
+        assert (entry / "bin/faketool").read_bytes() == b"#!x"
+        assert stat.S_IMODE(outside.stat().st_mode) == 0o644
+        assert list(runtime.glob(".reclaim-*"))
+    finally:
+        for held in [*runtime.glob(".reclaim-*/*"), *runtime.glob(".previous-*/*")]:
+            held.chmod(0o700)
+
+
 def test_held_displacement_does_not_fail_restore_and_gc_spares_interrupted_one(pm_env, monkeypatch):
     """A restore that succeeded leaves the displaced tree as garbage; a held one
     must not fail the install. An interrupted restore's displacement is never
     set aside, so gc keeps it."""
-    import pm.install as install
+    from pm import install
     from pm.cli import cmd_gc
 
     _, runtime, *_ = pm_env
@@ -875,9 +905,9 @@ def test_verify_arch_mismatch_reports_target(tmp_path):
 def test_install_verify_failure_reports_reason(pm_env):
     """The CI failure: an entry that installs but fails verification must
     surface WHY in the InstallError, not a bare status."""
-    lockfile_path, runtime, docroot, base_url = pm_env
+    lockfile_path, _runtime, docroot, _base_url = pm_env
     # Archive whose layout does not match binary_rel (bin/faketool).
-    name, digest = make_tar(docroot, "faketool-2.0.tar.gz", {"nope/x": "y"})
+    _name, digest = make_tar(docroot, "faketool-2.0.tar.gz", {"nope/x": "y"})
     _pin(lockfile_path, "faketool", "2.0", digest)
 
     from pm.install import ensure
@@ -939,6 +969,9 @@ def test_store_path_dirs_include_node_npm_when_installed(tmp_path, monkeypatch):
     dirs = _store_path_dirs()
     assert any(d.endswith("node-1") for d in dirs), dirs
     assert any(d.endswith("npm-1") for d in dirs), dirs
+    # npm extends node, and node's dir also holds node's bundled npm: npm's dir must win.
+    npm_dir = next(i for i, d in enumerate(dirs) if d.endswith("npm-1"))
+    assert npm_dir < next(i for i, d in enumerate(dirs) if d.endswith("node-1")), dirs
 
     # And the split holds: uv, still internal, contributes nothing even
     # if a (fabricated) fact exists for it.
@@ -947,33 +980,3 @@ def test_store_path_dirs_include_node_npm_when_installed(tmp_path, monkeypatch):
     facts.record("uv", "1", uv_entry, {"PATH": ["{store}/" + uv_entry]}, store_root=store)
     dirs = _store_path_dirs()
     assert not any(d.endswith("uv-1") for d in dirs), dirs
-
-
-@pytest.mark.platforms("posix")
-@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores directory modes")
-def test_unremovable_replaced_entry_on_posix_is_set_aside_without_touching_outside(pm_env, tmp_path):
-    """A POSIX permission failure inside the replaced entry (an unreadable dir, an
-    unwritable dir holding a symlink) sets the tree aside as before; cleanup never
-    raises past that and never chmods the symlink's target outside the tree."""
-    from pm.install import ensure
-
-    _, runtime, *_ = pm_env
-    ensure("faketool", base_env={})
-    entry = runtime / Facts(runtime / "facts.json").get("faketool")["entry"]
-    outside = tmp_path / "outside.txt"
-    outside.write_text("keep", encoding="utf-8")
-    outside.chmod(0o644)
-    (entry / "sealed").mkdir()
-    (entry / "pinned").mkdir()
-    (entry / "pinned" / "link").symlink_to(outside)
-    (entry / "sealed").chmod(0)
-    (entry / "pinned").chmod(0o500)
-    try:
-        (entry / "bin/faketool").unlink()
-        ensure("faketool", base_env={})
-        assert (entry / "bin/faketool").read_bytes() == b"#!x"
-        assert stat.S_IMODE(outside.stat().st_mode) == 0o644
-        assert list(runtime.glob(".reclaim-*"))
-    finally:
-        for held in [*runtime.glob(".reclaim-*/*"), *runtime.glob(".previous-*/*")]:
-            held.chmod(0o700)
