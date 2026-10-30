@@ -5,7 +5,7 @@ Applies on top of the root `AGENTS.md`. Read it before adding or changing any te
 ## Running tests
 
 **ALWAYS use `scripts/run_tests.sh`**, never bare `pytest`. It enforces CI parity: credential
-vars unset, `TZ=UTC`, `LANG=C.UTF-8`, `QUBIT_HOME` → temp dir, and per-file subprocess
+vars unset, `TZ=UTC`, `LANG=C.UTF-8`, `HERMES_HOME` → temp dir, and per-file subprocess
 isolation via `scripts/run_tests_parallel.py` (no xdist; workers scale with CPU count) so
 module-level dicts/ContextVars cannot leak between files. Direct `pytest` on a big machine
 with API keys set has caused repeated "works locally, fails in CI" incidents (and the reverse).
@@ -35,28 +35,28 @@ scripts/run_tests.sh -v --tb=long                       # pytest flags pass thro
   wall-clock bounds ≥ 2s, event-based sync, no `assert not _wait_until(...)` races. A new
   non-zero `time.sleep`/`asyncio.sleep` in a test fails the ratchet (HX013): wait on an Event or
   poll with `tests.waiting.wait_until` / `async_wait_until`.
-- **Placement mirrors the source tree.** A test lives in `tests/<top-level source dir>/` (`tests/qubit_cli/`,
-  `tests/agent/`, `tests/qubit_state/`, `tests/gateway/relay/`, ...); installer/updater script tests
+- **Placement mirrors the source tree.** A test lives in `tests/<top-level source dir>/` (`tests/hermes_cli/`,
+  `tests/agent/`, `tests/hermes_state/`, `tests/gateway/relay/`, ...); installer/updater script tests
   under `tests/scripts/{install,desktop_update}/`. Only tests of root-level modules (`batch_runner`,
-  `utils`, `qubit_constants`, packaging) sit directly in `tests/`. No issue numbers in filenames —
+  `utils`, `hermes_constants`, packaging) sit directly in `tests/`. No issue numbers in filenames —
   cite the issue in the module docstring (`test_89315_x.py` → `test_x.py`, "Regression for #89315").
 - **Placement (CI lanes):** `scripts/ci/classify_changes.py` picks jobs by changed files. A Python test
   asserting about `package.json`, `package-lock.json`, `tsconfig.json`, or `.ts/.tsx/.js/
   .mjs/.cjs` sources will not run on a JS-only PR (green on PR, red on `main` where the
   classifier fails open). Such tests belong in the vitest suite, not `tests/*.py`.
-- **Tests must not write to `~/.hermes/`.** The autouse `_isolate_qubit_home` fixture in
-  `tests/conftest.py` redirects `QUBIT_HOME`; never hardcode `~/.hermes/` in tests. Profile
-  tests also mock `Path.home()` so `_get_profiles_root()` / `_get_default_qubit_home()` stay
-  in the temp dir (pattern: `tests/qubit_cli/test_profiles.py`):
+- **Tests must not write to `~/.hermes/`.** The autouse `_isolate_hermes_home` fixture in
+  `tests/conftest.py` redirects `HERMES_HOME`; never hardcode `~/.hermes/` in tests. Profile
+  tests also mock `Path.home()` so `_get_profiles_root()` / `_get_default_hermes_home()` stay
+  in the temp dir (pattern: `tests/hermes_cli/test_profiles.py`):
   ```python
   @pytest.fixture
   def profile_env(tmp_path, monkeypatch):
       home = tmp_path / ".hermes"; home.mkdir()
       monkeypatch.setattr(Path, "home", lambda: tmp_path)
-      monkeypatch.setenv("QUBIT_HOME", str(home))
+      monkeypatch.setenv("HERMES_HOME", str(home))
       return home
   ```
-  Tests that `patch.object(Path, "home", ...)` must ALSO set `QUBIT_HOME` — code reads the
+  Tests that `patch.object(Path, "home", ...)` must ALSO set `HERMES_HOME` — code reads the
   env var, not `Path.home()/.hermes`.
 
 ## Don't fake the host OS
@@ -93,7 +93,7 @@ fully replaced — `platforms` is the only host-gating marker in the tree.
 real Windows process behavior that mocks cannot reproduce (venv-holder
 scans, process-tree parentage, launcher/worker chains, detach semantics),
 there is an on-demand workflow `windows-venv-e2e.yml` that runs
-`tests/qubit_cli/test_venv_holder_windows_live.py` on a real
+`tests/hermes_cli/test_venv_holder_windows_live.py` on a real
 `windows-latest` runner — spawning actual processes and driving the real
 detection code, no mocked psutil. It fires ONLY on pushes to `wine2e/**`
 branches (inert on PRs and main; costs nothing on normal work). The proven

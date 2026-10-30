@@ -87,12 +87,12 @@ public static class HermesBasicUser {
 '@
 
 # The batch starts from this process's environment. The CI driver exports its own PM home
-# (QUBIT_HOME, HERMES_RUNTIME_DIR, HERMES_PYTHON); a CLI that inherits them builds on the
+# (HERMES_HOME, HERMES_RUNTIME_DIR, HERMES_PYTHON); a CLI that inherits them builds on the
 # driver's Python instead of the package's, and the bug never shows. Start clean, as a user does.
 function Get-UserEnvironmentReset {
     $lines = @(Get-ChildItem env: | Where-Object { $_.Name -match '^(HERMES_|UV_|PYTHON|VIRTUAL_ENV|CONDA)' } |
         ForEach-Object { 'set "' + $_.Name + '="' })
-    $driverRoots = @($env:QUBIT_HOME, $env:HERMES_RUNTIME_DIR) | Where-Object { $_ }
+    $driverRoots = @($env:HERMES_HOME, $env:HERMES_RUNTIME_DIR) | Where-Object { $_ }
     $path = @($env:PATH -split ';' | Where-Object { $entry = $_; $_ -and -not @($driverRoots | Where-Object {
         $entry.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }).Count })
     return $lines + @('set "PATH=' + ($path -join ';') + '"')
@@ -144,7 +144,7 @@ function Test-BundlePluginInstall([string]$Root, [string]$Out) {
         $rows = if ($json.Success) { @($json.Value | ConvertFrom-Json) } else { @() }
         $row = @($rows | Where-Object { $_.name -ceq 'msix-smoke-plugin' })
         $installLog = if (Test-Path -LiteralPath (Join-Path $scratch 'install.log')) { Get-Content -Raw -LiteralPath (Join-Path $scratch 'install.log') } else { '' }
-        foreach ($driverRoot in @($env:QUBIT_HOME, $env:HERMES_RUNTIME_DIR) | Where-Object { $_ }) {
+        foreach ($driverRoot in @($env:HERMES_HOME, $env:HERMES_RUNTIME_DIR) | Where-Object { $_ }) {
             if ($installLog.IndexOf($driverRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
                 throw "Plugin install used the CI driver's PM home ($driverRoot), not the package's"
             }
