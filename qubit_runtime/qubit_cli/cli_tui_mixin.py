@@ -438,6 +438,8 @@ class CLITuiMixin:
             input_rule_bot,
             voice_status_bar,
             completions_menu]
+        if getattr(self, "_modern_layout", False):  # footer under the composer and its completions
+            ordered.append(ordered.pop(ordered.index(status_bar)))
         return [item for item in ordered if item is not None]
 
     def _tui_spinner_loop(self):
