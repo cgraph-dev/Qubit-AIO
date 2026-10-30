@@ -221,6 +221,8 @@ class TestResolveApproval:
     @pytest.mark.asyncio
     async def test_resolves_once(self):
         adapter = _make_adapter()
+        # No Feishu allowlist: the gateway authorization decides (here: this user is allowed).
+        adapter.set_authorization_check(lambda *_a, **_kw: True)
         adapter._approval_state[1] = {
             "session_key": "agent:main:feishu:group:oc_12345",
             "message_id": "msg_001",
@@ -498,6 +500,8 @@ class TestCardActionCallbackResponse:
         adapter._loop.is_closed = MagicMock(return_value=False)
         adapter._admins = set()
         adapter._allowed_group_users = set()
+        # The paired DM user passes the gateway authorization (pairing store).
+        adapter.set_authorization_check(lambda *_a, **_kw: True)
         adapter._approval_state[15] = {
             "session_key": "sess-15",
             "message_id": "msg-15",
@@ -524,6 +528,8 @@ class TestCardActionCallbackResponse:
         adapter._loop.is_closed = MagicMock(return_value=False)
         adapter._admins = set()
         adapter._allowed_group_users = set()
+        # The paired DM user passes the gateway authorization (pairing store).
+        adapter.set_authorization_check(lambda *_a, **_kw: True)
         adapter._update_prompt_state[23] = {
             "session_key": "sess-up-23",
             "message_id": "msg_up_023",
@@ -629,6 +635,7 @@ class TestResolveUpdatePrompt:
         adapter = _make_adapter()
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         (tmp_path / ".hermes").mkdir()
+        adapter.set_authorization_check(lambda *_a, **_kw: True)
         adapter._update_prompt_state[1] = {
             "session_key": "sess-up-1",
             "message_id": "msg_up_003",
