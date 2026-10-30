@@ -151,6 +151,7 @@ class ProviderProfile:
     display_name: str = ""       # e.g. "GMI Cloud" — shown in picker/labels
     description: str = ""        # e.g. "GMI Cloud (multi-model direct API)" — picker subtitle
     signup_url: str = ""         # e.g. "https://www.gmicloud.ai/" — shown during setup
+    models_dev_id: str = ""      # models.dev provider id when it differs from ``name``
 
     # True when the provider is pre-release / not for public listing. Discovery surfaces (provider
     # pickers, the setup provider list, the dashboard accounts tab) skip it unless ``listed()``

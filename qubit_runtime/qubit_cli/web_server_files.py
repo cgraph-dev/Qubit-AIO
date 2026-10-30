@@ -15,9 +15,7 @@ from typing import Any, Dict, Iterator, Optional
 
 logger = logging.getLogger(__name__)
 
-_MANAGED_FILES_ROOT_ENV = "QUBIT_DASHBOARD_FILES_ROOT"
-#: Pre-rebrand spelling, still read so an installed unit keeps its lock.
-_MANAGED_FILES_ROOT_ENV_LEGACY = "HERMES_DASHBOARD_FILES_ROOT"
+_MANAGED_FILES_ROOT_ENV = "HERMES_DASHBOARD_FILES_ROOT"
 _HOSTED_MANAGED_FILES_ROOT = Path("/opt/data")
 
 
@@ -413,11 +411,8 @@ def _dashboard_local_update_managed_externally() -> bool:
     return True
 
 
-def _managed_files_policy(request: Request, *, create_root: bool = True) -> ManagedFilesPolicy:
-    raw_forced_root = (
-        os.environ.get(_MANAGED_FILES_ROOT_ENV, "").strip()
-        or os.environ.get(_MANAGED_FILES_ROOT_ENV_LEGACY, "").strip()
-    )
+def _managed_files_policy(request: Optional[Request], *, create_root: bool = True) -> ManagedFilesPolicy:
+    raw_forced_root = os.environ.get(_MANAGED_FILES_ROOT_ENV, "").strip()
     if raw_forced_root:
         root = _ensure_managed_root(raw_forced_root) if create_root else _canonical_path(Path(raw_forced_root))
         return ManagedFilesPolicy(default_path=root, locked_root=root, can_change_path=False)

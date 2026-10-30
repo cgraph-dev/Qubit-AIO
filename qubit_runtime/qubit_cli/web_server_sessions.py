@@ -1,12 +1,9 @@
-"""Session-DB access for the dashboard: per-profile SessionDB opening with schema
-heal, latest-descendant lookup and the auto-archive ticker.
+"""Read-only session browsing, latest-descendant lookup and owner maintenance.
 """
 
 import logging
 import asyncio
-import threading
 import time
-import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional
@@ -33,6 +30,12 @@ _DESCENDANTS_SQL = f"""
             )
             SELECT id, parent_session_id, started_at FROM descendants
             """
+
+
+# Desktop 0.22.2's ``readableError`` keeps the HTTP ``detail`` and shows its "app and backend are
+# on different versions" toast (with an Update action) for "out of sync (different versions)".
+CLIENT_UPGRADE_REQUIRED = ('client_upgrade_required: this app is out of sync (different versions) '
+                           'with the Qubit backend; update the app to edit sessions')
 
 
 def _session_latest_descendant(session_id: str, db):
@@ -92,12 +95,12 @@ def _session_mutation_context(request, profile):
     if native is not None:
         subject = native['subject']
     elif session is not None:
-        from gateway.session_identity import authenticated_subject
-        subject = authenticated_subject({"user_id": session.user_id,
+        from gateway.owner_identity import principal_subject
+        subject = principal_subject({"user_id": session.user_id,
             "provider": session.provider, "issuer": session.issuer})
     elif not getattr(request.app.state, 'auth_required', False) and _has_valid_session_token(request):
-        from gateway.session_identity import authenticated_subject
-        subject = authenticated_subject({'user_id': 'legacy-token-owner', 'provider': 'session-token'})
+        from gateway.owner_identity import host_owner_subject
+        subject = host_owner_subject()
     else:
         raise HTTPException(status_code=401, detail='Unauthorized')
     authority = getattr(request.app.state, 'session_authority', None)
@@ -182,54 +185,87 @@ def _mutate_offline_store(profile, actor, params):
     return _with_session_maintenance(profile, run)
 
 
-def _resolve_session_mutation_identity(profile, session_id, request_id, expected_revision,
-                                       expected_generation, operation):
-    """Fill in mutation identity the caller omitted, from the row being edited.
+async def _mutate_via_gateway_owner(profile, actor, params):
+    """Forward a standalone dashboard mutation to the live gateway owner.
 
-    The durable seam below (``mutate_runtime_session``) requires a non-empty
-    ``request_id`` and a concrete ``expected_revision`` (plus ``expected_generation``
-    for generation-fenced operations such as delete). The HTTP callers on the sidebar
-    path do not send any of them — Desktop's ``setSessionUnreadRemote`` /
-    ``setSessionArchived`` / ``setSessionPinnedRemote`` PATCH ``{flag, profile}``, and
-    the SPA does the same — so requiring a client-supplied receipt made every plain
-    sidebar edit 500 (``SessionRename`` had no such field) or 409.
+    While a gateway serves the same home, a separately launched ``qubit
+    dashboard`` is not the store owner, so the offline path's
+    exclusive-maintenance reservation can never win and every write action
+    dies on a bare 409 (#138915). The owner exposes the same revision-fenced
+    verb over the control socket. With no endpoint the offline store's reservation
+    decides: no endpoint does not prove a live owner (a stale bad-mode socket, a parked
+    secondary read ``inaccessible`` with the lock free). When the reservation loses and
+    discovery read anything but ``absent`` (a control timeout, a profile mismatch, one
+    starting or draining), the edit answers 503 with discovery's reason rather than the
+    bare 409 (#144141).
 
-    An omitted value is resolved HERE, server-side: a minted receipt id and the
-    revision/generation the row carries at request time. A caller that DOES send
-    ``expected_revision``/``expected_generation`` keeps its optimistic precondition
-    untouched, so a concurrent edit still answers ``revision_conflict`` (409) rather
-    than overwriting — this fills a gap, it does not remove the fence.
+    A dial, mint or RPC that dies on an endpoint discovery just identified is
+    not owner-less (a slow first dial, or an owner restart between discovery
+    and mint): the offline reservation would only lose to that same owner and
+    answer with the bare 409 this forward exists to remove, so every transport
+    failure surfaces a retryable 503. Only the owner's refusal frame
+    (``GatewayRPCError``) is passed on as a verdict.
+
+    The ticket is minted for the dashboard's authenticated principal, not the
+    socket UID: ``authorize_history`` compares the actor subject against the
+    row's stored owner, so a cold row owned by a dashboard account only takes
+    the mutation when the forward acts as that account.
     """
-    if request_id and expected_revision is not None:
-        return request_id, expected_revision, expected_generation
-    # ``import`` creates its anchor row, so a generation fence can only answer
-    # ``stale_generation`` (the store has no row to compare against).
-    fenced_operations = operation != 'import'
-    revision, generation = 0, 0
-    try:
-        db = _open_session_db_for_profile(profile, read_only=True)
+    from fastapi import HTTPException
+    from gateway.runtime_ownership import OwnershipConflict
+    from qubit_cli.gateway_client import GatewayClientError, GatewayRPCError, connect_gateway
+    from qubit_cli.gateway_runtime import discover_gateway_endpoint
+    from qubit_cli.gateway_runtime_discovery import DiscoveryError
+    from qubit_cli.web_server_cron import _cron_profile_home
+    from qubit_state import _default_db_path
+
+    home = Path(_cron_profile_home(profile)[1]) if profile else Path(_default_db_path()).parent
+    # Discovery is read-only and never starts a gateway.
+    discovery = await asyncio.to_thread(discover_gateway_endpoint, home, timeout=1.5)
+    endpoint = discovery.endpoint
+    if endpoint is None:
         try:
-            with db._read_ctx() as conn:
-                row = conn.execute(
-                    'SELECT runtime_revision, runtime_generation FROM sessions WHERE id=?',
-                    (session_id,)).fetchone()
-            if row is not None:
-                revision, generation = int(row[0] or 0), int(row[1] or 0)
-        finally:
-            db.close()
-    except Exception:  # an unreadable store refuses below, on its own terms
-        _log.debug("mutation identity: could not read the target row", exc_info=True)
-    if expected_generation is not None:
-        resolved_generation = expected_generation
-    elif not fenced_operations:
-        resolved_generation = None   # import: the anchor row does not exist yet
-    else:
-        resolved_generation = generation   # 0 for an absent row; delete maps not_found
-    return (
-        request_id or uuid.uuid4().hex,
-        expected_revision if expected_revision is not None else revision,
-        resolved_generation,
-    )
+            return await asyncio.to_thread(_mutate_offline_store, profile, actor, params)
+        except HTTPException as exc:
+            if discovery.state == 'absent' or not isinstance(exc.__cause__, OwnershipConflict):
+                raise
+            known = ''.join(f', {value}' for value in (discovery.reason_code, discovery.detail) if value)
+            _log.warning('session write for %s: gateway owner not reachable (%s%s)', home, discovery.state, known)
+            reason = discovery.reason_code or discovery.state
+            raise HTTPException(status_code=503, detail=f'owner_unavailable: {reason}: {exc.detail}') from exc
+    if not getattr(endpoint, 'control_home', True):
+        # The selected home answered on its own socket (a multiplexer-served profile already
+        # names the multiplexer root). Pin it, so the ticket is minted on the socket that just
+        # identified as this profile's owner, never on the dashboard launch home's.
+        from dataclasses import replace
+        endpoint = replace(endpoint, control_home=str(home.expanduser().resolve()))
+    call = {key: params[key] for key in
+            ('session_id', 'request_id', 'expected_revision', 'operation', 'payload') if key in params}
+    if params.get('expected_generation') is not None:
+        call['expected_generation'] = params['expected_generation']
+    # A sign-in is the machine owner (owner_identity), which is this same-user socket's own peer
+    # subject: let the socket mint it natively. The verifier lets a peer NAME only a structured
+    # login subject, so forwarding the owner's OS subject explicitly would be refused.
+    from gateway.owner_identity import host_owner_subject
+    subject = None if actor.subject == host_owner_subject() else actor.subject
+    try:
+        async with connect_gateway(endpoint=endpoint, subject=subject) as client:
+            return await client.rpc('session.mutate', **call)
+    except GatewayRPCError:
+        # The owner's own refusal frame: a verdict the caller maps to the direct path's status.
+        raise
+    except (GatewayClientError, DiscoveryError, OSError, TimeoutError) as exc:
+        # Transport, not a verdict: a refused WebSocket dial (wrapped as GatewayClientError), a
+        # control socket that refuses the mint after a restart (DiscoveryError), a raw socket error
+        # or a timeout. Retrying is safe because the request reuses its request_id.
+        raise HTTPException(status_code=503, detail='owner_unreachable') from exc
+
+
+# One reason -> HTTP status map for a session mutation refusal, shared by the direct path
+# (RuntimeStoreError) and the owner forward (GatewayClientError): a storage failure is a
+# server fault (503), never a session conflict.
+_MUTATION_REFUSAL_STATUS = {'permission_denied': 403, 'profile_mismatch': 403, 'not_found': 404,
+                            'invalid_params': 400, 'runtime_draining': 503, 'storage_unavailable': 503}
 
 
 async def _mutate_session_request(request, profile, session_id, *, request_id,
@@ -239,6 +275,7 @@ async def _mutate_session_request(request, profile, session_id, *, request_id,
     from fastapi import HTTPException
     from gateway.session_contract import SessionRef
     from gateway.session_mutations import mutate_session
+    from qubit_cli.gateway_client import GatewayClientError
     from qubit_state_mutation_guards import MUTATION_GUARD_REFUSALS
     from qubit_state_runtime import RuntimeStoreError
 
@@ -247,24 +284,32 @@ async def _mutate_session_request(request, profile, session_id, *, request_id,
         _, errors = authority.db._validate_import_payload(payload['sessions'])
         if errors:
             raise HTTPException(status_code=400, detail={'errors': errors})
-    request_id, expected_revision, expected_generation = await asyncio.to_thread(
-        _resolve_session_mutation_identity, profile, session_id, request_id,
-        expected_revision, expected_generation, operation)
+    if request_id is None and expected_revision is None and expected_generation is None:
+        # A pre-fence client (Desktop <= 0.22.2) sends none of the identity. The owner never
+        # commits an unfenced write, so name the upgrade; the wording is what those builds'
+        # toast summariser maps to "different versions, update" (#139742).
+        raise HTTPException(status_code=409, detail=CLIENT_UPGRADE_REQUIRED)
+    if request_id is None or expected_revision is None:
+        raise HTTPException(status_code=409, detail='mutation_identity_required')
     params = dict(session_id=session_id, request_id=request_id, expected_revision=expected_revision,
         operation=operation, payload=payload)
     if expected_generation is not None:
         params['expected_generation'] = expected_generation
     try:
         if authority is None:
-            result = await asyncio.to_thread(_mutate_offline_store, profile, actor, params)
+            # A live gateway owner answers first; a home without an endpoint takes
+            # the offline store (whose reservation loses to any owner holding the lock).
+            result = await _mutate_via_gateway_owner(profile, actor, params)
         else:
             with _native_history_transport(request, authority, actor):
                 result = await mutate_session(authority, actor, SessionRef(authority.profile_id, session_id), params)
         return {'ok': True, **result}
     except RuntimeStoreError as exc:
-        status = {'permission_denied': 403, 'profile_mismatch': 403, 'not_found': 404,
-                  'invalid_params': 400, 'runtime_draining': 503}.get(exc.reason, 409)
-        raise HTTPException(status_code=status, detail=exc.reason) from exc
+        raise HTTPException(status_code=_MUTATION_REFUSAL_STATUS.get(exc.reason, 409), detail=exc.reason) from exc
+    except GatewayClientError as exc:
+        # The owner's own refusal verdicts (transport failures already became 503 above),
+        # wire-shaped like RuntimeStoreError's reasons, so a forwarded write answers as the direct path.
+        raise HTTPException(status_code=_MUTATION_REFUSAL_STATUS.get(str(exc), 409), detail=str(exc)) from exc
     except MUTATION_GUARD_REFUSALS as exc:
         raise HTTPException(status_code=409, detail='session_busy') from exc
     except ValueError as exc:
@@ -285,119 +330,93 @@ def _with_session_maintenance(profile, operation, *args):
         with exclusive_maintenance([home]):
             return operation(*args)
     except OwnershipConflict as exc:
+        # uvicorn runs at log_level=warning, so a handled 4xx leaves no server-side trace and the
+        # refusal reads as a UI bug (#138915). Bulk store maintenance has no owner verb: name it.
+        _log.warning('session write refused for %s: %s', home, exc)
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-# Serialises the one-time writable schema bootstrap for read-only opens, so
-# concurrent first-load polls don't open mode=ro against a half-written schema
-# ("no such table: sessions").
-_session_db_bootstrap_lock = threading.Lock()
-
-
 def _session_db_read_probe_statements() -> tuple:
-    """Stale-schema probes for read-only opens (which skip _reconcile_columns()).
-    Derived from SCHEMA_SQL so a new column is probed automatically — a
-    hand-written list once went stale and emptied the sidebar after update."""
+    """Probe the declared schema without reconciling it on a browsing request."""
     from qubit_state_schema import schema_read_probe_statements
 
     return schema_read_probe_statements()
 
 
-# Stores where a heal WRITABLE OPEN SUCCEEDED but the read probe still failed:
-# one reconciliation cannot fix them (e.g. a NOT-NULL-without-default column),
-# so they fall back to the raw read-only open until restart instead of paying
-# a writable init per poll. A FAILED writable open (transient lock) is NOT
-# recorded — the next poll retries the heal.
-_session_db_heal_exhausted: set = set()
-
-# Deduplicates the heal-failure warning per store per process.
-_session_db_heal_warned: set = set()
-
-
-def _is_stale_schema_error(exc: BaseException) -> bool:
-    message = str(exc).lower()
-    return "no such table" in message or "no such column" in message
-
-
 def _open_session_db_at_path(db_path: Path, *, read_only: bool):
-    """Open a SessionDB at an explicit path with an explicit access mode.
+    """Browsing never initializes or repairs the owner's session store.
 
-    Read-only opens bootstrap a missing/zero-byte store once and heal a stale or
-    malformed schema through ONE writable open before reopening read-only; the
-    healthy read path never takes a write lock.  Tables outside SCHEMA_SQL
-    (telemetry ``tel_*``, FTS shadow tables) are outside both probe and heal.
+    Owner startup reconciles schema. The one write a browse may do: a store that lags
+    SCHEMA_SQL (missing table/column, not corruption) with NO gateway owning it gets the
+    missing declared tables/columns once, in one short locked transaction (#140315); an
+    owned store is refused by name instead. Explicit mutation APIs retain their writable
+    acquisition until their separate owner-RPC migration.
     """
     import sqlite3
 
-    from qubit_state import SessionDB, is_malformed_schema_error
-    from qubit_state_registry import acquire, release_or_close
+    from fastapi import HTTPException
+    from qubit_state import SessionDB
+    from qubit_state_errors import is_transient_sqlite_error
+    from qubit_state_registry import acquire
 
-    # Read-only file/sidecar preflight (port of kilocode#12508): repair-or-refuse BEFORE the first
-    # connection so users get an actionable message instead of an opaque "attempt to write a readonly
-    # database" from deep inside _init_schema.
     if not read_only:
         return acquire(db_path)
 
-    def _needs_bootstrap() -> bool:
-        try:
-            return db_path.stat().st_size == 0
-        except FileNotFoundError:
-            return True
-        except OSError:
-            return False
+    try:
+        initialized = db_path.stat().st_size > 0
+    except FileNotFoundError:
+        initialized = False
+    if not initialized:
+        raise HTTPException(
+            status_code=503,
+            detail="Session store is not initialized. Start this profile's gateway to initialize it.")
 
-    if _needs_bootstrap():
-        with _session_db_bootstrap_lock:
-            if _needs_bootstrap():
-                db = acquire(db_path)
-                release_or_close(db)
+    from qubit_state_reconcile import (
+        DeclarativeDriftError, is_declarative_drift_error, reconcile_drift_for_browse,
+    )
 
     def _open_probed():
         db = SessionDB(db_path=db_path, read_only=True)
-        # Unit-test fakes may replace SessionDB without exposing a raw
-        # connection. Probe only real connections.
-        conn = getattr(db, "_conn", None)
-        if conn is not None and str(db_path) not in _session_db_heal_exhausted:
-            try:
+        try:
+            conn = getattr(db, "_conn", None)
+            if conn is not None:
                 for statement in _session_db_read_probe_statements():
                     conn.execute(statement).fetchone()
-            except BaseException:
-                db.close()
-                raise
-        return db
+            return db
+        except BaseException:
+            db.close()
+            raise
 
     try:
-        return _open_probed()
-    except (sqlite3.DatabaseError, UnicodeDecodeError) as exc:
-        # UnicodeDecodeError = pysqlite could not decode SQLite's own error
-        # message because corrupt file bytes were embedded in it; the
-        # one-writable-open heal is the only repair path, so treat it as
-        # malformed schema.
-        if not (
-            _is_stale_schema_error(exc)
-            or is_malformed_schema_error(exc)
-            or isinstance(exc, UnicodeDecodeError)):
-            raise
-        db = acquire(db_path)
-        release_or_close(db)
         try:
             return _open_probed()
-        except (sqlite3.DatabaseError, UnicodeDecodeError) as still_stale:
-            if not _is_stale_schema_error(still_stale):
+        except sqlite3.OperationalError as exc:
+            # A missing declared table/column is upgrade drift, not corruption (#140315): catch
+            # an unowned store up once under its runtime lock, refuse by name when a gateway
+            # owns it. Never destructive: additive DDL only, no repair from browse.
+            if not is_declarative_drift_error(exc):
                 raise
-            # Writable open succeeded but the store is STILL behind the probe:
-            # serve reads without the probe (only queries touching the broken
-            # part fail) and stop paying the writable init per poll.
-            _session_db_heal_exhausted.add(str(db_path))
-            if str(db_path) not in _session_db_heal_warned:
-                _session_db_heal_warned.add(str(db_path))
-                _log.warning(
-                    "state.db at %s is missing schema that a writable "
-                    "reconcile could not add (%s); read paths may partially "
-                    "fail until the store is repaired",
-                    db_path,
-                    still_stale)
+            try:
+                reconcile_drift_for_browse(db_path)
+            except DeclarativeDriftError as drift:
+                _log.warning("session store at %s is behind SCHEMA_SQL: %s", db_path, drift)
+                raise HTTPException(status_code=503, detail=str(drift)) from exc
             return _open_probed()
+    except (sqlite3.DatabaseError, UnicodeDecodeError) as exc:
+        from qubit_state_errors import is_malformed_db_error
+        if isinstance(exc, sqlite3.DatabaseError) and is_malformed_db_error(exc):
+            # Same structured 503 the analytics routers publish (``corrupt_store_as_status``): a
+            # corrupt image names the repair (`qubit doctor`), never a generic "schema unavailable".
+            from qubit_cli.web_routers._common import corrupt_store_status
+            raise corrupt_store_status(db_path, exc) from exc
+        if isinstance(exc, sqlite3.OperationalError) and is_transient_sqlite_error(exc):
+            detail = "Session store is busy (disk I/O or lock). Retry; the list was not cleared."
+        else:
+            detail = (
+                "Session store schema is unavailable or corrupt. Start or restart this profile's "
+                "gateway to reconcile it; if it persists, run `qubit doctor` for diagnosis. "
+                "Browsing does not repair the store.")
+        raise HTTPException(status_code=503, detail=detail) from exc
 
 
 def _session_db_path_for_profile(profile: Optional[str]) -> Path:
@@ -423,13 +442,15 @@ def _open_session_db_for_profile(profile: Optional[str], *, read_only: bool):
 # profile: bounds the config.yaml read to once per window; the sweep itself is
 # throttled far more coarsely by state_meta (sessions.min_interval_hours).
 _AUTO_ARCHIVE_CHECK_INTERVAL_S = 300.0
-_last_auto_archive_check: Dict[str, float] = {}
+_last_auto_archive_check: dict[str, float] = {}
 
 
 def _maybe_auto_archive_for_profile(profile: Optional[str]) -> None:
-    """Config-gated stale-session auto-archive for ``profile``; never raises.
-    ``qubit serve`` runs neither CLI nor gateway startup hooks, so this
-    session-list trigger is what makes ``sessions.auto_archive`` work there."""
+    """Config-gated owner-lifetime maintenance, never invoked by browsing.
+
+    The standalone serve ticker maintains its own profile; a composed HTTP
+    listener relies on its gateway owner's startup and housekeeping hooks.
+    """
     try:
         key = profile or ""
         now = time.monotonic()

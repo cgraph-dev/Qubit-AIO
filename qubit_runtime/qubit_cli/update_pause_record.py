@@ -1,8 +1,8 @@
-"""Durable record of the gateways and services ``hermes update`` paused on Windows.
+"""Durable record of the gateways and services ``qubit update`` paused on Windows.
 
 The pause token used to live only in the updater's memory (plus an ``atexit`` resume), so a
 killed updater (console closed, ``taskkill``, power loss) left every paused gateway and SCM
-service stopped with nothing on disk saying so. The record is written under the ROOT Hermes
+service stopped with nothing on disk saying so. The record is written under the ROOT Qubit
 home BEFORE anything is stopped, names its owner (pid + creation time, the update-marker
 identity format), is rewritten as the token changes, and is removed only after a verified
 resume. A later launch whose owner check finds the updater dead (and no update live) resumes it.
@@ -143,7 +143,7 @@ def _mutex(wait_s: float = _MUTEX_WAIT_S):
 
 
 def _git_executable() -> str:
-    """The git ``hermes update`` runs, found without installing anything: PATH's, else the copy
+    """The git ``qubit update`` runs, found without installing anything: PATH's, else the copy
     install.ps1 staged in PM's store (``_subprocess_compat.expose_pm_git`` puts it on PATH only
     inside the updater). A bare ``git`` on such an install dies with WinError 2, so every gate
     read would fail and the paused gateways would never be restarted."""
@@ -356,6 +356,20 @@ def _deps_hold_resume(root: Path) -> bool:
         return False
 
 
+def _paused_on_unreadable_head(token: dict) -> bool:
+    """Every pause in the set already found HEAD unreadable and none bound a tree move since.
+
+    The gateways were serving exactly this tree when they stopped, and no step of the update wrote
+    a file (``_checkout_move`` records its targets/paths before git writes), so restarting them
+    leaves the tree as they knew it. Without this a ``.git`` git rejects (an empty ``HEAD``) kept
+    the set stopped on every later launch, since no update can fetch until the checkout is repaired.
+    """
+    baselines = token.get("baselines") or []
+    return bool(baselines) and all(
+        b.get("pre_sha") is None and not (b.get("move_targets") or b.get("move_paths") or b.get("landed"))
+        for b in baselines)
+
+
 def tree_is_whole(token: dict, root: Path | None = None) -> tuple[bool, str]:
     """May paused gateways start on this checkout now? ``(verdict, reason when not)``."""
     from qubit_cli._early_recovery import interrupted_pull_marker
@@ -365,6 +379,8 @@ def tree_is_whole(token: dict, root: Path | None = None) -> tuple[bool, str]:
             return False, "the checkout is mid-pull (interrupted-pull marker present)"
         head = head_sha(root)
         if head is None:
+            if _paused_on_unreadable_head(token):
+                return True, ""
             return False, "the checkout HEAD is unreadable"
         baselines = token.get("baselines") or []
         at_head = [b for b in baselines if b.get("pre_sha") == head]
@@ -722,7 +738,7 @@ def claim(src: Path) -> tuple[Path, dict] | None:
 
 
 def adopt_orphans() -> tuple[dict | None, list[Path]]:
-    """For ``hermes update``: claim every orphaned pause and merge their sets. The caller records the
+    """For ``qubit update``: claim every orphaned pause and merge their sets. The caller records the
     merged set durably (its ``absorbed`` ids name the claims), then :func:`release_claims`."""
     retire_redundant()
     adopted, claims = None, []
@@ -796,7 +812,7 @@ def _request_on_disk(token: dict, pid: str) -> bool | None:
     """The planned-stop marker this update's stopper wrote for *pid* is still on disk (the gateway's
     watcher has not consumed it yet): the request was issued even if the updater died before
     :func:`mark_stop_sent` — or the gateway's receipt of accepting it (:func:`mark_stop_accepted`).
-    A marker naming another stopper (a user's ``hermes gateway stop``) is not. ``None``: one of them
+    A marker naming another stopper (a user's ``qubit gateway stop``) is not. ``None``: one of them
     exists but cannot be read or parsed — the stop may have been accepted, so it is unknown."""
     path = (token.get("stop_markers") or {}).get(str(pid))
     if not path:
@@ -841,7 +857,7 @@ def _asked(token: dict) -> tuple[set[str], set[str]]:
 def drop_never_stopped(token: dict) -> dict:
     """Drop entries whose recorded process is the same live incarnation AND was never actually asked
     to stop (the update died before issuing its request, even with the intent on disk): it is still
-    serving, and a later exit — a user's ``hermes gateway stop`` included — is not this update's to
+    serving, and a later exit — a user's ``qubit gateway stop`` included — is not this update's to
     undo. One it asked may be draining: it keeps its restart debt (:func:`split_draining`). The
     evidence is resolved here, once, into ``stop_sent`` (a merge carries it under another stopper).
     Evidence that cannot be read keeps the entry too (it may be draining) but resolves nothing: it is
@@ -942,7 +958,7 @@ def _resume_fenced(claim_path: Path, body: dict) -> None:
     token.update(resume_needed=True, recovery=True)
     try:
         if _has_work(token):
-            print("→ Restarting gateway(s) paused by an interrupted `hermes update`...", file=sys.stderr)
+            print("→ Restarting gateway(s) paused by an interrupted `qubit update`...", file=sys.stderr)
             from qubit_cli.update_cmd_windows import _resume_windows_gateways_after_update
             # Whatever command this launch runs owns stdout (``--json`` output, a Desktop pipe).
             with redirect_stdout(sys.stderr):
@@ -950,8 +966,8 @@ def _resume_fenced(claim_path: Path, body: dict) -> None:
         else:
             token["resume_needed"] = False
     except Exception as exc:  # health: allow BLE001 -- recovery boundary: any resume error is reported and the claim handed back (finally), never raised into the launch
-        print(f"  ⚠ Could not restart every paused gateway: {exc}. Run `hermes update` or "
-              "`hermes gateway start`.", file=sys.stderr)
+        print(f"  ⚠ Could not restart every paused gateway: {exc}. Run `qubit update` or "
+              "`qubit gateway start`.", file=sys.stderr)
     finally:
         _back_off_unready(token, attempted, draining)
         _hand_back(claim_path, body, token, draining)
@@ -960,7 +976,7 @@ def _resume_fenced(claim_path: Path, body: dict) -> None:
 # A recovering launch runs before every command (chat, doctor, a Desktop-spawned serve) and waits
 # for each relaunched gateway to become ready. One that does not is re-launched only after this
 # backoff (``relaunch_retry``), so an interactive command pays that wait at most once per window;
-# the debt itself stays owed, and ``hermes update`` (which drops the backoff) retries at once.
+# the debt itself stays owed, and ``qubit update`` (which drops the backoff) retries at once.
 _RELAUNCH_RETRY_BASE_S = 60.0
 _RELAUNCH_RETRY_MAX_S = 3600.0
 

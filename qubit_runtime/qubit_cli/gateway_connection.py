@@ -50,10 +50,6 @@ def _resume_plain(exc, session_id, typed):
     logger.debug("session.resume %s: launch key not taken (%s); resuming without it", session_id, exc)
 
 
-class CallStopped(GatewayClientError):
-    """The caller stopped waiting (:meth:`GatewayConnection.call_until`); the request was sent."""
-
-
 def lost_before(frame, epoch) -> bool:
     """``frame`` is a transport error from a connection older than ``epoch``: a reconnect replaced it,
     so it is no outcome of anything submitted on ``epoch``."""
@@ -440,7 +436,7 @@ class GatewayConnection:
         answer, sent = concurrent.futures.Future(), threading.Event()
         answer.add_done_callback(lambda _done: wake.set())
         thread = spawn_context_thread(lambda: asyncio.run(self._command(method, params, wake, answer, sent)),
-                                      name="qubit-gateway-command")
+                                      name="hermes-gateway-command")
         with self._side_lock:
             self._commands.add(wake)
         thread.start()

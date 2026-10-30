@@ -31,6 +31,8 @@ from typing import Any, Awaitable, Callable, Optional, Protocol, TypeVar
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
 __all__ = [
     "MAX_SAFE_TIMEOUT_S",
     "BoundedResult",

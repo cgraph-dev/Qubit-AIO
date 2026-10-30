@@ -29,7 +29,7 @@ _HERMES_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_HERMES_HOME_OVERR
 INDICATOR_STYLES: tuple[str, ...] = ("ascii", "emoji", "kaomoji", "unicode")
 DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
-# Browser-hosted attachments are staged on the Hermes host and then read back
+# Browser-hosted attachments are staged on the Qubit host and then read back
 # as a base64 data URL for the normal remote attachment RPC. Keep the upload
 # and read-back boundaries identical so a successful picker/drop can always be
 # attached afterward.
