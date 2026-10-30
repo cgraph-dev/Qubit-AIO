@@ -3586,6 +3586,23 @@ def _held_watermark(agent: Any, watermark: Optional[int], messages: list, verbat
     return held_archive_watermark(agent._session_db, agent.session_id, watermark, messages, verbatim_tail)
 
 
+_ATTEMPT_TELEMETRY_FIELDS = (
+    "_last_compression_telemetry", "_active_compression_telemetry", "_compression_telemetry_seed",
+)
+
+
+@contextlib.contextmanager
+def _hold_attempt_telemetry(compressor: Any):
+    """Restore the live attempt's telemetry after a call that may reset it (the memory flush)."""
+    held = tuple(getattr(compressor, name, None) for name in _ATTEMPT_TELEMETRY_FIELDS)
+    try:
+        yield
+    finally:
+        for name, value in zip(_ATTEMPT_TELEMETRY_FIELDS, held):
+            with contextlib.suppress(Exception):
+                setattr(compressor, name, value)
+
+
 def _commit_compaction(
     agent: Any, messages: list, compressed: list, *, in_place: bool, lease: _CompressionLease,
     new_system_prompt: str, system_message: str, compressed_user_turn_outcome: str,

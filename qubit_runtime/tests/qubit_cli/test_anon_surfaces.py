@@ -215,3 +215,25 @@ def test_a_claimed_guest_reads_as_the_free_tier_on_the_cli_too(isolated_store, m
     auth_commands.auth_status_command(SimpleNamespace(provider="nous"))
     text = capsys.readouterr().out
     assert "free tier" in text.lower()
+
+
+@pytest.mark.parametrize("tier", ["Anonymous", "ANONYMOUS", " anonymous "])
+def test_anonymous_tier_matches_case_and_whitespace_insensitively(isolated_store, tier):
+    """The tier claim is wire data; casing must not hand a guest billing copy instead of the sign-in copy."""
+    _write_auth({**_guest_state(), "account_tier": tier, "access_token": _jwt(account_tier=tier)})
+    info = nous_account.get_nous_portal_account_info()
+    assert info.is_anonymous_tier
+    assert nous_account.format_nous_portal_entitlement_message(info) == nous_account.FREE_TIER_NEEDS_ACCOUNT
+
+
+def test_guest_whose_lookup_fails_still_gets_the_sign_in_copy(isolated_store, monkeypatch):
+    """A token inside its refresh window falls through to the account API; when that fails the
+    stored tier must survive on the error snapshot."""
+    state = {**_guest_state(), "access_token": _jwt(exp=int(time.time()) + 30),
+             "portal_base_url": "http://127.0.0.1:9"}
+    _write_auth(state)
+    monkeypatch.setattr(nous_account, "_fetch_nous_account_info",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("portal down")))
+    info = nous_account.get_nous_portal_account_info()
+    assert info.error is not None and info.is_anonymous_tier
+    assert nous_account.format_nous_portal_entitlement_message(info) == nous_account.FREE_TIER_NEEDS_ACCOUNT

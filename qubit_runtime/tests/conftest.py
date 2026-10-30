@@ -1575,3 +1575,41 @@ def _reap_session_hermes_processes(config) -> list[int]:
             pass
     return pids
 
+
+@pytest.fixture(autouse=True)
+def scratch_prune_spawns(monkeypatch):
+    """No test starts a real detached scratch prune (one would outlive the test, and get any
+    Popen mock the test installed): ``spawn_prune`` only records the scratch dir it was given.
+    A test that needs the real child runs a launcher in a subprocess."""
+    import hermes_constants_scratch_detach
+
+    spawned: list = []
+    monkeypatch.setattr(hermes_constants_scratch_detach, "spawn_prune", spawned.append)
+    return spawned
+
+
+_NOUS_SERVICE_DOMAINS = ("nousresearch.com", "staging-nousresearch.com")
+
+
+def _is_nous_service_host(host) -> bool:
+    name = (host.decode() if isinstance(host, bytes) else str(host or "")).lower().rstrip(".")
+    return any(name == domain or name.endswith("." + domain) for domain in _NOUS_SERVICE_DOMAINS)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_nous_services(request, monkeypatch):
+    if request.node.get_closest_marker("live"):
+        return
+    import socket
+
+    real_getaddrinfo = socket.getaddrinfo
+
+    def fenced_getaddrinfo(host, *args, **kwargs):
+        if _is_nous_service_host(host):
+            raise socket.gaierror(
+                socket.EAI_NONAME,
+                f"test fence: {host!r} is a live Nous service; stub the HTTP layer "
+                "(tests/hermes_cli/anon_portal.py) or mark the test live")
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", fenced_getaddrinfo)

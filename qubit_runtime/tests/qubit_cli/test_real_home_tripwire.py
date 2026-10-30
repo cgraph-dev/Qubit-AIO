@@ -254,3 +254,17 @@ def test_qubit_exported_scratch_tmp_is_not_the_test_temp_root(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "1 passed" in result.stdout
+
+
+def test_checkout_inside_a_guarded_root_is_not_hermes_state():
+    """The default install checks the repo out INSIDE the home (install.sh:
+    INSTALL_DIR=$HERMES_HOME/hermes-agent): the checkout, its .venv and test
+    data are exempt even when the guarded root contains them; siblings under
+    that root are still refused."""
+    from tests.home_io_guard import HomeIOGuard
+
+    guard = HomeIOGuard(lambda: [PROJECT_ROOT.parent])
+    guard.check(PROJECT_ROOT / "tests" / "home_io_guard.py")
+    guard.check(PROJECT_ROOT / ".venv" / "bin" / "python", metadata=True)
+    with pytest.raises(AssertionError, match="REAL hermes home"):
+        guard.check(PROJECT_ROOT.parent / "config.yaml")

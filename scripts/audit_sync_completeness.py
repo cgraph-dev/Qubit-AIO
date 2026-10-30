@@ -175,6 +175,13 @@ ROUTES = {
 DIR_ROUTES = {
     "hermes-achievements": "qubit-achievements",
 }
+# Exact upstream test-file renames the token map cannot express (the segment
+# starts with `test_`, not `hermes`).
+FILE_ROUTES = {
+    "tests/test_hermes_dir_acl_windows.py": "tests/test_qubit_dir_acl_windows.py",
+    # The bundled Office skill's docx test moved with the `docx` skill rename.
+    "skills/productivity/microsoft-office/tests/test_docx_skill.py": "skills/productivity/docx/tests/test_docx_skill.py",
+}
 RUNTIME = REPO / "qubit_runtime"
 
 
@@ -332,6 +339,8 @@ def route(path: str) -> str:
         The old rule only fired when the LAST segment *started* with ``hermes``,
         so a leading underscore or an interior directory escaped it.
     """
+    if path in FILE_ROUTES:
+        return FILE_ROUTES[path]
     for prefix in ("tests/", ""):
         if prefix and not path.startswith(prefix):
             continue

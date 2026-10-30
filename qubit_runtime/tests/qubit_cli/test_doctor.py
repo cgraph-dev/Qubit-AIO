@@ -1643,3 +1643,59 @@ def test_profile_alias_status_follows_the_wrapper_the_profile_really_has(monkeyp
     assert "no alias" in status["ops"]  # a foreign ops.bat is not ops's alias
     old = next(p for p in profiles.list_profiles() if p.name == "old")
     assert old.alias_path == tmp_path / ".local" / "bin" / "old"  # never the foreign old.bat (uninstall unlinks it)
+
+
+@pytest.mark.parametrize(
+    ("provider", "default_model"),
+    [
+        ("ai-gateway", "anthropic/claude-sonnet-4.6"),
+        ("opencode-zen", "anthropic/claude-sonnet-4.6"),
+        ("kilocode", "anthropic/claude-sonnet-4.6"),
+        ("kimi-coding", "kimi-k2"),
+        ("nvidia", "qwen/qwen3.5-122b-a10b"),
+        ("moa", "anthropic/claude-sonnet-4.6"),
+    ],
+)
+def test_run_doctor_accepts_hermes_provider_ids_that_catalog_aliases(
+    monkeypatch, tmp_path, provider, default_model
+):
+    home = tmp_path / ".hermes"
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "config.yaml").write_text(
+        "model:\n"
+        f"  provider: {provider}\n"
+        f"  default: {default_model}\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(doctor_mod, "HERMES_HOME", home)
+    monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
+    monkeypatch.setattr(doctor_mod, "_DHH", str(home))
+    (tmp_path / "project").mkdir(exist_ok=True)
+
+    fake_model_tools = types.SimpleNamespace(
+        check_tool_availability=lambda *a, **kw: ([], []),
+        TOOLSET_REQUIREMENTS={},
+    )
+    monkeypatch.setitem(sys.modules, "model_tools", fake_model_tools)
+
+    try:
+        from hermes_cli import auth as _auth_mod
+        monkeypatch.setattr(_auth_mod, "get_nous_auth_status_local", dict)
+        monkeypatch.setattr(_auth_mod, "get_codex_auth_status", dict)
+        monkeypatch.setattr(_auth_mod, "get_xai_oauth_auth_status", dict)
+    except Exception:
+        pass
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        doctor_mod.run_doctor(Namespace(fix=False))
+
+    out = buf.getvalue()
+    assert f"model.provider '{provider}' is not a recognised provider" not in out
+    assert f"model.provider '{provider}' is unknown" not in out
+    if provider in {"ai-gateway", "opencode-zen", "kilocode", "nvidia"}:
+        assert (
+            f"model.default '{default_model}' uses a vendor/model slug but provider is '{provider}'"
+            not in out
+        )
