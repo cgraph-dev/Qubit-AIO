@@ -67,10 +67,10 @@ def home(tmp_path, monkeypatch):
     (path / "profiles" / "ops" / "config.yaml").write_text("{}\n")
     monkeypatch.setenv("QUBIT_HOME", str(path))
     monkeypatch.setattr(srv, "_run_idempotency_store", DurableRunStore(), raising=False)
-    methods_groups.stop_hosted_room_service(timeout=1.0)
+    methods_groups.stop_hosted_room_service(timeout=10.0)
     methods_groups.start_hosted_room_service()
     yield path
-    methods_groups.stop_hosted_room_service(timeout=1.0)
+    methods_groups.stop_hosted_room_service(timeout=10.0)
 
 
 def _result(envelope):
