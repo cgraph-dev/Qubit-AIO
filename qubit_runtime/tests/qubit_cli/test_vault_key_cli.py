@@ -5,10 +5,15 @@ from __future__ import annotations
 
 import argparse
 
-import keyring
 import pytest
-from keyring.backend import KeyringBackend
-from keyring.backends import fail
+
+# ``keyring`` is the upstream ``keychain`` extra (keyring==25.7.0), not a core/test-group
+# dependency: a plain checkout collects this module without it. Skip with the install hint
+# rather than failing collection; the contracts below need the real backend protocol.
+keyring = pytest.importorskip(
+    "keyring", reason="requires the optional keychain extra (keyring==25.7.0)")
+from keyring.backend import KeyringBackend  # noqa: E402
+from keyring.backends import fail  # noqa: E402
 
 from agent.vault_store import VaultStore
 

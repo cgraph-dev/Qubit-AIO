@@ -366,7 +366,7 @@ def test_model_switch_mirror_binds_runtime_scope_under_multiplex(two_homes, monk
     reads ``get_secret`` with no scope active and the mirror reports "live session sync failed:
     ... UnscopedSecretError" while the session stays on its previous route."""
     from agent.secret_scope import UnscopedSecretError, get_secret
-    from hermes_constants import get_hermes_home
+    from qubit_constants import get_hermes_home
 
     root, b = two_homes
     seen = []

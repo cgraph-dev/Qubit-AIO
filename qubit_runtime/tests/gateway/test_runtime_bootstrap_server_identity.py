@@ -51,7 +51,7 @@ class _Kernel32:
 @pytest.fixture()
 def pipe(monkeypatch):
     """Install one pipe server's facts as the Win32 layer reports them to this client."""
-    import hermes_dir_acl
+    import qubit_dir_acl
 
     def install(*, process_sid, owner=OWN, aces=((0, OWN),), readable=True, own_elevated=False,
                 own_session=1, server_session=1, client_pid=None, server_elevated=None):
@@ -73,13 +73,13 @@ def pipe(monkeypatch):
                 raise PermissionError("cannot read named-pipe owner")
             return owner, tuple(aces)
         monkeypatch.setattr(native, "_pipe_security", security, raising=False)
-        monkeypatch.setattr(hermes_dir_acl, "process_is_elevated", lambda: own_elevated)
+        monkeypatch.setattr(qubit_dir_acl, "process_is_elevated", lambda: own_elevated)
 
         def elevation(pid=None):
             # TokenElevation of the server's token; None (the probe failed) unless a test says otherwise.
             assert pid == SERVER_PID and process_sid is not None, "elevation probed for an unreadable server"
             return server_elevated
-        monkeypatch.setattr(hermes_dir_acl, "process_elevation", elevation)
+        monkeypatch.setattr(qubit_dir_acl, "process_elevation", elevation)
     return install
 
 

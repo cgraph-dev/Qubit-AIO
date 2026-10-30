@@ -16,12 +16,17 @@ import stat
 import sys
 from pathlib import Path
 
-import keyring
 from cryptography.fernet import Fernet
 import pytest
-from keyring.backend import KeyringBackend
-from keyring.backends import fail
-from keyring.errors import PasswordDeleteError
+
+# ``keyring`` is the upstream ``keychain`` extra (keyring==25.7.0), not a core/test-group
+# dependency: a plain checkout collects this module without it. Skip with the install hint
+# rather than failing collection; the contracts below need the real backend protocol.
+keyring = pytest.importorskip(
+    "keyring", reason="requires the optional keychain extra (keyring==25.7.0)")
+from keyring.backend import KeyringBackend  # noqa: E402
+from keyring.backends import fail  # noqa: E402
+from keyring.errors import PasswordDeleteError  # noqa: E402
 
 from agent.vault_store import VaultError, VaultStore
 

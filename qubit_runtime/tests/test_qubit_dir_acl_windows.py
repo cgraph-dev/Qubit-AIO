@@ -108,7 +108,7 @@ _REPORTERS_DACL = ["/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-
 
 def _elevated() -> bool:
     sys.path.insert(0, str(_REPO))
-    from hermes_dir_acl import process_is_elevated
+    from qubit_dir_acl import process_is_elevated
     return process_is_elevated()
 
 
@@ -159,7 +159,7 @@ def _require_faithful_probe(reporters_parent: Path, reporters_dir: Path) -> None
 
 
 def test_dir_made_while_elevated_stays_usable_by_the_filtered_token(reporters_parent):
-    from hermes_dir_acl import make_user_dir
+    from qubit_dir_acl import make_user_dir
 
     plain = reporters_parent / "plain"
     plain.mkdir()  # inherits the reporters' SYSTEM + Administrators DACL
@@ -173,7 +173,7 @@ def test_dir_made_while_elevated_stays_usable_by_the_filtered_token(reporters_pa
 
 
 def test_elevated_rerun_repairs_a_dir_an_earlier_elevated_run_left(reporters_parent):
-    from hermes_dir_acl import make_user_dir
+    from qubit_dir_acl import make_user_dir
 
     left = reporters_parent / "state"
     left.mkdir()
@@ -188,7 +188,7 @@ def test_elevated_rerun_repairs_a_dir_an_earlier_elevated_run_left(reporters_par
 def test_elevated_repair_also_reaches_an_old_lock_already_inside_the_dir(reporters_parent):
     """Review #140490: the pywin32 write does not propagate, so a token lock an earlier elevated run
     left INSIDE the dir kept the reporters' DACL after the dir itself was repaired."""
-    from hermes_dir_acl import make_user_dir
+    from qubit_dir_acl import make_user_dir
 
     left = reporters_parent / "gateway-locks"
     left.mkdir()
@@ -317,18 +317,18 @@ def _dacls(paths):
 
 
 def test_elevated_grants_never_reach_a_junction_target_outside_the_home(home_with_junction_out):
-    import hermes_dir_acl
+    import qubit_dir_acl
     from qubit_cli import update_windows_acl
 
     home, outside, junction = home_with_junction_out
-    assert hermes_dir_acl.is_reparse_point(junction)
+    assert qubit_dir_acl.is_reparse_point(junction)
     watched = [outside, *sorted(outside.rglob("*"))]
     before = _dacls(watched)
-    hermes_dir_acl._granted.clear()
-    hermes_dir_acl.make_user_dir(junction, parents=True, exist_ok=True)  # the existing-leaf "repair" case
-    hermes_dir_acl.make_user_dir(junction / "thumbs", parents=True, exist_ok=True)  # through the junction
-    assert hermes_dir_acl.grant_user_access(junction) is False
-    granted, skipped, failed = hermes_dir_acl.grant_tree_user_access(home)
+    qubit_dir_acl._granted.clear()
+    qubit_dir_acl.make_user_dir(junction, parents=True, exist_ok=True)  # the existing-leaf "repair" case
+    qubit_dir_acl.make_user_dir(junction / "thumbs", parents=True, exist_ok=True)  # through the junction
+    assert qubit_dir_acl.grant_user_access(junction) is False
+    granted, skipped, failed = qubit_dir_acl.grant_tree_user_access(home)
     update_windows_acl.repair_windows_home_acl()  # the post-update repair that used icacls /T
     assert junction in skipped and not failed and granted >= 2
     assert _dacls(watched) == before, "an elevated grant followed the junction out of the home"

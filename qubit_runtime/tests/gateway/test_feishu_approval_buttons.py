@@ -24,17 +24,32 @@ if _repo not in sys.path:
 # ---------------------------------------------------------------------------
 def _ensure_feishu_mocks():
     """Provide stubs for lark-oapi / aiohttp.web so the import succeeds."""
-    if importlib.util.find_spec("lark_oapi") is None and "lark_oapi" not in sys.modules:
-        mod = MagicMock()
-        for name in (
-            "lark_oapi", "lark_oapi.api.im.v1",
-            "lark_oapi.event", "lark_oapi.event.callback_type",
-        ):
-            sys.modules.setdefault(name, mod)
-    if importlib.util.find_spec("aiohttp") is None and "aiohttp" not in sys.modules:
-        aio = MagicMock()
-        sys.modules.setdefault("aiohttp", aio)
-        sys.modules.setdefault("aiohttp.web", aio.web)
+    # A sibling gateway module may already have installed a mock for lark_oapi. That stub has
+    # no ``__spec__`` and makes ``find_spec`` raise ValueError, so consult sys.modules first.
+    if "lark_oapi" not in sys.modules:
+        try:
+            installed = importlib.util.find_spec("lark_oapi") is not None
+        except (ImportError, ValueError):
+            installed = False
+        if not installed:
+            sys.modules["lark_oapi"] = MagicMock()
+    if "lark_oapi" in sys.modules:
+        mod = sys.modules["lark_oapi"]
+        if isinstance(mod, MagicMock) or getattr(mod, "__spec__", None) is None:
+            for name in (
+                "lark_oapi.api.im.v1",
+                "lark_oapi.event", "lark_oapi.event.callback_type",
+            ):
+                sys.modules.setdefault(name, mod)
+    if "aiohttp" not in sys.modules:
+        try:
+            installed = importlib.util.find_spec("aiohttp") is not None
+        except (ImportError, ValueError):
+            installed = False
+        if not installed:
+            aio = MagicMock()
+            sys.modules["aiohttp"] = aio
+            sys.modules.setdefault("aiohttp.web", aio.web)
 
 
 _ensure_feishu_mocks()
