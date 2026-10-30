@@ -586,7 +586,7 @@ def _run_logged_subprocess(cmd, *, cwd=None, env=None):
 
     child_env = dict(os.environ if env is None else env)
     child_env.setdefault("PYTHONUNBUFFERED", "1")
-    spawn = {"creationflags": windows_hide_flags()} if os.name == "nt" else {"process_group": 0}
+    spawn = {"creationflags": windows_hide_flags()} if os.name == "nt" else {"process_group": 0}  # detached-spawn: ok — the child is owned and reaped by the parent process
     proc = subprocess.Popen(
         cmd, cwd=cwd, env=child_env, stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **spawn)

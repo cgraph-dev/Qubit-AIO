@@ -7,7 +7,7 @@ by email_modes.extract_verification_link, so arbitrary/phishing links are ignore
 The agent still OPENS the link with its own browser - several brokers bind the
 verification session to the browser that opens it (see the intelius record).
 
-Configuration comes from the same env vars the Qubit email gateway uses:
+Configuration comes from the same env vars the Hermes email gateway uses:
   EMAIL_ADDRESS / EMAIL_PASSWORD              (required for Mode B)
   EMAIL_SMTP_HOST / EMAIL_SMTP_PORT           (optional; inferred for common providers)
   EMAIL_IMAP_HOST / EMAIL_IMAP_PORT           (optional; inferred for common providers)
@@ -118,7 +118,7 @@ def browser_send_payload(broker: dict, body_text: str, to: str | None = None) ->
 
     No network and no credentials: the deterministic part (recipient-lock to the broker's own
     declared address, subject/body split) happens here; the agent then composes and sends it in
-    the operator's logged-in webmail with browser_* tools. Same recipient guard as `send()`, so
+    the operator's logged-in webmail with browser_exec. Same recipient guard as `send()`, so
     the browser lane cannot be pointed at an arbitrary person either.
     """
     allowed = broker_addresses(broker)
@@ -244,7 +244,7 @@ def _decode_part(part) -> str:
             return ""
         charset = part.get_content_charset() or "utf-8"
         return payload.decode(charset, errors="replace")
-    except Exception:  # noqa: BLE001 - malformed MIME must not kill the poll
+    except Exception:
         return ""
 
 
@@ -310,7 +310,7 @@ def fetch_recent(env: dict | None = None, since_days: int = 3, limit: int = 30,
     finally:
         try:
             conn.logout()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
 
 

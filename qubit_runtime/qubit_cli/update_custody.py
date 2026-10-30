@@ -360,7 +360,7 @@ def _owner_watch(pid: int):
     read_end, write_end = os.pipe()  # non-inheritable: no other child keeps the owner's end open
     try:
         watcher = subprocess.Popen([sys.executable, "-I", "-S", "-c", _OWNER_WATCH, str(pid)], stdin=read_end,
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
     except OSError as exc:
         os.close(write_end)
         logger.warning("Could not watch update child %s for its owner's death: %s", pid, exc)

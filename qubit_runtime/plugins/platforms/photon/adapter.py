@@ -1053,7 +1053,7 @@ class PhotonAdapter(BasePlatformAdapter):
             self._sidecar_proc = subprocess.Popen(  # noqa: S603
                 [self._node_bin, str(_sidecar_dir() / "index.mjs")],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
-                start_new_session=(sys.platform != "win32"),
+                start_new_session=(sys.platform != "win32"),  # detached-spawn: ok — the child is owned and reaped by the parent process
                 # Windows: run the persistent sidecar headless so it does not open
                 # (or leave) a visible console window. CREATE_NO_WINDOW only (no
                 # DETACHED_PROCESS) so the stdin/stdout pipes above stay usable.

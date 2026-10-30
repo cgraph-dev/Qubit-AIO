@@ -123,7 +123,7 @@ def test_every_owed_followup_reaches_the_desktop_result(tmp_path, step):
     assert result["exit_code"] == 0 and result["ok"] is True
     assert result["manual"] is True
     assert step in result["message"]
-    assert ("hermes gateway restart" in result["message"]) is (step == "gateway_restart")
+    assert ("qubit gateway restart" in result["message"]) is (step == "gateway_restart")
 
 
 @requires_posix_handoff
@@ -136,7 +136,7 @@ def test_dashboard_only_gateway_restart_followup_gets_no_gateway_hint(tmp_path):
 
     result = json.loads((tmp_path / ".hermes-update-result.json").read_text(encoding="utf-8-sig"))
     assert result["manual"] is True and "gateway_restart" in result["message"]
-    assert "hermes gateway restart" not in result["message"]
+    assert "qubit gateway restart" not in result["message"]
 
 
 @requires_posix_handoff

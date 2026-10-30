@@ -41,7 +41,7 @@ VALID = {
     #   programmatic - CLI sends via SMTP + reads verify links via IMAP (needs EMAIL_* creds)
     #   alias        - AgentMail agent-owned inboxes / per-broker aliases
     "email_mode": {"draft_only", "browser", "programmatic", "alias"},
-    # browser_backend: local = Qubit's own Chromium via browser_exec; camofox = the `camofox`
+    # browser_backend: local = Hermes's own Chromium via browser_exec; camofox = the `camofox`
     # catalog plugin. Only browserbase (or auto + key) changes planning (soft-CAPTCHA clearing).
     "browser_backend": {"auto", "browserbase", "local", "camofox"},
     "tracker_backend": {"local-json", "google-sheets"},
@@ -49,7 +49,7 @@ VALID = {
 }
 
 
-# Values written by older installs, renamed when Qubit dropped agent-browser.
+# Values written by older installs, renamed when Hermes dropped agent-browser.
 LEGACY_VALUES = {"browser_backend": {"agent-browser": "local"}}
 
 
@@ -71,7 +71,7 @@ def save_config(cfg: dict) -> Path:
 
 
 def dotenv_env() -> dict:
-    """Shell env overlaid on `$QUBIT_HOME/.env`, so capability detection sees the creds Qubit
+    """Shell env overlaid on `$QUBIT_HOME/.env`, so capability detection sees the creds Hermes
     loads for its own tools (BROWSERBASE_API_KEY, EMAIL_*, AGENTMAIL_API_KEY, ...) even though the
     terminal-tool shell doesn't export them. Shell env wins; the .env only fills gaps."""
     merged: dict = {}

@@ -4,7 +4,7 @@ Behavioral contracts for the /docs/plugins catalog extractor:
 
 1. Reads ``plugin-catalog/*.yaml`` entries (skipping ``removed.yaml``) and
    emits ``plugins.json`` rows carrying name/repo/sha/tier/capabilities plus
-   a synthesized ``qubit plugins install <name>`` command.
+   a synthesized ``hermes plugins install <name>`` command.
 2. Entries missing any of name/repo/sha are skipped (logged, not fatal).
 3. A missing ``plugin-catalog/`` directory degrades gracefully: empty
    catalog list, zero counts in the meta sidecar, exit 0 — the docs build
@@ -303,12 +303,12 @@ def test_git_dates_added_is_first_commit_updated_is_last_and_renames_keep_added(
 
     dates = mod.load_git_dates(catalog)
 
-    assert dates["alpha.yaml"] == {"addedAt": "2026-01-01T00:00:00+00:00", "updatedAt": "2026-02-01T00:00:00+00:00"}
-    assert dates["new-name.yaml"] == {"addedAt": "2026-01-01T00:00:00+00:00", "updatedAt": "2026-03-01T00:00:00+00:00"}
+    assert dates["alpha.yaml"] == {"addedAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-02-01T00:00:00Z"}
+    assert dates["new-name.yaml"] == {"addedAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-03-01T00:00:00Z"}
     entries = mod.load_catalog_entries(catalog, dates=dates)
     by_name = {e["name"]: e for e in entries}
-    assert by_name["alpha"]["addedAt"] == "2026-01-01T00:00:00+00:00"
-    assert by_name["alpha"]["updatedAt"] == "2026-02-01T00:00:00+00:00"
+    assert by_name["alpha"]["addedAt"] == "2026-01-01T00:00:00Z"
+    assert by_name["alpha"]["updatedAt"] == "2026-02-01T00:00:00Z"
 
 
 def test_git_dates_are_null_outside_a_repository(mod, tmp_path):

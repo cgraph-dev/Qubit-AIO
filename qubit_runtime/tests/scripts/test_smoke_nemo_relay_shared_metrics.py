@@ -24,8 +24,8 @@ _EXACT_EXPECTATIONS = {
 @pytest.mark.parametrize(
     "relative_path",
     [
-        Path(".venv") / "bin" / "hermes",
-        Path(".venv") / "Scripts" / "hermes.exe",
+        Path(".venv") / "bin" / "qubit",
+        Path(".venv") / "Scripts" / "qubit.exe",
     ],
 )
 def test_resolve_qubit_executable_from_repository_venv(
@@ -88,22 +88,22 @@ def test_gateway_turn_wait_settles_only_on_the_rows_in_the_real_store(tmp_path):
     assert not smoke._wait_for_gateway_turn_rows(database, timeout=0)
     assert not database.exists()  # polling never creates the store ahead of the gateway
 
-    resource = {"architecture": "x86_64", "hermes_version": "0.0.0", "install_method": "git", "os_family": "linux"}
+    resource = {"architecture": "x86_64", "qubit_version": "0.0.0", "install_method": "git", "os_family": "linux"}
     store = SharedMetricsStore(database, tmp_path / "outbox")
     for name, dimensions in [
         *smoke.GATEWAY_TURN_EXPECTED_DIMENSIONS.items(),
-        ("hermes.gateway.reply_latency", {"first_response_bucket": "lt_2s", "platform": "local"}),
-        ("hermes.startup.latency", {"latency_bucket": "lt_500ms", "surface": "cli"}),
+        ("qubit.gateway.reply_latency", {"first_response_bucket": "lt_2s", "platform": "local"}),
+        ("qubit.startup.latency", {"latency_bucket": "lt_500ms", "surface": "cli"}),
     ]:
         store.record_counter(name, dimensions, resource)
     assert not smoke._wait_for_gateway_turn_rows(database, timeout=0)  # gateway_boot still pending
 
-    store.record_counter("hermes.startup.latency", {"latency_bucket": "2s_to_5s", "surface": "gateway_boot"}, resource)
+    store.record_counter("qubit.startup.latency", {"latency_bucket": "2s_to_5s", "surface": "gateway_boot"}, resource)
     assert smoke._wait_for_gateway_turn_rows(database, timeout=0)
 
 
 def test_smoke_update_expectations_match_the_receipt_projection():
     run, stage_rows = update_receipt_fields(smoke.UPDATE_RECEIPT)
 
-    assert run == smoke.FAILURE_EXPECTED_DIMENSIONS["hermes.update.run"]
+    assert run == smoke.FAILURE_EXPECTED_DIMENSIONS["qubit.update.run"]
     assert sorted((row["stage"], row["outcome"]) for row in stage_rows) == smoke.expected_update_stages()

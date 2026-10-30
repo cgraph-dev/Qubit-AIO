@@ -6981,8 +6981,6 @@ def register(ctx) -> None:
         # env vars that the adapter reads via os.getenv(). Replaces the hardcoded block in
         # gateway/config.py. Hook contract: #24849.
         apply_yaml_config_fn=_apply_yaml_config,
-        allowed_users_env="SLACK_ALLOWED_USERS",
-        allow_all_env="SLACK_ALLOW_ALL_USERS",
         cron_deliver_env_var="SLACK_HOME_CHANNEL",
         # Out-of-process cron delivery; without it deliver=slack cron jobs fail with
         # "No live adapter" when cron runs apart from the gateway.

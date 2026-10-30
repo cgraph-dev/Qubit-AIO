@@ -143,7 +143,7 @@ def _run(cmd: str, *, ask_password: Callable[[], str], on_line: Callable[[str], 
     env = {"DEBIAN_FRONTEND": "noninteractive", "LC_ALL": "C.UTF-8"}
     proc = subprocess.Popen(  # windows-footgun: ok — Linux-only (is_supported_host)
         argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        env={**os.environ, **env}, start_new_session=True)
+        env={**os.environ, **env}, start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
     try:
         if stdin_payload is not None:
             proc.stdin.write(stdin_payload.encode("utf-8"))  # type: ignore[union-attr]

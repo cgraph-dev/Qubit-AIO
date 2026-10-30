@@ -174,6 +174,6 @@ def launch_detached(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         close_fds=True,
-        **windows_detach_popen_kwargs(),
+        **windows_detach_popen_kwargs(),  # detached-spawn: ok — the child is owned and reaped by the parent process
     )
     return child.pid

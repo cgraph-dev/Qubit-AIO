@@ -123,7 +123,7 @@ def _run_fresh_recovery_process(
         kwargs["creationflags"] = (
             getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0))
     else:
-        kwargs["start_new_session"] = True
+        kwargs["start_new_session"] = True  # detached-spawn: ok — the child is owned and reaped by the parent process
     try:
         return subprocess.run(command, **kwargs)
     except (OSError, subprocess.TimeoutExpired) as exc:

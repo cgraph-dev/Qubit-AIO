@@ -334,7 +334,7 @@ class _SlashWorker:
         self.proc = subprocess.Popen(
             argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             encoding="utf-8", errors="replace", bufsize=1, cwd=os.getcwd(), env=env,
-            creationflags=windows_hide_flags(), start_new_session=True)
+            creationflags=windows_hide_flags(), start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
         threading.Thread(target=self._drain_stdout, daemon=True).start()
         threading.Thread(target=self._drain_stderr, daemon=True).start()
 

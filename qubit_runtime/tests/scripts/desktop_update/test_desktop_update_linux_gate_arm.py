@@ -112,7 +112,7 @@ def test_foreign_target_with_arm_dirs_present_is_still_skew(tmp_path):
     (arm / "Hermes").touch()
     foreign = tmp_path / "opt" / "Hermes"
     foreign.mkdir(parents=True)
-    (foreign / "qubit").touch()
-    assert _gate(tmp_path, foreign / "qubit", tmp_path) == "skew"
+    (foreign / "hermes").touch()
+    assert _gate(tmp_path, foreign / "hermes", tmp_path) == "skew"
     # A sibling dir sharing the arch prefix must not be mistaken for the unpacked tree.
     assert _gate(tmp_path, Path(str(arm) + "-evil") / "Hermes", tmp_path) == "skew"

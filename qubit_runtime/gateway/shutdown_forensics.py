@@ -160,7 +160,7 @@ def spawn_async_diagnostic(log_path: Path, signal_name: str, *,
     try:  # start_new_session: outlive systemd killing our cgroup (KillMode=control-group) to flush
         return subprocess.Popen(
             [*bound, "bash", "-c", script], stdout=fd,
-            stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,
+            stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
             close_fds=True).pid
     except OSError:
         return None

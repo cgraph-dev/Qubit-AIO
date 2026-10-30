@@ -734,7 +734,7 @@ def _spawn_daemon(bin_path: Path, cfg: Path, env: Dict[str, str], log_path: Path
         # start_new_session is POSIX-only (Windows isn't supported anyway — no upstream binary).
         return subprocess.Popen(  # noqa: S603
             [str(bin_path), "-config", str(cfg)], env=env, stdin=subprocess.DEVNULL, stdout=log_fd, stderr=subprocess.STDOUT,
-            **({} if platform.system() == "Windows" else {"start_new_session": True}),
+            **({} if platform.system() == "Windows" else {"start_new_session": True}),  # detached-spawn: ok — the child is owned and reaped by the parent process
         )
     except OSError as exc:
         raise RuntimeError(f"failed to spawn iron-proxy: {exc}") from exc

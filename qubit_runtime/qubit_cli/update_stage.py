@@ -131,7 +131,7 @@ def ensure_panel(update_root: Path) -> None:
         subprocess.Popen(
             ["/usr/bin/osascript", "-l", "JavaScript", str(panel), str(status_file())],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, start_new_session=True,
+            stderr=subprocess.DEVNULL, start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
         )
         os.environ[UI_SPAWNED_ENV] = "1"  # inherited: never spawn twice per chain
     except OSError:

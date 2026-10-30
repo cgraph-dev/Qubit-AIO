@@ -49,6 +49,17 @@ _ACTIVE_INSTALL_INTERVAL = timedelta(hours=24)
 # Column order of the client resource in every counter_aggregates statement.
 _RESOURCE_COLUMNS = ("hermes_version", "os_family", "architecture", "install_method")
 
+
+def _resource_value(resource: dict, column: str):
+    """The stored resource column, accepting the renamed client key.
+
+    The on-disk schema keeps the historical ``hermes_version`` column while the
+    client contract names ``qubit_version``; either spelling may arrive here.
+    """
+    if column == "hermes_version" and "hermes_version" not in resource:
+        return resource["qubit_version"]
+    return resource[column]
+
 _CREATE_TELEMETRY_STATE_SQL = """
             CREATE TABLE IF NOT EXISTS telemetry_state (
                 key TEXT PRIMARY KEY,
@@ -417,7 +428,7 @@ class SharedMetricsStore:
         connection.execute(
             _INCREMENT_COUNTER_SQL,
             (
-                period_start, metric_name, *(resource[column] for column in _RESOURCE_COLUMNS),
+                period_start, metric_name, *(_resource_value(resource, column) for column in _RESOURCE_COLUMNS),
                 _compact_json(dimensions), amount,
             ),
         )

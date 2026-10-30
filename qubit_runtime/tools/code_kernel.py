@@ -658,7 +658,7 @@ def _spawn(kernel: SessionKernel, *, child_python: str, child_cwd: str,
         kernel.proc = subprocess.Popen(
             [child_python, os.path.join(kernel.tmpdir, "hermes_kernel_runner.py")],
             # Strict mode passes an empty cwd: the kernel's staging dir plays the per-call tmpdir's role.
-            cwd=child_cwd or kernel.tmpdir, env=child_env, start_new_session=True,
+            cwd=child_cwd or kernel.tmpdir, env=child_env, start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE,
             creationflags=subprocess.CREATE_NO_WINDOW if _IS_WINDOWS else 0,
             close_fds=True, pass_fds=pass_fds, startupinfo=startupinfo,

@@ -136,7 +136,7 @@ def _run_profile_restart(profile: str, *, run: Callable[..., Any]) -> bool:
     if os.name == "nt":
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
     else:
-        kwargs["start_new_session"] = True
+        kwargs["start_new_session"] = True  # detached-spawn: ok — the child is owned and reaped by the parent process
     argv = [sys.executable, "-m", "qubit_cli.main", "-p", profile, "gateway", "restart"]
     return _succeeded(_run_quiet(run, argv, timeout=_PROFILE_RESTART_TIMEOUT, **kwargs))
 

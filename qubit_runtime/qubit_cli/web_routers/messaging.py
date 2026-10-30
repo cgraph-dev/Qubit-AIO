@@ -436,7 +436,7 @@ def _spawn_whatsapp_pairing_process(session_path: Path, mode: str) -> subprocess
     return subprocess.Popen(
         [node, str(bridge_script), "--pair-only", "--pair-json", "--session", str(session_path)],
         cwd=str(bridge_dir), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        encoding="utf-8", errors="replace", start_new_session=True, env=env,
+        encoding="utf-8", errors="replace", start_new_session=True, env=env,  # detached-spawn: ok — the child is owned and reaped by the parent process
         creationflags=windows_hide_flags(),
     )
 

@@ -351,7 +351,7 @@ class HostSupervisor:
         proc = subprocess.Popen(
             self.argv, cwd=str(self.cwd), env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
-            start_new_session=True)
+            start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
         self._proc = proc
         for target, name in ((self._drain_stdout, "compute-host-stdout"),
                              (self._drain_stderr, "compute-host-stderr"),

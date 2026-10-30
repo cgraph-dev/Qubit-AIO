@@ -3929,7 +3929,7 @@ def _launch_external_cron_worker(job: dict) -> bool:
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=stderr_fd,
-                start_new_session=True,
+                start_new_session=True,  # detached-spawn: ok — the child is owned and reaped by the parent process
                 creationflags=windows_hide_flags(),
             )
         finally:

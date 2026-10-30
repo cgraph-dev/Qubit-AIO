@@ -7593,8 +7593,6 @@ def register(ctx) -> None:
         # into ``DISCORD_*`` env vars that the adapter reads via ``os.getenv()``. Replaces the hardcoded
         # block that used to live in ``gateway/config.py``. Hook contract: #24836.
         apply_yaml_config_fn=_apply_yaml_config,
-        allowed_users_env="DISCORD_ALLOWED_USERS",
-        allow_all_env="DISCORD_ALLOW_ALL_USERS",
         cron_deliver_env_var="DISCORD_HOME_CHANNEL",
         # Out-of-process cron delivery via REST, else ``deliver=discord`` jobs fail with "No live adapter".
         standalone_sender_fn=_standalone_send,

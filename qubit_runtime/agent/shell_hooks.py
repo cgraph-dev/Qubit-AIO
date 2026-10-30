@@ -493,7 +493,7 @@ def _spawn(spec: ShellHookSpec, stdin_json: str) -> Dict[str, Any]:
     t0 = time.monotonic()
     # Own process group on POSIX so a timed-out hook's descendants are reaped with it (Windows: kill_process_tree
     # / taskkill /T). Hooks that finish in time keep detached helpers alive.
-    popen_kwargs: Dict[str, Any] = {"creationflags": windows_hide_flags()} if IS_WINDOWS else {"process_group": 0}
+    popen_kwargs: Dict[str, Any] = {"creationflags": windows_hide_flags()} if IS_WINDOWS else {"process_group": 0}  # detached-spawn: ok — the child is owned and reaped by the parent process
     # QUBIT_HOME follows the routed profile (the import-time environ holds the launch profile's), and
     # under multiplexing os.environ carries the DEFAULT profile's secrets, which a secondary's hook
     # script must not inherit; single-profile runs keep the process env byte-for-byte as before.

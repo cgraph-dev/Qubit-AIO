@@ -7334,7 +7334,7 @@ def register(ctx) -> None:
         name="telegram", label="Telegram", adapter_factory=_build_adapter, check_fn=telegram_deps_present,
         ensure_deps_fn=check_telegram_requirements, is_connected=_is_connected, required_env=["TELEGRAM_BOT_TOKEN"],
         install_hint=t("platform.telegram.install_hint"), setup_fn=interactive_setup, apply_yaml_config_fn=_apply_yaml_config,
-        allowed_users_env="TELEGRAM_ALLOWED_USERS", allow_all_env="TELEGRAM_ALLOW_ALL_USERS", cron_deliver_env_var="TELEGRAM_HOME_CHANNEL",
+        cron_deliver_env_var="TELEGRAM_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, max_message_length=4096, emoji="✈️", allow_update_command=True, platform_hint=PLATFORM_HINT,
         env_overrides=gateway_env.ENV_OVERRIDES,
         env_enable_credentials=gateway_env.ENV_ENABLE_CREDENTIALS, **gateway_env.AUTHZ)

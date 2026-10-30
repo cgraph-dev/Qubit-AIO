@@ -1252,7 +1252,7 @@ class ProcessRegistry(ProcessTerminationMixin, ProcessCheckpointMixin, ProcessOu
             proc = subprocess.Popen(
                 spawn_argv, text=True, cwd=session.cwd, env=spawn_env, encoding="utf-8",
                 errors="replace", stdout=output, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                start_new_session=True, **_popen_kwargs)
+                start_new_session=True, **_popen_kwargs)  # detached-spawn: ok — the child is owned and reaped by the parent process
         finally:
             if log:
                 os.close(output)

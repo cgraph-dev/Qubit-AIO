@@ -1,9 +1,9 @@
-"""``scripts/run-in-qubit-env``: run a command in the Hermes environment, syncing only when needed.
+"""``scripts/run-in-hermes-env``: run a command in the Hermes environment, syncing only when needed.
 
 The runner is what repo scripts hand themselves to from their shebang and what
 ``scripts/run_tests.sh`` re-executes under. Its decision worth pinning is
 staleness: pm stamps each dependency input's mtime beside the installed-state
-file ``__QUBIT_ACTIVATED`` names, and any input whose mtime differs from its
+file ``__HERMES_ACTIVATED`` names, and any input whose mtime differs from its
 stamp means the inherited environment may not match its inputs. Invert that
 either way and the cost is invisible — a re-sync on every run, or a stale
 environment that looks fine.
@@ -33,7 +33,7 @@ from pm.environments import ACTIVATION_INPUTS, activation_input_mtimes, record_a
 from tests.pm.activation_support import bash, posix
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNNER = REPO_ROOT / "scripts" / "run-in-qubit-env"
+RUNNER = REPO_ROOT / "scripts" / "run-in-hermes-env"
 
 EARLIER = "2018-01-01 00:00:00"
 LONG_AGO = "2019-01-01 00:00:00"
@@ -50,7 +50,7 @@ def _shim(path: Path) -> None:
     """Quote in posix form: a /bin/sh script treats backslashes in an unquoted
     word as escapes (same pattern as tests/pm/activation_support.py)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("#!/bin/sh\nexec '%s' \"$@\"\n" % posix(Path(sys.executable)), encoding="utf-8")
+    path.write_text(f"#!/bin/sh\nexec '{posix(Path(sys.executable))}' \"$@\"\n", encoding="utf-8")
     path.chmod(0o755)
 
 
@@ -82,7 +82,7 @@ def checkout(tmp_path: Path) -> Path:
     (root / "pm" / "environments.py").write_text(
         "import sys\n"
         "assert sys.argv[1:] == ['--format', 'sh'], sys.argv\n"
-        f"print(\"export __QUBIT_ACTIVATED='{posix(root)}/state/facts.json'\")\n"
+        f"print(\"export __HERMES_ACTIVATED='{posix(root)}/state/facts.json'\")\n"
         f"print('export PATH=\"{posix(root)}/shim:$PATH\"')\n",
         encoding="utf-8",
     )
@@ -98,12 +98,13 @@ def _record(root: Path, *, test_environment: bool = True) -> None:
 def _run_in(root: Path, *command: str, sentinel: str | None = "{root}/state/facts.json"):
     """Drive the runner as a caller would; the shim dir is on PATH like any tool dir."""
     env = {**os.environ, "PATH": f"{posix(root / 'shim')}{os.pathsep}{os.environ.get('PATH', '')}"}
-    env.pop("__QUBIT_ACTIVATED", None)
+    env.pop("__HERMES_ACTIVATED", None)
     if sentinel is not None:
-        env["__QUBIT_ACTIVATED"] = sentinel.replace("{root}", posix(root))
+        env["__HERMES_ACTIVATED"] = sentinel.replace("{root}", posix(root))
     return subprocess.run(
         [bash(), posix(root / "scripts" / RUNNER.name), *command],
         capture_output=True, text=True, cwd=posix(root), env=env, timeout=60,
+        check=False,
     )
 
 
@@ -159,7 +160,7 @@ def test_unusable_sentinel_syncs(checkout: Path, sentinel: str | None):
 
 
 def test_command_runs_in_the_environment_with_its_arguments_and_exit_status(checkout: Path):
-    run = _run_in(checkout, "bash", "-c", 'echo "$__QUBIT_ACTIVATED|$0|$1|$2"; exit 7', "zero", "b c", "d",
+    run = _run_in(checkout, "bash", "-c", 'echo "$__HERMES_ACTIVATED|$0|$1|$2"; exit 7', "zero", "b c", "d",
                   sentinel=None)
     assert run.returncode == 7, run.stderr
     assert run.stdout.strip() == f"{posix(checkout)}/state/facts.json|zero|b c|d"

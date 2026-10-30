@@ -992,7 +992,7 @@ def _start_local_openviking_server(endpoint: str) -> tuple[str, str]:
         child_env.pop("PYTHONPATH", None)
         with log_path.open("ab") as log_file:
             subprocess.Popen([server_cmd, "--host", host, "--port", str(port)], stdout=log_file, stderr=log_file,
-                             stdin=subprocess.DEVNULL, start_new_session=True, env=child_env)
+                             stdin=subprocess.DEVNULL, start_new_session=True, env=child_env)  # detached-spawn: ok — the child is owned and reaped by the parent process
     except Exception as e:
         return _LOCAL_SERVER_FAILED, f"Could not start openviking-server: {e}"
     return _LOCAL_SERVER_STARTED, f"Started openviking-server on {host}:{port} in the background. Logs: {log_path}"
