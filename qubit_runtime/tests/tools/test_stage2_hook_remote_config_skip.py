@@ -49,7 +49,7 @@ def _run(home: Path, backend_env: str | None) -> str:
     python.chmod(0o755)
     script = (
         "set -eu\n"
-        + f'PATH="{bin_dir}:$PATH"\nHERMES_HOME="{home}"\nINSTALL_DIR="{root / "install"}"\n'
+        + f'PATH="{bin_dir}:$PATH"\nQUBIT_HOME="{home}"\nINSTALL_DIR="{root / "install"}"\n'
         + _block()
     )
     proc = subprocess.run(["sh", "-c", script], capture_output=True, text=True, timeout=60,
