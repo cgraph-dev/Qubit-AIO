@@ -148,8 +148,8 @@ def _warm_gateway_module() -> None:
     """
     for mod in (
         "qubit_cli.gateway",
-        "qubit_cli.auth",  # provider auth state → copilot_auth → subprocess
-        "qubit_cli.copilot_auth",
+        "qubit_cli.auth",  # provider auth state
+        "providers",  # provider plugin discovery (below) imports every profile's module chain
         "qubit_cli.runtime_provider",
         "qubit_cli.skin_engine",  # resolve_skin() config + skin engine init
         "qubit_cli.inventory",  # provider catalogs + models.dev cache
@@ -157,8 +157,14 @@ def _warm_gateway_module() -> None:
     ):
         try:
             __import__(mod)
-        except Exception:
-            pass
+        except Exception:  # health: allow BLE001 -- best-effort warm-up; the real import reports
+            _log.debug("warm-up import of %s failed", mod, exc_info=True)
+    try:
+        # Provider plugins carry their own auth chains (token exchange, CLI probes): warm them too.
+        import providers
+        providers.list_providers()
+    except Exception:  # health: allow BLE001 -- best-effort warm-up; discovery reports on real use
+        _log.debug("warm-up provider discovery failed", exc_info=True)
 
 
 def _resolve_restart_drain_timeout() -> float:
@@ -190,7 +196,7 @@ def _eager_reconcile_own_session_db() -> None:
     except Exception as exc:
         _log.warning(
             "startup schema reconcile of state.db failed (%s); session "
-            "reads will retry the heal per poll", exc,
+            "reads will report the store unavailable until owner recovery", exc,
         )
 
 
@@ -297,7 +303,7 @@ def _is_serve_orphaned(
 #: Ceiling on the post-orphan graceful unwind before the hard exit takes over.
 #: The desktop is already gone, so nothing escalates for us and this is the
 #: whole budget: comfortably past the 5s exit-flush budget
-#: (``QUBIT_TUI_EXIT_FLUSH_BUDGET_S``), still short enough to keep the reap prompt.
+#: (``HERMES_TUI_EXIT_FLUSH_BUDGET_S``), still short enough to keep the reap prompt.
 _ORPHAN_EXIT_CEILING_S = 10.0
 
 
@@ -454,7 +460,7 @@ def _report_port_in_use(host: str, port: int) -> None:
     _write_machine_sentinel_line(_PORT_IN_USE_SENTINEL.format(port=port))
     print(
         f"  Port {port} on {host} is already in use — likely another "
-        "'qubit serve' / 'qubit dashboard' backend or the Qubit gateway. "
+        "'hermes serve' / 'hermes dashboard' backend or the Hermes gateway. "
         "Stop the other process, or pass --port <other> "
         "(--port 0 picks a free ephemeral port).",
         flush=True,
@@ -462,60 +468,6 @@ def _report_port_in_use(host: str, port: int) -> None:
 
 
 _DEFAULT_DASHBOARD_FORWARDED_ALLOW_IPS = ("127.0.0.1", "::1")
-
-
-def build_listener_server(served_app, host: str, port: int, *, auth_required: bool,
-                          ws_ping: Optional[tuple[float, float]] = None,
-                          timeout_graceful_shutdown: Optional[float] = 3, lifespan: str = "auto"):
-    """uvicorn ``Config`` + ``Server`` for a dashboard or gateway-session listener (FastAPI-free, so
-    the gateway can build its session listener without importing the dashboard app).
-
-    WS keepalive ping runs ON the agent event loop; a GIL-holding worker call can starve it for
-    minutes, so uvicorn misses the pong and drops a healthy local socket (#53773/#48445/#50005).
-    The ping only detects half-open connections (proxy 524, dropped tunnels), impossible on
-    loopback where a dead client sends a real FIN/RST -> WebSocketDisconnect. So: no ping on
-    loopback; non-loopback sits behind a Cloudflare Tunnel (~100s idle) and keeps a config-driven
-    cadence (dashboard.ws_ping_interval/_timeout, #79635) defaulting to 20/20. *ws_ping* overrides
-    both (SSH-isolated Desktop backends).
-    """
-    import uvicorn
-    from qubit_cli.config import load_config
-    from qubit_cli.web_server_boundary import _DESKTOP_ATTACHMENT_WS_MAX_BYTES, _LOOPBACK_HOST_VALUES
-
-    try:
-        dash_cfg = load_config().get("dashboard") or {}
-    except Exception:  # health: allow BLE001 -- same fail-open read as web_server._build_uvicorn_server: a broken config.yaml must not stop the listener
-        dash_cfg = {}
-
-    def _ws_ping_setting(key: str, default: float = 20.0) -> float:
-        try:
-            return float(dash_cfg.get(key, default))
-        except (TypeError, ValueError):
-            return default
-
-    if ws_ping is None:
-        ws_ping = (None, None) if host in _LOOPBACK_HOST_VALUES else (
-            _ws_ping_setting("ws_ping_interval"), _ws_ping_setting("ws_ping_timeout"))
-    config = uvicorn.Config(
-        served_app, host=host, port=port, log_level="warning",
-        # Off by default so _ws_client_is_allowed sees the real peer, not
-        # X-Forwarded-For. Gated mode runs behind a TLS terminator and needs
-        # X-Forwarded-Proto for cookie Secure flags.
-        proxy_headers=auth_required,
-        # Loopback-only unless the operator trusts a bounded upstream proxy, so
-        # spoofed X-Forwarded-* from arbitrary callers is never honoured.
-        forwarded_allow_ips=_dashboard_forwarded_allow_ips(dash_cfg),
-        ws_ping_interval=ws_ping[0],
-        ws_ping_timeout=ws_ping[1],
-        ws_max_size=_DESKTOP_ATTACHMENT_WS_MAX_BYTES,
-        # Desktop sends a single SIGTERM and escalates to SIGKILL ~5s later;
-        # uvicorn's default (None) waits on lingering ASGI tasks forever, so a
-        # mid-turn request orphans the backend past that budget (#76244). 3s
-        # leaves room for lifespan shutdown + cron_stop before the kill.
-        timeout_graceful_shutdown=timeout_graceful_shutdown,
-        lifespan=lifespan,
-    )
-    return config, uvicorn.Server(config)
 
 
 def _dashboard_forwarded_allow_ips(dashboard_config: dict[str, Any]) -> list[str]:
@@ -571,3 +523,85 @@ def _dashboard_forwarded_allow_ips(dashboard_config: dict[str, Any]) -> list[str
         _log.info("Dashboard trusted proxies: %s", ", ".join(trusted))
 
     return trusted
+
+
+def _uvicorn_console_logging() -> None:
+    """uvicorn's default console logging, without its ``dictConfig``.
+
+    ``uvicorn.Config``'s default ``log_config`` runs ``dictConfig``, which calls
+    ``logging.shutdown()`` on every live handler: a multiplexed gateway's profile log routers are
+    already installed when its listener is built, and a closed router stays closed. The listeners
+    pass ``log_config=None`` and get uvicorn's handlers here instead: ``uvicorn`` to stderr,
+    ``uvicorn.access`` to stdout, neither propagating into the Hermes log files.
+    """
+    from uvicorn.config import LOGGING_CONFIG
+    from uvicorn.logging import AccessFormatter, DefaultFormatter
+
+    formats = LOGGING_CONFIG["formatters"]
+    for name, stream, formatter in (
+        ("uvicorn", sys.stderr, DefaultFormatter(formats["default"]["fmt"])),
+        ("uvicorn.access", sys.stdout, AccessFormatter(formats["access"]["fmt"])),
+    ):
+        logger = logging.getLogger(name)
+        logger.propagate = False
+        if not logger.handlers:  # a second listener in this process keeps the first one's
+            handler = logging.StreamHandler(stream)
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+    # LOGGING_CONFIG's level for the parent; uvicorn.Config sets only the child loggers' levels.
+    logging.getLogger("uvicorn").setLevel(logging.INFO)
+
+
+def build_listener_server(served_app, host: str, port: int, *, auth_required: bool,
+                          ws_ping: Optional[tuple[float, float]] = None,
+                          timeout_graceful_shutdown: Optional[float] = 3, lifespan: str = "auto"):
+    """uvicorn ``Config`` + ``Server`` for a dashboard or gateway-session listener (FastAPI-free, so
+    the gateway can build its session listener without importing the dashboard app).
+
+    WS keepalive ping runs ON the agent event loop; a GIL-holding worker call can starve it for
+    minutes, so uvicorn misses the pong and drops a healthy local socket (#53773/#48445/#50005).
+    The ping only detects half-open connections (proxy 524, dropped tunnels), impossible on
+    loopback where a dead client sends a real FIN/RST -> WebSocketDisconnect. So: no ping on
+    loopback; non-loopback sits behind a Cloudflare Tunnel (~100s idle) and keeps a config-driven
+    cadence (dashboard.ws_ping_interval/_timeout, #79635) defaulting to 20/20. *ws_ping* overrides
+    both (SSH-isolated Desktop backends).
+    """
+    import uvicorn
+    from qubit_cli.config import load_config
+    from qubit_cli.web_server_boundary import _DESKTOP_ATTACHMENT_WS_MAX_BYTES, _LOOPBACK_HOST_VALUES
+
+    try:
+        dash_cfg = load_config().get("dashboard") or {}
+    except Exception:  # health: allow BLE001 -- same fail-open read as web_server._build_uvicorn_server: a broken config.yaml must not stop the listener
+        dash_cfg = {}
+
+    def _ws_ping_setting(key: str, default: float = 20.0) -> float:
+        try:
+            return float(dash_cfg.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    if ws_ping is None:
+        ws_ping = (None, None) if host in _LOOPBACK_HOST_VALUES else (
+            _ws_ping_setting("ws_ping_interval"), _ws_ping_setting("ws_ping_timeout"))
+    _uvicorn_console_logging()
+    config = uvicorn.Config(
+        served_app, host=host, port=port, log_level="warning", log_config=None,
+        # Off by default so _ws_client_is_allowed sees the real peer, not
+        # X-Forwarded-For. Gated mode runs behind a TLS terminator and needs
+        # X-Forwarded-Proto for cookie Secure flags.
+        proxy_headers=auth_required,
+        # Loopback-only unless the operator trusts a bounded upstream proxy, so
+        # spoofed X-Forwarded-* from arbitrary callers is never honoured.
+        forwarded_allow_ips=_dashboard_forwarded_allow_ips(dash_cfg),
+        ws_ping_interval=ws_ping[0],
+        ws_ping_timeout=ws_ping[1],
+        ws_max_size=_DESKTOP_ATTACHMENT_WS_MAX_BYTES,
+        # Desktop sends a single SIGTERM and escalates to SIGKILL ~5s later;
+        # uvicorn's default (None) waits on lingering ASGI tasks forever, so a
+        # mid-turn request orphans the backend past that budget (#76244). 3s
+        # leaves room for lifespan shutdown + cron_stop before the kill.
+        timeout_graceful_shutdown=timeout_graceful_shutdown,
+        lifespan=lifespan,
+    )
+    return config, uvicorn.Server(config)

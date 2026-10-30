@@ -1,15 +1,16 @@
-"""``qubit vault`` — manage the local encrypted autofill vault.
+"""``hermes vault`` — manage the local encrypted autofill vault.
 
 Subcommands:
-- ``qubit vault add``   interactive wizard; the password is read via
+- ``hermes vault add``   interactive wizard; the password is read via
   getpass (never echoed, never accepted as argv). The login identifier is
   visible metadata and prompted normally.
-- ``qubit vault list``  metadata — labels, kinds, identifiers, origins,
+- ``hermes vault list``  metadata — labels, kinds, identifiers, origins,
   handles. Passwords are never shown.
-- ``qubit vault rm``    remove an item by handle/id.
+- ``hermes vault rm``    remove an item by handle/id.
+- ``hermes vault key``   where the vault key lives; ``key migrate --to keychain|file`` moves it.
 
 The vault backs the password-blind browser autofill tools
-(``browser_vault_list`` / ``browser_vault_fill``): the agent sees handles
+(``browser_vault`` list / fill): the agent sees handles
 and login identifiers, types the identifier itself, and fills the password
 server-side without ever seeing it.
 """
@@ -111,7 +112,7 @@ def _cmd_add(args) -> None:
 
 def _cmd_list(args) -> None:
     """Local items always; external managers only for the lifetime of this CLI process (a
-    `qubit vault list` unlock does not carry into a chat session — unlock there when asked)."""
+    `hermes vault list` unlock does not carry into a chat session — unlock there when asked)."""
     from agent.vault_backends import enabled_backends
 
     c = _console()
@@ -122,7 +123,7 @@ def _cmd_list(args) -> None:
             continue
         rows.extend((backend.display_name, meta) for meta in backend.list_items())
     if not rows and not locked:
-        c.print("[dim]Vault is empty. Add an item with `qubit vault add`.[/]")
+        c.print("[dim]Vault is empty. Add an item with `hermes vault add`.[/]")
         return
     if rows:
         from rich.table import Table
@@ -165,7 +166,7 @@ def _cmd_sources(args) -> None:
         if name in enabled:
             status = "[green]detected[/] · the agent asks you to unlock it when it needs a login"
         elif is_installed(name):
-            status = "[dim]turned off[/] (`qubit vault sources --enable {name}` to use it)".format(name=name)
+            status = f"[dim]turned off[/] (`hermes vault sources --enable {name}` to use it)"
         else:
             status = "[dim]not installed[/]"
         c.print(f"  {cls.display_name:<10} {status}")
@@ -182,8 +183,71 @@ def _cmd_rm(args) -> None:
         c.print(f"[red]No vault item with handle {args.handle!r}[/]")
 
 
+def _cmd_key(args) -> None:
+    """Show where the local vault's key lives, or move it between vault.key and the OS keychain."""
+    from agent import vault_keychain
+    from agent.vault_store import configured_key_storage, get_vault_store
+
+    c = _console()
+    store = get_vault_store()
+    target = getattr(args, "to", None)
+    if target:
+        if target == "keychain" and not _ensure_keychain_extra(c):
+            return
+        store.migrate_key(target)
+        _set_key_storage(target)
+        if store.key_location()["storage"] == "none":  # nothing was moved or verified, only the setting
+            c.print(f"No vault key exists yet. The first saved item creates one in "
+                    f"{'the OS keychain' if target == 'keychain' else 'vault.key'} (vault.key_storage = {target}).")
+        elif target == "keychain":
+            c.print(f"[green]Vault key moved to the OS keychain[/] ({vault_keychain.backend_label()}); "
+                    "vault.key was removed after the keychain copy decrypted the vault.")
+            c.print("[dim]Backups of this profile now hold the encrypted vault without its key; "
+                    "`hermes vault key migrate --to file` before moving the profile to another machine.[/]")
+        else:
+            where = store.key_location()
+            c.print(f"[green]Vault key moved to[/] {where.get('path')} (0600).")
+            if where.get("keychain_entry_left"):
+                c.print(f"[yellow]The keychain copy ({where['keychain_entry_left']}) could not be removed yet;[/] "
+                        "run this command again when the keychain is reachable.")
+            else:
+                c.print("Keychain entry removed.")
+        return
+    where = store.key_location()
+    if where["storage"] == "file":
+        c.print(f"Vault key: [bold]file[/] {where['path']} (0600, beside the encrypted vault)")
+    elif where["storage"] == "keychain":
+        c.print(f"Vault key: [bold]OS keychain[/] service {where.get('service')!r}, account {where['account']!r}")
+    else:
+        c.print("Vault key: [dim]none yet[/] (created with the first saved item)")
+    c.print(f"New vaults use: vault.key_storage = {configured_key_storage()}")
+    c.print(f"OS keychain here: {vault_keychain.backend_label()}")
+
+
+def _ensure_keychain_extra(c) -> bool:
+    from pm.extras import available, ensure_import
+    from pm.package import InstallError
+
+    if available("keychain"):
+        return True
+    try:
+        ensure_import("keychain")
+    except InstallError as exc:
+        c.print(f"[red]The keychain feature is not installed:[/] {exc}")
+        return False
+    return True
+
+
+def _set_key_storage(value: str) -> None:
+    from qubit_cli.config import _ensure_dict, load_config, save_config
+
+    cfg = load_config()
+    _ensure_dict(cfg, "vault")["key_storage"] = value
+    save_config(cfg)
+
+
 def register_cli(subparser) -> None:
-    """Build the ``qubit vault`` argparse tree (called from main.py)."""
+    """Build the ``hermes vault`` argparse tree (called from main.py)."""
     subs = subparser.add_subparsers(dest="vault_action")
 
     p_add = subs.add_parser(
@@ -200,7 +264,7 @@ def register_cli(subparser) -> None:
     p_list.set_defaults(_vault_handler=_cmd_list)
 
     p_rm = subs.add_parser("rm", help="Remove a vault item by handle")
-    p_rm.add_argument("handle", help="Item handle (see `qubit vault list`)")
+    p_rm.add_argument("handle", help="Item handle (see `hermes vault list`)")
     p_rm.set_defaults(_vault_handler=_cmd_rm)
 
     p_src = subs.add_parser("sources", help="Show detected password managers (1Password, Bitwarden); they are on automatically")
@@ -208,6 +272,14 @@ def register_cli(subparser) -> None:
     group.add_argument("--disable", metavar="NAME", help="Stop using a detected manager: onepassword | bitwarden")
     group.add_argument("--enable", metavar="NAME", help="Undo --disable")
     p_src.set_defaults(_vault_handler=_cmd_sources)
+
+    p_key = subs.add_parser("key", help="Show where the local vault key is stored (vault.key file or OS keychain)")
+    p_key.set_defaults(_vault_handler=_cmd_key, to=None)
+    key_subs = p_key.add_subparsers(dest="vault_key_action")
+    p_migrate = key_subs.add_parser(
+        "migrate", help="Move the vault key to the OS keychain or back to vault.key (verified before the old copy is removed)")
+    p_migrate.add_argument("--to", choices=["keychain", "file"], required=True, help="Destination for the key")
+    p_migrate.set_defaults(_vault_handler=_cmd_key)
 
 
 def vault_command(args) -> None:

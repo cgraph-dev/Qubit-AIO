@@ -13,7 +13,7 @@ import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from qubit_cli._subprocess_compat import windows_detach_flags
+from qubit_cli._subprocess_compat import windows_detach_flags, windows_detach_flags_without_breakaway
 from qubit_cli.config import get_qubit_home
 
 # Same logger the code used before extraction (record parity).
@@ -47,14 +47,15 @@ def _probe_gateway_health() -> tuple[bool, dict | None]:
     if not _GATEWAY_HEALTH_URL:
         return False, None
     base = re.sub(r"/health(/detailed)?$", "", _GATEWAY_HEALTH_URL.rstrip("/"))
-    import os as _os
-    auth_key = _os.environ.get("API_SERVER_KEY", "").strip()
+    # Bearer credential for an auth-protected gateway (issue #76051): sent to the
+    # authenticated /health/detailed probe ONLY — never to the public /health fallback,
+    # which is unauthenticated by design.
+    api_key = os.environ.get("API_SERVER_KEY", "").strip()
     for path in (f"{base}/health/detailed", f"{base}/health"):
         try:
-            # The key authenticates the detailed endpoint only; /health is public and must never
-            # receive it (an unauthenticated fallback would otherwise leak the credential).
-            headers = {"Authorization": f"Bearer {auth_key}"} if auth_key and path.endswith("/health/detailed") else {}
-            req = urllib.request.Request(path, method="GET", headers=headers)
+            req = urllib.request.Request(path, method="GET")
+            if api_key and path.endswith("/health/detailed"):
+                req.add_header("Authorization", f"Bearer {api_key}")
             with urllib.request.urlopen(req, timeout=_GATEWAY_HEALTH_TIMEOUT) as resp:
                 if resp.status == 200:
                     return True, _read_dashboard_json_response(resp)
@@ -66,7 +67,7 @@ def _probe_gateway_health() -> tuple[bool, dict | None]:
 # ``platform-name -> (config port key, adapter default)`` for port-binding gateway platforms.
 # Mirrors PORT_BINDING_PLATFORM_VALUES (gateway/config.py) and each adapter's DEFAULT_PORT /
 # DEFAULT_WEBHOOK_PORT. Display-only data for the topology readout, not a bind source.
-_PORT_BINDING_PLATFORM_PORTS: Dict[str, Tuple[str, int]] = {
+_PORT_BINDING_PLATFORM_PORTS: dict[str, tuple[str, int]] = {
     "webhook": ("port", 8644), "api_server": ("port", 8642), "msgraph_webhook": ("port", 8646),
     "feishu": ("webhook_port", 8765), "wecom_callback": ("port", 8645), "bluebubbles": ("webhook_port", 8645),
     "sms": ("webhook_port", 8080), "whatsapp_cloud": ("webhook_port", 8090), "line": ("port", 8646),
@@ -77,7 +78,7 @@ _PORT_BINDING_PLATFORM_PORTS: Dict[str, Tuple[str, int]] = {
 _PLATFORM_DEAD_STATES = frozenset({"fatal", "disconnected", "stopped"})
 
 
-def _profile_platform_ports(profile_home: Path, runtime: Optional[dict]) -> Dict[str, int]:
+def _profile_platform_ports(profile_home: Path, runtime: Optional[dict]) -> dict[str, int]:
     """Best-effort ``platform -> host TCP port`` for one profile's live gateway.
 
     Ports come from the profile's own config.yaml (``gateway.platforms`` then top-level
@@ -93,7 +94,7 @@ def _profile_platform_ports(profile_home: Path, runtime: Optional[dict]) -> Dict
     if not active:
         return {}
 
-    blocks: Dict[str, dict] = {}
+    blocks: dict[str, dict] = {}
     try:
         # load_config() targets the ACTIVE profile's home; read the probed profile's file raw.
         from qubit_cli.config import read_user_config_raw
@@ -108,7 +109,7 @@ def _profile_platform_ports(profile_home: Path, runtime: Optional[dict]) -> Dict
     except Exception:
         blocks = {}
 
-    ports: Dict[str, int] = {}
+    ports: dict[str, int] = {}
     for name in active:
         port_key, default_port = _PORT_BINDING_PLATFORM_PORTS[name]
         block = blocks.get(name) or {}
@@ -157,7 +158,7 @@ def _owned_profile_platforms(writer_identity: Optional[tuple], platforms: dict) 
         and value.get("writer_start_time") == live_start}
 
 
-def _collect_profile_gateway_topology() -> Dict[str, Any]:
+def _collect_profile_gateway_topology() -> dict[str, Any]:
     """Enumerate profiles and the gateways serving them for ``/api/status``.
 
     Returns ``profiles`` (all profile names via the cheap ``profiles_to_serve(True)`` chokepoint),
@@ -174,8 +175,8 @@ def _collect_profile_gateway_topology() -> Dict[str, Any]:
         _log.debug("profile/gateway topology enumeration failed", exc_info=True)
         return {"profiles": [], "gateway_mode": "unknown", "gateways": [], "profile_platforms": {}}
 
-    gateways: List[Dict[str, Any]] = []
-    profile_platforms: Dict[str, dict] = {}
+    gateways: list[dict[str, Any]] = []
+    profile_platforms: dict[str, dict] = {}
     multiplex = False
     standalone_reason: Optional[str] = None
     for name, home in homes:
@@ -203,7 +204,7 @@ def _collect_profile_gateway_topology() -> Dict[str, Any]:
                 profile_platforms[name] = owned
         # Ports from the OWNED entries too: a platform entry a previous process left "connected"
         # reported a port the live gateway does not bind.
-        entry: Dict[str, Any] = {"profile": name, "ports": _profile_platform_ports(home, {"platforms": owned})}
+        entry: dict[str, Any] = {"profile": name, "ports": _profile_platform_ports(home, {"platforms": owned})}
         if served:
             entry["served_profiles"] = served
         gateways.append(entry)
@@ -232,18 +233,18 @@ def _collect_profile_gateway_topology() -> Dict[str, Any]:
 # gets gateway.ready. A short TTL cache with a collapse lock keeps the scan to one per window.
 # The cache remembers which collector produced the entry: tests monkeypatch
 # _collect_profile_gateway_topology per case, and a swapped collector is a miss (no reset hook).
-_TOPOLOGY_CACHE: Dict[str, Any] = {"ts": 0.0, "data": None, "fn": None}
+_TOPOLOGY_CACHE: dict[str, Any] = {"ts": 0.0, "data": None, "fn": None}
 _TOPOLOGY_CACHE_LOCK = threading.Lock()
 _TOPOLOGY_CACHE_TTL = 10.0
 
 
-def _topology_cache_get(fn: Any) -> Optional[Dict[str, Any]]:
+def _topology_cache_get(fn: Any) -> Optional[dict[str, Any]]:
     c = _TOPOLOGY_CACHE
     fresh = c["fn"] is fn and time.monotonic() - c["ts"] < _TOPOLOGY_CACHE_TTL
     return c["data"] if fresh and c["data"] is not None else None
 
 
-def _collect_profile_gateway_topology_cached() -> Dict[str, Any]:
+def _collect_profile_gateway_topology_cached() -> dict[str, Any]:
     fn = _collect_profile_gateway_topology
     cached = _topology_cache_get(fn)
     if cached is not None:
@@ -277,7 +278,7 @@ def _windows_build_number(version: str, platform_label: str) -> Optional[int]:
     return None
 
 
-def _display_system_platform(*, system: str, release: str, version: str, platform_label: str) -> Dict[str, str]:
+def _display_system_platform(*, system: str, release: str, version: str, platform_label: str) -> dict[str, str]:
     """Host OS fields for display; Windows 10 builds >= 22000 are relabelled Windows 11."""
     if system == "Windows" and release == "10":
         build = _windows_build_number(version, platform_label)
@@ -289,18 +290,16 @@ def _display_system_platform(*, system: str, release: str, version: str, platfor
 
 # Gateway + update actions (invoked from the Status page). Spawned detached so the request
 # returns immediately; stdin is DEVNULL so stray input() fails fast; stdout/stderr stream to
-# ~/.qubit/logs/<action>.log which the dashboard tails.
+# ~/.hermes/logs/<action>.log which the dashboard tails.
 
 _ACTION_LOG_DIR: Path = get_qubit_home() / "logs"
 
 # Short ``name`` (from the URL) → log file name under _ACTION_LOG_DIR.
-_ACTION_LOG_FILES: Dict[str, str] = {
+_ACTION_LOG_FILES: dict[str, str] = {
     "gateway-restart": "gateway-restart.log",
     "gateway-start": "gateway-start.log",
     "gateway-stop": "gateway-stop.log",
     "gateway-migrate": "gateway-migrate.log",
-    "qubit-update": "qubit-update.log",
-    # A run started before the rename still tails its own log.
     "hermes-update": "hermes-update.log",
     **{name: f"action-{name}.log" for name in (
         "doctor", "security-audit", "backup", "import", "checkpoints-prune", "skills-install",
@@ -310,11 +309,14 @@ _ACTION_LOG_FILES: Dict[str, str] = {
 }
 
 # ``name`` → most recent Popen handle / argv / action id, so ``status`` needs no ``ps``.
-_ACTION_PROCS: Dict[str, subprocess.Popen] = {}
-_ACTION_COMMANDS: Dict[str, Tuple[str, ...]] = {}
-_ACTION_IDS: Dict[str, str] = {}
+_ACTION_PROCS: dict[str, subprocess.Popen] = {}
+_ACTION_COMMANDS: dict[str, tuple[str, ...]] = {}
+_ACTION_IDS: dict[str, str] = {}
 # ``name`` → synthetic result for actions handled without a subprocess (e.g. unsupported Docker updates).
-_ACTION_RESULTS: Dict[str, Dict[str, Any]] = {}
+_ACTION_RESULTS: dict[str, dict[str, Any]] = {}
+# ``name`` → (pid, byte offset of that child's section in its log): a later spawn that fails after
+# writing its own header must not lend its text to the child that is still on record.
+_ACTION_LOG_STARTS: dict[str, tuple[int, int]] = {}
 
 
 def _terminate_desktop_managed_gateway() -> None:
@@ -329,7 +331,7 @@ def _terminate_desktop_managed_gateway() -> None:
         pass  # exited between poll() and terminate()
 
 
-def _named_profile_from_action(subcommand: List[str]) -> Optional[str]:
+def _named_profile_from_action(subcommand: list[str]) -> Optional[str]:
     """Return the named-profile selector that :func:`_profile_cli_args` puts in front of an action.
 
     Deliberately inspects only the leading selector: values after the real subcommand may
@@ -342,11 +344,11 @@ def _named_profile_from_action(subcommand: List[str]) -> Optional[str]:
     return None
 
 
-def _is_host_gateway_spawn(subcommand: List[str]) -> bool:
+def _is_host_gateway_spawn(subcommand: list[str]) -> bool:
     """True when *subcommand* starts the host multiplexer, not a named profile's own gateway.
 
-    ``qubit gateway restart`` and ``qubit -p default gateway restart`` are the host.
-    ``qubit -p coder gateway stop`` is not.
+    ``hermes gateway restart`` and ``hermes -p default gateway restart`` are the host.
+    ``hermes -p coder gateway stop`` is not.
     """
     profile = _named_profile_from_action(subcommand)
     if profile not in (None, "default"):
@@ -361,17 +363,17 @@ def _is_host_gateway_spawn(subcommand: List[str]) -> bool:
 
 
 def _profile_action_environment(
-    subcommand: List[str], env_overrides: Optional[Dict[str, str]] = None,
-) -> Dict[str, str]:
-    """Environment for a detached ``qubit <subcommand>`` action.
+    subcommand: list[str], env_overrides: Optional[dict[str, str]] = None,
+) -> dict[str, str]:
+    """Environment for a detached ``hermes <subcommand>`` action.
 
     The dashboard loads its own profile's ``.env`` into process-global ``os.environ``. Copying
-    that mapping verbatim into ``qubit -p <other> ...`` lets the named child see the dashboard
+    that mapping verbatim into ``hermes -p <other> ...`` lets the named child see the dashboard
     profile's platform credentials and ports *before* its own dotenv loads (``load_qubit_dotenv``
     does not override keys already present): a supposedly A2A-only profile then claims the default
     Discord token and binds the default API/BlueBubbles ports.
 
-    Named-profile actions therefore start from Qubit' standard scrubbed subprocess env, then drop
+    Named-profile actions therefore start from Hermes' standard scrubbed subprocess env, then drop
     the profile-managed keys plus every key declared by the dashboard/default profile dotenv files
     and their hydrated secret sources, and pin ``QUBIT_HOME`` to the target profile. The child's
     normal startup then loads that profile's own ``.env``. A host-gateway verb (bare ``gateway``
@@ -427,9 +429,6 @@ def _profile_action_environment(
     # inheriting it trips the child's in-process restart-loop guard (exit 1). Drop it, like
     # the gateway's own restart watcher does (gateway/run.py, #52470).
     action_env.pop("_HERMES_GATEWAY", None)
-    # The fork's restart watcher/CLI stamped the canonical spelling too (gateway/run_shutdown,
-    # qubit_cli.gateway); a child inheriting either marker hits the same restart-loop guard.
-    action_env.pop("_QUBIT_GATEWAY", None)
     if env_overrides:
         action_env.update(env_overrides)
     return action_env
@@ -440,13 +439,13 @@ def _profile_action_environment(
 _ROOT_REQUIRING_GATEWAY_VERBS = frozenset({"restart", "start", "stop"})
 
 
-def _action_targets_system_gateway(subcommand: List[str]) -> bool:
+def _action_targets_system_gateway(subcommand: list[str]) -> bool:
     """True when *subcommand* is a gateway lifecycle verb that resolves to the SYSTEM unit.
 
     Scope is decided by the CLI's own picker (``_select_systemd_scope``) evaluated for the profile
     the action addresses, not by "a system unit exists": a host carrying both units resolves to the
     user unit, which the dashboard user operates unelevated. Same root/sudo posture as the
-    ``qubit update`` fleet restart (``update_cmd_fleet._needs_sudo`` / ``_sudo_noninteractive_ok``).
+    ``hermes update`` fleet restart (``update_cmd_fleet._needs_sudo`` / ``_sudo_noninteractive_ok``).
     """
     from qubit_cli.update_cmd_fleet import _needs_sudo
 
@@ -477,13 +476,23 @@ def _action_targets_system_gateway(subcommand: List[str]) -> bool:
 
 
 def _spawn_qubit_action(
-    subcommand: List[str], name: str, *, env_overrides: Optional[Dict[str, str]] = None
+    subcommand: list[str], name: str, *, env_overrides: Optional[dict[str, str]] = None
 ) -> subprocess.Popen:
-    """Spawn ``qubit <subcommand>`` detached (via ``qubit_cli.main``) and record the handle."""
+    """Spawn ``hermes <subcommand>`` detached (via ``qubit_cli.main``) and record the handle."""
     from qubit_cli.web_server import PROJECT_ROOT
     _ACTION_LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_file = open(_ACTION_LOG_DIR / _ACTION_LOG_FILES[name], "ab", buffering=0)
-    log_file.write(f"\n=== {name} started {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n".encode())
+    section_start = os.fstat(log_file.fileno()).st_size
+    # The header carries the action id durably: the update's completion marker lands in the ROOT
+    # update.log every profile shares, and only this id ties one to the action THIS log started.
+    action_id = (env_overrides or {}).get("HERMES_ACTION_ID")
+    stamp = time.strftime('%Y-%m-%d %H:%M:%S') + (f" {action_id}" if action_id else "")
+    log_file.write(f"\n=== {name} started {stamp} ===\n".encode())
+    if action_id:
+        # ...and a sidecar keeps it once build output pushes the header past the status route's
+        # bounded tail, or the log rotates: a restarted dashboard still knows which action it ran.
+        from qubit_cli.runtime_state import _atomic_bytes
+        _atomic_bytes(_ACTION_LOG_DIR / f"{name}.action_id", action_id.encode("ascii"))
 
     from qubit_cli._launchers import runtime_command
     cmd = runtime_command(PROJECT_ROOT, subcommand)
@@ -494,7 +503,7 @@ def _spawn_qubit_action(
         # QUBIT_HOME past sudo's env_reset and reads SUDO_USER for the service identity.
         # ``-n`` never prompts (stdin is DEVNULL anyway); without a passwordless path the
         # REQUEST fails instead of reporting a started action whose child refuses. Same
-        # two-step gate as the ``qubit update`` fleet restart: a refused blanket probe falls
+        # two-step gate as the ``hermes update`` fleet restart: a refused blanket probe falls
         # back to ``sudo -l`` on the exact argv, so a command-scoped NOPASSWD entry qualifies.
         from qubit_cli.update_cmd_fleet import _sudo_noninteractive_ok
 
@@ -502,7 +511,7 @@ def _spawn_qubit_action(
             message = (
                 f"{name} targets the system-scope gateway service, which requires root, and "
                 "passwordless sudo is unavailable for the dashboard user. Run "
-                f"'sudo qubit {' '.join(subcommand)}' on the host, or grant that user NOPASSWD sudo."
+                f"'sudo hermes {' '.join(subcommand)}' on the host, or grant that user NOPASSWD sudo."
             )
             log_file.write(f"{message}\n".encode())
             log_file.close()
@@ -511,13 +520,34 @@ def _spawn_qubit_action(
     # Named-profile actions get a scrubbed, pinned environment so the child cannot inherit the
     # dashboard profile's credentials; see _profile_action_environment (also drops _HERMES_GATEWAY).
     action_env = _profile_action_environment(subcommand, env_overrides)
-    detach = {"creationflags": windows_detach_flags()} if sys.platform == "win32" else {"start_new_session": True}
-    try:
-        proc = subprocess.Popen(
+
+    def _popen(**detach: Any) -> subprocess.Popen:
+        return subprocess.Popen(
             cmd, cwd=str(PROJECT_ROOT), stdin=subprocess.DEVNULL, stdout=log_file, stderr=subprocess.STDOUT,
             env=action_env, **detach,
         )
-    except Exception as exc:
+
+    try:
+        if sys.platform == "win32":
+            try:
+                proc = _popen(creationflags=windows_detach_flags())
+            except OSError as exc:
+                # CREATE_BREAKAWAY_FROM_JOB is refused ("Access is denied") when the parent's job
+                # object forbids breakaway — an Electron/Tauri-launched dashboard, some Windows
+                # Terminal configs. The flag is best-effort by contract (windows_detach_flags);
+                # retry without it so the action still spawns, and record why for the status route.
+                if getattr(exc, "winerror", None) != 5:
+                    raise
+                log_file.write(
+                    f"{name}: breakaway spawn refused ({exc}); retrying without CREATE_BREAKAWAY_FROM_JOB\n".encode()
+                )
+                proc = _popen(creationflags=windows_detach_flags_without_breakaway())
+        else:
+            # detached-spawn: ok — dashboard gateway start/restart actions, which must outlive the dashboard
+            proc = _popen(start_new_session=True)
+    except OSError as exc:
+        # Without this the action log would hold only the started-header for a spawn that never
+        # happened; close the handle the child would have owned and let the endpoint report it.
         log_file.write(f"{name}: spawn failed: {exc}\n".encode())
         log_file.close()
         raise
@@ -525,26 +555,17 @@ def _spawn_qubit_action(
     _ACTION_RESULTS.pop(name, None)
     _ACTION_COMMANDS[name] = tuple(subcommand)
     _ACTION_PROCS[name] = proc
-    action_id = ((env_overrides or {}).get("QUBIT_ACTION_ID")
-                 or (env_overrides or {}).get("HERMES_ACTION_ID"))
-    sidecar = _ACTION_LOG_DIR / f"{name}.action_id"
+    _ACTION_LOG_STARTS[name] = (proc.pid, section_start)
     if action_id:
         _ACTION_IDS[name] = action_id
-        # Persist the id beside the log: the in-memory registry is lost when the dashboard
-        # restarts mid-action and the start header is pushed out of the tail boundary.
-        try:
-            sidecar.write_text(action_id + "\n", encoding="utf-8")
-        except OSError:
-            pass
     else:
         _ACTION_IDS.pop(name, None)
-        sidecar.unlink(missing_ok=True)
     return proc
 
 
 def _own_profile_selector(profile: Optional[str]) -> Optional[str]:
     """The profile a lifecycle verb addresses: the explicit selector, else the process's own
-    profile (a pooled Desktop ``qubit --profile X serve`` answers ``/api/gateway/*`` without
+    profile (a pooled Desktop ``hermes --profile X serve`` answers ``/api/gateway/*`` without
     ``?profile=``; an unscoped verb there is about X). The default home resolves to the literal
     ``"default"`` selector, never to a bare argv: a selector-less child re-reads the sticky
     ``active_profile`` and would act on another profile's gateway (and skips the named-target
@@ -556,8 +577,8 @@ def _own_profile_selector(profile: Optional[str]) -> Optional[str]:
     return profile_name_for_home(get_process_qubit_home()) or None
 
 
-def _gateway_subcommand(profile: Optional[str], verb: str) -> List[str]:
-    """``qubit [-p X] gateway <verb>`` argv for a dashboard lifecycle action. A profile served by the
+def _gateway_subcommand(profile: Optional[str], verb: str) -> list[str]:
+    """``hermes [-p X] gateway <verb>`` argv for a dashboard lifecycle action. A profile served by the
     live default multiplexer has no gateway of its own: ``restart`` targets the multiplexer (the process
     that actually serves X — a ``-p X gateway restart`` child only exits 78 into the action log while the
     UI reports "restarted"); ``start``/``stop`` are refused by the caller (``multiplexed_profile_refusal``).
@@ -601,7 +622,7 @@ def multiplexed_profile_refusal(profile: Optional[str], verb: str) -> Optional[s
     """Refusal text for ``gateway start``/``stop`` on a named profile with no gateway of its own (a
     ``--force``-started separate one is managed normally), else None. A profile the live host
     multiplexer serves is parked by ``stop`` and a parked one is unparked by ``start`` (the spawned
-    ``qubit -p X gateway <verb>`` runs ``gateway_profile_lifecycle``), so neither is refused;
+    ``hermes -p X gateway <verb>`` runs ``gateway_profile_lifecycle``), so neither is refused;
     ``start`` on an unparked named profile is — one host gateway serves every profile, so a new
     per-profile gateway is never the answer (the CLI twin ``_named_profile_refused_under_multiplexer``
     exits 78 into an action log nobody reads while the UI shows the verb as done)."""
@@ -637,16 +658,34 @@ def multiplexed_profile_refusal(profile: Optional[str], verb: str) -> Optional[s
     if _installed_services(profile_dir):
         return None  # a --force-installed fleet member is not NEW; its own service is started normally
     return (f"Profile '{requested}' does not get a gateway of its own: one host gateway serves every "
-            f"profile. Install or start it from the default profile (qubit gateway install), or fold an "
-            f"existing per-profile fleet with `qubit gateway migrate --multiplex`; "
-            f"`qubit -p {requested} gateway install --force` starts a separate one anyway.")
+            f"profile. Install or start it from the default profile (hermes gateway install), or fold an "
+            f"existing per-profile fleet with `hermes gateway migrate --multiplex`; "
+            f"`hermes -p {requested} gateway install --force` starts a separate one anyway.")
+
+
+def live_session_refusal(profile: Optional[str], verb: str) -> Optional[str]:
+    """Refusal text when the gateway ``verb`` would act on has live sessions, else None. Asked before
+    spawning: the child refuses the same way, but into an action log the UI never reads."""
+    from qubit_cli.gateway_lifecycle_guards import refusal_lines
+    from qubit_cli.web_server_profiles import _resolve_profile_dir
+    homes = [_resolve_profile_dir(_own_profile_selector(profile) or "default")]
+    from gateway.host_attach import host_gateway
+    owner = host_gateway()
+    if owner is not None:
+        homes.append(Path(owner.home))
+    lines = refusal_lines(verb, homes, flag_hint=f"POST /api/gateway/{verb}?interrupt=true")
+    return "\n".join(lines) or None
 
 
 def _restart_gateway_after(profile: Optional[str], *, what: str, label: str) -> dict[str, Any]:
     """Best-effort gateway restart after a config change. The save stays authoritative: a failed
     spawn is reported (``restart_started: False`` + ``restart_error``) so the UI can fall back to
-    its manual restart banner instead of failing the request."""
+    its manual restart banner instead of failing the request. Live sessions refuse it the same way,
+    with ``restart_busy`` set so a UI can say so in its own words."""
     from qubit_cli.web_server import _spawn_gateway_restart
+    refusal = live_session_refusal(profile, "restart")
+    if refusal:
+        return {"restart_started": False, "restart_error": refusal, "restart_busy": True}
     try:
         proc, reused = _spawn_gateway_restart(profile)
     except Exception as exc:
@@ -655,6 +694,50 @@ def _restart_gateway_after(profile: Optional[str], *, what: str, label: str) -> 
     if reused:
         _log.info("%s: reusing in-flight gateway restart (pid %s)", label, proc.pid)
     return {"restart_started": True, "restart_action": "gateway-restart", "restart_pid": proc.pid}
+
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+_RESTART_REASON_MAX = 300
+
+
+def _restart_log_last_line(pid: int) -> str:
+    """The last line the ``gateway-restart`` child *pid* wrote to its log, or ``""``: its section
+    runs from the offset ``_spawn_qubit_action`` recorded to the next spawn's header."""
+    start = _ACTION_LOG_STARTS.get("gateway-restart")
+    if start is None or start[0] != pid:
+        return ""
+    log_path = _ACTION_LOG_DIR / _ACTION_LOG_FILES["gateway-restart"]
+    try:
+        with log_path.open("rb") as log:
+            log.seek(start[1])
+            section = log.read(256 * 1024).decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+    header, _, body = section.lstrip("\n").partition("\n")
+    if not header.startswith("=== gateway-restart started"):
+        return ""  # the log was rotated or truncated since
+    body = body.split("\n=== gateway-restart started", 1)[0]
+    lines = [_ANSI_ESCAPE.sub("", line).strip() for line in body.splitlines()]
+    last = next((line for line in reversed(lines) if line), "")
+    return last[:_RESTART_REASON_MAX]
+
+
+def gateway_restart_failure(profile: Optional[str]) -> Optional[dict[str, Any]]:
+    """Why the newest restart of the *profile* gateway failed, or ``None`` while it runs, after it
+    succeeded, or when this process started none. A child that exits nonzero leaves the old
+    gateway serving the old config, so a UI waiting for the new one learns here that none is coming.
+    ``pid`` is the ``restart_pid`` the restart answered, so the UI ignores an older restart."""
+    from qubit_cli import web_server
+    recent = web_server._LAST_GATEWAY_RESTART
+    if recent is None:
+        return None
+    _spawned_at, proc, command = recent
+    if tuple(arg for arg in command if arg != "--interrupt") != tuple(_gateway_subcommand(profile, "restart")):
+        return None
+    exit_code = proc.poll()
+    if not exit_code:
+        return None
+    return {"pid": proc.pid, "exit_code": exit_code, "reason": _restart_log_last_line(proc.pid) or f"exit code {exit_code}"}
 
 
 def _split_text_for_speak_stream(text: str, cap: int) -> list:
@@ -686,7 +769,7 @@ def _split_text_for_speak_stream(text: str, cap: int) -> list:
 _SESSION_LIST_HEAVY_FIELDS = ("system_prompt", "model_config")
 
 
-def _strip_session_list_rows(sessions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _strip_session_list_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for s in sessions:
         for key in _SESSION_LIST_HEAVY_FIELDS:
             s.pop(key, None)

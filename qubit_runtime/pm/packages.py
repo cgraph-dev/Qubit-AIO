@@ -1,4 +1,4 @@
-"""Package definitions for the tools qubit manages. Versions and hashes
+"""Package definitions for the tools hermes manages. Versions and hashes
 live in pm/lock.json (written by `pm lock`), never here."""
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from pm.filesystem import long_root
+from pm.filesystem import long_root, native
 from pm.package import (
     DebPackage,
     InstallError,
@@ -102,16 +102,17 @@ class BinaryPackage(Package):
             return ""
         try:
             proc = subprocess.run(
-                [str(binary), *self.probe_args],
+                [native(binary), *self.probe_args],
                 capture_output=True,
                 timeout=60,
-                cwd=str(binary.parent) if self.probe_cwd else None,
+                cwd=native(binary.parent) if self.probe_cwd else None,
                 env=self._probe_env(),
+                check=False,
             )
         except OSError as e:
-            return f"could not exec {binary} {' '.join(self.probe_args)}: {e}"
+            return f"could not exec {native(binary)} {' '.join(self.probe_args)}: {e}"
         except subprocess.TimeoutExpired:
-            return f"{binary} {' '.join(self.probe_args)} timed out after 60s"
+            return f"{native(binary)} {' '.join(self.probe_args)} timed out after 60s"
         if proc.returncode != 0:
             return _probe_reason(binary, proc)
         return ""
@@ -219,6 +220,10 @@ class Uv(_BionicDebArm, BinaryPackage, DebPackage):
         return github_release_tags("astral-sh/uv")
 
 
+# The POSIX interpreter name the pinned Windows Python also answers to (see Python.stage).
+WINDOWS_PYTHON3 = "python3.exe"
+
+
 @register
 class Python(_BionicDebArm, BinaryPackage, DebPackage):
     """The pinned interpreter for launchers and every PM-managed uv command.
@@ -260,6 +265,28 @@ class Python(_BionicDebArm, BinaryPackage, DebPackage):
         # old bundle-time drop did) makes doctor's re-hash mismatch.
         if target == "win32-arm64":
             (staged / "vcruntime140_1.dll").unlink(missing_ok=True)
+        # python-build-standalone's Windows build ships python.exe only, so `python3` (npm and
+        # vitest helpers, POSIX-minded scripts) resolves past the activated PATH to the Microsoft
+        # Store's App Execution Alias stub, which installs nothing and fails. python.exe is a
+        # small launcher of pythonXY.dll that finds its home from its own directory, so a copy
+        # under the POSIX name is the same interpreter. Staged before publish, so the recorded
+        # tree digest covers it.
+        if target.startswith("win32"):
+            shutil.copy2(staged / "python.exe", staged / WINDOWS_PYTHON3)
+
+    def verify(self, entry: Path, target: str) -> str:
+        reason = super().verify(entry, target)
+        if reason or not target.startswith("win32"):
+            return reason
+        # An entry staged before python3.exe existed fails here, so an explicit install
+        # (activation's setup) restages it once; startup's facts check never calls verify.
+        alias = entry / WINDOWS_PYTHON3
+        try:
+            if alias.read_bytes() == (entry / "python.exe").read_bytes():
+                return ""
+        except OSError:
+            return f"{WINDOWS_PYTHON3} is missing beside python.exe"
+        return f"{WINDOWS_PYTHON3} differs from python.exe"
 
     def fetch_url(self, version: str, target: str) -> str:
         if target == "linux-arm64-bionic":
@@ -328,7 +355,7 @@ def _copy_seed_file(src: str | os.PathLike, dst: str | os.PathLike) -> str | os.
 def uv_cache_dir() -> Path:
     """The hermes-owned uv cache: machine-scoped and shared (keyed by
     content — two profiles reuse one cache), anchored to the DEFAULT
-    qubit root like partials_root(). A bundle ships a seeded copy at
+    hermes root like partials_root(). A bundle ships a seeded copy at
     the payload root (uv-cache/); the first call under each uv.lock
     merges it into the writable machine cache (the read-only payload
     can't serve uv's working cache), and a warm `uv sync --offline`
@@ -386,6 +413,7 @@ def uv_cache_dir() -> Path:
             except OSError:
                 pass
     return machine_cache
+
 
 @register
 class Venv(StatePackage):
@@ -478,10 +506,12 @@ class Venv(StatePackage):
                           seed_lock=seed, frozen=repair or not members, replay=replay,
                           source=project, environment=environment)
             resolved_lock = generation / "workspace" / "uv.lock"
-            environment.check()
+            environment.check(resolved_lock)
             if repair:
+                from pm.environments import venv_command
                 from pm.recovery import validate_environment
-                validate_environment(environment.executable, env=dict(environment.env), cwd=resolved_lock.parent)
+                validate_environment(venv_command(project, candidate, ("-I",)),
+                                     env=dict(environment.env), cwd=resolved_lock.parent)
         except BaseException:
             shutil.rmtree(generation, ignore_errors=True)
             raise
@@ -654,14 +684,15 @@ class Npm(BinaryPackage):
         with tempfile.TemporaryDirectory(prefix="hermes-npm-cache-", ignore_cleanup_errors=True) as cache:
             proc = subprocess.run(
                 [
-                    str(node_bin), str(bundled_cli), "install", "--global",
-                    "--prefix", str(staged), "--offline", "--ignore-scripts",
-                    "--no-audit", "--no-fund", str(archive),
+                    native(node_bin), native(bundled_cli), "install", "--global",
+                    "--prefix", native(staged), "--offline", "--ignore-scripts",
+                    "--no-audit", "--no-fund", native(archive),
                 ],
                 capture_output=True,
                 text=True,
                 timeout=900,
                 env=npm_env(Path(cache)),
+                check=False,
             )
         if proc.returncode != 0:
             raise InstallError(
@@ -739,11 +770,12 @@ class Git(BinaryPackage):
             # open past the stub's exit. Under -y the stub prints nothing anyway.
             try:
                 proc = subprocess.run(
-                    [str(exe), f"-o{staged}", "-y"],
+                    [native(exe), f"-o{native(staged)}", "-y"],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     timeout=600,
+                    check=False,
                 )
             except subprocess.TimeoutExpired:
                 raise InstallError(
@@ -788,7 +820,7 @@ class Gh(BinaryPackage):
 class Ffmpeg(_BionicDebArm, BinaryPackage, DebPackage):
     """FFmpeg builds for supported targets; BtbN Linux archives require glibc.
     optional=False: ffmpeg is a required runtime tool where supported. Sealed bundles ship
-    it baked into the payload; every `qubit update` and `qubit pm install`
+    it baked into the payload; every `hermes update` and `hermes pm install`
     re-ensures it from the new lockfile before the venv sync
     (pm.client.ensure_tools_for_sync), so a pin bump lands. Windows + Linux:
     BtbN/FFmpeg-Builds (month-end autobuild tag, kept two years; ships ffprobe too).
@@ -957,65 +989,6 @@ class CuaDriver(BinaryPackage):
 
 
 @register
-class AgentBrowser(BinaryPackage):
-    name = "agent-browser"
-    optional = True
-    # Browser tools find agent-browser only in PM's store or on PATH (no npx
-    # fallback), and their readiness check never installs it, so an install
-    # without it silently loses every browser_* tool.
-    # Default-install it; `install.sh --skip-browser` declines it.
-    default = True
-    deps = ("chromium",)
-    # Termux owns its browser stack (`npm install -g agent-browser`; see
-    # tools/browser_tool_install.py), and PM has no bionic Chromium to drive.
-    gaps = {
-        "linux-arm64-bionic": "Termux installs agent-browser through npm",
-        **{target: "agent-browser has no musl Chromium runtime" for target in MUSL_TARGETS},
-    }
-    flatten = True
-    probe_version = False
-    url = "https://registry.npmjs.org/agent-browser/-/agent-browser-{version}.tgz"
-    # No win32-arm64 gap: agent-browser ships only win32-x64, and Windows
-    # ARM64 runs it via built-in emulation (its own postinstall falls back
-    # to x64 on arm64). chromium is likewise the x64 build on win32-arm64.
-    emulated_arch_targets = frozenset({"win32-arm64"})
-
-    def latest_versions(self, target: str, locked=None) -> list[str]:
-        latest = npm_dist_tags("agent-browser").get("latest")
-        return [latest] if latest else []
-
-    def _rel(self, target: str) -> Optional[str]:
-        ext = ".exe" if target.startswith("win32") else ""
-        # Windows ARM64 runs the x64 binary under built-in emulation:
-        # agent-browser ships no native arm64 build (its own postinstall
-        # falls back to x64 on arm64), so the staged name is win32-x64.
-        if target == "win32-arm64":
-            target = "win32-x64"
-        return f"bin/agent-browser-{target}{ext}"
-
-    def binary(self, entry: Path, target: str) -> Optional[Path]:
-        # The win32-arm64 payload carries the x64 binary (emulated), so
-        # resolve it under the win32-x64 name.
-        return super().binary(entry, "win32-x64" if target == "win32-arm64" else target)
-
-    def stage(self, store: Store, staged: Path, version: str, target: str) -> None:
-        flatten_single_dir(staged)
-        bin_dir = staged / "bin"
-        if not bin_dir.is_dir():
-            raise InstallError(self.name, "staged without a bin/ directory")
-        keep = Path(self._rel(target)).name
-        if not (bin_dir / keep).is_file():
-            raise InstallError(self.name, f"{keep} missing from the staged tarball")
-        for item in bin_dir.iterdir():
-            if item.is_file() and item.name.startswith("agent-browser-") and item.name != keep:
-                item.unlink()
-        # The npm tarball ships every native binary as 0644; agent-browser's
-        # own postinstall sets the exec bit, and pm runs no postinstall.
-        kept = bin_dir / keep
-        kept.chmod(kept.stat().st_mode | 0o111)
-
-
-@register
 class Chromium(Package):
     """Playwright resolves browsers by DIRECTORY NAME under one root:
     `<name with '-'→'_'>-<revision>`, no target suffix. The env points
@@ -1030,6 +1003,10 @@ class Chromium(Package):
 
     name = "chromium"
     optional = True
+    # browser_exec's launcher drives this build, and its readiness check
+    # installs it only once per process, so default-install it like the
+    # other OS tools; `install.sh --skip-browser` declines it.
+    default = True
     on_path = False
     # Neither Chrome-for-Testing nor Playwright's mirror builds for Android.
     gaps = {
@@ -1043,7 +1020,7 @@ class Chromium(Package):
     # playwright's dbazure mirror with its own platform names.
     # win32-arm64 uses the win64 (x64) build: CfT publishes no native
     # win-arm64 chromium, and Windows ARM64 runs x64 binaries via built-in
-    # emulation — the same choice agent-browser's own postinstall makes.
+    # emulation.
     _CFT = {
         "linux-x64": "linux64",
         "darwin-x64": "mac-x64",
@@ -1080,20 +1057,21 @@ class Chromium(Package):
     def verify(self, entry: Path, target: str) -> str:
         marker = entry / "INSTALLATION_COMPLETE"
         if not marker.is_file():
-            return f"INSTALLATION_COMPLETE missing under {entry}; {_entry_listing(entry)}"
+            return f"INSTALLATION_COMPLETE missing under {native(entry)}; {_entry_listing(entry)}"
         binary = self.binary(entry, target)
         if binary is None:
-            return f"Chromium executable missing under {entry}"
+            return f"Chromium executable missing under {native(entry)}"
         return self._binary_reason(binary, entry, target)
 
     def env(self, entry: Path, target: str) -> dict:
         binary = self.binary(entry, target)
         if binary is None:
-            raise InstallError(self.name, f"Chromium executable missing under {entry}")
-        return {
-            "PLAYWRIGHT_BROWSERS_PATH": str(entry.parent),
-            "AGENT_BROWSER_EXECUTABLE_PATH": str(binary),
-        }
+            raise InstallError(self.name, f"Chromium executable missing under {native(entry)}")
+        # Playwright launches without an executable_path (e.g. the
+        # har-derived-api-client skill's `chromium.launch(channel="chromium")`)
+        # find this build through the root; Hermes's own launcher asks
+        # qubit_cli.browser_runtime.chromium_executable() instead.
+        return {"PLAYWRIGHT_BROWSERS_PATH": str(entry.parent)}
 
 
 class LlamaCpp(BinaryPackage):

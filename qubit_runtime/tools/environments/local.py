@@ -6,6 +6,7 @@ import ntpath
 import os
 import platform
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -20,12 +21,13 @@ from qubit_constants import get_process_qubit_home
 from tools.environments.base import BaseEnvironment
 from tools.environments.base_output import _pipe_stdin
 from qubit_cli._subprocess_compat import windows_hide_flags
-from tools.environments.local_env_policy import (  # noqa: F401 — _QUBIT_PROVIDER_ENV_BLOCKLIST stays importable from here
+from qubit_cli.process_identity import own_process_groups, release_process_groups
+from tools.environments.local_env_policy import (
     _ALWAYS_STRIP_FOLDED, _ALWAYS_STRIP_KEYS, _QUBIT_PROVIDER_ENV_BLOCKLIST, _QUBIT_PROVIDER_ENV_FORCE_PREFIX,
     _is_qubit_internal_secret, _is_provider_env_blocklisted, _is_terminal_first_party_env,
     _home_adapter_secret_env, _matches_terminal_first_party_prefix, _plugin_terminal_env_strip_keys,
     _registered_adapter_secret_env, _registry_adapter_secret_env,
-    strip_profile_gate_env)
+    strip_profile_gate_env, strip_supervised_process_identity)
 from tools.environments.local_pythonpath import (
     _build_qubit_repo_root_aliases, _strip_qubit_owned_pythonpath_and_runtime_markers)
 
@@ -48,7 +50,7 @@ _terminal_temp_pruned_once = False
 _BG_GROUP_RE = re.compile(r"^(hermes_bg_[A-Za-z0-9_-]+)\.(log|pid|exit)$")
 
 
-def _default_terminal_temp_dir() -> "Path | None":
+def _default_terminal_temp_dir() -> Path | None:
     """Return QUBIT_HOME/cache/terminal, or None if unresolvable."""
     try:
         from qubit_constants import get_qubit_home
@@ -262,7 +264,7 @@ def _inject_session_context_env(env: dict) -> None:
 def _filter_secret_env(
     items: Mapping[str, str], out: dict, *, unwrap_force: bool,
     plugin_strip: frozenset = frozenset()) -> None:
-    """Copy *items* into *out*, dropping Qubit-managed secrets. ``_HERMES_FORCE_<NAME>``
+    """Copy *items* into *out*, dropping Hermes-managed secrets. ``_HERMES_FORCE_<NAME>``
     unwraps to ``NAME`` when ``unwrap_force`` (caller extras / terminal env), else is
     dropped. Blocklisted names survive only via env_passthrough registration or as
     context-entitled first-party ``BUZZ_*`` vars; the latter are used directly, never
@@ -295,11 +297,12 @@ def _filter_secret_env(
 
 def _finalize_child_env(env: dict) -> dict:
     """Guards shared by every spawn surface: profile-home propagation, session-context
-    bridging, Qubit-owned PYTHONPATH + venv-marker strip, MSYS defaults, delegate_task
+    bridging, Hermes-owned PYTHONPATH + venv-marker strip, MSYS defaults, delegate_task
     Kanban scrub. Returns the (possibly new) dict."""
     _apply_profile_home(env)
     _inject_session_context_env(env)
     _strip_qubit_owned_pythonpath_and_runtime_markers(env)
+    strip_supervised_process_identity(env)
     _apply_windows_msys_bash_env_defaults(env)
     from agent.delegation_context import delegated_child_subprocess_env
     return delegated_child_subprocess_env(env)
@@ -307,7 +310,7 @@ def _finalize_child_env(env: dict) -> dict:
 
 def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
     """Filter each ``(items, unwrap_force)`` in *parts* into one env, rewrite PATH via
-    *fix_path* (always prepending the qubit install dir so bare ``qubit`` resolves
+    *fix_path* (always prepending the hermes install dir so bare ``hermes`` resolves
     for children of a systemd/cron-launched gateway), then apply the shared guards."""
     out: dict[str, str] = {}
     for items, unwrap_force in parts:
@@ -319,12 +322,19 @@ def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
     from tools.env_passthrough import scoped_passthrough_additions
     out.update((k, v) for k, v in scoped_passthrough_additions(out).items() if k not in plugin_strip)
     path_key = _path_env_key(out)
-    # Keep bare ``qubit`` invocations available to child jobs even when the gateway was launched by a
+    # Keep bare ``hermes`` invocations available to child jobs even when the gateway was launched by a
     # service manager or cron without the console script's directory on PATH. The terminal environment
     # already applies this invariant; Cron scripts use this sanitizer directly (#92998).
     if path_key is not None:
         out[path_key] = _prepend_qubit_bin_dir(fix_path(out.get(path_key, "")))
     return _finalize_child_env(out)
+
+
+def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = None) -> dict:
+    """Filter Hermes-managed secrets from a subprocess environment (background/PTY
+    spawn path, search workers, computer-use driver, user-script runners)."""
+    return _scrubbed_env([(base_env or {}, False), (extra_env or {}, True)],
+                         _plugin_terminal_env_strip_keys(), lambda p: p)
 
 
 def _terminal_env(env: dict) -> dict:
@@ -333,13 +343,6 @@ def _terminal_env(env: dict) -> dict:
     if path_key is not None:
         env[path_key] = _user_tools_first(env[path_key])
     return env
-
-
-def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = None) -> dict:
-    """Filter Qubit-managed secrets from a subprocess environment (background/PTY
-    spawn path, search workers, computer-use driver, user-script runners)."""
-    return _scrubbed_env([(base_env or {}, False), (extra_env or {}, True)],
-                         _plugin_terminal_env_strip_keys(), lambda p: p)
 
 
 def qubit_subprocess_env(
@@ -376,14 +379,15 @@ def _scrub_credentials(env: dict, *, inherit_credentials: bool) -> dict:
 
 
 def build_subprocess_env(
-    base: "Mapping[str, str] | None" = None, *, inherit_profile_home: bool = True,
-    scrub_secrets: bool = True, extra: "Mapping[str, str] | None" = None,
+    base: Mapping[str, str] | None = None, *, inherit_profile_home: bool = True,
+    scrub_secrets: bool = True, extra: Mapping[str, str] | None = None,
     strip_launch_profile: bool = False) -> dict[str, str]:
     """Single factory for child-process envs. ``base=None`` snapshots ``os.environ``.
     ``scrub_secrets=True`` -> :func:`_sanitize_subprocess_env` (profile home inherent,
-    ``inherit_profile_home`` ignored). ``scrub_secrets=False`` keeps the base
-    byte-for-byte (git credential flows, ``bws``/``op``); ``inherit_profile_home``
-    bridges QUBIT_HOME + HOME and ``extra`` is applied last so caller overrides win.
+    ``inherit_profile_home`` ignored). ``scrub_secrets=False`` keeps the base's secrets
+    (git credential flows, ``bws``/``op``); ``inherit_profile_home``
+    bridges QUBIT_HOME + HOME and ``extra`` is applied last so caller overrides win. Both modes
+    drop the supervised process's own identity (:func:`strip_supervised_process_identity`).
     ``strip_launch_profile`` drops the LAUNCH profile's ``.env`` residue from the base first
     (:func:`strip_launch_profile_env`; a no-op unless a routed home is active) so a child that
     acts for a routed profile sees only that profile's declared names, never the launch profile's.
@@ -407,15 +411,16 @@ def build_subprocess_env(
         _apply_profile_home(env)
     if extra:
         env.update(extra)
+    strip_supervised_process_identity(env)
     from agent.delegation_context import delegated_child_subprocess_env
     return delegated_child_subprocess_env(env)
 
 
 def served_profile_child_env(
-    base: "Mapping[str, str] | None" = None, *, target_home: "str | Path | None" = None,
+    base: Mapping[str, str] | None = None, *, target_home: str | Path | None = None,
     inherit_credentials: bool = False,
 ) -> dict[str, str]:
-    """Child env for a process that acts FOR the active (possibly served) profile: ``qubit -p X``
+    """Child env for a process that acts FOR the active (possibly served) profile: ``hermes -p X``
     workers, ``key_cmd`` helpers, browser drivers. The process env is the LAUNCH profile's. When the
     target is a ROUTED home (not the launch profile's — under multiplex or a Desktop/dashboard backend
     serving ``?profile=`` with the flag off) the launch ``.env`` residue and bridged ``TERMINAL_*`` are
@@ -424,7 +429,7 @@ def served_profile_child_env(
     never recorded in ``.env`` or a source snapshot, so a name-based strip cannot see it and the target
     overlay cannot remove it. ``inherit_credentials=True`` is for children that legitimately run with
     the profile's credentials (they run the agent or mint its token): the target profile's own secrets
-    (its ``.env`` + hydrated sources, what a standalone ``qubit -p X`` loads itself) are overlaid — never
+    (its ``.env`` + hydrated sources, what a standalone ``hermes -p X`` loads itself) are overlaid — never
     a sibling profile's. Under multiplex with neither a target nor a bound scope the call raises
     (``get_secret``'s fail-closed contract): minting with the launch environ would sign in as the wrong
     profile. ``False`` keeps the provider scrub; the caller re-adds the few keys the child needs via
@@ -456,7 +461,7 @@ def served_profile_child_env(
 
 
 def host_gateway_child_env(
-    base: "Mapping[str, str] | None" = None,
+    base: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Child env for the host gateway: the default profile's secrets, never the launcher's.
 
@@ -470,7 +475,7 @@ def host_gateway_child_env(
     )
 
 
-def _is_routed_home(target_home: "str | Path") -> bool:
+def _is_routed_home(target_home: str | Path) -> bool:
     """True when ``target_home`` is not the process's own (launch) home.
 
     Same launch-home identity as ``agent.secret_scope.serves_routed_profile()``: under a host that
@@ -483,11 +488,11 @@ def _is_routed_home(target_home: "str | Path") -> bool:
         return True
 
 
-def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None) -> dict:
+def strip_launch_profile_env(env: dict, target_home: str | Path | None = None) -> dict:
     """Drop the LAUNCH profile's residue from a child env built for another served profile.
     ``os.environ`` holds the default profile's ``.env`` and its bridged ``TERMINAL_*`` settings;
     the secret scrub removes credentials but not settings (``HERMES_MODEL``, ``TERMINAL_ENV``,
-    ``HERMES_LANGUAGE``...), so a standalone ``qubit -p X`` worker and a served one saw different
+    ``HERMES_LANGUAGE``...), so a standalone ``hermes -p X`` worker and a served one saw different
     envs. The child re-loads X's own ``.env`` and bridges X's config itself. ``target_home``
     defaults to the active home override; no-op when there is no target or the target IS the
     launch profile. The authority test is "does this task serve a routed home", not "is the
@@ -511,9 +516,12 @@ def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None)
     # LAUNCH profile's source supplied is not the target profile's to see; the caller's scope
     # overlay puts back exactly the ones the target's own sources supply. The administrator-managed
     # .env is NOT residue: its values are policy for every profile (``_apply_managed_env`` applies
-    # it last, with override, so it beats the user's own .env) — leave them in place.
+    # it last, with override, so it beats the user's own .env) — leave them in place. Neither is
+    # the config backend's deployment (which backend, which plane, which instance): it is the
+    # instance's, and a child without it reads the target profile's config from another backend.
+    from qubit_cli.config_backend import deployment_env_names
     from qubit_cli.env_loader import launch_dotenv_keys, managed_dotenv_keys, source_supplied_names
-    managed_names = {key.upper() for key in managed_dotenv_keys()}
+    managed_names = {key.upper() for key in managed_dotenv_keys()} | set(deployment_env_names())
     residue_names = {
         key.upper() for key in
         set(load_env_file(launch_home / ".env")) | set(launch_dotenv_keys())
@@ -541,7 +549,7 @@ def restore_managed_env(env: dict) -> dict:
 
 # --- Shell discovery ---
 def _find_bash() -> str:
-    """Resolve the shell Qubit runs commands with. Owned by pm (the store
+    """Resolve the shell Hermes runs commands with. Owned by pm (the store
     is the authority on bundled bash); this is a thin wrapper over
     pm.shell() for callers that need a bash binary."""
     import pm.shell
@@ -550,12 +558,12 @@ def _find_bash() -> str:
     if bash:
         return bash
     raise RuntimeError(
-        "No shell found. Qubit needs bash (Git for Windows on Windows). "
-        "Run `qubit pm install` or reinstall the bundle."
+        "No shell found. Hermes needs bash (Git for Windows on Windows). "
+        "Run `hermes pm install` or reinstall the bundle."
     )
 
 
-_git_bash_bin_dirs_cache: "list[str] | None" = None
+_git_bash_bin_dirs_cache: list[str] | None = None
 
 
 def _git_bash_bin_dirs() -> list[str]:
@@ -587,12 +595,6 @@ def _prepend_missing_path_entries(existing_path: str, dirs: list[str]) -> str:
     entries = [e for e in existing_path.split(os.pathsep) if e]
     missing = [d for d in dirs if d not in entries]
     return os.pathsep.join([*missing, *entries]) if missing else existing_path
-
-
-def _prepend_git_bash_dirs(existing_path: str) -> str:
-    """Prepend Git Bash's binary dirs if missing (no-op off Windows), so the
-    non-login ``bash -c`` fallback can find coreutils."""
-    return _prepend_missing_path_entries(existing_path, _git_bash_bin_dirs())
 
 
 def _user_tools_first(existing_path: str) -> str:
@@ -634,72 +636,69 @@ def _find_shell() -> str:
 _SANE_PATH = ("/opt/homebrew/bin:/opt/homebrew/sbin:"
               "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 
-# Cached directory containing the ``qubit`` console-script.
+# Cached directory containing the ``hermes`` console-script.
 # ``_SENTINEL`` distinguishes "not resolved yet" from a resolved ``None``.
 _SENTINEL = object()
-_QUBIT_BIN_DIR: "str | None | object" = _SENTINEL
+_QUBIT_BIN_DIR: str | None | object = _SENTINEL
 # True when the cached dir is a sealed payload's own launcher dir (see below).
-_QUBIT_BIN_DIR_IS_PAYLOAD = False
+_HERMES_BIN_DIR_IS_PAYLOAD = False
 
 
 def _resolve_qubit_bin_dir() -> str | None:
-    """Directory holding the ``qubit`` console-script, or None (cached). A gateway
+    """Directory holding the ``hermes`` console-script, or None (cached). A gateway
     launched by systemd/cron/a desktop launcher lacks the install dir on PATH and bare
-    ``qubit`` exits 127. Order: a sealed payload's own launcher dir; ``which``; absolute
-    ``sys.argv[0]`` naming a real qubit executable; ``sys.executable``'s dir if it holds
+    ``hermes`` exits 127. Order: a sealed payload's own launcher dir; ``which``; absolute
+    ``sys.argv[0]`` naming a real hermes executable; ``sys.executable``'s dir if it holds
     the shim."""
-    global _QUBIT_BIN_DIR, _QUBIT_BIN_DIR_IS_PAYLOAD
+    global _QUBIT_BIN_DIR, _HERMES_BIN_DIR_IS_PAYLOAD
     if _QUBIT_BIN_DIR is not _SENTINEL:
         return _QUBIT_BIN_DIR  # type: ignore[return-value]
     from pm.environments import payload_command_dir
 
-    # A payload's venv also holds a `qubit`, but on Windows its redirector names the
+    # A payload's venv also holds a `hermes`, but on Windows its redirector names the
     # build machine's interpreter, so PATH order must not decide which copy children get.
     payload_dir = payload_command_dir(Path(__file__).resolve().parents[2])
     if payload_dir is not None and payload_dir.is_dir():
-        _QUBIT_BIN_DIR, _QUBIT_BIN_DIR_IS_PAYLOAD = str(payload_dir), True
+        _QUBIT_BIN_DIR, _HERMES_BIN_DIR_IS_PAYLOAD = str(payload_dir), True
         return _QUBIT_BIN_DIR
-    which = shutil.which("qubit") or shutil.which("hermes")
+    which = shutil.which("hermes")
     argv0 = sys.argv[0] if sys.argv else ""
     base = os.path.basename(argv0).lower()
     exe_dir = os.path.dirname(sys.executable) if sys.executable else ""
-    # Prefer the Qubit console-script; the legacy ``hermes`` shim is a read-old fallback.
-    names = ("qubit.exe", "qubit", "hermes.exe", "hermes") if _IS_WINDOWS else ("qubit", "hermes")
+    shim = "hermes.exe" if _IS_WINDOWS else "hermes"
     if which:
         candidate = os.path.dirname(which)
-    elif (os.path.isabs(argv0) and (base in names or base.startswith("qubit."))
+    elif (os.path.isabs(argv0) and (base == "hermes" or base.startswith("hermes."))
             and os.path.isfile(argv0)):
         candidate = os.path.dirname(argv0)
     else:
-        candidate = exe_dir if exe_dir and any(
-            os.path.isfile(os.path.join(exe_dir, n)) for n in names) else None
+        candidate = exe_dir if exe_dir and os.path.isfile(os.path.join(exe_dir, shim)) else None
     _QUBIT_BIN_DIR = candidate if candidate and os.path.isdir(candidate) else None
-    _QUBIT_BIN_DIR_IS_PAYLOAD = False
+    _HERMES_BIN_DIR_IS_PAYLOAD = False
     return _QUBIT_BIN_DIR
 
 
 def _prepend_qubit_bin_dir(existing_path: str) -> str:
-    """Prepend the qubit install dir to ``existing_path`` if missing. A sealed payload's
+    """Prepend the hermes install dir to ``existing_path`` if missing. A sealed payload's
     launcher dir moves to the front even when already listed: a login PATH can list
-    another install's ``qubit`` ahead of it."""
+    another install's ``hermes`` ahead of it."""
     bin_dir = _resolve_qubit_bin_dir()
-    if bin_dir and _QUBIT_BIN_DIR_IS_PAYLOAD:
+    if bin_dir and _HERMES_BIN_DIR_IS_PAYLOAD:
         rest = [entry for entry in existing_path.split(os.pathsep) if entry and entry != bin_dir]
         return os.pathsep.join([bin_dir, *rest])
     return _prepend_missing_path_entries(existing_path, [bin_dir] if bin_dir else [])
 
 
 def _managed_runtime_path_entries() -> list[str]:
-    """Return existing Qubit-managed runtime dirs for the terminal subshell PATH.
+    """Return existing Hermes-managed runtime dirs for the terminal subshell PATH.
 
     The terminal tool spawns a subshell whose PATH is the agent process's PATH
-    plus ``_SANE_PATH``. Neither carries the runtimes Qubit installs for
-    itself, so on a machine where Qubit provisioned its own toolchain a
+    plus ``_SANE_PATH``. Neither carries the runtimes Hermes installs for
+    itself, so on a machine where Hermes provisioned its own toolchain a
     command the agent runs resolves a system copy instead — or nothing at all:
 
-    - the pm store's node/npm entries — installed to satisfy the desktop and
-      browser toolchain. ``tools/browser_tool.py`` already does this for its own
-      subprocesses; the agent's shell deserves the same.
+    - the pm store's node/npm entries — installed to satisfy the desktop
+      toolchain; the agent's shell deserves the same.
     - ``$QUBIT_HOME/bin`` — the managed ``uv``. ``install.sh`` writes it there
       and nothing has ever put that directory on PATH, so an install whose only
       uv is the managed one looks uv-less to both the agent and the model.
@@ -757,7 +756,7 @@ def _apply_windows_msys_bash_env_defaults(env: dict) -> None:
 
     Git Bash rewrites arguments that look like Unix paths (``/FO``, ``/TN``, ``/Create``) into
     ``C:/.../git/FO``-style paths, which breaks native Windows commands such as ``tasklist``, ``schtasks``,
-    and ``wmic``. Qubit runs terminal commands through bash on Windows, so set the standard MSYS opt-out by
+    and ``wmic``. Hermes runs terminal commands through bash on Windows, so set the standard MSYS opt-out by
     default. Refs #56700.
     MSYS2-proper and Cygwin bash (which ``_find_bash`` can still return via the final ``shutil.which``
     fallback) ignore it and honor ``MSYS2_ARG_CONV_EXCL`` instead, so set both. ``*`` disables all argv
@@ -778,11 +777,14 @@ def _make_run_env(env: dict) -> dict:
     """Build a run environment with a sane PATH and provider-var stripping. The process env is
     the LAUNCH profile's; under a routed home override its ``.env`` residue is dropped first
     (``strip_launch_profile_env``, a no-op for the launch profile) so the backend's own ``env``
-    and the served profile's declared passthrough names are what the child sees."""
+    and the served profile's declared passthrough names are what the child sees. A local session's
+    client toolchain (PATH, venv, nvm/pyenv/conda: ``agent.session_client_env``) replaces the daemon's
+    beneath the backend's own ``env``."""
+    from agent.session_client_env import toolchain_environ
     run_env = _scrubbed_env(
-        [(dict(strip_launch_profile_env(os.environ.copy()) | env), True)],
+        [(dict(toolchain_environ(strip_launch_profile_env(os.environ.copy())) | env), True)],
         frozenset(),
-        lambda p: _prepend_git_bash_dirs(_append_missing_sane_path_entries(p)),
+        lambda p: _user_tools_first(_append_missing_sane_path_entries(p)),
     )
     # While this profile's Bot Desktop is running, its DISPLAY/XAUTHORITY/DBUS ride along so GUI
     # apps the agent launches from the terminal open on the Bot Screen the user is watching, not
@@ -802,11 +804,11 @@ def _make_run_env(env: dict) -> dict:
     return run_env
 
 
-# --- Qubit venv / repo-root detection (module-level, computed once) ---
+# --- Hermes venv / repo-root detection (module-level, computed once) ---
 # Owned here; read lazily by tools.environments.local_pythonpath (tests patch here).
 # The Electron app prepends the repo root to PYTHONPATH so the backend can ``import
 # tools``; other subprocesses must not inherit it. Aliases: launchers may emit other
-# spellings — the Windows gateway launcher renders Qubit-owned paths under the
+# spellings — the Windows gateway launcher renders Hermes-owned paths under the
 # configured QUBIT_HOME spelling (possibly a junction to another drive).
 _qubit_repo_root: Path = Path(__file__).resolve().parents[2]
 _qubit_repo_root_aliases: tuple[Path, ...] = _build_qubit_repo_root_aliases(
@@ -859,6 +861,31 @@ def _prepend_shell_init(cmd_string: str, files: list[str]) -> str:
     safe = [p.replace("'", "'\\''") for p in files]
     prelude = ["set +e", *(f"[ -r '{p}' ] && . '{p}' 2>/dev/null || true" for p in safe)]
     return "\n".join(prelude) + "\n" + cmd_string
+
+
+def _append_dropped_path_entries(cmd_string: str, parent_path: str) -> str:
+    """Prepend a line that re-appends *parent_path* dirs the login profile dropped.
+
+    A login profile can reset PATH outright (Debian's ``/etc/profile``, so every
+    Debian/Ubuntu image and host), and the snapshot's ``export -p`` then pins the reset
+    PATH over the spawn env for every later command: in the Docker image that loses
+    ``/opt/hermes/bin`` and bare ``hermes`` exits 127 (#56634). Dropped dirs go AFTER
+    the login PATH in parent order, so a command that resolved before still resolves
+    to the same binary (the user's nvm/pyenv keep precedence); only commands that had
+    no match gain one. Present entries are never duplicated; missing absolute dirs are skipped.
+    Background commands (``ProcessRegistry.spawn_local``, ``bash -lic``, no snapshot) use
+    this same prelude so the two paths cannot diverge."""
+    if _IS_WINDOWS:
+        return cmd_string  # native PATH stays ``;``-joined; bash sees a converted copy
+    # Relative entries resolve against the shell's cwd, not ours, so only absolute ones are checked.
+    entries = [d for d in dict.fromkeys(parent_path.split(":"))
+               if d and (not os.path.isabs(d) or os.path.isdir(d))]
+    if not entries:
+        return cmd_string
+    restore = (f"for __hermes_p in {' '.join(shlex.quote(d) for d in entries)}; do "
+               'case ":$PATH:" in *":$__hermes_p:"*) ;; *) PATH="${PATH:+$PATH:}$__hermes_p" ;; esac; '
+               "done; unset __hermes_p; export PATH")
+    return restore + "\n" + cmd_string
 
 
 # --- Process-group teardown (POSIX) ---
@@ -918,7 +945,7 @@ def _leader_is_ours(pgid, expected_start) -> bool:
     from gateway.status import get_process_start_time, start_time_fingerprints_match
     try:
         current = get_process_start_time(pgid)
-    except Exception:  # noqa: BLE001 — the guard must never break signalling
+    except Exception:
         return True
     if current is None:
         # Unreadable while alive: best effort. Gone: POSIX never reuses a PGID while any
@@ -1011,14 +1038,16 @@ def _kill_process_windows(proc) -> None:
 
 class LocalEnvironment(BaseEnvironment):
     """Run commands directly on the host: every execute() spawns a fresh bash;
-    the session snapshot preserves env vars across calls; CWD persists via the
-    stdout marker."""
+    the session snapshot preserves exported env vars across calls (unless
+    ``persistent=False``); CWD persists via the stdout marker."""
 
-    _sudo_nopasswd_probe_supported = True
+    _passwordless_sudo_probe_supported = True
     _profile_scoped_passthrough = True
-    # Commands run on the Qubit host itself — controller-side platform behavior
+    # Commands run on the Hermes host itself — controller-side platform behavior
     # (macOS TCC pruning, etc.) legitimately applies here.
     is_local = True
+    # A subclass that confines its commands (a sandbox) sets this False: see BaseEnvironment.
+    uses_host_filesystem = True
 
     def _additional_profile_scoped_passthrough_names(self) -> tuple[str, ...]:
         """First-party ``BUZZ_*`` names present in the env, excluded from the shared
@@ -1031,17 +1060,14 @@ class LocalEnvironment(BaseEnvironment):
             name for name in merged
             if isinstance(name, str) and _matches_terminal_first_party_prefix(name)))
 
-    def __init__(self, cwd: str = "", timeout: int = 60, env: dict = None, persist_env: bool = True):
-        # ``persist_env`` is the ``TERMINAL_LOCAL_PERSISTENT`` verdict (off = every command starts
-        # from the login snapshot again).
-        super().__init__(cwd=_resolve_local_initial_cwd(cwd), timeout=timeout, env=env,
-                         persist_env=persist_env)
+    def __init__(self, cwd: str = "", timeout: int = 60, env: dict | None = None, persistent: bool = True):
+        super().__init__(cwd=_resolve_local_initial_cwd(cwd), timeout=timeout, env=env, persist_env=persistent)
         self.init_session()
 
     def get_temp_dir(self) -> str:
         """Shell-safe writable temp dir. Precedence: ``TERMINAL_TEMP_DIR``, TMPDIR/TMP/TEMP
         (Termux has no system temp dir), ``QUBIT_HOME/cache/terminal`` (real storage: a
-        tmpfs system temp dir fills under Qubit load; pruned by ``cleanup_terminal_temp_cache``),
+        tmpfs system temp dir fills under Hermes load; pruned by ``cleanup_terminal_temp_cache``),
         ``tempfile.gettempdir()``; backend env before process env so terminal.env
         overrides work. Windows: ``%TEMP%`` often has spaces that break unquoted bash,
         so always the QUBIT_HOME cache dir with forward slashes (bash- and Python-valid)."""
@@ -1107,19 +1133,29 @@ class LocalEnvironment(BaseEnvironment):
     def _run_bash(self, cmd_string: str, *, login: bool = False, timeout: int = 120,
                   stdin_data: str | None = None) -> subprocess.Popen:
         bash = _find_bash()
+        run_env = _make_run_env(self.env)
         # Login invocations (init_session's env snapshot) source the user's rc /
-        # custom init files so nvm/asdf/pyenv land on PATH in the snapshot.
+        # custom init files so nvm/asdf/pyenv land on PATH in the snapshot; then the
+        # spawn env's dirs a resetting profile dropped are re-appended (#56634).
         if login:
+            cmd_string = _append_dropped_path_entries(cmd_string, run_env.get("PATH", ""))
             cmd_string = _prepend_shell_init(cmd_string, _resolve_shell_init_files())
         args = [bash, *(["-l"] if login else []), "-c", cmd_string]
         self._recover_cwd()
+        # Not spawn_owned: an awaited command needs no spawn-ledger entry; own_process_groups below hands
+        # its group to the owner-death supervisor and _wait_for_process releases it.
         proc = subprocess.Popen(
-            args, text=True, env=_make_run_env(self.env), encoding="utf-8", errors="replace",
+            args, text=True, env=run_env, encoding="utf-8", errors="replace",
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
+            # detached-spawn: ok — owned via own_process_groups right below
             start_new_session=True, cwd=self.cwd,
             **({"creationflags": windows_hide_flags()} if _IS_WINDOWS else {}))
         if not _IS_WINDOWS:
+            # The command dies with this process however it dies: a SIGKILLed / OOM-killed host left a
+            # running `npm run dev` or `sleep` on init. Released once the wait returns (see below).
+            own_process_groups([proc.pid])
+            proc._qubit_owned_pgid = proc.pid
             with contextlib.suppress(ProcessLookupError):
                 proc._qubit_pgid = os.getpgid(proc.pid)
                 # Record the group leader's start-time fingerprint so _kill_process can
@@ -1131,6 +1167,18 @@ class LocalEnvironment(BaseEnvironment):
         if stdin_data is not None:
             _pipe_stdin(proc, stdin_data)
         return proc
+
+    def _wait_for_process(self, proc, *args, **kwargs) -> dict:
+        """Base wait, then hand the command's group back from the owner-death supervisor: once the
+        command returned, what it left running in the background (`server &`) is not ours to kill,
+        exactly as on a graceful exit. A command that yielded to background took the group with it
+        (``ProcessRegistry.adopt_local`` clears ``_qubit_owned_pgid``)."""
+        try:
+            return super()._wait_for_process(proc, *args, **kwargs)
+        finally:
+            if (owned_pgid := getattr(proc, "_qubit_owned_pgid", None)) is not None:
+                proc._qubit_owned_pgid = None
+                release_process_groups([owned_pgid])
 
     def _kill_process(self, proc):
         """Kill the entire process group (all children)."""

@@ -20,8 +20,10 @@ from starlette.concurrency import run_in_threadpool
 from fastapi import HTTPException, Request
 from gateway.status import (
     derive_gateway_busy, derive_gateway_drainable, normalize_updated_at, parse_active_agents,
-    profile_platforms_from_multiplexer, resolve_gateway_liveness, retained_gateway_state,
+    profile_platforms_from_multiplexer, resolve_gateway_liveness,
+    retained_gateway_state,
     runtime_status_heartbeat_age_s, runtime_status_is_stale)
+from gateway.status_served import local_liveness_pid
 from qubit_cli import __release_date__
 from qubit_cli.config import get_config_path, get_env_path
 from qubit_cli.version_info import get_version_info
@@ -55,7 +57,6 @@ get_install_id = late("get_install_id")
 get_running_pid_cached = late("get_running_pid_cached", "gateway.status")
 get_runtime_status_running_pid = late("get_runtime_status_running_pid", "gateway.status")
 served_profile_runtime = late("served_profile_runtime", "gateway.status_served")
-local_liveness_pid = late("local_liveness_pid", "gateway.status_served")
 load_config = late("load_config", "qubit_cli.config")
 read_runtime_status = late("read_runtime_status", "gateway.status")
 _open_session_db_for_profile = late("_open_session_db_for_profile", "qubit_cli.web_server_sessions")
@@ -76,7 +77,7 @@ def _safe_call(mod, fn_name: str, default):
 
 def _count_status_active_sessions() -> int:
     """Best-effort status garnish. Opens read-only (via the shared stale-schema heal) so
-    /api/status never routinely writes to state.db while another Qubit process uses it."""
+    /api/status never routinely writes to state.db while another Hermes process uses it."""
     from qubit_state import _default_db_path
     # The heal helper bootstraps a missing store; this garnish must not — on a fresh install
     # /api/status polls would otherwise create state.db before the user's first session.
@@ -97,7 +98,7 @@ async def _status_active_sessions() -> int:
         return await asyncio.wait_for(
             run_in_threadpool(_count_status_active_sessions),
             timeout=_STATUS_ACTIVE_SESSIONS_TIMEOUT)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         _log.debug("/api/status active session count exceeded %.2fs; returning 0",
                    _STATUS_ACTIVE_SESSIONS_TIMEOUT)
     except Exception as exc:
@@ -117,7 +118,12 @@ async def get_ssh_ownership(request: Request):
 
 @router.get("/api/health")
 async def get_health():
-    """Lightweight process liveness for desktop/backend readiness probes."""
+    """Lightweight process liveness for desktop/backend readiness probes.
+
+    ``commit`` is the code this process BOOTED from (``get_version_info`` is cached at
+    ``web_server`` import): Desktop refuses to attach to a backend whose commit differs from
+    its checkout, so a serve that outlived ``hermes update`` is never re-adopted.
+    """
     info = get_version_info()
     return {"ok": True, "version": info.base_version, "displayVersion": info.display_version,
             "commit": info.commit,
@@ -126,18 +132,18 @@ async def get_health():
 
 @router.get("/api/host/identity")
 async def get_host_identity(request: Request):
-    """Prove to an attaching `qubit serve`/`dashboard` WHO owns this port.
+    """Prove to an attaching `hermes serve`/`dashboard` WHO owns this port.
 
     The host rendezvous record names a (pid, port) owner, but a record cannot say whether that
     owner still holds the port: a graceful-shutdown window or an unrelated listener that
     inherited the port both look identical on disk. The attaching side dials this endpoint with
     the owner's 0600 token and attaches only when pid+role match. ``servesSpa`` is false for
-    headless ``serve``, so a `qubit dashboard` user is never routed to a backend with no UI.
+    headless ``serve``, so a `hermes dashboard` user is never routed to a backend with no UI.
     """
     _require_token(request)
     # ``role`` is the host ROLE this process published (gateway/host_rendezvous.ROLE_SERVE, or
-    # ROLE_DESKTOP_SERVE for a Desktop-owned child), not the launch mode: `qubit serve` and
-    # `qubit dashboard` are one host role that differ in SPA.
+    # ROLE_DESKTOP_SERVE for a Desktop-owned child), not the launch mode: `hermes serve` and
+    # `hermes dashboard` are one host role that differ in SPA.
     return {"ok": True, "protocolVersion": 1, "pid": os.getpid(),
             "role": getattr(app.state, "host_role", None) or "serve",
             "servesSpa": bool(getattr(app.state, "serves_spa", False))}
@@ -182,7 +188,7 @@ def _is_profile_platform_status_key(key: object) -> bool:
     return isinstance(key, str) and bool(_PROFILE_PLATFORM_STATUS_KEY_RE.fullmatch(key))
 
 
-def _status_platform_key_allowed(key: object, configured: "set[str] | None") -> bool:
+def _status_platform_key_allowed(key: object, configured: set[str] | None) -> bool:
     """Whether a runtime-status platform key may appear publicly: namespaced
     ``<profile>:<platform>`` keys are validated against the grammar *unconditionally* (a
     failed config-set load must not fail open into projecting arbitrary keys from a
@@ -258,7 +264,7 @@ def _bounded_health_probe():
             return False, None
 
 
-def _project_gateway_platforms(gateway_platforms: dict, configured: "set[str] | None",
+def _project_gateway_platforms(gateway_platforms: dict, configured: set[str] | None,
                                gateway_running: bool, gateway_state) -> dict:
     """Public projection of a runtime's platform map (see ``_status_platform_key_allowed``
     for the key rules). A cleanly stopped gateway's platform states are stale noise and are
@@ -276,7 +282,7 @@ def _project_gateway_platforms(gateway_platforms: dict, configured: "set[str] | 
     return {}
 
 
-async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> Dict[str, Any]:
+async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> dict[str, Any]:
     """Liveness + runtime-state readout (running/pid/state/platforms/exit_reason/updated_at
     plus the raw ``runtime`` document).
 
@@ -307,13 +313,13 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> Di
     runtime = local_runtime
     if runtime is None and remote_health_body and remote_health_body.get("gateway_state"):
         runtime = remote_health_body
-    # Unscoped, the profile is the process's own home (a pooled ``qubit --profile X serve``).
+    # Unscoped, the profile is the process's own home (a pooled ``hermes --profile X serve``).
     own_home = profile_dir or get_process_qubit_home()
     if liveness.runtime is not None:
         # Served by the multiplexer: its record is this profile's runtime, with the profile's own
         # adapters under ``<profile>:<platform>`` re-keyed to the standalone shape.
         # Fold on the profile NAME, never ``profile_dir.name``: ``?profile=default`` resolves the
-        # root itself, whose basename (``.qubit``) matched nothing and read as a named id (#123088).
+        # root itself, whose basename (``.hermes``) matched nothing and read as a named id (#123088).
         served_name = profile_name_for_home(own_home)
         runtime = {**liveness.runtime,
                    "platforms": profile_platforms_from_multiplexer(liveness.runtime, served_name or "")}
@@ -349,7 +355,7 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> Di
         elif gateway_state in {"running", "degraded", "starting"} and runtime_status_is_stale(runtime):
             # Alive PID, but housekeeping stopped re-stamping the heartbeat: the loop or the
             # housekeeping thread wedged while the file still says 'running' (#113372). Same arm
-            # as ``qubit gateway status`` so the sidebar strip and the CLI agree.
+            # as ``hermes gateway status`` so the sidebar strip and the CLI agree.
             gateway_heartbeat_stale_s = runtime_status_heartbeat_age_s(runtime)
         gateway_platforms = _project_gateway_platforms(
             runtime.get("platforms") or {}, configured, gateway_running, gateway_state)
@@ -363,34 +369,36 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> Di
     if gateway_running and gateway_state is None and remote_health_body is not None:
         gateway_state = "running"
 
-    # ``liveness.runtime`` is set only when the shared multiplexer answered for a served profile: its
-    # gateway IS that process, so name every bot a restart would blip ("default, alpha, beta").
-    served = (liveness.runtime or {}).get("served_profiles")
+    # A live multiplexer's record (the host's own, or the one serving this profile) names every
+    # profile a restart would blip ("default, alpha, beta"); a standalone gateway's names none.
+    shared_with = (runtime or {}).get("served_profiles") if gateway_running else None
     return {
         "runtime": runtime, "gateway_running": gateway_running, "gateway_pid": liveness.pid,
         "gateway_state": gateway_state, "gateway_platforms": gateway_platforms,
         "gateway_exit_reason": gateway_exit_reason, "gateway_updated_at": gateway_updated_at,
         "gateway_heartbeat_stale_s": gateway_heartbeat_stale_s,
-        "gateway_shared_with": [str(p) for p in served] if isinstance(served, list) else None}
+        "gateway_shared_with": [str(p) for p in shared_with] if isinstance(shared_with, list) else None}
 
 
-def _auth_gate_status() -> Dict[str, Any]:
+def _auth_gate_status() -> dict[str, Any]:
     """Dashboard auth gate readout: gate engaged, registered providers, and the RFC 8252
     native-app capability advertisement ``auth_flows`` the desktop reads to pick the
     system-browser + loopback + PKCE flow over the embedded-webview cookie flow. "cookie" is
     always available in gated mode; "native_pkce" when at least one interactive session
-    provider is registered (token-only credentials such as drain don't count). Missing
+    provider is registered (token-only credentials such as drain, and provisioned-credential
+    session providers such as session-token, don't count). Missing
     "native_pkce" ⇒ older gateway ⇒ desktop falls back automatically."""
     auth_required = bool(getattr(app.state, "auth_required", False))
     auth_providers: list[str] = []
     auth_flows: list[str] = []
     try:
         from qubit_cli.dashboard_auth import (
-            list_providers as _list_providers, list_session_providers as _list_session_providers)
+            list_interactive_providers as _list_interactive_providers,
+            list_providers as _list_providers)
         auth_providers = [p.name for p in _list_providers()]
         if auth_required:
             auth_flows.append("cookie")
-            if _list_session_providers():
+            if _list_interactive_providers():
                 auth_flows.append("native_pkce")
     except Exception:
         # Module not importable yet (early startup) — leave as [].
@@ -400,7 +408,7 @@ def _auth_gate_status() -> Dict[str, Any]:
 
 
 def _nous_session_validity() -> str:
-    """Qubit bootstrap-session validity for the NAS health sweep: a hosted agent whose Qubit
+    """Nous bootstrap-session validity for the NAS health sweep: a hosted agent whose Nous
     auth dies terminally looks HEALTHY to every liveness probe yet every inference turn
     fails, and this is the ONLY signal that surfaces it (local auth-store state, no token
     needed). Best-effort: never let auth classification break the probe."""
@@ -411,14 +419,14 @@ def _nous_session_validity() -> str:
         return "unknown"
 
 
-async def _component_health(gateway: Dict[str, Any]) -> Dict[str, Any]:
+async def _component_health(gateway: dict[str, Any]) -> dict[str, Any]:
     """Component-level health rollup: counts and status enums only (public payload — no
     messages, paths or other detail that could carry secrets). The storage probe reuses the
     gateway readiness state_db check (read-only, 1s-bounded) off-loop."""
     from qubit_cli.web_server import DASHBOARD_HEALTH
     gateway_running, gateway_state = gateway["gateway_running"], gateway["gateway_state"]
     gateway_platforms = gateway["gateway_platforms"]
-    components: Dict[str, Any] = {
+    components: dict[str, Any] = {
         "gateway": {
             "status": "ok" if gateway_running and gateway_state in {"running", "draining"} else "degraded",
             "state": gateway_state or ("running" if gateway_running else "stopped")},
@@ -443,7 +451,7 @@ async def _component_health(gateway: Dict[str, Any]) -> Dict[str, Any]:
     return components
 
 
-async def _advisory_pressure(status: Dict[str, Any], home: Path) -> None:
+async def _advisory_pressure(status: dict[str, Any], home: Path) -> None:
     """Memory / disk pressure rollups + deferred FTS rebuild progress (coarse numbers/enums
     only; public payload). Deliberately NOT folded into components/overall: pressure is
     advisory, not a liveness verdict, and flipping ``overall`` on it would page NAS's
@@ -458,23 +466,70 @@ async def _advisory_pressure(status: Dict[str, Any], home: Path) -> None:
             status[key] = {"pressure": "unknown"}
 
     try:
-        from qubit_state import SessionDB as _SDB
-        from qubit_constants import get_qubit_home as _ghh
-        _db_path = _ghh() / "state.db"
-        if _db_path.exists():
-            _sdb = _SDB(db_path=_db_path, read_only=True)
-            try:
-                _rebuild = _sdb.fts_rebuild_status()
-            finally:
-                _sdb.close()
-            if _rebuild is not None:
-                status["fts_rebuild"] = _rebuild
+        # SQLite open + read: off the loop like the rest of the probe.
+        _rebuild = await run_in_threadpool(_fts_rebuild_status)
+        if _rebuild is not None:
+            status["fts_rebuild"] = _rebuild
     except Exception:
         pass
 
 
+def _status_local_reads() -> dict[str, Any]:
+    """The probe's synchronous local reads: the raw config.yaml stamp, the install method, the
+    auth store and (first call only) git provenance. Run on a worker thread: on the event loop that
+    also serves the session WebSocket they stalled every Desktop request behind the disk (#143561)."""
+    current_ver, latest_ver = check_config_version()
+    return {"version": get_version_info().base_version, "config_version": current_ver,
+            "latest_config_version": latest_ver,
+            "can_update_hermes": not _dashboard_local_update_managed_externally(),
+            "nous_session_valid": _nous_session_validity()}
+
+
+def _fts_rebuild_status() -> Optional[dict[str, Any]]:
+    """Deferred FTS rebuild progress of this home's state.db (read-only open), or None."""
+    from qubit_state import SessionDB as _SDB
+    from qubit_constants import get_qubit_home as _ghh
+    _db_path = _ghh() / "state.db"
+    if not _db_path.exists():
+        return None
+    _sdb = _SDB(db_path=_db_path, read_only=True)
+    try:
+        return _sdb.fts_rebuild_status()
+    finally:
+        _sdb.close()
+
+
+#: What the gateway's Webapp answers a caller who has not signed in: liveness, version and the
+#: sign-in shape (the native-app login probe and uptime checks read nothing else). Profile names,
+#: the install id and host figures wait for sign-in, since a Webapp on a wildcard bind is reachable
+#: by everyone on the network. The standalone dashboard keeps its public body: Hermes Cloud reads
+#: the profile list there without a session (#60585).
+_WEBAPP_SIGNED_OUT_STATUS_KEYS = frozenset({
+    "version", "release_date", "gateway_running", "gateway_state", "overall", "components",
+    "auth_required", "auth_providers", "auth_flows"})
+
+
+async def _webapp_caller_signed_out(request: Request) -> bool:
+    """True when this request reached the gateway's Webapp behind its sign-in gate with no
+    session the gate would accept. ``/api/status`` is public, so the gate never verified one."""
+    from qubit_cli.web_server import _require_token
+    from qubit_cli.web_server_surface import surface
+    if request is None or surface(request.app.state) != "webapp" \
+            or not getattr(request.app.state, "auth_required", False):
+        return False
+    if getattr(request.state, "session", None) is None:
+        from qubit_cli.dashboard_auth.middleware import peek_session
+        request.state.session = await run_in_threadpool(peek_session, request)
+    try:
+        _require_token(request)
+    except HTTPException:
+        return True
+    return False
+
+
 @router.get("/api/status")
-async def get_status(profile: Optional[str] = None):
+async def get_status(profile: Optional[str] = None,
+                     request: Request = None):  # type: ignore[assignment]  # None when awaited in-process
     """Public machine-level liveness probe (``PUBLIC_API_PATHS``): version, gateway state,
     active session count and the auth-gate shape — no bodies, no session content, no secrets.
 
@@ -483,8 +538,10 @@ async def get_status(profile: Optional[str] = None):
     process-global skills-module attributes a concurrent request would cross-restore.
     """
     from qubit_cli.web_server import _GATEWAY_HEALTH_URL
+    signed_out = await _webapp_caller_signed_out(request)
     status_scope = None
-    requested_profile = (profile or "").strip()
+    # A signed-out caller's ``?profile=`` is ignored: an unknown name's 404 would tell it which exist.
+    requested_profile = "" if signed_out else (profile or "").strip()
     profile_dir: Optional[Path] = None
     if requested_profile and requested_profile.lower() != "current":
         profile_dir = _resolve_profile_dir(requested_profile)
@@ -492,7 +549,7 @@ async def get_status(profile: Optional[str] = None):
         status_scope.__enter__()
 
     try:
-        current_ver, latest_ver = check_config_version()
+        local = await run_in_threadpool(_status_local_reads)
         gateway = await _resolve_gateway_status(profile_dir, _GATEWAY_HEALTH_URL)
         gateway_running, gateway_state = gateway["gateway_running"], gateway["gateway_state"]
 
@@ -516,9 +573,9 @@ async def get_status(profile: Optional[str] = None):
         auth = _auth_gate_status()
 
         status = {
-            "version": get_version_info().base_version, "release_date": __release_date__,
-            "config_version": current_ver, "latest_config_version": latest_ver,
-            "can_update_hermes": not _dashboard_local_update_managed_externally(),
+            "version": local["version"], "release_date": __release_date__,
+            "config_version": local["config_version"], "latest_config_version": local["latest_config_version"],
+            "can_update_hermes": local["can_update_hermes"],
             "gateway_running": gateway_running, "gateway_state": gateway_state,
             "gateway_platforms": gateway["gateway_platforms"],
             "gateway_exit_reason": gateway["gateway_exit_reason"],
@@ -535,7 +592,7 @@ async def get_status(profile: Optional[str] = None):
             "gateway_drainable": derive_gateway_drainable(
                 gateway_running=gateway_running, gateway_state=gateway_state),
             "restart_drain_timeout": restart_drain_timeout, "active_sessions": active_sessions,
-            **auth, "nous_session_valid": _nous_session_validity()}
+            **auth, "nous_session_valid": local["nous_session_valid"]}
 
         # Stable per-install identity (first call may touch disk). Omitted (not null) when
         # unpersistable so older-client behavior and the no-identity fallback stay identical.
@@ -553,7 +610,7 @@ async def get_status(profile: Optional[str] = None):
                              else "degraded")
         await _advisory_pressure(status, profile_dir if profile_dir else get_qubit_home())
 
-        # Profile NAMES and ``gateway_mode`` are low-sensitivity product surface (Qubit Cloud
+        # Profile NAMES and ``gateway_mode`` are low-sensitivity product surface (Hermes Cloud
         # renders the profile list over a gated bind) so they survive the auth gate; the
         # per-gateway ``gateways[]`` carries host ports and stays gated below.
         status["profiles"] = topology["profiles"]
@@ -570,6 +627,8 @@ async def get_status(profile: Optional[str] = None):
                 "env_path": str(get_env_path()), "gateway_pid": gateway["gateway_pid"],
                 "gateway_health_url": _GATEWAY_HEALTH_URL, "gateways": topology["gateways"]})
 
+        if signed_out:
+            return {key: value for key, value in status.items() if key in _WEBAPP_SIGNED_OUT_STATUS_KEYS}
         return status
     finally:
         if status_scope is not None:
@@ -577,12 +636,12 @@ async def get_status(profile: Optional[str] = None):
 
 
 @router.get("/api/system/stats")
-async def get_system_stats():
+def get_system_stats():  # sync: FastAPI runs it on a worker (psutil.cpu_percent blocks 100 ms)
     """Host + process system stats for the System page (stdlib identity; psutil CPU/memory/
-    disk/uptime when available). Non-sensitive: no env values, no paths beyond qubit home."""
+    disk/uptime when available). Non-sensitive: no env values, no paths beyond hermes home."""
     import platform as _platform
 
-    info: Dict[str, Any] = {
+    info: dict[str, Any] = {
         **_display_system_platform(
             system=_platform.system(), release=_platform.release(), version=_platform.version(),
             platform_label=_platform.platform()),
@@ -666,7 +725,7 @@ async def set_curator_paused(body: CuratorPause, profile: Optional[str] = None):
 
 
 def _spawn_action(argv: list, name: str, prefix: str, profile: Optional[str] = None) -> dict:
-    """Spawn a background ``qubit -p <profile> <argv>`` action; a spawn failure is
+    """Spawn a background ``hermes -p <profile> <argv>`` action; a spawn failure is
     ``500 "<prefix>: <exc>"``."""
     try:
         proc = _spawn_qubit_action(_profile_cli_args(profile) + argv, name)
@@ -737,7 +796,7 @@ async def update_learning_node(body: LearningNodeEdit, profile: Optional[str] = 
         body.profile or profile, lambda: edit_node(body.id, body.content), 400, "edit failed")
 
 
-# Portal — Qubit Labs auth + Tool Gateway routing status (read-only).
+# Portal — Nous Portal auth + Tool Gateway routing status (read-only).
 
 
 @router.get("/api/portal")
@@ -749,7 +808,7 @@ async def get_portal_status(profile: Optional[str] = None):
 
 def _feature_state(feat) -> str:
     if getattr(feat, "managed_by_nous", False):
-        return "via Qubit Labs"
+        return "via Nous Portal"
     if getattr(feat, "active", False):
         return getattr(feat, "current_provider", None) or "active"
     return "not configured"
@@ -757,7 +816,7 @@ def _feature_state(feat) -> str:
 
 def _get_portal_status_sync():
     cfg = load_config() or {}
-    auth: Dict[str, Any] = {}
+    auth: dict[str, Any] = {}
     try:
         from qubit_cli.auth import get_nous_auth_status_local
         # Refresh-free snapshot so polling never performs an OAuth refresh.
@@ -836,29 +895,15 @@ async def run_debug_share_endpoint(body: DebugShareRequest | None = None,
 async def get_logs(
     file: str = "agent", lines: int = 100, level: Optional[str] = None,
     component: Optional[str] = None, search: Optional[str] = None,
-    profile: Optional[str] = None, offset: int = 0):
-    """Tail a log file, newest-first, with an additive ``offset`` page contract.
-
-    Upstream accepts only ``file/lines/level/component/search`` and returns
-    ``{file, lines}``; ``offset`` is Qubit-added and backwards-compatible:
-    ``offset=0`` (the default) returns exactly the same ``lines`` as before, and
-    the extra pagination fields are additive. ``offset`` counts matching lines to
-    skip from the newest end, so ``offset += returned`` walks backwards.
-    """
+    profile: Optional[str] = None):
     from qubit_cli.logs import _read_tail, LOG_FILES
     log_name = LOG_FILES.get(file)
     if not log_name:
         raise HTTPException(status_code=400, detail=f"Unknown log file: {file}")
     with _config_profile_scope(profile):
         log_path = get_qubit_home() / "logs" / log_name
-    cap = min(lines, 500)
-    if cap < 0:
-        cap = 0
-    offset = max(0, offset)
-    empty = {"file": file, "lines": [], "offset": offset, "limit": cap,
-             "returned": 0, "has_more": False, "next_offset": None}
     if not log_path.exists():
-        return empty
+        return {"file": file, "lines": []}
 
     try:
         from qubit_logging import COMPONENT_PREFIXES
@@ -873,33 +918,17 @@ async def get_logs(
         if comp_prefixes is None:
             raise HTTPException(status_code=400, detail=f"Unknown component: {component}. "
                                 f"Available: {', '.join(sorted(COMPONENT_PREFIXES))}")
-    # Read one matching line past the requested page so ``has_more`` is proven
-    # (an older line exists), never guessed. Search keeps the upstream 2000-line
-    # over-read; without search we read exactly offset+cap+1 matching lines.
-    read_n = 2000 if search else max(1, offset + cap + 1)
-
     def _load_logs():
         result = _read_tail(
-            log_path, read_n,
+            log_path, min(lines, 500) if not search else 2000,
             has_filters=bool(min_level or comp_prefixes or search),
             min_level=min_level, component_prefixes=comp_prefixes)
         # _read_tail doesn't support free-text search, so post-filter (case-insensitive
-        # substring) here before paginating.
+        # substring) here and trim to the requested line count afterward.
         if search:
             needle = search.lower()
-            result = [line for line in result if needle in line.lower()]
-        # result is oldest→newest. Skip the newest ``offset`` matching lines, then
-        # take the next ``cap`` (the page); anything before that is older => has_more.
-        end = len(result) - offset
-        if end <= 0:
-            page: list = []
-        else:
-            start = max(0, end - cap)
-            page = result[start:end]
-        has_more = cap > 0 and (len(result) - offset - cap) > 0
-        return page, has_more
+            result = [line for line in result if needle in line.lower()][-min(lines, 500):]
+        return result
 
-    page, has_more = await asyncio.to_thread(_load_logs)
-    return {"file": file, "lines": page, "offset": offset, "limit": cap,
-            "returned": len(page), "has_more": has_more,
-            "next_offset": (offset + len(page)) if has_more else None}
+    result = await asyncio.to_thread(_load_logs)
+    return {"file": file, "lines": result}

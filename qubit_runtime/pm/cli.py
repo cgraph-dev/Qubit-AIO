@@ -1,4 +1,4 @@
-"""qubit pm: lock / install / repair / env / doctor / gc / bundle."""
+"""hermes pm: lock / install / repair / env / doctor / gc / bundle."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 from pathlib import Path
 
 from pm import termux_libs
@@ -142,7 +143,7 @@ def _pin_tool(args) -> int:
     lockfile.set_pin(args.name, args.version, artifacts)
     lockfile.save()
     print(f"pinned {args.name} {args.version} ({len(artifacts)} targets)")
-    return 0
+    return _regenerate_bootstrap_pins(lockfile)
 
 
 def _fmt_bytes(n: int) -> str:
@@ -284,10 +285,10 @@ def _install_flag_error(args, *, extras: list[str], cross_target, tools_only: bo
     if without and (extras or cross_target or args.names):
         return "--without shapes the default closure; it does not take names, --extra, or --target"
     if without:
-        from pm.defaults import default_package_names
+        from pm.defaults import canonical_default_name, default_package_names
 
         allowed = default_package_names()
-        unknown = [name for name in without if name not in allowed]
+        unknown = [name for name in without if canonical_default_name(name) not in allowed]
         if unknown:
             return (f"--without accepts only optional default packages ({', '.join(allowed)}); "
                     f"not {', '.join(unknown)}")
@@ -297,14 +298,14 @@ def _install_flag_error(args, *, extras: list[str], cross_target, tools_only: bo
 def _install_defaults(names: list[str], *, verify: bool) -> None:
     """Install the optional defaults; a failure warns and never fails the install.
 
-    They are the browser and computer-use tools, not what Qubit needs to run:
+    They are the browser and computer-use tools, not what Hermes needs to run:
     a Chromium download that fails behind a proxy must not abort an install
     whose required closure and venv are fine.
     """
     for name in names:
         if _install_names([name], verify=verify):
             print(f"⚠ optional {name} was not installed; its tools stay unavailable until "
-                  f"`qubit pm install {name}` succeeds", flush=True)
+                  f"`hermes pm install {name}` succeeds", flush=True)
 
 
 def _install_python_environments(extras: list[str], *, sync: bool, test_environment) -> int:
@@ -315,7 +316,7 @@ def _install_python_environments(extras: list[str], *, sync: bool, test_environm
 
         try:
             # Default the venv to the [all] feature set — the same thing
-            # `qubit update` force-syncs on every run (update_cmd.py) and
+            # `hermes update` force-syncs on every run (update_cmd.py) and
             # the installers' old `--extra all` did. sync_venv unions, so
             # any lazy extras already recorded survive this; it only makes
             # a fresh bootstrap match what the first update would do.
@@ -341,6 +342,10 @@ def _install_python_environments(extras: list[str], *, sync: bool, test_environm
 
 
 def cmd_install(args) -> int:
+    from pm.defaults import canonical_default_name
+
+    # Old install logs print `hermes pm install agent-browser` as the browser opt-back-in.
+    args.names = [canonical_default_name(name) for name in args.names or ()]
     cross_target = getattr(args, "target", None)
     # Source-install launchers require the store interpreter, even though
     # Python remains optional when provisioning individual tools.
@@ -359,7 +364,7 @@ def cmd_install(args) -> int:
         from pm.defaults import record_declined
 
         # Persisted before anything installs: later bare installs and
-        # `qubit update` read the same record, so the opt-out sticks.
+        # `hermes update` read the same record, so the opt-out sticks.
         record_declined(add=without)
     defaults: list[str] = []
     if not (args.names or extras):
@@ -396,7 +401,7 @@ def cmd_install(args) -> int:
         return 0
     failed = _install_python_environments(extras, sync=bool(extras or not args.names),
                                           test_environment=test_environment)
-    # Defaults are optional and large (agent-browser + Chromium, cua-driver): fetch them
+    # Defaults are optional and large (Chromium, cua-driver): fetch them
     # only once the venv, and on Windows ARM64 its build tools, succeeded.
     if not failed:
         _install_defaults(defaults, verify=not trust_recorded)
@@ -444,7 +449,7 @@ def cmd_doctor(args) -> int:
         ):
             # Legacy fact: pre-dates digest-bound identity; installed()
             # treats it as not installed and forces one reinstall.
-            print(f"{'?' if soft else '✗'} {name}: legacy fact: no recorded identity, run `qubit pm install`")
+            print(f"{'?' if soft else '✗'} {name}: legacy fact: no recorded identity, run `hermes pm install`")
             bad += 0 if soft else 1
             continue
         if not facts.installed(name, lockfile.version(name), store.root, identity):
@@ -487,6 +492,9 @@ def _gc_store(store, facts) -> tuple[int, int]:
         return (0, 0)
     removed = 0
     with store.install_lock():
+        from pm.defaults import RETIRED_DEFAULTS
+
+        facts.forget(RETIRED_DEFAULTS)
         facts.reload()
         keep = facts.entries_in_use()
         collect_partials(partials_dir)
@@ -540,13 +548,14 @@ def _run_live(cmd: list[str], *, cwd, env, timeout: int = 3600) -> tuple[int, st
     return result.returncode, result.stderr
 
 
-def _resolve_updates(names: list[str], lockfile, only_target: str | None) -> tuple[list, list[str]]:
+def _resolve_updates(names: list[str], lockfile, only_target: str | None,
+                     skip_targets: frozenset[str] = frozenset()) -> tuple[list, list[str]]:
     """Resolve each package's latest; an upstream outage records a failure instead of aborting."""
     resolved = []
     failures = []
     for name in names:
         package = get_package(name)
-        targets = [t for t in ALL_TARGETS if package.missing_reason(t) is None]
+        targets = [t for t in ALL_TARGETS if package.missing_reason(t) is None and t not in skip_targets]
         if only_target:  # cross-target check: only the requested target matters
             targets = [t for t in targets if t == only_target]
         if not targets:
@@ -588,10 +597,25 @@ def _sync_venv_step() -> bool:
     return True
 
 
+def _regenerate_bootstrap_pins(lockfile) -> int:
+    """Splice the new uv and Windows git pins into this checkout's installers.
+
+    curl|sh and irm|iex bootstrap those tools before any checkout exists to read
+    the lock, so they carry the pins as generated fragments. A lock outside a
+    checkout (a test fixture) feeds no installer.
+    """
+    script = lockfile.path.parent.parent / "scripts" / "gen-bootstrap-pins.py"
+    if not script.is_file():
+        return 0
+    return subprocess.run([sys.executable, str(script)], timeout=60, check=False).returncode
+
+
 def _apply_pins(changed: list, lockfile) -> int:
     if not changed:
         print("pm update: nothing to update")
-        return 0
+        # A run that saved the lock but failed to write the fragments leaves the
+        # pins current, so the retry lands here: it must still repair them.
+        return _regenerate_bootstrap_pins(lockfile)
     pinned: list[str] = []
     failed: dict[str, str] = {}
     for d in changed:
@@ -602,22 +626,27 @@ def _apply_pins(changed: list, lockfile) -> int:
             # One broken pin — a package's resolution bug or one target's upstream
             # pool skew (rolling Termux pool 404 while nodejs.org is ahead) — must
             # not zero out the whole run. Pin the rest, report the failure (#125386).
-            print(f"✗ {d.name} pin failed: {e}")
-            failed[d.name] = f"{type(e).__name__}: {e}"
+            # str(HTTPError) omits the URL, and a bare "404" can't tell you which
+            # upstream (nodejs.org, Termux pool, mirror) is missing the file.
+            url = e.url if isinstance(e, urllib.error.HTTPError) else None
+            detail = f"{e} ({url})" if url else str(e)
+            print(f"✗ {d.name} pin failed: {detail}")
+            failed[d.name] = f"{type(e).__name__}: {detail}"
             continue
         lockfile.set_pin(d.name, d.version, artifacts)
         pinned.append(d.name)
         print(f"✓ {d.name} pinned {d.locked or '—'} → {d.version}")
     if pinned:
         lockfile.save()
-        rc = 1 if _install_names(pinned) or not _sync_venv_step() else 0
+        fragments = _regenerate_bootstrap_pins(lockfile)
+        rc = 1 if _install_names(pinned) or not _sync_venv_step() or fragments else 0
     else:
         print("pm update: every pin failed; lockfile untouched")
         rc = 1
     if not failed:
         return rc
     print(f"pm update: pinned {len(pinned)}, failed {len(failed)}: {', '.join(failed)}")
-    # The venv sync above leaves an `ok` sync receipt as latest; `qubit pm
+    # The venv sync above leaves an `ok` sync receipt as latest; `hermes pm
     # status` and the desktop read latest, so the partial run must land last.
     from pm import receipt
 
@@ -646,7 +675,7 @@ def _refresh_npm_lock() -> int:
     npm = installed_package("npm")
     node = installed_package("node")
     if npm is None or npm.binary is None or node is None or node.binary is None:
-        print("✗ npm or Node: not installed; run `qubit pm install`")
+        print("✗ npm or Node: not installed; run `hermes pm install`")
         return 1
     env = npm_env(writable_store_root() / ".npm-cache", env_for("npm"))
     code, tail = _run_live([str(npm.binary), "update"], cwd=str(repo_root()), env=env)
@@ -658,7 +687,7 @@ def _refresh_npm_lock() -> int:
 
 
 def cmd_update(args) -> int:
-    """`qubit pm update [names...] [--check] [--target T] [--uv] [--npm] [--termux]`.
+    """`hermes pm update [names...] [--check] [--target T] [--skip-target T] [--uv] [--npm] [--termux]`.
 
     Resolve each package's latest via its own latest_versions() hook,
     intersect across targets, and (real mode) re-pin the lockfile + install
@@ -679,7 +708,7 @@ def cmd_update(args) -> int:
         print("::warning::--target is a CHECK-only cross-resolution flag; ignoring it for apply (the lockfile pins every target)")
         args.target = None
 
-    resolved, failures = _resolve_updates(names, lockfile, args.target)
+    resolved, failures = _resolve_updates(names, lockfile, args.target, frozenset(args.skip_target))
     changed = [d for d in resolved if d.changed]
     if not resolved:
         print("pm update: nothing to check (no resolvable packages)")
@@ -787,7 +816,73 @@ def cmd_repair(args) -> int:
 
     if not recover_if_needed(repo_root(), explicit=True):
         return 1
-    print("Restart Qubit to use the repaired dependency environment.")
+    print("Restart Hermes to use the repaired dependency environment.")
+    return 0
+
+
+def _extra_requirements(project: Path, extras: list[str]) -> list[str]:
+    """The pinned requirements of declared extras, self-references expanded.
+
+    Pins, not the whole lock, define the environment: an identity over uv.lock
+    would build a new generation on every Hermes update, and superseded side
+    generations are never reclaimed while a caller may still run from them.
+    """
+    import re
+    import tomllib
+
+    declared = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))
+    name = declared["project"]["name"]
+    table = declared["project"].get("optional-dependencies", {})
+    requirements: list[str] = []
+    pending, seen = list(extras), set()
+    while pending:
+        extra = pending.pop()
+        if extra in seen:
+            continue
+        if extra not in table:
+            raise ValueError(f"{extra!r} is not an extra declared in {project / 'pyproject.toml'}")
+        seen.add(extra)
+        for requirement in table[extra]:
+            own = re.fullmatch(rf"{re.escape(name)}\[([^\]]+)\]", requirement.replace(" ", ""))
+            if own:
+                pending.extend(own.group(1).split(","))
+            else:
+                requirements.append(requirement)
+    return requirements
+
+
+def cmd_environment(args) -> int:
+    """Make a named side environment current and print its interpreter.
+
+    Shell callers (skills) cannot import PM: the terminal's `python` is rarely
+    Hermes's own. Concurrent callers serialize on PM's per-environment lock and
+    a rebuild lands in a new generation, so a running caller keeps its files.
+    """
+    import contextlib
+    import os
+
+    import pm
+
+    if bool(args.extra) == bool(args.requirement):
+        print("hermes pm environment: pass --extra or --requirement (not both)", file=sys.stderr)
+        return 2
+    # stdout carries only the interpreter path, for PY=$(hermes pm environment ...);
+    # progress from PM and its uv children goes to stderr at both levels.
+    sys.stdout.flush()
+    saved = os.dup(1)
+    os.dup2(2, 1)
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            requirements = _extra_requirements(repo_root(), args.extra) if args.extra else args.requirement
+            python = pm.ensure_environment(args.name, requirements, explicit=True)
+    except (InstallError, ValueError) as exc:
+        print(f"hermes pm environment: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        sys.stdout.flush()
+        os.dup2(saved, 1)
+        os.close(saved)
+    print(python)
     return 0
 
 
@@ -807,7 +902,7 @@ def main(argv=None) -> int:
             stream.reconfigure(errors="replace", line_buffering=True)
         except (AttributeError, OSError):
             pass
-    parser = argparse.ArgumentParser(prog="qubit pm")
+    parser = argparse.ArgumentParser(prog="hermes pm")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     lock_parser = p = sub.add_parser(
@@ -825,8 +920,8 @@ def main(argv=None) -> int:
     p.add_argument("--extra", action="append", default=[], metavar="NAME",
                    help="enable a declared dependency extra in the venv (repeatable)")
     p.add_argument("--without", action="append", default=[], metavar="NAME",
-                   help="leave an optional default package (agent-browser, cua-driver) out of this and every later "
-                        "default install and update; `qubit pm install NAME` opts back in (repeatable)")
+                   help="leave an optional default package (chromium, cua-driver) out of this and every later "
+                        "default install and update; `hermes pm install NAME` opts back in (repeatable)")
     p.add_argument("--tools-only", action="store_true",
                    help="install the tool closure, put it on PATH, and stop before the venv sync")
     p.add_argument("--trust-recorded", action="store_true",
@@ -852,6 +947,17 @@ def main(argv=None) -> int:
     p = sub.add_parser("repair", help="rebuild the recorded dependency environment without changing its graph")
     p.set_defaults(func=cmd_repair)
 
+    p = sub.add_parser(
+        "environment", help="make a named side environment current and print its python",
+        description="Build or reuse QUBIT_HOME/environments/NAME, an isolated venv that never "
+                    "touches Hermes's own: --extra installs the pins of a declared extra, "
+                    "--requirement an ad hoc bounded requirement (both repeatable). "
+                    "Prints only the interpreter path on stdout.")
+    p.add_argument("name")
+    p.add_argument("--extra", action="append", default=[], metavar="EXTRA")
+    p.add_argument("--requirement", action="append", default=[], metavar="REQ")
+    p.set_defaults(func=cmd_environment)
+
     p = sub.add_parser("gc", help="remove store entries nothing references")
     p.set_defaults(func=cmd_gc)
 
@@ -868,6 +974,9 @@ def main(argv=None) -> int:
     p.add_argument("--check", action="store_true",
                    help="dry-run: print what would change, write nothing (exit 1 if updates exist)")
     p.add_argument("--target", help="resolve for a different target instead of this machine (e.g. win32-arm64)")
+    p.add_argument("--skip-target", action="append", default=[], choices=ALL_TARGETS, metavar="TARGET",
+                   help="leave TARGET's pins as they are, e.g. linux-arm64-bionic while the termux "
+                        "pool lags upstream (repeatable)")
     p.add_argument("--uv", action="store_true", help="also refresh uv.lock + venv (uv update + sync)")
     p.add_argument("--npm", action="store_true", help="also refresh package-lock.json (npm update)")
     p.add_argument("--termux", action="store_true",

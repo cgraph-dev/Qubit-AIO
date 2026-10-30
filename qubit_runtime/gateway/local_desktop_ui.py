@@ -15,16 +15,14 @@ _wire_desktop_sinks`` and ``tui_gateway/agent_callbacks.py::_agent_cbs``):
   (``terminal.close``).
 
 On the session authority none was installed, so every ``desktop_ui`` tool the session policy
-still offers a GUI session failed with "only available in the Qubit desktop app". Here the
+still offers a GUI session failed with "only available in the Hermes desktop app". Here the
 emitter and the process sinks are installed once per process; the emitter routes each event to the
 turn that raised it (by the turn's bound ``HERMES_SESSION_ID``) through the generation-fenced
 execution stream, and the process sinks route by the process's ``session_key`` to the owning
 session's event stream (a background process outlives the turn that started it). The callbacks
 are installed per turn on the cached agent and restored with the other turn sinks.
 
-Not bridged here: ``connection_callback`` (the manage_connections card). Its card answers through
-the ``connection.respond`` RPC, which the session authority does not serve yet, so installing the
-callback would show a card whose buttons go nowhere; the tool keeps its off-desktop result.
+Card for ``manage_connections``: ``connection_callback`` publishes ``connection.request`` on the turn, and each later change of an operation is published as ``connection.update`` on the session that owns it (looked up by its session key, the route); the card answers through ``connection.respond`` (``gateway/session_connections.py``).
 """
 from __future__ import annotations
 
@@ -37,7 +35,8 @@ logger = logging.getLogger(__name__)
 
 # Agent attributes ``wire`` installs for one local-viewer turn (restored by ``local_viewer_events``).
 CALLBACK_ATTRS = ("read_terminal_callback", "read_preview_callback", "drive_preview_callback",
-                  "read_window_below_callback", "theme_callback", "tour_callback", "setup_beat_callback")
+                  "read_window_below_callback", "theme_callback", "tour_callback", "setup_beat_callback",
+                  "connection_callback")
 
 # main: tui_gateway/agent_callbacks.py ``_read_block`` budgets and tui_gateway/server.py's preview.act ladder.
 _TERMINAL_READ_TIMEOUT_S = 30
@@ -48,23 +47,23 @@ _PREVIEW_ACTION_PROBE_TIMEOUT_S = 10
 _PREVIEW_ACTION_REPROBE_COOLDOWN_S = 30
 _PREVIEW_ACTION_BRIDGE_UNAVAILABLE = json.dumps({
     "success": False,
-    "error": ("No Qubit Desktop window answered the preview action request. The drive_preview / "
+    "error": ("No Hermes Desktop window answered the preview action request. The drive_preview / "
               "annotate_preview bridge is served by the desktop app's renderer, which updates "
               "separately from this backend, so an app build older than the tool has nothing "
-              "listening. Update the Qubit Desktop app, open a page with open_preview, and try "
+              "listening. Update the Hermes Desktop app, open a page with open_preview, and try "
               "again in this session after a short cooldown.")})
 
 # main: tui_gateway/theme_bridge.py and tui_gateway/server.py's tour ladder.
 _THEME_TIMEOUT_S = 15
 _THEME_PICK_TIMEOUT_S = 300
-_THEME_UNANSWERED = {"success": False, "error": "No Qubit Desktop window answered the theme request."}
+_THEME_UNANSWERED = {"success": False, "error": "No Hermes Desktop window answered the theme request."}
 _TOUR_TIMEOUT_S = 45
 _TOUR_PROBE_TIMEOUT_S = 10
 _TOUR_BRIDGE_UNAVAILABLE = json.dumps({
     "success": False,
-    "error": ("No Qubit Desktop window answered the tour request. The tour is driven by the desktop app's "
+    "error": ("No Hermes Desktop window answered the tour request. The tour is driven by the desktop app's "
               "renderer, which updates separately from this backend, so an app build older than the tour tool "
-              "has nothing listening. Update the Qubit Desktop app and start a new session. Do not retry tour "
+              "has nothing listening. Update the Hermes Desktop app and start a new session. Do not retry tour "
               "in this session.")})
 
 _lock = threading.Lock()
@@ -88,7 +87,7 @@ def _emit(sid, event, payload) -> None:
         publish = next((_turns[key] for key in keys if key and key in _turns), None)
     if publish is None:
         # Raised outside a local-viewer turn (a messaging route, a background thread): no window.
-        raise RuntimeError("no Qubit desktop window is attached to this turn")
+        raise RuntimeError("no Hermes desktop window is attached to this turn")
     publish(event, dict(payload or {}))
 
 
@@ -107,7 +106,7 @@ def _publish_process(session, event_type, payload) -> None:
     with _lock:
         route = _process_routes.get(key) if key else None
     if route is None:
-        raise RuntimeError("no Qubit desktop window owns this process")
+        raise RuntimeError("no Hermes desktop window owns this process")
     authority, session_id = route
     live = authority.sessions.get(session_id)
     if live is None:
@@ -128,6 +127,31 @@ def _install_process_sinks() -> None:
         process_registry.on_close = lambda session, pid: _publish_process(
             session, "terminal.close", {"process_id": pid})
     _process_sinks_installed = True
+
+
+def _install_connection_hook() -> None:
+    """``connection.update`` for an operation opened by one of our turns, on the session that owns it (same session key and profile, as the sidecar matches its own); any other operation goes to the hook this one wraps (the sidecar's, for its own sessions). Re-wraps whenever another hook replaced it, so install order does not matter."""
+    from tools.connectors.operation import ConnectionOperation
+    previous = ConnectionOperation.on_change
+    if getattr(previous, "_local_desktop_ui", False):
+        return
+
+    def on_change(operation, change, snapshot):
+        from qubit_constants import qubit_home_key
+        with _lock:
+            route = _process_routes.get(operation.session_key)
+        live = route[0].sessions.get(route[1]) if route is not None else None
+        if live is None or qubit_home_key(route[0].profile_id) != operation.profile_key:
+            if previous is not None:
+                previous(operation, change, snapshot)
+            return
+        from tui_gateway.connector_payload import connector_ui_payload
+        payload = {**snapshot, "settled": snapshot.get("settled_at") is not None, **(change or {}),
+                   "owner": {"type": "session", "session_id": route[1]}}
+        live.event_stream.publish(route[1], connector_ui_payload(payload), event_type="connection.update")
+
+    on_change._local_desktop_ui = True
+    ConnectionOperation.on_change = staticmethod(on_change)
 
 
 def _ask_result(turn, agent, method, params, timeout):
@@ -190,7 +214,9 @@ def _ask(turn, agent, method, params, timeout):
     live = authority.sessions.get(session_id)
     if live is None:
         return ""
-    value = ask_viewer(live.event_stream, session_id, method, dict(params), timeout=timeout,
+    # Automatic window requests (reads, a preview click, the tour) are not handed to a reconnecting
+    # viewer again: a second delivery would repeat the action.
+    value = ask_viewer(live.event_stream, session_id, method, dict(params), timeout=timeout, replay=False,
                        cancelled=lambda: bool(getattr(agent, "_interrupt_requested", False)))
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
@@ -231,6 +257,7 @@ def wire(turn, agent):
     try:
         _install_emitter()
         _install_process_sinks()
+        _install_connection_hook()
     except Exception:  # health: allow BLE001 -- the window bridges are optional; the turn must run
         logger.warning("Desktop UI sink install failed", exc_info=True)
     key = str(getattr(turn._ctx, "session_id", "") or owner[1])
@@ -247,6 +274,8 @@ def wire(turn, agent):
     agent.theme_callback = lambda payload: _theme(turn, agent, dict(payload or {}))
     agent.tour_callback = lambda payload: _tour(turn, agent, dict(payload or {}))
     agent.setup_beat_callback = lambda payload: _setup_beat(turn, agent, dict(payload or {}))
+    # Fire-and-forget: the tool thread waits on its own operation; the card answers by op_id.
+    agent.connection_callback = lambda payload: publish("connection.request", dict(payload)) and None
     return key, publish
 
 

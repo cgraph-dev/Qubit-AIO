@@ -25,8 +25,7 @@ from agent.error_classifier import FailoverReason, classify_api_error
 from agent.message_sanitization import (
     _looks_like_corrupt_image_rejection, _looks_like_image_content_rejection, _sanitize_messages_non_ascii,
     _sanitize_messages_surrogates, _sanitize_structure_non_ascii, _sanitize_structure_surrogates,
-    _strip_images_from_messages, _strip_non_ascii, close_interrupted_tool_sequence,
-    record_reasoning_field_rejection,
+    _strip_images_from_messages, _strip_non_ascii, close_interrupted_tool_sequence, record_reasoning_field_rejection,
 )
 from agent.thinking_timeout_guidance import build_thinking_timeout_guidance, is_thinking_timeout
 from agent.vision_message_prep import _provider_model_key
@@ -35,6 +34,9 @@ from agent.turn_failure_copy import (
     provider_label_for, site_copy, stamp_failure,
 )
 from agent.turn_retry_state import TurnRetryState
+from agent.turn_recovery_codex import (
+    _is_codex_token_expired, _recover_stale_codex_reasoning, reset_codex_reasoning_replay,
+)
 from qubit_constants import display_qubit_home
 from utils import base_url_host_matches
 
@@ -102,7 +104,7 @@ def _image_error_max_dimension(error: Exception) -> Optional[int]:
 
 
 def _try_refresh_nous_paid_entitlement_credentials(agent) -> bool:
-    """Refresh Qubit runtime credentials after a fresh paid-entitlement check."""
+    """Refresh Nous runtime credentials after a fresh paid-entitlement check."""
     try:
         from qubit_cli.nous_account import get_nous_portal_account_info
 
@@ -145,9 +147,9 @@ def _repair_transport_credentials(agent: Any) -> bool:
 
 
 def _recover_unicode_encode_error(
-    agent: Any, api_error: Exception, messages: List[Dict[str, Any]], api_messages: Any,
+    agent: Any, api_error: Exception, messages: list[dict[str, Any]], api_messages: Any,
     api_kwargs: Any, active_system_prompt: Any,
-) -> Tuple[bool, Any]:
+) -> tuple[bool, Any]:
     """UnicodeEncodeError recovery: lone surrogates (clipboard paste) first, then an ASCII
     codec under a non-UTF-8 locale. Sanitizes in place; bounded by the caller's
     ``_unicode_sanitization_passes < 2`` guard (surrogate strip, then ASCII-only)."""
@@ -233,9 +235,9 @@ def _strip_request_images_and_retry(agent: Any, api_messages: Any) -> bool:
 
 
 def recover_before_classification(
-    agent: Any, api_error: Exception, *, messages: List[Dict[str, Any]], api_messages: Any,
+    agent: Any, api_error: Exception, *, messages: list[dict[str, Any]], api_messages: Any,
     api_kwargs: Any, active_system_prompt: Any,
-) -> Tuple[bool, Any]:
+) -> tuple[bool, Any]:
     """Recovery branches that run BEFORE ``classify_api_error``: UnicodeEncodeError
     sanitization, Anthropic fast mode with no capacity (drop ``speed`` for that model),
     provider image-content rejection (record the (provider, model);
@@ -326,7 +328,7 @@ def recover_before_classification(
 
 
 def _print_nous_401_diagnostics(agent: Any, api_error: Exception) -> None:
-    """Qubit 401 that survived a credential refresh: likely Portal OAuth expired/revoked,
+    """Nous 401 that survived a credential refresh: likely Portal OAuth expired/revoked,
     no credits, or agent key blocked."""
     from agent.conversation_loop import _print_nous_entitlement_guidance
     from qubit_constants import display_qubit_home
@@ -337,7 +339,7 @@ def _print_nous_401_diagnostics(agent: Any, api_error: Exception) -> None:
             _body_text = str(_body)[:200]
     except Exception:
         pass
-    _plines(agent, "🔐 Qubit 401 — Portal authentication failed.")
+    _plines(agent, "🔐 Nous 401 — Portal authentication failed.")
     if _body_text:
         _plines(agent, f"   Response: {_body_text}")
     try:
@@ -345,17 +347,17 @@ def _print_nous_401_diagnostics(agent: Any, api_error: Exception) -> None:
         if is_anonymous_agent(agent):
             # The free tier has no credits, no agent key and no auth.json to inspect: its session
             # ended and could not be replaced. The two doors are a sign-in or another provider.
-            _plines(agent, "   Your session ended and Qubit couldn't start a new one.",
-                    "   Sign in with a Qubit account (it's free), or switch providers with /model.")
+            _plines(agent, "   Your session ended and Hermes couldn't start a new one.",
+                    "   Sign in with a Nous account (it's free), or switch providers with /model.")
             return
     except Exception:
         pass
-    if not _print_nous_entitlement_guidance(agent, "Qubit model access"):
+    if not _print_nous_entitlement_guidance(agent, "Nous model access"):
         _plines(agent, "   Most likely: Portal OAuth expired, account out of credits, or agent key revoked.")
     _plines(
         agent,
         "   Troubleshooting:",
-        "     • Re-authenticate: qubit auth add qubit",
+        "     • Re-authenticate: hermes auth add nous",
         "     • Check credits / billing: https://portal.nousresearch.com",
         f"     • Verify stored credentials: {display_qubit_home()}/auth.json",
         "     • Switch providers temporarily: /model <model> --provider openrouter",
@@ -374,7 +376,7 @@ def _print_anthropic_401_diagnostics(agent: Any, key: Any) -> None:
         _plines(
             agent,
             "   Auth method: Microsoft Entra ID (httpx event hook)",
-            "   Run `qubit doctor` for credential-chain diagnostics, or",
+            "   Run `hermes doctor` for credential-chain diagnostics, or",
             "   `az login` if your developer session expired.",
         )
     else:
@@ -388,23 +390,23 @@ def _print_anthropic_401_diagnostics(agent: Any, key: Any) -> None:
     _plines(
         agent,
         "   Troubleshooting:",
-        f"     • Check ANTHROPIC_TOKEN in {_dhh}/.env for Qubit-managed OAuth/setup tokens",
+        f"     • Check ANTHROPIC_TOKEN in {_dhh}/.env for Hermes-managed OAuth/setup tokens",
         f"     • Check ANTHROPIC_API_KEY in {_dhh}/.env for API keys or legacy token values",
         "     • For API keys: verify at https://platform.claude.com/settings/keys",
-        "     • Qubit login (OAuth): run 'qubit auth add anthropic' to sign in again, then retry",
-        "     • Inspect what Qubit holds: qubit auth list anthropic",
-        "     • Legacy cleanup: qubit config set ANTHROPIC_TOKEN \"\"",
-        "     • Clear stale keys: qubit config set ANTHROPIC_API_KEY \"\"",
+        "     • Hermes login (OAuth): run 'hermes auth add anthropic' to sign in again, then retry",
+        "     • Inspect what Hermes holds: hermes auth list anthropic",
+        "     • Legacy cleanup: hermes config set ANTHROPIC_TOKEN \"\"",
+        "     • Clear stale keys: hermes config set ANTHROPIC_API_KEY \"\"",
     )
 
 
 def _refresh_credentials_after_401(
     agent: Any, api_error: Exception, _retry: TurnRetryState, status_code: Optional[int]
 ) -> bool:
-    """Per-provider one-shot credential refresh on 401 (codex/xai, vertex, qubit, copilot,
-    anthropic), printing user-facing diagnostics when the qubit/anthropic refresh fails.
-    Returns True when a refresh succeeded and the call should be retried."""
-    from agent.conversation_loop import _is_copilot_provider
+    """Per-provider one-shot credential refresh on 401 (codex/xai, vertex, nous, a profile's
+    ``refresh_runtime_credentials``, anthropic), printing user-facing diagnostics when the
+    nous/anthropic refresh fails. Returns True when a refresh succeeded and the call should be retried."""
+    from agent.conversation_loop import _credential_refresh_profile
 
     if status_code != 401:
         return False
@@ -430,13 +432,15 @@ def _refresh_credentials_after_401(
     ):
         _retry.nous_auth_retry_attempted = True
         if agent._try_refresh_nous_client_credentials(force=True):
-            agent._buffer_vprint("🔐 Qubit agent key refreshed after 401. Retrying request...")
+            agent._buffer_vprint("🔐 Nous agent key refreshed after 401. Retrying request...")
             return True
         _print_nous_401_diagnostics(agent, api_error)
-    if _is_copilot_provider(agent) and not _retry.copilot_auth_retry_attempted:
-        _retry.copilot_auth_retry_attempted = True
-        if agent._try_refresh_copilot_client_credentials():
-            agent._buffer_vprint("🔐 Copilot credentials refreshed after 401. Retrying request...")
+    if not _retry.provider_auth_refresh_attempted and (profile := _credential_refresh_profile(agent)) is not None:
+        _retry.provider_auth_refresh_attempted = True
+        if agent._try_refresh_provider_runtime_credentials(reason="unauthorized"):
+            from agent.provider_route_hooks import ask_on_error_path
+            agent._buffer_vprint("🔐 " + (ask_on_error_path(profile, "credential_refresh_notice", "", reason="unauthorized") or (
+                f"{profile.display_name or profile.name} credentials refreshed after 401. Retrying request...")))
             return True
     if (
         agent.api_mode == "anthropic_messages"
@@ -451,68 +455,9 @@ def _refresh_credentials_after_401(
     return False
 
 
-def _is_codex_token_expired(agent: Any, api_error: Exception) -> bool:
-    """401 ``token_expired`` from the Codex backend (#88510). It rejects a stale replayed
-    ``encrypted_content`` blob with this auth signature, so a persisted session loops on "sign
-    in again" while a fresh session on the same bearer works. The caller treats it like
-    ``invalid_encrypted_content`` — but only while cached reasoning items remain to strip."""
-    if getattr(api_error, "status_code", None) != 401:
-        return False
-    reason = agent._extract_api_error_context(api_error).get("reason")
-    return isinstance(reason, str) and reason.strip().lower() == "token_expired"
-
-
-def reset_codex_reasoning_replay(agent: Any) -> None:
-    """The replay verdict belongs to the route that earned it: a ``/model`` switch, fallback
-    activation or primary restore starts the new route with replay on (#61552)."""
-    agent._codex_reasoning_replay_enabled = True
-    agent._codex_reasoning_replay_rejected = False
-
-
-def _recover_stale_codex_reasoning(
-    agent: Any, _retry: TurnRetryState, messages: List[Dict[str, Any]], api_messages: Any,
-) -> bool:
-    """Stale ``codex_reasoning_items`` blob rejected by the provider: strip cached items (mutates
-    persisted ``messages``) and retry once. The first rejection keeps replay on, since blobs the
-    route mints from now on are sealed with its current key; a repeat rejection means the route
-    cannot round-trip its own blobs, so replay is disabled for the session."""
-    if (
-        _retry.invalid_encrypted_content_retry_attempted
-        or agent.api_mode != "codex_responses"
-        or not bool(getattr(agent, "_codex_reasoning_replay_enabled", True))
-        or not any(
-            isinstance(_m, dict)
-            and _m.get("role") == "assistant"
-            and isinstance(_m.get("codex_reasoning_items"), list)
-            and _m.get("codex_reasoning_items")
-            for _m in messages
-        )
-    ):
-        return False
-    _retry.invalid_encrypted_content_retry_attempted = True
-    keep_replay = not getattr(agent, "_codex_reasoning_replay_rejected", False)
-    agent._codex_reasoning_replay_rejected = True
-    replay_stats = agent._disable_codex_reasoning_replay(messages, keep_replay=keep_replay)
-    # The retry is rebuilt from the request copy; with replay kept on it would resend the stale blob.
-    for _m in api_messages if isinstance(api_messages, list) else []:
-        if isinstance(_m, dict):
-            _m.pop("codex_reasoning_items", None)
-    action = "stripped stale" if keep_replay else "disabled replay for this session and stripped"
-    _vlines(
-        agent,
-        f"⚠️  Encrypted reasoning replay was rejected by the provider — "
-        f"{action} {replay_stats['items']} item(s) from {replay_stats['messages']} message(s), retrying...",
-    )
-    logger.warning(
-        "%sInvalid encrypted reasoning recovery: %s %d items from %d messages",
-        agent.log_prefix, action, replay_stats["items"], replay_stats["messages"],
-    )
-    return True
-
-
 def _recover_format_errors(
     agent: Any, api_error: Exception, classified: Any, _retry: TurnRetryState,
-    messages: List[Dict[str, Any]], api_messages: Any,
+    messages: list[dict[str, Any]], api_messages: Any,
 ) -> bool:
     """One-shot format-recovery strips: thinking-signature → invalid-encrypted-content
     replay disable → native-compaction reject → llama.cpp grammar strip. Returns True when
@@ -602,20 +547,21 @@ def _recover_format_errors(
 
 _WELCOME_ROUTE_HEAL_COPY = {
     "anon_on_paid_host": "Reconnected to the free model's own route.",
-    "named_on_welcome_host": "Reconnected to your Qubit account's own route.",
+    "named_on_welcome_host": "Reconnected to your Nous account's own route.",
     "session_expired": "Renewed the connection to the free model.",
 }
 
 
 def _recover_welcome_tier(agent: Any, classified: Any, _retry: TurnRetryState) -> bool:
-    """Two one-shot repairs for the Qubit free tier, both silent on the wire and named once in chat.
+    """Two one-shot repairs for the Nous free tier, both silent on the wire and named once in chat.
 
     ``model_not_free``: the session asked the welcome host for a model it does not serve; move
     to the first alternate the gateway named (its own model) and retry, instead of failing the
     turn. ``anon_on_paid_host`` / ``named_on_welcome_host``: this process is pointed at the other
     identity's host (a stale route); re-read the credentials, which heals the URL, and retry. The
     refresh reports False when the store yields the same route, so a user-set
-    ``NOUS_INFERENCE_BASE_URL`` falls straight through to the terminal copy.
+    ``NOUS_INFERENCE_BASE_URL`` falls straight through to the terminal copy. ``session_expired``
+    (403 ``invalid jwt``): the same forced refresh re-exchanges the free credential.
 
     Reads the CLASSIFIER's context (``classified.error_context``): that is where
     ``_nous_welcome_tier`` parks ``welcome_refusal`` / ``welcome_route``. The turn's other context
@@ -675,18 +621,43 @@ def _reject_all_turns(agent: Any, api_error: Exception) -> bool:
     return bool(reject(api_error)) if callable(reject) else False
 
 
+def _pool_error_context(agent, classified: Any, error_context: Any) -> Any:
+    """What the credential pool sees: a plan limit (usage-window 402) benches only the refused model on the
+    credential, until its reset; every other failure passes the error context through unchanged."""
+    if not (getattr(classified, "error_context", None) or {}).get("usage_window"):
+        return error_context
+    return {**(error_context if isinstance(error_context, dict) else {}), "usage_window": True,
+            **_usage_window_reset_context(agent)}
+
+
+def _usage_window_reset_context(agent) -> dict[str, float]:
+    """``{"reset_at": epoch s}`` for a usage-window 402: when the refused allowance frees up, from the usage
+    headers the 402 carried (the API's error body has no reset). Empty when the state names none, so the
+    pool keeps its default bench."""
+    try:
+        from agent.credits_tracker import window_stop_resets_at_ms
+        from agent.plan_limits import current_model_is_top_tier
+        state = getattr(agent, "_credits_state", None)
+        resets_ms = (window_stop_resets_at_ms(state, model_is_top_tier=current_model_is_top_tier(agent))
+                     if state is not None else None)
+    except Exception:
+        logger.debug("usage-window reset unavailable for the pool", exc_info=True)
+        return {}
+    return {"reset_at": resets_ms / 1000} if isinstance(resets_ms, (int, float)) and resets_ms > 0 else {}
+
+
 def recover_after_classification(
     agent: Any, api_error: Exception, classified: Any, _retry: TurnRetryState, *,
-    status_code: Optional[int], error_context: Any, messages: List[Dict[str, Any]],
+    status_code: Optional[int], error_context: Any, messages: list[dict[str, Any]],
     api_messages: Any,
-) -> Tuple[bool, bool]:
+) -> tuple[bool, bool]:
     """One-shot recovery chain that runs AFTER ``classify_api_error`` and before the
     generic retry path. Order is load-bearing (each branch may ``return`` early):
-    welcome-tier repair → credit-limited 402 output-cap clamp → Qubit paid-entitlement refresh →
+    welcome-tier repair → credit-limited 402 output-cap clamp → ``reasoning.context`` opt-out → Nous paid-entitlement refresh →
     Codex stale-reasoning strip on 401 ``token_expired`` → credential-pool rotation → image shrink → multimodal-tool-content strip → corrupt-image
     strip → Anthropic OAuth 1M-beta disable → per-provider 401 credential refresh →
     format-recovery strips.
-    Returns ``(retry_now, recovered_with_pool)``; the latter feeds the Qubit rate-limit guard."""
+    Returns ``(retry_now, recovered_with_pool)``; the latter feeds the Nous rate-limit guard."""
     from agent.conversation_loop import _is_nous_inference_route
 
     # The credit-limited 402 clamp runs before pool rotation, which would bench a credential
@@ -708,6 +679,8 @@ def recover_after_classification(
 
     if (
         classified.reason == FailoverReason.billing
+        # A usage-window 402 is the plan's own limit: refreshing credentials cannot lift it.
+        and not (getattr(classified, "error_context", None) or {}).get("usage_window")
         and _is_nous_inference_route(
             getattr(agent, "provider", "") or "", getattr(agent, "base_url", "") or ""
         )
@@ -715,12 +688,12 @@ def recover_after_classification(
     ):
         _retry.nous_paid_entitlement_refresh_attempted = True
         if _try_refresh_nous_paid_entitlement_credentials(agent):
-            _vlines(agent, "🔐 Qubit paid access verified — refreshed runtime credentials and retrying request...")
+            _vlines(agent, "🔐 Nous paid access verified — refreshed runtime credentials and retrying request...")
             return True, False
 
     recovered_with_pool, _retry.has_retried_429 = agent._recover_with_credential_pool(
         status_code=status_code, has_retried_429=_retry.has_retried_429,
-        classified_reason=classified.reason, error_context=error_context,
+        classified_reason=classified.reason, error_context=_pool_error_context(agent, classified, error_context),
         billing_unverified=classified.billing_unverified,
     )
     if recovered_with_pool:
@@ -754,7 +727,7 @@ def recover_after_classification(
             "messages with image parts found; surfacing original error."
         )
 
-    # Route rejecting a reasoning disable: a reasoning-mandatory route (Qubit Labs / OpenRouter,
+    # Route rejecting a reasoning disable: a reasoning-mandatory route (Nous Portal / OpenRouter,
     # e.g. GLM-5.3) 400s on ``reasoning: {enabled: false}``; a chat-only OpenAI-compatible relay
     # 400s on the ``reasoning_effort: none`` the title/continuation disable projects (#114460).
     # The catalog guard in the provider profile normally swallows the first, but a process that
@@ -834,7 +807,7 @@ def recover_after_classification(
     return False, recovered_with_pool
 
 
-def _failed_turn_result(final_response: str, messages: Any, api_call_count: int, error: str) -> Dict[str, Any]:
+def _failed_turn_result(final_response: str, messages: Any, api_call_count: int, error: str) -> dict[str, Any]:
     """Base failed-turn result dict shared by the two terminal paths."""
     return {
         "final_response": final_response, "messages": messages, "api_calls": api_call_count,
@@ -886,9 +859,15 @@ def limit_reset_epoch(agent: Any, api_error: Exception) -> Optional[float]:
         return None
 
 
-def _stamp_limit_reset(result: Dict[str, Any], agent: Any, api_error: Exception) -> None:
+# Responses for other failures can still carry rate-limit headers; a reset time only explains a limit.
+_LIMIT_REASONS = frozenset({FailoverReason.rate_limit, FailoverReason.upstream_rate_limit, FailoverReason.billing})
+
+
+def _stamp_limit_reset(result: dict[str, Any], agent: Any, api_error: Exception, classified: Any) -> None:
     """``failure_resets_at`` for structured clients (Desktop card: "Limit resets at HH:mm") and the
     same sentence appended to the chat text every plain surface (CLI/TUI/gateway) renders (#98852)."""
+    if classified.reason not in _LIMIT_REASONS:
+        return
     resets_at = limit_reset_epoch(agent, api_error)
     if resets_at is None:
         return
@@ -901,6 +880,8 @@ def _print_nonretryable_auth_guidance(
     agent: Any, classified: Any, *, status_code: Optional[int], provider: Any, base_url: Any, model: Any,
 ) -> None:
     """Actionable guidance for a terminal auth / billing error."""
+    if (getattr(classified, "error_context", None) or {}).get("usage_window"):
+        return  # a plan limit's refusal line and limit panel are its guidance: no second copy, no portal fetch
     from agent.conversation_loop import _print_billing_or_entitlement_guidance, _print_nous_entitlement_guidance
 
     if classified.reason == FailoverReason.billing and _print_billing_or_entitlement_guidance(
@@ -908,7 +889,7 @@ def _print_nonretryable_auth_guidance(
         model=model, unverified=classified.billing_unverified,
     ):
         return
-    if provider == "nous" and _print_nous_entitlement_guidance(agent, "Qubit model access"):
+    if provider == "nous" and _print_nous_entitlement_guidance(agent, "Nous model access"):
         return
     if provider in {"openai-codex", "xai-oauth", "nous"} and status_code == 401:
         if provider == "openai-codex":
@@ -917,37 +898,43 @@ def _print_nonretryable_auth_guidance(
             _vlines(
                 agent,
                 "   💡 Codex OAuth token was rejected (HTTP 401). Your token may have been",
-                "      refreshed by another client (Codex CLI, VS Code) or another Qubit profile.",
+                "      refreshed by another client (Codex CLI, VS Code) or another Hermes profile.",
                 f"      Sign this profile in again: `{oauth_relogin_command(provider)}`",
             )
         elif provider == "xai-oauth":
             _vlines(
                 agent,
                 "   💡 xAI OAuth token was rejected (HTTP 401). To fix:",
-                "      re-authenticate with xAI Grok OAuth (SuperGrok / Premium+) from `qubit model`.",
+                "      re-authenticate with xAI Grok OAuth (SuperGrok / Premium+) from `hermes model`.",
             )
-        else:  # qubit
+        else:  # nous
             _vlines(
                 agent,
-                "   💡 Qubit Labs OAuth token was rejected (HTTP 401). Your token may be",
+                "   💡 Nous Portal OAuth token was rejected (HTTP 401). Your token may be",
                 "      expired, revoked, or your account may be out of credits. To fix:",
-                "      1. Re-authenticate: qubit portal",
+                "      1. Re-authenticate: hermes portal",
                 "      2. Check your portal account: https://portal.nousresearch.com",
             )
-            # ``:free`` is OpenRouter slug syntax; Qubit Labs will reject the model
+            # ``:free`` is OpenRouter slug syntax; Nous Portal will reject the model
             # name even after a successful re-auth.
             if isinstance(model, str) and model.endswith(":free"):
                 _vlines(
                     agent,
                     f"      ⚠️  Note: `{model}` looks like an OpenRouter slug (`:free` suffix).",
-                    "         Qubit Labs won't recognize that model name. Either switch to a",
-                    f"         Qubit catalog model, or run `/model openrouter:{model}` to use OpenRouter.",
+                    "         Nous Portal won't recognize that model name. Either switch to a",
+                    f"         Nous catalog model, or run `/model openrouter:{model}` to use OpenRouter.",
                 )
+        return
+    from qubit_cli.auth_plugin_providers import plugin_refresh_hook
+    if status_code == 401 and plugin_refresh_hook(str(provider or "")) is not None:
+        # A plugin OAuth grant the pool could not refresh: the fix is a fresh sign-in, not a key.
+        from agent.turn_failure_copy import oauth_relogin_command
+        _vlines(agent, f"   💡 {provider} sign-in was rejected (HTTP 401). Sign in again: `{oauth_relogin_command(provider)}`")
         return
     _vlines(
         agent,
         "   💡 Your API key was rejected by the provider. Check:",
-        "      • Is the key valid? Run: qubit setup",
+        "      • Is the key valid? Run: hermes setup",
         f"      • Does your account have access to {model}?",
     )
     if base_url_host_matches(str(base_url), "openrouter.ai"):
@@ -955,7 +942,7 @@ def _print_nonretryable_auth_guidance(
 
 
 def _welcome_tier_guidance(classified: Any, *, model: Any, in_chat: bool, door: bool = True) -> str:
-    """Copy for a Qubit free-tier refusal the classifier parsed (``welcome_refusal`` /
+    """Copy for a Nous free-tier refusal the classifier parsed (``welcome_refusal`` /
     ``welcome_route`` in ``error_context``); empty for every other error."""
     ctx = getattr(classified, "error_context", None) or {}
     refusal, route = ctx.get("welcome_refusal"), ctx.get("welcome_route")
@@ -985,13 +972,16 @@ def _welcome_surface_kind(classified: Any) -> str:
     route = ctx.get("welcome_route") if isinstance(ctx, dict) else None
     if route == "tier_disabled":
         return "disabled"
+    # The renewal failed but the tier is up: a plain Retry mints a new credential.
+    if route == "session_expired":
+        return "outage"
     # A named account on the welcome host has already signed in: no sign-in card, copy only.
     if route == "named_on_welcome_host":
         return ""
     return "route" if route else ""
 
 
-def _stamp_free_tier(result: Dict[str, Any], kind: str, message: str) -> Dict[str, Any]:
+def _stamp_free_tier(result: dict[str, Any], kind: str, message: str) -> dict[str, Any]:
     """Structured free-tier failure block: ``error_surface`` keys its code on ``kind`` and a client
     shows ``message`` (the chat sentence) as the card body instead of its own generic copy."""
     result["free_tier"] = {"kind": kind or "refused", "message": message}
@@ -999,7 +989,7 @@ def _stamp_free_tier(result: Dict[str, Any], kind: str, message: str) -> Dict[st
 
 
 def _welcome_outage_copy(agent: Any, base_url: Any, classified: Any) -> str:
-    """On the Qubit free tier, a transport / server failure that outlived every retry reads as one
+    """On the Nous free tier, a transport / server failure that outlived every retry reads as one
     plain sentence (the free model is having trouble) rather than the technical summary. Empty
     for every other route and for rate limits / billing, which have their own copy."""
     from qubit_cli.anon_auth import FREE_TIER_OUTAGE_COPY, on_free_model
@@ -1035,15 +1025,17 @@ def _missing_vendor_prefix_suggestion(api_error: Exception, provider: Any, model
 
 def nonretryable_client_error_result(
     agent: Any, api_error: Exception, classified: Any, *, status_code: Optional[int],
-    api_kwargs: Any, api_messages: Any, messages: List[Dict[str, Any]], conversation_history: Any,
+    api_kwargs: Any, api_messages: Any, messages: list[dict[str, Any]], conversation_history: Any,
     api_call_count: int, approx_tokens: int, provider: Any, base_url: Any, model: Any,
     delivered: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Terminal path for a non-retryable 4xx once fallback is exhausted: debug dump, flush
     the retry trace, print auth / billing / content-policy / TLS guidance, persist (skipped
     for likely context-overflow 400s so the failure does not grow the session), build result."""
     # Result/guidance helpers stay in the loop module (tests import + patch them there).
-    from agent.conversation_loop import _billing_failure_result, _content_policy_blocked_result
+    from agent.conversation_loop import (
+        _billing_failure_result, _content_policy_blocked_result, _usage_window_refusal,
+    )
 
     if api_kwargs is not None:
         agent._dump_api_request_debug(api_kwargs, reason="non_retryable_client_error", error=api_error)
@@ -1064,6 +1056,9 @@ def nonretryable_client_error_result(
         )
     _welcome_hint = _welcome_tier_guidance(classified, model=model, in_chat=False)
     _prefix_suggestion = _missing_vendor_prefix_suggestion(api_error, provider, model)
+    from qubit_cli.left_core_migration import host_install_hint
+    if _moved_hint := host_install_hint(base_url):  # a host whose plugin left core: install it first
+        _vlines(agent, f"   💡 {_moved_hint}")
     if _welcome_hint:
         # A free-tier gate or a wrong-host refusal: the way forward is a sign-in or another
         # provider, never the key/credits advice below.
@@ -1085,7 +1080,7 @@ def nonretryable_client_error_result(
             agent,
             "   💡 The endpoint's firewall/CDN blocked the request before it reached the model — your key",
             "      and model access are probably fine. Relays often reject the SDK's default User-Agent:",
-            "      set `extra_headers: {User-Agent: QubitAgent/1.0}` on the custom_providers entry,",
+            "      set `extra_headers: {User-Agent: HermesAgent/1.0}` on the custom_providers entry,",
             "      or check the proxy/WAF rules and your network.",
         )
     # Content-policy blocks: the provider refused this prompt, so recovery is a rephrase
@@ -1094,13 +1089,13 @@ def nonretryable_client_error_result(
         _vlines(
             agent,
             f"   💡 {CONTENT_POLICY_NEXT_STEPS}",
-            "      To route future blocks to another provider automatically: qubit fallback add",
+            "      To route future blocks to another provider automatically: hermes fallback add",
         )
     # TLS certificate failures are environment problems — name the knobs for each cause.
     if classified.reason == FailoverReason.ssl_cert_verification:
         _vlines(
             agent,
-            "   💡 Qubit couldn't verify the provider's security certificate. This fails the same",
+            "   💡 Hermes couldn't verify the provider's security certificate. This fails the same",
             "      way on every retry — fix the environment, then try again:",
             "      • Corporate TLS-inspecting proxy? Ask your administrator to install",
             "        its root certificate in the operating system trust store.",
@@ -1130,6 +1125,7 @@ def nonretryable_client_error_result(
         return _billing_failure_result(
             classified=classified, summary=_nonretryable_summary, messages=messages,
             api_call_count=api_call_count, provider=provider, base_url=base_url, model=model,
+            usage_window=_usage_window_refusal(agent, classified, api_messages),
         )
     if _welcome_hint:
         # A free-tier refusal is fully explained by its own sentence; the raw provider summary
@@ -1154,7 +1150,7 @@ def nonretryable_client_error_result(
     })
     if _keep_partial:
         result["partial"] = True
-    _stamp_limit_reset(result, agent, api_error)
+    _stamp_limit_reset(result, agent, api_error, classified)
     if _welcome_hint and (_kind := _welcome_surface_kind(classified)):
         # The card form: the desktop renders the sign-in as a button, so no "To sign in" tail.
         _stamp_free_tier(result, _kind,
@@ -1170,16 +1166,15 @@ _STREAM_DROP_MARKERS = (
 
 def max_retries_exhausted_result(
     agent: Any, api_error: Exception, classified: Any, *, attempts: int, is_rate_limited: bool,
-    error_msg: str, api_kwargs: Any, api_messages: Any, messages: List[Dict[str, Any]],
+    error_msg: str, api_kwargs: Any, api_messages: Any, messages: list[dict[str, Any]],
     conversation_history: Any, api_call_count: int, approx_tokens: int, provider: Any,
     base_url: Any, model: Any, delivered: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Terminal path once retries, transport recovery and fallback all failed: flush the
     trace, emit the billing / rate-limit / generic status, print stream-drop or thinking-timeout
     guidance (the latter wins), persist, build the result with ``failure_reason`` /
     ``failure_retryable`` / ``billing_block``."""
     # Result/guidance helpers stay in the loop module (tests import + patch them there).
-    from qubit_cli.anon_auth import is_anonymous_agent
     from agent.conversation_loop import (
         _billing_block_dict, _billing_or_entitlement_message, _billing_terminal_label,
         _print_billing_or_entitlement_guidance,
@@ -1202,8 +1197,10 @@ def max_retries_exhausted_result(
             capability="model access", provider=provider, base_url=str(base_url), model=model,
             unverified=classified.billing_unverified,
         )
-        _billing_guidance = _billing_or_entitlement_message(**_billing_kw)
-        _print_billing_or_entitlement_guidance(agent, **_billing_kw)
+        # A plan limit (usage-window 402) carries its own refusal line: no portal fetch, no second copy.
+        if not (classified.error_context or {}).get("usage_window"):
+            _billing_guidance = _billing_or_entitlement_message(**_billing_kw)
+            _print_billing_or_entitlement_guidance(agent, **_billing_kw)
     elif is_rate_limited:
         _reset = reset_hint(api_error)
         agent._emit_diagnostic_status(
@@ -1302,7 +1299,7 @@ def max_retries_exhausted_result(
     if _keep_partial:
         result["final_response"] = _final_response
         result["partial"] = True
-    _stamp_limit_reset(result, agent, api_error)
+    _stamp_limit_reset(result, agent, api_error, classified)
     if _free_tier_kind:
         _stamp_free_tier(result, _free_tier_kind, (
             _welcome_tier_guidance(classified, model=model, in_chat=True, door=False)
@@ -1314,7 +1311,7 @@ def log_api_error_attempt(
     agent: Any, api_error: Exception, *, retry_count: int, max_retries: int,
     status_code: Optional[int], elapsed_time: float, api_messages: Any, approx_tokens: int,
     retryable: bool = True,
-) -> Tuple[str, str, Any, Any, Any]:
+) -> tuple[str, str, Any, Any, Any]:
     """Log one failed API attempt (warning + buffered retry trace, OpenRouter "no tool
     endpoints" hint, bare-404 missing-vendor-prefix hint); the buffer only surfaces if every
     retry+fallback exhausts. Returns ``(error_type, error_msg, provider, base_url, model)``.
@@ -1374,9 +1371,9 @@ def log_api_error_attempt(
 
 
 def abort_turn_on_interrupt(
-    agent: Any, messages: List[Dict[str, Any]], conversation_history: Any, api_call_count: int, *,
+    agent: Any, messages: list[dict[str, Any]], conversation_history: Any, api_call_count: int, *,
     abort_message: str, interrupt_text: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Announce ``abort_message``, close any open tool sequence with ``interrupt_text``,
     persist, clear the interrupt and return the ``interrupted`` result dict."""
     _vlines(agent, f"⚡ {abort_message}")
@@ -1384,7 +1381,7 @@ def abort_turn_on_interrupt(
     # already-executed tool result. Strip only that request-local scaffold before
     # closing, so this exit owner can persist its specific interrupt reason.
     agent._drop_trailing_empty_response_scaffolding(messages)
-    close_interrupted_tool_sequence(messages, interrupt_text)
+    close_interrupted_tool_sequence(messages, interrupt_text, stopped=True)
     agent._persist_session(messages, conversation_history)
     # The turn was stopped, not rebuilt: a pending steer was aimed at this turn's next
     # tool iteration, which will no longer happen — drop it (hard-cancel semantics).
@@ -1397,9 +1394,9 @@ def abort_turn_on_interrupt(
 
 def interruptible_backoff_sleep(
     agent: Any, wait_time: float, _retry: Optional[TurnRetryState], *,
-    messages: List[Dict[str, Any]], conversation_history: Any, api_call_count: int,
+    messages: list[dict[str, Any]], conversation_history: Any, api_call_count: int,
     abort_message: str, interrupt_text: str, activity_label: str,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Sleep ``wait_time`` in 200 ms slices so interrupts are honoured promptly, touching
     activity every ~30 s so the gateway's inactivity monitor knows we are alive.
 
@@ -1421,6 +1418,9 @@ def interruptible_backoff_sleep(
         _touch_counter += 1
         if _touch_counter % 150 == 0:  # 150 × 0.2s = 30s
             agent._touch_activity(f"{activity_label}, {int(sleep_end - time.time())}s remaining")
+    # A long wait can outlive a short-lived credential (the free tier's JWT lives 15 minutes), and
+    # the per-iteration pre-expiry adoption does not run between retries.
+    agent._adopt_nous_key_before_expiry()
     return None
 
 
@@ -1517,7 +1517,7 @@ def free_tier_cooldown_ends_turn(agent: Any, api_error: Exception, base_url: Any
     sits through. The free tier's pause is service-wide: a 600 s retry met a second 429 while its
     1069 s window ran, so the caller ends the attempt cycle now (fallback, or the reset time and
     the sign-in / model doors). Every other provider, and every unattended run (cron, messaging,
-    ``qubit chat -q``), waits out its ``Retry-After``: a paid bucket reopens on time, and
+    ``hermes chat -q``), waits out its ``Retry-After``: a paid bucket reopens on time, and
     ``fallback.min_switch_reset_seconds`` relies on that wait."""
     from agent.retry_utils import LIVE_RETRY_WAIT_CAP_S, provider_retry_after_seconds
     from agent.session_source import is_attended
@@ -1528,7 +1528,7 @@ def free_tier_cooldown_ends_turn(agent: Any, api_error: Exception, base_url: Any
     return cooldown is not None and cooldown > LIVE_RETRY_WAIT_CAP_S
 
 
-def _codex_soft_failure_error(response: Any) -> Dict[str, Any]:
+def _codex_soft_failure_error(response: Any) -> dict[str, Any]:
     """``response.error`` of a Codex ``failed``/``cancelled`` Response as ``{"code", "message"}``
     (the SDK types it as ``ResponseError``; the raw-SSE assembler keeps the dict); ``{}`` when absent."""
     error_obj = getattr(response, "error", None)
@@ -1547,12 +1547,12 @@ class _CodexSoftFailure(Exception):
     """A Codex HTTP-200 ``status=failed`` Response reshaped so ``classify_api_error`` and
     ``extract_api_error_context`` read ``response.error`` exactly like an SDK error body."""
 
-    def __init__(self, error: Dict[str, Any]) -> None:
+    def __init__(self, error: dict[str, Any]) -> None:
         super().__init__(error.get("message") or "")
         self.body = {"error": error}
 
 
-def classify_codex_soft_failure(agent: Any, response: Any) -> Tuple[Any, Dict[str, Any]]:
+def classify_codex_soft_failure(agent: Any, response: Any) -> tuple[Any, dict[str, Any]]:
     """``(classified, error_context)`` for a Codex ``failed``/``cancelled`` Response, or
     ``(None, {})`` when it is not one. The SDK never raises on these HTTP-200 soft failures,
     so this is the only place their quota/billing/auth semantics reach the credential pool."""
@@ -1568,7 +1568,7 @@ def classify_codex_soft_failure(agent: Any, response: Any) -> Tuple[Any, Dict[st
     return classified, agent._extract_api_error_context(exc)
 
 
-def validate_response_shape(agent: Any, response: Any) -> Tuple[bool, List[str]]:
+def validate_response_shape(agent: Any, response: Any) -> tuple[bool, list[str]]:
     """Validate the raw provider response via the transport; ``(response_invalid,
     error_details)``. A Codex ``failed``/``cancelled`` status (e.g. quota exhaustion) is
     invalid so the fallback chain triggers; an empty Codex ``output`` with non-empty
@@ -1620,7 +1620,7 @@ def validate_response_shape(agent: Any, response: Any) -> Tuple[bool, List[str]]
     return True, [detail]
 
 
-def describe_invalid_response(agent: Any, response: Any, api_duration: float) -> Tuple[str, str, str]:
+def describe_invalid_response(agent: Any, response: Any, api_duration: float) -> tuple[str, str, str]:
     """Diagnostics for an empty/malformed response: ``(error_msg, provider_name,
     failure_hint)``. The hint is derived from the provider error code (524/504/429/
     5xx) and the response time, instead of always assuming rate limiting."""
@@ -1682,14 +1682,14 @@ def _failure_hint_for(code: Optional[int], api_duration: float) -> str:
 @dataclass
 class ClassifiedErrorVerdict:
     """Outcome of ``route_classified_error``. ``action``: ``"return"`` (terminal result),
-    ``"break"`` (restart armed on ``_retry``), ``"continue"`` (re-enter the retry loop; Qubit
+    ``"break"`` (restart armed on ``_retry``), ``"continue"`` (re-enter the retry loop; Nous
     guard re-check) or ``"fallthrough"`` (proceed to overflow / client-error / backoff
     handling). The remaining fields are loop locals the router rebound or computed."""
 
     action: str
-    result: Optional[Dict[str, Any]]
+    result: Optional[dict[str, Any]]
     status_code: Optional[int]
-    messages: List[Dict[str, Any]]
+    messages: list[dict[str, Any]]
     active_system_prompt: Any
     conversation_history: Any
     retry_count: int
@@ -1756,7 +1756,7 @@ def _eager_fallback_status(classified: Any, is_upstream: bool, is_transport_fail
     return "⚠️ Rate limited — switching to fallback provider..."
 
 
-def activate_codex_app_server_fallback(agent: Any, result: Dict[str, Any]) -> bool:
+def activate_codex_app_server_fallback(agent: Any, result: dict[str, Any]) -> bool:
     """The codex app-server runtime reports a failed turn as ``result["error"]`` text instead of
     raising, so the generic classify -> ``fallback_providers`` chain never saw it (#71633).
     Classify that text; on a billing / rate-limit verdict activate the configured fallback and
@@ -1775,7 +1775,7 @@ def activate_codex_app_server_fallback(agent: Any, result: Dict[str, Any]) -> bo
 
 
 def _is_genuine_nous_rate_limit(agent: Any, api_error: Exception, error_context: Any, classified: Any = None) -> bool:
-    """Record a genuine account-level Qubit 429 to the cross-session breaker; upstream
+    """Record a genuine account-level Nous 429 to the cross-session breaker; upstream
     capacity 429s (no exhausted bucket in headers or last-known state) are left alone.
 
     *error_context* is the turn's (``extract_api_error_context``); *classified* brings the
@@ -1801,7 +1801,7 @@ def _is_genuine_nous_rate_limit(agent: Any, api_error: Exception, error_context:
             record_nous_rate_limit(headers=_err_hdrs, error_context=_merged, anonymous=anonymous)
         else:
             logger.info(
-                "Qubit 429 looks like upstream capacity "
+                "Nous 429 looks like upstream capacity "
                 "(no exhausted bucket in headers or "
                 "last-known state) -- not tripping "
                 "cross-session breaker."
@@ -1814,7 +1814,7 @@ def _is_genuine_nous_rate_limit(agent: Any, api_error: Exception, error_context:
 def route_classified_error(
     agent: Any, api_error: Exception, classified: Any, _retry: TurnRetryState, *, error_msg: str,
     error_context: Any, recovered_with_pool: bool, base_url: Any, model: Any,
-    messages: List[Dict[str, Any]], api_messages: Any, system_message: Any,
+    messages: list[dict[str, Any]], api_messages: Any, system_message: Any,
     active_system_prompt: Any, conversation_history: Any, retry_count: int, max_retries: int,
     compression_attempts: int, max_compression_attempts: int, api_call_count: int,
     effective_task_id: Any,
@@ -1824,7 +1824,7 @@ def route_classified_error(
     long-context tier 429 → cap at 200k and compress; eager fallback for rate-limit/billing
     (immediately) and transport failures (after 1 retry) unless credential-pool rotation may
     still recover (upstream-aggregator 429s always fall back); persistent 401/403 → fallback
-    chain once; genuine Qubit 429 → cross-session breaker + re-enter the loop exactly once."""
+    chain once; genuine Nous 429 → cross-session breaker + re-enter the loop exactly once."""
     from agent.conversation_compression import conversation_history_after_compression
     from agent.conversation_loop import _arm_fallback_restart, _ra
     from agent.model_metadata import estimate_request_tokens_rough
@@ -1835,7 +1835,7 @@ def route_classified_error(
     _is_zai_coding_overload = False
     status_code = getattr(api_error, "status_code", None)
 
-    def _verdict(action: str, result: Optional[Dict[str, Any]] = None) -> ClassifiedErrorVerdict:
+    def _verdict(action: str, result: Optional[dict[str, Any]] = None) -> ClassifiedErrorVerdict:
         return ClassifiedErrorVerdict(
             action=action, result=result, status_code=status_code, messages=messages,
             active_system_prompt=active_system_prompt, conversation_history=conversation_history,
@@ -1897,7 +1897,7 @@ def route_classified_error(
                 # from the engine's overflow guard (upstream PR #77169 review).
                 messages, system_message,
                 approx_tokens=estimate_request_tokens_rough(api_messages, tools=agent.tools or None),
-                task_id=effective_task_id, trigger="overflow",
+                task_id=effective_task_id, trigger="overflow", overflow_reason=classified.reason.value,
             )
             conversation_history = conversation_history_after_compression(agent, messages, conversation_history)
             if len(messages) < original_len or old_ctx > _LONG_CONTEXT_TIER_CAP:
@@ -1938,7 +1938,7 @@ def route_classified_error(
     _should_fallback = (
         (is_rate_limited and _wrapped_output_cap_budget is None)
         or (_is_transport_failure and retry_count >= 2)
-    )
+    ) and not (getattr(classified, "error_context", None) or {}).get("usage_window")  # never switch models on a plan limit
     if _should_fallback and agent._fallback_index < len(agent._fallback_chain):
         # No eager fallback while credential pool rotation may recover. Exception: an
         # upstream-aggregator 429 — the pool can't help, always fall back.
@@ -1968,7 +1968,7 @@ def route_classified_error(
         if agent._try_activate_fallback(reason=classified.reason):
             return _fallback_break()
 
-    # Qubit Labs: a genuine account-level 429 is recorded to a shared file so ALL
+    # Nous Portal: a genuine account-level 429 is recorded to a shared file so ALL
     # sessions back off; is_genuine_nous_rate_limit excludes upstream 429s.
     if (
         is_rate_limited
@@ -1977,7 +1977,7 @@ def route_classified_error(
         and not recovered_with_pool
         and _is_genuine_nous_rate_limit(agent, api_error, error_context, classified)
     ):
-        # Re-enter the loop exactly once so the top-of-loop Qubit guard runs
+        # Re-enter the loop exactly once so the top-of-loop Nous guard runs
         # (retry_count = max_retries would skip it entirely).
         retry_count = max(0, max_retries - 1)
         return _verdict("continue")

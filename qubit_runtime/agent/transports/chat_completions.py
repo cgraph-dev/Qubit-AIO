@@ -11,12 +11,11 @@ import string
 from typing import Any
 from urllib.parse import urlparse
 
-from agent.lmstudio_reasoning import resolve_lmstudio_effort
 from agent.reasoning_effort import (
-    GEMINI4_THINKING_LEVELS, KIMI_K3_EFFORTS, KIMI_K3_OVERRIDES, OPENAI_COMPAT_WIRE_EFFORTS, TOKENHUB_EFFORTS, clamp_effort,
-    clamp_reasoning_config, kimi_supported_efforts, requested_effort,
+    GEMINI4_THINKING_LEVELS, KIMI_K3_EFFORTS, KIMI_K3_OVERRIDES, OPENAI_COMPAT_WIRE_EFFORTS, clamp_effort,
+    clamp_reasoning_config, kimi_supported_efforts, requested_effort, tokenhub_effort,
 )
-from agent.message_metadata import MESSAGE_UID
+from agent.message_metadata import DATA_USE, MESSAGE_UID, data_use_requirement
 from agent.message_sanitization import coalesce_tool_call_id, normalize_finish_reason as _normalize_finish_reason
 from agent.moonshot_schema import is_moonshot_model, sanitize_moonshot_tools
 from agent.prompt_builder import DEVELOPER_ROLE_MODELS
@@ -39,7 +38,10 @@ _XAI_TOOL_SEARCH_ALIAS = "hermes_tool_search"
 # providers reject with HTTP 400 ("Extra inputs are not permitted").
 _STRIP_MSG_KEYS = (
     "codex_reasoning_items", "codex_message_items", "tool_name", "effect_disposition", "timestamp",
-    "platform_message_id", "api_content", "anthropic_content_blocks", "bedrock_content_blocks", MESSAGE_UID,
+    # ``platform_message_id`` is persisted as-is and comes back from replay as ``message_id``
+    # (JSONL transcript compat); both are delivery bookkeeping, never model input.
+    "platform_message_id", "message_id", "api_content", "anthropic_content_blocks", "bedrock_content_blocks",
+    MESSAGE_UID, DATA_USE,
 )
 _STRIP_TC_KEYS = ("call_id", "response_item_id")
 _HIGH_EFFORTS = {"high", "xhigh", "max", "ultra"}
@@ -94,8 +96,8 @@ def _add_prompt_cache_key(
     # Responses calls stay cache-cold while the main Responses transport is warm (issue #53735). The key is
     # content-addressed from the static prefix (instructions + tool schemas) so it stays warm across
     # turns/fires. Guard the top-level field the same way the main transport does: xAI Responses takes the
-    # key in extra_body (not top-level) and GitHub/Copilot Responses opts out of cache-key routing entirely
-    # — for those hosts, skip it here.
+    # key in extra_body (not top-level) and endpoints declaring ``responses_prompt_cache_key=False`` opt out
+    # of cache-key routing entirely — for those hosts, skip it here.
     from agent.transports.codex import (
         _bound_prompt_cache_key_field, _cache_scope_from_session_id, _content_cache_key
     )
@@ -154,9 +156,9 @@ def is_router_timeout_shim(response: Any) -> bool:
 
 
 def _reasoning_config_for_model(model: str, reasoning_config: dict | None) -> dict | None:
-    """Clamp Qubit' extended effort set (``ultra``) to the OpenAI-compat wire vocabulary.
+    """Clamp Hermes' extended effort set (``ultra``) to the OpenAI-compat wire vocabulary.
 
-    Qubit' internal effort set extends the wire vocabulary with ``ultra`` (the /reasoning command documents
+    Hermes' internal effort set extends the wire vocabulary with ``ultra`` (the /reasoning command documents
     none..xhigh|max|ultra). OpenAI- compatible wires — OpenRouter chief among them — accept exactly
     max|xhigh|high|medium|low|minimal|none and reject the extension with HTTP 400 (#89503). Clamp against
     the declared wire vocabulary via the shared policy in ``agent.reasoning_effort``; provider profiles with
@@ -166,7 +168,7 @@ def _reasoning_config_for_model(model: str, reasoning_config: dict | None) -> di
 
 
 def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> dict | None:
-    """Translate Qubit/OpenRouter-style reasoning config to Gemini thinkingConfig."""
+    """Translate Hermes/OpenRouter-style reasoning config to Gemini thinkingConfig."""
     from agent.gemini_native_adapter import gemini_uses_thinking_level
 
     if not isinstance(reasoning_config, dict):
@@ -193,7 +195,9 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
         # Gemini 2.5 documents ``thinkingBudget: 0`` as the off switch, while
         # Gemini 3+ deprecated that field in favour of the ``thinkingLevel``
         # string enum (which has no "none"), so use its lowest universally
-        # supported level — "low". (#91927)
+        # supported level — "low" (3.6's "minimal" is not accepted by 3.7+ /
+        # 3.1 Pro). ``_thinking_requests_output_headroom`` keeps the small
+        # budget intact for this hidden-thoughts path. (#91927)
         config: dict[str, Any] = {"includeThoughts": False}
         if normalized_model.startswith("gemini-2.5-"):
             config["thinkingBudget"] = 0
@@ -207,7 +211,7 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
     if effort not in {"minimal", "low", "medium", "high", "xhigh", "max", "ultra"}:
         effort = "medium"
     # Gemini 3 Pro is strict (low/high); every other thinking-level model (3.x Flash, Gemini 4 Argon)
-    # documents low/medium/high, and "minimal" is not universal (Argon 400s on it). Clamp Qubit's wider
+    # documents low/medium/high, and "minimal" is not universal (Argon 400s on it). Clamp Hermes' wider
     # effort set to what each family accepts so we never forward an undocumented level verbatim.
     if gemini_uses_thinking_level(normalized_model):
         if "pro" in normalized_model:
@@ -261,7 +265,18 @@ def _is_openai_api_base_url(base_url: Any) -> bool:
 
 
 _GEMINI_SIGNATURE_HOSTS = ("generativelanguage.googleapis.com", "aiplatform.googleapis.com")
-_GEMINI_SIGNATURE_PROVIDERS = frozenset({"gemini", "vertex", "copilot"})
+_GEMINI_SIGNATURE_PROVIDERS = frozenset({"gemini", "vertex"})
+
+
+def _profile_replays_tool_call_signatures(provider: Any) -> bool:
+    """``ProviderProfile.replays_tool_call_signatures`` for the provider named exactly (canonical name only)."""
+    name = (provider or "").strip().lower()
+    if not name:
+        return False
+    from providers import get_provider_profile
+
+    profile = get_provider_profile(name)
+    return profile is not None and profile.name == name and profile.replays_tool_call_signatures
 
 
 def _model_consumes_thought_signature(model: Any, base_url: Any = None, provider: Any = None) -> bool:
@@ -276,6 +291,7 @@ def _model_consumes_thought_signature(model: Any, base_url: Any = None, provider
     return (
         "gemini" in m or "gemma" in m
         or (provider or "").strip().lower() in _GEMINI_SIGNATURE_PROVIDERS
+        or _profile_replays_tool_call_signatures(provider)
         or any(base_url_host_matches(base_url, host) for host in _GEMINI_SIGNATURE_HOSTS)
     )
 
@@ -289,32 +305,15 @@ def _wire_reasoning_carriers(provider: Any, base_url: Any) -> frozenset:
     Nous Portal) and to vendors documenting it (Novita, MiniMax /v1, TokenHub), never to strict
     schemas (Groq, Mistral, Cerebras, opencode relays: ``property 'reasoning_details' is
     unsupported`` / ``Extra inputs are not permitted`` / ``no such field``, #70233).
-    Stored history always keeps every carrier."""
+    The Portal is back on the list: the "cumulative replayed-reasoning budget" blamed for #118182
+    does not exist in the Portal code and ~440 live replay requests (up to 32 KB of reasoning)
+    returned no 400; the observed failures were an upstream content filter surfaced as
+    "Provider returned error". Portal lanes that reject a carrier are handled by the
+    per-(provider, host, model) reactive strip. Stored history always keeps every carrier.
+    """
     from agent.message_sanitization import route_reasoning_carriers
 
     return route_reasoning_carriers(provider, base_url)
-
-
-def _route_replays_reasoning_details(base_url: Any) -> bool:
-    """True when the target route reads replayed ``reasoning_details`` (OpenRouter's unified
-    reasoning array).
-
-    Every other chat-completions endpoint either ignores the field or, when its schema is
-    strict (Groq, Mistral, Cerebras, opencode relays: ``property 'reasoning_details' is
-    unsupported`` / ``Extra inputs are not permitted`` / ``no such field``), rejects the whole
-    request with HTTP 400/422 — so a reasoning turn produced earlier in the session wedges every
-    later turn once the model is switched (#70233). The stored history keeps the field; only the
-    wire copy drops it.
-
-    The Nous Portal read the field too (multi-turn reasoning continuity), but it enforces a
-    cumulative replayed-reasoning budget: replaying stored reasoning_details wedges long
-    sessions with a non-retryable 400 (#118182), so the Portal now strips like every other
-    route. Stored history keeps the field, so a route that genuinely replays it (OpenRouter,
-    #129037) still receives it.
-    """
-    from utils import base_url_host_matches
-
-    return base_url_host_matches(base_url, "openrouter.ai")
 
 
 def _has_replayable_thought_signature(extra_content: Any) -> bool:
@@ -572,7 +571,12 @@ class ChatCompletionsTransport(ProviderTransport):
         path below (is_kimi, is_openrouter, ...) is only reached for unregistered providers.
         """
         _profile = params.get("provider_profile")
-        sanitized = self.convert_messages(messages, model=model, base_url=params.get("base_url"), provider_profile=_profile)
+        # Read before convert_messages strips the key; only a profile that asks for it consumes it.
+        params["data_use"] = data_use_requirement(messages)
+        sanitized = self.convert_messages(
+            messages, model=model, base_url=params.get("base_url"), provider_profile=_profile,
+            provider=params.get("provider_name"),
+        )
         if _profile:
             return self._build_kwargs_from_profile(_profile, model, sanitized, tools, params)
 
@@ -580,12 +584,11 @@ class ChatCompletionsTransport(ProviderTransport):
         api_kwargs = _base_kwargs(model, sanitized, tools, params)
 
         is_kimi = params.get("is_kimi", False)
-        is_lmstudio = params.get("is_lmstudio", False)
         supports_reasoning = params.get("supports_reasoning", False)
         reasoning_config = _reasoning_config_for_model(model, params.get("reasoning_config"))
         _apply_max_tokens(api_kwargs, model, reasoning_config, params)
 
-        # Kimi / TokenHub / LM Studio: top-level reasoning_effort (unless thinking disabled).
+        # Kimi / TokenHub by host (agents with no registered profile): top-level reasoning_effort (unless thinking disabled).
         thinking_off = isinstance(reasoning_config, dict) and reasoning_config.get("enabled") is False
         _e = requested_effort(reasoning_config)
         if is_kimi and not thinking_off:
@@ -597,11 +600,7 @@ class ChatCompletionsTransport(ProviderTransport):
                 else clamp_effort(_e, _supported, KIMI_K3_OVERRIDES if is_k3 else None)
             )
         if params.get("is_tokenhub", False) and not thinking_off:
-            api_kwargs["reasoning_effort"] = "high" if _e is None else clamp_effort(_e, TOKENHUB_EFFORTS)
-        if is_lmstudio and supports_reasoning:
-            _lm_effort = resolve_lmstudio_effort(reasoning_config, params.get("lmstudio_reasoning_options"))
-            if _lm_effort is not None:
-                api_kwargs["reasoning_effort"] = _lm_effort
+            api_kwargs["reasoning_effort"] = tokenhub_effort(_e)
 
         extra_body: dict[str, Any] = {}
         is_openrouter = params.get("is_openrouter", False)
@@ -616,11 +615,11 @@ class ChatCompletionsTransport(ProviderTransport):
         if is_kimi:
             extra_body["thinking"] = {"type": "disabled" if thinking_off else "enabled"}
 
-        # LM Studio is handled above via top-level reasoning_effort.
-        if supports_reasoning and not is_lmstudio:
-            if params.get("is_github_models", False):
-                if params.get("github_reasoning_extra") is not None:
-                    extra_body["reasoning"] = params["github_reasoning_extra"]
+        if supports_reasoning:
+            # An endpoint claimed by a profile (providers.profile_for_host) takes its verbatim payload.
+            if params.get("profile_endpoint", False):
+                if params.get("endpoint_reasoning") is not None:
+                    extra_body["reasoning"] = params["endpoint_reasoning"]
             else:
                 _effort = (reasoning_config.get("effort", "medium") or "medium") if reasoning_config and isinstance(reasoning_config, dict) else "medium"
                 # Honor explicit "thinking off" like the profile path — never re-enable it.
@@ -658,11 +657,15 @@ class ChatCompletionsTransport(ProviderTransport):
         # Profiles fronting several backends override get_max_tokens() per model.
         _apply_max_tokens(api_kwargs, model, reasoning_config, params, profile_max=profile.get_max_tokens(model))
 
+        # LM Studio's probed allowed_options ride only when present, so plugin hooks written
+        # against the older keyword set (no ``**context``) keep working.
+        _lm_options = params.get("lmstudio_reasoning_options")
         extra_body_from_profile, top_level_from_profile = profile.build_api_kwargs_extras(
             reasoning_config=reasoning_config, supports_reasoning=params.get("supports_reasoning", False),
             qwen_session_metadata=params.get("qwen_session_metadata"), model=model,
             base_url=params.get("base_url"), ollama_num_ctx=params.get("ollama_num_ctx"),
             session_id=params.get("session_id"), cache_scope_id=params.get("cache_scope_id"),
+            **({"lmstudio_reasoning_options": _lm_options} if _lm_options is not None else {}),
         )
         api_kwargs.update(top_level_from_profile)
 
@@ -670,7 +673,7 @@ class ChatCompletionsTransport(ProviderTransport):
         profile_body = profile.build_extra_body(
             session_id=params.get("session_id"), provider_preferences=params.get("provider_preferences"), model=model,
             base_url=params.get("base_url"), reasoning_config=reasoning_config,
-            openrouter_min_coding_score=params.get("openrouter_min_coding_score"),
+            openrouter_min_coding_score=params.get("openrouter_min_coding_score"), data_use=params.get("data_use"),
         )
         for part in (profile_body, extra_body_from_profile, params.get("extra_body_additions")):
             if part:
@@ -684,14 +687,14 @@ class ChatCompletionsTransport(ProviderTransport):
         if extra_body:
             # Native Gemini speaks Google's REST schema: OpenAI-style extra_body
             # keys (tags, reasoning, provider, ...) are unknown fields -> HTTP 400.
-            # The native client only reads thinking_config, so drop everything else.
+            # The native client reads only thinking_config and the long-decode budget.
             try:
                 from agent.gemini_native_adapter import is_native_gemini_base_url
                 _native_gemini = is_native_gemini_base_url(params.get("base_url"))
             except Exception:
                 _native_gemini = False
             if _native_gemini:
-                extra_body = {k: v for k, v in extra_body.items() if k in ("thinking_config", "thinkingConfig")}
+                extra_body = {k: v for k, v in extra_body.items() if k in ("thinking_config", "thinkingConfig", "max_output_tokens")}
             if extra_body:
                 api_kwargs["extra_body"] = extra_body
         return _finish_kwargs(
@@ -724,8 +727,12 @@ class ChatCompletionsTransport(ProviderTransport):
             provider_data["reasoning_content"] = reasoning_content
         if getattr(msg, "reasoning_details", None):
             provider_data["reasoning_details"] = msg.reasoning_details
-        # Message-level carriers (Gemini text-turn signature, Copilot reasoning): agent/reasoning_carriers.py.
-        for key in ("extra_content", "reasoning_opaque", "reasoning_text"):
+        # Message-level carriers (Gemini text-turn signature, profile-declared reasoning keys):
+        # agent/reasoning_carriers.py.
+        from agent.reasoning_carriers import declared_carrier_keys
+
+        opaque_keys, text_keys = declared_carrier_keys()
+        for key in dict.fromkeys(("extra_content", *opaque_keys, *text_keys)):
             if (value := _attr_or_model_extra(msg, key)) is not None:
                 provider_data[key] = _dump_extra_content(value)
 
@@ -743,8 +750,9 @@ class ChatCompletionsTransport(ProviderTransport):
 
         return NormalizedResponse(
             content=content, tool_calls=tool_calls, finish_reason=finish_reason,
-            # Copilot /chat/completions names its readable reasoning ``reasoning_text``.
-            reasoning=getattr(msg, "reasoning", None) or provider_data.get("reasoning_text"), usage=usage,
+            # A profile-declared text carrier doubles as the readable reasoning (first declared wins).
+            reasoning=getattr(msg, "reasoning", None) or next(
+                (provider_data[k] for k in text_keys if provider_data.get(k)), None), usage=usage,
             provider_data=provider_data or None,
         )
 
@@ -762,7 +770,7 @@ class ChatCompletionsTransport(ProviderTransport):
             name = alias_map.get(name, name)
         arguments = getattr(tc_function, "arguments", None)
         extra = _attr_or_model_extra(tc, "extra_content")
-        fn_sig = _attr_or_model_extra(tc_function, "thought_signature")  # Copilot's Gemini 3 variant
+        fn_sig = _attr_or_model_extra(tc_function, "thought_signature")  # gateway-signed Gemini 3 calls
         provider_data = {k: v for k, v in (("extra_content", None if extra is None else _dump_extra_content(extra)),
                                             ("thought_signature", fn_sig)) if v is not None}
         call = ToolCall(
@@ -791,6 +799,6 @@ class ChatCompletionsTransport(ProviderTransport):
         return {"cached_tokens": cached, "creation_tokens": written} if cached or written else None
 
 
-from agent.transports import register_transport  # noqa: E402
+from agent.transports import register_transport
 
 register_transport("chat_completions", ChatCompletionsTransport)

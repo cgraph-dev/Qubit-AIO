@@ -130,7 +130,7 @@ def _cli_hint(label: str, command: str, *, suggested: bool = False) -> Diagnosti
 
 
 def _log_hint_action(task_id: str) -> DiagnosticAction:
-    cmd = f"qubit kanban log {task_id}"
+    cmd = f"hermes kanban log {task_id}"
     return _cli_hint(f"Check logs: {cmd}", cmd, suggested=True)
 
 
@@ -285,7 +285,7 @@ _TRIAGE_SLOTS = {
     False: (
         "auxiliary.triage_specifier", "auxiliary.kanban_decomposer", "specifier",
         "Auto-decompose is off, so triage tasks need "
-        "`qubit kanban specify`, which uses auxiliary.triage_specifier.",
+        "`hermes kanban specify`, which uses auxiliary.triage_specifier.",
     ),
 }
 
@@ -317,14 +317,14 @@ def _rule_triage_aux_unavailable(task, events, runs, now, cfg) -> list[Diagnosti
 
     task_id = _task_field(task, "id") or "<task_id>"
     actions = [_cli_hint(
-        f"Configure {primary_slot}", f"qubit config set {primary_slot}.provider auto", suggested=True,
+        f"Configure {primary_slot}", f"hermes config set {primary_slot}.provider auto", suggested=True,
     )]
     if not fallback_explicit and not main_visible:
         actions.append(_cli_hint(
-            f"Or configure fallback {fallback_slot}", f"qubit config set {fallback_slot}.provider auto",
+            f"Or configure fallback {fallback_slot}", f"hermes config set {fallback_slot}.provider auto",
         ))
     if not auto_decompose:
-        cmd = f"qubit kanban specify {task_id}"
+        cmd = f"hermes kanban specify {task_id}"
         actions.append(_cli_hint(f"Specify manually: {cmd}", cmd))
 
     return [Diagnostic(
@@ -400,7 +400,7 @@ def _rule_repeated_failures(task, events, runs, now, cfg) -> list[Diagnostic]:
     actions: list[DiagnosticAction] = []
     if most_recent_outcome == "spawn_failed" and assignee and assignee != "default":
         # Spawn is failing specifically — profile setup issue.
-        doctor, auth = f"qubit -p {assignee} doctor", f"qubit -p {assignee} auth"
+        doctor, auth = f"hermes -p {assignee} doctor", f"hermes -p {assignee} auth"
         actions.append(_cli_hint(f"Verify profile: {doctor}", doctor, suggested=True))
         actions.append(_cli_hint(f"Fix profile auth: {auth}", auth))
     elif most_recent_outcome in {"timed_out", "crashed"}:
@@ -535,12 +535,12 @@ def _rule_review_dependency_deadlock(task, events, runs, now, cfg) -> list[Diagn
     actions: list[DiagnosticAction] = []
     if task_id:
         actions.append(_cli_hint(
-            "Complete the finished implementation phase", f"qubit kanban complete {task_id}",
+            "Complete the finished implementation phase", f"hermes kanban complete {task_id}",
             suggested=True,
         ))
     if task_id and child_ids:
         actions.append(_cli_hint(
-            "Or unlink the incorrectly gated reviewer", f"qubit kanban unlink {task_id} {child_ids[0]}",
+            "Or unlink the incorrectly gated reviewer", f"hermes kanban unlink {task_id} {child_ids[0]}",
         ))
 
     blocked_at = _event_ts(latest_block) or now
@@ -585,7 +585,7 @@ def _rule_running_with_open_parents(task, events, runs, now, cfg) -> list[Diagno
                "parent is done or archived. Finish the parent, or unlink the edge if it was never meant "
                "to gate this run.",
         actions=[_cli_hint("Unlink the parent that should not gate this run",
-                           f"qubit kanban unlink {parent_ids[0]} {task_id}")],
+                           f"hermes kanban unlink {parent_ids[0]} {task_id}")],
         first_seen_at=seen_at, last_seen_at=now, count=len(parent_ids),
         data={"open_parents": [{"id": p["id"], "status": p.get("status")} for p in open_parents]},
     )]
@@ -662,7 +662,7 @@ def _rule_block_unblock_cycling(task, events, runs, now, cfg) -> list[Diagnostic
     task_id = _task_field(task, "id")
     actions: list[DiagnosticAction] = []
     if task_id:
-        cmd = f"qubit kanban events {task_id}"
+        cmd = f"hermes kanban events {task_id}"
         actions.append(_cli_hint(f"Check block reasons: {cmd}", cmd, suggested=True))
     return [Diagnostic(
         kind="block_unblock_cycling", severity="warning",
@@ -720,7 +720,7 @@ def _rule_stranded_in_ready(task, events, runs, now, cfg) -> list[Diagnostic]:
     actions = [
         DiagnosticAction(kind="reassign", label="Reassign to a different worker",
                          payload={"current_assignee": assignee}),
-        _cli_hint("Check dispatcher status", "qubit kanban diagnostics"),
+        _cli_hint("Check dispatcher status", "hermes kanban diagnostics"),
     ]
     return [Diagnostic(
         kind="stranded_in_ready", severity=severity,
@@ -736,6 +736,77 @@ def _rule_stranded_in_ready(task, events, runs, now, cfg) -> list[Diagnostic]:
     )]
 
 
+def _rule_stale_running(task, events, runs, now, cfg) -> list[Diagnostic]:
+    """A ``running`` card whose claim expired >= cfg["stale_running_grace_seconds"]
+    (default 1h) ago with no live recorded worker.
+
+    Nothing in the dispatcher is going to free this card — its reclaim paths can decline a
+    card whose owner receipt never resolved, and until they could not, the failure was
+    invisible: an operator saw only the cards queued behind the profile's worker cap. So the
+    jam itself is the signal. Silent in every shape that can still progress: a live claim
+    (the owner is still working), a heartbeat inside the dispatcher's max-stale window, a
+    foreign host's lock (its pids say nothing here), or a live recorded worker. Read-only.
+    """
+    grace_seconds = float(cfg.get("stale_running_grace_seconds", 60 * 60))
+    if _task_field(task, "status") != "running":
+        return []
+    from qubit_cli import kanban_db as kb
+    expires = kb._to_epoch(_task_field(task, "claim_expires", None))
+    if expires is None or (now - expires) < grace_seconds:
+        return []
+    lock = str(_task_field(task, "claim_lock", "") or "")
+    if not lock.startswith(kb._host_prefix()):
+        return []
+    hb = kb._to_epoch(_task_field(task, "last_heartbeat_at", None))
+    if hb is not None and (now - hb) <= kb.DEFAULT_CLAIM_HEARTBEAT_MAX_STALE_SECONDS:
+        return []
+
+    from qubit_cli.kanban_db_dispatch import _worker_alive
+    recorded = [(_task_field(task, "worker_pid", None),
+                 _task_field(task, "worker_started_at", None))]
+    # Only this attempt's pids speak for it: an earlier run's worker that is still alive
+    # (or whose number was reused) says nothing about whether the current run is executing.
+    run_id = _task_field(task, "current_run_id", None)
+    for ev in events:
+        if run_id is not None and _task_field(ev, "run_id", None) != run_id:
+            continue
+        if _event_kind(ev) in {"spawned", "worker_bound"}:
+            payload = _parse_payload(ev)
+            recorded.append((payload.get("pid"), payload.get("started_at")))
+    pids = sorted({int(pid) for pid, _ in recorded if pid})
+    if any(_worker_alive(int(pid), started_at) for pid, started_at in recorded if pid):
+        return []
+
+    expired_seconds = now - expires
+    age_str = (f"{expired_seconds / 3600:.1f}h" if expired_seconds >= 3600
+               else f"{int(expired_seconds / 60)}m")
+    # Escalate with age: <2x grace warning, 2x-6x error, >6x critical.
+    if expired_seconds >= grace_seconds * 6:
+        severity = "critical"
+    elif expired_seconds >= grace_seconds * 2:
+        severity = "error"
+    else:
+        severity = "warning"
+
+    task_id = str(_task_field(task, "id") or "")
+    return [Diagnostic(
+        kind="stale_running", severity=severity,
+        title=f"Running {age_str} past its expired claim with no live worker",
+        detail=f"Nothing is executing this card and nothing has reclaimed it: the claim expired "
+               f"{age_str} ago, no heartbeat arrived inside the last hour, and no pid recorded for "
+               f"the run ({', '.join(str(p) for p in pids) or 'none'}) is alive. The dispatcher "
+               f"declines a reclaim when the run's owner receipt never resolved, so the card can "
+               f"hold its profile's worker slot indefinitely while every card queued behind it "
+               f"stays deferred. Check the card's log, then reclaim it.",
+        actions=[DiagnosticAction(kind="reclaim", label="Reclaim the dead claim", suggested=True),
+                 _cli_hint("Reclaim from the CLI", f"hermes kanban reclaim {task_id}")],
+        first_seen_at=expires, last_seen_at=expires, count=1,
+        data={"claim_expires": expires, "expired_seconds": int(expired_seconds),
+              "recorded_pids": pids, "last_heartbeat_at": hb,
+              "grace_seconds": int(grace_seconds)},
+    )]
+
+
 # Order matters: earlier rules render first on severity ties.
 _RULES: list[RuleFn] = [
     _rule_hallucinated_cards,
@@ -748,6 +819,7 @@ _RULES: list[RuleFn] = [
     _rule_stuck_in_blocked,
     _rule_block_unblock_cycling,
     _rule_stranded_in_ready,
+    _rule_stale_running,
 ]
 
 
@@ -762,6 +834,10 @@ DEFAULT_CONFIG = {
     # Below 30 min the signal is dominated by tasks about to be claimed on
     # the next dispatcher tick.
     "stranded_threshold_seconds": 30 * 60,
+    # The dispatcher reclaims an expired claim on its own next tick, so a card
+    # still `running` an hour past its expiry means every reclaim path declined
+    # it. Same hour the heartbeat backstop uses.
+    "stale_running_grace_seconds": 60 * 60,
 }
 
 

@@ -9,7 +9,8 @@ from pathlib import Path
 import sys
 import uuid
 
-from qubit_cli.gateway_client import GatewayClientError, connect_gateway
+from qubit_cli.gateway_client import RESUME_KEY_MISMATCH, GatewayClientError, connect_gateway
+from qubit_cli.gateway_connection import RESUME_REFUSALS
 
 # These options change execution or require frontend facilities not yet exposed by
 # the authority. Reject them, rather than mutate process-wide gateway settings.
@@ -22,16 +23,16 @@ _POLICY = ("model", "provider", "reasoning", "toolsets", "max_turns", "base_url"
            "yolo", "safe_mode", "ignore_user_config", "skills", "checkpoints", "accept_hooks", "pass_session_id")
 # Where each refused option lives now; the refusal names it so the user is not left guessing.
 _RELOCATED = {
-    "image": "`qubit --tui` or the Desktop app to attach the image",
-    "worktree": "`qubit --tui -w`",
-    "w": "`qubit --tui -w`",
+    "image": "`hermes --tui` or the Desktop app to attach the image",
+    "worktree": "`hermes --tui -w`",
+    "w": "`hermes --tui -w`",
     "no_restore_cwd": "`--in <dir>` (the gateway keeps the session's frozen cwd)",
     "run_budget": "`agent.run_budget_seconds` in config.yaml",
-    "verbose": "`qubit logs --follow`, or `qubit chat --tui -v`",
+    "verbose": "`hermes logs --follow`, or `hermes chat --tui -v`",
     "compact": "`display.compact: true` in config.yaml",
     "create-if-missing without -c <name>": "`-c <name> --create-if-missing`",
 }
-_SAFE_MODE_EXAMPLE = 'qubit chat --safe-mode --provider openrouter --model anthropic/claude-sonnet-4 -q "hello"'
+_SAFE_MODE_EXAMPLE = 'hermes chat --safe-mode --provider openrouter --model anthropic/claude-sonnet-4 -q "hello"'
 
 
 # The documented environment equivalents of creation flags (the set Ink's localCreationOptions
@@ -45,6 +46,24 @@ _ENV_LAUNCH_FLAGS = (("yolo", "HERMES_YOLO_MODE"), ("ignore_rules", "HERMES_IGNO
 def env_launch_flags() -> dict:
     from utils import is_truthy_value
     return {field: True for field, name in _ENV_LAUNCH_FLAGS if is_truthy_value(os.environ.get(name))}
+
+
+def shell_client_env() -> dict:
+    """This shell's allowlisted environment (``agent.session_client_env``) with the extra names of the
+    profile's effective config (managed layer included), as the gateway reads them. A bypass launch's
+    owner freezes code defaults, so it reads no profile."""
+    from agent.session_client_env import collect_client_env
+    if {'safe_mode', 'ignore_user_config'} & set(env_launch_flags()):
+        return collect_client_env()
+    from qubit_cli.config import get_config_path
+    from qubit_cli.config_effective import load_user_config_effective
+    return collect_client_env(config=load_user_config_effective(get_config_path()))
+
+
+def client_env_policy(parameters) -> dict:
+    """``client_env`` for a new session (main's process read these from its shell; the shared gateway
+    applies them to this session only), or nothing for a gateway that predates the field."""
+    return {"client_env": shell_client_env()} if "client_env" in parameters else {}
 
 
 def bypass_launch(args) -> bool:
@@ -115,8 +134,7 @@ async def _resume(client, args, **params):
         return await client.rpc("session.resume", **params, **({"api_key": key} if key else {}))
     except GatewayClientError as exc:
         if key and str(exc) == "admission_conflict":
-            raise GatewayClientError("--api-key on resume must be the key this session was launched with "
-                                     "(a session launched without --api-key keeps its profile credentials).") from None
+            raise GatewayClientError(RESUME_KEY_MISMATCH) from None
         raise
 
 
@@ -129,7 +147,7 @@ async def _resume_latest(client, args):
         try:
             return await _resume(client, args, session_id=crumb)
         except GatewayClientError as exc:
-            if str(exc) not in {"not_found", "permission_denied"}:
+            if str(exc) not in RESUME_REFUSALS:
                 raise
     workspace = await asyncio.to_thread(_workspace_key, _caller_cwd(args))
     try:
@@ -137,8 +155,8 @@ async def _resume_latest(client, args):
     except GatewayClientError as exc:
         if str(exc) != "not_found":
             raise
-        raise GatewayClientError("No previous CLI session to continue. Start a new one with `qubit`, "
-                                 "or list sessions with `qubit sessions list`.") from None
+        raise GatewayClientError("No previous CLI session to continue. Start a new one with `hermes`, "
+                                 "or list sessions with `hermes sessions list`.") from None
 
 
 async def run_gateway_chat(args, emitter=None):
@@ -173,7 +191,7 @@ async def run_gateway_chat(args, emitter=None):
                     if str(exc) != "not_found":
                         raise
                     raise GatewayClientError(
-                        f"No session found matching '{name}'. Use 'qubit sessions list' to see available "
+                        f"No session found matching '{name}'. Use 'hermes sessions list' to see available "
                         "sessions, or pass -c <name> --create-if-missing to start a new session with that title.")
             check_resume_policy(args, snapshot)
         else:
@@ -181,7 +199,8 @@ async def run_gateway_chat(args, emitter=None):
             # Finite runs are stored as ``oneshot`` (hidden from human pickers, still CLI history);
             # an explicit ``--source`` always wins. A remote gateway predating the label stores ``cli``.
             sources = contract.get("sources", [])
-            source = getattr(args, "source", None) or ("oneshot" if oneshot and "oneshot" in sources else "cli")
+            from agent.session_source import create_surface
+            source = create_surface(getattr(args, "source", None) or ("oneshot" if oneshot and "oneshot" in sources else "cli"))
             if source not in sources:
                 raise GatewayClientError(f"Gateway does not support source {source!r}")
             parameters = contract.get("parameters", [])
@@ -190,6 +209,7 @@ async def run_gateway_chat(args, emitter=None):
             if create_if_missing:
                 policy["title"] = title
             policy.update(env_launch_flags())
+            policy.update(client_env_policy(parameters))
             cwd = await asyncio.to_thread(_caller_cwd, args)
             if "cwd" in parameters:
                 policy["cwd"] = cwd
@@ -201,6 +221,8 @@ async def run_gateway_chat(args, emitter=None):
             if missing:
                 raise GatewayClientError("Gateway does not support creation options: " + ", ".join(missing))
             snapshot = await client.rpc("session.create", request_id=uuid.uuid4().hex, source=source, **policy)
+            if (warning := (snapshot.get("info") or {}).get("config_warning")) and not isinstance(oneshot_prompt, str):
+                print(f"Warning: {warning}", file=sys.stderr)
         if not isinstance(oneshot_prompt, str):  # main's -z writes nothing to stderr on success
             print("Session: " + snapshot["stored_session_id"], file=sys.stderr, flush=True)
         if not oneshot:
@@ -214,8 +236,12 @@ async def run_gateway_chat(args, emitter=None):
         view.unattended = isinstance(oneshot_prompt, str)
         view.resume_footer = oneshot and not quiet
         if (getattr(args, "resume", None) or title or latest) and not quiet:
+            from agent.context_compressor import MODEL_ONLY_DISPLAY_METADATA_KEY
             for row in snapshot.get("messages", []):
-                if row.get("role") in {"user", "assistant"} and isinstance(row.get("content"), str):
+                # A micro-compaction merge (model_only) is not printed: its original prompts are.
+                metadata = row.get("display_metadata")
+                merged = isinstance(metadata, dict) and metadata.get(MODEL_ONLY_DISPLAY_METADATA_KEY)
+                if row.get("role") in {"user", "assistant"} and isinstance(row.get("content"), str) and not merged:
                     print(f"{row['role']}: {row['content']}")
         return await view.run(query, oneshot=oneshot)
 
@@ -242,7 +268,7 @@ def resume_policy_error(keys):
 
 def exit_on_resume_refusal(exc):
     """A refused resume is a usage error on every classic path (interactive startup's copy): ``Error:``, exit 2."""
-    if isinstance(exc, GatewayClientError) and str(exc).startswith(_RESUME_POLICY_MISMATCH):
+    if isinstance(exc, GatewayClientError) and str(exc).startswith((_RESUME_POLICY_MISMATCH, RESUME_KEY_MISMATCH)):
         print(f"Error: {exc}", file=sys.stderr)
         raise SystemExit(2) from None
 
@@ -265,7 +291,8 @@ def _requested_policy(args):
         if not policy["skills"]:
             policy.pop("skills")
     if getattr(args, "source", None):
-        policy["source"] = args.source
+        from agent.session_source import create_surface
+        policy["source"] = create_surface(args.source)
     return policy
 
 

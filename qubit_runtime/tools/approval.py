@@ -26,7 +26,7 @@ from tools.approval_context import (
     _get_session_platform, _is_cron_approval_context,
     _is_gateway_approval_context, _is_interactive_cli, _is_single_query_approval_context,
     _is_unattended_platform_approval_context, _resolve_cli_approval_callback, _should_fall_through_to_cli_approval,
-    _tirith_fail_open, get_current_session_key,
+    get_current_session_key,
 )
 from tools.approval_detection import (
     _approval_key_aliases, _check_sudo_stdin_guard, detect_dangerous_command, detect_hardline_command,
@@ -52,7 +52,7 @@ _lock = threading.Lock()
 _pending: dict[str, dict] = {}
 _session_approved: dict[str, set] = {}
 _session_yolo: set[str] = set()
-# Session keys whose launch YOLO (`qubit chat --yolo` session policy) was already seeded by
+# Session keys whose launch YOLO (`hermes chat --yolo` session policy) was already seeded by
 # ``tools.approval_yolo.apply_launch_yolo``: once per boundary, so a later `/yolo` off sticks.
 _launch_yolo_applied: set[str] = set()
 _permanent_approved: set = set()
@@ -210,6 +210,16 @@ def register_gateway_settle(session_key: str, request_id: str, settle) -> bool:
     return False
 
 
+def observe_gateway_settle(session_key: str, request_id: str, observer) -> bool:
+    """Observe a pending approval without replacing its existing settle hook."""
+    with _lock:
+        for entry in _gateway_queues.get(session_key, []):
+            if entry.data.get("request_id") == request_id:
+                entry.observers.append(observer)
+                return True
+    return False
+
+
 def ack_gateway_approval(session_key: str, request_id: str) -> bool:
     """Record that a client received a particular pending approval request."""
     with _lock:
@@ -257,7 +267,7 @@ def approve_session(session_key: str, pattern_key: str):
 
 
 def _release_permission_mode_dependents(session_key: str) -> None:
-    """Drop resources whose immutable mode derives from Qubit YOLO. Lazy import so approval-only
+    """Drop resources whose immutable mode derives from Hermes YOLO. Lazy import so approval-only
     sessions never load computer-use; releasing on BOTH edges makes enabling YOLO replace a
     standard backend and disabling it revoke a private unrestricted daemon immediately."""
     try:
@@ -350,6 +360,24 @@ def _permanent_set() -> set:
     return approved
 
 
+def _sync_permanent_from_disk(approved: set, key: str) -> None:
+    """Apply hand edits to ``command_allowlist`` made since the last sync. The gateway daemon
+    outlives any one session, so an entry the operator removed must stop being honoured now, not
+    at restart. Only the on-disk delta is applied: approvals this process made but could not save
+    survive. The config read is cached on the file signature. Callers hold ``_lock``."""
+    try:
+        on_disk = _read_permanent_allowlist()
+    except Exception as e:
+        logger.warning("Failed to load permanent allowlist: %s", e, exc_info=True)
+        return
+    baseline = _permanent_baseline_by_home.get(key, set())
+    if on_disk == baseline:
+        return
+    approved.difference_update(baseline - on_disk)
+    approved.update(on_disk - baseline)
+    _permanent_baseline_by_home[key] = on_disk
+
+
 def is_approved(session_key: str, pattern_key: str) -> bool:
     """Session-scoped or permanent approval. Accepts the canonical key and the legacy
     regex-derived key so existing command_allowlist entries survive key migrations."""
@@ -380,42 +408,17 @@ def load_permanent(patterns: set):
         governing.update(patterns)
 
 
-def _normalize_warnings(warnings: list) -> list[tuple]:
-    """Return ``(key, description, is_tirith)`` triples from either accepted caller shape.
-
-    Upstream passes a flat list of pattern-key strings; Qubit's gate passes warning
-    triples carrying the tirith flag. A malformed entry is a caller bug, so it raises
-    here instead of silently persisting nothing.
-    """
-    normalized = []
-    for entry in warnings:
-        if isinstance(entry, str):
-            normalized.append((entry, None, False))
-            continue
-        if isinstance(entry, (tuple, list)) and len(entry) == 3:
-            key, description, is_tirith = entry
-            if not isinstance(key, str):
-                raise TypeError(f"approval warning key must be a string, got {key!r}")
-            normalized.append((key, description, bool(is_tirith)))
-            continue
-        raise ValueError(
-            "approval warnings must be pattern-key strings or "
-            f"(key, description, is_tirith) triples, got {entry!r}"
-        )
-    return normalized
-
-
-def _persist_choice(session_key: str, choice: str, warnings: list) -> None:
-    """Persist a human ``session``/``always`` choice for each warning. Tirith findings are
-    session-max by design (no broad permanent allowlisting of content-level findings), so
-    ``always`` downgrades them to session. ``once`` persists nothing. Accepts either the
-    upstream flat key list or the gate's ``(key, _, is_tirith)`` triples."""
-    for key, _, is_tirith in _normalize_warnings(warnings):
+def _persist_choice(session_key: str, choice: str, keys: list[str]) -> None:
+    """Persist a human ``session``/``always`` choice for each pattern key. ``once`` persists nothing."""
+    for key in keys:
         if choice not in ("session", "always"):
             continue
         approve_session(session_key, key)
-        if choice == "always" and not is_tirith:
+        if choice == "always":
             approve_permanent(key)
+            # Pass only this process's grants, taken against the baseline of the same snapshot. A
+            # check that syncs a hand removal before the save runs advances the baseline, so a
+            # removed entry left in a full snapshot would pass for a new grant and be written back.
             with _lock:
                 grants = _permanent_set() - _permanent_baseline_by_home.get(_baseline_key(), set())
             save_permanent_allowlist(grants)
@@ -460,24 +463,6 @@ def _baseline_key() -> str:
     return "" if get_qubit_home_override() is None else qubit_home_key()
 
 
-def _sync_permanent_from_disk(approved: set, key: str) -> None:
-    """Apply hand edits to ``command_allowlist`` made since the last sync. The gateway daemon
-    outlives any one session, so an entry the operator removed must stop being honoured now, not
-    at restart. Only the on-disk delta is applied: approvals this process made but could not save
-    survive. The config read is cached on the file signature. Callers hold ``_lock``."""
-    try:
-        on_disk = _read_permanent_allowlist()
-    except Exception as e:
-        logger.warning("Failed to load permanent allowlist: %s", e, exc_info=True)
-        return
-    baseline = _permanent_baseline_by_home.get(key, set())
-    if on_disk == baseline:
-        return
-    approved.difference_update(baseline - on_disk)
-    approved.update(on_disk - baseline)
-    _permanent_baseline_by_home[key] = on_disk
-
-
 def load_permanent_allowlist() -> set:
     """Load ``command_allowlist`` from config and sync it into the approval state
     so is_approved() honors 'always' choices from previous sessions."""
@@ -502,7 +487,7 @@ def save_permanent_allowlist(patterns: set):
     resurrected the ones removed. The result written is ``what is on disk now``
     plus ``what this process approved since its own baseline``; revoked entries are
     also dropped from the governing permanent set so ``is_approved()`` stops
-    honouring them. Nothing re-reads the file on the approval hot path.
+    honouring them (``_sync_permanent_from_disk`` does the same on every check).
 
     ``patterns`` may only ADD: an entry left out of it is not removed, because the
     on-disk list wins for anything this process did not approve itself. Remove
@@ -662,7 +647,7 @@ _CRON_CTX = _Unattended(
 
 
 def _unattended_contexts() -> list[_Unattended]:
-    """Active unattended contexts in evaluation order: single-query first (``qubit chat -q``
+    """Active unattended contexts in evaluation order: single-query first (``hermes chat -q``
     exports HERMES_INTERACTIVE=1 but nobody answers); cron beats a platform marker because
     cron binds the platform for delivery routing only."""
     contexts = []
@@ -681,13 +666,7 @@ def _unattended_contexts() -> list[_Unattended]:
 
 
 def _unattended_deny(command: str, ctx: _Unattended) -> dict | None:
-    """Deny-mode handling for one unattended context (cron / -q / webhook); None = allow.
-
-    Pattern detection first, then tirith so content-level threats (homograph URLs,
-    pipe-to-interpreter, terminal injection) are caught even when the pattern detector misses.
-    An un-importable tirith honours ``security.tirith_fail_open``: fail-closed means block,
-    since nobody can approve.
-    """
+    """Deny-mode handling for one unattended context (cron / -q / webhook); None = allow."""
     if ctx.mode() != "deny":
         return None
 
@@ -702,18 +681,6 @@ def _unattended_deny(command: str, ctx: _Unattended) -> dict | None:
         if ctx.name == "single_query":
             result.update(pattern_key=pattern_key, description=description)
         return result
-    try:
-        from tools.tirith_security import check_command_security
-        tirith = check_command_security(command)
-    except ImportError:
-        if _tirith_fail_open():
-            return None
-        return {"approved": False, "message": (
-            "BLOCKED: the Tirith security scanner could not be imported and security.tirith_fail_open is false, "
-            f"so this command cannot be silently allowed — and {ctx.clause}. "
-            f"Find an alternative approach, install tirith, or set approvals.{ctx.cfg_key}: approve in config.yaml.")}
-    if tirith.get("action") in ("block", "warn"):
-        return block(_format_tirith_description(tirith))
     return None
 
 
@@ -837,16 +804,13 @@ def _smart_gate(spec: _GateSpec, command: str, description: str, pattern_key: st
 
 
 def _human_decision(spec: _GateSpec, *, command: str, description: str,
-                    pattern_key: str, pattern_keys: list[str], warnings: list[tuple],
+                    pattern_key: str, pattern_keys: list[str],
                     session_key: str, approval_callback, is_cli: bool, is_gateway: bool,
-                    is_ask: bool, smart: bool = False,
-                    permanent_capable: bool = True, pending_body=None) -> dict:
+                    is_ask: bool, smart: bool = False, pending_body=None) -> dict:
     """Ask a human (after the optional guardian-LLM step) and turn the answer into the gate result.
 
-    ``warnings`` are the ``(key, _, is_tirith)`` tuples :func:`_persist_choice` stores on
-    session/always. ``permanent_capable`` hides [a]lways when no key could be permanently
-    allowlisted (pure-tirith prompts); a smart-DENY owner override reduces every surface to
-    once/deny and persists nothing. ``pending_body`` is a thunk, built only once a human is
+    ``pattern_keys`` are what :func:`_persist_choice` stores on session/always; a smart-DENY
+    owner override reduces every surface to once/deny and persists nothing. ``pending_body`` is a thunk, built only once a human is
     actually asked, so a smart APPROVE never pays for redacting a large script.
     """
     from agent.redact import redact_sensitive_text
@@ -858,7 +822,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
         if result is not None:
             return result
     pending_body = pending_body() if pending_body else None
-    allow_permanent = permanent_capable and not smart_denied
+    allow_permanent = not smart_denied
 
     def deny(template: str, outcome: str, **fmt) -> dict:
         breaker = ""
@@ -873,7 +837,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
     def grant(choice: str) -> dict:
         # A smart-DENY owner override is always one operation, even if an older client returns "session" or "always".
         if not smart_denied:
-            _persist_choice(session_key, choice, warnings)
+            _persist_choice(session_key, choice, pattern_keys)
         if spec.user_approved:
             return _user_approved(session_key, description)
         return _approved()
@@ -903,12 +867,11 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
         notify_cb = _gateway_notify_cb(session_key)
         if notify_cb is not None:
             # Smart DENY overrides are one-operation decisions, so the UI must not offer a
-            # permanent scope. Session approval is safe for every non-Smart-DENY prompt —
-            # including pure-tirith ones, where persistence already caps scope at session.
+            # permanent or session scope.
             data = {
                 "command": display_command, "pattern_key": pattern_key,
                 "pattern_keys": pattern_keys, "description": display_description,
-                "allow_permanent": permanent_capable and not smart_denied,
+                "allow_permanent": not smart_denied,
                 "allow_session": not smart_denied,
             }
             if smart_denied:
@@ -980,7 +943,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
 def _presence(approval_callback=None) -> tuple:
     """``(approval_callback, is_cli, is_gateway, is_ask)`` for the current context.
 
-    Single-query ``-q`` and cron clear the presence trio: ``qubit chat -q`` exports
+    Single-query ``-q`` and cron clear the presence trio: ``hermes chat -q`` exports
     HERMES_INTERACTIVE=1 for sudo prompts, and a gateway sets HERMES_EXEC_ASK=1 at startup and
     passes its environ to every external cron worker (#110932) — in neither can a human answer
     the card, so the gate must resolve from ``approvals.<ctx>_mode`` instead of parking on a
@@ -1080,7 +1043,7 @@ def _run_approval_gate(
 
     return _human_decision(
         _ACTION_GATE, command=display_target, description=description, pattern_key=pattern_key,
-        pattern_keys=[pattern_key], warnings=[(pattern_key, None, False)], session_key=session_key,
+        pattern_keys=[pattern_key], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
     )
 
@@ -1090,7 +1053,7 @@ def _should_skip_container_guards(env_type: str, has_host_access: bool = False) 
     exception once host paths are bind-mounted: ``rm -rf /workspace`` then reaches host files."""
     if env_type == "docker":
         return not has_host_access
-    if env_type in ("singularity", "modal", "daytona", "vercel_sandbox"):
+    if env_type in ("modal", "daytona", "vercel_sandbox"):
         return True
     # Plugin backends declare the same classification through the provider ABI (#94400);
     # fail-soft to False so an unknown or raising backend — or a raising registry
@@ -1193,48 +1156,13 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
     )
 
 
-# --- Combined pre-exec guard (tirith + dangerous command detection) -------------------------------------------------
-
-def _format_tirith_description(tirith_result: dict) -> str:
-    """Human-readable severity/title/description summary of tirith findings."""
-    parts = []
-    for f in tirith_result.get("findings") or []:
-        severity, title, desc = f.get("severity", ""), f.get("title", ""), f.get("description", "")
-        if title:
-            text = f"{title}: {desc}" if desc else title
-            parts.append(f"[{severity}] {text}" if severity else text)
-    if not parts:
-        summary = tirith_result.get("summary") or "security issue detected"
-        return f"Security scan: {summary}"
-    return "Security scan — " + "; ".join(parts)
-
-
-def _tirith_scan(command: str) -> dict:
-    """Tirith result for the interactive flow; an un-importable scanner allows
-    (default) or, under fail-closed, synthesizes a HIGH warn finding that goes
-    through the normal approval flow (#20733)."""
-    try:
-        from tools.tirith_security import check_command_security
-        return check_command_security(command)
-    except ImportError:
-        if _tirith_fail_open():
-            return {"action": "allow", "findings": [], "summary": ""}
-        return {"action": "warn", "summary": "Tirith unavailable (fail-closed)", "findings": [{
-            "rule_id": "tirith-import-error", "severity": "HIGH",
-            "title": "Tirith security module unavailable",
-            "description": ("The Tirith security scanner could not be imported. "
-                            "Because security.tirith_fail_open is false, this "
-                            "command cannot be silently allowed. Approve only if "
-                            "you have verified the command is safe."),
-        }]}
-
+# --- Combined pre-exec guard (floors + dangerous command detection) ------------------------------------------------
 
 def check_all_command_guards(command: str, env_type: str,
                              approval_callback=None,
                              has_host_access: bool = False) -> dict:
-    """Run all pre-exec security checks and return a single approval decision. Tirith and
-    dangerous-command findings are presented as ONE combined approval request, so a gateway
-    force=True replay cannot bypass one check when only the other was shown to the user.
+    """Run all pre-exec security checks and return a single approval decision. Plugins that
+    want to veto or escalate a command do it from ``pre_tool_call``.
     ``has_host_access``: a Docker sandbox with bind-mounted host paths takes the normal flow."""
     if _should_skip_container_guards(env_type, has_host_access=has_host_access):
         return _user_deny_block(command) or _approved()
@@ -1264,36 +1192,15 @@ def check_all_command_guards(command: str, env_type: str,
                 return result
         return _approved()
 
-    # Gather findings: warnings = [(pattern_key, description, is_tirith)]. Tirith block AND warn both go through the
-    # approval flow (block used to be a hard stop) so users can inspect the findings and approve.
-    tirith_result = _tirith_scan(command)
     is_dangerous, pattern_key, description = detect_dangerous_command(command)
-    warnings = []
     session_key = get_current_session_key()
-    if tirith_result["action"] in {"block", "warn"}:
-        findings = tirith_result.get("findings") or []
-        rule_id = findings[0].get("rule_id", "unknown") if findings else "unknown"
-        tirith_key = f"tirith:{rule_id}"
-        if not is_approved(session_key, tirith_key):
-            warnings.append((tirith_key, _format_tirith_description(tirith_result), True))
-    if is_dangerous and not is_approved(session_key, pattern_key):
-        warnings.append((pattern_key, description, False))
-    if not warnings:
+    if not is_dangerous or is_approved(session_key, pattern_key):
         return _approved()
-
-    combined_desc = "; ".join(desc for _, desc, _ in warnings)
-    primary_key = warnings[0][0]
-    all_keys = [key for key, _, _ in warnings]
-
-    # "Always" is offered when at least one warning is a dangerous-pattern key the persistence layer would actually
-    # allowlist permanently. Pure-tirith findings are session-max by design, so a tirith-only prompt hides Always;
-    # mixed prompts offer it (the pattern key persists, tirith downgrades to session — see _persist_choice).
     return _human_decision(
-        _COMMAND_GATE, command=command, description=combined_desc,
-        pattern_key=primary_key, pattern_keys=all_keys, warnings=warnings,
+        _COMMAND_GATE, command=command, description=description,
+        pattern_key=pattern_key, pattern_keys=[pattern_key],
         session_key=session_key, approval_callback=approval_callback,
         is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask, smart=approval_mode == "smart",
-        permanent_capable=any(not is_t for _, _, is_t in warnings),
     )
 
 
@@ -1382,7 +1289,7 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
     from agent.redact import redact_sensitive_text
     return _human_decision(
         _EXECUTE_CODE_GATE, command=command, description=description, pattern_key=pattern_key,
-        pattern_keys=[pattern_key], warnings=[(pattern_key, None, False)], session_key=session_key,
+        pattern_keys=[pattern_key], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
         smart=approval_mode == "smart",
         pending_body=lambda: f"**Code:**\n```python\n{redact_sensitive_text(code)}\n```",
