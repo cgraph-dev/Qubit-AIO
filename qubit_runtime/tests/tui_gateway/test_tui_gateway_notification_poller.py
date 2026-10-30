@@ -20,6 +20,9 @@ def test_session_rebuild_stops_previous_notification_poller(monkeypatch):
     session (two live loops per rebuild) until the session itself is finalized — close can only
     signal the newest event."""
     monkeypatch.setattr(server, "_notify_session_boundary", lambda *a, **k: None)
+    # Warm the shared state.db before the poller starts: its first loop/heartbeat read then reuses
+    # the registry handle instead of racing a cold schema init on the poller thread.
+    server._get_db()
     sess = _session()
     server._sessions["sid_rebuild"] = sess
     try:

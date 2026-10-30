@@ -27,6 +27,10 @@ def server(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(home))
     with patch.dict("sys.modules", {"qubit_cli.env_loader": MagicMock(), "qubit_cli.banner": MagicMock()}):
         mod = importlib.import_module("tui_gateway.server")
+        # The gateway opens its shared state.db before it starts a session's poller. Warm the
+        # registry handle here so the poller's first loop/heartbeat read reuses it instead of
+        # racing a cold schema init on the poller thread (SQLite writer lock under load).
+        mod._get_db()
         yield mod
         mod._sessions.clear()
         mod._pending_ws_reaps.clear()
