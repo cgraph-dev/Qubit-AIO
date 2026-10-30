@@ -257,10 +257,10 @@ def test_rejected_background_child_stops_with_parent(
         release_occupier.set()
         if background_child is not None:
             async_delegation.interrupt_for_session(parent_session_id=parent.session_id)
-            for extra in (background_child, pending_child):
+            for label, extra in (("background", background_child), ("pending", pending_child)):
                 extra.allow_finish.set()
-                assert extra.closed.wait(5)
-                assert extra.finished.is_set()
+                assert extra.closed.wait(5), f"{label} child was not closed"
+                assert extra.finished.is_set(), f"{label} child did not finish"
                 assert extra.close_count == 1
                 assert not extra.closed_while_running
             completed_ids = {registry_state.get(timeout=5)["delegation_id"] for _ in accepted_ids}

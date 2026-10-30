@@ -183,7 +183,7 @@ def test_a_missing_backend_fails_closed_and_default_keeps_todays_route(tmp_path,
     assert len(set(definitions)) == 1 and '"option"' not in definitions[0]
     assert [(b["model"], b["override_base_url"]) for b in recorded] == [("pinned-model", "http://127.0.0.1:9/v1")] * 2
     error = outcomes[2]["error"]
-    assert "'not-installed' is not installed" in error and "hermes config set delegation.backend default" in error
+    assert "'not-installed' is not installed" in error and "qubit config set delegation.backend default" in error
 
 
 def test_a_backend_route_without_its_own_chain_inherits_delegation_fallback_providers(tmp_path, monkeypatch):
