@@ -3,9 +3,11 @@ server shutdown and draining of the background MCP loop."""
 
 import logging
 import asyncio
+import contextlib
 import os
 import time
 from typing import Dict, Optional
+from qubit_cli.process_identity import is_owner_death_supervisor, release_process_groups
 from tools.mcp_tool_common import _core
 from tools import mcp_tool_loop as _loop
 
@@ -13,15 +15,15 @@ logger = logging.getLogger("tools.mcp_tool")
 
 # Live stdio MCP children (pid -> server_name), added after connection and removed on normal
 # shutdown, so they can be force-killed if SDK teardown fails.
-_stdio_pids: Dict[int, str] = {}
+_stdio_pids: dict[int, str] = {}
 # PIDs that survived their session context exit (detected in _run_stdio's finally, reaped by
 # _kill_orphaned_mcp_children). Separate from _stdio_pids so sweeps never race active sessions.
 _orphan_stdio_pids: set = set()
-_orphan_stdio_pid_servers: Dict[int, str] = {}
+_orphan_stdio_pid_servers: dict[int, str] = {}
 # pid -> pgid captured at spawn. The SDK spawns with start_new_session=True (PGID == PID);
 # grandchildren keep that PGID after the direct child exits, so killpg still reaches them.
 # Separate from _stdio_pids so the PGID survives the child's removal. Empty on Windows.
-_stdio_pgids: Dict[int, int] = {}
+_stdio_pgids: dict[int, int] = {}
 # Spawn-time start-time fingerprints of each stdio child's pgroup leader, captured
 # alongside the PGID (the psutil fallback means every platform has a baseline, macOS
 # included).  PIDs/PGIDs are recycled by the kernel once the original process exits and
@@ -32,7 +34,7 @@ _stdio_pgids: Dict[int, int] = {}
 # readings drift ~1 s on macOS (#117505) — before signalling so a recycled PGID is
 # never killed.  None entries are dropped: a capture that raced the child's exit keeps
 # the legacy best-effort behaviour.
-_stdio_starttimes: Dict[int, int] = {}  # pid -> leader start ticks
+_stdio_starttimes: dict[int, int] = {}  # pid -> leader start ticks
 
 
 def _leader_start_time(pid: int) -> Optional[int]:
@@ -42,7 +44,7 @@ def _leader_start_time(pid: int) -> Optional[int]:
     from gateway.status import get_process_start_time
     try:
         return get_process_start_time(pid)
-    except Exception:  # noqa: BLE001 — the guard must never break signalling
+    except Exception:
         return None
 
 
@@ -77,8 +79,9 @@ def _snapshot_child_pids() -> set:
 
 
 # argv markers of non-MCP gateway children that can race into the snapshot delta during an
-# MCP spawn (defense-in-depth; LSP/slash_worker already use start_new_session). Matched against
-# argv[1:] because Python/Java children start with the interpreter path.
+# MCP spawn (defense-in-depth: LSP servers and the slash worker lead their own groups under the
+# owner-death supervisor, see spawn_owned). Matched against argv[1:] because Python/Java children
+# start with the interpreter path.
 _NON_MCP_CHILD_CMDLINE_MARKERS: tuple[str, ...] = (
     "tui_gateway.slash_worker", "tui_gateway.entry",
     "-dorg.eclipse.equinox.launcher", "eclipse.jdt.ls", "org.eclipse.equinox.launcher_",  # jdtls
@@ -101,24 +104,23 @@ def _filter_mcp_children(pids: set) -> set:
             argv = psutil.Process(pid).cmdline()
         except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
             continue  # raced away or zombie — cannot be our fresh server, unsafe to track
+        if is_owner_death_supervisor(argv):
+            continue  # the shared reaper of every owned child; MCP teardown must never kill it
         if not any(marker in arg for arg in argv[1:] for marker in _NON_MCP_CHILD_CMDLINE_MARKERS):
             kept.add(pid)
     return kept
 
 
 def _clear_connect_cooldowns(keys=None) -> None:
-    """Drop connect-retry cooldowns and terminal-unavailable records: a restart/reload must
-    re-attempt every server immediately, not honour a stale per-server backoff or a
-    process-lifetime disable. Caller holds ``_core._lock``."""
+    """Drop connect-retry cooldowns: a restart must re-attempt every server immediately, not
+    honour a stale per-server backoff. Caller holds ``_core._lock``."""
     if keys is None:
         _core._server_connect_retry_after.clear()
         _core._server_connect_failures.clear()
-        _core._server_unavailable.clear()
     else:
         for key in keys:
             _core._server_connect_retry_after.pop(key, None)
             _core._server_connect_failures.pop(key, None)
-            _core._server_unavailable.pop(key, None)
 
 
 def _reregister_orphaned_adopters() -> None:
@@ -169,7 +171,7 @@ def shutdown_mcp_servers(*, scope: Optional[str] = None, names: Optional[set] = 
     the wait for the close to land on the MCP loop — a caller running one pass per served
     profile under a total budget divides it, or N profiles × 15s starve the wildcard pass that
     actually stops the loop."""
-    from tools.mcp_tool_scope import _key_name, _key_scope
+    from tools.mcp_tool_scope import _key_name
     wildcard = scope is None and names is None
     with _core._lock:
         selected = [key for key in _core._servers if wildcard or _core._server_scope_keys.get(key) == scope]
@@ -185,17 +187,6 @@ def shutdown_mcp_servers(*, scope: Optional[str] = None, names: Optional[set] = 
                 | set(_core._server_connecting) | set(_core._server_connect_errors))
         else:
             selected_status = {key for key, owner in _core._server_scope_keys.items() if owner == scope}
-        # A server that never reached ``_servers`` (unresolved env/terminal auth) only has an
-        # unavailable record, so collect it for this scope/name selection or a reload would
-        # leave it disabled for the rest of the process.
-        if names is not None:
-            selected_status |= {key for key in _core._server_unavailable
-                                if _key_name(key) in names
-                                and (wildcard or _key_scope(key) == scope)}
-        elif wildcard:
-            selected_status |= set(_core._server_unavailable)
-        else:
-            selected_status |= {key for key in _core._server_unavailable if _key_scope(key) == scope}
         # Adopters of the connections being torn down lose their overlays with the tasks' own
         # ``_deregister_tools``; remember them so the next discovery pass re-registers them
         # (``_reregister_orphaned_adopters``).
@@ -255,10 +246,10 @@ def shutdown_mcp_servers(*, scope: Optional[str] = None, names: Optional[set] = 
         _close_mcp_stderr_logs(scope=scope)
 
 
-def _take_reapable_pids(include_active: bool, server_name: Optional[str]) -> tuple[Dict[int, str], Dict[int, int], Dict[int, int]]:
+def _take_reapable_pids(include_active: bool, server_name: Optional[str]) -> tuple[dict[int, str], dict[int, int], dict[int, int]]:
     """Pop the PIDs to reap (and their spawn-time pgids) out of the ledgers under the lock, so
     a future spawn can't collide with stale state. Returns ``(pid -> owner, pid -> pgid)``."""
-    def _owned(entries: Dict[int, str]) -> Dict[int, str]:
+    def _owned(entries: dict[int, str]) -> dict[int, str]:
         return {pid: owner for pid, owner in entries.items() if server_name is None or owner == server_name}
 
     with _core._lock:
@@ -277,7 +268,7 @@ def _take_reapable_pids(include_active: bool, server_name: Optional[str]) -> tup
 
 
 def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int], my_pgid: Optional[int],
-                        expected_start: Optional[int] = None) -> bool:
+                        expected_start: Optional[int] = None) -> None:
     """SIGTERM/SIGKILL via the spawn-time pgroup on POSIX (reaches reparented grandchildren),
     falling back to a per-pid signal.
 
@@ -300,7 +291,7 @@ def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int
                     logger.debug(
                         "Skip signalling MCP pid %d (%s): start-time mismatch — PID was recycled; "
                         "refusing to kill an unrelated process group.", pid, server_name)
-                    return False
+                    return
             except (TypeError, ValueError):
                 pass  # junk fingerprints: best-effort, never break signalling
     killpg = getattr(os, "killpg", None)
@@ -318,7 +309,7 @@ def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int
         else:
             try:
                 killpg(pgid, sig)
-                return True
+                return
             except (ProcessLookupError, PermissionError, OSError) as exc:
                 # Pgroup gone or refused — still try the direct child.
                 logger.debug("killpg(%d, %d) failed for MCP server '%s': %s; falling back to kill(pid)",
@@ -329,7 +320,6 @@ def _signal_mcp_process(pid: int, sig: int, server_name: str, pgid: Optional[int
         pass
     if os.name == "nt":  # Windows has no pgid reaching reparented grandchildren — kill the tree
         _kill_windows_process_tree(pid, sig)
-    return True
 
 
 def _kill_windows_process_tree(pid: int, sig: int) -> None:
@@ -349,14 +339,14 @@ def _kill_windows_process_tree(pid: int, sig: int) -> None:
     for child in descendants:
         try:
             child.terminate()
-        except Exception:  # noqa: BLE001 - raced away or refused; sweep continues
+        except Exception:
             pass
     if sig == getattr(_signal, "SIGKILL", _signal.SIGTERM):  # force pass: don't wait for graceful exit
         _, alive = psutil.wait_procs(descendants, timeout=0)
         for child in alive:
             try:
                 child.kill()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
 
@@ -388,25 +378,24 @@ def _kill_orphaned_mcp_children(include_active: bool = False, server_name: Optio
     except (AttributeError, OSError):
         my_pgid = None  # Windows or restricted environment
 
-    refused: set[int] = set()
     for pid, owner in pids.items():
-        if not _signal_mcp_process(pid, _signal.SIGTERM, owner, pgids.get(pid), my_pgid, starts.get(pid)):
-            refused.add(pid)
-            continue
+        _signal_mcp_process(pid, _signal.SIGTERM, owner, pgids.get(pid), my_pgid, starts.get(pid))
         logger.debug("Sent SIGTERM to orphaned MCP process %d (%s)", pid, owner)
     time.sleep(2)
     sigkill = getattr(_signal, "SIGKILL", _signal.SIGTERM)
     from gateway.status import _pid_exists  # ``os.kill(pid, 0)`` is NOT a no-op on Windows
     for pid, owner in pids.items():
-        if pid in refused:
-            # Recycled PID: never probe (or signal) the unrelated group that owns it now.
-            continue
         if _pid_exists(pid) or _group_alive(pgids.get(pid), my_pgid):  # leader or descendants survived SIGTERM
             _signal_mcp_process(pid, sigkill, owner, pgids.get(pid), my_pgid, starts.get(pid))
             logger.warning("Force-killed MCP process %d (%s) after SIGTERM timeout", pid, owner)
     # These groups are reaped. Release them last, so a crash partway through the SIGTERM/SIGKILL
     # dance still leaves the supervisor holding them.
-    _core._update_death_supervisor("unregister", pgids.values())
+    release_process_groups(pgids.values())
+    # The fork's dedicated MCP death supervisor (mcp_death_supervisor.py) is a second control
+    # channel kept for installs/tests that run it; tell it too so neither supervisor holds a
+    # group this process has already reaped.
+    with contextlib.suppress(Exception):
+        _core._update_death_supervisor("unregister", pgids.values())
 
 
 def _stop_mcp_loop_if_idle() -> bool:
