@@ -33,6 +33,10 @@ def test_session_store_default_db_uses_runtime_qubit_home(tmp_path, monkeypatch)
     fake_home = tmp_path / "alt_qubit_home"
     fake_home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(fake_home))
+    import qubit_state
+    # The suite fixture pins DEFAULT_DB_PATH; un-pin it so this test measures the
+    # runtime QUBIT_HOME resolution it documents.
+    monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", qubit_state._IMPORT_DEFAULT_DB_PATH)
 
     with patch("gateway.session.SessionStore._ensure_loaded"):
         store = SessionStore(sessions_dir=tmp_path / "sessions", config=config)
