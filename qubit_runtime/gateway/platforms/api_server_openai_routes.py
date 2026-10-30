@@ -969,7 +969,7 @@ class OpenAICompatRoutesMixin:
             _started_tool_call_ids: set[str] = set()
 
             def _on_tool_start(tool_call_id, function_name, function_args):
-                """``hermes.tool.progress`` status=running; ``_``-prefixed tools stay off the wire."""
+                """``qubit.tool.progress`` status=running; ``_``-prefixed tools stay off the wire."""
                 if not tool_call_id or function_name.startswith("_"):
                     return
                 _started_tool_call_ids.add(tool_call_id)
@@ -1177,7 +1177,7 @@ class OpenAICompatRoutesMixin:
                     # Custom event: tool lifecycle for frontends without markers in history.
                     if not self._tool_progress_events:
                         continue  # opted out for strict OpenAI clients (#12020)
-                    await response.write(_sse_frame(delta[1], event="hermes.tool.progress"))
+                    await response.write(_sse_frame(delta[1], event="qubit.tool.progress"))
                 elif isinstance(delta, tuple) and len(delta) == 2 and delta[0] == "__reasoning__":
                     # DeepSeek-style ``delta.reasoning_content`` (#99552), the field Open WebUI,
                     # opencode and the Vercel AI SDK render as a thinking block.
