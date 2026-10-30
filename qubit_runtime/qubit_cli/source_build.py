@@ -252,9 +252,9 @@ def build_update_products(project_root: Path, *, desktop: bool) -> None:
 def _rebuild_served_webapp(project_root: Path, publish_stage) -> None:
     """The Webapp bundle (``apps/desktop/dist-webapp``), when a home sharing this install serves it
     (``webapp.enabled``): its gateway serves the bundle as built, so one older than the updated
-    backend would talk to it with an outdated contract. Built with the function ``hermes webapp``
+    backend would talk to it with an outdated contract. Built with the function ``qubit webapp``
     uses, which reuses a current bundle. A failed build leaves the previous bundle on disk, marked
-    out of date: its gateways report the Webapp unavailable until ``hermes webapp`` rebuilds it."""
+    out of date: its gateways report the Webapp unavailable until ``qubit webapp`` rebuilds it."""
     from gateway.webapp_listener import webapp_settings
     from qubit_cli.webapp import mark_webapp_stale, prepare_webapp_renderer
     from pm.plugins_state import dependency_homes
@@ -267,7 +267,7 @@ def _rebuild_served_webapp(project_root: Path, publish_stage) -> None:
     except BaseException:
         try:
             if mark_webapp_stale(project_root):
-                print("  ⓘ The Webapp stays unavailable until `hermes webapp` rebuilds it.")
+                print("  ⓘ The Webapp stays unavailable until `qubit webapp` rebuilds it.")
         except OSError as exc:
             print(f"  ⚠ Could not mark the Webapp out of date: {exc}")
         raise
