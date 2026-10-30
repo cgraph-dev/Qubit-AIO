@@ -586,31 +586,12 @@ def _conflicting_homes(homes):
 
 
 def _reserve_waiting_out_browse_reconcile(ownership, homes, *, wait_s: float | None = None):
-    """Reserve *homes*, waiting (bounded) while a contender is a browse reconcile or has not yet
-    published its lock record (flock taken, record unwritten). Only a positively identified holder
-    that is not browse maintenance refuses at once; the flock exclusion itself is never weakened."""
-    from gateway.runtime_ownership import OwnershipConflict, lock_record_unpublished, maintenance_holder
-    from qubit_state_reconcile import BROWSE_RECONCILE_PURPOSE
+    """Boot's all-or-nothing reserve of every served home, waiting out transient holders (a browse
+    reconcile, an unpublished record, a client's lock probe) for up to the browse window."""
+    from gateway.runtime_ownership import reserve_waiting_out_transient_holders
     if wait_s is None:
         wait_s = _browse_reconcile_reserve_wait_s()
-    deadline = time.monotonic() + wait_s
-    logged = False
-    while True:
-        try:
-            return ownership.reserve(homes)
-        except OwnershipConflict:
-            # Only the homes that actually conflict decide: a real owner on any of them refuses at
-            # once, even while another home is mid-browse (multiplexer boot, all-or-nothing).
-            conflicting = _conflicting_homes(homes)
-            holders = [h for h in conflicting
-                       if maintenance_holder(h, BROWSE_RECONCILE_PURPOSE) or lock_record_unpublished(h)]
-            if not holders or len(holders) < len(conflicting) or time.monotonic() >= deadline:
-                raise
-            if not logged:
-                logger.info("Profile %s is held by a short session-store schema catch-up; waiting up to %.0fs",
-                            holders[0], wait_s)
-                logged = True
-            time.sleep(0.1)
+    return reserve_waiting_out_transient_holders(ownership, homes, wait_s=wait_s)
 
 
 def _start_gateway_reserve_profiles(profile_homes) -> bool:
