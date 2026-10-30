@@ -16,7 +16,7 @@ async def probe():
     from tests.gateway.fixtures.local_recovery_probe import rpc
     from websockets.asyncio.client import connect
 
-    home = Path(os.environ['HERMES_HOME'])
+    home = Path(os.environ["QUBIT_HOME"])
     work = home / 'session-checkout'
     work.mkdir()
     (home / 'config.yaml').write_text('gateway:\n  multiplex_profiles: false\nmodel:\n  provider: custom\n  default: no-inference\n  base_url: http://127.0.0.1:1/v1\nauxiliary:\n  title_generation:\n    enabled: false\n')
