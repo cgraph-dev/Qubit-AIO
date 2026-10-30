@@ -108,7 +108,7 @@ def test_doctor_offers_optimize_storage_for_a_stale_trigram(v1_trigram_db, monke
     stats = collect_state_db_stats(v1_trigram_db)
     monkeypatch.setattr(doctor_state, "STATE_DB_SIZE_WARN_BYTES", 0)
     rows = doctor_state._render_state_db_stats(stats)
-    assert any("hermes sessions optimize-storage" in detail for _, _, detail in rows)
+    assert any("qubit sessions optimize-storage" in detail for _, _, detail in rows)
 
 
 def test_fresh_store_is_stamped_on_creation_and_doctor_stays_quiet(tmp_path, monkeypatch):
@@ -122,7 +122,7 @@ def test_fresh_store_is_stamped_on_creation_and_doctor_stays_quiet(tmp_path, mon
     assert _stamp(db_path) == str(qubit_state_common.FTS_STORAGE_VERSION)
     monkeypatch.setattr(doctor_state, "STATE_DB_SIZE_WARN_BYTES", 0)
     rows = doctor_state._render_state_db_stats(collect_state_db_stats(db_path))
-    assert not any("hermes sessions optimize-storage" in detail for _, _, detail in rows)
+    assert not any("qubit sessions optimize-storage" in detail for _, _, detail in rows)
 
 
 def _notice_for(db_path: pathlib.Path, monkeypatch) -> str:
@@ -149,7 +149,7 @@ def _notice_for(db_path: pathlib.Path, monkeypatch) -> str:
 
 def test_notice_for_a_stale_trigram_does_not_claim_the_legacy_reclaim(v1_trigram_db, monkeypatch):
     out = _notice_for(v1_trigram_db, monkeypatch)
-    assert "hermes sessions optimize-storage" in out
+    assert "qubit sessions optimize-storage" in out
     assert "60%" not in out and "old storage layout" not in out.lower()
 
 
@@ -497,7 +497,7 @@ def test_doctor_offers_the_resume_after_backfill_before_teardown(tmp_path, monke
     assert "optimize-storage" in _notice_for(db_path, monkeypatch)
     monkeypatch.setattr(doctor_state, "STATE_DB_SIZE_WARN_BYTES", 0)
     rows = doctor_state._render_state_db_stats(collect_state_db_stats(db_path))
-    assert any("hermes sessions optimize-storage" in detail for _, _, detail in rows)
+    assert any("qubit sessions optimize-storage" in detail for _, _, detail in rows)
 
 
 @pytest.mark.parametrize("mode, heading", [("advise", "Search index update available"),

@@ -1,7 +1,7 @@
 """Execution-scoped worker operations on the ordinary authenticated authority.
 
-Only explicit local compute registrations are enabled. Cron/child claims need
-producer-specific validation before their consumers can use this transport.
+Only explicit local compute registrations are enabled here. A delegated child is reserved by
+the owner on its parent's receipt stream (gateway/session_worker_child.py), never registered.
 """
 import asyncio
 import hmac

@@ -4711,7 +4711,10 @@ class TestFTSExternalContentMigration:
             result = db.optimize_fts_storage(vacuum=False)
             assert result["ok"] is False
             assert result.get("reason") == "backfill_incomplete"
-            assert db.get_meta("fts_storage_version") is None
+            # A fresh store is stamped when it is created; a refused settle must leave
+            # that stamp alone (and must not advance it past a pending backfill).
+            from qubit_state_common import FTS_STORAGE_VERSION
+            assert db.get_meta("fts_storage_version") == str(FTS_STORAGE_VERSION)
             assert db.get_meta("fts_rebuild_high_water") is not None
         finally:
             db.close()

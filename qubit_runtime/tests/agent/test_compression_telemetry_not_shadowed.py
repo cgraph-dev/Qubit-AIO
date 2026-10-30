@@ -46,5 +46,7 @@ def test_generic_abort_verdict_does_not_clobber_same_attempt_failure_class(caplo
             agent, started_at=0.0, commit_status="aborted",
             split_status="aborted", failure_class="no_progress",
         )
-    payload = json.loads(caplog.records[-1].getMessage().split(": ", 1)[1])
+    record = next(r for r in reversed(caplog.records)
+                   if r.getMessage().startswith("context compression attempt telemetry: "))
+    payload = json.loads(record.getMessage().split(": ", 1)[1])
     assert payload["failure_class"] == "provider_timeout"

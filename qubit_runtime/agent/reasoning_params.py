@@ -161,6 +161,22 @@ class ReasoningParamsMixin:
         return ask_profile(profile, "reasoning_payload", None, self.model, self.reasoning_config,
                            base_url=str(base_url), scope=self)
 
+    def _github_models_reasoning_extra_body(self) -> dict | None:
+        """Format reasoning payload for GitHub Models/OpenAI-compatible routes."""
+        try:
+            from qubit_cli.models import clamp_github_reasoning_effort, github_model_reasoning_efforts
+        except Exception:
+            return None
+
+        supported = github_model_reasoning_efforts(self.model)
+        if not supported:
+            return None
+
+        cfg = self.reasoning_config if isinstance(self.reasoning_config, dict) else {}
+        if cfg.get("enabled") is False:
+            return None
+        return {"effort": clamp_github_reasoning_effort(cfg.get("effort"), supported)}
+
     def _build_assistant_message(self, assistant_message, finish_reason: str) -> dict:
         """``build_assistant_message``; a held turn's row with visible text comes back typed hidden
         (``withhold_held_row``) until ``finish_text_response`` publishes it as the final."""

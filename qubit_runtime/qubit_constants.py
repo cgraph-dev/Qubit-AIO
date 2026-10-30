@@ -240,7 +240,8 @@ def get_qubit_home() -> Path:
     override = get_qubit_home_override()
     if override:
         return _expand_qubit_home(override)
-    if not os.environ.get("QUBIT_HOME", "").strip():
+    if not (os.environ.get("QUBIT_HOME", "").strip()
+            or os.environ.get("HERMES_HOME", "").strip()):
         _warn_profile_fallback_once()
     return get_process_qubit_home()
 
@@ -325,7 +326,10 @@ def get_process_qubit_home() -> Path:
     ``QUBIT_HOME`` live on purpose: routed-profile DECISIONS compare against
     :func:`get_routing_process_qubit_home` instead (#119242).
     """
-    val = os.environ.get("QUBIT_HOME", "").strip()
+    # QUBIT_HOME is canonical; HERMES_HOME is the read-old spelling existing
+    # deployments and tests still set. Accept either, canonical first.
+    val = (os.environ.get("QUBIT_HOME", "").strip()
+           or os.environ.get("HERMES_HOME", "").strip())
     return _expand_qubit_home(val) if val else _get_platform_default_qubit_home()
 
 

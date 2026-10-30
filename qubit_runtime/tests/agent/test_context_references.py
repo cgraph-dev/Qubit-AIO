@@ -713,6 +713,7 @@ def _stage_outside_workspace(tmp_path: Path, monkeypatch, name: str, subdir: str
     """Stage *name* under a HERMES_HOME that lives outside the workspace (SSH topology)."""
     hermes_home = tmp_path / "gateway-data"  # /opt/data inside the gateway container
     (hermes_home / subdir).mkdir(parents=True)
+    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
     return hermes_home / subdir / name
