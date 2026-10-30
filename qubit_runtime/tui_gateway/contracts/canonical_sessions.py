@@ -50,7 +50,7 @@ class CanonicalCreateParams(ProfileParams):
     run_budget: float | None = None
     # The classic CLI's `-v`: the session agent's status lines are not quieted.
     verbose: bool = False
-    # A shell-launched client's allowlisted environment (QUBIT_* behaviour values, toolchain PATH/venv),
+    # A shell-launched client's allowlisted environment (HERMES_* behaviour values, toolchain PATH/venv),
     # applied to this session only; never echoed in ``launch_request``.
     client_env: dict[str, str] | None = None
 
@@ -117,6 +117,7 @@ class CanonicalSnapshotInfo(SessionInventoryFields):
     profile_id: str | None = None
     profile_name: str | None = None
     cwd: str | None = None
+    edit_approval_policy: Literal['ask', 'workspace_session', 'session'] | None = None
     launch_request: dict[str, JsonValue] | None = None
     reasoning_effort: str | None = None
     reasoning_effort_wire: str | None = None
@@ -200,6 +201,9 @@ class CanonicalTurnAuthor(Params):
 class CanonicalModelOverride(Params):
     model: str
     provider: str | None = None
+    # ``/model B --once --reasoning X``: this admission alone runs level X. The owner refuses a level
+    # ``parse_reasoning_effort`` cannot read (``gateway/session_cli_turn.py``).
+    reasoning: str | None = None
 
 
 class CanonicalSubmitParams(CanonicalSessionParams):
@@ -230,6 +234,19 @@ class CanonicalSubmitParams(CanonicalSessionParams):
     clarify_batch: bool = False
 
 
+class CanonicalVoiceStopped(Result):
+    """A bare stop phrase typed while the session's voice chat is on: the chat ended, nothing was
+    admitted (TUI-26)."""
+
+    voice_stopped: Literal[True]
+
+
+class CanonicalSubmitResult(RootModel):
+    """``prompt.submit``: the admission receipt, or ``{voice_stopped: true}``."""
+
+    root: AdmissionStatus | CanonicalVoiceStopped
+
+
 class CanonicalSteerQueuedParams(CanonicalSessionParams):
     admission_id: str
 
@@ -253,11 +270,21 @@ class CanonicalCorrectionParams(CanonicalControlParams):
     text: str
 
 
-class CanonicalCorrectionResult(Result):
+class CanonicalCorrectionAck(Result):
     status: Literal['queued', 'redirected', 'rejected']
     text: str
     execution_generation: int
     authority_epoch: int
+    # Only on a 'rejected' no agent ever saw (none was live): safe to admit as the next prompt. A plain
+    # 'rejected' may follow delivery (a Codex steer whose ACK timed out), so clients never re-send it.
+    delivered: Literal[False] | None = None
+
+
+class CanonicalCorrectionResult(RootModel):
+    """``session.steer`` / ``session.redirect``: the correction verdict, or ``{voice_stopped: true}``
+    when the busy-time text was a bare stop phrase that ended the LOCAL voice chat."""
+
+    root: CanonicalCorrectionAck | CanonicalVoiceStopped
 
 
 class CanonicalApprovalParams(CanonicalControlParams):
@@ -291,6 +318,7 @@ class CanonicalEventsResult(Result):
     truncated: bool
     snapshot_required: bool
     count: int
+    open_requests: list[OpenRequestEntry] | None = None
 
 
 for _name, _params, _result in (
@@ -301,7 +329,7 @@ for _name, _params, _result in (
     ('session.steer', CanonicalCorrectionParams, CanonicalCorrectionResult),
     ('session.redirect', CanonicalCorrectionParams, CanonicalCorrectionResult),
     ('session.events.since', CanonicalEventsParams, CanonicalEventsResult),
-    ('prompt.submit', CanonicalSubmitParams, AdmissionStatus),
+    ('prompt.submit', CanonicalSubmitParams, CanonicalSubmitResult),
     ('approval.respond', CanonicalApprovalParams, PromptResponseResult),
 ):
     canonical_method(_name, params=_params, result=_result)
@@ -320,28 +348,3 @@ canonical_method('prompt.replace_queued', params=CanonicalReplaceQueuedParams, r
                      "at the back of the FIFO, in one write bound to the replaced admission. "
                      "Refusals: admission_started, admission_conflict (the submission_id replaced "
                      "another admission), queue_full, unsupported_control, not_found.")
-
-
-# --- ported from upstream 088f657ecf ---
-
-class CanonicalVoiceStopped(Result):
-    """A bare stop phrase typed while the session's voice chat is on: the chat ended, nothing was
-    admitted (TUI-26)."""
-
-    voice_stopped: Literal[True]
-
-
-class CanonicalSubmitResult(RootModel):
-    """``prompt.submit``: the admission receipt, or ``{voice_stopped: true}``."""
-
-    root: AdmissionStatus | CanonicalVoiceStopped
-
-
-class CanonicalCorrectionAck(Result):
-    status: Literal['queued', 'redirected', 'rejected']
-    text: str
-    execution_generation: int
-    authority_epoch: int
-    # Only on a 'rejected' no agent ever saw (none was live): safe to admit as the next prompt. A plain
-    # 'rejected' may follow delivery (a Codex steer whose ACK timed out), so clients never re-send it.
-    delivered: Literal[False] | None = None
