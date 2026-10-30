@@ -246,3 +246,26 @@ def test_capture_level_reaches_the_panel(monkeypatch):
     helper._note_capture_frame(0.62)
 
     assert overlay.levels and abs(overlay.levels[-1] - 0.62) < 1e-6
+
+
+def test_bare_wake_opens_the_panel_listening(monkeypatch):
+    # A bare wake arms the monitor's next-utterance capture; the panel must
+    # show that it is listening instead of leaving the last error/preview on
+    # screen, and the helper must remain IDLE (no overlapping request).
+    helper, overlay = _helper(monkeypatch)
+    helper.state = helper.IDLE
+    helper._on_wake_armed()
+    assert "show" in overlay.events
+    assert ("status", "listening") in overlay.events
+    assert helper.state == helper.IDLE
+
+
+def test_bare_wake_keeps_an_open_preview_applyable(monkeypatch):
+    helper, overlay = _helper(monkeypatch)
+    helper.state = helper.PREVIEW
+    helper._preview = {"proposed": "NEW TEXT"}
+    helper._on_wake_armed()
+    assert ("status", "listening") in overlay.events
+    assert helper.state == helper.PREVIEW
+    # A PREVIEW is not cleared by the bare-wake cue.
+    assert not any(e == ("live", "", False) for e in overlay.events)

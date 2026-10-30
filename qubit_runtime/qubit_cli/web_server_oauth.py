@@ -1,5 +1,5 @@
 """Dashboard OAuth/login-status helpers: provider catalog, per-provider device pollers,
-Anthropic/Copilot/Claude-Code status probes.
+Anthropic/Claude-Code status probes, and the poller for provider-profile device logins.
 """
 
 import contextlib
@@ -120,7 +120,7 @@ def _copilot_acp_status() -> Dict[str, Any]:
 
 def _external_process_cli_command(provider_id: str, default: str) -> str:
     """Render an external-process provider's sign-in command with the CLI actually configured
-    (``HERMES_COPILOT_ACP_COMMAND`` / ``COPILOT_CLI_PATH``); others get ``default`` untouched."""
+    (its profile's ``process_command_env_vars`` override); others get ``default`` untouched."""
     try:
         from qubit_cli.auth import PROVIDER_REGISTRY, get_external_process_provider_status
         pconfig = PROVIDER_REGISTRY.get(provider_id)
@@ -140,7 +140,8 @@ def _external_process_cli_command(provider_id: str, default: str) -> str:
 # Hand-tuned OAuth/account cards: the bits not derivable from the unified provider catalog
 # (``flow``, ``status_fn``, ``cli_command``, display order). OVERRIDE BASE for
 # ``_build_oauth_catalog()``, which unions them with every accounts-tab provider so new
-# providers appear automatically. Also carries two non-catalog rows the Accounts tab needs:
+# providers appear automatically (a provider profile customises its own card through
+# ``account_card`` / ``account_status`` / ``start_device_login``). Also carries two non-catalog rows:
 # the Anthropic credential-status card and the synthetic ``claude-code`` row.
 # ``flow``: ``device_code`` = show code + URL + poll; ``external`` = delegated to a terminal/CLI.
 _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
@@ -235,51 +236,33 @@ def _record_sign_in_state(sess: Dict[str, Any], state: Any) -> None:
             sess["account_email"] = state.email or None
             # None when the config was left on the user's own model, as the poll route documents.
             sess["model"] = state.model if state.model_changed else None
+            # What the free tier's handoff did (moved apps, apps to reconnect); empty without one.
+            sess["handoff"] = list(state.handoff)
+            # The same result as fields, so the desktop can name the apps and follow a retry.
+            sess["handoff_status"] = state.handoff_status
             return
-        if kind == "declined":
-            sess["status"], sess["reason"] = "denied", "user_declined"
-            sess["error_message"] = state.copy
+        if kind == "cancelled":
+            sess["status"] = "cancelled"
             return
         if kind == "timed_out":
             sess["status"], sess["reason"] = "error", "timeout"
             # The enriched device-auth guidance, which the dashboard has room for.
             sess["error_message"] = state.detail or state.copy
             return
-        if kind == "retired":
-            sess["status"], sess["reason"] = "error", "account_retired"
-            sess["error_message"] = state.copy
-            return
-        if kind == "superseded":
-            # Two producers, two screens: the user's own DELETE is a cancellation, while a sign-in
-            # started somewhere else (a chat, the terminal) voided this code and is an error the
-            # renderer has a dedicated screen for.
-            if sess.get("cancelled"):
-                sess["status"] = "cancelled"
-            else:
-                sess["status"], sess["reason"] = "error", "superseded"
-                sess["error_message"] = state.copy
-            return
-        if kind == "failed":
-            sess["status"] = "error"
-            sess["reason"] = state.reason or "error"
-            sess["error_message"] = state.copy    # the chat form: no raw exception reaches the UI
-            # Whether a later attempt can succeed, and the wait the service named (seconds).
-            sess["retryable"] = bool(getattr(state, "retryable", False))
-            sess["retry_after"] = int(getattr(state, "retry_after", 0) or 0)
-            return
-        # already_signed_in / unavailable: the start route refuses these, so this is unreachable
-        # through the dashboard; record rather than crash.
         sess["status"] = "error"
-        sess["reason"] = kind or "error"
-        sess["error_message"] = state.copy
+        sess["reason"] = getattr(state, "reason", "") or kind or "error"
+        sess["error_message"] = state.copy    # the chat form: no raw exception reaches the UI
+        # Whether a later attempt can succeed, and the wait the service named (seconds).
+        sess["retryable"] = bool(getattr(state, "retryable", False))
+        sess["retry_after"] = int(getattr(state, "retry_after", 0) or 0)
 
 
 @_oauth_poller("nous")
-def _nous_promotion_poller(session_id: str, sess: Dict[str, Any]) -> None:
-    """Drain the sign-in the start route began: one shared flow, rendered onto the session.
+def _nous_sign_in_poller(session_id: str, sess: dict[str, Any]) -> None:
+    """Drain the sign-in the start route began: the one shared flow, rendered onto the session.
 
     The generator was created and advanced to its ``Code`` state by ``_start_nous_device_code``, so
-    it is already holding the transfer's codes and its HTTP client. Nothing here is wrapped in
+    it is already holding the device code and its HTTP client. Nothing here is wrapped in
     ``_profile_scope``: that context manager holds a process-global lock and swaps module
     attributes across its ``yield``, and this loop can last the sign-in code's whole expiry. The
     generator scopes its own short config/auth-store sections instead.
@@ -300,7 +283,7 @@ def _nous_plain_poller(session_id: str, sess: Dict[str, Any]) -> None:
     """Background poller for a plain Qubit device-code login (no free-tier identity to transfer).
 
     A sign-in that carries the free tier's connectors runs through ``anon_auth.run_sign_in`` and
-    ``_nous_promotion_poller`` instead; this is the "connect another Qubit account" path.
+    ``_nous_sign_in_poller`` instead; this is the "connect another Qubit account" path.
     """
     from qubit_cli.web_server_profiles import _profile_scope
     from qubit_cli.auth import _poll_for_token, persist_nous_credentials, refresh_nous_oauth_from_state
@@ -449,3 +432,50 @@ def _xai_device_poller(session_id: str, sess: Dict[str, Any]) -> None:
         # duplicates the single-use refresh token and triggers ``refresh_token_reused`` churn.
         # An interactive login is an explicit re-enable, so clear any prior suppression.
         unsuppress_credential_source("xai-oauth", "device_code")
+
+
+def _sleep_unless_cancelled(sess: dict[str, Any], seconds: float) -> bool:
+    """Sleep *seconds* in short ticks; True as soon as the session is cancelled."""
+    deadline = time.monotonic() + seconds
+    while True:
+        with _oauth_sessions_lock:
+            if sess.get("cancelled"):
+                return True
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return False
+        time.sleep(min(0.25, left))
+
+
+_DEVICE_LOGIN_ENDINGS = {"denied": "Authorization was denied.", "expired": "Device code expired before approval"}
+
+
+@_oauth_poller("provider-profile")
+def _profile_device_poller(session_id: str, sess: dict[str, Any]) -> None:
+    """Drive a device-code login a provider profile owns (``ProviderProfile.start_device_login``):
+    one ``poll_device_login`` per interval (each bound to the session's profile) until approved, then
+    ``save_device_login`` under the session's profile scope, in one critical section with the cancel check like the built-in savers."""
+    from qubit_cli.web_server_profiles import _config_profile_scope, _profile_scope
+    profile, state, interval = sess["_provider_profile"], sess["_device_state"], int(sess["interval"])
+    result: dict[str, Any] = {}
+    while time.time() < sess["expires_at"]:
+        if _sleep_unless_cancelled(sess, interval):
+            break
+        with _config_profile_scope(sess.get("profile")):  # await-safe: no skills lock across the wait
+            result = dict(profile.poll_device_login(state) or {})
+        state = result.get("state", state)
+        if result.get("status") != "pending":
+            break
+        interval = int(result.get("interval") or interval)
+    with _profile_scope(sess.get("profile")), _oauth_sessions_lock:
+        if sess.get("cancelled"):
+            sess["status"] = "cancelled"
+            return
+        status = result.get("status")
+        if status in (None, "pending"):     # the code's lifetime ran out
+            status = "expired"
+        if status != "approved":
+            sess["status"] = status if status in _DEVICE_LOGIN_ENDINGS else "error"
+            sess["error_message"] = result.get("message") or _DEVICE_LOGIN_ENDINGS.get(status) or "Sign-in failed"
+            return
+        profile.save_device_login(result.get("credential"))

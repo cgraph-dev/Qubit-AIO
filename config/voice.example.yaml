@@ -268,9 +268,21 @@ agent_runtime:
 #   mic_gain: 12.0
 #   speak_answers: true       # speak replies aloud
 #   history_panel: true       # show the overlay history
+#   barge_in: true            # a wake spoken while TTS plays stops the reply
+#   barge_in_threshold: 0.06  # RMS gate after the live mic gain (see below)
+#   barge_in_ms: 200          # sustained speech to trigger, clamped 150-300
 #   wake:
+#     enabled: true
+#     engine: auto            # auto|kws|asr (auto prefers the keyword spotter)
+#     phrase: hey qubit
+#     arm_window_s: 12        # seconds a bare wake stays armed for the command
+#     asr_fallback: true      # one accurate ASR probe when the spotter misses
 #     hold_silence_ms: 900    # trailing silence once speech is established;
 #                             # lower is snappier but can split slow speech
+#     silence_ms: 500         # endpointer silence before speech is established
+#     rms_gate: 0.008         # endpointer RMS floor (quiet mics: lower it)
+#     vad: auto               # auto|silero|energy
+#     kws_threshold: 0.25     # keyword-spotter trigger score (lower = more hits)
 #     cue_on_kws: true        # immediate single-note cue when the spotter
 #                             # hears the phrase (final beep stays on command)
 #     cue_on_speech: true     # cue at VAD speech onset for voices the spotter
@@ -280,6 +292,13 @@ agent_runtime:
 #     kws_target_peak: 0.5    # normalization target, clamped 0.05..0.9
 #     kws_max_gain: 6.0       # max normalization gain, clamped 1..16
 #     kws_input_gain: 1.0     # extra fixed spotter-only gain, clamped 1..16
+#
+# The wake path's ASR fallback uses the SAME accurate/English decoder as
+# Right-Ctrl (``voice_edit.stt_mode: accurate``); the streaming socket is only
+# the internal last resort. Live 2026-10-29 the streaming engine heard
+# "open GitHub" as "One GitHub" and the reply itself blocked the next wake, so
+# the fallback no longer prefers streaming and the post-TTS echo guard is a
+# short tail after ``speak_done`` instead of 5 s from the reply's start.
 #
 # Local chat wording (applies to the voice brain; both configurable):
 # intent:

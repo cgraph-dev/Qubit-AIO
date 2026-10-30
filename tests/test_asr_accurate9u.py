@@ -260,3 +260,21 @@ def test_default_loader_retries_on_cpu_after_transcribe_oom(monkeypatch):
     assert out.ok is True and out.text == "hello qubit"
     assert state["cpu_loads"] == 1
     assert cpu_model.calls == 1
+
+
+def test_invalid_cuda_device_ordinal_triggers_the_cpu_retry():
+    """Live 2026-10-29: an invalid CUDA ordinal aborted the accurate rescore.
+
+    The error was "parallel_for failed: cudaErrorInvalidDevice: invalid device
+    ordinal"; it was not in the CUDA-lib markers, so the accurate path failed
+    and the wake fallback dropped to the streaming decoder. A CPU retry is the
+    correct recovery.
+    """
+    from qubit_runtime.tools.transcription_local import (
+        _looks_like_cuda_lib_error)
+
+    exc = RuntimeError(
+        "parallel_for failed: cudaErrorInvalidDevice: invalid device ordinal")
+    assert _looks_like_cuda_lib_error(exc) is True
+    # A legitimate runtime failure must still surface, not silently retry.
+    assert _looks_like_cuda_lib_error(RuntimeError("bad audio")) is False

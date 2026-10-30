@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import collections
 import math
+import errno
 import os
 import time
 import uuid
@@ -189,8 +191,15 @@ def _lease_paths(
     return home / "runtime" / "active_sessions.json", home / "runtime" / "active_sessions.lock"
 
 
-def _flock(fh, *, lock: bool) -> None:
-    """Exclusive whole-file lock/unlock on ``fh`` (fcntl on POSIX, msvcrt on Windows)."""
+def _flock(fh, *, lock: bool, timeout: Optional[float] = None) -> None:
+    """Exclusive whole-file lock/unlock on ``fh`` (fcntl on POSIX, msvcrt on Windows). With ``timeout``
+    the lock is retried only while another holder has it, then BlockingIOError is raised, so a holder
+    stopped mid-write (SIGSTOP, a debugger) cannot stall the caller; other errors raise at once."""
+    if lock and timeout is not None:
+        from pm.filesystem import lock_fd
+        if not lock_fd(fh.fileno(), wait=True, timeout=timeout):
+            raise BlockingIOError(errno.EWOULDBLOCK, f"file lock still held after {timeout}s")
+        return
     if os.name == "nt":
         import msvcrt
         fh.seek(0)
@@ -201,19 +210,20 @@ def _flock(fh, *, lock: bool) -> None:
 
 
 class _FileLock:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, timeout: Optional[float] = None):
         self.path = path
+        self.timeout = timeout
         self._fh = None
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._fh = open(self.path, "a+b")
         try:
-            _flock(self._fh, lock=True)
+            _flock(self._fh, lock=True, timeout=self.timeout)
         except Exception as exc:
             self._fh.close()
             self._fh = None
-            raise RuntimeError("active session file lock unavailable") from exc
+            raise RuntimeError(f"file lock unavailable: {self.path}") from exc
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -784,3 +794,45 @@ def release_active_session_liveness_guard(
             _write_entries(state_path, kept)
         lease.released = True
         yield _holds_session(kept, session_id)
+
+
+# --- ported from upstream 088f657ecf ---
+
+_queued_releases: dict[str, set[str]] = {}
+
+
+_queued_releases_lock = threading.Lock()
+
+
+def _registry_key(path: Path) -> str:
+    return os.path.normcase(os.path.realpath(path))
+
+
+def mark_release_queued(lease: ActiveSessionLease) -> None:
+    """Retire ``lease`` from this process's view of the registry now; its file write comes later."""
+    if not isinstance(lease, ActiveSessionLease) or not lease.enabled or lease.released:
+        return
+    state_path, _ = _lease_paths(lease)
+    with _queued_releases_lock:
+        _queued_releases.setdefault(_registry_key(state_path), set()).add(lease.lease_id)
+
+
+def _unmark_release_queued(state_path: Path, lease_id: str) -> None:
+    """Make ``lease_id`` visible again to the caller holding the registry lock, which drops it."""
+    key = _registry_key(state_path)
+    with _queued_releases_lock:
+        queued = _queued_releases.get(key)
+        if queued is not None:
+            queued.discard(lease_id)
+            if not queued:
+                del _queued_releases[key]
+
+
+def _without_queued_releases(path: Path, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not _queued_releases:
+        return entries
+    with _queued_releases_lock:
+        queued = set(_queued_releases.get(_registry_key(path), ()))
+    if not queued:
+        return entries
+    return [e for e in entries if str(e.get("lease_id") or "") not in queued]

@@ -4,20 +4,31 @@ import { formatLatency } from "@/lib/latency-sampler";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
-/** Gateway + session summary for the System sidebar block (no separate strip chrome). */
+/**
+ * Gateway + session summary for the rail's System block.
+ *
+ * Renders as a hairline rows grid (`key ......... value`) inside the
+ * telemetry card — the label column is muted uppercase mono so a glance at
+ * the rail reads as a status readout rather than a second menu.
+ */
 export function SidebarStatusStrip({ status, latencyMs }: SidebarStatusStripProps) {
   const { t } = useI18n();
 
   if (status === null) {
     return (
-      <div className="px-5 py-1.5" aria-hidden>
+      <div className="flex flex-col gap-1.5" aria-hidden>
         <div className="h-2 w-[80%] max-w-full animate-pulse rounded-sm bg-midground/10" />
+        <div className="h-2 w-[55%] max-w-full animate-pulse rounded-sm bg-midground/10" />
+        <div className="h-2 w-[42%] max-w-full animate-pulse rounded-sm bg-midground/10" />
       </div>
     );
   }
 
   const gw = gatewayLine(status, t);
   const { activeSessionsLabel, gatewayStatusLabel } = t.app;
+  // The i18n labels ship with a trailing colon ("Gateway Status:"); the
+  // key/value grid supplies its own separator.
+  const strip = (value: string) => value.replace(/[:：]\s*$/, "");
 
   return (
     <Link
@@ -25,35 +36,27 @@ export function SidebarStatusStrip({ status, latencyMs }: SidebarStatusStripProp
       title={t.app.statusOverview}
       className={cn(
         "block text-left",
-        "px-5 pb-2 pt-0.5",
-        "text-text-secondary",
-        "transition-colors hover:text-midground",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground/40",
-        "focus-visible:ring-inset",
       )}
     >
-      <div className="flex flex-col gap-1 font-sans text-xs leading-snug tracking-[0.08em]">
-        <p className="break-words">
-          <span className="text-text-tertiary">{gatewayStatusLabel}</span>{" "}
-          <span className={cn("font-medium", gw.tone)}>{gw.label}</span>
-        </p>
+      <span className="qagent-sidebar__telemetry-row">
+        <span className="qagent-sidebar__telemetry-key">{strip(gatewayStatusLabel)}</span>
+        <span className={cn("qagent-sidebar__telemetry-value", gw.tone)}>{gw.label}</span>
+      </span>
 
-        <p className="break-words">
-          <span className="text-text-tertiary">{activeSessionsLabel}</span>{" "}
-          <span className="tabular-nums text-text-secondary">
-            {status.active_sessions}
+      <span className="qagent-sidebar__telemetry-row">
+        <span className="qagent-sidebar__telemetry-key">{strip(activeSessionsLabel)}</span>
+        <span className="qagent-sidebar__telemetry-value">{status.active_sessions}</span>
+      </span>
+
+      {latencyMs !== undefined && (
+        <span className="qagent-sidebar__telemetry-row">
+          <span className="qagent-sidebar__telemetry-key">Latency</span>
+          <span className="qagent-sidebar__telemetry-value">
+            {latencyMs === null ? "—" : formatLatency(latencyMs)}
           </span>
-        </p>
-
-        {latencyMs !== undefined && (
-          <p className="break-words">
-            <span className="text-text-tertiary">Latency</span>{" "}
-            <span className="tabular-nums text-text-secondary">
-              {formatLatency(latencyMs)}
-            </span>
-          </p>
-        )}
-      </div>
+        </span>
+      )}
     </Link>
   );
 }

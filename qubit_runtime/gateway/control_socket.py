@@ -2,7 +2,7 @@
 versioned JSON verbs (``identify``, ``status``). A connectable socket with a well-formed ``identify``
 answer IS liveness — no PID-reuse heuristics. Never a TCP port: filesystem/pipe ACLs are the auth
 boundary. POSIX: ``$QUBIT_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
-file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\qubit-gateway-<hash>``.
+file when the home path exceeds ``sun_path`` or its filesystem refuses sockets); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
 Wire contract: ONE request per connection — one JSON line in, one out, then the server closes.
 Consumers PREFER the socket and fall back to the state-file/scan layer when it doesn't answer.
 """
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import hashlib
 import inspect
 import json
@@ -27,11 +28,6 @@ from typing import Any, Callable, Optional
 logger = logging.getLogger(__name__)
 
 CONTROL_PROTOCOL_VERSION = 1
-# N26: the Qubit-owned Windows pipe prefix. ``_LEGACY_PIPE_PREFIX`` is the
-# pre-de-brand name; clients still try it so a daemon started before the rename
-# remains reachable (read-old/write-new).
-_PIPE_PREFIX = "qubit-gateway"
-_LEGACY_PIPE_PREFIX = "hermes-gateway"
 _SOCKET_FILENAME = "gateway.sock"
 _POINTER_FILENAME = "gateway.sock.path"
 _IS_WINDOWS = sys.platform == "win32"
@@ -40,6 +36,10 @@ _MAX_UNIX_PATH = 100  # sun_path limit is 104 on macOS/BSD, 108 on Linux; margin
 _MAX_REQUEST_BYTES = 64 * 1024
 _MAX_RESPONSE_BYTES = 512 * 1024
 _DEFAULT_CLIENT_TIMEOUT = 2.0
+# What a filesystem that cannot host an AF_UNIX node answers: a Docker Desktop (virtiofs) bind mount
+# refuses the socket, and an inode a previous container left there can be neither stat'ed nor
+# removed from inside (#123761). Not EADDRINUSE: a live sibling must keep failing loudly.
+_SOCKET_UNSUPPORTED_ERRNOS = frozenset({errno.EOPNOTSUPP, errno.ENOTSUP})
 
 
 def _home_hash(home: Path) -> str:
@@ -48,12 +48,7 @@ def _home_hash(home: Path) -> str:
 
 def windows_pipe_name(home: Path) -> str:
     """Per-QUBIT_HOME named pipe path (Windows transport)."""
-    return rf"\\.\pipe\{_PIPE_PREFIX}-{_home_hash(home)}"
-
-
-def _legacy_windows_pipe_name(home: Path) -> str:
-    """Pre-de-brand pipe name, tried only as a fallback for an older daemon."""
-    return rf"\\.\pipe\{_LEGACY_PIPE_PREFIX}-{_home_hash(home)}"
+    return rf"\\.\pipe\hermes-gateway-{_home_hash(home)}"
 
 
 def _fits_sun_path(path: Path) -> bool:
@@ -77,7 +72,7 @@ def _fallback_socket_path(home: Path) -> Path:
     ``$XDG_RUNTIME_DIR`` first, then ``tempfile.gettempdir()`` and ``/tmp`` (POSIX); if nothing fits
     the first candidate is returned anyway. A squatted shared-temp name is handled at bind time
     (``_squat_proof_fallback``)."""
-    name = f"qubit-gw-{_home_hash(home)}/control.sock"
+    name = f"hermes-gw-{_home_hash(home)}/control.sock"
     runtime = _private_runtime_dir()
     candidates = ([runtime / name] if runtime else []) + [Path(tempfile.gettempdir()) / name] + (
         [] if _IS_WINDOWS else [Path("/tmp") / name])  # no-tmp: ok — AF_UNIX 104-byte path limit needs the short /tmp candidate
@@ -90,15 +85,32 @@ def _private_directory(path: Path) -> bool:
 
 
 def _squat_proof_fallback(bind_path: Path) -> Path:
-    """Same ``qubit-gw-<hash>/control.sock`` leaf (what clients authenticate through the private
+    """Same ``hermes-gw-<hash>/control.sock`` leaf (what clients authenticate through the private
     pointer), under a fresh ``mkdtemp`` root no other user can predict or pre-create."""
-    root = Path(tempfile.mkdtemp(prefix="qgw-", dir=bind_path.parent.parent))
+    root = Path(tempfile.mkdtemp(prefix="hgw-", dir=bind_path.parent.parent))
     path = root / bind_path.parent.name / bind_path.name
     if not _fits_sun_path(path):
         root.rmdir()
         raise PermissionError("fallback control directory is squatted and no private path fits sun_path")
     path.parent.mkdir(mode=0o700)
     return path
+
+
+def _publish_pointer(pointer_file: Path, bind_path: Path) -> None:
+    """Replace ``pointer_file`` with one naming ``bind_path``, atomically: the listener is already
+    accepting, so a client polling for it may read the pointer at any instant, and an empty or
+    partial pointer is ``invalid_control_pointer`` to it, a refusal rather than "still starting".
+    The fresh mkstemp inode is 0600 and the rename replaces a symlink rather than following it,
+    which also heals an older gateway's leftover 0644 pointer."""
+    fd, tmp = tempfile.mkstemp(prefix=f".{pointer_file.name}.", dir=pointer_file.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as pointer:
+            pointer.write(str(bind_path))
+        os.replace(tmp, pointer_file)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
 
 
 def resolve_server_socket_path(home: Path) -> tuple[Path, Optional[Path]]:
@@ -110,8 +122,9 @@ def resolve_server_socket_path(home: Path) -> tuple[Path, Optional[Path]]:
 def resolve_client_socket_path(home: Path) -> Optional[Path]:
     """Where a client should connect for ``home``, or None when nothing exists."""
     direct = Path(home) / _SOCKET_FILENAME
-    if direct.exists():
-        return direct
+    with contextlib.suppress(OSError):  # an un-stat-able stale inode (#123761) is absent, not an error
+        if direct.exists():
+            return direct
     with contextlib.suppress(OSError):
         pointer = Path(home) / _POINTER_FILENAME
         target = pointer.read_text(encoding="utf-8-sig").strip() if pointer.is_file() else ""
@@ -133,7 +146,7 @@ def _detect_supervisor() -> str:
     from gateway.restart import launchd_job_label
     if sys.platform == "darwin" and (launchd_job_label(env) or env.get("LAUNCHD_SOCKET")):
         return "launchd"
-    if env.get("QUBIT_DESKTOP_MANAGED"):
+    if env.get("HERMES_DESKTOP_MANAGED"):
         return "desktop"
     return "external" if "--external-supervisor" in sys.argv else "manual"
 
@@ -168,8 +181,8 @@ def build_identify_payload() -> dict[str, Any]:
     supervisor = _detect_supervisor()
     payload: dict[str, Any] = {
         "protocol": CONTROL_PROTOCOL_VERSION,
-        **{k: record.get(k) for k in ("kind", "pid", "start_time", "qubit_home")},
-        "profile": _profile_label_for_home(record.get("qubit_home") or ""),
+        **{k: record.get(k) for k in ("kind", "pid", "start_time", "hermes_home")},
+        "profile": _profile_label_for_home(record.get("hermes_home") or ""),
         "supervisor": supervisor, "launch_supervisor": supervisor, **_get_code_identity_fields()}
     with contextlib.suppress(Exception):
         # served_profiles (multiplex mode) is stamped into runtime status by the runner.
@@ -188,10 +201,8 @@ def build_status_payload() -> dict[str, Any]:
 
 class GatewayControlServer:
     """Gateway-owned control socket server (identify/status, v1): ``start()`` after the PID-file claim,
-    ``stop()`` on shutdown. ``start()`` returning ``None`` (a bind failure) is reported, not raised:
-    verb/identify consumers fall back to the scan layer. The gateway bootstrap deliberately
-    escalates a missing listener to a fatal startup error, because ``session-ticket`` attach has
-    no scan fallback and a gateway without this listener cannot serve a local session."""
+    ``stop()`` on shutdown. ``start()`` reports a bind failure as False and the gateway bootstrap
+    treats that as fatal: local clients attach only with tickets minted on this listener."""
 
     def __init__(self, home: Optional[Path] = None, *,
                  verb_handlers: Optional[dict[str, Callable[..., dict[str, Any]]]] = None) -> None:
@@ -199,7 +210,7 @@ class GatewayControlServer:
             from gateway.status import _get_process_qubit_home
             home = _get_process_qubit_home()
         # The real directory, as clients canonicalize it: the peer check below refuses any
-        # symlinked component, so an unresolved symlinked ~/.qubit would never mint tickets.
+        # symlinked component, so an unresolved symlinked ~/.hermes would never mint tickets.
         self._home = Path(home).resolve()
         self.ticket_store = None
         self.private_handlers = {}
@@ -218,11 +229,37 @@ class GatewayControlServer:
             return await (self._start_windows() if _IS_WINDOWS else self._start_posix())
         except Exception as exc:
             await self.stop()
-            logger.warning("Gateway control socket failed to start (non-fatal): %s", exc)
+            logger.warning("Gateway control socket failed to start: %s", exc)
             return False
 
     async def _start_posix(self) -> bool:
         bind_path, pointer_file = resolve_server_socket_path(self._home)
+        try:
+            bind_path = await self._bind_posix(bind_path, pointer_file)
+        except OSError as exc:
+            # A home that fits sun_path can still refuse the socket (Docker Desktop bind mounts,
+            # #123761): listen on the same private temp-dir socket + pointer an over-long home uses.
+            if pointer_file is not None or exc.errno not in _SOCKET_UNSUPPORTED_ERRNOS:
+                raise
+            logger.warning("Control socket cannot be created in %s (%s); listening in a private temp directory",
+                           self._home, exc.strerror or exc)
+            pointer_file = Path(self._home) / _POINTER_FILENAME
+            bind_path = await self._bind_posix(_fallback_socket_path(self._home), pointer_file)
+        self._bind_path = bind_path
+        info = bind_path.lstat()
+        self._file_identities[bind_path] = (info.st_dev, info.st_ino)
+        if pointer_file is not None:
+            _publish_pointer(pointer_file, bind_path)
+            self._pointer_file = pointer_file
+        for path in filter(None, (self._bind_path, self._pointer_file)):
+            info = path.lstat()
+            self._file_identities[path] = (info.st_dev, info.st_ino)
+        logger.info("Gateway control socket listening at %s", bind_path)
+        return True
+
+    async def _bind_posix(self, bind_path: Path, pointer_file: Optional[Path]) -> Path:
+        """Bind the listener at ``bind_path`` (moved to a squat-proof root when its shared-temp
+        directory is not private) and return where it actually listens."""
         if pointer_file is not None:
             with contextlib.suppress(FileExistsError):
                 bind_path.parent.mkdir(mode=0o700)
@@ -248,22 +285,7 @@ class GatewayControlServer:
             os.umask(old_umask)
         with contextlib.suppress(OSError):
             os.chmod(bind_path, 0o600)
-        self._bind_path = bind_path
-        info = bind_path.lstat()
-        self._file_identities[bind_path] = (info.st_dev, info.st_ino)
-        if pointer_file is not None:
-            fd = os.open(pointer_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-            # O_CREAT's mode only applies to a NEW file; an older gateway's leftover pointer is 0644
-            # and clients refuse it, so restarting must heal the mode.
-            os.fchmod(fd, 0o600)
-            with os.fdopen(fd, "w", encoding="utf-8") as pointer:
-                pointer.write(str(bind_path))
-            self._pointer_file = pointer_file
-        for path in filter(None, (self._bind_path, self._pointer_file)):
-            info = path.lstat()
-            self._file_identities[path] = (info.st_dev, info.st_ino)
-        logger.info("Gateway control socket listening at %s", bind_path)
-        return True
+        return bind_path
 
     async def _start_windows(self) -> bool:
         from gateway.runtime_bootstrap_windows import NativeControlServer
@@ -294,7 +316,7 @@ class GatewayControlServer:
         self._file_identities.clear()
         if self._fallback_root is not None:
             with contextlib.suppress(OSError):
-                (self._fallback_root / f"qubit-gw-{_home_hash(self._home)}").rmdir()
+                (self._fallback_root / f"hermes-gw-{_home_hash(self._home)}").rmdir()
                 self._fallback_root.rmdir()
             self._fallback_root = None
 
@@ -351,7 +373,8 @@ class GatewayControlServer:
             raise PermissionError("invalid bootstrap envelope")
         params = request.get("params")
         if (not isinstance(params, dict) or not {"profile_id", "instance_id", "purpose"} <= set(params)
-                or set(params) - {"profile_id", "instance_id", "purpose", "scope", "subject"}):
+                or set(params) - {"profile_id", "instance_id", "purpose", "scope", "subject", "restart_wait"}
+                or params.get("restart_wait", "refuse") != "refuse"):
             raise PermissionError("invalid bootstrap parameters")
         if params["instance_id"] != self.ticket_store.instance_id:
             raise PermissionError("stale runtime instance")
@@ -367,7 +390,8 @@ class GatewayControlServer:
         if subject is not peer_subject and not _structured_login_subject(subject):
             raise PermissionError("invalid bootstrap subject")
         ticket = self.ticket_store.mint(profile_id=params["profile_id"], subject=subject,
-                                       purpose=params["purpose"], scope=params.get("scope", "profile"))
+                                       purpose=params["purpose"], scope=params.get("scope", "profile"),
+                                       refuse_restart_wait="restart_wait" in params)
         return {"ticket": ticket, "expires_in_seconds": 30,
                 "instance_id": self.ticket_store.instance_id,
                 "profile_id": params["profile_id"], "runtime_protocol": 1}

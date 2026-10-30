@@ -1,32 +1,21 @@
-import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import type { StatusResponse } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
+/**
+ * Version / org colophon at the very foot of the rail. The wrapper
+ * (`qagent-sidebar__colophon`) owns the border, padding and type — this
+ * component only answers "which version" and "whose product".
+ */
 export function SidebarFooter({ status }: SidebarFooterProps) {
   const { t } = useI18n();
 
   return (
-    <div
-      className={cn(
-        "flex shrink-0 items-center justify-between gap-2",
-        "px-5 py-2.5",
-        "border-t border-current/10",
-      )}
-    >
-      <Typography
-        className="font-mono-ui text-xs tabular-nums tracking-[0.08em] text-text-tertiary lowercase"
-      >
+    <div className="flex w-full items-center justify-between gap-2">
+      <span className="tabular-nums">
         {status?.version != null ? `v${status.version}` : "—"}
-      </Typography>
-
-      <span
-        className={cn(
-          "font-sans text-display text-xs tracking-[0.12em] text-midground",
-        )}
-      >
-        {t.app.footer.org}
       </span>
+
+      <span>{t.app.footer.org}</span>
     </div>
   );
 }

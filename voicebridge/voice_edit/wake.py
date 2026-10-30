@@ -971,8 +971,10 @@ class WakeMonitor:
                  arm_window_s: float = 6.0,
                  segmenter_factory: Optional[Callable[[Any], Any]] = None,
                  pending_probe: Optional[Callable[[], bool]] = None,
+                 pending_cancel: Optional[Callable[[], bool]] = None,
                  on_hint: Optional[Callable[[str], None]] = None,
                  on_command_route: Optional[Callable[[str, Any], None]] = None,
+                 on_wake_armed: Optional[Callable[[], None]] = None,
                  ) -> None:
         self.cfg = cfg
         self.on_command = on_command
@@ -997,6 +999,16 @@ class WakeMonitor:
         # Never raises (a broken probe degrades to no-pending, never a
         # settle), never writes.
         self._pending_probe = pending_probe
+        # A fresh directed wake supersedes a staged confirmation: the user
+        # explicitly started a new turn, so the stale yes/no prompt must not
+        # latch the wake gate. The callback clears the helper's in-process
+        # pending (never runs it); CT journal pending is denied below.
+        self._pending_cancel = pending_cancel
+        # Optional "a bare wake armed the next utterance" sink. The helper
+        # shows the panel in its listening state from it, so a bare
+        # "Hey Qubit" visibly starts the next recording instead of leaving
+        # the last preview/error on screen.
+        self._on_wake_armed = on_wake_armed
         # 2026-10-03 (silent-discard fix): optional visible-hint sink for
         # unarmed command-shaped discards. The helper wires this to its
         # existing heard-preview path (``_safe_show`` + ``_ui_status("heard",
@@ -1201,7 +1213,7 @@ class WakeMonitor:
                         agc=bool(_cfg(self.cfg, "voice_edit", "agc",
                                       default=True)))
 
-    def _do_transcribe(self, pcm: bytes, *, prefer_streaming: bool = False) -> str:
+    def _do_transcribe(self, pcm: bytes) -> str:
         # Honest consumer of ``voice_edit.noise_suppression``: the software
         # NS/AGC stage runs on the captured utterance before either STT path
         # (accurate or streaming). OFF → pcm unchanged (see _maybe_ns_filter).
@@ -1210,15 +1222,19 @@ class WakeMonitor:
             return self._transcribe(pcm)
         # Accurate whole-utterance pass first (default); the streaming socket
         # remains the live path and the fallback when the accurate engine is
-        # unavailable or yields nothing.
+        # unavailable or yields nothing. The wake fallback uses this SAME
+        # decoder as Right-Ctrl: the streaming nemotron heard "open GitHub"
+        # as "One GitHub" (live 2026-10-29), so it must never be the primary
+        # decoder for a wake command.
         mode = str(_cfg(self.cfg, "voice_edit", "stt_mode",
                         default="accurate") or "accurate").lower()
-        if mode == "accurate" and not prefer_streaming:
+        if mode == "accurate":
             norm = _normalize_pcm(
                 pcm, target_peak=_mic_target_peak(self.cfg))
-            # Browser-local STT parity: decode with the configured Sherpa
-            # engine (parakeet) first. The streaming nemotron is the fast
-            # fallback, not the primary short-command decoder.
+            # Browser-local STT parity: decode with the configured accurate
+            # Sherpa engine first (same as Right-Ctrl). The streaming
+            # nemotron is the fast fallback, not the primary short-command
+            # decoder.
             try:
                 from .asr_accurate import transcribe_sherpa
                 text, fail = transcribe_sherpa(self.cfg, norm)
@@ -1447,12 +1463,14 @@ class WakeMonitor:
                         # mode, and a miss is discarded, never typed.
                         if _asr_fallback_allows(self.cfg, pcm):
                             _trace("asr_fallback_probe", bytes=len(pcm),
-                                   prefer="streaming")
-                            # KWS missed: use the streaming engine for the
-                            # wake phrase (it hears "Hey Qubit" reliably;
-                            # moonshine misheard it as "Hate your bit").
-                            self._handle_segment(
-                                pcm, forced=False, prefer_streaming=True)
+                                   prefer="accurate")
+                            # KWS missed: decode with the same accurate/English
+                            # decoder Right-Ctrl uses. The streaming engine is
+                            # only the internal last resort inside
+                            # ``_do_transcribe`` (accurate empty/unavailable);
+                            # as the primary it heard "open GitHub" as
+                            # "One GitHub" (live 2026-10-29).
+                            self._handle_segment(pcm, forced=False)
                         else:
                             _trace("asr_fallback_skip", bytes=len(pcm))
                         continue
@@ -1508,11 +1526,15 @@ class WakeMonitor:
         if not helper_live and not ct_kind:
             return False
         if not affirmative and not negative:
-            # A live confirmation is open: any non-affirm/deny transcript
-            # (media, unrelated speech) is dropped and the pending KEPT —
-            # nothing may clobber a staged confirmation. (The forced/KWS
-            # path runs the same gate directly in _handle_transcript, since
-            # it never reaches this method.)
+            # A fresh DIRECTED wake is a new intent: the explicit "hey qubit"
+            # supersedes the stale confirmation (without running it) so the
+            # prompt cannot latch the wake gate forever. Unrelated speech
+            # still keeps the pending staged — nothing clobbers it by
+            # accident. (The forced/KWS path runs the same gate directly in
+            # _handle_transcript, since it never reaches this method.)
+            if self._directed_wake(text) and self._cancel_live_pending():
+                _trace("pending_superseded", via="wake", chars=len(text))
+                return False
             _trace("pending_guard", chars=len(text))
             return True
         with self._lock:
@@ -1577,6 +1599,83 @@ class WakeMonitor:
             pass
         return False
 
+    def _directed_wake(self, text: Any) -> bool:
+        """True when ``text`` is a real wake address, not unrelated speech.
+
+        Only a full phrase ("hey/hi/ok … qubit"), a deliberate trailing
+        address, or an owner custom trigger counts. A bare "Qubit, …" is
+        room chatter on the unarmed path and must keep the old discard
+        behavior. Never raises.
+        """
+        try:
+            body = text if isinstance(text, str) else str(text or "")
+            if not body.strip():
+                return False
+            aliases = [self.phrase, *WAKE_ALIASES]
+            try:
+                from . import wake_words as _ww
+                aliases = [*aliases, *_ww.active_triggers()]
+            except Exception:
+                pass
+            if _matches_custom_trigger(body):
+                return True
+            try:
+                if wake_match_kind(body, aliases=aliases) == "full":
+                    return True
+            except Exception:
+                pass
+            return strip_wake_trailing(body, aliases=aliases) is not None
+        except Exception:
+            return False
+
+    def _cancel_live_pending(self) -> bool:
+        """Cancel (never run) a staged confirmation for a fresh wake.
+
+        Helper-staged pending is cleared through the injected callback; CT
+        journal pending is denied through its existing settle-once path. A
+        live helper pending with no callback cannot be cleared safely, so
+        the caller keeps the old "drop the utterance" behavior instead of
+        routing over it. Never raises.
+        """
+        try:
+            ct_kind = _live_voice_pending(self.cfg)
+        except Exception:
+            ct_kind = ""
+        try:
+            probe = self._pending_probe
+            helper_live = bool(probe()) if probe is not None else False
+        except Exception:
+            helper_live = False
+        if not helper_live and not ct_kind:
+            return True
+        ok = True
+        if ct_kind:
+            try:
+                _deny_voice_pending(self.cfg, ct_kind)
+            except Exception:
+                # The record may already be gone; treat as cleared rather
+                # than wedge the gate forever.
+                pass
+        if helper_live:
+            cancel = self._pending_cancel
+            if not callable(cancel):
+                return False
+            try:
+                ok = bool(cancel())
+            except Exception:
+                ok = False
+        return ok
+
+    def _notify_wake_armed(self) -> None:
+        """Tell the helper a bare wake armed the next utterance. Never raises."""
+        cb = self._on_wake_armed
+        if cb is None:
+            return
+        try:
+            cb()
+        except Exception:
+            pass
+
     def _speaking(self) -> bool:
         """True when the helper reports it is speaking / in its echo tail.
 
@@ -1588,16 +1687,14 @@ class WakeMonitor:
         except Exception:
             return False
 
-    def _handle_segment(self, pcm: bytes, *, forced: bool = False,
-                        prefer_streaming: bool = False) -> None:
+    def _handle_segment(self, pcm: bytes, *, forced: bool = False) -> None:
         if len(pcm) < 4800:
             _trace("segment_too_short", bytes=len(pcm))
             return
         _trace("segment", bytes=len(pcm), forced=forced,
                engine=self.engine, capped=_segment_capped(self.cfg, len(pcm)))
         try:
-            text = self._do_transcribe(
-                pcm, prefer_streaming=prefer_streaming).strip()
+            text = self._do_transcribe(pcm).strip()
         except Exception as exc:
             self.last_error = str(exc)[:160]
             _trace("transcribe_error", detail=self.last_error)
@@ -1657,8 +1754,16 @@ class WakeMonitor:
                 except Exception:
                     allowed = False
                 if not allowed:
-                    _trace("pending_guard", chars=len(text), forced=True)
-                    return
+                    # A directed wake supersedes a stale confirmation on the
+                    # acoustic path too; unrelated speech stays guarded.
+                    if (self._directed_wake(text)
+                            and self._cancel_live_pending()):
+                        _trace("pending_superseded", via="wake",
+                               forced=True, chars=len(text))
+                        pending = False
+                    else:
+                        _trace("pending_guard", chars=len(text), forced=True)
+                        return
         now = time.monotonic()
         with self._lock:
             armed = now < self._armed_until
@@ -1746,6 +1851,7 @@ class WakeMonitor:
                 else:
                     with self._lock:
                         self._armed_until = time.monotonic() + self.arm_window_s
+                    self._notify_wake_armed()
             else:
                 _trace("forced_weak_arm", chars=len(text), kind=kind or "none")
                 with self._lock:
@@ -1775,6 +1881,7 @@ class WakeMonitor:
                 _trace("armed_empty_repeat", chars=len(text))
                 if not self._cue_segment:
                     beep(self.cfg, "wake")
+                self._notify_wake_armed()
                 return
             # Continuous mode: an utterance accepted through a live
             # follow-up run consumes one of its bounded budget. When the
@@ -1842,6 +1949,7 @@ class WakeMonitor:
         else:
             with self._lock:
                 self._armed_until = time.monotonic() + self.arm_window_s
+            self._notify_wake_armed()
 
     def _emit(self, command: str) -> None:
         cmd = (command or "").strip()

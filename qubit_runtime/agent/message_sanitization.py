@@ -285,7 +285,7 @@ def _repair_tool_call_arguments(raw_args: str, tool_name: str = "?") -> str:
     return "{}"
 
 
-def close_interrupted_tool_sequence(messages: list, final_response: Any = None) -> bool:
+def close_interrupted_tool_sequence(messages: list, final_response: Any = None, *, stopped: bool = False) -> bool:
     """Append a synthetic assistant turn when an interrupted tail is a tool result: a transcript
     ending on a raw ``tool`` message makes the next user message land as ``tool → user``, an
     alternation violation strict providers (Gemini, Claude) answer by hallucinating a
@@ -297,7 +297,12 @@ def close_interrupted_tool_sequence(messages: list, final_response: Any = None) 
     ``display_kind="hidden"`` keep it out of rendered transcripts, matching the
     ``_INTERRUPTED_PLACEHOLDER`` shape in ``turn_api_call.py``. A caller-supplied banner
     (truncation notices, partial-delivery text) stays visible: it is the turn's only
-    user-facing explanation."""
+    user-facing explanation.
+
+    ``stopped`` (an interrupted turn: a user stop or any other interrupt, not a truncation or
+    overflow exit) puts the stopped mark on the closing row, as ``turn_api_call.py`` does on every
+    interrupted partial reply: it is the turn's last stored row, so a reopened transcript still says
+    the turn was stopped."""
     last = messages[-1] if messages else None
     if not isinstance(last, dict) or last.get("role") != "tool":
         return False
@@ -306,9 +311,12 @@ def close_interrupted_tool_sequence(messages: list, final_response: Any = None) 
 
     stripped = text.strip()
     if not stripped or stripped == _INTERRUPTED_PLACEHOLDER:
-        append_message(messages, hidden_interrupt_placeholder_row())
+        row = hidden_interrupt_placeholder_row()
     else:
-        append_message(messages, {"role": "assistant", "content": stripped})
+        row = {"role": "assistant", "content": stripped}
+    if stopped:
+        row["display_metadata"] = {"interrupted": True}
+    append_message(messages, row)
     return True
 
 
@@ -626,30 +634,28 @@ def _set_provider_tool_id(tc: Any, key: str, value: str) -> None:
         _tc_set(tc, key, value)
 
 
-# -- reasoning_content policy: single owner of strip-vs-re-pad; adapters keep only SYNTAX --
-# Require side (echo-back enforced; replays 400 without the field): the families below. Kimi
-# is host-driven on purpose (aggregators re-exporting kimi reject it); DeepSeek V4 rejects
-# empty-string pads → " ". Strict side (400/422 "Extra inputs are not permitted"): everyone
-# else — Mistral, Cerebras, Groq, SambaNova, … Strip the key entirely, even a one-space pad.
-
-# --------------------------------------------------------------------------- reasoning_content policy —
-# single owner (audit F4) --------------------------------------------------------------------------- The
-# strip-vs-repad decision was previously forked across the wire files in separate incident commits
-# (2b3a4f0af8 strip for strict providers, b5495db701 re-pad for require-side, 94b3131be7/9a9f8a6d99 kimi
-# pad). The POLICY — which provider direction gets which treatment — lives here as one rule table + apply
-# functions; adapters keep only SYNTAX mapping (e.g. anthropic_adapter turning reasoning_content into a
-# thinking block). Direction table: require-side (echo-back enforced; replays 400 without the field): kimi
-# — provider kimi-coding/kimi-coding-cn, or host api.kimi.com / moonshot.ai / moonshot.cn. Host-driven on
-# purpose: aggregators re-exporting kimi models reject the echo. deepseek — provider "deepseek", model
-# contains "deepseek", or host api.deepseek.com (#15250; V4 rejects empty-string pads, hence the " "
-# single-space pad, #17341). mimo     — provider "xiaomi", model contains "mimo", or host *.xiaomimimo.com.
-# strict side (field rejected with 400/422 "Extra inputs are not permitted"): everyone else — Mistral,
-# Cerebras, Groq, SambaNova, … (#45655). Strip the key entirely, even a single-space pad.
+# -- reasoning replay policy: single owner; adapters keep only SYNTAX ----------------------
+# Every model reasons and intends that reasoning to be replayed, so every chat-completions
+# route gets its stored reasoning back BY DEFAULT, on the carrier(s) that route reads. Two
+# tables own the decision:
+#   * ``_REASONING_ECHO_RULES`` — the MUST-ECHO tier: a tool-call turn without a non-empty
+#     ``reasoning_content`` is an HTTP 400 there, so a missing value is padded with " " (never
+#     "": DeepSeek V4 rejects it, #17341). Kimi is host-driven on purpose (aggregators
+#     re-exporting kimi do not need the pad).
+#   * ``_REASONING_CARRIER_ROUTES`` — which carriers a route reads (first match wins). Strict
+#     hosts come first: their schemas reject unknown message keys with 400/422 ("Extra inputs
+#     are not permitted" / "property X is unsupported" / "no such field", #45655, #70233).
+#     Every other route defaults to ``reasoning_content``, which is the de-facto standard.
+# A route that still rejects a field is learned at runtime (``record_reasoning_field_rejection``)
+# and the field is dropped for that (provider, host, model) only. Stored history keeps every
+# carrier; only wire copies are shaped here.
 _REASONING_ECHO_RULES: tuple = (
     # (family, exact providers (raw), exact providers (lowered), model substrings (lowered), hosts)
     ("kimi", frozenset({"kimi-coding", "kimi-coding-cn"}), frozenset(), (), ("api.kimi.com", "moonshot.ai", "moonshot.cn")),
     ("deepseek", frozenset(), frozenset({"deepseek"}), ("deepseek",), ("api.deepseek.com",)),
     ("mimo", frozenset(), frozenset({"xiaomi"}), ("mimo",), ("api.xiaomimimo.com", "xiaomimimo.com")),
+    # Portal stealth model that 400s on a tool-call turn without reasoning_content (f86276d2ebc).
+    ("missingno", frozenset(), frozenset(), ("stealth/missingno",), ()),
 )
 _REASONING_ECHO_RULE_BY_FAMILY = {rule[0]: rule for rule in _REASONING_ECHO_RULES}
 
@@ -698,8 +704,8 @@ def matches_reasoning_echo_family(family: str, provider: Any, model: Any, base_u
 
 
 def reasoning_echo_family(provider: Any, model: Any, base_url: Any) -> str | None:
-    """``"kimi"`` / ``"deepseek"`` / ``"mimo"`` (first match in table order) when the
-    endpoint enforces reasoning_content echo-back, else ``None`` (strip side)."""
+    """``"kimi"`` / ``"deepseek"`` / ``"mimo"`` (first match in table order) when the endpoint
+    enforces reasoning_content echo-back on tool-call turns, else ``None``."""
     families = (rule[0] for rule in _REASONING_ECHO_RULES)
     return next((f for f in families if matches_reasoning_echo_family(f, provider, model, base_url)), None)
 
@@ -876,7 +882,7 @@ def apply_reasoning_content_policy(
     else:
         api_msg.pop(R, None)
     if carriers is not None and RD not in carriers:
-        # Private ``*.native_assistant`` records (Gemini/Copilot carriers) survive: the transport lifts
+        # Private ``*.native_assistant`` records (Gemini / profile-declared carriers) survive: the transport lifts
         # them onto the route that reads them and filters them from every other wire.
         private = [d for d in api_msg.pop(RD, None) or () if isinstance(d, dict)
                    and str(d.get("type") or "").endswith(".native_assistant")]

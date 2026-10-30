@@ -802,3 +802,81 @@ def _(rid, params: dict) -> dict:
 
 def register(server) -> None:
     bind_module(globals(), server, skip=("_",))
+
+
+# --- ported from upstream 088f657ecf ---
+
+_voice_capture_sid: str = ""
+
+
+_voice_capture_gen = 0
+
+
+def _session_voice_enabled(session_id) -> bool:
+    """Push-to-talk gate: a shared-owner local session's own gateway ``/voice`` mode (what Ink's
+    ``/voice on`` sets through slash.exec, T9); the sidecar's env flag for its own sessions."""
+    try:
+        from gateway.session_config import local_voice_enabled
+        held = local_voice_enabled(session_id)
+    except ImportError:
+        held = None
+    return _voice_mode_enabled() if held is None else held
+
+
+def _set_session_voice_off(session_id) -> bool:
+    """Turn a shared-owner session's own voice mode off (spoken stop, no-speech limit); False when
+    no owner in this process holds it (the sidecar's env flag is the state)."""
+    try:
+        from gateway.session_config import set_local_voice_mode
+        return set_local_voice_mode(session_id, "off") is True
+    except ImportError:
+        return False
+
+
+def _stop_session_voice_capture(session_id) -> None:
+    """End *session_id*'s live capture (not another session's) and drop its late text callbacks."""
+    global _voice_capture_gen
+    with _voice_sid_lock:
+        if not session_id or session_id != _voice_capture_sid:
+            return
+        _voice_capture_gen += 1
+    with contextlib.suppress(Exception):
+        from qubit_cli.voice import stop_continuous
+        stop_continuous()
+    _resume_voice_wake()
+
+
+def _capture_live() -> bool:
+    try:
+        from qubit_cli.voice import is_continuous_active
+    except ImportError:  # an older voice wrapper without the probe
+        return False
+    return bool(is_continuous_active())
+
+
+def _voice_capture_callback(fn):
+    """*fn* while the capture it was registered for is still current; a no-op once invalidated."""
+    with _voice_sid_lock:
+        gen = _voice_capture_gen
+
+    def call(*args):
+        with _voice_sid_lock:
+            current = gen == _voice_capture_gen
+        if current:
+            fn(*args)
+    return call
+
+
+def _end_session_voice_chat(session_id, *, stop_loop: bool, stop_tts: bool) -> None:
+    """A stop phrase (spoken, typed or full-duplex) ends *session_id*'s voice chat: a shared-owner
+    session through its own mode (which ends only its capture); else the sidecar's env flags."""
+    if not _set_session_voice_off(session_id):
+        _end_voice_chat(stop_loop=stop_loop, stop_tts=stop_tts)
+    elif stop_tts:
+        with contextlib.suppress(Exception):
+            _tts_stream_stop(user_barge=False)
+
+
+def _vr_on_silent_limit():
+    _set_session_voice_off(_voice_capture_sid)
+    _vr_transcript({"no_speech_limit": True})

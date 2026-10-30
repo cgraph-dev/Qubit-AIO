@@ -3813,3 +3813,22 @@ __all__ = [
     "switch_model",
     "try_recover_primary_transport",
 ]
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _ensure_route_client_headers(client_kwargs: dict, provider: str) -> None:
+    """Defense-in-depth: recovery/restore rebuild from a snapshot without re-running header
+    wiring, and a route whose provider requires its client headers (integration ids) 400s
+    without them. Only ADD missing keys, never override."""
+    from agent.provider_route_hooks import route_answer
+    required = route_answer("client_headers", provider=provider, base_url=str(client_kwargs.get("base_url", "")),
+                            api_key=str(client_kwargs.get("api_key", "") or ""))
+    if not required:
+        return
+    existing = dict(client_kwargs.get("default_headers") or {})
+    existing_lower = {k.lower() for k in existing}
+    for hk, hv in required.items():
+        if hk.lower() not in existing_lower:
+            existing[hk] = hv
+    client_kwargs["default_headers"] = existing

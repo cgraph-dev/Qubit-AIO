@@ -284,21 +284,20 @@ def test_speak_barge_in_disabled_plays_through(monkeypatch):
     assert mic.started is False, "disabled barge-in must not open the mic"
 
 
-# Lane 3 (2026-10-03): barge-in threshold calibrated to measured levels.
-#
-# Journal proof: owner speech peaks at 0.5 (max-abs) through the live
-# ParecMic chain (gain 12, AGC off) while the 60 s drone baseline never
-# exceeds RMS 0.073 and speaker echo never exceeds RMS 0.097. The old
-# default (0.20) sat above every owner word at seating distance, so the
-# first "stop" during TTS died silently (wake yields while _speaking, the
-# watcher never tripped) and the louder retry arrived after playback as a
-# new command. 0.10 sits above echo/drone with margin and below owner
-# speech even when the word straddles two 300 ms frames.
-CALIBRATED_BARGE_THRESHOLD = 0.10
+# Lane 3 (2026-10-29): barge-in threshold re-calibrated against the LIVE
+# chain. ParecMic applies a per-frame gain cap of 12x, so the mic's output is
+# normalized toward a 0.5 peak: a normal TTS reply played through the room
+# measured 0.012-0.057 RMS (p90 0.033) while owner speech reaches the 0.5
+# peak target, i.e. ~0.08 RMS. The old 0.10 sat ABOVE that speech level, so a
+# wake spoken during TTS never tripped the watcher and the user had to wait
+# and repeat. 0.06 sits above the measured echo ceiling and below owner
+# speech; the wake-phrase gate still resumes playback for any non-wake sound,
+# so a false gate costs at most a brief pause, never a dropped reply.
+CALIBRATED_BARGE_THRESHOLD = 0.06
 
 
 def test_barge_default_threshold_is_calibrated():
-    """The shipped default must match the measured calibration (0.10)."""
+    """The shipped default must match the measured calibration (0.06)."""
     from voicebridge import desktop_helper as DH
     assert DH.BargeInWatcher().threshold == CALIBRATED_BARGE_THRESHOLD
     probe = DH.DesktopHelper.__new__(DH.DesktopHelper)
@@ -320,8 +319,8 @@ class _DefaultCfg:
 
 
 def test_barge_owner_level_speech_interrupts_at_default(monkeypatch):
-    """Owner-distance speech (RMS 0.13, one 300 ms frame) stops playback."""
-    mic = FakeMic([_frame(0.01), _frame(0.13)])  # RMS 0.13: owner word
+    """Owner speech at the measured live level (RMS ~0.08) stops playback."""
+    mic = FakeMic([_frame(0.01), _frame(0.08)])  # RMS 0.08: measured owner word
     procs = []
     helper = _helper(monkeypatch, _DefaultCfg(), mic, procs)
     helper._speak("hello there this is a long spoken reply with many words")
@@ -332,8 +331,8 @@ def test_barge_owner_level_speech_interrupts_at_default(monkeypatch):
 
 
 def test_barge_echo_floor_never_trips_at_default(monkeypatch):
-    """Sustained echo/drone-level audio (RMS ~0.09) plays through."""
-    mic = FakeMic([_frame(0.09)] * 5)  # RMS 0.09: above the drone max
+    """Sustained echo-level audio (measured p90 ~0.03, max 0.057) plays through."""
+    mic = FakeMic([_frame(0.05)] * 5)  # below the 0.06 gate, above p90 echo
     procs = []
     helper = _helper(monkeypatch, _DefaultCfg(), mic, procs)
     helper._speak("hello there this is a long spoken reply with many words")

@@ -129,3 +129,20 @@ class CredentialPoolModelCooldownMixin:
                 if waits and all(waits) and min(waits) - now < MODEL_ENTITLEMENT_BENCH_SECONDS / 2:
                     cooled[model] = min(waits)
         return {"scope": "models", "models": cooled} if cooled else None
+
+
+# --- ported from upstream 088f657ecf ---
+
+FAILURE_REASON_USAGE_WINDOW = "usage_window"
+
+
+def pool_failure_reason(reason: Any, error_context: Optional[dict[str, Any]], billing_unverified: bool) -> str:
+    """The pool's failure reason for a rotation (*reason* is a ``FailoverReason``). A usage-window 402
+    benches only the refused model; an ambiguous billing body is sized as transient, not a 1-hour bench."""
+    from agent.error_classifier import FailoverReason
+    if reason == FailoverReason.billing and (error_context or {}).get("usage_window"):
+        return FAILURE_REASON_USAGE_WINDOW
+    if reason == FailoverReason.billing and billing_unverified:
+        from agent.credential_pool import FAILURE_REASON_BILLING_UNVERIFIED
+        return FAILURE_REASON_BILLING_UNVERIFIED
+    return reason.value

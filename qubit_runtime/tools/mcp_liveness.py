@@ -196,3 +196,18 @@ def unavailable_details(server_name: str) -> tuple[declaration.Declaration, Stat
     if decl is None or current is None:
         return None
     return decl, current, describe(decl, current.availability, current.state)
+
+
+# --- ported from upstream 088f657ecf ---
+
+_AVAILABILITY_PROBLEMS: dict[str, LivenessState] = {
+    "missing_app": "missing_app",
+    "unsupported_os": "missing_app",
+    "unsupported_gpu": "unsupported_gpu",
+    "version_too_old": "version_too_old",
+}
+
+
+def availability_problem(available: Availability) -> LivenessState | None:
+    """The unavailable state an install-time availability verdict maps to; None when it is not a problem."""
+    return _AVAILABILITY_PROBLEMS.get(available.state)

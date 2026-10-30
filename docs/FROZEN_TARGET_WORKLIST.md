@@ -1,5 +1,9 @@
 # FROZEN-TARGET WORKLIST — production symbols still missing
 
+> **STALE — pre-2026-10-30 re-pin.** The target is now `088f657ecf77674c7b8e2ededf4e3576d82e042c`.
+> Re-run `scripts/frozen_target_progress.py` for current numbers. The 296/78 figures below
+> are the 2026-10-19 measurement against the previous pin and are not current.
+
 Target: upstream `43faacfb8de7b29548547a7fbdedad0cc6e7391c` (frozen 2026-10-16).
 Measured by `scripts/audit_sync_completeness.py --rev 43faacfb8de7... --show-symbols`
 on 2026-10-19, tree at `35fdb1e33`.

@@ -2029,6 +2029,12 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
         return data if want_deepcopy else cached_copy
 
 
+def _raw_config_cache_store(path_key: str, cache_key: tuple[Any, ...], data: dict[str, Any]) -> None:
+    """Publish ``data`` (caller-owned copy) as the raw config for ``path_key`` at ``cache_key``.
+    One whole-tuple replace, so the lock-free readers see either the old or the new entry."""
+    _RAW_CONFIG_CACHE[path_key] = (*cache_key, data)
+
+
 def read_raw_config() -> Dict[str, Any]:
     """Read config.yaml as-is (no defaults merged, no migration); ``{}`` if missing/unparseable.
     Cached on the file signature (mtime_ns, size, ino, ctime_ns); returns a deepcopy since callers mutate before ``save_config()``."""
@@ -3426,6 +3432,21 @@ def _validate_config_key(key: str) -> tuple[bool, Optional[str]]:
         consumed.append(seg)
         node = node[seg]
     return True, None
+
+
+def _validate_schema_key(key: str) -> tuple[bool, Optional[str]]:
+    """Schema validation for a dotted config-key path, including the legacy left-core terminal
+    keys that are read at runtime but deliberately absent from ``DEFAULT_CONFIG``. Delegates the
+    structural walk to :func:`_validate_config_key`."""
+    if not key:
+        return False, None
+    try:
+        from qubit_cli.left_core_migration import LEFT_CORE_TERMINAL_KEYS
+    except ModuleNotFoundError:
+        LEFT_CORE_TERMINAL_KEYS = {"terminal.singularity_image": "TERMINAL_SINGULARITY_IMAGE"}
+    if key in LEFT_CORE_TERMINAL_KEYS:
+        return True, None
+    return _validate_config_key(key)
 
 
 def _is_wrong_prefix_suggestion(key: str, suggestion: Optional[str]) -> bool:

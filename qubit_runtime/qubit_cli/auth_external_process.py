@@ -31,3 +31,23 @@ def resolve_external_process_command(command: str) -> Optional[str]:
     from agent.anthropic_adapter import find_claude_code_cli
 
     return find_claude_code_cli(command)
+
+
+# --- ported from upstream 088f657ecf ---
+
+def external_process_launch_env_names() -> frozenset[str]:
+    """Env names that choose an external-process provider's executable or argv, from every registered
+    profile's ``process_command_env_vars`` and ``process_args_env_var``: executable authority, so the
+    generic env writers (dashboard, MCP/connector installs, ``save_env_value``) must refuse them."""
+    from providers import list_providers
+
+    return frozenset(name for profile in list_providers() if profile.auth_type == "external_process"
+                     for name in (*profile.process_command_env_vars, profile.process_args_env_var) if name)
+
+
+def env_writer_launch_denylist() -> frozenset[str]:
+    """:func:`external_process_launch_env_names` plus every left-core row's ``launch_env``: a plugin that is
+    not loaded (absent, disabled, failed, quarantined) registers no profile to declare them."""
+    from qubit_cli.left_core_migration import launch_env_names
+
+    return external_process_launch_env_names() | launch_env_names()

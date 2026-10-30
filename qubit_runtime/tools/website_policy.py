@@ -183,3 +183,17 @@ def check_website_access(url: str, config_path: Optional[Path] = None) -> Option
                 "message": f"Blocked by website policy: '{host}' matched rule '{pattern}' from {source}",
             }
     return None
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _fresh_cached_policy(resolved_path: str, now: float) -> Optional[dict[str, Any]]:
+    """Return the cached policy only when it belongs to this config path and is still within TTL."""
+    with _cache_lock:
+        if (
+            _cached_policy is not None
+            and _cached_policy_path == resolved_path
+            and (now - _cached_policy_time) < _CACHE_TTL_SECONDS
+        ):
+            return _cached_policy
+    return None

@@ -229,6 +229,27 @@ def test_expiry_is_honest_and_never_runs(monkeypatch):
     assert any("expired" in d for _, d in overlay.statuses), overlay.statuses
 
 
+def test_expired_pending_does_not_block_a_new_command(monkeypatch):
+    """An abandoned confirmation must not wedge the wake path.
+
+    Live 2026-10-29: an expired staged task made every later wake command
+    answer only "say yes, no, or cancel". Expiry still never RUNS the stale
+    action, but a new non-affirm command now clears it and proceeds.
+    """
+    h, overlay, client, desktop = _helper(
+        monkeypatch, routes={"open": {"mode": "answer",
+                                      "question": "open youtube"}})
+    h._pending_task = {"text": "delete everything", "request_id": "old",
+                       "staged_at": time.monotonic() - 9999.0}
+    h._process_transcript("open youtube")
+    assert client.runs == [], "a stale confirmation must never execute"
+    assert h._pending_task == {}, "the stale stage must be cleared"
+    assert ("route", h.request_id, "open youtube") in client.calls, \
+        "a new command must reach routing instead of being blocked"
+    assert not any("pending confirmation" in d
+                   for _, d in overlay.statuses), overlay.statuses
+
+
 def test_new_command_stages_only_after_cancel(monkeypatch):
     h, overlay, client, desktop = _helper(
         monkeypatch, routes={

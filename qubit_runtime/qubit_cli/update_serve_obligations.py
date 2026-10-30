@@ -106,3 +106,79 @@ def warn_pending_manual_serves(*, startup: bool = False, pending_manual: list[di
         except (OSError, ValueError, KeyError, TypeError) as exc:
             logger.debug("Could not reconcile manual serve obligation %s: %s", path, exc)
             print(f"  ⚠ Manual serve restart reminder could not be verified: {path.name}", file=stream)
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _defer_identified(runtime: dict, *, extra: dict | None = None, require_alive: bool = False) -> bool:
+    """Shared tail of the manual and unit deferrals: True when the incarnation is gone or its reminder
+    (plus *extra* fields) was filed; False while it is still owed and nothing durable was written."""
+    from qubit_cli.process_identity import _pid_alive_matches
+
+    pid, created = runtime.get("pid"), runtime["detail"].get("create_time")
+    if type(pid) is not int or pid <= 0:
+        return False
+    identified = type(created) in (int, float) and math.isfinite(created) and created > 0
+    if not identified:
+        # Without a recorded creation time no durable reminder can be filed (#116507);
+        # only a provably dead pid discharges the row, anything less stays pending.
+        return not require_alive and _pid_alive_matches(pid, None) is False
+    try:
+        alive = _pid_alive_matches(pid, created)
+        if require_alive and alive is not True:
+            return False
+        if alive is False:
+            return True
+        _write_reminder({"kind": runtime["kind"], "profile": runtime.get("profile", "unknown"), "pid": pid,
+                         "create_time": created, **(extra or {})})
+        return True
+    except (OSError, ValueError, TypeError) as exc:
+        logger.debug("Could not preserve serve restart obligation: %s", exc)
+        return False
+
+
+def _write_reminder(row: dict) -> None:
+    """Persist one reminder row, one immutable file per incarnation (no read/merge/write races
+    between CLI startups). Raises OSError/ValueError/TypeError to the caller."""
+    directory = get_qubit_home() / "serve_restart_pending"
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / f"{row['pid']}-{float(row['create_time']).hex()}.json"
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as handle:
+            temporary = Path(handle.name)
+            json.dump(row, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def is_unit_serve_row(row: object) -> bool:
+    """A serve/dashboard row whose systemd unit owns it (MainPID), with the unit recorded (#141021)."""
+    return (isinstance(row, dict) and row.get("kind") in ("serve", "dashboard") and row.get("supervisor") == "systemd"
+            and isinstance(row.get("detail"), dict) and bool(row["detail"].get("systemd_unit")))
+
+
+def is_reminder_row(row: object) -> bool:
+    """Rows the receipt-backed reminder flow carries: manual serves and unit-owned serves."""
+    return is_unit_serve_row(row) or (
+        isinstance(row, dict) and row.get("kind") in ("serve", "dashboard") and row.get("supervisor") == "manual-serve")
+
+
+def defer_unit_serve(runtime: dict) -> bool:
+    """The unit-owned twin of :func:`defer_manual_serve`: file a durable reminder carrying the unit's
+    restart command for a pre-update incarnation that is still alive. A unit-owned row moved off the
+    manual-serve reminder when it was classified ``systemd`` (#141021), and the fleet obligation names
+    only gateways, so without this a unit the update could not restart (no root, an aborted run,
+    ``--no-gateway-restart``) is never mentioned again. True when the row is discharged (process gone)
+    or the reminder was filed; False when it is still owed and nothing durable could be written."""
+    from qubit_cli.main_dashboard import _systemd_restart_commands
+
+    if not is_unit_serve_row(runtime):
+        return False
+    detail = runtime["detail"]
+    return _defer_identified(runtime, extra={
+        "restart": _systemd_restart_commands(str(detail["systemd_unit"]), detail.get("systemd_scope"))})

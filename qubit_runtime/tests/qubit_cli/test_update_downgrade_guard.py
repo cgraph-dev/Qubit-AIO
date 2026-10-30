@@ -78,7 +78,7 @@ def test_a_pre_runtime_target_is_refused_before_the_move_with_the_snapshot_that_
     out = capsys.readouterr().out
     assert "Downgrading is unsupported" in out and str(home / "state.db") in out
     assert "/snapshot restore 20261001-000000-pre-update" in out and "20261008" not in out
-    assert "hermes gateway stop" in out and "No update was applied" in out
+    assert "qubit gateway stop" in out and "No update was applied" in out
 
 
 def test_forward_updates_and_stores_without_ledger_rows_are_never_refused(repo, tmp_path, monkeypatch):

@@ -196,6 +196,20 @@ def _check_requires_env(report: ValidationReport, manifest: dict) -> None:
         report.add("requires_env", True, "all entries UPPER_SNAKE")
 
 
+def _check_oauth(report: ValidationReport, manifest: dict, plugin_dir: Path) -> None:
+    """``oauth:`` clients (qubit_cli.plugin_oauth): shape, https and declared variables fail admission; a
+    host outside the IdP's domains and plugin code that names a token URL are reviewer warnings."""
+    from qubit_cli.plugin_oauth import oauth_admission_problems, oauth_admission_warnings
+
+    if manifest.get("oauth") in (None, []):
+        report.add("oauth", True, "not declared")
+        return
+    problems = oauth_admission_problems(manifest, plugin_dir)
+    report.add("oauth", not problems, "; ".join(problems) or "clients valid")
+    for warning in oauth_admission_warnings(manifest, plugin_dir):
+        report.warn(warning)
+
+
 # ─── Capability probe (subprocess-isolated) ──────────────────────────────────
 
 # Self-contained harness run in a scratch child process. Imports the plugin
@@ -229,7 +243,7 @@ class RecordingContext:
     def register_tool(self, name, *args, **kwargs):
         recorded["tools"].append(str(name))
 
-    def register_hook(self, hook_name, callback):
+    def register_hook(self, hook_name, callback, *, hold_stream=False):
         recorded["hooks"].append(str(hook_name))
 
     def register_middleware(self, kind, callback):
@@ -351,10 +365,15 @@ def _run_capability_probe(
     with tempfile.TemporaryDirectory(prefix="qubit-validate-") as scratch:
         env = dict(probe[1] if probe else os.environ)
         env["QUBIT_HOME"] = scratch
+        # The probe imports this tree's ``providers``; name the tree instead of relying on the cwd.
+        repo_root = str(Path(__file__).resolve().parents[1])
+        env["PYTHONPATH"] = os.pathsep.join(p for p in (repo_root, env.get("PYTHONPATH", "")) if p)
+        python, *options = probe[0] if probe else [sys.executable]
         try:
             result = subprocess.run(
                 [
-                    str(probe[0]) if probe else sys.executable,
+                    # -P: ``-c`` would put the user's cwd ahead of Qubit and the plugin's imports.
+                    python, "-P", *options,
                     "-c",
                     _PROBE_SCRIPT,
                     str(plugin_dir),
@@ -539,6 +558,7 @@ def validate_plugin_dir(
     _check_requires_qubit(report, manifest)
     _check_config_spec(report, manifest)
     _check_requires_env(report, manifest)
+    _check_oauth(report, manifest, plugin_dir)
     _check_loadable(report, plugin_dir, manifest)
     _check_python_dependencies(report, plugin_dir)
     recorded = _check_capabilities(report, manifest, plugin_dir, probe)
@@ -570,7 +590,7 @@ _LOADABLE_ENTRYPOINTS = ("__init__.py", "desktop/plugin.js", "plugin.json")
 
 
 def _check_loadable(report: ValidationReport, plugin_dir: Path, manifest: Optional[dict] = None) -> None:
-    """A plugin.yaml with nothing beside it that Hermes can load (no ``register()`` module, no
+    """A plugin.yaml with nothing beside it that Qubit can load (no ``register()`` module, no
     desktop bundle, no portable manifest, no declared language pack) installs "successfully" and does
     nothing — a pip-layout repo whose code lives under ``src/`` behind an entry point is the usual shape."""
     present = [rel for rel in _LOADABLE_ENTRYPOINTS if (plugin_dir / rel).is_file()]
@@ -657,10 +677,18 @@ def _validate_portable_plugin(report: ValidationReport, plugin_dir: Path) -> Val
         bool(name),
         "name present" if name else "plugin.json missing required 'name'",
     )
+    from qubit_cli.agent_plugins import manifest_config_schema
+    _check_config_spec(report, {"config_schema": manifest_config_schema(manifest)})
     for server_name, config in package.mcp_servers.items():
         if config.get("trust") == "untrusted":
             report.add(f"server trust: {server_name}", True,
                        "untrusted (Qubit asks before every write-capable tool call)")
+        if config.get("tool_costs"):
+            limit = config.get("spend_limit") or 0
+            report.add(f"server costs: {server_name}", True,
+                       f"{len(config['tool_costs'])} costed tool(s), "
+                       + (f"spend limit {limit} {config.get('cost_unit') or 'credits'} per chat" if limit
+                          else "no spend limit"))
     for server_name, server_decl in package.server_declarations.items():
         result = availability(server_decl.declaration)
         detail = result.state

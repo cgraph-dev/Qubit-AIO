@@ -131,11 +131,10 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             ref={dropdownRef}
             aria-label={sheetTitle}
             className={cn(
-              "min-w-[240px] max-h-[70dvh] overflow-y-auto",
-              "border border-current/20 bg-background-base/95",
-              "shadow-[0_12px_32px_-8px_rgba(0,0,0,0.6)]",
+              "qrail-flyout",
               dropUp ? "fixed z-[100]" : "absolute z-50 right-0 top-full mt-1",
             )}
+            data-align="top"
             role="listbox"
             style={
               dropUp && rect
@@ -146,25 +145,24 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
                 : undefined
             }
           >
-            <div className="border-b border-current/20 px-3 py-2">
-              <Typography
-                className="text-display text-xs tracking-[0.12em] text-text-tertiary"
-              >
-                {sheetTitle}
-              </Typography>
+            <div className="qrail-flyout__head">
+              <Palette className="h-3 w-3" />
+              <Typography className="qrail-flyout__title">{sheetTitle}</Typography>
             </div>
 
-            <ThemeSwitcherOptions
-              availableThemes={availableThemes}
-              close={close}
-              setTheme={setTheme}
-              themeName={themeName}
-            />
-            <FontSection
-              fontChoices={fontChoices}
-              fontId={fontId}
-              setFont={setFont}
-            />
+            <div className="qrail-flyout__body">
+              <ThemeSwitcherOptions
+                availableThemes={availableThemes}
+                close={close}
+                setTheme={setTheme}
+                themeName={themeName}
+              />
+              <FontSection
+                fontChoices={fontChoices}
+                fontId={fontId}
+                setFont={setFont}
+              />
+            </div>
           </div>
         );
         return dropUp ? createPortal(dropdown, document.body) : dropdown;
@@ -334,23 +332,17 @@ function ThemeSwatch({ theme }: { theme: DashboardTheme }) {
     theme.palette.warmGlow,
   ];
   return (
-    <div
-      aria-hidden
-      className="flex h-4 w-9 shrink-0 overflow-hidden border border-current/20"
-    >
-      <span className="flex-1" style={{ background: c1 }} />
-      <span className="flex-1" style={{ background: c2 }} />
-      <span className="flex-1" style={{ background: c3 }} />
-    </div>
+    <span aria-hidden className="qrail-swatch" style={{ borderColor: c2 }}>
+      <span style={{ background: c1 }} />
+      <span style={{ background: c2 }} />
+      <span style={{ background: c3 }} />
+    </span>
   );
 }
 
 function PlaceholderSwatch() {
   return (
-    <div
-      aria-hidden
-      className="h-4 w-9 shrink-0 border border-dashed border-current/20"
-    />
+    <span aria-hidden className="qrail-swatch qrail-swatch--empty" />
   );
 }
 

@@ -96,6 +96,14 @@ def list_session_providers() -> List[DashboardAuthProvider]:
     return [p for p in list_providers() if getattr(p, "supports_session", True)]
 
 
+def list_interactive_providers() -> List[DashboardAuthProvider]:
+    """Session providers that offer a sign-in flow (``interactive_login`` True). Every login
+    surface — the login page, ``/api/auth/providers``, auto-SSO, native authorize selection and
+    chooser, the ``native_pkce`` advertisement — uses this; the verify/refresh loops keep
+    :func:`list_session_providers`, so a provisioned-credential provider still authenticates."""
+    return [p for p in list_session_providers() if getattr(p, "interactive_login", True)]
+
+
 def register_global_provider(provider: DashboardAuthProvider) -> None:
     """Register a host-owned provider in the process-global slot (upsert). The registry is shared
     across every profile one dashboard process serves, so these outlive any per-home plugin
@@ -126,3 +134,13 @@ def clear_providers() -> None:
     with _lock:
         _providers.clear()
         _scoped_providers.clear()
+
+
+# --- ported from upstream 088f657ecf ---
+
+def list_interactive_providers() -> list[DashboardAuthProvider]:
+    """Session providers that offer a sign-in flow (``interactive_login`` True). Every login
+    surface — the login page, ``/api/auth/providers``, auto-SSO, native authorize selection and
+    chooser, the ``native_pkce`` advertisement — uses this; the verify/refresh loops keep
+    :func:`list_session_providers`, so a provisioned-credential provider still authenticates."""
+    return [p for p in list_session_providers() if getattr(p, "interactive_login", True)]

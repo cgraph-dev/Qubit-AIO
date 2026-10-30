@@ -76,3 +76,46 @@ def _three_way(live: Any, desired: Any, base: Any) -> Any:
         kept = [item for item in live if item not in removed]
         return kept + [copy.deepcopy(item) for item in desired if item not in base and item not in kept]
     return copy.deepcopy(desired)
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _frozen_for_deletion(snapshot: dict[str, Any]) -> Any:
+    """The snapshot branches that count as operator state.
+
+    An ordinary snapshot only contains what the profile had at creation, so an explicit
+    empty allowlist is a real branch. A bypass worker (safe mode, ``--ignore-user-config``)
+    freezes a copy of the schema, so a branch that is still the schema default was never
+    an operator choice and must not count as a deletion."""
+    from agent.safe_worker_policy import _current_policy
+
+    policy = _current_policy()
+    if policy is None or not policy.ignore_user_config:
+        return snapshot
+    from qubit_cli.config_defaults import DEFAULT_CONFIG
+
+    return _schema_default_branch(snapshot, DEFAULT_CONFIG)
+
+
+def _schema_default_branch(snapshot: Any, defaults: Any) -> Any:
+    """*snapshot* without branches whose value is still the schema default."""
+    if not isinstance(snapshot, dict) or not isinstance(defaults, dict):
+        return copy.deepcopy(snapshot)
+    kept: dict[str, Any] = {}
+    for key, value in snapshot.items():
+        if key not in defaults:
+            kept[key] = copy.deepcopy(value)
+            continue
+        default = defaults[key]
+        if value == default:
+            continue
+        if isinstance(value, dict) and isinstance(default, dict):
+            nested = _schema_default_branch(value, default)
+            if nested:
+                kept[key] = nested
+        else:
+            kept[key] = copy.deepcopy(value)
+    return kept
+
+
+_SAME_AS_BASE = object()

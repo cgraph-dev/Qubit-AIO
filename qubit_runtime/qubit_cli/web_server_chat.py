@@ -261,6 +261,57 @@ def _ws_request_view(ws: WebSocket) -> Request:
     })
 
 
+def _ignore_rejection(reason: str) -> None:
+    """The loopback gate keeps no audit record of a refused credential."""
+
+
+def _audit_ws_rejection(ws: WebSocket, reason: str) -> None:
+    """The gated gate's audit record of a refused upgrade credential."""
+    from qubit_cli.dashboard_auth.audit import AuditEvent, audit_log
+    audit_log(AuditEvent.WS_TICKET_REJECTED, reason=reason, ip=(ws.client.host if ws.client else ""),
+              path=ws.url.path)
+
+
+def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
+                       auth_required: bool = False) -> Optional[tuple[Optional[str], str]]:
+    """A one-use ticket offered as the ``qubit-gateway-ticket.`` subprotocol or ``?ticket=``:
+    ``(reason, credential)`` once judged, or None when the upgrade presents none. An accepted ticket
+    stamps the server-minted identity onto the socket; the client never supplies it through RPC
+    params. *socket* is the route's socket (``web_session_sockets.ticket_refusal``); a socket a
+    session-token ticket, or a Webapp login's ticket, opens is tracked so signing out closes it."""
+    from qubit_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_ticket
+    from qubit_cli.web_session_sockets import admitted_with, ticket_refusal, track
+    protocol_ticket, protocol_reason = _gateway_ws_ticket_from_subprotocol(ws)
+    if protocol_reason == "invalid":
+        return "ticket_invalid", "ticket-subprotocol"
+    ticket = protocol_ticket or ws.query_params.get("ticket", "")
+    if not ticket:
+        return None
+    try:
+        info = consume_ticket(ticket)
+    except TicketInvalid as exc:
+        reject(str(exc))
+        return "ticket_invalid", "ticket"
+    refusal = ticket_refusal(info, socket, auth_required=auth_required)
+    if refusal is not None:
+        reject(refusal)
+        return "ticket_invalid", "ticket"
+    if info.get("provider") == "bot-desktop":
+        reject("display ticket presented as a gateway login")
+        return "ticket_invalid", "ticket"
+    ws._qubit_auth_identity = {"user_id": info.get("user_id"), "provider": info.get("provider")}
+    if info.get("issuer"):
+        ws._qubit_auth_identity["issuer"] = info["issuer"]
+    if info.get("profile_home"):
+        ws._qubit_ticket_profile_home = info["profile_home"]
+    if (admitted := admitted_with(info)) is not None:
+        track(ws, admitted)
+    if not protocol_ticket:
+        return None, "ticket"
+    ws._qubit_ws_subprotocol = _GATEWAY_WS_PROTOCOL
+    return None, "ticket-subprotocol"
+
+
 def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
     """Validate WS-upgrade auth; return ``(reason, credential)``.
 
@@ -407,6 +458,66 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
 def _ws_auth_ok(ws: WebSocket) -> bool:
     """True when the WS-upgrade credential is accepted. See _ws_auth_reason."""
     return _ws_auth_reason(ws)[0] is None
+
+
+def _ws_close_reason(text: str) -> str:
+    """Clamp to RFC 6455's 123-byte close-reason limit (uvicorn raises past it);
+    reasons embed an attacker-controlled origin, so truncate rather than crash."""
+    encoded = text.encode("utf-8", "replace")
+    if len(encoded) <= 123:
+        return text
+    return encoded[:120].decode("utf-8", "ignore") + "..."
+
+
+def _ws_auth_mode() -> str:
+    """Short label for the active WS auth mode — logged on every connection."""
+    from qubit_cli.web_server import app
+    return "gated" if getattr(app.state, "auth_required", False) else "loopback"
+
+
+async def _ws_gate(ws: WebSocket, kind: str) -> Optional[tuple[str, str, str]]:
+    """Run the pre-accept gates for /api/console, /api/pty and /api/host-terminal.
+
+    Each gate maps to a distinct close code so the log and the browser banner
+    agree on the cause: 4404 chat disabled, 4401 bad credential, 4403 host/origin
+    mismatch, 4408 peer not allowed. Returns ``(peer, mode, cred)``
+    once every gate passes, or None after closing the socket.
+    """
+    from qubit_cli.web_server import _DASHBOARD_EMBEDDED_CHAT_ENABLED
+    peer = ws.client.host if ws.client else "?"
+    if not _DASHBOARD_EMBEDDED_CHAT_ENABLED:
+        _log.info("%s refused: embedded chat disabled peer=%s", kind, peer)
+        await ws.close(code=4404, reason="embedded chat disabled")
+        return None
+
+    auth_reason, cred = _ws_auth_reason(ws)
+    mode = _ws_auth_mode()
+    if auth_reason is not None:
+        _log.warning("%s auth rejected reason=%s mode=%s cred=%s peer=%s", kind, auth_reason, mode, cred, peer)
+        await ws.close(code=4401, reason=_ws_close_reason(f"auth: {auth_reason}"))
+        return None
+
+    host_origin_reason = _ws_host_origin_reason(ws)
+    if host_origin_reason is not None:
+        _log.warning("%s refused: %s peer=%s", kind, host_origin_reason, peer)
+        await ws.close(code=4403, reason=_ws_close_reason(host_origin_reason))
+        return None
+
+    client_reason = _ws_client_reason(ws)
+    if client_reason is not None:
+        _log.warning("%s refused: %s", kind, client_reason)
+        await ws.close(code=4408, reason=_ws_close_reason(client_reason))
+        return None
+    return peer, mode, cred
+
+
+async def _pty_fail(ws: WebSocket, exc: BaseException, *, surface: str = "Chat") -> None:
+    """Tell the user why chat could not start, then close 1011 so the SPA renders
+    "Start new session". The raw exception goes to the server log only."""
+    from qubit_cli.web_routers.chat_ws_errors import chat_start_failure_message
+    _log.warning("pty start failed: %s: %s", type(exc).__name__, exc)
+    await ws.send_text(f"\r\n\x1b[31m{chat_start_failure_message(exc, surface=surface)}\x1b[0m\r\n")
+    await ws.close(code=1011)
 
 
 def _resolve_chat_argv(

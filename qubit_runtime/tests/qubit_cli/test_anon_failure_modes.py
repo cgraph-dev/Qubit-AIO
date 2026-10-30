@@ -1,5 +1,5 @@
-"""Nous free tier: every way the account service or the wire can refuse the free tier, and what
-Hermes does with each (the failure-mode contract behind the desktop's onboarding copy).
+"""Qubit free tier: every way the account service or the wire can refuse the free tier, and what
+Qubit does with each (the failure-mode contract behind the desktop's onboarding copy).
 
 Driven through a fake NAS whose responses are the ones the real service sends (see the code table
 in ``qubit_cli.anon_auth``), never through mocked-away client code.
@@ -15,13 +15,7 @@ import pytest
 from qubit_cli import anon_auth, anon_sign_in, free_tier_bootstrap
 from qubit_cli.auth import _load_auth_store
 
-from tests.qubit_cli.anon_portal import (
-    PORTAL,
-    WELCOME,
-    as_local_desktop_backend,
-    claimed_trial,
-    install_portal,  # noqa: F401
-)
+from tests.qubit_cli.anon_portal import PORTAL, WELCOME, as_local_desktop_backend, claimed_trial, install_portal
 
 
 @pytest.fixture
@@ -110,26 +104,6 @@ class TestNasRefusalCodes:
         assert "nous" not in _load_auth_store().get("providers", {})
         assert nas.creates() == 1
 
-    def test_unknown_token_is_replaced_once_at_first_use(self, nas, monkeypatch):
-        from qubit_cli.auth_nous import resolve_nous_runtime_credentials
-        first = claimed_trial(monkeypatch)
-        original = nas.handler
-
-        def _first_only(request):
-            # Only the FIRST credential is dead; its replacement exchanges normally.
-            if request.url.path == "/api/anonymous/token" and json.loads(request.content)["token"] == first["anon_token"]:
-                nas.calls.append((request.method, request.url.path))
-                return httpx.Response(404, json={"error": "unknown_token"})
-            return original(request)
-        nas.handler = _first_only  # type: ignore[method-assign]
-        try:
-            creds = resolve_nous_runtime_credentials()
-        finally:
-            nas.handler = original  # type: ignore[method-assign]
-        assert creds["base_url"].startswith(WELCOME)
-        assert nas.creates() == 2
-        assert _load_auth_store()["providers"]["nous"]["anon_token"] != first["anon_token"]
-
     def test_a_5xx_or_non_json_body_is_a_retryable_server_error(self, nas):
         nas.create_response = httpx.Response(500, text="<html>oops</html>")
         err = _mint_error(nas)
@@ -196,11 +170,20 @@ class TestMintCooldown:
         assert anon_auth.ensure_portal_identity(explicit=True) is None      # and still terminal
 
 
-# --- The boot record and its retries -------------------------------------------------------------
+# --- The boot record ----------------------------------------------------------------------------
+
+
+def _failed_claim(nas, monkeypatch) -> anon_auth.AuthError:
+    """The desktop's welcome-trial claim, refused by the service (boot itself never mints)."""
+    from qubit_cli import welcome_trial
+    as_local_desktop_backend(monkeypatch)
+    with pytest.raises(anon_auth.AuthError) as exc:
+        welcome_trial.claim_desktop_free_tier()
+    return exc.value
 
 
 class TestBootstrapRecord:
-    def test_the_record_carries_the_code_and_the_wait(self, nas, monkeypatch):
+    def test_the_record_carries_the_failed_claims_code_and_wait(self, nas, monkeypatch):
         nas.create_response = httpx.Response(
             429, json={"error": "temporarily_unavailable"}, headers={"Retry-After": "30"})
         _failed_claim(nas, monkeypatch)
@@ -211,85 +194,31 @@ class TestBootstrapRecord:
         assert record.failure_fields() == {
             "error": record.error, "error_code": anon_auth.ANON_RATE_LIMITED, "retryable": True,
             "retry_after": record.failure["retry_after"]}
+        assert nas.creates() == 1, "the boot record never retries the mint"
 
-    def test_a_clean_boot_carries_no_failure_block(self, nas, monkeypatch):
+    def test_a_claimed_trial_carries_no_failure_block(self, nas, monkeypatch):
         claimed_trial(monkeypatch)
         record = free_tier_bootstrap.run_bootstrap(announce=False)
         assert record.free_tier_account is True and record.failure_fields() == {}
 
-    def test_the_background_loop_retries_a_transient_failure_until_it_settles(self, nas, monkeypatch):
+    def test_a_refresh_re_inventories_so_a_provider_connected_meanwhile_keeps_inference(self, nas, monkeypatch):
         nas.raise_transport = httpx.ConnectTimeout("no route")
-        slept = []
-
-        def _sleep(seconds):
-            slept.append(seconds)
-            # The cooldown passes while we "slept".
-            failure = anon_auth._mint_failure_for_profile()
-            monkeypatch.setattr(anon_auth.time, "monotonic", lambda f=failure: f.not_before + 1)
-            if len(slept) == 2:
-                nas.raise_transport = None          # the network comes back on the second wait
-        monkeypatch.setattr(free_tier_bootstrap, "_sleep", _sleep)
         _failed_claim(nas, monkeypatch)
-        free_tier_bootstrap._bootstrap_then_retry()
-        record = free_tier_bootstrap.current_record()
-        assert record.has_identity is True and record.free_tier_account is True
-        assert slept == [int(w) for w in anon_auth._MINT_RETRY_LADDER[:2]]
-        assert nas.creates() == 3
-
-    def test_the_background_loop_never_retries_a_terminal_code(self, nas, monkeypatch):
-        nas.create_response = httpx.Response(404, json={"error": "not_found"})
-        monkeypatch.setattr(free_tier_bootstrap, "_sleep", lambda s: pytest.fail("must not sleep"))
-        _failed_claim(nas, monkeypatch)
-        free_tier_bootstrap._bootstrap_then_retry()
-        assert free_tier_bootstrap.current_record().failure["error_code"] == anon_auth.ANON_GATE_CLOSED
-        assert nas.creates() == 1
-
-    def test_the_background_loop_is_bounded(self, nas, monkeypatch):
-        nas.raise_transport = httpx.ConnectTimeout("no route")
-
-        def _sleep(seconds):
-            failure = anon_auth._mint_failure_for_profile()
-            monkeypatch.setattr(anon_auth.time, "monotonic", lambda f=failure: f.not_before + 1)
-        monkeypatch.setattr(free_tier_bootstrap, "_sleep", _sleep)
-        _failed_claim(nas, monkeypatch)
-        free_tier_bootstrap._bootstrap_then_retry()
-        assert nas.creates() == 1 + free_tier_bootstrap.BOOTSTRAP_RETRY_ATTEMPTS
-        assert free_tier_bootstrap.current_record().failure["error_code"] == anon_auth.ANON_UNREACHABLE
-
-    def test_a_retry_re_inventories_so_a_provider_connected_meanwhile_keeps_inference(self, nas, monkeypatch):
-        nas.raise_transport = httpx.ConnectTimeout("no route")
         free_tier_bootstrap.run_bootstrap(announce=False)
         # The user connected their own provider during the cooldown.
         monkeypatch.setattr(free_tier_bootstrap, "_inventory_other_providers", lambda: True)
-        nas.raise_transport = None
-        record = free_tier_bootstrap.retry_bootstrap_mint(force=True, announce=False)
-        assert record.has_identity is True and record.other_providers is True
+        record = free_tier_bootstrap.refresh_record(announce=False)
+        assert record.other_providers is True and record.provider_configured is True
         assert _load_auth_store().get("active_provider") != "nous"
 
-    def test_a_late_failed_build_never_overwrites_a_success_that_landed_meanwhile(self, nas, monkeypatch):
-        """The background loop and the user's click can race: the loop's build (no identity, still
-        in cooldown) must not replace the record the click just wrote."""
-        nas.raise_transport = httpx.ConnectTimeout("no route")
-        free_tier_bootstrap.run_bootstrap(announce=False)
-        real_build = free_tier_bootstrap._build_record
-
-        def slow_build(**kw):
-            stale = real_build(**kw)                       # no identity: still inside the cooldown
-            monkeypatch.setattr(free_tier_bootstrap, "_build_record", real_build)
-            nas.raise_transport = None                    # ...meanwhile the click's forced mint succeeds
-            free_tier_bootstrap.retry_bootstrap_mint(force=True, announce=False)
-            return stale
-        monkeypatch.setattr(free_tier_bootstrap, "_build_record", slow_build)
-        record = free_tier_bootstrap.retry_bootstrap_mint(force=False, announce=False)
-        assert record.has_identity is True
-        assert free_tier_bootstrap.current_record().has_identity is True
-
     def test_the_desktop_retry_refreshes_the_boot_record(self, nas, monkeypatch):
+        from qubit_cli import welcome_trial
         nas.raise_transport = httpx.ConnectTimeout("no route")
         _failed_claim(nas, monkeypatch)
         free_tier_bootstrap.run_bootstrap(announce=False)
         nas.raise_transport = None
-        record = free_tier_bootstrap.retry_bootstrap_mint(force=True, announce=False)
+        assert welcome_trial.claim_desktop_free_tier(force=True) is not None   # the user's retry
+        record = free_tier_bootstrap.refresh_record(announce=False)
         assert record.free_tier_account is True and record.failure_fields() == {}
         assert free_tier_bootstrap.current_record() is record
 
@@ -312,7 +241,7 @@ class TestSignInFailures:
         assert state.retryable is retryable
         assert state.retry_after == retry_after
         assert needle in state.copy
-        assert "Hermes " not in state.copy and "http" not in state.copy
+        assert "Qubit " not in state.copy and "http" not in state.copy
 
     def test_the_wire_failing_reads_as_unreachable(self):
         state = anon_sign_in._failed_from_exception(httpx.ReadTimeout("slow"))
@@ -322,10 +251,6 @@ class TestSignInFailures:
         state = anon_sign_in._failed_from_exception(RuntimeError("bad CA bundle"))
         assert state.reason == "" and state.copy == anon_sign_in.UPGRADE_NOT_COMPLETED
         assert "bad CA bundle" in state.copy_terminal
-
-    def test_account_busy_is_retryable(self):
-        state = anon_sign_in.Failed(reason="account_busy")
-        assert state.retryable is True and "few seconds" in state.copy
 
 
 # --- The dev-only host override ------------------------------------------------------------------
@@ -353,14 +278,3 @@ def test_retry_after_is_the_whole_wait_not_the_wait_plus_float_dust(monkeypatch)
     failure = anon_auth.MintFailure(code=anon_auth.ANON_SERVER_ERROR, message="x", retryable=True,
                                     retry_after=60.0, not_before=now + 60.0)
     assert failure.as_payload()["retry_after"] == 60
-
-
-# --- ported from upstream pin (wave 25 short-port) ---
-def _failed_claim(nas, monkeypatch) -> anon_auth.AuthError:
-    """The desktop's welcome-trial claim, refused by the service (boot itself never mints)."""
-    from qubit_cli import welcome_trial
-    as_local_desktop_backend(monkeypatch)
-    with pytest.raises(anon_auth.AuthError) as exc:
-        welcome_trial.claim_desktop_free_tier()
-    return exc.value
-

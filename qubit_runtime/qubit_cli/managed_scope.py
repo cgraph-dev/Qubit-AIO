@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import Dict, Optional
 
 
-# Stale-module bridge: this module binds ``utils.file_signature`` at import time, so a fresh
+# Stale-module bridge: this module binds ``utils`` names at import time, so a fresh
 # import in a post-pull updater process (pre-handoff purge keeps root modules cached) dies
 # unless the stale ``utils`` is dropped first. See qubit_cli.stale_modules.
 from qubit_cli.stale_modules import drop_stale_root_modules
 
 drop_stale_root_modules()
 
-from utils import fast_safe_load, file_signature
+from utils import fast_safe_load, file_cache_version, file_signature  # file_signature: bound for the bridge above
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MANAGED_DIR = Path("/etc/qubit")
 
 _CACHE_LOCK = threading.Lock()
-# path_key -> (*file_signature, parsed)
-_CONFIG_CACHE: Dict[str, tuple] = {}
-_ENV_CACHE: Dict[str, tuple] = {}
+# path_key -> (*file_cache_version, parsed)
+_CONFIG_CACHE: dict[str, tuple] = {}
+_ENV_CACHE: dict[str, tuple] = {}
 
 
 def _under_pytest() -> bool:
@@ -81,7 +81,7 @@ def _cached_read(path: Path, cache: Dict[str, tuple], parse):
         st = path.stat()
     except OSError:
         return None  # absent
-    key = file_signature(st)
+    key = file_cache_version(path, st)
     path_key = str(path)
     with _CACHE_LOCK:
         hit = cache.get(path_key)
@@ -109,7 +109,12 @@ def _load_managed_file(name: str, cache: Dict[str, tuple], parse) -> dict:
 
 
 def load_managed_config() -> dict:
-    """Parsed managed config.yaml, or {} when absent/malformed (fail-open)."""
+    """Parsed managed config.yaml, or {} when absent/malformed (fail-open). Always {} under a config
+    backend that takes config and locks from elsewhere (remote mode, D18; boot warns about the file)."""
+    from qubit_cli.config_backend import get_config_backend
+
+    if not get_config_backend().honors_managed_config():
+        return {}
     return _load_managed_file("config.yaml", _CONFIG_CACHE, lambda p: fast_safe_load(p.read_text(encoding="utf-8-sig")) or {})
 
 
@@ -177,3 +182,11 @@ def is_key_managed(dotted_key: str) -> bool:
 def is_env_managed(name: str) -> bool:
     """True if the env var name is pinned by the managed .env layer."""
     return name in load_managed_env()
+
+
+def pinned_terminal_backend() -> Optional[str]:
+    """The non-empty ``terminal.backend`` the managed config pins, or None. An empty or null value
+    names no backend to run, so it pins nothing."""
+    terminal = apply_managed_overlay({}).get("terminal")
+    backend = terminal.get("backend") if isinstance(terminal, dict) else None
+    return (backend.strip() or None) if isinstance(backend, str) else None

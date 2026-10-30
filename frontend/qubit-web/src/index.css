@@ -235,6 +235,110 @@ code { font-size: 0.875rem; }
   to   { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
+/* Rail flyout (components/SidebarTooltip.tsx). Themed off the rail's own
+   derived tokens, inherited through the portalled card's inline style. */
+.qagent-sidebar__tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding: 0.42rem 0.6rem;
+  border-color: color-mix(in srgb, var(--midground-base) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--background-base) 94%, #000) !important;
+  box-shadow:
+    0 10px 30px rgb(0 0 0 / 45%),
+    inset 2px 0 0 var(--midground-base);
+  color: var(--midground-base);
+  font-family: var(--theme-font-sans, system-ui, sans-serif);
+  animation: qagent-tooltip-in 130ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.qagent-sidebar__tooltip[data-placement="left"] {
+  box-shadow:
+    0 10px 30px rgb(0 0 0 / 45%),
+    inset -2px 0 0 var(--midground-base);
+}
+.qagent-sidebar__tooltip-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+.qagent-sidebar__tooltip-detail {
+  color: color-mix(in srgb, var(--midground-base) 62%, var(--background-base));
+  font-family: var(--theme-font-mono, ui-monospace, monospace);
+  font-size: 0.63rem;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+@keyframes qagent-tooltip-in {
+  from { opacity: 0; margin-left: -4px; }
+  to { opacity: 1; margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qagent-sidebar__tooltip { animation: none; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Rail flyouts — the theme and language pickers, opened from the rail's     */
+/* utility strip and portalled to <body>. Same instrument panel language as  */
+/* the rail itself, and entirely theme-derived so a light theme stays light. */
+/* ------------------------------------------------------------------------ */
+.qrail-flyout {
+  min-width: 15.5rem;
+  max-height: 70dvh;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--midground-base) 20%, transparent);
+  border-radius: var(--theme-radius, 0.5rem);
+  background: color-mix(in srgb, var(--background-base) 97%, #000);
+  box-shadow:
+    0 24px 60px -18px rgb(0 0 0 / 72%),
+    0 0 0 1px color-mix(in srgb, var(--midground-base) 6%, transparent);
+  color: var(--midground-base);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--midground-base) 22%, transparent) transparent;
+}
+
+.qrail-flyout__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--midground-base) 14%, transparent);
+  background: color-mix(in srgb, var(--background-base) 97%, #000);
+  color: color-mix(in srgb, var(--midground-base) 55%, var(--background-base));
+}
+
+.qrail-flyout__title {
+  font-family: var(--theme-font-mono, ui-monospace, monospace) !important;
+  font-size: 0.63rem !important;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.qrail-flyout__body {
+  padding: 0.3rem 0 0.35rem;
+}
+
+/* Three-stop palette chip: the theme's own colours, framed by its accent. */
+.qrail-swatch {
+  display: inline-flex;
+  height: 1.35rem;
+  width: 2.55rem;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: calc(var(--theme-radius, 0.5rem) * 0.4);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 25%);
+}
+.qrail-swatch > span { flex: 1 1 0; }
+.qrail-swatch--empty {
+  border: 1px dashed color-mix(in srgb, var(--midground-base) 24%, transparent);
+  background: transparent;
+}
+
 /* Toast animations used by `components/Toast.tsx`. */
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(16px); }
@@ -416,37 +520,12 @@ textarea:focus {
 }
 
 /* ------------------------------------------------------- shell chrome skin */
-#app-sidebar {
-  background:
-    linear-gradient(180deg, rgb(10 17 28 / 96%), rgb(4 7 13 / 98%)) !important;
-  box-shadow: inset -1px 0 0 var(--scan-hairline), 0 0 60px rgb(0 0 0 / 55%);
-}
-
-#app-sidebar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgb(127 212 255 / 4%) 0 1px,
-    transparent 1px 4px
-  );
-  opacity: 0.5;
-}
-
-#app-sidebar a[data-stage-row="nav"] {
-  position: relative;
-  letter-spacing: 0.14em;
-}
-
-#app-sidebar a[data-stage-row="nav"]:hover {
-  background: linear-gradient(90deg, rgb(127 212 255 / 9%), transparent 72%);
-}
-
-#app-sidebar a[aria-current="page"] {
-  text-shadow: 0 0 14px rgb(127 212 255 / 45%);
-}
+/* The sidebar's surface, ruling and row states are owned ENTIRELY by
+   `styles/sidebar-studio.css`. An earlier "dossier" skin painted a hardcoded
+   navy gradient here with `!important` plus a blue scanline overlay and a blue
+   hover/active glow — it sat above the theme tokens, so the rail stayed dark
+   navy on every theme including the light one. It is deleted, not overridden:
+   two sheets fighting over one element is how the theme blindness happened. */
 
 /* Cards and panels pick up the dossier glow ring on hover only — no
    pseudo-element overlays, so nothing can misplace against unpositioned
@@ -469,79 +548,8 @@ textarea:focus {
   }
 }
 
-/* ---- Sidebar presence pass: glow rails, hover slide, live tooltips ------ */
-.qagent-sidebar__link {
-  transition:
-    color 150ms ease,
-    background-color 150ms ease,
-    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
-    text-shadow 160ms ease;
-}
-
-.qagent-sidebar__link:hover {
-  transform: translateX(3px);
-}
-
-.qagent-sidebar__link:hover .qagent-sidebar__link-label {
-  text-shadow: 0 0 12px rgb(127 212 255 / 35%);
-}
-
-.qagent-sidebar__link:active {
-  transform: translateX(1px) scale(0.99);
-}
-
-/* Active entry: lit label + breathing rail. */
-.qagent-sidebar__link[aria-current="page"] .qagent-sidebar__link-label {
-  text-shadow: 0 0 14px rgb(127 212 255 / 55%);
-}
-
-.qagent-sidebar__active-rail {
-  box-shadow: 0 0 8px rgb(127 212 255 / 70%), 0 0 2px rgb(127 212 255 / 90%);
-  animation: qagent-rail-breathe 3.2s ease-in-out infinite;
-}
-
-@keyframes qagent-rail-breathe {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
-}
-
-.qagent-sidebar__link svg {
-  transition: color 150ms ease, filter 160ms ease;
-}
-
-.qagent-sidebar__link:hover svg,
-.qagent-sidebar__link[aria-current="page"] svg {
-  filter: drop-shadow(0 0 5px rgb(127 212 255 / 60%));
-}
-
-/* Tooltip: terminal readout with a snap entrance. */
-.qagent-sidebar__tooltip {
-  border-color: var(--scan-hairline-strong) !important;
-  background: rgb(6 11 20 / 96%) !important;
-  box-shadow: 0 8px 28px rgb(0 0 0 / 55%), 0 0 0 1px rgb(127 212 255 / 12%) !important;
-  animation: qagent-tooltip-snap 140ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-@keyframes qagent-tooltip-snap {
-  from { opacity: 0; transform: translateY(-50%) translateX(-5px); }
-  to { opacity: 1; transform: translateY(-50%) translateX(0); }
-}
-
-/* Sidebar icon buttons (collapse, actions): same hover language. */
-.qagent-sidebar button {
-  transition: color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
-}
-
-.qagent-sidebar button:hover {
-  box-shadow: inset 0 0 0 1px var(--scan-hairline-strong);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .qagent-sidebar__active-rail,
-  .qagent-sidebar__tooltip {
-    animation: none;
-  }
-  .qagent-sidebar__link:hover {
-    transform: none;
-  }
-}
+/* ---- Sidebar: rail anatomy, tooltips and utility chrome live in --------
+   `styles/sidebar-studio.css` (imported by App.tsx). A duplicate "presence
+   pass" used to sit here with a hardcoded blue glow and a hover translate
+   that fought the rail's own geometry — it is gone on purpose: two sheets
+   styling the same row is how the rail ended up theme-blind and jittery. */

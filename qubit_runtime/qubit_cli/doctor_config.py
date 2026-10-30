@@ -98,7 +98,7 @@ def report_deprecated_config_and_env(raw_config: dict | None = None, env_map: di
 
 @doctor_check("Relay plugin check failed: {e}")
 def _check_relay_plugins(should_fix: bool, f: Finding) -> None:
-    """Name the plugins.toml files Relay applies to Hermes, including ones outside the Hermes home."""
+    """Name the plugins.toml files Relay applies to Qubit, including ones outside the Qubit home."""
     from agent.relay_runtime import resolve_plugin_sources
     try:
         sources = resolve_plugin_sources()
@@ -108,7 +108,7 @@ def _check_relay_plugins(should_fix: bool, f: Finding) -> None:
         check_ok("NeMo Relay is not available on this platform")
         return
     except Exception as exc:
-        check_warn("Relay plugin configuration could not be read", "(Hermes runs without Relay plugins)")
+        check_warn("Relay plugin configuration could not be read", "(Qubit runs without Relay plugins)")
         _relay_info_lines(cause for cause in (exc, exc.__cause__) if cause is not None)
         f.manual_issues.append("Fix the Relay plugin configuration shown under NeMo Relay Plugins.")
         return
@@ -116,13 +116,13 @@ def _check_relay_plugins(should_fix: bool, f: Finding) -> None:
         check_ok("No Relay plugin files found")
         return
     if sources.errors:
-        check_warn("Relay will reject this plugin configuration", "(Hermes runs without Relay plugins)")
+        check_warn("Relay will reject this plugin configuration", "(Qubit runs without Relay plugins)")
         f.manual_issues.append("Fix the Relay plugin configuration shown under NeMo Relay Plugins.")
     else:
         # Validation cannot load dynamic plugins, so Relay reports what it cannot confirm as a warning.
         report = check_warn if sources.warnings else check_ok
         if sources.enabled:
-            report("Relay plugins enabled", "(applies to every profile a Hermes process hosts)")
+            report("Relay plugins enabled", "(applies to every profile a Qubit process hosts)")
         else:
             report("Relay plugin files found, nothing enabled")
     _relay_info_lines((*sources.config_paths, *sources.errors, *sources.warnings))
@@ -309,6 +309,7 @@ def _validate_auxiliary_config(config_path, issues: list) -> None:
     """Resolve every routed ``auxiliary.<task>`` block through the real entry point the tasks use and report
     the ones that fail — an unresolvable block otherwise silently runs the task on the main model (#116055)."""
     from qubit_cli.config import read_user_config_raw
+    from qubit_cli.left_core_migration import provider_install_hint
     from qubit_cli.runtime_provider import resolve_runtime_provider
     from utils import base_url_hostname
     aux = read_user_config_raw(config_path).get("auxiliary")
@@ -319,10 +320,12 @@ def _validate_auxiliary_config(config_path, issues: list) -> None:
         provider, model, base_url, api_key = (str(block.get(k) or "").strip() or None for k in ("provider", "model", "base_url", "api_key"))
         try:
             runtime = resolve_runtime_provider(requested=provider, target_model=model, explicit_api_key=api_key, explicit_base_url=base_url)
-        except Exception as exc:  # noqa: BLE001 — every resolver error is a finding here
-            _fail_and_issue(f"auxiliary.{task}.provider '{provider}' does not resolve", f"({str(exc).splitlines()[0]})",
-                            f"auxiliary.{task}.provider '{provider}' cannot be resolved ({str(exc).splitlines()[0]}); the task "
-                            f"silently runs on the main model. Fix the provider name/credentials in auxiliary.{task}.", issues)
+        except Exception as exc:
+            reason, moved = str(exc).splitlines()[0], provider_install_hint(provider or "")
+            _fail_and_issue(f"auxiliary.{task}.provider '{provider}' does not resolve", f"({reason})",
+                            f"auxiliary.{task}.provider '{provider}' cannot be resolved ({reason}); the task silently runs "
+                            f"on the main model. " + (moved or f"Fix the provider name/credentials in auxiliary.{task}."),
+                            issues)
             continue
         if not runtime.get("api_key") and not runtime.get("command"):
             check_warn(f"auxiliary.{task}.provider '{provider}' resolved without credentials", f"({runtime.get('provider')} @ {runtime.get('base_url')})")
@@ -335,10 +338,15 @@ def _validate_auxiliary_config(config_path, issues: list) -> None:
 @doctor_check()
 def _check_config_file(should_fix: bool, f: Finding) -> None:
     """config.yaml presence (project cli-config.yaml as fallback); model/provider validation."""
+    from qubit_cli.config_backend import config_exists, get_config_backend
     from qubit_cli.doctor import QUBIT_HOME, PROJECT_ROOT, _DHH
     config_path = QUBIT_HOME / 'config.yaml'
-    if config_path.exists():
-        check_ok(f"{_DHH}/config.yaml exists")
+    backend = get_config_backend()
+    if not backend.supports_file_tooling() and not _check_config_backend(backend, QUBIT_HOME, f):
+        return
+    if config_exists(config_path):
+        if backend.supports_file_tooling():
+            check_ok(f"{_DHH}/config.yaml exists")
         with warn_on_error("Could not validate model/provider config"):
             _validate_model_config(config_path, f.issues)
         with warn_on_error("Could not validate auxiliary task routing"):
@@ -352,6 +360,22 @@ def _check_config_file(should_fix: bool, f: Finding) -> None:
         f.fixed += 1
     else:
         check_warn("config.yaml not found", "(using defaults)")
+
+
+def _check_config_backend(backend, home, f: Finding) -> bool:
+    """A backend without a config file (§4.7): report where config comes from instead of the file
+    checks, plus the backend's own warnings (remote mode flags an ignored managed config.yaml, D18)."""
+    try:
+        backend.read_user_doc(home)
+        check_ok(f"Config backend: {backend.describe(home)}")
+    except SystemExit as exc:  # ConfigBackendUnavailable: the plane cannot serve this profile
+        check_fail(f"Config backend {backend.name!r} unavailable", str(exc.code or ""))
+        f.issues.append(f"Config backend {backend.name!r} cannot serve config for {home}")
+        return False
+    for warning, hint, issue in backend.doctor_warnings(home):
+        check_warn(warning, hint)
+        f.issues.append(issue)
+    return True
 
 
 def _drift_config_version(f: Finding, should_fix: bool, config_path) -> None:
@@ -529,9 +553,10 @@ def _check_config_drift(should_fix: bool, f: Finding) -> None:
 
     Each step is independent and best-effort: a failure in one never hides the next.
     """
+    from qubit_cli.config_backend import config_exists
     from qubit_cli.doctor import QUBIT_HOME
     config_path = QUBIT_HOME / 'config.yaml'
-    if not config_path.exists():
+    if not config_exists(config_path):
         config_path = None
     for step in _CONFIG_DRIFT_STEPS if config_path else (_drift_deprecations,):
         with warn_on_error(""):

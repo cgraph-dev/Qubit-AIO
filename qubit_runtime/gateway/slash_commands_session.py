@@ -20,7 +20,6 @@ from gateway.config import Platform
 from gateway.platforms.base import EphemeralReply
 from gateway.platforms.event import MessageEvent, MessageType
 from gateway.session import SessionSource, build_session_key, is_shared_multi_user_session
-from gateway.session_ingress_context import carry_callback
 from gateway.session_transcript import TranscriptReadError
 from gateway.slash_commands_branch_thread import (
     BRANCH_THREAD_PLATFORMS, branch_dest_source, branch_thread_parent, format_thread_ref, parse_branch_args,
@@ -37,7 +36,7 @@ _DM_CHAT_TYPES = {"dm", "direct", "private", ""}
 
 _BRANCH_COPIED_FIELDS = ("content", "tool_calls", "tool_call_id", "finish_reason", "reasoning",
                          "reasoning_content", "reasoning_details", "codex_reasoning_items",
-                         "codex_message_items", "timestamp")
+                         "codex_message_items", "timestamp", "data_use")
 
 
 def _sattr(obj, name: str) -> str:
@@ -96,22 +95,11 @@ def _reset_process_scoped_tool_state() -> None:
 
 def _branch_row(msg: dict) -> dict:
     """/branch child row; keeps the api_content sidecar so the branch's first turn replays the
-    parent's exact wire bytes (warm provider prompt cache) instead of a cold prefill.
-
-    Carries the parent's message identity (``message_identity``) too, exactly like the CLI
-    (/branch, ``cli_commands_mixin.py``), workdir (``session_workdir.py:_persist_branch_seed``)
-    and Desktop (``methods_session.py:_persist_branch``) branch copies. Without it the child
-    rows mint fresh uids while the parent's continue to be used, so a context engine keying on
-    ``message_uid`` sees a different identity on every branch boundary
-    (agent/message_metadata.py:102-106).
-    """
-    from agent.message_metadata import message_identity
-
+    parent's exact wire bytes (warm provider prompt cache) instead of a cold prefill."""
     row = {k: msg.get(k) for k in _BRANCH_COPIED_FIELDS}
     row["role"] = msg.get("role", "user")
     row["tool_name"] = msg.get("tool_name") or msg.get("name")
     row["api_content"] = extract_api_content_sidecar(msg)
-    row.update(message_identity(msg, with_tool_uids=True))
     return row
 
 
@@ -124,75 +112,31 @@ def _strip_resume_name(parts: list[str]) -> str:
     return name
 
 
+async def discard_lost_turns(authority, session_id) -> str:
+    """Messaging ``/discard`` (#134889 GW-10): acknowledge every ``unknown`` (lost-in-restart) turn
+    of this chat's FIFO through the owner's fenced ``resolve_unknown``, the path Desktop's Discard,
+    the TUI queue and ``hermes sessions discard`` use. Never replays the input; the saved
+    followers run once it commits."""
+    from gateway.session_contract import SessionRef
+    from qubit_state_runtime import RuntimeStoreError, list_session_admissions
+    rows = await asyncio.to_thread(list_session_admissions, authority.db, session_id=session_id)
+    lost = [row for row in rows if row['status'] == 'unknown']
+    if not lost:
+        return t("gateway.discard.nothing")
+    ref = SessionRef(authority.profile_id, session_id)
+    done = 0
+    for row in lost:
+        try:
+            await authority.resolve_unknown_as_owner(ref, row['admission_id'], row['generation'])
+        except RuntimeStoreError as exc:
+            logger.warning("/discard of %s refused: %s", row['admission_id'], exc.reason)
+            continue
+        done += 1
+    return t("gateway.discard.done", count=done) if done else t("gateway.discard.nothing")
+
+
 class GatewaySessionCommandsMixin:
     """Session-transcript slash commands (/new, /resume, /sessions, /branch, /title, /save, /undo, /retry, /topic, /compress)."""
-
-    def _retry_owned_store(self, session_id: str):
-        """The session store a /retry rewrite must fence against, or None without a session authority.
-
-        Under an authority the durable rows live on ``SessionAuthority.db``; outside one the
-        caller falls back to the plain transcript path.
-        """
-        from gateway.session_authorities import active_authority
-        authority = active_authority(self)
-        return getattr(authority, "db", None) if authority is not None else None
-
-    def _retry_readmission_reply(self, source, last_user_msg: str):
-        """Refusal text when the re-sent turn cannot be re-admitted, else None.
-
-        Deferred by design: the refusals a re-sent turn can hit are already decided by the
-        transcript resolver above (``retryable_user_text`` raises ``ValueError`` for media and
-        unknown content, which the caller answers with ``gateway.retry.unsafe``) and by the
-        post-command gates on the redispatch itself. There is no additional pre-rewrite gate to
-        apply, so this reports "no refusal" and lets those paths decide.
-        """
-        return None
-
-    async def _retry_in_admission(self, event, session_entry, owned, pinned, truncated,
-                                  last_user_msg, has_carrier):
-        """Plan the /retry rewrite and let the re-send's OWN admission commit it.
-
-        Rewriting first and admitting afterwards loses the turn when admission refuses (a drain or
-        retirement that starts after the pre-check, a full FIFO). ``session_retry_admission`` is the
-        mechanism: the handler only PLANS the rewrite — pinning the active row ids it read — and
-        binds it to the re-send, so ``SessionAuthority._admit_native`` runs it as a write guard
-        inside the same BEGIN IMMEDIATE that inserts the row. A refusal rolls both back; a transcript
-        that changed since the read refuses both (``RetryRewriteRefused``).
-        """
-        from gateway import session_retry_admission as sra
-
-        def _write(conn):
-            """The rewrite the plain path performs, against the admission's own transaction."""
-            if pinned is not None:
-                # Fence on the rows read before the plan: a concurrent newer turn then invalidates
-                # the plan instead of being removed for stale text.
-                rows = {r[0] for r in conn.execute(
-                    "SELECT id FROM session_messages WHERE session_id=? AND active=1",
-                    (session_entry.session_id,)).fetchall()}
-                if rows - set(pinned):
-                    raise ValueError("a newer turn outran the retry")
-            conn.execute(
-                "UPDATE session_messages SET active=0 WHERE id IN "
-                "(SELECT id FROM session_messages WHERE session_id=? AND active=1 "
-                " ORDER BY id DESC LIMIT 1)",
-                (session_entry.session_id,))
-
-        def _on_commit():
-            session_entry.last_prompt_tokens = 0  # transcript was truncated
-
-        rewrite = sra.RetryRewrite(
-            db=owned, session_id=session_entry.session_id, source=event.source,
-            write=_write, on_commit=_on_commit,
-        )
-        token = sra.bind(rewrite)
-        try:
-            retry_event = MessageEvent(
-                text=last_user_msg, message_type=MessageType.TEXT, source=event.source,
-                raw_message=event.raw_message, channel_prompt=event.channel_prompt)
-            carry_callback(event, retry_event)
-            return await self._handle_message(retry_event)
-        finally:
-            sra.unbind(token)
 
     # ------------------------------------------------------------------ /new, /reset
 
@@ -232,6 +176,23 @@ class GatewaySessionCommandsMixin:
         await self.hooks.emit("session:end", dict(hook_payload))
         await self.hooks.emit("session:reset", dict(hook_payload))
 
+    async def _handle_discard_command(self, event: MessageEvent) -> str:
+        """``/discard``: drop this chat's turn lost in a gateway restart so its queue runs again."""
+        from gateway.session_authorities import active_authority
+        if not self._is_user_authorized_for_source(event.source):
+            return t("gateway.discard.nothing")
+        authority = active_authority(self)
+        session_key = self._session_key_for_source(event.source)
+        sid = authority.logical_owner(self.session_store.peek_session_id(session_key)) if authority else None
+        if not sid:
+            return t("gateway.discard.nothing")
+        if sid not in authority.sessions:
+            # A conversation /resume brought back after a restart is the chat's route but not yet
+            # live: publish the peeked conversation on its route (review #141357). Never through
+            # get-or-create: a suspended route would rotate to a new session and strand the lost turn.
+            authority._publish_route(event.source, sid, session_key)
+        return await discard_lost_turns(authority, sid)
+
     async def _handle_reset_command(self, event: MessageEvent) -> str | EphemeralReply:
         """Handle /new or /reset command."""
         source = event.source
@@ -261,10 +222,11 @@ class GatewaySessionCommandsMixin:
                                   parent_session_id=str(getattr(old_entry, "session_id", "") or ""))
         _reset_process_scoped_tool_state()
 
-        new_entry = await self.async_session_store.reset_session(session_key)
         _old_sid = old_entry.session_id if old_entry else None
-        from gateway.session_automation import move_route_wakes
-        await move_route_wakes(self, session_key, _old_sid)  # main #114456: a parked wake survives /new
+        from gateway.session_automation import move_route_wakes, route_owner_lock
+        async with route_owner_lock(self, _old_sid):
+            new_entry = await self.async_session_store.reset_session(session_key)
+            await move_route_wakes(self, session_key, _old_sid)  # main #114456: a parked wake survives /new
         await self._fire_session_reset_hooks(source, session_key, _old_sid,
                                              new_entry.session_id if new_entry else None)
         # Scoped to the profile serving this source so a multiplexed /new banner reports the
@@ -524,11 +486,128 @@ class GatewaySessionCommandsMixin:
             return t("gateway.retry.failed_unchanged")
         session_entry.last_prompt_tokens = 0  # transcript was truncated
         self._record_model_friction("retry", source, session_entry.session_id)
-        retry_event = MessageEvent(
+        # The re-sent turn is the /retry event's own turn, built on its authenticated source: carry
+        # that event's native callback to it, or admission refuses it under multiplex (#139040).
+        from gateway.session_ingress_context import carry_callback
+        turn = MessageEvent(
             text=last_user_msg, message_type=MessageType.TEXT, source=source,
             raw_message=event.raw_message, channel_prompt=event.channel_prompt)
-        carry_callback(event, retry_event)
-        return await self._handle_message(retry_event)
+        carry_callback(event, turn)
+        return await self._handle_message(turn)
+
+    def _retry_owned_store(self, session_id: str):
+        """The SessionDB that holds both *session_id*'s transcript and its authority's admission
+        ledger, or None (no authority: the rewrite-then-send path). One handle means one write
+        transaction can carry the rewrite and the admission (#139257 step 2)."""
+        from gateway.session_authorities import active_authority
+        authority = active_authority(self)
+        if authority is None:
+            return None
+        db = self.session_store._db_for_session_id(session_id)
+        return db if db is not None and db is authority.db else None
+
+    async def _retry_in_admission(self, event, session_entry, db, pinned, truncated, resend_text,
+                                  composite: bool) -> Optional[str]:
+        """Plan the rewrite, bind it to the re-send and let ``admit_native`` commit both in one write
+        (``gateway.session_retry_admission``). A refusal leaves the transcript as it was; a
+        transcript changed since the read refuses both."""
+        from gateway import session_retry_admission as retry_admission
+        from gateway.session_ingress_context import carry_callback
+        from qubit_state_rewind import RewindTargetUnavailableError
+        from qubit_state_runtime import RuntimeStoreError
+        session_id = session_entry.session_id
+        if composite:
+            # The carrier-aware rewind, planned on the same snapshot: archive the carrier, keep its scaffold.
+            try:
+                plan = await asyncio.to_thread(db.plan_user_turn_rewind, session_id, -1,
+                                               require_retryable=True, require_composite=True)
+            except ValueError as exc:
+                if isinstance(exc, RewindTargetUnavailableError):
+                    return t("gateway.retry.failed_unchanged")
+                return t("gateway.retry.unsafe", error=exc)
+            except RuntimeError:  # the history changed under the plan, or the target has no row id
+                logger.debug("/retry carrier plan refused for %s", session_id, exc_info=True)
+                return t("gateway.retry.failed_unchanged")
+            if plan.expected_active_ids != pinned:
+                return t("gateway.retry.failed_unchanged")
+            resend_text = plan.live_text
+
+            def write(conn):
+                from qubit_state_mutation_transcript import rewind_in_transaction
+                rewind_in_transaction(db, conn, session_id, plan.target_row_id, preserve_compaction_handoff=True,
+                                      expected_active_ids=plan.expected_active_ids,
+                                      expected_target_content=plan.expected_target_content)
+        else:
+            def write(conn):
+                db.replace_messages_in_transaction(conn, session_id, [dict(m) for m in truncated], active_only=True,
+                                                   reject_active_turn_lease=True, expected_active_ids=pinned)
+
+        def committed():
+            self.session_store._clear_dirty_transcript(session_id)
+            session_entry.last_prompt_tokens = 0  # transcript was truncated
+            self._record_model_friction("retry", event.source, session_id)
+        rewrite = retry_admission.RetryRewrite(db=db, session_id=session_id, source=event.source,
+                                               write=write, on_commit=committed)
+        turn = MessageEvent(
+            text=resend_text, message_type=MessageType.TEXT, source=event.source,
+            raw_message=event.raw_message, channel_prompt=event.channel_prompt)
+        carry_callback(event, turn)
+        token = retry_admission.bind(rewrite)
+        try:
+            return await self._handle_message(turn)
+        except retry_admission.RetryRewriteRefused as exc:
+            logger.info("/retry refused with the transcript unchanged for %s: %s", session_id, exc)
+            return t("gateway.retry.failed_unchanged")
+        except RuntimeStoreError as exc:
+            if not rewrite.applied and exc.reason == 'runtime_draining':
+                # The drain began after the pre-check: the re-send was refused, nothing rewritten.
+                return t("gateway.busy.drain_rejected", action=self._status_action_gerund())
+            raise
+        finally:
+            retry_admission.unbind(token)
+
+    def _retry_readmission_reply(self, source: SessionSource, resend_text: str) -> Optional[str]:
+        """Refusal the /retry re-send would meet in ``_handle_message``, if any — checked before the
+        transcript rewrite so a refused /retry leaves the transcript untouched.  Mirrors the gates
+        the re-sent plain-text turn passes after canonical command dispatch: the emergency-stop
+        pause (canonical commands pass it, plain turns do not), the external-drain new-turn refusal
+        and the active-session cap.  Not race-free — a drain can engage or the cap can fill between
+        this check and the re-send — but every refusal known up front is answered with the
+        transcript intact."""
+        resend = MessageEvent(text=resend_text, message_type=MessageType.TEXT, source=source)
+        paused_notice = self._hm_estop_gate(resend, source, False)
+        if paused_notice is not None:
+            return paused_notice
+        if getattr(self, "_external_drain_active", False):
+            return t("gateway.busy.draining_maintenance")
+        authority_reply = self._retry_authority_refusal(source)
+        if authority_reply is not None:
+            return authority_reply
+        return self._active_session_limit_message(self._session_key_for_source(source))
+
+    def _retry_authority_refusal(self, source: SessionSource) -> Optional[str]:
+        """The routed authority's own admission refusals for the re-send (#139257): a draining or
+        retiring runtime (``runtime_draining``) and a full FIFO (``queue_full``), the gates
+        ``admit_native`` applies. Same not-race-free caveat as the caller."""
+        from gateway.session_authorities import active_authority
+        authority = active_authority(self)
+        if authority is None:
+            return None
+        import qubit_state_runtime
+        from qubit_state_runtime import RuntimeStoreError
+        try:
+            authority._require_admission_open()
+        except RuntimeStoreError:
+            return t("gateway.busy.drain_rejected", action=self._status_action_gerund())
+        entry = self.session_store.lookup_by_session_key(self._session_key_for_source(source))
+        if entry is None:
+            return None
+        rows = qubit_state_runtime.list_session_admissions(
+            authority.db, session_id=authority.logical_owner(entry.session_id))
+        if sum(row["status"] == "queued" for row in rows) >= qubit_state_runtime.ADMISSION_QUEUE_MAX:
+            from gateway.session_ingress import QUEUE_FULL_REPLY
+            return QUEUE_FULL_REPLY
+        return None
 
     def _record_model_friction(self, signal: str, source, session_id: str, turns: int = 1) -> None:
         """Slash dispatch does not install the routed profile's scope, so a multiplexed runner
@@ -817,8 +896,7 @@ class GatewaySessionCommandsMixin:
         """Handle /save — export the current session and send it as a document."""
         import tempfile
         from qubit_cli.session_export import (
-            SAVE_USAGE, default_save_filename, load_save_snapshot, normalize_save_format,
-            render_session_for_save)
+            SAVE_USAGE, default_save_filename, load_save_snapshot, normalize_save_format, render_session_for_save)
 
         parts = event.get_command_args().split()
         redact = bool(parts) and parts[-1].lower() in ("redact", "--redact")
@@ -841,7 +919,7 @@ class GatewaySessionCommandsMixin:
         filename = os.path.basename(filename) or default_save_filename(session_id, fmt)
         from qubit_state import SessionExportTooLargeError
         try:
-            # One off-loop hop for the cap check + read; shared with the CLI and TUI /save.
+            # One off-loop hop for the cap check + read; the helper is shared with the CLI and TUI /save.
             export_data = await asyncio.to_thread(load_save_snapshot, self._session_db._db, session_id, fmt)
         except SessionExportTooLargeError as e:
             return str(e)
@@ -850,7 +928,7 @@ class GatewaySessionCommandsMixin:
         if redact:
             from qubit_cli.session_export_md import redact_session_data
             export_data = redact_session_data(export_data)
-        temp_dir = tempfile.mkdtemp(prefix="qubit_save_")
+        temp_dir = tempfile.mkdtemp(prefix="hermes_save_")
         temp_path = os.path.join(temp_dir, filename)
         try:
             # Off-loop: render + write scale with transcript size (multi-MB) and would stall the loop.
@@ -998,6 +1076,12 @@ class GatewaySessionCommandsMixin:
         if isinstance(resolved, str):
             return resolved
         target_id, name = resolved
+        # A local conversation moves onto this lane from its current head, as /handoff carries it: a
+        # title naming its first segment (a local /new moved on) would strand the live one (#143286).
+        from gateway.session_route_recovery import conversation_head, follow_hand_off
+        authority, local_owner, head = await conversation_head(self, target_id)
+        if local_owner is not None:
+            target_id = head
         denied = await self._resume_access_denied_reply(source, target_id, name, allow_all, allow_cross_room)
         if denied is not None:
             return denied
@@ -1010,6 +1094,8 @@ class GatewaySessionCommandsMixin:
         )
         if not new_entry:
             return t("gateway.resume.switch_failed")
+        if local_owner is not None and authority is not None:  # a Desktop still viewing it follows it
+            follow_hand_off(authority, source, session_key, authority.logical_owner(target_id), local_owner)
         # Conversation boundary: all conversation-scoped state + security state in one funnel call.
         # Conversation boundary: clear ALL conversation-scoped per-session state (model/reasoning overrides
         # #10702, one-turn restores, model notes, last-resolved cache #58403, /queue overflow) + security

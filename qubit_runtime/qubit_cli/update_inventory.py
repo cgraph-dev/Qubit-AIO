@@ -48,7 +48,7 @@ class UpdatePlan:
         return asdict(self)  # recursive: RuntimeRecord entries become dicts
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "UpdatePlan":
+    def from_dict(cls, data: dict[str, Any]) -> UpdatePlan:
         """Inverse of :meth:`to_dict` (the plan crosses the post-swap hand-off as JSON)."""
         fields_ = {f.name for f in dataclass_fields(cls)}
         plan = cls(**{k: v for k, v in data.items() if k in fields_ and k != "runtimes"})
@@ -240,7 +240,7 @@ def _loaded_backend_launchd_jobs() -> list:
     return []
 
 
-def _launchd_owner_for_ledger_entry(entry: dict, pid: int, jobs: list) -> "tuple[str, str, int | None] | None":
+def _launchd_owner_for_ledger_entry(entry: dict, pid: int, jobs: list) -> tuple[str, str, int | None] | None:
     """``(domain, label, live_pid)`` of the loaded launchd job owning this ledger row, if any.
 
     A KeepAlive LaunchAgent backend's recorded spawner (the bootstrap shell) is long dead, so the
@@ -256,6 +256,21 @@ def _launchd_owner_for_ledger_entry(entry: dict, pid: int, jobs: list) -> "tuple
         except ValueError:
             cmdline = None
         return _dash._launchd_job_owning_backend(pid, cmdline, jobs, ancestors=_process_ancestors(pid))
+    return None
+
+
+def _systemd_owner_for_ledger_pid(pid: int) -> tuple[str, str | None] | None:
+    """``(unit, scope)`` of the systemd unit whose live ``MainPID`` is *pid*, if any.
+
+    A unit-launched backend sets neither ``HERMES_SPAWN`` nor ``HERMES_PARENT_PID``, so the spawner
+    probe reads ``manual-serve`` and the update tells the user to "ask the owner to relaunch
+    `qubit dashboard`" for a process systemd owns (#141021). Ownership is the unit's MainPID, not
+    cgroup membership (a hand-started dashboard inside some unrelated unit's cgroup is still manual);
+    ``None`` off Linux, when unreadable, or when no unit owns it."""
+    with suppress(Exception):
+        from qubit_cli import main_dashboard as _dash
+
+        return _dash._systemd_owner_for_pid(pid)
     return None
 
 
@@ -277,7 +292,8 @@ def _collect_ledger_runtimes(plan: UpdatePlan, seen: set[int]) -> None:
     ledger_entries() live-verifies (pid, create_time) so PID reuse never fabricates a row. Desktop-
     supervised backends (spawner still alive) restart via the Desktop's own respawn, not ours.
     A backend owned by a loaded launchd job is classified ``launchd`` (kickstart restart, never a
-    detached argv respawn) — the spawner probe cannot see that (#116503)."""
+    detached argv respawn) — the spawner probe cannot see that (#116503); one that is a systemd
+    unit's MainPID is ``systemd`` for the same reason (#141021)."""
     with _probe("Serve/dashboard ledger inventory"):
         from qubit_cli.process_identity import ledger_entries, spawner_is_dead
 
@@ -300,8 +316,12 @@ def _collect_ledger_runtimes(plan: UpdatePlan, seen: set[int]) -> None:
                 # No local spawner, so the probe below would read manual-serve and file a reminder
                 # nobody here can discharge; its token file and owner nonce belong to the client.
                 supervisor = "desktop-ssh"
+            elif spawner_is_dead(entry) is False:
+                supervisor = "desktop"
+            elif unit := _systemd_owner_for_ledger_pid(pid):
+                supervisor, detail["systemd_unit"], detail["systemd_scope"] = "systemd", unit[0], unit[1]
             else:
-                supervisor = "desktop" if spawner_is_dead(entry) is False else "manual-serve"
+                supervisor = "manual-serve"
             plan.runtimes.append(_runtime(
                 str(purpose), str(entry.get("profile") or "default"), pid, supervisor, detail=detail,
             ))
@@ -354,41 +374,31 @@ def print_update_plan(plan: UpdatePlan) -> None:
 
 
 def _serve_unit_matches_profile(profile: str, unit: object) -> bool:
-    """Does *unit* name a ``qubit-serve*``/``qubit-dashboard*`` unit for *profile*? (OWN vocabulary;
-    the gateway's ``qubit-gateway*`` names never cover serve/dashboard runtimes.)
+    """Does *unit* name a ``hermes-serve*``/``hermes-dashboard*`` unit for *profile*? (OWN vocabulary;
+    the gateway's ``hermes-gateway*`` names never cover serve/dashboard runtimes.)
 
-    Exact names only — ``work`` must not claim ``qubit-serve-workbench`` — and a scope prefix
-    (``user/qubit-serve``) is tolerated because the restart phase records scope-qualified identities in
-    some lists. Pre-rebrand ``hermes-*`` units remain recognised as read-old aliases. See #100479.
+    Exact names only — ``work`` must not claim ``hermes-serve-workbench`` — and a scope prefix
+    (``user/hermes-serve``) is tolerated because the restart phase records scope-qualified identities in
+    some lists. See #100479.
     """
     name = str(unit).removesuffix(".service").rsplit("/", 1)[-1]
     suffix = "" if profile == "default" else f"-{profile}"
-    return name in {
-        f"qubit-serve{suffix}", f"qubit-dashboard{suffix}",
-        f"hermes-serve{suffix}", f"hermes-dashboard{suffix}",
-    }
+    return name in {f"hermes-serve{suffix}", f"hermes-dashboard{suffix}"}
 
 
 def _gateway_service_matches_profile(profile: str, service: object) -> bool:
     """Match an exact gateway service/label (systemd/launchd/s6 shapes) to a profile.
 
-    Never substring-match: ``foo`` must not claim ``qubit-gateway-foobar.service``.
-    Launchd labels are ``ai.qubit.gateway`` / ``ai.qubit.gateway-<profile>`` — they do
-    not contain the substring ``qubit-gateway``, so a successful macOS kickstart must
-    still credit the planned default gateway. A scope prefix (``user/qubit-gateway``,
-    ``gui/501/ai.qubit.gateway``) is stripped the same way serve units are. Pre-rebrand
-    ``hermes-*`` names stay accepted as read-old aliases.
+    Never substring-match: ``foo`` must not claim ``hermes-gateway-foobar.service``.
+    Launchd labels are ``ai.hermes.gateway`` / ``ai.hermes.gateway-<profile>`` — they do
+    not contain the substring ``hermes-gateway``, so a successful macOS kickstart must
+    still credit the planned default gateway. A scope prefix (``user/hermes-gateway``,
+    ``gui/501/ai.hermes.gateway``) is stripped the same way serve units are.
     """
     name = str(service).removesuffix(".service").rsplit("/", 1)[-1]
     if profile == "default":
-        return name in {
-            "qubit-gateway", "ai.qubit.gateway", "hermes-gateway", "ai.hermes.gateway",
-            "gateway", "gateway-default",
-        }
-    return name in {
-        f"qubit-gateway-{profile}", f"ai.qubit.gateway-{profile}",
-        f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}", f"gateway-{profile}",
-    }
+        return name in {"hermes-gateway", "ai.hermes.gateway", "gateway", "gateway-default"}
+    return name in {f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}", f"gateway-{profile}"}
 
 
 def _gateway_named_in(r: RuntimeRecord, names: set) -> bool:
@@ -398,11 +408,11 @@ def _gateway_named_in(r: RuntimeRecord, names: set) -> bool:
 
 
 def match_runtime_outcomes(
-    plan: "UpdatePlan", *, restarted_services: list, relaunched_profiles: list,
+    plan: UpdatePlan, *, restarted_services: list, relaunched_profiles: list,
     externally_supervised_profiles: list, killed_pids: set, failed_units: list,
-    stale_serve_pids: "set | None" = None, failed_respawn_pids: "set | None" = None,
-    external_gateway_pids: "set | None" = None,
-    live_gateway_pids: "dict[str, set[int]] | None" = None,
+    stale_serve_pids: set | None = None, failed_respawn_pids: set | None = None,
+    external_gateway_pids: set | None = None,
+    live_gateway_pids: dict[str, set[int]] | None = None,
 ) -> list[dict[str, Any]]:
     """Reconcile the plan's runtimes against what the restart phase DID.
 
@@ -544,7 +554,8 @@ def match_runtime_outcomes(
         for r in plan.runtimes:
             if isinstance(r, RuntimeRecord):
                 outcomes.append(
-                    {"kind": r.kind, "profile": r.profile, "pid": r.pid, "mechanism": r.restart_via, "outcome": _outcome(r)}
+                    {"kind": r.kind, "profile": r.profile, "pid": r.pid, "mechanism": r.restart_via, "outcome": _outcome(r),
+                     **{k: r.detail[k] for k in ("systemd_unit", "systemd_scope") if k in (r.detail or {})}}
                 )
     except Exception as exc:
         logger.debug("Runtime-outcome reconciliation failed: %s", exc)
@@ -555,7 +566,7 @@ def report_unaccounted_runtimes(outcomes: list[dict[str, Any]]) -> bool:
     """Print a loud warning for runtimes the restart phase never touched.
 
     Returns True when at least one planned runtime is unaccounted; the caller escalates like a
-    STALE/DOWN fleet row (exit 1) — a promised restart silently missed is the class this phase
+    STALE/DOWN fleet row (an owed ``gateway_restart`` follow-up) — a promised restart silently missed is the class this phase
     exists to kill.
     """
     manual = [o for o in outcomes if o.get("outcome") == "deferred" and o.get("mechanism") == "respawn-argv"]
@@ -595,9 +606,17 @@ def report_unaccounted_runtimes(outcomes: list[dict[str, Any]]) -> bool:
     if any(o.get("kind") in _SERVE_KINDS for o in missed):
         # A serve/dashboard is not reachable by any `gateway restart` command: name the process, not the wrong verb.
         # See #100479.
-        if sys.platform == "linux":
-            print("      systemctl --user restart hermes-serve.service   # unit-managed serve")
-        print("      relaunch `qubit serve` / `qubit dashboard`")
+        from qubit_cli.main_dashboard import _systemd_restart_commands
+
+        for o in missed:
+            if o.get("kind") in _SERVE_KINDS and o.get("systemd_unit"):
+                # The owning unit and scope are known: name its exact command (#141021).
+                for command in _systemd_restart_commands(o["systemd_unit"], o.get("systemd_scope")):
+                    print(f"      {command}   # pid {o['pid']}")
+        if any(o.get("kind") in _SERVE_KINDS and not o.get("systemd_unit") for o in missed):
+            if sys.platform == "linux":
+                print("      systemctl --user restart hermes-serve.service   # unit-managed serve")
+            print("      relaunch `qubit serve` / `qubit dashboard`")
     return True
 
 

@@ -151,3 +151,10 @@ def _as_method(call: Callable[..., Any]) -> Callable[..., Any]:
         method.__signature__ = signature.replace(  # type: ignore[attr-defined]
             parameters=[self_param, *signature.parameters.values()])
     return method
+
+
+# --- ported from upstream 088f657ecf ---
+
+def is_hosted_profile(profile: Any) -> bool:
+    """True for a profile proxy whose code runs in the plugin host."""
+    return type(profile).__module__ == __name__

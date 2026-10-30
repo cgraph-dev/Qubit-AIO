@@ -136,3 +136,10 @@ def commit_refreshed_policy(db, *, epoch, session_id, old, new, generation):
         return _commit_policy(db, conn, session_id, {'snapshot': snapshot, 'policy': new})[1]
     return db._execute_write(write)
 
+
+# --- ported from upstream 088f657ecf ---
+
+def edit_policy_in_transaction(db, conn, session_id, payload, prepared):
+    snapshot, generation = _commit_policy(db, conn, session_id, prepared)
+    return {session_id, snapshot['target']}, {'edit_approval_policy': payload['policy'],
+                                              'execution_generation': generation}

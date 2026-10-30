@@ -534,6 +534,18 @@ def _backup_db_file(db_path: Path) -> tuple[Optional[Path], Optional[str]]:
         return None, f"backup copy failed: {exc}"
 
 
+def _rw_or_vanished(p: Path) -> bool:
+    """True when *p* is read-write for this user OR no longer exists.
+
+    The preflight lists the files first and checks them after, and a live sibling connection's last ``close()``
+    unlinks ``-wal``/``-shm`` in between (a concurrent quarantine can rename ``state.db`` aside the same way).
+    ``os.access`` on the vanished path returns False, which is "gone", not "read-only". The final re-check covers
+    a sidecar that vanished and was recreated by the next opener before ``exists()`` ran.
+    """
+    mode = os.R_OK | os.W_OK
+    return os.access(p, mode) or not p.exists() or os.access(p, mode)
+
+
 def preflight_db_writability(db_path: Path, *, db_label: str = "state.db", directory_only: bool = False) -> None:
     """Refuse-or-repair read-only DB files BEFORE the first connection opens.
 
@@ -555,7 +567,7 @@ def preflight_db_writability(db_path: Path, *, db_label: str = "state.db", direc
     sidecars = (db_path.with_name(db_path.name + "-wal"), db_path.with_name(db_path.name + "-shm"))
     files = () if directory_only else tuple((p, False) for p in (db_path, *sidecars) if p.is_file())
     for p, is_dir in [(db_path.parent, True), *files]:
-        if (is_dir and not p.is_dir()) or os.access(p, os.R_OK | os.W_OK):
+        if (is_dir and not p.is_dir()) or _rw_or_vanished(p):
             continue
         x = "x" if is_dir else ""
         in_scope = False
@@ -705,28 +717,6 @@ _FTS_OBJECT_RE = re.compile(
 )
 _INTEGRITY_TREE_RE = re.compile(r"\bTree (\d+)\b")
 _INTEGRITY_MISSING_INDEX_RE = re.compile(r"missing from index (\S+)")
-_FTS_CONSTRUCTOR_ERROR_RE = re.compile(r"vtable constructor failed:\s*(\S+)", re.IGNORECASE)
-
-
-def _integrity_error_is_fts_only(conn, master_rows, exc: sqlite3.DatabaseError) -> bool:
-    """True when an ``integrity_check`` DatabaseError is an FTS5 vtable-constructor failure and
-    every canonical table still checks clean. Corrupted FTS shadow data makes the virtual table
-    fail to open, aborting the whole check; that is recoverable by the FTS rebuild ladder, while
-    any canonical failure (or an error that does not name an FTS object) stays structural."""
-    match = _FTS_CONSTRUCTOR_ERROR_RE.search(str(exc))
-    if not match or not _FTS_OBJECT_RE.fullmatch(match.group(1)):
-        return False
-    for _rootpage, type_, name in master_rows:
-        if type_ != "table" or _FTS_OBJECT_RE.fullmatch(name):
-            continue
-        quoted = '"%s"' % str(name).replace('"', '""')
-        try:
-            rows = conn.execute(f"PRAGMA integrity_check({quoted})").fetchall()
-        except sqlite3.DatabaseError:
-            return False
-        if any(str(row[0]).lower() != "ok" for row in rows):
-            return False
-    return True
 
 
 def integrity_damage_is_structural(integrity_lines, master_rows) -> bool:
@@ -755,11 +745,9 @@ def integrity_damage_is_structural(integrity_lines, master_rows) -> bool:
 def state_db_has_structural_damage(db_path: Path) -> bool:
     """Read-only ``integrity_check`` + ``sqlite_master`` rootpage map on a fresh connection;
     ``integrity_damage_is_structural`` over the result. A check that RAISES instead of
-    reporting (a torn page under the walk) is structural too, unless the raise is an FTS5
-    vtable-constructor failure and the canonical tables check clean: corrupt FTS shadow data
-    aborts the whole walk even though the FTS rebuild ladder is the correct repair.
+    reporting (a torn page under the walk) is structural too: no FTS-only fixture does that
+    while ``messages``/``sessions`` read cleanly, and the FTS rebuild ladder cannot help.
     Cannot-open / locked stays False so the caller keeps the FTS path."""
-    master_rows: list[tuple] = []
     try:
         conn = sqlite3.connect(read_only_db_uri(db_path), uri=True, timeout=1.0)
     except sqlite3.Error:
@@ -770,8 +758,8 @@ def state_db_has_structural_damage(db_path: Path) -> bool:
         lines = [str(r[0]) for r in conn.execute("PRAGMA integrity_check").fetchall()]
     except sqlite3.OperationalError:
         return False
-    except sqlite3.DatabaseError as exc:
-        return not _integrity_error_is_fts_only(conn, master_rows, exc)
+    except sqlite3.DatabaseError:
+        return True
     finally:
         conn.close()
     return integrity_damage_is_structural(
@@ -868,7 +856,7 @@ def _live_writer_holds_db(db_path: Path) -> bool:
     return _state_holders.live_writer_holds_db(db_path, connect_repair_durable=_connect_repair_durable)
 
 
-def _repair_skip(report: Dict[str, Any], verb: str, error: str, exc: Optional[BaseException] = None) -> Dict[str, Any]:
+def _repair_skip(report: dict[str, Any], verb: str, error: str, exc: Optional[BaseException] = None) -> dict[str, Any]:
     """Record *error* on *report* and log it as ``state.db repair <verb>``. An
     *exc* proving deterministic corruption consumes the persistent repair budget
     (private ``_repair_attempted`` marker, popped by the caller)."""
@@ -879,7 +867,7 @@ def _repair_skip(report: Dict[str, Any], verb: str, error: str, exc: Optional[Ba
     return report
 
 
-def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, Any]:
+def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> dict[str, Any]:
     """Repair a state.db whose ``sqlite_master`` is malformed or whose FTS indexes reject writes.
 
     Two corruption classes: malformed schema / "duplicate object definition" (even ``PRAGMA`` fails), and FTS
@@ -892,7 +880,7 @@ def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, A
 
     See #50502.
     """
-    report: Dict[str, Any] = {"repaired": False, "strategy": None, "backup_path": None, "error": None}
+    report: dict[str, Any] = {"repaired": False, "strategy": None, "backup_path": None, "error": None}
     # Startup-watchdog lease: repair is I/O-bound (near-zero CPU), which the watchdog's CPU fallback would
     # misread as a parked deadlock. One lease (clamped to _MAX_LEASE_S=900) beats per-chunk renewal complexity.
     report_startup_progress(900.0, phase="state_db_repair")
@@ -997,8 +985,8 @@ def _restore_journal_mode_after_repair(db_path: Path, before_mode: Optional[str]
 
 
 def _repair_state_db_schema_locked(
-    db_path: Path, *, backup: bool, report: Dict[str, Any], journal_mode_before: Optional[str] = None,
-) -> Dict[str, Any]:
+    db_path: Path, *, backup: bool, report: dict[str, Any], journal_mode_before: Optional[str] = None,
+) -> dict[str, Any]:
     """Repair strategies for :func:`repair_state_db_schema`; caller holds the cross-process repair lock.
 
     Strategies run on a SCRATCH COPY, copied back through SQLite's transactional backup API only once proven to open
@@ -1077,7 +1065,7 @@ def _repair_state_db_schema_locked(
 def _unlink_db_triple(path: Path) -> Optional[str]:
     """Remove *path* and every SQLite sidecar; return any cleanup failure."""
     from qubit_state import _IS_WINDOWS
-    failures: List[str] = []
+    failures: list[str] = []
     for victim in (path, *_sidecars(path)):
         for attempt in range(10):
             try:
@@ -1163,7 +1151,7 @@ _REPAIR_STRATEGIES = (
 )
 
 
-def _run_repair_strategies(db_path: Path, report: Dict[str, Any]) -> Dict[str, Any]:
+def _run_repair_strategies(db_path: Path, report: dict[str, Any]) -> dict[str, Any]:
     """Escalating repair attempts, applied to *db_path* IN PLACE — only ever a scratch copy nothing else holds open,
     never the user's database. The "could not recover" log lives in the caller so it names the user's database."""
 

@@ -1,4 +1,4 @@
-"""Gateway restart/drain, Qubit update and background-action status dashboard routes.
+"""Gateway restart/drain, Hermes update and background-action status dashboard routes.
 
 Extracted from ``qubit_cli.web_server``; helpers/state that tests monkeypatch on
 ``web_server`` stay there and are late-bound (cycle-safe).
@@ -52,12 +52,10 @@ _ACTION_LOG_TAIL_MAX_BYTES = 256 * 1024
 _ACTION_LOG_TAIL_INITIAL_CHUNK_BYTES = 8 * 1024
 _ACTION_LOG_TAIL_MAX_CHUNK_BYTES = 64 * 1024
 
-# Both spellings: `qubit-update` is what this product writes, `hermes-update` is what a run
-# started before the rename left in its log — the status page must read either.
-_UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== (?:qubit|hermes)-update completed ([0-9a-f]{32}) ===$")
-_UPDATE_ACTION_STARTED_RE = re.compile(r"^=== (?:qubit|hermes)-update started .* ([0-9a-f]{32}) ===$")
+_UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== hermes-update completed ([0-9a-f]{32}) ===$")
+_UPDATE_ACTION_STARTED_RE = re.compile(r"^=== hermes-update started .* ([0-9a-f]{32}) ===$")
 
-_MANAGED_EXTERNALLY_MESSAGE = "Qubit updates are managed outside this dashboard in containerized environments."
+_MANAGED_EXTERNALLY_MESSAGE = "Hermes updates are managed outside this dashboard in containerized environments."
 
 # Per-kind dashboard error codes the UI keys on, by admission-refusal code.
 _UPDATE_REFUSAL_ERROR_CODES = {
@@ -65,12 +63,6 @@ _UPDATE_REFUSAL_ERROR_CODES = {
     "image-marker-invalid": "docker_update_unsupported", "apt": "apt_update_required",
     "nix": "nix_update_unsupported",
 }
-
-# The Status page's update action. ``qubit-update`` is the product's name for it; the
-# ``hermes-update`` spelling stays readable so a run started before the rename (its log,
-# its ``HERMES_ACTION_ID``, its completion marker) still reports instead of 404ing.
-_UPDATE_ACTION = "qubit-update"
-_UPDATE_ACTION_NAMES = frozenset({_UPDATE_ACTION, "hermes-update"})
 
 
 def _finish_action(name: str, exit_code: Optional[int], pid: Optional[int]) -> None:
@@ -92,7 +84,7 @@ def _record_completed_action(name: str, message: str, exit_code: int = 1) -> Non
     _finish_action(name, exit_code, None)
 
 
-def _tail_lines(path: Path, n: int) -> List[str]:
+def _tail_lines(path: Path, n: int) -> list[str]:
     """Return the last ``n`` lines of ``path`` without loading huge logs."""
     try:
         size = path.stat().st_size
@@ -105,7 +97,7 @@ def _tail_lines(path: Path, n: int) -> List[str]:
     offset = size
     chunk_size = _ACTION_LOG_TAIL_INITIAL_CHUNK_BYTES
     newline_count = 0
-    chunks: List[bytes] = []
+    chunks: list[bytes] = []
     drop_partial_first_line = False
     try:
         with path.open("rb") as handle:
@@ -129,7 +121,7 @@ def _tail_lines(path: Path, n: int) -> List[str]:
     return lines[-n:]
 
 
-def _durable_completed_update_action_id(lines: List[str]) -> Optional[str]:
+def _durable_completed_update_action_id(lines: list[str]) -> Optional[str]:
     """Latest successful update id from ``update.log`` — the durable record that survives
     the update restarting the dashboard (losing the in-memory ``Popen``/result registries).
     Only a completion marker after the latest start marker counts, so a stale success
@@ -137,7 +129,7 @@ def _durable_completed_update_action_id(lines: List[str]) -> Optional[str]:
     last_start = last_completed = -1
     completed_action_id: Optional[str] = None
     for index, line in enumerate(lines):
-        if line.startswith("=== qubit update started "):
+        if line.startswith("=== hermes update started "):
             last_start = index
         match = _UPDATE_ACTION_COMPLETED_RE.fullmatch(line.strip())
         if match:
@@ -146,11 +138,10 @@ def _durable_completed_update_action_id(lines: List[str]) -> Optional[str]:
     return completed_action_id if completed_action_id and last_completed > last_start else None
 
 
-def _latest_spawned_update_action_id(lines: List[str]) -> Optional[str]:
-    """Action id named by the latest update-started header of THIS dashboard's log."""
-    prefixes = tuple(f"=== {name} started " for name in sorted(_UPDATE_ACTION_NAMES))
+def _latest_spawned_update_action_id(lines: list[str]) -> Optional[str]:
+    """Action id named by the latest ``hermes-update started`` header of THIS dashboard's log."""
     for line in reversed(lines):
-        if line.startswith(prefixes):
+        if line.startswith("=== hermes-update started "):
             match = _UPDATE_ACTION_STARTED_RE.fullmatch(line.strip())
             return match.group(1) if match else None
     return None
@@ -168,9 +159,10 @@ def _persisted_action_id(log_dir: Path, name: str) -> Optional[str]:
 
 @router.post("/api/gateway/restart")
 async def restart_gateway(profile: Optional[str] = None):
-    """Kick off a ``qubit gateway restart`` in the background."""
+    """Kick off a ``hermes gateway restart --interrupt`` in the background: the user-commanded force
+    path that supersedes a drain (D6, 19b26244046), so live sessions do not refuse it."""
     with http_failure("Failed to spawn gateway restart", 500, "Failed to restart gateway"):
-        proc, _reused = _spawn_gateway_restart(profile)
+        proc, _reused = _spawn_gateway_restart(profile, interrupt=True)
     return {"ok": True, "pid": proc.pid, "name": "gateway-restart"}
 
 
@@ -184,7 +176,7 @@ async def gateway_migrate_plan():
 
 @router.post("/api/gateway/migrate")
 async def gateway_migrate():
-    """Run ``qubit gateway migrate --multiplex --yes`` detached; the CLI re-runs the preflight and
+    """Run ``hermes gateway migrate --multiplex --yes`` detached; the CLI re-runs the preflight and
     refuses (exit 1 into the action log) when blocked, so the UI should gate on the plan first."""
     from qubit_cli.web_server_gateway import _spawn_qubit_action
     with http_failure("Failed to spawn gateway migrate", 500, "Failed to start gateway migration"):
@@ -238,17 +230,17 @@ async def gateway_drain(request: Request):
     }
 
 
-def _update_refused(error: str, message: str, update_command: str) -> Dict[str, Any]:
-    _record_completed_action(_UPDATE_ACTION, message, exit_code=1)
+def _update_refused(error: str, message: str, update_command: str) -> dict[str, Any]:
+    _record_completed_action("hermes-update", message, exit_code=1)
     return {
-        "ok": False, "pid": None, "name": _UPDATE_ACTION, "error": error, "message": message,
+        "ok": False, "pid": None, "name": "hermes-update", "error": error, "message": message,
         "update_command": update_command,
     }
 
 
-@router.post("/api/qubit/update")
+@router.post("/api/hermes/update")
 async def update_hermes():
-    """Kick off ``qubit update`` in the background."""
+    """Kick off ``hermes update`` in the background."""
     if is_commit_build(_server_path("PROJECT_ROOT")):
         return _update_refused("commit-build", COMMIT_BUILD_UPDATE_MESSAGE, "")
 
@@ -269,29 +261,34 @@ async def update_hermes():
         record_refusal_receipt(refusal)
         return response
 
-    existing = _ACTION_PROCS.get(_UPDATE_ACTION)
+    existing = _ACTION_PROCS.get("hermes-update")
     if existing is not None and existing.poll() is None:
-        response = {"ok": True, "pid": existing.pid, "name": _UPDATE_ACTION, "already_running": True}
-        action_id = _ACTION_IDS.get(_UPDATE_ACTION)
+        response = {"ok": True, "pid": existing.pid, "name": "hermes-update", "already_running": True}
+        action_id = _ACTION_IDS.get("hermes-update")
         if action_id:
             response["action_id"] = action_id
         return response
 
     action_id = secrets.token_hex(16)
-    with http_failure("Failed to spawn qubit update", 500, "Failed to start update"):
-        proc = _spawn_qubit_action(["update"], _UPDATE_ACTION, env_overrides={"QUBIT_ACTION_ID": action_id})
-    return {"ok": True, "pid": proc.pid, "name": _UPDATE_ACTION, "action_id": action_id}
+    with http_failure("Failed to spawn hermes update", 500, "Failed to start update"):
+        proc = _spawn_qubit_action(["update"], "hermes-update", env_overrides={"HERMES_ACTION_ID": action_id})
+    return {"ok": True, "pid": proc.pid, "name": "hermes-update", "action_id": action_id}
 
 
 _NON_APPLYABLE_MESSAGES = {
     "docker": format_docker_update_message,
-    "apt": lambda: "Qubit is managed by Termux APT; run `pkg upgrade hermes-agent`.",
+    "apt": lambda: "Hermes is managed by Termux APT; run `pkg upgrade hermes-agent`.",
 }
 
 
-@router.get("/api/qubit/update/check")
+def _source_release_label(status: dict[str, Any]) -> str:
+    version = status.get("sourceVersion")
+    return f"{status.get('channel') or 'stable'} release" + (f" v{version}" if version else "")
+
+
+@router.get("/api/hermes/update/check")
 async def check_qubit_update(force: bool = False, profile: Optional[str] = None):
-    """Report whether a Qubit update is available, without applying it.
+    """Report whether a Hermes update is available, without applying it.
 
     Returns install_method ('apt'|'git'|'docker'|'nix'|'nixos'|'unknown'),
     current_version, behind (commits behind, 0 = up to date, -1 = unknown count,
@@ -318,7 +315,7 @@ async def check_qubit_update(force: bool = False, profile: Optional[str] = None)
         }
 
     install_method = detect_install_method(_server_path("PROJECT_ROOT"))
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "install_method": install_method,
         "current_version": get_version_info().derived_version,
         "behind": None,
@@ -332,6 +329,7 @@ async def check_qubit_update(force: bool = False, profile: Optional[str] = None)
 
     # source_check.check_for_updates() handles git / nix-revision paths through the GitHub API and
     # caches the result for 24h. ``force`` busts the cache so "Check now" reflects reality.
+    status: dict[str, Any] = {}
     try:
         from qubit_cli.source_check import check_for_updates
 
@@ -345,19 +343,31 @@ async def check_qubit_update(force: bool = False, profile: Optional[str] = None)
     payload["behind"] = behind
     if behind is None:
         payload["message"] = "Couldn't reach the update source — try again later."
+    elif behind == 0 and status.get("held"):
+        version = status.get("sourceVersion")
+        payload.update(held=status["held"], source_version=version,
+                       message=f"This build is newer than {_source_release_label(status)}, which predates the gateway "
+                               "runtime its sessions use. It stays on this build until a newer release ships.")
     elif behind == 0:
         payload["message"] = "You're on the latest version."
     else:
         payload["update_available"] = True
+        if status.get("rollback"):
+            # A stable release this build already contains: applying it moves back.
+            payload.update(rollback_to=status.get("sourceVersion"),
+                           message=f"This build is newer than {_source_release_label(status)}. "
+                                   "Updating moves it back to that release.")
         # "What's changed" for the desktop's remote update overlay; best-effort
-        # (empty list on any failure).
+        # (empty list on any failure). Channel + release name pick its notes source.
+        payload.update(channel=status.get("channel"), branch=status.get("branch"),
+                       source_version=status.get("sourceVersion"))
         payload["commits"] = [{**row, "sha": row["sha"][:7], "at": row["at"] // 1000}
                               for row in status.get("commits", [])[:20]]
     return payload
 
 
 def _completed_exit_code(
-    result: Optional[Dict[str, Any]], durable_action_id: Optional[str], receipt: Optional[Dict[str, Any]],
+    result: Optional[dict[str, Any]], durable_action_id: Optional[str], receipt: Optional[dict[str, Any]],
 ) -> Optional[int]:
     """Exit code for an action with no live process: in-memory result, else durable evidence."""
     if result is not None:
@@ -365,9 +375,9 @@ def _completed_exit_code(
     if durable_action_id:
         return 0
     if receipt is not None and receipt.get("outcome") in ("success", "partial"):
-        # No in-memory result and no log marker (e.g. log rotated), but the
-        # receipt proves a completed run: report its outcome rather than a
-        # null clients time out on. ``partial`` maps to exit 1 like the CLI.
+        # No in-memory result and no log marker (e.g. log rotated), but THIS
+        # action's receipt proves a completed run: report its outcome rather than
+        # a null clients time out on. ``partial`` maps to exit 1 like the CLI.
         return 0 if receipt["outcome"] == "success" else 1
     return None
 
@@ -385,29 +395,21 @@ async def get_action_status(name: str, lines: int = 200):
 
     durable_update_action_id = None
     update_receipt_summary = action_receipt_summary = None
-    if name in _UPDATE_ACTION_NAMES:
-        # ``qubit update`` mirrors to the ROOT home's update.log (main_dashboard), never this
+    if name == "hermes-update":
+        # ``hermes update`` mirrors to the ROOT home's update.log (main_dashboard), never this
         # dashboard's profile home: read it where it is written.
         from qubit_cli.logs import log_file_path
 
         durable_update_action_id = _durable_completed_update_action_id(_tail_lines(log_file_path("update"), 2000))
         spawned_action_id = (_latest_spawned_update_action_id(_tail_lines(log_dir / log_file_name, 2000))
                              or _persisted_action_id(log_dir, name) or _ACTION_IDS.get(name))
-        if spawned_action_id is not None and durable_update_action_id != spawned_action_id:
+        if durable_update_action_id != spawned_action_id:
             # The root log is shared by every profile: another profile's (or an older) run's
-            # completion never certifies the action this dashboard started. An ABSENT local id
-            # is not that evidence — after a dashboard restart the in-memory/sidecar record is
-            # gone and the durable marker is the only proof left, so it must stand.
+            # completion never certifies the action this dashboard started.
             durable_update_action_id = None
         if durable_update_action_id:
-            markers = [f"=== {_UPDATE_ACTION} completed {durable_update_action_id} ==="]
-            markers += [f"=== {legacy} completed {durable_update_action_id} ==="
-                        for legacy in sorted(_UPDATE_ACTION_NAMES - {_UPDATE_ACTION})]
-            for marker in markers:
-                if marker in tail:
-                    break
-            else:
-                marker = markers[0]
+            marker = f"=== hermes-update completed {durable_update_action_id} ==="
+            if marker not in tail:
                 tail = [*tail, marker][-requested_lines:]
         # The update receipt is the durable, structured truth about the last
         # update (written by every run, incl. refused/failed; survives the
@@ -415,10 +417,7 @@ async def get_action_status(name: str, lines: int = 200):
         # the outcome instead of inferring it from liveness probes.
         # See #81193, #87359, #91277.
         # The store is root-wide (every profile's runs): show THIS action's receipt when one exists.
-        # After a dashboard restart the in-memory/sidecar spawn id is gone; the durable marker
-        # is then the only identity left, so use it to find OUR receipt rather than the latest
-        # (another profile's) one.
-        update_receipt_summary = _latest_update_receipt_summary(spawned_action_id or durable_update_action_id)
+        update_receipt_summary = _latest_update_receipt_summary(spawned_action_id)
         if spawned_action_id and (update_receipt_summary or {}).get("action_id") == spawned_action_id:
             action_receipt_summary = update_receipt_summary
 
@@ -445,7 +444,7 @@ async def get_action_status(name: str, lines: int = 200):
     return response
 
 
-def _read_latest_receipt() -> Optional[Dict[str, Any]]:
+def _read_latest_receipt() -> Optional[dict[str, Any]]:
     """Latest update receipt, or None on any failure (never raises)."""
     try:
         from qubit_cli.update_receipt import read_latest_receipt
@@ -454,13 +453,13 @@ def _read_latest_receipt() -> Optional[Dict[str, Any]]:
         return None
 
 
-def _latest_update_receipt_summary(action_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def _latest_update_receipt_summary(action_id: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Compact summary of dashboard action ``action_id``'s receipt when one exists, else of the
-    latest receipt (written by EVERY ``qubit update`` run, incl. refused/failed), or None; never
+    latest receipt (written by EVERY ``hermes update`` run, incl. refused/failed), or None; never
     raises. Steps/skips stay in the full endpoint. ``action_id`` names the writer so a client
     never credits another action's run.
 
-    Phase-1 bullet 3 (#91277): the receipt (written by EVERY ``qubit update`` run since #91283, including
+    Phase-1 bullet 3 (#91277): the receipt (written by EVERY ``hermes update`` run since #91283, including
     refused and failed ones, with a ``latest.json`` pointer) is the durable success signal the Desktop and
     dashboard should read instead of inferring outcomes from liveness probes across the update's stop/start
     gap (#81193, #87359).
@@ -489,7 +488,7 @@ def _latest_update_receipt_summary(action_id: Optional[str] = None) -> Optional[
         return None
 
 
-@status_router.get("/api/qubit/update/receipt")
+@status_router.get("/api/hermes/update/receipt")
 async def get_update_receipt():
     """The FULL latest update receipt (steps, skips, gateway restart outcome, fleet
     matrix) plus a compact ``summary``; 404 when no update has run since receipts landed.
@@ -500,5 +499,5 @@ async def get_update_receipt():
     """
     receipt = _read_latest_receipt()
     if not receipt:
-        raise HTTPException(status_code=404, detail="No update receipt found (no `qubit update` run recorded).")
+        raise HTTPException(status_code=404, detail="No update receipt found (no `hermes update` run recorded).")
     return {"receipt": receipt, "summary": _latest_update_receipt_summary()}

@@ -93,6 +93,14 @@ def _connect_local_default(port: int, system: str, announce) -> str | None:
     return None
 
 
+def _reap_profile_browsers() -> None:
+    """Close the current profile's browsers only: the live connection is per profile, so other
+    profiles' sessions on a multiplexed gateway keep theirs."""
+    from qubit_constants import qubit_home_key
+    from tools.browser_session_lifecycle import cleanup_profile_browsers
+    cleanup_profile_browsers(qubit_home_key())
+
+
 def _browser_connect(rid, params: dict) -> dict:
     import platform
     from qubit_cli.browser_connect import DEFAULT_BROWSER_CDP_URL

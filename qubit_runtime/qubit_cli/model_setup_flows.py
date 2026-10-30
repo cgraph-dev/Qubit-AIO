@@ -1191,3 +1191,13 @@ def _model_flow_plugin_provider(config, provider_id, current_model=""):
         confirm_base_url=base_url, confirm_api_key=api_key, notes=notes)
     _finish_model(selected, provider_id, f"Default model set to: {selected} (via {profile.display_name or provider_id})",
                   base_url=base_url or None, api_mode=profile.api_mode or None)
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _profile_model_setup_flow(provider_id: str):
+    """``flow(config, current_model, args)`` for a registered profile that owns its ``hermes model``
+    step (``ProviderProfile.model_setup_flow``), else None."""
+    from providers import get_provider_profile
+    profile = get_provider_profile(provider_id)
+    return getattr(profile, "model_setup_flow", None) if profile is not None else None

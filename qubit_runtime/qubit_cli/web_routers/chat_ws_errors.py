@@ -30,7 +30,7 @@ def _node_missing(exc: BaseException) -> bool:
     return isinstance(exc, SystemExit) or "'node'" in text or "'npm'" in text or "Node.js" in text
 
 
-def chat_start_failure_message(exc: BaseException) -> str:
+def chat_start_failure_message(exc: BaseException, *, surface: str = "Chat") -> str:
     """One plain sentence for the terminal pane; never the bare exception."""
     if isinstance(exc, RegistryFull):
         return CHAT_TOO_MANY_TERMINALS

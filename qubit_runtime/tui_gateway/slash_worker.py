@@ -224,3 +224,33 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _start_legacy_parent_watchdog(parent_pid: int, *, poll_s: float = 2.0, grace_s: float = 5.0) -> None:
+    """Keep the old death guard for a worker launched by a pre-update gateway.
+
+    A gateway started before the owned-child change still runs its old code. That code starts this
+    (updated) worker with a plain Popen and ``--parent-pid`` and never registers it with an
+    owner-death supervisor. If that gateway dies while the worker is inside a command, stdin EOF is
+    never read and nothing stops the worker. The watchdog compares the kernel's live ppid with the
+    pid passed at spawn, so a reused pid can never pass for the parent. An in-flight command gets
+    ``grace_s`` to finish. POSIX only: Windows never reparents, so the check could not fire there.
+    Current gateways don't pass ``--parent-pid`` (spawn_owned covers the worker), so it never starts.
+    """
+    if not parent_pid or os.name != "posix":
+        return
+
+    def _loop():
+        while os.getppid() == parent_pid:
+            time.sleep(poll_s)
+        deadline = time.monotonic() + grace_s
+        while _in_flight.is_set() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        from qubit_cli.observability.shared_metrics_process import flush_before_hard_exit
+        flush_before_hard_exit()  # os._exit skips the opt-in metrics runtimes' atexit flush (bounded)
+        os._exit(0)
+
+    # health: allow HX012 -- the loop reads getppid(), flushes the opt-in metrics and calls os._exit
+    threading.Thread(target=_loop, daemon=True, name="slash-legacy-parent-watchdog").start()

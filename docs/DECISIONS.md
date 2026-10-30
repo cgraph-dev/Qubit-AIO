@@ -21,7 +21,8 @@ does not add policy of its own.
    → Full text: `docs/IDENTITY.md` §"Language policy (owner ruling, 2026-10-10)".
 
 4. **The finish line is a frozen pin, not upstream HEAD.** Target
-   `43faacfb8de7b29548547a7fbdedad0cc6e7391c` (2026-10-16). Ports are literal 1:1 against that
+   `43faacfb8de7b29548547a7fbdedad0cc6e7391c` (2026-10-16; **superseded for the pin
+   value by ruling 13**). Ports are literal 1:1 against that
    revision, including features this fork dropped on purpose; exclusions are pruned by the owner
    *after* the gap closes, never skipped mid-port by an agent. The pin does not move until
    hermes is retired, and post-freeze upstream commits are out of scope until then.
@@ -64,6 +65,15 @@ does not add policy of its own.
    the bootstrap escalates), pinned by
    `qubit_runtime/tests/gateway/test_control_listener_fatal.py`.
    → Provenance: owner ruling 2026-10-21 after the read-only investigation in wave 16.
+
+13. **Re-pin to upstream main `088f657ecf` (owner ruling, 2026-10-30).** The finish line
+    is now `088f657ecf77674c7b8e2ededf4e3576d82e042c` (2026-10-29T20:29:59Z), superseding
+    the `43faacfb8de7` pin in ruling 4 for the pin value. Ports are literal 1:1 against the
+    new pin; post-pin upstream commits are out of scope until the owner re-pins again.
+    Measured gap at the re-freeze: **1,968 production missing** (244 absent production
+    files + 1,724 behind-head production symbols across 497 files); tests add 1,908
+    non-blocking missing symbols. Evidence: `scripts/frozen_target_progress.py` and the
+    audit JSON at `088f657ecf`. → Full text: `docs/FROZEN_TARGET.md`.
 
 ## Why this file is not the original
 

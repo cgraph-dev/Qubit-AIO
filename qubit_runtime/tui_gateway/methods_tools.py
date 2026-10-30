@@ -1928,3 +1928,54 @@ def _(rid, params: dict) -> dict:
 def register(server) -> None:
     """Rebind this module's helpers + handlers onto ``server`` and register the handlers."""
     bind_module(globals(), server, skip=("_",))
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _source_moved_data(result: dict) -> dict | None:
+    """The structured marker of an install refused because the source left the reviewed commit: the
+    client re-inspects on ``reason``, never on the message, which echoes text a git server controls."""
+    return {"reason": "source_moved"} if result.get("source_moved") else None
+
+
+def _plugins_inspect(rid, params):
+    """Read-only pre-install check of ``identifier``/``repo`` (or ``catalog_name`` at its pin): which halves it
+    ships. Nothing is installed or run; a source that cannot be read answers ``ok: false`` + ``error``."""
+    ident = (params.get("identifier") or params.get("repo") or "").strip()
+    catalog_name = str(params.get("catalog_name") or "").strip()
+    if not ident and not catalog_name:
+        return _err(rid, 4019, "plugins.inspect requires 'identifier', 'repo', or 'catalog_name'")
+    inspect = _tools_mod("qubit_cli.plugins_cmd_inspect").inspect_plugin_source
+    return _ok(rid, inspect(ident, catalog_name=catalog_name or None))
+
+
+def _plugins_install_desktop(rid, params):
+    """Install a repository's desktop half onto this host (``desktop-plugins/<name>``) — what Electron's
+    ``installDesktopPlugin`` does, for a browser-hosted client with no disk of its own. ``ref`` is the
+    commit the install dialog reviewed; the loader picks the folder up on its next scan."""
+    ident = (params.get("identifier") or params.get("repo") or "").strip()
+    catalog_name = str(params.get("catalog_name") or "").strip()
+    if not ident and not catalog_name:
+        return _err(rid, 4019, "plugins.manage install_desktop requires 'identifier', 'repo', or 'catalog_name'")
+    result = _tools_mod("qubit_cli.desktop_plugin_install").install_desktop_plugin(
+        ident, ref=params.get("ref"), catalog_name=catalog_name or None, force=bool(params.get("force")))
+    if not result.get("ok"):
+        return _err(rid, 5026, result.get("error") or "desktop install failed", data=_source_moved_data(result))
+    return _ok(rid, result)
+
+
+def _plugins_remove_desktop(rid, params):
+    """Delete one installed desktop plugin folder from this host. The desktop half of a package is
+    refused: that package's own removal takes it away."""
+    name = (params.get("name") or params.get("key") or "").strip()
+    if not name:
+        return _err(rid, 4019, "plugins.manage remove_desktop requires a 'name'")
+    result = _tools_mod("qubit_cli.desktop_plugin_install").remove_desktop_plugin(
+        name, force=bool(params.get("force")))
+    return _ok(rid, result) if result.get("ok") else _err(rid, 5026, result.get("error") or "desktop remove failed")
+
+
+def _portable_server_names(plugin_dir: Path, key: str) -> set[str]:
+    package = _tools_mod("qubit_cli.agent_plugins").load_agent_plugin(plugin_dir, plugin_dir)
+    name_for = _tools_mod("qubit_cli.plugins_manifest").portable_mcp_server_name
+    return {name_for(key, server) for server in package.mcp_servers}

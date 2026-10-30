@@ -111,3 +111,8 @@ def retry_network(
                 exc, delay, attempt, _ATTEMPTS,
             )
             (wait or time.sleep)(delay)
+
+
+# --- ported from upstream 088f657ecf ---
+
+_MAX_RECOVERY_DELAY = 300.0

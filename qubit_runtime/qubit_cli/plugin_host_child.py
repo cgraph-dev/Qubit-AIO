@@ -1,10 +1,10 @@
-"""The plugin host process: imports third-party plugins and serves their callbacks to Hermes.
+"""The plugin host process: imports third-party plugins and serves their callbacks to Qubit.
 
 Started by :class:`qubit_cli.plugin_host.PluginHost` as ``python -m qubit_cli.plugin_host_child``
 (optionally under ``plugins.host.launcher``, e.g. a sandbox runner) with the profile's environment.
 Plugins get a :class:`RemotePluginContext` that looks like ``PluginContext``: registrations and
-queries are forwarded to Hermes, callables and provider objects stay here and are invoked by
-reference. Nothing in this module is imported by the Hermes process itself.
+queries are forwarded to Qubit, callables and provider objects stay here and are invoked by
+reference. Nothing in this module is imported by the Qubit process itself.
 
 stdin/stdout carry the protocol, so the real file descriptors are duplicated for the channel and
 fd 0/1 are pointed at /dev/null and stderr before any plugin code runs: a stray ``print()`` in a
@@ -29,8 +29,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from qubit_cli.plugin_host_wire import (
-    Channel, Opaque, PROTOCOL_VERSION, PluginHostUnsupported, bind_serving_request, decode, describe_signature,
-    encode, is_async_callable, serving_request,
+    Channel, Opaque, PROTOCOL_VERSION, PluginHostUnsupported, bind_serving_request, declared_member, decode,
+    describe_signature, encode, is_async_callable, restore_arguments, serving_request,
 )
 
 logger = logging.getLogger("qubit_cli.plugin_host_child")
@@ -39,7 +39,7 @@ _ENTRY_POINTS_GROUP = "qubit_agent.plugins"
 
 
 class RemoteRegistration:
-    """Child-side twin of ``PluginRegistration``: ``dispose()`` releases the Hermes-side entry."""
+    """Child-side twin of ``PluginRegistration``: ``dispose()`` releases the Qubit-side entry."""
 
     def __init__(self, runtime: HostRuntime, handle_id: int, kind: str, key: str):
         self._runtime, self._id, self.kind, self.key = runtime, handle_id, kind, key
@@ -57,11 +57,11 @@ class RemoteRegistration:
 
 
 class RemoteFacade:
-    """``ctx.state`` / ``ctx.llm`` / ...: every method call runs on the Hermes-side facade."""
+    """``ctx.state`` / ``ctx.llm`` / ...: every method call runs on the Qubit-side facade."""
 
     def __init__(self, runtime: HostRuntime, plugin_key: str, name: str):
         self._runtime, self._plugin_key, self._name = runtime, plugin_key, name
-        self._methods: Dict[str, bool] = {}  # method name -> is a coroutine function in Hermes
+        self._methods: Dict[str, bool] = {}  # method name -> is a coroutine function in Qubit
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("_"):
@@ -84,7 +84,7 @@ class RemoteFacade:
 
 class RemotePluginContext:
     """What ``register(ctx)`` receives inside the host. Mirrors ``PluginContext``'s public surface as
-    announced by Hermes at load, so ``hasattr(ctx, "register_x")`` answers the same as in-process."""
+    announced by Qubit at load, so ``hasattr(ctx, "register_x")`` answers the same as in-process."""
 
     def __init__(self, runtime: "HostRuntime", plugin_key: str, info: Dict[str, Any]):
         self._runtime, self._plugin_key = runtime, plugin_key
@@ -182,7 +182,7 @@ class HostRuntime:
                 methods[name] = {"async": is_async_callable(value), "sig": describe_signature(value)}
             else:
                 # Class-level defaults too: an engine that sets ``context_length`` only later in
-                # ``update_model()`` must not read as the base-class default forever in Hermes.
+                # ``update_model()`` must not read as the base-class default forever in Qubit.
                 live.append(name)
         return {"__object__": self._remember(plugin_key, obj), "methods": methods, "live": live,
                 "type": type(obj).__name__}
@@ -231,7 +231,12 @@ class HostRuntime:
         return result
 
     def _encode_result(self, plugin_key: str, value: Any) -> Any:
-        return encode(value, functools.partial(self.ref_for, plugin_key, allow_objects=False))
+        def refs(obj: Any) -> Optional[dict]:
+            if _provider_base(obj) is not None:  # e.g. the engine ``clone_for_agent`` returns
+                return self._describe_object(plugin_key, obj)
+            return self.ref_for(plugin_key, obj, allow_objects=False)
+
+        return encode(value, refs)
 
     def _decode_args(self, params: Dict[str, Any]):
         return decode(params.get("args") or [], None), decode(params.get("kwargs") or {}, None)
@@ -254,9 +259,9 @@ class HostRuntime:
     def op_load_instance(self, params: Dict[str, Any]) -> Any:
         """Category plugins (memory provider, context engine, cron scheduler): import the directory,
         run ``register(ctx)`` capturing the one ``capture`` registration, else instantiate the first
-        subclass of ``base``. Other registrations reach Hermes only when it bound a ctx for them."""
+        subclass of ``base``. Other registrations reach Qubit only when it bound a ctx for them."""
         plugin_key = str(params["plugin_key"])
-        # Hermes asks for a fresh instance many times (agent cache, doctor, dashboard); like the
+        # Qubit asks for a fresh instance many times (agent cache, doctor, dashboard); like the
         # in-process loader, the module body runs once per host and only the instance is new.
         module = self.instance_modules.get(str(params["path"]))
         if module is None:
@@ -320,7 +325,8 @@ class HostRuntime:
 
         async def request() -> Dict[str, Any]:
             import httpx
-            transport = httpx.ASGITransport(app=app)
+            from qubit_cli.plugin_host_http_auth import with_hosted_admission
+            transport = httpx.ASGITransport(app=with_hosted_admission(app, params.get("authenticated")))
             async with httpx.AsyncClient(transport=transport, base_url="http://plugin-host") as client:
                 response = await client.request(
                     str(params["method"]), str(params["path"]), params=str(params.get("query") or ""),
@@ -348,6 +354,9 @@ class HostRuntime:
         if method.startswith("_"):
             raise AttributeError(method)
         args, kwargs = self._decode_args(params)
+        base = _provider_base(obj)
+        if base is not None:  # the ABC's annotations say what Qubit passed (``home_path: Path``)
+            args, kwargs = restore_arguments(declared_member(base, method), args, kwargs)
         return self._encode_result(self.owners.get(ref, ""), self._run(getattr(obj, method)(*args, **kwargs)))
 
     def op_obj_getattr(self, params: Dict[str, Any]) -> Any:
@@ -360,7 +369,7 @@ class HostRuntime:
         return self._encode_result(self.owners.get(int(params["ref"]), ""), getattr(obj, name))
 
     def op_release(self, params: Dict[str, Any]) -> None:
-        """Drop objects whose Hermes-side proxies were garbage-collected."""
+        """Drop objects whose Qubit-side proxies were garbage-collected."""
         with self._lock:
             for ref in params.get("refs") or ():
                 self.refs.pop(int(ref), None)
@@ -420,7 +429,7 @@ _HANDLERS: Dict[str, Callable[[HostRuntime, Dict[str, Any]], Any]] = {
 
 class _CapturingContext(RemotePluginContext):
     """``register(ctx)`` for a category plugin: the category's own registration is kept here; the rest
-    forward to Hermes when it bound a context (memory providers), else are no-ops."""
+    forward to Qubit when it bound a context (memory providers), else are no-ops."""
 
     def __init__(self, runtime: HostRuntime, plugin_key: str, info: Dict[str, Any], capture: str,
                  base: type, captured: List[Any], *, forward: bool):
@@ -443,6 +452,18 @@ def _import_base(ref: str) -> type:
     return getattr(importlib.import_module(module), attr)
 
 
+def _provider_base(value: Any) -> Optional[type]:
+    """The provider ABC (``HOST_OBJECT_BASES``) ``value`` implements. Only an already-imported base
+    can match: a plugin object subclassing it imported it."""
+    from qubit_cli.plugin_isolation import HOST_OBJECT_BASES
+    for ref in HOST_OBJECT_BASES.values():
+        module, attr = ref.split(":")
+        base = getattr(sys.modules.get(module), attr, None)
+        if isinstance(base, type) and isinstance(value, base):
+            return base
+    return None
+
+
 def _is_provider_object(value: Any) -> bool:
     """A plugin-defined instance (provider/engine), as opposed to a function or bound method."""
     return not isinstance(value, (types.FunctionType, types.MethodType, types.BuiltinFunctionType,
@@ -455,7 +476,7 @@ async def _on_behalf_of(awaitable: Any, origin: Optional[int]) -> Any:
 
 
 def _import_plugin(params: Dict[str, Any]) -> Any:
-    """Import a directory plugin under the module name Hermes assigned, or resolve an entry point."""
+    """Import a directory plugin under the module name Qubit assigned, or resolve an entry point."""
     if params.get("entrypoint"):
         for ep in importlib.metadata.entry_points().select(group=_ENTRY_POINTS_GROUP):
             if ep.name == params.get("name"):
@@ -507,7 +528,6 @@ def _take_protocol_streams():
 def capture_profiles(path: str, module_name: str) -> List[Any]:
     """Import a model-provider plugin and return the profiles it passes to ``register_provider``."""
     import providers
-    from providers.base import ProviderProfile
     providers.list_providers()  # bundled + known profiles register before the capture window
     captured: List[Any] = []
     original = providers.register_provider
@@ -516,15 +536,25 @@ def capture_profiles(path: str, module_name: str) -> List[Any]:
         _import_plugin({"path": path, "module_name": module_name, "name": Path(path).name})
     finally:
         providers.register_provider = original  # type: ignore[assignment]
-    for profile in captured:
-        if type(profile).create_client is not ProviderProfile.create_client:
-            raise PluginHostUnsupported(
-                f"provider profile {getattr(profile, 'name', '?')!r} overrides create_client(), which returns "
-                "a live SDK client; it runs only in-process")
     return captured
 
 
-def describe_profile(profile: Any) -> Dict[str, Any]:
+def _host_unsupported_reason(profile: Any) -> str | None:
+    """Why *profile* cannot run behind the plugin host (it then loads in-process), or None."""
+    from providers.base import ProviderProfile
+    if type(profile).create_client is not ProviderProfile.create_client:
+        return "it overrides create_client(), which returns a live SDK client"
+    return None
+
+
+def _extraction_entry(profile: Any) -> dict[str, Any]:
+    reason = _host_unsupported_reason(profile)
+    if reason is not None:
+        return {"name": profile.name, "in_process": reason}
+    return describe_profile(profile)
+
+
+def describe_profile(profile: Any) -> dict[str, Any]:
     """Profile data (instance fields) plus the methods and callable fields that must run here."""
     from providers.base import ProviderProfile
     fields: Dict[str, Any] = {}
@@ -557,7 +587,7 @@ def extract_profiles_main(path: str, module_name: str) -> int:
     del reader
     import qubit_bootstrap  # noqa: F401
     try:
-        payload = {"profiles": [describe_profile(p) for p in capture_profiles(path, module_name)]}
+        payload = {"profiles": [_extraction_entry(p) for p in capture_profiles(path, module_name)]}
     except Exception as exc:
         payload = {"error": f"{type(exc).__name__}: {exc}"}
     writer.write(json.dumps(payload).encode("utf-8"))
@@ -567,7 +597,7 @@ def extract_profiles_main(path: str, module_name: str) -> int:
 
 def main() -> int:
     reader, writer = _take_protocol_streams()
-    import qubit_bootstrap  # noqa: F401 — PM dependency environments, like every Hermes entry point
+    import qubit_bootstrap  # noqa: F401 — PM dependency environments, like every Qubit entry point
     logging.basicConfig(stream=sys.stderr, level=os.environ.get("QUBIT_PLUGIN_HOST_LOG_LEVEL", "WARNING"),
                         format="%(levelname)s %(name)s: %(message)s")
     runtime = HostRuntime(reader, writer)
@@ -581,5 +611,5 @@ if __name__ == "__main__":
     code = (extract_profiles_main(sys.argv[2], sys.argv[3]) if sys.argv[1:2] == ["--extract-profiles"]
             else main())
     sys.stderr.flush()
-    # A plugin thread stuck in a handler must not keep the host alive once Hermes has gone.
+    # A plugin thread stuck in a handler must not keep the host alive once Qubit has gone.
     os._exit(code)

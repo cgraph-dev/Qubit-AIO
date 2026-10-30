@@ -189,7 +189,7 @@ def test_null_plugin_platform_uses_synthetic_default():
         assert resolve_toolset(f"hermes-{platform}")
         assert any(
             f"platform '{platform}'" in w
-            and f"falling back to 'hermes-{platform}'" in w
+            and f"falling back to 'qubit-{platform}'" in w
             for w in warnings
         )
         assert not any("zero valid toolsets" in w for w in warnings)

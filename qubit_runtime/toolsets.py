@@ -1,6 +1,5 @@
 """Toolset helpers: get/resolve/validate named tool groups (static TOOLSETS + registry-registered)."""
 
-from pathlib import Path
 from typing import Dict, List, Any, Set, Optional, Tuple
 
 
@@ -10,24 +9,20 @@ from typing import Dict, List, Any, Set, Optional, Tuple
 # (tui_gateway/server.py::_load_enabled_toolsets). HA, kanban and computer_use
 # entries are further gated by their tools' check_fns.
 _QUBIT_CORE_TOOLS = [
-    "web_search", "web_extract", "subscription_research",
+    "web_search", "web_extract",
     "terminal", "process_manage",
     "read_file", "write_file", "patch", "search_files",
     "vision_analyze", "image_generate",
     "skills_list", "skill_view", "skill_manage",
-    "browser_navigate", "browser_snapshot", "browser_click",
-    "browser_type", "browser_scroll", "browser_back",
-    "browser_press", "browser_get_images",
-    "browser_vision", "browser_console", "browser_cdp", "browser_dialog",
-    "browser_vault_list", "browser_vault_unlock", "browser_vault_fill", "browser_vault_save_login", "browser_vault_enter_code",  # ride with the browser
-    "browser_exec",  # replaces the other browser tools when browser.backend is "browser-use"
+    "browser_exec",  # THE browser: Python over CDP (browser-harness)
+    "browser_cdp", "browser_dialog",
+    "browser_vault",  # rides with the browser; deferred by default (tools.tool_search.defer)
     "text_to_speech",
     "todo_list", "memory",
     "session_search",
     "clarify",
     "execute_code", "delegate_task",
     "cronjob_manage",
-    "ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service",
     "kanban_show", "kanban_list",
     "kanban_complete", "kanban_block", "kanban_request_review",
     "kanban_request_changes",
@@ -38,14 +33,10 @@ _QUBIT_CORE_TOOLS = [
     "computer_use",
     # Service-gated connector account status and authorization links.
     "manage_connections",
-    # Read-only connector tools over their existing credential/platform paths.
-    "google_contacts", "google_calendar", "dropbox",
-    "apple_calendar", "apple_contacts", "apple_health", "apple_music",
 ]
 
 # Webhook payloads are untrusted third-party content: no file/system execution.
 _QUBIT_WEBHOOK_SAFE_TOOLS = ["web_search", "web_extract", "vision_analyze", "clarify"]
-_HA_TOOLS = ["ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service"]
 _FEISHU_TOOLS = [
     "feishu_doc_read", "feishu_drive_list_comments", "feishu_drive_list_comment_replies",
     "feishu_drive_reply_comment", "feishu_drive_add_comment",
@@ -60,11 +51,7 @@ def _ts(description, tools=(), includes=(), **extra):
 
 def _bundle(description, extras=()):
     """A `qubit-*` platform bundle: the shared core tools plus optional platform extras."""
-    # posture=True: a bundle that re-lists the core tools without owning them, so
-    # disabling it removes only the platform-specific delta instead of emptying the
-    # list (model_tools._apply_toolset_selection) and the blank-slate minimiser
-    # leaves it out of disabled_toolsets (qubit_cli.setup_quick).
-    return _ts(description, _QUBIT_CORE_TOOLS + list(extras), posture=True)
+    return _ts(description, _QUBIT_CORE_TOOLS + list(extras))
 
 
 def _core_without(*excluded, kanban=True):
@@ -73,8 +60,8 @@ def _core_without(*excluded, kanban=True):
 
 
 # Coding posture: everything you reach for while pairing on code; drops messaging,
-# tts, image_gen, home-assistant, cron, kanban and computer-use.
-_CODING_TOOLS = _core_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS, kanban=False)
+# tts, image_gen, cron, kanban and computer-use.
+_CODING_TOOLS = _core_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", kanban=False)
 
 # Toolsets a CLIENT adds to its own sessions (tui_gateway/server.py::_gui_surface_toolsets), never
 # config: another surface lacking them made no configuration choice.
@@ -83,7 +70,7 @@ CLIENT_SURFACE_TOOLSETS = frozenset({"project", "desktop_ui", "catalog"})
 # Core toolset definitions: individual tools or references to other toolsets.
 TOOLSETS = {
     # Basic toolsets - individual tool categories
-    "web": _ts("Web research and content extraction tools", ["web_search", "web_extract", "subscription_research"]),
+    "web": _ts("Web research and content extraction tools", ["web_search", "web_extract"]),
     "search": _ts("Web search only (no content extraction/scraping)", ["web_search"]),
     "x_search": _ts(
         "Search X (Twitter) posts and threads via xAI's built-in x_search Responses "
@@ -120,8 +107,8 @@ TOOLSETS = {
     # web_search from every session, because disabled toolsets are a strict
     # end-of-pipeline subtraction (#17309, #64503).
     "browser": _ts(
-        "Browser automation for web interaction (navigate, click, type, scroll, "
-        "iframes, hold-click)",
+        "Browser automation: drive a real browser with Python over CDP (navigate, "
+        "click, type, extract, screenshots), raw CDP, dialogs and vault logins",
         [t for t in _QUBIT_CORE_TOOLS if t.startswith("browser_")],
     ),
     "cronjob": _ts(
@@ -140,27 +127,6 @@ TOOLSETS = {
     "context_engine": _ts("Runtime tools exposed by the active context engine"),
     "session_search": _ts("Search and recall past conversations with summarization", ["session_search"]),
     "connections": _ts("Remote connector discovery, execution, and account authorization", ["manage_connections"]),
-    "google_contacts": _ts(
-        "Read-only Google Contacts search and listing (uses the existing Google Workspace token)",
-        ["google_contacts"]),
-    "google_calendar": _ts(
-        "Read-only Google Calendar event listing and search (uses the existing Google Workspace token)",
-        ["google_calendar"]),
-    "dropbox": _ts(
-        "Read-only Dropbox folder listing, metadata and search (uses the existing Dropbox token)",
-        ["dropbox"]),
-    "apple_calendar": _ts(
-        "Read-only Apple Calendar events (macOS EventKit; not exposed on other hosts)",
-        ["apple_calendar"]),
-    "apple_contacts": _ts(
-        "Read-only Apple Contacts search and listing (macOS Contacts; not exposed on other hosts)",
-        ["apple_contacts"]),
-    "apple_health": _ts(
-        "Read-only Apple Health daily summary (macOS HealthKit; not exposed on other hosts)",
-        ["apple_health"]),
-    "apple_music": _ts(
-        "Read-only Apple Music library listing (macOS MusicKit/Music.app; not exposed on other hosts)",
-        ["apple_music"]),
     "project": _ts("Desktop Projects — create/switch named workspaces (GUI sessions only)", ["desktop_project"]),
     "bot_room": _ts("Verified text-only Group Chat turn capabilities"),
 
@@ -169,31 +135,22 @@ TOOLSETS = {
     # process env var, which is blind to a desktop client on a remote backend.
     "desktop_ui": _ts(
         "Desktop GUI affordances — in-app terminal/browser panes, pane focus, "
-        "reactions (GUI sessions only)",
+        "reactions, appearance (GUI sessions only)",
         ["read_terminal", "close_terminal", "desktop_preview", "drive_preview",
          "annotate_preview", "read_window_below", "focus_pane", "react_to_message",
-         "gui_tour", "show_tip"],
+         "gui_tour", "show_tip", "set_theme"],
     ),
+    "onboarding": _ts("First-run onboarding cards; folded in only for the onboarding chat (tui_gateway/methods_onboarding.py)",
+                      ["setup_beat"], platforms=frozenset({"desktop"})),
     # ``platforms``: the session platforms this toolset exists for (TOOLSET_SESSION_PLATFORMS).
     "catalog": _ts(
         "Desktop catalog plugin/skill install requests through the approval card (GUI sessions only)",
         ["manage_catalog"],
         platforms=frozenset({"desktop"}),
     ),
-    # Enabled per SESSION whose PROFILE carries ``role: setup`` in its backend-written
-    # profile.yaml (tui_gateway/server.py::_load_enabled_toolsets); stripped from every
-    # other profile's selection whatever the config, env pin or client asked for
-    # (model_tools._select_tool_names). Never configurable, never in `qubit tools`.
-    "setup": _ts(
-        "Onboarding-only surface for the setup profile: catalog plugin/skill install "
-        "requests through the approval card",
-        ["manage_catalog"],
-        role="setup",
-    ),
     "clarify": _ts("Ask the user clarifying questions (multiple-choice or open-ended)", ["clarify"]),
     "code_execution": _ts("Run Python scripts that call tools programmatically (reduces LLM round trips)", ["execute_code"]),
     "delegation": _ts("Spawn subagents with isolated context for complex subtasks", ["delegate_task"]),
-    "homeassistant": _ts("Home Assistant smart home control and monitoring", _HA_TOOLS),
     "kanban": _ts(
         "Kanban multi-agent coordination — only active when the agent is spawned by "
         "the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs "
@@ -226,65 +183,60 @@ TOOLSETS = {
     ),
 
     # Full Qubit toolsets (CLI + messaging platforms). All share the core tools;
-    # there is deliberately no agent-callable send_message tool. qubit-acp is the
+    # there is deliberately no agent-callable send_message tool. hermes-acp is the
     # coding posture minus the interactive clarify UI.
-    "qubit-acp": _ts(
+    "hermes-acp": _ts(
         "Editor integration (VS Code, Zed, JetBrains) — coding-focused tools without "
         "messaging, audio, or clarify UI",
         [t for t in _CODING_TOOLS if t != "clarify"],
-        posture=True,
     ),
-    "qubit-api-server": _ts(
+    "hermes-api-server": _ts(
         "OpenAI-compatible API server — full agent tools accessible via HTTP (no "
         "interactive UI tools like clarify or send_message)",
         _core_without("text_to_speech", "clarify", "computer_use", kanban=False),
-        posture=True,
     ),
-    "qubit-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
+    "hermes-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
 
-    # Mirrors qubit-cli; `qubit tools` platform config filters it down and
+    # Mirrors hermes-cli; `qubit tools` platform config filters it down and
     # _get_platform_tools() drops _DEFAULT_OFF_TOOLSETS unless user-enabled.
-    "qubit-cron": _bundle("Default cron toolset - same core tools as qubit-cli; gated by `qubit tools`"),
-    "qubit-telegram": _bundle("Telegram bot toolset - full access for personal use (terminal has safety checks)"),
-    "qubit-discord": _bundle(
+    "hermes-cron": _bundle("Default cron toolset - same core tools as hermes-cli; gated by `qubit tools`"),
+    "hermes-telegram": _bundle("Telegram bot toolset - full access for personal use (terminal has safety checks)"),
+    "hermes-discord": _bundle(
         "Discord bot toolset - full access (terminal has safety checks via dangerous "
         "command approval)",
         ["discord", "discord_admin"],
     ),
-    "qubit-whatsapp": _bundle("WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)"),
-    "qubit-slack": _bundle("Slack bot toolset - full access for workspace use (terminal has safety checks)"),
-    "qubit-signal": _bundle("Signal bot toolset - encrypted messaging platform (full access)"),
-    "qubit-bluebubbles": _bundle("BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server"),
-    "qubit-homeassistant": _bundle("Home Assistant bot toolset - smart home event monitoring and control"),
-    "qubit-email": _bundle("Email bot toolset - interact with Qubit via email (IMAP/SMTP)"),
-    "qubit-mattermost": _bundle("Mattermost bot toolset - self-hosted team messaging (full access)"),
-    "qubit-matrix": _bundle("Matrix bot toolset - decentralized encrypted messaging (full access)"),
-    "qubit-dingtalk": _bundle("DingTalk bot toolset - enterprise messaging platform (full access)"),
-    "qubit-feishu": _bundle("Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)", _FEISHU_TOOLS),
-    "qubit-weixin": _bundle("Weixin bot toolset - personal WeChat messaging via iLink (full access)"),
-    "qubit-qqbot": _bundle("QQBot toolset - QQ messaging via Official Bot API v2 (full access)"),
-    "qubit-wecom": _bundle("WeCom bot toolset - enterprise WeChat messaging (full access)"),
-    "qubit-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
-    "qubit-yuanbao": {
+    "hermes-whatsapp": _bundle("WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)"),
+    "hermes-slack": _bundle("Slack bot toolset - full access for workspace use (terminal has safety checks)"),
+    "hermes-signal": _bundle("Signal bot toolset - encrypted messaging platform (full access)"),
+    "hermes-bluebubbles": _bundle("BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server"),
+    "hermes-email": _bundle("Email bot toolset - interact with Qubit via email (IMAP/SMTP)"),
+    "hermes-mattermost": _bundle("Mattermost bot toolset - self-hosted team messaging (full access)"),
+    "hermes-matrix": _bundle("Matrix bot toolset - decentralized encrypted messaging (full access)"),
+    "hermes-dingtalk": _bundle("DingTalk bot toolset - enterprise messaging platform (full access)"),
+    "hermes-feishu": _bundle("Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)", _FEISHU_TOOLS),
+    "hermes-weixin": _bundle("Weixin bot toolset - personal WeChat messaging via iLink (full access)"),
+    "hermes-qqbot": _bundle("QQBot toolset - QQ messaging via Official Bot API v2 (full access)"),
+    "hermes-wecom": _bundle("WeCom bot toolset - enterprise WeChat messaging (full access)"),
+    "hermes-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
+    "hermes-yuanbao": {
         "description": "Yuanbao Bot 元宝消息平台工具集 - 群信息、成员查询、私聊、贴纸表情",
         "tools": _QUBIT_CORE_TOOLS + _YUANBAO_TOOLS,
         "module": "tools.yuanbao_tools",
         "includes": [],
-        "posture": True,
     },
-    "qubit-sms": _bundle("SMS bot toolset - interact with Qubit via SMS (Twilio)"),
-    "qubit-webhook": _ts("Webhook toolset - receive and process external webhook events", _QUBIT_WEBHOOK_SAFE_TOOLS, posture=True),
-    "qubit-gateway": _ts(
+    "hermes-sms": _bundle("SMS bot toolset - interact with Qubit via SMS (Twilio)"),
+    "hermes-webhook": _ts("Webhook toolset - receive and process external webhook events", _QUBIT_WEBHOOK_SAFE_TOOLS),
+    "hermes-gateway": _ts(
         "Gateway toolset - union of all messaging platform tools",
         [],
         includes=[
-            "qubit-telegram", "qubit-discord", "qubit-whatsapp", "qubit-slack",
-            "qubit-signal", "qubit-bluebubbles", "qubit-homeassistant", "qubit-email",
-            "qubit-sms", "qubit-mattermost", "qubit-matrix", "qubit-dingtalk",
-            "qubit-feishu", "qubit-wecom", "qubit-wecom-callback", "qubit-weixin",
-            "qubit-qqbot", "qubit-webhook", "qubit-yuanbao",
+            "hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack",
+            "hermes-signal", "hermes-bluebubbles", "hermes-email",
+            "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk",
+            "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin",
+            "hermes-qqbot", "hermes-webhook", "hermes-yuanbao",
         ],
-        posture=True,
     ),
 }
 
@@ -295,28 +247,6 @@ TOOLSET_SESSION_PLATFORMS = {name: spec["platforms"] for name, spec in TOOLSETS.
 # these names, so a plugin, MCP server or custom toolset name never leaves the machine.
 BUILTIN_TOOL_NAMES = frozenset(tool for spec in TOOLSETS.values() for tool in spec["tools"])
 BUILTIN_TOOLSET_NAMES = frozenset(TOOLSETS)
-
-
-def canonical_toolset_name(name: str) -> str:
-    """Preferred ``TOOLSETS`` key for *name* (read-old resolver).
-
-    Exact key wins. Otherwise the name is matched case-insensitively (a careless
-    string rebrand produced ``Qubit-cli``), then a legacy ``hermes-*`` platform
-    bundle is swapped to its canonical ``qubit-*`` spelling so a config saved
-    before the rename keeps resolving. Unknown names are returned unchanged so
-    plugin/MCP toolsets and error paths are unaffected.
-    """
-    if not isinstance(name, str) or name in TOOLSETS:
-        return name
-    folded = name.lower()
-    for key in TOOLSETS:
-        if key.lower() == folded:
-            return key
-    if folded.startswith("hermes-"):
-        candidate = "qubit-" + folded[len("hermes-"):]
-        if candidate in TOOLSETS:
-            return candidate
-    return name
 
 
 def _registry():
@@ -336,12 +266,12 @@ def _registry_call(method: str, default):
         return default
 
 
-def _registry_generation() -> Tuple[int, int]:
+def _registry_generation() -> tuple[int, int]:
     reg = _registry()
     return (id(reg), getattr(reg, "_generation", 0)) if reg is not None else (0, 0)
 
 
-def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[str, Any]]:
+def get_toolset(name: str, *, include_registry: bool = True) -> Optional[dict[str, Any]]:
     """Toolset definition, or None if unknown.
 
     include_registry=True merges plugin/overlay tools registered into this toolset
@@ -354,7 +284,6 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
     ``_get_platform_tools`` uses False so that a tool registered into a toolset but absent from a platform's
     static composite does not drop the whole toolset from inference. See issue #49622.
     """
-    name = canonical_toolset_name(name)
     toolset = TOOLSETS.get(name)
     if not include_registry:
         return {**toolset, "tools": list(toolset.get("tools", [])), "includes": list(toolset.get("includes", []))} if toolset else None
@@ -365,7 +294,7 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
 
     if toolset:
         merged_tools = set(toolset.get("tools", [])) | set(registry.get_tool_names_for_toolset(name))
-        # An MCP server named like a built-in toolset ("homeassistant", "browser") registers a bare
+        # An MCP server named like a built-in toolset ("browser", "memory") registers a bare
         # alias to its `mcp-<name>` toolset; without this union the static entry shadows it and the
         # server's tools never reach the model even though discovery registered them.
         alias_target = registry.get_toolset_alias_target(name)
@@ -386,7 +315,7 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
     return {"description": description, "tools": registry.get_tool_names_for_toolset(registry_toolset), "includes": []}
 
 
-def bundle_non_core_tools(toolset_name: str) -> Set[str]:
+def bundle_non_core_tools(toolset_name: str) -> set[str]:
     """A bundle's tools minus _QUBIT_CORE_TOOLS (one level of includes).
 
     Disabling a `core + extras` bundle must not strip the core tools every other
@@ -408,20 +337,15 @@ def bundle_non_core_tools(toolset_name: str) -> Set[str]:
 # engages only at the public entry (visited is None). The scope is part of the key because a
 # multiplexed process resolves ``mcp-<server>`` per profile overlay: without it profile B got
 # profile A's tool names for a server B never connected (#106005).
-_resolve_toolset_memo: Dict[Tuple[str, bool, int, int, str], List[str]] = {}
+_resolve_toolset_memo: dict[tuple[str, bool, int, int, str], list[str]] = {}
 
 
-def _plugin_platform_bundle(name: str) -> List[str]:
-    """Implicit platform bundle for a registered plugin platform: core tools plus
-    whatever the plugin registered under the platform name. Accepts either the
-    canonical ``qubit-<platform>`` or the read-old ``hermes-<platform>`` spelling.
-    [] otherwise."""
-    for prefix in ("qubit-", "hermes-"):
-        if name.startswith(prefix):
-            platform_name = name[len(prefix):]
-            break
-    else:
+def _plugin_platform_bundle(name: str) -> list[str]:
+    """Implicit `qubit-<platform>` bundle for a registered plugin platform: core
+    tools plus whatever the plugin registered under the platform name. [] otherwise."""
+    if not name.startswith("qubit-"):
         return []
+    platform_name = name[len("qubit-"):]
     try:
         from gateway.platform_registry import platform_registry
         if not platform_registry.is_registered(platform_name):
@@ -445,7 +369,6 @@ def resolve_toolset(name: str, visited: set[str] | None = None, *, include_regis
     registered into a toolset. Platform reverse-mapping uses False so a registry-added tool cannot drop the
     whole toolset from inference (see #49622 and ``_get_platform_tools``).
     """
-    name = canonical_toolset_name(name)
     external_call = visited is None
     if external_call:
         memo_key = (name, include_registry, *_registry_generation(), _registry_call("current_scope_key", ""))
@@ -457,15 +380,10 @@ def resolve_toolset(name: str, visited: set[str] | None = None, *, include_regis
     # "all"/"*" span every toolset so new toolsets are included automatically, except the ones a
     # session platform gates: a profile gets those only when its config names them.
     if name in {"all", "*"}:
-        all_tools: Set[str] = set()
-        # Role-reserved toolsets (``setup``) never come in through "all" unless the
-        # running profile carries that role; their tools also appear in platform-gated
-        # sets (``catalog``), which are added only when a config names them.
-        denied_role_toolsets = profile_role_toolsets()[1]
+        all_tools: set[str] = set()
         for toolset_name in get_toolset_names():
-            if toolset_name in TOOLSET_SESSION_PLATFORMS or toolset_name in denied_role_toolsets:
-                continue
-            all_tools.update(resolve_toolset(toolset_name, visited.copy(), include_registry=include_registry))
+            if toolset_name not in TOOLSET_SESSION_PLATFORMS:
+                all_tools.update(resolve_toolset(toolset_name, visited.copy(), include_registry=include_registry))
         return sorted(all_tools)
 
     # Diamond include or cycle: [] silently — the tools are collected via another path.
@@ -489,27 +407,27 @@ def resolve_toolset(name: str, visited: set[str] | None = None, *, include_regis
     return result
 
 
-def _get_plugin_toolset_names() -> Set[str]:
+def _get_plugin_toolset_names() -> set[str]:
     """Registry toolset names absent from the static TOOLSETS dict."""
     return {n for n in _registry_call("get_registered_toolset_names", ()) if n not in TOOLSETS}
 
 
-def _get_registry_toolset_aliases() -> Dict[str, str]:
+def _get_registry_toolset_aliases() -> dict[str, str]:
     return _registry_call("get_registered_toolset_aliases", {})
 
 
-def _display_alias(ts_name: str, aliases: Dict[str, str]) -> Optional[str]:
+def _display_alias(ts_name: str, aliases: dict[str, str]) -> Optional[str]:
     """First non-static alias pointing at *ts_name*, or None."""
     return next((a for a, canonical in aliases.items() if canonical == ts_name and a not in TOOLSETS), None)
 
 
-def _plugin_display_names() -> List[str]:
+def _plugin_display_names() -> list[str]:
     """Plugin toolset names, shown under their first non-static alias when one exists."""
     aliases = _get_registry_toolset_aliases()
     return [_display_alias(n, aliases) or n for n in _get_plugin_toolset_names()]
 
 
-def get_all_toolsets() -> Dict[str, Dict[str, Any]]:
+def get_all_toolsets() -> dict[str, dict[str, Any]]:
     """All toolset definitions: static plus plugin-registered."""
     result = dict(TOOLSETS)
     aliases = _get_registry_toolset_aliases()
@@ -523,7 +441,7 @@ def get_all_toolsets() -> Dict[str, Dict[str, Any]]:
     return result
 
 
-def get_toolset_names() -> List[str]:
+def get_toolset_names() -> list[str]:
     """Sorted names of all toolsets (static + plugin), excluding aliases."""
     return sorted(set(TOOLSETS.keys()) | set(_plugin_display_names()))
 
@@ -534,12 +452,17 @@ def session_platform_tool_drops(platform: Optional[str]) -> frozenset:
                      for tool in resolve_toolset(name))
 
 
-def session_disabled_toolsets(disabled: Optional[List[str]], platform: Optional[str]) -> Optional[List[str]]:
-    """*disabled* plus every platform-gated toolset a session on *platform* does not get. An agent stores
-    this as its ``disabled_toolsets``, so the tool list, the tool_search listing and bridge, MCP refreshes
+def session_disabled_toolsets(
+    disabled: Optional[list[str]], platform: Optional[str], *, oneshot: bool = False,
+) -> Optional[list[str]]:
+    """*disabled* plus every platform-gated toolset a session on *platform* does not get, and for a *oneshot*
+    session the toolsets nobody is there to use (``agent.oneshot_footprint.ONESHOT_DISABLED_TOOLSETS``). An agent
+    stores this as its ``disabled_toolsets``, so the tool list, the tool_search listing and bridge, MCP refreshes
     and delegate children (which inherit it) all subtract the gated tools in ``_select_tool_names``."""
-    gated = [name for name, platforms in TOOLSET_SESSION_PLATFORMS.items()
-             if platform not in platforms and name not in (disabled or ())]
+    from agent.oneshot_footprint import ONESHOT_DISABLED_TOOLSETS
+    gated = [name for name, platforms in TOOLSET_SESSION_PLATFORMS.items() if platform not in platforms]
+    gated += ONESHOT_DISABLED_TOOLSETS if oneshot else ()
+    gated = [name for name in gated if name not in (disabled or ())]
     return [*(disabled or ()), *gated] if gated else disabled
 
 
@@ -550,20 +473,19 @@ def agent_tool_drops(agent: Any) -> frozenset:
     return side_agent_tool_drops(agent) | session_platform_tool_drops(getattr(agent, "platform", None))
 
 
-def profile_role_toolsets(profile_home: Optional[Path] = None) -> Tuple[Set[str], Set[str]]:
-    """``(granted, denied)`` for the profile at *profile_home* (default: the in-scope home; a session's
-    home override, when bound, IS its profile dir): toolsets reserved for the role in its backend-written
-    ``profile.yaml``, and toolsets reserved for any other role. An ordinary profile is granted none."""
-    from qubit_cli.profiles import read_profile_meta
-    from qubit_constants import get_qubit_home
-    role = read_profile_meta(Path(profile_home or get_qubit_home())).get("role")
-    granted = {name for name, spec in TOOLSETS.items() if role is not None and spec.get("role") == role}
-    denied = {name for name, spec in TOOLSETS.items() if spec.get("role") not in (None, role)}
-    return granted, denied
+def agent_tool_surface(agent: Any, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """*tools* as *agent* carries them: :func:`agent_tool_drops` removed and, in a one-shot session or a gateway
+    session that joins its delegations in the turn (``delegation.gateway_mode``), the joined ``delegate_task``
+    variant (``agent.oneshot_footprint.oneshot_tool_schemas``). Applied to FRESH definitions (load, MCP refresh)
+    before any merge: a pinned or carried entry keeps the bytes already sent."""
+    from agent.oneshot_footprint import agent_is_oneshot, oneshot_tool_schemas
+    from tools.delegate_tool_config import agent_joins_delegation
+    drops = agent_tool_drops(agent)
+    tools = [tool for tool in tools if (tool.get("function") or {}).get("name") not in drops] if drops else list(tools)
+    return oneshot_tool_schemas(tools) if agent_is_oneshot(agent) or agent_joins_delegation(agent) else tools
 
 
 def validate_toolset(name: str) -> bool:
-    name = canonical_toolset_name(name)
     return (name in {"all", "*"} or name in TOOLSETS
             or name in _get_plugin_toolset_names() or name in _get_registry_toolset_aliases())
 
@@ -573,9 +495,8 @@ def create_custom_toolset(name: str, description: str, tools: list[str] | None =
     TOOLSETS[name] = _ts(description, tools or [], includes or [])
 
 
-def get_toolset_info(name: str) -> Dict[str, Any]:
+def get_toolset_info(name: str) -> dict[str, Any]:
     """Toolset definition plus its resolved tools, or None if unknown."""
-    name = canonical_toolset_name(name)
     toolset = get_toolset(name)
     if not toolset:
         return None
@@ -586,3 +507,41 @@ def get_toolset_info(name: str) -> Dict[str, Any]:
         "resolved_tools": resolved_tools, "tool_count": len(resolved_tools),
         "is_composite": bool(toolset["includes"]),
     }
+
+
+# --- fork compatibility: read-old toolset resolver and role-scoped toolsets ---
+from pathlib import Path as _Path
+
+
+def canonical_toolset_name(name: str) -> str:
+    """Preferred ``TOOLSETS`` key for *name* (read-old resolver).
+
+    Exact key wins. Otherwise the name is matched case-insensitively (a careless
+    string rebrand produced ``Qubit-cli``), then a legacy ``qubit-*`` platform
+    bundle is swapped to its canonical ``qubit-*`` spelling so a config saved
+    before the rename keeps resolving. Unknown names are returned unchanged so
+    plugin/MCP toolsets and error paths are unaffected.
+    """
+    if not isinstance(name, str) or name in TOOLSETS:
+        return name
+    folded = name.lower()
+    for key in TOOLSETS:
+        if key.lower() == folded:
+            return key
+    if folded.startswith("qubit-"):
+        candidate = "qubit-" + folded[len("qubit-"):]
+        if candidate in TOOLSETS:
+            return candidate
+    return name
+
+
+def profile_role_toolsets(profile_home: Optional[_Path] = None) -> Tuple[Set[str], Set[str]]:
+    """``(granted, denied)`` for the profile at *profile_home* (default: the in-scope home; a session's
+    home override, when bound, IS its profile dir): toolsets reserved for the role in its backend-written
+    ``profile.yaml``, and toolsets reserved for any other role. An ordinary profile is granted none."""
+    from qubit_cli.profiles import read_profile_meta
+    from qubit_constants import get_qubit_home
+    role = read_profile_meta(_Path(profile_home or get_qubit_home())).get("role")
+    granted = {name for name, spec in TOOLSETS.items() if role is not None and spec.get("role") == role}
+    denied = {name for name, spec in TOOLSETS.items() if spec.get("role") not in (None, role)}
+    return granted, denied

@@ -16,7 +16,6 @@ import importlib.util
 import inspect
 import logging
 import os
-import sys
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -24,7 +23,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 logger = logging.getLogger(__name__)
 
 from tools.mcp_tool_common import _DEFAULT_TOOL_TIMEOUT, mcp_field
-from tools.mcp_tool_config import _get_mcp_stderr_log, _npx_cached_bin, _packaged_npx_entry
+from tools.mcp_tool_config import _npx_cached_bin, _packaged_npx_entry
 from tools.mcp_tool_sampling import ElicitationHandler, SamplingHandler
 from tools.mcp_tool_transport import MCPServerTransportMixin
 from tools.mcp_tool_server_run import MCPServerRunMixin
@@ -512,8 +511,11 @@ _CIRCUIT_BREAKER_THRESHOLD, _CIRCUIT_BREAKER_COOLDOWN_SEC = 3, 60.0
 # mutation, prompt cache intact. ``_server_trust_levels`` is keyed by the CONSUMING profile's own
 # key (its policy for the name, even when it adopted another profile's connection);
 # ``_tool_read_only_hints`` by the connection key (the server's own tool annotations).
-_server_trust_levels: Dict[Any, str] = {}
-_tool_read_only_hints: Dict[Any, Dict[str, bool]] = {}
+_server_trust_levels: dict[Any, str] = {}
+_tool_read_only_hints: dict[Any, dict[str, bool]] = {}
+# Declared per-tool costs + per-chat spend limit (``tools.mcp_tool_costs.CostPolicy``), keyed like
+# ``_server_trust_levels``: the consuming profile's policy. Absent = no costs, behaviour unchanged.
+_server_cost_policies: dict[Any, Any] = {}
 
 _TRUST_FULL, _TRUST_UNTRUSTED = "full", "untrusted"
 

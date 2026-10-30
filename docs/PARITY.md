@@ -11,7 +11,7 @@ its own — every number lives in the doc that measured it, next to the command 
 | Axis | Target | Measured by |
 |---|---|---|
 | **Behavioral** — what a user can do | the local reference dashboard at `http://127.0.0.1:9119/?profile=default`, read-only, plus voice-commandability of every capability there | manual/scripted exercise against the live instance; **no single instrument** |
-| **Code** — what the tree contains | upstream `43faacfb8de7b29548547a7fbdedad0cc6e7391c` (frozen 2026-10-16) | `scripts/audit_sync_completeness.py`, wrapped by `scripts/frozen_target_progress.py` |
+| **Code** — what the tree contains | upstream `088f657ecf77674c7b8e2ededf4e3576d82e042c` (frozen 2026-10-30) | `scripts/audit_sync_completeness.py`, wrapped by `scripts/frozen_target_progress.py` |
 
 The behavioral directive and the code freeze are different questions with different answers. Do
 not convert one into the other: a symbol can be present and the capability still unreachable, and
@@ -29,13 +29,13 @@ The instruments and their arguments:
 
 ```bash
 python scripts/frozen_target_progress.py                                  # pin + overall progress
-python scripts/audit_sync_completeness.py --rev 43faacfb8de7b29548547a7fbdedad0cc6e7391c --show-symbols
+python scripts/audit_sync_completeness.py --rev 088f657ecf77674c7b8e2ededf4e3576d82e042c --show-symbols
 ```
 
 Requirements and exclusions are `docs/FROZEN_TARGET.md` (read it before porting); the last
-recorded gap list is `docs/FROZEN_TARGET_WORKLIST.md` — "296 production symbols across 78 files",
-measured on 2026-10-19 against tree `35fdb1e33`. **That is a historical measurement, not the
-current state**: HEAD has moved since. Re-run the command rather than quoting the worklist.
+recorded gap list is `docs/FROZEN_TARGET_WORKLIST.md` — **stale**: it was measured on
+2026-10-19 against the previous pin. Re-run the command for the current gap; the
+2026-10-30 re-pin measured 1,968 production missing.
 
 ### Reading the numbers correctly
 

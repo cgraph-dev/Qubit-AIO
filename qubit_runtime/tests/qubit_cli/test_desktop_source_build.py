@@ -5,7 +5,7 @@ import subprocess
 import pytest
 
 from qubit_cli import main, main_desktop
-from tests.qubit_cli.test_source_build import source_checkout, source_products, _events  # noqa: F401
+from tests.qubit_cli.test_source_build import source_checkout, source_products, _events
 
 
 @pytest.fixture

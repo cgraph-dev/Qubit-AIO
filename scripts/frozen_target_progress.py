@@ -2,7 +2,7 @@
 """BURNDOWN INSTRUMENT: are we at the FROZEN target yet?
 
 ONE COMMAND answers the finish-line question for the freeze pin
-`43faacfb8de7` (see docs/FROZEN_TARGET.md). It runs the completeness audit
+`088f657ecf` (see docs/FROZEN_TARGET.md). It runs the completeness audit
 against that revision ONLY -- never `origin/main`, which drifts (it moved 11
 commits DURING the audit that produced the baseline numbers), and prints a
 single verdict line so no human has to read a full audit to know whether the
@@ -26,12 +26,14 @@ never touches. This script splits on the `tests/` path segment (also matching
 `plugins/*/tests/`): a missing path is a test iff it starts with `tests/` or
 contains a `/tests/` segment. The verdict is driven by PRODUCTION only.
 
-BASELINE (re-frozen 2026-10-16 at `--rev 43faacfb8de7`)
+BASELINE (re-frozen 2026-10-30 at `--rev 088f657ecf`)
 --------------------------------------------------------
-`BASE` below is the measurement at the freeze. Because the pin moved to the true
-upstream `main` tip, these numbers are LARGER than the pre-freeze baseline: we are
-now measuring against a milestone 4,218 commits / 5,434 files further ahead, not
-against a stale waypoint. Progress is judged by `BASE` shrinking from THAT number.
+`BASE` below is the measurement at the freeze. The pin was re-frozen at the
+owner's direction on 2026-10-30 to the upstream `main` tip `088f657ecf` (5,689
+commits / 5,940 files ahead of the previous `43faacfb8de7` pin). These numbers
+are therefore LARGER than the previous baseline: we are measuring against the new
+milestone, not a stale waypoint. Progress is judged by `BASE` shrinking from THAT
+number.
 If the audit disagrees with `BASE`, that is a bug in this instrument or a moved
 pin -- not progress -- and it is flagged loudly. Do not edit `BASE` without
 re-freezing `FROZEN_REV`, and do not edit `FROZEN_REV` without re-measuring it
@@ -63,20 +65,18 @@ if not (REPO / "qubit_runtime").is_dir() or not (REPO / "scripts").is_dir():
 
 # THE FROZEN PIN. Never origin/main. See docs/FROZEN_TARGET.md.
 #
-# Re-frozen 2026-10-16 at the owner's direction: the milestone is upstream `main` as of the
-# freeze, and we stop chasing it. The previous pin (517b5e10febd, 2026-10-08) had drifted 4,218
-# commits / 5,434 files behind; the previous BASELINE block below was measured at a THIRD
-# revision (ad12263a5ed4), which is the inconsistency this re-freeze also retires -- pin,
-# baseline and docstring now all name the same commit.
-FROZEN_REV = "43faacfb8de7b29548547a7fbdedad0cc6e7391c"
+# Re-frozen 2026-10-30 at the owner's direction: the milestone is upstream `main` as of
+# 2026-10-29T20:29:59Z, and we stop chasing it after this port. The previous pin
+# (43faacfb8de7, 2026-10-16) was 5,689 commits / 5,940 files behind this revision.
+FROZEN_REV = "088f657ecf77674c7b8e2ededf4e3576d82e042c"
 
 AUDIT = REPO / "scripts" / "audit_sync_completeness.py"
 CACHE = REPO / ".frozen_target_progress.cache.json"
 
 # Baseline at the freeze. DO NOT EDIT without re-freezing the pin.
 #
-# MEASURED 2026-10-17 at FROZEN_REV=43faacfb8de7 with:
-#   .venv/bin/python scripts/audit_sync_completeness.py --rev 43faacfb8de7 --json tmp/audit/refreeze.json
+# MEASURED 2026-10-30 at FROZEN_REV=088f657ecf with:
+#   .venv/bin/python scripts/audit_sync_completeness.py --rev 088f657ecf --json /tmp/repin-audit.json
 #
 # These replace a PREVIOUS revision's numbers (ad12263a5ed4), which had been left in
 # place as a placeholder after the 2026-10-16 re-freeze. Against the new pin that
@@ -98,12 +98,12 @@ CACHE = REPO / ".frozen_target_progress.cache.json"
 # actually readable, a file we never ported is ABSENT (or short against our own
 # baseline) instead of being mis-credited as merely "behind head".
 BASE = {
-    "absent": 974,
-    "short_port_files": 610,
-    "short_port_symbols": 1649,
-    "behind_head_files": 0,
-    "behind_head_symbols": 0,
-    "total_missing": 2623,
+    "absent": 1058,
+    "short_port_files": 1,
+    "short_port_symbols": 1,
+    "behind_head_files": 871,
+    "behind_head_symbols": 2817,
+    "total_missing": 2818,
 }
 
 

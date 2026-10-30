@@ -12,7 +12,6 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { stageChrome, stageRoute } from "@/lib/stageReveal";
 import {
   Routes,
@@ -91,6 +90,8 @@ import { MemoryPressureBanner } from "@/components/MemoryPressureBanner";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
+import { SidebarTooltip } from "@/components/SidebarTooltip";
+import { navDescription, sectionizeNav } from "@/lib/sidebar-sections";
 import "@/styles/sidebar-studio.css";
 import "@/styles/qubit-mark.css";
 
@@ -778,6 +779,26 @@ export default function App() {
     () => partitionSidebarNav(builtinNav, manifests),
     [builtinNav, manifests],
   );
+  // Presentation grouping only — every route stays mounted and reachable; an
+  // entry this module does not know about lands in the trailing "More"
+  // section instead of disappearing.
+  const sidebarSections = useMemo(
+    () => sectionizeNav(sidebarNav.coreItems),
+    [sidebarNav],
+  );
+  // Rail brand-row status chip: the one always-visible health readout.
+  const brandTone = useMemo(() => {
+    if (!sidebarStatus) return "muted";
+    const tone = gatewayLine(sidebarStatus, t).tone;
+    if (tone === "text-success") return "success";
+    if (tone === "text-warning") return "warning";
+    if (tone === "text-destructive") return "destructive";
+    return "muted";
+  }, [sidebarStatus, t]);
+  const brandLabel = useMemo(
+    () => (sidebarStatus ? `${t.status.gateway} ${gatewayLine(sidebarStatus, t).label}` : t.status.gateway),
+    [sidebarStatus, t],
+  );
   const routes = useMemo(
     () => buildRoutes(builtinRoutes, manifests),
     [builtinRoutes, manifests],
@@ -844,13 +865,13 @@ export default function App() {
           "lg:hidden fixed top-0 left-0 right-0 z-40 min-h-14",
           "flex items-center gap-2 px-4 py-2",
           "border-b border-current/20",
-          "bg-background-base",
         )}
         style={{
-          background:
-            "var(--component-header-background, var(--background-base))",
-          borderImage: "var(--component-header-border-image)",
-          clipPath: "var(--component-header-clip-path)",
+          /* Theme-derived, same ladder as the rail: a pinned navy here was the
+             header half of the theme-blindness bug (it never changed with the
+             theme). */
+          background: "color-mix(in srgb, var(--midground-base) 4%, var(--background-base))",
+          color: "var(--midground-base)",
         }}
       >
         <Button
@@ -865,8 +886,8 @@ export default function App() {
           <Menu />
         </Button>
 
-        <QubitMark className="h-10 w-10 shrink-0 text-midground" />
-        <Typography className="font-bold text-[1.3rem] tracking-[0.03em] text-midground">
+        <QubitMark className="h-8 w-8 shrink-0 text-midground" />
+        <Typography className="font-bold text-[1.1rem] tracking-[0.01em] text-midground">
           {t.app.brand}
         </Typography>
       </header>
@@ -910,12 +931,6 @@ export default function App() {
               "lg:transition-[width] lg:duration-300 lg:ease-[cubic-bezier(0.23,1,0.32,1)]",
               collapsed && "lg:w-14",
             )}
-            style={{
-              background:
-                "var(--component-sidebar-background, var(--background-base))",
-              clipPath: "var(--component-sidebar-clip-path)",
-              borderImage: "var(--component-sidebar-border-image)",
-            }}
           >
             <div
               className={cn(
@@ -932,14 +947,21 @@ export default function App() {
                 )}
               >
                 <PluginSlot name="header-left" />
-                <QubitMark className="h-11 w-11 shrink-0 text-midground" />
+                <QubitMark className="h-7 w-7 shrink-0 text-midground" />
                 <span
-                  className="qagent-sidebar__brand-name relative font-bold text-[1.35rem] tracking-[0.03em] text-midground"
+                  className="qagent-sidebar__brand-name"
                   data-brand={t.app.brand}
                 >
                   <QubitBrandSparks />
-                  <span className="qbrand-label">{t.app.brand}</span>
+                  <span className="qbrand-label truncate">{t.app.brand}</span>
                 </span>
+                <span
+                  aria-hidden
+                  className="qagent-sidebar__pulse ml-auto"
+                  data-tone={brandTone}
+                  role="status"
+                  aria-label={brandLabel}
+                />
               </div>
 
               <Button
@@ -972,55 +994,87 @@ export default function App() {
             <ProfileSwitcher collapsed={isDesktopCollapsed} />
 
             <nav
-              className="qagent-sidebar__nav min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden border-t border-current/10 py-2"
+              className="qagent-sidebar__nav min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden py-2"
               aria-label={t.app.navigation}
             >
-              <ul className="flex flex-col">
-                {sidebarNav.coreItems.map((item) =>
-                  item.children && item.children.length > 0 ? (
-                    <SidebarNavGroup
-                      closeMobile={closeMobile}
-                      collapsed={isDesktopCollapsed}
-                      item={item}
-                      key={item.path}
-                      t={t}
-                      tooltipWarmRef={tooltipWarmRef}
-                    />
-                  ) : (
-                    <SidebarNavLink
-                      closeMobile={closeMobile}
-                      collapsed={isDesktopCollapsed}
-                      item={item}
-                      key={item.path}
-                      t={t}
-                      tooltipWarmRef={tooltipWarmRef}
-                    />
-                  ),
-                )}
-              </ul>
+              {sidebarSections.map(({ section, entries }, sectionIndex) => (
+                <div
+                  aria-labelledby={`qubit-sidebar-section-${section.id}`}
+                  className="qagent-sidebar__section"
+                  key={section.id}
+                  role="group"
+                >
+                  {/* The first section needs no heading — the primary surface
+                      is obvious and a label there is pure chrome. */}
+                  {sectionIndex > 0 && (
+                    <span
+                      className={cn(
+                        "qagent-sidebar__section-head",
+                        collapsed && "lg:justify-center",
+                      )}
+                      id={`qubit-sidebar-section-${section.id}`}
+                    >
+                      <span className="qagent-sidebar__section-index">{section.index}</span>
+                      <span className={cn(collapsed && "lg:hidden")}>{section.label}</span>
+                      {!collapsed && (
+                        <span aria-hidden className="qagent-sidebar__section-rule" />
+                      )}
+                    </span>
+                  )}
+
+                  <ul className="flex flex-col">
+                    {entries.map((item) =>
+                      item.children && item.children.length > 0 ? (
+                        <SidebarNavGroup
+                          closeMobile={closeMobile}
+                          collapsed={collapsed}
+                          item={item}
+                          key={item.path}
+                          t={t}
+                          tooltipWarmRef={tooltipWarmRef}
+                        />
+                      ) : (
+                        <SidebarNavLink
+                          closeMobile={closeMobile}
+                          collapsed={collapsed}
+                          item={item}
+                          key={item.path}
+                          t={t}
+                          tooltipWarmRef={tooltipWarmRef}
+                        />
+                      ),
+                    )}
+                  </ul>
+                </div>
+              ))}
 
               {sidebarNav.pluginItems.length > 0 && (
                 <div
                   aria-labelledby="qubit-sidebar-plugin-nav-heading"
-                  className="flex flex-col border-t border-current/10 pb-2"
+                  className="qagent-sidebar__section"
                   role="group"
                 >
                   <span
                     className={cn(
-                      "px-5 pt-2.5 pb-1",
-                      "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
-                      isDesktopCollapsed && "lg:hidden",
+                      "qagent-sidebar__section-head",
+                      collapsed && "lg:justify-center",
                     )}
                     id="qubit-sidebar-plugin-nav-heading"
                   >
-                    {t.app.pluginNavSection}
+                    <span className="qagent-sidebar__section-index">++</span>
+                    <span className={cn(collapsed && "lg:hidden")}>
+                      {t.app.pluginNavSection}
+                    </span>
+                    {!collapsed && (
+                      <span aria-hidden className="qagent-sidebar__section-rule" />
+                    )}
                   </span>
 
                   <ul className="flex flex-col">
                     {sidebarNav.pluginItems.map((item) => (
                       <SidebarNavLink
                         closeMobile={closeMobile}
-                        collapsed={isDesktopCollapsed}
+                        collapsed={collapsed}
                         item={item}
                         key={item.path}
                         t={t}
@@ -1039,40 +1093,24 @@ export default function App() {
               tooltipWarmRef={tooltipWarmRef}
             />
 
-            <div
-              className={cn(
-                "flex shrink-0 items-center gap-2",
-                "px-3 py-2",
-                "border-t border-current/20",
-                isDesktopCollapsed
-                  ? "lg:flex-col lg:items-start lg:gap-3 lg:py-3"
-                  : "justify-between",
-              )}
-            >
-              <div
-                className={cn(
-                  "flex min-w-0 items-center gap-2",
-                  isDesktopCollapsed && "lg:flex-col lg:items-start",
-                )}
+            <div className="qagent-sidebar__utility">
+              <PluginSlot name="header-right" />
+
+              <SidebarIconWithTooltip
+                collapsed={isDesktopCollapsed}
+                label={t.theme?.switchTheme ?? "Switch theme"}
+                tooltipWarmRef={tooltipWarmRef}
               >
-                <PluginSlot name="header-right" />
+                <ThemeSwitcher collapsed={isDesktopCollapsed} dropUp />
+              </SidebarIconWithTooltip>
 
-                <SidebarIconWithTooltip
-                  collapsed={isDesktopCollapsed}
-                  label={t.theme?.switchTheme ?? "Switch theme"}
-                  tooltipWarmRef={tooltipWarmRef}
-                >
-                  <ThemeSwitcher collapsed={isDesktopCollapsed} dropUp />
-                </SidebarIconWithTooltip>
-
-                <SidebarIconWithTooltip
-                  collapsed={isDesktopCollapsed}
-                  label={t.language.switchTo}
-                  tooltipWarmRef={tooltipWarmRef}
-                >
-                  <LanguageSwitcher collapsed={isDesktopCollapsed} dropUp />
-                </SidebarIconWithTooltip>
-              </div>
+              <SidebarIconWithTooltip
+                collapsed={isDesktopCollapsed}
+                label={t.language.switchTo}
+                tooltipWarmRef={tooltipWarmRef}
+              >
+                <LanguageSwitcher collapsed={isDesktopCollapsed} dropUp />
+              </SidebarIconWithTooltip>
             </div>
 
             <div
@@ -1082,6 +1120,9 @@ export default function App() {
               )}
             >
               <AuthWidget />
+            </div>
+
+            <div className="qagent-sidebar__colophon">
               <SidebarFooter status={sidebarStatus} />
             </div>
           </aside>
@@ -1195,18 +1236,19 @@ function SidebarNavLink({
   expanded = false,
 }: SidebarNavLinkProps) {
   const { path, label, labelKey, icon: Icon } = item;
-  const [hovered, setHovered] = useState(false);
   const [tooltipAnchor, setTooltipAnchor] = useState<HTMLElement | null>(null);
 
   const navLabel = labelKey
     ? ((t.app.nav as Record<string, string>)[labelKey] ?? label)
     : label;
+  const description = navDescription(path);
+  // Tooltip content: `Label — what it is`. Collapsed mode only; when the rail
+  // is open the label is already visible and a card would be noise.
+  const tooltipText = description ? `${navLabel} — ${description}` : navLabel;
   const showTooltip = (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => {
-    setHovered(true);
     setTooltipAnchor(event.currentTarget);
   };
   const hideTooltip = () => {
-    setHovered(false);
     setTooltipAnchor(null);
   };
 
@@ -1223,30 +1265,20 @@ function SidebarNavLink({
           closeMobile();
           onNavigate?.();
         }}
-        title={navLabel}
-        aria-label={collapsed ? navLabel : undefined}
+        title={collapsed ? undefined : navLabel}
+        aria-label={navLabel}
         onFocus={collapsed ? showTooltip : undefined}
         onBlur={collapsed ? hideTooltip : undefined}
         className={({ isActive }) =>
           cn(
             "qagent-sidebar__link",
             "group/nav relative flex items-center gap-3",
-            "px-5 py-2.5",
-            // Submenu children sit one indent in (tailwind-merge keeps the
-            // later pl over px-5's left padding).
-            nested && "pl-10",
             nested && "qagent-sidebar__link--nested",
-            "font-sans text-display uppercase text-sm tracking-[0.12em]",
-            "whitespace-nowrap transition-colors cursor-pointer",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground",
-            isActive
-              ? "text-midground"
-              : "text-text-secondary hover:text-midground",
+            "whitespace-nowrap cursor-pointer",
+            "focus-visible:outline-none",
+            isActive ? "text-midground" : "text-text-secondary hover:text-midground",
           )
         }
-        style={{
-          clipPath: "var(--component-tab-clip-path)",
-        }}
       >
         {({ isActive }) => (
           <>
@@ -1255,41 +1287,32 @@ function SidebarNavLink({
             <span
               className={cn(
                 "qagent-sidebar__link-label truncate transition-opacity duration-300",
-                collapsed ? "lg:hidden" : "lg:opacity-100",
+                collapsed && "lg:hidden",
               )}
             >
               {navLabel}
             </span>
-
-            <span
-              aria-hidden
-              className="qagent-sidebar__hover-wash absolute inset-y-0.5 left-1.5 right-1.5 bg-midground opacity-0 pointer-events-none transition-opacity duration-200 group-hover/nav:opacity-5"
-            />
-
-            {isActive && (
-              <span
-                aria-hidden
-                className="qagent-sidebar__active-rail absolute left-0 top-0 bottom-0 w-px bg-midground"
-              />
-            )}
 
             {/* Disclosure chevron on a group parent. Hidden when the rail is
                 collapsed to icons (no room), where the tooltip carries it. */}
             {expandable && !collapsed && (
               <span
                 aria-hidden
-                className="ml-auto flex shrink-0 items-center text-text-secondary transition-transform duration-200"
+                className="qagent-sidebar__chevron"
                 style={{ transform: expanded ? "rotate(90deg)" : "none" }}
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </span>
             )}
+
+            {/* Screen readers / mobile keep the state explicit. */}
+            <span className="sr-only">{isActive ? "(current page)" : ""}</span>
           </>
         )}
       </NavLink>
 
-      {collapsed && hovered && tooltipAnchor && (
-        <SidebarTooltip anchor={tooltipAnchor} label={navLabel} warmRef={tooltipWarmRef} />
+      {collapsed && tooltipAnchor && (
+        <SidebarTooltip anchor={tooltipAnchor} label={tooltipText} warmRef={tooltipWarmRef} />
       )}
     </li>
   );
@@ -1547,26 +1570,17 @@ function SidebarSystemActions({
 
   return (
     <>
-    <div
-      className={cn(
-        "shrink-0 flex flex-col",
-        "border-t border-current/10",
-        "py-1",
+    <div className="qagent-sidebar__system">
+      {!collapsed && (
+        <div className="qagent-sidebar__telemetry" role="group" aria-label={t.app.system}>
+          <span className="qagent-sidebar__section-head" style={{ margin: "0 0 .2rem", borderTop: 0 }}>
+            <span className="qagent-sidebar__section-index">06</span>
+            <span>{t.app.system}</span>
+            <span aria-hidden className="qagent-sidebar__section-rule" />
+          </span>
+          <SidebarStatusStrip status={status} latencyMs={latencyMs} />
+        </div>
       )}
-    >
-      <span
-        className={cn(
-          "px-5 pt-0.5 pb-0.5",
-          "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
-          collapsed && "lg:hidden",
-        )}
-      >
-        {t.app.system}
-      </span>
-
-      <div className={cn(collapsed && "lg:hidden")}>
-        <SidebarStatusStrip status={status} latencyMs={latencyMs} />
-      </div>
 
       <GatewayDot collapsed={collapsed} status={status} tooltipWarmRef={tooltipWarmRef} />
 
@@ -1631,16 +1645,13 @@ function SystemActionButton({
   tooltipWarmRef,
 }: SystemActionButtonProps) {
   const { icon: Icon, label, runningLabel, spin } = item;
-  const [hovered, setHovered] = useState(false);
   const [tooltipAnchor, setTooltipAnchor] = useState<HTMLElement | null>(null);
   const busy = isPending || isActionRunning;
   const displayLabel = isActionRunning ? runningLabel : label;
   const showTooltip = (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => {
-    setHovered(true);
     setTooltipAnchor(event.currentTarget);
   };
   const hideTooltip = () => {
-    setHovered(false);
     setTooltipAnchor(null);
   };
 
@@ -1654,20 +1665,13 @@ function SystemActionButton({
         disabled={disabled}
         aria-busy={busy}
         title={item.disabledReason || undefined}
-        aria-label={collapsed ? displayLabel : undefined}
+        aria-label={displayLabel}
         onFocus={collapsed ? showTooltip : undefined}
         onBlur={collapsed ? hideTooltip : undefined}
         type="button"
         className={cn(
-          "group/action relative flex w-full items-center gap-3",
-          "px-5 py-2.5",
-          "font-sans text-display text-xs tracking-[0.1em]",
-          "whitespace-nowrap transition-colors cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground",
-          busy
-            ? "text-midground"
-            : "text-text-secondary hover:text-midground",
-          "disabled:text-text-disabled disabled:cursor-not-allowed",
+          "qagent-sidebar__action group/action",
+          busy ? "text-midground" : "text-text-secondary",
         )}
       >
         {isPending ? (
@@ -1683,28 +1687,17 @@ function SystemActionButton({
           />
         )}
 
-        <span className={cn(
-          "truncate transition-opacity duration-300",
-          collapsed ? "lg:opacity-0" : "lg:opacity-100",
-        )}>
+        <span className={cn("truncate", collapsed && "lg:hidden")}>
           {displayLabel}
         </span>
-
-        <span
-          aria-hidden
-          className="absolute inset-y-0.5 left-1.5 right-1.5 bg-midground opacity-0 pointer-events-none transition-opacity duration-200 group-hover/action:opacity-5"
-        />
-
-        {busy && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-0 bottom-0 w-px bg-midground"
-          />
-        )}
       </button>
 
-      {collapsed && hovered && tooltipAnchor && (
-        <SidebarTooltip anchor={tooltipAnchor} label={displayLabel} warmRef={tooltipWarmRef} />
+      {collapsed && tooltipAnchor && (
+        <SidebarTooltip
+          anchor={tooltipAnchor}
+          label={item.disabledReason ? `${displayLabel} — unavailable: ${item.disabledReason}` : displayLabel}
+          warmRef={tooltipWarmRef}
+        />
       )}
     </li>
   );
@@ -1716,36 +1709,23 @@ function SidebarIconWithTooltip({
   label,
   tooltipWarmRef,
 }: SidebarIconWithTooltipProps) {
-  const [hovered, setHovered] = useState(false);
   const [tooltipAnchor, setTooltipAnchor] = useState<HTMLElement | null>(null);
   const showTooltip = (event: MouseEvent<HTMLDivElement>) => {
-    setHovered(true);
     setTooltipAnchor(event.currentTarget);
   };
   const hideTooltip = () => {
-    setHovered(false);
     setTooltipAnchor(null);
   };
 
   return (
     <div
-      className={cn(
-        "relative w-fit",
-        collapsed && "group/icon",
-      )}
+      className="relative w-fit"
       onMouseEnter={collapsed ? showTooltip : undefined}
       onMouseLeave={collapsed ? hideTooltip : undefined}
     >
       {children}
 
-      {collapsed && (
-        <span
-          aria-hidden
-          className="absolute inset-y-0 inset-x-[-0.375rem] bg-midground opacity-0 pointer-events-none transition-opacity duration-200 group-hover/icon:opacity-5 hidden lg:block"
-        />
-      )}
-
-      {collapsed && hovered && tooltipAnchor && (
+      {collapsed && tooltipAnchor && (
         <SidebarTooltip anchor={tooltipAnchor} label={label} warmRef={tooltipWarmRef} />
       )}
     </div>
@@ -1754,40 +1734,37 @@ function SidebarIconWithTooltip({
 
 function GatewayDot({ collapsed, status, tooltipWarmRef }: GatewayDotProps) {
   const { t } = useI18n();
-  const [hovered, setHovered] = useState(false);
   const [tooltipAnchor, setTooltipAnchor] = useState<HTMLElement | null>(null);
 
-  const toneToColor: Record<string, string> = {
-    "text-success": "bg-success",
-    "text-warning": "bg-warning",
-    "text-destructive": "bg-destructive",
-    "text-muted-foreground": "bg-muted-foreground",
+  const toneToTone: Record<string, string> = {
+    "text-success": "success",
+    "text-warning": "warning",
+    "text-destructive": "destructive",
+    "text-muted-foreground": "muted",
   };
 
-  let color: string;
+  let tone: string;
   let label: string;
 
   if (!status) {
-    color = "bg-midground/20";
+    tone = "muted";
     label = t.status.gateway;
   } else {
     const gw = gatewayLine(status, t);
-    color = toneToColor[gw.tone] ?? "bg-muted-foreground";
+    tone = toneToTone[gw.tone] ?? "muted";
     label = `${t.status.gateway} ${gw.label}`;
   }
   const showTooltip = (event: MouseEvent<HTMLDivElement> | FocusEvent<HTMLDivElement>) => {
-    setHovered(true);
     setTooltipAnchor(event.currentTarget);
   };
   const hideTooltip = () => {
-    setHovered(false);
     setTooltipAnchor(null);
   };
 
   return (
     <div
       className={cn(
-        "hidden lg:flex py-3 pl-[1.625rem] transition-opacity duration-300",
+        "hidden lg:flex py-2 pl-3",
         collapsed ? "lg:opacity-100" : "lg:opacity-0 lg:h-0 lg:py-0 lg:overflow-hidden",
       )}
       role="status"
@@ -1800,55 +1777,14 @@ function GatewayDot({ collapsed, status, tooltipWarmRef }: GatewayDotProps) {
     >
       <span
         aria-hidden
-        className={cn("h-1.5 w-1.5 rounded-full", color)}
+        className="qagent-sidebar__pulse"
+        data-tone={tone}
       />
 
-      {hovered && tooltipAnchor && (
+      {tooltipAnchor && (
         <SidebarTooltip anchor={tooltipAnchor} label={label} warmRef={tooltipWarmRef} />
       )}
     </div>
-  );
-}
-
-function SidebarTooltip({ anchor, label, warmRef }: SidebarTooltipProps) {
-  const rect = anchor.getBoundingClientRect();
-  const sidebar = document.getElementById("app-sidebar");
-  const sidebarRight = sidebar?.getBoundingClientRect().right ?? rect.right;
-  const [isWarm, setIsWarm] = useState(false);
-
-  useEffect(() => {
-    if (!warmRef) {
-      setIsWarm(false);
-      return;
-    }
-    const now = Date.now();
-    setIsWarm(now - warmRef.current < 300);
-    warmRef.current = now;
-    return () => {
-      if (warmRef) warmRef.current = Date.now();
-    };
-  }, [warmRef]);
-
-  return createPortal(
-    <span
-      className={cn(
-        "qagent-sidebar__tooltip",
-        "fixed z-[100] pointer-events-none",
-        "px-2 py-1",
-        "bg-background-base border border-current/20 shadow-lg",
-        "font-sans text-display text-xs tracking-[0.1em] text-midground uppercase",
-      )}
-      style={{
-        top: rect.top + rect.height / 2,
-        left: sidebarRight + 8,
-        transform: "translateY(-50%)",
-        opacity: isWarm ? 1 : undefined,
-        animation: isWarm ? "none" : "sidebar-tooltip-in 120ms ease-out",
-      }}
-    >
-      {label}
-    </span>,
-    document.body,
   );
 }
 
@@ -1900,12 +1836,6 @@ interface SidebarSystemActionsProps {
   onNavigate: () => void;
   status: StatusResponse | null;
   tooltipWarmRef: TooltipWarmRef;
-}
-
-interface SidebarTooltipProps {
-  anchor: HTMLElement;
-  label: string;
-  warmRef?: TooltipWarmRef;
 }
 
 interface SystemActionButtonProps {

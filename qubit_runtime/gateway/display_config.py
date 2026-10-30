@@ -49,35 +49,10 @@ _TIER_LOW = {
 _TIER_MINIMAL = {**_TIER_LOW, "tool_preview_length": 0}
 
 # Core-only surfaces. A plugin platform declares ``display_tier`` (+ optional ``display_overrides``)
-# on its ``PlatformEntry``; _platform_defaults() reads it from the registry. The table stays as the
-# fallback for every platform that does NOT declare one - without it a platform resolves to {} and
-# silently inherits the GLOBAL default, which is how slack asked for "all" where it had always
-# resolved "off" (tests/gateway/test_display_config.py pins the old answers).
+# on its ``PlatformEntry``; _platform_defaults() reads it from the registry.
 _PLATFORM_DEFAULTS: dict[str, dict[str, Any]] = {
     "webhook": _TIER_MINIMAL,
     "api_server": {**_TIER_HIGH, "tool_preview_length": 0},
-    # Mobile inbox: quiet tool_progress / busy-ack, but keep interim commentary and heartbeats so it
-    # doesn't look like "typing..." for 30 minutes.
-    "telegram": {**_TIER_HIGH, "tool_progress": "off", "busy_ack_detail": False},
-    "discord": {**_TIER_HIGH, "reasoning_style": "subtext"},  # "-# " subtext reads as metadata
-    # Slack: Bolt posts cannot be edited like CLI; "new"/"all" spam permanent lines.
-    "slack": {**_TIER_MEDIUM, "tool_progress": "off", "long_running_notifications": False, "busy_ack_detail": False},
-    "mattermost": _TIER_MEDIUM,
-    "matrix": _TIER_MEDIUM,
-    "feishu": _TIER_MEDIUM,
-    "buzz": _TIER_MEDIUM,  # Nostr: edits in place but channels are shared community spaces
-    "signal": _TIER_LOW,
-    "whatsapp": _TIER_MEDIUM,  # Baileys bridge supports /edit
-    "whatsapp_cloud": _TIER_LOW,  # adapter lacks edit_message; promote once it lands
-    "photon": _TIER_LOW,  # permanent-message iMessage inboxes (no edit)
-    "bluebubbles": _TIER_LOW,
-    "weixin": _TIER_LOW,
-    # Non-editable, but its native "stream" msgtype gives a typing animation + cumulative updates.
-    "wecom": {**_TIER_LOW, "streaming": True},
-    "wecom_callback": _TIER_LOW,
-    "dingtalk": _TIER_LOW,
-    "email": _TIER_MINIMAL,
-    "sms": _TIER_MINIMAL,
 }
 
 _TIERS = {"high": _TIER_HIGH, "medium": _TIER_MEDIUM, "low": _TIER_LOW, "minimal": _TIER_MINIMAL}
@@ -86,26 +61,20 @@ _TIERS = {"high": _TIER_HIGH, "medium": _TIER_MEDIUM, "low": _TIER_LOW, "minimal
 def _platform_defaults(platform_key: str) -> dict[str, Any]:
     """Built-in defaults for *platform_key*: the table above, else the ``display_tier`` a plugin
     platform registered (``PlatformEntry.display_tier``) with its ``display_overrides`` on top."""
-    from gateway.platform_registry import platform_registry
-    entry = None
+    if platform_key in _PLATFORM_DEFAULTS:
+        return _PLATFORM_DEFAULTS[platform_key]
     try:
+        from gateway.platform_registry import platform_registry
         entry = platform_registry.get(platform_key)
     except Exception:
-        entry = None
-    # A registered ``display_tier`` is an explicit statement about THIS platform and wins; the
-    # table is the fallback for platforms that predate the field and never declare it.
-    if entry is not None:
-        tier = _TIERS.get(str(getattr(entry, "display_tier", "") or "").lower(), {})
-        overrides = getattr(entry, "display_overrides", None)
-        if tier:
-            return {**tier, **overrides} if overrides else tier
-    return _PLATFORM_DEFAULTS.get(platform_key, {})
+        return {}
+    tier = _TIERS.get(str(getattr(entry, "display_tier", "") or "").lower(), {})
+    overrides = getattr(entry, "display_overrides", None)
+    return {**tier, **overrides} if overrides else tier
 
 
 # Canonical set of per-platform overrideable keys (for validation).
 OVERRIDEABLE_KEYS = frozenset(_GLOBAL_DEFAULTS.keys())
-
-_TIERS = {"high": _TIER_HIGH, "medium": _TIER_MEDIUM, "low": _TIER_LOW, "minimal": _TIER_MINIMAL}
 
 
 def resolve_display_setting(user_config: dict, platform_key: str, setting: str, fallback: Any = None) -> Any:
@@ -233,3 +202,29 @@ def _normalise(setting: str, value: Any) -> Any:
     """Normalise a user-supplied value for *setting*; unknown settings pass through."""
     norm = _NORMALISERS.get(setting)
     return norm(value) if norm else value
+
+
+# LOCAL's per-platform config key (``_platform_config_key(Platform.LOCAL)``): where a local session's
+# ``/reasoning show|hide`` and ``/footer`` save, and what every local surface reads.
+LOCAL_DISPLAY_KEY = "cli"
+# The per-platform display settings a local surface takes from the local key over the global one.
+_LOCAL_OVERLAY_KEYS = ("show_reasoning", "runtime_footer")
+
+
+def local_display_config(display: Any) -> dict[str, Any]:
+    """*display* (a ``config.yaml`` ``display`` block) as a local surface (classic CLI, Ink, Desktop,
+    a local turn) resolves it: ``display.platforms.cli.<key>`` over ``display.<key>`` for the settings
+    the local commands save there. No second key is written; the block is returned copied."""
+    display = dict(display) if isinstance(display, dict) else {}
+    platforms = display.get("platforms")
+    local = platforms.get(LOCAL_DISPLAY_KEY) if isinstance(platforms, dict) else None
+    if not isinstance(local, dict):
+        return display
+    for key in _LOCAL_OVERLAY_KEYS:
+        value = local.get(key)
+        if value is None:
+            continue
+        if isinstance(value, dict) and isinstance(display.get(key), dict):
+            value = {**display[key], **value}
+        display[key] = _normalise(key, value)
+    return display

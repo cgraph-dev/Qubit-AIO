@@ -11,7 +11,7 @@ every refresh or the next refresh replays a rotated token and revokes the whole 
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from qubit_cli.dashboard_auth import LoginStart, ProviderError, Session
 from plugins.dashboard_auth._shared import (
@@ -161,3 +161,17 @@ def register(ctx) -> None:
         logger.info(
             "dashboard-auth-nous: registered provider (client_id=%s, portal=%s, token_leeway=%ss)",
             kwargs["client_id"], kwargs["portal_url"], kwargs["token_leeway"])
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _swap_provider() -> Callable[[], None]:
+    """Put a provider on the listener's own client (``listener_client.use`` has made it current) in
+    place of the registered one; the returned undo puts that one, or none, back."""
+    from qubit_cli.dashboard_auth.registry import (
+        register_global_provider, restore_registration, snapshot_registration)
+
+    previous = snapshot_registration(NousDashboardAuthProvider.name)
+    provider = NousDashboardAuthProvider(**_settings())
+    register_global_provider(provider)
+    return lambda: restore_registration(NousDashboardAuthProvider.name, provider, previous)

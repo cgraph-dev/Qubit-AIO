@@ -1173,6 +1173,16 @@ def is_source_suppressed(provider_id: str, source: str) -> bool:
         return False
 
 
+def suppressed_credential_sources(provider_id: str) -> frozenset[str]:
+    """Every credential source the user suppressed for *provider_id* (unreadable store = none)."""
+    try:
+        section = _load_auth_store().get("suppressed_sources")
+    except OSError:  # unreadable store (logged by the loader): nothing to honour, as before
+        return frozenset()
+    listed = section.get(provider_id) if isinstance(section, dict) else None
+    return frozenset(map(str, listed)) if isinstance(listed, (list, dict)) else frozenset()
+
+
 def unsuppress_credential_source(provider_id: str, source: str) -> bool:
     """Clear a suppression marker so the source will be re-seeded on the next load."""
     with _auth_store_lock():
@@ -1605,6 +1615,12 @@ def _config_model_provider() -> Tuple[Any, Optional[str]]:
 # implied by LM_API_KEY (may be offline; no-auth setup uses a placeholder). Both need an explicit
 # choice.
 _NO_AUTO_DETECT_PROVIDERS = frozenset({"copilot", "lmstudio"})
+
+
+def _credential_profile(provider_id: str) -> Any:
+    """The provider's registered profile (credential seams), or None."""
+    from providers import get_provider_profile
+    return get_provider_profile(provider_id)
 
 
 def _env_key_auto_detected(

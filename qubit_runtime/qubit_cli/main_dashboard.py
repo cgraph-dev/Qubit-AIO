@@ -87,7 +87,7 @@ _SYSTEMCTL_ERRORS = (FileNotFoundError, subprocess.TimeoutExpired, OSError)
 def _run_probe(cmd: list[str], *, timeout: int) -> subprocess.CompletedProcess:
     """Captured, text-decoded ``subprocess.run`` for short local probes (systemctl, ps)."""
     return subprocess.run(
-        cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+        cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, check=False)
 
 
 def _restart_managed_dashboard_service(reason: str, unit: str = _DASHBOARD_SYSTEMD_UNIT) -> bool:
@@ -185,7 +185,7 @@ def _pid_unified_cgroup_entries(pid: int):
 
 
 def _get_systemd_service_for_pid(pid: int) -> str | None:
-    """The systemd service unit that supervises *pid* (``qubit-serve.service``), or None.
+    """The systemd service unit that supervises *pid* (``hermes-serve.service``), or None.
 
     A ``.service`` cgroup alone only says where the process was started: a dashboard launched by
     hand from a shell that itself runs under some unit (a CI runner agent, ``cron.service``, a
@@ -229,6 +229,27 @@ def _extract_scope_from_cgroup(cgroup_entry: str) -> str | None:
 def _get_pid_cgroup_path(pid: int) -> str | None:
     """The unified (``0::``) cgroup path from ``/proc/<pid>/cgroup``, or None."""
     return next(_pid_unified_cgroup_entries(pid), None)
+
+
+def _systemd_owner_for_pid(pid: int) -> tuple[str, str | None] | None:
+    """``(unit, scope)`` of the systemd unit whose live ``MainPID`` is *pid*; ``None`` when no unit
+    provably owns it (see :func:`_get_systemd_service_for_pid`). Scope is ``user``/``system`` or
+    ``None`` when the cgroup path does not say."""
+    unit = _get_systemd_service_for_pid(pid)
+    if unit is None:
+        return None
+    return unit, _extract_scope_from_cgroup(_get_pid_cgroup_path(pid) or "")
+
+
+def _systemd_restart_commands(unit: str, scope: str | None) -> list[str]:
+    """The command(s) that restart *unit* in its scope; both forms when the scope is unknown."""
+    user_cmd, system_cmd = f"systemctl --user restart {unit}", f"sudo systemctl restart {unit}"
+    return {"user": [user_cmd], "system": [system_cmd]}.get(scope or "", [user_cmd, system_cmd])
+
+
+def _format_restart_commands(commands: list[str]) -> str:
+    """Join restart commands as a user-facing hint: each backticked, separated by " or "."""
+    return " or ".join(f"`{c}`" for c in commands)
 
 
 def _try_restart_systemd_service(svc_name: str, cgroup_path: str | None = None) -> bool:
@@ -391,7 +412,7 @@ def _respawnable_command_for_current_install(argv: list[str]) -> list[str]:
     """
     root = Path(__file__).resolve().parents[1]
     if (len(argv) > 2 and os.path.basename(argv[0]).startswith("python")
-            and os.path.basename(argv[1]) == "qubit" and Path(argv[1]) != root / "qubit"):
+            and os.path.basename(argv[1]) == "hermes" and Path(argv[1]) != root / "hermes"):
         from qubit_cli._launchers import runtime_command
         return runtime_command(root, argv[2:])
     return list(argv)
@@ -422,6 +443,7 @@ def _respawn_dashboard_processes(commands: list[list[str]]) -> list[list[str]]:
             with open(log_path, "ab") as log_f:
                 proc = subprocess.Popen(
                     command, stdin=subprocess.DEVNULL, stdout=log_f, stderr=subprocess.STDOUT,
+                    # detached-spawn: ok — dashboard service launch, meant to outlive the CLI that starts it
                     start_new_session=True, close_fds=True)
             spawned.append((original, command, proc))
         except (OSError, ValueError) as exc:
@@ -515,10 +537,11 @@ def _install_hangup_protection(gateway_mode: bool = False):
 
     # Any failure here is non-fatal; we just skip the wrap.
     try:
-        # Late-bound import so tests can monkeypatch
-        # qubit_cli.config.get_qubit_home to simulate setup failure.
-        from qubit_cli.config import get_qubit_home as _get_qubit_home
-        logs_dir = _get_qubit_home() / "logs"
+        # Late-bound import so tests can monkeypatch it to simulate setup failure. The ROOT
+        # home, never a sticky profile's: the update mutates the shared checkout, and the
+        # Desktop and the hand-off scripts read <root>/logs/update.log.
+        from qubit_constants import get_default_qubit_root as _get_root_home
+        logs_dir = _get_root_home() / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         log_file = open(logs_dir / "update.log", "a", buffering=1, encoding="utf-8")
 
@@ -653,9 +676,9 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
             "the dashboard again:\n"
             "    qubit dashboard register\n"
             "  It provisions a Qubit Labs OAuth client and writes "
-            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into the Qubit home .env for you.\n"
-            "  Docs: run `qubit dashboard register --help` for the authentication-gated "
-            "setup steps."
+            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
+            "  Docs: https://hermes-agent.nousresearch.com/docs/"
+            "user-guide/features/web-dashboard#authentication-gated-mode"
         )
         sys.exit(0)
 
@@ -730,8 +753,8 @@ def _read_ssh_session_token_file(path: str) -> str:
     if not os.path.isabs(path):
         raise SystemExit("--ssh-session-token-file must be absolute")
 
-    # The Desktop client writes the token under the account's default QUBIT_HOME
-    # desktop-ssh, independent of the active profile. Anchor
+    # The Desktop client writes the token under the account's $HOME/.hermes/
+    # desktop-ssh, independent of QUBIT_HOME and the active profile. Anchor
     # validation there, NOT get_qubit_home(): a non-default profile or a Docker
     # /opt/data root re-homes get_qubit_home() and would reject every token.
     # See #69551.
@@ -992,9 +1015,8 @@ def _route_named_profile_dashboard(
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=False)
     # Pin the child to the machine ROOT, resolved explicitly rather than by
     # dropping QUBIT_HOME: in the Docker layout the root is /opt/data, and an
-    # unset QUBIT_HOME would fall back to the platform-default home nested under
-    # /opt/data — an empty auto-seeded home with only the default profile and no
-    # install stamp.
+    # unset QUBIT_HOME would fall back to $HOME/.hermes = /opt/data/.hermes — an
+    # empty auto-seeded home with only the default profile and no install stamp.
     # get_default_qubit_root() strips a trailing profiles/<name> for both layouts.
     try:
         from qubit_constants import get_default_qubit_root
@@ -1013,7 +1035,7 @@ def _route_named_profile_dashboard(
 def _resolve_dashboard_web_dist(args, _headless_backend: bool) -> None:
     """Build or validate the web UI dist before the server imports.
 
-    ``serve`` sets QUBIT_SERVE_HEADLESS so mount_spa() stays off. Otherwise build
+    ``serve`` sets HERMES_SERVE_HEADLESS so mount_spa() stays off. Otherwise build
     unless HERMES_WEB_DIST / --skip-build promise a dist — then verify index.html
     (else the server serves 404s). --skip-build on the default location gets ONE
     recovery build; a caller-managed HERMES_WEB_DIST can't be populated.
@@ -1022,7 +1044,7 @@ def _resolve_dashboard_web_dist(args, _headless_backend: bool) -> None:
     from qubit_cli.main_web_build import _build_web_ui
     skip_build = getattr(args, "skip_build", False)
     if _headless_backend:
-        os.environ["QUBIT_SERVE_HEADLESS"] = "1"  # set before web_server import
+        os.environ["HERMES_SERVE_HEADLESS"] = "1"  # set before web_server import
     elif "HERMES_WEB_DIST" not in os.environ and not skip_build:
         if not _build_web_ui(PROJECT_ROOT / "web", fatal=True):
             sys.exit(1)

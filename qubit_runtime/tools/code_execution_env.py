@@ -301,3 +301,10 @@ def _resolve_child_cwd(mode: str, staging_dir: str, task_id: str = "") -> str:
         if candidate and os.path.isdir(candidate):
             return candidate
     return staging_dir
+
+
+# --- ported from upstream 088f657ecf ---
+
+def is_secret_env_name(name: str) -> bool:
+    """The credential-name policy, shared with a local session's client environment (``agent.session_client_env``)."""
+    return any(s in name.upper() for s in _SECRET_SUBSTRINGS)

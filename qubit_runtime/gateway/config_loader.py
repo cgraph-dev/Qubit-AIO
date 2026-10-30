@@ -136,8 +136,7 @@ def bridge_toplevel_keys(yaml_cfg: dict, gateway_section: Any, gw_data: dict) ->
 
 # --- platform sections -----------------------------------------------------------
 
-def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict,
-                            also: Any = None) -> dict:
+def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict, *, also: frozenset = frozenset()) -> dict:
     """Merge every place a platform block may live into ``gw_data["platforms"]`` and return it.
 
     Order (later wins on shared keys, ``extra`` deep-merged so gateway.json defaults survive):
@@ -145,24 +144,15 @@ def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict,
     first so top-level config keeps precedence, matching the gateway.streaming fallback). An
     ``enabled`` key in any block sets the ``_enabled_explicit`` marker consumed by the env pass.
     Top-level adapter keys (``gateway.api_server.port: 8642``) reach ``extra`` in
-    ``PlatformConfig.from_dict``.
-
-    ``also`` (optional) scopes the merge to a set of platform names — used by the
-    left-core migration's per-platform probe; ``None`` merges every platform
-    (the default, unchanged).
+    ``PlatformConfig.from_dict``. *also* names platforms whose ``gateway.<platform>`` shorthand counts
+    even while no adapter is registered (a platform that left core, read before its plugin loads).
     """
-    try:
-        only = frozenset(also) if also is not None else None
-    except TypeError:
-        only = None
     platforms_data = _dict_slot(gw_data, "platforms")
 
     def merge(source_platforms: Any) -> None:
         if not isinstance(source_platforms, dict):
             return
         for plat_name, plat_block in source_platforms.items():
-            if only is not None and plat_name not in only:
-                continue
             if not isinstance(plat_block, dict):
                 continue
             existing = platforms_data.get(plat_name, {})
@@ -179,8 +169,7 @@ def merge_platform_sections(yaml_cfg: dict, gateway_cfg: Any, gw_data: dict,
     merge(nested_gateway.get("platforms"))
     merge(yaml_cfg.get("platforms"))
     merge({k: v for k, v in nested_gateway.items()
-           if k != "platforms" and isinstance(v, dict) and _is_platform_name(k)
-           and (only is None or k in only)})
+           if k != "platforms" and isinstance(v, dict) and (k in also or _is_platform_name(k))})
     return platforms_data
 
 
@@ -504,15 +493,12 @@ def read_yaml_layers(home: Path) -> dict:
     (``gateway.relay.relay_explicitly_disabled``) reads through here so it cannot disagree with
     ``load_gateway_config()`` on which files count.
     """
-    config_yaml_path = home / "config.yaml"
-    yaml_cfg: dict = {}
-    if config_yaml_path.exists():
-        # The installer seeds config.yaml by copying cli-config.yaml.example (~120 KB, almost all
-        # comments), and nothing caches this loader — so the pure-Python parser dominates the load.
-        from utils import fast_safe_load
+    from qubit_cli.config_backend import config_exists, read_config_doc
 
-        with open(config_yaml_path, encoding="utf-8-sig") as f:
-            yaml_cfg = fast_safe_load(f) or {}
+    config_path = Path(home) / "config.yaml"
+    yaml_cfg: dict = {}
+    if config_exists(config_path):
+        yaml_cfg = read_config_doc(config_path) or {}
 
     from qubit_cli.config import _expand_env_vars
 
@@ -566,3 +552,14 @@ def load_yaml_layer(home: Path, gw_data: dict) -> None:
     apply_plugin_yaml_hooks(yaml_cfg, gateway_platforms, platforms_data, registry,
                             warned=warned, authored=authored, managed_extra=managed_extra, entries=entries)
     bridge_core_env_settings(yaml_cfg, platforms_data)
+
+
+def load_gateway_config_file(gateway_config_file: str):
+    """``gateway --config <file>``: a ``GatewayConfig`` from an explicit local YAML file. Refused
+    when the config backend has no file tooling (Remote Config: config comes only from the plane)."""
+    import qubit_yaml as yaml
+    from gateway.config import GatewayConfig
+    from qubit_cli.config_backend import require_file_tooling
+    require_file_tooling("gateway --config <file>")
+    with open(gateway_config_file, encoding="utf-8-sig") as f:
+        return GatewayConfig.from_dict(yaml.safe_load(f) or {})
