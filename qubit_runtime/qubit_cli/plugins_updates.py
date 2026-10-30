@@ -51,7 +51,7 @@ class CheckResult:
     latest: Optional[str] = None
     update_available: Optional[bool] = None   # None = unknown/uncheckable
     needs_fixing: Optional[str] = None        # mismatch reason when set
-    min_hermes: Optional[str] = None          # feed's version floor, if any
+    min_hermes: Optional[str] = None          # feed floor / catalog requires_hermes, if any
     reason: str = ""
 
     def to_json(self) -> dict:
@@ -130,6 +130,18 @@ def check_local_provenance(prov: Provenance) -> CheckResult:
     return result
 
 
+def held_for_newer_hermes(result: CheckResult) -> Optional[str]:
+    """``needs Qubit <spec>; this is <version>`` when the update's ``min_hermes`` (a feed floor or the
+    catalog entry's ``requires_hermes``) rejects the running Qubit, else ``None``. The update path refuses
+    such an update, so listings name it as waiting on a Qubit update instead of offering it."""
+    if not result.min_hermes:
+        return None
+    from qubit_cli.plugins_manifest import requires_qubit_error, running_qubit_version
+    if not requires_qubit_error({"requires_hermes": result.min_hermes}):
+        return None
+    return f"needs Qubit {result.min_hermes}; this is {running_qubit_version()}"
+
+
 def check_provenanced(
     prov: Provenance,
     *,
@@ -158,6 +170,7 @@ def check_provenanced(
             return result
         result.latest = entry.sha
         result.update_available = result.current != entry.sha
+        result.min_hermes = entry.requires_hermes or None
         return result
     result = check_local_provenance(prov)
     if result.reason or result.needs_fixing:
@@ -395,6 +408,7 @@ def default_ls_remote(source: str) -> str:
         capture_output=True,
         text=True, encoding="utf-8", errors="replace",
         timeout=30,
+        check=False,
     )
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or "ls-remote failed").strip()[:200])

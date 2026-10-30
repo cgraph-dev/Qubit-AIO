@@ -7,10 +7,11 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from pathlib import Path
 from typing import Any
 
@@ -23,9 +24,7 @@ from .shared_metrics_contract import (
     COUNTER_METRICS,
     FEATURE_ADOPTION_METRIC,
     INSTALL_SNAPSHOT_METRIC,
-    LEGACY_MODEL_CALL_METRIC,
     MILESTONE_METRIC,
-    MODEL_CALL_METRIC,
     MODEL_ROUTE_METRIC,
     SUM_METRICS,
     client_resource_is_valid,
@@ -34,7 +33,7 @@ from .shared_metrics_contract import (
 from .shared_metrics_drift import conform_counter_dimensions, counter_dimensions_shape_is_known
 
 
-_PACKAGE_SCHEMA_VERSION = "qubit.shared_metrics.v4"
+_PACKAGE_SCHEMA_VERSION = "hermes.shared_metrics.v4"
 _STORE_SCHEMA_VERSION = "2"
 _BUSY_TIMEOUT_MS = 250
 _SCHEMA_BUSY_TIMEOUT_MS = 5_000
@@ -48,7 +47,7 @@ _FEATURE_STATE_PREFIX = "feature:"
 _DAILY_ONCE_STATE_PREFIX = "daily_once:"
 _ACTIVE_INSTALL_INTERVAL = timedelta(hours=24)
 # Column order of the client resource in every counter_aggregates statement.
-_RESOURCE_COLUMNS = ("qubit_version", "os_family", "architecture", "install_method")
+_RESOURCE_COLUMNS = ("hermes_version", "os_family", "architecture", "install_method")
 
 _CREATE_TELEMETRY_STATE_SQL = """
             CREATE TABLE IF NOT EXISTS telemetry_state (
@@ -60,7 +59,7 @@ _CREATE_COUNTER_AGGREGATES_SQL = """
             CREATE TABLE IF NOT EXISTS counter_aggregates (
                 period_start TEXT NOT NULL,
                 metric_name TEXT NOT NULL,
-                qubit_version TEXT NOT NULL,
+                hermes_version TEXT NOT NULL,
                 os_family TEXT NOT NULL,
                 architecture TEXT NOT NULL,
                 install_method TEXT NOT NULL,
@@ -68,7 +67,7 @@ _CREATE_COUNTER_AGGREGATES_SQL = """
                 value INTEGER NOT NULL,
                 packaged_value INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (
-                    period_start, metric_name, qubit_version, os_family, architecture,
+                    period_start, metric_name, hermes_version, os_family, architecture,
                     install_method, dimensions_json
                 )
             )
@@ -108,11 +107,11 @@ _MIGRATE_V1_SQL = (
     _CREATE_COUNTER_AGGREGATES_SQL,
     """
             INSERT INTO counter_aggregates(
-                period_start, metric_name, qubit_version, os_family, architecture,
+                period_start, metric_name, hermes_version, os_family, architecture,
                 install_method, dimensions_json, value, packaged_value
             )
             SELECT
-                period_start, metric_name, qubit_version, 'unknown', 'unknown', 'unknown',
+                period_start, metric_name, hermes_version, 'unknown', 'unknown', 'unknown',
                 dimensions_json, value, packaged_value
             FROM counter_aggregates_v1
             """,
@@ -120,18 +119,18 @@ _MIGRATE_V1_SQL = (
 )
 _PENDING_PERIOD_COUNT_SQL = """
                 SELECT COUNT(*) AS period_count FROM (
-                    SELECT period_start, qubit_version, os_family, architecture, install_method
+                    SELECT period_start, hermes_version, os_family, architecture, install_method
                     FROM counter_aggregates WHERE value > packaged_value
-                    GROUP BY period_start, qubit_version, os_family, architecture, install_method
+                    GROUP BY period_start, hermes_version, os_family, architecture, install_method
                 )
                 """
 _INCREMENT_COUNTER_SQL = """
             INSERT INTO counter_aggregates(
-                period_start, metric_name, qubit_version, os_family, architecture,
+                period_start, metric_name, hermes_version, os_family, architecture,
                 install_method, dimensions_json, value, packaged_value
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
             ON CONFLICT(
-                period_start, metric_name, qubit_version, os_family, architecture,
+                period_start, metric_name, hermes_version, os_family, architecture,
                 install_method, dimensions_json
             )
             DO UPDATE SET value = value + excluded.value
@@ -157,13 +156,32 @@ _SEND_COLUMNS = (
 
 logger = logging.getLogger(__name__)
 
+# Every store in this process that ever deferred a write, the per-profile runtimes' stores and the
+# ones no runtime owns alike (the root profile's host-level active-profiles accumulator, the Desktop
+# store). ``os._exit`` skips each store's atexit drain, so a hard exit drains this set instead.
+_DEFERRING_STORES: list[SharedMetricsStore] = []
+_DEFERRING_STORES_LOCK = threading.Lock()
+
+
+def drain_deferring_stores(deadline: float) -> None:
+    """Write every store's deferred rows before an ``os._exit``, waiting on a busy store no later
+    than ``deadline`` (``time.monotonic``). Each deferred write runs against the store that deferred
+    it, so one profile's rows never land in another's database."""
+    with _DEFERRING_STORES_LOCK:
+        stores = list(_DEFERRING_STORES)
+    for store in stores:
+        remaining_ms = int((deadline - time.monotonic()) * 1000)
+        if remaining_ms <= 0:
+            return
+        store.drain_deferred(busy_timeout_ms=remaining_ms)
+
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _isoformat(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _compact_json(value: Any) -> str:
@@ -431,6 +449,8 @@ class SharedMetricsStore:
                 register, self._drain_at_exit = not self._drain_at_exit, True
             if register:
                 atexit.register(self.drain_deferred)
+                with _DEFERRING_STORES_LOCK:
+                    _DEFERRING_STORES.append(self)
             if not busy:
                 raise
 
@@ -444,7 +464,11 @@ class SharedMetricsStore:
             with self._write(busy_timeout_ms=busy_timeout_ms) as connection:
                 for item in pending:
                     item(connection)
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, sqlite3.OperationalError) and ("locked" in str(exc) or "busy" in str(exc)):
+                with self._deferred_lock:  # still contended: keep them for the next write or exit drain
+                    self._deferred = [*pending, *self._deferred][-_DEFERRED_WRITES_MAX:]
+                return
             logger.warning("Unable to write %d deferred shared-metrics updates", len(pending), exc_info=True)
 
     def create_and_export_package_if_due(self) -> list[Path]:
@@ -466,10 +490,10 @@ class SharedMetricsStore:
         with self._connection() as connection:
             rows = connection.execute(
                 """
-                SELECT period_start, metric_name, qubit_version, os_family, architecture,
+                SELECT period_start, metric_name, hermes_version, os_family, architecture,
                     install_method, dimensions_json, value, packaged_value
                 FROM counter_aggregates
-                ORDER BY period_start, qubit_version, os_family, architecture, install_method,
+                ORDER BY period_start, hermes_version, os_family, architecture, install_method,
                     metric_name, dimensions_json
                 """
             ).fetchall()
@@ -555,10 +579,10 @@ class SharedMetricsStore:
     @staticmethod
     def _parse_state_timestamp(value: Any) -> datetime | None:
         try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(str(value))
         except (TypeError, ValueError):
             return None
-        return None if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+        return None if parsed.tzinfo is None else parsed.astimezone(UTC)
 
     def _create_pending_packages_if_due(self) -> None:
         now = _utc_now()
@@ -582,9 +606,9 @@ class SharedMetricsStore:
     ) -> dict[str, Any] | None:
         period_row = connection.execute(
             """
-                SELECT period_start, qubit_version, os_family, architecture, install_method
+                SELECT period_start, hermes_version, os_family, architecture, install_method
                 FROM counter_aggregates WHERE value > packaged_value
-                ORDER BY period_start, qubit_version, os_family, architecture, install_method
+                ORDER BY period_start, hermes_version, os_family, architecture, install_method
                 LIMIT 1
                 """
         ).fetchone()
@@ -597,13 +621,13 @@ class SharedMetricsStore:
         rows = connection.execute(
             """
                 SELECT metric_name, dimensions_json, value, packaged_value FROM counter_aggregates
-                WHERE period_start = ? AND qubit_version = ? AND os_family = ?
+                WHERE period_start = ? AND hermes_version = ? AND os_family = ?
                   AND architecture = ? AND install_method = ? AND value > packaged_value
                 ORDER BY metric_name, dimensions_json
                 """,
             (period_value, *resource_values),
         ).fetchall()
-        period_start = datetime.fromisoformat(str(period_value)).replace(tzinfo=timezone.utc)
+        period_start = datetime.fromisoformat(str(period_value)).replace(tzinfo=UTC)
         if not client_resource_is_valid(resource):
             raise ValueError("Unsupported shared-metrics client resource")
         metrics = self._package_metrics(rows)
@@ -647,7 +671,7 @@ class SharedMetricsStore:
             connection.execute(
                 """
                     UPDATE counter_aggregates SET packaged_value = value
-                    WHERE period_start = ? AND metric_name = ? AND qubit_version = ?
+                    WHERE period_start = ? AND metric_name = ? AND hermes_version = ?
                       AND os_family = ? AND architecture = ? AND install_method = ?
                       AND dimensions_json = ?
                     """,
@@ -672,9 +696,6 @@ class SharedMetricsStore:
     @staticmethod
     def _package_metric(row: sqlite3.Row) -> dict[str, Any] | None:
         metric_name = str(row["metric_name"])
-        # Pre-v2 pending rows carry the frozen v1 name; the v3 package names the current counter.
-        if metric_name == LEGACY_MODEL_CALL_METRIC:
-            metric_name = MODEL_CALL_METRIC
         dimensions = json.loads(row["dimensions_json"])
         # An unknown field set is tamper evidence and fails closed (must-not-be-exported). A known
         # shape whose values fell out of the contract was recorded by an earlier build or catalog

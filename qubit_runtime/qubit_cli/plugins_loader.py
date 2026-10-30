@@ -33,12 +33,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = logging.getLogger("qubit_cli.plugins")
 
-# Guards creating a manager's plugin host, so concurrent first callers share one host process.
-_PLUGIN_HOST_CREATE_LOCK = threading.Lock()
-
 _NS_PARENT = "qubit_plugins"
 _MODULE_NAMESPACE_LOCK = threading.RLock()
-_BARE_MODULE_SCOPE: Dict[str, str] = {}  # bare module name -> owning scope_key
+_BARE_MODULE_SCOPE: dict[str, str] = {}  # bare module name -> owning scope_key
 
 # Per-plugin deadline on import + register(): ``plugins.load_timeout_seconds`` (default 10s, 0 disables,
 # clamped to the max). A plugin that never returns is skipped with a named reason and loading moves on
@@ -48,11 +45,13 @@ _LOAD_TIMEOUT_SECS = 10.0
 _MAX_LOAD_TIMEOUT_SECS = 600.0
 _MAX_ABANDONED_LOADERS = 8
 _LOADER_THREAD_PREFIX = "plugin-load:"  # names each deadline-bounded load worker; the re-arm guard matches it
-_ABANDONED_LOADERS: List[threading.Thread] = []
+_ABANDONED_LOADERS: list[threading.Thread] = []
 _ABANDONED_LOADERS_LOCK = threading.Lock()
+# Guards creating a manager's plugin host, so concurrent first callers share one host process.
+_PLUGIN_HOST_CREATE_LOCK = threading.Lock()
 # PluginContexts of the outermost deadline-bounded load; set only inside its worker.
-_IN_PLUGIN_LOAD: contextvars.ContextVar[Optional[List["PluginContext"]]] = contextvars.ContextVar(
-    "qubit_plugin_load_scope", default=None,
+_IN_PLUGIN_LOAD: contextvars.ContextVar[Optional[list[PluginContext]]] = contextvars.ContextVar(
+    "hermes_plugin_load_scope", default=None,
 )
 
 
@@ -104,7 +103,7 @@ def _reserve_abandoned_loader_slot() -> None:
     )
 
 
-def run_with_load_deadline(plugin_key: str, ctx: "PluginContext", fn: Callable[[], Any]) -> Any:
+def run_with_load_deadline(plugin_key: str, ctx: PluginContext, fn: Callable[[], Any]) -> Any:
     """Run ``fn`` (a plugin's import + ``register()``) under the per-plugin deadline.
 
     The worker inherits the caller's context (the Qubit-home override is a ContextVar). On timeout the
@@ -124,8 +123,8 @@ def run_with_load_deadline(plugin_key: str, ctx: "PluginContext", fn: Callable[[
     if timeout <= 0:
         return fn()
     _reserve_abandoned_loader_slot()
-    outcome: List[Any] = []
-    failure: List[BaseException] = []
+    outcome: list[Any] = []
+    failure: list[BaseException] = []
 
     scope = [ctx]
 
@@ -198,22 +197,90 @@ def _load_error_text(exc: BaseException) -> str:
     return str(exc)
 
 
-def _dist_installed(req: str) -> Optional[bool]:
-    """Best-effort presence probe on a requirement's distribution name; ``None`` when unprobeable."""
-    dist = re.split(r"[<>=!~\[;\s]", req, maxsplit=1)[0].strip()
+def _dist_name(req: str) -> str:
+    return re.split(r"[<>=!~\[;\s]", req, maxsplit=1)[0].strip()
+
+
+def _dist_installed(req: str, path: Optional[list[str]] = None) -> Optional[bool]:
+    """Best-effort probe: a distribution the requirement accepts is installed (on ``path`` when given,
+    else this process's ``sys.path``); ``None`` when unprobeable. The version counts: a running
+    process holding ``x 1.2`` cannot serve a plugin that now requires ``x>=1.3``."""
+    dist = _dist_name(req)
     if not dist:
         return None
     try:
-        importlib.metadata.version(dist)
-        return True
-    except importlib.metadata.PackageNotFoundError:
-        return False
+        found = next(iter(importlib.metadata.distributions(name=dist, path=path) if path
+                          else importlib.metadata.distributions(name=dist)), None)
     except Exception:
         return None
+    if found is None:
+        return False
+    try:
+        from packaging.requirements import Requirement
+        return Requirement(req).specifier.contains(found.version, prereleases=True)
+    except (ImportError, ValueError):  # no packaging, or an unparseable requirement/version: presence decides
+        return True
+
+
+def missing_python_dependencies(manifest: Any) -> list[str]:
+    """The plugin's effective Python requirements (:func:`_declared_requirements`) this process
+    cannot import.
+
+    A requirement whose environment marker excludes this interpreter is never missing: PM does not
+    install it here, so reporting it would ask for a restart or repair that can never help."""
+    return [req for req in _declared_requirements(manifest)
+            if _applies_here(req) and _dist_installed(req) is False]
+
+
+def _declared_requirements(manifest: Any) -> tuple[str, ...]:
+    """What PM installs into Qubit's environment for this plugin: its declaration read the way
+    admission reads it (``pm.plugin_declarations.read_python_declaration`` — an authored
+    ``pyproject.toml`` first, then ``python_dependencies`` / ``pip_dependencies``; nothing for a
+    ``python_runtime: external`` sidecar). A plugin with no directory (an entry point) has only its
+    manifest list."""
+    path = getattr(manifest, "path", None)
+    if not path or not Path(path).is_dir():
+        return tuple(getattr(manifest, "python_dependencies", None) or ())
+    from pm.plugin_declarations import read_python_declaration
+    try:
+        return read_python_declaration(Path(path)).install_requirements
+    except (OSError, ValueError):  # a declaration PM cannot read is refused at admission, not ours to report
+        return ()
+
+
+def _applies_here(req: str) -> bool:
+    if ";" not in req:
+        return True
+    try:
+        from packaging.requirements import InvalidRequirement, Requirement
+    except ImportError:
+        return True
+    try:
+        marker = Requirement(req).marker
+        return marker is None or marker.evaluate()
+    except (InvalidRequirement, ValueError, KeyError):  # unparseable: keep reporting it
+        return True
+
+
+def installed_in_selected_environment(requirements: list[str]) -> bool:
+    """Whether every one of *requirements* is in the dependency environment PM currently selects.
+
+    Activation is a boot decision (``pm.environments.activate_dependencies``): a gateway or dashboard
+    that was running when ``qubit plugins enable`` committed a new generation keeps the old one. A
+    requirement it cannot import that the selected generation carries therefore needs a restart, not
+    a repair. False when unknown."""
+    try:
+        from pm.environments import selected_venv, site_packages
+        from pm.paths import repo_root
+
+        site = str(site_packages(selected_venv(repo_root())))
+        return bool(requirements) and all(_dist_installed(req, [site]) for req in requirements)
+    except (OSError, RuntimeError, ValueError):  # unreadable or invalid selection record
+        return False
 
 
 class PluginLoaderMixin:
-    def on_plugin_loaded(self, callback: Callable[[List[Dict[str, Any]]], Any]) -> Callable[[], None]:
+    def on_plugin_loaded(self, callback: Callable[[list[dict[str, Any]]], Any]) -> Callable[[], None]:
         """Subscribe to "a discovery sweep loaded plugins this process did not have": fires from INSIDE
         :meth:`discover_and_load` (never emitted by an install RPC) with one
         ``{name, key, activated_now, deferred}`` summary per NEWLY loaded plugin — every plugin at boot,
@@ -380,7 +447,7 @@ class PluginLoaderMixin:
             return
         before = set(self._plugin_tool_names)  # lets the failure path credit partial registrations
 
-        def _credit() -> List[str]:
+        def _credit() -> list[str]:
             """Attribute every tool registered since ``before`` to this plugin."""
             registered = [t for t in self._plugin_tool_names if t not in before]
             if registered:
@@ -431,20 +498,24 @@ class PluginLoaderMixin:
 
         Plugin admission and PM repair own dependency changes.
         """
-        deps = manifest.python_dependencies
-        if not deps:
+        missing = missing_python_dependencies(manifest)
+        if not missing:
             return
         key = manifest_key(manifest)
-        missing = [req for req in deps if _dist_installed(req) is False]
-        if missing:
+        if installed_in_selected_environment(missing):
+            logger.warning(
+                "Plugin %s's Python dependencies were installed after this process started: %s. "
+                "A running process never switches dependency environments; restart Qubit "
+                "(qubit gateway restart for the gateway) to load them.",
+                key, ", ".join(missing),
+            )
+        else:
             logger.warning(
                 "Plugin %s declares Python dependencies that are not "
                 "installed: %s. For an enabled plugin, run qubit pm repair, "
                 "then restart Qubit. Discovery does not install dependencies.",
                 key, ", ".join(missing),
             )
-        else:
-            logger.debug("Plugin %s python_dependencies satisfied: %s", key, ", ".join(deps))
 
     def _validate_plugin_config_schema(self, manifest: PluginManifest) -> None:
         """Warn (never block) on plugins.entries.<id> settings that violate config_schema.
@@ -587,7 +658,9 @@ class PluginLoaderMixin:
         return manifest.source != "bundled" and isolation_mode() == ISOLATION_HOST
 
     def _plugin_host(self) -> Any:
-        """This manager's plugin host (one process per profile home), created on first use."""
+        """This manager's plugin host (one process per profile home), created on first use. Creation
+        is atomic, so concurrent first callers share one host (which starts its process once); a
+        failed creation stores nothing, and the next caller tries again."""
         host = getattr(self, "_plugin_host_instance", None)
         if host is None:
             from qubit_cli.plugin_host import PluginHost
@@ -625,7 +698,7 @@ class PluginLoaderMixin:
             if r.plugin_key == plugin_key and r.active
         ]
 
-        def _keys(kind: str) -> List[str]:
+        def _keys(kind: str) -> list[str]:
             return [r.key for r in registrations if r.kind == kind]
 
         # Discovery-time tools predate registration_start; credit them back or `qubit plugins list`
@@ -649,7 +722,7 @@ class PluginLoaderMixin:
         try:
             from qubit_cli.agent_plugins import load_agent_plugin
             package = load_agent_plugin(
-                Path(manifest.path), get_qubit_home() / "plugin-data" / manifest.skill_namespace)
+                Path(manifest.path), get_qubit_home() / "plugin-data" / manifest.data_namespace)
             ctx = PluginContext(manifest, self)
             for diagnostic in package.diagnostics:
                 logger.warning("Agent Plugin '%s' [%s]: %s", lookup_key, diagnostic.scope, diagnostic.message)
@@ -755,14 +828,7 @@ class PluginLoaderMixin:
     def _load_entrypoint_module(self, manifest: PluginManifest) -> types.ModuleType | Callable[..., Any]:
         """Load a pip-installed plugin via its entry-point reference: the module for a bare ``module`` target,
         the referenced attribute (normally ``register``) for the ``module:function`` form."""
-        # Scan the SAME group set discovery used (own + foreign adapter groups). Selecting
-        # only ``ENTRY_POINTS_GROUP`` here meant a plugin discoverable under
-        # ``qubit_agent.plugins`` (or a foreign group) was found by discovery but raised
-        # "entry point not found" at load time — discovered, never loadable.
-        from qubit_cli.plugins_discovery import entry_point_groups, _select_entry_point_groups
-        for ep in _select_entry_point_groups(importlib.metadata.entry_points(), entry_point_groups()):
+        for ep in _select_entry_point_group(importlib.metadata.entry_points(), ENTRY_POINTS_GROUP):
             if ep.name == manifest.name:
                 return ep.load()
-        raise ImportError(
-            f"Entry point '{manifest.name}' not found in any plugin group: "
-            f"{', '.join(entry_point_groups())}")
+        raise ImportError(f"Entry point '{manifest.name}' not found in group '{ENTRY_POINTS_GROUP}'")

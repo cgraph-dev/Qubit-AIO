@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import sys
+import threading
 from pathlib import Path, PurePath
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -232,20 +233,21 @@ def skill_matches_apps(frontmatter: Dict[str, Any]) -> bool:
 
 
 _RAW_CONFIG_CACHE: Dict[Tuple[str, int, int, int, int], Dict[str, Any]] = {}
+_RAW_CONFIG_CACHE_MAX = 128
+_RAW_CONFIG_CACHE_LOCK = threading.Lock()
 
 
 def _raw_config_cache_clear() -> None:
     """Test hook — drop the shared raw config cache."""
-    _RAW_CONFIG_CACHE.clear()
+    with _RAW_CONFIG_CACHE_LOCK:
+        _RAW_CONFIG_CACHE.clear()
 
 
-def _config_cache_key(config_path: Path) -> Optional[Tuple[str, int, int, int, int]]:
-    """``(path, *file_signature)`` identity of config.yaml, or None when unreadable/absent."""
-    try:
-        from utils import file_signature
-        return (str(config_path), *file_signature(config_path.stat()))
-    except OSError:
-        return None
+def _config_cache_key(config_path: Path) -> Optional[Tuple[Any, ...]]:
+    """``(path, *backend cache version)`` identity of config.yaml, or None when unreadable/absent."""
+    from qubit_cli.config_backend import config_cache_version_or_none
+    version = config_cache_version_or_none(config_path)
+    return None if version is None else (str(config_path), *version)
 
 
 def _load_raw_config() -> Dict[str, Any]:
@@ -365,8 +367,9 @@ def _config_str_list(raw) -> List[str]:
 def get_external_skills_dirs() -> List[Path]:
     """Validated, deduplicated ``skills.external_dirs`` (existing dirs only). Entries
     are ``~``/``${VAR}`` expanded, relative to QUBIT_HOME; the local skills dir is skipped."""
+    from qubit_cli.config_backend import config_exists
     config_path = get_config_path()
-    if not config_path.exists():
+    if not config_exists(config_path):
         return []
     full_key = _config_cache_key(config_path)
     cache_key = full_key
@@ -449,7 +452,7 @@ def get_skill_search_roots(local: Optional[Path] = None, *, include_project: boo
 
 
 def get_all_skills_dirs() -> List[Path]:
-    """Skill dirs: local ``~/.hermes/skills/`` first, then create_dir, then external.
+    """Skill dirs: local ``~/.qubit/skills/`` first, then create_dir, then external.
     Trusted project dirs are NOT included (higher precedence; see get_project_skills_dirs)."""
     return [d for _tier, d in get_skill_search_roots(include_project=False)]
 
@@ -870,6 +873,19 @@ def resolve_skill_config_values(config_vars: List[Dict[str, Any]]) -> Dict[str, 
 
 
 SKILL_PROMPT_DESC_LIMIT = 60
+_LAST_WHITESPACE_RE = re.compile(r"\s\S*$")
+_CLIP_TRAIL_RE = re.compile(r"[\s.,;:\-\u2013\u2014(/]+$")
+
+
+def clip_skill_description(desc: str) -> str:
+    """*desc* fitted to SKILL_PROMPT_DESC_LIMIT, cut at a word boundary so the index never shows a half word."""
+    if len(desc) <= SKILL_PROMPT_DESC_LIMIT:
+        return desc
+    head = desc[:SKILL_PROMPT_DESC_LIMIT - 2]  # one char past the budget: whitespace there means the last word is whole
+    boundary = _LAST_WHITESPACE_RE.search(head)  # any whitespace (tab, NBSP, ...) separates words, not just " "
+    if not boundary or boundary.start() == 0:  # a single word longer than the budget has no boundary to cut at
+        return desc[:SKILL_PROMPT_DESC_LIMIT - 3] + "..."
+    return _CLIP_TRAIL_RE.sub("", head[:boundary.start()]) + "..."
 
 
 def _normalize_skill_description(frontmatter: Dict[str, Any]) -> str:
@@ -880,8 +896,7 @@ def _normalize_skill_description(frontmatter: Dict[str, Any]) -> str:
 
 def extract_skill_description(frontmatter: Dict[str, Any]) -> str:
     """Extract a system-prompt-length description from parsed frontmatter."""
-    desc = _normalize_skill_description(frontmatter)
-    return desc[:SKILL_PROMPT_DESC_LIMIT - 3] + "..." if len(desc) > SKILL_PROMPT_DESC_LIMIT else desc
+    return clip_skill_description(_normalize_skill_description(frontmatter))
 
 
 def is_skill_description_truncated_for_prompt(frontmatter: Dict[str, Any]) -> bool:

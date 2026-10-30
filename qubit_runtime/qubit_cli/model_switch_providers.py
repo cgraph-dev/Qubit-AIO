@@ -219,9 +219,8 @@ def _prefetch_provider_models_parallel(provider_slugs: list[str]) -> None:
     fingerprint-mismatched, or hard-expired entries. TTL-expired non-empty rows are served
     inside the stale-serve window while revalidating off-thread, and an empty local-ollama
     catalog is authoritative inside its own short native TTL, so prefetching either trades a
-    non-blocking serial read for a parallel fetch the picker waits on. Each worker re-persists
-    through the thread-safe ``update_provider_cache_entry`` so concurrent writes cannot
-    clobber each other."""
+    non-blocking serial read for a parallel fetch the picker waits on. Persistence is
+    ``cached_provider_model_ids``'s own locked write; workers add none of their own."""
     from qubit_cli.models import (
         _credential_fingerprint, _disk_serve_tier, _load_provider_models_cache,
         _normalized_cache_slug, cached_provider_model_ids)
@@ -246,12 +245,7 @@ def _prefetch_provider_models_parallel(provider_slugs: list[str]) -> None:
     import concurrent.futures
     def _fetch_one(slug: str) -> None:
         try:
-            models = cached_provider_model_ids(slug, force_refresh=True)
-            # cached_provider_model_ids persists via a non-locked read-modify-write; re-persist
-            # through the locked path so no write is lost under concurrency.
-            if models:
-                from qubit_cli.models import update_provider_cache_entry
-                update_provider_cache_entry(slug, models)
+            cached_provider_model_ids(slug, force_refresh=True)
         except Exception:
             pass  # best-effort; picker falls back to curated list
 
@@ -278,11 +272,11 @@ def _iter_builtin_candidates(models_dev_data: dict, excluded: set, seen: set):
     silently switch a user onto an endpoint they may have no key for), aliases of another canonical
     profile ("kimi" -> "kimi-coding"), non-api_key auth types (section 2 handles them) and
     unroutable providers. PROVIDER_REGISTRY env var names win over models.dev's."""
-    from agent.models_dev import PROVIDER_TO_MODELS_DEV
+    from agent.models_dev import models_dev_provider_map
     from qubit_cli.auth import PROVIDER_REGISTRY, is_runtime_provider_routable
     from qubit_cli.models import _AGGREGATOR_PROVIDERS
     from qubit_cli.providers import ALIASES
-    for hermes_id, mdev_id in PROVIDER_TO_MODELS_DEV.items():
+    for hermes_id, mdev_id in models_dev_provider_map().items():
         alias_target = ALIASES.get(hermes_id)
         if alias_target and alias_target != hermes_id and alias_target in _AGGREGATOR_PROVIDERS:
             continue
@@ -320,13 +314,13 @@ def _auth_store_has_provider(*keys: str) -> bool:
         return False
 
 
-def _raw_pool_usable(qubit_id: str, *, for_picker: bool = False) -> bool:
+def _raw_pool_usable(hermes_id: str, *, for_picker: bool = False) -> bool:
     """Section-1 pool check: only consult the pool when auth.json lists a raw entry."""
     try:
         from qubit_cli.auth import _load_auth_store
         store = _load_auth_store()
-        if store and store.get("credential_pool", {}).get(qubit_id):
-            return _credential_pool_is_usable(qubit_id, raw_pool_present=True, for_picker=for_picker)
+        if store and store.get("credential_pool", {}).get(hermes_id):
+            return _credential_pool_is_usable(hermes_id, raw_pool_present=True, for_picker=for_picker)
     except Exception:
         pass
     return False
@@ -482,24 +476,36 @@ def _nous_picker_model_ids(curated: dict, force_fresh_nous_tier: bool) -> list:
         from qubit_cli.models_pricing import nous_policy_allowed_ids, restrict_to_nous_policy
         model_ids = restrict_to_nous_policy(model_ids, nous_policy_allowed_ids(), rescue_empty=True)
     except Exception:
+        logger.debug("Nous model policy filter failed", exc_info=True)
+    try:
+        # Window plans: the plan's featured picks lead the list. Plan shape only (it rarely changes), so
+        # the last snapshot at any age answers — a long-running gateway's 60s cache has usually lapsed
+        # by the time someone opens /model.
+        from qubit_cli.model_picker_usage import featured_first, nous_picker_usage
+        usage = nous_picker_usage(any_age=True)
+        if usage is not None:
+            model_ids = featured_first(model_ids, usage.featured_model_ids)
+    except Exception:
         pass
     return model_ids
 
 
 def _free_tier_nous_row(row: dict) -> dict | None:
-    """The one free-tier rule for a Qubit picker row, shared by every row builder.
+    """The one free-tier rule for a Nous picker row, shared by every row builder.
 
     ``row`` carries at least ``name`` and ``models``. A guest identity carrying inference turns
-    it into "Qubit · free tier" with the single model ``qubit/welcome`` (the welcome host serves
-    nothing else). A guest that ``nous.guest: false`` has switched off yields ``None``: no Qubit
-    row at all, since there is nothing selectable. A real account (or no Qubit state) passes the
+    it into "Nous · free tier" with the single model ``nous/welcome`` (the welcome host serves
+    nothing else). A guest that ``nous.guest: false`` has switched off yields ``None``: no Nous
+    row at all, since there is nothing selectable. A real account (or no Nous state) passes the
     row through untouched. Builders that compute the full catalog lazily should pass
     ``models=[]`` and only compute when the returned row still has no models."""
     from qubit_cli import anon_auth
     if not anon_auth.has_guest():
         return row
-    if not anon_auth.guest_enabled():
+    if not anon_auth.guest_allowed():
         return None
+    if not anon_auth.free_inference_active():
+        return row  # a guest without the welcome trial here: the row is whatever real Nous login exists
     out = dict(row)
     out["name"] = anon_auth.FREE_TIER_LABEL
     out["models"] = [anon_auth.GUEST_MODEL]
@@ -653,9 +659,9 @@ def _collect_authed_provider_slugs(
     Env vars are read through the per-profile secret scope. AWS SDK providers are skipped
     (heavier detection)."""
     from qubit_cli.model_switch import _scoped_key_env
-    from agent.models_dev import PROVIDER_TO_MODELS_DEV
+    from agent.models_dev import models_dev_provider_map
     from qubit_cli.auth import PROVIDER_REGISTRY
-    from qubit_cli.providers import HERMES_OVERLAYS
+    from qubit_cli.providers import hermes_overlays
     from qubit_cli.models import CANONICAL_PROVIDERS
     excluded_set = {str(p).strip().lower() for p in excluded if p}
     slugs: list[str] = []
@@ -669,8 +675,8 @@ def _collect_authed_provider_slugs(
         if _any_env(env_vars, _scoped_key_env) or _raw_pool_usable(hermes_id):
             _emit(hermes_id, hermes_id)
 
-    mdev_to_hermes = {v: k for k, v in PROVIDER_TO_MODELS_DEV.items()}
-    for pid, overlay in HERMES_OVERLAYS.items():
+    mdev_to_hermes = {v: k for k, v in models_dev_provider_map().items()}
+    for pid, overlay in hermes_overlays().items():
         hermes_slug = mdev_to_hermes.get(pid, pid)
         if _skip(seen, excluded_set, pid, hermes_slug) or overlay.auth_type == "aws_sdk":
             continue
@@ -688,7 +694,7 @@ def _collect_authed_provider_slugs(
         if has_creds or _auth_store_has_provider(cp.slug) or _pool_usable(cp.slug):
             _emit(cp.slug, cp.slug)
 
-    # Qubit excluded: its picker branch builds from the curated list and never reads the
+    # Nous excluded: its picker branch builds from the curated list and never reads the
     # api_key-only cache entry a prefetch would write.
     return [s for s in slugs if s != "nous"]
 
@@ -759,7 +765,7 @@ class _PickerBuild:
             "models": _cap_models(model_ids, self.max_models, slug if uncapped_ok else ""),
             "total_models": len(model_ids), "source": source}
         if slug == "nous":
-            # Free-tier identity: one row "Qubit · free tier" / qubit/welcome, or no row when
+            # Free-tier identity: one row "Nous · free tier" / nous/welcome, or no row when
             # nous.guest is off. Still marks the slug seen so a later lap cannot re-emit it.
             row = _free_tier_nous_row(row)
         if row is not None:
@@ -833,7 +839,7 @@ def _lap_lmstudio_row(b: _PickerBuild, user_providers: dict) -> None:
     from qubit_cli.model_switch import _declared_model_ids
     configured_models = _declared_model_ids(configured.get("models")) if isinstance(configured, dict) else []
     model_ids = list(dict.fromkeys([*configured_models, *b.curated.get("lmstudio", [])]))
-    b.add_builtin_row("lmstudio", get_label("lmstudio"), is_current, model_ids, "qubit")
+    b.add_builtin_row("lmstudio", get_label("lmstudio"), is_current, model_ids, "hermes")
 
 
 def _lap_builtin_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None:
@@ -865,8 +871,8 @@ def _overlay_has_creds(b: _PickerBuild, pid: str, hermes_slug: str, overlay) -> 
     else:
         from qubit_cli.model_switch import _scoped_key_env
         has_creds = _overlay_has_env_creds(pid, hermes_slug, overlay, _scoped_key_env)
-    # External-process providers (copilot-acp) hold no key/token/pool entry by design — the
-    # spawned ACP subprocess brings its own auth. "Configured" means the executable resolves.
+    # External-process providers (ACP CLIs) hold no key/token/pool entry by design — the
+    # spawned subprocess brings its own auth. "Configured" means the executable resolves.
     # "Configured" means the executable resolves, which is exactly what get_auth_status() reports for them;
     # without this branch the has_creds filter below unconditionally hides the provider from every picker
     # (#63662).
@@ -886,14 +892,6 @@ def _overlay_has_creds(b: _PickerBuild, pid: str, hermes_slug: str, overlay) -> 
         try:
             if _credential_pool_is_usable(hermes_slug, for_picker=b.for_picker):
                 has_creds = True
-            elif b.for_picker:
-                # Show providers whose pool is entirely in cooldown: limits are per-model for
-                # many providers, so another model may work.
-                try:
-                    from agent.credential_pool import load_pool
-                    has_creds = load_pool(hermes_slug).has_credentials()
-                except Exception:
-                    pass
         except Exception as exc:
             logger.debug("Credential pool check failed for %s: %s", hermes_slug, exc)
     if not has_creds and hermes_slug == "anthropic":
@@ -911,21 +909,20 @@ def _overlay_has_creds(b: _PickerBuild, pid: str, hermes_slug: str, overlay) -> 
 
 
 def _lap_overlay_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None:
-    """Section 2: Qubit-only providers (qubit, openai-codex, copilot, opencode-go, ...)."""
-    from agent.models_dev import PROVIDER_TO_MODELS_DEV
+    """Section 2: Qubit-only providers (nous, openai-codex, opencode-go, plugin overlays, ...)."""
+    from agent.models_dev import models_dev_provider_map
     from qubit_cli.model_switch import _declared_model_ids
-    from qubit_cli.providers import HERMES_OVERLAYS
+    from qubit_cli.providers import hermes_overlays
 
-    # HERMES_OVERLAYS keys may be models.dev IDs ("github-copilot") while config.yaml uses
-    # Qubit IDs ("copilot").
-    mdev_to_hermes = {v: k for k, v in PROVIDER_TO_MODELS_DEV.items()}
-    for pid, overlay in HERMES_OVERLAYS.items():
+    # Overlay keys may be models.dev IDs while config.yaml uses Qubit IDs.
+    mdev_to_hermes = {v: k for k, v in models_dev_provider_map().items()}
+    for pid, overlay in hermes_overlays().items():
         hermes_slug = mdev_to_hermes.get(pid, pid)
         if _skip(b.seen_slugs, b.excluded, pid, hermes_slug):
             continue
         if not _overlay_has_creds(b, pid, hermes_slug, overlay):
             continue
-        if hermes_slug in {"openai-codex", "copilot", "copilot-acp"}:
+        if hermes_slug == "openai-codex":
             # Live OAuth-backed discovery so Pro-only Codex slugs not in the static catalog
             # appear; falls back to curated when unreachable (or not yet cached on the read path).
             model_ids = _live_or_curated_ids(hermes_slug, b.curated, merge_models_dev=False,
@@ -934,7 +931,7 @@ def _lap_overlay_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None
             model_ids = _aws_live_or_curated_ids(hermes_slug, b.curated, hermes_slug, pid,
                                                  non_blocking=b.non_blocking_catalogs)
         elif hermes_slug == "nous":
-            # A guest identity never needs the Portal catalog: add_builtin_row pins qubit/welcome
+            # A guest identity never needs the Portal catalog: add_builtin_row pins nous/welcome
             # (or drops the row when nous.guest is off), so only a real account fetches.
             tier_row = _free_tier_nous_row({"name": get_label(hermes_slug), "models": []})
             real_account = tier_row is not None and not tier_row["models"]
@@ -948,7 +945,7 @@ def _lap_overlay_rows(b: _PickerBuild, data: dict, user_providers: dict) -> None
         if isinstance(configured, dict):
             model_ids = list(dict.fromkeys([*_declared_model_ids(configured.get("models")), *model_ids]))
         b.add_builtin_row(
-            hermes_slug, get_label(hermes_slug), b.current_provider in (hermes_slug, pid), model_ids, "qubit")
+            hermes_slug, get_label(hermes_slug), b.current_provider in (hermes_slug, pid), model_ids, "hermes")
         b.seen_slugs.add(pid.lower())
 
 
@@ -975,7 +972,7 @@ def _lap_canonical_rows(b: _PickerBuild) -> None:
             _is_aws_sdk(cp_config) and _has_aws_sdk_creds_for_listing(cp.slug, b.current_provider))
         if not has_creds and cp_config is not None and cp_config.auth_type == "external_process":
             # Subprocess-backed providers own their auth; the binary resolving is the credential
-            # evidence for listing (same gate as the copilot-acp overlay row and qubit auth status).
+            # evidence for listing (same gate as the section-2 overlay rows and qubit auth status).
             try:
                 from qubit_cli.auth import get_external_process_provider_status
                 has_creds = bool(get_external_process_provider_status(cp.slug).get("configured"))
@@ -1188,18 +1185,18 @@ def _lap_custom_provider_rows(b: _PickerBuild, custom_providers: list) -> None:
 
 def _build_curated_lists(current_provider: str, current_base_url: str, current_model: str,
                         non_blocking: bool = False) -> dict[str, list[str]]:
-    """Curated model lists keyed by qubit provider id, plus the dynamic ones (qubit manifest,
+    """Curated model lists keyed by hermes provider id, plus the dynamic ones (nous manifest,
     Ollama Cloud, LM Studio live probe). ``non_blocking`` (GUI read path) takes cached Ollama Cloud
     ids and warms them in the background rather than waiting on an 8s probe (#114215)."""
     from qubit_cli.models import OPENROUTER_MODELS, _PROVIDER_MODELS, get_curated_nous_model_ids
     curated: dict[str, list[str]] = dict(_PROVIDER_MODELS)
     curated["openrouter"] = [mid for mid, _ in OPENROUTER_MODELS]
-    # Plugin profiles without a static row: their fallback_models are the curated floor, so the
-    # non-blocking GUI read (cold catalog cache) lists them instead of an empty provider row.
+    # Plugin profiles without a built-in row: this home's static_models, else fallback_models, are the
+    # curated floor, so the non-blocking GUI read (cold catalog cache) never lists an empty provider row.
     from providers import list_providers
     for _pp in list_providers():
-        if _pp.fallback_models and not curated.get(_pp.name):
-            curated[_pp.name] = list(_pp.fallback_models)
+        if not curated.get(_pp.name) and (rows := list(_pp.static_models or _pp.fallback_models)):
+            curated[_pp.name] = rows
     # Remote manifest so new Portal models surface without a release; in-repo snapshot fallback.
     curated["nous"] = get_curated_nous_model_ids()
     if "ollama-cloud" not in curated:
@@ -1235,13 +1232,13 @@ def list_authenticated_providers(
     max_models: int | None = None, current_model: str = "", refresh: bool = False,
     probe_custom_providers: bool = True, probe_current_custom_provider: bool = False,
     for_picker: bool = False, excluded_providers: list | None = None,
-    non_blocking_catalogs: bool = False, fast_custom_probe: bool | None = None) -> List[dict]:
+    non_blocking_catalogs: bool = False, fast_custom_probe: bool | None = None) -> list[dict]:
     """Detect which providers have credentials and list their curated (not full models.dev) models.
 
     Returns dicts with ``slug`` (the --provider value), ``name``, ``is_current``,
     ``is_user_defined``, ``models`` (up to max_models), ``total_models``, ``source``
     ("built-in", "hermes", "canonical", "user-config", "model-config").
-    ``force_fresh_nous_tier`` bypasses the short Qubit tier cache (account-sensitive flows only);
+    ``force_fresh_nous_tier`` bypasses the short Nous tier cache (account-sensitive flows only);
     ``refresh`` busts the model-id disk cache up front (explicit user action only);
     ``probe_custom_providers`` enables live ``/models`` discovery for saved custom endpoints (CLI
     true, GUI false); ``probe_current_custom_provider`` probes only the selected custom endpoint.
@@ -1276,7 +1273,7 @@ def list_authenticated_providers(
     user_providers = stringify_provider_map(user_providers)
     data = fetch_models_dev()
 
-    # A single excluded entry like ``copilot`` hides the provider under every key it surfaces
+    # A single excluded entry like ``kimi-coding`` hides the provider under every key it surfaces
     # as (hermes_id / mdev_id / canonical slug).
     b = _PickerBuild(
         current_provider=current_provider, current_base_url=current_base_url, current_model=current_model,
@@ -1353,7 +1350,7 @@ def _finalize_picker_rows(results: list, user_providers, current_model: str) -> 
     return results
 
 
-def _prepend_moa_picker_provider(providers: List[dict], current_provider: str = "") -> List[dict]:
+def _prepend_moa_picker_provider(providers: list[dict], current_provider: str = "") -> list[dict]:
     """Add the virtual MoA provider row used by interactive model pickers.
 
     ``list_authenticated_providers()`` only returns real/auth-backed providers; the CLI inventory
@@ -1374,7 +1371,7 @@ def list_picker_providers(
     custom_providers: list | None = None, max_models: int | None = None, current_model: str = "",
     include_moa: bool = False, excluded_providers: list | None = None,
     non_blocking_catalogs: bool = False, probe_custom_providers: bool = True,
-    probe_current_custom_provider: bool = False) -> List[dict]:
+    probe_current_custom_provider: bool = False) -> list[dict]:
     """Interactive-picker variant of :func:`list_authenticated_providers`.
 
     OpenRouter's list is replaced with :func:`qubit_cli.models.fetch_openrouter_models` (curated
@@ -1393,7 +1390,7 @@ def list_picker_providers(
     if include_moa:
         providers = _prepend_moa_picker_provider(providers, current_provider=current_provider)
 
-    filtered: List[dict] = []
+    filtered: list[dict] = []
     for p in providers:
         if str(p.get("slug", "")).lower() == "openrouter":
             try:
@@ -1410,4 +1407,36 @@ def list_picker_providers(
     from qubit_cli.models_validate import drop_unofferable_model_ids
 
     drop_unofferable_model_ids(filtered)
+    _attach_window_model_notes(filtered)
     return filtered
+
+
+def _attach_window_model_notes(providers: list[dict]) -> None:
+    """Nous on a usage-window plan, for the messaging pickers (same words as the CLI/TUI/desktop pickers):
+    ``model_labels`` {id: "Large" | "Free"} (plan shape, any-age snapshot; other levels carry no tag), and
+    from a fresh snapshot only (a stale percent would mislabel it) ``plan_line`` (the limit line: "Weekly
+    limit reached · resets in 21h · paid models now use your credits (pay as you go)").
+    Every field is omitted when empty and for any account not on a window plan. Never raises."""
+    try:
+        nous = next((p for p in providers if str(p.get("slug", "")).lower() == "nous"), None)
+        if nous is None:
+            return
+        from qubit_cli.model_picker_usage import nous_picker_usage, usage_level_label, usage_tag_levels
+        fresh = nous_picker_usage()
+        usage = fresh or nous_picker_usage(any_age=True)
+        if usage is None:
+            return
+        from agent.plan_limits import cached_pricing
+        pricing = cached_pricing()  # this profile's catalog only (cache-only, no credential refresh)
+        models = [str(m) for m in nous.get("models", [])]
+        # Subscription-billed rows carry no tag (usage_tag_levels).
+        labels = {m: label for m, lv in usage_tag_levels(models, pricing).items() if (label := usage_level_label(lv))}
+        if labels:
+            nous["model_labels"] = labels
+        if fresh is None:
+            return
+        line = usage.limit_line()
+        if line:
+            nous["plan_line"] = line
+    except Exception:
+        logger.debug("window model notes failed", exc_info=True)
