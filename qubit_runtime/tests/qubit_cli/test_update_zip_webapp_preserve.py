@@ -1,6 +1,7 @@
 """Source ZIP updates preserve the separately built Webapp renderer."""
 
 from pathlib import Path
+import shutil
 import subprocess
 import zipfile
 
@@ -17,20 +18,20 @@ def _git(root, *args):
 
 @pytest.fixture
 def clean_install(tmp_path):
-    # Keep the real ignore rules and tracked root entries without copying a full checkout
-    # or committing fixture source. Git objects are read-only shared with the test checkout.
-    outer = tmp_path / "install"
-    repo = Path(__file__).resolve().parents[3]
-    subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", "--template=",
-                    str(repo), str(outer)], check=True)
-    _git(outer, "config", "core.sparseCheckout", "true")
-    (outer / ".git/info").mkdir(exist_ok=True)
-    # The Qubit runtime lives in the ``qubit_runtime`` subtree of the repo; its own
-    # .gitignore and tracked desktop entry are the ones the update swap reads.
-    (outer / ".git/info/sparse-checkout").write_text(
-        "/qubit_runtime/.gitignore\n/qubit_runtime/apps/desktop/package.json\n", encoding="utf-8")
-    _git(outer, "read-tree", "-mu", "HEAD")
-    root = outer / "qubit_runtime"
+    # A real git checkout carrying the runtime's own ignore rules and the one tracked
+    # desktop entry the ZIP ships; a full clone is unnecessary and the runtime lives in
+    # the ``qubit_runtime`` subtree, whose parent is not a project root.
+    root = tmp_path / "install"
+    root.mkdir()
+    repo = Path(__file__).resolve().parents[2]
+    shutil.copy(repo / ".gitignore", root / ".gitignore")
+    tracked = root / "apps" / "desktop" / "package.json"
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text('{"name":"source"}\n', encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "init"], check=True)
     assert _git(root, "status", "--porcelain", "--untracked-files=all") == ""
     for dist in (root / "apps/desktop/dist", webapp_dist_dir(root)):
         dist.mkdir(parents=True)
