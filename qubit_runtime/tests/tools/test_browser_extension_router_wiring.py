@@ -33,6 +33,12 @@ def _route_spy(monkeypatch):
 
     import tools.browser_tool as browser_tool
     import tools.browser_cdp_tool as browser_cdp_tool
+    from tools import browser_tool_session
+
+    # The wiring test must not reach a real browser/PM install: every legacy fallback for the
+    # unrelated actions returns a harmless result.
+    monkeypatch.setattr(browser_tool_session, "_run_browser_command",
+                        lambda *a, **k: {"success": True, "data": {"result": "legacy"}})
 
     monkeypatch.setattr(browser_tool, "routed_browser_handler", spy)
     monkeypatch.setattr(browser_cdp_tool, "routed_browser_handler", spy)

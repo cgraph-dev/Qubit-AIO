@@ -347,10 +347,16 @@ class SessionKernel:
         if self.alive():
             from tools.code_execution_tool import _kill_process_group
             _kill_process_group(self.proc, escalate=True)
+        group_released = True
+        if self.proc is not None and not _IS_WINDOWS:
+            from qubit_cli.process_identity import release_process_group_once_empty
+            group_released = release_process_group_once_empty(self.proc.pid, proc=self.proc)
         # Close the child's pipes: reaching EOF (after the kill) does not release the
         # TextIOWrapper/BufferedReader objects, so leaving them open leaks 3 fds per kernel
-        # until GC. Readers have exited on EOF or tolerate the closed stream.
-        if self.proc is not None:
+        # until GC. Readers have exited on EOF or tolerate the closed stream. When a cell child
+        # survived teardown the group is still covered: keep the pipes (they are the surviving
+        # child's stdout/stderr) and let GC close them after the group is released.
+        if self.proc is not None and group_released:
             for stream in (self.proc.stdout, self.proc.stderr, self.proc.stdin):
                 if stream is not None:
                     try:
@@ -654,11 +660,15 @@ def _spawn(kernel: SessionKernel, *, child_python: str, child_cwd: str,
         death_r, kernel.death_pipe_w = os.pipe()
         child_env["HERMES_KERNEL_PARENT_DEATH_FD"] = str(death_r)
         pass_fds = (death_r,)
+    # POSIX: spawn_owned makes the kernel lead its own group, which everything a cell spawns joins,
+    # and hands that group to the owner-death supervisor: the whole group dies the moment this
+    # process dies, by any cause. A kernel-only death pipe let a cell's subprocesses outlive the host.
+    from qubit_cli.process_identity import spawn_owned
     try:
-        kernel.proc = subprocess.Popen(
-            [child_python, os.path.join(kernel.tmpdir, "hermes_kernel_runner.py")],
+        kernel.proc = spawn_owned(
+            [child_python, os.path.join(kernel.tmpdir, "hermes_kernel_runner.py")], purpose="code-kernel",
             # Strict mode passes an empty cwd: the kernel's staging dir plays the per-call tmpdir's role.
-            cwd=child_cwd or kernel.tmpdir, env=child_env, start_new_session=True,
+            cwd=child_cwd or kernel.tmpdir, env=child_env,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE,
             creationflags=subprocess.CREATE_NO_WINDOW if _IS_WINDOWS else 0,
             close_fds=True, pass_fds=pass_fds, startupinfo=startupinfo,

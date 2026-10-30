@@ -12,7 +12,7 @@ from typing import Dict, Optional, Set
 from utils import normalize_proxy_url
 from agent.proxy_bypass import is_loopback_host, should_bypass_proxy
 from agent import runtime_cwd as _runtime_cwd
-from tools.mcp_tool_errors import NonMcpEndpointError, _apply_identity_header, _describe_http_failure, _handshake_answered_with_unsupported_version, _handshake_rejected_as_modern, _is_streamable_http_rejection, _make_http_rejection_recorder, _make_mcp_body_cap_transport, _make_redirect_header_stripper, _resolve_client_cert, _unwrap_exception_group
+from tools.mcp_tool_errors import _MCP_HTTP_MAX_BODY_BYTES, NonMcpEndpointError, _apply_identity_header, _describe_http_failure, _handshake_answered_with_unsupported_version, _handshake_rejected_as_modern, _is_streamable_http_rejection, _make_http_rejection_recorder, _make_mcp_body_cap_transport, _make_redirect_header_stripper, _resolve_client_cert, _unwrap_exception_group
 from tools.mcp_tool_lifecycle import _filter_mcp_children, _leader_start_time, _orphan_stdio_pid_servers, _orphan_stdio_pids, _stdio_pgids, _stdio_pids, _stdio_starttimes
 from tools.mcp_tool_common import _core
 from tools.mcp_tool_node_abi import node_abi_error
@@ -21,6 +21,37 @@ from tools import mcp_tool_lifecycle as _lifecycle
 from tools import mcp_tool_registration as _registration
 
 logger = logging.getLogger("tools.mcp_tool")
+
+
+def _raise_sdk_sse_default() -> None:
+    """Give older mcp SDKs our wire-style SSE event bound.
+
+    Newer SDKs accept ``max_sse_event_size`` (passed by ``_owned_client_streams``). Older
+    ``mcp.client.streamable_http`` builds ``EventSource(response)`` for POST streams with
+    httpx2's 1 MiB default and exposes no knob, so a large ``tools/list`` failed outright.
+    Patch that module's ``EventSource`` default once; the class and its API are unchanged.
+    """
+    try:
+        import inspect
+        import mcp.client.streamable_http as _sh
+        if "max_sse_event_size" in inspect.signature(_sh.streamable_http_client).parameters:
+            return
+        if getattr(_sh, "_qubit_sse_limit_patched", False):
+            return
+        _orig = _sh.EventSource
+
+        class _QubitEventSource(_orig):
+            def __init__(self, response, max_event_size=_MCP_HTTP_MAX_BODY_BYTES):
+                super().__init__(response, max_event_size=max_event_size)
+
+        _sh.EventSource = _QubitEventSource
+        _sh._qubit_sse_limit_patched = True
+    except Exception:
+        logger.debug("could not raise the SDK SSE event bound", exc_info=True)
+
+
+_raise_sdk_sse_default()
+
 
 _PROBE_INITIALIZE_BODY = (  # JSON-RPC ``initialize`` body for the content-type preflight POST
     '{"jsonrpc":"2.0","id":"_probe","method":"initialize","params":{"protocolVersion":"2025-03-26",'
@@ -167,7 +198,7 @@ class MCPServerTransportMixin:
         return caps is None or getattr(caps, "tools", None) is not None
 
     def _session_kwargs(self) -> dict:
-        """ClientSession kwargs: sampling, elicitation, notification + logging callbacks."""
+        """ClientSession kwargs: client identity, sampling, elicitation, notification + logging callbacks."""
         kwargs = {}
         for handler in (self._sampling, self._elicitation):
             if handler:
@@ -176,6 +207,11 @@ class MCPServerTransportMixin:
             kwargs["message_handler"] = self._make_message_handler()
         if _core._MCP_LOGGING_CALLBACK_SUPPORTED:
             kwargs["logging_callback"] = self._make_logging_callback()
+        if _core._client_session_accepts("client_info"):
+            # Servers key logs/behaviour on clientInfo; the SDK default is "mcp"/"0.1.0".
+            from mcp.types import Implementation
+            from qubit_cli.version_info import get_version_info
+            kwargs["client_info"] = Implementation(name="hermes-agent", version=get_version_info().base_version)
         return kwargs
 
     async def _negotiate_session(self, session, connect_timeout: float):
@@ -578,7 +614,33 @@ class MCPServerTransportMixin:
         @asynccontextmanager
         async def _owned_client_streams():  # the SDK skips cleanup when http_client is provided
             async with _build_client(**client_kwargs) as http_client:
-                async with _core.streamable_http_client(url, http_client=http_client) as streams:
+                # Without max_sse_event_size the SDK parses each event against httpx2's 1 MiB default,
+                # a tighter second cap under our wire cap: a large tools/list or tool result (an
+                # editor screenshot) failed outright. SDKs without the knob (older mcp 2.x) keep
+                # their own bound.
+                import inspect as _inspect
+                _sse_kwargs = {}
+                try:
+                    _supports_sse_limit = "max_sse_event_size" in _inspect.signature(
+                        _core.streamable_http_client).parameters
+                except (TypeError, ValueError):
+                    _supports_sse_limit = False
+                if _supports_sse_limit:
+                    _sse_kwargs["max_sse_event_size"] = _MCP_HTTP_MAX_BODY_BYTES
+                else:
+                    # Older SDKs do not expose the knob but read every stream through the same
+                    # httpx2 client: raise that client's own SSE parser bound so a large
+                    # tools/list or tool result is not cut at httpx2's 1 MiB default.
+                    try:
+                        _sse_fn = http_client.sse
+                        if "max_event_size" in _inspect.signature(_sse_fn).parameters:
+                            def _sse_with_limit(*a, **kw):
+                                kw.setdefault("max_event_size", _MCP_HTTP_MAX_BODY_BYTES)
+                                return _sse_fn(*a, **kw)
+                            http_client.sse = _sse_with_limit
+                    except (AttributeError, TypeError, ValueError):
+                        pass
+                async with _core.streamable_http_client(url, http_client=http_client, **_sse_kwargs) as streams:
                     yield streams
         return _owned_client_streams()
 

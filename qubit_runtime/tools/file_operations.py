@@ -910,16 +910,17 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             file_size=file_size, file_ends_with_newline=file_ends_with_newline)
 
     def _native_read_enabled(self) -> bool:
-        """Whether ``read_file`` and ``search_files`` may bypass the shell: only POSIX + ``LocalEnvironment``
-        (file is on this host, path already native; Windows keeps the shell path since
-        file_operations holds Git-Bash-style paths there). ``HERMES_NATIVE_FILE_READ=0``
-        turns the fast path off."""
+        """Whether ``read_file`` and ``search_files`` may bypass the shell: only POSIX + a backend whose
+        files are the host's (``uses_host_filesystem``: the file is on this host, path already native;
+        Windows keeps the shell path since file_operations holds Git-Bash-style paths there).
+        ``HERMES_NATIVE_FILE_READ=0`` turns the fast path off."""
         flag = os.environ.get("HERMES_NATIVE_FILE_READ", "1").strip().lower()
         if flag in ("0", "false", "no", "off"):
             return False
-        # Same "is this env the local host" test the LSP path uses; isinstance is
-        # microseconds and self.env is never rebound, so nothing to memoize.
-        return sys.platform != "win32" and self._lsp_local_only()
+        # Same "are these the host's files" test the LSP path uses; an attribute read
+        # and self.env is never rebound, so nothing to memoize.
+        from tools.environments.base import env_uses_host_filesystem
+        return sys.platform != "win32" and env_uses_host_filesystem(getattr(self, "env", None))
 
     def _native_path(self, path: str) -> str:
         """``path`` resolved the way the shell resolves it: against the live backend cwd."""

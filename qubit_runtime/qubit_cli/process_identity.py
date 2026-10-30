@@ -965,9 +965,10 @@ def _release_when_idle_locked(proc) -> None:
         _idle_release = threading.Timer(_SUPERVISOR_IDLE_EXIT_S, release)
         _idle_release.daemon = True
         _idle_release.start()
-    except RuntimeError:
-        # No thread for the grace (thread limit, interpreter shutdown): release at once, as before the
-        # grace existed. Losing the grace must never fail the live child this call is about.
+    except Exception:
+        # No thread for the grace (thread limit, interpreter shutdown, or a patched threading module
+        # in a test): release at once, as before the grace existed. Losing the grace must never fail
+        # the live child this call is about.
         _idle_release = None
         logger.debug("Could not start the supervisor idle timer; releasing it now", exc_info=True)
         _close_idle_supervisor_locked(proc)

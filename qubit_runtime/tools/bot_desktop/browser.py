@@ -34,10 +34,9 @@ def profile_dir() -> Path:
     """User-data-dir the bot's browser uses on this profile's screen. ``AGENT_BROWSER_PROFILE`` pins your own:
     ``~`` expands, and a relative path is anchored at this profile's QUBIT_HOME (where the rest of the screen's
     state lives), so ``pin`` means ``<QUBIT_HOME>/pin`` and two profiles never share one jar by accident."""
-    override = os.path.expanduser(os.environ.get("AGENT_BROWSER_PROFILE", "").strip())
-    if override:
-        return Path(override) if os.path.isabs(override) else runtime.get_qubit_home() / override
-    return runtime.state_dir() / "browser-profile"
+    from tools.browser_session_cloud import user_data_dir
+    override = user_data_dir()
+    return Path(override) if override else runtime.state_dir() / "browser-profile"
 
 
 def executable() -> Optional[str]:
@@ -49,7 +48,8 @@ def executable() -> Optional[str]:
     a distro chromium ships the helper. The bundle stays the answer when it is the only browser — a dock
     icon that fails loudly beats a non-root ``--no-sandbox``.
     """
-    explicit = os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH", "").strip()
+    from tools.browser_session_cloud import executable_path
+    explicit = executable_path()
     if explicit and os.access(explicit, os.X_OK) and not _is_headless_shell(explicit):
         return explicit
     finders = [_managed_executable, _system_executable]
@@ -82,7 +82,7 @@ def _is_root() -> bool:
 
 
 def _userns_restricted() -> bool:
-    from tools.browser_tool_session import apparmor_restricts_unprivileged_userns
+    from tools.browser_launcher import apparmor_restricts_unprivileged_userns
     return apparmor_restricts_unprivileged_userns()
 
 
@@ -101,12 +101,12 @@ def dock_argv(exe: str, user_data_dir: str, *, sandbox_bypass: Optional[bool] = 
     # The same sandbox policy agent-browser starts this binary with (root, Docker, AppArmor userns): the
     # human's Browser is the bot's browser, in the same container; a stricter rule here just made the dock
     # icon die with 'No usable sandbox!' in the official image while the agent's own Chromium ran fine.
-    from tools.browser_tool_session import CHROMIUM_SANDBOX_BYPASS_ARGS, _needs_chromium_sandbox_bypass
+    from tools.browser_launcher import CHROMIUM_SANDBOX_BYPASS_ARGS, needs_chromium_sandbox_bypass
     # The profile is persistent by design (logins survive handoffs); its HTTP cache is not worth a
     # gateway's disk: uncapped it grows for months toward a hosted instance's 6 GB.
     return [exe, f"--user-data-dir={user_data_dir}", "--remote-debugging-port=0", "--no-first-run",
             "--no-default-browser-check", "--test-type", f"--disk-cache-size={DISK_CACHE_BYTES}",
-            *(CHROMIUM_SANDBOX_BYPASS_ARGS if (_needs_chromium_sandbox_bypass() if sandbox_bypass is None
+            *(CHROMIUM_SANDBOX_BYPASS_ARGS if (needs_chromium_sandbox_bypass() if sandbox_bypass is None
                                               else sandbox_bypass) else ())]
 
 

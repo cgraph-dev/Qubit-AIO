@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional
 from utils import base_url_hostname, is_truthy_value
@@ -550,16 +551,8 @@ def _resolve_child_runtime(
     # override credentials entirely (issue #16816).
     if override_provider and not override_acp_command:
         effective_acp_command, effective_acp_args = None, []
-    # Defensive: validate trusted delegation.command exists on PATH before honoring it. An explicitly pinned
-    # transport that cannot run must fail the spawn loudly (#80450) — silently falling back to the default
-    # transport would run the child somewhere the user explicitly routed it away from. Normally unreachable
-    # via delegate_task, which pre-validates the command in _resolve_delegation_credentials.
-    if override_acp_command:
-        from providers import get_provider_profile
-        profile = get_provider_profile(effective_provider or "")
-        # A generic process command does not imply the legacy ACP protocol.
-        if profile is None or profile.auth_type != "external_process":
-            effective_provider, effective_api_mode = "copilot-acp", "chat_completions"
+    # A pinned command arrives only with the runtime of the provider that resolved it, so the selected
+    # provider (and its api_mode) is kept as is.
 
     # A named provider identity is endpoint-scoped. Preserve it only when the
     # child inherits the exact parent route; an override owns its final identity.
@@ -618,6 +611,7 @@ def gateway_delegation_inline(user_config: Any, platform_key: str, *, interim_en
 _GATEWAY_DELEGATION_INLINE: ContextVar[bool] = ContextVar("hermes_gateway_delegation_inline", default=False)
 
 
+@contextmanager
 def gateway_delegation_inline_scope(inline: bool) -> Iterator[None]:
     """Build an agent whose tools carry the joined ``delegate_task`` variant (frozen on the agent by
     :func:`agent_joins_delegation`). Dispatch reads the variant the session carries, not this flag."""
