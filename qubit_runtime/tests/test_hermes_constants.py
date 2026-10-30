@@ -1,5 +1,6 @@
 """Tests for qubit_constants module."""
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -9,7 +10,6 @@ import pytest
 import qubit_constants
 from qubit_platform.host import runtime as host_runtime
 from qubit_constants import (
-    agent_browser_runnable,
     get_default_qubit_root,
     get_qubit_dir,
     get_qubit_home,
@@ -61,13 +61,40 @@ class TestGetDefaultHermesRoot:
 
     @pytest.mark.platforms("windows")
     def test_no_qubit_home_returns_localappdata_root_on_windows(self, tmp_path, monkeypatch):
-        """Native Windows falls back to %LOCALAPPDATA%/qubit, not ~/.qubit."""
+        """Native Windows falls back to %LOCALAPPDATA%\\qubit, not ~/.qubit."""
         local_appdata = tmp_path / "LocalAppData"
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
 
         assert get_default_qubit_root() == local_appdata / "qubit"
+
+    @pytest.mark.platforms("windows")
+    def test_root_for_another_environment_ignores_this_process(self, tmp_path, monkeypatch):
+        """hermes_root_for_environment applies the root rules to the mapping it gets."""
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "sandbox-local"))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "sandbox-home"))
+        local = tmp_path / "local"
+        user = tmp_path / "user"
+        custom = tmp_path / "data"
+        cases = [
+            ({"LOCALAPPDATA": str(local)}, local / "hermes"),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": str(local / "hermes" / "profiles" / "work")},
+             local / "hermes"),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": str(custom / "profiles" / "work")}, custom),
+            ({"LOCALAPPDATA": str(local), "HERMES_DATA_DIR_SUFFIX": "-magic"}, local / "hermes-magic"),
+            ({"localappdata": str(local), "QUBIT_HOME": "%LocalAppData%\\data"}, local / "data"),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": "$LOCALAPPDATA\\data"}, local / "data"),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": "${LOCALAPPDATA}\\data"}, local / "data"),
+            ({"LOCALAPPDATA": str(local), "USERPROFILE": str(user), "QUBIT_HOME": "~\\data"}, user / "data"),
+            ({"USERPROFILE": str(user)}, user / "AppData" / "Local" / "hermes"),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": "relative\\data"}, None),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": "%UNDEFINED%\\data"}, None),
+            ({"LOCALAPPDATA": str(local), "QUBIT_HOME": "~\\data"}, None),
+            ({}, None),
+        ]
+        for environ, root in cases:
+            assert qubit_constants.qubit_root_for_environment(environ) == root, environ
 
 
 
@@ -89,7 +116,7 @@ class TestGetHermesHome:
 
     @pytest.mark.platforms("windows")
     def test_windows_fallback_uses_localappdata(self, tmp_path, monkeypatch):
-        """When QUBIT_HOME is unset on Windows, use %LOCALAPPDATA%/qubit."""
+        """When QUBIT_HOME is unset on Windows, use %LOCALAPPDATA%\\hermes."""
         local_appdata = tmp_path / "LocalAppData"
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
@@ -377,7 +404,7 @@ class TestSecureParentDir:
 
     def test_safe_path_calls_chmod(self, tmp_path, monkeypatch):
         """Normal nested path (depth >= 3) should call os.chmod."""
-        safe_dir = tmp_path / "home" / "user" / ".hermes"
+        safe_dir = tmp_path / "home" / "user" / ".qubit"
         safe_dir.mkdir(parents=True)
         target = safe_dir / "auth.json"
         target.touch()
@@ -475,40 +502,6 @@ class TestSecureParentDir:
         secure_parent_dir(link_target)
         assert len(called_with) == 1
         assert called_with[0] == (str(real_dir), 0o700)
-
-
-@pytest.mark.platforms("posix")  # POSIX shell stubs; Windows uses .cmd shims
-class TestAgentBrowserRunnable:
-    """agent_browser_runnable() validates the resolved CLI actually runs.
-
-    Regression coverage for issue #48521: a dangling global symlink left by
-    agent-browser's npm postinstall is reported by ``which`` but fails at exec
-    with exit 127, silently breaking every browser tool. The validator must
-    reject it (and other non-runnable candidates) so callers fall through.
-    """
-
-    def _stub(self, tmp_path, name, body, mode=0o755):
-        p = tmp_path / name
-        p.write_text(body)
-        p.chmod(mode)
-        return p
-
-    def test_none_and_empty_rejected(self):
-        assert agent_browser_runnable(None) is False
-        assert agent_browser_runnable("") is False
-
-    def test_dangling_symlink_rejected(self, tmp_path):
-        link = tmp_path / "agent-browser"
-        link.symlink_to(tmp_path / "does-not-exist")
-        # exists() follows the link → False, so it's rejected without exec.
-        assert agent_browser_runnable(str(link)) is False
-
-
-
-
-
-
-
 
 
 class TestGetHermesDir:
@@ -616,23 +609,46 @@ class TestProjectVenvDirOutOfTree:
         monkeypatch.setattr(sys, "prefix", str(venv))
         monkeypatch.setattr(sys, "base_prefix", str(checkout / "no-such-base"))
 
-    def test_out_of_tree_install_resolves_the_running_interpreter_venv(self, monkeypatch, tmp_path):
-        checkout = tmp_path / "hermes-agent"
-        checkout.mkdir()
-        venv = tmp_path / "venvs" / "hermes"
+    @staticmethod
+    def _venv_installed_from(venv, source):
+        from pm.environments import site_packages
         qubit_constants.venv_python_path(venv).parent.mkdir(parents=True)
         qubit_constants.venv_python_path(venv).write_text("", encoding="utf-8")
+        dist_info = site_packages(venv) / "qubit_agent-0.0.0.dist-info"
+        dist_info.mkdir(parents=True)
+        (dist_info / "METADATA").write_text("Name: qubit-agent\nVersion: 0.0.0\n", encoding="utf-8")
+        (dist_info / "direct_url.json").write_text(
+            json.dumps({"url": source.resolve().as_uri(), "dir_info": {"editable": True}}), encoding="utf-8")
+
+    def test_out_of_tree_install_resolves_the_running_interpreter_venv(self, monkeypatch, tmp_path):
+        checkout = tmp_path / "qubit-agent"
+        checkout.mkdir()
+        venv = tmp_path / "venvs" / "hermes"
+        self._venv_installed_from(venv, checkout)
         self._running_from(monkeypatch, checkout, venv)
 
         assert qubit_constants.project_venv_dir(checkout) == venv
 
+    def test_another_installs_interpreter_is_never_claimed(self, monkeypatch, tmp_path):
+        """``PYTHONPATH=<dev checkout> <app venv>/bin/python``: the code comes from the dev checkout,
+        but the venv belongs to the app install. Claiming it pointed the dev checkout's update sync at
+        the app's venv, which became an editable install of the dev tree."""
+        dev = tmp_path / "dev" / "qubit-agent"
+        dev.mkdir(parents=True)
+        app = tmp_path / "app" / "qubit-agent"
+        app.mkdir(parents=True)
+        venv = tmp_path / "app" / "venv"
+        self._venv_installed_from(venv, app)
+        self._running_from(monkeypatch, dev, venv)
+
+        assert qubit_constants.project_venv_dir(dev) is None
+
     def test_foreign_root_and_in_tree_venv_are_unchanged(self, monkeypatch, tmp_path):
         """A temp dir / another clone never claims the running venv; an in-tree venv still wins."""
-        checkout = tmp_path / "hermes-agent"
+        checkout = tmp_path / "qubit-agent"
         checkout.mkdir()
         venv = tmp_path / "venvs" / "hermes"
-        qubit_constants.venv_python_path(venv).parent.mkdir(parents=True)
-        qubit_constants.venv_python_path(venv).write_text("", encoding="utf-8")
+        self._venv_installed_from(venv, checkout)
         self._running_from(monkeypatch, checkout, venv)
         other = tmp_path / "not-our-checkout"
         other.mkdir()

@@ -493,3 +493,16 @@ if __name__ == '__main__':
         for _handler in logger.handlers:
             _handler.flush()
     os._exit(_exit_code)
+
+
+# The receipt ledger a finite viewer's `-z --usage-file` reads (``qubit_cli/oneshot._USAGE_KEYS``),
+# projected from the accepted result. Kept for gateway/run_turn_runner.py's import while the
+# upstream ledger projection lands with its own lane.
+LEDGER_PASSTHROUGH_KEYS = ('estimated_cost_usd', 'cost_status', 'cost_source', 'cache_read_tokens',
+                           'cache_write_tokens', 'reasoning_tokens', 'provider', 'turn_exit_reason',
+                           'service_tier')
+
+
+def ledger_usage(values) -> dict:
+    """The receipt-ledger slice of a result mapping: only keys the result actually carries."""
+    return {key: values[key] for key in LEDGER_PASSTHROUGH_KEYS if values.get(key) is not None}

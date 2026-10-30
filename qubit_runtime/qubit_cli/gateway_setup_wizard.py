@@ -550,3 +550,46 @@ def gateway_setup():
         _gw().print_info("No platforms configured. Run 'qubit gateway setup' when ready.")
 
     print()
+
+# ---------------------------------------------------------------------------
+# Facade compatibility for ``qubit_cli.gateway`` (not yet re-pinned): the
+# interactive setup helpers moved to public names and the per-platform wizard
+# bodies moved to the platform registry. Keep the old private spellings
+# importable so the gateway facade keeps re-exporting them.
+# ---------------------------------------------------------------------------
+_print_setup_header = print_setup_header
+_confirm_reconfigure = confirm_reconfigure
+_offer_home_channel = offer_home_channel
+_save_env_values = save_env_values
+_prompt_csv = prompt_csv
+
+
+def _platform_by_key(key: str) -> dict:
+    return next((p for p in _all_platforms() if p.get("key") == key), {"key": key})
+
+
+def _setup_weixin() -> None:
+    _configure_platform(_platform_by_key("weixin"))
+
+
+def _setup_qqbot() -> None:
+    _configure_platform(_platform_by_key("qqbot"))
+
+
+def _signal_line_input(prompt_text: str):
+    """``line_input`` for the Signal wizard; None (after printing the cancel line) on EOF/Ctrl+C."""
+    try:
+        return _gw().line_input(prompt_text).strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\n  Setup cancelled.")
+        return None
+
+
+def _setup_signal() -> None:
+    _configure_platform(_platform_by_key("signal"))
+
+
+# Deprecated wizard knobs kept for the facade import (the platform registry owns setup now).
+_WEIXIN_DM_POLICIES = {}
+_WEIXIN_GROUP_NOTE = ()
+

@@ -252,6 +252,12 @@ def _prefix_within_utf16_limit(s: str, limit: int) -> str:
     return s[:_custom_unit_to_cp(s, limit, utf16_len)]
 
 
+def fit_prefix(text: str, budget: int, measure, suffix: str = "...") -> str:
+    """``text``, or its longest prefix within ``budget`` ``measure`` units plus ``suffix`` (outside it)."""
+    n = _custom_unit_to_cp(text, budget, measure)
+    return text if n == len(text) else text[:n] + suffix
+
+
 def is_network_accessible(host: str) -> bool:
     """True if *host* would expose the server beyond loopback (incl. IPv4-mapped
     ::ffff:127.0.0.1); hostnames are resolved and DNS failure fails closed (True)."""
