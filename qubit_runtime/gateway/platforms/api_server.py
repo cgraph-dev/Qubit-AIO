@@ -2884,8 +2884,8 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         """GET /v1/skills — deterministic JSON listing of installed skills (name, description,
         category), the same set ``/skills list`` shows."""
         try:
-            from tools.skills_tool import _find_all_skills, _sort_skills
-            skills = _sort_skills(_find_all_skills(skip_disabled=False))
+            from tools.skills_tool import find_all_skills, sort_skills
+            skills = sort_skills(find_all_skills(skip_disabled=False))
         except Exception:
             logger.exception("GET /v1/skills failed")
             return _error_response("Failed to enumerate skills", 500, err_type="server_error")
@@ -3219,6 +3219,10 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             store = getattr(runner, "session_store", None)
             if store is not None:
                 await asyncio.to_thread(store.remove_by_session_id, session_id)
+            # Retirement erased the chat's image references; bytes nothing else holds go too. Off the
+            # loop like every other media release: its holder check and unlink are one write txn.
+            from gateway.session_ingress_media import collect_unheld_api_images
+            await asyncio.to_thread(collect_unheld_api_images, db)
         return web.json_response({"object": "qubit.session.deleted", "id": session_id, "deleted": bool(deleted)})
 
     @_require_auth

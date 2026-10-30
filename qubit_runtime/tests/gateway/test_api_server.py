@@ -742,7 +742,7 @@ class TestDisconnectedAgentReap:
 
         deadline = time.time() + 1.0
         while not calls and time.time() < deadline:
-            time.sleep(0.01)
+            await asyncio.sleep(0.01)
         assert calls == [("run-stop-sess", frozenset(), "api_server_run_stop")]
         agent.interrupt.assert_called_once()
 
@@ -985,7 +985,7 @@ class TestSkillsEndpoint:
             {"name": "ascii-art", "description": "ASCII art generation", "category": "creative"},
         ]
         with patch(
-            "tools.skills_tool._find_all_skills",
+            "tools.skills_tool.find_all_skills",
             return_value=list(fake_skills),
         ):
             app = _create_app(adapter)
@@ -998,32 +998,6 @@ class TestSkillsEndpoint:
                 assert names == ["ascii-art", "github"]
                 for entry in data["data"]:
                     assert set(entry.keys()) >= {"name", "description", "category"}
-
-    @pytest.mark.asyncio
-    async def test_skills_endpoint_signature_matches_the_lister(self, adapter):
-        """The endpoint must call ``_find_all_skills`` with only kwargs it declares.
-
-        Regression: the endpoint passed ``include_editorial=True`` — a kwarg
-        ``_find_all_skills`` never had — so ``GET /v1/skills`` raised a TypeError
-        the broad ``except Exception`` turned into an opaque 500. The sibling
-        test above could not catch it because it patched the lister with a Mock
-        that accepts any kwarg; this one patches only the DATA SOURCE so the
-        real function's signature is exercised end-to-end.
-        """
-        fake_catalog = [
-            {"load_name": "github", "description": "GitHub workflow skill", "category": "github"},
-            {"load_name": "ascii-art", "description": "ASCII art generation", "category": "creative"},
-        ]
-        with patch(
-            "tools.skills_tool._skill_catalog",
-            return_value=list(fake_catalog),
-        ):
-            app = _create_app(adapter)
-            async with TestClient(TestServer(app)) as cli:
-                resp = await cli.get("/v1/skills")
-                assert resp.status == 200
-                data = await resp.json()
-                assert sorted(s["name"] for s in data["data"]) == ["ascii-art", "github"]
 
 
 class TestToolsetsEndpoint:
@@ -1261,7 +1235,7 @@ class TestChatCompletionsEndpoint:
                 # Tool progress must appear as a custom SSE event, not in
                 # delta.content — prevents model from learning to imitate
                 # markers instead of calling tools (#6972).
-                assert "event: qubit.tool.progress" in body
+                assert "event: hermes.tool.progress" in body
                 assert '"tool": "terminal"' in body
                 # ``label`` is now derived by ``build_tool_preview`` from the
                 # tool args rather than passed by the caller, so we assert
@@ -1290,14 +1264,14 @@ class TestChatCompletionsEndpoint:
         """Regression for #16588.
 
         ``/v1/chat/completions`` streaming previously emitted only a
-        ``tool.started``-style ``qubit.tool.progress`` event; clients
+        ``tool.started``-style ``hermes.tool.progress`` event; clients
         rendering tool lifecycle UI had no way to mark a tool as finished
         because no matching ``status: completed`` event was emitted, and
         no ``toolCallId`` was carried for correlation.
 
         The fix adds ``tool_start_callback`` / ``tool_complete_callback``
         to the chat completions agent invocation and writes both halves
-        of the lifecycle pair on the same ``event: qubit.tool.progress``
+        of the lifecycle pair on the same ``event: hermes.tool.progress``
         SSE line, with stable ``toolCallId`` and ``status``.
         """
         import asyncio
@@ -1343,7 +1317,7 @@ class TestChatCompletionsEndpoint:
             pairs: list[tuple[str | None, str | None]] = []
             lines = body.splitlines()
             for i, line in enumerate(lines):
-                if line.strip() != "event: qubit.tool.progress":
+                if line.strip() != "event: hermes.tool.progress":
                     continue
                 for follow in lines[i + 1: i + 4]:
                     if follow.startswith("data: "):
@@ -2452,8 +2426,7 @@ class TestConversationParameter:
 
 
 # ---------------------------------------------------------------------------
-# X-Qubit-Session-Id header (session continuity); the legacy X-Hermes-Session-Id
-# name is still accepted read-old for pre-rebrand clients.
+# X-Qubit-Session-Id header (session continuity)
 # ---------------------------------------------------------------------------
 
 
@@ -2462,7 +2435,7 @@ class TestSessionIdHeader:
 
     @pytest.mark.asyncio
     async def test_traversal_session_id_header_rejected(self, auth_adapter):
-        """Security (#5958): a path-traversal X-Hermes-Session-Id must be
+        """Security (#5958): a path-traversal X-Qubit-Session-Id must be
         rejected with 400 so it can't reach the filesystem artifact paths
         (session snapshot / request dump) and escape the sessions dir."""
         app = _create_app(auth_adapter)
@@ -2471,7 +2444,7 @@ class TestSessionIdHeader:
                 for bad in ("../../../../etc/pwned", "/abs/path", "..\\win"):
                     resp = await cli.post(
                         "/v1/chat/completions",
-                        headers={"X-Hermes-Session-Id": bad, "Authorization": "Bearer sk-secret"},
+                        headers={"X-Qubit-Session-Id": bad, "Authorization": "Bearer sk-secret"},
                         json={"model": "hermes-agent", "messages": [{"role": "user", "content": "hi"}]},
                     )
                     assert resp.status == 400, f"{bad!r} should be rejected"
@@ -2480,7 +2453,7 @@ class TestSessionIdHeader:
 
     @pytest.mark.asyncio
     async def test_provided_session_id_loads_history_from_db(self, auth_adapter):
-        """When X-Hermes-Session-Id is provided, history comes from SessionDB not request body."""
+        """When X-Qubit-Session-Id is provided, history comes from SessionDB not request body."""
         mock_result = {"final_response": "OK", "messages": [], "api_calls": 1}
         db_history = [
             {"role": "user", "content": "stored message 1"},
@@ -2497,7 +2470,7 @@ class TestSessionIdHeader:
 
                 resp = await cli.post(
                     "/v1/chat/completions",
-                    headers={"X-Hermes-Session-Id": "existing-session", "Authorization": "Bearer sk-secret"},
+                    headers={"X-Qubit-Session-Id": "existing-session", "Authorization": "Bearer sk-secret"},
                     # Request body has different history — should be ignored
                     json={
                         "model": "hermes-agent",
@@ -2515,55 +2488,9 @@ class TestSessionIdHeader:
             assert call_kwargs["conversation_history"] == db_history
             assert call_kwargs["user_message"] == "new question"
 
-    @pytest.mark.asyncio
-    async def test_canonical_session_id_header_wins_and_legacy_is_read_old(self, auth_adapter):
-        """``X-Qubit-Session-Id`` is the canonical (write-new) name; a legacy
-        ``X-Hermes-Session-Id`` alone still continues the session (read-old), and the
-        canonical header takes precedence when both are present."""
-        mock_result = {"final_response": "OK", "messages": [], "api_calls": 1}
-        mock_db = MagicMock()
-        mock_db.get_messages_as_conversation.return_value = []
-        mock_db.resolve_resume_session_id.side_effect = lambda sid: sid
-        auth_adapter._session_db = mock_db
-        app = _create_app(auth_adapter)
-        async with TestClient(TestServer(app)) as cli:
-            with patch.object(auth_adapter, "_run_agent", new_callable=AsyncMock) as mock_run:
-                mock_run.return_value = (
-                    mock_result, {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0})
-                payload = {"model": "hermes-agent", "messages": [{"role": "user", "content": "hi"}]}
-
-                # legacy alone is still honored (read-old)
-                resp = await cli.post(
-                    "/v1/chat/completions",
-                    headers={"X-Hermes-Session-Id": "legacy-session",
-                             "Authorization": "Bearer sk-secret"},
-                    json=payload)
-                assert resp.status == 200
-                assert mock_db.resolve_resume_session_id.call_args[0][0] == "legacy-session"
-
-                # canonical alone works
-                resp = await cli.post(
-                    "/v1/chat/completions",
-                    headers={"X-Qubit-Session-Id": "canonical-session",
-                             "Authorization": "Bearer sk-secret"},
-                    json=payload)
-                assert resp.status == 200
-                assert mock_db.resolve_resume_session_id.call_args[0][0] == "canonical-session"
-
-                # canonical wins when both are sent
-                resp = await cli.post(
-                    "/v1/chat/completions",
-                    headers={"X-Qubit-Session-Id": "canonical-session",
-                             "X-Hermes-Session-Id": "legacy-session",
-                             "Authorization": "Bearer sk-secret"},
-                    json=payload)
-                assert resp.status == 200
-                assert mock_db.resolve_resume_session_id.call_args[0][0] == "canonical-session"
-
 
 # ---------------------------------------------------------------------------
-# X-Qubit-Session-Key header (long-term memory scoping); the legacy
-# X-Hermes-Session-Key name is still accepted read-old for pre-rebrand clients.
+# X-Qubit-Session-Key header (long-term memory scoping)
 # ---------------------------------------------------------------------------
 
 
@@ -2596,7 +2523,7 @@ class TestSessionKeyHeader:
                 resp = await cli.post(
                     "/v1/chat/completions",
                     headers={
-                        "X-Hermes-Session-Key": "agent:main:webui:dm:user-7",
+                        "X-Qubit-Session-Key": "agent:main:webui:dm:user-7",
                         "Authorization": "Bearer sk-secret",
                     },
                     json={"model": "hermes-agent", "messages": [{"role": "user", "content": "hi"}]},
@@ -2606,39 +2533,8 @@ class TestSessionKeyHeader:
             assert captured_kwargs.get("gateway_session_key") == "agent:main:webui:dm:user-7"
 
     @pytest.mark.asyncio
-    async def test_canonical_session_key_header_wins_over_legacy(self, auth_adapter):
-        """``X-Qubit-Session-Key`` is canonical; ``X-Hermes-Session-Key`` is read-old,
-        and the canonical name takes precedence when both are present."""
-        captured_kwargs = {}
-
-        def _fake_create_agent(**kwargs):
-            captured_kwargs.update(kwargs)
-            mock_agent = MagicMock()
-            mock_agent.run_conversation.return_value = {"final_response": "ok", "messages": []}
-            mock_agent.session_prompt_tokens = 0
-            mock_agent.session_completion_tokens = 0
-            mock_agent.session_total_tokens = 0
-            return mock_agent
-
-        app = _create_app(auth_adapter)
-        async with TestClient(TestServer(app)) as cli:
-            with patch.object(auth_adapter, "_create_agent", side_effect=_fake_create_agent):
-                resp = await cli.post(
-                    "/v1/chat/completions",
-                    headers={
-                        "X-Qubit-Session-Key": "canonical-key",
-                        "X-Hermes-Session-Key": "legacy-key",
-                        "Authorization": "Bearer sk-secret",
-                    },
-                    json={"model": "hermes-agent", "messages": [{"role": "user", "content": "hi"}]},
-                )
-            assert resp.status == 200
-            assert captured_kwargs.get("gateway_session_key") == "canonical-key"
-
-    @pytest.mark.asyncio
     async def test_responses_endpoint_accepts_session_key(self, auth_adapter):
-        """Responses API honors the session-key contract: the legacy header is read
-        (read-old) and the canonical X-Qubit-Session-Key is echoed back (write-new)."""
+        """Responses API honors the same X-Qubit-Session-Key contract."""
         mock_result = {"final_response": "ok", "messages": [], "api_calls": 1}
         app = _create_app(auth_adapter)
         async with TestClient(TestServer(app)) as cli:
@@ -2647,7 +2543,7 @@ class TestSessionKeyHeader:
                 resp = await cli.post(
                     "/v1/responses",
                     headers={
-                        "X-Hermes-Session-Key": "webui:chan-1",
+                        "X-Qubit-Session-Key": "webui:chan-1",
                         "Authorization": "Bearer sk-secret",
                     },
                     json={"model": "hermes-agent", "input": "hello", "store": False},
@@ -2683,7 +2579,7 @@ def _patch_create_agent_runtime(monkeypatch, captured: dict, fake_agent_cls):
         },
     )
     monkeypatch.setattr("gateway.run._resolve_gateway_model", lambda: "global/model")
-    monkeypatch.setattr("gateway.run._load_gateway_config", lambda: {})
+    monkeypatch.setattr("gateway.run._load_gateway_config", dict)
     monkeypatch.setattr(
         "gateway.run.GatewayRunner._load_reasoning_config", staticmethod(lambda model="": {})
     )

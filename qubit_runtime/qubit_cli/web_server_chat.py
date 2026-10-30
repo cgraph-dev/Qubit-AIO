@@ -312,7 +312,7 @@ def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
     return None, "ticket-subprotocol"
 
 
-def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
+def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False, socket: Optional[str] = None) -> tuple[Optional[str], str]:
     """Validate WS-upgrade auth; return ``(reason, credential)``.
 
     ``reason`` is None when accepted, else a short token (``no_credential``,
@@ -455,9 +455,9 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
     return "token_mismatch", "token"
 
 
-def _ws_auth_ok(ws: WebSocket) -> bool:
+def _ws_auth_ok(ws: WebSocket, *, allow_internal: bool = False, socket: Optional[str] = None) -> bool:
     """True when the WS-upgrade credential is accepted. See _ws_auth_reason."""
-    return _ws_auth_reason(ws)[0] is None
+    return _ws_auth_reason(ws, allow_internal=allow_internal, socket=socket)[0] is None
 
 
 def _ws_close_reason(text: str) -> str:

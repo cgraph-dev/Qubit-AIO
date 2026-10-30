@@ -9,7 +9,6 @@ import socket
 import threading
 
 import aiohttp
-import pytest
 
 from tests.gateway.fixtures.local_recovery_probe import daemon, websocket, rpc
 
@@ -68,7 +67,7 @@ def test_api_and_ws_pending_controls_share_identity(tmp_path):
     (home / 'config.yaml').write_text(json.dumps(cfg))
     from tests.gateway.fixtures.local_recovery_probe import child_env
     env = {**child_env(), **{k: os.environ[k] for k in ('TIRITH_ENABLED',) if k in os.environ}}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), QUBIT_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=base, API_SERVER_KEY='ordinary-daemon-owned-secret',
                API_SERVER_ENABLED='true', API_SERVER_PORT=str(port), PYTHONUNBUFFERED='1')
 
