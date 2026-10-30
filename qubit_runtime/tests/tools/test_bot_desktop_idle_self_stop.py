@@ -101,15 +101,15 @@ def test_a_screen_started_before_an_update_still_stops_itself(abandoned_screen, 
     --run-module`` launcher, which loads the current generation at every run) with its own pid appended."""
     install = tmp_path / "an install's root"  # quoting: the command crosses the env as a shell-quoted string
     used = tmp_path / "launcher-used"
-    qubit = install / ".hermes" / "bin" / "hermes"
-    hermes.parent.mkdir(parents=True)
-    hermes.write_text(
+    qubit = install / ".qubit" / "bin" / "qubit"
+    qubit.parent.mkdir(parents=True)
+    qubit.write_text(
         "#!/bin/sh\n"
         '[ "$1" = --run-module ] && [ "$2" = tools.bot_desktop.idle_watch ] && [ $# -eq 3 ] || exit 64\n'
         f'echo "$3" > "{used}"\n'
         "shift 2\n"
         f'PYTHONPATH="{_REPO}" exec "{sys.executable}" -m tools.bot_desktop.idle_watch "$@"\n', encoding="utf-8")
-    hermes.chmod(0o755)
+    qubit.chmod(0o755)
     prelude = (
         "from qubit_cli import _launchers\n"
         f"_launchers.resolve_store_python = lambda root, **_: Path({str(tmp_path / 'store/bin/python3')!r})\n"
