@@ -340,11 +340,13 @@ PLATFORM_HINT = (
 
 def register(ctx) -> None:
     """Plugin entry point — called by the Qubit plugin system."""
+    from . import gateway_env  # env -> GatewayConfig bridge (gateway.config_env)
     ctx.register_platform(
         name="sms", label="SMS (Twilio)", adapter_factory=SmsAdapter,
         check_fn=check_sms_requirements, is_connected=_is_connected,
         required_env=["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"],
-        install_hint="pip install aiohttp", allowed_users_env="SMS_ALLOWED_USERS",
-        allow_all_env="SMS_ALLOW_ALL_USERS", cron_deliver_env_var="SMS_HOME_CHANNEL",
+        install_hint="pip install aiohttp", cron_deliver_env_var="SMS_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, max_message_length=MAX_SMS_LENGTH, pii_safe=True,
-        emoji="📱", allow_update_command=True, platform_hint=PLATFORM_HINT)
+        emoji="📱", allow_update_command=True, platform_hint=PLATFORM_HINT,
+        env_overrides=gateway_env.ENV_OVERRIDES,
+        env_enable_credentials=gateway_env.ENV_ENABLE_CREDENTIALS, **gateway_env.AUTHZ)
