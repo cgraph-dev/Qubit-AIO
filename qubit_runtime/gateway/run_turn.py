@@ -1232,66 +1232,6 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
         529: "gateway.errors.hint_overloaded",
     }
 
-    async def _hmwa_agent_error_reply(self, e, event, source, session_entry, session_key, prepared):
-        """``except Exception`` body of the agent turn: stop typing, log, persist the inbound user
-        turn once and close it, and build the sanitized user-facing error reply."""
-        # Retain Slack thread/workspace routing so a failed turn cannot leave its status visible.
-        await self._hmwa_stop_typing_for_turn(event, source)
-        logger.exception("Agent error in session %s", session_key)
-        status_code = getattr(e, "status_code", None)
-        if status_code in {400, 500} and len(prepared.history) > 50:
-            # Context overflow / payload too large: a deterministic rejection (#107567), and the same
-            # no-grow rule as the persist path (#1630) — nothing is written into an oversized session.
-            from gateway.run import _context_overflow_reply
-            from gateway.session_results import record_unexecuted_failure
-            return record_unexecuted_failure(_context_overflow_reply())
-        # Replay can coalesce inputs; only this input's durable marker establishes ownership.
-        try:
-            if prepared.message_text is not None and session_entry is not None:
-                _owned = await self.async_session_store.has_input_owner(
-                    prepared.persistence_session_id, prepared.persistence_owner,
-                )
-                if not _owned:
-                    await self.async_session_store.append_to_transcript(
-                        session_entry.session_id, self._hmwa_user_transcript_entry(event, prepared, time.time()),
-                    )
-                # Tool effects are unknown after an exception.
-                await self._hmwa_close_failed_turn(session_entry.session_id, PARTIAL_FAILED_TURN_NOTICE)
-        except Exception:
-            logger.debug("Failed to persist inbound user message after agent exception", exc_info=True)
-        # Never expose raw exception types/messages to end users (info-leakage risk).
-        _hint_key = self._STATUS_HINTS.get(status_code)
-        status_hint = t(_hint_key) if _hint_key and status_code != 401 else ""
-        if status_code == 401:
-            from agent.turn_failure_copy import relogin_command_hint
-
-            _turn_agent = getattr(self._session_state(session_key).turn, "agent", None)
-            status_hint = t(_hint_key, relogin=relogin_command_hint(getattr(_turn_agent, "provider", None)))
-        elif status_code == 429:
-            # Plan usage limit (resets on a schedule) vs a transient rate limit
-            _err_json = {}
-            with suppress(Exception):
-                _err_json = e.response.json().get("error", {})
-            if not isinstance(_err_json, dict):
-                _err_json = {}
-            _resets_in = _err_json.get("resets_in_seconds")
-            if _err_json.get("type") != "usage_limit_reached":
-                status_hint = t("gateway.errors.hint_rate_limited")
-            elif _resets_in and _resets_in > 0:
-                import math
-                status_hint = t("gateway.errors.hint_usage_limit_resets", hours=math.ceil(_resets_in / 3600))
-            else:
-                status_hint = t("gateway.errors.hint_usage_limit")
-        elif status_code == 400:
-            status_hint = t("gateway.errors.hint_rejected")
-        elif getattr(e, "reason", None) == "launch_credentials_unavailable" and getattr(e, "field", None):
-            # The session's own frozen route credential is gone or changed: name it, not the model.
-            status_hint = f" {e.reason} ({e.field}: {e.detail or 'unavailable'})."
-        from gateway.session_results import record_unexecuted_failure
-        return record_unexecuted_failure(self._hmwa_add_failed_turn_notice(
-            t("gateway.errors.generic_failed_with_hint", hint=status_hint), PARTIAL_FAILED_TURN_NOTICE,
-        ))
-
     def _hmwa_discard_stale_result(self, source, _quick_key, run_generation):
         """A newer run generation superseded this turn: drop its deferred post-delivery callback."""
         logger.info(
