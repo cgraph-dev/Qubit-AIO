@@ -1,6 +1,6 @@
 """HTTP lifespan composition; standalone backend services remain opt-in owners."""
 
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 import asyncio
 import logging
 import os
@@ -212,18 +212,27 @@ async def http_lifespan(app: FastAPI):
     app.state.event_lock = asyncio.Lock()
     app.state.pty_active_session_files = {}
     app.state.chat_argv_lock = asyncio.Lock()
-    tasks = [
-        asyncio.create_task(run_reaper(PTY_REGISTRY), name="gateway-api-pty-reaper"),
-        asyncio.create_task(_dashboard_selftest_loop(), name="gateway-api-selftest"),
-    ]
-    try:
-        yield
-    finally:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        await PTY_REGISTRY.close_all()
-        _unlink_pty_markers(app)
+    from qubit_cli.web_server_surface import policy
+
+    async with AsyncExitStack() as stack:
+        # The Webapp's listener owns the host terminal registry: its lifespan creates it before the
+        # first socket and withdraws it on shutdown. Other surfaces leave host shells off.
+        if policy(app.state).host_terminal:
+            from qubit_cli.web_host_terminal_sessions import host_terminal_lifespan
+
+            await stack.enter_async_context(host_terminal_lifespan(app))
+        tasks = [
+            asyncio.create_task(run_reaper(PTY_REGISTRY), name="gateway-api-pty-reaper"),
+            asyncio.create_task(_dashboard_selftest_loop(), name="gateway-api-selftest"),
+        ]
+        try:
+            yield
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            await PTY_REGISTRY.close_all()
+            _unlink_pty_markers(app)
 
 
 @asynccontextmanager
