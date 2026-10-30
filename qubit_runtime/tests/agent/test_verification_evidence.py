@@ -497,7 +497,7 @@ def test_file_tool_stales_evidence_by_session_id_for_absolute_edit(tmp_path, mon
 
 
 def test_workspace_verify_clears_stale_on_other_session(tmp_path, monkeypatch):
-    """A hermes verify pass is a property of the workspace, not the session
+    """A qubit verify pass is a property of the workspace, not the session
     that ran the CLI (#103271)."""
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
     _python_project(tmp_path)
@@ -509,7 +509,7 @@ def test_workspace_verify_clears_stale_on_other_session(tmp_path, monkeypatch):
     assert event is not None
     status = verification_status(session_id="s-edit", cwd=tmp_path)
     assert status["status"] == "passed"
-    assert status["evidence"]["canonical_command"] == "hermes verify"
+    assert status["evidence"]["canonical_command"] == "qubit verify"
 
 
 def test_targeted_partial_verify_does_not_clear_other_session(tmp_path, monkeypatch):

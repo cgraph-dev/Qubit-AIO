@@ -111,7 +111,7 @@ _GH_ONLY = {"credential_pool": {"copilot": [{"source": "gh_cli", "label": "gh au
 def test_relogin_notice_only_for_a_copilot_home_without_a_token_the_plugin_reads(tmp_path, config, env, auth,
                                                                                   notice):
     text = lcm.copilot_relogin_notice(_home(tmp_path, config=config, env=env, auth=auth))
-    assert ("hermes auth add copilot" in text) is notice
+    assert ("qubit auth add copilot" in text) is notice
 
 
 def test_gh_only_home_is_told_to_log_in_on_every_migration_outcome(tmp_path):
@@ -123,11 +123,11 @@ def test_gh_only_home_is_told_to_log_in_on_every_migration_outcome(tmp_path):
         return {"ok": True}
 
     assert lcm.migrate_home(home, install=install, say=said.append) == ["github-copilot"]
-    assert "✓ GitHub Copilot moved out of core" in said[0] and "run `hermes auth add copilot`" in said[0]
+    assert "✓ GitHub Copilot moved out of core" in said[0] and "run `qubit auth add copilot`" in said[0]
     other = _home(tmp_path / "b", config="model:\n  provider: copilot\n", auth=_GH_ONLY)
     said.clear()
     lcm.migrate_home(other, install=lambda name: {"ok": False, "error": "network down"}, say=said.append)
-    assert "could not be installed automatically" in said[0] and "run `hermes auth add copilot`" in said[0]
+    assert "could not be installed automatically" in said[0] and "run `qubit auth add copilot`" in said[0]
 
 
 def test_update_reads_the_launch_homes_exported_token_for_the_relogin_notice(tmp_path, monkeypatch):
@@ -148,8 +148,8 @@ def test_update_reads_the_launch_homes_exported_token_for_the_relogin_notice(tmp
     lcm.migrate_all_homes(say=said.append)
     by_home = {h: " ".join(m for m in said if lcm._home_label(h) in m) for h in (launch, other)}
     assert "✓ GitHub Copilot moved out of core" in by_home[launch]
-    assert "run `hermes auth add copilot`" not in by_home[launch]
-    assert "run `hermes auth add copilot`" in by_home[other]
+    assert "run `qubit auth add copilot`" not in by_home[launch]
+    assert "run `qubit auth add copilot`" in by_home[other]
 
 
 # ── generic seams through a fake row ─────────────────────────────────────────────────────────────
@@ -174,11 +174,11 @@ def test_unknown_left_core_provider_names_the_install_on_every_surface(acme_row)
         resolve_provider("acme-acp")
     for text in (str(err.value), str(_unknown_provider_exit("acme")), _unknown_provider_message("ACME")):
         assert "Acme LLM moved out of core into the 'acme-llm' plugin" in text
-        assert "hermes plugins install acme-llm" in text
+        assert "qubit plugins install acme-llm" in text
     (acme_row / "plugins" / "acme-llm").mkdir(parents=True)
     (acme_row / "config.yaml").write_text("model:\n  provider: acme\nplugins:\n  disabled: [acme-llm]\n",
                                           encoding="utf-8")
-    assert "hermes plugins enable acme-llm" in lcm.provider_install_hint("acme")  # installed but disabled
+    assert "qubit plugins enable acme-llm" in lcm.provider_install_hint("acme")  # installed but disabled
     assert lcm.provider_install_hint("other") == ""
 
 
@@ -192,7 +192,7 @@ def test_a_provider_plugin_that_failed_to_load_gets_its_error_not_enable(acme_ro
     (plugin / "__init__.py").write_text("from acme_sdk import client\n", encoding="utf-8")
     (acme_row / "config.yaml").write_text("model:\n  provider: acme\n" + listed, encoding="utf-8")
     hint = lcm.provider_install_hint("acme")
-    assert "ModuleNotFoundError: No module named 'acme_sdk'" in hint and "hermes plugins update acme-llm" in hint
+    assert "ModuleNotFoundError: No module named 'acme_sdk'" in hint and "qubit plugins update acme-llm" in hint
     assert "enable" not in hint
 
 
@@ -312,7 +312,7 @@ def test_a_request_rejected_at_the_rows_host_names_the_install(acme_row, monkeyp
             api_kwargs=None, api_messages=[], messages=[], conversation_history=None, api_call_count=1,
             approx_tokens=10, provider="custom", base_url=base_url, model="m")
         return "\n".join(printed)
-    assert "hermes plugins install acme-llm" in reject("https://api.eu.acme.test/v1")
+    assert "qubit plugins install acme-llm" in reject("https://api.eu.acme.test/v1")
     assert "acme-llm" not in reject("https://api.other.test/v1")
     import providers
     monkeypatch.setattr(providers, "get_provider_profile", lambda name: object())  # the plugin is loaded

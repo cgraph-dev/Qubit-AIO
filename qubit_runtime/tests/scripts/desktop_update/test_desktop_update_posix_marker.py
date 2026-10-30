@@ -254,7 +254,7 @@ def test_nonzero_exit_after_the_commit_point_is_installed_with_a_followup(tmp_pa
     assert result.returncode == 0, result.stdout + result.stderr
     receipt = json.loads((home / ".hermes-update-result.json").read_text(encoding="utf-8-sig"))
     assert (receipt["ok"], receipt["exit_code"], receipt["manual"]) == (True, 0, True), receipt
-    assert receipt["message"].startswith("Hermes was updated, but"), receipt
+    assert receipt["message"].startswith("Qubit was updated, but"), receipt
     assert [w.split(":")[0] for w in receipt["warnings"]] == ["update"], receipt
     assert f"exited {code} after the commit point" in receipt["warnings"][0]
 
@@ -315,7 +315,7 @@ def test_failed_update_carries_the_updaters_own_output(tmp_path, output):
     assert result.returncode == 1, result.stdout + result.stderr
     outcome = json.loads((home / ".hermes-update-result.json").read_text(encoding="utf-8-sig"))
     assert (outcome["ok"], outcome["exit_code"]) == (False, 1), outcome
-    assert outcome["message"].startswith("Update failed (exit 1). Run hermes debug share"), outcome
+    assert outcome["message"].startswith("Update failed (exit 1). Run qubit debug share"), outcome
     if output:
         assert "Last output: sweeping the venv ERROR: the autostash cannot be re-applied" in outcome["message"], outcome
     else:

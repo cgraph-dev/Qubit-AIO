@@ -65,7 +65,7 @@ def _status_after_child_exits(client, pid: int) -> dict:
 def test_a_restart_child_that_exits_at_once_reports_its_last_error_line(client, restart_child):
     restart_child["script"] = (
         "import sys; print('Starting gateway restart...');"
-        "print(\"error: Hermes's dependency environment is missing; run `hermes pm repair`\");"
+        "print(\"error: Hermes's dependency environment is missing; run `qubit pm repair`\");"
         "sys.exit(1)"
     )
 
@@ -76,7 +76,7 @@ def test_a_restart_child_that_exits_at_once_reports_its_last_error_line(client, 
     assert failure == {
         "pid": answer["restart_pid"],
         "exit_code": 1,
-        "reason": "error: Hermes's dependency environment is missing; run `hermes pm repair`",
+        "reason": "error: Hermes's dependency environment is missing; run `qubit pm repair`",
     }
 
 
@@ -110,7 +110,7 @@ def test_a_retry_that_fails_to_spawn_does_not_lend_its_error_to_the_recorded_chi
     from qubit_cli import web_server
 
     monkeypatch.setattr(web_server, "GATEWAY_RESTART_COOLDOWN_SECONDS", 0.0)
-    restart_child["script"] = "import sys; print('first child: run `hermes pm repair`'); sys.exit(1)"
+    restart_child["script"] = "import sys; print('first child: run `qubit pm repair`'); sys.exit(1)"
     first = client.post("/api/webapp-access/restart").json()
     web_server._LAST_GATEWAY_RESTART[1].wait(timeout=10)
 
@@ -125,4 +125,4 @@ def test_a_retry_that_fails_to_spawn_does_not_lend_its_error_to_the_recorded_chi
 
     failure = client.get("/api/webapp-access/status").json()["restart_failure"]
     assert failure["pid"] == first["restart_pid"]
-    assert failure["reason"] == "first child: run `hermes pm repair`"
+    assert failure["reason"] == "first child: run `qubit pm repair`"

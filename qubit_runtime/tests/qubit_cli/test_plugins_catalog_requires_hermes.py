@@ -21,7 +21,7 @@ from tests.pm._fixtures import client, isolated_python  # fixtures world needs
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not available")
 
-REFUSAL = "cat-plugin needs Hermes >=0.31; this is 0.30.0."
+REFUSAL = "cat-plugin needs Qubit >=0.31; this is 0.30.0."
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def _rpc(params: dict) -> dict:
 def test_install_by_catalog_name_refused_on_every_surface_when_qubit_is_too_old(gated):
     gated["state"]["requires"] = ">=0.31"
 
-    with pytest.raises(SystemExit):  # `hermes plugins install <name>` (and `hermes setup`'s importer step)
+    with pytest.raises(SystemExit):  # `qubit plugins install <name>` (and `hermes setup`'s importer step)
         pc.cmd_install("cat-plugin", enable=False)
     assert any(REFUSAL in line and "and install again" in line for line in gated["printed"])
 
@@ -93,16 +93,16 @@ def test_update_keeps_the_installed_pin_when_the_new_pin_needs_a_newer_hermes(ga
     target = gated["plugins_dir"] / "cat-plugin"
     gated["state"].update(pin=gated["sha2"], requires=">=0.31")
 
-    with pytest.raises(SystemExit):  # `hermes plugins update cat-plugin`
+    with pytest.raises(SystemExit):  # `qubit plugins update cat-plugin`
         pc.cmd_update("cat-plugin", interactive=False)
-    assert any(REFUSAL in line and "after you update Hermes" in line for line in gated["printed"])
+    assert any(REFUSAL in line and "after you update Qubit" in line for line in gated["printed"])
     dashboard = pc.dashboard_update_user_plugin("cat-plugin")
     assert dashboard["ok"] is False and REFUSAL in dashboard["error"]
     assert REFUSAL in _rpc({"action": "update", "name": "cat-plugin"})["error"]["message"]
-    # `hermes plugins update` (all) lists it as held, not as an update it will apply.
+    # `qubit plugins update` (all) lists it as held, not as an update it will apply.
     plan = plan_update_all(run_checks(gated["plugins_dir"], include_pip=False))
     assert not plan.movable
-    assert [(row.name, "after updating Hermes" in why) for row, why in plan.skipped] == [("cat-plugin", True)]
+    assert [(row.name, "after updating Qubit" in why) for row, why in plan.skipped] == [("cat-plugin", True)]
     assert _head(target) == gated["sha1"]
 
     gated["state"]["running"] = "0.31.0"

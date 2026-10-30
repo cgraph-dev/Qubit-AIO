@@ -1,6 +1,6 @@
 """Signing the Webapp out closes every socket the old browser credential opened.
 
-``hermes webapp --sign-out`` (control verb ``webapp-sign-out``) replaces the session token and closes
+``qubit webapp --sign-out`` (control verb ``webapp-sign-out``) replaces the session token and closes
 the live sockets that token authenticated, directly or through a ticket minted with it: each tab's
 host terminal and event stream close at once with code 4401, and the media and download links it
 minted stop working. A socket opened with another credential stays connected. The verb runs on a

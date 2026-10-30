@@ -245,7 +245,7 @@ async def test_topic_restore_quote_never_exposes_compaction_scaffolding(tmp_path
         "restorable",
     )
 
-    assert "Last Hermes message:\nreal completed answer" in result
+    assert "Last Qubit message:\nreal completed answer" in result
     assert "CONTEXT COMPACTION" not in result
     assert "Historical Task Snapshot" not in result
     db.close()
@@ -276,7 +276,7 @@ async def test_topic_restore_quote_unwraps_merged_assistant_carrier(tmp_path):
         "restorable",
     )
 
-    assert "Last Hermes message:\nreal completed answer" in result
+    assert "Last Qubit message:\nreal completed answer" in result
     assert "PRIOR CONTEXT" not in result
     assert "CONTEXT COMPACTION" not in result
     db.close()
@@ -433,7 +433,7 @@ async def test_group_new_keeps_existing_reset_semantics_when_dm_topic_mode_enabl
 
     result = await runner._handle_message(_make_group_event("/new", thread_id="555"))
 
-    assert "Started a new Hermes session in this topic" not in result
+    assert "Started a new Qubit session in this topic" not in result
     assert "parallel work" not in result
     runner.session_store.reset_session.assert_called_once_with(group_key)
 

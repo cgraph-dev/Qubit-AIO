@@ -2,7 +2,7 @@
 
 On a LAN or own-URL Webapp a browser signs in with the dashboard's sign-in (a password, or an OAuth
 provider) and keeps that login in cookies. Each login on the Webapp is bound to the gateway's browser
-credential, so ``hermes webapp --sign-out``, which replaces that credential, ends every one of them:
+credential, so ``qubit webapp --sign-out``, which replaces that credential, ends every one of them:
 the login's requests get 401 and the sign-in view, the sockets and host terminals it opened close with
 4401, tickets it minted open nothing, and its cookies replayed from anywhere get nothing. The provider
 tokens those cookies hold work only as those cookies: the Webapp's listener refuses them as a bearer
@@ -392,7 +392,7 @@ def test_a_credential_replaced_while_the_gateway_was_down_ends_its_logins_tokens
     browser = gated.browser()
     _sign_in_with_password(browser)
     access, refresh = _tokens(browser)
-    # The gateway stops, hermes webapp --sign-out replaces the stored credential, a gateway starts.
+    # The gateway stops, qubit webapp --sign-out replaces the stored credential, a gateway starts.
     _restart(gated, monkeypatch, token=browser_session_token(tmp_path / ".hermes", rotate=True))
     _signed_out(browser.get("/api/auth/me"))
     _refused_alone(gated, access, refresh)

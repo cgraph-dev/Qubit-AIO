@@ -191,7 +191,7 @@ def test_nudge_explains_only_a_check_run_the_shell_could_not_attribute(tmp_path,
     assert "did not count" not in scored
 
 def test_nudge_drops_the_unscored_run_warning_once_qubit_verify_records(tmp_path, monkeypatch):
-    """``hermes verify`` records from its own process: its newer failure is the latest check."""
+    """``qubit verify`` records from its own process: its newer failure is the latest check."""
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
     _node_project(tmp_path)
     changed = str(tmp_path / "src" / "app.ts")
@@ -206,7 +206,7 @@ def test_nudge_drops_the_unscored_run_warning_once_qubit_verify_records(tmp_path
     nudge = build_verify_on_stop_nudge(session_id="s1", changed_paths=[changed])
 
     assert nudge is not None
-    assert "hermes verify" in nudge and "did not count" not in nudge
+    assert "qubit verify" in nudge and "did not count" not in nudge
 
 # ---------------------------------------------------------------------------
 # Fix C: documentation/prose edits carry no verifiable behavior and must never
