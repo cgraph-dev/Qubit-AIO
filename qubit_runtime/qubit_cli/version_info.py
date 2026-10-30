@@ -310,7 +310,7 @@ def get_version_info() -> VersionInfo:
     return info
 
 
-def hermes_user_agent(product: str = "hermes-cli") -> str:
+def hermes_user_agent(product: str = "qubit-cli") -> str:
     """``<product>/<base version>`` for an outbound request.
 
     Call it where the request is built, never at module level: a source checkout resolves the
