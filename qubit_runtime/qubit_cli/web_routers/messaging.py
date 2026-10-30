@@ -1186,3 +1186,87 @@ async def test_messaging_platform(platform_id: str, profile: Optional[str] = Non
     if payload.get("error_message"):
         return result(False, payload["error_message"])
     return result(False, "Setup looks complete, but the gateway has not reported a connection yet. Restart the gateway.")
+
+def _env_value_rules(platform_id: str) -> dict[str, tuple[Any, str]]:
+    """``{env key: (accepts(value), 400 detail)}`` declared on the platform plugin's PlatformEntry."""
+    from gateway.platform_env import bundled_sibling
+    from gateway.platform_registry import platform_registry
+    entry = platform_registry.get(platform_id)
+    if entry is not None and entry.env_value_rules:
+        return dict(entry.env_value_rules)
+    card = getattr(bundled_sibling(platform_id, "dashboard_card"), "DASHBOARD_CARD", None) or {}
+    return dict(card.get("env_value_rules") or {})
+
+
+def _release_whatsapp_reservation(record: _WhatsAppOnboardingSession) -> None:
+    """Call under the onboarding lock. A live writer keeps its reservation."""
+    if not record.session_reserved or record.starting_process:
+        return
+    if record.proc is None and record.status not in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES:
+        return
+    if record.proc is not None and record.proc.poll() is None:
+        return
+    from gateway.status_scoped_locks import release_scoped_lock
+    release_scoped_lock("whatsapp-session", record.session_path)
+    record.session_reserved = False
+    if record.expiry_timer is not None:
+        record.expiry_timer.cancel()
+
+
+def _expire_whatsapp_pairing(record: _WhatsAppOnboardingSession) -> None:
+    with _whatsapp_onboarding_lock:
+        if record.status not in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES or record.session_reserved:
+            record.status = "expired"
+            record.error = "WhatsApp QR setup expired. Start a new setup."
+            _terminate_whatsapp_pairing(record.proc)
+        _release_whatsapp_reservation(record)
+
+
+def _reserve_whatsapp_session(record: _WhatsAppOnboardingSession) -> None:
+    """Reserve before moving keys or launching a writer, including its queued start."""
+    from gateway.status import acquire_scoped_lock
+    busy = "WhatsApp is in use. Disable WhatsApp and restart the gateway, then try re-pairing again."
+    for existing in _whatsapp_onboarding_sessions.values():
+        if existing.session_path == record.session_path and (
+            existing.status not in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES
+            or existing.session_reserved or existing.starting_process
+            or (existing.proc is not None and existing.proc.poll() is None)
+        ):
+            raise HTTPException(status_code=409, detail="Another WhatsApp QR setup is still active. Cancel it or wait for it to stop before re-pairing.")
+    acquired, previous = acquire_scoped_lock("whatsapp-session", record.session_path, metadata={"owner_kind": "process"})
+    if not acquired or previous and previous.get("pid") == os.getpid():
+        raise HTTPException(status_code=409, detail=busy)
+    record.session_reserved = True
+
+
+def _launch_whatsapp_pairing(pairing_id: str, record: _WhatsAppOnboardingSession, session_path: Path) -> None:
+    from agent.memory_provider import spawn_context_thread
+    record.expiry_timer = threading.Timer(_WHATSAPP_ONBOARDING_TTL_SECONDS, _expire_whatsapp_pairing, args=(record,))
+    record.expiry_timer.daemon = True
+    launched = False
+    try:
+        record.expiry_timer.start()
+        spawn_context_thread(_run_whatsapp_pairing, name="whatsapp-pairing",
+                             args=(pairing_id, session_path, record.mode)).start()
+        launched = True
+    finally:
+        if not launched:
+            record.status = "error"
+            _release_whatsapp_reservation(record)
+
+
+async def _wait_whatsapp_pairing_flush(pairing_id: str) -> None:
+    with _whatsapp_onboarding_lock:
+        record = _whatsapp_record_or_404(pairing_id)
+        if record.status != "connected":
+            raise HTTPException(status_code=409, detail="WhatsApp setup is not connected yet.")
+    if record.session_reserved and record.proc is not None:
+        try:
+            await asyncio.to_thread(record.proc.wait, timeout=3)
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=409, detail="WhatsApp is still saving its linked device. Wait a moment and try Save and restart again.") from exc
+    with _whatsapp_onboarding_lock:
+        _release_whatsapp_reservation(record)
+        if record.session_reserved:
+            raise HTTPException(status_code=409, detail="WhatsApp is still finishing pairing. Wait a moment and try Save and restart again.")
+
