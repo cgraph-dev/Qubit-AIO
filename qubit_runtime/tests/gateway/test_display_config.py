@@ -7,7 +7,9 @@
 class TestToolProgressProvenance:
     def test_winning_source_controls_mode_and_intent(self):
         from gateway.display_config import resolve_tool_progress
+        from qubit_cli.plugins import discover_plugins
 
+        discover_plugins()  # slack's "off" default ships on its PlatformEntry (display_overrides)
         cases = [
             ({}, None, ("off", False)),
             ({}, "all", ("all", True)),

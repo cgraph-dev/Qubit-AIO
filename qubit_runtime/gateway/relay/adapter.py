@@ -21,6 +21,7 @@ from collections import OrderedDict
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from gateway.config import Platform, PlatformConfig
+from gateway.relay.adapter_discord_interaction import RelayDiscordInteractionMixin
 from gateway.platforms.base import (
     BasePlatformAdapter, ExecApprovalPrompt, SendResult,
 )
@@ -59,7 +60,6 @@ _URL_RE = re.compile(r"https?://|<https?:|\]\(https?:")
 _RESOLVED_PROMPT_MEMORY = 256
 
 # Connector promptCodec.decodePromptCallback id alphabet ([A-Za-z0-9_.-], <=32).
-_PROMPT_ID_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,32}$")
 
 _TRUTHY = {"1", "true", "yes", "on"}
 _FALSY = {"0", "false", "no", "off"}
@@ -109,7 +109,7 @@ def _profile_from_session_key(session_key: str) -> Optional[str]:
     return None if profile == "default" else profile
 
 
-class RelayAdapter(BasePlatformAdapter):
+class RelayAdapter(RelayDiscordInteractionMixin, BasePlatformAdapter):
     """Generic relay adapter advertising a connector-negotiated capability profile."""
 
     # Connector egress splits against negotiated max_message_length, so the
@@ -155,6 +155,10 @@ class RelayAdapter(BasePlatformAdapter):
         self._auto_thread_waiters: Dict[str, asyncio.Event] = {}
         # Bounded FIFO seen-set for inbound replay dedupe (insertion-ordered dict).
         self._seen_inbound: Dict[str, None] = {}
+        # Discord chat labels the text lane carries and a forwarded interaction does not:
+        # (scope, chat) -> (chat_name, chat_topic); the second map is what the store holds.
+        self._discord_chat_labels: Dict[tuple, tuple] = {}
+        self._discord_labels_recorded: Dict[tuple, tuple] = {}
         # (platform, chat_id) -> the chat's latest off-reader admission task (inbound_admission).
         self._admission_lanes: Dict[Tuple[str, str], asyncio.Task] = {}
         # Live cards: draft_key -> draft_id of the OPEN native stream. Armed by
@@ -894,7 +898,8 @@ class RelayAdapter(BasePlatformAdapter):
             self._seen_inbound[dedupe_key] = None
             self._evict_oldest(self._seen_inbound, self._SEEN_INBOUND_MAX)
         try:
-            self._capture_scope(event)
+            self._capture_ingress_scope(event)
+            await self._remember_discord_labels(event.source)
             self._stamp_slack_session_thread(event)
             # A structured prompt answer resolves its waiting primitive and is CONSUMED —
             # never also dispatched as chat.
@@ -1033,28 +1038,28 @@ class RelayAdapter(BasePlatformAdapter):
             urls = list(getattr(event, "media_urls", None) or [])
             if not urls:
                 return
-            # media_types is INDEXED IN PARALLEL with media_urls by every downstream
-            # classifier: carry (url, mime) PAIRS through the loop or surviving
-            # attachments inherit a neighbour's type.
-            types = list(getattr(event, "media_types", None) or [])
-            pairs = [(u, types[i] if i < len(types) else "") for i, u in enumerate(urls)]
+            # media_types / media_filenames are INDEXED IN PARALLEL with media_urls downstream:
+            # carry (url, mime, name) TRIPLES or survivors inherit a neighbour's type or name.
+            types = list(getattr(event, "media_types", None) or []) + [""] * len(urls)
+            names = list(getattr(event, "media_filenames", None) or []) + [""] * len(urls)
             client = self._get_media_client()
-            localized: list[tuple[str, str]] = []
-            for url, mime in pairs:
+            localized: list[tuple[str, str, str]] = []
+            for url, mime, name in zip(urls, types, names):
                 if not isinstance(url, str) or not url:
                     continue
                 if client is None:
                     if "/relay/media/" not in url:
-                        localized.append((url, mime))
+                        localized.append((url, mime, name))
                     continue
-                path = await client.download(url)
-                if path:
-                    localized.append((path, mime))
+                # The path is a random temp name; the original name rides beside it.
+                got = await client.download_with_name(url, suggested_name=name or None)
+                if got:
+                    localized.append((got[0], mime, got[1]))
                 elif "/relay/media/" not in url:
                     # A public URL still has value as a URL; a dead re-host does not.
-                    localized.append((url, mime))
-            event.media_urls = [u for u, _ in localized]
-            event.media_types = [m for _, m in localized]
+                    localized.append((url, mime, name))
+            event.media_urls, event.media_types, event.media_filenames = (
+                [entry[i] for entry in localized] for i in range(3))
         except Exception:  # noqa: BLE001 - media localization must never break inbound
             logger.debug("relay inbound media localization failed", exc_info=True)
 
@@ -1140,137 +1145,6 @@ class RelayAdapter(BasePlatformAdapter):
     async def on_interrupt(self, session_key: str, chat_id: str) -> None:
         """Bridge a connector-delivered /stop into the per-session interrupt path."""
         await self.interrupt_session_activity(session_key, chat_id)
-
-    async def _on_passthrough(self, forward, buffer_id: Optional[str] = None) -> None:
-        """Handle a connector-forwarded passthrough request. The connector answered the
-        provider's latency-critical ACK at the edge, verified the signature and vaulted
-        any shared-identity credential; the agent later acts via the token-less
-        ``send_follow_up`` path. A Discord interaction becomes a normalized
-        ``MessageEvent`` on the SAME agent path as chat; other forwards are logged and
-        dropped. NEVER raises: a malformed forward must not kill the read loop."""
-        try:
-            platform = getattr(forward, "platform", "") or ""
-            if platform == "discord":
-                event = self._discord_interaction_to_event(forward)
-                if event is not None:
-                    self._capture_scope(event)
-                    # A prompt-token component press is consumed (same gate as _on_inbound).
-                    if await self._consume_prompt_response(event):
-                        return
-                    await self.handle_message(event)
-                    return
-            logger.info(
-                "relay passthrough_forward dropped (no handler): platform=%s method=%s path=%s",
-                platform, getattr(forward, "method", "?"), getattr(forward, "path", "?"),
-            )
-        except Exception:  # noqa: BLE001 - a bad forward must never break the reader
-            logger.warning("relay passthrough_forward handling failed", exc_info=True)
-
-    def _discord_interaction_to_event(self, forward):
-        """Convert a forwarded Discord interaction body to a MessageEvent, or None for
-        an unusable body (a PING is answered at the edge and never forwarded). The
-        session source mirrors the connector's ``interactionSessionSource`` so the
-        session key matches the one the follow-up capability was bound under."""
-        try:
-            payload = json.loads(bytes(getattr(forward, "body", b"")).decode("utf-8"))
-        except Exception:  # noqa: BLE001
-            return None
-        if not isinstance(payload, dict):
-            return None
-        # type 2 = APPLICATION_COMMAND; 3 = MESSAGE_COMPONENT; 5 = MODAL_SUBMIT.
-        itype = payload.get("type")
-        data = payload.get("data") or {}
-        message_type = MessageType.TEXT
-        if itype == 2:
-            # Normalize to a leading-slash command string ("/name arg…"), the
-            # shape the dispatcher and the connector's Slack slash lane expect.
-            text = ("/" + str(data.get("name") or "")).rstrip("/") or ""
-            if text:
-                parts = [text] + self._render_interaction_options(data.get("options"))
-                text = " ".join(parts).strip()
-                message_type = MessageType.COMMAND
-        elif itype == 3:
-            text = str(data.get("custom_id") or "")
-        else:
-            text = ""
-        member = payload.get("member") or {}
-        user = (member.get("user") if isinstance(member, dict) else None) or payload.get("user") or {}
-        if not isinstance(user, dict):
-            user = {}
-        guild_id = payload.get("guild_id")
-        source = SessionSource(
-            # The LOGICAL platform, not RELAY: session keys must match the connector's
-            # capability binding (platform="discord"), /sethome must file under the
-            # logical platform, and _capture_scope skips the generic "relay".
-            platform=Platform.DISCORD,
-            chat_id=str(payload.get("channel_id") or ""),
-            # "group", not "channel": both the connector's capability binding and the
-            # native Discord adapter key guild channels as "group".
-            chat_type="group" if guild_id else "dm",
-            user_id=str(user["id"]) if user.get("id") else None,
-            user_name=str(user["username"]) if user.get("username") else None,
-            scope_id=str(guild_id) if guild_id else None,
-            message_id=str(payload.get("id")) if payload.get("id") else None,
-            # Same upstream-trust marker the relay text lane stamps. Set locally, never
-            # read off the wire (engages /sethome's via_relay guard).
-            delivered_via_upstream_relay=True,
-            # Profile routing (multiplex mode), mirroring _event_from_wire.
-            # The QUBIT profile this interaction is routed to (multiplex mode) — mirrors _event_from_wire's
-            # profile stamping for plain relayed messages (#60586). Without this, a Team-Gateway's Discord
-            # slash-command/button/modal always fell back to the legacy agent:main namespace even when the
-            # connector resolved a specific profile for it.
-            profile=getattr(forward, "profile", None),
-        )
-        event = MessageEvent(text=text, message_type=message_type, source=source)
-        if itype == 3:
-            # A component press whose custom_id is a Qubit prompt token
-            # (hp1:<prompt_id>:<option_id>) becomes a STRUCTURED prompt answer;
-            # foreign custom_ids keep the best-effort TEXT shape.
-            decoded = self._decode_prompt_token(text)
-            if decoded:
-                prompt_id, option_id = decoded
-                msg = payload.get("message") or {}
-                prompt_message_id = str(msg["id"]) if isinstance(msg, dict) and msg.get("id") else None
-                event.prompt_response = {
-                    "prompt_id": prompt_id,
-                    "option_id": option_id,
-                    "prompt_message_id": prompt_message_id,
-                }
-                event.text = f"/{option_id}"
-                event.message_type = MessageType.COMMAND
-        return event
-
-    @staticmethod
-    def _decode_prompt_token(token: str):
-        """Decode an hp1:<prompt_id>:<option_id> callback token, or None (mirrors the connector's promptCodec)."""
-        parts = (token or "").split(":")
-        if len(parts) != 3 or parts[0] != "hp1":
-            return None
-        if not _PROMPT_ID_RE.match(parts[1]) or not _PROMPT_ID_RE.match(parts[2]):
-            return None
-        return parts[1], parts[2]
-
-    @staticmethod
-    def _render_interaction_options(options) -> list:
-        """Render Discord interaction options to text parts: scalars contribute their
-        value (native ``f"/model {name}"`` shape); SUB_COMMAND (1) / SUB_COMMAND_GROUP
-        (2) contribute their name then recurse into nested options."""
-        parts: list = []
-        if not isinstance(options, list):
-            return parts
-        for opt in options:
-            if not isinstance(opt, dict):
-                continue
-            if opt.get("type") in (1, 2):
-                sub_name = str(opt.get("name") or "").strip()
-                if sub_name:
-                    parts.append(sub_name)
-                parts.extend(RelayAdapter._render_interaction_options(opt.get("options")))
-            else:
-                value = opt.get("value")
-                if value is not None and str(value).strip():
-                    parts.append(str(value).strip())
-        return parts
 
     async def disconnect(self) -> None:
         # The runner wraps this call in wait_for(adapter disconnect budget). Monitor

@@ -1279,6 +1279,12 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
                 # mirroring the CLI exit path (cli.py). Best-effort: a flush failure must never block
                 # teardown.
                 _mm = getattr(agent, "_memory_manager", None)
+                if _mm is not None and hasattr(_mm, "claim_teardown"):
+                    # Reserve session-end teardown BEFORE the (up to 10 s) pre-extraction flush: a /new
+                    # or /model that evicts this agent while the flush is still running must not claim
+                    # the soft release first, or the extraction never runs (it would lose the claim).
+                    with suppress(Exception):
+                        _mm.claim_teardown(session_end=True)
                 if _mm is not None and hasattr(_mm, "flush_pending"):
                     with suppress(Exception):
                         _mm.flush_pending(timeout=10)

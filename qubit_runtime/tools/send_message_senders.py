@@ -485,28 +485,6 @@ async def _send_weixin(pconfig, chat_id, message, media_files=None):
         return _error(f"Weixin send failed: {e}")
 
 
-async def _send_bluebubbles(extra, chat_id, message):
-    """Send via BlueBubbles iMessage server using the adapter's REST API."""
-    bb, err = _gateway_platform_module("bluebubbles", unavailable="BlueBubbles adapter not available.",
-                                       unmet="BlueBubbles requirements not met (need aiohttp + httpx).")
-    if err:
-        return err
-    try:
-        from gateway.config import PlatformConfig
-        adapter = bb.BlueBubblesAdapter(PlatformConfig(extra=extra))
-        if not await adapter.connect():
-            return _error("BlueBubbles: failed to connect to server")
-        try:
-            result = await adapter.send(chat_id, message)
-        finally:
-            await adapter.disconnect()
-        if not result.success:
-            return _error(f"BlueBubbles send failed: {result.error}")
-        return _success("bluebubbles", chat_id, message_id=result.message_id)
-    except Exception as e:
-        return _error(f"BlueBubbles send failed: {e}")
-
-
 async def _signal_send_batch(post, scheduler, rl, idx, n_batches, att_batch, batch_message):
     """One Signal batch under the scheduler with rate-limit retries: None on success, False when
     retries were exhausted (batch lost), error dict for a non-rate-limit RPC error."""

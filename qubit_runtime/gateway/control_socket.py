@@ -48,7 +48,7 @@ def _home_hash(home: Path) -> str:
 
 def windows_pipe_name(home: Path) -> str:
     """Per-QUBIT_HOME named pipe path (Windows transport)."""
-    return rf"\\.\pipe\hermes-gateway-{_home_hash(home)}"
+    return rf"\\.\pipe\qubit-gateway-{_home_hash(home)}"
 
 
 def _fits_sun_path(path: Path) -> bool:
@@ -176,13 +176,16 @@ def launch_supervisor(identity: dict[str, Any]) -> Optional[str]:
 
 def build_identify_payload() -> dict[str, Any]:
     """Default ``identify`` answer, built from gateway.status primitives."""
-    from gateway.status import _build_pid_record, _get_code_identity_fields, _profile_label_for_home, read_runtime_status
+    from gateway.status import (
+        _build_pid_record, _get_code_identity_fields, _profile_label_for_home, read_runtime_status, record_home)
     record = _build_pid_record()
     supervisor = _detect_supervisor()
+    _home = record_home(record) or ""
     payload: dict[str, Any] = {
         "protocol": CONTROL_PROTOCOL_VERSION,
-        **{k: record.get(k) for k in ("kind", "pid", "start_time", "hermes_home")},
-        "profile": _profile_label_for_home(record.get("hermes_home") or ""),
+        **{k: record.get(k) for k in ("kind", "pid", "start_time")},
+        "qubit_home": _home or None,
+        "profile": _profile_label_for_home(_home),
         "supervisor": supervisor, "launch_supervisor": supervisor, **_get_code_identity_fields()}
     with contextlib.suppress(Exception):
         # served_profiles (multiplex mode) is stamped into runtime status by the runner.

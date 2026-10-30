@@ -22,7 +22,7 @@ from pathlib import Path
 from agent.i18n import t
 from gateway.config import Platform
 from gateway.platforms.base import EphemeralReply
-from gateway.platforms.event import MessageEvent, MessageType
+from gateway.platforms.event import MessageEvent, MessageType, clean_attachment_filename
 from gateway.run_busy import approval_input_words
 from gateway.run_common import _UNSET
 from gateway.run_inbound_hooks import GatewayInboundHooksMixin
@@ -79,46 +79,6 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
 
     Plugin-triggered turns (publisher, scheduler, origin/keyless dispatch) come from
     ``GatewayPluginInjectionMixin``; this class used to carry staler inline copies."""
-
-    async def _hm_pre_gateway_dispatch_hook(
-        self, event: MessageEvent, source: SessionSource
-    ) -> Optional[MessageEvent]:
-        """Run the ``pre_gateway_dispatch`` plugin hook; None = drop, else the (maybe rewritten) event.
-        Results: ``{"action": "skip"}`` → drop; ``{"action": "rewrite", "text"}`` → replace ``event.text``;
-        ``allow``/None → normal dispatch. Runs BEFORE auth so plugins can handle unauthorized senders."""
-        try:
-            from qubit_cli.lifecycle import ainvoke_hook as _ainvoke_hook
-            _hook_results = await _ainvoke_hook(
-                "pre_gateway_dispatch", event=event, gateway=self,
-                # getattr: bare-runner tests build GatewayRunner via object.__new__ without __init__.
-                session_store=getattr(self, "session_store", None),
-            )
-        except Exception as _hook_exc:
-            logger.warning("pre_gateway_dispatch invocation failed: %s", _hook_exc)
-            _hook_results = []
-
-        for _result in _hook_results:
-            if not isinstance(_result, dict):
-                continue
-            _action = _result.get("action")
-            if _action == "skip":
-                logger.info(
-                    "pre_gateway_dispatch skip: reason=%s platform=%s chat=%s",
-                    _result.get("reason"), source.platform.value if source.platform else "unknown",
-                    source.chat_id or "unknown",
-                )
-                return None
-            if _action == "rewrite":
-                _new_text = _result.get("text")
-                if isinstance(_new_text, str):
-                    from gateway.session_ingress_context import carry_callback
-                    rewritten = dataclasses.replace(event, text=_new_text)
-                    carry_callback(event, rewritten)
-                    event = rewritten
-                break
-            if _action == "allow":
-                break
-        return event
 
     async def _hm_offer_pairing_code(self, source: SessionSource) -> None:
         """DM an unauthorized sender a pairing code (rate-limited; groups never reach here)."""
@@ -255,6 +215,8 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
 
         if is_internal:
             return event, source, True
+        if getattr(event, "_fifo_only", False):  # a slash command's queued turn: its command passed ingress
+            return event, source, False
 
         # scale-to-zero: only real user-originated inbound stamps the last-inbound clock;
         # counting internal/system events would keep a genuinely idle gateway awake.
@@ -1611,23 +1573,41 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         return message_text
 
     @staticmethod
-    def _inbound_attachment_display_name(path: str) -> Tuple[str, str]:
-        """``(display_name, agent_visible_path)``: cache filename is ``<id>_<id>_<original>``; the
-        path is translated to the in-container mount under a Docker backend."""
+    def _inbound_attachment_display_name(path: str, original_name: str = "") -> Tuple[str, str]:
+        """``(display_name, agent_visible_path)``. The display name is the adapter-supplied
+        original name when known (``MessageEvent.media_filenames``), else parsed from the native
+        cache filename ``<id>_<id>_<original>``. A relay temp file (``relay_media_<random>``)
+        carries no name, so it is labelled unknown rather than shown as the random basename.
+        The path is translated to the in-container mount under a Docker backend."""
         from tools.credential_files import to_agent_visible_cache_path
         basename = os.path.basename(path)
-        parts = basename.split("_", 2)
-        return re.sub(r'[^\w.\- ]', '_', parts[2] if len(parts) >= 3 else basename), to_agent_visible_cache_path(path)
+        name = clean_attachment_filename(original_name)
+        if not name and basename.startswith(_RELAY_MEDIA_PREFIX):
+            return _UNKNOWN_ATTACHMENT_NAME, to_agent_visible_cache_path(path)
+        if not name:
+            parts = basename.split("_", 2)
+            name = parts[2] if len(parts) >= 3 else basename
+        return re.sub(r'[^\w.\- ]', '_', name), to_agent_visible_cache_path(path)
+
+    @staticmethod
+    def _inbound_original_names(event: MessageEvent) -> dict[str, str]:
+        """``{path: original_name}`` for the attachments whose original name the adapter kept."""
+        names = getattr(event, "media_filenames", None) or []
+        return {p: n for p, n in zip(event.media_urls or [], names) if n}
 
     @classmethod
-    def _prepend_inbound_media_file_notes(cls, message_text: str, audio_file_paths: list[str], video_paths: list[str]) -> str:
+    def _prepend_inbound_media_file_notes(
+        cls, message_text: str, audio_file_paths: list[str], video_paths: list[str],
+        original_names: Optional[dict[str, str]] = None,
+    ) -> str:
         """Prepend a path-pointing note per audio-file / video attachment (content is not inlined)."""
+        names = original_names or {}
         for kind, noun, verb, tool, paths in (
             ("an audio file attachment", "audio", "transcribe or process", "a transcription or media tool", audio_file_paths),
             ("a video attachment", "video", "inspect or process", "a video analysis or media tool", video_paths),
         ):
             for _path in paths:
-                _display, _agent_path = cls._inbound_attachment_display_name(_path)
+                _display, _agent_path = cls._inbound_attachment_display_name(_path, names.get(_path, ""))
                 message_text = (
                     f"[The user sent {kind}: '{_display}'. "
                     f"It is saved at: {_agent_path}. "
@@ -1653,6 +1633,7 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
 
         _TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".log", ".json", ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg"}
         inline_flags = getattr(event, "media_text_inlined", None) or []
+        names = getattr(event, "media_filenames", None) or []
         for i, path in enumerate(event.media_urls):
             # A document mixed into a PHOTO/VOICE message (message-level type != DOCUMENT) still
             # reaches the agent; only genuine non-media files get a note.
@@ -1664,7 +1645,8 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
                 mtype = "text/plain" if _is_text else (_mimetypes.guess_type(path)[0] or "application/octet-stream")
             # Every accepted file gets a note — a non-text/non-application MIME (font/*, model/*)
             # must still tell the agent the file exists.
-            display_name, agent_path = cls._inbound_attachment_display_name(path)
+            display_name, agent_path = cls._inbound_attachment_display_name(
+                path, names[i] if i < len(names) else "")
             inline_flag = inline_flags[i] if i < len(inline_flags) else None
             context_note = _build_document_context_note(
                 display_name, agent_path, mtype, content_inlined=inline_flag is not False,
@@ -1793,7 +1775,8 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
             message_text = await self._enrich_inbound_images(source, session_key, message_text, image_paths)
         if audio_paths:
             message_text = await self._enrich_inbound_voice(event, source, message_text, audio_paths)
-        message_text = self._prepend_inbound_media_file_notes(message_text, audio_file_paths, video_paths)
+        message_text = self._prepend_inbound_media_file_notes(
+            message_text, audio_file_paths, video_paths, self._inbound_original_names(event))
         message_text = self._prepend_inbound_document_notes(event, message_text)
         from gateway.session_context_refs import turn_references
         message_text = await turn_references(self, event, source, session_key, message_text)

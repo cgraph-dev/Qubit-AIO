@@ -566,6 +566,17 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
         delivered: set[tuple[str, str, Optional[str]]] = set()
         skipped = skip_targets or set()
         message = t("gateway.startup.online")
+        # A free-tier identity is the only inference route on a host with no paid provider:
+        # say so once, or a first DM that works has no explanation. A configured paid key wins.
+        try:
+            import os as _os
+            from qubit_cli import anon_auth
+            _paid = any(_os.environ.get(k, "").strip() for k in (
+                "OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"))
+            if not _paid and anon_auth.has_free_tier_account():
+                message += "\n♻️ Free tier is active — requests use the shared free-tier inference."
+        except Exception:  # health: allow BLE001 - a notice must never break startup
+            logger.debug("free-tier startup notice check failed", exc_info=True)
         targets = list(self._served_home_channel_transports())
         # A chat already notified for ANOTHER profile is not notified again.
         notified_chats = {

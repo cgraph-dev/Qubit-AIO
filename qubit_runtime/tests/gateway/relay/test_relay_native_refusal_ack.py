@@ -55,8 +55,8 @@ async def test_refused_relay_frame_is_acked_and_the_reader_keeps_serving(tmp_pat
             assert await adapter.connect()
             ws = await asyncio.wait_for(ready.get(), 5)
             source = {'platform': 'telegram', 'chat_id': 'relay-chat', 'chat_type': 'dm', 'user_id': 'relay-user'}
-            # A route this single-profile gateway does not serve: refused (profile_mismatch) on every replay.
-            refused = {'text': 'for another profile', 'message_id': 'r1', 'source': {**source, 'profile': 'foreign'}}
+            # A platform this socket never advertised: refused (permission_denied) on every replay.
+            refused = {'text': 'for another platform', 'message_id': 'r1', 'source': {**source, 'platform': 'discord'}}
             ok = {'text': 'hello', 'message_id': 'r2', 'source': source}
             for event, buffer_id in ((refused, 'buf-refused'), (ok, 'buf-ok')):
                 await ws.send(json.dumps({'type': 'inbound', 'event': event, 'bufferId': buffer_id}) + '\n')

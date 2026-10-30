@@ -170,6 +170,8 @@ class SessionInventoryFields(Result):
     # Classic CLI surface (``source: cli``) only: main's startup lines under the banner (Rich markup).
     tool_availability_warnings: list[str] | None = None
     unknown_toolsets: list[str] | None = None  # main's "Unknown toolsets" warning, judged by the gateway
+    # main's ``_show_browser_backend_notice`` line, computed once by the gateway for the CLI surface.
+    browser_backend_notice: str | None = None
 
 
 class CanonicalSessionInfo(SessionInventoryFields, OpenModel):

@@ -1227,6 +1227,21 @@ class GatewayStartupMixin:
             if stuck:
                 logger.warning("Auto-suspended %d stuck-loop session(s)", stuck)
 
+    @staticmethod
+    def _start_free_tier_bootstrap() -> None:
+        """Run the free-tier identity bootstrap BEFORE any adapter connects.
+
+        Rung 5 made every demand-time site a read (provider resolution, /login, the
+        connector token), so a gateway that never bootstraps can never have an identity
+        and a fast first DM resolves nothing. Never fatal: a bootstrap failure leaves the
+        process env-preserving and the next demand-time read still works.
+        """
+        try:
+            from qubit_cli.free_tier_bootstrap import run_bootstrap
+            run_bootstrap(announce=False)
+        except Exception:  # noqa: BLE001 - boot must survive a bootstrap failure
+            logger.debug("free tier bootstrap failed at gateway startup", exc_info=True)
+
     async def _start_prefilter_platforms(self) -> tuple[bool, int, list, list]:
         """Create + wire an adapter per enabled platform (no connects). Returns
         (aborted, enabled_platform_count, multiplex_skipped_platforms, pending_connects)."""
@@ -1699,6 +1714,7 @@ class GatewayStartupMixin:
         startup_retryable_errors: list[str] = []
         self._startup_parked_platforms = False  # fresh boot: no platform has failed yet
         self._startup_ownership_conflict = False
+        self._start_free_tier_bootstrap()
         (
             _aborted, enabled_platform_count, _multiplex_skipped_platforms, _pending_connects
         ) = await self._start_prefilter_platforms()

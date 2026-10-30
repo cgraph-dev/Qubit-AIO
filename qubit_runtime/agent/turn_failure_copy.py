@@ -191,7 +191,7 @@ def is_max_iteration_handoff(result: Any) -> bool:
 _NEXT_STEPS_RETRY = "Wait a minute and send /retry, or switch models with /model."
 _NEXT_STEPS_LOOP = (
     "Your message is saved. Send `continue` to try again, or start a new session with /new. "
-    "If it happens again, run `hermes doctor` and share the error details."
+    "If it happens again, run `qubit doctor` and share the error details."
 )
 
 # Lead sentence per classifier reason once retries and fallback are exhausted.
@@ -213,11 +213,11 @@ _EXHAUSTED_FIRST_ATTEMPT_LEADS: dict[str, str] = {
 _NONRETRYABLE_COPY: dict[str, str] = {
     FailoverReason.model_not_found.value: (
         "Model '{model}' isn't available on {label}. Pick a different model with /model "
-        "(or `hermes model` in a terminal).{prefix_hint}"
+        "(or `qubit model` in a terminal).{prefix_hint}"
     ),
     FailoverReason.format_error.value: (
         "{label} rejected this request as malformed, so the model didn't answer. Start a clean "
-        "session with /new or switch models with /model; if it keeps happening, run `hermes doctor`."
+        "session with /new or switch models with /model; if it keeps happening, run `qubit doctor`."
     ),
     FailoverReason.role_alternation.value: (
         "{label} requires user and assistant turns to strictly alternate and rejected this "
@@ -255,7 +255,7 @@ _AUTH_COPY: dict[str, str] = {
     "oauth": "{label} rejected your sign-in, so the model can't be reached. Sign in again: `{relogin}`.",
     "api_key": (
         "{label} rejected your API key, so the model can't be reached. Update it in "
-        "Settings → Providers, or run `hermes setup` in a terminal."
+        "Settings → Providers, or run `qubit setup` in a terminal."
     ),
 }
 
@@ -383,7 +383,7 @@ _ONE_OFF_COPY: dict[str, str] = {
     ),
     "nous_rate_limit": (
         "Wait for the reset and send /retry, or switch models with /model. To avoid waits, add "
-        "a backup provider with `hermes fallback add`."
+        "a backup provider with `qubit fallback add`."
     ),
 }
 _SITE_COPY: dict[str, str] = {**_FAILURE_CODE_COPY, **_ONE_OFF_COPY}
@@ -410,7 +410,7 @@ def exhausted_copy(reason: str, *, label: str, attempts: int, summary: str, rese
         situation = f"it looks temporarily unavailable. {_NEXT_STEPS_RETRY}"
     return (
         f"{lead} — {situation} To avoid this in future, "
-        f"add a backup provider with `hermes fallback add`.\n\nProvider said: {summary}"
+        f"add a backup provider with `qubit fallback add`.\n\nProvider said: {summary}"
     )
 
 
@@ -429,32 +429,32 @@ def limit_reset_copy(resets_at: float, now: Optional[float] = None) -> str:
 
 def oauth_relogin_command(provider: Any) -> str:
     """The exact re-login command for a rejected OAuth grant, naming the provider slug and the active
-    named profile: a profile's credentials are its own (93889b770da), so a bare ``hermes auth`` from
+    named profile: a profile's credentials are its own (93889b770da), so a bare ``qubit auth`` from
     the root profile re-signs the wrong store and the goal judge, reading a bare 401, guesses which
     service revoked the token (#114012)."""
     from qubit_constants import profile_cli_selector
 
     slug = str(provider or "").strip().lower()
     if slug == "nous":
-        return f"hermes {profile_cli_selector()}portal"
-    return f"hermes {profile_cli_selector()}auth add {slug} --type oauth"
+        return f"qubit {profile_cli_selector()}portal"
+    return f"qubit {profile_cli_selector()}auth add {slug} --type oauth"
 
 
 def relogin_command_hint(provider: Any) -> str:
     """Re-sign-in command for a rejected credential on surfaces that may not know the provider:
-    the exact OAuth command for a known OAuth slug, ``hermes auth add <slug>`` for a known API-key
+    the exact OAuth command for a known OAuth slug, ``qubit auth add <slug>`` for a known API-key
     slug, and the ``<provider>`` placeholder when the slug is unknown — always carrying the
     ``-p <profile>`` selector so a profile user never re-signs the ROOT store (#114012)."""
     from qubit_constants import profile_cli_selector
 
     slug = str(provider or "").strip().lower()
     if not slug:
-        return f"hermes {profile_cli_selector()}auth add <provider>"
+        return f"qubit {profile_cli_selector()}auth add <provider>"
     from agent.error_surface import auth_kind
 
     if auth_kind(slug) == "oauth":
         return oauth_relogin_command(slug)
-    return f"hermes {profile_cli_selector()}auth add {slug}"
+    return f"qubit {profile_cli_selector()}auth add {slug}"
 
 
 def nonretryable_copy(

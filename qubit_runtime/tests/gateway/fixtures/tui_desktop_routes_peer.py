@@ -32,7 +32,7 @@ async def probe(mode):
     from tests.gateway.fixtures.local_recovery_probe import rpc
     from websockets.asyncio.client import connect
 
-    home = Path(os.environ['HERMES_HOME'])
+    home = Path(os.environ.get('QUBIT_HOME') or os.environ['HERMES_HOME'])
     marker = home / 'quick-exec-ran'
     (home / 'config.yaml').write_text(_CONFIG.format(marker=marker), encoding='utf-8')
     runner = GatewayRunner()
@@ -171,7 +171,7 @@ async def _commands(authority, ws, reader, sid, marker, receipt):
     assert ran.get('result') == {'type': 'exec', 'output': 'QUICK_EXEC_OK'}, ran
     assert marker.exists()
     # A relative path acts in the session's folder, never the gateway process's.
-    work = Path(os.environ['HERMES_HOME']) / 'session-work'
+    work = Path(os.environ.get('QUBIT_HOME') or os.environ['HERMES_HOME']) / 'session-work'
     assert (work / 'relative-exec-ran').exists(), 'exec quick command ran outside the session folder'
     assert not (Path.cwd() / 'relative-exec-ran').exists()
     dispatched = await rpc(ws, 'command.dispatch', session_id=sid, name='probe-plugin', arg='ARG_ONE two')

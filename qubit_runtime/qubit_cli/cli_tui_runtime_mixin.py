@@ -271,7 +271,8 @@ class CLITuiRuntimeMixin:
         (and its once-per-24h stamp) with the session's tools, so it is printed from the snapshot."""
         inventory = getattr(getattr(self, "_session_db", None), "banner_inventory", lambda: None)()
         if inventory is None or "browser_backend_notice" not in inventory:
-            self._show_startup_browser_notice()
+            # No gateway snapshot (standalone CLI): main's own renderer computes it here.
+            self._show_browser_backend_notice()
             return
         notice = inventory.get("browser_backend_notice")
         if notice:

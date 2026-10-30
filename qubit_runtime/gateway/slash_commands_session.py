@@ -36,7 +36,11 @@ _DM_CHAT_TYPES = {"dm", "direct", "private", ""}
 
 _BRANCH_COPIED_FIELDS = ("content", "tool_calls", "tool_call_id", "finish_reason", "reasoning",
                          "reasoning_content", "reasoning_details", "codex_reasoning_items",
-                         "codex_message_items", "timestamp", "data_use")
+                         "codex_message_items", "timestamp", "data_use",
+                         # Identity travels with the copy: a child minted with fresh uids diverges from
+                         # the parent's live dicts forever (a context engine keyed on message_uid then
+                         # sees a different history on every gateway branch boundary).
+                         "message_uid", "_tool_call_uids", "_tool_call_uid")
 
 
 def _sattr(obj, name: str) -> str:
@@ -96,10 +100,15 @@ def _reset_process_scoped_tool_state() -> None:
 def _branch_row(msg: dict) -> dict:
     """/branch child row; keeps the api_content sidecar so the branch's first turn replays the
     parent's exact wire bytes (warm provider prompt cache) instead of a cold prefill."""
+    from agent.message_metadata import message_identity
+
     row = {k: msg.get(k) for k in _BRANCH_COPIED_FIELDS}
     row["role"] = msg.get("role", "user")
     row["tool_name"] = msg.get("tool_name") or msg.get("name")
     row["api_content"] = extract_api_content_sidecar(msg)
+    # Keep the live dict's identity (minting a uid when it has none) so the child restores with the
+    # SAME uids the running agent saw — tool-call uids ride along because the copy keeps their calls.
+    row.update(message_identity(msg, with_tool_uids=True))
     return row
 
 
