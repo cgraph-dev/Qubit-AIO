@@ -332,7 +332,7 @@
     },
     {
       "name": "browser.manage",
-      "summary": "Inspect, attach to, or drop the CDP browser the tools use, or switch Browser Use mode (``use``, applies to new sessions); ``messages`` narrate a connect.",
+      "summary": "Inspect, attach to, or drop the CDP browser the tools use; ``messages`` narrate a connect.",
       "params": [
         {
           "name": "params",
@@ -6712,6 +6712,11 @@
             "title": "Logged In",
             "type": "boolean"
           },
+          "free_tier": {
+            "default": false,
+            "title": "Free Tier",
+            "type": "boolean"
+          },
           "free_tier_account": {
             "default": false,
             "title": "Free Tier Account",
@@ -7399,8 +7404,7 @@
         "enum": [
           "status",
           "connect",
-          "disconnect",
-          "use"
+          "disconnect"
         ],
         "title": "BrowserAction",
         "type": "string"
@@ -7677,18 +7681,6 @@
             "default": null,
             "title": "Url"
           },
-          "enabled": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Enabled"
-          },
           "session_id": {
             "anyOf": [
               {
@@ -7750,18 +7742,6 @@
             ],
             "default": null,
             "title": "Messages"
-          },
-          "browser_use": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Browser Use"
           }
         },
         "required": [
@@ -31335,6 +31315,18 @@
             "title": "Session Key",
             "type": "string"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source"
+          },
           "started_at": {
             "title": "Started At",
             "type": "number"
@@ -33039,6 +33031,18 @@
             ],
             "default": null,
             "title": "Last Seen"
+          },
+          "replay_epoch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Replay Epoch"
           }
         },
         "required": [

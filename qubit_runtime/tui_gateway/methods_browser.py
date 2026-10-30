@@ -97,7 +97,7 @@ def _reap_profile_browsers() -> None:
 def _browser_connect(rid, params: dict) -> dict:
     import platform
     from qubit_cli.browser_connect import DEFAULT_BROWSER_CDP_URL
-    from tools.browser_tool_lifecycle import cleanup_all_browsers
+    from tools.browser_session_cdp import set_live_cdp_override
     from urllib.parse import urlparse
     raw_url = params.get("url")
     if raw_url is not None and not isinstance(raw_url, str):
@@ -147,11 +147,11 @@ def _browser_connect(rid, params: dict) -> dict:
         # to ``scheme://host:port`` so ``_resolve_cdp_override`` can append ``/json/version``.
         normalized = (parsed.geturl() if parsed.path.startswith("/devtools/browser/")
                       else parsed._replace(path="", params="", query="", fragment="").geturl())
-        # Reap BEFORE publishing the new env (an in-flight tool call sees the old supervisor closed)
-        # and AFTER (the default task's cached supervisor drains against the new URL).
-        cleanup_all_browsers()
-        os.environ["BROWSER_CDP_URL"] = normalized
-        cleanup_all_browsers()
+        # Reap BEFORE publishing this profile's endpoint (an in-flight tool call sees the old
+        # supervisor closed) and AFTER (the default task's cached supervisor drains against the new URL).
+        _reap_profile_browsers()
+        set_live_cdp_override(normalized)
+        _reap_profile_browsers()
     except Exception as e:
         return _err(rid, 5031, str(e))
     return _ok(rid, {"connected": True, "url": normalized,
@@ -159,14 +159,15 @@ def _browser_connect(rid, params: dict) -> dict:
 
 
 def _browser_disconnect(rid) -> dict:
-    # Reap, drop the override, reap again — same swap window as ``_browser_connect``.
+    # Reap, drop this profile's override, reap again — same swap window as ``_browser_connect``.
+    from tools.browser_session_cdp import set_live_cdp_override
+
     def reap() -> None:
         with contextlib.suppress(Exception):
-            from tools.browser_tool_lifecycle import cleanup_all_browsers
-            cleanup_all_browsers()
+            _reap_profile_browsers()
 
     reap()
-    os.environ.pop("BROWSER_CDP_URL", None)
+    set_live_cdp_override(None)
     reap()
     return _ok(rid, {"connected": False})
 
