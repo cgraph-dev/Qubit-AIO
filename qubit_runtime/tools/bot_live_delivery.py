@@ -121,15 +121,22 @@ def _root(home: Path | str) -> Path:
     return Path(home).resolve() / "runtime" / DELIVERY_DIR_NAME
 
 
+class PreDialError(ValueError):
+    """The authority call died before its RPC reached the socket: nothing was admitted, so
+    this is a definite no-send the sender may safely retry — never the ambiguous
+    post-admission state that orders 'do not resend' (#139303). A ``ValueError`` like the
+    "authority is not ready" refusals it wraps, so existing ``except ValueError`` callers hold."""
+
+
 def authority_delivery(home, params):
     """Call only this home's already-running authority; never start a fallback."""
-    return _authority_rpc(home, "bot_relay.deliver", params)
+    return _authority_rpc(home, 'bot_relay.deliver', params)
 
 
 def authority_settle(home, params):
     """The same authority's ``bot_relay.settle``: the delivery id settled as never sent, or its
     existing receipt (``gateway/session_bot.py:_settle``)."""
-    return _authority_rpc(home, "bot_relay.settle", params)
+    return _authority_rpc(home, 'bot_relay.settle', params)
 
 
 def _authority_rpc(home, method, params):
@@ -139,8 +146,10 @@ def _authority_rpc(home, method, params):
     from websockets.asyncio.client import connect
 
     home = Path(home).resolve()
+    rpc_started = False
 
     async def request():
+        nonlocal rpc_started
         discovery = await asyncio.to_thread(discover_gateway_endpoint, home, timeout=5)
         if discovery.state != 'ready' or discovery.endpoint is None:
             raise ValueError('profile authority is not ready')
@@ -152,9 +161,22 @@ def _authority_rpc(home, method, params):
             if ws.subprotocol != GATEWAY_WS_PROTOCOL:
                 raise ValueError('authority protocol mismatch')
             async with GatewayClient(ws) as client:
+                rpc_started = True  # the RPC is going out: past here a failure may have been admitted
                 return await client.rpc(method, **params)
 
-    return asyncio.run(request())
+    try:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(request())
+        # A gateway-hosted tool call runs on a thread with a live loop, where asyncio.run() raises
+        # before anything is dialed (#139303).
+        from model_tools import _run_async
+        return _run_async(request())
+    except Exception as exc:
+        if not rpc_started:
+            raise PreDialError(str(exc)) from exc
+        raise
 
 
 def has_mailbox(profile_home: Path | str) -> bool:
@@ -163,6 +185,38 @@ def has_mailbox(profile_home: Path | str) -> bool:
     owner lookup — a state.db open plus the exclusive active-session registry lock — can be skipped."""
     return _root(profile_home).is_dir()
 
+
+_warned_unhardened: set[Path] = set()
+# Mailbox dirs already reported unusable by this process: WARNING once per dir, DEBUG after,
+# because the receipt readers re-enter ``_locked`` while Bot Chat is waiting.
+_warned_unusable: set[Path] = set()
+
+
+class MailboxUnusable(PermissionError):
+    """This token cannot list, create or lock inside the mailbox dir (#139485, #138872).
+
+    On Windows an elevated install/update creates ``runtime/bot_live_delivery`` owned by
+    Administrators with no entry for the user; the same user's non-elevated gateway then
+    cannot even open ``.lock``. Bot Chat deliveries pause; nothing else depends on the dir.
+    A ``PermissionError`` subclass so every existing caller keeps its handling.
+    """
+
+
+def _dir_owner(path: Path) -> str:
+    """Best-effort owner name for the log line; never raises (an ACL that hides it is the reported case)."""
+    if os.name == "nt":
+        try:
+            import pywintypes
+            import win32security
+        except ImportError as exc:
+            return f"unknown ({exc})"
+        try:
+            descriptor = win32security.GetFileSecurity(str(path), win32security.OWNER_SECURITY_INFORMATION)
+            name, domain, _ = win32security.LookupAccountSid(None, descriptor.GetSecurityDescriptorOwner())
+        except pywintypes.error as exc:
+            return f"unknown ({exc})"
+        return f"{domain}\\{name}" if domain else name
+    import pwd  # windows-footgun: ok — POSIX branch only
 
 _warned_unhardened: set[Path] = set()
 # Mailbox dirs already reported unusable by this process: WARNING once per dir, DEBUG after,

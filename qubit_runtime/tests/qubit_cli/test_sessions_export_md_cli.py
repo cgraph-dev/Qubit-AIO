@@ -142,10 +142,14 @@ def _export_delete(monkeypatch, out_dir, session_id, *extra):
     import qubit_cli.main as main_mod
 
     monkeypatch.setattr(sys, "argv", [
-        "hermes", "sessions", "export", "--format", "md", "--session-id", session_id,
+        "qubit", "sessions", "export", "--format", "md", "--session-id", session_id,
         "--delete-after-verified", "--yes", *extra, str(out_dir),
     ])
-    main_mod.main()
+    try:
+        main_mod.main()
+    except SystemExit as exc:
+        return exc.code
+    return 0
 
 
 @pytest.mark.parametrize("lineage", ["single", "logical"])
@@ -184,7 +188,7 @@ def test_delete_after_verified_rejects_same_count_content_change(monkeypatch, tm
         return path
 
     monkeypatch.setattr(session_export_md, "write_session_markdown", write_then_rewrite)
-    _export_delete(monkeypatch, tmp_path / "out", "s1")
+    assert _export_delete(monkeypatch, tmp_path / "out", "s1") == 1
 
     output = capsys.readouterr().out
     assert "was not deleted because its history or delegate set changed after export" in output
