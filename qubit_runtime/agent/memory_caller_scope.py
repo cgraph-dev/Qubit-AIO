@@ -65,7 +65,7 @@ def _refuse(label: str, reason: str, caller_home: Any, bound_home: Any, multiple
 def bound_scope(qubit_home: Any, agent_identity: Any = None) -> dict[str, Any]:
     """What ``initialize_all`` records for ``caller_scope``: the bound home's key is resolved once
     here, so each call only resolves the caller's."""
-    return {"qubit_home": qubit_home, "agent_identity": agent_identity, "home_key": _home_key(qubit_home)}
+    return {"hermes_home": qubit_home, "agent_identity": agent_identity, "home_key": _home_key(qubit_home)}
 
 
 def caller_scope(bound: Optional[dict[str, Any]], label: str) -> Optional[dict[str, Any]]:
@@ -75,7 +75,7 @@ def caller_scope(bound: Optional[dict[str, Any]], label: str) -> Optional[dict[s
     log (``tool <name>`` / ``hook <name>``)."""
     from agent.secret_scope import is_multiplex_active
     bound = bound or {}
-    bound_home = bound.get("qubit_home")
+    bound_home = bound.get("hermes_home")
     multiplexed = is_multiplex_active()
     caller_home = _explicit_caller_home()
     if caller_home is None:
@@ -88,13 +88,13 @@ def caller_scope(bound: Optional[dict[str, Any]], label: str) -> Optional[dict[s
         if multiplexed:
             _refuse(label, "the memory manager recorded no profile", caller_home, None, multiplexed)
             return None
-        return {"qubit_home": str(caller_home)}
+        return {"hermes_home": str(caller_home)}
     caller_key = _home_key(caller_home)
     if caller_key is None or caller_key != (bound.get("home_key") or _home_key(bound_home)):
         _refuse(label, "the caller's profile is not the one its provider was initialized for",
                 caller_home, bound_home, multiplexed)
         return None
-    scope: dict[str, Any] = {"qubit_home": str(bound_home)}
+    scope: dict[str, Any] = {"hermes_home": str(bound_home)}
     if bound.get("agent_identity"):
         scope["agent_identity"] = bound["agent_identity"]
     return scope

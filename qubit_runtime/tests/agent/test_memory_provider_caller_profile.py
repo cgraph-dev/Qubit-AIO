@@ -81,7 +81,7 @@ def _agent(home, gsk, provider_cls=_ProcessWideProvider, *, initialize=True):
     with _Scope(home):
         manager.add_provider(provider_cls())
         if initialize:
-            manager.initialize_all(session_id=f"s-{home.name}", platform="api_server", qubit_home=str(home))
+            manager.initialize_all(session_id=f"s-{home.name}", platform="api_server", hermes_home=str(home))
     return SimpleNamespace(
         _memory_manager=manager, _context_engine_tool_names=set(), _gateway_session_key=gsk,
         _should_emit_quiet_tool_messages=lambda: False, _should_start_quiet_spinner=lambda: False,
@@ -290,7 +290,7 @@ def _manager(home, provider=None):
     manager = MemoryManager()
     with _Scope(home):
         manager.add_provider(provider or _InstanceScopedProvider())
-        manager.initialize_all(session_id=f"s-{home.name}", platform="api_server", qubit_home=str(home))
+        manager.initialize_all(session_id=f"s-{home.name}", platform="api_server", hermes_home=str(home))
     return manager
 
 
