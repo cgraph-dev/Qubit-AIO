@@ -619,6 +619,11 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
     # Gateway-dedicated entrypoints carry no subcommand to inspect.
     if any(t == "gateway/run.py" or t.endswith("/gateway/run.py") for t in tokens):
         return "run"
+    # The module spelling of the same script: its PID record renders argv as ``gateway/run.py``,
+    # but a fixture-launched live process reads as ``python -m gateway.run``. Without this a
+    # liveness probe rejected it as "not a gateway" (and skipped hot-serve/unroute).
+    if any(tokens[i] == "-m" and tokens[i + 1] == "gateway.run" for i in range(len(tokens) - 1)):
+        return "run"
     # Atomic Hermes' bundled desktop runner shares QUBIT_HOME with the CLI; without this,
     # `gateway run --replace` does not recognise it as a running gateway, skips the
     # terminate-and-scoped-lock-handoff path, and collides with its still-held scoped locks

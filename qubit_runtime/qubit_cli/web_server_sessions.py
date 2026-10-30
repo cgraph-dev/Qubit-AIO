@@ -13,6 +13,12 @@ from qubit_state_common import _RESET_CHILD_SQL, _sql_json_extract
 # Same logger the code used before extraction (record parity).
 _log = logging.getLogger("qubit_cli.web_server")
 
+# Stores whose one-shot browse-time schema heal already failed this process: a later browse must
+# not retry the same write every poll (the sidebar reports a failed load with a retry once the
+# store has rows, rather than an endless heal loop).
+_session_db_heal_exhausted: set = set()
+_session_db_heal_warned: set = set()
+
 _DESCENDANTS_SQL = f"""
             WITH RECURSIVE descendants(id, parent_session_id, started_at) AS (
                 SELECT id, parent_session_id, started_at FROM sessions WHERE id = ?
@@ -399,7 +405,10 @@ def _open_session_db_at_path(db_path: Path, *, read_only: bool):
             try:
                 reconcile_drift_for_browse(db_path)
             except DeclarativeDriftError as drift:
-                _log.warning("session store at %s is behind SCHEMA_SQL: %s", db_path, drift)
+                _session_db_heal_exhausted.add(str(db_path))
+                if str(db_path) not in _session_db_heal_warned:
+                    _session_db_heal_warned.add(str(db_path))
+                    _log.warning("session store at %s is behind SCHEMA_SQL: %s", db_path, drift)
                 raise HTTPException(status_code=503, detail=str(drift)) from exc
             return _open_probed()
     except (sqlite3.DatabaseError, UnicodeDecodeError) as exc:

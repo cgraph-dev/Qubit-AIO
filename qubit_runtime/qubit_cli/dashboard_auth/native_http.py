@@ -105,20 +105,31 @@ async def _check_profile_scope(request, profile_id):
 
 
 def _redeem_http_ticket(store, ticket, request):
+    from gateway.runtime_bootstrap import _PURPOSE_CAPABILITIES
     try:
         grant = store.redeem(ticket, profile_id=None, purpose='native-http')
         expected = frozenset({'http:owner'})
     except PermissionError:
-        # Only this host-management operation accepts the dedicated same-user grant.
+        # Only these host-management operations accept a dedicated same-user grant.
         # Wrong-purpose redemption does not consume a ticket; ordinary profile grants
-        # still reach _check_profile_scope and remain unable to create other profiles.
-        if request.method != 'POST' or request.url.path.rstrip('/') != '/api/profiles':
+        # still reach _check_profile_scope and remain unable to create, move or delete profiles.
+        if request.method == 'POST' and request.url.path.rstrip('/') == '/api/profiles':
+            grant = store.redeem(ticket, profile_id=None, purpose='native-profile-create')
+        elif _registry_target(request) is not None:
+            grant = store.redeem(ticket, profile_id=None, purpose='native-profile-registry')
+        else:
             raise
-        grant = store.redeem(ticket, profile_id=None, purpose='native-profile-create')
-        expected = frozenset({'profiles:create'})
-    if grant['capabilities'] != expected:
+    # The issuer's own purpose -> capability table, not a second copy of it.
+    if grant['capabilities'] != _PURPOSE_CAPABILITIES[grant['purpose']]:
         raise PermissionError('invalid native grant')
     return grant
+
+
+def _launch_home(runner):
+    from gateway.session_authorities import all_authorities
+    registry = getattr(runner, 'session_authorities', None)
+    launch = registry.launch if registry is not None else (all_authorities(runner) or [None])[0]
+    return launch.profile_id if launch is not None else None
 
 
 def _native_store(conn, tickets):
@@ -207,7 +218,9 @@ async def authenticate_native_http(request):
     except PermissionError:
         return JSONResponse({'detail': 'Unauthorized'}, status_code=401)
     try:
-        if grant['purpose'] != 'native-profile-create':
+        if grant['purpose'] == 'native-profile-registry':
+            _check_registry_scope(request, grant['profile_id'], _launch_home(runner))
+        elif grant['purpose'] != 'native-profile-create':
             await _check_profile_scope(request, grant['profile_id'])
     except PermissionError:
         return JSONResponse({'detail': 'profile_scope_mismatch'}, status_code=403)
