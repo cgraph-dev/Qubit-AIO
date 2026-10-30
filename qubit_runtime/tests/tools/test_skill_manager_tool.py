@@ -265,16 +265,39 @@ class TestCreateSkill:
         assert empty_result["success"] is True
         assert (empty / "SKILL.md").exists()
 
-    def test_edit_long_desc_still_allowed_with_preview(self, tmp_path):
-        """Edit/patch paths stay permissive so existing over-limit skills
-        remain maintainable — they warn via system_prompt_preview instead."""
+    def test_written_long_desc_rejected_but_legacy_one_stays_editable(self, tmp_path):
+        """A description an edit/patch WRITES must fit the index width; a legacy over-limit
+        description the call leaves alone never blocks a body change (preview instead)."""
         with _skill_dir(tmp_path):
             _create_skill("my-skill", VALID_SKILL_CONTENT)
-            result = _edit_skill("my-skill", LONG_DESC_CONTENT)
-        assert result["success"] is True
-        assert "system_prompt_preview" in result
+            edit = _edit_skill("my-skill", LONG_DESC_CONTENT)
+            patched = _patch_skill("my-skill", "A test skill for unit testing.",
+                                   "Use when deploying multi-region clusters with custom CNI plugins.")
+            legacy = tmp_path / "legacy"
+            legacy.mkdir()
+            (legacy / "SKILL.md").write_text(LONG_DESC_CONTENT.replace("long-desc", "legacy"))
+            body = _edit_skill("legacy", LONG_DESC_CONTENT.replace("long-desc", "legacy") + "\nMore.\n")
+        assert edit["success"] is False and "60" in edit["error"]
+        assert patched["success"] is False and "60" in patched["error"]
+        assert "A test skill for unit testing." in (tmp_path / "my-skill" / "SKILL.md").read_text()
+        assert body["success"] is True
         fm, _ = parse_frontmatter(LONG_DESC_CONTENT)
-        assert extract_skill_description(fm) in result["system_prompt_preview"]
+        assert extract_skill_description(fm) in body["system_prompt_preview"]
+
+    def test_explicit_skill_md_paths_cannot_write_a_long_desc(self, tmp_path):
+        """patch(file_path='SKILL.md') and write_file('SKILL.md') reach the same root file as a plain
+        patch/edit, so the description written through them must fit the index width too."""
+        long_desc = "Use when deploying multi-region clusters with custom CNI plugins."
+        with _skill_dir(tmp_path):
+            _create_skill("my-skill", VALID_SKILL_CONTENT)
+            patched = _patch_skill("my-skill", "A test skill for unit testing.", long_desc, file_path="SKILL.md")
+            written = _write_file("my-skill", "SKILL.md", VALID_SKILL_CONTENT.replace(
+                "A test skill for unit testing.", long_desc))
+            body = _write_file("my-skill", "SKILL.md", VALID_SKILL_CONTENT + "\nMore.\n")
+        assert patched["success"] is False and "60" in patched["error"]
+        assert written["success"] is False and "60" in written["error"]
+        assert body["success"] is True
+        assert long_desc not in (tmp_path / "my-skill" / "SKILL.md").read_text()
 
 
 class TestEditSkill:
@@ -1018,8 +1041,8 @@ class TestBackgroundOwnershipPolicyConsistency:
 
     def test_repeated_identical_delete_gets_the_same_answer(self, tmp_path, monkeypatch):
         """No stubbing of load_usage: telemetry side effects are live. Both attempts agree."""
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
-        (tmp_path / ".qubit" / "skills").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
+        (tmp_path / ".hermes" / "skills").mkdir(parents=True, exist_ok=True)
         with _skill_dir(tmp_path):
             _create_skill("flip-skill", VALID_SKILL_CONTENT)
             first = self._bg_delete("flip-skill")
@@ -1032,7 +1055,7 @@ class TestBackgroundOwnershipPolicyConsistency:
     def test_foreground_write_to_unmanaged_skill_still_allowed(self, tmp_path, monkeypatch):
         """Fail-closed applies to AUTONOMOUS writes only. A user-directed
         foreground edit to their own skill must keep working."""
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         with _skill_dir(tmp_path):
             _create_skill("no-record", VALID_SKILL_CONTENT)
             with patch("tools.skill_usage.load_usage", return_value={}):
@@ -1044,7 +1067,7 @@ class TestBackgroundOwnershipPolicyConsistency:
 
     def test_adoption_lifts_the_autonomous_delete_refusal(self, tmp_path, monkeypatch):
         """Adoption is the documented path from refused to allowed for archival."""
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".qubit"))
+        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         with _skill_dir(tmp_path):
             _create_skill("adopt-me", VALID_SKILL_CONTENT)
             with patch("tools.skill_usage.load_usage", return_value={}):
@@ -1065,7 +1088,7 @@ class TestBackgroundOwnershipPolicyConsistency:
 # ---------------------------------------------------------------------------
 # Pinned-skill guard — skill_manage refuses only `delete` on pinned skills.
 # Patches and edits go through so pinned skills can still evolve as pitfalls
-# come up. The user unpins via `qubit curator unpin <name>` to delete.
+# come up. The user unpins via `hermes curator unpin <name>` to delete.
 # ---------------------------------------------------------------------------
 
 class TestPinnedGuard:
@@ -1184,7 +1207,7 @@ class TestDeleteSkillRmtreeGuard:
 def _curator_pass(tmp_path, *, monkeypatch):
     """Run the body as the curator/background-review fork.
 
-    Points QUBIT_HOME at ``tmp_path/.qubit`` so skill_usage's archive path
+    Points QUBIT_HOME at ``tmp_path/.hermes`` so skill_usage's archive path
     (``get_qubit_home()``) resolves into the same tree the skill manager
     searches, and flips ``is_background_review()`` → True so the consolidation
     guard fires.
@@ -1198,7 +1221,7 @@ def _curator_pass(tmp_path, *, monkeypatch):
     here; tests that specifically exercise the ownership guard set their own
     records instead.
     """
-    qubit_home = tmp_path / ".qubit"
+    qubit_home = tmp_path / ".hermes"
     skills_root = qubit_home / "skills"
     skills_root.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -1319,7 +1342,7 @@ class TestCuratorConsolidationDeleteGuard:
         _reset_background_review_read_marks()
         with _curator_pass(tmp_path, monkeypatch=monkeypatch):
             _create_curator_skill("reviewed", _skill_content("reviewed"))
-            ref = tmp_path / ".qubit" / "skills" / "reviewed" / "references"
+            ref = tmp_path / ".hermes" / "skills" / "reviewed" / "references"
             ref.mkdir()
             (ref / "workflow.md").write_text("old workflow\n", encoding="utf-8")
 
