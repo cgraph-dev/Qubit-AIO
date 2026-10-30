@@ -60,6 +60,7 @@ from qubit_cli.plugins_dispatch import (  # noqa: F401 — re-exported
     is_valid_system_prompt_section_id,
 )
 from qubit_cli.plugins_ledger import PluginLedgerMixin, PluginRegistration
+from qubit_cli.plugins_capability_ctx import PluginCapabilityCtxMixin
 from qubit_cli.plugins_state import (
     PluginState, _locked_plugin_state, _nested_plugin_mapping, _nested_plugin_value,
     _plugin_relative_segments, _plugin_settings_entry, save_plugin_setting,
@@ -227,7 +228,7 @@ class LoadedPlugin:
     deferred: bool = False
 
 
-class PluginContext:
+class PluginContext(PluginCapabilityCtxMixin):
     """Facade given to plugins so they can register tools and hooks."""
 
     def __init__(self, manifest: PluginManifest, manager: PluginManager):
@@ -930,9 +931,9 @@ class PluginContext:
                 logger.warning("Plugin '%s' locale file %s skipped: %s", self.manifest.name, file, exc)
         return handles
 
-    def register_hook(self, hook_name: str, callback: Callable) -> PluginRegistration:
-        """Register a lifecycle hook callback (unknown names warn but are still stored)."""
-        return self._track_callback("hook", hook_name, callback, self._manager._hooks, VALID_HOOKS)
+    def register_hook(self, hook_name: str, callback: Callable, *, hold_stream: bool = False) -> PluginRegistration:
+        """Register a lifecycle hook callback (``PluginDispatchMixin.track_hook``)."""
+        return self._manager.track_hook(self, hook_name, callback, hold_stream=hold_stream)
 
     def register_middleware(self, kind: str, callback: Callable) -> PluginRegistration:
         """Register behavior-changing middleware (request kinds rewrite the payload, execution kinds

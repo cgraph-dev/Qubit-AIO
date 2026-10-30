@@ -422,6 +422,15 @@ def serves_local_desktop_now() -> bool:
     return _SERVING_LOCAL_DESKTOP.get()
 
 
+def is_local_desktop_backend() -> bool:
+    """Whether this process is the backend the desktop app spawned on this machine.
+
+    Alias kept for the sign-in gate's process-level check; the activity-level check is
+    ``serves_local_desktop_now``.
+    """
+    return is_desktop_owned_backend()
+
+
 def local_desktop_client(identity: Optional[dict], declared: object) -> bool:
     """A connected client is the Desktop app on this machine when it says so (it knows its connection
     mode) AND it redeemed a native ticket, which only this machine's private control socket mints, for

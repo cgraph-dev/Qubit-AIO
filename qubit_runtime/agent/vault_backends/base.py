@@ -10,6 +10,7 @@ namespaced by ``prefix`` so ``backend_for_handle`` needs no lookup table.
 from __future__ import annotations
 
 import subprocess
+from contextlib import AbstractContextManager, nullcontext
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
@@ -36,6 +37,11 @@ class LoginBackend(ABC):
 
     def is_unlocked(self) -> bool:
         return True
+
+    def fill_context(self) -> AbstractContextManager:
+        """Optional profile-exclusive context, entered after the origin pre-check: covers the in-context
+        metadata re-check, secret resolution and the CDP write."""
+        return nullcontext()
 
     @abstractmethod
     def list_items(self) -> List[VaultItemMeta]:

@@ -84,6 +84,14 @@ def _canonical_issuer_kind(kind: Any) -> Any:
 _CROSS_ISSUER_WARN_EMITTED = False
 
 
+def _wire_model_identity(model: Any) -> Optional[str]:
+    """Canonical Responses wire model stamped on encrypted reasoning: blobs are sealed to the issuing
+    model too, so a same-endpoint model switch must not replay them (HTTP 400)."""
+    from agent.model_metadata import strip_codex_context_variant_suffix
+
+    return str(strip_codex_context_variant_suffix(model or "")).strip() or None
+
+
 # api.openai.com model families that accept ``reasoning.context: "all_turns"`` and honour a reasoning blob
 # minted by a sibling variant of the same family (LIVE: gpt-5.4<->5.4-mini, 5.5->5.5-pro, 5.6-luna<->terra,
 # 6-astra<->6.1-sol all rendered the blob). o-series, base gpt-5-mini/nano and gpt-5.1/5.2/5.3-codex 400 on
@@ -108,6 +116,8 @@ def _is_openai_api_issuer(issuer_kind: Any) -> bool:
 
 def _model_can_read_blob(issuer_kind: Optional[str], item_model: Any, current_model: Optional[str]) -> bool:
     """Exact model everywhere; same all_turns family on api.openai.com, which accepts sibling-variant blobs."""
+    if current_model is None or item_model is None or item_model == current_model:
+        return True
     if current_model is None or item_model is None or item_model == current_model:
         return True
     family = openai_reasoning_family(current_model)

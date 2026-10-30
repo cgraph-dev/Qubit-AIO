@@ -276,29 +276,60 @@ class SessionAuthority:
         self.authorize(actor, ref, 'session:read')
         return self._handle(ref)
 
-    async def attach(self, actor, ref):
+    def unless_deleted(self, ref, read):
+        """``read()``; a refusal because *ref* was deleted after ``authorize`` passed is ``not_found``.
+        A delete commits off the loop, so its rows can be gone while the live entry still waits for its
+        retirement, and readers meet the missing receipt instead."""
+        try:
+            return read()
+        except RuntimeStoreError:
+            if self.db.get_session(ref.session_id) is None:
+                raise RuntimeStoreError('not_found') from None
+            raise
+
+    async def attach(self, actor, ref, *, history=True, replay_from=None):
+        """Join *ref*'s event stream and snapshot it. ``history=False``: the snapshot carries no transcript
+        (``history == ()``), only the physical ``transcript_target``, so the display-row lineage read is
+        skipped; for a viewer that pages the transcript itself (Desktop over REST).
+        *replay_from*: ``(epoch, sequence)`` this connection's reconnect replay answered (SessionEvents.catch_up)."""
+        self.authorize(actor, ref, 'session:read')
+        from gateway.session_local_recovery import local_history, prepare_history, transcript_target
+        # The lineage read stays off the loop and the lock; without history the target is resolved under it.
+        prepared = await prepare_history(self, ref) if history else None
+        from gateway.session_onboarding import keep_from_discard
+        # The last await before the viewer joins: a fresh launch's claim is taken back with no yield
+        # before the join, and a delete already past it answers not_found below.
+        await keep_from_discard(self, ref.session_id)
+        # A delete or eviction can land during those awaits: re-check, so it answers not_found, never a KeyError.
         self.authorize(actor, ref, 'session:read')
         live = self.sessions[ref.session_id]
-        from gateway.session_local_recovery import local_history
         from gateway.session_queued_controls import pending_rows
         with live.event_stream.lock:
+            handle = self._handle(ref)  # before the viewer joins: a delete committed meanwhile is not_found
             subscription = next((key for key, member in live.subscribers.items()
                                  if member == actor), None) or uuid.uuid4().hex
             live.subscribers[subscription] = actor
             self.pending_closes.pop(ref.session_id, None)
+            from gateway.session_viewer_close import cancel_orphan_close
+            cancel_orphan_close(self, ref.session_id)
             from tools.async_delegation import allow_for_session
             allow_for_session((self.profile_id, ref.session_id))  # a closed session's work may start again
             transport = self.events.get(actor.transport_id)
             if transport is not None:
+                if replay_from is not None and not live.event_stream.fanout.contains(transport):
+                    live.event_stream.catch_up(transport, *replay_from)
                 live.event_stream.fanout.attach(transport)
                 live.event_stream.on_overflow = partial(self._retire_overflowed, ref.session_id)
-            handle = self._handle(ref)
             active_generation = handle.execution_generation if handle.execution_state == "running" else None
             prompts = live.controls.snapshot(ref.session_id, active_generation)
             epoch, sequence = live.event_stream.watermark()
-            snapshot = SubscriptionSnapshot(subscription, handle, epoch,
-                                        sequence, tuple(local_history(self, ref)),
-                                        tuple(self._pending_receipt(r) for r in pending_rows(self, ref)), prompts)
+            if history:
+                history, target = self.unless_deleted(ref, lambda: tuple(local_history(self, ref, prepared))), None
+            else:
+                history, target = (), self.unless_deleted(ref, lambda: transcript_target(self, ref))
+            snapshot = SubscriptionSnapshot(subscription, handle, epoch, sequence, history,
+                                        tuple(self._pending_receipt(r) for r in pending_rows(self, ref)), prompts,
+                                        transcript_target=target)
         from gateway.session_viewer_close import cancel_persisted_close
         await asyncio.to_thread(cancel_persisted_close, self, ref.session_id)  # the viewer cancels it
         from gateway.session_deferred_pick import reask_on_attach
@@ -313,7 +344,7 @@ class SessionAuthority:
             if self.events.get(member.transport_id) is transport:
                 del live.subscribers[subscription]
 
-    async def detach(self, actor, subscription_id, *, end_reason=None):
+    async def detach(self, actor, subscription_id, *, end_reason=None, orphaned=False):
         for session_id, live in self.sessions.items():
             if subscription_id in live.subscribers:
                 if live.subscribers[subscription_id] != actor:
@@ -334,6 +365,9 @@ class SessionAuthority:
                     # A viewer that attached while the close was off the loop reopens it.
                     await tracked_write(self, partial(end_idle_acp_session, self, session_id),
                                         then=partial(reopen_if_reattached, self, session_id))
+                    if orphaned:  # a plain session.detach is a live client handing the session back
+                        from gateway.session_viewer_close import arm_detached_orphan_close
+                        await arm_detached_orphan_close(self, session_id)
                 return
         raise RuntimeStoreError('not_found')
 
