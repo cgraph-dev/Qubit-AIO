@@ -111,20 +111,36 @@ function isUpdateToastSnoozed(): boolean {
 //     `<kind>.request` notifications would never render a card.
 export const REQUIRED_BACKEND_CONTRACT = 8
 const SKEW_TOAST_ID = 'backend-contract-skew'
+// The reverse direction: the GUI build predates the backend it is talking to.
+// Kept as its own toast id so it gets its own snooze and an "update the app"
+// action instead of telling the user to update the backend that is already
+// ahead.
+const GUI_SKEW_TOAST_ID = 'gui-contract-skew'
 // The contract check runs on every session.resume (applyRuntimeInfo), so
 // without a snooze the warning re-popped on every thread the user opened, even
 // right after they closed it. Mirror the update toast: persist a cooldown when
 // the user dismisses it. It still reminds again after the window if the backend
 // is still behind, and clears immediately once the backend catches up.
 const SKEW_TOAST_SNOOZE_KEY = 'hermes:backend-skew-toast-snooze-until'
+const GUI_SKEW_TOAST_SNOOZE_KEY = 'hermes:gui-skew-toast-snooze-until'
 const SKEW_TOAST_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
 function snoozeSkewToast(): void {
   persistString(SKEW_TOAST_SNOOZE_KEY, String(Date.now() + SKEW_TOAST_COOLDOWN_MS))
 }
 
+function snoozeGuiSkewToast(): void {
+  persistString(GUI_SKEW_TOAST_SNOOZE_KEY, String(Date.now() + SKEW_TOAST_COOLDOWN_MS))
+}
+
 function isSkewToastSnoozed(): boolean {
   const until = Number(storedString(SKEW_TOAST_SNOOZE_KEY) || 0)
+
+  return Number.isFinite(until) && Date.now() < until
+}
+
+function isGuiSkewToastSnoozed(): boolean {
+  const until = Number(storedString(GUI_SKEW_TOAST_SNOOZE_KEY) || 0)
 
   return Number.isFinite(until) && Date.now() < until
 }
@@ -157,11 +173,44 @@ function isInstallMethodToastSnoozed(): boolean {
  * doesn't nag on every thread switch.
  */
 export function reportBackendContract(contract: number | undefined): void {
-  if ((contract ?? 0) >= REQUIRED_BACKEND_CONTRACT) {
+  const reported = contract ?? 0
+
+  if (reported >= REQUIRED_BACKEND_CONTRACT) {
     dismissNotification(SKEW_TOAST_ID)
     // Backend caught up — forget any prior snooze so a future regression warns
     // immediately rather than staying silent for the rest of the window.
     persistString(SKEW_TOAST_SNOOZE_KEY, null)
+
+    // A backend NEWER than this build means the GUI is the stale side: warn
+    // with an app-update action instead of the backend-out-of-date toast.
+    if (reported > REQUIRED_BACKEND_CONTRACT) {
+      dismissNotification(SKEW_TOAST_ID)
+
+      if (!isGuiSkewToastSnoozed()) {
+        notify({
+          action: {
+            label: translateNow('notifications.updateDesktopApp'),
+            onClick: () => {
+              snoozeGuiSkewToast()
+              void applyUpdates()
+            }
+          },
+          durationMs: 0,
+          id: GUI_SKEW_TOAST_ID,
+          kind: 'warning',
+          message: translateNow('notifications.desktopOutOfDateMessage'),
+          onDismiss: () => snoozeGuiSkewToast(),
+          title: translateNow('notifications.desktopOutOfDateTitle')
+        })
+      }
+
+      return
+    }
+
+    // Aligned: clear the reverse-direction toast + its snooze so a later skew
+    // warns immediately.
+    dismissNotification(GUI_SKEW_TOAST_ID)
+    persistString(GUI_SKEW_TOAST_SNOOZE_KEY, null)
 
     return
   }
@@ -435,15 +484,28 @@ function isRemoteMode(): boolean {
   return $connection.get()?.mode === 'remote'
 }
 
-function mapBackendCheck(res: BackendUpdateCheckResponse): DesktopUpdateStatus {
-  const behind = res.behind ?? 0
+export function mapBackendCheck(res: BackendUpdateCheckResponse): DesktopUpdateStatus {
+  // The producer's contract: behind is 0 = up to date, -1 = update available
+  // but the count is unknown (shallow clone without a merge-base), null = the
+  // check could not run at all. DesktopUpdateStatus types "unknown count" as
+  // null — never render it as a literal number.
+  const behind = res.behind === undefined ? 0 : res.behind
+
+  // `behind: null` from a supported (git) backend is the endpoint's "the check
+  // could not run" answer and carries the explanation in `message`. Only a
+  // check that actually ran may claim there is nothing to update.
+  const checkFailed = res.can_apply && res.behind === null
 
   return {
     supported: res.can_apply,
+    error: checkFailed ? 'check-failed' : undefined,
     message: res.message ?? undefined,
     updateAvailable: res.update_available,
-    behind: behind > 0 ? behind : 0,
+    behind: behind === null || behind < 0 ? null : behind,
     currentVersion: res.current_version,
+    channel: res.channel ?? undefined,
+    branch: res.branch ?? undefined,
+    latestTag: res.source_version && !res.rollback_to ? `v${res.source_version}` : undefined,
     targetSha: res.update_available ? `backend:${res.current_version}` : undefined,
     commits: res.commits,
     fetchedAt: Date.now()
@@ -455,22 +517,56 @@ export interface UpdateCheckOptions {
   force?: boolean
 }
 
+function connectionKey(conn: HermesConnection | null): string {
+  if (!conn) {
+    return 'none'
+  }
+
+  return [conn.mode, conn.baseUrl ?? '', conn.profile ?? '', conn.connectionId ?? ''].join('|')
+}
+
 export async function checkBackendUpdates({
   force = false
 }: UpdateCheckOptions = {}): Promise<DesktopUpdateStatus | null> {
-  if (!isRemoteMode() || $backendUpdateChecking.get()) {
+  if (!isRemoteMode()) {
     return $backendUpdateStatus.get()
   }
+
+  if ($backendUpdateChecking.get()) {
+    // A switch while a check is in flight must not be silently dropped: the
+    // in-flight result belongs to the old target, and without a follow-up the
+    // new profile would keep showing it until the next daily poll.
+    backendRecheckPending = true
+
+    return $backendUpdateStatus.get()
+  }
+
+  const keyAtStart = connectionKey($connection.get())
 
   $backendUpdateChecking.set(true)
 
   try {
     const status = mapBackendCheck(await checkHermesUpdate(force))
+
+    // The connection changed under this request — discard the stale response
+    // (it describes another profile/backend) and let the finally re-check.
+    if (connectionKey($connection.get()) !== keyAtStart) {
+      backendRecheckPending = true
+
+      return $backendUpdateStatus.get()
+    }
+
     $backendUpdateStatus.set(status)
     maybeNotifyUpdateAvailable(status, 'backend')
 
     return status
   } catch (error) {
+    if (connectionKey($connection.get()) !== keyAtStart) {
+      backendRecheckPending = true
+
+      return $backendUpdateStatus.get()
+    }
+
     const fallback: DesktopUpdateStatus = {
       supported: $backendUpdateStatus.get()?.supported ?? true,
       error: 'check-failed',
@@ -483,6 +579,14 @@ export async function checkBackendUpdates({
     return fallback
   } finally {
     $backendUpdateChecking.set(false)
+
+    if (backendRecheckPending) {
+      backendRecheckPending = false
+
+      if (isRemoteMode()) {
+        void checkBackendUpdates()
+      }
+    }
   }
 }
 
@@ -766,8 +870,13 @@ async function runBackendUpdate(): Promise<DesktopUpdateApplyResult> {
 
     if (!started.ok) {
       const message = (started as { message?: string }).message || translateNow('updates.applyStatus.notAvailable')
-      const command = (started as { update_command?: string }).update_command || 'qubit update'
-      $backendUpdateApply.set({ ...IDLE, applying: false, stage: 'manual', message, command })
+      // An explicitly empty command means the backend manages updates outside
+      // this dashboard (a container, say) — show its refusal, not a made-up
+      // command. Only an OLDER backend that omits the field entirely falls back
+      // to the CLI command we know it supports.
+      const rawCommand = (started as { update_command?: null | string }).update_command
+      const command = rawCommand === undefined || rawCommand === null ? 'qubit update' : rawCommand || undefined
+      $backendUpdateApply.set({ ...IDLE, applying: false, stage: 'manual', message, command: command ?? null })
 
       return { ok: false, error: 'manual', manual: true, message, command }
     }
@@ -1072,7 +1181,8 @@ function ingestProgress(payload: DesktopUpdateProgress): void {
 let pollerStarted = false
 let backgroundTimer: ReturnType<typeof setInterval> | null = null
 let connectionUnsub: (() => void) | null = null
-let lastConnectionMode: string | undefined
+let lastConnectionKey: string | undefined
+let backendRecheckPending = false
 
 export const BACKGROUND_UPDATE_CHECK_MS = 24 * 60 * 60 * 1000
 const FOCUS_RECHECK_KEY = 'hermes.updates.last-passive-check'
@@ -1110,11 +1220,17 @@ export function startUpdatePoller(): void {
   // backend check above sees mode≠remote and no-ops. Re-check once the
   // connection resolves to remote.
   connectionUnsub = $connection.subscribe((conn: HermesConnection | null): void => {
-    if (conn?.mode === lastConnectionMode) {
+    // The update check is profile/baseUrl-scoped, not just mode-scoped: two
+    // remote profiles can share a mode while pointing at different backends
+    // (or the same backend with different per-profile channel overrides), and
+    // keeping the previous profile's status on screen is wrong for both.
+    const key = connectionKey(conn)
+
+    if (key === lastConnectionKey) {
       return
     }
 
-    lastConnectionMode = conn?.mode
+    lastConnectionKey = key
 
     if (conn?.mode === 'remote') {
       void checkBackendUpdates()
@@ -1133,7 +1249,8 @@ export function stopUpdatePoller(): void {
 
   connectionUnsub?.()
   connectionUnsub = null
-  lastConnectionMode = undefined
+  lastConnectionKey = undefined
+  backendRecheckPending = false
   window.removeEventListener('focus', onFocus)
   pollerStarted = false
 }

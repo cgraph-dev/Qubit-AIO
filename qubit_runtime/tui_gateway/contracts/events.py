@@ -727,12 +727,19 @@ event("preview.open", PreviewOpenPayload, doc="Open a URL / file in the desktop 
 event("preview.close", PreviewClosePayload, doc="Close the preview pane or one tab.")
 
 
+class LayoutApplyPayload(OpenPayload):
+    """``tools/apply_layout_tool.py``."""
+
+    preset: str
+
+
 class PaneRevealPayload(OpenPayload):
     """``tools/focus_pane_tool.py``."""
 
     pane: str
 
 
+event("layout.apply", LayoutApplyPayload, doc="Apply a named desktop layout preset.")
 event("pane.reveal", PaneRevealPayload, doc="Focus / reveal a named desktop pane.")
 
 
@@ -770,6 +777,31 @@ class BrowserProgressPayload(Payload):
 
 
 event("browser.progress", BrowserProgressPayload, doc="Browser (CDP) connect / install progress line.")
+
+
+# ── browser controller (gateway/browser_control_broker frames re-enveloped as events) ─────────
+
+
+class BrowserControllerCommandPayload(Payload):
+    """``gateway/browser_control_broker.py`` FRAME_COMMAND params."""
+
+    command_id: str
+    action: str
+    arguments: dict[str, JsonValue]
+    controller_id: str | None = None
+    browser_profile_id: str | None = None
+    tool_call_id: str | None = None
+
+
+class BrowserControllerCancelPayload(Payload):
+    """``gateway/browser_control_broker.py::_cancel_frame``."""
+
+    command_id: str
+    tool_call_id: str | None = None
+
+
+event("browser.controller.command", BrowserControllerCommandPayload, doc="Dispatch one browser action to the attached controller.")
+event("browser.controller.cancel", BrowserControllerCancelPayload, doc="Withdraw a pending controller command.")
 
 
 # ── voice ─────────────────────────────────────────────────────────────────────────────────────
@@ -872,7 +904,7 @@ __all__ = [
     "ErrorSurface", "FreeTierChallengePayload", "GatewayReadyPayload",
     "MessageCompletePayload", "MessageInterimPayload", "MessageReaction", "MessageReactionPayload", "MoaAggregatingPayload",
     "MoaPhasePayload", "MoaProgressPayload", "MoaReferencePayload", "NoticePayload",
-    "NotificationClearPayload", "NotificationShowPayload", "OpenPayload", "PaneRevealPayload",
+    "NotificationClearPayload", "NotificationShowPayload", "LayoutApplyPayload", "OpenPayload", "PaneRevealPayload",
     "PetChangedPayload", "PetGenerateProgressPayload", "PetHatchProgressPayload", "PreviewClosePayload",
     "PreviewOpenPayload", "PreviewRestartProgressPayload", "ReactionPayload", "ResumePhaseStatus",
     "ReviewSummaryPayload", "SessionControlSnapshot", "SessionControlUpdatePayload",

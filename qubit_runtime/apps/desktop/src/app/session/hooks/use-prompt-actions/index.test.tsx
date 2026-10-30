@@ -41,6 +41,11 @@ import { uploadComposerAttachment, usePromptActions } from '.'
 // never-settling in-flight promise from one test into the next.
 beforeEach(() => {
   clearSingleFlightSessionResumeState()
+  // The composer queue mirrors localStorage, and the store merges against the
+  // live persisted map. Clear both so an entry queued by one test cannot leak
+  // into the next test's `getQueuedPrompts` assertions.
+  window.localStorage.clear()
+  $queuedPromptsBySession.set({})
   vi.mocked(getLatestSessionMessages).mockReset()
   vi.mocked(getLatestSessionMessages).mockImplementation(async () => ({ messages: [], session_id: 'session' }))
 })

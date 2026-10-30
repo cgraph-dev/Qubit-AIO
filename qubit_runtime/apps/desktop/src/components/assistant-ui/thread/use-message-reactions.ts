@@ -88,7 +88,7 @@ export function useMessageReactions(
       (emoji: null | string) => commitReaction(messageId, role, rowId, reactions, emoji),
       [messageId, reactions, role, rowId]
     ),
-    reactions: mergeReactions(reactions, localAll[messageId], rowId === undefined ? undefined : agentLive[rowId])
+    reactions: mergeReactions(reactions, localAll[messageId], rowId === undefined ? undefined : agentLive[rowId]?.reactions)
   }
 }
 

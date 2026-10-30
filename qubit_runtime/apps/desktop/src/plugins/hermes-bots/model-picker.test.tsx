@@ -38,9 +38,11 @@ const { hostMock } = vi.hoisted(() => ({
 
 vi.mock('@qubit/plugin-sdk', async () => {
   const { useQuery } = await import('@tanstack/react-query')
-  const { useI18n } = await vi.importActual<typeof HermesSdk>('@qubit/plugin-sdk')
+  const actual = await vi.importActual<typeof HermesSdk>('@qubit/plugin-sdk')
+  const { useI18n } = actual
 
   return {
+    catalogProviderMatches: actual.catalogProviderMatches,
     Button: (props: React.ComponentProps<'button'>) => <button {...props} />,
     GlyphSpinner: () => <span data-testid="spinner" />,
     host: hostMock,

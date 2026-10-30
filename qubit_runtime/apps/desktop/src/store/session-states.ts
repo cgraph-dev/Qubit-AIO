@@ -32,25 +32,38 @@ import {
 } from '@/components/pane-shell/tree/store'
 import { resolveRememberedActivePane, workspaceScopeKey } from '@/components/pane-shell/workspace-scope'
 import type { WorkspaceMode } from '@/contrib/types'
-import type { ChatMessage } from '@/lib/chat-messages'
+import { finalizeInterruptedMessages, sealOpenToolParts, type ChatMessage } from '@/lib/chat-messages'
 import type { ErrorSurface } from '@/lib/error-surface'
 import { stableArray } from '@/lib/stable-array'
+import { tileFocusStampOnFocusChange } from '@/lib/session-timer-since'
 import { readJson, writeJson } from '@/lib/storage'
 import type { SessionInfo } from '@/types/hermes'
 
 import { dropStatusDrawersForProfile, migrateStatusDrawersForProfile } from './composer-status-drawer'
 import { registryConnectionKind } from './connection-registry-state'
 import { dialedGatewayModeFor } from './gateway'
-import { dropPreviewTabsForProfile, migratePreviewTabsForProfile, setPreviewScope } from './preview'
+import {
+  adoptPendingRuntimeTabs,
+  dropPreviewTabsForProfile,
+  migratePreviewTabsForProfile,
+  setPreviewScope
+} from './preview'
+import { forgetPendingRuntimeTabs } from './preview-ownership'
 import { dropPreviewArtifactsForProfile, migratePreviewArtifactsForProfile } from './preview-status'
 import { $activeGatewayProfile, normalizeProfileKey } from './profile'
+import { $projectTree } from './projects'
 import { clearAllProviderWaits, clearSessionProviderWait } from './provider-wait'
 import {
   $activeSessionId,
   $connection,
+  $cronSessions,
+  $currentCwd,
+  $messagingSessions,
+  $unlistedSessionOwnerRows,
   $lastReadAtBySessionId,
   $selectedStoredSessionId,
   $sessions,
+  $workspaceCwdOwner,
   clearReadBaseline,
   getSessionOwnerHint,
   knownSessionOwner,
@@ -63,10 +76,13 @@ import {
   setActiveSessionStoredIdRotation,
   setAwaitingResponse,
   setBusy,
-  setSessions
+  setSessions,
+  setTileSessionFocusStartedAt,
+  setTurnStartedAt
 } from './session'
 import { secondaryProfileOwnerForEvent } from './session-event-provenance'
-import { $focusedTreePaneId } from './session-focus'
+import { turnHasReply, withNoReplyNotice } from './session-no-reply'
+import { $focusedSessionIsTile, $focusedStoredSessionId, $focusedTreePaneId } from './session-focus'
 import { assertSessionOwnerResolved } from './session-owner-resolution'
 import {
   isSessionOwnerRoute,
@@ -175,6 +191,15 @@ export function liveSessionScopes(): Set<string> {
 
     if (scope) {
       scopes.add(scope)
+      continue
+    }
+
+    // Local secondary sockets prove a profile-only owner (no connectionId):
+    // the keep-set speaks bare profile names for them (#121865).
+    const owner = sessionOwnerByRuntimeId.get(runtimeId)
+
+    if (typeof owner === 'string' && owner.trim()) {
+      scopes.add(normalizeProfileKey(owner))
     }
   }
 
@@ -295,7 +320,45 @@ export function foregroundSessionScopes(): Set<string> {
     }
   }
 
-  addRuntimeScope($activeSessionId.get() ?? undefined)
+  const addOwnerScope = (owner: SessionOwnerScope) => {
+    if (!owner) {
+      return
+    }
+
+    if (isSessionOwnerRoute(owner)) {
+      const connectionId = owner.connectionId?.trim()
+      const profile = owner.profile?.trim()
+
+      if (connectionId && profile) {
+        scopes.add(registryBackendScopeKey(connectionId, normalizeProfileKey(profile)))
+      } else if (profile) {
+        scopes.add(normalizeProfileKey(profile))
+      }
+
+      return
+    }
+
+    if (typeof owner === 'string' && owner.trim()) {
+      scopes.add(normalizeProfileKey(owner))
+    }
+  }
+
+  const activeRuntimeId = $activeSessionId.get() ?? undefined
+
+  addRuntimeScope(activeRuntimeId)
+
+  // A foreground session can be owned by a local secondary profile whose
+  // events have not arrived yet; the runtime is bound but its event scope is
+  // unknown. Resolve the owner through the durable ladder (tile / hint / row)
+  // so its gateway socket survives the foreground handoff (#121865). The
+  // selected stored thread stands in for the active runtime in that gap.
+  const activeOwner = knownOwnerForSession(activeRuntimeId)
+
+  addOwnerScope(activeOwner)
+
+  if (activeRuntimeId && !activeOwner) {
+    addOwnerScope(knownOwnerForSession($selectedStoredSessionId.get() ?? undefined))
+  }
 
   for (const tile of $sessionTiles.get()) {
     addRuntimeScope(tile.runtimeId)
@@ -361,17 +424,49 @@ export function setSessionStalled(storedSessionId: string | null | undefined, st
 // suspect. Eight minutes was the other failure — longer than a user is willing
 // to sit and wonder, so the hint arrived after they had already given up on it.
 export const SESSION_WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000
-// A live turn that stops producing events — including after a partial payload —
-// must not wait out the presentation hint above. The clock resets on every
-// session event and on a live-status poll that still reports the turn working,
-// so a quiet tool call is left alone. The window outlasts the 30s live-status
-// backstop: a dead backend stops both events and polls, and this settles it
-// instead of leaving the spinner up. Not keyed on a model name or an error string.
+// A live turn that goes this long without a session event is checked against
+// its backend. Silence alone proves nothing: a foreground tool emits nothing
+// between tool.start and tool.complete, a local model can prefill for minutes,
+// and the live-status poll that also resets this clock pauses while the window
+// is not viewed and slows to 2 min on battery. Only the backend decides whether
+// the turn is over (see onEventSilence).
 export const LIVE_TURN_EVENT_SILENCE_MS = 45_000
+// Bound on the status request itself; past it the check counts as unanswered.
+export const LIVE_TURN_PROBE_TIMEOUT_MS = 15_000
 const sessionEventSilenceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+// One token per status check in flight: an event, a settle, or a newer check
+// drops it, so a late answer cannot act on a turn that moved on.
+const silentTurnChecks = new Map<string, object>()
+
+type AmbientGatewayRequest = <R>(method: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<R>
+
+interface LiveTurnBackend {
+  /** The window's gateway requester; the check routes through the session's
+   *  owner, so this only answers for sessions it provably owns. */
+  request: AmbientGatewayRequest
+  /** Pull the stored transcript for an on-screen session whose turn the
+   *  backend reported ended, so a reply that finished there shows up here. */
+  refreshTranscript?: (runtimeId: string, storedSessionId: string) => Promise<unknown> | unknown
+}
+
+let liveTurnBackend: LiveTurnBackend | null = null
+
+/** Register the backend a silent live turn is checked against. Returns the
+ *  unregister function; with nothing registered, a silent turn is left alone. */
+export function setLiveTurnBackend(backend: LiveTurnBackend): () => void {
+  liveTurnBackend = backend
+
+  return () => {
+    if (liveTurnBackend === backend) {
+      liveTurnBackend = null
+    }
+  }
+}
 
 function clearEventSilence(runtimeId: string) {
   const timer = sessionEventSilenceTimers.get(runtimeId)
+
+  silentTurnChecks.delete(runtimeId)
 
   if (timer) {
     clearTimeout(timer)
@@ -379,70 +474,164 @@ function clearEventSilence(runtimeId: string) {
   }
 }
 
-function isLiveTurnAwaitingEvents(state: ClientSessionState | undefined): boolean {
+export function isLiveTurnAwaitingEvents(state: ClientSessionState | undefined): boolean {
   return Boolean(state && (state.busy || state.awaitingResponse || state.turnLive) && !state.needsInput)
 }
 
-const SILENT_TURN_RETRY: ErrorSurface = { code: 'stream_drop', layer: 'streaming', retryable: true }
+export type LiveTurnVerdict = 'ended' | 'running' | 'unknown'
 
-function withSilentTurnRetry(messages: ChatMessage[], streamId: string | null): ChatMessage[] {
-  const occurredAt = Date.now() / 1000
-  const error = 'The connection dropped before the reply finished.'
-  const targetId =
-    (streamId && messages.some(message => message.id === streamId) ? streamId : null) ??
-    [...messages].reverse().find(message => message.role === 'assistant' && message.pending)?.id ??
-    null
-
-  const unpended = messages
-    .filter(message => !(message.pending && message.parts.length === 0 && message.id !== targetId))
-    .map(message =>
-      message.pending || message.id === targetId ? { ...message, completedAt: occurredAt, pending: false } : message
-    )
-
-  if (targetId && unpended.some(message => message.id === targetId)) {
-    return unpended.map(message =>
-      message.id === targetId ? { ...message, error, errorSurface: SILENT_TURN_RETRY, pending: false } : message
-    )
-  }
-
-  return [
-    ...unpended,
-    {
-      completedAt: occurredAt,
-      error,
-      errorSurface: SILENT_TURN_RETRY,
-      id: `assistant-interrupted-${Date.now()}`,
-      parts: [],
-      pending: false,
-      role: 'assistant',
-      timestamp: occurredAt
-    }
-  ]
+interface LiveTurnStatusResponse {
+  sessions?: { id?: string; status?: string }[]
 }
 
-function settleSilentLiveTurn(runtimeId: string) {
-  const current = $sessionStates.get()[runtimeId]
+/** What one `session.active_list` snapshot says about `runtimeId`'s turn. A
+ *  runtime missing from a well-formed list has been reaped: its turn is over.
+ *  `starting` is an agent build for a turn the backend accepted. */
+export function liveTurnVerdict(
+  response: LiveTurnStatusResponse | null | undefined,
+  runtimeId: string
+): LiveTurnVerdict {
+  if (!Array.isArray(response?.sessions)) {
+    return 'unknown'
+  }
 
-  if (!current || !isLiveTurnAwaitingEvents(current)) {
+  const status = response.sessions.find(session => session.id?.trim() === runtimeId)?.status
+
+  if (status === undefined || status === 'idle') {
+    return 'ended'
+  }
+
+  return status === 'starting' || status === 'waiting' || status === 'working' ? 'running' : 'unknown'
+}
+
+async function checkLiveTurn(runtimeId: string): Promise<LiveTurnVerdict> {
+  const backend = liveTurnBackend
+
+  if (!backend) {
+    return 'unknown'
+  }
+
+  try {
+    // Owner-routed: a turn in another profile's pane is answered by the
+    // backend running it, not by whichever gateway this window shows. An
+    // unresolved owner throws, which counts as no answer.
+    const response = await requestForOwnedSession<LiveTurnStatusResponse>(
+      runtimeId,
+      backend.request,
+      'session.active_list',
+      {},
+      LIVE_TURN_PROBE_TIMEOUT_MS
+    )
+
+    return liveTurnVerdict(response, runtimeId)
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** Write through the wiring cache when it holds the runtime, so the cache,
+ *  the focused view, and tile mirrors agree (#93059); otherwise the mirror. */
+function writeSessionState(runtimeId: string, updater: (state: ClientSessionState) => ClientSessionState) {
+  if (sessionTileDelegate()?.updateHeldSession?.(runtimeId, updater)) {
     return
   }
 
-  publishSessionState(runtimeId, {
-    ...current,
-    awaitingResponse: false,
-    busy: false,
-    interrupted: true,
-    messages: withSilentTurnRetry(current.messages, current.streamId),
-    pendingBranchGroup: null,
-    streamId: null,
-    turnLive: false,
-    turnStartedAt: null
+  const current = $sessionStates.get()[runtimeId]
+
+  if (current) {
+    publishSessionState(runtimeId, updater(current))
+  }
+}
+
+/** The backend reported the turn over and its end events never arrived. Settle
+ *  it like the running=false edge: nothing is interrupted, the kept stream
+ *  bubble is remembered so a late message.complete settles onto it. */
+function settleEndedLiveTurn(runtimeId: string) {
+  const occurredAt = Date.now() / 1000
+
+  writeSessionState(runtimeId, state => {
+    if (!isLiveTurnAwaitingEvents(state)) {
+      return state
+    }
+
+    const messages = sealOpenToolParts(finalizeInterruptedMessages(state.messages, state.streamId, occurredAt))
+
+    return {
+      ...state,
+      awaitingResponse: false,
+      busy: false,
+      heartbeatSettledStreamId:
+        state.streamId && messages.some(message => message.id === state.streamId) ? state.streamId : null,
+      messages,
+      pendingBranchGroup: null,
+      streamId: null,
+      turnLive: false,
+      turnStartedAt: null
+    }
   })
 }
 
+/** Stamp the retry card on an ended turn that has no reply, never an intentional
+ *  interruption. A newer turn is either live (skipped) or has its own reply. */
+function markTurnWithoutReply(runtimeId: string) {
+  writeSessionState(runtimeId, state =>
+    state.interrupted || isLiveTurnAwaitingEvents(state) || turnHasReply(state.messages)
+      ? state
+      : { ...state, messages: withNoReplyNotice(state.messages) }
+  )
+}
+
+async function recoverEndedLiveTurn(runtimeId: string) {
+  const storedSessionId = $sessionStates.get()[runtimeId]?.storedSessionId ?? null
+  const refreshTranscript = liveTurnBackend?.refreshTranscript
+
+  // Only a session on screen reads its history now; a background session
+  // reads it when the user opens it, like the running=false edge.
+  if (refreshTranscript && storedSessionId && runtimeReferenced(runtimeId, storedSessionId)) {
+    try {
+      await refreshTranscript(runtimeId, storedSessionId)
+    } catch {
+      // The local transcript still decides whether a reply arrived.
+    }
+  }
+
+  markTurnWithoutReply(runtimeId)
+}
+
+/** The silence window ran out: ask the backend. Running keeps the turn and
+ *  restarts the clock; no answer (gateway down, request failed, owner unknown)
+ *  also keeps it — the stall hint and Stop remain — and asks again next window.
+ *  Only a backend that reports the turn over settles it. */
+async function onEventSilence(runtimeId: string) {
+  sessionEventSilenceTimers.delete(runtimeId)
+
+  if (!isLiveTurnAwaitingEvents($sessionStates.get()[runtimeId])) {
+    return
+  }
+
+  const check = {}
+  silentTurnChecks.set(runtimeId, check)
+  const verdict = await checkLiveTurn(runtimeId)
+
+  if (silentTurnChecks.get(runtimeId) !== check) {
+    return
+  }
+
+  silentTurnChecks.delete(runtimeId)
+
+  if (verdict !== 'ended') {
+    noteSessionEvent(runtimeId)
+
+    return
+  }
+
+  settleEndedLiveTurn(runtimeId)
+  await recoverEndedLiveTurn(runtimeId)
+}
+
 /** Record that this session just produced an event. A live turn that then goes
- *  silent is force-settled; a turn still receiving events, or waiting on the
- *  user, is not. */
+ *  silent is checked against its backend; a turn still receiving events, or
+ *  waiting on the user, is not. */
 export function noteSessionEvent(runtimeId: string) {
   if (!runtimeId) {
     return
@@ -458,10 +647,7 @@ export function noteSessionEvent(runtimeId: string) {
 
   sessionEventSilenceTimers.set(
     runtimeId,
-    setTimeout(() => {
-      sessionEventSilenceTimers.delete(runtimeId)
-      settleSilentLiveTurn(runtimeId)
-    }, LIVE_TURN_EVENT_SILENCE_MS)
+    setTimeout(() => void onEventSilence(runtimeId), LIVE_TURN_EVENT_SILENCE_MS)
   )
 }
 
@@ -588,6 +774,12 @@ function handleTransition(previous: ClientSessionState | null, next: ClientSessi
 
     clearSettled(previous.storedSessionId)
     setSessionStalled(previous.storedSessionId, false)
+  }
+
+  // THIS runtime's stored id binding: the preview tabs it opened before then
+  // are now its session's (#73890).
+  if (!previous?.storedSessionId && next.storedSessionId) {
+    adoptPendingRuntimeTabs(runtimeId, next.storedSessionId)
   }
 
   // Every busy publish is stream activity: clear the quiet hint and restart
@@ -798,6 +990,8 @@ export function dropSessionState(runtimeId: string) {
   clearSessionProviderWait(runtimeId)
   sessionScopeByRuntimeId.delete(runtimeId)
   sessionOwnerByRuntimeId.delete(runtimeId)
+  // A runtime that never bound a stored id never will now (#73890).
+  forgetPendingRuntimeTabs(runtimeId)
 
   const current = $sessionStates.get()
   setSessionStalled(current[runtimeId]?.storedSessionId, false)
@@ -831,6 +1025,7 @@ export function clearAllSessionStates() {
   clearAllProviderWaits()
   sessionScopeByRuntimeId.clear()
   sessionOwnerByRuntimeId.clear()
+  forgetPendingRuntimeTabs()
   $stalledSessionIds.set([])
   $sessionStates.set({})
 }
@@ -875,6 +1070,7 @@ export function clearAllSessionStates() {
  *  alone — a background socket says nothing about the primary composer. */
 export function reconcileBusyStatesOnReconnect(scope?: string) {
   const states = $sessionStates.get()
+  const activeRuntimeId = $activeSessionId.get() ?? undefined
 
   // Only the primary socket has a confirm producer for a parked completion
   // (the active profile's `session.active_list` poll); a scoped reconcile
@@ -883,13 +1079,24 @@ export function reconcileBusyStatesOnReconnect(scope?: string) {
 
   try {
     for (const [runtimeId, state] of Object.entries(states)) {
-      if (!state || (!state.busy && !state.awaitingResponse)) {
+      if (!state || (!state.busy && !state.awaitingResponse && !state.turnLive && state.turnStartedAt === null)) {
         continue
       }
 
       const recorded = sessionScopeByRuntimeId.get(runtimeId)
 
-      if (scope === undefined ? recorded !== undefined : recorded !== scope) {
+      // Local secondary sockets record a profile-only owner, not a composite
+      // scope. The primary reconcile must leave those alone (a different
+      // profile's socket is still healthy); its own scoped reconcile clears
+      // them (#121865).
+      const profileOnlyOwner = sessionOwnerByRuntimeId.get(runtimeId)
+      const profileOnlyScope = typeof profileOnlyOwner === 'string' ? normalizeProfileKey(profileOnlyOwner) : undefined
+
+      if (scope === undefined) {
+        if (recorded !== undefined || profileOnlyScope !== undefined) {
+          continue
+        }
+      } else if (recorded !== scope && profileOnlyScope !== normalizeProfileKey(scope)) {
         continue
       }
 
@@ -898,8 +1105,19 @@ export function reconcileBusyStatesOnReconnect(scope?: string) {
       // Re-read — the write path may have republished (and released) this entry.
       const published = $sessionStates.get()[runtimeId]
 
-      if (published?.busy || published?.awaitingResponse) {
-        publishSessionState(runtimeId, { ...published, awaitingResponse: false, busy: false })
+      if (published && (published.busy || published.awaitingResponse || published.turnLive || published.turnStartedAt !== null)) {
+        publishSessionState(runtimeId, {
+          ...published,
+          awaitingResponse: false,
+          busy: false,
+          turnLive: false,
+          turnStartedAt: null
+        })
+      }
+
+      // A retired turn must not leave the focused view's clock running.
+      if (runtimeId === activeRuntimeId) {
+        setTurnStartedAt(null)
       }
     }
   } finally {
@@ -1098,7 +1316,10 @@ function parseTileList(value: unknown): StoredTile[] {
           const raw = t as SessionTile
 
           return {
-            anchor: typeof raw.anchor === 'string' ? raw.anchor : undefined,
+            anchor:
+              typeof raw.anchor === 'string' && raw.anchor !== `${TILE_PANE_PREFIX}${raw.storedSessionId}`
+                ? raw.anchor
+                : undefined,
             before: typeof raw.before === 'string' || raw.before === null ? raw.before : undefined,
             dir: raw.dir,
             ownerProfile: typeof raw.ownerProfile === 'string' ? normalizeProfileKey(raw.ownerProfile) : undefined,
@@ -1264,6 +1485,216 @@ export function patchSessionTile(storedSessionId: string, patch: Partial<Session
   saveTiles($sessionTiles.get().map(t => (t.storedSessionId === storedSessionId ? { ...t, ...patch } : t)))
 }
 
+function sameSessionOwner(left: SessionOwnerScope, right: SessionOwnerScope): boolean {
+  if (isSessionOwnerRoute(left) && isSessionOwnerRoute(right)) {
+    return (
+      left.connectionId.trim() === right.connectionId.trim() &&
+      normalizeProfileKey(left.profile) === normalizeProfileKey(right.profile) &&
+      normalizeProfileKey(left.targetProfile ?? left.profile) ===
+        normalizeProfileKey(right.targetProfile ?? right.profile)
+    )
+  }
+
+  if (typeof left === 'string' && typeof right === 'string') {
+    return normalizeProfileKey(left) === normalizeProfileKey(right)
+  }
+
+  return false
+}
+
+function tileWorkspaceMode(tile: SessionTile): WorkspaceMode {
+  return tile.workspaceMode ?? 'sessions'
+}
+
+function tilesShareOwner(left: SessionTile, right: SessionTile): boolean {
+  if (left.workspaceMode && right.workspaceMode && left.workspaceMode !== right.workspaceMode) {
+    return false
+  }
+
+  const workspaceMode = left.workspaceMode ?? right.workspaceMode ?? 'sessions'
+
+  if (workspaceMode === 'bots') {
+    if (left.workspaceOwnerKey && right.workspaceOwnerKey) {
+      return left.workspaceOwnerKey === right.workspaceOwnerKey
+    }
+
+    if (left.ownerRoute && right.ownerRoute) {
+      return sameSessionOwner(left.ownerRoute, right.ownerRoute)
+    }
+
+    return true
+  }
+
+  if (left.ownerRoute && right.ownerRoute) {
+    return sameSessionOwner(left.ownerRoute, right.ownerRoute)
+  }
+
+  return true
+}
+
+function tileBelongsToMain(tile: SessionTile, selectedStoredSessionId: string, tileProfile = profileKey()): boolean {
+  if (tileWorkspaceMode(tile) === 'bots') {
+    return false
+  }
+
+  const mainOwner = knownSessionOwner(ownerLookupSessionRows(), selectedStoredSessionId) ?? profileKey()
+
+  if (tile.ownerRoute) {
+    return isSessionOwnerRoute(mainOwner) && sameSessionOwner(tile.ownerRoute, mainOwner)
+  }
+
+  return typeof mainOwner === 'string' && normalizeProfileKey(mainOwner) === normalizeProfileKey(tileProfile)
+}
+
+function mergeSessionTile(previous: SessionTile, next: SessionTile, storedSessionId: string): SessionTile {
+  const merged: SessionTile = { ...previous, storedSessionId }
+
+  if (next.anchor !== undefined) {
+    merged.anchor = next.anchor
+  }
+
+  if (next.before !== undefined) {
+    merged.before = next.before
+  }
+
+  if (next.dir !== undefined) {
+    merged.dir = next.dir
+  }
+
+  if (next.error !== undefined) {
+    merged.error = next.error
+  }
+
+  if (next.ownerRoute !== undefined) {
+    merged.ownerRoute = next.ownerRoute
+  }
+
+  if (next.runtimeId !== undefined) {
+    merged.runtimeId = next.runtimeId
+  }
+
+  if (next.workspaceMode !== undefined) {
+    merged.workspaceMode = next.workspaceMode
+  }
+
+  if (next.workspaceOwnerKey !== undefined) {
+    merged.workspaceOwnerKey = next.workspaceOwnerKey
+  }
+
+  if (next.workspaceTabTitle !== undefined) {
+    merged.workspaceTabTitle = next.workspaceTabTitle
+  }
+
+  return merged
+}
+
+function rekeyTileList(
+  tiles: SessionTile[],
+  tileProfile: string,
+  previousStoredSessionId: string,
+  nextStoredSessionId: string
+): SessionTile[] | null {
+  const stale = tiles.find(t => t.storedSessionId === previousStoredSessionId)
+
+  if (!stale) {
+    return null
+  }
+
+  const selectedStoredSessionId = $selectedStoredSessionId.get()
+
+  const mainOwnsRotation =
+    Boolean(selectedStoredSessionId) &&
+    (selectedStoredSessionId === previousStoredSessionId || selectedStoredSessionId === nextStoredSessionId) &&
+    tileBelongsToMain(stale, selectedStoredSessionId!, tileProfile)
+
+  const nextTile = tiles.find(t => t.storedSessionId === nextStoredSessionId && tilesShareOwner(stale, t))
+
+  if (mainOwnsRotation) {
+    return tiles.filter(t => t !== stale)
+  }
+
+  if (nextTile) {
+    return tiles
+      .map(t => (t === nextTile ? mergeSessionTile(stale, t, nextStoredSessionId) : t))
+      .filter(t => t !== stale)
+  }
+
+  return tiles.map(t => (t === stale ? { ...t, storedSessionId: nextStoredSessionId } : t))
+}
+
+function ownerProfileKey(owner: SessionOwnerScope): string | undefined {
+  if (isSessionOwnerRoute(owner)) {
+    return normalizeProfileKey(owner.profile)
+  }
+
+  return typeof owner === 'string' ? normalizeProfileKey(owner) : undefined
+}
+
+function saveTileBucket(bucket: string, tiles: SessionTile[]) {
+  const stored = tiles.map(toStored)
+
+  if (stored.length > 0) {
+    tilesByProfile[bucket] = stored
+  } else {
+    delete tilesByProfile[bucket]
+  }
+
+  persistTiles()
+}
+
+export function rekeySessionTile(
+  previousStoredSessionId: string,
+  nextStoredSessionId: string,
+  runtimeSessionId?: string
+) {
+  if (!previousStoredSessionId || !nextStoredSessionId || previousStoredSessionId === nextStoredSessionId) {
+    return
+  }
+
+  const visibleTiles = $sessionTiles.get()
+
+  if (visibleTiles.some(t => t.storedSessionId === previousStoredSessionId)) {
+    const nextTiles = rekeyTileList(visibleTiles, profileKey(), previousStoredSessionId, nextStoredSessionId)
+
+    if (nextTiles) {
+      saveTiles(nextTiles)
+    }
+
+    return
+  }
+
+  const candidateBuckets = Object.entries(tilesByProfile).filter(([, tiles]) =>
+    tiles.some(t => t.storedSessionId === previousStoredSessionId)
+  )
+
+  if (candidateBuckets.length === 0) {
+    return
+  }
+
+  const owner =
+    (runtimeSessionId ? knownOwnerForSession(runtimeSessionId) : undefined) ??
+    knownSessionOwner(ownerLookupSessionRows(), previousStoredSessionId)
+
+  const resolvedProfile = ownerProfileKey(owner)
+
+  const candidate = resolvedProfile
+    ? candidateBuckets.find(([bucket]) => bucket === resolvedProfile)
+    : candidateBuckets.length === 1
+      ? candidateBuckets[0]
+      : undefined
+
+  if (!candidate) {
+    return
+  }
+
+  const [bucket, storedTiles] = candidate
+  const nextTiles = rekeyTileList(storedTiles, bucket, previousStoredSessionId, nextStoredSessionId)
+
+  if (nextTiles) {
+    saveTileBucket(bucket, nextTiles)
+  }
+}
+
 export function sessionTileOwnerRoute(storedSessionId: string): SessionOwnerRoute | undefined {
   return $sessionTiles.get().find(tile => tile.storedSessionId === storedSessionId)?.ownerRoute
 }
@@ -1367,7 +1798,14 @@ export function knownOwnerForSession(sessionId: null | string | undefined): Sess
  *  showed one agent's previews in every agent's chat. `bot-row.tsx` documents
  *  the same trap for the roster highlight and resolves it the same way. */
 function railScopeForActiveSession(): string {
-  const owner = knownOwnerForSession($activeSessionId.get() ?? undefined)
+  return previewScopeForRuntime($activeSessionId.get() ?? undefined)
+}
+
+/** The preview-rail profile a runtime's chat belongs to — the bucket whose
+ *  pins its agent may use. Same resolution as the rail's own scope, so the
+ *  primary's runtime always lands on the bucket in view. */
+export function previewScopeForRuntime(runtimeId: string | undefined): string {
+  const owner = knownOwnerForSession(runtimeId)
   const profile = typeof owner === 'string' ? owner : owner?.profile
 
   return normalizeProfileKey(profile || $activeGatewayProfile.get())
@@ -1746,7 +2184,7 @@ export interface SessionTileDelegate {
   deleteSession(storedSessionId: string): Promise<void>
   /** Run a slash command against a tile's session (app-level effects — e.g.
    *  branch/handoff — act on the main surface, as they should). */
-  executeSlash(rawCommand: string, sessionId: string): Promise<void>
+  executeSlash(rawCommand: string, sessionId: string, options?: { typed?: boolean }): Promise<void>
   /** Interrupt a tile's running turn. */
   interruptSession(runtimeId: string): Promise<void>
   /** Drop the wiring cache's stored→runtime bindings. Called on gateway
@@ -1773,10 +2211,14 @@ export interface SessionTileDelegate {
    *  invalidateRuntimeBindings (#93059). */
   retireBusyClaim?(runtimeId: string): boolean
   /** Submit a prompt to a tile's live session. */
-  submitToSession(runtimeId: string, text: string): Promise<void>
+  submitToSession(runtimeId: string, text: string): Promise<{ runtimeSessionId: string; storedSessionId: null | string }>
   /** THE session-state write path — routes through the wiring cache so the
    *  cache, the primary view (when active), and every tile mirror agree. */
   updateSession(runtimeId: string, updater: (state: ClientSessionState) => ClientSessionState): ClientSessionState
+  /** Branch a tile's transcript at one message (canonical chat tiles). */
+  branchSessionAtMessage?(storedSessionId: string, runtimeId: string, messageId: string): Promise<boolean>
+  /** Write a held runtime's state through the delegate, when it owns it. */
+  updateHeldSession?(runtimeId: string, updater: (state: ClientSessionState) => ClientSessionState): boolean
 }
 
 let delegate: SessionTileDelegate | null = null
@@ -2459,13 +2901,7 @@ export function reopenLastClosedTile(): void {
 // timer / model) reads these instead of the primary-only atoms.
 // ---------------------------------------------------------------------------
 
-export const $focusedSessionIsTile = computed($focusedTreePaneId, active =>
-  Boolean(active?.startsWith(TILE_PANE_PREFIX))
-)
-
-export const $focusedStoredSessionId = computed([$focusedTreePaneId, $selectedStoredSessionId], (active, selected) =>
-  active?.startsWith(TILE_PANE_PREFIX) ? active.slice(TILE_PANE_PREFIX.length) : selected
-)
+export { $focusedSessionIsTile, $focusedStoredSessionId } from './session-focus'
 
 /** Every session currently OPEN as a surface: the primary's selection plus
  *  every tile's stored id. The sidebar highlights all of them (the focused one
@@ -2513,7 +2949,22 @@ $focusedStoredSessionId.listen(focused => {
     markSessionRead(focused)
     ackStoredSessionId(focused)
   }
+
+  stampTileSessionFocus(focused)
 })
+
+stampTileSessionFocus($focusedStoredSessionId.get())
+
+// Statusbar timer: stamp "focused since" for non-primary tiles so they share
+// the primary's contract instead of the row's durable started_at (#103123).
+// Primary focus leaves the stamp alone; the next tile focus re-stamps.
+function stampTileSessionFocus(focused: null | string) {
+  const stamp = tileFocusStampOnFocusChange(focused, $selectedStoredSessionId.get(), Date.now())
+
+  if (stamp) {
+    setTileSessionFocusStartedAt(stamp)
+  }
+}
 
 // Cold-start restore is the one selection change that is NOT a navigation: the
 // route already pointed at the primary session before the window loaded, and
@@ -2541,6 +2992,92 @@ $selectedStoredSessionId.listen(selected => {
   noteActiveTreeGroup(null)
   revealTreePane('workspace')
 })
+
+/** Front the workspace pane when `storedSessionId` names the chat MAIN already
+ *  holds (through any compression-lineage alias). False when main holds
+ *  another chat or nothing — the caller then owns the open. */
+export function frontMainIfSelected(storedSessionId: string): boolean {
+  const aliases = lineageAliases(storedSessionId, $sessions.get())
+
+  if (!aliases.includes($selectedStoredSessionId.get() ?? '')) {
+    return false
+  }
+
+  revealTreePane('workspace')
+  noteActiveTreeGroup(null)
+
+  return true
+}
+
+function focusedSessionRow(storedSessionId: string): SessionInfo | undefined {
+  return (
+    ownerLookupSessionRows().find(s => sessionMatchesStoredId(s, storedSessionId)) ??
+    $projectTree
+      .get()
+      .flatMap(project => [
+        ...(project.previewSessions ?? []),
+        ...project.repos.flatMap(repo => repo.groups.flatMap(group => group.sessions))
+      ])
+      .find(s => sessionMatchesStoredId(s, storedSessionId))
+  )
+}
+
+/** The workspace CWD of the currently focused session (the focused tile's cwd,
+ *  else the primary session's confirmed workspace cwd, with fallback to historical session cwd). */
+export const $focusedWorkspaceCwd = computed(
+  [
+    $focusedStoredSessionId,
+    $selectedStoredSessionId,
+    $focusedSessionState,
+    $sessions,
+    $currentCwd,
+    $workspaceCwdOwner,
+    $unlistedSessionOwnerRows,
+    $projectTree,
+    $cronSessions,
+    $messagingSessions
+  ],
+  (
+    focusedStoredId,
+    selectedStoredId,
+    focusedSessionState,
+    sessions: readonly SessionInfo[],
+    currentCwd,
+    workspaceCwdOwner
+  ) => {
+    const isTile = Boolean(focusedStoredId && focusedStoredId !== selectedStoredId)
+
+    if (isTile && focusedStoredId) {
+      return (
+        focusedSessionState?.cwd ||
+        sessions.find(s => sessionMatchesStoredId(s, focusedStoredId))?.cwd ||
+        focusedSessionRow(focusedStoredId)?.cwd ||
+        ''
+      ).trim()
+    }
+
+    const hasPrimaryWorkspace = Boolean(currentCwd) && (workspaceCwdOwner ?? null) === (selectedStoredId ?? null)
+
+    if (hasPrimaryWorkspace) {
+      return currentCwd.trim()
+    }
+
+    if (selectedStoredId) {
+      const fallbackCwd = (
+        focusedSessionState?.cwd ||
+        sessions.find(s => sessionMatchesStoredId(s, selectedStoredId))?.cwd ||
+        focusedSessionRow(selectedStoredId)?.cwd ||
+        ''
+      ).trim()
+
+      if (fallbackCwd) {
+        return fallbackCwd
+      }
+    }
+
+    return ''
+  }
+)
 
 // Dev hook for automation (mirrors __HERMES_LAYOUT_TREE__).
 if ((import.meta.env.DEV || import.meta.env.VITE_PERF_PROBE === '1') && typeof window !== 'undefined') {

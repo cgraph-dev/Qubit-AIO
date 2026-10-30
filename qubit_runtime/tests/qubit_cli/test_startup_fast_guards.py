@@ -51,8 +51,16 @@ def test_cli_starts_from_a_deleted_cwd(tmp_path):
     gone = tmp_path / "scratch"
     gone.mkdir()
     # The child needs the checkout on sys.path by absolute name; the cwd is exactly what is gone.
+    # Only absolute PYTHONPATH entries: CPython 3.12's ``getpath`` resolves relative entries
+    # against the cwd during interpreter startup, so a relative entry aborts the process before
+    # any product code runs (``OSError: failed to make path absolute``). That is an interpreter
+    # limitation, not the #102941 product bug this test covers.
+    _pythonpath = [str(REPO_ROOT)] + [
+        part for part in os.environ.get("PYTHONPATH", "").split(os.pathsep)
+        if part and os.path.isabs(part)
+    ]
     env = {**os.environ, "QUBIT_HOME": str(home), "TERMUX_VERSION": "",
-           "PYTHONPATH": os.pathsep.join(p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH")) if p)}
+           "PYTHONPATH": os.pathsep.join(_pythonpath)}
     env.pop("HERMES_DEV", None)
     fd = os.open(gone, os.O_RDONLY)
     try:

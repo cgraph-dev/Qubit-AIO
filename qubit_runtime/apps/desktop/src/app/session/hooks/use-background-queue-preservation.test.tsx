@@ -19,7 +19,8 @@ afterEach(() => {
   vi.useRealTimers()
   $queuedPromptsBySession.set({})
   // Queue mutations build on the persisted map, not the atom.
-  window.localStorage.removeItem('qubit.desktop.composerQueue.v1')
+  // The queue store persists under its legacy wire key (see composer-queue.ts).
+    window.localStorage.removeItem('hermes.desktop.composerQueue.v1')
   $parkedQueueSessions.set({})
   $sessions.set([])
   setSessionsLoading(true)

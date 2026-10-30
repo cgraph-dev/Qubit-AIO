@@ -74,10 +74,26 @@ def stage_host_python(python: Path) -> Path:
     shutil.copy2(Path(sys._base_executable).resolve(), python)
     host_lib = Path(sys.base_prefix) / "lib"
     stdlib = next((d for d in host_lib.glob("python3.*") if (d / "os.py").is_file()), None)
-    if stdlib is not None and not (python.parent.parent / "lib" / stdlib.name).exists():
-        shutil.copytree(stdlib, python.parent.parent / "lib" / stdlib.name,
+    destination = python.parent.parent / "lib" / stdlib.name if stdlib is not None else None
+    if stdlib is not None and not destination.exists():
+        shutil.copytree(stdlib, destination,
                         ignore=shutil.ignore_patterns("site-packages", "test", "__pycache__", "idlelib", "tkinter"),
                         symlinks=True)
+        # Some distributions symlink stdlib files outside the tree (Debian points
+        # sitecustomize.py at /etc). Payload guards refuse links that escape, so
+        # materialize those files; links that stay inside are kept.
+        root = destination.resolve()
+        for directory, dirs, names in os.walk(destination, followlinks=False):
+            for name in dirs + names:
+                entry = Path(directory) / name
+                if not entry.is_symlink():
+                    continue
+                target = entry.resolve()
+                if target.is_relative_to(root):
+                    continue
+                entry.unlink()
+                if target.is_file():
+                    shutil.copy2(target, entry)
     return python
 
 

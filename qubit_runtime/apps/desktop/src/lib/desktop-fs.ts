@@ -2,6 +2,7 @@ import { hermesApi } from '@/api/client'
 import type {
   HermesConnection,
   HermesReadDirResult,
+  HermesReadFileErrorResult,
   HermesReadFileTextResult,
   HermesSelectPathsOptions
 } from '@/global'
@@ -72,6 +73,30 @@ function remoteFsApi<T>(path: string, body?: Record<string, unknown>): Promise<T
   )
 }
 
+/** True when a bridge read returned the main process's structured "file is
+ *  not on disk" answer (the main process returns this instead of rejecting, so
+ *  a restored preview tab or transcript reference to a deleted/moved file does
+ *  not spam Electron's console with a stack trace per probe). */
+export function isReadFileErrorResult(value: unknown): value is HermesReadFileErrorResult {
+  return !!value && typeof value === 'object' && (value as { ok?: unknown }).ok === false
+}
+
+function throwForReadErrorResult(result: HermesReadFileErrorResult): never {
+  throw new DesktopFileMissingError(result)
+}
+
+/** Thrown by the facade when the main process answered that the file is simply
+ *  not on disk (the structured `{ ok:false }` result). */
+export class DesktopFileMissingError extends Error {
+  readonly code: string
+
+  constructor(result: HermesReadFileErrorResult) {
+    super(result.message || `File read failed: ${result.error}`)
+    this.name = 'DesktopFileMissingError'
+    this.code = result.error
+  }
+}
+
 export async function readDesktopDir(path: string): Promise<HermesReadDirResult> {
   if (!isDesktopFsRemoteMode()) {
     return bridge().readDir(path)
@@ -82,7 +107,13 @@ export async function readDesktopDir(path: string): Promise<HermesReadDirResult>
 
 export async function readDesktopFileText(path: string): Promise<HermesReadFileTextResult> {
   if (!isDesktopFsRemoteMode()) {
-    return bridge().readFileText(path)
+    const result = await bridge().readFileText(path)
+
+    if (isReadFileErrorResult(result)) {
+      throwForReadErrorResult(result)
+    }
+
+    return result
   }
 
   return remoteFsApi<HermesReadFileTextResult>(fsPath('read-text', path))
@@ -118,7 +149,13 @@ export async function createRemoteDir(path: string): Promise<string> {
 
 export async function readDesktopFileDataUrl(path: string): Promise<string> {
   if (!isDesktopFsRemoteMode()) {
-    return bridge().readFileDataUrl(path)
+    const result = await bridge().readFileDataUrl(path)
+
+    if (isReadFileErrorResult(result)) {
+      throwForReadErrorResult(result)
+    }
+
+    return result
   }
 
   const result = await remoteFsApi<string | { dataUrl?: string }>(fsPath('read-data-url', path))
@@ -135,7 +172,7 @@ export async function readDesktopFileDataUrlLocalFirst(path: string): Promise<st
   try {
     const local = await window.hermesDesktop?.readFileDataUrl?.(path)
 
-    if (local) {
+    if (local && !isReadFileErrorResult(local)) {
       return local
     }
   } catch (error) {

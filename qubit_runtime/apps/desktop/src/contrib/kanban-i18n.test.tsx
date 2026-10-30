@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { PALETTE_AREA, usePaletteContributions } from '@/app/command-palette/contrib'
 import { ROUTES_AREA, SIDEBAR_NAV_AREA, type SidebarNavContribution } from '@/app/routes'
-import { createPluginContext } from '@/contrib/plugin'
+import { createPluginContext, declaredCapabilities } from '@/contrib/plugin'
 import { useContributions } from '@/contrib/react/use-contributions'
 import { registry } from '@/contrib/registry'
 import type { HermesConfigRecord } from '@/hermes'
@@ -57,7 +57,7 @@ afterEach(() => {
 
 it('relabels Kanban after delayed config load and locale switches without replacing the board or bindings', async () => {
   setRuntimeI18nLocale('en')
-  plugin.register(createPluginContext('kanban', dispose => disposers.push(dispose)))
+  plugin.register(createPluginContext(plugin.id, dispose => disposers.push(dispose), declaredCapabilities(plugin)))
   const route = registry.getArea(ROUTES_AREA).find(c => c.id === 'kanban:page')
   const handler = contributedKeybindHandler('kanban.newTask')
   setBinding('kanban.newTask', ['mod+alt+k'])
@@ -102,7 +102,7 @@ it('relabels Kanban after delayed config load and locale switches without replac
     expect(registry.getArea(area).some(c => c.source === 'plugin:kanban')).toBe(false)
   }
 
-  await act(() => plugin.register(createPluginContext('kanban', dispose => disposers.push(dispose))))
+  await act(() => plugin.register(createPluginContext(plugin.id, dispose => disposers.push(dispose), declaredCapabilities(plugin))))
   expect(screen.getByText(KANBAN_LOCALES.zh!.nav as string)).toBeTruthy()
   expect(bindingsFor('kanban.newTask')).toEqual(['mod+alt+k'])
 })

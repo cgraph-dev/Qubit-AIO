@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { resolveDesktopQubitHome } from './data-paths'
+import { resolveDesktopHermesHome } from './data-paths'
 
 // macOS apps launched from Finder/Dock inherit only /usr/bin:/bin:/usr/sbin:/sbin,
 // which misses Homebrew and user-installed CLI tools (codex, git credential
@@ -197,7 +197,7 @@ function storeFirstPath(
 ) {
   const pathModule = pathModuleForPlatform(platform)
   const delimiter = delimiterForPlatform(platform)
-  const hermesHome = resolveDesktopQubitHome({ home: homedir, env: currentEnv, platform })
+  const hermesHome = resolveDesktopHermesHome({ home: homedir, env: currentEnv, platform })
   const roots = [currentEnv?.QUBIT_RUNTIME_DIR, pathModule.join(hermesHome, 'tools')].filter(Boolean)
 
   const owned = (entry: string) =>

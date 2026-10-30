@@ -18,9 +18,6 @@ import qubit_yaml
 from qubit_cli import update_cmd_fleet_verify
 
 
-def _swap_leftovers(root):
-    """Staging/backup siblings and the journal; the swap lock is a stable sidecar that stays (one inode)."""
-    return [p for p in root.glob("*.hermes-update-*") if p.name != ".qubit-update-zip-swap.lock"]
 
 
 @pytest.fixture
@@ -500,7 +497,4 @@ def test_a_zip_that_does_not_name_its_commit_is_refused_before_the_swap(tmp_path
 
 
 # --- ported from upstream pin (wave 25 short-port) ---
-def _swap_leftovers(root):
-    """Staging/backup siblings and the journal; the swap lock is a stable sidecar that stays (one inode)."""
-    return [p for p in root.glob("*.hermes-update-*") if p.name != ".hermes-update-zip-swap.lock"]
 

@@ -40,6 +40,8 @@ export interface ChatBarProps {
   busy: boolean
   disabled: boolean
   focusKey?: string | null
+  freshDraftKey?: null | string
+  profile?: null | string
   maxRecordingSeconds?: number
   state: ChatBarState
   gateway?: HermesGateway | null

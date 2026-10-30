@@ -21,7 +21,7 @@ import { atom } from 'nanostores'
 
 import { readJson, writeJson } from '@/lib/storage'
 
-import { BUILTIN_THEMES } from './presets'
+import { BUILTIN_THEMES, DEFAULT_SKIN_NAME, RETIRED_SKINS } from './presets'
 import { skinToDesktopTheme } from './skin'
 import { type DesktopTheme, isValidTheme } from './types'
 
@@ -29,27 +29,56 @@ import { type DesktopTheme, isValidTheme } from './types'
 // resolve a persisted skin pick synchronously, like a built-in or a user
 // install. Without it the stored name failed `resolveTheme` on every launch
 // and the app silently painted the default until the next `skin.changed`.
-const BACKEND_THEMES_KEY = 'hermes-desktop-backend-themes-v1'
+const BACKEND_THEMES_KEY = 'qubit-desktop-backend-themes-v1'
+const LEGACY_BACKEND_THEMES_KEY = 'hermes-desktop-backend-themes-v1'
 
 // Electron reads the active local `display.skin` before it creates the
 // renderer. Seed it alongside the existing cache so an unreachable primary
 // gateway cannot leave a first-time custom skin unknown to the theme registry.
-const localSkinPayload = typeof window === 'undefined' ? null : window.hermesDesktop?.localSkin ?? null
+const localSkinPayload = typeof window === 'undefined' ? null : (window.hermesDesktop?.localSkin ?? null)
 const localSkin = localSkinPayload?.skin ?? null
 export const localDisplaySkinName = (localSkin?.name ?? '').trim() || null
-export const localDisplaySkinProfile = localDisplaySkinName ? (localSkinPayload?.profile ?? '').trim() || 'default' : null
+export const localDisplaySkinProfile = localDisplaySkinName
+  ? (localSkinPayload?.profile ?? '').trim() || 'default'
+  : null
 
-const readCached = (): Record<string, DesktopTheme> =>
-  Object.fromEntries(
-    Object.entries(readJson<Record<string, unknown>>(BACKEND_THEMES_KEY) ?? {}).filter(
-      (entry): entry is [string, DesktopTheme] => !BUILTIN_THEMES[entry[0]] && isValidTheme(entry[1])
-    )
+// Built-in names keep their desktop palette and retired names resolve to the
+// default skin, so a cached theme under either is a shadow nothing should list.
+const cacheable = (name: string) => !BUILTIN_THEMES[name] && !RETIRED_SKINS.has(name)
+
+// Dropped entries are written back out, so a stale shadow (the reverted #130015
+// build cached the CLI `default` skin as a second "Classic Hermes") is gone from
+// disk on the first launch, not only hidden until the next registry change.
+const readCached = (): Record<string, DesktopTheme> => {
+  const raw = readJson<Record<string, unknown>>(BACKEND_THEMES_KEY) ?? readJson<Record<string, unknown>>(LEGACY_BACKEND_THEMES_KEY) ?? {}
+  const stored = Object.entries(raw)
+
+  const kept = Object.fromEntries(
+    stored.filter((entry): entry is [string, DesktopTheme] => cacheable(entry[0]) && isValidTheme(entry[1]))
   )
+
+  if (Object.keys(kept).length !== stored.length) {
+    writeJson(BACKEND_THEMES_KEY, kept)
+    writeJson(LEGACY_BACKEND_THEMES_KEY, kept)
+  }
+
+  return kept
+}
 
 /** Skins pushed by the backend, keyed by name. Merged by `listAllThemes`. */
 export const $backendThemes = atom<Record<string, DesktopTheme>>(typeof window === 'undefined' ? {} : readCached())
 
-$backendThemes.listen(themes => writeJson(BACKEND_THEMES_KEY, themes))
+$backendThemes.listen(themes => {
+  writeJson(BACKEND_THEMES_KEY, themes)
+  writeJson(LEGACY_BACKEND_THEMES_KEY, themes)
+})
+
+/** Custom CSS carried by a user skin whose name is `default` or a desktop
+ *  built-in. The palette policy keeps built-in palettes (a user `mono.yaml`
+ *  must not shadow the desktop's hand-tuned mono), but the user's CSS is still
+ *  the skin file's truth — keyed by the name the desktop resolves the skin
+ *  under (`default` → `nous`). Merged into the active theme in context.tsx. */
+export const $backendCustomCSS = atom<Record<string, string>>({})
 
 /** One-shot skin name the ThemeProvider should switch to (it clears this). */
 export const $pendingSkinApply = atom<string | null>(null)
@@ -67,6 +96,7 @@ export function __resetBackendSkinSync(): void {
   lastSynced = null
   $backendThemes.set({})
   $pendingSkinApply.set(null)
+  $backendCustomCSS.set({})
 }
 
 /**
@@ -75,21 +105,26 @@ export function __resetBackendSkinSync(): void {
  * change. Built-in names keep the desktop's own palette but can still be applied.
  */
 export function ingestBackendSkin(skin: HermesSkin | undefined | null, { apply }: { apply: boolean }): void {
-  const name = (skin && typeof skin === 'object' ? (skin.name ?? '') : '').trim()
+  if (!skin || typeof skin !== 'object') {
+    return
+  }
+
+  const name = (skin.name ?? '').trim()
 
   if (!name) {
     return
   }
 
-  // `default` is "no opinion" on the PALETTE — the desktop keeps its own default
-  // (nous), so we never register a converted theme under `default`. It is still a
+  // `default` (like every retired name) is "no opinion" on the PALETTE — the
+  // desktop keeps its own default (nous), so we never register a converted theme
+  // under `default`. It is still a
   // valid apply TARGET though: a runtime switch back to `default` must repaint the
   // desktop to its own default (setTheme normalizes `default` → nous). So we only
   // skip the registry step here and let it flow through the apply logic below.
   // Built-in names (mono/slate/…) already have a hand-tuned desktop palette — we
   // never shadow it, but the name is still a valid apply target.
-  if (name !== 'default' && !BUILTIN_THEMES[name]) {
-    const theme = skinToDesktopTheme(skin as HermesSkin)
+  if (cacheable(name)) {
+    const theme = skinToDesktopTheme(skin)
 
     if (!theme) {
       return
@@ -99,6 +134,25 @@ export function ingestBackendSkin(skin: HermesSkin | undefined | null, { apply }
 
     if (JSON.stringify(current[name]) !== JSON.stringify(theme)) {
       $backendThemes.set({ ...current, [name]: theme })
+    }
+  } else {
+    // Built-in/default-named user skins never shadow the desktop palette, but
+    // their customCSS still belongs to the user's skin file (user skins take
+    // precedence over built-ins with the same name). Carry it separately so
+    // applyTheme can inject it on top of the built-in palette; dropping the
+    // field from the YAML clears the entry so stale rules don't linger.
+    const css = skin?.customCSS?.trim() ?? ''
+    const cssKey = name === 'default' ? DEFAULT_SKIN_NAME : name
+    const current = $backendCustomCSS.get()
+
+    if (css) {
+      if (current[cssKey] !== css) {
+        $backendCustomCSS.set({ ...current, [cssKey]: css })
+      }
+    } else if (current[cssKey]) {
+      const next = { ...current }
+      delete next[cssKey]
+      $backendCustomCSS.set(next)
     }
   }
 

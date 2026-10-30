@@ -1,6 +1,6 @@
 # Bundled plugins
 
-Drop a `<name>/plugin.{ts,tsx}` here that default-exports a `HermesPlugin` and
+Drop a `<name>/plugin.{js,jsx,ts,tsx}` here that default-exports a `HermesPlugin` and
 it registers automatically at boot (vite glob in `../contrib/plugins.ts`), with
 the same inventory + live enable/disable contract as runtime plugins.
 

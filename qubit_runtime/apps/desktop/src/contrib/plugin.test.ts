@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { dispatchPluginNativeNotification } from '@/store/native-notifications'
 
 import { emitGatewayEvent } from './events'
-import { createPluginContext } from './plugin'
+import { createPluginContext, declaredCapabilities } from './plugin'
 
 vi.mock('@/store/native-notifications', () => ({ dispatchPluginNativeNotification: vi.fn() }))
 
@@ -121,5 +121,26 @@ describe('createPluginContext.os', () => {
     } finally {
       delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
     }
+  })
+})
+
+describe('createPluginContext.media', () => {
+  it('stays undefined without the media.player capability', () => {
+    const ctx = createPluginContext('demo')
+    expect(ctx.media).toBeUndefined()
+  })
+
+  it('exposes one memoized media adapter when the plugin declares media.player', () => {
+    const disposers: Array<() => void> = []
+    const ctx = createPluginContext('demo', dispose => disposers.push(dispose), ['media.player'])
+    expect(ctx.media).toBeDefined()
+    expect(ctx.media).toBe(ctx.media)
+    expect(disposers).toHaveLength(1)
+    disposers.forEach(dispose => dispose())
+  })
+
+  it('normalizes declared capabilities to strings', () => {
+    expect(declaredCapabilities({ capabilities: ['media.player', 7 as never] })).toEqual(['media.player'])
+    expect(declaredCapabilities({})).toEqual([])
   })
 })

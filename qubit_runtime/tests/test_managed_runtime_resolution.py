@@ -77,27 +77,6 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "can only run what is on that subshell's PATH, which local.py populates "
         "with the managed dirs — so PATH is the correct question to ask here."
     ),
-    ("qubit_cli/main_tui_launch.py", "node"): (
-        "PM-composed launch context: `which(node)` runs against the PATH "
-        "pm.ensure('node'|'npm') just composed (store dirs first), not the ambient one."
-    ),
-    ("qubit_cli/main_tui_launch.py", "npm"): (
-        "Same PM-composed launch context as the node lookup above."
-    ),
-    ("qubit_cli/source_build.py", "node"): (
-        "PM-composed build context: `which(node)` runs against the PATH pm's "
-        "ensure('npm')/env_for('node') just composed, not the ambient one."
-    ),
-    ("qubit_cli/source_build.py", "npm"): (
-        "Same PM-composed build context as the node lookup above."
-    ),
-    ("qubit_cli/main_desktop.py", "npm"): (
-        "Desktop build resolves npm inside the PM-prepared build_env PATH."
-    ),
-    ("pm/workspace.py", "npm"): (
-        "Plugin workspace installs resolve npm inside the PM runner env that "
-        "pm.ensure('npm') just composed."
-    ),
     ("apps/desktop/electron/fixtures/source-backend.py", "uv"): (
         "Test fixture drives the real uv deliberately placed on the test "
         "runner's PATH; it is not Hermes-owned subprocess resolution."
@@ -121,6 +100,10 @@ def _iter_which_calls(tree: ast.AST):
             else func.id if isinstance(func, ast.Name) else None
         )
         if name != "which":
+            continue
+        # ``which(cmd, path=...)`` / ``which(cmd, path_arg)`` resolves against an
+        # explicit search path, not the ambient PATH — not a bare lookup.
+        if len(node.args) > 1 or any(kw.arg == "path" for kw in node.keywords):
             continue
         first = node.args[0]
         if isinstance(first, ast.Constant) and first.value in _MANAGED_COMMANDS:

@@ -33,7 +33,7 @@ it.each([false, true])('keeps startup visible without chat controls (reduced mot
 
   const status = screen.getByRole('status')
   expect(status.getAttribute('aria-busy')).toBe('true')
-  expect(status.textContent).toMatch(/Starting Hermes Desktop/)
+  expect(status.textContent).toMatch(/Starting Qubit Desktop/)
   expect(container.querySelector('input, textarea, [contenteditable], button')).toBeNull()
 
   if (reducedMotion) {

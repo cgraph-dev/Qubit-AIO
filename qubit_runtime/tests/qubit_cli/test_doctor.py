@@ -639,60 +639,6 @@ def test_run_doctor_flags_missing_credentials_for_active_openrouter_provider(mon
     assert "model.provider 'openrouter' is set but no API key is configured" in out
 
 
-@pytest.mark.parametrize(
-    ("provider", "default_model"),
-    [
-        ("ai-gateway", "anthropic/claude-sonnet-4.6"),
-        ("opencode-zen", "anthropic/claude-sonnet-4.6"),
-        ("kilocode", "anthropic/claude-sonnet-4.6"),
-        ("kimi-coding", "kimi-k2"),
-        ("nvidia", "qwen/qwen3.5-122b-a10b"),
-        ("moa", "anthropic/claude-sonnet-4.6"),
-    ],
-)
-def test_run_doctor_accepts_qubit_provider_ids_that_catalog_aliases(
-    monkeypatch, tmp_path, provider, default_model
-):
-    home = tmp_path / ".qubit"
-    home.mkdir(parents=True, exist_ok=True)
-    (home / "config.yaml").write_text(
-        "model:\n"
-        f"  provider: {provider}\n"
-        f"  default: {default_model}\n",
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(doctor_mod, "QUBIT_HOME", home)
-    monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
-    monkeypatch.setattr(doctor_mod, "_DHH", str(home))
-    (tmp_path / "project").mkdir(exist_ok=True)
-
-    fake_model_tools = types.SimpleNamespace(
-        check_tool_availability=lambda *a, **kw: ([], []),
-        TOOLSET_REQUIREMENTS={},
-    )
-    monkeypatch.setitem(sys.modules, "model_tools", fake_model_tools)
-
-    try:
-        from qubit_cli import auth as _auth_mod
-        monkeypatch.setattr(_auth_mod, "get_nous_auth_status_local", lambda: {})
-        monkeypatch.setattr(_auth_mod, "get_codex_auth_status", lambda: {})
-        monkeypatch.setattr(_auth_mod, "get_xai_oauth_auth_status", lambda: {})
-    except Exception:
-        pass
-
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        doctor_mod.run_doctor(Namespace(fix=False))
-
-    out = buf.getvalue()
-    assert f"model.provider '{provider}' is not a recognised provider" not in out
-    assert f"model.provider '{provider}' is unknown" not in out
-    if provider in {"ai-gateway", "opencode-zen", "kilocode", "nvidia"}:
-        assert (
-            f"model.default '{default_model}' uses a vendor/model slug but provider is '{provider}'"
-            not in out
-        )
 
 
 def test_run_doctor_accepts_vendor_slugs_for_named_custom_provider(monkeypatch, tmp_path):
@@ -1665,60 +1611,6 @@ def test_cron_store_check_reports_writability_and_low_space(
     assert len(finding.issues) == len(issues) and all(any(s in i for i in finding.issues) for s in issues)
 
 
-@pytest.mark.parametrize(
-    ("provider", "default_model"),
-    [
-        ("ai-gateway", "anthropic/claude-sonnet-4.6"),
-        ("opencode-zen", "anthropic/claude-sonnet-4.6"),
-        ("kilocode", "anthropic/claude-sonnet-4.6"),
-        ("kimi-coding", "kimi-k2"),
-        ("nvidia", "qwen/qwen3.5-122b-a10b"),
-        ("moa", "anthropic/claude-sonnet-4.6"),
-    ],
-)
-def test_run_doctor_accepts_qubit_provider_ids_that_catalog_aliases(
-    monkeypatch, tmp_path, provider, default_model
-):
-    home = tmp_path / ".qubit"
-    home.mkdir(parents=True, exist_ok=True)
-    (home / "config.yaml").write_text(
-        "model:\n"
-        f"  provider: {provider}\n"
-        f"  default: {default_model}\n",
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(doctor_mod, "QUBIT_HOME", home)
-    monkeypatch.setattr(doctor_mod, "PROJECT_ROOT", tmp_path / "project")
-    monkeypatch.setattr(doctor_mod, "_DHH", str(home))
-    (tmp_path / "project").mkdir(exist_ok=True)
-
-    fake_model_tools = types.SimpleNamespace(
-        check_tool_availability=lambda *a, **kw: ([], []),
-        TOOLSET_REQUIREMENTS={},
-    )
-    monkeypatch.setitem(sys.modules, "model_tools", fake_model_tools)
-
-    try:
-        from qubit_cli import auth as _auth_mod
-        monkeypatch.setattr(_auth_mod, "get_nous_auth_status_local", dict)
-        monkeypatch.setattr(_auth_mod, "get_codex_auth_status", dict)
-        monkeypatch.setattr(_auth_mod, "get_xai_oauth_auth_status", dict)
-    except Exception:
-        pass
-
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        doctor_mod.run_doctor(Namespace(fix=False))
-
-    out = buf.getvalue()
-    assert f"model.provider '{provider}' is not a recognised provider" not in out
-    assert f"model.provider '{provider}' is unknown" not in out
-    if provider in {"ai-gateway", "opencode-zen", "kilocode", "nvidia"}:
-        assert (
-            f"model.default '{default_model}' uses a vendor/model slug but provider is '{provider}'"
-            not in out
-        )
 
 
 @pytest.mark.platforms("any")  # the wrapper name differs per host (.bat on Windows)

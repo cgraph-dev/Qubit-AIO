@@ -40,7 +40,7 @@ vi.mock('@qubit/plugin-sdk', async importOriginal => {
   }
 })
 
-const { createPluginContext } = await import('@/contrib/plugin')
+const { createPluginContext, declaredCapabilities } = await import('@/contrib/plugin')
 const { default: plugin } = await import('./plugin')
 
 const flushSweep = async () => {
@@ -59,7 +59,7 @@ describe('Bot Mode hidden-session reconciliation lifecycle', () => {
     vi.useFakeTimers()
     const disposers: Array<() => void> = []
 
-    plugin.register(createPluginContext(plugin.id, dispose => disposers.push(dispose)))
+    plugin.register(createPluginContext(plugin.id, dispose => disposers.push(dispose), declaredCapabilities(plugin as HermesSdk.HermesPlugin)))
 
     gatewayState.set('open')
     await flushSweep()

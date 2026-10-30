@@ -171,7 +171,11 @@ def command_flags(facts: Mapping[str, object]) -> list[str]:
             flags += ["--branding", str(facts["branding"])]
     baked = facts["bundle_env"]
     if isinstance(baked, dict):
-        for name in sorted(baked):
+        names = sorted(baked)
+        # Unsets first, then assignments: the dispatcher's declared order, so a
+        # round trip through the flags is stable regardless of name sorting.
+        for name in [name for name in names if baked[name] is None] + \
+                    [name for name in names if baked[name] is not None]:
             value = baked[name]
             if value is None:
                 flags += ["--bundle-unset", name]

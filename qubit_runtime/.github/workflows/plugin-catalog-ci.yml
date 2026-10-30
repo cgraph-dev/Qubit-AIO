@@ -54,16 +54,32 @@ jobs:
         run: |
           set -euo pipefail
           MERGE_BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
-          # Added + modified entry files only; deletions and removed.yaml
-          # have nothing to clone.
-          CHANGED=$(git diff --name-only --diff-filter=AM "$MERGE_BASE"...HEAD \
-            -- 'plugin-catalog/*.yaml' 'plugin-catalog/*.yml' \
-            | grep -v '/removed\.yaml$' || true)
+          # --no-renames so a rename surfaces as "delete old + add new" and the
+          # added path is validated. Typechanges (T) must reach the pinned gate,
+          # and deletions of ordinary entries have nothing to clone.
+          CHANGED_ALL=$(git diff --name-only --no-renames --diff-filter=AMT \
+            "$MERGE_BASE"...HEAD)
+          CHANGED=""
+          UNEXPECTED=""
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            case "$path" in
+              plugin-catalog/removed.yaml|plugin-catalog/README.md) ;;
+              plugin-catalog/*.yaml|plugin-catalog/*.yml) CHANGED+="$path"$'\n' ;;
+              contributors/emails/*|website/docs/*|.github/*) ;;
+              *) UNEXPECTED+="$path"$'\n' ;;
+            esac
+          done <<< "$CHANGED_ALL"
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error::a catalog-entry PR may only change plugin-catalog entries, contributors/emails, website/docs and .github"
+            printf '%s' "$UNEXPECTED"
+            exit 1
+          fi
           echo "Changed catalog entries:"
           echo "${CHANGED:-<none>}"
           {
             echo 'files<<__EOF__'
-            echo "$CHANGED"
+            printf '%s' "$CHANGED"
             echo '__EOF__'
           } >> "$GITHUB_OUTPUT"
 
@@ -81,50 +97,175 @@ jobs:
         run: |
           set -euo pipefail
           FAILED=0
+          sanitize() { printf '%s' "$1" | tr '\n\r' '??'; }
           while IFS= read -r entry; do
             [ -z "$entry" ] && continue
-            echo "::group::validate $entry"
+            SAFE_ENTRY=$(sanitize "$entry")
+            echo "::group::validate $SAFE_ENTRY"
 
-            # Parse repo / sha / subdir from the entry yaml.
-            eval "$(python3 - "$entry" <<'PYEOF'
+            # The changed-file list is PR-controlled. A symlink would let the
+            # parser read a file the PR does not actually contain.
+            if [ ! -f "$entry" ] || [ -L "$entry" ]; then
+              echo "::error file=$SAFE_ENTRY::catalog entry must be a regular file"
+              FAILED=1; echo "::endgroup::"; continue
+            fi
+
+            # Parse and validate repo / sha / subdir. -I keeps a PR-controlled
+            # module (e.g. shlex.py) from shadowing the parser's imports.
+            PARSE_OUT=$(mktemp)
+            if ! python3 -I - "$entry" >"$PARSE_OUT" 2>&1 <<'PYEOF'
+          import re
           import shlex
           import sys
 
-          import qubit_yaml as yaml
+          from ruamel.yaml import YAML
 
-          with open(sys.argv[1], encoding="utf-8") as fh:
-              data = yaml.safe_load(fh) or {}
-          print(f"REPO={shlex.quote(str(data.get('repo', '')))}")
-          print(f"SHA={shlex.quote(str(data.get('sha', '')))}")
-          print(f"SUBDIR={shlex.quote(str(data.get('subdir', '') or ''))}")
+          try:
+              with open(sys.argv[1], encoding="utf-8") as fh:
+                  data = YAML(typ="safe").load(fh)
+          except Exception:
+              sys.stderr.write("catalog entry is not valid YAML\n")
+              sys.exit(1)
+          if not isinstance(data, dict):
+              sys.stderr.write("catalog entry must be a YAML mapping\n")
+              sys.exit(1)
+
+          repo = data.get("repo")
+          if not isinstance(repo, str) or not re.fullmatch(r"https://\S+", repo):
+              sys.stderr.write("repo must be an https:// git URL\n")
+              sys.exit(1)
+
+          sha = data.get("sha")
+          if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+              sys.stderr.write("sha must be exactly 40 lowercase hex\n")
+              sys.exit(1)
+
+          subdir = data.get("subdir")
+          if subdir is None:
+              subdir = ""
+          if not isinstance(subdir, str):
+              sys.stderr.write("subdir must be a string\n")
+              sys.exit(1)
+          if subdir and (
+              not re.fullmatch(r"[A-Za-z0-9._/-]+", subdir)
+              or any(seg in ("", ".", "..") for seg in subdir.split("/"))
+          ):
+              sys.stderr.write(
+                  "subdir must be a relative path without '.' or '..' segments\n"
+              )
+              sys.exit(1)
+
+          print(f"REPO={shlex.quote(repo)}")
+          print(f"SHA={shlex.quote(sha)}")
+          print(f"SUBDIR={shlex.quote(subdir)}")
           PYEOF
-          )"
+            then
+              cat "$PARSE_OUT"
+              rm -f "$PARSE_OUT"
+              echo "::error file=$SAFE_ENTRY::catalog entry parser failed"
+              FAILED=1; echo "::endgroup::"; continue
+            fi
+            eval "$(cat "$PARSE_OUT")"
+            rm -f "$PARSE_OUT"
             echo "repo=$REPO sha=$SHA subdir=$SUBDIR"
 
             CLONE_DIR=$(mktemp -d)
             # Full clone (no --depth 1): the pinned sha may not be the branch tip.
-            if ! git clone "$REPO" "$CLONE_DIR"; then
-              echo "::error file=$entry::clone failed for $REPO"
+            if ! git clone "$REPO" "$CLONE_DIR" </dev/null; then
+              echo "::error file=$SAFE_ENTRY::clone failed for $REPO"
               FAILED=1; echo "::endgroup::"; continue
             fi
 
-            # SUPPLY-CHAIN GATE: the pinned sha must be reachable in the repo.
-            if ! git -C "$CLONE_DIR" checkout --detach "$SHA"; then
-              echo "::error file=$entry::pinned sha $SHA is not reachable in $REPO"
+            # SUPPLY-CHAIN GATE: the pinned sha must be a commit object that is
+            # reachable in the repo. An annotated tag object is a different
+            # object and must not be accepted as a pin.
+            OBJECT_TYPE=$(git -C "$CLONE_DIR" cat-file -t "$SHA" 2>/dev/null || echo missing)
+            if [ "$OBJECT_TYPE" != "commit" ]; then
+              echo "::error file=$SAFE_ENTRY::pinned sha $SHA is not a commit object"
+              FAILED=1; echo "::endgroup::"; continue
+            fi
+            if ! git -C "$CLONE_DIR" checkout --detach "$SHA" </dev/null; then
+              echo "::error file=$SAFE_ENTRY::pinned sha $SHA is not reachable in $REPO"
               FAILED=1; echo "::endgroup::"; continue
             fi
 
             PLUGIN_DIR="$CLONE_DIR${SUBDIR:+/$SUBDIR}"
+            # The subdir is pinned-clone-relative. Resolve it before touching
+            # anything: an in-clone symlink can otherwise point at the runner.
+            REAL_CLONE=$(realpath -e "$CLONE_DIR")
+            REAL_PLUGIN=$(realpath -e "$PLUGIN_DIR" 2>/dev/null || true)
+            if [ -z "$REAL_PLUGIN" ] || { [ "$REAL_PLUGIN" != "$REAL_CLONE" ] && [[ "$REAL_PLUGIN" != "$REAL_CLONE/"* ]]; }; then
+              echo "::error file=$SAFE_ENTRY::subdir '$SUBDIR' resolves outside the pinned clone"
+              FAILED=1; echo "::endgroup::"; continue
+            fi
+
+            # No file reachable from the plugin may resolve outside the clone.
+            # Walk in-clone directory symlinks too: `find` does not, so a
+            # plugin/ext -> ../lib link can hide lib/evil -> outside.
+            if ! python3 -I - "$REAL_CLONE" "$REAL_PLUGIN" <<'PYEOF'
+          import os
+          import sys
+
+          clone = os.path.realpath(sys.argv[1])
+          root = os.path.realpath(sys.argv[2])
+
+          def inside(path: str) -> bool:
+              return path == clone or path.startswith(clone + os.sep)
+
+          if not inside(root):
+              print(f"subdir resolves outside the pinned clone: {root}")
+              sys.exit(1)
+
+          bad: list[str] = []
+          seen: set[str] = set()
+          stack = [root]
+          while stack:
+              directory = stack.pop()
+              real = os.path.realpath(directory)
+              if real in seen:
+                  continue
+              seen.add(real)
+              if not inside(real):
+                  bad.append(directory)
+                  continue
+              try:
+                  entries = list(os.scandir(directory))
+              except OSError:
+                  continue
+              for item in entries:
+                  if item.name == ".git":
+                      continue
+                  path = item.path
+                  if item.is_symlink():
+                      target = os.path.realpath(path)
+                      if not inside(target):
+                          bad.append(path)
+                          continue
+                      if os.path.isdir(target):
+                          stack.append(target)
+                  elif item.is_dir(follow_symlinks=False):
+                      stack.append(path)
+
+          if bad:
+              for path in bad:
+                  print(f"symlink in the repo resolves outside the pinned clone: {path}")
+              sys.exit(1)
+          PYEOF
+            then
+              echo "::error file=$SAFE_ENTRY::symlink in the repo resolves outside the pinned clone"
+              FAILED=1; echo "::endgroup::"; continue
+            fi
+
             # Native plugin.yaml OR portable Agent Plugins v1 plugin.json
             # (#81196; native manifest wins when both exist).
             if [ ! -f "$PLUGIN_DIR/plugin.yaml" ] && [ ! -f "$PLUGIN_DIR/plugin.yml" ] && [ ! -f "$PLUGIN_DIR/plugin.json" ]; then
-              echo "::error file=$entry::no plugin.yaml or plugin.json at subdir '$SUBDIR' of $REPO@$SHA"
+              echo "::error file=$SAFE_ENTRY::no plugin.yaml or plugin.json at subdir '$SUBDIR' of $REPO@$SHA"
               FAILED=1; echo "::endgroup::"; continue
             fi
 
             # Manifest schema + declared-vs-registered capability check.
-            if ! qubit plugins validate --install-deps "$PLUGIN_DIR"; then
-              echo "::error file=$entry::qubit plugins validate failed"
+            if ! qubit plugins validate --install-deps "$PLUGIN_DIR" </dev/null; then
+              echo "::error file=$SAFE_ENTRY::qubit plugins validate failed"
               FAILED=1; echo "::endgroup::"; continue
             fi
 
@@ -132,14 +273,15 @@ jobs:
             # A desktop bundle that both fetches from GitHub AND writes/renames
             # plugin files is a self-updater; either half alone is fine (a
             # plugin may read the API, or manage its own data files).
-            SELF_UPDATE=$(grep -rlE 'releases/latest|raw\.githubusercontent\.com' \
+            SELF_UPDATE=$(grep -rlZE 'releases/(latest|download)|raw\.githubusercontent\.com' \
                 --include='*.js' --include='*.mjs' --include='*.cjs' --include='*.ts' "$PLUGIN_DIR" \
-              | xargs -r grep -lE 'writeTextFile|renamePath|writeFile\(' || true)
+              | xargs -0 -r grep -lZE 'writeTextFile|renamePath|writeFileSync|writeFile\(' || true)
             if [ -n "$SELF_UPDATE" ]; then
-              echo "::error file=$entry::self-updating code in catalog build (fetches GitHub AND writes plugin files): $SELF_UPDATE"
+              SELF_UPDATE_SAFE=$(printf '%s' "$SELF_UPDATE" | tr '\n\r\0' '???')
+              echo "::error file=$SAFE_ENTRY::self-updating code in catalog build (fetches GitHub AND writes plugin files): $SELF_UPDATE_SAFE"
               FAILED=1; echo "::endgroup::"; continue
             fi
-            echo "✅ PASS: $entry"
+            echo "✅ PASS: $SAFE_ENTRY"
             echo "::endgroup::"
           done <<< "$CHANGED_FILES"
 

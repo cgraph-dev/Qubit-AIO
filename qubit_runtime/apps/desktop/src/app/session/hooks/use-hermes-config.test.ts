@@ -22,7 +22,7 @@ import { $showToolActivity, setShowToolActivityFromConfig } from '@/store/tool-a
 
 import { deferred } from '../../../test/deferred'
 
-import { useHermesConfig } from './use-hermes-config'
+import { useHermesConfig, useQubitConfig } from './use-hermes-config'
 
 vi.mock('@/hermes', () => ({
   getHermesConfig: vi.fn(),

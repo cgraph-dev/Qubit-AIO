@@ -596,8 +596,74 @@ class BotRelayReplyParams(ProfileParams):
 method("bot_relay.reply", params=BotRelayReplyParams, result=OkResult,
        doc="Write a relayed reply and/or typed error for an envelope so the sender-side waiter resolves.")
 
+# ── browser controller ────────────────────────────────────────────────────────────────────────
+
+
+class BrowserControllerParams(Params):
+    """Every controller call names the session the controller is attached to."""
+
+    session_id: str
+
+
+class BrowserControllerRegisterParams(BrowserControllerParams):
+    controller_id: str
+    browser_profile_id: str
+    capabilities: list[str] | None = None
+    protocol_version: JsonValue | None = None  # checked exactly by the handler (an int today)
+    # Ignored: the principal is derived from the server-minted identity, never client-supplied.
+    principal_id: str | None = None
+
+
+class ControllerScope(Result):
+    principal_id: str
+    profile_id: str
+    session_id: str
+    controller_id: str
+    browser_profile_id: str
+    transport_family: str
+    capabilities: list[str]
+
+
+class BrowserControllerRegisterResult(Result):
+    scope: ControllerScope
+
+
+method("browser.controller.register", params=BrowserControllerRegisterParams,
+       result=BrowserControllerRegisterResult,
+       doc="Attach this connection as the browser controller for one session; fails closed (4403).")
+
+
+class BrowserControllerResultParams(BrowserControllerParams):
+    command_id: str
+    ok: JsonValue | None = None  # only the exact ``true`` counts as success
+    result: JsonValue | None = None
+    error: JsonValue | None = None
+
+
+class BrowserControllerResultResult(Result):
+    accepted: bool
+
+
+method("browser.controller.result", params=BrowserControllerResultParams,
+       result=BrowserControllerResultResult,
+       doc="Deliver one command result to the broker; accepted is false for unknown or settled command ids.")
+
+
+method("browser.controller.heartbeat", params=BrowserControllerParams, result=OkResult,
+       doc="Acknowledge a heartbeat only for this transport's own attached controller.")
+
+
+class BrowserControllerDetachResult(Result):
+    detached: bool = True
+
+
+method("browser.controller.detach", params=BrowserControllerParams, result=BrowserControllerDetachResult,
+       doc="Hard-detach only the controller owned by this authenticated transport.")
+
 
 __all__ = [
     "GroupsLogResult", "RelayEnvelope", "Room", "RoomAuthority", "RoomEvent", "RoomLinkCatalog",
-    "RoomMember", "RoomMemberInput",
+    "RoomMember", "RoomMemberInput", "BrowserControllerParams", "BrowserControllerRegisterParams",
+    "BrowserControllerRegisterResult", "ControllerScope", "BrowserControllerResultParams",
+    "BrowserControllerResultResult", "BrowserControllerDetachResult",
 ]

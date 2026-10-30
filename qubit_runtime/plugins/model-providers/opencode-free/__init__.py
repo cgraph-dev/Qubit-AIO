@@ -37,6 +37,7 @@ class OpenCodeFreeProfile(ProviderProfile):
 opencode_free = OpenCodeFreeProfile(
     name="opencode-free", aliases=("free", "opencode_free"),
     env_vars=(),  # keyless — nothing to configure
+    auth_type="keyless",  # no credential surface: not an api_key provider card
     base_url="https://opencode.ai/zen/v1", display_name="OpenCode Free",
     description="OpenCode free models — keyless, no account needed",
     default_headers={

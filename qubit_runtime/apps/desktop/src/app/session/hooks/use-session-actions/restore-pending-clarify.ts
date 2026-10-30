@@ -55,7 +55,7 @@ export function restorePendingClarifyFromSnapshot(
 export function pendingClarifyToolPayload(request: ClarifyRequest): GatewayEventPayload {
   return {
     args: {
-      questions: request.questions.map(question => ({
+      questions: (request.questions ?? []).map(question => ({
         choices: question.choices ?? undefined,
         multi_select: question.multiSelect || undefined,
         question: question.question

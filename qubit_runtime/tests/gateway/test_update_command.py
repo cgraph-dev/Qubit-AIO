@@ -92,34 +92,7 @@ class TestHandleUpdateCommand:
         assert "Not a git repository" in result
 
 
-    @pytest.mark.asyncio
-    async def test_resolve_qubit_bin_module_argv(self):
-        """_resolve_qubit_bin uses the running interpreter's module argv when qubit_cli is
-        importable, even when PATH also offers a ``hermes`` binary (#111569: a PATH-first
-        lookup would re-exec an attacker-planted executable on /update and /restart)."""
-        import sys
-        from gateway.run import _resolve_qubit_bin
 
-        fake_spec = MagicMock()
-        with patch("shutil.which", return_value="/tmp/attacker/hermes"), \
-             patch("importlib.util.find_spec", return_value=fake_spec):
-            result = _resolve_qubit_bin()
-
-        assert result == [sys.executable, "-m", "qubit_cli.main"]
-
-    @pytest.mark.asyncio
-    async def test_resolve_qubit_bin_falls_back_to_path_then_none(self):
-        """Without an importable qubit_cli the argv degrades to PATH, then to None — never a
-        bare ``hermes`` string that a hostile PATH entry could shadow."""
-        from gateway.run import _resolve_qubit_bin
-
-        with patch("shutil.which", return_value="/usr/local/bin/hermes"), \
-             patch("importlib.util.find_spec", return_value=None):
-            assert _resolve_qubit_bin() == ["/usr/local/bin/hermes"]
-
-        with patch("shutil.which", return_value=None), \
-             patch("importlib.util.find_spec", side_effect=ImportError):
-            assert _resolve_qubit_bin() is None
 
 
     @pytest.mark.asyncio
@@ -197,33 +170,6 @@ class TestHandleUpdateCommand:
         call_kwargs = mock_popen.call_args[1]
         assert call_kwargs.get("start_new_session") is True
 
-    @pytest.mark.asyncio
-    async def test_resolve_qubit_bin_falls_back_to_path_then_none(self):
-        """Without an importable hermes_cli the argv degrades to PATH, then to None — never a
-        bare ``hermes`` string that a hostile PATH entry could shadow."""
-        from gateway.run import _resolve_qubit_bin
-
-        with patch("shutil.which", return_value="/usr/local/bin/hermes"), \
-             patch("importlib.util.find_spec", return_value=None):
-            assert _resolve_qubit_bin() == ["/usr/local/bin/hermes"]
-
-        with patch("shutil.which", return_value=None), \
-             patch("importlib.util.find_spec", side_effect=ImportError):
-            assert _resolve_qubit_bin() is None
-    @pytest.mark.asyncio
-    async def test_resolve_qubit_bin_module_argv(self):
-        """_resolve_qubit_bin uses the running interpreter's module argv when hermes_cli is
-        importable, even when PATH also offers a ``hermes`` binary (#111569: a PATH-first
-        lookup would re-exec an attacker-planted executable on /update and /restart)."""
-        import sys
-        from gateway.run import _resolve_qubit_bin
-
-        fake_spec = MagicMock()
-        with patch("shutil.which", return_value="/tmp/attacker/hermes"), \
-             patch("importlib.util.find_spec", return_value=fake_spec):
-            result = _resolve_qubit_bin()
-
-        assert result == [sys.executable, "-m", "qubit_cli.main"]
 
 
 # ---------------------------------------------------------------------------

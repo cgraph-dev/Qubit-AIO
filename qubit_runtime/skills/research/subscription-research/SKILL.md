@@ -1,6 +1,6 @@
 ---
 name: subscription-research
-description: "Use the user's own Perplexity Pro / Gemini Web accounts for web research through local OmniRoute."
+description: "Research the web through your Perplexity/Gemini accounts."
 version: 1.0.0
 author: Qubit Agent
 license: MIT

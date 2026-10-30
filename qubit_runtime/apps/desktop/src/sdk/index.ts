@@ -47,6 +47,7 @@ import { onGatewayEvent } from '@/contrib/events'
 import { registry } from '@/contrib/registry'
 import type { WorkspaceMode } from '@/contrib/types'
 import { deleteProfile, getLogs, getStatus, hermesApi, type HermesGateway } from '@/hermes'
+import { traceIdentityChange } from '@/lib/identity-trace'
 import { completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
 import {
   $gateway,
@@ -378,6 +379,8 @@ let openSessionGeneration = 0
 let gatewaySwapTargetOwnerGeneration: number | null = null
 
 export interface PluginOpenSessionOptions {
+  /** Re-use the live view instead of opening a fresh tab, when supported. */
+  refreshInPlace?: boolean
   awaitHydration?: boolean
   expectHistory?: boolean
   /** Always request a sequenced session.resume after the open, even when the
@@ -650,6 +653,8 @@ async function awaitProfileActivation(
 }
 
 export const host = {
+  /** Change-only desktop.log line for multi-connection identity diagnostics. */
+  traceIdentityChange,
   state: {
     /** Runtime id of the active chat session (null on a fresh draft). */
     activeSessionId: readonlyAtom<null | string>($activeSessionId),
@@ -1635,6 +1640,9 @@ export { SidebarRowLead } from '@/app/chat/sidebar/chrome'
 export { ConnectionGlyph } from '@/app/chat/sidebar/connection-glyph'
 export { SIDEBAR_ROW_LEAD, SIDEBAR_TRUNCATED_LEADING } from '@/app/chat/sidebar/row-geometry'
 export { PALETTE_AREA, type PaletteContribution } from '@/app/command-palette/contrib'
+/** Page-owned header control: projected into the workspace page header when the
+ *  page renders in the workspace pane, and rendered inline anywhere else. */
+export { WorkspacePageHeaderControl } from '@/app/contrib/workspace-page-header'
 /** THE overdue test for a cron job's `next_run_at`: non-null once the stored slot
  *  sits past the scheduler grace and the job is expected to fire. Every surface
  *  that prints a next run switches its label on this (`t.cron.next` →
@@ -1806,6 +1814,8 @@ export type {
   PluginRestOptions,
   PluginStorage
 } from '@/contrib/plugin'
+export { createDesktopMedia } from '@/sdk/desktop-media'
+export type { DesktopMedia, DesktopMediaSurfaceProps, MediaPlayerController } from '@/sdk/desktop-media'
 /** Mount-scoped contribution: while the rendering component is mounted, its
  *  children render in the target area's slot; unmount disposes it. Use for
  *  page-owned chrome (a page's titlebar control leaves with the page) —
@@ -1818,6 +1828,30 @@ export { Contribute, type ContributeProps } from '@/contrib/react/contribute'
 export type { Contribution } from '@/contrib/types'
 /** The live gateway instance type — for typing the `gateway` prop `ConnectorsTab`
  *  takes; obtain the instance from `host.getGateway()`. */
+/** Compact session row returned by the gateway's session list. */
+export interface SessionListRow {
+  id: string
+  resolved_id?: null | string
+  title?: string
+  preview?: string
+  started_at?: number
+  message_count?: number
+  live_message_count?: null | number
+  source?: string
+  _lineage_root_id?: null | string
+}
+
+/** Newest human-facing session of a profile (rosters use this for activity). */
+export interface ProfileSessionPreview {
+  id?: string
+  title?: string
+  preview?: string
+  started_at?: number
+  last_active?: number
+  message_count?: number
+  live_message_count?: null | number
+}
+
 export type { HermesGateway } from '@/hermes'
 /** Grab-to-pan for overflow containers (boards, timelines, wide tables) —
  *  the shared scrub primitive; don't hand-roll drag-to-scroll. */
@@ -1863,6 +1897,7 @@ export {
   type SurfaceModelSwitchConfirmOptions
 } from '@/lib/guarded-model-switch'
 export { triggerHaptic as haptic } from '@/lib/haptics'
+export { catalogProviderMatches } from '@/lib/model-options'
 export type { HermesOpenTarget } from '@/lib/hermes-open-target'
 /** The app's lucide icon set (RefreshCw, LayoutDashboard, Activity, …). */
 export * as icons from '@/lib/icons'
@@ -1985,6 +2020,10 @@ export type { DisplayLease, DisplayObserveResult, DisplayStatus, DisplayThumbnai
 /** THE compact-number formatter — every user-facing count/token figure goes
  *  through here (1230 → "1.2k", 1_500_000 → "1.5M"). Don't hand-roll `/1000`. */
 export { compactNumber } from '@qubit/shared'
+/** Client deadline for `approval.respond`: matches the backend's
+ *  `approvals.timeout` (300s) so a plugin answering an approval never rejects
+ *  its own RPC while the backend still applies the decision. */
+export { APPROVAL_RESPOND_TIMEOUT_MS } from '@qubit/shared'
 /** Qubit' reasoning levels, so a plugin surfacing a thinking depth uses the
  *  same scale as the rest of the app (labels: `reasoningEffortLabel`). */
 export {

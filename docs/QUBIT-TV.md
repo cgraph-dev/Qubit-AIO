@@ -1,23 +1,27 @@
 # QubitTV — provenance, scope, and the web-vs-native boundary
 
 **Status:** provenance and scope note. **Not a completion claim.** It records the
-license and upstream origin of the QubitTV integration and states what Qubit does
-and does not ship. It does not assert that native or DRM playback works.
+license and upstream origin of the QubitTV integration, what the desktop port
+implements, and what remains unavailable. It does not assert live playback or
+DRM support.
 
 ## What was adapted
 
-Qubit's QubitTV surface adapts the **service list and launcher UI concept** of
-[`asimons81/hermestv`](https://github.com/asimons81/hermestv) into a web
-launcher. In scope:
+Qubit has two QubitTV surfaces, both adapted from
+[`asimons81/hermestv`](https://github.com/asimons81/hermestv):
 
-- The catalogue of services the upstream plugin presents: YouTube, YouTube TV,
-  Netflix, Prime Video, Disney+, Hulu, HBO Max, Apple TV+, Peacock and
-  Paramount+.
-- The "pick a service, launch it" interaction model (a grid/tiles that open the
-  service), expressed as an ordinary web launcher.
+1. **Qubit Desktop (native).** A Qubit Desktop plugin and Electron
+   `WebContentsView` host. The plugin declares `capabilities: ['media.player']`
+   and renders the host-owned `ctx.media.Surface` inside a right-docked
+   workspace. It ports the upstream player manager, navigation policy, context
+   tokens, media-job worker, renderer contracts and the seven session-scoped
+   media tools. User-facing copy is QubitTV; IPC channels are `qubit:player:*`.
+2. **Web dashboard launcher (fallback).** The `/qubit-tv` page presents the same
+   service catalogue as browser-window links and an embedded YouTube URL/ID
+   player. It is not the native player and does not claim native playback.
 
-Qubit's page, routing, styling and any state are original; nothing from the
-upstream frontend bundle is copied in.
+Service catalogue (both surfaces): YouTube, YouTube TV, Netflix, Prime Video,
+Disney+, Hulu, HBO Max, Apple TV+, Peacock and Paramount+.
 
 ## Provenance and license
 
@@ -25,49 +29,56 @@ upstream frontend bundle is copied in.
 - Pinned commit: `fbd445b381ff5f371bf46bdc96a7d79362d9510f` (2026-10-25)
 - License: **MIT**, `Copyright (c) 2025 Nous Research` — full text in the
   upstream `LICENSE`, reproduced with the attribution in
-  `THIRD_PARTY_NOTICES.md`.
-- Reusable source reviewed: `plugin-source/` — `desktop/src/plugin.jsx` (the
-  service grid and launcher UI), `plugin.yaml` (the `hermestv` plugin manifest)
-  and `__init__.py` (the session-scoped `hermestv_*` tool set).
+  `THIRD_PARTY_NOTICES.md` and in `qubit_runtime/plugins/qubit-tv/LICENSE`.
+- Reusable source reviewed: `plugin-source/` (`desktop/src/plugin.jsx`,
+  `plugin.yaml`, `__init__.py`) and `host-source/` (the desktop player host,
+  renderer SDK, gateway/local player and TUI player agent).
 
-The MIT notice and copyright are retained in `THIRD_PARTY_NOTICES.md`. Qubit's
-`LICENSE` applies only to original Qubit material and does not relicense
-upstream-derived code.
+The MIT notice and copyright are retained. Qubit's `LICENSE` applies only to
+original Qubit material and does not relicense upstream-derived code.
 
-## What was not vendored
+## Native desktop port
 
-- The native Electron desktop plugin SDK (`@hermes/plugin-sdk`) and the
-  `ctx.media` / `ctx.desktop.media_request` host capability.
-- The embedded/Dock player, transcript and download job runner, and the custom
-  HermesTV backend.
-- Any credentials, browser profiles, runtime or CDM.
+| Layer | Location |
+|---|---|
+| Renderer contracts + SDK | `qubit_runtime/apps/desktop/src/lib/player-*.ts`, `src/sdk/desktop-media.tsx` |
+| Electron host | `qubit_runtime/apps/desktop/electron/player/`, `player-ipc.ts`, `player-media-jobs.ts` |
+| Worker | `qubit_runtime/apps/desktop/public/qubit-tv-worker.py` |
+| Python routing | `qubit_cli/plugin_desktop.py`, `gateway/local_player.py`, `tui_gateway/player_agent.py` |
+| Plugin (desktop) | `qubit_runtime/apps/desktop/src/plugins/qubit-tv/plugin.jsx` |
+| Plugin (agent tools) | `qubit_runtime/plugins/qubit-tv/` |
 
-The upstream plugin is a **native Electron media plugin**, not a stock Hermes or
-web plugin. It requires the independent HermesTV application host and its native
-media SDK; a stock Hermes/Qubit install cannot load it.
+Security model preserved: session-scoped context tokens, navigation generation,
+closed/validated operations, owner-window binding, and no model-controlled
+session id. The dispatcher supplies the durable session id; it is never in a
+tool schema.
 
-## Web-vs-native limitation
+## What is unavailable
 
-QubitTV is a **web launcher**. It opens the selected service in the browser; it
-does not embed the upstream native player.
+- **Widevine/CDM.** The shipped Electron 40.10.2 runtime has no `components`
+  API (upstream pins Electron 44.9.3). The player returns the typed
+  `unsupported` state and the QubitTV pane says protected playback is
+  unavailable. Do not claim DRM playback.
+- **Protected services.** Netflix, HBO Max, Apple TV+, Peacock, Disney+, Hulu,
+  Prime Video and YouTube TV depend on the CDM; the pane may open the service
+  page but does not claim sign-in or playback.
+- **Live playback proof.** The port is covered by focused unit tests; a live
+  packaged Electron run was not performed in this environment. Ordinary
+  eligible YouTube navigation is the only path the upstream preview validates.
 
-- Ordinary eligible YouTube playback was the only path the upstream preview
-  validated.
-- Signed-in DRM services (Netflix, HBO Max, Apple TV+, Peacock and peers) are
-  untested upstream and depend on the native player/CDM, which Qubit does not
-  ship.
-- Qubit therefore makes **no claim** of in-page, native, or DRM playback. Do not
-  describe QubitTV as a media player in product copy.
+## Verification
 
-## Where future UI work goes
-
-The served Qubit dashboard is built from **`frontend/qubit-web`**; that is the
-only correct source for QubitTV UI work. Do not build `qubit_runtime/web` (the
-upstream Hermes SPA) into `frontend/qubit-dist`. Rebuild with:
-
-```bash
-KEEP_NODE_MODULES=1 bash scripts/build_dashboard.sh
-node frontend/qubit-web/scripts/write-build-info.mjs
-```
-
-Any future QubitTV component belongs under `frontend/qubit-web/src`.
+- Desktop QubitTV focused suite: **105 passed** (renderer contracts, bridge/decoder,
+  tool-media, capability gate, pane, server-request handler, Electron player/IPC/
+  media-jobs, preload bridge).
+- Python QubitTV/contract suite: **59 passed** (`test_qubit_tv_plugin.py`,
+  `test_plugin_desktop_capability.py`, `test_player_agent_route.py`,
+  `test_generated.py`); real bundled-plugin discovery registered all seven
+  `qubit_tv_*` tools.
+- Two full runtime matrices: 64,037 passed / 321 failed (before fixes) and
+  64,297 passed / 319 failed (after fixes). Every QubitTV test passed in both.
+  The remaining failures are pre-existing CI/PM/install/desktop-update/website
+  and live-timeout issues, not QubitTV.
+- Not verified: a live packaged Electron playback run. The desktop app build is
+  currently blocked by pre-existing missing exports in the vendored tree,
+  unrelated to the player port. Protected playback remains unavailable.

@@ -168,11 +168,20 @@ def load_git_dates(catalog_dir: Path) -> dict[str, dict[str, str]]:
     dates: dict[str, dict[str, str]] = {}
     alias: dict[str, str] = {}  # old file name → current name, for renamed entries
 
+    def _utc_z(value: str) -> str:
+        """Normalize a git strict-ISO date (``%cI``) to the documented UTC ``Z`` form."""
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
+                timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            return value
+
     def touch(name: str, when: str) -> None:
         if "/" in name or not name.endswith(".yaml"):
             return
         while name in alias:
             name = alias[name]
+        when = _utc_z(when)
         rec = dates.setdefault(name, {"addedAt": when, "updatedAt": when})
         rec["addedAt"] = when  # newest-first walk: the last write wins = oldest commit
 

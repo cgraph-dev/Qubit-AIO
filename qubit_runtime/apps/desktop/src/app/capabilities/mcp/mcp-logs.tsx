@@ -8,7 +8,7 @@ import { $activeGatewayProfile } from '@/store/profile'
 
 export const LOG_POLL_MS = 2000
 
-const STDIO_MARKER_RE = /^===== \[.*\] starting MCP server '(.+)' =====$/
+const STDIO_MARKER_RE = /^(?:\d{4}-\d{2}-\d{2} [\d:,]+ )?===== (?:\[.*\] )?starting MCP server '(.+)' =====$/
 
 export function filterStdioSections(lines: string[], server: string): string[] {
   const out: string[] = []
@@ -31,15 +31,7 @@ export function filterStdioSections(lines: string[], server: string): string[] {
 
 export type McpLogSource = 'agent' | 'stdio'
 
-export function McpLogs({
-  emptyLabel,
-  server,
-  source
-}: {
-  emptyLabel: string
-  server: null | string
-  source: McpLogSource
-}) {
+export function useMcpLogLines(server: null | string, source: McpLogSource): null | string[] {
   const [lines, setLines] = useState<null | string[]>(null)
   const activeProfile = useStore($activeGatewayProfile)
 
@@ -59,6 +51,20 @@ export function McpLogs({
       publish: setLines
     })
   }, [server, source, activeProfile])
+
+  return lines
+}
+
+export function McpLogs({
+  emptyLabel,
+  server,
+  source
+}: {
+  emptyLabel: string
+  server: null | string
+  source: McpLogSource
+}) {
+  const lines = useMcpLogLines(server, source)
 
   return <LogTail emptyLabel={emptyLabel} lines={lines} />
 }

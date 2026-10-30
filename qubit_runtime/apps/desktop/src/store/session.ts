@@ -12,6 +12,7 @@ import {
   rescopeConnectionScopedStores
 } from '@/lib/connection-scoped'
 import { isMessagingSource } from '@/lib/session-source'
+import type { TileSessionFocusStamp } from '@/lib/session-timer-since'
 import { persistBoolean, persistString, readJson, storedBoolean, storedString, writeJson } from '@/lib/storage'
 import type { SessionInfo, UsageStats } from '@/types/hermes'
 
@@ -168,7 +169,9 @@ export function migrateSessionOwnerHintsForProfile(oldProfile: string, newProfil
   for (const [key, entry] of [...sessionOwnerHints]) {
     const { route } = entry
 
-    if (route.profile !== from && route.targetProfile !== from) {
+    // Local-connection hints only, like every other rename family: a same-named
+    // profile on another connection was not renamed.
+    if (route.connectionId !== 'local' || (route.profile !== from && route.targetProfile !== from)) {
       continue
     }
 
@@ -860,6 +863,44 @@ export function touchSessionActivity(
   })
 }
 
+/** Patch a session's title across EVERY sidebar slice, matching the row by
+ *  any id the conversation has answered to (`sessionMatchesStoredId`) — a
+ *  compression tip, its root, and a middle segment all name the same chat.
+ *  A rename writes one title; every surface that renders the row (recents,
+ *  cron, messaging) must show it without waiting for a profile switch to
+ *  force a refetch. Reference-stable per slice when nothing matched or the
+ *  title is already current. */
+export function applySessionTitle(storedSessionId: string | null | undefined, title: string | null): void {
+  const id = storedSessionId?.trim()
+
+  if (!id) {
+    return
+  }
+
+  const next = title?.trim() || null
+
+  const patch = (rows: SessionInfo[]): SessionInfo[] => {
+    let changed = false
+
+    const mapped = rows.map(session => {
+      if (!sessionMatchesStoredId(session, id) || session.title === next) {
+        return session
+      }
+
+      changed = true
+
+      return { ...session, title: next }
+    })
+
+    return changed ? mapped : rows
+  }
+
+  setSessions(patch)
+  setCronSessions(patch)
+  setMessagingSessions(patch)
+  setUnlistedSessionOwnerRows(patch)
+}
+
 export const $connection = atom<HermesConnection | null>(null)
 export const $gatewayState = atom<ConnectionState>('idle')
 export const $sessions = atom<SessionInfo[]>([])
@@ -1299,6 +1340,13 @@ export const $currentFastMode = atom(storedBoolean(COMPOSER_FAST_KEY, false))
 export const $yoloActive = atom(false)
 export const $currentCwd = atom(getRememberedWorkspaceCwd())
 
+// True only when the next new chat's cwd is a deliberate workspace choice (#52589).
+// The desktop otherwise seeds a chat's cwd from its app-global workspace; the
+// gateway must treat that as an inherited default — NOT an explicit pick.
+export const $currentCwdExplicit = atom(false)
+
+export const setCurrentCwdExplicit = (next: Updater<boolean>) => updateAtom($currentCwdExplicit, next)
+
 // Which conversation the live `$currentCwd` is known to describe. Three
 // inhabitants, and the difference between the last two is load-bearing:
 // a stored-session id (that conversation owns the path), `null` (the fresh-draft
@@ -1336,6 +1384,9 @@ export const $currentUsage = atom<UsageStats>({
   total: 0
 })
 export const $sessionStartedAt = atom<number | null>(null)
+// $sessionStartedAt is primary-only; tiles get their own "focused since" stamp
+// for the statusbar timer, set when a tile becomes the focused surface.
+export const $tileSessionFocusStartedAt = atom<null | TileSessionFocusStamp>(null)
 export const $turnStartedAt = atom<number | null>(null)
 export const $introPersonality = atom('')
 export const $currentPersonality = atom('')
@@ -1544,6 +1595,9 @@ export const setCurrentModel = (next: Updater<string>) => {
   }
 }
 
+export const setCurrentModelTransient = (next: Updater<string>) => updateAtom($currentModel, next)
+export const setCurrentProviderTransient = (next: Updater<string>) => updateAtom($currentProvider, next)
+
 export const setCurrentProvider = (next: Updater<string>) => {
   updateAtom($currentProvider, next)
   const key = composerSelectionKey(COMPOSER_PROVIDER_KEY)
@@ -1715,6 +1769,8 @@ export const workspaceCwdForNewSession = (): string => {
 export const setCurrentBranch = (next: Updater<string>) => updateAtom($currentBranch, next)
 export const setCurrentUsage = (next: Updater<UsageStats>) => updateAtom($currentUsage, next)
 export const setSessionStartedAt = (next: Updater<number | null>) => updateAtom($sessionStartedAt, next)
+export const setTileSessionFocusStartedAt = (next: Updater<null | TileSessionFocusStamp>) =>
+  updateAtom($tileSessionFocusStartedAt, next)
 export const setTurnStartedAt = (next: Updater<number | null>) => updateAtom($turnStartedAt, next)
 export const setIntroPersonality = (next: Updater<string>) => updateAtom($introPersonality, next)
 export const setCurrentPersonality = (next: Updater<string>) => updateAtom($currentPersonality, next)
@@ -1723,3 +1779,5 @@ export const setIntroSeed = (next: Updater<number>) => updateAtom($introSeed, ne
 export const setContextSuggestions = (next: Updater<ContextSuggestion[]>) => updateAtom($contextSuggestions, next)
 export const setModelPickerOpen = (next: Updater<boolean>) => updateAtom($modelPickerOpen, next)
 export const setSessionPickerOpen = (next: Updater<boolean>) => updateAtom($sessionPickerOpen, next)
+
+export { $freshDraftKey, rotateFreshDraftKey } from './composer'

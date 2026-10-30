@@ -470,6 +470,7 @@ export interface Translations {
       retryingRemoteBackend: string
       startingDesktopConnection: string
       startingHermesDesktop: string
+      startingQubitDesktop?: string
     }
     errors: {
       backgroundExited: string
@@ -1404,6 +1405,9 @@ export interface Translations {
       sshKeyTitle: string
       sshKeyDesc: string
       sshHermesPathTitle: string
+      sshQubitPathTitle?: string
+      sshQubitPathDesc?: string
+      sshQubitPathPlaceholder?: string
       sshHermesPathDesc: string
       sshHermesPathPlaceholder: string
       sshTestConnection: string
@@ -2367,6 +2371,7 @@ export interface Translations {
     mcpServers: string
     archivedChats: string
     sections: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
+    sectionDescriptions: Record<'maintenance' | 'sessions' | 'system' | 'usage', string>
     nav: Record<'newChat' | 'settings' | 'capabilities' | 'messaging' | 'artifacts', { title: string; detail: string }>
     sectionEntries: Record<'sessions' | 'system' | 'usage', { title: string; detail: string }>
     providerNavigate: string
@@ -3999,6 +4004,7 @@ export interface Translations {
         title: string
         tokenSummary: (used: string, max: string) => string
       }
+      session: string
       focusedSince: string
       focusedSinceTitle: string
       yoloOn: string
@@ -4395,10 +4401,15 @@ export interface Translations {
       skip: string
       skipped: string
       noAnswer: string
+      continueLabel: string
       confirmAndContinueLabel: string
       singleSelectHint: string
       multiSelectHint: string
       questionProgress: (answered: number, total: number) => string
+      answeredBadge: string
+      lateAnswer: (question: string, choice: string) => string
+      lateAnswerTip: string
+      lateAnswerHint: string
       notDelivered: string
     }
     catalogInstall: {
@@ -4414,7 +4425,7 @@ export interface Translations {
       hideNames: string
       skill: (name: string) => string
       kind: { plugin: string; skill: string }
-      tier: { official: string; community: string }
+      tier: { official: string; community: string; verified: string }
       targetProfile: (profile: string) => string
       sendFailed: string
       commitLabel: string

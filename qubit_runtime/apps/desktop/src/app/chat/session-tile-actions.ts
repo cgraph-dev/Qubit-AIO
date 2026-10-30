@@ -745,7 +745,7 @@ export function useSessionTileActions({ requestGateway, runtimeId, scope, stored
 
   const branchInNewChat = useCallback(
     (messageId: string) =>
-      sessionTileDelegate()?.branchSessionAtMessage(storedIdRef.current, runtimeIdRef.current, messageId) ??
+      sessionTileDelegate()?.branchSessionAtMessage?.(storedIdRef.current, runtimeIdRef.current, messageId) ??
       Promise.resolve(false),
     []
   )

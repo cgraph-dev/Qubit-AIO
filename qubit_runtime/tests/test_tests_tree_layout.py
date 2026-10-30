@@ -29,11 +29,22 @@ TESTS_ROOT = REPO_ROOT / "tests"
 # "_fixtures": topic modules tests/conftest.py is split into — suite-wide
 # plumbing (env filtering, live-system guard, platform gating), not tests.
 _NON_MIRROR_DIRS = {
-    "compat", "installation", "_fixtures",
+    # "runtime": the engine-port contract (agent/runtime_port.py and its native /
+    # registry / OpenJarvis backends); the modules live under agent/, the group
+    # names the feature rather than a package.
+    # "honcho_plugin": tests for plugins/memory/honcho plus the bundled Honcho
+    # skill, which has no single source package to mirror.
+    "compat", "installation", "_fixtures", "runtime", "honcho_plugin",
     "ci", "conformance", "dashboard", "desktop", "docker", "e2e", "evals",
     "fakes", "fixtures", "install", "integration", "manual",
     "monitoring", "openviking_plugin", "perf_guards", "scripts", "secret_sources",
     "security", "skills", "verify", "website", "computer_use", "qubit_state",
+    # "honcho_plugin": the honcho memory provider lives at plugins/memory/honcho,
+    # not as a top-level package.
+    "honcho_plugin",
+    # "runtime": the engine-port suite spans agent/runtime_* + recipes/roles;
+    # there is no single top-level ``runtime`` package to mirror.
+    "runtime",
 }
 
 # Root-level modules whose tests sit directly in tests/ (no package to mirror).

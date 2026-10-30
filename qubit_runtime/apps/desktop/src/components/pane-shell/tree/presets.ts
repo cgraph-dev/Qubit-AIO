@@ -61,7 +61,8 @@ export const layoutPresetResting = (id: string): ReadonlySet<string> => {
 }
 
 // v2: v1 presets predate semantic placement (see store.ts) — retire them.
-const USER_KEY = 'hermes.desktop.layoutPresets.v2'
+const USER_KEY = 'qubit.desktop.layoutPresets.v2'
+const LEGACY_USER_KEY = 'hermes.desktop.layoutPresets.v2'
 
 writeKey('hermes.desktop.layoutPresets.v1', null)
 
@@ -74,7 +75,8 @@ interface StoredPreset {
 const userDisposers = new Map<string, () => void>()
 
 function loadUserPresets(): Record<string, StoredPreset> {
-  const parsed = readJson<Record<string, StoredPreset>>(USER_KEY) ?? {}
+  const parsed =
+    readJson<Record<string, StoredPreset>>(USER_KEY) ?? readJson<Record<string, StoredPreset>>(LEGACY_USER_KEY) ?? {}
   const out: Record<string, StoredPreset> = {}
   let healed = false
 
@@ -114,6 +116,7 @@ function loadUserPresets(): Record<string, StoredPreset> {
 
 function persistUserPresets(presets: Record<string, StoredPreset>) {
   writeJson(USER_KEY, presets)
+  writeJson(LEGACY_USER_KEY, presets)
 }
 
 function registerUserPreset(id: string, preset: StoredPreset) {

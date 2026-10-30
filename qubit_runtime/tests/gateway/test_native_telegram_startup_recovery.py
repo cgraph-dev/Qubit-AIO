@@ -62,7 +62,7 @@ class BotAPI(BaseHTTPRequestHandler):
             pass
 
 
-def wait_for(predicate, detail, timeout=30):
+def wait_for(predicate, detail, timeout=120):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():

@@ -76,7 +76,8 @@ describe('useBackgroundQueueDrain', () => {
     // The queue store merges over live localStorage on save (cross-window sync,
     // #46732) — stale persisted entries from an earlier test would be adopted
     // into the atom and drained here as if they were fresh queue state.
-    window.localStorage.removeItem('qubit.desktop.composerQueue.v1')
+    // The queue store persists under its legacy wire key (see composer-queue.ts).
+    window.localStorage.removeItem('hermes.desktop.composerQueue.v1')
     resetFrozenQueuedTransportsForTests()
     // Production drain waits for the sidebar list. Tests that assert drain
     // behavior are post-load unless they opt into the loading gate.

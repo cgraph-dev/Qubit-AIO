@@ -28,6 +28,8 @@ export const PROMPT_SUBMIT_REQUEST_TIMEOUT_MS = 1_800_000
 
 export const GATEWAY_NOT_CONNECTED_MESSAGE = 'Qubit gateway is not connected'
 
+export { HermesGateway as QubitGateway }
+
 export class HermesGateway extends JsonRpcGatewayClient {
   constructor() {
     super({
@@ -122,7 +124,7 @@ export function resolveOwnerNow(owner?: OwnerScope): ResolvedOwner {
  *  ambient connection spread underneath. An untagged half stays untagged. A
  *  named profile is always explicit here, so it carries the foreground
  *  priority `profileScoped` gives explicit profiles (voice is user-driven). */
-export function hermesApiAs<T>(owner: ResolvedOwner, request: QubitApiRequest): Promise<T> {
+export function hermesApiAs<T>(owner: ResolvedOwner, request: HermesApiRequest): Promise<T> {
   return window.hermesDesktop.api<T>({
     ...(owner.connectionId ? { connectionId: owner.connectionId } : {}),
     ...(owner.profile ? { priority: 'foreground' as const, profile: owner.profile } : {}),

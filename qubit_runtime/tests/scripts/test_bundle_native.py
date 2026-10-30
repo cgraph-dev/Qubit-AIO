@@ -18,7 +18,15 @@ import pytest
 
 from scripts.bundles import native
 
+# The bundle stages PM's manager runtime, which pins CPython 3.14
+# (pm/pyproject.toml) and cannot be synced by an older interpreter.
+_needs_pm_runtime_python = pytest.mark.skipif(
+    sys.version_info < (3, 14),
+    reason=f"PM runtime pins CPython 3.14; test interpreter is {sys.version.split()[0]}",
+)
 
+
+@_needs_pm_runtime_python
 def test_bundle_stages_git_tree_and_runs_native_children_before_manifest(tmp_path, monkeypatch):
     import importlib
     import inspect

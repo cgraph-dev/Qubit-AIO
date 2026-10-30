@@ -54,6 +54,8 @@ import type {
   SessionRedirectResponse
 } from '../../../types'
 
+import type { CreateBackendSessionForSend } from '../use-session-actions/create-overrides'
+
 import {
   appendMidTurnUserMessage,
   applyBranchVisibility,
@@ -238,7 +240,7 @@ interface PromptActionsOptions {
   activeSessionIdRef: MutableRefObject<string | null>
   busyRef: MutableRefObject<boolean>
   branchCurrentSession: () => Promise<boolean>
-  createBackendSessionForSend: (preview?: string | null) => Promise<string | null>
+  createBackendSessionForSend: CreateBackendSessionForSend
   getRoutedStoredSessionId: () => null | string
   getRuntimeIdForStoredSession: (storedSessionId: string) => null | string
   getRouteToken: () => string
@@ -264,6 +266,14 @@ interface RestoreMessageTarget {
   text?: string
   userOrdinal?: number | null
 }
+
+// The gateway reports a stale truncation target when the row or ordinal the
+// cached plan addressed was compressed away. Shared with session tiles so both
+// surfaces retry-and-reload on the same condition.
+const isStaleTargetError = (err: unknown) =>
+  /no longer in session history|not in session history/i.test(err instanceof Error ? err.message : String(err))
+
+export { isStaleTargetError }
 
 export function usePromptActions({
   activeSessionId,
@@ -1129,9 +1139,6 @@ export function usePromptActions({
       setBusy(true)
       setAwaitingResponse(true)
       updateSessionState(sessionId, state => applyRewindOptimistic(state, plan.sourceIndex, plan.editedMessage))
-
-      const isStaleTargetError = (err: unknown) =>
-        /no longer in session history|not in session history/i.test(err instanceof Error ? err.message : String(err))
 
       const isCompressedAwayError = (err: unknown) => {
         if (!(err instanceof JsonRpcGatewayError) || err.code !== 4018) {

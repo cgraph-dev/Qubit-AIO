@@ -31,6 +31,7 @@ main = _mod.main
 DEFAULT = {
     "python": True,
     "python_prod": True,
+    "catalog": True,
     "frontend": True,
     "docker": True,
     "docker_meta": True,
@@ -48,7 +49,6 @@ DEFAULT = {
     "desktop_updater": True,
     "rust": True,
     "remote_backends": True,
-    "catalog": True,
 }
 
 SLOW_LANES = {"docker", "nix", "e2e", "e2e_upgrade", "e2e_desktop_core", "e2e_desktop_update"}
@@ -66,6 +66,7 @@ def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_
     return {
         "python": python,
         "python_prod": _python_prod,
+        "catalog": catalog,
         "docker": docker_meta if docker is None else docker,
         "nix": nix,
         "e2e": e2e,
@@ -83,7 +84,6 @@ def _lanes(python=False, frontend=False, site=False, scan=False, deps=False, uv_
         "desktop_updater": desktop_updater,
         "rust": rust,
         "remote_backends": remote_backends,
-        "catalog": catalog,
     }
 
 

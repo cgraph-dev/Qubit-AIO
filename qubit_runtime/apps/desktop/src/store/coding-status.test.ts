@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { HermesRepoStatus } from '@/global'
+import type { HermesRepoStatus, QubitRepoStatus } from '@/global'
 
 import {
   $repoStatus,

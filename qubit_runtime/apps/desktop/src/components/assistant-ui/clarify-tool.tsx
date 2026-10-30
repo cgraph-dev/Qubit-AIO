@@ -1013,7 +1013,7 @@ function ClarifyToolBatchPending({
       for (const question of questions) {
         const answer = lockedAnswers[question.qid]
 
-        if (answer === undefined || next[question.qid]) {
+        if (answer == null || next[question.qid]) {
           continue
         }
 

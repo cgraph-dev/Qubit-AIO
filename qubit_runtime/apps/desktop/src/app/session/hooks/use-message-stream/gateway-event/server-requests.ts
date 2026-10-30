@@ -19,6 +19,8 @@ import type { PreviewActAction } from '@/lib/preview-act/act-in-page'
 import type { TourAction, TourStep } from '@/lib/tour'
 import { normalizeQuestions, setClarifyRequest } from '@/store/clarify'
 import type { ScopedServerRequest } from '@/store/gateway'
+
+import { playerAgentRequest } from './player-agent-request'
 import { dispatchNativeNotification } from '@/store/native-notifications'
 import type { PreviewOwner } from '@/store/preview-ownership'
 import {
@@ -104,7 +106,14 @@ type PreviewSessionRoute = 'ignore' | 'retry' | 'run'
  * would win the race, so the tool reports "no preview tab / no terminal" while
  * the owner's pane is open (#113348).
  */
-const WINDOW_OWNED_REQUESTS = new Set(['preview.act', 'preview.read', 'terminal.read', 'window.read', 'tour'])
+const WINDOW_OWNED_REQUESTS = new Set([
+  'player.agent.request',
+  'preview.act',
+  'preview.read',
+  'terminal.read',
+  'window.read',
+  'tour'
+])
 
 /**
  * A window not hosting the session declines instead of staying silent. The
@@ -659,6 +668,7 @@ const tour: Handler = ({ isActiveSession, request, sessionId }) => {
 
 /** Method → handler. Every `ServerRequestMap` key the desktop answers. */
 export const SERVER_REQUEST_HANDLERS: Record<string, Handler> = {
+  'player.agent.request': playerAgentRequest,
   approval,
   clarify,
   'display.install.sudo': displayInstallSudo,
