@@ -1,4 +1,4 @@
-"""Gateway fleet restart + post-update verification for ``qubit update``.
+"""Gateway fleet restart + post-update verification for ``hermes update``.
 
 Split out of ``qubit_cli/update_cmd.py``; every name is re-imported there so
 ``qubit_cli.update_cmd.<name>`` keeps resolving/monkeypatching. Origin helpers are
@@ -19,9 +19,6 @@ from pathlib import Path
 from qubit_cli.update_cmd_common import _best_effort
 from qubit_cli.update_host_obligation import PROFILE_MARKER_NAME
 from qubit_cli.update_inventory import _gateway_service_matches_profile
-from qubit_cli.update_cmd_fleet_verify import (  # noqa: F401  moved to the topical sibling; re-imported so existing `from update_cmd_fleet import <name>` consumers and `update_cmd_fleet.<name>` patch seams keep working
-    _collect_fleet_snapshot, _fleet_row_identity_pending, _live_gateway_pids_from_fleet,
-    _print_legacy_units_warning, _restarted_units_gone, _verify_fleet_after_update)
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("qubit_cli.update_cmd")
@@ -36,7 +33,7 @@ _FRESH_RESTART_SUPERVISORS = frozenset({"systemd", "launchd", "service", "s6"})
 
 _SYSTEMD_SCOPES = (("user", ["systemctl", "--user"]), ("system", ["systemctl"]))
 _LIST_GATEWAY_UNITS = [
-    "list-units", "qubit-gateway*", "qubit-serve*", "qubit-dashboard*",
+    "list-units", "hermes-gateway*", "hermes-serve*", "hermes-dashboard*",
     "--plain", "--no-legend", "--no-pager",
 ]
 
@@ -66,8 +63,7 @@ def _fleet_restart_pending_marker_path() -> Path:
     return get_qubit_home() / _FLEET_RESTART_PENDING_NAME
 
 
-def _write_fleet_restart_pending_marker(*, expected_sha: str = "", runtimes: list[dict] | None = None,
-                                        owner: str = "") -> bool:
+def _write_fleet_restart_pending_marker(*, expected_sha: str = "", runtimes: list[dict] | None = None, owner: str = "") -> bool:
     """Arm the HOST pull→restart obligation. Never raises; False when no store every profile reads took it.
 
     An unwritable host state dir falls back to this profile's per-home marker, which settles the
@@ -77,7 +73,7 @@ def _write_fleet_restart_pending_marker(*, expected_sha: str = "", runtimes: lis
     if runtimes == []:
         # An explicit empty inventory owes no restart (e.g. Desktop-hosted `serve` with no
         # gateway services). Arming the marker here leaves a breadcrumb nothing can discharge:
-        # a no-gateway host would then fail every later ``qubit update`` (#115311).
+        # a no-gateway host would then fail every later ``hermes update`` (#115311).
         return True
     from qubit_cli.update_cmd import _m
     from qubit_cli.update_host_obligation import arm_host_obligation
@@ -145,9 +141,8 @@ def _current_checkout_sha() -> str | None:
     """Current on-disk checkout HEAD, or None if it cannot be resolved."""
     from qubit_cli.update_cmd import _capture_head_sha, _m
     try:
-        from qubit_cli.version_info import get_code_identity
-        sha = (get_code_identity(refresh=True) or {}).get("sha")
-        return str(sha) if sha else None
+        from qubit_cli.version_info import read_checkout_sha
+        return read_checkout_sha()
     except Exception:
         return _capture_head_sha(["git"], _m().PROJECT_ROOT)
 
@@ -157,7 +152,7 @@ def _receipt_looks_unfinished(receipt: dict) -> bool:
 
     The command boundary stamps a ``stop_reason`` on every receipt, including clean
     ones (``completed at command boundary``, ``sys.exit(0)``); it must not make a
-    successful receipt look unfinished, or the next ``qubit update`` retriggers
+    successful receipt look unfinished, or the next ``hermes update`` retriggers
     ``fleet_restart_pending`` from pre-pull plan SHAs (#98022).
     """
     exit_code = receipt.get("exit_code")
@@ -219,9 +214,9 @@ _SUPERVISED_SERVE_BACKENDS = frozenset(
 )
 # Backends whose supervisor restarts the process without any updater bookkeeping. ``manual-serve``
 # is excluded: it owes a durable handoff (``defer_manual_serve``) before it stops counting.
-# ``systemd``/``windows-service``/``service`` mirror ``_SUPERVISED_SERVE_BACKENDS`` for parity only —
-# the inventory writer classifies a serve/dashboard row as exactly launchd, desktop, desktop-ssh or manual-serve
-# (``update_inventory._collect_ledger_runtimes``); those three are set for gateway rows alone.
+# The inventory writer classifies a serve/dashboard row as launchd, desktop, desktop-ssh, systemd (a unit's
+# MainPID, #141021) or manual-serve (``update_inventory._collect_ledger_runtimes``); ``windows-service`` and
+# ``service`` mirror ``_SUPERVISED_SERVE_BACKENDS`` for parity only — they are set for gateway rows alone.
 _SUPERVISOR_OWNED_SERVE_BACKENDS = _SUPERVISED_SERVE_BACKENDS - {"manual-serve"}
 
 
@@ -491,7 +486,7 @@ def _update_owes_fleet_restart(*, receipt: dict | None = None, pending_manual: l
     if not _receipt_reports_stale_runtime(receipt):
         return False
     restarted_to = _receipt_restart_phase_completed(receipt)
-    # A fleet an operator has since restarted onto a moved checkout (``qubit gateway restart`` —
+    # A fleet an operator has since restarted onto a moved checkout (``hermes gateway restart`` —
     # the remedy this warning names) has nothing of the update left to owe either.
     if restarted_to and _live_fleet_covers_receipt(restarted_to, receipt, owed, accept_states=("current", "stale")):
         return False
@@ -501,10 +496,10 @@ def _update_owes_fleet_restart(*, receipt: dict | None = None, pending_manual: l
 def _warn_pending_fleet_restart(*, startup: bool = False) -> None:
     """Print the specific interrupted-update fleet-restart warning."""
     stream = sys.stderr if startup else sys.stdout
-    print("⚠ A previous `qubit update` pulled new code but did not restart running gateways.", file=stream)
+    print("⚠ A previous `hermes update` pulled new code but did not restart running gateways.", file=stream)
     print("  Gateways may still be serving pre-update modules (mixed sys.modules).", file=stream)
     if startup:
-        print("  Run `qubit update` or `qubit gateway restart`.", file=stream)
+        print("  Run `hermes update` or `hermes gateway restart`.", file=stream)
 
 
 def _warn_pending_fleet_restart_on_startup() -> None:
@@ -602,7 +597,7 @@ def _restart_systemd_gateway_units_best_effort(failed: list, listings) -> None:
         print(
             f"  • {unit_key} is a legacy per-profile unit sharing one host gateway process with "
             f"{owner_key}; restarting it again would restart that process twice. Fold the units "
-            "together with: qubit gateway migrate"
+            "together with: hermes gateway migrate"
         )
 
     for key in keys:
@@ -647,7 +642,7 @@ def _restart_identity_sha() -> str:
 
     ``_current_checkout_sha()`` is ``None`` on every non-git install (zip, pip, Docker), and an
     empty stamp can never match, so the per-host restart-once guard would be inert exactly on the
-    installs it exists for: each profile's ``qubit update`` would re-kill the one shared
+    installs it exists for: each profile's ``hermes update`` would re-kill the one shared
     multiplexer. The obligation's own ``expected_sha`` — else the receipt's post-update identity —
     names the same pulled code.
     """
@@ -670,9 +665,9 @@ def _fleet_restart_skip_reason(plan) -> str | None:
 
     Every route (pulled, already-current, ZIP) now finishes through the same completion
     tail, so the guards the old catch-up path carried live here: one host runs ONE
-    multiplexing gateway, so a second profile's ``qubit update`` attaches to the restart the
+    multiplexing gateway, so a second profile's ``hermes update`` attaches to the restart the
     first one already stamped (#95294), and a fleet already serving the checkout code (a
-    no-op update, a manual ``qubit gateway restart`` seconds ago) is not re-killed (#117051).
+    no-op update, a manual ``hermes gateway restart`` seconds ago) is not re-killed (#117051).
 
     The second guard needs BOTH the pre-update plan and the live probe: the live matrix only
     lists gateways, so a planned ``serve`` still on pre-update code (or any runtime without a
@@ -697,7 +692,7 @@ def _run_pending_fleet_restart() -> bool:
 
 def _systemctl(cmd: list, *, timeout: float):
     """Run a systemctl (or sudo systemctl) invocation, capturing utf-8 text with a timeout."""
-    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, check=False)
 
 
 def _systemctl_reset_and_restart(manage_cmd: list, svc_name: str, *, scope_cmd: list | None = None):
@@ -705,38 +700,52 @@ def _systemctl_reset_and_restart(manage_cmd: list, svc_name: str, *, scope_cmd: 
     auto-restart can wedge a plain ``restart`` against RestartSec backoff and stay dead."""
     # Property reads need no manage-units privileges: narrow sudoers may permit
     # restart/reset-failed but deny show. Keep the same user/system manager scope.
-    from qubit_cli.update_cmd_fleet_unit_budget import systemd_restart_timeout
-    timeout = systemd_restart_timeout(scope_cmd if scope_cmd is not None else manage_cmd, svc_name)
+    from qubit_cli.update_cmd_fleet_unit_budget import run_unit_job, systemd_restart_timeout
+    scope_cmd = scope_cmd if scope_cmd is not None else manage_cmd
+    timeout = systemd_restart_timeout(scope_cmd, svc_name)
     _systemctl(manage_cmd + ["reset-failed", svc_name], timeout=10)
-    return _systemctl(manage_cmd + ["restart", svc_name], timeout=timeout)
+    return run_unit_job(manage_cmd, scope_cmd, "restart", svc_name, timeout=timeout)
 
 
 def _systemd_unit_owned_by_update(scope_cmd: list, svc_name: str) -> bool:
     """Gate a unit restart on the unit's home being one this update owns (#93349).
 
-    ``hermes-gateway*`` is an account-wide namespace: a second install's ``qubit update`` used
+    ``hermes-gateway*`` is an account-wide namespace: a second install's ``hermes update`` used
     to drain and restart the account's real ``hermes-gateway.service`` because the unit was
     listed, not because it ran the updated code. Foreign or unreadable ownership prints a notice
     and leaves the unit alone; it is not a failed restart.
     """
-    from qubit_cli.update_fleet_scope import describe_skipped_runtime, systemd_unit_qubit_home, home_in_update_scope
+    from qubit_cli.update_fleet_scope import announce_skipped_runtime, systemd_unit_qubit_home, home_in_update_scope
     home = systemd_unit_qubit_home(scope_cmd, svc_name)
     if home is not None and home_in_update_scope(home):
         return True
-    print(describe_skipped_runtime("systemd unit", svc_name, home))
+    announce_skipped_runtime("systemd unit", svc_name, home)
     return False
 
 
 def _scoped_manual_gateway_pids(pids, *, keep=(), quiet: bool = False) -> list[int]:
     """*pids* whose live home this update owns (plus *keep*, PIDs already mapped to this
     install's profile PID files); every other gateway process is named and left running."""
-    from qubit_cli.update_fleet_scope import describe_skipped_runtime, partition_gateway_pids_by_scope
+    from qubit_cli.update_fleet_scope import announce_skipped_runtime, partition_gateway_pids_by_scope
     keep = set(keep)
     owned, foreign = partition_gateway_pids_by_scope([pid for pid in pids if pid not in keep])
     if not quiet:
         for pid, home in foreign:
-            print(describe_skipped_runtime("gateway process", f"PID {pid}", home))
+            announce_skipped_runtime("gateway process", f"PID {pid}", home)
     return [pid for pid in pids if pid in keep or pid in owned]
+
+
+def _is_serve_or_dashboard_unit(unit: str) -> bool:
+    """``hermes-serve*``/``hermes-dashboard*`` (``.service``) by the same exact-or-hyphenated shape."""
+    return (
+        unit == "hermes-serve.service"
+        or unit.startswith("hermes-serve-")
+        # #125297: ``hermes-dashboard*`` units are systemd-supervised dashboard backends — the
+        # same fleet this pass restarts. Leaving them out meant a successful update reported
+        # the dashboard ``deferred`` (still on pre-update code) while nothing ever restarted it.
+        or unit == "hermes-dashboard.service"
+        or unit.startswith("hermes-dashboard-")
+    )
 
 
 def _is_qubit_gateway_unit(unit: str) -> bool:
@@ -745,15 +754,9 @@ def _is_qubit_gateway_unit(unit: str) -> bool:
     return (
         # list-units is already pattern-filtered, but keep the name gate so a stray non-gateway/serve line
         # cannot enter the restart path. See #83595.
-        unit == "qubit-gateway.service"
-        or unit.startswith("qubit-gateway-")
-        or unit == "qubit-serve.service"
-        or unit.startswith("qubit-serve-")
-        # #125297: ``qubit-dashboard*`` units are systemd-supervised dashboard backends — the
-        # same fleet this pass restarts. Leaving them out meant a successful update reported
-        # the dashboard ``deferred`` (still on pre-update code) while nothing ever restarted it.
-        or unit == "qubit-dashboard.service"
-        or unit.startswith("qubit-dashboard-")
+        unit == "hermes-gateway.service"
+        or unit.startswith("hermes-gateway-")
+        or _is_serve_or_dashboard_unit(unit)
     )
 
 
@@ -789,7 +792,7 @@ def _service_unit_supports_graceful_sigusr1_restart(svc_name: str) -> bool:
 
     See #83438.
     """
-    return svc_name == "qubit-gateway" or svc_name.startswith("qubit-gateway-")
+    return svc_name == "hermes-gateway" or svc_name.startswith("hermes-gateway-")
 
 
 def _warn_incomplete_gateway_fleet_restart(failed_units: list) -> None:
@@ -808,13 +811,13 @@ def _warn_incomplete_gateway_fleet_restart(failed_units: list) -> None:
         # See #88848.
         print("  Listed services may be deregistered from launchd, or still")
         print("  running pre-update code (mixed sys.modules). Recover with:")
-        print("    qubit gateway status")
+        print("    hermes gateway status")
         print("    launchctl list | grep <label>")
         print("    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<label>.plist")
         return
     print("  Skipped units may still be running pre-update code (mixed")
     print("  sys.modules). Restart them manually, then verify:")
-    print("    qubit gateway status")
+    print("    hermes gateway status")
     if any(not name.startswith("ai.hermes.") for name in ordered):
         print("    systemctl --user restart <unit>   # user-scope")
         print("    sudo systemctl restart <unit>     # system-scope")
@@ -861,7 +864,7 @@ def _restart_launchd_gateway_after_update(
             print(
                 f"  ⚠ Gateway restart failed: {stderr}\n"
                 "    The gateway may be DOWN on pre-update code. "
-                "Recover manually: qubit gateway restart"
+                "Recover manually: hermes gateway restart"
             )
             return [], [current_label]
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
@@ -871,7 +874,7 @@ def _restart_launchd_gateway_after_update(
             # The old code `pass`ed here (#74973's second silent variant); count it and tell the operator.
             "  ⚠ Could not restart the gateway "
             f"({e.__class__.__name__}: {e}).\n"
-            "    Recover manually: qubit gateway restart"
+            "    Recover manually: hermes gateway restart"
         )
         return [], [current_label]
 
@@ -895,7 +898,7 @@ def _restart_launchd_gateway_after_update(
         return [current_label], []
     print(
         f"  ✗ {current_label} restarted but launchd is not supervising a new process for it.\n"
-        "    Check logs, then: qubit gateway restart"
+        "    Check logs, then: hermes gateway restart"
     )
     return [], [current_label]
 
@@ -923,7 +926,7 @@ def _restart_macos_launchd_gateways(
         _locate_launchd_gateway_service, _wait_for_launchd_service_pid,
     )
     if require_supervision:
-        listing = subprocess.run(["launchctl", "list"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
+        listing = subprocess.run(["launchctl", "list"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, check=False)
         if listing.returncode != 0:
             failed_or_stale_units.append("launchd (listing failed)")
             return
@@ -1016,12 +1019,13 @@ _DESKTOP_SERVE_SKIP_REASON = (
     "desktop app owns and respawns this serve backend;"
     " the recovery pass must not restart it out from under its supervisor"
 )
-# NOT a claim that no supervisor exists: a systemd-launched serve sets neither HERMES_SPAWN
-# nor HERMES_PARENT_PID ("manual-serve"). Unit-backed serves are recovered by the fresh
-# child's systemd pass; survivors reported by _surviving_pre_update_serve_runtimes.
+# NOT a claim that no supervisor exists: a unit's MainPID row is classified "systemd" (#141021),
+# and "manual-serve" still covers a process inside some unit's cgroup it is not MainPID of, or
+# unreadable ownership. Unit-backed serves are recovered by the fresh child's systemd pass;
+# survivors reported by _surviving_pre_update_serve_runtimes.
 _SERVE_SKIP_REASON = (
     "no per-profile relaunch command reaches a serve/dashboard runtime; recovered by the fresh"
-    " systemd unit pass when it owns a hermes-serve* unit, else left running for explicit"
+    " systemd unit pass when a hermes-serve*/hermes-dashboard* unit owns it, else left running for explicit"
     " operator restart"
 )
 # A launchd-owned backend (#116503): the fresh child has no per-label kickstart for serve/dashboard
@@ -1096,8 +1100,8 @@ def _warn_gateway_restart_phase_aborted(exc: BaseException, pids) -> None:
         print("  Any gateway still running is serving pre-update code")
         print("  (mixed sys.modules) against the updated checkout.")
     print("  Restart it manually, then verify:")
-    print("    qubit gateway restart")
-    print("    qubit gateway status")
+    print("    hermes gateway restart")
+    print("    hermes gateway status")
 
 
 def _drain_or_signal_gateway_for_update(
@@ -1166,10 +1170,10 @@ def _sudo_noninteractive_ok(targeted_probe: list) -> bool:
     are about to elevate.
     """
     try:
-        if subprocess.run(["sudo", "-n", "true"], capture_output=True, timeout=5).returncode == 0:
+        if subprocess.run(["sudo", "-n", "true"], capture_output=True, timeout=5, check=False).returncode == 0:
             return True
         # Blanket sudo refused — a targeted NOPASSWD sudoers entry may still work.
-        return subprocess.run(["sudo", "-n", *targeted_probe], capture_output=True, timeout=5).returncode == 0
+        return subprocess.run(["sudo", "-n", *targeted_probe], capture_output=True, timeout=5, check=False).returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         return False
 
@@ -1206,7 +1210,7 @@ def _repair_unit_without_fatal_exit_park(svc_name: str, scope: str) -> None:
     system = scope == "system"
     unit_path = (_SYSTEM_UNIT_DIR if system else user_systemd_unit_dir()) / f"{svc_name}.service"
     try:
-        parked = re.search(rf"^RestartPreventExitStatus=.*\b{GATEWAY_FATAL_CONFIG_EXIT_CODE}\b", unit_path.read_text(encoding="utf-8-sig"), re.M)
+        parked = re.search(rf"^RestartPreventExitStatus=.*\b{GATEWAY_FATAL_CONFIG_EXIT_CODE}\b", unit_path.read_text(encoding="utf-8-sig"), re.MULTILINE)
     except OSError:
         return
     if parked:
@@ -1226,7 +1230,7 @@ def _repair_unit_without_fatal_exit_park(svc_name: str, scope: str) -> None:
     print(
         f"  ⚠ {svc_name} lacks RestartPreventExitStatus={GATEWAY_FATAL_CONFIG_EXIT_CODE}: a permanent refusal "
         f"(exit {GATEWAY_FATAL_CONFIG_EXIT_CODE}) would crash-loop it instead of parking.\n"
-        f"    Repair: {'sudo ' if system else ''}qubit gateway install{' --system' if system else ''}"
+        f"    Repair: {'sudo ' if system else ''}hermes gateway install{' --system' if system else ''}"
     )
 
 
@@ -1264,17 +1268,15 @@ def _restart_one_systemd_gateway_unit(
         _main_pid, drain_budget, svc_name, self_restart_pending=self_restart_pending)
 
     if _graceful_ok:
-        from qubit_cli.update_cmd_fleet_unit_budget import service_restart_sec, systemd_restart_timeout
+        from qubit_cli.update_cmd_fleet_unit_budget import run_unit_job, service_restart_sec, systemd_restart_timeout
         # ``Restart=always`` respawns only after RestartSec (60s in our unit; dead time for a
         # voluntary restart). ``reset-failed`` + ``start`` skips it (~1-3s); if RestartSec already
         # elapsed, ``start`` is a no-op and we fall through to the poll. Needs manage-units
         # privileges; without them auto-restart still fires after RestartSec.
         if _manage_cmd is not None:
             _systemctl(_manage_cmd + ["reset-failed", svc_name], timeout=10)
-            _systemctl(
-                _manage_cmd + ["start", svc_name],
-                timeout=systemd_restart_timeout(scope_cmd, svc_name, start_only=True),
-            )
+            run_unit_job(_manage_cmd, scope_cmd, "start", svc_name,
+                         timeout=systemd_restart_timeout(scope_cmd, svc_name, start_only=True))
             if _wait_for_service_active(scope_cmd, svc_name, timeout=10.0):
                 restarted_services.append(svc_name)
                 return
@@ -1302,13 +1304,13 @@ def _restart_one_systemd_gateway_unit(
             f"  ⚠ {svc_name} is a system service and restarting it needs root.\n"
             f"    Restart it manually to load the new version:\n"
             f"      sudo systemctl restart {svc_name}\n"
-            f"    To let `qubit update` restart it automatically, allow\n"
+            f"    To let `hermes update` restart it automatically, allow\n"
             f"    passwordless sudo for systemctl, or run updates with sudo."
         )
         return
 
     # Blunt restart — only when the graceful path failed (no SIGUSR1 wiring, drain over
-    # budget, restart-policy mismatch). Mirrors `qubit gateway restart` (`systemd_restart()`).
+    # budget, restart-policy mismatch). Mirrors `hermes gateway restart` (`systemd_restart()`).
     restart = _systemctl_reset_and_restart(_manage_cmd, svc_name, scope_cmd=scope_cmd)
     if restart.returncode != 0:
         failed_or_stale_units.append(svc_name)
@@ -1358,7 +1360,7 @@ def _restart_systemd_gateway_units(
         print(
             f"  ⚠ systemctl timed out listing {scope}-scope "
             f"gateway units ({exc.cmd if exc.cmd else 'unknown command'}). "
-            f"Check the gateway with: qubit gateway status"
+            f"Check the gateway with: hermes gateway status"
         )
 
     def _on_unit_timeout(svc_name: str, exc: subprocess.TimeoutExpired) -> None:
@@ -1395,7 +1397,7 @@ def _restart_systemd_gateway_units(
         print(
             f"  • {unit_key} is a legacy per-profile unit sharing one host gateway process with "
             f"{owner_key}; restarting it again would restart that process twice. Fold the units "
-            "together with: qubit gateway migrate"
+            "together with: hermes gateway migrate"
         )
 
     from qubit_cli.update_cmd_posix_pause import already_restarted
@@ -1448,7 +1450,7 @@ class _GatewayRestartOutcome:
 
     incomplete: bool
     phase_errors: list
-    pre_restart_gateway_pids: "list | None"
+    pre_restart_gateway_pids: list | None
     restarted_services: list
     failed_or_stale_units: list
     relaunched_profiles: list
@@ -1465,6 +1467,11 @@ class _GatewayRestartOutcome:
     #: (``_drain_or_signal_gateway_for_update`` branch 1): they restart only after this process
     #: exits, so the fleet matrix renders them as pending instead of STALE (#119597).
     self_restart_pending_pids: set = field(default_factory=set)
+    #: Units the restart phase itself could not restart. Verification warns about the ones its fleet
+    #: probe does not prove current: a timed-out ``systemctl`` call can still bring its unit up. Not
+    #: ``failed_or_stale_units``: the Windows resume merge and an aborted phase add to that list, and
+    #: neither gets this systemctl/launchctl advice.
+    unrestarted_units: list = field(default_factory=list)
 
     def fleet_probe_signals(self) -> tuple:
         """``(pre_restart_pids, killed_pids)`` with the unmapped stops removed — the signals that
@@ -1564,9 +1571,9 @@ def _restart_manual_gateways(out: _GatewayRestartOutcome, _drain_budget) -> None
         unmapped_count = (len(out.killed_pids) - len(out.relaunched_profiles) - len(out.externally_supervised_profiles))
         if unmapped_count:
             print(f"  → Stopped {unmapped_count} manual gateway process(es)")
-            print("    Restart manually: qubit gateway run")
+            print("    Restart manually: hermes gateway run")
             if unmapped_count > 1:
-                print("    (or: qubit -p <profile> gateway run  for each profile)")
+                print("    (or: hermes -p <profile> gateway run  for each profile)")
 
 
 def _force_kill_stuck_gateways(killed_pids) -> None:
@@ -1685,6 +1692,9 @@ def _restart_gateway_fleet_after_update(_pre_update_plan, gateway_mode: bool):
     every planned gateway is verifiably covered.
     """
     from qubit_cli.update_cmd import _m
+    from qubit_cli.update_stage import publish_stage
+
+    publish_stage("Restarting Hermes services")  # also after a failed build: the code is committed
     # All bookkeeping is declared before the try so abort recovery and fleet reconciliation
     # can read it even if the phase raises early. ``pre_restart_gateway_pids`` stays empty
     # until we are about to stop/drain, so an early exception has nothing to fail closed on,
@@ -1708,7 +1718,7 @@ def _restart_gateway_fleet_after_update(_pre_update_plan, gateway_mode: bool):
     try:
         # Every gateway helper the phase needs is imported up front so a broken gateway
         # module aborts into recovery BEFORE any unit is touched.
-        from qubit_cli.gateway import (  # noqa: F401
+        from qubit_cli.gateway import (
             is_macos,
             find_gateway_pids,
             find_profile_gateway_processes,
@@ -1746,7 +1756,7 @@ def _restart_gateway_fleet_after_update(_pre_update_plan, gateway_mode: bool):
         if out.failed_or_stale_units:
             # Owed restart (C3): verification records the follow-up; the /update marker stays committed.
             out.incomplete = True
-        _warn_incomplete_gateway_fleet_restart(out.failed_or_stale_units)
+        out.unrestarted_units = list(out.failed_or_stale_units)
         out.record_receipt()
         _force_kill_stuck_gateways(out.killed_pids)
 
