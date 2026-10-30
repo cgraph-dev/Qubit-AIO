@@ -80,11 +80,11 @@ def read_active_work(home: Optional[Path] = None) -> Optional[list]:
 
 
 def _tui_command(home: Optional[Path]) -> str:
-    """The TUI command that opens *home*'s profile: a bare ``qubit`` opens the default one."""
+    """The TUI command that opens *home*'s profile: a bare ``hermes`` opens the default one."""
     from qubit_constants import profile_name_for_home
 
     name = profile_name_for_home(home)
-    return f"qubit -p {name} --tui" if name and name != "default" else "qubit --tui"
+    return f"hermes -p {name} --tui" if name and name != "default" else "hermes --tui"
 
 
 def format_drain_report(work: Optional[list], *, remaining_s: float, home: Optional[Path] = None) -> str:
