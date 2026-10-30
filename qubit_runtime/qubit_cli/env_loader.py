@@ -19,7 +19,11 @@ try:  # the left-core profile_env table lands with the left-core port (lane1)
     from qubit_cli.left_core_migration import profile_env_names
 except ImportError:  # pragma: no cover - interim tree before the left-core port
     def profile_env_names() -> frozenset[str]:
-        return frozenset()
+        # The names the fork hardcoded before the left-core profile_env table lands (lane1).
+        return frozenset({
+            "HERMES_COPILOT_ACP_COMMAND", "HERMES_COPILOT_ACP_ARGS",
+            "COPILOT_CLI_PATH", "COPILOT_ACP_BASE_URL",
+        })
 from utils import atomic_replace, mkstemp_beside
 
 logger = logging.getLogger(__name__)
