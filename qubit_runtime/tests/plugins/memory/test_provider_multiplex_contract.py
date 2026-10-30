@@ -114,7 +114,7 @@ def test_retaindb_binds_the_home_initialize_receives(homes, fake_retaindb):
     provider.initialize("s", qubit_home=str(alpha))  # no context override: the ambient home is the root
     try:
         assert provider._queue._db_path == alpha / "retaindb_queue.db"
-        assert provider._client.project == "hermes-alpha"
+        assert provider._client.project == "qubit-alpha"
     finally:
         provider.shutdown()
 
@@ -136,7 +136,7 @@ def test_retaindb_two_profiles_interleaving_stay_in_their_own_projects(homes, fa
     for home in homes:
         mine = [c for c in _FakeClient.calls if f"{home.name}-" in c[2]]
         assert {c[0] for c in mine} == {"add_memory", "ingest_session"}, mine
-        assert all(project == f"hermes-{home.name}" for _, project, _ in mine), mine
+        assert all(project == f"qubit-{home.name}" for _, project, _ in mine), mine
         assert (home / "retaindb_queue.db").exists()
 
 
