@@ -27,7 +27,11 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from gateway.run_shutdown import _log_suppressed
-from qubit_cli.config_backend import ConfigBackendUnavailable
+try:
+    from qubit_cli.config_backend import ConfigBackendUnavailable
+except ImportError:  # config backend lands with its own port lane; lazy reads below use it when present
+    class ConfigBackendUnavailable(Exception):
+        """A config backend outage; the real class replaces this when the backend module lands."""
 from utils import file_cache_version
 
 logger = logging.getLogger(__name__)

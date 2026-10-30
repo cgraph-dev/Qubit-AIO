@@ -2405,7 +2405,10 @@ def _refuse_rename_without_file_tooling(old_canon: str) -> None:
     """A remote config backend keys each profile's settings by its canonical name, and the plane
     has no rename: renaming the local home would leave the settings under the old name and read
     another (possibly populated) level under the new one. Refused before any side effect."""
-    from qubit_cli import config_backend as _config_backend
+    try:
+        from qubit_cli import config_backend as _config_backend
+    except ImportError:  # config backend lands with its own port lane; local files are the default
+        return
 
     backend = _config_backend.get_config_backend()
     if not backend.supports_file_tooling():
