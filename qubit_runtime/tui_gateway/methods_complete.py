@@ -274,10 +274,10 @@ def _(rid, params: dict) -> dict:
     # session cwd (Desktop sends it) or the session's terminal cwd as-is.
     if local:
         root = _completion_cwd(params)
-    elif session is not None:
-        root = _terminal_task_cwd(session) or "."
     else:
-        root = params.get("cwd") or "."
+        # The composer's explicit cwd (Desktop sends it) wins; otherwise the session's terminal
+        # cwd, which for a session-less composer is the profile's configured backend cwd.
+        root = params.get("cwd") or _terminal_task_cwd(session) or "."
     session_key = session.get("session_key") if session else None
     return _ok(rid, {"items": _path_completion_items(word, root, session_key, local)})
 

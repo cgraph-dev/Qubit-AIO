@@ -2255,9 +2255,20 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
             pending_event = self._promote_queued_event(session_key, adapter, pending_event)
             if result.get("interrupted") and not pending_event and result.get("interrupt_message"):
                 interrupt_message = result.get("interrupt_message")
+                from gateway.session_ingress import executing_admission
                 if _is_control_interrupt_message(interrupt_message):
                     logger.info(
                         "Ignoring control interrupt message for session %s: %s",
+                        session_key or "?", interrupt_message,
+                    )
+                elif executing_admission.get():
+                    # This turn is an execution of the durable admission FIFO. The busy input that
+                    # interrupted it was (or was refused as) its own queued row, so replaying the
+                    # interrupt text here would run the same send twice: once as this follow-up and
+                    # again when the FIFO advances to the admitted row (or at all, if the admit was
+                    # refused). The FIFO owns the resend.
+                    logger.debug(
+                        "Not replaying interrupt message as a follow-up for admitted turn %s: %s",
                         session_key or "?", interrupt_message,
                     )
                 else:

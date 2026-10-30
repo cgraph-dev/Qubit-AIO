@@ -149,7 +149,12 @@ def _prepare(authority, session_id, mcp_only=False, adopt_only=False):
     # A bypass launch never reads the profile; cron, Kanban and room routes are not resumed CLI sessions.
     if old.ignore_user_config or old.source not in SURFACES:
         return None
-    home = Path(authority.db.db_path).resolve().parent
+    # The profile the authority serves, not the state.db file's directory: a store may be pinned
+    # outside the profile home (an embedder's sessions dir, a test's temp store), and reading that
+    # directory's config.yaml would refresh the frozen policy from an empty tree.
+    home = Path(str(authority.profile_id))
+    if not home.is_absolute() or not home.is_dir():
+        home = Path(authority.db.db_path).resolve().parent
     terminal = {} if mcp_only or adopt_only else build_profile_terminal_scope(home)
     live, picked = _load_gateway_config(home / 'config.yaml'), policy_picks(authority.db, session_id)
     base = old

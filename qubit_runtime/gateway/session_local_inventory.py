@@ -128,6 +128,25 @@ def _cli_skills():
     return grouped
 
 
+@contextlib.contextmanager
+def _profile_home(authority):
+    """Resolve home-relative builders (skills, MCP status, notices) inside the OWNING profile.
+
+    ``owner_scope`` is a no-op for a single-profile standalone gateway, so without this the
+    inventory of a canonical session read the ambient home (an embedder's, a test sandbox's)
+    instead of the profile the session belongs to.
+    """
+    from pathlib import Path
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+    home = Path(str(authority.profile_id))
+    token = set_qubit_home_override(home) if home.is_absolute() and home.is_dir() else None
+    try:
+        yield
+    finally:
+        if token is not None:
+            reset_qubit_home_override(token)
+
+
 def _session_provider(view, config=None):
     from qubit_cli.runtime_provider_custom import session_provider_identity
     return session_provider_identity(getattr(view, "provider", None), getattr(view, "requested_provider", None),
@@ -142,7 +161,7 @@ def session_inventory(authority, policy, agent, cwd):
     info: dict = {"tools": {}, "skills": {}, "mcp_servers": [], "version": "", "release_date": "",
                   "update_behind": None, "update_command": "",
                   "branch": git_probe.branch(cwd) if cwd else "", "project": _project(cwd)}
-    with owner_scope(authority):
+    with _profile_home(authority), owner_scope(authority):
         config = policy.config(authority, secrets=False) if policy is not None else {}
         if agent is not None:
             from agent.voice_turn_route import session_runtime_view

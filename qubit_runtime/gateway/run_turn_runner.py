@@ -797,10 +797,14 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 adapter.send(ctx._status_chat_id, msg, metadata=_interim_metadata(metadata)), "Approval text-send scheduling error",
             )
             if fut is not None:
-                fut.result(timeout=15)
-                # No card to edit on the text path: the prompt has no buttons to drop and carries
-                # the /approve instructions, so the timeout notice is posted as a new message.
-                register_timeout_notice(self, approval_data, command=cmd, card_message_id=None)
+                sent = fut.result(timeout=15)
+                # Rewrite the delivered prompt in place on timeout, exactly like a button card: the
+                # message already carries the /approve instructions and the "NOT run" deadline line,
+                # so it is the record of what was asked. Sending a second message duplicates the
+                # prompt; a platform that returns no id falls back to a new message.
+                register_timeout_notice(
+                    self, approval_data, command=cmd,
+                    card_message_id=getattr(sent, "message_id", None))
         except Exception as e:
             logger.error("Failed to send approval request: %s", e)
 
