@@ -930,9 +930,17 @@ class PluginContext:
                 logger.warning("Plugin '%s' locale file %s skipped: %s", self.manifest.name, file, exc)
         return handles
 
-    def register_hook(self, hook_name: str, callback: Callable) -> PluginRegistration:
-        """Register a lifecycle hook callback (unknown names warn but are still stored)."""
-        return self._track_callback("hook", hook_name, callback, self._manager._hooks, VALID_HOOKS)
+    def register_hook(self, hook_name: str, callback: Callable, *, hold_stream: bool = False) -> PluginRegistration:
+        """Register a lifecycle hook callback (unknown names warn but are still stored).
+        ``hold_stream=True`` on ``transform_llm_output`` declares the rewrite must reach the user
+        first, so this profile's replies are not streamed (``PluginManager.holds_stream``)."""
+        handle = self._track_callback("hook", hook_name, callback, self._manager._hooks, VALID_HOOKS)
+        if hold_stream and hook_name != "transform_llm_output":
+            logger.warning("Plugin '%s' set hold_stream on '%s'; only transform_llm_output rewrites the reply, ignored",
+                           self.manifest.name, hook_name)
+        else:
+            handle.hold_stream = hold_stream
+        return handle
 
     def register_middleware(self, kind: str, callback: Callable) -> PluginRegistration:
         """Register behavior-changing middleware (request kinds rewrite the payload, execution kinds
