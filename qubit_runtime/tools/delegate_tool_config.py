@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional
 from utils import base_url_hostname, is_truthy_value
@@ -618,6 +619,7 @@ def gateway_delegation_inline(user_config: Any, platform_key: str, *, interim_en
 _GATEWAY_DELEGATION_INLINE: ContextVar[bool] = ContextVar("hermes_gateway_delegation_inline", default=False)
 
 
+@contextmanager
 def gateway_delegation_inline_scope(inline: bool) -> Iterator[None]:
     """Build an agent whose tools carry the joined ``delegate_task`` variant (frozen on the agent by
     :func:`agent_joins_delegation`). Dispatch reads the variant the session carries, not this flag."""
