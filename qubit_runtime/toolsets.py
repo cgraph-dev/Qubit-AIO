@@ -240,6 +240,12 @@ TOOLSETS = {
     ),
 }
 
+# Qubit platform bundles: the canonical ``qubit-<platform>`` spelling the platform registry and the
+# fork's `qubit tools` surfaces use. Published alongside the historical ``hermes-*`` keys (dual
+# publish, same definitions) so configs and delegated composites saved with either spelling resolve.
+for _platform_bundle_key in [k for k in TOOLSETS if k.startswith("hermes-")]:
+    TOOLSETS.setdefault("qubit-" + _platform_bundle_key[len("hermes-"):], TOOLSETS[_platform_bundle_key])
+
 # Toolset -> the session platforms it exists for, from the specs that carry ``platforms``.
 TOOLSET_SESSION_PLATFORMS = {name: spec["platforms"] for name, spec in TOOLSETS.items() if "platforms" in spec}
 
