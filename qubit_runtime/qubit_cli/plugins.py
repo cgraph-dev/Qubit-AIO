@@ -37,8 +37,9 @@ from qubit_cli.plugin_capabilities import plugin_capability_granted
 from qubit_cli.relay_plugin_cutover import RELAY_PLUGINS_CONFIG_ENV, legacy_relay_plugin_keys
 # Sibling modules' names are re-exported here (origin) so plugins and tests keep one import path.
 from qubit_cli.plugins_manifest import (  # noqa: F401 — re-exported
-    _CONFIG_SCHEMA_TYPES, SUPPORTED_MANIFEST_VERSION, PluginManifest, _portable_skill_namespace,
-    manifest_key, parse_manifest_file, resolve_module_origin, resolve_plugin_load_order,
+    _CONFIG_SCHEMA_TYPES, SUPPORTED_MANIFEST_VERSION, PluginManifest, _portable_data_namespace,
+    _portable_skill_namespace, manifest_key, parse_manifest_file, resolve_module_origin,
+    resolve_plugin_load_order,
     validate_config_schema,
 )
 from qubit_cli.plugins_discovery import (  # noqa: F401 — re-exported

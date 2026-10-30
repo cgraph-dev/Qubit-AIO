@@ -39,6 +39,9 @@ class PluginRegistration:
     # re-discovery when the plugin no longer re-registers it.
     # See #91701.
     persistent: bool = False
+    # A ``transform_llm_output`` registration that must see the reply before the user does
+    # (``register_hook(..., hold_stream=True)``; read by ``PluginDispatchMixin.holds_stream``).
+    hold_stream: bool = False
     _disposed: bool = field(default=False, init=False, repr=False)
     _on_dispose: Optional[Callable[[PluginRegistration], None]] = field(default=None, init=False, repr=False)
 

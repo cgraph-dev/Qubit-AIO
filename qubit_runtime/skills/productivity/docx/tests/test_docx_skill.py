@@ -43,7 +43,7 @@ def run(script: str, *args: str) -> dict:
     env["PYTHONIOENCODING"] = "utf-8"
     proc = subprocess.run(
         [sys.executable, str(SCRIPTS / script), *map(str, args)],
-        capture_output=True, env=env)
+        capture_output=True, env=env, check=False)
     assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
     return json.loads(proc.stdout.decode("utf-8"))
 
@@ -147,6 +147,25 @@ class TestCreateAndRead:
         assert rev["has_tracked_changes"] is False
         assert rev["comments"] is False
 
+    def test_text_includes_nested_tables_and_header_variants(self, workdir: Path):
+        path = workdir / "nested-and-headers.docx"
+        doc = Document()
+        outer = doc.add_table(rows=1, cols=1)
+        outer.cell(0, 0).text = "outer"
+        nested = outer.cell(0, 0).add_table(rows=1, cols=1)
+        nested.cell(0, 0).text = "nested-only"
+        outer.cell(0, 0).add_paragraph("after-nested")
+        section = doc.sections[0]
+        section.different_first_page_header_footer = True
+        section.first_page_header.paragraphs[0].text = "first-header"
+        section.even_page_header.paragraphs[0].text = "even-header"
+        doc.save(path)
+
+        text = run("docx_read.py", path, "--text")
+        assert text["tables"][0][0][0].split("\n") == ["outer", "nested-only", "after-nested"]
+        assert "first-header" in text["headers"]
+        assert "even-header" in text["headers"]
+
 
 class TestEdit:
     def test_replace_preserves_formatting(self, created: Path, workdir: Path):
@@ -228,7 +247,7 @@ class TestTemplate:
         proc = subprocess.run(
             [sys.executable, str(SCRIPTS / "docx_template.py"), str(tpl),
              str(values), str(workdir / "out2.docx"), "--strict"],
-            capture_output=True, env=env)
+            capture_output=True, env=env, check=False)
         assert proc.returncode == 1
         payload = json.loads(proc.stdout.decode("utf-8"))
         assert payload["unfilled_tokens"] == ["gone"]
@@ -247,7 +266,7 @@ def run_raw(script: str, *args: str):
     env = dict(os.environ, LC_ALL="C", PYTHONIOENCODING="utf-8")
     return subprocess.run(
         [sys.executable, str(SCRIPTS / script), *map(str, args)],
-        capture_output=True, env=env)
+        capture_output=True, env=env, check=False)
 
 
 def _add_ins(para, rev_id: int, text: str, author="Editor"):
