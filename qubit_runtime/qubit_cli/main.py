@@ -1974,6 +1974,7 @@ cmd_auth = _forward_command("cmd_auth", "qubit_cli.auth_commands", "auth_command
 cmd_status = _forward_command("cmd_status", "qubit_cli.status", "show_status", doc='Show status of all components.')
 cmd_cron = _forward_command("cmd_cron", "qubit_cli.cron", "cron_command", forward_return=True, doc='Cron job management.')
 cmd_webhook = _forward_command("cmd_webhook", "qubit_cli.webhook", "webhook_command", forward_return=True, doc='Webhook subscription management.')
+cmd_webapp = _forward_command("cmd_webapp", "qubit_cli.webapp_launcher", "cmd_webapp", forward_return=True, doc='Open the browser-hosted Desktop the gateway serves.')
 cmd_kanban = _forward_command("cmd_kanban", "qubit_cli.kanban", "kanban_command", forward_return=True, doc='Multi-profile collaboration board.')
 cmd_project = _forward_command("cmd_project", "qubit_cli.projects_cmd", "projects_command", forward_return=True, doc='Manage projects (named, multi-folder workspaces).')
 cmd_hooks = _forward_command("cmd_hooks", "qubit_cli.hooks", "hooks_command", doc='Shell-hook inspection and management.')

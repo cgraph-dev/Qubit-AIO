@@ -270,6 +270,13 @@ def free_inference_active(state: Any = None) -> bool:
             and on_local_desktop_backend())
 
 
+def trial_model() -> str:
+    """The last rung of model resolution, below every model the user named (``model.default``, a cron
+    or task pin): ``qubit/welcome`` while the welcome trial carries inference, else ''. Never written to
+    config.yaml, so it stops applying the moment the user configures a real model."""
+    return GUEST_MODEL if free_inference_active() else ""
+
+
 WELCOME_HOSTS = frozenset({"welcome-api.nousresearch.com"})
 # Dev-only: extra hostnames that count as the welcome host, comma-separated (for example
 # ``127.0.0.1`` while ``NOUS_INFERENCE_BASE_URL`` points at a local stand-in). Read from the

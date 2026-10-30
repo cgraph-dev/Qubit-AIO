@@ -21,6 +21,12 @@ from tools.bot_desktop import runtime
 
 DISK_CACHE_BYTES = 256 * 1024 * 1024
 
+# Flags the agent's launch and the dock's icon share on the persistent profile. --test-type hides the
+# "Chrome for Testing is only for automated testing" and unsupported-flag (--no-sandbox as root) infobars
+# that would sit over the human's takeover view; the persistent profile's HTTP cache is capped (uncapped it
+# grows for months toward a hosted instance's 6 GB).
+SHARED_PROFILE_ARGS = ("--test-type", f"--disk-cache-size={DISK_CACHE_BYTES}")
+
 _SYSTEM_BROWSERS = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser")
 
 
