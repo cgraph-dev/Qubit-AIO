@@ -331,7 +331,7 @@ def _displace_bot_chat(db, sid):
 
 
 async def _create_bot_chat(authority, actor, *, displace=None):
-    """No Bot Chat yet (or *displace*, an API conversation holding its title, is moved aside first): mint it the way ``hermes chat --in ~ -c "Bot Chat" --create-if-missing``
+    """No Bot Chat yet (or *displace*, an API conversation holding its title, is moved aside first): mint it the way ``qubit chat --in ~ -c "Bot Chat" --create-if-missing``
     did on the CLI lane this door replaced, so a fresh profile's first delivery has somewhere
     to land instead of being recorded as failed. Same owner step as ``session.create`` with a
     title: lookup, creation and title run under the authority's titled-create lock, with the

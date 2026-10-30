@@ -1,7 +1,7 @@
 """What a worktree holds that neither git nor an archive can bring back.
 
 Every path that deletes a tree (the sweep, the classic clean-tree pruner, exit-time Archive,
-subagent finalization, the attended ``hermes worktree prune``) asks :func:`removal_blocker`
+subagent finalization, the attended ``qubit worktree prune``) asks :func:`removal_blocker`
 first; anything it names keeps the tree. The rule: a tree may only be removed when everything
 that is not reproducible is in git or in the archive. Not reproducible:
 
@@ -178,7 +178,7 @@ def private_worktree_refs(wt_path, env=None) -> list[str]:
     for line in out.splitlines():
         name, _, sha = line.partition("\0")
         if sha and _git(["rev-list", "--max-count=1", sha, "--not", "--branches", "--tags", "--remotes",
-                         "--glob=refs/hermes/archive/*"], wt, env).strip():
+                         "--glob=refs/qubit/archive/*"], wt, env).strip():
             private.append(name)
     return private
 

@@ -18,7 +18,7 @@ _ENV_VALUE_RULES = {
 }
 
 DASHBOARD_CARD = dict(
-    dashboard_description="Run Hermes from Telegram DMs, groups, and topics.",
+    dashboard_description="Run Qubit from Telegram DMs, groups, and topics.",
     docs_url="https://core.telegram.org/bots/features#botfather",
     dashboard_env_vars=("TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USERS", "TELEGRAM_PROXY"),
     env_value_rules=_ENV_VALUE_RULES,

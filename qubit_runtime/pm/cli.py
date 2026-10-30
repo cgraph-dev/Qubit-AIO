@@ -1,4 +1,4 @@
-"""hermes pm: lock / install / repair / env / doctor / gc / bundle."""
+"""qubit pm: lock / install / repair / env / doctor / gc / bundle."""
 
 from __future__ import annotations
 
@@ -298,14 +298,14 @@ def _install_flag_error(args, *, extras: list[str], cross_target, tools_only: bo
 def _install_defaults(names: list[str], *, verify: bool) -> None:
     """Install the optional defaults; a failure warns and never fails the install.
 
-    They are the browser and computer-use tools, not what Hermes needs to run:
+    They are the browser and computer-use tools, not what Qubit needs to run:
     a Chromium download that fails behind a proxy must not abort an install
     whose required closure and venv are fine.
     """
     for name in names:
         if _install_names([name], verify=verify):
             print(f"⚠ optional {name} was not installed; its tools stay unavailable until "
-                  f"`hermes pm install {name}` succeeds", flush=True)
+                  f"`qubit pm install {name}` succeeds", flush=True)
 
 
 def _install_python_environments(extras: list[str], *, sync: bool, test_environment) -> int:
@@ -316,7 +316,7 @@ def _install_python_environments(extras: list[str], *, sync: bool, test_environm
 
         try:
             # Default the venv to the [all] feature set — the same thing
-            # `hermes update` force-syncs on every run (update_cmd.py) and
+            # `qubit update` force-syncs on every run (update_cmd.py) and
             # the installers' old `--extra all` did. sync_venv unions, so
             # any lazy extras already recorded survive this; it only makes
             # a fresh bootstrap match what the first update would do.
@@ -344,7 +344,7 @@ def _install_python_environments(extras: list[str], *, sync: bool, test_environm
 def cmd_install(args) -> int:
     from pm.defaults import canonical_default_name
 
-    # Old install logs print `hermes pm install agent-browser` as the browser opt-back-in.
+    # Old install logs print `qubit pm install agent-browser` as the browser opt-back-in.
     args.names = [canonical_default_name(name) for name in args.names or ()]
     cross_target = getattr(args, "target", None)
     # Source-install launchers require the store interpreter, even though
@@ -364,7 +364,7 @@ def cmd_install(args) -> int:
         from pm.defaults import record_declined
 
         # Persisted before anything installs: later bare installs and
-        # `hermes update` read the same record, so the opt-out sticks.
+        # `qubit update` read the same record, so the opt-out sticks.
         record_declined(add=without)
     defaults: list[str] = []
     if not (args.names or extras):
@@ -449,7 +449,7 @@ def cmd_doctor(args) -> int:
         ):
             # Legacy fact: pre-dates digest-bound identity; installed()
             # treats it as not installed and forces one reinstall.
-            print(f"{'?' if soft else '✗'} {name}: legacy fact: no recorded identity, run `hermes pm install`")
+            print(f"{'?' if soft else '✗'} {name}: legacy fact: no recorded identity, run `qubit pm install`")
             bad += 0 if soft else 1
             continue
         if not facts.installed(name, lockfile.version(name), store.root, identity):
@@ -646,7 +646,7 @@ def _apply_pins(changed: list, lockfile) -> int:
     if not failed:
         return rc
     print(f"pm update: pinned {len(pinned)}, failed {len(failed)}: {', '.join(failed)}")
-    # The venv sync above leaves an `ok` sync receipt as latest; `hermes pm
+    # The venv sync above leaves an `ok` sync receipt as latest; `qubit pm
     # status` and the desktop read latest, so the partial run must land last.
     from pm import receipt
 
@@ -675,7 +675,7 @@ def _refresh_npm_lock() -> int:
     npm = installed_package("npm")
     node = installed_package("node")
     if npm is None or npm.binary is None or node is None or node.binary is None:
-        print("✗ npm or Node: not installed; run `hermes pm install`")
+        print("✗ npm or Node: not installed; run `qubit pm install`")
         return 1
     env = npm_env(writable_store_root() / ".npm-cache", env_for("npm"))
     code, tail = _run_live([str(npm.binary), "update"], cwd=str(repo_root()), env=env)
@@ -687,7 +687,7 @@ def _refresh_npm_lock() -> int:
 
 
 def cmd_update(args) -> int:
-    """`hermes pm update [names...] [--check] [--target T] [--skip-target T] [--uv] [--npm] [--termux]`.
+    """`qubit pm update [names...] [--check] [--target T] [--skip-target T] [--uv] [--npm] [--termux]`.
 
     Resolve each package's latest via its own latest_versions() hook,
     intersect across targets, and (real mode) re-pin the lockfile + install
@@ -816,7 +816,7 @@ def cmd_repair(args) -> int:
 
     if not recover_if_needed(repo_root(), explicit=True):
         return 1
-    print("Restart Hermes to use the repaired dependency environment.")
+    print("Restart Qubit to use the repaired dependency environment.")
     return 0
 
 
@@ -824,7 +824,7 @@ def _extra_requirements(project: Path, extras: list[str]) -> list[str]:
     """The pinned requirements of declared extras, self-references expanded.
 
     Pins, not the whole lock, define the environment: an identity over uv.lock
-    would build a new generation on every Hermes update, and superseded side
+    would build a new generation on every Qubit update, and superseded side
     generations are never reclaimed while a caller may still run from them.
     """
     import re
@@ -855,7 +855,7 @@ def cmd_environment(args) -> int:
     """Make a named side environment current and print its interpreter.
 
     Shell callers (skills) cannot import PM: the terminal's `python` is rarely
-    Hermes's own. Concurrent callers serialize on PM's per-environment lock and
+    Qubit's own. Concurrent callers serialize on PM's per-environment lock and
     a rebuild lands in a new generation, so a running caller keeps its files.
     """
     import contextlib
@@ -864,9 +864,9 @@ def cmd_environment(args) -> int:
     import pm
 
     if bool(args.extra) == bool(args.requirement):
-        print("hermes pm environment: pass --extra or --requirement (not both)", file=sys.stderr)
+        print("qubit pm environment: pass --extra or --requirement (not both)", file=sys.stderr)
         return 2
-    # stdout carries only the interpreter path, for PY=$(hermes pm environment ...);
+    # stdout carries only the interpreter path, for PY=$(qubit pm environment ...);
     # progress from PM and its uv children goes to stderr at both levels.
     sys.stdout.flush()
     saved = os.dup(1)
@@ -876,7 +876,7 @@ def cmd_environment(args) -> int:
             requirements = _extra_requirements(repo_root(), args.extra) if args.extra else args.requirement
             python = pm.ensure_environment(args.name, requirements, explicit=True)
     except (InstallError, ValueError) as exc:
-        print(f"hermes pm environment: {exc}", file=sys.stderr)
+        print(f"qubit pm environment: {exc}", file=sys.stderr)
         return 1
     finally:
         sys.stdout.flush()
@@ -902,7 +902,7 @@ def main(argv=None) -> int:
             stream.reconfigure(errors="replace", line_buffering=True)
         except (AttributeError, OSError):
             pass
-    parser = argparse.ArgumentParser(prog="hermes pm")
+    parser = argparse.ArgumentParser(prog="qubit pm")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     lock_parser = p = sub.add_parser(
@@ -921,7 +921,7 @@ def main(argv=None) -> int:
                    help="enable a declared dependency extra in the venv (repeatable)")
     p.add_argument("--without", action="append", default=[], metavar="NAME",
                    help="leave an optional default package (chromium, cua-driver) out of this and every later "
-                        "default install and update; `hermes pm install NAME` opts back in (repeatable)")
+                        "default install and update; `qubit pm install NAME` opts back in (repeatable)")
     p.add_argument("--tools-only", action="store_true",
                    help="install the tool closure, put it on PATH, and stop before the venv sync")
     p.add_argument("--trust-recorded", action="store_true",
@@ -950,7 +950,7 @@ def main(argv=None) -> int:
     p = sub.add_parser(
         "environment", help="make a named side environment current and print its python",
         description="Build or reuse QUBIT_HOME/environments/NAME, an isolated venv that never "
-                    "touches Hermes's own: --extra installs the pins of a declared extra, "
+                    "touches Qubit's own: --extra installs the pins of a declared extra, "
                     "--requirement an ad hoc bounded requirement (both repeatable). "
                     "Prints only the interpreter path on stdout.")
     p.add_argument("name")

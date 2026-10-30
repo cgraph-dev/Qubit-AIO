@@ -15,7 +15,7 @@ logger = logging.getLogger("run_agent")
 
 
 def _is_nous_agent(agent) -> bool:
-    """True for the Nous provider (or a route to a nousresearch.com host)."""
+    """True for the Qubit provider (or a route to a nousresearch.com host)."""
     if (getattr(agent, "provider", "") or "").strip().lower() == "nous":
         return True
     from utils import base_url_host_matches
@@ -59,7 +59,7 @@ class RateLimitCreditsMixin:
         return self._rate_limit_state
 
     def _capture_nous_model_switch(self, http_response: Any) -> None:
-        """Record the Nous gateway's ``x-nous-model-switch`` header (a named account asked for the
+        """Record the Qubit gateway's ``x-nous-model-switch`` header (a named account asked for the
         free tier's model; the gateway served its backing model and named it). Applied between
         calls by ``qubit_cli.anon_auth.apply_model_switch``. Fail-open."""
         headers = _response_headers(http_response)
@@ -115,7 +115,7 @@ class RateLimitCreditsMixin:
         if state is None:
             if dev:
                 logger.info("credits ▸ response had no valid x-nous-credits-* headers "
-                            "(miss — producer off / non-Nous path / >TTL stale)")
+                            "(miss — producer off / non-Qubit path / >TTL stale)")
             return
 
         if state.is_usage_window and not _is_nous_agent(self):
@@ -139,7 +139,7 @@ class RateLimitCreditsMixin:
         except Exception:
             logger.debug("Plan snapshot sync failed", exc_info=True)
         if dev:
-            # HERMES_DEV_CREDITS streams each capture to agent.log (`hermes logs -f`, grep 'credits ▸').
+            # HERMES_DEV_CREDITS streams each capture to agent.log (`qubit logs -f`, grep 'credits ▸').
             spent = self.get_credits_spent_micros()
             logger.info(
                 "credits ▸ remaining=%d (%s) · paid=%s · denom=%s · used=%s · Δspent=%s · age=%s%s",

@@ -14,7 +14,7 @@ it has served nobody and has nothing to do for ``gateway.unmanaged_idle_exit_sec
 
 Every probe fails CLOSED: an unreadable source counts as work, so the gateway stays up. A gateway with
 a supervisor (systemd/launchd/Desktop/external) or started without ``--idle-exit`` (installed services,
-``hermes gateway run`` by hand, ``hermes gateway ensure`` from Desktop) never arms this. The exit
+``qubit gateway run`` by hand, ``qubit gateway ensure`` from Desktop) never arms this. The exit
 publishes ``draining`` with ``drain_reason: idle_exit`` before anything else, so a client that races it
 waits for the process to go and starts a fresh one instead of failing.
 """

@@ -154,8 +154,8 @@ def _login_success(request: Request, session: Session, provider: str) -> None:
 def _externalize_post_login_target(target: str, prefix: str) -> str:
     """Prepend *prefix* to *target* when behind a reverse proxy.
 
-    When the dashboard is mounted at a sub-path (e.g. ``/hermes``) via
-    ``X-Forwarded-Prefix``, a bare ``/`` landing must become ``/hermes/``
+    When the dashboard is mounted at a sub-path (e.g. ``/qubit``) via
+    ``X-Forwarded-Prefix``, a bare ``/`` landing must become ``/qubit/``
     so the browser stays inside the mount. Paths that already carry the
     prefix are returned unchanged; the native loopback redirect (an
     absolute ``http://127.0.0.1...`` URL) never matches and is untouched.

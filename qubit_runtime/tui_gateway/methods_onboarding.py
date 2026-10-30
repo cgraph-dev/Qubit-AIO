@@ -27,7 +27,7 @@ def _(rid, params: dict) -> dict:
 
 
 def _run_state(*, assume_fresh: bool = False) -> dict:
-    """``run``: the root config says so, else this OS user never used Hermes (or the unpackaged
+    """``run``: the root config says so, else this OS user never used Qubit (or the unpackaged
     desktop's ``--fresh-install`` says to assume that). ``eligible``: this is the desktop's local
     backend and something can carry the first chat (the welcome trial or a configured provider);
     remote backends answer at once and run onboarding only from Settings. On the local backend the
@@ -56,7 +56,7 @@ def _due_now(*, assume_fresh: bool = False) -> dict[str, bool]:
 def _due_stamp() -> tuple:
     """The files the due answer reads, by their config-cache signature: the root config
     (``onboarding.run``), the default profile's config, ``.env`` and ``auth.json`` (what carries a
-    first chat), the shared Nous store (another profile's sign-in or connector guest) and the managed
+    first chat), the shared Qubit store (another profile's sign-in or connector guest) and the managed
     layer's ``config.yaml`` and ``.env`` (an admin's onboarding or provider policy)."""
     from qubit_cli import managed_scope
     from qubit_constants import get_default_qubit_root
@@ -68,7 +68,7 @@ def _due_stamp() -> tuple:
 
 
 def _shared_nous_store() -> tuple[Path, ...]:
-    """The shared Nous store as ``_read_shared_nous_state`` finds it: none when the test seat belt trips."""
+    """The shared Qubit store as ``_read_shared_nous_state`` finds it: none when the test seat belt trips."""
     from qubit_cli.auth_nous import _nous_shared_store_path
     try:
         return (_nous_shared_store_path(),)

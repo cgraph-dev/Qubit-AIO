@@ -1,4 +1,4 @@
-"""Child-scoped desktop build tools, independent of the invoking Hermes install.
+"""Child-scoped desktop build tools, independent of the invoking Qubit install.
 
 This module is stdlib-only until preparation runs inside the isolated child.
 """

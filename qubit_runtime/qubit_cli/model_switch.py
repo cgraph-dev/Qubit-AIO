@@ -32,7 +32,7 @@ def _declared_model_ids(value: Any) -> list[str]:
     if isinstance(value, str):
         candidates: Any = [value]
     elif isinstance(value, dict):
-        # Pre-fix Hermes wrote sentinel keys inside the user-facing ``models`` mapping.
+        # Pre-fix Qubit wrote sentinel keys inside the user-facing ``models`` mapping.
         candidates = (k for k in value if k not in ("__explicit_model_allowlist__", "__discovered_model_catalog__"))
     elif isinstance(value, (list, tuple)):
         candidates = (_declared_item_id(item) if isinstance(item, dict) else item for item in value)
@@ -57,7 +57,7 @@ def _declared_item_id(item: dict) -> Any:
 
 
 def _entry_models_discovered(entry: Any) -> bool:
-    """True when the entry's ``models`` mapping was auto-discovered by Hermes.
+    """True when the entry's ``models`` mapping was auto-discovered by Qubit.
 
     Current shape: entry-level ``models_discovered: true``. Older versions wrote an in-mapping
     ``__discovered_model_catalog__: true`` sentinel — accepted on read (the next save migrates it)."""
@@ -75,7 +75,7 @@ def _models_config_is_allowlist(value: Any, discovered: bool = False) -> bool:
     ``_save_custom_provider`` / the wizard, not a catalog narrow (treating it as one made GUI
     pickers show only the saved default for keyless Ollama while the CLI live-probed). List and
     string shapes remain allowlists for no-key endpoints; pin a dict catalog with
-    ``discover_models: false``. A catalog Hermes itself persisted (``discovered``) is never a pin."""
+    ``discover_models: false``. A catalog Qubit itself persisted (``discovered``) is never a pin."""
     if discovered:
         return False
     if isinstance(value, str):
@@ -98,16 +98,16 @@ def _bare_custom_provider_def(current_base_url: str) -> Optional[ProviderDef]:
 # --- Non-agentic model warning
 
 _HERMES_MODEL_WARNING = (
-    "Nous Research Hermes 3 & 4 models are NOT agentic and are not designed "
-    "for use with Hermes Agent. They lack the tool-calling capabilities "
+    "Qubit Labs Qubit 3 & 4 models are NOT agentic and are not designed "
+    "for use with Qubit Agent. They lack the tool-calling capabilities "
     "required for agent workflows. Consider using an agentic model instead "
     "(Claude, GPT, Gemini, DeepSeek, etc.).")
 
-# Match only the real Nous Research Hermes 3 / 4 chat families; a bare substring check
+# Match only the real Qubit Labs Qubit 3 / 4 chat families; a bare substring check
 # false-positived on tool-capable local Modelfiles like ``hermes-brain:qwen3-14b-ctx16k``.
-#   match:    NousResearch/Hermes-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
+#   match:    NousResearch/Qubit-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
 #   no match: hermes-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
-_NOUS_HERMES_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])hermes[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
+_NOUS_HERMES_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])qubit[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
 
 
 # Opaque proxy model IDs (Palantir Foundry: ``ri.language-model-service..language-model.<slug>``)
@@ -125,12 +125,12 @@ def format_model_for_display(model_name: str) -> str:
 
 
 def is_nous_qubit_non_agentic(model_name: str) -> bool:
-    """True if *model_name* is a real Nous Hermes 3/4 chat model (single owner; cli.py uses it too)."""
+    """True if *model_name* is a real Qubit Qubit 3/4 chat model (single owner; cli.py uses it too)."""
     return bool(model_name and _NOUS_HERMES_NON_AGENTIC_RE.search(model_name))
 
 
 def _check_qubit_model_warning(model_name: str) -> str:
-    """Warning string if *model_name* is a Nous Hermes 3/4 chat model, else ""."""
+    """Warning string if *model_name* is a Qubit Qubit 3/4 chat model, else ""."""
     return _HERMES_MODEL_WARNING if is_nous_qubit_non_agentic(model_name) else ""
 
 
@@ -1057,13 +1057,13 @@ def _unknown_provider_message(explicit_provider: str) -> str:
     if moved := provider_install_hint(explicit_provider):
         return f"Unknown provider '{explicit_provider}'. {moved}"
     msg = (
-        f"Unknown provider '{explicit_provider}'. Check 'hermes model' for available "
+        f"Unknown provider '{explicit_provider}'. Check 'qubit model' for available "
         f"providers, or define it in config.yaml under 'providers:'.")
     try:  # Surface common config issues that cause provider resolution failures
         from qubit_cli.config import validate_config_structure
         issues = validate_config_structure()
         if issues:
-            msg += "\n\nRun 'hermes doctor' — config issues detected:" + "".join(f"\n  • {ci.message}" for ci in issues[:3])
+            msg += "\n\nRun 'qubit doctor' — config issues detected:" + "".join(f"\n  • {ci.message}" for ci in issues[:3])
     except Exception:
         pass
     return msg
@@ -1298,7 +1298,7 @@ def _convert_vendor_colon_slug(st: _Switch) -> None:
     a variant tag (:free, :extended, :fast) that must be preserved.
 
     On an aggregator every ``left:right`` is a slug. Elsewhere the colon is converted only when
-    ``left`` names a provider Hermes knows, so ``/model alibaba:qwen3.6-plus`` routes like
+    ``left`` names a provider Qubit knows, so ``/model alibaba:qwen3.6-plus`` routes like
     ``alibaba/qwen3.6-plus`` (#9748) while Ollama-style tags (``qwen3.5:4b``) stay intact."""
     raw_input = st.raw_input
     colon_pos = raw_input.find(":")
@@ -1398,12 +1398,12 @@ def _route_from_model_input(st: _Switch) -> Optional[ModelSwitchResult]:
     if st.resolved_alias or resolved_in_current_catalog or st.target_provider != current_provider:
         return None
     if current_provider == "nous":
-        # The welcome host serves nous/welcome only; a model outside it needs an account or a key.
+        # The welcome host serves qubit/welcome only; a model outside it needs an account or a key.
         # Never hop to another provider on the user's behalf here (there is no key to hop to).
         from qubit_cli.anon_auth import GUEST_MODEL, route_is_welcome_host
         if route_is_welcome_host(st.current_base_url) and st.new_model != GUEST_MODEL:
             return st.fail(
-                f"{st.new_model} needs a Nous account or an API key. "
+                f"{st.new_model} needs a Qubit account or an API key. "
                 "Use /login to sign in, or /model to pick another provider.")
     config_routed = _route_configured_provider(st)  # d.5 — deliberately NOT gated on ``not is_custom``
     if isinstance(config_routed, ModelSwitchResult):
@@ -1486,7 +1486,7 @@ def _creds_for_switched_provider(st: _Switch) -> Optional[ModelSwitchResult]:
                 return st.fail_on_target(str(e))
             return st.fail_on_target(
                 f"{st.provider_label} is not connected: no API key or login was found for it. Add one with "
-                f"`hermes auth add {st.target_provider}`, or pick a connected provider in /model.\n"
+                f"`qubit auth add {st.target_provider}`, or pick a connected provider in /model.\n"
                 f"  Details: {e}")
     return None
 
@@ -1696,7 +1696,7 @@ _PROVIDER_API_MODE_OVERRIDES: dict[str, Any] = {
 
 def model_derived_api_mode(provider: str, model: str, api_key: str = "") -> Optional[str]:
     """api_mode re-derived from the FINAL model for providers that serve several wire formats behind one
-    endpoint (OpenCode Zen/Go and custom providers extending a family slug, Nous, and any provider profile
+    endpoint (OpenCode Zen/Go and custom providers extending a family slug, Qubit, and any provider profile
     declaring ``api_mode_for_model``); None when the provider's wire is fixed by its endpoint. A persisted
     api_mode from an earlier model of such a provider is never authoritative — resume paths must call this
     instead of honoring the row (#96066)."""

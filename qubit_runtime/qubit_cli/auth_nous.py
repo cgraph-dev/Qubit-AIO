@@ -1,4 +1,4 @@
-"""Nous Portal OAuth: device-code login, refresh, shared-store mirroring, JWT selection, status.
+"""Qubit Labs OAuth: device-code login, refresh, shared-store mirroring, JWT selection, status.
 
 Split out of ``qubit_cli/auth.py``; origin helpers are imported lazily inside each function
 so ``qubit_cli.auth.<name>`` patches still intercept (and no import cycle).
@@ -33,7 +33,7 @@ if TYPE_CHECKING:  # annotation-only; the runtime import would be a cycle
 # Log-record parity with the origin module (caplog tests pin "qubit_cli.auth").
 logger = logging.getLogger("qubit_cli.auth")
 
-_UNUSABLE_JWT_RELOGIN = "Re-authenticate with: hermes auth add nous"
+_UNUSABLE_JWT_RELOGIN = "Re-authenticate with: qubit auth add qubit"
 
 
 def _unusable_invoke_jwt_error(reason: str, *, no_refresh_token: bool = False) -> AuthError:
@@ -45,7 +45,7 @@ def _unusable_invoke_jwt_error(reason: str, *, no_refresh_token: bool = False) -
     """
     detail = " and no refresh token is available" if no_refresh_token else ""
     return _nous_err(
-        f"Nous Portal access token is not a usable inference JWT ({reason}){detail}. "
+        f"Qubit Labs access token is not a usable inference JWT ({reason}){detail}. "
         f"{_UNUSABLE_JWT_RELOGIN}",
         "nous_auth_missing_refresh_token" if no_refresh_token else reason, relogin=True)
 
@@ -71,7 +71,7 @@ def _iso_after(now: datetime, ttl_seconds: int) -> str:
     return datetime.fromtimestamp(now.timestamp() + ttl_seconds, tz=UTC).isoformat()
 
 
-# Nous agent-key slots; a fresh login persists them as None, quarantine strips them.
+# Qubit agent-key slots; a fresh login persists them as None, quarantine strips them.
 _NOUS_EMPTY_AGENT_KEY_FIELDS: dict[str, Any] = {
     "agent_key": None, "agent_key_id": None, "agent_key_expires_at": None,
     "agent_key_expires_in": None, "agent_key_reused": None, "agent_key_obtained_at": None}
@@ -89,29 +89,29 @@ def _portal_entitlement_message(capability: str) -> str:
 
 def _format_nous_entitlement_auth_error(error: AuthError) -> str:
     with suppress(Exception):
-        if message := _portal_entitlement_message("Nous model access"):
+        if message := _portal_entitlement_message("Qubit model access"):
             return message
-    return f"{error} Check credits or billing in Nous Portal, then retry."
+    return f"{error} Check credits or billing in Qubit Labs, then retry."
 
 
 def _migrate_stale_nous_portal_url(providers: dict[str, Any]) -> None:
-    nous = providers.get("nous")
-    if not isinstance(nous, dict):
+    qubit = providers.get("nous")
+    if not isinstance(qubit, dict):
         return
     stored = (nous.get("portal_base_url") or "").strip()
     if stored and urlparse(stored).hostname in _NOUS_STALE_PORTAL_HOSTS:
         logger.warning(
-            "auth: migrating stale nous portal_base_url %s -> %s", stored, DEFAULT_NOUS_PORTAL_URL)
-        nous["portal_base_url"] = DEFAULT_NOUS_PORTAL_URL
+            "auth: migrating stale qubit labs_base_url %s -> %s", stored, DEFAULT_NOUS_PORTAL_URL)
+        qubit["portal_base_url"] = DEFAULT_NOUS_PORTAL_URL
 
 
-# Allowlist of hosts the Nous Portal proxy will forward inference JWTs to — a bearer sent anywhere
+# Allowlist of hosts the Qubit Labs proxy will forward inference JWTs to — a bearer sent anywhere
 # else would leak. Consulted only for URLs from the NETWORK side (Portal refresh responses);
 # the NOUS_INFERENCE_BASE_URL env override bypasses it (documented dev/staging escape hatch, the
 # user set it themselves).
 _ALLOWED_NOUS_INFERENCE_HOSTS: frozenset[str] = frozenset({
     "inference-api.nousresearch.com",
-    # Free-tier (anonymous) host: serves the single ``nous/welcome`` model.
+    # Free-tier (anonymous) host: serves the single ``qubit/welcome`` model.
     "welcome-api.nousresearch.com"})
 
 def _nous_inference_host_allowed(hostname: Optional[str]) -> bool:
@@ -120,7 +120,7 @@ def _nous_inference_host_allowed(hostname: Optional[str]) -> bool:
 
     A non-production Portal's refresh response names that environment's inference gateway. The
     Portal-returned value is network provenance, so it does not get bearer-receive authority on
-    its own — not even for a Nous-owned host: the operator's explicit override is the authority,
+    its own — not even for a Qubit-owned host: the operator's explicit override is the authority,
     and the network value is accepted exactly when it agrees with it. Then the persisted endpoint,
     the pricing scope and the proxy all follow the environment the operator chose, and the
     per-turn "refusing inference URL host" warning stops.
@@ -148,11 +148,11 @@ def _validate_nous_inference_url_from_network(url: Optional[str]) -> Optional[st
         return None
     if parsed.scheme != "https":
         logger.warning(
-            "nous: refusing non-https inference URL scheme %r from Portal response", parsed.scheme)
+            "qubit: refusing non-https inference URL scheme %r from Portal response", parsed.scheme)
         return None
     if not _nous_inference_host_allowed(parsed.hostname):
         logger.warning(
-            "nous: refusing inference URL host %r from Portal response "
+            "qubit: refusing inference URL host %r from Portal response "
             "(not in allowlist); falling back to default",
             parsed.hostname)
         return None
@@ -181,7 +181,7 @@ def _scoped_operator_override(*names: str) -> Optional[str]:
         return None
     except UnscopedSecretError:
         logger.warning(
-            "nous: %s unreadable — no profile secret scope on a multiplexed call; treating the "
+            "qubit: %s unreadable — no profile secret scope on a multiplexed call; treating the "
             "override as absent (default routing applies). The caller needs a profile scope binding.",
             "/".join(names))
         return None
@@ -328,7 +328,7 @@ def _select_nous_invoke_jwt(
     if _nonempty_str(access_token):
         state["access_token"] = access_token
     _set_nous_agent_key_from_invoke_jwt(state)
-    logger.debug("Nous inference auth: using NAS invoke JWT")
+    logger.debug("Qubit inference auth: using NAS invoke JWT")
     _oauth_trace(
         "nous_invoke_jwt_selected", sequence_id=sequence_id,
         access_token_fp=_token_fingerprint(state.get("access_token")))
@@ -348,9 +348,9 @@ _nous_shared_lock_holder = threading.local()
 
 
 def _nous_shared_auth_dir() -> Path:
-    """Directory of the shared Nous token store: ``HERMES_SHARED_AUTH_DIR`` or ``<root>/shared/``.
+    """Directory of the shared Qubit token store: ``HERMES_SHARED_AUTH_DIR`` or ``<root>/shared/``.
 
-    Outside any named profile so all profiles share it (``hermes --profile X auth add nous --type
+    Outside any named profile so all profiles share it (``qubit --profile X auth add qubit --type
     oauth`` one-tap imports it). Written on login AND every runtime refresh so the refresh_token
     stays current across profiles; a stale token just falls back to device-code.
     """
@@ -364,7 +364,7 @@ def _nous_shared_auth_dir() -> Path:
 def _nous_shared_store_path() -> Path:
     path = _nous_shared_auth_dir() / NOUS_SHARED_STORE_FILENAME
     # Seat belt (mirrors the _auth_file_path() guard): under pytest, refuse a path under the real
-    # user's Hermes root so a test that forgot HERMES_SHARED_AUTH_DIR fails loudly instead of
+    # user's Qubit root so a test that forgot HERMES_SHARED_AUTH_DIR fails loudly instead of
     # corrupting cross-profile state.
     if os.environ.get("PYTEST_CURRENT_TEST"):
         from qubit_constants import get_default_qubit_root
@@ -376,14 +376,14 @@ def _nous_shared_store_path() -> Path:
             resolved = path
         if resolved == real_home_shared:
             raise RuntimeError(
-                f"Refusing to touch real user shared Nous auth store during test run: "
+                f"Refusing to touch real user shared Qubit auth store during test run: "
                 f"{path}. Set HERMES_SHARED_AUTH_DIR to a tmp_path in your test fixture.")
     return path
 
 
 @contextmanager
 def _nous_shared_store_lock(timeout_seconds: float = AUTH_LOCK_TIMEOUT_SECONDS):
-    """Cross-profile lock for the shared Nous OAuth store.
+    """Cross-profile lock for the shared Qubit OAuth store.
 
     Lock ordering invariant: if both this and ``_auth_store_lock`` need to be held, acquire
     ``_auth_store_lock`` FIRST. All runtime refresh paths follow this order.
@@ -396,7 +396,7 @@ def _nous_shared_store_lock(timeout_seconds: float = AUTH_LOCK_TIMEOUT_SECONDS):
         return
     with _file_lock(
         lock_path, _nous_shared_lock_holder, timeout_seconds,
-        f"Timed out waiting for shared Nous auth lock ({lock_path})"):
+        f"Timed out waiting for shared Qubit auth lock ({lock_path})"):
         yield
 
 
@@ -404,7 +404,7 @@ def _shared_lock_timeout(timeout_seconds: float) -> float:
     return max(timeout_seconds + 5.0, AUTH_LOCK_TIMEOUT_SECONDS)
 
 
-# OAuth fields mirrored between a profile's Nous state and the shared cross-profile store.
+# OAuth fields mirrored between a profile's Qubit state and the shared cross-profile store.
 _NOUS_SHARED_STATE_KEYS = (
     "access_token", "refresh_token", "token_type", "scope", "client_id", "portal_base_url",
     "inference_base_url", "obtained_at", "expires_at",
@@ -415,7 +415,7 @@ _SHARED_RENEWAL_KEY = "renewal"
 
 
 def _merge_shared_nous_oauth_state(state: dict[str, Any]) -> bool:
-    """Copy fresher shared OAuth tokens into a profile-local Nous state."""
+    """Copy fresher shared OAuth tokens into a profile-local Qubit state."""
     from qubit_cli.auth import _nonempty_str, _parse_iso_timestamp, _read_shared_nous_state
     shared = _read_shared_nous_state() or {}
     renewed = shared.get(_SHARED_RENEWAL_KEY)
@@ -455,7 +455,7 @@ def _nous_shared_shape(src: dict[str, Any]) -> dict[str, Any]:
 
 
 def _nous_identity(state: dict[str, Any]) -> tuple[str, Any]:
-    """Who a Nous state is: the guest's ``anon_`` credential, else the account's JWT subject (which,
+    """Who a Qubit state is: the guest's ``anon_`` credential, else the account's JWT subject (which,
     unlike the refresh token, survives a refresh)."""
     from qubit_cli.anon_auth import is_guest_state
     if is_guest_state(state):
@@ -464,7 +464,7 @@ def _nous_identity(state: dict[str, Any]) -> tuple[str, Any]:
 
 
 def _write_shared_nous_state(state: dict[str, Any], *, renewal: bool) -> None:
-    """Persist a minimal copy of the Nous OAuth state to the shared store.
+    """Persist a minimal copy of the Qubit OAuth state to the shared store.
 
     The store holds one identity, which profiles adopt or import. Only a sign-in (or a mint) changes
     it, so only a sign-in can replace a guest there. A *renewal* (a token refresh) of another
@@ -498,11 +498,11 @@ def _write_shared_nous_state(state: dict[str, Any], *, renewal: bool) -> None:
             "nous_shared_store_written", path=str(path),
             refresh_token_fp=_token_fingerprint(refresh_token))
     except Exception as exc:
-        logger.debug("Failed to write shared Nous auth store: %s", exc)
+        logger.debug("Failed to write shared Qubit auth store: %s", exc)
 
 
 def _read_shared_nous_state() -> Optional[dict[str, Any]]:
-    """Shared Nous OAuth state when present and well-formed, else None.
+    """Shared Qubit OAuth state when present and well-formed, else None.
 
     None (missing / unreadable / malformed / lacking tokens) means "fall through to device-code".
     """
@@ -516,7 +516,7 @@ def _read_shared_nous_state() -> Optional[dict[str, Any]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError) as exc:
-        logger.debug("Shared Nous auth store at %s is unreadable: %s", path, exc)
+        logger.debug("Shared Qubit auth store at %s is unreadable: %s", path, exc)
         return None
     if not isinstance(payload, dict):
         return None
@@ -526,13 +526,13 @@ def _read_shared_nous_state() -> Optional[dict[str, Any]]:
 
 
 def _clear_shared_nous_state(reason: str) -> None:
-    """Remove the shared Nous OAuth store after a terminal token failure."""
+    """Remove the shared Qubit OAuth store after a terminal token failure."""
     try:
         with _nous_shared_store_lock():
             _nous_shared_store_path().unlink(missing_ok=True)
         _oauth_trace("nous_shared_store_cleared", reason=reason)
     except Exception as exc:
-        logger.debug("Failed to clear shared Nous auth store: %s", exc)
+        logger.debug("Failed to clear shared Qubit auth store: %s", exc)
 
 
 def _quarantine_forensics(state: dict[str, Any], error: AuthError, reason: str) -> dict[str, Any]:
@@ -540,7 +540,7 @@ def _quarantine_forensics(state: dict[str, Any], error: AuthError, reason: str) 
 
     NEVER include a raw token/agent_key (credential-shaped literals get corrupted in logs). The
     12-char SHA-256 prefix correlates to NAS's refreshTokenHash without leaking the secret;
-    provenance is client_id + agent_key_id (Nous state has no session_id).
+    provenance is client_id + agent_key_id (Qubit state has no session_id).
     """
     from qubit_cli.auth import _auth_file_path
     forensic: dict[str, Any] = {
@@ -586,7 +586,7 @@ def _quarantine_nous_oauth_state(state: dict[str, Any], error: AuthError, *, rea
     # visible as a later "No access token found" WARNING, too late to root-cause. Managed log
     # drains may be WARNING-only, so this MUST be logger.warning.
     logger.warning(
-        "Nous OAuth state quarantined (terminal auth death): %s",
+        "Qubit OAuth state quarantined (terminal auth death): %s",
         json.dumps(_quarantine_forensics(state, error, reason), sort_keys=True, ensure_ascii=False))
     for key in (*_FLAT_OAUTH_TOKEN_KEYS, *_NOUS_EMPTY_AGENT_KEY_FIELDS):
         state.pop(key, None)
@@ -597,7 +597,7 @@ def _quarantine_nous_oauth_state(state: dict[str, Any], error: AuthError, *, rea
 
 def _quarantine_nous_pool_entries(
     auth_store: dict[str, Any], error: AuthError, *, reason: str) -> bool:
-    """Remove singleton-seeded Nous pool entries that contain dead OAuth state."""
+    """Remove singleton-seeded Qubit pool entries that contain dead OAuth state."""
     entries = _pool_entries(auth_store, "nous")
     if entries is None:
         return False
@@ -612,7 +612,7 @@ def _quarantine_nous_pool_entries(
 
 
 def _try_import_shared_nous_state(*, timeout_seconds: float = 15.0) -> Optional[dict[str, Any]]:
-    """Rehydrate Nous OAuth state from the shared store via a forced refresh.
+    """Rehydrate Qubit OAuth state from the shared store via a forced refresh.
 
     Returns auth_state ready for ``persist_nous_credentials()``; None on any failure (expired
     token, portal unreachable) so the caller falls through to device-code.
@@ -640,7 +640,7 @@ def _try_import_shared_nous_state(*, timeout_seconds: float = 15.0) -> Optional[
             **({"error_code": getattr(exc, "code", None)} if is_auth else {}))
         if is_auth and _is_terminal_nous_refresh_error(exc):
             _clear_shared_nous_state("shared_import_terminal_refresh_failure")
-        logger.debug("Shared Nous import failed: %s", exc)
+        logger.debug("Shared Qubit import failed: %s", exc)
         return None
     return refreshed
 
@@ -659,7 +659,7 @@ def _refresh_access_token(
         return payload
     if 500 <= response.status_code <= 599:
         raise AuthError(
-            f"Nous Portal is temporarily unavailable (HTTP {response.status_code}).",
+            f"Qubit Labs is temporarily unavailable (HTTP {response.status_code}).",
             provider="nous", code="temporarily_unavailable", retryable=True)
     # Vercel's Security Checkpoint in front of the Portal answers non-browser clients with a
     # 403 (``x-vercel-mitigated: deny``) or 429 (``challenge``) page (#120602). That is the edge
@@ -669,7 +669,7 @@ def _refresh_access_token(
     if mitigated:
         from agent.retry_utils import parse_retry_after_seconds
         raise AuthError(
-            f"Nous Portal's edge firewall challenged the token refresh (HTTP {response.status_code}, "
+            f"Qubit Labs's edge firewall challenged the token refresh (HTTP {response.status_code}, "
             f"x-vercel-mitigated={mitigated}). Credentials kept; try again shortly.",
             provider="nous", code="upstream_blocked", retryable=True,
             retry_after=parse_retry_after_seconds(response.headers))
@@ -691,19 +691,19 @@ def _refresh_access_token(
     description = str(error_payload.get("error_description") or "Refresh token exchange failed")
     relogin = code in _OAUTH_GRANT_DEAD_CODES
     # OAuth 2.1 "refresh token reuse": an external process (health check, monitoring tool, custom
-    # self-heal hook) redeemed Hermes's refresh_token without persisting the rotated token, so the
+    # self-heal hook) redeemed Qubit's refresh_token without persisting the rotated token, so the
     # server retired the original and revoked the whole session chain as a token-theft signal.
     if code == "refresh_token_reused" or "reuse" in description.lower():
         description = (
-            "Nous Portal detected refresh-token reuse and revoked this session.\n"
+            "Qubit Labs detected refresh-token reuse and revoked this session.\n"
             "This usually means an external process (monitoring script, "
-            "custom self-heal hook, or another Hermes install sharing "
-            "~/.hermes/auth.json) called POST /api/oauth/token with Hermes's "
+            "custom self-heal hook, or another Qubit install sharing "
+            "~/.hermes/auth.json) called POST /api/oauth/token with Qubit's "
             "refresh token without persisting the rotated token back.\n"
-            "Nous refresh tokens are single-use — only Hermes may call the "
-            "refresh endpoint. For health checks, use `hermes auth status` "
+            "Qubit refresh tokens are single-use — only Qubit may call the "
+            "refresh endpoint. For health checks, use `qubit auth status` "
             "instead.\n"
-            "Re-authenticate with: hermes auth add nous")
+            "Re-authenticate with: qubit auth add qubit")
         relogin = True
     raise _nous_err(description, code, relogin=relogin)
 
@@ -729,7 +729,7 @@ def _refresh_nous_or_quarantine(
 def _apply_nous_refreshed_tokens(
     state: dict[str, Any], refreshed: dict[str, Any], refresh_token: str, *,
     inference_base_url: Optional[str] = None) -> None:
-    """Write a successful Nous token-refresh payload into *state* (tokens + expiry fields).
+    """Write a successful Qubit token-refresh payload into *state* (tokens + expiry fields).
 
     *inference_base_url*, when given, is the healed network-provenance URL to persist alongside
     the rotated tokens (key order in auth.json is preserved from the original login shape).
@@ -776,7 +776,7 @@ def _model_priority(mid: str) -> tuple:
 def fetch_nous_models(
     *, inference_base_url: str, api_key: str, timeout_seconds: float = 15.0,
     verify: bool | str = True) -> list[str]:
-    """Fetch available model IDs from the Nous inference API."""
+    """Fetch available model IDs from the Qubit inference API."""
     from qubit_cli.auth import _nonempty_str
     with _nous_http_client(timeout_seconds, verify) as client:
         response = client.get(
@@ -796,7 +796,7 @@ def fetch_nous_models(
     model_ids: list[str] = []
     for item in data:
         model_id = item.get("id") if isinstance(item, dict) else None
-        # Hermes models aren't reliable for agentic tool-calling
+        # Qubit models aren't reliable for agentic tool-calling
         if _nonempty_str(model_id) and "hermes" not in model_id.lower():
             model_ids.append(model_id.strip())
     model_ids.sort(key=_model_priority)
@@ -819,7 +819,7 @@ def refresh_nous_oauth_pure(
     timeout_seconds: float = 15.0, insecure: Optional[bool] = None, ca_bundle: Optional[str] = None,
     force_refresh: bool = False,
     on_state_update: Optional[Callable[[dict[str, Any], str], None]] = None) -> dict[str, Any]:
-    """Refresh Nous OAuth state without mutating auth.json directly.
+    """Refresh Qubit OAuth state without mutating auth.json directly.
 
     ``on_state_update`` fires after a successful access-token refresh so callers owning persistent
     state can save the rotated refresh token before later validation can fail.
@@ -839,7 +839,7 @@ def refresh_nous_oauth_pure(
 def refresh_nous_oauth_from_state(
     src: dict[str, Any], *, timeout_seconds: float = 15.0, force_refresh: bool = False,
     on_state_update: Optional[Callable[[dict[str, Any], str], None]] = None) -> dict[str, Any]:
-    """Refresh Nous OAuth from a state dict (defaults filled in) without mutating auth.json."""
+    """Refresh Qubit OAuth from a state dict (defaults filled in) without mutating auth.json."""
     from qubit_cli.auth import (
         _assert_nous_inference_jwt_usable, _refresh_access_token, _resolve_verify,
         _select_nous_invoke_jwt)
@@ -866,7 +866,7 @@ def refresh_nous_oauth_from_state(
                     raise _unusable_invoke_jwt_error(
                         current_invoke_jwt_status, no_refresh_token=True)
                 raise _nous_err(
-                    "No refresh token is available for Nous Portal.", "nous_auth_missing_refresh_token",
+                    "No refresh token is available for Qubit Labs.", "nous_auth_missing_refresh_token",
                     relogin=True)
             refreshed = _refresh_access_token(
                 client=client, portal_base_url=state["portal_base_url"],
@@ -882,10 +882,10 @@ def refresh_nous_oauth_from_state(
 
 
 def persist_nous_credentials(creds: dict[str, Any], *, label: Optional[str] = None):
-    """Persist Nous OAuth credentials as the singleton provider state.
+    """Persist Qubit OAuth credentials as the singleton provider state.
 
-    Nous credentials are read from ``providers.nous`` (401 recovery, pool seeding) AND
-    ``credential_pool.nous`` (runtime ``pool.select()``); a pool-only write broke expiry recovery.
+    Qubit credentials are read from ``providers.qubit`` (401 recovery, pool seeding) AND
+    ``credential_pool.qubit`` (runtime ``pool.select()``); a pool-only write broke expiry recovery.
     So: write the singleton, mirror to the shared store, then ``load_pool("nous")`` upserts the
     canonical ``device_code`` entry in place. ``label`` rides in the singleton so re-seeding keeps
     it.
@@ -902,12 +902,12 @@ def persist_nous_credentials(creds: dict[str, Any], *, label: Optional[str] = No
 
 
 def _sync_nous_pool_from_auth_store() -> None:
-    """Best-effort pool reseed after providers.nous changes; never fail login."""
+    """Best-effort pool reseed after providers.qubit changes; never fail login."""
     try:
         from agent.credential_pool import load_pool
         load_pool("nous")
     except Exception as exc:
-        logger.debug("Failed to sync Nous credential pool from auth store: %s", exc)
+        logger.debug("Failed to sync Qubit credential pool from auth store: %s", exc)
 
 
 def _nous_effective_routing(state: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -1078,7 +1078,7 @@ class _NousRuntimeResolve:
                     self.persist("runtime_shared_merge_missing_access_token")
         if not self.has_access_token():
             raise _nous_err(
-                "No access token found for Nous Portal login.", "nous_auth_missing_access_token", relogin=True)
+                "No access token found for Qubit Labs login.", "nous_auth_missing_access_token", relogin=True)
         invoke_jwt_status = self.invoke_jwt_status()
         self.skip_refresh_if_peer_rotated()
         if not (self.force_refresh or invoke_jwt_status is not None):
@@ -1096,7 +1096,7 @@ def resolve_nous_runtime_credentials(
     *, timeout_seconds: float = 15.0, insecure: Optional[bool] = None,
     ca_bundle: Optional[str] = None, force_refresh: bool = False,
     stale_access_token: Optional[str] = None) -> dict[str, Any]:
-    """Resolve Nous inference credentials for runtime use (refreshing under the auth-store lock).
+    """Resolve Qubit inference credentials for runtime use (refreshing under the auth-store lock).
 
     A guest whose ``anon_`` credential NAS no longer knows (reaped or claimed) is retired and never
     replaced here: the welcome trial is claimed once per OS user, so that user goes on to sign-in or
@@ -1121,7 +1121,7 @@ def _resolve_nous_runtime_credentials(
     *, timeout_seconds: float = 15.0, insecure: Optional[bool] = None,
     ca_bundle: Optional[str] = None, force_refresh: bool = False,
     stale_access_token: Optional[str] = None) -> dict[str, Any]:
-    """Resolve Nous inference credentials for runtime use (refreshing under the auth-store lock).
+    """Resolve Qubit inference credentials for runtime use (refreshing under the auth-store lock).
 
     ``stale_access_token`` is the bearer that just failed upstream (401): with ``force_refresh``,
     the refresh POST is skipped if the store (re-read under the lock) already holds a *different*
@@ -1133,11 +1133,11 @@ def _resolve_nous_runtime_credentials(
         _tls_state_from_verify)
     with _provider_state_transaction("nous") as (auth_store, state, state_source_path):
         if not state:
-            raise _nous_err("Hermes is not logged into Nous Portal.", "nous_auth_missing", relogin=True)
+            raise _nous_err("Qubit is not logged into Qubit Labs.", "nous_auth_missing", relogin=True)
         from qubit_cli.anon_auth import guest_without_free_tier
         if guest_without_free_tier(state):
             # Not terminal (no relogin): the identity stays for connectors.
-            raise _nous_err("Hermes is not logged into Nous Portal.", "nous_auth_missing")
+            raise _nous_err("Qubit is not logged into Qubit Labs.", "nous_auth_missing")
         run = _NousRuntimeResolve(
             auth_store, state, state_source_path, force_refresh=force_refresh,
             stale_access_token=stale_access_token, timeout_seconds=timeout_seconds)
@@ -1162,7 +1162,7 @@ def _resolve_nous_runtime_credentials(
         _sync_nous_pool_from_auth_store()
     api_key = state.get("agent_key")
     if not isinstance(api_key, str) or not api_key:
-        raise _nous_err("Failed to resolve a Nous inference API key", "server_error")
+        raise _nous_err("Failed to resolve a Qubit inference API key", "server_error")
     expires_at = state.get("agent_key_expires_at")
     return {
         "provider": "nous", "base_url": run.inference_base_url, "api_key": api_key,
@@ -1226,7 +1226,7 @@ def _snapshot_nous_pool_status() -> dict[str, Any]:
 
 def _nous_status_from_state(
     state: dict[str, Any], *, logged_in: bool, source: str) -> dict[str, Any]:
-    """Auth-store-backed Nous status snapshot (shared by the live and refresh-free variants)."""
+    """Auth-store-backed Qubit status snapshot (shared by the live and refresh-free variants)."""
     from qubit_cli.anon_auth import is_guest_state
     access_token = state.get("access_token")
     account_tier = state.get("account_tier")
@@ -1295,7 +1295,7 @@ def _terminal_quarantine_marker(state: dict[str, Any]) -> Optional[dict[str, Any
 
 
 def get_nous_auth_status_local() -> dict[str, Any]:
-    """Refresh-free Nous auth snapshot for read-only display surfaces.
+    """Refresh-free Qubit auth snapshot for read-only display surfaces.
 
     NEVER calls ``resolve_nous_runtime_credentials()`` (no refresh POST / single-use token spent);
     ``logged_in`` = usable invoke JWT, or a refresh token not terminally quarantined — not proof
@@ -1329,7 +1329,7 @@ NOUS_SESSION_UNKNOWN = "unknown"
 
 
 def get_nous_session_validity() -> str:
-    """Classify the Nous bootstrap session for the dashboard /api/status probe.
+    """Classify the Qubit bootstrap session for the dashboard /api/status probe.
 
     Local auth-store state only; polled frequently, so it never resolves or refreshes. ANTI-FLAP:
     only a *terminal* failure maps to "terminal" — a rotation blip, network error, or expiring
@@ -1360,7 +1360,7 @@ def _pool_first_oauth_status(
     on_pool_miss: Optional[Callable[[], Optional[dict[str, Any]]]] = None) -> dict[str, Any]:
     """Status snapshot for a store-backed OAuth provider (Codex, xAI).
 
-    Pool first (where `hermes auth` / `hermes model` store device_code tokens), then
+    Pool first (where `qubit auth` / `qubit model` store device_code tokens), then
     *on_pool_miss* for a pool-derived degraded status, then the legacy state via *resolve*.
 
     The pool read is an observation (``peek``), not a lease: ``select()`` refreshes an expiring
@@ -1408,7 +1408,7 @@ def _nous_device_code_login(
     client_id: Optional[str] = None, scope: Optional[str] = None, open_browser: bool = True,
     timeout_seconds: float = 15.0, insecure: bool = False, ca_bundle: Optional[str] = None,
     on_verification: Optional[Callable[[str, str], None]] = None) -> dict[str, Any]:
-    """Run the Nous device-code flow and return full OAuth state without persisting."""
+    """Run the Qubit device-code flow and return full OAuth state without persisting."""
     from qubit_cli.auth import (
         PROVIDER_REGISTRY, _coerce_ttl_seconds, _is_remote_session, _optional_base_url,
         _poll_for_token, _print_device_code_instructions, _request_device_code,
@@ -1425,7 +1425,7 @@ def _nous_device_code_login(
     verify: bool | str = False if insecure else (ca_bundle if ca_bundle else True)
     if _is_remote_session():
         open_browser = False
-    print(f"Starting Hermes login via {pconfig.name}...")
+    print(f"Starting Qubit login via {pconfig.name}...")
     print(f"Portal: {portal_base_url}")
     if insecure:
         print("TLS verification: disabled (--insecure)")
@@ -1476,7 +1476,7 @@ def _nous_device_code_login(
             print(format_auth_error(exc))
             print(f"  Subscribe here: {portal_url}/billing")
             print()
-            print("After subscribing, run `hermes model` again to finish setup.")
+            print("After subscribing, run `qubit model` again to finish setup.")
             raise SystemExit(1)
         raise
 
@@ -1533,7 +1533,7 @@ def step_up_nous_billing_scope(
 
 def _pick_nous_model_after_login(
     auth_state: dict[str, Any], inference_base_url: str) -> Optional[str]:
-    """Fetch the curated Nous model list (tier/policy-filtered) and run the interactive picker.
+    """Fetch the curated Qubit model list (tier/policy-filtered) and run the interactive picker.
 
     Returns the selected model id, or None when the user skipped / nothing was selectable.
     Raises on any fetch failure so the caller can print the "Login succeeded, but..." notice.
@@ -1569,7 +1569,7 @@ def _pick_nous_model_after_login(
         _policy_allowed = nous_policy_allowed_ids()
         if free_tier:
             with suppress(Exception):
-                unavailable_message = _portal_entitlement_message("paid Nous models")
+                unavailable_message = _portal_entitlement_message("paid Qubit models")
         # The Portal's free/paidRecommendedModels endpoint is the source of truth for what's
         # available *right now*: newly-launched models show without a CLI release.
         union = (
@@ -1577,7 +1577,7 @@ def _pick_nous_model_after_login(
             else union_with_portal_paid_recommendations)
         model_ids, pricing = union(model_ids, pricing, _portal)
         if not free_tier:
-            # Paid users also see every model on sale right now (same rule as `hermes model`).
+            # Paid users also see every model on sale right now (same rule as `qubit model`).
             model_ids = union_with_nous_on_sale_models(model_ids, pricing)
         _before_policy = model_ids
         model_ids = restrict_to_nous_policy(model_ids, _policy_allowed, rescue_empty=True)
@@ -1608,12 +1608,12 @@ def _pick_nous_model_after_login(
         print("No free models currently available.")
         print(unavailable_message or f"Upgrade at {_url} to access paid models.")
     else:
-        print("No curated models available for Nous Portal.")
+        print("No curated models available for Qubit Labs.")
     return None
 
 
 def _offer_shared_nous_import(timeout_seconds: float) -> Optional[dict[str, Any]]:
-    """Codex-style auto-import: offer to rehydrate a Nous credential from another profile.
+    """Codex-style auto-import: offer to rehydrate a Qubit credential from another profile.
 
     Checks the shared store before launching a fresh device-code flow. Returns the refreshed
     auth state when the user accepted and the import succeeded, else None.
@@ -1630,11 +1630,11 @@ def _offer_shared_nous_import(timeout_seconds: float) -> Optional[dict[str, Any]
     except RuntimeError:
         shared_path = None
     print()
-    print(f"Found existing Nous OAuth credentials at {shared_path}" if shared_path
-          else "Found existing shared Nous OAuth credentials")
+    print(f"Found existing Qubit OAuth credentials at {shared_path}" if shared_path
+          else "Found existing shared Qubit OAuth credentials")
     if not _prompt_yes_no("Import these credentials? [Y/n]: ", default="y"):
         return None
-    print("Rehydrating Nous session from shared credentials...")
+    print("Rehydrating Qubit session from shared credentials...")
     auth_state = _try_import_shared_nous_state(timeout_seconds=timeout_seconds)
     if auth_state is None:
         print("Could not refresh shared credentials — falling back to device-code login.")
@@ -1654,7 +1654,7 @@ def _restore_active_provider(prior_active_provider: Any) -> None:
 
 
 def _login_nous(args, pconfig: ProviderConfig) -> None:
-    """Nous Portal device authorization flow."""
+    """Qubit Labs device authorization flow."""
     from qubit_cli.auth import (
         _auth_store_lock, _load_auth_store, _nous_device_code_login, _save_active_provider_state,
         _save_model_choice, _sync_nous_pool_from_auth_store, _update_config_for_provider,
@@ -1700,12 +1700,12 @@ def _login_nous(args, pconfig: ProviderConfig) -> None:
             print()
             print(f"Login succeeded, but could not fetch available models. Reason: {message}")
         # No model (Skip, fetch failed, nothing curated): keep the previous provider rather than
-        # switch to Nous with a mismatched model; the Nous tokens stay saved for future use.
+        # switch to Qubit with a mismatched model; the Qubit tokens stay saved for future use.
         if not selected_model:
             _restore_active_provider(prior_active_provider)
             print()
-            print("No provider change. Nous credentials saved for future use.")
-            print("  Run `hermes model` again to switch to Nous Portal.")
+            print("No provider change. Qubit credentials saved for future use.")
+            print("  Run `qubit model` again to switch to Qubit Labs.")
             return
         config_path = _update_config_for_provider(
             "nous", inference_base_url, default_model=selected_model)
@@ -1714,13 +1714,13 @@ def _login_nous(args, pconfig: ProviderConfig) -> None:
         from qubit_cli.model_picker_usage import large_model_notice
         if _notice := large_model_notice(selected_model, "nous"):
             print(f"  ⚠ {_notice}")  # window plans only (a Large mark exists only on their catalog)
-        print(f"  Config updated: {config_path} (model.provider=nous)")
+        print(f"  Config updated: {config_path} (model.provider=qubit)")
     except KeyboardInterrupt:
         print("\nLogin cancelled.")
         raise SystemExit(130)
     except Exception as exc:
         from qubit_cli.auth_error_copy import sign_in_failure_lines
-        logger.debug("nous login failed: %r", exc)
+        logger.debug("qubit login failed: %r", exc)
         print()
         for line in sign_in_failure_lines(exc, service_host=_portal_host(getattr(args, "portal_url", None))):
             print(line)

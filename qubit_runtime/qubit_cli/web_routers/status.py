@@ -77,7 +77,7 @@ def _safe_call(mod, fn_name: str, default):
 
 def _count_status_active_sessions() -> int:
     """Best-effort status garnish. Opens read-only (via the shared stale-schema heal) so
-    /api/status never routinely writes to state.db while another Hermes process uses it."""
+    /api/status never routinely writes to state.db while another Qubit process uses it."""
     from qubit_state import _default_db_path
     # The heal helper bootstraps a missing store; this garnish must not — on a fresh install
     # /api/status polls would otherwise create state.db before the user's first session.
@@ -122,7 +122,7 @@ async def get_health():
 
     ``commit`` is the code this process BOOTED from (``get_version_info`` is cached at
     ``web_server`` import): Desktop refuses to attach to a backend whose commit differs from
-    its checkout, so a serve that outlived ``hermes update`` is never re-adopted.
+    its checkout, so a serve that outlived ``qubit update`` is never re-adopted.
     """
     info = get_version_info()
     return {"ok": True, "version": info.base_version, "displayVersion": info.display_version,
@@ -132,18 +132,18 @@ async def get_health():
 
 @router.get("/api/host/identity")
 async def get_host_identity(request: Request):
-    """Prove to an attaching `hermes serve`/`dashboard` WHO owns this port.
+    """Prove to an attaching `qubit serve`/`dashboard` WHO owns this port.
 
     The host rendezvous record names a (pid, port) owner, but a record cannot say whether that
     owner still holds the port: a graceful-shutdown window or an unrelated listener that
     inherited the port both look identical on disk. The attaching side dials this endpoint with
     the owner's 0600 token and attaches only when pid+role match. ``servesSpa`` is false for
-    headless ``serve``, so a `hermes dashboard` user is never routed to a backend with no UI.
+    headless ``serve``, so a `qubit dashboard` user is never routed to a backend with no UI.
     """
     _require_token(request)
     # ``role`` is the host ROLE this process published (gateway/host_rendezvous.ROLE_SERVE, or
-    # ROLE_DESKTOP_SERVE for a Desktop-owned child), not the launch mode: `hermes serve` and
-    # `hermes dashboard` are one host role that differ in SPA.
+    # ROLE_DESKTOP_SERVE for a Desktop-owned child), not the launch mode: `qubit serve` and
+    # `qubit dashboard` are one host role that differ in SPA.
     return {"ok": True, "protocolVersion": 1, "pid": os.getpid(),
             "role": getattr(app.state, "host_role", None) or "serve",
             "servesSpa": bool(getattr(app.state, "serves_spa", False))}
@@ -313,7 +313,7 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> di
     runtime = local_runtime
     if runtime is None and remote_health_body and remote_health_body.get("gateway_state"):
         runtime = remote_health_body
-    # Unscoped, the profile is the process's own home (a pooled ``hermes --profile X serve``).
+    # Unscoped, the profile is the process's own home (a pooled ``qubit --profile X serve``).
     own_home = profile_dir or get_process_qubit_home()
     if liveness.runtime is not None:
         # Served by the multiplexer: its record is this profile's runtime, with the profile's own
@@ -355,7 +355,7 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> di
         elif gateway_state in {"running", "degraded", "starting"} and runtime_status_is_stale(runtime):
             # Alive PID, but housekeeping stopped re-stamping the heartbeat: the loop or the
             # housekeeping thread wedged while the file still says 'running' (#113372). Same arm
-            # as ``hermes gateway status`` so the sidebar strip and the CLI agree.
+            # as ``qubit gateway status`` so the sidebar strip and the CLI agree.
             gateway_heartbeat_stale_s = runtime_status_heartbeat_age_s(runtime)
         gateway_platforms = _project_gateway_platforms(
             runtime.get("platforms") or {}, configured, gateway_running, gateway_state)
@@ -408,7 +408,7 @@ def _auth_gate_status() -> dict[str, Any]:
 
 
 def _nous_session_validity() -> str:
-    """Nous bootstrap-session validity for the NAS health sweep: a hosted agent whose Nous
+    """Qubit bootstrap-session validity for the NAS health sweep: a hosted agent whose Qubit
     auth dies terminally looks HEALTHY to every liveness probe yet every inference turn
     fails, and this is the ONLY signal that surfaces it (local auth-store state, no token
     needed). Best-effort: never let auth classification break the probe."""
@@ -502,7 +502,7 @@ def _fts_rebuild_status() -> Optional[dict[str, Any]]:
 #: What the gateway's Webapp answers a caller who has not signed in: liveness, version and the
 #: sign-in shape (the native-app login probe and uptime checks read nothing else). Profile names,
 #: the install id and host figures wait for sign-in, since a Webapp on a wildcard bind is reachable
-#: by everyone on the network. The standalone dashboard keeps its public body: Hermes Cloud reads
+#: by everyone on the network. The standalone dashboard keeps its public body: Qubit Cloud reads
 #: the profile list there without a session (#60585).
 _WEBAPP_SIGNED_OUT_STATUS_KEYS = frozenset({
     "version", "release_date", "gateway_running", "gateway_state", "overall", "components",
@@ -610,7 +610,7 @@ async def get_status(profile: Optional[str] = None,
                              else "degraded")
         await _advisory_pressure(status, profile_dir if profile_dir else get_qubit_home())
 
-        # Profile NAMES and ``gateway_mode`` are low-sensitivity product surface (Hermes Cloud
+        # Profile NAMES and ``gateway_mode`` are low-sensitivity product surface (Qubit Cloud
         # renders the profile list over a gated bind) so they survive the auth gate; the
         # per-gateway ``gateways[]`` carries host ports and stays gated below.
         status["profiles"] = topology["profiles"]
@@ -638,7 +638,7 @@ async def get_status(profile: Optional[str] = None,
 @router.get("/api/system/stats")
 def get_system_stats():  # sync: FastAPI runs it on a worker (psutil.cpu_percent blocks 100 ms)
     """Host + process system stats for the System page (stdlib identity; psutil CPU/memory/
-    disk/uptime when available). Non-sensitive: no env values, no paths beyond hermes home."""
+    disk/uptime when available). Non-sensitive: no env values, no paths beyond qubit home."""
     import platform as _platform
 
     info: dict[str, Any] = {
@@ -725,7 +725,7 @@ async def set_curator_paused(body: CuratorPause, profile: Optional[str] = None):
 
 
 def _spawn_action(argv: list, name: str, prefix: str, profile: Optional[str] = None) -> dict:
-    """Spawn a background ``hermes -p <profile> <argv>`` action; a spawn failure is
+    """Spawn a background ``qubit -p <profile> <argv>`` action; a spawn failure is
     ``500 "<prefix>: <exc>"``."""
     try:
         proc = _spawn_qubit_action(_profile_cli_args(profile) + argv, name)
@@ -796,7 +796,7 @@ async def update_learning_node(body: LearningNodeEdit, profile: Optional[str] = 
         body.profile or profile, lambda: edit_node(body.id, body.content), 400, "edit failed")
 
 
-# Portal — Nous Portal auth + Tool Gateway routing status (read-only).
+# Portal — Qubit Labs auth + Tool Gateway routing status (read-only).
 
 
 @router.get("/api/portal")
@@ -808,7 +808,7 @@ async def get_portal_status(profile: Optional[str] = None):
 
 def _feature_state(feat) -> str:
     if getattr(feat, "managed_by_nous", False):
-        return "via Nous Portal"
+        return "via Qubit Labs"
     if getattr(feat, "active", False):
         return getattr(feat, "current_provider", None) or "active"
     return "not configured"

@@ -205,7 +205,7 @@ def project_plugins_warning(policy):
             return None
     except OSError:  # an unlistable folder skips the optional notice, never the session
         return None
-    return (f'project plugins in {folder} are not loaded: the gateway that runs Hermes sessions does not '
+    return (f'project plugins in {folder} are not loaded: the gateway that runs Qubit sessions does not '
             'load ./.hermes/plugins, so HERMES_ENABLE_PROJECT_PLUGINS has no effect here.')
 
 
@@ -369,7 +369,7 @@ def publish_local_policy(authority, session_id, *, evict=True):
 
 def _lazy_model(authority, policy):
     """The model a not-yet-built session will run: with no provider pinned, the free tier's agent
-    build pins ``nous/welcome`` (``pin_model_for_route``), so the configured default is not it."""
+    build pins ``qubit/welcome`` (``pin_model_for_route``), so the configured default is not it."""
     import json
     model = policy.current_model(authority) if policy else None
     if (policy is None or json.loads(policy.request_json).get('model')

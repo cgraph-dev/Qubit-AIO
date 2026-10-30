@@ -42,7 +42,7 @@ MAX_INACTIVITY_CLEANUP_FAILURES = 3
 
 _active_sessions: dict[str, dict[str, Any]] = {}
 _session_last_activity: dict[str, float] = {}
-# Owner Hermes home per session: the janitor is one process-global thread, so each teardown re-enters the
+# Owner Qubit home per session: the janitor is one process-global thread, so each teardown re-enters the
 # OWNING profile's scope (#86402).
 _session_owner_homes: dict[str, str] = {}
 _cleanup_failures: dict[str, int] = {}  # consecutive janitor failures (#100738)
@@ -75,7 +75,7 @@ def build_browser_env() -> dict:
 # ── Bot Desktop fence ────────────────────────────────────────────────────────────────────────────────
 
 def shares_bot_desktop_browser(session_info: dict[str, Any]) -> bool:
-    """Every LOCAL session is a browser Hermes launched with this profile's Bot Desktop DISPLAY, so it is the
+    """Every LOCAL session is a browser Qubit launched with this profile's Bot Desktop DISPLAY, so it is the
     screen a human who took over is typing into. Cloud / user-supplied CDP sessions are another browser. A
     human lease with the screen already gone still fences (computer_use does the same)."""
     if not (session_info.get("features") or {}).get("local"):
@@ -379,7 +379,7 @@ def _atexit_cleanup() -> None:
     prompt_toolkit key-binding callback corrupts the coroutine state and makes the process unkillable."""
     try:
         from tools.browser_session_lifecycle import emergency_cleanup_all_sessions, stop_cleanup_thread
-    except ImportError:  # half-updated tree mid-`hermes update` (#112437): nothing resolvable to clean
+    except ImportError:  # half-updated tree mid-`qubit update` (#112437): nothing resolvable to clean
         return
     emergency_cleanup_all_sessions()
     stop_cleanup_thread()

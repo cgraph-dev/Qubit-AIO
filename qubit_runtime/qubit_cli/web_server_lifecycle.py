@@ -460,7 +460,7 @@ def _report_port_in_use(host: str, port: int) -> None:
     _write_machine_sentinel_line(_PORT_IN_USE_SENTINEL.format(port=port))
     print(
         f"  Port {port} on {host} is already in use — likely another "
-        "'hermes serve' / 'hermes dashboard' backend or the Hermes gateway. "
+        "'qubit serve' / 'qubit dashboard' backend or the Qubit gateway. "
         "Stop the other process, or pass --port <other> "
         "(--port 0 picks a free ephemeral port).",
         flush=True,
@@ -532,7 +532,7 @@ def _uvicorn_console_logging() -> None:
     ``logging.shutdown()`` on every live handler: a multiplexed gateway's profile log routers are
     already installed when its listener is built, and a closed router stays closed. The listeners
     pass ``log_config=None`` and get uvicorn's handlers here instead: ``uvicorn`` to stderr,
-    ``uvicorn.access`` to stdout, neither propagating into the Hermes log files.
+    ``uvicorn.access`` to stdout, neither propagating into the Qubit log files.
     """
     from uvicorn.config import LOGGING_CONFIG
     from uvicorn.logging import AccessFormatter, DefaultFormatter

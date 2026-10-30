@@ -26,7 +26,7 @@ from .method_ctx import bind_module
 
 def _prepend_tool_paths(env: dict[str, str]) -> dict[str, str]:
     """Prepend managed bin (managed-first policy for the Browser Use CLI), venv bin and
-    ~/.local/bin to PATH so slash_worker children resolve Hermes-managed CLIs under the Desktop's minimal PATH.
+    ~/.local/bin to PATH so slash_worker children resolve Qubit-managed CLIs under the Desktop's minimal PATH.
     The PM store dirs go in front of all of them: a user's node/uv in ~/.local/bin never wins."""
     managed_bin = ""
     with contextlib.suppress(Exception):
@@ -58,7 +58,7 @@ class _SlashWorker:
             + (["--provider", provider] if provider else [])
         self._closed = False
         from qubit_cli._subprocess_compat import windows_hide_flags
-        # slash_worker runs the Hermes agent → needs provider credentials. Tier-1 secrets
+        # slash_worker runs the Qubit agent → needs provider credentials. Tier-1 secrets
         # (gateway/GitHub/infra) are still stripped (#29157). Global-remote / multi-profile sessions: the
         # worker must resolve config/skills/state against the session's profile home, not the gateway's
         # launch QUBIT_HOME (#40677).
@@ -68,7 +68,7 @@ class _SlashWorker:
         # The worker runs the agent → needs provider credentials; tier-1 secrets (gateway/GitHub/
         # infra) are still stripped. A served profile's worker gets THAT profile's home + secrets and
         # none of the launch profile's .env / TERMINAL_* residue, exactly what a standalone
-        # `hermes -p X` would load itself. The launch profile is a profile too: once the process hosts
+        # `qubit -p X` would load itself. The launch profile is a profile too: once the process hosts
         # a second home (multiplex flipped), its worker must name its own home or the fail-closed
         # no-target/no-scope path raises UnscopedSecretError (#115427).
         env = _prepend_tool_paths(served_profile_child_env(
@@ -85,8 +85,8 @@ class _SlashWorker:
         # a quick command's shell, and anything else the worker started in its group, running forever.
         # errors="replace": bytes invalid in the system locale (GBK Windows) must not raise
         # UnicodeDecodeError in the drain threads.
-        # Prepend the Hermes venv bin dir and the user-local bin dir to PATH so slash_worker child processes
-        # can resolve Hermes-managed CLIs (browser-use, uvx) even when the parent gateway was launched with
+        # Prepend the Qubit venv bin dir and the user-local bin dir to PATH so slash_worker child processes
+        # can resolve Qubit-managed CLIs (browser-use, uvx) even when the parent gateway was launched with
         # a minimal PATH (e.g. by the Desktop/Dashboard app). See #83845.
         self.proc = spawn_owned(
             argv, purpose="slash-worker", stdin=subprocess.PIPE, stdout=subprocess.PIPE,

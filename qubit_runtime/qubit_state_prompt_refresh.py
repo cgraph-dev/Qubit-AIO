@@ -1,4 +1,4 @@
-"""Operator-requested system prompt refresh epochs (``hermes sessions refresh-prompts``).
+"""Operator-requested system prompt refresh epochs (``qubit sessions refresh-prompts``).
 
 A continuing session replays its stored system prompt every turn so the provider prefix cache
 stays warm. After an operator updates the profile's prompt sources (SOUL.md, skills, project

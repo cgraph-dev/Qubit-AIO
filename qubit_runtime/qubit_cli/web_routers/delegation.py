@@ -2,7 +2,7 @@
 routes under ``delegation.backends.<name>``.
 
 The settings shapes are the ones the official advanced-delegation plugin reads (``model_map``:
-named model routes; ``profile_routes``: Hermes profiles subagents may run as). Writes replace one
+named model routes; ``profile_routes``: Qubit profiles subagents may run as). Writes replace one
 backend's block wholesale through the same profile scope + config lock every config route uses, so
 deleting a route really deletes it (``PUT /api/config`` deep-merges and cannot drop a key).
 """

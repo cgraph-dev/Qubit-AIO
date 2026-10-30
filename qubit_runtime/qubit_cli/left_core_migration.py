@@ -6,20 +6,20 @@ plugin keeps its names, config keys and env vars, so migrating is only "install 
 contract is the one memory providers established (``memory_provider_migration``, whose helpers this
 reuses; memory is not a row because its plugin name comes from ``memory.provider``, not a table):
 
-* ``hermes update`` installs the plugin for every profile home sharing the venv that uses the feature.
+* ``qubit update`` installs the plugin for every profile home sharing the venv that uses the feature.
 * Agent start and gateway start retry once per process for the active home (Desktop users update
-  through the app and never run ``hermes update``), honouring ``security.allow_lazy_installs``.
+  through the app and never run ``qubit update``), honouring ``security.allow_lazy_installs``.
 * After a failed attempt (catalog miss or unreachable, failed install) starts skip the row for
   an hour, doubling with each further failure up to a week, so an offline
-  machine pays the network round trip once, not on every ``hermes chat``, and a home whose install
-  cannot succeed stops failing every hour; ``hermes update`` always retries.
+  machine pays the network round trip once, not on every ``qubit chat``, and a home whose install
+  cannot succeed stops failing every hour; ``qubit update`` always retries.
 * A home gets the plugin automatically at most once (``_left_core_installed`` in its config.yaml):
-  ``hermes plugins remove`` afterwards is the user's choice and sticks.
+  ``qubit plugins remove`` afterwards is the user's choice and sticks.
 
 Installs go through the normal catalog install path at the reviewed pin (kill list, dependency
 constraints, enable). Unattended dependency consent covers only these rows: the feature shipped in
 core, so its users already accepted its dependencies. Agent/gateway start always installs with it
-(nothing can answer a prompt there); ``hermes update`` in a terminal still asks. Every outcome
+(nothing can answer a prompt there); ``qubit update`` in a terminal still asks. Every outcome
 reaches the user (terminal, Desktop, chat); an outcome no terminal shows waits in the home for its next
 turn someone sees (:func:`claim_kept_notices`).
 """
@@ -42,7 +42,7 @@ from qubit_cli.memory_provider_migration import (
 
 logger = logging.getLogger(__name__)
 
-# ``terminal.*`` keys a left-core plugin still reads -> the ``.env`` copy core's ``hermes config set`` also
+# ``terminal.*`` keys a left-core plugin still reads -> the ``.env`` copy core's ``qubit config set`` also
 # wrote. Not in DEFAULT_CONFIG (a seeded default would hide the plugin's env fallback), so ``config
 # set/get`` recognise them here, and ``config unset`` removes that copy too: the plugin falls back to it,
 # and the old value would return instead of the default.
@@ -128,7 +128,7 @@ def _auth_store(home: Path) -> dict:
 
 def spotify_in_use(home: Path, *, process_env: bool = False) -> bool:
     """What made core's Spotify tools usable for *home*: a login stored in its ``auth.json``
-    (``providers.spotify``, written by ``hermes auth spotify``) or the ``spotify`` toolset selected
+    (``providers.spotify``, written by ``qubit auth spotify``) or the ``spotify`` toolset selected
     for a platform. The tools were opt-in and login-gated, so a client id alone is not use."""
     providers = _auth_store(home).get("providers")
     state = providers.get("spotify") if isinstance(providers, dict) else None
@@ -197,7 +197,7 @@ def singularity_in_use(home: Path, *, process_env: bool = False) -> bool:
 
 
 def agent_imports_in_use(home: Path, *, process_env: bool = False) -> bool:
-    """*home* registered a ``hermes import-agent`` source for ``--sync`` (its ``import-sync.json``,
+    """*home* registered a ``qubit import-agent`` source for ``--sync`` (its ``import-sync.json``,
     which scheduled syncs read). A one-shot import leaves no other trace, and installing the plugin
     for every home would add a command nobody asked for; the old spelling names the install."""
     return (home / "import-sync.json").is_file()
@@ -349,8 +349,8 @@ def copilot_in_use(home: Path, *, process_env: bool = False) -> bool:
 def copilot_relogin_notice(home: Path, *, process_env: bool = False) -> str:
     """The Copilot API provider is in use in *home* with no token the plugin reads: no
     COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN in its dotenv layers (process env too for the launch home
-    with *process_env*) and no Hermes login in its ``auth.json`` (a ``manual`` credential-pool row from
-    ``hermes auth add copilot``, or ``providers.copilot``). Core also took ``gh auth token`` and the
+    with *process_env*) and no Qubit login in its ``auth.json`` (a ``manual`` credential-pool row from
+    ``qubit auth add copilot``, or ``providers.copilot``). Core also took ``gh auth token`` and the
     GitHub/Copilot CLI's token files, which the plugin does not; read-only, never runs ``gh``."""
     if not providers_selected(home, _COPILOT_API, process_env=process_env):
         return ""
@@ -367,7 +367,7 @@ def copilot_relogin_notice(home: Path, *, process_env: bool = False) -> str:
     if isinstance(providers, dict) and isinstance(providers.get("copilot"), dict) and providers["copilot"]:
         return ""
     return ("This profile's Copilot login came from `gh auth token` or the GitHub/Copilot CLI, which the plugin "
-            "no longer reads: run `hermes auth add copilot` to sign in.")
+            "no longer reads: run `qubit auth add copilot` to sign in.")
 
 
 def _no_notice(home: Path, *, process_env: bool = False) -> str:
@@ -391,7 +391,7 @@ class LeftCoreFeature:
     # platform whose known_plugin_toolsets does not name it, so :func:`_record_migration` records
     # them there wherever core had them off.
     toolsets: tuple[str, ...] = ()
-    # Platforms whose core default composite (``hermes-<platform>``) never carried those toolsets.
+    # Platforms whose core default composite (``qubit-<platform>``) never carried those toolsets.
     off_platforms: tuple[str, ...] = ()
     # Core-era toolsets the plugin's toolsets replace while core keeps the name for something else
     # (core's ``browser`` is browser_exec now; Camofox's tools live in the plugin's ``camofox``). The
@@ -407,20 +407,20 @@ class LeftCoreFeature:
     # prefixes it shared with the feature's tools (stripped only when the source runs the adapter).
     enable_env: tuple[str, ...] = ()
     channel_env_prefixes: tuple[str, ...] = ()
-    # Top-level command the plugin registers in place of core's ``hermes auth <cli>`` login
-    # (``hermes <cli> login|status|logout``); :func:`moved_command_hint` points the old spelling at it.
+    # Top-level command the plugin registers in place of core's ``qubit auth <cli>`` login
+    # (``qubit <cli> login|status|logout``); :func:`moved_command_hint` points the old spelling at it.
     cli: str = ""
-    # Top-level command the plugin registers: core's own command kept under its name (``hermes
-    # import-agent``), or in place of core's nested ``old_command`` (``hermes mcp serve`` -> ``hermes
+    # Top-level command the plugin registers: core's own command kept under its name (``qubit
+    # import-agent``), or in place of core's nested ``old_command`` (``qubit mcp serve`` -> ``qubit
     # mcp-serve``); :func:`moved_command_hint` points the old spelling at it.
     command: str = ""
     old_command: str = ""
-    # Other top-level commands core shipped that the same plugin now registers (``hermes claw``, the
-    # OpenClaw migration's spelling before ``hermes import-agent openclaw``); hinted like *command*.
+    # Other top-level commands core shipped that the same plugin now registers (``qubit claw``, the
+    # Qubit migration's spelling before ``qubit import-agent qubit``); hinted like *command*.
     old_cli: tuple[str, ...] = ()
     # Key of the bundled plugin core shipped (``observability/langfuse``). It stays an alias of the
     # catalog plugin in ``plugins.enabled`` / ``plugins.disabled`` (the loader's gate, an
-    # administrator's pinned list) and for every `hermes plugins <verb>` (:func:`legacy_plugin_alias`).
+    # administrator's pinned list) and for every `qubit plugins <verb>` (:func:`legacy_plugin_alias`).
     plugin_key: str = ""
     # ``terminal.backend`` value the plugin registers: unknown-backend errors name the install command.
     terminal_backend: str = ""
@@ -435,7 +435,7 @@ class LeftCoreFeature:
     # never resolve through another rung (the models.dev catalog) while the plugin is not loaded.
     providers: tuple[str, ...] = ()
     # Env names the plugin's providers read that core kept profile-managed: scrubbed when inherited but
-    # absent from the profile's .env (env_loader._PROFILE_MANAGED_ENV_KEYS) and routed to .env by `hermes
+    # absent from the profile's .env (env_loader._PROFILE_MANAGED_ENV_KEYS) and routed to .env by `qubit
     # config set` (config._EXTRA_ENV_KEYS). Read statically: env_loader runs before provider discovery.
     profile_env: tuple[str, ...] = ()
     # The subset of those names that choose an executable or its argv: the generic env writers refuse them
@@ -464,7 +464,7 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
     LeftCoreFeature(
         plugin="spotify", label="Spotify", in_use=spotify_in_use,
         unchanged="your Spotify login, the spotify toolset and the spotify_* tools are unchanged; "
-                  "`hermes auth spotify` is now `hermes spotify login`",
+                  "`qubit auth spotify` is now `qubit spotify login`",
         cli="spotify",
     ),
     LeftCoreFeature(
@@ -476,11 +476,11 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
         plugin_key="observability/langfuse",
     ),
     LeftCoreFeature(
-        # MCP clients that launch `hermes mcp serve` are configured outside Hermes, so no home shows the
+        # MCP clients that launch `qubit mcp serve` are configured outside Qubit, so no home shows the
         # feature in use: nothing installs automatically, and the old spelling prints where it went.
-        plugin="mcp-serve", label="Hermes as an MCP server", in_use=lambda home, **_: False,
+        plugin="mcp-serve", label="Qubit as an MCP server", in_use=lambda home, **_: False,
         unchanged="the conversation tools keep their names; MCP clients change their args to [\"mcp-serve\"]",
-        command="mcp-serve", old_command="hermes mcp serve",
+        command="mcp-serve", old_command="qubit mcp serve",
     ),
     LeftCoreFeature(
         # CAMOFOX_URL is an address, not a credential: core kept it out of children only through its
@@ -500,15 +500,15 @@ LEFT_CORE: tuple[LeftCoreFeature, ...] = (
         terminal_backend="singularity",
     ),
     LeftCoreFeature(
-        plugin="agent-importers", label="`hermes import-agent`", in_use=agent_imports_in_use,
-        unchanged="`hermes import-agent`, its flags and your import-sync.json sync sources are unchanged",
+        plugin="agent-importers", label="`qubit import-agent`", in_use=agent_imports_in_use,
+        unchanged="`qubit import-agent`, its flags and your import-sync.json sync sources are unchanged",
         command="import-agent", old_cli=("claw",),
     ),
     LeftCoreFeature(
         # Core kept COPILOT_GITHUB_TOKEN and the two base-URL overrides out of children as provider env
         # (Tier 2: credentialed CLIs still get them); GH_TOKEN/GITHUB_TOKEN stay on core's static lists.
         plugin="github-copilot", label="GitHub Copilot", in_use=copilot_in_use,
-        unchanged="your COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN and `hermes auth add copilot` logins, model "
+        unchanged="your COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN and `qubit auth add copilot` logins, model "
                   "names and copilot-acp settings are unchanged",
         private_env=("COPILOT_GITHUB_TOKEN", "COPILOT_API_BASE_URL", "COPILOT_ACP_BASE_URL"),
         providers=_COPILOT_API + _COPILOT_ACP, hosts=("githubcopilot.com", "models.github.ai"),
@@ -548,7 +548,7 @@ def provider_install_hint(name: str) -> str:
     """For a provider name nothing resolves to that a left-core plugin supplies: the sentence naming its
     install command for the active home (its enable command when installed but disabled; its load error and
     update command when installed but it failed to load), else ``""``.
-    Appended to every "unknown provider" error (runtime resolution, ``/model``, ``hermes model``, ``hermes
+    Appended to every "unknown provider" error (runtime resolution, ``/model``, ``qubit model``, ``qubit
     auth add``)."""
     feature = _provider_feature(name)
     if feature is None:
@@ -565,7 +565,7 @@ def provider_install_hint(name: str) -> str:
     error = _load_error(feature)
     return (f"{feature.label} moved out of core into the '{feature.plugin}' plugin, which is installed but failed "
             f"to load{f' ({error})' if error else ''}: run `{command.replace(' install ', ' update ')}`, or "
-            f"see `hermes logs` for the cause.")
+            f"see `qubit logs` for the cause.")
 
 
 def _load_error(feature: LeftCoreFeature) -> str:
@@ -604,7 +604,7 @@ def recover_for_provider(name: Optional[str]) -> None:
     """Runtime resolution of *name*, a provider a left-core plugin supplies, in a home that uses it and lacks
     the plugin: run :func:`recover_at_startup` now. The CLI and Desktop resolve the provider before the agent
     (whose start runs the migration) exists, so they would otherwise stop at "unknown provider" on a home no
-    ``hermes update`` migrated. Outcomes print in a declared terminal front end (:func:`serve_notices_on_stderr`),
+    ``qubit update`` migrated. Outcomes print in a declared terminal front end (:func:`serve_notices_on_stderr`),
     else wait for the home's next turn someone sees."""
     from qubit_constants import get_qubit_home, qubit_home_key
     from providers import get_provider_profile
@@ -617,7 +617,7 @@ def recover_for_provider(name: Optional[str]) -> None:
         return
     # A terminal front end shows outcomes now, also those another process (the gateway this CLI started) kept;
     # otherwise (Desktop, gateway, a detached turn) the home's next watched turn in any process gets them. Never
-    # inferred from a TTY: a foreground `hermes gateway run` has one, and its resolutions serve the chat user.
+    # inferred from a TTY: a foreground `qubit gateway run` has one, and its resolutions serve the chat user.
     say = (lambda message: print(message, file=sys.stderr)) if _terminal_front_end else None
     if say is not None:
         for message in _claim_notices(home):
@@ -635,7 +635,7 @@ _terminal_front_end = False
 
 def serve_notices_on_stderr() -> None:
     """This process is a terminal front end (the classic CLI, whose turns run in the gateway): outcomes of
-    :func:`recover_for_provider` print to its stderr, also when its output is piped (``hermes chat -q``),
+    :func:`recover_for_provider` print to its stderr, also when its output is piped (``qubit chat -q``),
     since a resolution that fails before any agent exists (no credentials) leaves no agent to deliver them.
     Only a declaration counts: a foreground gateway has a TTY too, and its outcomes belong to the chat user."""
     global _terminal_front_end
@@ -664,9 +664,9 @@ def legacy_plugin_keys(plugin: str) -> set[str]:
 
 
 def moved_command_hint(prog: str, value: str, action: str = "") -> str:
-    """For a command a left-core plugin took over: ``hermes auth [<action>] <cli>`` (core's old login
-    spelling), core's old nested spelling (``hermes mcp serve``), or the plugin's own ``hermes <cli>`` /
-    ``hermes <command>`` / ``hermes <old_cli>`` while the plugin is not loaded, the line saying where it
+    """For a command a left-core plugin took over: ``qubit auth [<action>] <cli>`` (core's old login
+    spelling), core's old nested spelling (``qubit mcp serve``), or the plugin's own ``qubit <cli>`` /
+    ``qubit <command>`` / ``qubit <old_cli>`` while the plugin is not loaded, the line saying where it
     went and how to get it for the active home, else ``""``."""
     from qubit_constants import get_qubit_home
     home = Path(get_qubit_home())
@@ -675,10 +675,10 @@ def moved_command_hint(prog: str, value: str, action: str = "") -> str:
         present = plugin_present(moved.plugin, home)
         get = "" if present else f" Install it with: `{_install_command(moved.plugin, home)}`."
         return (f"{moved.label} moved out of core into the '{moved.plugin}' plugin: `{moved.old_command}` is now "
-                f"`hermes {moved.command}`.{get}")
-    if prog == "hermes auth":
+                f"`qubit {moved.command}`.{get}")
+    if prog == "qubit auth":
         feature = next((f for f in LEFT_CORE if f.cli and f.cli == value), None)
-    elif prog == "hermes":
+    elif prog == "qubit":
         feature = next((f for f in LEFT_CORE if value and value in (f.cli, f.command, *f.old_cli)), None)
     else:
         feature = None
@@ -688,12 +688,12 @@ def moved_command_hint(prog: str, value: str, action: str = "") -> str:
     if not plugin_present(feature.plugin, home):
         get = f" Install it with: `{install}`."
     else:
-        get = f" Enable it with: `{install.replace(' install ', ' enable ')}`." if prog == "hermes" else ""
-    if prog == "hermes auth":
-        old = " ".join(p for p in ("hermes auth", action, value) if p)
+        get = f" Enable it with: `{install.replace(' install ', ' enable ')}`." if prog == "qubit" else ""
+    if prog == "qubit auth":
+        old = " ".join(p for p in ("qubit auth", action, value) if p)
         return (f"{feature.label} moved out of core into the '{feature.plugin}' plugin: `{old}` is now "
-                f"`hermes {value} {action or 'login'}`.{get}")
-    label = f"`hermes {value}`" if value in feature.old_cli else feature.label
+                f"`qubit {value} {action or 'login'}`.{get}")
+    label = f"`qubit {value}`" if value in feature.old_cli else feature.label
     return f"{label} moved out of core into the '{feature.plugin}' plugin, which is not loaded.{get}"
 
 
@@ -711,7 +711,7 @@ _installs_held: ContextVar[bool] = ContextVar("left_core_installs_held", default
 
 @contextmanager
 def installs_held():
-    """No migration attempt inside (a read-only diagnostic such as ``hermes doctor``, whose provider checks run
+    """No migration attempt inside (a read-only diagnostic such as ``qubit doctor``, whose provider checks run
     the runtime resolver): the unknown-provider and host hints still name the install command."""
     token = _installs_held.set(True)
     try:
@@ -778,7 +778,7 @@ def _claim_notices(home: Path) -> list[str]:
     for line in dict.fromkeys(lines):
         try:
             messages.append(str(json.loads(line)))
-        except ValueError:  # a line from outside Hermes: skip it only
+        except ValueError:  # a line from outside Qubit: skip it only
             continue
     return messages
 
@@ -796,11 +796,11 @@ def plugin_present(plugin: str, home: Path) -> bool:
 
 def _core_carried(feature: LeftCoreFeature, selection: list) -> bool:
     """Whether core resolved *feature*'s toolsets on for a platform selecting *selection*: named
-    directly, or through a ``hermes`` / ``hermes-<platform>`` composite that included them."""
+    directly, or through a ``qubit`` / ``qubit-<platform>`` composite that included them."""
     def carries(name: str) -> bool:
         if name in feature.toolsets or name in feature.replaces_toolsets or name == "hermes":
             return True
-        return name.startswith("hermes-") and name[len("hermes-"):].replace("-", "_") not in feature.off_platforms
+        return name.startswith("qubit-") and name[len("qubit-"):].replace("-", "_") not in feature.off_platforms
     return any(carries(str(name)) for name in selection)
 
 
@@ -828,7 +828,7 @@ def record_core_use(home: Path, config: dict, version: int) -> bool:
 def _predates_split(home: Path, feature: LeftCoreFeature) -> bool:
     """*home* ran *feature* in core: its config is still below ``left_at`` (this pass ran before the
     config step), that step recorded the feature in use, or config.yaml is missing or unstamped. Every
-    config.yaml Hermes writes carries a stamp, and the first save that stamps one records the rows in use
+    config.yaml Qubit writes carries a stamp, and the first save that stamps one records the rows in use
     (``config_version_stamp.note_first_stamp``), so only a home from before the split lacks it; core ran
     the feature there from its .env alone."""
     if not feature.left_at:
@@ -888,7 +888,7 @@ def _record_migration(home: Path, feature: LeftCoreFeature) -> None:
     conversion per home and row, independent of installation: a plugin installed before the update
     (it stays inert on a core that still ships the feature) still needs it. Completion is marked
     under ``_left_core_scoped`` so a later run never undoes a choice the user made since
-    (``hermes tools``). Raises when config.yaml cannot be read or written."""
+    (``qubit tools``). Raises when config.yaml cannot be read or written."""
     from qubit_cli.config import atomic_config_write, read_user_config_raw
     from qubit_cli.config_backend import config_exists
     from qubit_cli.toolset_validation import parse_platform_toolsets_value
@@ -958,19 +958,19 @@ def _pending(home: Path, *, say: Callable[[str], None], process_env: bool = Fals
             _record_migration(home, feature)
         except Exception as exc:
             say(f"  ⚠ {feature.label} moved out of core into the '{feature.plugin}' plugin: its per-platform "
-                f"toolset selection could not be kept ({exc}). Check `hermes tools`"
+                f"toolset selection could not be kept ({exc}). Check `qubit tools`"
                 + ("." if present else f" and run `{_install_command(feature.plugin, home)}`."))
             continue
         if present:
             continue
         if backoff and _failed_recently(home, feature.plugin):
-            logger.info("%s plugin install failed recently for %s; retrying later or on `hermes update`",
+            logger.info("%s plugin install failed recently for %s; retrying later or on `qubit update`",
                         feature.label, home)
             continue
         if catalog_source(feature.plugin) is None:
             _note_failure(home, feature.plugin)
             say(_noticed(f"  ⚠ {feature.label} moved out of core into the '{feature.plugin}' plugin, which this "
-                         f"Hermes cannot find in the plugin catalog yet. Run "
+                         f"Qubit cannot find in the plugin catalog yet. Run "
                          f"`{_install_command(feature.plugin, home)}` once it is listed.", home, feature, process_env))
             continue
         out.append(feature)
@@ -1052,7 +1052,7 @@ def migrate_home(home: Path, *, install: Callable[[str], dict], say: Callable[[s
 
 
 def migrate_all_homes(*, say: Callable[[str], None] = print) -> list[str]:
-    """``hermes update`` hook: every profile home sharing this venv. Grouped by plugin and each home's
+    """``qubit update`` hook: every profile home sharing this venv. Grouped by plugin and each home's
     unattended consent like the memory migration: homes of one group share dependency answers, and a
     failure names the rest of its group in one line instead of failing them one by one."""
     from qubit_cli.plugins_cmd_install import shared_dependency_answers
@@ -1097,7 +1097,7 @@ def migrate_all_homes(*, say: Callable[[str], None] = print) -> list[str]:
                     break
     except KeyboardInterrupt:
         say("  ⚠ Plugin migration cancelled. Profiles already migrated keep their plugin; run "
-            "`hermes plugins install <name>` (with `-p <profile>`) for the rest.")
+            "`qubit plugins install <name>` (with `-p <profile>`) for the rest.")
     return installed
 
 
@@ -1163,7 +1163,7 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None, gateway_s
         if not lazy_installs_allowed():
             for feature in features:
                 report(_noticed(f"⚠ {feature.label} moved out of core and its '{feature.plugin}' plugin is not "
-                                f"installed, so it is off. security.allow_lazy_installs is off, so Hermes did not "
+                                f"installed, so it is off. security.allow_lazy_installs is off, so Qubit did not "
                                 f"fetch it: run `{_install_command(feature.plugin, home)}`.", home, feature, True))
             return []
         installed = []
@@ -1174,7 +1174,7 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None, gateway_s
             if _install_one(home, feature, install=_install_into(home, consent=True), say=report, process_env=True):
                 installed.append(feature.plugin)
                 if not gateway_start and feature.platform and _gateway_serves(home):
-                    report(f"Restart the gateway (`hermes gateway restart`) so it serves {feature.label}.")
+                    report(f"Restart the gateway (`qubit gateway restart`) so it serves {feature.label}.")
         return installed
     except Exception as exc:  # never take agent/gateway start down
         logger.warning("left-core plugin migration failed: %s", exc, exc_info=True)
@@ -1182,11 +1182,11 @@ def recover_at_startup(*, say: Optional[Callable[[str], None]] = None, gateway_s
 
 
 def recover_for_command(name: Optional[str]) -> None:
-    """``hermes <name>`` names a command a left-core plugin registers, and the active home uses that
+    """``qubit <name>`` names a command a left-core plugin registers, and the active home uses that
     feature but lacks the plugin: run :func:`recover_at_startup` now, before plugin commands are
     discovered, so the command it installs runs in this same invocation. A home nothing migrated yet
-    (a Docker image swap runs no ``hermes update``) whose only Hermes process is a scheduled
-    ``hermes import-agent --sync`` never starts an agent or a gateway to do it."""
+    (a Docker image swap runs no ``qubit update``) whose only Qubit process is a scheduled
+    ``qubit import-agent --sync`` never starts an agent or a gateway to do it."""
     from qubit_constants import get_qubit_home
     home = Path(get_qubit_home())
     if any(name and name in (f.cli, f.command, *f.old_cli) and not plugin_present(f.plugin, home)
