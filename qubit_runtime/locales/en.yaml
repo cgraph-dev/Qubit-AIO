@@ -700,6 +700,9 @@ gateway:
     history_unavailable: "⚠️ This session's history is temporarily unavailable, so this message was not processed. Ask the operator to inspect state.db, then resend after it is healthy. Use /reset only if you intentionally want to start a new conversation."
     no_credentials: "⚠️ I couldn't connect to the AI model service, so this message wasn't processed. Use /login to sign in again, or /model to pick a different model. If it keeps failing, run `qubit doctor` on the host."
 
+    cron_session_read_only: ⚠️ This chat belongs to a scheduled job and only runs that job, so your message was not run. Start a new chat to send it.
+    launch_credentials_unavailable: ⚠️ This chat can't use the API key it was started with any more{detail}, so nothing can run in it. An open chat never switches to a different key on its own, so /retry fails the same way. Use /new to start a new chat on your current key.
+    workspace_unavailable: ⚠️ This chat's working folder no longer exists ({path}), so your message was not run. Recreate the folder, or move the chat to another one (`/worktree new` in the CLI, Move to project in the desktop app), then send your message again.
   skills:
     disabled: "The **{name}** skill is installed but disabled.\nEnable it with: `qubit skills config`"
     not_installed: "The **{name}** skill is available but not installed.\nInstall it with: `qubit skills install {install_name}`"
@@ -991,6 +994,9 @@ gateway:
   login:
     free_tier_remaining: "\nSome chats are still on the free tier; use /model in those chats to switch."
 
+  discard:
+    done: 🗑️ Discarded {count} lost turn(s); they were not re-run. Your saved messages will be answered now.
+    nothing: 'Nothing to discard: this chat has no turn lost in a restart.'
 platform:
   whatsapp:
     clarify_other_title: "✏️ Other"
@@ -1047,6 +1053,8 @@ platform:
       resolved_session: "Approved for session"
       resolved_always: "Approved permanently"
       resolved_deny: "Denied"
+      click_failed: ⚠️ Couldn't record your choice. Click again, or answer with /approve or /deny.
+      no_longer_pending: ⌛ This approval is no longer pending (it timed out or was answered elsewhere)
     slash_confirm:
       already_resolved: "This prompt has already been resolved~"
       approve_once: "Approve Once"
@@ -1932,6 +1940,20 @@ cli:
     used_this_month: "{spent} of {limit} used this month{ceiling}"
     monthly_limit_read_only: "The monthly limit is set on the portal — the terminal shows it read-only."
 
+    keep_going_choice: Keep going on credits
+    keep_going_confirm_body: 'Use your credits when included usage runs out. Off: Qubit waits for the reset.'
+    keep_going_confirm_title: Keep going on credits?
+    keep_going_desc: use your credits when included usage runs out
+    keep_going_is_on_title: Keep going on credits is on
+    keep_going_keep_off_desc: 'keep it off: Qubit waits for the reset'
+    keep_going_leave_on: Leave it on
+    keep_going_off_line: 'Keep going on credits: off (Qubit waits for the reset)'
+    keep_going_on_line: 'Keep going on credits: on (uses your credits when included usage runs out)'
+    keep_going_turn_off: Turn it off
+    keep_going_turn_off_desc: Qubit waits for the reset
+    keep_going_turn_on: Turn on
+    keep_going_turned_off: '✅ Keep going on credits: off. Qubit waits for the reset.'
+    keep_going_turned_on: '✅ Keep going on credits: on. Uses your credits when included usage runs out.'
   subscription:
     load_failed_label: "Could not load subscription"
     team_header: "Team subscription"
@@ -2079,6 +2101,7 @@ cli:
     could_not_load_config: "❌ could not load config: {error}"
     tip_reset_new_session: "Tip: `/reset` starts a new session immediately."
 
+    confirm_choice_prompt: 'Choice [1/2]: '
   single_query:
     query_label: "Query:"
     kanban_run_reclaimed: "kanban: this worker's run was reclaimed before it started; exiting"
@@ -2092,9 +2115,9 @@ cli:
     label_disabled: "disabled"
     label_yes: "yes"
     label_no: "no"
-    label_on:                 "on"
-    label_off:                "off"
-    label_on_upper:          "ON"
+    label_on: "on"
+    label_off: "off"
+    label_on_upper: "ON"
     label_off_upper: "OFF"
     label_value: "{label}: {value}"
     just_now: "just now"
@@ -2466,6 +2489,14 @@ cli:
     move_out_of_range: "Queue move out of range. Current size: {size}"
     moved: "Moved queue item {source} to {destination}."
     usage_add: "Usage: /queue add <prompt>"
+    already_started: Queue item {index} already started; it runs as it was sent.
+    change_unknown: The gateway did not answer about queue item {index} ({error}); check /queue list before trying again.
+    edit_refused: 'Could not edit queue item {index}: {error}'
+    gateway_refused: 'The gateway did not queue it: {error}. Nothing was queued; send it again when the turn ends.'
+    move_gateway_fifo: The gateway runs queued prompts in the order they were sent; edit or remove one instead.
+    remove_refused: 'Could not remove queue item {index}: {error}'
+    started_stopped: Queue item {index} had already started; the gateway stopped it.
+    submit_unknown: The gateway did not answer ({error}), so the prompt may already be queued. Check /queue list before sending it again.
   reload:
     env_reloaded: "Reloaded .env ({count} var(s) updated)"
   steer:
@@ -3403,6 +3434,27 @@ cli:
     clean_up_manually: "To clean up manually: git worktree remove --force {path}"
     cleaned_up: "✓ Worktree cleaned up: {path}"
 
+    archive_failed: '✗ Could not archive {path}, keeping it: {error}'
+    archived: '✓ Worktree archived to {ref} and removed: {path}'
+    archived_kept: '✓ Worktree archived to {ref} but kept ({reason}): {path}'
+    archiving: Archiving {path} … (this can take a while for a large tree)
+    discarded: 'Worktree removed and its changes discarded: {path}'
+    exit_choice_archive: Archive and remove it (restorable)
+    exit_choice_discard: Remove it and discard the changes
+    exit_choice_keep: Keep the worktree (default)
+    restore_hint: 'Restore it with: qubit worktree restore {name}'
+    sweep_archived_kept: archived, kept ({reason}) → {ref}
+    sweep_archived_removed: archived + removed → {ref}
+  modern:
+    hint_commands: commands
+    hint_files: files
+    hint_queue: queue
+    hint_shell: shell
+    hint_stop: stop
+    preparing: Preparing {what}…
+    thought: Thought
+    thought_for: Thought for {seconds}s
+    working: Working…
 display:
   # Tool verbs, spinner/progress text, completion rows and failure suffixes (agent/display.py).
   # ``verb.<tool>`` is resolved at call time by get_tool_verb(); the connector joins verb + preview.
