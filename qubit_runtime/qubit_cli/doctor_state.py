@@ -709,8 +709,8 @@ def _check_plugins_in_both_lists(should_fix: bool, f: Finding) -> None:
     for name in both:
         check_warn(f"{name} will not load", "(plugins.disabled wins)")
         f.manual_issues.append(f"Plugin '{name}' is in both plugins.enabled and plugins.disabled, so it is off. "
-                               f"Turn it on with `hermes plugins enable {name}` (a memory provider also needs "
-                               f"memory.provider set), or keep it off with `hermes plugins disable {name}`")
+                               f"Turn it on with `qubit plugins enable {name}` (a memory provider also needs "
+                               f"memory.provider set), or keep it off with `qubit plugins disable {name}`")
 
 
 @doctor_check("")  # best-effort: profile enumeration must never break doctor

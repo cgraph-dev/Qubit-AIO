@@ -68,7 +68,7 @@ def resolve_memory_provider(name: str, say=None):
         if provider is None and find_provider_dir(name) is not None:
             _warn_once(name, f"⚠ Memory provider '{name}' is installed but failed to load, so external memory is off "
                              "for this session (built-in memory still works). The log names the error; "
-                             "`hermes memory status` shows the plugin's state.", say=say, kind="load")
+                             "`qubit memory status` shows the plugin's state.", say=say, kind="load")
     if provider is None or provider.is_available():
         return provider
     if _unavailable_warning_key(name) not in _warned_unavailable_providers:

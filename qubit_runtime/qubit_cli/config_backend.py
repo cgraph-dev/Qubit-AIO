@@ -125,7 +125,7 @@ class ConfigBackend(Protocol):
         ...
 
     def doctor_warnings(self, home: Path) -> tuple:
-        """``(warning, hint, issue)`` triples ``hermes doctor`` reports after a successful read."""
+        """``(warning, hint, issue)`` triples ``qubit doctor`` reports after a successful read."""
         ...
 
     def apply_in_memory(self, home: Path, doc: dict) -> None:

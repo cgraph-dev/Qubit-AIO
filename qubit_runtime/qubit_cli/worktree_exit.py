@@ -1,4 +1,4 @@
-"""The keep / archive / discard question when an interactive ``hermes -w`` session exits with a
+"""The keep / archive / discard question when an interactive ``qubit -w`` session exits with a
 dirty or unpushed worktree.
 
 Asked once, in the foreground, after the UI released the terminal: by the classic CLI in

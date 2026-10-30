@@ -205,7 +205,7 @@ def _listener_socket(family, kind, proto, port: int, *, dual_stack: bool = False
 
 def _listener_public_url(webapp) -> str | None:
     """The public URL the listener answers to: the Webapp's own ``webapp.public_url`` ("" for none),
-    never ``dashboard.public_url``, which describes ``hermes dashboard``. None leaves main's listener
+    never ``dashboard.public_url``, which describes ``qubit dashboard``. None leaves main's listener
     reading ``dashboard.public_url``."""
     return None if webapp is None else webapp.public_url
 

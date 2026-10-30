@@ -390,7 +390,7 @@ def _refresh_recorded_env(package, facts, store, entry, previous, target) -> Non
 
 
 def _refresh_found_env(package, location, target, operation) -> None:
-    """:func:`_refresh_recorded_env` for an entry ``ensure`` found installed: `hermes update` skips
+    """:func:`_refresh_recorded_env` for an entry ``ensure`` found installed: `qubit update` skips
     installed defaults, so no install would re-record it. Only the writable store is re-recorded, under
     its install lock (a sealed store's facts ship with the artifact)."""
     facts, store = location

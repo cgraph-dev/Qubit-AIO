@@ -122,7 +122,7 @@ class StatusOutputMixin:
 
     def _emit_startup_warning(self, message: str) -> None:
         """A warning raised during ``__init__`` that the user must see (e.g. a memory provider that
-        could not be recovered). The CLI prints it; a CLI session the gateway hosts (``hermes chat``) has
+        could not be recovered). The CLI prints it; a CLI session the gateway hosts (``qubit chat``) has
         no viewer sink until its first turn wires one, so the line waits for that turn. Other drivers get
         a sticky warn ``AgentNotice``: Desktop renders notices but no warn-kind ``status.update``, and the
         messaging gateway wires its callbacks per turn, after init, so a notice raised before then waits

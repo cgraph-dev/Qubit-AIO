@@ -1,4 +1,4 @@
-"""Refusals that keep ``hermes gateway`` lifecycle verbs off gateways they must not take down.
+"""Refusals that keep ``qubit gateway`` lifecycle verbs off gateways they must not take down.
 
 Two rules, one per failure that took a production gateway down:
 
@@ -68,7 +68,7 @@ def _candidate_homes(system: bool = False) -> list[Path]:
     return homes
 
 
-def refusal_lines(verb: str, homes: list[Path], *, flag_hint: str = f"hermes gateway {{verb}} {INTERRUPT_FLAG}",
+def refusal_lines(verb: str, homes: list[Path], *, flag_hint: str = f"qubit gateway {{verb}} {INTERRUPT_FLAG}",
                   profile: Optional[str] = None) -> list[str]:
     """Refusal text for ``verb`` while the first answering gateway among ``homes`` has live work, else []."""
     for home in homes:

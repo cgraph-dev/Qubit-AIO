@@ -92,7 +92,7 @@ def _refusal(authority, tip, exc):
 async def reset_local_title_owner(db, title, include_hidden, source=None):
     """``[row]`` for the exact-title lookup of a LOCAL conversation that was reset (``/new``, the
     compression-exhaustion auto-reset), else ``[]``. The listing shows a reset lineage as its latest,
-    untitled segment, so ``hermes peer dm`` stopped finding its Bot Chat and its create collided
+    untitled segment, so ``qubit peer dm`` stopped finding its Bot Chat and its create collided
     with the title. The titled creation id still owns the FIFO and is what the chat door admits.
     It applies the listing's own filters: hidden only with ``include_hidden``, never an archived
     row (a deliberate archive stays put; the reaper-archive resurrection is the caller's), and

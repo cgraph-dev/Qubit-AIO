@@ -385,7 +385,7 @@ def _tree_matches_completed_stamp(root: Path) -> bool:
     return info.commit == commit and not info.dirty
 
 
-# `hermes update` flags that report and exit without changing anything (subcommands/update.py).
+# `qubit update` flags that report and exit without changing anything (subcommands/update.py).
 _REPORT_ONLY_UPDATE_FLAGS = frozenset({"--check", "--plan", "--list-venv-holders"})
 
 
@@ -394,17 +394,17 @@ def _may_retry_completion(root: Path, command: list[str], *, current: bool) -> b
     import sys
 
     if not current and command[:1] == ["update"] and not _REPORT_ONLY_UPDATE_FLAGS & set(command):
-        # `hermes update` is the remedy every backed-off launch names: it always tries the repair.
+        # `qubit update` is the remedy every backed-off launch names: it always tries the repair.
         # Its report-only forms change nothing, so they stay inside the backoff like any launch.
         return True
     may_retry, attempts, backoff = completion_retry_state(root)
     if not may_retry and attempts >= COMPLETION_RETRY_MAX_ATTEMPTS:
         # The tail has failed often enough that every relaunch re-running it
         # does more harm than good (#122206: "every launch burns ~4 minutes").
-        # Leave the marker for an explicit `hermes update`; say so once.
+        # Leave the marker for an explicit `qubit update`; say so once.
         print(
             f"hermes: a source update could not be finished automatically "
-            f"({attempts} attempts); run `hermes update` from a shell to finish it",
+            f"({attempts} attempts); run `qubit update` from a shell to finish it",
             file=sys.stderr, flush=True,
         )
     elif not may_retry and not current:
@@ -412,7 +412,7 @@ def _may_retry_completion(root: Path, command: list[str], *, current: bool) -> b
         # tracks the wait); stale dependencies are worth one line in front of the user.
         print(
             f"hermes: running with the previous dependencies after {attempts} failed syncs; "
-            f"next automatic retry in {max(1, backoff // 60)} min, or run `hermes update` to finish it",
+            f"next automatic retry in {max(1, backoff // 60)} min, or run `qubit update` to finish it",
             file=sys.stderr, flush=True,
         )
     return may_retry
@@ -432,7 +432,7 @@ def _relaunch_target(root: Path, python: Path, *, same: bool) -> Path | None:
 
     if same and getattr(sys, "_qubit_relaunched", False) and not pm.venv_is_current(project_root=root):
         print("hermes: relaunching did not leave this install current; running with the "
-              "dependencies it has — run `hermes update` to finish it", file=sys.stderr, flush=True)
+              "dependencies it has — run `qubit update` to finish it", file=sys.stderr, flush=True)
         return None
     return python
 

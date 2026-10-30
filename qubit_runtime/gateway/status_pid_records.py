@@ -6,7 +6,7 @@ lock: a launch-service gateway keeps serving after ``gateway.pid`` was unlinked
 (#110166), and ``gateway run --replace`` rewrites the lock but can leave the
 previous gateway's PID file behind (#143331). That leftover names a different
 process instance (its own start time) that is gone or whose PID was recycled,
-and comparing it with the lock aborted every following ``hermes update`` at the
+and comparing it with the lock aborted every following ``qubit update`` at the
 Windows gateway pause stage until the file was removed by hand.
 
 A PID file claiming the lock holder's own start time under another PID is not a

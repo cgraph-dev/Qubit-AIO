@@ -2,7 +2,7 @@
 
 A continuing session replays its stored system prompt verbatim so the provider prefix cache stays
 warm, which also means SOUL.md, skills and project-context edits never reach it before ``/new``.
-``hermes sessions refresh-prompts`` records a refresh epoch in the profile's state.db
+``qubit sessions refresh-prompts`` records a refresh epoch in the profile's state.db
 (``qubit_state_prompt_refresh``). At the start of the session's next turn this module compares
 that epoch with the one stamped when the session's prompt was built (``model_config``) and, when
 the prompt is older, rebuilds it once through the normal builder: history, session id and the

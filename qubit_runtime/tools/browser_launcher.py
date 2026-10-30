@@ -1121,7 +1121,7 @@ def _reclaim_throwaway_dirs(home: str) -> None:
             logger.debug("browser: keeping the throwaway profile %s: a Chromium still runs on it", entry)
             continue
         shutil.rmtree(entry, ignore_errors=True)  # a symlink is refused, never followed
-        logger.info("browser: removed the throwaway profile %s of a Hermes process that is gone", entry)
+        logger.info("browser: removed the throwaway profile %s of a Qubit process that is gone", entry)
 
 
 def _served_home_keys(homes) -> set[str]:
