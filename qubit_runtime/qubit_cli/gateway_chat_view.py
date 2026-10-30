@@ -23,7 +23,7 @@ def _pending_preview(text):
     line = " ".join("".join(ch if ch.isprintable() else " " for ch in strip_ansi(text)).split())
     if len(line) > _PREVIEW_CHARS:
         line = line[:_PREVIEW_CHARS - 1] + "…"
-    return f": {line}" if line else ""
+    return line
 
 
 _BLOCKING_CONTROL_EVENTS = frozenset({
