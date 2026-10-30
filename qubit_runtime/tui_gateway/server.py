@@ -748,11 +748,23 @@ def _event_frame(event: str, sid: str, payload: dict | None = None) -> dict:
     return {"jsonrpc": "2.0", "method": "event", "params": params}
 
 
+from tui_gateway import stream_segments  # noqa: E402
+
+
 def _emit(event: str, sid: str, payload: dict | None = None) -> bool:
     from agent.notification_presentation import event_presentation_muted
     if event_presentation_muted(event, sid):
         return False
-    return write_json(_event_frame(event, sid, payload))
+    session = _sessions.get(sid)
+    if session is not None and event == "message.start":
+        session[stream_segments.SESSION_KEY] = stream_segments.TurnSegments()
+    if session is not None:
+        payload = stream_segments.stamp_session_frame(session, event, payload)
+    try:
+        return write_json(_event_frame(event, sid, payload))
+    finally:
+        if session is not None and event in {"message.complete", "error"}:
+            session.pop(stream_segments.SESSION_KEY, None)
 
 
 from tui_gateway import server_requests as _server_requests  # noqa: E402
@@ -1331,7 +1343,11 @@ def _load_cfg_raw() -> dict:
     from qubit_cli.config_read_errors import FailedConfigRead
     try:
         p = _active_config_path()
-        sig = file_signature(p.stat()) if p.exists() else None
+        from qubit_cli import config_backend
+        try:
+            sig = config_backend.config_version(p)
+        except FileNotFoundError:
+            sig = None
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)
@@ -1365,7 +1381,8 @@ def _save_cfg(cfg: dict, *, allow_deletions: bool = False):
     with _cfg_lock:
         _cfg_cache, _cfg_path = copy.deepcopy(cfg), path
         try:
-            _cfg_sig = file_signature(path.stat())
+            from qubit_cli import config_backend
+            _cfg_sig = config_backend.config_version(path)
         except Exception:
             _cfg_sig = None
 
@@ -1608,7 +1625,8 @@ def _resolve_model() -> str:
     with contextlib.suppress(Exception):
         from qubit_cli.models import get_preferred_silent_default_model
         return get_preferred_silent_default_model()
-    return "z-ai/glm-5.2"
+    from qubit_cli.models_catalog_static import PREFERRED_SILENT_DEFAULT_MODEL
+    return PREFERRED_SILENT_DEFAULT_MODEL
 
 
 def _resolve_session_platform() -> str:
