@@ -28,14 +28,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MEMORY_PLUGINS_DIR = Path(__file__).parent
-QUBIT_ENTRY_POINTS_GROUP = "qubit_agent.memory_providers"
 ENTRY_POINTS_GROUP = "hermes_agent.memory_providers"
-ENTRY_POINTS_GROUPS = (QUBIT_ENTRY_POINTS_GROUP, ENTRY_POINTS_GROUP)
 # Per Qubit home (plugin managers are per home too): pruning under one multiplexed profile must
 # only retract that profile's provider skills, never a sibling profile's.
 _REGISTERED_MEMORY_PROVIDER_SKILLS: dict[str, dict[str, Path]] = {}
 # Native extensions whose first import must not race another thread (#58083 warm-up).
-_NATIVE_WARM_IMPORTS: Tuple[str, ...] = ("numpy",)
+_NATIVE_WARM_IMPORTS: tuple[str, ...] = ("numpy",)
 
 
 def _registered_skills_for_active_home() -> dict[str, Path]:
@@ -51,19 +49,14 @@ _get_user_plugins_dir = _loader.user_plugins_dir
 
 
 def _get_project_plugins_dir() -> Optional[Path]:
-    """``./.qubit/plugins/`` (legacy ``./.hermes/plugins/`` as fallback), or None.
-
-    Gated on ``QUBIT_ENABLE_PROJECT_PLUGINS``/``HERMES_ENABLE_PROJECT_PLUGINS``
-    like the PluginManager scan: a repo you merely ``cd`` into must not offer a
-    memory backend."""
+    """``./.hermes/plugins/`` or None. Gated on HERMES_ENABLE_PROJECT_PLUGINS like the
+    PluginManager scan: a repo you merely ``cd`` into must not offer a memory backend."""
     try:
         from qubit_cli.plugins import _env_enabled
 
         if not _env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
             return None
-        d = Path.cwd() / ".qubit" / "plugins"
-        if not d.is_dir():
-            d = Path.cwd() / ".hermes" / "plugins"
+        d = Path.cwd() / ".hermes" / "plugins"
         return d if d.is_dir() else None
     except Exception:
         return None
@@ -117,12 +110,12 @@ def _module_name(provider_dir: Path, name: str) -> str:
     return f"{_USER_NAMESPACE}.{name}__source_{digest}"
 
 
-def _external_source_dirs() -> List[Path]:
+def _external_source_dirs() -> list[Path]:
     """User then project plugin roots that exist (precedence order)."""
     return [d for d in (_get_user_plugins_dir(), _get_project_plugins_dir()) if d]
 
 
-def _iter_provider_dirs() -> List[Tuple[str, Path]]:
+def _iter_provider_dirs() -> list[tuple[str, Path]]:
     """``(name, path)`` for bundled, then user-installed, then project-local; first-seen wins."""
     dirs = [(child.name, child) for child in _loader.iter_plugin_dirs(_MEMORY_PLUGINS_DIR)]
     seen = {name for name, _ in dirs}
@@ -140,28 +133,12 @@ def _iter_provider_dirs() -> List[Tuple[str, Path]]:
 
 
 def _iter_entry_points():
-    """Return pip-installed memory provider entry points.
-
-    Reads the Qubit-owned group first and the legacy upstream group as a
-    read-old fallback, deduped by ``(name, value)``.
-    """
+    """Yield pip-installed memory provider entry points."""
     try:
         eps = importlib.metadata.entry_points()
-        out, seen = [], set()
-        for group in ENTRY_POINTS_GROUPS:
-            if hasattr(eps, "select"):
-                group_eps = list(eps.select(group=group))
-            elif isinstance(eps, dict):
-                group_eps = list(eps.get(group, []))
-            else:
-                group_eps = [ep for ep in eps if ep.group == group]
-            for ep in group_eps:
-                key = (getattr(ep, "name", ""), getattr(ep, "value", ""))
-                if key in seen:
-                    continue
-                seen.add(key)
-                out.append(ep)
-        return out
+        if hasattr(eps, "select"):
+            return list(eps.select(group=ENTRY_POINTS_GROUP))
+        return list(eps.get(ENTRY_POINTS_GROUP, [])) if isinstance(eps, dict) else [ep for ep in eps if ep.group == ENTRY_POINTS_GROUP]
     except Exception as exc:
         logger.debug("Memory provider entry-point scan failed: %s", exc)
         return []
@@ -209,7 +186,7 @@ def find_provider_entry_point(name: str):
     return next((ep for ep in _iter_entry_points() if ep.name == name), None)
 
 
-def list_memory_provider_names() -> List[str]:
+def list_memory_provider_names() -> list[str]:
     """Cheap name-only listing (directory scan + entry-point enumeration, no import or
     availability check) — safe at module-import time (dashboard dropdown)."""
     names = {name for name, _ in _iter_provider_dirs()}
@@ -217,7 +194,7 @@ def list_memory_provider_names() -> List[str]:
     return sorted(names)
 
 
-def discover_memory_providers() -> List[Tuple[str, str, bool]]:
+def discover_memory_providers() -> list[tuple[str, str, bool]]:
     """``[(name, description, is_available), ...]``; bundled wins on name collisions,
     then user directories, then pip."""
     results = [
@@ -249,10 +226,9 @@ def load_memory_provider(name: str, *, register_skills: Optional[bool] = None) -
         logger.debug("Memory provider '%s' not found in bundled, user plugins, or entry points", name)
         return None
     if provider_dir is not None and _explicitly_disabled(name, provider_dir):
-        # The Plugins hub / `qubit plugins disable` park a user-installed provider in
-        # ``plugins.disabled``; the loader must honour it or "disabled" is a lie in the UI.
-        logger.warning("Memory provider '%s' is disabled via plugins.disabled; run `qubit plugins enable %s` "
-                       "or change memory.provider.", name, name)
+        # The Plugins hub / `qubit plugins disable` (or an update that could not install it) park a
+        # user-installed provider in ``plugins.disabled``; the loader must honour it or "disabled" is a lie.
+        logger.warning("%s", parked_provider_notice(name))
         return None
 
     def _load(_dir):
@@ -460,10 +436,11 @@ class _ProviderCollector:
             base_ref="agent.memory_provider:MemoryProvider", ctx=self, before_reload=drop_hooks)
         return self.provider
 
-    def register_hook(self, hook_name, callback):
+    def register_hook(self, hook_name, callback, *, hold_stream=False):
         context = self._plugin_context()
         with context._manager._discovery_lock:
-            return context._manager._register_fallback_hook(context, self._hook_source, hook_name, callback)
+            return context._manager._register_fallback_hook(
+                context, self._hook_source, hook_name, callback, hold_stream=hold_stream)
 
     def register_memory_provider(self, provider):
         self.provider = provider
@@ -527,6 +504,22 @@ def _get_active_memory_provider() -> Optional[str]:
         return None
 
 
+def parked_provider_notice(name: str) -> Optional[str]:
+    """The user-facing reason a configured provider is not loading because ``plugins.disabled`` parks
+    it, naming the update that did so when there was one; None when it is not parked."""
+    provider_dir = find_provider_dir(name)
+    if provider_dir is None or not _explicitly_disabled(name, provider_dir):
+        return None
+    from qubit_cli.config import load_config
+    from pm.plugins_state import RECORD
+    record = cfg_get(load_config(), "plugins", RECORD)
+    recorded = record.get(name) if isinstance(record, dict) else None
+    why = (f" An update turned it off ({recorded.get('reason')}) and a later update retries it."
+           if isinstance(recorded, dict) and recorded.get("reason") else "")
+    return (f"⚠ Memory provider '{name}' is turned off: plugins.disabled lists it, so external memory is off "
+            f"(built-in memory still works).{why} Turn it back on with `qubit plugins enable {name}`.")
+
+
 def _explicitly_disabled(name: str, provider_dir: Path) -> bool:
     """True when a NON-bundled provider is parked in ``plugins.disabled`` under any spelling the
     plugin commands write: the provider name, its directory name or its manifest ``name:``."""
@@ -539,14 +532,9 @@ def _explicitly_disabled(name: str, provider_dir: Path) -> bool:
         return False
     if not isinstance(disabled, list):
         return False
-    names = {name, provider_dir.name}
-    try:
-        import qubit_yaml as yaml
-        with open(provider_dir / "plugin.yaml", encoding="utf-8-sig") as f:
-            names.add(str((yaml.safe_load(f) or {}).get("name") or ""))
-    except Exception:
-        pass
-    return bool(names & {v for v in disabled if isinstance(v, str)})
+    from pm.plugins_state import plugin_spellings
+
+    return bool(plugin_spellings(provider_dir, name) & {v for v in disabled if isinstance(v, str)})
 
 
 def _prune_inactive_memory_provider_skills(active_provider: Optional[str] = None) -> None:
@@ -566,7 +554,7 @@ def _prune_inactive_memory_provider_skills(active_provider: Optional[str] = None
         registered.pop(qualified_name, None)
 
 
-def discover_plugin_cli_commands() -> List[dict]:
+def discover_plugin_cli_commands() -> list[dict]:
     """CLI commands for the **active** memory plugin only. Imports just its ``cli.py``
     (``register_cli(subparser)``), never the provider module, so it is safe during
     argparse setup. At most one dict: name/help/description/setup_fn/handler_fn/plugin."""
