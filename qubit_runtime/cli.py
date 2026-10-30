@@ -1554,9 +1554,6 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
             toolsets_list = coding_selection(platform="cli", config=CLI_CONFIG)
         except Exception:
             toolsets_list = None
-        if toolsets_list is None:
-            from qubit_cli.tools_config import _get_platform_tools
-            toolsets_list = sorted(_get_platform_tools(CLI_CONFIG, "cli"))
 
     parsed_skills = _parse_skills_argument(skills)
 

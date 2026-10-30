@@ -483,7 +483,6 @@ class CLIInitMixin:
         from qubit_cli.gateway_session_store import GatewaySessionStore
         store = getattr(self, "_session_db", None)
         if not isinstance(store, GatewaySessionStore) or not getattr(self, "_gateway_session_open", False):
-            from qubit_state_ids import new_session_id
             return new_session_id(now)
         if branch_of:
             child = store.branch(branch_of, title)

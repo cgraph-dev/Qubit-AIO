@@ -139,7 +139,7 @@ def _mirror_config_to_env(defaults, _file_has_terminal_config):
 
     # TERMINAL_CWD is force-exported (beats stale .env) except inside a gateway process,
     # whose config bridge already set it.
-    _is_gateway = os.environ.get("_HERMES_GATEWAY") == "1"
+    _is_gateway = "gateway.run" in sys.modules
     for config_key, env_var in _TERMINAL_ENV_MAPPINGS.items():
         if config_key not in terminal_config:
             continue
