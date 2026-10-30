@@ -22,6 +22,12 @@ _HERMES_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_HERMES_HOME_OVERR
 INDICATOR_STYLES: tuple[str, ...] = ("ascii", "emoji", "kaomoji", "unicode")
 DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
+# Browser-hosted attachments are staged on the Hermes host and then read back
+# as a base64 data URL for the normal remote attachment RPC. Keep the upload
+# and read-back boundaries identical so a successful picker/drop can always be
+# attached afterward.
+WEBAPP_ATTACHMENT_MAX_BYTES: int = 16 * 1024 * 1024
+
 
 def set_qubit_home_override(path: str | Path | None) -> Token:
     """Set a context-local Qubit home override and return its reset token.
@@ -80,6 +86,33 @@ def _platform_default_qubit_home(environ: Mapping[str, str], user_home: Callable
         base = Path(local_appdata) if local_appdata else user_home() / "AppData" / "Local"
         return base / ("qubit" + suffix)
     return user_home() / (".qubit" + suffix)
+
+
+def _account_home() -> Path:
+    """The OS account's home from the password database, never ``$HOME``: harnesses and profile isolation
+    repoint HOME (root under ``sudo`` has uid 0 too, which keeps the #108674 remap). Falls back to the
+    shared real-home resolver where pwd cannot answer."""
+    try:
+        import pwd
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)  # windows-footgun: ok — POSIX-only module inside try/except
+    except (ImportError, KeyError, OSError, AttributeError):
+        return Path(get_real_home())
+
+
+def account_default_qubit_home() -> Path:
+    """The platform default of the OS ACCOUNT, never of a foreign process ``HOME``.
+
+    Host service identities (``systemctl --user`` units, LaunchAgents) belong to the account, and their
+    definitions are found under the account home. A process started with ``HOME=<scratch>`` used to call
+    ``<scratch>/.hermes`` native, name the bare ``hermes-gateway`` unit, and stop the account's real
+    gateway through it. When the process HOME is the account home the two answers are the same home.
+    """
+    account = _account_home()
+    try:
+        same = Path.home().resolve() == account.resolve()
+    except (OSError, RuntimeError):
+        same = False
+    return _get_platform_default_qubit_home() if same else _platform_default_qubit_home(os.environ, lambda: account)
 
 
 def _qubit_root_of(native_home: Path, env_path: Path | None) -> Path:
@@ -507,10 +540,10 @@ def mkdir_under_qubit_home(path: str | Path) -> Path:
     """Create *path*, but never materialize a deleted/missing named profile."""
     target = Path(path)
     assert_named_profile_home_live(target)
-    # Lazy so this module still imports alone; qubit_dir_acl (stdlib only) ships beside it in every
+    # Lazy so this module still imports alone; hermes_dir_acl (stdlib only) ships beside it in every
     # closure that creates home dirs, and a missing copy fails loudly instead of silently skipping the
-    # elevated grant.
-    from qubit_dir_acl import make_user_dir
+    # elevated grant (tests/pm/test_bootstrap_import_closure.py).
+    from hermes_dir_acl import make_user_dir
     make_user_dir(target, parents=True, exist_ok=True)
     return target
 
@@ -670,22 +703,6 @@ def with_qubit_node_path(env: dict[str, str] | None = None) -> dict[str, str]:
     from pm import env_for
 
     return env_for("npm", base_env=env)
-
-
-def agent_browser_runnable(path: str | None) -> bool:
-    """True when *path* is an agent-browser CLI that runs (``--version`` exits 0).
-
-    Dead/wrong-arch/hung binaries are rejected so callers try the next candidate.
-
-    A bare presence check (``shutil.which`` / ``Path.exists``) is not enough: agent-browser's npm
-    ``postinstall`` re-points a *global* install symlink (e.g. ``/opt/homebrew/bin/agent-browser``) at our
-    local ``node_modules/agent-browser/bin/...`` binary, which then disappears on the next ``qubit update``
-    — leaving a **dangling symlink** that ``which`` still reports but exec fails on with exit 127 (issue
-    #48521). Callers that trust such a path silently break every browser tool.
-    """
-    if not path:
-        return False
-    return _is_executable_file(path) and _version_probe_ok(path)
 
 
 def _legacy_path_has_content(path: Path) -> bool:
@@ -1034,6 +1051,10 @@ def get_scratch_dir(home: str | Path | None = None, *, prune: bool = True) -> Pa
     :func:`export_scratch_tmp_env`), so ``tempfile`` defaults land here without call sites
     knowing. Entries idle for ``SCRATCH_MAX_IDLE_HOURS`` are pruned at most once per process
     and once per hour across processes (stamp file), so a fan-out of children stays cheap.
+    The pass itself runs in a detached child process (``qubit_constants_scratch_detach``): the
+    directory is created and permissioned before this returns, no caller (the boot hook
+    included) waits on the idle scan or the ``rmtree`` of a multi-GB entry, and the pass still
+    finishes when the caller is a ``hermes`` command that exits a moment later.
 
     Permissions follow :func:`apply_secure_dir_policy`, so an explicit ``HERMES_HOME_MODE`` or
     a managed/shared home is honored instead of a blanket ``0700`` (#117347).
@@ -1080,7 +1101,9 @@ def _prune_scratch_dir_once(scratch: Path) -> None:
         pass
     with contextlib.suppress(Exception):
         stamp.touch()
-        prune_scratch_dir(scratch)
+        from qubit_constants_scratch_detach import spawn_prune
+
+        spawn_prune(scratch)
 
 
 def scratch_dir_usage_bytes(scratch: Path | None = None) -> int:
