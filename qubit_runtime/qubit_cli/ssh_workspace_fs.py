@@ -91,7 +91,7 @@ class SshWorkspaceFs:
 
     @staticmethod
     def _error_code(output: str, fallback: str = "EIO") -> str:
-        marker = "__HERMES_FS_ERROR__:"
+        marker = "__QUBIT_FS_ERROR__:"
         for line in (output or "").splitlines():
             if line.startswith(marker):
                 return line[len(marker) :].strip() or fallback
@@ -102,9 +102,9 @@ class SshWorkspaceFs:
         quoted = shlex.quote(target)
         command = f"""
 p={quoted}
-if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; fi
-if [ ! -d "$p" ]; then printf '__HERMES_FS_ERROR__:ENOTDIR\\n'; exit 45; fi
-if [ ! -r "$p" ]; then printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; fi
+if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; fi
+if [ ! -d "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOTDIR\\n'; exit 45; fi
+if [ ! -r "$p" ]; then printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; fi
 for child in "$p"/* "$p"/.[!.]* "$p"/..?*; do
   [ -e "$child" ] || [ -L "$child" ] || continue
   name=${{child##*/}}
@@ -151,19 +151,19 @@ done
         )
         command = f"""
 p={quoted}
-if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; fi
-if [ ! -f "$p" ]; then printf '__HERMES_FS_ERROR__:ENOTREG\\n'; exit 45; fi
-size=$(stat -c %s "$p" 2>/dev/null || stat -f %z "$p" 2>/dev/null) || {{ printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; }}
-if [ "$size" -gt {int(max_bytes)} ]; then printf '__HERMES_FS_ERROR__:EFBIG\\n'; exit 47; fi
-printf '__HERMES_FS_SIZE__:%s\\n' "$size"
-{{ {read_command}; }} || {{ printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; }}
+if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; fi
+if [ ! -f "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOTREG\\n'; exit 45; fi
+size=$(stat -c %s "$p" 2>/dev/null || stat -f %z "$p" 2>/dev/null) || {{ printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; }}
+if [ "$size" -gt {int(max_bytes)} ]; then printf '__QUBIT_FS_ERROR__:EFBIG\\n'; exit 47; fi
+printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
+{{ {read_command}; }} || {{ printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; }}
 """
         result = self._execute(command)
         output = result.get("output", "")
         if result.get("returncode") != 0:
             raise SshWorkspaceFsError(self._error_code(output))
         lines = output.splitlines()
-        if not lines or not lines[0].startswith("__HERMES_FS_SIZE__:"):
+        if not lines or not lines[0].startswith("__QUBIT_FS_SIZE__:"):
             raise SshWorkspaceFsError("EIO", "SSH filesystem did not return a file size")
         try:
             size = int(lines[0].split(":", 1)[1])
@@ -181,18 +181,18 @@ printf '__HERMES_FS_SIZE__:%s\\n' "$size"
         target = self._normalize(path)
         command = f"""
 p={shlex.quote(target)}
-target=$(realpath "$p" 2>/dev/null || readlink -f "$p" 2>/dev/null) || {{ printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; }}
-if [ ! -f "$target" ]; then printf '__HERMES_FS_ERROR__:ENOTREG\\n'; exit 45; fi
-size=$(stat -c %s "$target" 2>/dev/null || stat -f %z "$target" 2>/dev/null) || {{ printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; }}
-printf '__HERMES_FS_TARGET__:%s\\n' "$(printf '%s' "$target" | base64 | tr -d '\\r\\n')"
-printf '__HERMES_FS_SIZE__:%s\\n' "$size"
+target=$(realpath "$p" 2>/dev/null || readlink -f "$p" 2>/dev/null) || {{ printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; }}
+if [ ! -f "$target" ]; then printf '__QUBIT_FS_ERROR__:ENOTREG\\n'; exit 45; fi
+size=$(stat -c %s "$target" 2>/dev/null || stat -f %z "$target" 2>/dev/null) || {{ printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; }}
+printf '__QUBIT_FS_TARGET__:%s\\n' "$(printf '%s' "$target" | base64 | tr -d '\\r\\n')"
+printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
 """
         result = self._execute(command)
         output = result.get("output", "")
         if result.get("returncode") != 0:
             raise SshWorkspaceFsError(self._error_code(output))
-        target_line = next((line for line in output.splitlines() if line.startswith("__HERMES_FS_TARGET__:")), "")
-        size_line = next((line for line in output.splitlines() if line.startswith("__HERMES_FS_SIZE__:")), "")
+        target_line = next((line for line in output.splitlines() if line.startswith("__QUBIT_FS_TARGET__:")), "")
+        size_line = next((line for line in output.splitlines() if line.startswith("__QUBIT_FS_SIZE__:")), "")
         if not target_line or not size_line:
             raise SshWorkspaceFsError("EIO", "SSH filesystem did not return file metadata")
         try:
@@ -247,8 +247,8 @@ printf '__HERMES_FS_SIZE__:%s\\n' "$size"
 target={q_target}
 parent={q_parent}
 tmp={q_temp}
-if [ ! -d "$parent" ]; then printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; fi
-if [ -e "$target" ] && [ ! -f "$target" ]; then printf '__HERMES_FS_ERROR__:ENOTREG\\n'; exit 45; fi
+if [ ! -d "$parent" ]; then printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; fi
+if [ -e "$target" ] && [ ! -f "$target" ]; then printf '__QUBIT_FS_ERROR__:ENOTREG\\n'; exit 45; fi
 trap 'rm -f "$tmp"' EXIT HUP INT TERM
 cat > "$tmp" && mv -f "$tmp" "$target"
 """
