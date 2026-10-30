@@ -25,7 +25,7 @@ def test_bootstrap_token_visibility(monkeypatch, tmp_path, surface, gated, headl
     application.state.auth_required = gated
     monkeypatch.setattr(server, "app", application)
     monkeypatch.setattr(server, "WEB_DIST", tmp_path)
-    monkeypatch.setenv("HERMES_SERVE_HEADLESS", "1" if headless else "0")
+    monkeypatch.setenv("QUBIT_SERVE_HEADLESS", "1" if headless else "0")
     mount_spa(application)
     client = TestClient(application)
     for path in ("/", "/chat", "/settings", "/index.html"):
@@ -37,9 +37,9 @@ def test_bootstrap_token_visibility(monkeypatch, tmp_path, surface, gated, headl
         assert server._SESSION_TOKEN not in str(response.headers)
         if not headless and not raw:
             profile_js = json.dumps(serving_profile).replace("</", "<\\/")
-            assert f"window.__HERMES_DASHBOARD_PROFILE__={profile_js};" in response.text
+            assert f"window.__QUBIT_DASHBOARD_PROFILE__={profile_js};" in response.text
         if surface == "webapp" and not headless:
-            assert 'window.__HERMES_UI_SURFACE__="webapp"' in response.text
+            assert 'window.__QUBIT_UI_SURFACE__="webapp"' in response.text
 
 
 @pytest.mark.parametrize("operation", ["shell", "reattach", "close", "rpc", "file"])
@@ -56,10 +56,10 @@ def test_html_cannot_authorize_privileged_sibling_routes(monkeypatch, tmp_path, 
     spa.state.ui_surface = "webapp"
     spa.state.auth_required = False
     monkeypatch.setattr(server, "WEB_DIST", tmp_path)
-    monkeypatch.delenv("HERMES_SERVE_HEADLESS", raising=False)
+    monkeypatch.delenv("QUBIT_SERVE_HEADLESS", raising=False)
     mount_spa(spa)
     html = TestClient(spa).get("/").text
-    match = re.search(r'__HERMES_SESSION_TOKEN__\s*=\s*("[^"]*")', html)
+    match = re.search(r'__QUBIT_SESSION_TOKEN__\s*=\s*("[^"]*")', html)
     exposed = json.loads(match[1]) if match else ""
     client = TestClient(server.app, base_url="http://testclient")
     if operation == "file":
