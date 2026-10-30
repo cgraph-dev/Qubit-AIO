@@ -710,12 +710,12 @@ async def test_composer_paste_outside_workspace_is_attached_but_sibling_dir_is_n
 
 
 def _stage_outside_workspace(tmp_path: Path, monkeypatch, name: str, subdir: str = "attachments") -> Path:
-    """Stage *name* under a HERMES_HOME that lives outside the workspace (SSH topology)."""
-    hermes_home = tmp_path / "gateway-data"  # /opt/data inside the gateway container
-    (hermes_home / subdir).mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    """Stage *name* under a QUBIT_HOME that lives outside the workspace (SSH topology)."""
+    qubit_home = tmp_path / "gateway-data"  # /opt/data inside the gateway container
+    (qubit_home / subdir).mkdir(parents=True)
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
-    return hermes_home / subdir / name
+    return qubit_home / subdir / name
 
 
 def test_ssh_backend_staged_text_attachment_still_expands(tmp_path: Path, monkeypatch):
