@@ -232,10 +232,17 @@ class GatewayChatView:
 
     async def submit(self, text):
         self.mutations.retire(self.session_id)
-        return await self.client.rpc("prompt.submit", session_id=self.session_id,
-                                     input_id=uuid.uuid4().hex, text=text,
-                                     **({"finite": True} if self.finite else {}),
-                                     **({"unattended": True} if self.finite and self.unattended else {}))
+        receipt = await self.client.rpc("prompt.submit", session_id=self.session_id,
+                                        input_id=uuid.uuid4().hex, text=text,
+                                        **({"finite": True} if self.finite else {}),
+                                        **({"unattended": True} if self.finite and self.unattended else {}))
+        # TUI-26: a bare stop phrase typed into a LOCAL voice chat ends that chat and admits
+        # nothing. Say so once (unless this view is quiet); the caller must not treat the
+        # receipt as an admission.
+        if isinstance(receipt, dict) and receipt.get("voice_stopped") is True and not self.quiet:
+            from agent.i18n import t
+            print(t("cli.voice.stop_phrase_typed"), flush=True)
+        return receipt
 
     async def command(self, text):
         command, _, rest = text.partition(" ")
@@ -428,9 +435,9 @@ class GatewayChatView:
         try:
             receipt = await self.submit(query) if query else None
             if oneshot:
-                if receipt is None:
-                    raise GatewayClientError("One-shot requires a query")
-                admission = receipt["admission_id"]
+                admission = _oneshot_admission(receipt)
+                if admission is None:  # a bare stop phrase ended the local voice chat; nothing runs
+                    return 0
                 self.finite_admission = admission
                 for kind, event_admission, payload in self._finite_events:
                     if event_admission == admission:

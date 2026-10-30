@@ -442,6 +442,22 @@ def _door(call: Callable[[Path, dict], dict], profile_home, owner, message, *, d
         **({"author": dict(author)} if author else {}), **category)), **category}
 
 
+def _matches(home: Path | str, record: dict, owner: dict) -> bool:
+    """Whether ``owner`` may claim ``record`` (same owner, or along its compression chain)."""
+    pinned = record["owner"]
+    if any(pinned[key] != owner[key] for key in ("profile_home", "lease_id", "live_session_id")):
+        return False
+    if pinned["session_id"] == owner["session_id"]:
+        return True
+    from qubit_state import SessionDB
+
+    db = SessionDB(db_path=Path(home) / "state.db", read_only=True)
+    try:
+        return db.get_compression_tip(pinned["session_id"]) == owner["session_id"]
+    finally:
+        db.close()
+
+
 def owner_holds_delivery(profile_home: Path | str, record: dict) -> bool:
     """Whether the profile authority still holds ``record`` (main's bounded DM wait asks this).
 
