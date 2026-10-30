@@ -272,7 +272,12 @@ def _(rid, params: dict) -> dict:
     local = _effective_terminal_backend() == "local"
     # A non-local backend's cwd lives inside the target; the host cannot validate it, so take the composer's
     # session cwd (Desktop sends it) or the session's terminal cwd as-is.
-    root = _completion_cwd(params) if local else (params.get("cwd") or _terminal_task_cwd(session))
+    if local:
+        root = _completion_cwd(params)
+    elif session is not None:
+        root = _terminal_task_cwd(session) or "."
+    else:
+        root = params.get("cwd") or "."
     session_key = session.get("session_key") if session else None
     return _ok(rid, {"items": _path_completion_items(word, root, session_key, local)})
 

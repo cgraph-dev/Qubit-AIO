@@ -1637,6 +1637,12 @@ def _resolve_session_platform() -> str:
     return "desktop" if desktop and not is_truthy_value(terminal) else "tui"
 
 
+def _sanitize_client_source(source) -> str:
+    """A client-named source, kept only when it is a known local surface; else the TUI default."""
+    text = str(source or "").strip().lower()
+    return text if text in {"tui", "desktop", "cli", "acp", "gui", "oneshot"} else "tui"
+
+
 def _resolve_session_source(explicit: str | None) -> str:
     """Session DB ``source``: an explicit caller value (plugin session tagged ``"telegram"``) is never
     rewritten; only empty/None falls back to the env-resolved platform."""
@@ -2859,7 +2865,7 @@ def _hydrate_session_cwd(sid: str, key: str, session_db, profile_home: str | Non
                 with _sessions_lock:
                     if sid in _sessions:
                         _sessions[sid]["cwd"] = row["cwd"]
-                        if remote:
+                        if remote or not _host_cwd_is_terminal_cwd(profile_home):
                             _sessions[sid]["explicit_cwd"] = True
                 # Lazy desktop rows already carry their explicitly chosen cwd, so they never reach the fresh-cwd
                 # branch below. Claim a generation before probing to keep an older probe from overwriting a later

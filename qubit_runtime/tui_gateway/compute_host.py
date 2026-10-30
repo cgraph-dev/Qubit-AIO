@@ -392,7 +392,9 @@ class ComputeHost:
                 server._init_session(
                     sid, key, agent, list(history), cols=int(frame.get("cols") or 80),
                     cwd=str(frame.get("cwd") or "") or None, session_db=session_db,
-                    source=frame.get("source"))
+                    source=frame.get("source"),
+                    explicit_cwd=bool(frame.get("explicit_cwd", False)),
+                    profile_home=str(frame.get("profile_home") or "") or None)
             finally:
                 reset_transport(token)
         except Exception:
@@ -404,7 +406,9 @@ class ComputeHost:
                 "history_version": int(frame.get("history_version") or 0), "inflight_turn": None,
                 "created_at": time.time(), "last_active": time.time(), "running": False,
                 "attached_images": [], "image_counter": 0,
-                "cwd": str(frame.get("cwd") or os.getcwd()), "cols": int(frame.get("cols") or 80),
+                "cwd": str(frame.get("cwd") or os.getcwd()),
+                "explicit_cwd": bool(frame.get("explicit_cwd", False)),
+                "cols": int(frame.get("cols") or 80),
                 "slash_worker": None, "show_reasoning": server._load_show_reasoning(),
                 "tool_progress_mode": server._load_tool_progress_mode(), "edit_snapshots": {},
                 "tool_started_at": {}, "model_override": frame.get("model_override"),
