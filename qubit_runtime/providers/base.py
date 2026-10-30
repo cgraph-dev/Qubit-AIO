@@ -130,6 +130,16 @@ class ProviderProfile:
     # hostname: base hostname for URL→provider reverse-mapping in model_metadata.py
     # e.g. "api.gmi-serving.com". Derived from base_url when empty.
     hostname: str = ""
+    # Hosts (exact or any subdomain) that serve THIS provider's API, so a ``custom`` endpoint or an
+    # auto-routed aux client at one of them is recognised as this provider (``providers.profile_for_host``).
+    # It also makes ``reasoning_payload`` the reasoning gate there, except on hosts core gates itself
+    # (OpenRouter, Ollama Cloud, Nous Portal, Vercel AI Gateway, the ``lmstudio`` provider).
+    hostnames: tuple = ()
+    # Hosts that identify this provider's catalog for model metadata (context length, models.dev) but
+    # take other credentials; matched only by ``profile_for_host(url, metadata=True)``.
+    metadata_hostnames: tuple = ()
+    # models.dev provider id when it differs from ``name`` (e.g. ``fireworks`` -> ``fireworks-ai``).
+    models_dev_id: str = ""
 
     # ── Client-level quirks (set once at client construction) ─
     default_headers: dict[str, str] = field(default_factory=dict)
@@ -311,6 +321,40 @@ class ProviderProfile:
         """
         return None
 
+    # ── L1 wire seams (per-model wire, endpoint-keyed headers, max-tokens param) ──
+    # Endpoint-keyed hooks take the request's ``base_url``: core asks the named provider's profile first,
+    # then any registered profile overriding the hook (``agent.provider_route_hooks``), so a ``custom``
+    # route pointed at this provider's host is served too. Return None / ``{}`` for an endpoint that is
+    # not yours. All four are pure: no I/O unless the docstring says so.
+
+    def api_mode_for_model(self, model: str, *, api_key: str | None = None) -> str | None:
+        """Wire (``api_mode``) this provider serves *model* on, or None to keep the static ``api_mode``.
+
+        ``api_key=None`` is the pure hot path (agent init, fallback, aux client builds): answer from the
+        id alone. A string ``api_key`` comes from resolution-time callers (``/model``, runtime resolve),
+        which may consult a cached live catalog with that credential to normalize the id first.
+        """
+        return None
+
+    def client_headers(
+        self, *, base_url: str, api_key: str = "", has_images: bool = False,
+    ) -> dict[str, str] | None:
+        """Default headers for an OpenAI client built for *base_url*, or None when this profile has no
+        endpoint-specific headers there (core then uses the static ``default_headers``). ``has_images``
+        asks for the headers of a request-scoped client carrying native image parts. Core merges user
+        ``model.default_headers`` over the result and re-adds missing keys on snapshot rebuilds."""
+        return None
+
+    def request_headers(self, *, base_url: str, model: str = "", user_initiated: bool = False) -> dict[str, str]:
+        """Per-request headers (``extra_headers``) for *base_url*; ``user_initiated`` is True only on the
+        first attempt of a user turn's first API call (attribution). Pure: core memoizes the answer per argument set."""
+        return {}
+
+    def max_tokens_param(self, *, base_url: str, model: str = "") -> str | None:
+        """``"max_completion_tokens"`` / ``"max_tokens"`` for requests to *base_url*, or None for the
+        core heuristic (direct OpenAI / Azure host or newer OpenAI model families). Pure: memoized per arguments."""
+        return None
+
     def listed(self) -> bool:
         """Whether discovery surfaces may offer this provider.
 
@@ -433,3 +477,8 @@ class ProviderProfile:
         except Exception as exc:
             logger.debug("fetch_models(%s): %s", self.name, exc)
             return None
+
+
+    def live_context_length(self, model: str, *, api_key: str = "", base_url: str = "") -> int | None:
+        """Context window from the provider's live, credentialed catalog; consulted after the persistent cache."""
+        return None

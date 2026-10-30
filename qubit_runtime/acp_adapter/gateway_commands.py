@@ -5,18 +5,13 @@ Main served these in-process (``acp_adapter/commands.py``). The reports are the 
 controls, ``/steer`` the owner's ``session.steer``; ``/queue`` and an idle ``/steer`` become the
 next prompt, which the session's FIFO runs after any turn in flight. ``/title <name>`` is the
 ``rename`` mutation and ``/undo`` / ``/retry`` the ``rewind`` one, as in the classic transport
-client (``qubit_cli/gateway_chat_commands.py``). The read reports go to the owner's ``slash.exec``; a
-registered command this surface does not carry is refused locally (``unsupported_command``) and is
-never forwarded as text the owner might execute as a control.
+client (``qubit_cli/gateway_chat_commands.py``). Every other registry command goes to the owner's
+``slash.exec`` like there: it runs what it serves for this session and refuses the rest, and that
+refusal reaches the editor as a reply naming the command, never a failed prompt.
 """
 from __future__ import annotations
 
 from qubit_cli.gateway_client import GatewayClientError, GatewayRPCError
-
-# Reports the owner answers for a local session (``gateway/session_commands.py::_READ_COMMANDS``).
-_READS = frozenset({'context', 'usage', 'status', 'version'})
-_MUTATIONS = frozenset({'model', 'compress', 'new', 'branch'})
-_PROMPTS = frozenset({'steer', 'queue'})
 
 
 class CommandRefused(GatewayClientError):
@@ -31,8 +26,6 @@ async def run_command(agent, session_id, command, arg):
     the reads included, is the owner's ``slash.exec`` answer (``_forward``)."""
     route = ROUTES.get(command)
     if route is None:
-        if command not in _READS:
-            raise GatewayClientError('unsupported_command')
         return await _forward(agent, await agent._client(), session_id, command, arg)
     return await route[1](agent, session_id, command, arg)
 
@@ -74,6 +67,22 @@ async def _mutation(agent, session_id, command, arg):
 
 async def _rewind_command(agent, session_id, command, arg):
     return await _rewind(agent, await agent._client(), session_id, command, arg)
+
+
+async def _discard_unknown(agent, session_id, _command, admission_id):
+    """Acknowledge one exact lost turn and refresh its FIFO snapshot."""
+    if not admission_id:
+        return 'Usage: /discard <lost admission id>', None
+    client = await agent._client()
+    agent._snapshots[session_id] = await client.rpc('session.resume', session_id=session_id)
+    lost = next((row for row in agent._snapshots[session_id].get('pending', [])
+                 if row.get('admission_id') == admission_id and row.get('status') == 'unknown'), None)
+    if lost is None:
+        return (f'No unknown (lost) admission with id {admission_id}; refresh the session and try again.', None)
+    await client.rpc('prompt.resolve_unknown', session_id=session_id, admission_id=admission_id,
+                     execution_generation=lost['execution_generation'])
+    agent._snapshots[session_id] = await client.rpc('session.resume', session_id=session_id)
+    return 'Discarded the lost turn. Queued messages can continue.', None
 
 
 async def _forward(agent, client, session_id, command, arg):
@@ -166,6 +175,11 @@ async def _steer(agent, session_id, text):
         if str(exc) == 'stale_generation':
             return None
         raise
+    if result.get('voice_stopped') is True:
+        # TUI-26: the guidance was a bare stop phrase that ended this LOCAL session's voice chat;
+        # no turn saw it, and sending it on as a prompt would admit ``stop`` as a turn.
+        from agent.i18n import t
+        return t('cli.voice.stop_phrase_typed')
     if result.get('status') != 'queued':
         return None
     return f"⏩ Steer queued for the active turn: {text[:80]}{'...' if len(text) > 80 else ''}"
@@ -215,7 +229,7 @@ async def _refresh_context(agent, client, session_id, operation):
     stats = await client.rpc('session.stats', session_id=session_id)
     if stats.get('context_length') is None:
         from agent.model_metadata import estimate_request_tokens_rough
-        messages = agent._snapshots[session_id].get('messages') or []
+        messages = [m for m in agent._snapshots[session_id].get('messages') or [] if not m.get('archived')]
         stats = {**stats, 'context_length': (agent._usage.get(session_id) or {}).get('context_length'),
                  'context_tokens': estimate_request_tokens_rough(messages) if operation == 'compress' else 0}
     await agent._project_usage(session_id, agent._editor_id(session_id), stats)
@@ -264,6 +278,7 @@ def _tools_text(info):
 # "new session + clear screen"; here it is ``/new``'s reset of this session.
 ROUTES = {
     'branch': ('ACP fork_session', _branch),
+    'discard': ('prompt.resolve_unknown', _discard_unknown),
     'help': ('local', _help),
     'steer': ('session.steer', _prompt),
     'queue': ('prompt.submit', _prompt),

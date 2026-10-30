@@ -11,6 +11,9 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+# plugins.<RECORD> maps each plugin an update disabled to {enabled, reason}: what to undo once it fits.
+RECORD = "disabled_by_update"
+
 
 def _profiles_root() -> Path:
     # Plugin discovery and dependency publication must use the same home root.

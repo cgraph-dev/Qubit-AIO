@@ -243,6 +243,11 @@ def list_archived_skill_names() -> List[str]:
     return sorted({p.name for p in root.iterdir() if p.is_dir()}) if root.exists() else []
 
 
+def read_skill_name(skill_md: Path, fallback: str) -> str:
+    """The frontmatter ``name:`` field of a SKILL.md (first 4000 chars), else *fallback*."""
+    return _read_skill_name(skill_md, fallback)
+
+
 def _read_skill_name(skill_md: Path, fallback: str) -> str:
     """The frontmatter ``name:`` field of a SKILL.md (first 4000 chars), else *fallback*."""
     try:

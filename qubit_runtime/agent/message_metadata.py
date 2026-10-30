@@ -19,7 +19,8 @@ from agent.conversation_compression_archive import MERGED_DURABLE_ROWS, RETIRED_
 # stored-row CAS digest and the durable row adopted onto the live dict. Never transcript payload.
 DB_ROW_SNAPSHOT = "_db_row_snapshot"
 CANONICAL_ROW = "_canonical_row"
-REPAIR_BOOKKEEPING_FIELDS = frozenset({DB_ROW_SNAPSHOT, CANONICAL_ROW})
+RESTORED_FROM_STORE = "_restored_from_store"
+REPAIR_BOOKKEEPING_FIELDS = frozenset({DB_ROW_SNAPSHOT, CANONICAL_ROW, RESTORED_FROM_STORE})
 # Unanswered text a merged user row held before the current turn was absorbed
 # (agent_runtime_helpers._merge_consecutive_users); the persist override keeps it.
 # It repeats the row's own content, so pricing it would double the estimate.
@@ -54,6 +55,15 @@ PERSISTENCE_ONLY_MESSAGE_FIELDS = frozenset(
 # duplicate reasoning copies, ordered sidecars); a mismatch between the two estimates loops compaction.
 UNPRICED_REPLAY_FIELDS = frozenset({"_anthropic_content_blocks", "reasoning_details", "extra_content",
                                     "reasoning_opaque", "reasoning_text", "bedrock_content_blocks"})
+
+
+# Connector data-use requirement on a tool message; persisted inside ``display_metadata``, never sent to a model.
+DATA_USE = "data_use"
+
+
+def data_use_requirement(messages: Any) -> frozenset[str]:
+    """The union of ``data_use`` over *messages*: what the model receiving them must guarantee."""
+    return frozenset(r for m in messages or () if isinstance(m, Mapping) for r in m.get(DATA_USE) or ())
 
 
 def without_persistence_fields(msg: Mapping[str, Any]) -> Mapping[str, Any]:
