@@ -158,7 +158,7 @@ class GatewayAgentCacheMixin:
         except Exception:
             logger.debug("Failed to read persisted session model override", exc_info=True)
             return
-        if not persisted:
+        if not isinstance(persisted, dict) or not persisted:
             return
         override: Dict[str, Any] = {k: persisted.get(k) for k in ("model", "provider", "base_url")}
         provider = persisted.get("provider")
