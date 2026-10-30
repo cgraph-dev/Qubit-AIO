@@ -1,4 +1,4 @@
-"""Cross-process mutual exclusion for in-flight Hermes updates.
+"""Cross-process mutual exclusion for in-flight Qubit updates.
 
 Two artifacts, one authority each:
 
@@ -12,7 +12,7 @@ Two artifacts, one authority each:
   An owner is live while its pid is alive and its creation time still matches: never by age
   (the 20-minute ceiling only ages out v1 markers, which carry no creation time).
 * The checkout lock ``<git common dir>/hermes-update.lock`` (``<install root>/.hermes-update.lock``
-  for a ZIP install with no ``.git``) — a kernel lock (flock / msvcrt) that ``hermes update``
+  for a ZIP install with no ``.git``) — a kernel lock (flock / msvcrt) that ``qubit update``
   holds for its whole process tree, so two updates of one checkout started from different
   homes exclude each other and a killed updater whose completion child still runs keeps the
   checkout locked until that child exits. In the git dir it is never a worktree file: no
@@ -60,7 +60,7 @@ CHECKOUT_LOCK_NAME = ".hermes-update.lock"
 GIT_CHECKOUT_LOCK_NAME = "hermes-update.lock"
 
 # Set by an orchestrating updater (Tauri `hermes-setup --update`) to its own pid before
-# spawning `hermes update` as a child stage; the parent holds the marker for its whole run,
+# spawning `qubit update` as a child stage; the parent holds the marker for its whole run,
 # so without this the child would refuse its own parent's lock. Keep in sync with
 # update_child_env in apps/bootstrap-installer/src-tauri/src/update.rs.
 HANDOFF_PID_ENV = "HERMES_UPDATE_HANDOFF_PID"
@@ -72,7 +72,7 @@ _MAX_ANCESTRY_DEPTH = 128
 
 # Exit code meaning "another updater/instance owns this install right now" — the same
 # contract as the Windows shim / venv-holder guards in _cmd_update_impl, matched by the
-# Tauri updater (UPDATE_EXIT_CONCURRENT in update.rs) to show "Hermes is still running".
+# Tauri updater (UPDATE_EXIT_CONCURRENT in update.rs) to show "Qubit is still running".
 UPDATE_EXIT_CONCURRENT = 2
 
 # msvcrt locks a byte range; lock one byte far past the holder record so other processes can
@@ -90,14 +90,14 @@ _FILETIME_UNIX_EPOCH = 116444736000000000
 def update_marker_path() -> Path:
     """Path of the shared update marker: always the profile-tree ROOT home.
 
-    A sticky or ``-p`` profile re-homes ``HERMES_HOME`` to ``<root>/profiles/<p>``; the Desktop,
+    A sticky or ``-p`` profile re-homes ``QUBIT_HOME`` to ``<root>/profiles/<p>``; the Desktop,
     the hand-off scripts and the Tauri updater all look at the root, so a profile-scoped marker
     would be one the other owners never see.
     """
     try:
         from qubit_constants import get_default_qubit_root
     except ImportError:  # a partial tree (an -I -S completion child of a stubbed checkout)
-        home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+        home = Path(os.environ.get("QUBIT_HOME") or Path.home() / ".qubit")
         root = home.parent.parent if home.parent.name == "profiles" else home
         return root / MARKER_NAME
     return get_default_qubit_root() / MARKER_NAME
@@ -208,6 +208,7 @@ def _stdlib_create_time(pid: int) -> float | None:
             ["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=5, stdin=subprocess.DEVNULL,
             env={"PATH": os.environ.get("PATH") or "/bin:/usr/bin", "LC_ALL": "C", "TZ": "UTC0"},
+            check=False,
         ).stdout.strip()
         if not out:
             return None
@@ -329,8 +330,7 @@ def _handoff_pid() -> int | None:
     """Pid of the orchestrating updater that spawned us (:data:`HANDOFF_PID_ENV`); malformed
     values count as absent so a broken handoff falls back to the normal refusal."""
     try:
-        raw = os.environ.get(HANDOFF_PID_ENV) or os.environ.get("QUBIT_UPDATE_HANDOFF_PID", "")
-        pid = int(raw.strip())
+        pid = int(os.environ.get(HANDOFF_PID_ENV, "").strip())
     except ValueError:
         return None
     return pid if pid > 0 else None
@@ -423,7 +423,7 @@ def _stdlib_parent_pid(pid: int) -> int | None:
 def _is_ancestor_pid(pid: int) -> bool:
     """True when ``pid`` is a live ancestor of this process.
 
-    The orchestrating updater spawns ``hermes update`` as a (grand)child, so a live marker
+    The orchestrating updater spawns ``qubit update`` as a (grand)child, so a live marker
     owned by one of our ancestors can only be the claim we are already running under — an
     unrelated concurrent updater is never in our parent chain. This heals the fleet of staged
     ``hermes-setup`` binaries that predate the HANDOFF_PID_ENV export and can never send it.
@@ -489,7 +489,7 @@ def _is_ancestor_pid(pid: int) -> bool:
 
 
 def _is_runtime_host(cmdline: list[str]) -> bool:
-    """A long-lived Hermes host (``gateway run`` / ``serve`` / ``dashboard``), by the canonical
+    """A long-lived Qubit host (``gateway run`` / ``serve`` / ``dashboard``), by the canonical
     command-line matchers (profile flags, ``qubit_cli/main.py`` paths, inline bootstraps)."""
     from gateway.status import looks_like_gateway_command_line
     from qubit_cli.update_cmd_windows import _qubit_holder_subcommand
@@ -498,10 +498,10 @@ def _is_runtime_host(cmdline: list[str]) -> bool:
 
 
 def _runtime_host_below(holder_pid: int) -> bool:
-    """True when a Hermes gateway/serve/dashboard sits between us and *holder_pid* (or anywhere
+    """True when a Qubit gateway/serve/dashboard sits between us and *holder_pid* (or anywhere
     above us when the holder is not reached).
 
-    Such a host is relaunched BY an update and outlives its stages; a ``hermes update`` its agent
+    Such a host is relaunched BY an update and outlives its stages; a ``qubit update`` its agent
     or ``/update`` starts is an independent update that must not run under the first one's claim
     (cli §7 V9). Unreadable command lines count as not-a-host (the legacy adoption stands).
     """
@@ -954,7 +954,7 @@ def describe_holder(holder: UpdateHolder | None) -> str:
             "  Updating without the lock could let two updates corrupt the install, or run\n"
             "  under a Desktop app, gateway or installer that cannot see it. Make that path\n"
             "  writable (fix its owner or permissions, or remount a read-only filesystem\n"
-            "  read-write), or run `hermes update` as the user that owns the install."
+            "  read-write), or run `qubit update` as the user that owns the install."
         )
     minutes, seconds = divmod(int(max(0 if holder is None else holder.age_seconds, 0)), 60)
     elapsed = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
@@ -962,24 +962,32 @@ def describe_holder(holder: UpdateHolder | None) -> str:
     if holder is not None and holder.held:
         who = "; its owner exited but a process it started still holds the checkout"
     return (
-        f"✗ Another Hermes update is already running (started {elapsed} ago{who}).\n"
+        f"✗ Another Qubit update is already running (started {elapsed} ago{who}).\n"
         "\n"
         "  Running two at once would corrupt the install. Wait for it to finish\n"
-        "  (watch `hermes logs`), or close the Desktop/dashboard window that\n"
-        "  started it, then run `hermes update` again."
+        "  (watch `qubit logs`), or close the Desktop/dashboard window that\n"
+        "  started it, then run `qubit update` again."
     )
 
 
 # --- the checkout lock -------------------------------------------------------------------
 
 # This process's hold on the checkout lock: {"path", "fd", "owned", "depth"}. "owned" means
-# we opened and locked it; otherwise the fd was inherited from the `hermes update` that holds
+# we opened and locked it; otherwise the fd was inherited from the `qubit update` that holds
 # it (pass_fds) and belongs to the whole tree — it is never unlocked or closed here.
 _HELD: dict | None = None
 _JOBS: list = []
 
 
-def _try_lock(fd: int) -> bool:
+def _try_lock(fd: int, *, shared: bool = False) -> bool:
+    """Lock the owner byte and every lease byte without waiting; False when any is held.
+
+    ``shared`` is the held? probe (:func:`checkout_lock_held`): holders lock exclusively, so a
+    shared try fails only on a holder and two probes never read each other as one. POSIX drops it
+    when the caller closes ``fd``; Windows gives it straight back.
+    """
+    if shared:
+        return _try_shared_lock(fd)
     if sys.platform == "win32":
         if not _lock_bytes(fd, _WINDOWS_LOCK_OFFSET):
             return False
@@ -992,6 +1000,40 @@ def _try_lock(fd: int) -> bool:
 
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def _try_shared_lock(fd: int) -> bool:
+    if sys.platform == "win32":
+        # msvcrt has no shared mode: LockFileEx without LOCKFILE_EXCLUSIVE_LOCK over the owner byte
+        # and the 16 lease bytes. Any failure answers held, as the exclusive probe did.
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+
+        class _Overlapped(ctypes.Structure):
+            _fields_ = [("Internal", ctypes.c_void_p), ("InternalHigh", ctypes.c_void_p),
+                        ("Offset", wintypes.DWORD), ("OffsetHigh", wintypes.DWORD), ("hEvent", wintypes.HANDLE)]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.LockFileEx.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD,
+                                        wintypes.DWORD, ctypes.POINTER(_Overlapped)]
+        kernel32.LockFileEx.restype = wintypes.BOOL
+        kernel32.UnlockFileEx.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD,
+                                          ctypes.POINTER(_Overlapped)]
+        kernel32.UnlockFileEx.restype = wintypes.BOOL
+        handle = wintypes.HANDLE(msvcrt.get_osfhandle(fd))
+        span = 1 + _LEASE_SLOTS
+        if not kernel32.LockFileEx(handle, 0x1, 0, span, 0, ctypes.byref(_Overlapped(Offset=_WINDOWS_LOCK_OFFSET))):
+            return False  # 0x1 = LOCKFILE_FAIL_IMMEDIATELY
+        kernel32.UnlockFileEx(handle, 0, span, 0, ctypes.byref(_Overlapped(Offset=_WINDOWS_LOCK_OFFSET)))
+        return True
+    import fcntl
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
     except BlockingIOError:
         return False
     return True
@@ -1072,7 +1114,7 @@ def _lock_holder(fd_or_path) -> UpdateHolder:
 
 def _open_lock_file(path: Path) -> tuple[int | None, object]:
     """``(fd, True)`` read-write; ``(fd, False)`` read-only for an existing lock file we may not
-    write (left root-owned by a ``sudo hermes update``: the kernel lock works on a read-only fd,
+    write (left root-owned by a ``sudo qubit update``: the kernel lock works on a read-only fd,
     contract A5; POSIX only — a Windows owner needs its record); ``(None, reason)`` when neither opens."""
     # Never follow a link planted at the name: the holder record is written into this file.
     binary = getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
@@ -1169,7 +1211,7 @@ def _lock_with_contention_wait(fd: int, path: Path) -> bool:
 
 def _held_by_our_windows_ancestor(path: Path) -> bool:
     """Windows: the checkout lock's holder record names a LIVE incarnation of one of our
-    ancestors (the ``hermes update`` whose completion/build children we are)."""
+    ancestors (the ``qubit update`` whose completion/build children we are)."""
     if sys.platform != "win32":
         return False
     record = _parse_marker(_read_bytes(path) or b"")
@@ -1326,9 +1368,12 @@ def update_in_progress(install_root: Path | str | None = None) -> bool:
 def checkout_lock_held(install_root: Path | str | None = None) -> bool:
     """True while some process (this one included) holds the checkout kernel lock.
 
-    A probe takes the lock for the microseconds of one try and drops it (closing the fd), the
-    way ``marker.sh::checkout_lock_held`` does; an updater acquiring at that instant waits
-    :data:`CHECKOUT_CONTENTION_WAIT_SECONDS` instead of failing (R6/D17).
+    A probe takes a SHARED lock on the owner byte and every lease byte for the microseconds of one
+    try and drops it (closing the fd). Holders lock exclusively, so the probe fails only on a real
+    holder, while two probes never read each other as one: a client polling ``ensure`` and the
+    gateway it just started both probe while a killed update's dead marker is still there. An
+    updater acquiring at that instant waits :data:`CHECKOUT_CONTENTION_WAIT_SECONDS` instead of
+    failing (R6/D17).
 
     Only a missing lock file is free. One that exists but cannot be opened answers held, the same
     verdict ``marker.sh`` / ``marker.ps1`` and the Desktop probes give, so no reader admits a
@@ -1345,10 +1390,7 @@ def checkout_lock_held(install_root: Path | str | None = None) -> bool:
     except OSError:
         return True
     try:
-        if not _try_lock(fd):
-            return True
-        _unlock(fd)
-        return False
+        return not _try_lock(fd, shared=True)
     except OSError:
         return False
     finally:
@@ -1576,7 +1618,7 @@ class UpdateLock:
             self.acquired = self._claimed = False
             self._drop_checkout()
 
-    def __enter__(self) -> "UpdateLock":
+    def __enter__(self) -> UpdateLock:
         self.acquire()
         return self
 

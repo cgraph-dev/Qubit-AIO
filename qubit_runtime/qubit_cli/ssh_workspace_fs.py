@@ -34,8 +34,25 @@ class _SshFsConfig:
     timeout: int
 
 
-_CACHE_LOCK = threading.RLock()
+# ``_CACHE_LOCK`` guards only the dicts and is never held across a dial or cleanup, so one
+# unreachable host cannot stall file requests on every other SSH profile. A dial or cleanup holds
+# its profile's lock plus that endpoint's lock: profiles on one user@host:port share a control
+# socket, and one profile's cleanup would otherwise unlink the socket another profile's dial just
+# created. At most one endpoint lock is held at a time, always inside the profile's lock.
+_CACHE_LOCK = threading.Lock()
 _BACKENDS: dict[str, tuple[_SshFsConfig, SshWorkspaceFs]] = {}
+_DIAL_LOCKS: dict[str, threading.Lock] = {}
+_ENDPOINT_LOCKS: dict[tuple[str, str, int], threading.Lock] = {}
+
+
+def _lock_for(locks: dict, key) -> threading.Lock:
+    with _CACHE_LOCK:
+        return locks.setdefault(key, threading.Lock())
+
+
+def _endpoint(config: _SshFsConfig) -> tuple[str, str, int]:
+    """The key ``SSHEnvironment`` derives its control socket from."""
+    return config.user, config.host, config.port
 
 
 class SshWorkspaceFs:
@@ -74,7 +91,7 @@ class SshWorkspaceFs:
 
     @staticmethod
     def _error_code(output: str, fallback: str = "EIO") -> str:
-        marker = "__QUBIT_FS_ERROR__:"
+        marker = "__HERMES_FS_ERROR__:"
         for line in (output or "").splitlines():
             if line.startswith(marker):
                 return line[len(marker) :].strip() or fallback
@@ -85,9 +102,9 @@ class SshWorkspaceFs:
         quoted = shlex.quote(target)
         command = f"""
 p={quoted}
-if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; fi
-if [ ! -d "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOTDIR\\n'; exit 45; fi
-if [ ! -r "$p" ]; then printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; fi
+if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; fi
+if [ ! -d "$p" ]; then printf '__HERMES_FS_ERROR__:ENOTDIR\\n'; exit 45; fi
+if [ ! -r "$p" ]; then printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; fi
 for child in "$p"/* "$p"/.[!.]* "$p"/..?*; do
   [ -e "$child" ] || [ -L "$child" ] || continue
   name=${{child##*/}}
@@ -134,19 +151,19 @@ done
         )
         command = f"""
 p={quoted}
-if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; fi
-if [ ! -f "$p" ]; then printf '__QUBIT_FS_ERROR__:ENOTREG\\n'; exit 45; fi
-size=$(stat -c %s "$p" 2>/dev/null || stat -f %z "$p" 2>/dev/null) || {{ printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; }}
-if [ "$size" -gt {int(max_bytes)} ]; then printf '__QUBIT_FS_ERROR__:EFBIG\\n'; exit 47; fi
-printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
-{{ {read_command}; }} || {{ printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; }}
+if [ ! -e "$p" ] && [ ! -L "$p" ]; then printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; fi
+if [ ! -f "$p" ]; then printf '__HERMES_FS_ERROR__:ENOTREG\\n'; exit 45; fi
+size=$(stat -c %s "$p" 2>/dev/null || stat -f %z "$p" 2>/dev/null) || {{ printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; }}
+if [ "$size" -gt {int(max_bytes)} ]; then printf '__HERMES_FS_ERROR__:EFBIG\\n'; exit 47; fi
+printf '__HERMES_FS_SIZE__:%s\\n' "$size"
+{{ {read_command}; }} || {{ printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; }}
 """
         result = self._execute(command)
         output = result.get("output", "")
         if result.get("returncode") != 0:
             raise SshWorkspaceFsError(self._error_code(output))
         lines = output.splitlines()
-        if not lines or not lines[0].startswith("__QUBIT_FS_SIZE__:"):
+        if not lines or not lines[0].startswith("__HERMES_FS_SIZE__:"):
             raise SshWorkspaceFsError("EIO", "SSH filesystem did not return a file size")
         try:
             size = int(lines[0].split(":", 1)[1])
@@ -164,18 +181,18 @@ printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
         target = self._normalize(path)
         command = f"""
 p={shlex.quote(target)}
-target=$(realpath "$p" 2>/dev/null || readlink -f "$p" 2>/dev/null) || {{ printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; }}
-if [ ! -f "$target" ]; then printf '__QUBIT_FS_ERROR__:ENOTREG\\n'; exit 45; fi
-size=$(stat -c %s "$target" 2>/dev/null || stat -f %z "$target" 2>/dev/null) || {{ printf '__QUBIT_FS_ERROR__:EACCES\\n'; exit 46; }}
-printf '__QUBIT_FS_TARGET__:%s\\n' "$(printf '%s' "$target" | base64 | tr -d '\\r\\n')"
-printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
+target=$(realpath "$p" 2>/dev/null || readlink -f "$p" 2>/dev/null) || {{ printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; }}
+if [ ! -f "$target" ]; then printf '__HERMES_FS_ERROR__:ENOTREG\\n'; exit 45; fi
+size=$(stat -c %s "$target" 2>/dev/null || stat -f %z "$target" 2>/dev/null) || {{ printf '__HERMES_FS_ERROR__:EACCES\\n'; exit 46; }}
+printf '__HERMES_FS_TARGET__:%s\\n' "$(printf '%s' "$target" | base64 | tr -d '\\r\\n')"
+printf '__HERMES_FS_SIZE__:%s\\n' "$size"
 """
         result = self._execute(command)
         output = result.get("output", "")
         if result.get("returncode") != 0:
             raise SshWorkspaceFsError(self._error_code(output))
-        target_line = next((line for line in output.splitlines() if line.startswith("__QUBIT_FS_TARGET__:")), "")
-        size_line = next((line for line in output.splitlines() if line.startswith("__QUBIT_FS_SIZE__:")), "")
+        target_line = next((line for line in output.splitlines() if line.startswith("__HERMES_FS_TARGET__:")), "")
+        size_line = next((line for line in output.splitlines() if line.startswith("__HERMES_FS_SIZE__:")), "")
         if not target_line or not size_line:
             raise SshWorkspaceFsError("EIO", "SSH filesystem did not return file metadata")
         try:
@@ -185,11 +202,21 @@ printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
             raise SshWorkspaceFsError("EIO", "SSH filesystem returned invalid file metadata") from exc
         return resolved, size
 
-    def stream_file(self, path: str, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
-        """Stream an already-authorized remote file without buffering it in memory."""
+    def stream_file(
+        self, path: str, chunk_size: int = 64 * 1024, *, offset: int = 0, length: int | None = None,
+    ) -> Iterator[bytes]:
+        """Stream an already-authorized remote file without buffering it in memory. ``offset`` and
+        ``length`` read one byte range of it instead (a media element's ``Range`` request)."""
         target = self._normalize(path)
+        source = f"< {shlex.quote(target)}"
+        if offset or length is not None:
+            script = f"tail -c +{int(offset) + 1} {source}"
+            if length is not None:
+                script += f" | head -c {int(length)}"
+        else:
+            script = f"exec cat {source}"
         command = self._env._build_ssh_command()
-        command.extend(["bash", "-c", shlex.quote(f"exec cat < {shlex.quote(target)}")])
+        command.extend(["bash", "-c", shlex.quote(script)])
         process = subprocess.Popen(
             command,
             stdin=subprocess.DEVNULL,
@@ -212,7 +239,7 @@ printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
         if encoded_size > max_bytes:
             raise SshWorkspaceFsError("EFBIG")
         parent = posixpath.dirname(target) or "/"
-        temp_path = posixpath.join(parent, f".{posixpath.basename(target)}.qubit-tmp-{uuid.uuid4().hex[:12]}")
+        temp_path = posixpath.join(parent, f".{posixpath.basename(target)}.hermes-tmp-{uuid.uuid4().hex[:12]}")
         q_target = shlex.quote(target)
         q_parent = shlex.quote(parent)
         q_temp = shlex.quote(temp_path)
@@ -220,8 +247,8 @@ printf '__QUBIT_FS_SIZE__:%s\\n' "$size"
 target={q_target}
 parent={q_parent}
 tmp={q_temp}
-if [ ! -d "$parent" ]; then printf '__QUBIT_FS_ERROR__:ENOENT\\n'; exit 44; fi
-if [ -e "$target" ] && [ ! -f "$target" ]; then printf '__QUBIT_FS_ERROR__:ENOTREG\\n'; exit 45; fi
+if [ ! -d "$parent" ]; then printf '__HERMES_FS_ERROR__:ENOENT\\n'; exit 44; fi
+if [ -e "$target" ] && [ ! -f "$target" ]; then printf '__HERMES_FS_ERROR__:ENOTREG\\n'; exit 45; fi
 trap 'rm -f "$tmp"' EXIT HUP INT TERM
 cat > "$tmp" && mv -f "$tmp" "$target"
 """
@@ -270,24 +297,31 @@ def get_ssh_workspace_fs(profile_key: str, terminal_config: dict[str, Any]) -> S
     if not config.host or not config.user:
         raise SshWorkspaceFsError("ECONN", "SSH host and user are required")
 
-    with _CACHE_LOCK:
-        cached = _BACKENDS.get(profile_key)
-        if cached and cached[0] == config:
-            return cached[1]
+    with _lock_for(_DIAL_LOCKS, profile_key):
+        with _CACHE_LOCK:
+            cached = _BACKENDS.get(profile_key)
+            if cached and cached[0] == config:
+                return cached[1]
+            _BACKENDS.pop(profile_key, None)
+        # Close the replaced connection before dialing: the control socket is keyed on
+        # user@host:port only, so a dial with new credentials would otherwise ride the old master.
         if cached:
-            cached[1]._env.cleanup()
+            with _lock_for(_ENDPOINT_LOCKS, _endpoint(cached[0])):
+                cached[1]._env.cleanup()
         try:
-            env = SSHEnvironment(
-                host=config.host,
-                user=config.user,
-                cwd=config.cwd,
-                timeout=config.timeout,
-                port=config.port,
-                key_path=config.key_path,
-                sync_files=False,
-            )
+            with _lock_for(_ENDPOINT_LOCKS, _endpoint(config)):
+                env = SSHEnvironment(
+                    host=config.host,
+                    user=config.user,
+                    cwd=config.cwd,
+                    timeout=config.timeout,
+                    port=config.port,
+                    key_path=config.key_path,
+                    sync_files=False,
+                )
         except Exception as exc:
             raise SshWorkspaceFsError("ECONN", "Could not connect to the SSH workspace") from exc
         backend = SshWorkspaceFs(env)
-        _BACKENDS[profile_key] = (config, backend)
+        with _CACHE_LOCK:
+            _BACKENDS[profile_key] = (config, backend)
         return backend

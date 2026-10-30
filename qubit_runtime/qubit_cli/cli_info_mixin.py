@@ -1,7 +1,7 @@
 """Informational views and reload flows for the interactive CLI: banner, help, tools, usage,
 insights, MCP/skills reload, bang shell.
 
-Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO. cli.py-internal symbols are
+Mixin split out of ``cli.py``; bound onto ``QubitCLI`` via the MRO. cli.py-internal symbols are
 imported LAZILY inside each method — the mixin never imports ``cli`` at module load time (cycle).
 """
 
@@ -13,11 +13,12 @@ import os
 import shutil
 import threading
 import time
+from typing import Any, NamedTuple
 
 from agent.i18n import t
 from qubit_constants import is_termux as _is_termux_environment
 from rich.markup import escape as _escape
-from utils import base_url_hostname, file_signature
+from utils import base_url_hostname
 
 from qubit_cli.cli_modal_mixin import _gated_confirm
 from qubit_cli.colors import Colors as _Colors
@@ -92,9 +93,48 @@ def _skill_line(item: dict) -> str:
     return f"    - {nm}: {desc}" if desc else f"    - {nm}"
 
 
+class BannerPlan(NamedTuple):
+    """What the welcome banner draws, shared by startup (``show_banner``) and ``/clear`` so the two
+    cannot drift apart."""
+    store: Any  # the gateway session store, or None off the gateway
+    inventory: dict | None  # a gateway session's tools: its snapshot, never this process's registry
+    ctx_len: int | None
+    banner_kw: dict | None  # build_welcome_banner's common kwargs; None → the compact banner
+
+
+def banner_plan(cli, console) -> BannerPlan:
+    """The welcome banner's plan. The compact banner (``banner_kw`` None) is for a narrow terminal,
+    ``display.compact``, or a gateway session with no snapshot yet."""
+    from agent.context_pin import is_context_pinned
+    from qubit_cli.gateway_tools_notify import gateway_store
+    store = gateway_store(cli)
+    inventory = store.banner_inventory() if store is not None else None
+    agent = getattr(cli, "agent", None)
+    compressor = getattr(agent, "context_compressor", None)
+    ctx_len = compressor.context_length if compressor is not None else None
+    if cli.compact or shutil.get_terminal_size().columns < 80 or (store is not None and inventory is None):
+        return BannerPlan(store, inventory, ctx_len, None)
+    return BannerPlan(store, inventory, ctx_len, dict(
+        console=console, model=cli.model, cwd=os.getenv("TERMINAL_CWD", os.getcwd()),
+        enabled_toolsets=cli.enabled_toolsets, session_id=cli.session_id, context_length=ctx_len,
+        provider=cli.provider,
+        context_pinned=is_context_pinned(ctx_len, getattr(agent, "_config_context_length", None))))
+
+
 class CLIInfoMixin:
     """Informational views and reload flows for the interactive CLI: banner, help, tools, usage,
     insights, MCP/skills reload, bang shell."""
+
+    def _show_gateway_banner(self, build_welcome_banner, inventory, banner_kw):
+        """Main's banner from the gateway session's snapshot (the TUI banner's data): the CLI
+        enumerates nothing. The canonical id shows as main's 8-character label (display only)."""
+        from qubit_cli.gateway_session_store import session_label
+        build_welcome_banner(
+            tools=inventory["tools"], get_toolset_for_tool=inventory["get_toolset_for_tool"],
+            availability=inventory["availability"], skills_by_category=inventory["skills_by_category"],
+            **{**banner_kw, "cwd": inventory["cwd"] or banner_kw["cwd"],
+               "context_length": inventory["context_length"] or banner_kw["context_length"],
+               "session_id": session_label(self.session_id)})
 
     def _print_gateway_tool_warnings(self, lines):
         """Main's ``_show_tool_availability_warnings`` lines, computed by the gateway that resolved
@@ -109,17 +149,11 @@ class CLIInfoMixin:
         from cli import _build_compact_banner, get_tool_definitions, logger
         from qubit_cli.banner import build_welcome_banner
         self.console.clear()
-        ctx_len = None
-        gateway_inventory = getattr(getattr(self, "_session_db", None), "banner_inventory", lambda: None)()
-        from qubit_cli.gateway_tools_notify import gateway_store
-        on_gateway = gateway_store(self) is not None  # its tools come from the gateway: never enumerated here
-        if hasattr(self, 'agent') and self.agent and hasattr(self.agent, 'context_compressor'):
-            ctx_len = self.agent.context_compressor.context_length
-        from agent.context_pin import is_context_pinned
-        ctx_pinned = is_context_pinned(ctx_len, getattr(getattr(self, "agent", None), "_config_context_length", None))
+        store, gateway_inventory, ctx_len, banner_kw = banner_plan(self, self.console)
+        on_gateway = store is not None  # its tools come from the gateway: never enumerated here
 
         # Auto-compact for narrow terminals — the full banner needs ~80 columns to avoid wrapping.
-        if self.compact or shutil.get_terminal_size().columns < 80 or (on_gateway and gateway_inventory is None):
+        if banner_kw is None:
             self._console_print(_build_compact_banner())
             self._show_status()
         else:
@@ -133,13 +167,10 @@ class CLIInfoMixin:
                 snapshot = load_banner_snapshot(self.enabled_toolsets)
             except Exception:
                 snapshot = None
-            cwd = os.getenv("TERMINAL_CWD", os.getcwd())  # where commands will execute
-            banner_kw = dict(
-                console=self.console, model=self.model, cwd=cwd,
-                enabled_toolsets=self.enabled_toolsets, session_id=self.session_id,
-                context_length=ctx_len, provider=self.provider, context_pinned=ctx_pinned)
 
-            if snapshot is not None:
+            if gateway_inventory is not None:
+                self._show_gateway_banner(build_welcome_banner, gateway_inventory, banner_kw)
+            elif snapshot is not None:
                 self._defer_tool_warnings = True
                 toolset_map = snapshot["toolset_map"]
                 build_welcome_banner(
@@ -431,25 +462,8 @@ class CLIInfoMixin:
 
     def show_toolsets(self):
         """Display available toolsets with kawaii ASCII art."""
-        from toolsets import get_all_toolsets, get_toolset_info
-        all_toolsets = get_all_toolsets()
-
-        print()
-        _ascii_box(t("cli.toolsets.header"), 58)
-        print()
-
-        for name in sorted(all_toolsets.keys()):
-            info = get_toolset_info(name)
-            if info:
-                marker = "(*)" if self.enabled_toolsets and name in self.enabled_toolsets else "   "
-                print(f"  {marker} {name:<18} [{info['tool_count']:>2} tools] - {info['description']}")
-
-        print()
-        print(f"  {t('cli.toolsets.currently_enabled_legend')}")
-        print()
-        print(f"  {t('cli.toolsets.tip_enable_all')}")
-        print(f"  {t('cli.toolsets.example')}")
-        print()
+        from qubit_cli.cli_info_lines import toolsets_lines
+        print("\n".join(toolsets_lines(self.enabled_toolsets)))
 
     def _handle_whoami_command(self):
         """Display slash-command access for the local CLI surface."""
@@ -547,48 +561,8 @@ class CLIInfoMixin:
 
     def _show_gateway_status(self):
         """Show status of the gateway and connected messaging platforms."""
-        from qubit_constants import display_qubit_home
-        from gateway.config import load_gateway_config, Platform
-
-        print()
-        _ascii_box(t("cli.gateway_status.header"), 60)
-        print()
-
-        try:
-            config = load_gateway_config()
-            print(f"  {t('cli.gateway_status.platform_config_header')}")
-            print("  " + "-" * 55)
-            platform_status = {
-                Platform.TELEGRAM: ("Telegram", "TELEGRAM_BOT_TOKEN"),
-                Platform.DISCORD: ("Discord", "DISCORD_BOT_TOKEN"),
-                Platform.SLACK: ("Slack", "SLACK_BOT_TOKEN"),
-                Platform.WHATSAPP: ("WhatsApp", "WHATSAPP_ENABLED")}
-            for platform, (name, env_var) in platform_status.items():
-                pconfig = config.platforms.get(platform)
-                if pconfig and pconfig.enabled:
-                    home = config.get_home_channel(platform)
-                    home_str = f" → {home.name}" if home else ""
-                    print(f"    ✓ {name:<12} {t('cli.gateway_status.enabled')}{home_str}")
-                else:
-                    print(f"    ○ {name:<12} {t('cli.gateway_status.not_configured', env_var=env_var)}")
-
-            print()
-            print(f"  {t('cli.gateway_status.conversations_persist')}")
-            print()
-            print(f"  {t('cli.gateway_status.to_start')}")
-            print("    python cli.py --gateway")
-            print()
-            print(f"  {t('cli.gateway_status.config_file', path=f'{display_qubit_home()}/config.yaml')}")
-            print()
-        except Exception as e:
-            print(f"  {t('cli.gateway_status.load_error', error=str(e))}")
-            print()
-            print(f"  {t('cli.gateway_status.to_configure')}")
-            print(f"    {t('cli.gateway_status.step_env_vars')}")
-            print("       TELEGRAM_BOT_TOKEN=your_token")
-            print("       DISCORD_BOT_TOKEN=your_token")
-            print(f"    {t('cli.gateway_status.step_config', path=f'{display_qubit_home()}/config.yaml')}")
-            print()
+        from qubit_cli.cli_info_lines import platforms_lines
+        print("\n".join(platforms_lines()))
 
     def _print_random_tip(self) -> None:
         """Best-effort discovery tip (startup + /clear); never raises."""
@@ -680,6 +654,9 @@ class CLIInfoMixin:
         """`/context [all]` — 5×20 glyph grid (cell ≈ 1% of the window) plus an estimated
         per-category table; `all` appends per-skill / per-toolset costs. Read-only: same chars/4
         engine as the desktop popover (agent.context_breakdown) — no provider calls, no cache impact."""
+        from qubit_cli.gateway_side import connection_for
+        if (connection := connection_for(self)) is not None:
+            return self._show_gateway_context_breakdown(connection)
         if not self.agent:
             print(f"  {t('cli.shared.no_active_agent')}")
             return
@@ -716,10 +693,32 @@ class CLIInfoMixin:
             print(f"  {line}")
         print()
 
-    def _show_usage(self):
-        """Rate limits + session token usage (when a live agent exists) + Qubit credits.
+    def _show_gateway_context_breakdown(self, connection):
+        """Main's ``/context`` grid and table over the gateway agent's own breakdown
+        (``session.context_breakdown``): the session's prompt, tools and transcript live there."""
+        from agent.context_breakdown import render_context_breakdown_lines
+        from agent.context_file_sources import render_context_file_lines
+        from qubit_cli.gateway_client import GatewayClientError
+        try:
+            payload = connection.call("session.context_breakdown", session_id=self.session_id)
+        except GatewayClientError as e:
+            print(f"  {t('cli.context.compute_failed', error=str(e))}")
+            return
+        if not payload.get("categories"):
+            print(f"  {t('cli.shared.no_active_agent')}")
+            return
+        file_lines = render_context_file_lines(payload.get("context_files") or [])
+        print()
+        print(f"  {t('cli.context.header', model=payload.get('model') or self.model)}")
+        print()
+        for line in render_context_breakdown_lines(payload, grid=True) + (["", *file_lines] if file_lines else []):
+            print(f"  {line}")
+        print()
 
-        The Qubit credits block is agent-independent (portal fetch), so it runs even with no live
+    def _show_usage(self):
+        """Rate limits + session token usage (when a live agent exists) + Nous credits.
+
+        The Nous credits block is agent-independent (portal fetch), so it runs even with no live
         agent — the TUI's /usage slash-worker resumes the session WITHOUT building an agent.
         """
         from cli import datetime, format_duration_compact
@@ -753,7 +752,7 @@ class CLIInfoMixin:
         output_tokens = getattr(agent, "session_output_tokens", 0) or 0
         reasoning_tokens = getattr(agent, "session_reasoning_tokens", 0) or 0
         compressor = agent.context_compressor
-        last_prompt = compressor.last_prompt_tokens if compressor.last_prompt_tokens > 0 else 0
+        last_prompt = max(0, compressor.last_prompt_tokens)
         ctx_len = compressor.context_length
         pct = min(100, (last_prompt / ctx_len * 100)) if ctx_len else 0
         elapsed = format_duration_compact((datetime.now() - self.session_start).total_seconds())
@@ -846,20 +845,10 @@ class CLIInfoMixin:
                     days = int(parts[i])
                 i += 1
 
-        try:
-            from qubit_state import SessionDB, _default_db_path
-            from agent.insights import InsightsEngine
-            if not _default_db_path().exists():
-                print(f"  {t('cli.insights.no_session_data')}")
-                return
-            db = SessionDB(read_only=True)
-            try:
-                engine = InsightsEngine(db)
-                print(engine.format_terminal(engine.generate(days=days, source=source)))
-            finally:
-                db.close()
-        except Exception as e:
-            print(f"  {t('gateway.insights.error', error=str(e))}")
+        from types import SimpleNamespace
+        from qubit_cli.main_agent_cmds import cmd_insights
+
+        cmd_insights(SimpleNamespace(days=days, source=source))
 
     def _check_config_mcp_changes(self) -> None:
         """Detect mcp_servers changes in config.yaml (polled from process_loop every
@@ -875,7 +864,7 @@ class CLIInfoMixin:
         cache** (the next message re-sends the full input prefix, expensive on long-context / high-reasoning
         models). See #1474.
         """
-        import qubit_yaml as _yaml
+        from qubit_cli.config_backend import config_version_or_none, read_config_doc
 
         now = time.monotonic()
         if now - self._last_config_check < CONFIG_WATCH_INTERVAL:
@@ -884,19 +873,15 @@ class CLIInfoMixin:
 
         from qubit_cli.config import get_config_path as _get_config_path
         cfg_path = _get_config_path()
-        if not cfg_path.exists():
-            return
-        try:
-            sig = file_signature(cfg_path.stat())
-        except OSError:
+        sig = config_version_or_none(cfg_path)
+        if sig is None:
             return
         if sig == self._config_sig:
             return  # unchanged — fast path
 
         self._config_sig = sig
         try:
-            with open(cfg_path, encoding="utf-8-sig") as f:
-                new_cfg = _yaml.safe_load(f) or {}
+            new_cfg = read_config_doc(cfg_path) or {}
         except Exception:
             return
 
@@ -1019,8 +1004,7 @@ class CLIInfoMixin:
                         if _name not in merged:
                             merged.append(_name)
                     enabled_override = merged
-                refresh_agent_mcp_tools(
-                    self.agent, enabled_override=enabled_override, quiet_mode=True, content_aware=True)
+                refresh_agent_mcp_tools(self.agent, enabled_override=enabled_override, quiet_mode=True)
                 if enabled_override is not None:
                     self.enabled_toolsets = enabled_override
 
