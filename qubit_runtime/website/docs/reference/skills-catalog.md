@@ -100,6 +100,7 @@ If a skill is missing from this list but present in the repo, the catalog is reg
 | [`competitor-news-monitor`](../user-guide/skills/bundled/research/research-competitor-news-monitor.md) | Watch named companies for material news; cited digests. | `research/competitor-news-monitor` |
 | [`grounded-citations`](../user-guide/skills/bundled/research/research-grounded-citations.md) | Ground answers and documents in cited, verifiable sources. | `research/grounded-citations` |
 | [`llm-wiki`](../user-guide/skills/bundled/research/research-llm-wiki.md) | Karpathy's LLM Wiki: build/query interlinked markdown KB. | `research/llm-wiki` |
+| [`subscription-research`](../user-guide/skills/bundled/research/research-subscription-research.md) | Use the user's own Perplexity Pro / Gemini Web accounts for web research through local OmniRoute. | `research/subscription-research` |
 
 ## social-media
 
