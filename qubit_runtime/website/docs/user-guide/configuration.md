@@ -167,6 +167,33 @@ You can also set `providers.<id>.stale_timeout_seconds` for the non-streaming st
 
 Leaving these unset keeps the legacy defaults (`HERMES_API_TIMEOUT=1800`s, `HERMES_API_CALL_STALE_TIMEOUT=90`s, native Anthropic 900s). The non-streaming stale detector is auto-disabled for local endpoints when left implicit and can scale upward for very large contexts. Not currently wired for AWS Bedrock (both `bedrock_converse` and AnthropicBedrock SDK paths use boto3 with its own timeout configuration). See the commented example in [`cli-config.yaml.example`](https://github.com/NousResearch/hermes-agent/blob/main/cli-config.yaml.example).
 
+## Browser Profile and Role Model Tiers
+
+Two optional maps tune where the browser tool finds a profile and which model each
+agent role tier runs.
+
+```yaml
+browser:
+  # Optional path to an installed Chromium-family profile. Empty means detect
+  # the active snap/native profile; Qubit never copies the profile.
+  profile_dir: ""
+
+roles:
+  model_tiers:
+    # `local` and `detail` default to the resident local brain.
+    local:
+      provider: ollama
+      model: qubit-brain
+    detail:
+      provider: ollama
+      model: qubit-brain
+    # `api` (or an omitted tier) uses the active model/provider.
+```
+
+The tiers are read by `qubit agent run`; `--model` / `--provider` override the
+selected tier for one turn. An unmapped tier reports `model_tier_applied: false`
+instead of silently falling back.
+
 ## Update Behavior
 
 ### Background checks

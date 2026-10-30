@@ -1,7 +1,7 @@
 ---
-title: "Subscription Research — Use the user's own Perplexity Pro / Gemini Web accounts for web research through local OmniRoute"
+title: "Subscription Research — Use the user's own Perplexity Pro / Gemini Web accounts for web research through local OmniRoute."
 sidebar_label: "Subscription Research"
-description: "Use the user's own Perplexity Pro / Gemini Web accounts for web research through local OmniRoute"
+description: "Use the user's own Perplexity Pro / Gemini Web accounts for web research through local OmniRoute."
 ---
 
 {/* This page is auto-generated from the skill's SKILL.md by website/scripts/generate-skill-docs.py. Edit the source SKILL.md, not this page. */}
@@ -20,6 +20,8 @@ Use the user's own Perplexity Pro / Gemini Web accounts for web research through
 | Author | Qubit Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
+| Tags | `Research`, `Perplexity`, `Gemini`, `OmniRoute`, `Search` |
+| Related skills | [`grounded-citations`](../../bundled/research/research-grounded-citations.md), [`competitor-news-monitor`](../../bundled/research/research-competitor-news-monitor.md) |
 
 ## Reference: full SKILL.md
 

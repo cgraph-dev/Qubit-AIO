@@ -27,6 +27,7 @@ from datetime import datetime, timezone, UTC
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO_ROOT)
 import qubit_yaml as yaml
+from qubit_cli import install_source  # noqa: E402
 
 LOCAL_SKILL_DIRS = [
     ("skills", "built-in"),
@@ -330,7 +331,7 @@ def extract_local_skills():
             rel_id = rel.replace(os.sep, "/")
             install_identifier = (
                 f"official/{rel_id}" if source_label == "optional"
-                else f"NousResearch/hermes-agent/skills/{rel_id}"
+                else f"{install_source.official_repository()}/skills/{rel_id}"
             )
             skills.append({
                 "name": fm.get("name", os.path.basename(root)),

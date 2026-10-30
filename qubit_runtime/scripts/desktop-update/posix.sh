@@ -101,7 +101,7 @@ export QUBIT_HOME HERMES_HOME="$QUBIT_HOME"
 MARKER="$QUBIT_HOME/.hermes-update-in-progress"
 LOG_DIR="$QUBIT_HOME/logs"; mkdir -p "$LOG_DIR" 2>/dev/null || true
 LOG="$LOG_DIR/desktop-update-handoff.log"
-RESULT="$QUBIT_HOME/.hermes-update-result.json"
+RESULT="$HOME_DIR/.hermes-update-result.json"
 STATUS="${TMPDIR:-/tmp}/hermes-update-status.$$"
 STARTED_AT="$(date +%s)"  # the shim's elapsed clock; see serve-ui.py
 # Separate identity from both heartbeat time and adopt-only HANDOFF_RUN.
@@ -670,6 +670,20 @@ deliver_outcome() { # the truth-determining half: swap bundles / gate the relaun
   fi
 }
 
+restore_user_proxy_env() { # port of restoreUserProxyEnv (electron/updater/system-proxy-env.ts):
+  # the Desktop gave its system proxy to the update only; the relaunched app gets the user's own env.
+  local key saved keys
+  IFS=, read -r -a keys <<< "${HERMES_UPDATE_SYSTEM_PROXY:-}"
+  for key in ${keys[@]+"${keys[@]}"}; do
+    case "$key" in HTTPS_PROXY|https_proxy|HTTP_PROXY|http_proxy|NO_PROXY|no_proxy) unset "$key" ;; esac
+  done
+  for key in NO_PROXY no_proxy; do
+    saved="HERMES_UPDATE_USER_$key"
+    if printenv "$saved" >/dev/null; then export "$key=$(printenv "$saved")"; unset "$saved"; fi
+  done
+  unset HERMES_UPDATE_SYSTEM_PROXY
+}
+
 launch_app() { # attempted BEFORE the terminal event (launch acceptance is
   # part of the outcome — gille's review). Returns nonzero when a launch
   # was due but did not verifiably happen; caller downgrades to manual.
@@ -687,7 +701,7 @@ launch_app() { # attempted BEFORE the terminal event (launch acceptance is
     /usr/bin/xattr -dr com.apple.quarantine "$RELAUNCH_TARGET" 2>/dev/null || true
     # `open` talks to launchd and FAILS LOUDLY on a broken/unlaunchable
     # bundle — its exit code IS launch acceptance here.
-    /usr/bin/open "$RELAUNCH_TARGET" || { log "WARNING: open rejected the app"; return 1; }
+    ( restore_user_proxy_env; /usr/bin/open "$RELAUNCH_TARGET" ) || { log "WARNING: open rejected the app"; return 1; }
   elif [ "$GATE" = "relaunch" ]; then
     # setsid only proves the wrapper shell started, so verify acceptance:
     # spawn, then confirm the child is still alive shortly after — an
@@ -1153,7 +1167,7 @@ cd "$INSTALL_ROOT" || {
   log "$FINAL_MSG"; exit 3
 }
 export PYTHONUNBUFFERED=1
-# The takeover children (qubit update -> _update_takeover/update_finish and
+# The takeover children (hermes update -> _update_takeover/update_finish and
 # the PM sync / build stages they drive) publish their stages back into the
 # shim's UI through this file; without a watching UI the variable is simply
 # absent and the helper no-ops.
@@ -1248,7 +1262,7 @@ if [ "$LEGACY_INSTALL" -eq 1 ] && [ "$CODE" -ne 0 ] && [ "$CODE" -ne 2 ]; then
   # dedicated exit code (8) so callers can distinguish "skipped" from a
   # real failure.
   if printf '%s' "$OUT" | grep -q "CODE UPDATE SKIPPED"; then
-    log "qubit update skipped (checkout parked on a non-target branch); not retrying"
+    log "hermes update skipped (checkout parked on a non-target branch); not retrying"
     FINAL_CODE=8
     FINAL_MSG="Update skipped: the git checkout is on a branch that isn't fully merged into $BRANCH. Switch to the target branch and update again (see the terminal output for the exact commands)."
     exit 8
@@ -1294,12 +1308,31 @@ elif [ "$CODE" -ne 2 ] && update_committed_after_exit; then
   add_warning "update" "qubit update exited $CODE after the commit point (receipt outcome: $RECEIPT_OUTCOME)"
 else
   FINAL_CODE="$CODE" FINAL_MSG="Update failed (exit $CODE). Run qubit debug share in a terminal to send a report."
+  # Name the failing layer where the user can see it: the updater's own tail
+  # rides the result file and the shim message (empty output keeps the
+  # original generic copy, byte-identical).
+  FAIL_EXCERPT="$(update_output_tail | tr '\n' ' ' | sed 's/ *$//')"
+  [ -z "$FAIL_EXCERPT" ] || FINAL_MSG="$FINAL_MSG Last output: $FAIL_EXCERPT"
   # The bricked-venv class is fixable and must not read as a generic exit 1:
   # a dead interpreter with a failed/impossible heal means retrying can never
   # succeed — tell the user what is actually wrong (#95759).
   if [ "$LEGACY_INSTALL" -eq 1 ] && ! tcc_probe_python "$INSTALL_ROOT/venv/bin/python3" \
       && ! tcc_probe_python "$INSTALL_ROOT/venv/bin/python"; then
-    FINAL_MSG="Update failed: the Python interpreter inside $INSTALL_ROOT/venv cannot start (heal state: $TCC_HEAL_STATE). Reinstall the runtime with the Qubit installer, or run qubit doctor --fix from a terminal if any qubit command still works."
+    FINAL_MSG="Update failed: the Python interpreter inside $INSTALL_ROOT/venv cannot start (heal state: $TCC_HEAL_STATE). Reinstall the runtime with the Qubit installer, or run qubit doctor --fix from a terminal if any hermes command still works."
+  fi
+fi
+
+# Pre-PM update code could report a failed desktop build with exit zero.
+# Current composition propagates failure and never enters this legacy repair.
+# The code already committed: a failed rebuild is a follow-up warning on an
+# ok:true result (contract C3), never "you're still on the previous version".
+if [ "$LEGACY_INSTALL" -eq 1 ] && [ "$CODE" -eq 0 ] && printf '%s' "$OUT" | grep -q "Desktop build failed"; then
+  log "desktop build failed inside hermes update; retrying build"
+  publish_stage "Rebuilding Desktop"
+  if ! ( trap - TERM; exec "${UPDATE_INVOKE[@]}" desktop --force-build --build-only ) >> "$LOG" 2>&1; then
+    APP_REBUILD_FAILED=1
+    DONE_NOTE="Qubit was updated, but the Desktop app rebuild failed - you are running the previous app build. Run qubit desktop --force-build from a terminal to retry."
+    add_warning "desktop-rebuild" "hermes desktop --force-build --build-only failed"
   fi
 fi
 
