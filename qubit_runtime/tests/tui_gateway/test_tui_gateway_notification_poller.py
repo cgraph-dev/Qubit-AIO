@@ -20,6 +20,10 @@ def test_session_rebuild_stops_previous_notification_poller(monkeypatch):
     session (two live loops per rebuild) until the session itself is finalized — close can only
     signal the newest event."""
     monkeypatch.setattr(server, "_notify_session_boundary", lambda *a, **k: None)
+    # This test pins poller lifecycle, not /loop, /heartbeat or kanban: stub those drivers so the
+    # loop never opens the session DB before it can observe its stop event.
+    for name in ("_maybe_fire_tui_loop_tick", "_maybe_fire_tui_heartbeat_tick", "_notif_poll_kanban"):
+        monkeypatch.setattr(server, name, lambda *a, **k: None)
     sess = _session()
     server._sessions["sid_rebuild"] = sess
     try:

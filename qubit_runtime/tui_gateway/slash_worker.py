@@ -222,10 +222,6 @@ def main():
                 logger.debug("slash worker memory trim failed: %s: %s", type(exc).__name__, exc)
 
 
-if __name__ == "__main__":
-    main()
-
-
 # --- ported from upstream 088f657ecf ---
 
 def _start_legacy_parent_watchdog(parent_pid: int, *, poll_s: float = 2.0, grace_s: float = 5.0) -> None:
@@ -254,3 +250,7 @@ def _start_legacy_parent_watchdog(parent_pid: int, *, poll_s: float = 2.0, grace
 
     # health: allow HX012 -- the loop reads getppid(), flushes the opt-in metrics and calls os._exit
     threading.Thread(target=_loop, daemon=True, name="slash-legacy-parent-watchdog").start()
+
+
+if __name__ == "__main__":
+    main()

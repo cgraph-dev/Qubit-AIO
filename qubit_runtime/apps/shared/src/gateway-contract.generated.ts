@@ -36,6 +36,7 @@ export type UsageBarKind = 'plan' | 'topup'
 export interface BillingStateResult {
   ok: boolean
   logged_in: boolean
+  free_tier?: boolean
   free_tier_account?: boolean
   free_tier_model?: string | null
   org_name?: string | null
@@ -3344,6 +3345,7 @@ export interface SessionActiveItem {
   model: string
   preview: string
   session_key: string
+  source?: string | null
   started_at: number
   status: LiveSessionStatus
   title: string
@@ -3684,6 +3686,7 @@ export interface SessionEventsSinceParams {
   session_id: string
   profile?: string | null
   last_seen?: number | null
+  replay_epoch?: string | null
 }
 export interface SessionEventsSinceResult {
   events: Record<string, unknown>[]
@@ -4062,16 +4065,14 @@ export interface CronRemovedJob {
 export interface BrowserManageParams {
   action?: BrowserAction
   url?: string | null
-  enabled?: boolean | null
   session_id?: string | null
   profile?: string | null
 }
-export type BrowserAction = 'status' | 'connect' | 'disconnect' | 'use'
+export type BrowserAction = 'status' | 'connect' | 'disconnect'
 export interface BrowserManageResult {
   connected: boolean
   url?: string | null
   messages?: string[] | null
-  browser_use?: boolean | null
 }
 /** Handlers that look a live session up with ``_sessions.get(params.get("session_id"))``: an absent / unknown id falls back to the launch profile's config, so it is never required. */
 export interface _SessionScoped {
@@ -5490,7 +5491,7 @@ export interface RpcMethods {
   'browser.controller.register': { params: BrowserControllerRegisterParams; result: BrowserControllerRegisterResult }
   /** Deliver one command result to the broker; accepted is false for unknown or settled command ids. */
   'browser.controller.result': { params: BrowserControllerResultParams; result: BrowserControllerResultResult }
-  /** Inspect, attach to, or drop the CDP browser the tools use, or switch Browser Use mode (``use``, applies to new sessions); ``messages`` narrate a connect. */
+  /** Inspect, attach to, or drop the CDP browser the tools use; ``messages`` narrate a connect. */
   'browser.manage': { params: BrowserManageParams; result: BrowserManageResult }
   /** Lock one answer of a batch clarify request (editable until every question is locked). */
   'clarify.lock': { params: ClarifyLockParams; result: ClarifyLockResult }

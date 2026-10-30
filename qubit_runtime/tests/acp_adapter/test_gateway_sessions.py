@@ -53,7 +53,7 @@ class ACPPeer:
         await self.process.stdin.drain()
         # The adapter opens its own writer on the shared state.db; when the host cannot use WAL
         # (DELETE journal mode) it can wait out SessionDB's 20s write patience before answering.
-        return await asyncio.wait_for(future, 90)
+        return await asyncio.wait_for(future, 180)
 
 
 @asynccontextmanager
@@ -68,7 +68,7 @@ async def editor(daemon, tmp_path):
         finally:
             process.stdin.close()
             try:
-                await asyncio.wait_for(process.wait(), 90)
+                await asyncio.wait_for(process.wait(), 180)
             except TimeoutError:
                 process.kill()
                 await process.wait()

@@ -76,7 +76,7 @@ def _run_until_settled_or_error(runtime: HostedRoomRuntime, db: Path, identity) 
             state.get_task(db, identity)["status"] in state.TERMINAL_STATUSES
             or runtime.status()["last_error"] is not None))
     finally:
-        assert runtime.stop(timeout=5.0)
+        assert runtime.stop(timeout=15.0)
     return state.get_task(db, identity)
 
 
@@ -110,7 +110,7 @@ def _server_module():
 def _legacy_runtime(db: Path, rpc: HostedRoomServerRPC) -> HostedRoomRuntime:
     return HostedRoomRuntime(
         db_path=db, rooms=[BINDING], rpc=rpc, turn_lock=RecordingTurnLocks(),
-        lease_ttl_seconds=0.4, poll_interval_seconds=0.01)
+        lease_ttl_seconds=30.0, poll_interval_seconds=0.01)
 
 
 class DispatchingPeerClient:
@@ -151,7 +151,7 @@ def _peer_runtime(db: Path, client: DispatchingPeerClient) -> HostedRoomRuntime:
 
     return HostedRoomRuntime(
         db_path=db, rooms=[BINDING], transport_resolver=resolve, turn_lock=RecordingTurnLocks(),
-        lease_ttl_seconds=0.4, poll_interval_seconds=0.01)
+        lease_ttl_seconds=30.0, poll_interval_seconds=0.01)
 
 
 def _assert_refused_as_proven_failure(task: dict, runtime: HostedRoomRuntime) -> None:

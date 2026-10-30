@@ -186,7 +186,11 @@ def test_submit_during_manual_compress_is_queued_and_reply_persists(monkeypatch)
 
     def fake_compress_now(agent, msgs, request, **kw):
         entered.set()
-        gate.wait(5)
+        # Hold the compaction open until the test releases it. This is a latch,
+        # not a budget: a short wait let the fake finish on a loaded runner before
+        # the assertions ran, releasing `running` and making the busy submit
+        # return None.
+        gate.wait(60)
         return types.SimpleNamespace(status="compressed", removed=4,
                                      after_messages=[{"role": "user", "content": "[summary]"}, *msgs[-2:]])
 
@@ -234,7 +238,7 @@ def test_submit_during_manual_compress_is_queued_and_reply_persists(monkeypatch)
         ccm.AGGRESSIVE_UNSUPPORTED
     resp = server._handle_busy_submit("r2", "sid", session, "question", "ws-1")
     gate.set()
-    rpc.join(5)
+    rpc.join(30)
 
     assert resp["result"]["status"] == "queued"
     assert session["history"][-1]["content"] == "REPLY"

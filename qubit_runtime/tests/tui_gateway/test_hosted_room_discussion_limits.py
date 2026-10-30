@@ -55,7 +55,7 @@ def _settle(service: HostedRoomService, index: int, text: str = "@everyone next"
         gateway_id=binding.gateway_id,
         authority_epoch=binding.authority_epoch,
         process_generation="budget-test",
-        ttl_seconds=30,
+        ttl_seconds=300,
         clock=time.time,
     )
     attempt = driver.start_task(

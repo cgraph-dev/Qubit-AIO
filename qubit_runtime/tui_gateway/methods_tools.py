@@ -1198,34 +1198,17 @@ def _container_checkpoint_refusal(session, mgr, cwd) -> str | None:
 
 
 @method("browser.manage")
+@_profile_scoped
 def _(rid, params: dict) -> dict:
     action = params.get("action", "status")
     if action == "status":
         url = _resolve_browser_cdp_url()
-        from tools.browser_use_cli import is_browser_use_cli_mode
-        return _ok(rid, {"connected": bool(url), "url": url, "browser_use": is_browser_use_cli_mode()})
-    if action == "use":
-        return _browser_manage_use(rid, params)
+        return _ok(rid, {"connected": bool(url), "url": url})
     if action == "disconnect":
         return _browser_disconnect(rid)
     if action == "connect":
         return _browser_connect(rid, params)
     return _err(rid, 4015, f"unknown action: {action}")
-
-
-def _browser_manage_use(rid, params: dict) -> dict:
-    """``/browser use [off]``: persist the target profile's ``browser.backend`` and drop cached
-    tool availability so the next agent build gets the swapped surface."""
-    from tools.browser_use_cli import is_browser_use_cli_mode, set_browser_use_mode
-    profile = (params.get("profile") or "").strip() or None
-    enabled = params.get("enabled", True)
-    try:
-        with _session_home_scope(None, profile=profile):
-            set_browser_use_mode(enabled is not False)
-            return _ok(rid, {"connected": bool(_resolve_browser_cdp_url()),
-                             "browser_use": is_browser_use_cli_mode()})
-    except ProfileUnavailableError:
-        return _err(rid, 4064, f"profile '{profile}' not found")
 
 
 @_scoped_rpc("config.show", 5030)

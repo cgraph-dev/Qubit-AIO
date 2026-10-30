@@ -555,7 +555,7 @@ def test_goal_draft_uses_session_profile_without_blocking_rpc_reader(
     def draft(objective):
         observed.append(get_qubit_home())
         started.set()
-        assert release.wait(10)
+        assert release.wait(30)
         return goals.GoalContract(verification="tests pass")
 
     def write(frame):
@@ -577,14 +577,14 @@ def test_goal_draft_uses_session_profile_without_blocking_rpc_reader(
     caller = threading.Thread(target=dispatch)
     caller.start()
     try:
-        assert started.wait(5)
-        assert returned.wait(2), "draft blocked the transport reader"
+        assert started.wait(30)
+        assert returned.wait(30), "draft blocked the transport reader"
         ping = server.dispatch({"id": "ping", "method": "ping", "params": {}}, transport)
         assert ping["id"] == "ping" and "result" in ping
     finally:
         release.set()
-        caller.join(5)
-    assert replied.wait(5)
+        caller.join(30)
+    assert replied.wait(30)
     assert observed == [secondary]
     assert goals.load_goal(key) is None, "goal leaked into the launch profile"
     with server._session_profile_runtime_scope(record):

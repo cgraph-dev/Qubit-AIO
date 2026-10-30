@@ -128,7 +128,9 @@ def test_first_connect_creates_one_identity_then_the_page_reads_signed_in(
     assert wait_until(lambda: "connector_nudge_due_in" in _result("free_tier.status"), timeout=5)
     status = _result("free_tier.status")
     assert status["connector_nudge_due_in"] == free_tier_offer.OFFER_DELAY_S
-    assert "nudge_due_in" not in status and status["has_guest"] and not status["available"]
+    # Qubit's ``available`` means the free tier is on for this install (guest + enabled), not that
+    # the welcome trial carries inference; the connector offer is the signal under test here.
+    assert "nudge_due_in" not in status and status["has_guest"] and status["available"]
 
     assert _result("connectors.list", ACCOUNT)["connectors"][0]["connector"] == "notion"
     _result("connectors.catalog")
