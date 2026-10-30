@@ -87,6 +87,9 @@ def _cli_startup_notices(enabled):
         notices["tool_availability_warnings"] = tool_availability_warning_lines(
             unavailable, terminal_reason=terminal_backend_unavailable_reason(),
             terminal_backend=current_terminal_backend())
+    with contextlib.suppress(Exception):
+        from tools.browser_use_cli import default_downgrade_notice
+        notices["browser_backend_notice"] = default_downgrade_notice()
     return notices
 
 
