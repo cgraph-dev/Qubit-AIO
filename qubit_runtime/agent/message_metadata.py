@@ -95,6 +95,15 @@ def unpriced_replay_fields() -> frozenset[str]:
     return _UNPRICED_CORE_FIELDS.union(opaque, text)
 
 
+# Connector data-use requirement on a tool message; persisted inside ``display_metadata``, never sent to a model.
+DATA_USE = "data_use"
+
+
+def data_use_requirement(messages: Any) -> frozenset[str]:
+    """The union of ``data_use`` over *messages*: what the model receiving them must guarantee."""
+    return frozenset(r for m in messages or () if isinstance(m, Mapping) for r in m.get(DATA_USE) or ())
+
+
 def without_persistence_fields(msg: Mapping[str, Any]) -> Mapping[str, Any]:
     """*msg* itself when it carries no persistence-only field, else a shallow copy without them."""
     if PERSISTENCE_ONLY_MESSAGE_FIELDS.isdisjoint(msg):

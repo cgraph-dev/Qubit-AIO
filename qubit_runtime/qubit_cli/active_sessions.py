@@ -11,6 +11,7 @@ import json
 import logging
 import collections
 import math
+import errno
 import os
 import time
 import uuid
@@ -190,18 +191,14 @@ def _lease_paths(
 
 
 def _flock(fh, *, lock: bool, timeout: Optional[float] = None) -> None:
-    """Exclusive whole-file lock/unlock on ``fh`` (fcntl on POSIX, msvcrt on Windows)."""
-    if lock and timeout is not None and os.name != "nt":
-        import fcntl
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                return
-            except BlockingIOError:
-                if time.monotonic() >= deadline:
-                    raise
-                time.sleep(0.01)
+    """Exclusive whole-file lock/unlock on ``fh`` (fcntl on POSIX, msvcrt on Windows). With ``timeout``
+    the lock is retried only while another holder has it, then BlockingIOError is raised, so a holder
+    stopped mid-write (SIGSTOP, a debugger) cannot stall the caller; other errors raise at once."""
+    if lock and timeout is not None:
+        from pm.filesystem import lock_fd
+        if not lock_fd(fh.fileno(), wait=True, timeout=timeout):
+            raise BlockingIOError(errno.EWOULDBLOCK, f"file lock still held after {timeout}s")
+        return
     if os.name == "nt":
         import msvcrt
         fh.seek(0)

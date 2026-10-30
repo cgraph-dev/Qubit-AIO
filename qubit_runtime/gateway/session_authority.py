@@ -34,6 +34,24 @@ _MARKER_RELEASE_WAIT_S = 60.0
 native_write_started = ContextVar('native_write_started', default=False)
 
 
+@contextlib.asynccontextmanager
+async def keyed_turn(table, key, *, queued=None):
+    """One FIFO turn per *key*: ``table[key]`` is ``[asyncio.Lock(), holder + waiters]``, created on
+    first use and deleted when the last one leaves. asyncio's Lock is FIFO and a cancelled waiter gives
+    up only its own place. *queued* runs (before waiting) when an earlier turn holds or awaits the key."""
+    entry = table.setdefault(key, [asyncio.Lock(), 0])
+    entry[1] += 1
+    if queued is not None and entry[1] > 1:
+        queued()
+    try:
+        async with entry[0]:
+            yield
+    finally:
+        entry[1] -= 1
+        if not entry[1]:
+            del table[key]
+
+
 @dataclass
 class LiveSession:
     source: object

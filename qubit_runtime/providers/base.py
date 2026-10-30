@@ -233,6 +233,16 @@ class ProviderProfile:
     # hostname: base hostname for URL→provider reverse-mapping in model_metadata.py
     # e.g. "api.gmi-serving.com". Derived from base_url when empty.
     hostname: str = ""
+    # Hosts (exact or any subdomain) that serve THIS provider's API, so a ``custom`` endpoint or an
+    # auto-routed aux client at one of them is recognised as this provider (``providers.profile_for_host``).
+    # It also makes ``reasoning_payload`` the reasoning gate there, except on hosts core gates itself
+    # (OpenRouter, Ollama Cloud, Nous Portal, Vercel AI Gateway, the ``lmstudio`` provider).
+    hostnames: tuple = ()
+    # Hosts that identify this provider's catalog for model metadata (context length, models.dev) but
+    # take other credentials; matched only by ``profile_for_host(url, metadata=True)``.
+    metadata_hostnames: tuple = ()
+    # models.dev provider id when it differs from ``name`` (e.g. ``fireworks`` -> ``fireworks-ai``).
+    models_dev_id: str = ""
 
     # ── Client-level quirks (set once at client construction) ─
     default_headers: dict[str, str] = field(default_factory=dict)

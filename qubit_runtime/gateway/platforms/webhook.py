@@ -664,7 +664,22 @@ class WebhookAdapter(BasePlatformAdapter):
             logger.warning("[webhook] Skill loading failed: %s", e)
         return prompt
 
-    async def _handle_webhook(self, request: web.Request) -> web.Response:
+    def _admission_source(self, route_name: str, profile, delivery_id: str):
+        """The ``SessionSource`` admission builds for one delivery, ``profile_routes`` resolved on it.
+        The edge's coalesced-route check (``parked_profile_refusal``) asks this same source, so a
+        route rule matches there exactly when it matches at admission."""
+        identity = _WebhookDeliveryIdentity.from_parts(profile, route_name, delivery_id)
+        source = self.build_source(chat_id=identity.session_chat_id, chat_name=f"webhook/{route_name}",
+                                   chat_type="webhook", user_id=f"webhook:{route_name}", user_name=route_name)
+        if profile and isinstance(profile, str):
+            # The ``/p/<profile>/`` prefix names the profile and wins over ``profile_routes``; the
+            # edge already refused it (retryable 503) when that profile is not served. Drop what
+            # ``build_source`` resolved from the routes, or a rejected route would refuse it here.
+            source.profile = profile
+            source.profile_route_rejected, source._rejected_route_profile = False, None
+        return source
+
+    async def _handle_webhook(self, request: "web.Request") -> "web.Response":
         """POST /webhooks/{route_name} — receive and process a webhook event."""
         route_name, route_config, profile, error_response = self._resolve_route(request)
         if error_response is None:
@@ -720,6 +735,7 @@ class WebhookAdapter(BasePlatformAdapter):
             # cron_job routes: the job's own skills apply; the rendered prompt is only per-run context.
             if (skills := route_config.get("skills", [])) and not route_config.get("cron_job"):
                 prompt = self._apply_skills(prompt, skills)
+        delivery_id = _header_delivery_id(headers)
         now = time.time()  # idempotency: skip duplicate deliveries (webhook retries)
         delivery_identity = _WebhookDeliveryIdentity.from_parts(profile, route_name, delivery_id)
         coalesce = route_config.get("coalesce")
