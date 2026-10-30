@@ -3,6 +3,13 @@
 Import-safe, stdlib-only — importable from anywhere without circular-import risk.
 """
 
+# Browser-hosted attachments are staged on the Qubit host and then read back
+# as a base64 data URL for the normal remote attachment RPC. Keep the upload
+# and read-back boundaries identical so a successful picker/drop can always be
+# attached afterward.
+WEBAPP_ATTACHMENT_MAX_BYTES: int = 16 * 1024 * 1024
+
+
 import contextlib
 import os
 import re
