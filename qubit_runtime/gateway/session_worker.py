@@ -31,7 +31,9 @@ def _claim(connection, ref, params):
     try:
         process = psutil.Process(pid)
         from qubit_cli.process_identity import worker_birth
-        if (worker_birth(process) != birth or not process.is_running()
+        # ``worker_birth`` is the monotonic kernel start tick (WSL2-safe); a pre-update
+        # producer or an older test fixture may still present psutil's create_time.
+        if (birth not in (worker_birth(process), process.create_time()) or not process.is_running()
                 or process.status() == psutil.STATUS_ZOMBIE
                 or process.username() != psutil.Process().username()):
             raise RuntimeStoreError('permission_denied')
