@@ -67,6 +67,7 @@ def model_in_transaction(db, conn, session_id, payload, prepared):
 
 
 def reasoning_in_transaction(db, conn, session_id, payload, prepared):
+    from qubit_state_runtime import _json
     snapshot, generation = _commit_policy(db, conn, session_id, prepared)
     # This level is newer than any still waiting for a turn boundary, beside or inside a deferred model pick.
     key = DEFERRED_PICK_PREFIX + session_id
