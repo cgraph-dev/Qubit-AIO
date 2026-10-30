@@ -68,7 +68,7 @@ The install also ships `hermes-agent`, a minimal runner that sends one query and
 | `qubit status` | Show agent, auth, and platform status. |
 | `qubit usage` | Show the configured account's rate-limit windows (the `/usage` block) without a session; `--json` for scripts. |
 | `qubit cron` | Inspect and tick the cron scheduler. |
-| `qubit pause` / `qubit resume` | Global emergency stop: no new cron fires (built-in ticker, managed-cron webhook, misfire catch-up), kanban dispatch or gateway turns start until resumed; in-flight work is never killed. |
+| `qubit pause` / `qubit resume` | Global emergency stop: no new cron fires (built-in ticker, managed-cron webhook, misfire catch-up), kanban dispatch or gateway turns start until resumed. Interactive CLI, TUI and Desktop turns are gateway turns, so they are held too, and each surface shows "Qubit is paused" with the reason and "run `qubit resume`". Turns already running finish; in-flight work is never killed. |
 | `qubit kanban` | Multi-profile collaboration board (tasks, links, dispatcher). |
 | `qubit project` | Manage named, multi-folder workspaces (projects). Anchors desktop session grouping and, when bound to a kanban board, gives tasks a deterministic worktree + branch convention. State is per-profile. |
 | `qubit webhook` | Manage dynamic webhook subscriptions for event-driven activation. |

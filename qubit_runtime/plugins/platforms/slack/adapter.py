@@ -6990,5 +6990,8 @@ def register(ctx) -> None:
         max_message_length=39000,
         emoji="💼",
         allow_update_command=True, platform_hint=PLATFORM_HINT,
+        display_tier="medium",
+        # Slack is a shared, customer-facing surface: default to final-answer-first (the #95841 tier).
+        display_overrides={"tool_progress": "off", "long_running_notifications": False, "busy_ack_detail": False},
         env_overrides=gateway_env.ENV_OVERRIDES,
         env_enable_credentials=gateway_env.ENV_ENABLE_CREDENTIALS, **gateway_env.AUTHZ)

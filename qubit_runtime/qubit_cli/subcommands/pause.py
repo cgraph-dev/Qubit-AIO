@@ -45,7 +45,9 @@ def build_pause_parser(subparsers) -> None:
         "pause", help="Emergency stop: pause cron/kanban dispatch and new gateway turns",
         description="Engage the global emergency stop. Halts NEW work only — cron "
             "dispatch, kanban dispatch, and new gateway turns — until "
-            "`qubit resume`. In-flight work is never killed.")
+            "`qubit resume`. Interactive CLI, TUI and Desktop turns are gateway turns, so they "
+            "are held too: each gets \"Qubit is paused\" with the reason. Turns already "
+            "running finish; in-flight work is never killed.")
     pause_parser.add_argument(
         "--reason", default=None, help="Optional reason stored in the sentinel and shown to users")
     pause_parser.set_defaults(func=cmd_pause)

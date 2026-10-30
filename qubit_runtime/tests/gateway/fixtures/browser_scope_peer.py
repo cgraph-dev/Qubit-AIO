@@ -29,7 +29,7 @@ async def probe():
     import tools.browser_tool_lifecycle as lifecycle
     from websockets.asyncio.client import connect
 
-    home = Path(os.environ['HERMES_HOME'])
+    home = Path(os.environ.get('QUBIT_HOME') or os.environ['HERMES_HOME'])
     (home / 'config.yaml').write_text('gateway:\n  multiplex_profiles: false\nmodel:\n  provider: custom\n  default: no-inference\n  base_url: http://127.0.0.1:1/v1\nauxiliary:\n  title_generation:\n    enabled: false\n')
     runner = GatewayRunner()
     await initialize_session_authority(runner, profile_id=str(home), instance_id='browser-scope')
