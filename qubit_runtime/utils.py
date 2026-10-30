@@ -119,6 +119,11 @@ def file_cache_version(path: str | Path, st: os.stat_result | None = None, *,
     return (*sig, racy_content_digest(path, sig))
 
 
+def mtime_is_racy(mtime_ns: int) -> bool:
+    """True while ``mtime_ns`` is too recent to rule out a same-tick write after the stat."""
+    return time.time_ns() - mtime_ns < RACY_MTIME_WINDOW_NS
+
+
 def _preserve_file_mode(path: Path) -> int | None:
     """Permission bits of *path* if it exists, else ``None``."""
     try:

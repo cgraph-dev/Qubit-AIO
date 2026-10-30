@@ -36,6 +36,7 @@ __all__ = [
     "BoundedResult",
     "DeadlineExpired",
     "clamp_timeout",
+    "poll_until",
     "kill_process_tree",
     "poll_until",
     "resolve_timeout",
@@ -155,7 +156,6 @@ def poll_until(predicate: Callable[[], _T], timeout: float, interval: float) -> 
         if remaining <= 0:
             return result
         time.sleep(min(interval, remaining))
-
 
 # --- Timeout resolution: config ``timeouts:`` > legacy env var > default ------
 

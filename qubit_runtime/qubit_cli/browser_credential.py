@@ -12,7 +12,7 @@ still the one in use: window and launch tickets (``web_routers.webapp``), socket
 tickets (``web_server_file_tickets``), open sockets (``web_session_sockets.track``) and a cookie
 login's binding (``webapp_sign_in.check``). Stores keep the generation, never the credential.
 
-:func:`rotate` (``hermes webapp --sign-out``) replaces the credential, then runs every revoker
+:func:`rotate` (``qubit webapp --sign-out``) replaces the credential, then runs every revoker
 registered with :func:`on_rotate`: grants that stay in use without being presented again (open
 sockets) end at once, and stores drop what can no longer be redeemed.
 """
