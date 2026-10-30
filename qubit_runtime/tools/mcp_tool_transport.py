@@ -22,6 +22,37 @@ from tools import mcp_tool_registration as _registration
 
 logger = logging.getLogger("tools.mcp_tool")
 
+
+def _raise_sdk_sse_default() -> None:
+    """Give older mcp SDKs our wire-style SSE event bound.
+
+    Newer SDKs accept ``max_sse_event_size`` (passed by ``_owned_client_streams``). Older
+    ``mcp.client.streamable_http`` builds ``EventSource(response)`` for POST streams with
+    httpx2's 1 MiB default and exposes no knob, so a large ``tools/list`` failed outright.
+    Patch that module's ``EventSource`` default once; the class and its API are unchanged.
+    """
+    try:
+        import inspect
+        import mcp.client.streamable_http as _sh
+        if "max_sse_event_size" in inspect.signature(_sh.streamable_http_client).parameters:
+            return
+        if getattr(_sh, "_qubit_sse_limit_patched", False):
+            return
+        _orig = _sh.EventSource
+
+        class _QubitEventSource(_orig):
+            def __init__(self, response, max_event_size=_MCP_HTTP_MAX_BODY_BYTES):
+                super().__init__(response, max_event_size=max_event_size)
+
+        _sh.EventSource = _QubitEventSource
+        _sh._qubit_sse_limit_patched = True
+    except Exception:
+        logger.debug("could not raise the SDK SSE event bound", exc_info=True)
+
+
+_raise_sdk_sse_default()
+
+
 _PROBE_INITIALIZE_BODY = (  # JSON-RPC ``initialize`` body for the content-type preflight POST
     '{"jsonrpc":"2.0","id":"_probe","method":"initialize","params":{"protocolVersion":"2025-03-26",'
     '"capabilities":{},"clientInfo":{"name":"hermes-probe","version":"0.1"}}}')
@@ -590,10 +621,25 @@ class MCPServerTransportMixin:
                 import inspect as _inspect
                 _sse_kwargs = {}
                 try:
-                    if "max_sse_event_size" in _inspect.signature(_core.streamable_http_client).parameters:
-                        _sse_kwargs["max_sse_event_size"] = _MCP_HTTP_MAX_BODY_BYTES
+                    _supports_sse_limit = "max_sse_event_size" in _inspect.signature(
+                        _core.streamable_http_client).parameters
                 except (TypeError, ValueError):
-                    pass
+                    _supports_sse_limit = False
+                if _supports_sse_limit:
+                    _sse_kwargs["max_sse_event_size"] = _MCP_HTTP_MAX_BODY_BYTES
+                else:
+                    # Older SDKs do not expose the knob but read every stream through the same
+                    # httpx2 client: raise that client's own SSE parser bound so a large
+                    # tools/list or tool result is not cut at httpx2's 1 MiB default.
+                    try:
+                        _sse_fn = http_client.sse
+                        if "max_event_size" in _inspect.signature(_sse_fn).parameters:
+                            def _sse_with_limit(*a, **kw):
+                                kw.setdefault("max_event_size", _MCP_HTTP_MAX_BODY_BYTES)
+                                return _sse_fn(*a, **kw)
+                            http_client.sse = _sse_with_limit
+                    except (AttributeError, TypeError, ValueError):
+                        pass
                 async with _core.streamable_http_client(url, http_client=http_client, **_sse_kwargs) as streams:
                     yield streams
         return _owned_client_streams()

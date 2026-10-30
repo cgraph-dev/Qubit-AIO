@@ -351,26 +351,26 @@ def _termux_browser_hints(*lines: str, node_installed: bool) -> None:
         check_info(step)
 
 
-def _check_chromium() -> None:
-    """Playwright Chromium presence, using the exact predicate browser_tool uses to hide browser_* tools.
+def _check_chromium(should_fix: bool) -> None:
+    """The Chromium browser_exec launches for a local session (``chromium_executable()``: browser.executable_path,
+    pm, the Docker image's baked build, a Termux system build). Only --fix may acquire it through PM."""
+    import pm
+    from qubit_cli.browser_runtime import chromium_executable, chromium_missing_hint
 
-    Lazy import: browser_tool is ~150KB; an import failure is a separate bug surfaced elsewhere. Camofox, a
-    CDP override, a cloud provider, or Lightpanda all bypass the local Chromium requirement (no warning).
-    """
-    try:
-        from tools.browser_tool import _is_camofox_mode
-        from tools.browser_tool_cloud import _get_cloud_provider
-        from tools.browser_tool_cdp import _get_cdp_override_raw
-        from tools.browser_tool_install import _chromium_installed
-        from tools.browser_tool_lightpanda_fallback import _using_lightpanda_engine
-    except Exception:
-        return
-    if _is_camofox_mode() or bool(_get_cdp_override_raw()) or _get_cloud_provider() is not None or _using_lightpanda_engine():
-        return
-    if not check_bool(_chromium_installed(), ("Playwright Chromium", "(browser engine)"),
-                      ("Playwright Chromium not installed", "(browser_* tools will be hidden from the agent)")):
-        check_info("Install with: qubit pm install chromium")
-
+    found = chromium_executable()
+    if not found and should_fix and not _is_termux():
+        try:
+            pm.ensure("chromium", explicit=True)
+        except (RuntimeError, OSError) as exc:  # pm.InstallError, a download or worker failure
+            check_warn("Chromium install failed", f"({exc})")
+        found = chromium_executable()
+    if found:
+        check_ok("Chromium", f"({found})")
+    elif reason := _chromium_not_needed_reason():
+        check_info(f"Chromium not installed (not needed: {reason})")
+    else:
+        check_warn("Chromium not installed", "(browser_exec cannot start a local browser)")
+        check_info(chromium_missing_hint())
 
 def _check_lightpanda() -> None:
     """Lightpanda engine (browser.engine / AGENT_BROWSER_ENGINE); independent of Node since Browser Use mode spawns ``lightpanda serve`` itself."""
@@ -406,7 +406,7 @@ def _check_node_and_browser(should_fix: bool, f: Finding) -> None:
     else:
         check_warn("Node.js not found", "(optional; PM agent-browser is a native executable)")
     if _check_agent_browser(should_fix) and not _is_termux():
-        _check_chromium()
+        _check_chromium(should_fix)
     _check_lightpanda()
 
 
