@@ -2699,6 +2699,78 @@ def _profile_seeds_pool(provider: str) -> bool:
     return profile is not None and type(profile).seed_pool_credentials is not ProviderProfile.seed_pool_credentials
 
 
+_COPILOT_RAW_DEGRADATION_WARNED: Set[str] = set()
+
+
+def _warn_copilot_raw_degradation_once(token: str) -> None:
+    """WARN once per token per process when Copilot exchange degrades to raw token (#114740)."""
+    fingerprint = fingerprint_secret_value(token) or "unknown"
+    if fingerprint in _COPILOT_RAW_DEGRADATION_WARNED:
+        return
+    _COPILOT_RAW_DEGRADATION_WARNED.add(fingerprint)
+    logger.warning(
+        "Copilot token exchange degraded to RAW token (exchange "
+        "unavailable); enterprise-only models may 400 with "
+        "model_not_available_for_integrator until exchange recovers."
+    )
+
+
+def _reset_copilot_raw_degradation_warned() -> None:
+    """Clear the degradation warning cache (for test isolation)."""
+    _COPILOT_RAW_DEGRADATION_WARNED.clear()
+
+
+def _seed_copilot_singleton(seed: _Seeder) -> None:
+    # Copilot tokens are resolved dynamically via `gh auth token` or env vars
+    # (COPILOT_GITHUB_TOKEN / GH_TOKEN); they don't live in the auth store.
+    try:
+        from qubit_cli.copilot_auth import (
+            COPILOT_ENV_VARS,
+            resolve_copilot_token,
+            get_copilot_api_token,
+        )
+        # All-sources gate BEFORE any work: resolve_copilot_token() shells out
+        # and the exchange retries 3x with backoff (~35s worst case); a user
+        # who suppressed every copilot source must not pay that on every pool
+        # load. The source space here matches credential_sources._remove_copilot_gh.
+        copilot_sources = ["gh_cli"] + [f"env:{v}" for v in COPILOT_ENV_VARS]
+        if all(seed.is_suppressed(seed.provider, s) for s in copilot_sources):
+            return
+        token, source = resolve_copilot_token()
+        if not token:
+            return
+        # Exact match: a substring test would classify GH_TOKEN/GITHUB_TOKEN
+        # as gh_cli and bypass a user's per-env-var suppression.
+        source_name = "gh_cli" if source == "gh auth token" else f"env:{source}"
+        # Per-source gate BEFORE the (~35s worst case) network exchange.
+        if seed.is_suppressed(seed.provider, source_name):
+            return
+        from qubit_cli.auth import is_provider_explicitly_configured
+        if not is_provider_explicitly_configured(seed.provider):
+            # Copilot is only discovered here (ambient gh CLI login), not selected anywhere: no
+            # model will be routed to it, so the network exchange — and its degradation warning on
+            # every pool load — buys nothing (#114740). Seed the raw token; the load that follows
+            # the user selecting copilot re-seeds and exchanges.
+            api_token, enterprise_base_url = token, None
+        else:
+            api_token, enterprise_base_url = get_copilot_api_token(token)
+            # get_copilot_api_token falls back to the RAW token when the exchange
+            # fails; the Copilot API then routes it to the fallback
+            # "copilot-language-server" integrator whose allowlist omits
+            # enterprise-only models -> HTTP 400 on every turn. Surface it once.
+            if api_token == token and not enterprise_base_url:
+                _warn_copilot_raw_degradation_once(token)
+        pconfig = PROVIDER_REGISTRY.get(seed.provider)
+        seed.upsert(source_name, {
+            "auth_type": AUTH_TYPE_API_KEY,
+            "access_token": api_token,
+            "base_url": enterprise_base_url or (pconfig.inference_base_url if pconfig else ""),
+            "label": source,
+        })
+    except Exception as exc:
+        logger.debug("Copilot token seed failed: %s", exc)
+
+
 def _seed_qwen_singleton(seed: _Seeder) -> None:
     # Qwen OAuth tokens live in ~/.qwen/oauth_creds.json (written by the Qwen
     # CLI). refresh_if_expiring=False avoids network calls during pool loading.
@@ -2783,6 +2855,8 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         _seed_anthropic_singletons(seed)
     elif provider == "nous":
         _seed_nous_singleton(seed, auth_store)
+    elif provider == "copilot":
+        _seed_copilot_singleton(seed)
     elif provider == "qwen-oauth":
         _seed_qwen_singleton(seed)
     elif provider == "minimax-oauth":

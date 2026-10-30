@@ -247,11 +247,11 @@ _REGISTRY_ROWS: Tuple[Any, ...] = (
     # region (agent/vertex_adapter.py build_vertex_base_url), not a fixed host.
     ("vertex", "Google Vertex AI", "", (), "", "vertex"),
     ("azure-foundry", "Azure Foundry", "", ("AZURE_FOUNDRY_API_KEY",), "AZURE_FOUNDRY_BASE_URL"))
-PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
-    p.id: p for p in (r if isinstance(r, ProviderConfig) else _api_key_provider(*r) for r in _REGISTRY_ROWS)
-}
+from qubit_cli.auth_plugin_providers import HomeScopedRegistry  # mirrored rows are read per home
+PROVIDER_REGISTRY: Dict[str, ProviderConfig] = HomeScopedRegistry(
+    (p.id, p) for p in (r if isinstance(r, ProviderConfig) else _api_key_provider(*r) for r in _REGISTRY_ROWS))
 # The rows above, before any plugin touches the dict (a user plugin may override these; #48450).
-BUILTIN_PROVIDER_IDS = frozenset(PROVIDER_REGISTRY)
+BUILTIN_PROVIDER_IDS = frozenset(dict.keys(PROVIDER_REGISTRY))
 
 # ``qubit_cli.config`` discovers model-provider plugins while importing, and a plugin may read this
 # module's registry during that discovery. Keep the import below ProviderConfig / PROVIDER_REGISTRY so
@@ -263,7 +263,8 @@ from qubit_cli.config import (  # noqa: E402
 # Plugin profiles (plugins/model-providers/<name>/) are mirrored into PROVIDER_REGISTRY with the
 # auth_type they declare; the mirror lives in the sibling so it can be re-run after discovery.
 from qubit_cli.auth_plugin_providers import (  # noqa: E402
-    get_plugin_oauth_auth_status, registry_lookup as _registry_lookup, sync_plugin_provider_registry)
+    canonical_registry_rows as _canonical_registry_rows, get_plugin_oauth_auth_status,
+    registry_lookup as _registry_lookup, sync_plugin_provider_registry)
 
 sync_plugin_provider_registry()
 
@@ -1627,8 +1628,11 @@ def _env_key_auto_detected(
     scoped_key_env: Callable[[str], str], oauth_active: Optional[str]) -> Optional[str]:
     """First registry api_key provider (registry order) with a usable env key, warning when it
     preempts a logged-in OAuth provider so a stale key in ~/.hermes/.env never switches silently."""
-    for pid, pconfig in PROVIDER_REGISTRY.items():
-        if pconfig.auth_type != "api_key" or pid in _NO_AUTO_DETECT_PROVIDERS:
+    from providers import list_providers
+
+    ambient = {p.name for p in list_providers() if p.ambient_credentials}  # never per-pid lookups: a miss walks the ladder
+    for pid, pconfig in _canonical_registry_rows():
+        if pconfig.auth_type != "api_key" or pid in _NO_AUTO_DETECT_PROVIDERS or pid in ambient:
             continue
         for env_var in pconfig.api_key_env_vars:
             if has_usable_secret(scoped_key_env(env_var)):
