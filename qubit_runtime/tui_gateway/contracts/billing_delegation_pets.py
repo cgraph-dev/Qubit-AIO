@@ -142,6 +142,7 @@ class BillingStateResult(Result):
 
     ok: bool
     logged_in: bool
+    free_tier: bool = False
     free_tier_account: bool = False
     free_tier_model: str | None = None
     org_name: str | None = None

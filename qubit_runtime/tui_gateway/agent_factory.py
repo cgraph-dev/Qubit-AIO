@@ -449,6 +449,12 @@ def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
         return None
 
 
+def _carry_onboarding_toolset(enabled, agent):
+    """A tool refresh keeps the onboarding toolset the agent was built with."""
+    from agent.onboarding_session import carry_onboarding_toolset
+    return carry_onboarding_toolset(enabled, agent)
+
+
 def _onboarding_toolsets(enabled, db, session_id):
     """The session-gated ``onboarding`` toolset folded into an active first-run chat's toolsets."""
     from agent.onboarding_session import onboarding_toolsets
