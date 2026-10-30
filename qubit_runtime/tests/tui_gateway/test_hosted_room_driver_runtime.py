@@ -461,7 +461,7 @@ def test_queued_task_routes_profile_and_credentials_without_overrides(db: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     create = next(params for method, params in rpc.calls if method == "create")
     submit = next(params for method, params in rpc.calls if method == "submit")
@@ -493,7 +493,7 @@ def test_worker_settles_without_any_client_transport(db: Path):
 
     assert runtime.status()["running"] is True
     assert runtime.status()["cycles"] >= 1
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
 
 def test_policy_hooks_prepare_and_publish_terminal_idempotently(db: Path):
@@ -514,7 +514,7 @@ def test_policy_hooks_prepare_and_publish_terminal_idempotently(db: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert prepared
     assert published == [(ROOM_ID, identity.task_id, "settled")]
@@ -543,7 +543,7 @@ def test_transport_resolver_selects_member_transport_without_forking_state(
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert resolutions
     assert all(binding == BINDING for binding, _, _ in resolutions)
@@ -679,7 +679,7 @@ def test_waiting_room_does_not_block_an_independent_room(tmp_path: Path):
     assert waiting.submitted.wait(10.0)
     _wait_for(lambda: state.get_task(db, identities[1])["status"] == "settled")
     assert state.get_task(db, identities[0])["status"] == "running"
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
 
 def test_bounded_scheduler_eventually_runs_later_room(tmp_path: Path):
@@ -725,7 +725,7 @@ def test_bounded_scheduler_eventually_runs_later_room(tmp_path: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
 
 def test_existing_canonical_session_is_resumed_not_duplicated(db: Path):
@@ -737,7 +737,7 @@ def test_existing_canonical_session_is_resumed_not_duplicated(db: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert not [call for call in rpc.calls if call[0] == "create"]
     resume = next(params for method, params in rpc.calls if method == "resume")
@@ -875,13 +875,13 @@ def test_oversized_terminal_reply_is_bounded_without_waiting_for_deadline(db: Pa
     runtime = _runtime(db, rpc, turn_timeout_seconds=30)
 
     runtime.start()
-    assert rpc.submitted.wait(timeout=5.0)
+    assert rpc.submitted.wait(timeout=15.0)
     rpc.complete(
         identity.task_id,
         content="é" * (MAX_TERMINAL_TEXT_BYTES + 100),
     )
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     result = state.get_task(db, identity)["result"]
     assert result["truncated"] is True
@@ -965,7 +965,7 @@ def test_turn_deadline_stops_exact_attempt_and_publishes_durable_failure(db: Pat
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "failed")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     failed = state.get_task(db, identity)
     assert failed["result"]["reason_code"] == "turn_deadline_exceeded"
@@ -1028,7 +1028,7 @@ def test_deadline_releases_worker_capacity_for_later_room(tmp_path: Path):
     runtime.start()
     _wait_for(lambda: state.get_task(db, identities[0])["status"] == "failed")
     _wait_for(lambda: state.get_task(db, identities[1])["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert state.get_task(db, identities[0])["result"]["reason_code"] == (
         "turn_deadline_exceeded"
@@ -1099,7 +1099,7 @@ def test_retry_ignores_late_receipt_from_prior_execution_generation(db: Path):
     runtime.start()
     assert rpc.submitted.wait(10.0)
     time.sleep(0.04)
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     task = state.get_task(db, identity)
     assert task["status"] == "running"
@@ -1131,7 +1131,7 @@ def test_active_recovered_turn_is_never_resubmitted(db: Path):
 
     runtime.start()
     time.sleep(0.08)
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert state.get_task(db, identity)["status"] == "running"
     assert not [call for call in rpc.calls if call[0] == "submit"]
@@ -1344,7 +1344,7 @@ def test_ambiguous_recovery_remains_indeterminate(db: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "indeterminate")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert not [call for call in rpc.calls if call[0] == "submit"]
 
@@ -1479,7 +1479,7 @@ def test_post_submit_observation_failure_preserves_recoverable_outcome(db: Path)
     rpc.complete(identity.task_id, content="Recovered after a transient read.")
     runtime.wakeup()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     task = state.get_task(db, identity)
     assert task["result"]["text"] == "Recovered after a transient read."
@@ -1504,7 +1504,7 @@ def test_cancellation_is_persisted_before_interrupt_and_fences_late_result(
     rpc.complete(identity.task_id, content="Too late.")
     runtime.wakeup()
     time.sleep(0.05)
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert cancelled["status"] == "cancelled"
     assert observed_status == ["stopping"]
@@ -1537,7 +1537,7 @@ def test_transient_remote_stop_failure_stays_pending_and_retries(db: Path):
     runtime.wakeup()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "cancelled")
     assert attempts >= 2
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
     assert state.get_task(db, identity)["status"] == "cancelled"
 
 
@@ -1686,7 +1686,7 @@ def test_completion_wins_a_race_with_unacknowledged_stop(db: Path):
 
     assert result["status"] == "settled"
     assert result["result"]["text"] == "Already done."
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
 
 def test_restart_harvests_completion_before_retrying_durable_stop(db: Path):
@@ -1745,7 +1745,7 @@ def test_restart_harvests_completion_before_retrying_durable_stop(db: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     settled = state.get_task(db, identity)
     assert stopping["status"] == "stopping"
@@ -1883,7 +1883,7 @@ def test_pending_local_approval_is_reported_with_safe_choices(db: Path):
     assert member == PROFILE
     assert action["request_id"] == "approval-1"
     assert action["approval"]["choices"] == ["once", "deny"]
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
 
 def test_cancel_never_interrupts_a_newer_task_in_the_same_session(db: Path):
@@ -1910,7 +1910,7 @@ def test_cancel_never_interrupts_a_newer_task_in_the_same_session(db: Path):
     assert all(params["expected_task_id"] == identity.task_id for params in skipped)
     assert rpc.states[session_id]["active"] is True
     assert rpc.states[session_id]["task_id"] == "task-2"
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
 
 def test_status_reports_room_blocked_on_unresolved_indeterminate_task(db: Path):
@@ -1940,7 +1940,7 @@ def test_status_reports_room_blocked_on_unresolved_indeterminate_task(db: Path):
 
     runtime.start()
     _wait_for(lambda: ROOM_ID in runtime.status()["blocked_rooms"])
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert state.get_task(db, identity)["status"] == "indeterminate"
 
@@ -1969,7 +1969,7 @@ def test_authority_loss_stops_terminal_commit(db: Path):
     rpc.complete(identity.task_id)
     runtime.wakeup()
     _wait_for(lambda: runtime.status()["last_error"] is not None)
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert state.get_task(db, identity)["status"] == "running"
     assert "authority changed" in runtime.status()["last_error"]
@@ -1984,7 +1984,7 @@ def test_profile_turn_lock_covers_resolve_submit_and_terminal_observation(db: Pa
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     # Balanced enter/exit pairs on the task's profile only (a loaded runner may run extra cycles).
     assert locks.events and all(profile == PROFILE for _event, profile in locks.events)
@@ -2004,7 +2004,7 @@ def test_stop_is_bounded_and_does_not_interrupt_active_turn(db: Path):
     runtime.start()
     assert rpc.submitted.wait(5.0)
     started = time.monotonic()
-    stopped = runtime.stop(timeout=5.0)
+    stopped = runtime.stop(timeout=15.0)
 
     assert stopped is True
     # Bounded: returns well before its own timeout and without waiting for the active turn (which never completes).

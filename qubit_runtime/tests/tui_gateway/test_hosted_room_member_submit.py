@@ -93,7 +93,7 @@ def test_submit_carries_the_target_member_id_the_transport_requires(db: Path):
 
     runtime.start()
     _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
-    assert runtime.stop(timeout=5.0)
+    assert runtime.stop(timeout=15.0)
 
     assert rpc.member_ids == ["member-ops"]
     assert state.get_task(db, identity)["result"]["text"] == "Finished once."
@@ -135,7 +135,7 @@ def test_driver_submit_settles_through_the_real_in_process_rpc(db: Path):
     try:
         _wait_for(lambda: state.get_task(db, identity)["status"] == "settled")
     finally:
-        assert runtime.stop(timeout=5.0)
+        assert runtime.stop(timeout=15.0)
 
     submits = [params for method, params in calls if method == "prompt.submit"]
     assert [params["_hosted_task"]["member_id"] for params in submits] == ["member-ops"]

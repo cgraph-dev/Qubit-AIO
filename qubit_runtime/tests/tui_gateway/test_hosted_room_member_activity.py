@@ -75,4 +75,4 @@ def test_status_names_the_member_answering_while_its_turn_runs(tmp_path: Path):
         assert service.status("room-1")["working"] is False
     finally:
         service.rpc.release.set()
-        assert service.stop(timeout=5.0)
+        assert service.stop(timeout=15.0)

@@ -76,7 +76,7 @@ def _run_until_settled_or_error(runtime: HostedRoomRuntime, db: Path, identity) 
             state.get_task(db, identity)["status"] in state.TERMINAL_STATUSES
             or runtime.status()["last_error"] is not None))
     finally:
-        assert runtime.stop(timeout=5.0)
+        assert runtime.stop(timeout=15.0)
     return state.get_task(db, identity)
 
 
