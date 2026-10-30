@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import socket
 import threading
 import time
 import urllib.parse
@@ -113,17 +114,34 @@ def _profile_home(profile: str) -> Optional[str]:
         from qubit_cli.profiles import get_profile_dir
         return str(get_profile_dir(profile))
     if profile and profile != "default":
-        # Same layout get_profile_dir() uses: <qubit_root>/profiles/<name>. Deriving
-        # from the resolved root keeps this consistent with every other home lookup;
-        # the old literal "~/.hermes/profiles/<p>" produced split-brain homes.
+        # Same layout get_profile_dir() uses: <qubit_root>/profiles/<name>. Deriving from the
+        # resolved root keeps this consistent with every other home lookup; a literal
+        # "~/.qubit/profiles/<p>" produced split-brain homes.
         with contextlib.suppress(Exception):
             from qubit_constants import get_default_qubit_root
             return str(get_default_qubit_root() / "profiles" / profile)
-        return os.path.join(os.path.expanduser("~/.qubit"), "profiles", profile)
+        return os.path.expanduser(f"~/.qubit/profiles/{profile}")
     with contextlib.suppress(Exception):
         from qubit_cli.config import get_qubit_home
         return str(get_qubit_home())
     return None
+
+
+class _ThreadingHTTPServerV6(ThreadingHTTPServer):
+    """IPv6 listener. ``V6ONLY=0`` makes the ``::`` wildcard dual-stack (IPv4 peers arrive as
+    ``::ffff:a.b.c.d``), so one socket serves IPv6-only private networks and IPv4 alike."""
+
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        with contextlib.suppress(OSError, AttributeError):  # no IPV6_V6ONLY: the bind stays v6-only
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
+
+
+def _http_server_class(host: str) -> type:
+    """``ThreadingHTTPServer`` is AF_INET only, so an IPv6 bind (``::1``, ``::``) needs the v6 family."""
+    return _ThreadingHTTPServerV6 if ":" in host else ThreadingHTTPServer
 
 
 def _daemon_thread(target, name: str) -> threading.Thread:
@@ -145,7 +163,21 @@ class A2ARequestHandler(BaseHTTPRequestHandler):
     def adapter(self) -> A2AAdapter:
         return self.server.adapter  # type: ignore[attr-defined]
 
-    def log_message(self, format, *args):  # noqa: A002,N802
+    def parse_request(self) -> bool:
+        """Without a token, refuse any request whose ``Host`` is not a loopback name, before a route
+        runs: a page on a hostname re-resolved to 127.0.0.1 (DNS rebinding) is same-origin to this
+        listener and could otherwise read its served-agent list and Agent Card."""
+        if not super().parse_request():
+            return False
+        adapter = self.adapter
+        if adapter._security_context.localhost_only() and not security.is_loopback_host_header(
+                self.headers.get("Host"), adapter._public_url):
+            self._error(403, None, protocol.ERR_UNAUTHORIZED,
+                        "Host must be a loopback name or the A2A_PUBLIC_URL host (no A2A token configured)")
+            return False
+        return True
+
+    def log_message(self, format, *args):
         logger.debug("A2A http: " + format, *args)  # silence the default stderr access log
 
     def _json(self, code: int, payload: dict):
@@ -160,7 +192,9 @@ class A2ARequestHandler(BaseHTTPRequestHandler):
         self._json(http_code, _err(req_id, code, message))
 
     def _client_ip(self) -> str:
-        return self.client_address[0] if self.client_address else ""
+        """The peer's address; an IPv4 peer of a dual-stack ``::`` bind keeps its plain IPv4 identity."""
+        ip = self.client_address[0] if self.client_address else ""
+        return ip.removeprefix("::ffff:") if ip.startswith("::ffff:") and "." in ip else ip
 
     def _request_public_url(self) -> str:
         """A2A_PUBLIC_URL > X-Forwarded-Host / Host (scheme from X-Forwarded-Proto) > "" (bind host).
@@ -179,7 +213,7 @@ class A2ARequestHandler(BaseHTTPRequestHandler):
         scheme = (self.headers.get("X-Forwarded-Proto", "") or "http").split(",")[0].strip()
         return f"{scheme}://{host}/" if host else ""
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         adapter = self.adapter
         route = adapter._route_for_path(self.path)
         agent = route["agent"]
@@ -198,12 +232,14 @@ class A2ARequestHandler(BaseHTTPRequestHandler):
             payload["served_agents"] = adapter._served_agent_summary(public_url=public_url)
         self._json(200, payload)
 
-    def do_POST(self):  # noqa: N802
+    def do_POST(self):
         adapter = self.adapter
         # Identity comes from the credential (or the socket in localhost-only mode) — never the body.
         identity = adapter._security_context.authenticate(self.headers.get("Authorization"), self._client_ip())
         if identity is None:
             return self._error(401, None, protocol.ERR_UNAUTHORIZED, "unauthorized")
+        if adapter._security_context.localhost_only() and (refusal := security.browser_post_refusal(self.headers)):
+            return self._error(403, None, protocol.ERR_UNAUTHORIZED, refusal)
         try:
             length = int(self.headers.get("Content-Length", 0))
             if length > _MAX_BODY:
@@ -276,8 +312,8 @@ class A2AAdapter(BasePlatformAdapter):
         self.tasks, self._turns, self._rate_limiter = protocol.TaskStore(), protocol.TurnTracker(), protocol.RateLimiter()
         # Pending reply futures: task_id -> (context_id, Future). _pending_order keeps per-context
         # FIFO so adapter.send() — which only knows the context — resolves the oldest task.
-        self._pending: Dict[str, tuple[str, Future]] = {}
-        self._pending_order: Dict[str, deque[str]] = {}
+        self._pending: dict[str, tuple[str, Future]] = {}
+        self._pending_order: dict[str, deque[str]] = {}
         # Request ownership outlives reply Futures and also covers synchronous profile forwards.
         self._active_tasks: set[str] = set()
         # Admission ids this process already forwarded; a resend of one is a retry, not a new turn.
@@ -302,7 +338,7 @@ class A2AAdapter(BasePlatformAdapter):
         # Capture the gateway loop so the HTTP thread can marshal events via run_coroutine_threadsafe.
         self._loop = asyncio.get_running_loop()
         try:
-            self._httpd = ThreadingHTTPServer((self.host, self.port), A2ARequestHandler)
+            self._httpd = _http_server_class(self.host)((self.host, self.port), A2ARequestHandler)
         except OSError as e:
             logger.error("A2A: could not bind %s:%s — %s", self.host, self.port, e)
             self._set_fatal_error("bind_failed", f"A2A bind failed: {e}", retryable=True)
@@ -410,7 +446,8 @@ class A2AAdapter(BasePlatformAdapter):
         return agents
 
     def _base_url(self, public_url: Optional[str]) -> str:
-        return (public_url or "").strip() or f"http://{self.host}:{self.port}/"
+        host = f"[{self.host}]" if ":" in self.host else self.host  # IPv6 literal
+        return (public_url or "").strip() or f"http://{host}:{self.port}/"
 
     def _served_agent_summary(self, public_url: Optional[str] = None) -> list[dict]:
         base = self._base_url(public_url)
@@ -476,6 +513,23 @@ class A2AAdapter(BasePlatformAdapter):
         with self._pending_lock:
             self._active_tasks.add(task_id)
 
+    _MAX_FORWARDED_INPUTS = 1000
+
+    def _note_forwarded_input(self, input_id: str) -> bool:
+        """Record a forwarded admission id; True when this process already sent it (a retry)."""
+        with self._pending_lock:
+            seen = input_id in self._forwarded_inputs
+            self._forwarded_inputs[input_id] = None
+            self._forwarded_inputs.move_to_end(input_id)
+            while len(self._forwarded_inputs) > self._MAX_FORWARDED_INPUTS:
+                self._forwarded_inputs.popitem(last=False)
+        return seen
+
+    def _forget_forwarded_input(self, input_id: Optional[str]) -> None:
+        """Drop a fresh id a pre-admission guard refused, so its resend is refused again."""
+        with self._pending_lock:
+            self._forwarded_inputs.pop(input_id, None)
+
     def _pop_pending(self, task_id: str) -> None:
         with self._pending_lock:
             self._active_tasks.discard(task_id)
@@ -503,23 +557,6 @@ class A2AAdapter(BasePlatformAdapter):
 
     def _scope_for_agent(self, agent: Optional[dict]) -> tuple[str, str]:
         return tuple(str((agent or self._agents[""]).get(k) or "") for k in ("slug", "tenant"))
-
-    _MAX_FORWARDED_INPUTS = 1000
-
-    def _note_forwarded_input(self, input_id: str) -> bool:
-        """Record a forwarded admission id; True when this process already sent it (a retry)."""
-        with self._pending_lock:
-            seen = input_id in self._forwarded_inputs
-            self._forwarded_inputs[input_id] = None
-            self._forwarded_inputs.move_to_end(input_id)
-            while len(self._forwarded_inputs) > self._MAX_FORWARDED_INPUTS:
-                self._forwarded_inputs.popitem(last=False)
-        return seen
-
-    def _forget_forwarded_input(self, input_id: Optional[str]) -> None:
-        """Drop a fresh id a pre-admission guard refused, so its resend is refused again."""
-        with self._pending_lock:
-            self._forwarded_inputs.pop(input_id, None)
 
     def _end_task(self, rec: dict, state: str, text: str, stored_reply: str = "") -> tuple[dict, None]:
         """Complete a task immediately (rejected / not ready) and build its terminal Task."""
@@ -823,7 +860,7 @@ class A2AAdapter(BasePlatformAdapter):
             headers["X-A2A-Signature"] = signature
         try:
             req = urllib.request.Request(callback_url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 status = resp.status
         except Exception as e:
             return fail("failed: %s", e)
@@ -832,7 +869,7 @@ class A2AAdapter(BasePlatformAdapter):
         protocol.metrics.push_sent += 1
         logger.debug("A2A: push notification sent for task %s", task_id)
 
-    async def send(self, chat_id: str, content: str, reply_to: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+    async def send(self, chat_id: str, content: str, reply_to: Optional[str] = None, metadata: Optional[dict[str, Any]] = None):
         """Fulfil the oldest pending reply Future for this context (``chat_id`` = A2A context id).
         Only sends carrying ``metadata['notify']`` (the base adapter's final-reply marker) satisfy
         the caller; progress/status/preview sends must not."""
@@ -845,7 +882,7 @@ class A2AAdapter(BasePlatformAdapter):
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         return None
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         return {"name": f"a2a:{chat_id}", "type": "dm"}
 
     async def on_processing_complete(self, event: MessageEvent, outcome: ProcessingOutcome) -> None:
