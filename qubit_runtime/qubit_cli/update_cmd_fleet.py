@@ -33,7 +33,8 @@ _FRESH_RESTART_SUPERVISORS = frozenset({"systemd", "launchd", "service", "s6"})
 
 _SYSTEMD_SCOPES = (("user", ["systemctl", "--user"]), ("system", ["systemctl"]))
 _LIST_GATEWAY_UNITS = [
-    "list-units", "hermes-gateway*", "hermes-serve*", "hermes-dashboard*",
+    "list-units", "qubit-gateway*", "qubit-serve*", "qubit-dashboard*",
+    "hermes-gateway*", "hermes-serve*", "hermes-dashboard*",
     "--plain", "--no-legend", "--no-pager",
 ]
 
@@ -737,14 +738,13 @@ def _scoped_manual_gateway_pids(pids, *, keep=(), quiet: bool = False) -> list[i
 
 def _is_serve_or_dashboard_unit(unit: str) -> bool:
     """``hermes-serve*``/``hermes-dashboard*`` (``.service``) by the same exact-or-hyphenated shape."""
+    names = ("qubit", "hermes")
     return (
-        unit == "hermes-serve.service"
-        or unit.startswith("hermes-serve-")
-        # #125297: ``hermes-dashboard*`` units are systemd-supervised dashboard backends — the
-        # same fleet this pass restarts. Leaving them out meant a successful update reported
-        # the dashboard ``deferred`` (still on pre-update code) while nothing ever restarted it.
-        or unit == "hermes-dashboard.service"
-        or unit.startswith("hermes-dashboard-")
+        any(unit == f"{n}-serve.service" or unit.startswith(f"{n}-serve-") for n in names)
+        # #125297: dashboard units are systemd-supervised dashboard backends — the same fleet
+        # this pass restarts. Leaving them out meant a successful update reported the dashboard
+        # ``deferred`` (still on pre-update code) while nothing ever restarted it.
+        or any(unit == f"{n}-dashboard.service" or unit.startswith(f"{n}-dashboard-") for n in names)
     )
 
 
@@ -754,7 +754,8 @@ def _is_qubit_gateway_unit(unit: str) -> bool:
     return (
         # list-units is already pattern-filtered, but keep the name gate so a stray non-gateway/serve line
         # cannot enter the restart path. See #83595.
-        unit == "hermes-gateway.service"
+        unit in {"qubit-gateway.service", "hermes-gateway.service"}
+        or unit.startswith("qubit-gateway-")
         or unit.startswith("hermes-gateway-")
         or _is_serve_or_dashboard_unit(unit)
     )
@@ -792,7 +793,8 @@ def _service_unit_supports_graceful_sigusr1_restart(svc_name: str) -> bool:
 
     See #83438.
     """
-    return svc_name == "hermes-gateway" or svc_name.startswith("hermes-gateway-")
+    return (svc_name in {"qubit-gateway", "hermes-gateway"}
+            or svc_name.startswith("qubit-gateway-") or svc_name.startswith("hermes-gateway-"))
 
 
 def _warn_incomplete_gateway_fleet_restart(failed_units: list) -> None:
