@@ -4,7 +4,7 @@ The listing is the shared body of ``GET /api/profiles`` and JSON-RPC ``profiles.
 Bots roster polls every 5s per connection, and it parsed three YAML files per profile every time —
 including an installer-seeded ``config.yaml`` (the annotated template, ~119KB) for two strings.
 
-The memo must be invisible: every edit has to show up on the very next read, or `hermes profile
+The memo must be invisible: every edit has to show up on the very next read, or `qubit profile
 list` and the roster paint stale names and models. Only derived values are cached — the raw
 readers keep their uncached contract, because callers write those documents back.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-import qubit_cli.profiles as profiles
+from qubit_cli import profiles
 
 
 @pytest.fixture(autouse=True)
@@ -84,3 +84,16 @@ def test_the_raw_config_reader_keeps_its_uncached_contract(profile_dir):
     config_path.write_text("model:\n  provider: xai\n  default: grok-4.6\n", encoding="utf-8")
 
     assert read_user_config_raw(config_path)["model"]["provider"] == "xai"
+
+
+def test_config_model_cache_is_keyed_on_the_backend_version_not_the_local_file(profile_dir, monkeypatch):
+    """The user layer changes through the config backend, which need not touch the local file."""
+    from qubit_cli import config_backend
+
+    assert profiles._read_config_model(profile_dir) == ("gpt-4o", "openai")
+    version = [("v2",)]
+    monkeypatch.setattr(config_backend, "config_version", lambda path: version[0])
+    monkeypatch.setattr(config_backend.FileBackend, "read_user_doc",
+                        lambda self, home: {"model": {"provider": "anthropic", "default": "claude-opus-4.6"}})
+
+    assert profiles._read_config_model(profile_dir) == ("claude-opus-4.6", "anthropic")

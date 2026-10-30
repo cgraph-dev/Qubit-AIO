@@ -12,7 +12,7 @@ import qubit_cli.plugins_cadence as cad
 
 @pytest.fixture
 def homed(tmp_path, monkeypatch):
-    """Cadence state (markers) inside a temp hermes home."""
+    """Cadence state (markers) inside a temp qubit home."""
     import qubit_constants
 
     monkeypatch.setattr(qubit_constants, "get_qubit_home", lambda: tmp_path)
@@ -70,6 +70,27 @@ def test_run_writes_receipt_and_marker(homed):
     assert result[0].name == "plug"
     assert receipts.latest()["outcome"] == "updates-available"
     assert cad.run_scheduled_check(run_checks_fn=checks, plugins_dir=homed / "plugins") is None
+    assert len(calls) == 1
+
+
+def test_damaged_install_records_do_not_stop_the_scheduled_check(homed):
+    """An install-metadata file that is not valid UTF-8 used to raise out of the pre-check snapshot,
+    before the check could write its receipt or marker, so every housekeeping tick retried silently.
+    A damaged file now reads as no records: the check still runs, records its receipt and backs off."""
+    import pm.receipt as receipts
+
+    plugins = homed / "plugins"
+    plugins.mkdir()
+    (plugins / ".install-metadata.json").write_bytes(b"\xff\xfe{not utf-8")
+    calls = []
+
+    def checks(directory):
+        calls.append(directory)
+        return [_Result("plug", update_available=True)]
+
+    assert cad.run_scheduled_check(run_checks_fn=checks, plugins_dir=plugins)[0].name == "plug"
+    assert receipts.latest()["outcome"] == "updates-available"
+    assert cad.run_scheduled_check(run_checks_fn=checks, plugins_dir=plugins) is None
     assert len(calls) == 1
 
 

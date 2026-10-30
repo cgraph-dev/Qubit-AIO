@@ -1254,6 +1254,7 @@ def persist_nous_credentials(*args, **kwargs):
 # The flow imports this module only inside calls, so either module can be imported first.
 from qubit_cli.anon_sign_in import (  # noqa: E402
     AlreadySignedIn as AlreadySignedIn,
+    Cancelled as Cancelled,
     Code as Code,
     Completed as Completed,
     Declined as Declined,

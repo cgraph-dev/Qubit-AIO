@@ -62,6 +62,7 @@ from qubit_cli.plugins_dispatch import (  # noqa: F401 — re-exported
 )
 from qubit_cli.plugins_ledger import PluginLedgerMixin, PluginRegistration
 from qubit_cli.plugins_registrars import _SCOPED_PROVIDER_REGISTRARS, make_scoped_provider_registrar
+from qubit_cli.plugins_capability_ctx import PluginCapabilityCtxMixin
 from qubit_cli.plugins_state import (
     PluginState, _locked_plugin_state, _nested_plugin_mapping, _nested_plugin_value,
     _plugin_relative_segments, _plugin_settings_entry, save_plugin_setting,
@@ -230,7 +231,7 @@ class LoadedPlugin:
     deferred: bool = False
 
 
-class PluginContext:
+class PluginContext(PluginCapabilityCtxMixin):
     """Facade given to plugins so they can register tools and hooks."""
 
     def __init__(self, manifest: PluginManifest, manager: PluginManager):

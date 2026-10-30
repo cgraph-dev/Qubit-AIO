@@ -595,14 +595,16 @@ def _sends_all_turns(model: Any, params: dict[str, Any]) -> bool:
 
 def _reasoning_fields(
     model: str, params: dict[str, Any], *, effort: Any, enabled: bool, replay_encrypted_reasoning: bool,
-    is_xai_responses: bool, is_github_responses: bool, all_turns: bool = False,
+    is_xai_responses: bool, profile_reasoning: bool, all_turns: bool = False,
 ) -> dict[str, Any]:
     """``reasoning`` / ``include`` request fields for the endpoint family.
 
-    xAI 400s on ``reasoning.effort`` outside its allowlist; GitHub Models takes a
-    verbatim ``github_reasoning_extra`` and never ``include``. A disabled ask resolved to
+    xAI 400s on ``reasoning.effort`` outside its allowlist; a ``profile_reasoning`` endpoint
+    (``ProviderProfile.responses_profile_reasoning``) takes the verbatim ``profile_reasoning``
+    payload plus ``summary: "auto"`` and never ``include``. A disabled ask resolved to
     ``effort="none"`` is sent as ``{"effort": "none"}`` — the wire has no other way to switch
-    a reasoning model's default effort off (#75227).
+    a reasoning model's default effort off (#75227). ``all_turns`` adds ``context: "all_turns"``
+    so the model renders replayed reasoning from earlier user turns (``_sends_all_turns``).
     """
     include = ["reasoning.encrypted_content"] if replay_encrypted_reasoning else []
     fields: dict[str, Any] = {}
@@ -613,21 +615,13 @@ def _reasoning_fields(
         if grok_supports_reasoning_effort(model):
             fields["reasoning"] = {"effort": effort}
     elif enabled:
-        if is_github_responses:
-            if params.get("github_reasoning_extra") is not None:
-                # Request a reasoning summary so the Responses API actually returns
-                # reasoning text. Without ``summary: "auto"`` the GitHub/Copilot
-                # /responses endpoint returns reasoning items with no summary, so Qubit
-                # persists empty reasoning/thinking content for every Copilot model on
-                # the Responses API (gpt-5.4, gpt-5, ...) — the same loss the non-GitHub
-                # branch below already avoids. Verified against api.githubcopilot.com
-                # /responses: the summary is only emitted when summary="auto" is sent.
-                # See #46527.
-                fields["reasoning"] = {**params["github_reasoning_extra"], "summary": "auto"}
+        if profile_reasoning:
+            if params.get("profile_reasoning") is not None:
+                fields["reasoning"] = {**params["profile_reasoning"], "summary": "auto"}
         else:
             fields["reasoning"] = {"effort": effort, "summary": "auto", **({"context": "all_turns"} if all_turns else {})}
             fields["include"] = include
-    elif not is_github_responses and not is_xai_responses:
+    elif not profile_reasoning and not is_xai_responses:
         fields["include"] = []
         if effort == "none":
             fields["reasoning"] = {"effort": "none"}
@@ -680,28 +674,32 @@ class ResponsesApiTransport(ProviderTransport):
     def api_mode(self) -> str:
         return "codex_responses"
 
-    def _resolve_issuer_kind(self, params: dict[str, Any]) -> str:
+    def _resolve_issuer_kind(self, params: dict[str, Any], endpoint: Any = None) -> str:
         """Classify the current Responses endpoint from transport params (stashed for normalize_response)."""
-        from agent.codex_responses_adapter import _classify_responses_issuer
+        from agent.codex_responses_adapter import _classify_responses_issuer, responses_endpoint_quirks
 
+        base_url = params.get("base_url")
         self._last_issuer_kind = _classify_responses_issuer(
             is_xai_responses=params.get("is_xai_responses") is True,
-            is_github_responses=params.get("is_github_responses") is True,
             is_codex_backend=params.get("is_codex_backend") is True,
-            base_url=params.get("base_url"),
+            base_url=base_url,
+            endpoint=endpoint if endpoint is not None else responses_endpoint_quirks(base_url),
         )
         return self._last_issuer_kind
 
     def convert_messages(self, messages: list[dict[str, Any]], **kwargs) -> Any:
         """Convert OpenAI chat messages to Responses API input items."""
-        from agent.codex_responses_adapter import _chat_messages_to_responses_input, _wire_model_identity
+        from agent.codex_responses_adapter import (
+            _chat_messages_to_responses_input, _wire_model_identity, responses_endpoint_quirks,
+        )
 
         self._last_issuer_model = _wire_model_identity(kwargs.get("model"))
+        endpoint = kwargs.get("endpoint") or responses_endpoint_quirks(kwargs.get("base_url"))
         return _chat_messages_to_responses_input(
             messages, is_xai_responses=kwargs.get("is_xai_responses") is True,
-            is_github_responses=kwargs.get("is_github_responses") is True,
+            drop_replay_item_ids=not endpoint.replay_item_ids,
             replay_encrypted_reasoning=bool(kwargs.get("replay_encrypted_reasoning", True)),
-            current_issuer_kind=self._resolve_issuer_kind(kwargs),
+            current_issuer_kind=self._resolve_issuer_kind(kwargs, endpoint),
             current_issuer_model=self._last_issuer_model,
             native_compaction_eligible=_native_compaction_active(kwargs.get("context_management")),
         )
@@ -746,7 +744,9 @@ class ResponsesApiTransport(ProviderTransport):
             payload_messages = messages[1:]
         instructions = instructions or DEFAULT_AGENT_IDENTITY
 
-        is_github_responses = params.get("is_github_responses") is True
+        from agent.codex_responses_adapter import responses_endpoint_quirks
+
+        endpoint = responses_endpoint_quirks(params.get("base_url"))
         is_codex_backend = params.get("is_codex_backend") is True
         is_xai_responses = params.get("is_xai_responses") is True
         # Foundry 400s on encrypted-reasoning replay only in the post-tool follow-up turn.
@@ -776,7 +776,7 @@ class ResponsesApiTransport(ProviderTransport):
             "model": wire_model,
             "instructions": instructions,
             "input": self.convert_messages(
-                payload_messages, is_xai_responses=is_xai_responses, is_github_responses=is_github_responses,
+                payload_messages, is_xai_responses=is_xai_responses, endpoint=endpoint,
                 replay_encrypted_reasoning=replay_encrypted_reasoning, base_url=params.get("base_url"),
                 is_codex_backend=is_codex_backend, context_management=context_management, model=wire_model,
             ),
@@ -795,8 +795,9 @@ class ResponsesApiTransport(ProviderTransport):
         # compression rotation; session_id itself stays untouched for transcript isolation.
         _cache_scope = _cache_scope_from_session_id(params.get("cache_scope_id") or session_id)
         cache_key = _content_cache_key(instructions, response_tools, _cache_scope) or _cache_scope
-        # xAI takes prompt_cache_key in extra_body (below); GitHub Models opts out entirely.
-        if not is_github_responses and not is_xai_responses and cache_key:
+        # xAI takes prompt_cache_key in extra_body (below); endpoints declaring
+        # ``responses_prompt_cache_key=False`` opt out entirely.
+        if endpoint.prompt_cache_key and not is_xai_responses and cache_key:
             kwargs["prompt_cache_key"] = cache_key
 
         cache_retention = _default_prompt_cache_retention_for_request(model, params.get("base_url"))
@@ -809,7 +810,7 @@ class ResponsesApiTransport(ProviderTransport):
         kwargs.update(_reasoning_fields(
             model, params, effort=reasoning_effort, enabled=reasoning_enabled,
             replay_encrypted_reasoning=replay_encrypted_reasoning,
-            is_xai_responses=is_xai_responses, is_github_responses=is_github_responses,
+            is_xai_responses=is_xai_responses, profile_reasoning=endpoint.profile_reasoning,
             all_turns=self._last_sent_all_turns,
         ))
         # agent.text_verbosity -> top-level ``text.verbosity`` (#20203). Unset sends nothing;

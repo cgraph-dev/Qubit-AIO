@@ -62,7 +62,6 @@ async def test_launch_options_reach_the_owner_frozen_and_hooks_consented(tmp_pat
     (home / 'skills' / 'launch-fixture' / 'SKILL.md').write_text(
         '---\nname: launch-fixture\ndescription: fixture\n---\n\nLAUNCH_SKILL_BODY\n')
     monkeypatch.setenv('QUBIT_HOME', str(home))
-    monkeypatch.setenv('HERMES_HOME', str(home))
     monkeypatch.delenv('HERMES_ACCEPT_HOOKS', raising=False)
     hook = tmp_path / 'hook.sh'
     hook.write_text('#!/bin/sh\nexit 0\n')
@@ -115,7 +114,7 @@ def test_launch_policy_reaches_real_turn_runner(tmp_path):
     state.mkdir()
     from tests.gateway.fixtures.local_recovery_probe import child_env
     env = child_env()
-    env.update(HOME=str(home), USERPROFILE=str(home), HERMES_HOME=str(state), QUBIT_HOME=str(state), PYTHONPATH=str(repo))
+    env.update(HOME=str(home), USERPROFILE=str(home), QUBIT_HOME=str(state), PYTHONPATH=str(repo))
     result = subprocess.run([sys.executable, str(Path(__file__).parent / 'fixtures' / 'session_policy_peer.py')],
                             cwd=repo, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=130, check=False)
     assert result.returncode == 0, result.stdout + '\n' + result.stderr
@@ -260,9 +259,32 @@ def test_provider_alias_spelling_and_auto_pick_keep_the_profiles_route(tmp_path,
         ('custom', 'http://localhost:1234/v1', 'sk-local')
 
 
+def test_bare_pick_of_a_shadowed_custom_entry_keeps_the_profiles_route(tmp_path, monkeypatch):
+    """#140107: an entry named like a canonical built-in (`providers: deepseek`, or the legacy
+    list) is shadowed by the built-in in raw provider resolution, so a Desktop pick of its row
+    arrives as the entry's bare key. Freezing that spelling pins the session to the built-in —
+    a different provider than the row the user picked — and drops the entry's endpoint and key
+    pointer with it. The entry's own alias set is what says the pick is the same route."""
+    from gateway.session_policy import build_policy
+    for var in ('DEEPSEEK_API_KEY', 'OPENAI_API_KEY'):
+        monkeypatch.delenv(var, raising=False)
+    new_style = {'providers': {'deepseek': {'name': 'deepseek', 'api': 'https://api.deepseek.com',
+                                            'key_env': 'DEEPSEEK_ENTRY_KEY', 'transport': 'chat_completions',
+                                            'default_model': 'deepseek-flash'}}}
+    legacy = {'custom_providers': [{'name': 'deepseek', 'base_url': 'https://api.deepseek.com',
+                                    'key_env': 'DEEPSEEK_ENTRY_KEY', 'model': 'deepseek-flash'}]}
+    for extra in (new_style, legacy):
+        cfg = {**extra, 'model': {'default': 'deepseek-flash', 'provider': 'custom:deepseek',
+                                  'base_url': 'https://api.deepseek.com', 'key_env': 'DEEPSEEK_ENTRY_KEY'}}
+        model = build_policy(dict(cwd=str(tmp_path), model='deepseek-flash', provider='deepseek'), cfg).config()['model']
+        assert model['provider'] == 'custom:deepseek', extra
+        assert model['base_url'] == 'https://api.deepseek.com', extra
+        assert model['key_env'] == 'DEEPSEEK_ENTRY_KEY', extra
+
+
 def test_unlimited_max_turns_spellings_create_an_uncapped_session(tmp_path):
     """`--max-turns 0` / -1 / none / unlimited meant "no cap" before the gateway cutover: session.create
-    freezes them as the unlimited budget, and `hermes chat` sends 0 instead of dropping it as falsy."""
+    freezes them as the unlimited budget, and `qubit chat` sends 0 instead of dropping it as falsy."""
     import argparse
     import sys
     from gateway.session_policy import build_policy
@@ -348,7 +370,6 @@ def test_frozen_route_keeps_its_endpoint_after_live_config_edit(tmp_path, monkey
     home = tmp_path / 'home'
     home.mkdir()
     monkeypatch.setenv('QUBIT_HOME', str(home))
-    monkeypatch.setenv('HERMES_HOME', str(home))
 
     def write(url, key):
         (home / 'config.yaml').write_text(json.dumps(
@@ -377,7 +398,6 @@ def test_frozen_bare_custom_route_keeps_its_endpoint_pool_and_launch_key_wins(tm
     home = tmp_path / 'home'
     home.mkdir()
     monkeypatch.setenv('QUBIT_HOME', str(home))
-    monkeypatch.setenv('HERMES_HOME', str(home))
     url = 'http://127.0.0.1:1/v1'
     (home / 'config.yaml').write_text(json.dumps(
         {'model': {'provider': 'custom', 'base_url': url, 'api_key': 'sk-frozen-config', 'default': 'm'}}))
@@ -410,7 +430,6 @@ def _frozen_fixture_routes(tmp_path, monkeypatch, *launches):
     home = tmp_path / 'home'
     home.mkdir()
     monkeypatch.setenv('QUBIT_HOME', str(home))
-    monkeypatch.setenv('HERMES_HOME', str(home))
 
     def write(url):
         (home / 'config.yaml').write_text(json.dumps({'model': {'provider': 'fixture', 'default': 'm'},
@@ -452,7 +471,7 @@ def test_frozen_launch_url_override_never_borrows_the_named_pool(tmp_path, monke
 
 
 def test_lazy_info_reports_the_free_tier_pinned_model(tmp_path, monkeypatch):
-    """A not-yet-built session with no launch model/provider runs on ``nous/welcome`` on the free
+    """A not-yet-built session with no launch model/provider runs on ``qubit/welcome`` on the free
     tier (the agent build pins it), so ``session.info`` says so; an explicit launch model stands."""
     from dataclasses import replace
     from types import SimpleNamespace
@@ -469,7 +488,7 @@ def test_lazy_info_reports_the_free_tier_pinned_model(tmp_path, monkeypatch):
 
 
 def test_run_budget_is_a_frozen_launch_option(tmp_path):
-    """`hermes chat --run-budget N` (main: AIAgent(run_budget_seconds=N)): frozen as the session's
+    """`qubit chat --run-budget N` (main: AIAgent(run_budget_seconds=N)): frozen as the session's
     agent.run_budget_seconds; the profile's own value applies without the flag; junk is refused."""
     from gateway.session_policy import build_policy
     from qubit_state_runtime import RuntimeStoreError
@@ -493,7 +512,7 @@ def test_run_budget_passes_the_session_create_contract():
 
 
 def test_verbose_is_a_frozen_launch_option(tmp_path):
-    """`hermes chat -v` (main: AIAgent(quiet_mode=False)): the session agent's status lines are not quieted."""
+    """`qubit chat -v` (main: AIAgent(quiet_mode=False)): the session agent's status lines are not quieted."""
     from gateway.session_policy import build_policy
     from qubit_state_runtime import RuntimeStoreError
     assert build_policy(dict(cwd=str(tmp_path), verbose=True), {}).verbose is True

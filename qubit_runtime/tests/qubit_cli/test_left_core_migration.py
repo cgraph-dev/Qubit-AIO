@@ -34,7 +34,7 @@ def _home(tmp_path: Path, name: str = "home", *, env: str = "", config: str = ""
 
 # The uncommented platform_toolsets block cli-config.yaml.example carried (the homeassistant row from
 # 1aa7badb3c until fb9fc8a3dd). The installers (install.sh, install.ps1, the Docker hook) and
-# `hermes doctor` seed config.yaml from that file, so the block alone says nothing about use.
+# `qubit doctor` seed config.yaml from that file, so the block alone says nothing about use.
 _EXAMPLE_PLATFORM_TOOLSETS = (
     "platform_toolsets:\n"
     "  cli: [hermes-cli]\n"
@@ -250,6 +250,33 @@ def test_gateway_start_outcome_waits_for_the_first_agent(tmp_path, monkeypatch):
     assert lcm.recover_at_startup(say=said.append) == [] and len(said) == 1
 
 
+@pytest.mark.parametrize("gateway_start", [False, True])
+def test_an_agent_start_install_of_a_platform_keeps_the_restart_hint(tmp_path, monkeypatch, gateway_start):
+    """An agent start keeps its outcome for the next turn someone sees, with the hint to restart the gateway
+    serving the home; the gateway's own start loads the platform right after, so it needs none."""
+    home = _home(tmp_path, env="HASS_TOKEN=abc\n")
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    import pm.install
+    monkeypatch.setattr(pm.install, "lazy_installs_allowed", lambda: True)
+    monkeypatch.setattr(lcm, "_install_into", lambda h, consent=None: lambda name: {"ok": True})
+    monkeypatch.setattr(lcm, "_gateway_serves", lambda h: True)
+    assert lcm.recover_at_startup(gateway_start=gateway_start) == ["homeassistant"]
+    kept = lcm._claim_notices(home)
+    assert kept[0].startswith("✓ Home Assistant moved out of core")
+    assert any("qubit gateway restart" in message for message in kept) is not gateway_start
+
+
+
+def test_a_malformed_route_url_does_not_abort_the_home_migration(tmp_path, monkeypatch):
+    """`urlparse` raises on an unclosed IPv6 bracket: that one slot is at no host, and the home's other
+    features (Home Assistant here) still migrate."""
+    home = _home(tmp_path, env="HASS_TOKEN=abc\n", config="model:\n  provider: custom\n  base_url: http://[fe80::1/v1\n")
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    import pm.install
+    monkeypatch.setattr(pm.install, "lazy_installs_allowed", lambda: True)
+    monkeypatch.setattr(lcm, "_install_into", lambda h, consent=None: lambda name: {"ok": True})
+    assert lcm.recover_at_startup() == ["homeassistant"]
+
 
 def test_the_migration_installs_once_so_a_removal_sticks(tmp_path, monkeypatch):
     """At most one automatic install per home: after `qubit plugins remove`, neither `qubit update`
@@ -343,7 +370,7 @@ def test_repeated_startup_failures_back_off_exponentially(tmp_path, monkeypatch)
     assert len(attempts) == 3
     start_after(24 * 7.1)
     assert len(attempts) == 4
-    stamp.write_text("", encoding="utf-8")               # an older Hermes's empty stamp counts once
+    stamp.write_text("", encoding="utf-8")               # an older Qubit's empty stamp counts once
     start_after(1.5)
     assert len(attempts) == 5
 
@@ -365,16 +392,46 @@ def test_spotify_in_use_is_a_stored_login_or_the_toolset(tmp_path, auth_json, co
 
 
 def test_old_spotify_commands_point_at_the_plugin(tmp_path, monkeypatch):
-    """`hermes auth spotify` / `hermes spotify` name the new command and how to get it for this home."""
+    """`qubit auth spotify` / `qubit spotify` name the new command and how to get it for this home."""
     home = _home(tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
     hint = lcm.moved_command_hint("qubit auth", "spotify", "status")
     assert "`qubit auth status spotify` is now `qubit spotify status`" in hint
     assert "plugins install spotify" in hint
-    assert "plugins install spotify" in lcm.moved_command_hint("qubit", "spotify")
+    assert "plugins install spotify" in lcm.moved_command_hint("hermes", "spotify")
     (home / "plugins" / "spotify").mkdir(parents=True)  # installed but disabled
-    assert "plugins enable spotify" in lcm.moved_command_hint("qubit", "spotify")
-    assert lcm.moved_command_hint("qubit", "honcho") == ""
+    assert "plugins enable spotify" in lcm.moved_command_hint("hermes", "spotify")
+    assert lcm.moved_command_hint("hermes", "honcho") == ""
+
+
+def test_old_mcp_serve_spelling_names_the_plugin_command(tmp_path, monkeypatch, capsys):
+    """`qubit mcp serve` (what MCP client configs launch) exits 2 with the new spelling and the install
+    line on stderr, never on stdout (the MCP wire); once the plugin is installed only the spelling."""
+    import sys
+
+    from qubit_cli import main as main_mod
+    home = _home(tmp_path)
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    monkeypatch.setattr(sys, "argv", ["hermes", "mcp", "serve", "--tools"])
+    parser, _ = main_mod._build_cli_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(["mcp", "serve", "--tools"])
+    out, err = capsys.readouterr()
+    assert exc.value.code == 2 and out == ""
+    assert "`qubit mcp serve` is now `qubit mcp-serve`" in err
+    assert "plugins install mcp-serve" in err
+    (home / "plugins" / "mcp-serve").mkdir(parents=True)
+    hint = lcm.moved_command_hint("qubit mcp", "serve")
+    assert "is now `qubit mcp-serve`" in hint and "install" not in hint
+
+
+def test_mcp_serve_is_never_installed_automatically(tmp_path):
+    """MCP clients live outside Qubit, so no home shows the feature in use: hint only, no install."""
+    installs = []
+    home = _home(tmp_path, config="mcp_servers:\n  qubit:\n    command: qubit\n    args: [mcp, serve]\n")
+    assert lcm.migrate_home(home, install=lambda name: installs.append(name) or {"ok": True},
+                            say=lambda _m: None) == []
+    assert installs == []
 
 
 _LANGFUSE_KEYS_ENV = "HERMES_LANGFUSE_PUBLIC_KEY=pk-lf-x\nHERMES_LANGFUSE_SECRET_KEY=sk-lf-x\n"
@@ -402,7 +459,7 @@ def test_old_langfuse_plugin_key_keeps_naming_the_catalog_plugin(tmp_path, monke
     """`observability/langfuse` (every pre-move doc, an administrator's pinned list) names the install
     while the plugin is absent, and selects/resolves the installed plugin once it is there."""
     from qubit_cli.plugins_cmd import _find_plugin_entry, _unknown_plugin_message
-    from qubit_cli.plugins_discovery import gate_manifest
+    from qubit_cli.plugins_discovery import IN_BOTH_LISTS, gate_manifest
     from qubit_cli.plugins_manifest import PluginManifest
     home = _home(tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -419,4 +476,6 @@ def test_old_langfuse_plugin_key_keeps_naming_the_catalog_plugin(tmp_path, monke
     assert _find_plugin_entry("observability/langfuse")[5] == "langfuse"
     manifest = PluginManifest(name="langfuse", source="user", path=str(plugin_dir), key="langfuse")
     assert gate_manifest(manifest, set(), {"observability/langfuse"}).action == "load"
-    assert gate_manifest(manifest, {"observability/langfuse"}, {"langfuse"}).error == "disabled via config"
+    # The old key in plugins.disabled still names the plugin, so with the new key enabled both lists do.
+    assert gate_manifest(manifest, {"observability/langfuse"}, {"langfuse"}).error == IN_BOTH_LISTS
+    assert gate_manifest(manifest, {"observability/langfuse"}, None).error == "disabled via config"

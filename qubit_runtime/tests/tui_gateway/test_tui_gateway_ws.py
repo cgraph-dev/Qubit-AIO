@@ -180,7 +180,7 @@ def _slow_dispatch_harness(monkeypatch):
     def fake_dispatch(req, transport):
         method = req.get("method")
         log.append(f"dispatch:{method}")
-        if method == "slow":
+        if method in {"slow", "session.context_breakdown"}:
             release.wait(5)
         log.append(f"done:{method}")
         return {"jsonrpc": "2.0", "id": req.get("id"), "result": {"method": method}}
@@ -230,7 +230,7 @@ def test_ws_ping_is_answered_while_an_earlier_rpc_blocks_dispatch(monkeypatch):
     starve gateway.ping — the client's 45s heartbeat deadline would otherwise tear down a busy but healthy
     backend. Non-ping RPCs keep their serial arrival order."""
     ws, inbound, sent, log, release = _slow_dispatch_harness(monkeypatch)
-    ids = lambda: [f.get("id") for f in sent if "id" in f]  # noqa: E731
+    ids = lambda: [f.get("id") for f in sent if "id" in f]
 
     async def scenario():
         task = asyncio.create_task(ws_mod.handle_ws(ws))
@@ -251,10 +251,32 @@ def test_ws_ping_is_answered_while_an_earlier_rpc_blocks_dispatch(monkeypatch):
     assert ids().index("r1") < ids().index("r2")
 
 
+def test_ws_context_breakdown_does_not_block_a_later_control_read(monkeypatch):
+    """Regression for #140667: the expensive read-only context meter may finish after controls."""
+    ws, inbound, sent, log, release = _slow_dispatch_harness(monkeypatch)
+    ids = lambda: [frame.get("id") for frame in sent if "id" in frame]
+
+    async def scenario():
+        task = asyncio.create_task(ws_mod.handle_ws(ws))
+        try:
+            inbound.put_nowait(_rpc("context", "session.context_breakdown"))
+            inbound.put_nowait(_rpc("control", "session.control.read"))
+            assert await _wait_for(lambda: "control" in ids())
+            assert "context" not in ids()
+        finally:
+            release.set()
+        assert await _wait_for(lambda: "context" in ids())
+        inbound.put_nowait(None)
+        await asyncio.wait_for(task, 5)
+
+    asyncio.run(scenario())
+    assert log.index("done:session.context_breakdown") > log.index("done:session.control.read")
+
+
 def test_ws_disconnect_teardown_waits_for_in_flight_dispatch(monkeypatch):
     """A client that drops while a handler runs must not have its sessions torn down under that handler, and
     frames it sent before dropping are still dispatched (as the serial read loop did)."""
-    ws, inbound, sent, log, release = _slow_dispatch_harness(monkeypatch)
+    ws, inbound, _sent, log, release = _slow_dispatch_harness(monkeypatch)
 
     async def scenario():
         task = asyncio.create_task(ws_mod.handle_ws(ws))
@@ -273,7 +295,7 @@ def test_ws_disconnect_teardown_waits_for_in_flight_dispatch(monkeypatch):
 
 def test_ws_failed_reply_from_dispatcher_ends_the_connection(monkeypatch):
     """A response the dispatcher cannot send ends the connection even while the reader waits on the socket."""
-    ws, inbound, sent, log, release = _slow_dispatch_harness(monkeypatch)
+    ws, inbound, _sent, log, _release = _slow_dispatch_harness(monkeypatch)
     real_send = type(ws).send_text
 
     async def send_text(self, line):
@@ -402,8 +424,6 @@ def test_ws_transport_preserves_cross_batch_order():
     asyncio.run(scenario())
 
 
-
-
 _INTERACTIVE = frozenset({"session:create", "session:read", "session:submit", "session:control",
                           "session:approve", "session:respond"})
 
@@ -417,6 +437,9 @@ def _drive_authority_fallback(monkeypatch, *, capabilities, profile_id, method):
         def __init__(self, authority, transport, identity, operator=False):
             self.actor = type("Actor", (), {"capabilities": frozenset(capabilities), "profile_id": profile_id})()
 
+        def awaits_profile_start(self, req, held):
+            return None  # no profile is starting
+
         async def dispatch(self, req):
             return {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "unknown method"}}
 
@@ -428,7 +451,7 @@ def _drive_authority_fallback(monkeypatch, *, capabilities, profile_id, method):
     sent, inbound = [], [json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": {}})]
 
     class FakeWS:
-        scope = {"qubit.session_authority": object()}
+        scope = {"hermes.session_authority": object()}
 
         async def accept(self, **_kw):
             pass
@@ -482,7 +505,7 @@ def test_ready_frame_advertises_a_session_authority_only_when_one_is_bound(monke
         asyncio.run(ws_mod.handle_ws(FakeWS(), auth_identity={"user_id": "u"}))
         return sent[0]["params"]["payload"]
 
-    assert ready({"qubit.session_authority": object()})["session_authority"] is True
+    assert ready({"hermes.session_authority": object()})["session_authority"] is True
     assert "session_authority" not in ready({})
 
 
@@ -538,7 +561,7 @@ def test_legacy_fallback_never_writes_an_authority_owned_session(monkeypatch, tm
         sent, inbound = [], [json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params})]
 
         class FakeWS:
-            scope = {"qubit.session_authority": authority}
+            scope = {"hermes.session_authority": authority}
 
             async def accept(self, **_kw):
                 pass
