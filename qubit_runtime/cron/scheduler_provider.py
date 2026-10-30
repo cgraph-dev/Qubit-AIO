@@ -71,6 +71,18 @@ def _profile_entry(entry) -> tuple:
     return entry if isinstance(entry, tuple) else (None, entry)
 
 
+def _home_tickable(home) -> bool:
+    """A home a tick may touch: it still exists and is not tombstoned by a rename/delete.
+
+    Re-checked immediately before every tick and heartbeat, not only at enumeration: a rename can
+    tombstone and move the home after this cycle's snapshot was taken, and the tick/heartbeat would
+    otherwise ``mkdir`` its ``cron/`` workspace back as a ghost profile (#47368).
+    """
+    from qubit_constants import named_profile_is_deleted
+    path = Path(_profile_entry(home)[1])
+    return path.is_dir() and not named_profile_is_deleted(path)
+
+
 def _existing_profile_homes(profile_homes: list) -> list:
     """Drop homes no longer on disk: ticking/heartbeating a deleted home would recreate its
     ``cron/`` workspace and silently resurrect the profile.
@@ -89,7 +101,7 @@ def _existing_profile_homes(profile_homes: list) -> list:
         except Exception:
             logger.warning("cron profile enumeration failed; skipping this cycle", exc_info=True)
             return []
-    return [entry for entry in profile_homes if Path(_profile_entry(entry)[1]).is_dir()]
+    return [entry for entry in profile_homes if _home_tickable(entry)]
 
 
 def routed_profile_fire(home=None) -> bool:
@@ -622,6 +634,9 @@ class InProcessCronScheduler(CronScheduler):
                     logger.debug("Cron dispatch paused while gateway drains existing work")
                 else:
                     for _pname, home in cycle_homes:
+                        if not _home_tickable(home):
+                            # Tombstoned/moved since this cycle's snapshot: never tick a deleted home.
+                            continue
                         try:
                             with _profile_cron_scope(home):
                                 cron_tick(
@@ -650,6 +665,8 @@ class InProcessCronScheduler(CronScheduler):
                 consecutive_failures = _note_tick_failure(e, consecutive_failures)
             # Completed cycle: each profile's own outcome; aborted cycle: all beats unsuccessful.
             for _, home in cycle_homes:
+                if not _home_tickable(home):
+                    continue
                 with _profile_cron_scope(home):
                     _home_ok = _tick_error is None and str(home) not in _profile_errors
                     _guarded_store_write(
