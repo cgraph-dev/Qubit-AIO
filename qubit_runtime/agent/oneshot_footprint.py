@@ -27,6 +27,17 @@ from typing import Any
 # the surface gate, so the tool list, the tool_search bridge and delegate children all lose them together.
 ONESHOT_DISABLED_TOOLSETS = ("clarify",)
 
+# Compatibility shims for callers that still ask for the pre-088f657ecf tool pruning. Upstream now
+# leaves ``skill_manage`` available in a one-shot and gates ``clarify`` through the toolset table
+# above, so these are inert on purpose; they remain importable for the gateway inventory and the
+# older agent-init path.
+ONESHOT_HIDDEN_TOOLS = frozenset()
+
+
+def prune_oneshot_tools(tools):
+    """Deprecated: return *tools* unchanged (upstream no longer hides ``skill_manage`` here)."""
+    return list(tools)
+
 
 def is_single_query_session() -> bool:
     """The finite ``-q`` marker, read through the session env so gateway-bound sessions never see it.

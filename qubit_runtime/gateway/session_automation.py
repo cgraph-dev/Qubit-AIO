@@ -357,20 +357,6 @@ def committed_route_envelope(authority, entry):
     envelope = next((r['payload']['native_text_v1'] for r in reversed(prior)
                      if 'native_text_v1' in r['payload']), None)
     return envelope if envelope is not None and 'provenance' in envelope else None
-
-
-def committed_route_envelope(authority, entry):
-    """The route's last committed native envelope with connector provenance (what a producer turn
-    borrows), or ``None`` while no human message was admitted there."""
-    from qubit_state_runtime import list_session_admissions
-    # Admissions belong to the logical root; ``entry.session_id`` is only the transcript tip.
-    prior = list_session_admissions(authority.db, session_id=authority.logical_owner(entry.session_id),
-                                    pending_only=False)
-    envelope = next((r['payload']['native_text_v1'] for r in reversed(prior)
-                     if 'native_text_v1' in r['payload']), None)
-    return envelope if envelope is not None and 'provenance' in envelope else None
-
-
 def snapshot_automation(authority, adapter, event, identity):
     runner = authority.runner
     if (not event.internal or event.message_type != MessageType.TEXT or event.is_command()

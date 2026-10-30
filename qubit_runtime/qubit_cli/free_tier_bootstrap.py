@@ -21,8 +21,7 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger("qubit_cli.auth")
 
-# The desktop's first ``setup.status`` waits this long for the record before falling back to a live
-# probe. The mint budget is 5 s (``GUEST_MINT_TIMEOUT_SECONDS``); the rest covers the inventory.
+# The desktop's first ``setup.status`` waits this long for the record before falling back to a live probe.
 SETUP_READY_WAIT_SECONDS = 8.0
 SETUP_READY_EVENT = "setup.ready"
 
@@ -34,21 +33,21 @@ class SetupRecord:
 
     provider_configured: bool      # some provider can carry inference (free tier included)
     inference_provider: str        # ``resolve_provider("auto")``'s answer, "" when nothing resolves
-    free_tier_account: bool        # the identity that exists is the free tier AND the tier is on
+    free_tier_account: bool        # the identity that exists is a guest that carries inference here
     has_identity: bool             # a Qubit identity (free tier or account) is on disk
     other_providers: bool          # the inventory found something usable BESIDES the free tier
-    error: str = ""                # why the mint did not happen, when it did not; "" otherwise
+    error: str = ""                # why the last trial claim failed, when it did; "" otherwise
     # The mint memo's verdict, verbatim (``anon_auth.MintFailure.as_payload``):
-    # ``{error, error_code, retryable, retry_after}`` when the mint did not happen, else ``{}``.
+    # ``{error, error_code, retryable, retry_after}`` after a failed claim, else ``{}``.
     # One wire shape: every status RPC spreads it as is.
-    failure: Dict[str, Any] = field(default_factory=dict)
+    failure: dict[str, Any] = field(default_factory=dict)
     finished_at: float = field(default_factory=time.time)
 
     @property
     def free_tier_route(self) -> bool:
         return self.free_tier_account and self.inference_provider == "nous"
 
-    def as_payload(self) -> Dict[str, Any]:
+    def as_payload(self) -> dict[str, Any]:
         # The broadcast carries the failure block flat, the same shape ``setup.status`` spreads,
         # so a client keys on ``error_code`` identically whichever surface it read.
         payload = asdict(self)
@@ -56,7 +55,7 @@ class SetupRecord:
         payload["free_tier_route"] = self.free_tier_route
         return payload
 
-    def failure_fields(self) -> Dict[str, Any]:
+    def failure_fields(self) -> dict[str, Any]:
         return dict(self.failure)
 
 
@@ -93,8 +92,7 @@ def reconcile_record() -> Optional[SetupRecord]:
     """Let a provider configured AFTER boot count: a record that says ``provider_configured:
     false`` is re-inventoried once ``config.yaml`` / ``.env`` / ``auth.json`` moved since the
     inventory that built it, and replaced (+ ``setup.ready``) when something now carries
-    inference. The mint verdict (identity, failure block) is kept as is: only the boot bootstrap
-    and its retries mint. A record that already says ``True`` is never re-probed, so the answer
+    inference. The identity and failure block are kept as is. A record that already says ``True`` is never re-probed, so the answer
     only moves false -> true here. Every write path that assigns the main model (the Models page,
     a picker key save) calls this for the immediate broadcast; ``setup.status`` calls it for
     writes this process never saw (``qubit setup`` / ``qubit model`` from a shell, a hand edit).
@@ -115,6 +113,7 @@ def reconcile_record() -> Optional[SetupRecord]:
         if _record is not record:  # a retry replaced it meanwhile; its inventory is newer
             return _record
         _record = refreshed
+    _due_changed()
     _broadcast(refreshed)
     return refreshed
 
@@ -171,45 +170,20 @@ def _resolve_inference() -> str:
         return ""
 
 
-def _build_record(*, other: bool, mint: bool = False, force: bool = False) -> SetupRecord:
-    """One inventory pass into a record.
-
-    Reads only unless *mint* is true: the boot bootstrap and a refresh never create an identity;
-    the desktop's ``free_tier.provision`` retry (``retry_bootstrap_mint``) is the only mint here.
-    *force* is that retry's bypass of the mint memo's cooldown."""
+def _build_record(*, other: bool) -> SetupRecord:
+    """One inventory pass into a record. Reads only: no identity is created here."""
     from qubit_cli import anon_auth
 
-    error = ""
-    failure: Dict[str, Any] = {}
-    state: Optional[Dict[str, Any]] = anon_auth.current_nous_state()
-    if mint and anon_auth.guest_enabled():
-        try:
-            from qubit_cli import welcome_trial
-            if anon_auth.on_local_desktop_backend() and welcome_trial.claim_blocker() is None:
-                # A retry on the desktop's local backend is the trial's claim (the only creator
-                # that gives a guest inference here); elsewhere it is the connector identity.
-                state = welcome_trial.claim_desktop_free_tier(force=force)
-            else:
-                state = anon_auth.ensure_portal_identity(explicit=True, force=force)
-        except Exception as exc:
-            error = str(exc)
-            logger.info("Qubit free tier not set up at boot: %s", exc)
-        if state is None:
-            # Either this attempt failed (the memo now holds why) or an earlier one did and its
-            # cooldown still runs: the record carries that verdict either way.
-            failure = anon_auth.last_mint_failure() or {}
-            error = error or str(failure.get("error") or "")
-    elif state is None:
-        failure = anon_auth.last_mint_failure() or {}
-        error = str(failure.get("error") or "")
-    free_tier_account = bool(state) and anon_auth.free_inference_active(state)
+    state: Optional[dict[str, Any]] = anon_auth.current_nous_state()
+    failure: dict[str, Any] = {} if state else (anon_auth.last_mint_failure() or {})
+    free_tier_account = anon_auth.free_inference_active(state) if state else False
     return SetupRecord(
         provider_configured=other or free_tier_account or (bool(state) and not anon_auth.is_guest_state(state)),
         inference_provider=_resolve_inference(),
         free_tier_account=free_tier_account,
         has_identity=bool(state),
         other_providers=other,
-        error=error,
+        error=str(failure.get("error") or ""),
         failure=failure,
     )
 
@@ -277,60 +251,39 @@ def resettle_after_failed_boot() -> None:
         _resettle_lock.release()
 
 
-# Background retries after a boot-time mint failure: the memo's cooldown decides WHEN (a server
-# ``Retry-After``, the ops-breaker floor, or the unreachable ladder), this decides HOW MANY before
-# the process stops trying on its own (the user's retry button, ``free_tier.provision``, is not
-# counted). A terminal code (gate closed, proof of work, locked) is never retried.
-BOOTSTRAP_RETRY_ATTEMPTS = 3
-_sleep = time.sleep      # seam for tests
-
-
-def retry_bootstrap_mint(*, force: bool = False, announce: bool = True) -> SetupRecord:
-    """Re-run the mint once (``force`` bypasses the cooldown), replace the record and announce it.
-
-    The desktop's ``free_tier.provision`` calls this with ``force=True``; the background loop calls
-    it as each cooldown passes. Returns the existing record untouched when no bootstrap ran yet
-    (nothing to replace) or when an identity already exists."""
+def refresh_record(*, announce: bool = True) -> Optional[SetupRecord]:
+    """Rebuild the launch profile's record after the identity changed (a trial claim), so
+    ``setup.status`` and the ``setup.ready`` listeners move with it. None before the first bootstrap."""
     global _record
-    current = _record
-    if current is None:
-        return run_bootstrap(announce=announce)
-    if current.has_identity:
-        return current
-    # Re-inventory: a provider the user connected during the cooldown must keep inference; the
-    # boot-time answer is stale by now.
-    record = _build_record(other=_inventory_other_providers(), mint=True, force=force)
+    if _record is None:
+        return None
+    record = _build_record(other=_inventory_other_providers())
     with _lock:
-        # Two retries can race (the background loop and the user's click): a build that found no
-        # identity must not overwrite one that did.
-        if _record is not None and _record.has_identity and not record.has_identity:
-            return _record
         _record = record
+    _due_changed()
     if announce:
         _broadcast(record)
     return record
 
 
-def _retry_until_settled() -> None:
-    """The background loop behind ``start_background_bootstrap``: wait out each cooldown and try
-    again, up to ``BOOTSTRAP_RETRY_ATTEMPTS``, while the record says a later attempt can succeed."""
-    for _ in range(BOOTSTRAP_RETRY_ATTEMPTS):
-        record = _record
-        if record is None or record.has_identity or not record.failure.get("retryable"):
-            return
-        _sleep(max(1, int(record.failure.get("retry_after") or 0)))
-        record = retry_bootstrap_mint(force=False)
-        if record.has_identity:
-            logger.info("Qubit free tier set up after a boot-time retry")
-            return
+def retry_bootstrap_mint(*, force: bool = False, announce: bool = True) -> Optional[SetupRecord]:
+    """Qubit read-old alias for the pre-088f657ecf connector-identity retry: mint through
+    ``anon_auth.ensure_portal_identity`` (the only creator outside the desktop trial) and refresh
+    the record. Upstream's desktop retry goes through ``welcome_trial.claim_desktop_free_tier``;
+    ``tui_gateway.methods_free_tier`` still calls this on the connector path."""
+    from qubit_cli import anon_auth
+    if anon_auth.guest_enabled():
+        try:
+            anon_auth.ensure_portal_identity(explicit=True, force=force)
+        except Exception as exc:  # memoised by the mint primitive before it re-raised
+            logger.info("free tier provisioning failed: %s", exc)
+    return refresh_record(announce=announce) or current_record()
 
 
-def _bootstrap_then_retry() -> None:
-    run_bootstrap()
-    try:
-        _retry_until_settled()
-    except Exception as exc:  # the loop is best effort; the record already says what happened
-        logger.debug("free tier bootstrap retry loop stopped: %s", exc)
+def _due_changed() -> None:
+    from qubit_cli import onboarding_due
+
+    onboarding_due.invalidate()
 
 
 def _broadcast(record: SetupRecord) -> None:
@@ -345,9 +298,6 @@ def start_background_bootstrap() -> threading.Thread:
     """Run on a daemon thread so the inventory never delays the socket."""
     from agent.memory_provider import spawn_context_thread
 
-
-def start_background_bootstrap() -> threading.Thread:
-    """``qubit serve`` entry: run on a daemon thread so a slow portal never delays the socket."""
-    thread = threading.Thread(target=_bootstrap_then_retry, daemon=True, name="free-tier-bootstrap")
+    thread = spawn_context_thread(run_bootstrap, name="free-tier-bootstrap")
     thread.start()
     return thread

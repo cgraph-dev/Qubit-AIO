@@ -238,6 +238,65 @@ def _use_gateway(browser_cfg: dict) -> bool:
     return str(browser_cfg.get("cloud_provider") or "").strip().lower() == NOUS_MANAGED_PROVIDER
 
 
+_BACKEND_KEY = _BROWSER_USE_PROVIDER
+BACKEND_DISABLED = "off"
+
+
+def _camofox_active(context: str = "") -> bool:
+    return _lazy_call("tools.browser_camofox", "is_camofox_mode", False, f"Camofox activity check failed{context}")
+
+
+def get_browser_backend() -> str:
+    """Configured browser backend key ("" = unset → default). YAML 1.1 parses an
+    unquoted ``off`` as False — that must mean BACKEND_DISABLED, not "unset"."""
+    raw = _read_browser_cfg().get("backend")
+    return (BACKEND_DISABLED if raw is False else "") if isinstance(raw, bool) else str(raw or "").strip().lower()
+
+
+def set_browser_use_mode(enabled: bool) -> None:
+    """``/browser use [off]`` on every surface: persist ``browser.backend`` for the current profile and drop
+    cached tool availability. A live agent keeps its tools (prompt cache); the next one built gets the swap."""
+    from qubit_cli.config import load_config, save_config
+    from tools.registry import invalidate_check_fn_cache
+    config = load_config()
+    config.setdefault("browser", {})["backend"] = _BACKEND_KEY if enabled else BACKEND_DISABLED
+    save_config(config)
+    invalidate_check_fn_cache()
+
+
+def is_browser_use_cli_mode() -> bool:
+    """True when the Browser Use CLI replaces the built-in browser stack. Browser Use mode is the DEFAULT:
+    unset ``browser.backend`` ("") enables it whenever browser-harness is importable (a core dependency);
+    ``browser.backend: off`` keeps the built-in browser_* tools. Camofox always falls back to the built-in
+    tools (Firefox, custom HTTP API, no CDP surface for the harness)."""
+    if _camofox_active():
+        return False
+    backend = get_browser_backend()
+    return backend == _BACKEND_KEY if backend else (is_legacy_browser_use_cloud_config(_read_browser_cfg()) or _find_cli() is not None)
+
+
+def default_downgrade_notice() -> Optional[str]:
+    """One-line notice when ``browser.backend`` is unset but the CLI is not runnable, so
+    the session fell back to the built-in tools. Rate-limited to once per 24h via a stamp file."""
+    try:
+        if get_browser_backend() or _camofox_active() or _find_cli() is not None:
+            return None  # explicit choice / Camofox / CLI present — nothing downgraded
+        stamp = Path(get_qubit_home()) / "cache" / ".browser_use_default_notice"
+        now = time.time()
+        with contextlib.suppress(OSError):
+            if 0 <= now - stamp.stat().st_mtime < 24 * 3600:
+                return None
+        with contextlib.suppress(OSError):
+            stamp.parent.mkdir(parents=True, exist_ok=True)
+            stamp.touch()
+            os.utime(stamp, (now, now))
+        return ("browser-harness is missing from Qubit's Python environment — using the built-in browser tools. "
+                "Run `qubit update` to re-sync it, or set `browser.backend: off` in config.yaml to silence this.")
+    except Exception as e:  # pragma: no cover — a notice must never break startup
+        logger.debug("browser-use downgrade notice failed: %s", e)
+        return None
+
+
 def is_legacy_browser_use_cloud_config(browser_cfg: dict) -> bool:
     """True for pre-CLI direct-API Browser Use cloud configs: no cloud_provider (or ``browser-use``), not the
     Qubit gateway, and BROWSER_USE_API_KEY set; the CLI then reaches Browser Use cloud natively."""

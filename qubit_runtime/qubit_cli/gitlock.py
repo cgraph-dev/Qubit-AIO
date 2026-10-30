@@ -801,16 +801,6 @@ _PACK_OBJECTS_CRASH_TERMINATORS = (
     "could not finish pack-objects to repack local links",
     "fetch-pack: invalid index-pack output",
 )
-
-
-def is_partial_clone_pack_objects_crash(stderr: str) -> bool:
-    """True when a fetch failure is the git 2.53+ partial-clone pack-objects BUG (#124272)."""
-    text = stderr or ""
-    if _PACK_OBJECTS_CRASH_FINGERPRINT not in text:
-        return False
-    return any(terminator in text for terminator in _PACK_OBJECTS_CRASH_TERMINATORS)
-
-
 def fetch_with_partial_clone_recovery(runner: Callable[..., subprocess.CompletedProcess],
                                       git_cmd: List[str], fetch_args: List[str],
                                       repo_root: Path) -> subprocess.CompletedProcess:

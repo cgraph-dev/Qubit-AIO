@@ -63,6 +63,11 @@ def _portable_data_namespace(key: str) -> str:
     return f"agent-plugin-{slug}-{digest}"
 
 
+def _portable_skill_namespace(key: str) -> str:
+    """Qubit read-old alias of :func:`_portable_data_namespace` (the pre-088f657ecf spelling)."""
+    return _portable_data_namespace(key)
+
+
 def _portable_slug(key: str) -> str:
     slug = "".join(ch if ch.isascii() and (ch.isalnum() or ch in "_-") else "-" for ch in key.lower())
     return slug.strip("-_") or "plugin"
