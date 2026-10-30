@@ -540,10 +540,10 @@ def mkdir_under_qubit_home(path: str | Path) -> Path:
     """Create *path*, but never materialize a deleted/missing named profile."""
     target = Path(path)
     assert_named_profile_home_live(target)
-    # Lazy so this module still imports alone; hermes_dir_acl (stdlib only) ships beside it in every
+    # Lazy so this module still imports alone; qubit_dir_acl (stdlib only) ships beside it in every
     # closure that creates home dirs, and a missing copy fails loudly instead of silently skipping the
     # elevated grant (tests/pm/test_bootstrap_import_closure.py).
-    from hermes_dir_acl import make_user_dir
+    from qubit_dir_acl import make_user_dir
     make_user_dir(target, parents=True, exist_ok=True)
     return target
 
