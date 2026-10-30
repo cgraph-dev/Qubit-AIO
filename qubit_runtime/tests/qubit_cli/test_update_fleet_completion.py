@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from qubit_cli import update_cmd, update_cmd_fleet, update_cmd_maint, update_receipt
+from qubit_cli import update_cmd, update_cmd_fleet, update_cmd_fleet_verify as fleet_verify, update_cmd_maint, update_receipt
 from qubit_constants import get_qubit_home
 
 
@@ -22,7 +22,7 @@ def test_fleet_completion_preserves_runtime_verdict_and_restart_obligation(
         restarted_services=["hermes-gateway"], failed_or_stale_units=[],
         relaunched_profiles=[], externally_supervised_profiles=[], killed_pids=set(),
     )
-    monkeypatch.setattr(update_cmd_fleet, "_print_legacy_units_warning", lambda: None)
+    monkeypatch.setattr(fleet_verify, "_print_legacy_units_warning", lambda: None)
     monkeypatch.setattr(update_cmd, "_surviving_pre_update_serve_runtimes", lambda plan: [])
     monkeypatch.setattr(
         update_cmd_maint, "_refresh_dashboard_after_update",
@@ -49,7 +49,7 @@ def test_fleet_completion_preserves_runtime_verdict_and_restart_obligation(
         # Fork contract C3 (post-freeze): the code is committed, so an owed gateway restart is a
         # recorded follow-up, never a failed update — no SystemExit even when the fleet is stale
         # or down. Validation.py's sibling tests pin the same success-with-follow-up outcome.
-        update_cmd_fleet._verify_fleet_after_update(
+        fleet_verify._verify_fleet_after_update(
             restart, _pre_update_plan=None, _windows_gateway_resume=None,
             update_complete=update_complete,
         )
