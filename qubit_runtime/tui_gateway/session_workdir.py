@@ -228,22 +228,6 @@ def _terminal_task_cwd(session: dict | None) -> str:
     return _terminal_task_cwd_with_source(session)[0]
 
 
-def _host_cwd_is_terminal_cwd(profile_home) -> bool:
-    """Whether the bound backend runs commands on this host, so the session's host cwd is its
-    workspace. docker mounts the host dir; local does; a remote/container sandbox does not; a
-    plugin backend declares the answer."""
-    backend = _bound_terminal_backend(profile_home)
-    if backend == "local" or backend == "docker":
-        return True
-    if backend in {"ssh", "modal", "managed_modal", "daytona", "vercel_sandbox", "singularity"}:
-        return False
-    from agent.terminal_env_registry import _registry
-    provider = _registry.get_provider(backend, scope=profile_home)
-    if provider is None:
-        return False  # unknown plugin: treated as remote, as the newer backend classification does
-    return not (getattr(provider, "is_remote", False) or getattr(provider, "is_container", False))
-
-
 def _terminal_task_cwd_with_source(session: dict | None) -> tuple[str, str]:
     """``(cwd, source)``: ``"session"`` for THIS session's workspace (``explicit_cwd``/tracked dir), ``"process"`` for
     the global ``TERMINAL_CWD``/``terminal.cwd`` fallback — under per-session docker isolation that is a PREVIOUS
