@@ -402,6 +402,11 @@ def is_desktop_owned_backend(argv: Optional[Sequence[str]] = None) -> bool:
     return is_desktop_ssh_backend_argv(list(sys.argv[1:] if argv is None else argv))
 
 
+def is_local_desktop_backend() -> bool:
+    """True when this process is the local Desktop-owned backend (alias of ``is_desktop_owned_backend``)."""
+    return is_desktop_owned_backend()
+
+
 # Set while this process works for the Desktop app on its own machine: one request from, or one turn of
 # a chat created by, a client ``local_desktop_client`` accepted. The gateway serves the Desktop, the CLI,
 # the TUI and bots from one process, so this is a property of the activity, never of the process.

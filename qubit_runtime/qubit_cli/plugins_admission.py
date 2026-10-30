@@ -55,6 +55,7 @@ def admit_plugin_set_change(
     extra_dirs: Iterable[Path] = (),
     expected_config: str | None = None,
     plugin: Optional[str] = None,
+    settled: Iterable[str] = (),
 ) -> None:
     """PM discovers and validates the proposed union under its install lock.
 
@@ -70,6 +71,7 @@ def admit_plugin_set_change(
         sync_venv(explicit=True, plugins=Selection({
             "home": str(home.resolve()), "enabled": sorted(candidate_enabled),
             "disabled": sorted(candidate_disabled), "extra_dirs": [str(Path(d).resolve()) for d in extra_dirs],
+            "settled": sorted(settled),
             **({"expected_config": expected_config} if expected_config is not None else {}),
         }))
     except Exception as exc:

@@ -28,6 +28,7 @@ from qubit_cli.config import (
 from qubit_cli.colors import Colors, color
 from qubit_cli.cli_output import print_error, print_info, print_success, print_warning
 from qubit_cli.secret_prompt import masked_secret_prompt
+from qubit_cli.setup_agent_import import offer_agent_import
 
 logger = logging.getLogger(__name__)
 
@@ -733,11 +734,17 @@ def _run_setup_wizard_impl(args):
         migration_ran = _offer_openclaw_migration(qubit_home)  # before configuration begins
         if migration_ran:
             config = load_config()
+        # The plugin install and the import write config.yaml from outside this dict (the
+        # import from another process), so reload it.
+        imported_from = offer_agent_import(qubit_home)
+        config = load_config()
         setup_mode = prompt_choice("How would you like to set up Qubit?", [label for label, _ in _FIRST_TIME_MODES], 0)
         label, runner = _FIRST_TIME_MODES[setup_mode]
         if runner is not None:
             from qubit_cli import setup_quick
-            _run_setup_steps([(label, lambda: getattr(setup_quick, runner)(config, qubit_home, is_existing))])
+            run_args = (config, qubit_home, is_existing) + (
+                (imported_from,) if runner == "_run_first_time_quick_setup" else ())
+            _run_setup_steps([(label, lambda: getattr(setup_quick, runner)(*run_args))])
             _record_setup_completed(config)
             return
     _run_full_setup(config, qubit_home, is_existing=is_existing, migration_ran=migration_ran)
