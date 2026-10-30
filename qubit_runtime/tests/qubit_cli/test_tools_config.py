@@ -169,7 +169,7 @@ def test_get_platform_tools_legacy_qubit_alias_expands():
 
     Regression test for issue #41579.
     """
-    config = {"platform_toolsets": {"cli": ["hermes", "kanban"]}}
+    config = {"platform_toolsets": {"cli": ["qubit", "kanban"]}}
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
@@ -188,7 +188,7 @@ def test_get_platform_tools_legacy_qubit_alias_expands():
 
 def test_get_platform_tools_legacy_qubit_alias_alone():
     """``"hermes"`` alone (no other toolsets) must still produce tools."""
-    config = {"platform_toolsets": {"cli": ["hermes"]}}
+    config = {"platform_toolsets": {"cli": ["qubit"]}}
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     reference = _get_platform_tools(

@@ -27,7 +27,7 @@ def test_sessions_delete_accepts_unique_id_prefix(monkeypatch, capsys):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["hermes", "sessions", "delete", "20260315_092437_c9a6", "--yes"],
+        ["qubit", "sessions", "delete", "20260315_092437_c9a6", "--yes"],
     )
 
     main_mod.main()
@@ -124,7 +124,7 @@ def _run_prune(monkeypatch, capsys, argv_tail, candidates=None, skipped_open=0, 
 
     monkeypatch.setattr(qubit_state, "SessionDB", lambda *args, **kwargs: FakeDB())
     monkeypatch.setattr(
-        sys, "argv", ["hermes", "sessions", sub, *argv_tail]
+        sys, "argv", ["qubit", "sessions", sub, *argv_tail]
     )
     monkeypatch.setattr("builtins.input", lambda _prompt="": "y")
     main_mod.main()

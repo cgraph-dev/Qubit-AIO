@@ -408,6 +408,11 @@ def is_desktop_owned_backend(argv: Optional[Sequence[str]] = None) -> bool:
 _SERVING_LOCAL_DESKTOP: ContextVar[bool] = ContextVar("hermes_serving_local_desktop", default=False)
 
 
+
+def is_local_desktop_backend() -> bool:
+    """True when this process is the local Desktop-owned backend (alias of ``is_desktop_owned_backend``)."""
+    return is_desktop_owned_backend()
+
 @contextmanager
 def serving_local_desktop(active: bool) -> Iterator[None]:
     """Mark the enclosed activity (and threads it hands its context to) as work for the local Desktop."""

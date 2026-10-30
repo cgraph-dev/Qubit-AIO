@@ -359,7 +359,7 @@ def test_pre_dial_failure_is_a_definite_no_send_not_ambiguous(tmp_path, monkeypa
     dm_files = _spy_dm_files(bot_mode_dm, monkeypatch)
 
     payload = json.loads(bot_mode_dm._start_delivery(
-        ["hermes", "-p", "researcher"], "hello", "@researcher",
+        ["qubit", "-p", "researcher"], "hello", "@researcher",
         stdin_file=False, task_id=None, agent=None, profile_home=tmp_path))
 
     assert payload["reason"] == "runtime_unavailable"

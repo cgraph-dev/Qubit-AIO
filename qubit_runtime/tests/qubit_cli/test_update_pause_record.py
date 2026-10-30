@@ -286,7 +286,7 @@ def test_startup_recovery_follows_the_parsed_command_not_raw_argv(tmp_path, argv
     cli = _child("""
         import sys
         from qubit_cli.main import main
-        sys.argv = ["hermes", *sys.argv[1:]]
+        sys.argv = ["qubit", *sys.argv[1:]]
         try:
             main()
         except SystemExit:

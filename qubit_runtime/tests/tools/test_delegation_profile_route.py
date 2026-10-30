@@ -73,7 +73,7 @@ def test_unknown_profile_is_refused_with_an_instruction(two_profiles):
     from agent.delegation_provider import DelegationRouteError
     from tools.delegate_tool_routes import _route_to_task_route
 
-    with pytest.raises(DelegationRouteError, match="hermes profile list"):
+    with pytest.raises(DelegationRouteError, match="qubit profile list"):
         _route_to_task_route({"profile": "nobody"}, _parent(), {})
 
 

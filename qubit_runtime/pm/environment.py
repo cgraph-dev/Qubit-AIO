@@ -8,7 +8,7 @@ from __future__ import annotations
 import codecs
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import io
 import os
 from pathlib import Path
@@ -483,10 +483,21 @@ class PythonEnvironment:
         if result.returncode:
             raise InstallError("uv", f"cache pruning failed: {result.stderr[-600:]}")
 
-    def check(self) -> None:
-        result = self._run(
-            ["pip", "check", "--no-config", "--python", str(self.executable)],
+    def check(self, lock: Path | None = None) -> None:
+        """`uv pip check` the environment; *lock* is the uv.lock it was installed from.
+
+        Mismatches the lock's manifest overrides account for are expected (pm.pip_check).
+        """
+        result = replace(self, output=None)._run(
+            # Forced colour (FORCE_COLOR/CLICOLOR_FORCE) would wrap the report in ANSI pm.pip_check cannot read.
+            ["pip", "check", "--no-config", "--color", "never", "--python", str(self.executable)],
             cwd=self.destination.parent, timeout=60,
         )
-        if result.returncode:
+        if not result.returncode:
+            return
+        from pm.pip_check import unexpected_incompatibilities
+        unexpected = unexpected_incompatibilities(f"{result.stdout or ''}\n{result.stderr or ''}", lock)
+        if unexpected is None:
             raise InstallError("venv", f"dependency validation failed: {result.stderr[-600:]}")
+        if unexpected:
+            raise InstallError("venv", "dependency validation failed: " + "\n".join(unexpected)[-600:])

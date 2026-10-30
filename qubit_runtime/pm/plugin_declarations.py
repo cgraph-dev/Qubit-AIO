@@ -71,6 +71,11 @@ class PythonDeclaration:
     def is_member(self) -> bool:
         return not self.external and (self.pyproject is not None or bool(self.install_requirements))
 
+    @property
+    def installs_packages(self) -> bool:
+        """Admission would put packages into the shared environment (dependency consent/workspace)."""
+        return self.is_member
+
     def python_error(self, version: str) -> str | None:
         """Why this member cannot join a workspace built for *version*; uv intersects every
         member's requires-python, so one excluding member fails the whole lock."""
