@@ -732,11 +732,14 @@ def _(rid, params: dict) -> dict:
     if wake_owner is not None and wake_owner is not transport:
         return _ok(rid, {"status": "busy", "reason": "wake_owned"})
     try:
-        global _voice_event_sid, _voice_event_transport, _voice_wake_owner
-        if action == "start" and not _voice_mode_enabled():
+        global _voice_event_sid, _voice_event_transport, _voice_wake_owner, _voice_capture_sid
+        if action == "start" and not _session_voice_enabled(params.get("session_id")):
             return _err(rid, 4015, "voice mode is off — enable with /voice on")
+        sid = params.get("session_id") or ""
+        if _voice_capture_sid and sid != _voice_capture_sid and _capture_live():
+            return _err(rid, 4016, "voice capture is busy in another session")
         with _voice_sid_lock:
-            _voice_event_sid = params.get("session_id") or _voice_event_sid
+            _voice_event_sid = sid or _voice_event_sid
             _voice_event_transport = transport
         if action == "stop":
             from qubit_cli.voice import stop_continuous
@@ -759,7 +762,7 @@ def _(rid, params: dict) -> dict:
         # Shape-safe lookups: malformed ``voice:`` YAML (bool/scalar/list) must not crash /voice with a 5025
         # — fall back to VAD defaults. Exclude ``bool`` from the numeric check since Python's bool is a
         # subclass of int — a hand-edit like ``silence_threshold: true`` would otherwise forward as ``1``
-        # instead of falling back to the documented 200 / 3.0 defaults (Copilot round-12 on #19835).
+        # instead of falling back to the documented 200 / 3.0 defaults (review round-12 on #19835).
         voice_cfg = _voice_cfg_dict()
         max_rec = _voice_cfg_number(voice_cfg.get("max_recording_seconds"), 120.0)
         # Hand the mic to STT if the wake detector holds it; a terminal capture event resumes it.
@@ -769,15 +772,20 @@ def _(rid, params: dict) -> dict:
         if wake_paused:
             with _voice_sid_lock:
                 _voice_wake_owner = transport
+        live = _voice_capture_callback
         started = start_continuous(
-            on_transcript=lambda t: _vr_transcript({"text": t}), on_status=_vr_on_status,
-            on_silent_limit=lambda: _vr_transcript({"no_speech_limit": True}),
+            on_transcript=live(lambda t: _vr_transcript({"text": t})), on_status=_vr_on_status,
+            on_silent_limit=live(_vr_on_silent_limit),
             silence_threshold=_voice_cfg_number(voice_cfg.get("silence_threshold"), 200),
             silence_duration=_voice_cfg_number(voice_cfg.get("silence_duration"), 3.0),
             auto_restart=False, max_recording_seconds=max_rec if max_rec > 0 else 0.0,
-            on_stop_phrase=_vr_on_stop_phrase, on_partial=lambda t: _voice_emit("voice.partial", {"text": t}))
+            on_stop_phrase=live(_vr_on_stop_phrase),
+            on_partial=live(lambda t: _voice_emit("voice.partial", {"text": t})))
         if started is False:
             _resume_voice_wake()
+        else:
+            with _voice_sid_lock:
+                _voice_capture_sid = sid
         return _ok(rid, {"status": "busy" if started is False else "recording"})
     except Exception as e:
         if wake_paused or action == "stop":
