@@ -518,3 +518,70 @@ def resume_footer(session_id):
     profile = get_active_profile_name()
     flag = "" if profile in ("default", "custom") else f" -p {profile}"
     return f"\n{t('cli.session.exit_resume_hint')}\n  qubit --resume {session_id}{flag}"
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _quoted(row, fallback):
+    """A pending row's own line: its quoted, indented prompt (so it can never start with
+    ``/discard``), or ``fallback`` naming its id when it carries no text."""
+    preview = _pending_preview(row.get("text"))
+    return f'    "{preview}"' if preview else f"    ({fallback} {row['admission_id']})"
+
+
+_UNKNOWN_OUTCOME = ("Hermes couldn't confirm how this turn ended (usually because it restarted mid-turn). "
+                    "Resume this session and use the /discard <id> command it shows to drop the turn. "
+                    "Don't send the same message again until you've checked.")
+
+
+def pending_lines(pending, *, interactive=True):
+    """The owner's pending admissions as shown on attach (the classic CLI shows them before a turn).
+    A lost turn is never replayed, so the person must be told what it was and the exact command
+    that drops it; a queued prompt is not in the transcript yet, so it is quoted too. A one-shot
+    (``interactive=False``) cannot take ``/discard``, so its caller names the remedy instead."""
+    lost = [row for row in pending if row["status"] == "unknown"]
+    queued = [row for row in pending if row["status"] == "queued"]
+    lines = []
+    if len(lost) == 1:
+        lines.append("⏸ This chat is paused. Hermes couldn't confirm how the last turn ended "
+                     "(usually because it restarted mid-turn):")
+        if _pending_preview(lost[0].get("text")):
+            lines.append(_quoted(lost[0], "lost turn"))
+        lines.append("  Hermes won't re-run it by itself, since it may already have done part of the work.")
+        if interactive:
+            lines += ["  To drop it and continue, type:", f"/discard {lost[0]['admission_id']}"]
+    elif lost:
+        lines.append(f"⏸ This chat is paused. Hermes couldn't confirm how {len(lost)} turns ended "
+                     "(usually because it restarted mid-turn):")
+        lines.append("  Hermes won't re-run them by itself, since they may already have done part of the work.")
+        if interactive:
+            lines.append("  To continue, drop each one with the /discard line under it:")
+        for row in lost:
+            lines.append(_quoted(row, "lost turn"))
+            if interactive:
+                lines.append(f"/discard {row['admission_id']}")
+    if queued:
+        count = "1 message is" if len(queued) == 1 else f"{len(queued)} messages are"
+        after = {0: "to run", 1: "and will run once that turn is dropped"}.get(
+            len(lost), "and will run once those turns are dropped")
+        lines.append(f"  {count} waiting {after}:")
+        lines.extend(_quoted(row, "queued message") for row in queued)
+    return lines
+
+
+def lost_admission(snapshot, admission_id):
+    """``/discard``'s row: the resume snapshot is the only source of the generation the authority
+    stamped on a turn lost across an owner restart."""
+    lost = next((row for row in snapshot.get("pending", [])
+                 if row["admission_id"] == admission_id and row["status"] == "unknown"), None)
+    if lost is None:
+        raise GatewayClientError("No unknown (lost) admission with that id; resume to refresh")
+    return lost
+
+
+def _oneshot_admission(receipt):
+    """The one-shot query's admission id; None when the owner admitted nothing because the query was a
+    bare stop phrase that ended the session's LOCAL voice chat (TUI-26 ``{voice_stopped: true}``)."""
+    if receipt is None:
+        raise GatewayClientError("One-shot requires a query")
+    return None if receipt.get("voice_stopped") is True else receipt["admission_id"]

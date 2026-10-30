@@ -213,3 +213,94 @@ async def authenticate_native_http(request):
         return JSONResponse({'detail': 'profile_scope_mismatch'}, status_code=403)
     request.state.native_http_principal = grant
     return None
+
+
+# --- ported from upstream 088f657ecf ---
+
+def grant_home_scope(grant):
+    """Bind *grant*'s home as the task-local home override; no-op without a grant."""
+    if grant is None:
+        yield
+        return
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
+    home = Path(grant['profile_id'])
+    token = set_qubit_home_override(str(home))
+    try:
+        yield
+    finally:
+        reset_qubit_home_override(token)
+
+
+PROFILE_COLLECTION_ROUTES = {
+    'active': frozenset({'GET', 'POST'}), 'import': frozenset({'POST'}),
+    'projects/tree': frozenset({'GET'}), 'sessions': frozenset({'GET'}),
+    'sessions/pull-requests': frozenset({'POST'}), 'sessions/sidebar': frozenset({'GET'}),
+}
+
+
+def profile_collection_route(path, method):
+    """The collection suffix ``method path`` serves, or None when the path names a profile."""
+    suffix = path.rstrip('/').removeprefix('/api/profiles/')
+    if suffix == path.rstrip('/'):
+        return None
+    return suffix if method.upper() in PROFILE_COLLECTION_ROUTES.get(suffix, ()) else None
+
+
+def _registry_target(request):
+    """The profile a ``PATCH``/``DELETE /api/profiles/<name>`` names, or None for any other route."""
+    if request.method not in {'PATCH', 'DELETE'}:
+        return None
+    suffix = request.url.path.rstrip('/').removeprefix('/api/profiles/')
+    if suffix == request.url.path.rstrip('/') or not suffix or '/' in suffix:
+        return None
+    return suffix
+
+
+def _check_registry_scope(request, profile_id, launch_home):
+    """A registry grant renames or deletes exactly the profile it was minted for (#140345).
+
+    Never the gateway's launch home, which this live process is running in: deleting it or moving
+    its directory pulls the runtime out from under itself. The default root's rename stays allowed,
+    because it only sets a presentation ``display_name`` and never moves the directory.
+    """
+    target = _registry_target(request)
+    for value in request.query_params.getlist('profile'):
+        _own_profile(value, profile_id, current=False)
+    _own_profile(target, profile_id, current=False)
+    if launch_home is None:
+        # Fail closed: with no known launch home the guard below cannot tell it apart.
+        raise PermissionError('profile_scope_mismatch')
+    from qubit_constants import get_default_qubit_root, qubit_home_key
+    # Compared by qubit_home_key, as SessionAuthorities keys homes (symlinks, case, separators).
+    launch = qubit_home_key(launch_home)
+    if qubit_home_key(profile_id) == launch and not (
+            request.method == 'PATCH' and launch == qubit_home_key(get_default_qubit_root())):
+        raise PermissionError('profile_scope_mismatch')
+
+
+AUDIO_STREAM_PATHS = frozenset({'/api/audio/speak-stream', '/api/audio/transcribe-stream'})
+
+
+def redeem_audio_ws(ws):
+    """Redeem the ``interactive`` grant a local Desktop's audio stream upgrade presents; None when refused.
+
+    The voice sockets are siblings of the Desktop's ``/api/ws`` dial and ride the same one-use
+    grant in the same gateway subprotocol (``gateway/run_api.py``), under the HTTP seam's
+    peer/Origin/served-profile rules. The upgrade's ``profile`` selectors must name the grant's home.
+    """
+    from qubit_cli.web_server_boundary import _gateway_ws_ticket_from_subprotocol
+    ticket, reason = _gateway_ws_ticket_from_subprotocol(ws)
+    gate = _native_store(ws, [ticket]) if reason == 'ok' and ws.url.path in AUDIO_STREAM_PATHS else None
+    if gate is None:
+        return None
+    runner, store = gate
+    from gateway.session_authorities import authority_for_profile_id
+    try:
+        grant = store.redeem(ticket, profile_id=None, purpose='interactive')
+        if authority_for_profile_id(runner, grant['profile_id']) is None:
+            return None
+        for value in ws.query_params.getlist('profile'):
+            _own_profile(value, grant['profile_id'])
+    except PermissionError:
+        return None
+    return grant

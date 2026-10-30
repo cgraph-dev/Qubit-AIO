@@ -407,3 +407,30 @@ _ALWAYS_STRIP_KEYS: frozenset[str] = frozenset({
     "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "DAYTONA_API_KEY",
 }) | _ADAPTER_SECRET_ENV | _left_core_env(secrets_only=True)  # every declared adapter secret is Tier 1
 _ALWAYS_STRIP_FOLDED: frozenset[str] = frozenset(k.upper() for k in _ALWAYS_STRIP_KEYS)
+
+
+# --- ported from upstream 088f657ecf ---
+
+_SUPERVISED_PROCESS_IDENTITY_VARS = (
+    "HERMES_LAUNCHD_LABEL", "HERMES_GATEWAY_EXTERNAL_SUPERVISOR", "NOTIFY_SOCKET", "WATCHDOG_USEC", "WATCHDOG_PID",
+)
+
+
+GATEWAY_PROFILE_PIN_ENV = "HERMES_GATEWAY_PROFILE_PIN"
+
+
+def carry_gateway_profile_pin(env: dict) -> dict:
+    """Mark *env* with :data:`GATEWAY_PROFILE_PIN_ENV` while it still holds a pinning supervisor marker."""
+    if env.get("HERMES_SUPERVISED_CHILD") or str(
+            env.get("HERMES_GATEWAY_EXTERNAL_SUPERVISOR", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        env[GATEWAY_PROFILE_PIN_ENV] = "1"
+    return env
+
+
+def strip_supervised_process_identity(env: dict) -> dict:
+    """Drop :data:`_SUPERVISED_PROCESS_IDENTITY_VARS` from a child env, in place; returns *env*.
+    The profile pin they carried survives (:func:`carry_gateway_profile_pin`)."""
+    carry_gateway_profile_pin(env)
+    for name in _SUPERVISED_PROCESS_IDENTITY_VARS:
+        env.pop(name, None)
+    return env

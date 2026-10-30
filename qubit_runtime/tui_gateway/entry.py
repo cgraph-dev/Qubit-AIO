@@ -418,3 +418,33 @@ def _serve():
 
 if __name__ == "__main__":
     main()
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _private_rpc_stdin_windows() -> None:
+    """Read RPC from a private handle and give the process a NUL standard input.
+
+    ``subprocess`` hands a child launched without ``stdin=`` an inheritable
+    duplicate of ``STD_INPUT_HANDLE`` (``Popen._get_handles``), so marking fd 0
+    non-inheritable keeps nothing out. That duplicate is the RPC pipe: such a
+    child can read requests meant for us, and a ``git`` child started while the
+    main loop holds its synchronous ``readline`` on the pipe never returned (the
+    version probe in ``_session_info``, past its 3 s timeout), so the session's
+    agent build never finished and no turn ran.
+    """
+    import ctypes
+    import msvcrt
+
+    try:
+        stdin = sys.stdin
+        rpc = os.fdopen(os.dup(stdin.fileno()), "r", encoding=stdin.encoding,
+                        errors=stdin.errors, newline=None)  # os.dup: non-inheritable
+        null_fd = os.open(os.devnull, os.O_RDONLY)
+    except (OSError, ValueError, AttributeError):
+        logger.debug("could not give the TUI gateway a private RPC stdin", exc_info=True)
+        return
+    os.dup2(null_fd, 0)
+    os.close(null_fd)
+    ctypes.windll.kernel32.SetStdHandle(-10, msvcrt.get_osfhandle(0))  # type: ignore[attr-defined]  # STD_INPUT_HANDLE
+    sys.stdin = rpc

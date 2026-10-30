@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+from pathlib import Path
 from typing import Any
 
 from tui_gateway import git_probe
@@ -942,3 +943,45 @@ def _set_session_cwd(session: dict, cwd: str) -> str:
 def register(server) -> None:
     """Publish this module's helpers onto ``server``, rebound to its globals."""
     bind_module(globals(), server, skip=("_",))
+
+
+# --- ported from upstream 088f657ecf ---
+
+def _host_cwd_is_terminal_cwd(profile_home) -> bool:
+    """Whether a host directory can be the terminal cwd of a session bound to ``profile_home``: the local backend runs
+    in it, docker mounts it at ``/workspace`` (``docker_mount_cwd_to_workspace``) or creates it (``docker run -w``),
+    and a plugin backend declaring neither ``is_remote`` nor ``is_container`` runs on this host. ssh, modal, daytona,
+    singularity, sprites and the other sandboxes run somewhere the host's directories do not exist."""
+    backend = _bound_terminal_backend(profile_home)
+    if backend in {"local", "docker"}:
+        return True
+    from tools.terminal_tool_config import _BUILTIN_BACKENDS
+    if backend in _BUILTIN_BACKENDS:
+        return False
+    # An unknown or unloaded plugin is treated as remote: sending it a host path is the failure this guards. The
+    # registry is read in the session's OWN profile scope: callers (session.create) run before that home is bound.
+    from agent.terminal_env_registry import provider_flag
+    scope = str(profile_home) if profile_home else None
+    return not (provider_flag(backend, "is_remote", True, scope=scope)
+                or provider_flag(backend, "is_container", True, scope=scope))
+
+
+def _is_launch_dir(cwd: str, profile_home) -> bool:
+    """Whether ``cwd`` IS a directory a Hermes process is launched from rather than a folder someone picked: the
+    Hermes root (``/opt/data`` in the Docker image), a subprocess home (``/opt/data/home``), the bound profile's
+    home, the install tree, the OS user's home or ``/`` (the desktop's launch dirs). Folders below them are not: a
+    user may keep a workspace there."""
+    from agent.runtime_cwd import _is_install_tree
+    from qubit_constants import get_default_qubit_root, get_real_home
+
+    if not os.path.isabs(cwd):
+        return False
+    try:
+        path = Path(cwd).resolve()
+        home = Path(profile_home or get_qubit_home()).expanduser().resolve()
+        root = get_default_qubit_root(home=home).resolve()
+        launch = {home, home / "home", root, root / "home", Path(path.anchor),
+                  Path(get_real_home()).resolve(), Path.home().resolve()}
+    except (OSError, RuntimeError):
+        return False
+    return path in launch or _is_install_tree(path)

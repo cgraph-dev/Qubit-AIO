@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import collections
 import math
 import os
@@ -784,3 +785,45 @@ def release_active_session_liveness_guard(
             _write_entries(state_path, kept)
         lease.released = True
         yield _holds_session(kept, session_id)
+
+
+# --- ported from upstream 088f657ecf ---
+
+_queued_releases: dict[str, set[str]] = {}
+
+
+_queued_releases_lock = threading.Lock()
+
+
+def _registry_key(path: Path) -> str:
+    return os.path.normcase(os.path.realpath(path))
+
+
+def mark_release_queued(lease: ActiveSessionLease) -> None:
+    """Retire ``lease`` from this process's view of the registry now; its file write comes later."""
+    if not isinstance(lease, ActiveSessionLease) or not lease.enabled or lease.released:
+        return
+    state_path, _ = _lease_paths(lease)
+    with _queued_releases_lock:
+        _queued_releases.setdefault(_registry_key(state_path), set()).add(lease.lease_id)
+
+
+def _unmark_release_queued(state_path: Path, lease_id: str) -> None:
+    """Make ``lease_id`` visible again to the caller holding the registry lock, which drops it."""
+    key = _registry_key(state_path)
+    with _queued_releases_lock:
+        queued = _queued_releases.get(key)
+        if queued is not None:
+            queued.discard(lease_id)
+            if not queued:
+                del _queued_releases[key]
+
+
+def _without_queued_releases(path: Path, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not _queued_releases:
+        return entries
+    with _queued_releases_lock:
+        queued = set(_queued_releases.get(_registry_key(path), ()))
+    if not queued:
+        return entries
+    return [e for e in entries if str(e.get("lease_id") or "") not in queued]
