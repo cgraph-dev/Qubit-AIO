@@ -35,17 +35,13 @@ def completion_tail(monkeypatch):
 
     spawned = Spawned()
 
-    class Result:
-        def __init__(self, code):
-            self.returncode = code
-
     def run(command, **kwargs):
         spawned.append(command)
         spawned.kwargs = kwargs
-        return Result(spawned.exit_code)
+        return subprocess.CompletedProcess(command, spawned.exit_code)
 
-    # The fork's tail runs through ``update_custody.run`` (the subprocess.call seam is gone).
     from qubit_cli import update_custody
+
     monkeypatch.setattr(update_custody, "run", run)
     return spawned
 
@@ -58,10 +54,6 @@ def _self_checkout(tmp_path, monkeypatch):
     (root / "install-stamp.json").write_text(json.dumps({"updateMechanism": "self"}))
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
     return root
 
@@ -88,12 +80,8 @@ def _committed_checkout(tmp_path, monkeypatch):
     assert write_source_stamp(root)["dirty"] is False
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
     return root
 
 
@@ -101,7 +89,7 @@ def _committed_checkout(tmp_path, monkeypatch):
 def test_completed_tree_discharges_only_a_marker_older_than_its_stamp(
         tmp_path, monkeypatch, completion_tail, marker_age, owed):
     """Fresh install under a preserved home (#123314): a marker armed before the stamp
-    owes no rebuild of the same SHA. One armed after it (a same-commit `qubit update`
+    owes no rebuild of the same SHA. One armed after it (a same-commit `hermes update`
     that failed or was killed) is newer debt and the launch still finishes it."""
     import pm
 
@@ -141,7 +129,7 @@ def test_adoption_stamp_never_discharges_an_owed_tail(tmp_path, monkeypatch, com
     import pm
 
     root = _committed_checkout(tmp_path, monkeypatch)
-    blessed = tmp_path / "home/qubit"
+    blessed = tmp_path / "home/hermes-agent"
     blessed.parent.mkdir(parents=True)
     root.rename(blessed)
     (blessed / "install-stamp.json").unlink()
@@ -158,7 +146,7 @@ def test_adoption_stamp_never_discharges_an_owed_tail(tmp_path, monkeypatch, com
 
 @pytest.mark.parametrize("argv", [["--version"], ["-V"], ["--help"], ["-p", "work", "-h"]])
 def test_metadata_query_never_waits_on_source_completion(tmp_path, monkeypatch, argv):
-    """`qubit --version` offline must answer from the tree, not run a network-bound sync."""
+    """`hermes --version` offline must answer from the tree, not run a network-bound sync."""
     import pm
 
     root = _self_checkout(tmp_path, monkeypatch)
@@ -175,7 +163,7 @@ def test_failed_completion_tail_is_retried_without_rebuilding_dependencies(tmp_p
     fact = runtime_facts_path(root)
     syncs = []
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: fact.is_file())
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
 
     def sync(extras=None, **kwargs):
         syncs.append(extras)
@@ -184,12 +172,12 @@ def test_failed_completion_tail_is_retried_without_rebuilding_dependencies(tmp_p
 
     monkeypatch.setattr(pm, "sync_venv", sync)
     completion_tail.exit_code = 1
-    with pytest.raises(RuntimeError, match="run `qubit update`"):
+    with pytest.raises(RuntimeError, match="run `hermes update`"):
         venv_sync.prepare_launch(root, [])
     assert len(syncs) == 1 and len(completion_tail) == 1
     assert pm.venv_is_current()
 
-    with pytest.raises(RuntimeError, match="run `qubit update`"):
+    with pytest.raises(RuntimeError, match="run `hermes update`"):
         venv_sync.prepare_launch(root, [])
     assert len(syncs) == 1, "current dependencies were rebuilt for a tail retry"
     assert len(completion_tail) == 2
@@ -220,7 +208,7 @@ def test_prepared_completion_import_does_not_start_another_tail(tmp_path, monkey
     worker.touch()
     venv_sync.arm_completion(root)
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: True)
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
     monkeypatch.setattr(sys, "argv", [str(worker), "--source", str(root), "--finish-update", "--prepared"])
 
     assert venv_sync.prepare_launch(root, sys.argv[1:]) is None
@@ -239,7 +227,7 @@ def test_same_named_script_outside_the_checkout_still_repairs(tmp_path, monkeypa
     foreign.touch()
     venv_sync.arm_completion(root)
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: True)
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
     monkeypatch.setattr(sys, "argv", [str(foreign), "--prepared"])
 
     assert venv_sync.prepare_launch(root, sys.argv[1:]) is None
@@ -255,7 +243,7 @@ def test_completion_tail_output_stays_off_stdout(tmp_path, monkeypatch, completi
     root = _self_checkout(tmp_path, monkeypatch)
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: False)
     monkeypatch.setattr(pm, "sync_venv", lambda *a, **kw: None)
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
     venv_sync.prepare_launch(root, [])
     assert completion_tail.kwargs["stdout"] is sys.__stderr__
 
@@ -272,15 +260,11 @@ def test_first_launch_syncs_without_marker_then_uses_completion_fact(tmp_path, m
     (root / "install-stamp.json").write_text(json.dumps({"updateMechanism": "self"}))
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
     fact = runtime_facts_path(root)
     calls = []
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: fact.is_file())
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
 
     def sync(extras=None, **kwargs):
         calls.append((extras, kwargs))
@@ -316,7 +300,7 @@ def test_relaunch_keeps_invocation_and_checkout_imports(tmp_path, mode):
         argv[0] = "-c"
         orig = [sys.executable, "-c", "import entry", *argv[1:]]
     command = venv_sync.relaunch_command(Path(sys.executable), root, argv, orig, module)
-    result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=30, check=False)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == ["from checkout", argv[1:]]
 
@@ -330,10 +314,6 @@ def test_non_self_or_pm_launch_cannot_trigger_update(tmp_path, monkeypatch, owne
     (root / "pyproject.toml").write_text("[project]\n")
     if owner:
         (root / "install-stamp.json").write_text(json.dumps({"updateMechanism": owner}))
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
@@ -348,10 +328,6 @@ def test_failed_launch_keeps_previous_completion_and_retries(tmp_path, monkeypat
     (root / ".git").mkdir()
     (root / "pyproject.toml").write_text("[project]\n")
     (root / "install-stamp.json").write_text(json.dumps({"updateMechanism": "self"}))
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
@@ -373,25 +349,51 @@ def test_failed_launch_keeps_previous_completion_and_retries(tmp_path, monkeypat
     assert not (root / ".update-incomplete").exists()
 
 
+def test_failed_dependency_sync_backs_off_only_for_the_same_inputs(tmp_path, monkeypatch):
+    """A failed launch sync counts toward the retry bound, so relaunches stop redoing the same
+    failing repair (#139952); a corrected source update is a different repair and runs."""
+    import pm
+    from qubit_cli import _launchers
+
+    root = _self_checkout(tmp_path, monkeypatch)
+    syncs = []
+
+    def failing_sync(*args, **kwargs):
+        syncs.append(args)
+        raise RuntimeError("sync failed")
+
+    monkeypatch.setattr(pm, "venv_is_current", lambda **kw: False)
+    monkeypatch.setattr(pm, "sync_venv", failing_sync)
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
+    for _ in range(venv_sync.COMPLETION_RETRY_BACKOFF_ATTEMPTS):
+        with pytest.raises(RuntimeError, match="sync failed"):
+            venv_sync.prepare_launch(root, [])
+    assert venv_sync.completion_pending_path(root).is_file()
+
+    assert venv_sync.prepare_launch(root, []) is None, "a backed-off stale launch must not relaunch"
+    assert len(syncs) == venv_sync.COMPLETION_RETRY_BACKOFF_ATTEMPTS, "the same failing repair re-ran"
+
+    (root / "uv.lock").write_text("# corrected source update\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="sync failed"):
+        venv_sync.prepare_launch(root, [])
+    assert len(syncs) == venv_sync.COMPLETION_RETRY_BACKOFF_ATTEMPTS + 1, "changed inputs were not retried"
+
+
 def test_blessed_legacy_install_is_adopted_before_sync(tmp_path, monkeypatch, completion_tail):
     import pm
     from qubit_cli import _launchers
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     home = tmp_path / "home"
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
-    root = home / "qubit"
+    root = home / "hermes-agent"
     root.mkdir(parents=True)
     (root / ".git").mkdir()
     (root / "pyproject.toml").write_text("[project]\n")
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: False)
     calls = []
     monkeypatch.setattr(pm, "sync_venv", lambda *args, **kw: calls.append(args))
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
     assert venv_sync.prepare_launch(root, []) == Path(sys.executable)
     assert json.loads((root / "install-stamp.json").read_text())["source"] == "adoption"
     assert calls == [(["all"],)]
@@ -399,12 +401,12 @@ def test_blessed_legacy_install_is_adopted_before_sync(tmp_path, monkeypatch, co
 
 def test_relaunch_runs_zip_launchers_and_preserves_interpreter_options(tmp_path):
     import zipfile
-    launcher = tmp_path / "qubit.exe"
+    launcher = tmp_path / "hermes.exe"
     with zipfile.ZipFile(launcher, "w") as archive:
         archive.writestr("__main__.py", "import json,sys; print(json.dumps([sys.argv[1:], sys.stdout.write_through, sys.flags.utf8_mode]))")
     original = [sys.executable, "-u", "-X", "utf8", str(launcher), "arg with spaces"]
     command = venv_sync.relaunch_command(Path(sys.executable), tmp_path, [str(launcher), "arg with spaces"], original, "__main__")
-    result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == [["arg with spaces"], True, 1]
 
@@ -418,10 +420,6 @@ def test_live_old_update_blocks_launch_sync(tmp_path, monkeypatch):
     (root / "install-stamp.json").write_text(json.dumps({"updateMechanism": "self"}))
     marker = root / ".update-incomplete"
     marker.write_text(f"pid={os.getpid()}\n")
-    monkeypatch.delenv("QUBIT_DISABLE_LAZY_INSTALLS", raising=False)
-    # The suite-wide switch is the legacy HERMES_ spelling: production reads it
-    # (BRAND §2 keeps HERMES_* names load-bearing), so clearing only QUBIT_ leaves
-    # launch sync disabled and every test here inert.
     monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: False)
     monkeypatch.setattr(pm, "sync_venv", lambda *a, **kw: pytest.fail("raced old updater"))
@@ -431,7 +429,7 @@ def test_live_old_update_blocks_launch_sync(tmp_path, monkeypatch):
     # Fresh post-sync verification children may boot under a live updater.
     from qubit_cli import _launchers
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: True)
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
     assert venv_sync.prepare_launch(root, []) is None
     assert marker.is_file()
 
@@ -457,11 +455,24 @@ def test_launch_under_the_owning_update_does_not_run_the_tail_again(tmp_path, mo
     assert pending.is_file(), "the owning update's obligation was discharged by its own tail"
 
 
+def test_gateway_status_skips_pending_source_update_completion(tmp_path, monkeypatch, completion_tail):
+    """`gateway status` remains a read-only recovery diagnostic while a tail is owed (#139133)."""
+    import pm
+
+    root = _self_checkout(tmp_path, monkeypatch)
+    pending = venv_sync.arm_completion(root)
+    monkeypatch.setattr(pm, "venv_is_current", lambda **_kw: pytest.fail("status started a dependency sync"))
+
+    assert venv_sync.prepare_launch(root, ["gateway", "status"]) is None
+    assert completion_tail == []
+    assert pending.is_file(), "a status query must leave the update tail for `hermes gateway restart`"
+
+
 @pytest.mark.parametrize("marker,value,owed_by_cli", [
-    ("QUBIT_SUPERVISED_CHILD", "1", True),
-    ("QUBIT_S6_SUPERVISED_CHILD", "true", True),
-    ("QUBIT_SUPERVISED_CHILD", "0", False),
-    ("QUBIT_SUPERVISED_CHILD", "false", False),
+    ("HERMES_SUPERVISED_CHILD", "1", True),
+    ("HERMES_S6_SUPERVISED_CHILD", "true", True),
+    ("HERMES_SUPERVISED_CHILD", "0", False),
+    ("HERMES_SUPERVISED_CHILD", "false", False),
 ])
 def test_supervised_launch_leaves_a_pending_tail_to_the_cli(
     tmp_path, monkeypatch, capsys, completion_tail, marker, value, owed_by_cli
@@ -470,7 +481,7 @@ def test_supervised_launch_leaves_a_pending_tail_to_the_cli(
 
     systemd/launchd/s6 restart the gateway under a policy; with a marker that never
     clears, each boot would rebuild the completion environment until the disk fills.
-    The obligation stays with `qubit update`. An off value (`0`/`false`) is not a
+    The obligation stays with `hermes update`. An off value (`0`/`false`) is not a
     supervised launch and still repays the tail.
     """
     import pm
@@ -481,9 +492,9 @@ def test_supervised_launch_leaves_a_pending_tail_to_the_cli(
     pending.parent.mkdir(parents=True)
     pending.write_text("owed\n")
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: True)
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
-    monkeypatch.delenv("QUBIT_SUPERVISED_CHILD", raising=False)
-    monkeypatch.delenv("QUBIT_S6_SUPERVISED_CHILD", raising=False)
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
+    monkeypatch.delenv("HERMES_SUPERVISED_CHILD", raising=False)
+    monkeypatch.delenv("HERMES_S6_SUPERVISED_CHILD", raising=False)
     monkeypatch.setenv(marker, value)
 
     assert venv_sync.prepare_launch(root, ["gateway", "run"]) is None
@@ -491,7 +502,7 @@ def test_supervised_launch_leaves_a_pending_tail_to_the_cli(
         assert completion_tail == []
         assert pending.is_file(), "a supervised child discharged an obligation the CLI still owes"
         out, err = capsys.readouterr()
-        assert out == "" and err.count("run `qubit update`") == 1
+        assert out == "" and err.count("run `hermes update`") == 1
     else:
         assert len(completion_tail) == 1
         assert not pending.is_file()
@@ -515,23 +526,10 @@ def test_supervised_launch_with_stale_dependencies_still_syncs(
     syncs = []
     monkeypatch.setattr(pm, "venv_is_current", lambda **kw: False)
     monkeypatch.setattr(pm, "sync_venv", lambda *a, **kw: syncs.append(a))
-    monkeypatch.setattr(_launchers, "resolve_store_python", lambda *_a, **_k: Path(sys.executable))
-    monkeypatch.setenv("QUBIT_SUPERVISED_CHILD", "1")
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda _, **__: Path(sys.executable))
+    monkeypatch.setenv("HERMES_SUPERVISED_CHILD", "1")
 
     venv_sync.prepare_launch(root, ["gateway", "run"])
     assert syncs, "a supervised child booted on a stale dependency graph without syncing"
     assert completion_tail, "the tail armed by that sync was never finished"
     assert not venv_sync.completion_pending_path(root).is_file()
-
-
-def test_gateway_status_skips_pending_source_update_completion(tmp_path, monkeypatch, completion_tail):
-    """`gateway status` remains a read-only recovery diagnostic while a tail is owed (#139133)."""
-    import pm
-
-    root = _self_checkout(tmp_path, monkeypatch)
-    pending = venv_sync.arm_completion(root)
-    monkeypatch.setattr(pm, "venv_is_current", lambda **_kw: pytest.fail("status started a dependency sync"))
-
-    assert venv_sync.prepare_launch(root, ["gateway", "status"]) is None
-    assert completion_tail == []
-    assert pending.is_file(), "a status query must leave the update tail for `hermes gateway restart`"

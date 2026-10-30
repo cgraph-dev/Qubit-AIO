@@ -44,7 +44,7 @@ receipt = os.environ.get('HANDOFF_RECEIPT')  # outcome[,correlation][,unfinished
 if receipt and sys.argv[1:2] == ['update']:
     import json
     outcome, correlation, finished = (receipt.split(',') + ['', ''])[:3]
-    path = Path(os.environ['HERMES_HOME']) / 'logs' / 'update_receipts' / 'latest.json'
+    path = Path(os.environ['QUBIT_HOME']) / 'logs' / 'update_receipts' / 'latest.json'
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
         'stages': [{'name': 'apply', 'outcome': 'failed'}],  # nested keys are never read
@@ -103,14 +103,14 @@ def _install(tmp_path: Path, *, legacy: bool = False) -> tuple[Path, Path]:
 
 
 def _run(tmp_path: Path, home: Path, install: Path, *args: str, **env: str) -> subprocess.CompletedProcess:
-    full_env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    full_env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "QUBIT_HOME": str(home),
                 "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
                 "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0", **env}
     for key in ("PYTHONPATH", "PYTHONHOME", "HERMES_UPDATE_STARTED_AT"):
         full_env.pop(key, None)
     full_env.update(env)
     return subprocess.run(["bash", str(POSIX), "--daemonized", "--no-ui", "--install-root", str(install), *args],
-                          env=full_env, cwd=tmp_path, capture_output=True, text=True, timeout=120)
+                          env=full_env, cwd=tmp_path, capture_output=True, text=True, timeout=120, check=False)
 
 
 def _calls(tmp_path: Path) -> list[str]:
@@ -123,7 +123,7 @@ def test_live_marker_is_never_reclaimed_and_refuses_the_handoff(tmp_path, sleepe
     home, install = _install(tmp_path)
     live = sleeper()
     if delegate:
-        # The orchestrator died (pid 1 is never ours) while `qubit update` still runs as the
+        # The orchestrator died (pid 1 is never ours) while `hermes update` still runs as the
         # delegate: the marker stays LIVE through line 4.
         body = f"999999\n{int(time.time()) - 60}\nct:1.000\ndelegate:{live.pid} ct:{_ct(live.pid)}\n"
     else:
@@ -244,7 +244,7 @@ def test_committed_update_with_failed_followup_is_ok_with_warnings(tmp_path):
 
 @pytest.mark.parametrize(("outcome", "code"), [("interrupted", "130"), ("partial", "1"), ("success", "1")])
 def test_nonzero_exit_after_the_commit_point_is_installed_with_a_followup(tmp_path, outcome, code):
-    """Contract C3: `qubit update` exits 130 (Ctrl-C after the code moved) or 1 (a parked
+    """Contract C3: `hermes update` exits 130 (Ctrl-C after the code moved) or 1 (a parked
     autostash) AFTER its commit point. Its own receipt says so; the result must report the
     update installed with an owed follow-up, never ok:false / "still on the previous version"."""
     home, install = _install(tmp_path)
@@ -254,7 +254,7 @@ def test_nonzero_exit_after_the_commit_point_is_installed_with_a_followup(tmp_pa
     assert result.returncode == 0, result.stdout + result.stderr
     receipt = json.loads((home / ".hermes-update-result.json").read_text(encoding="utf-8-sig"))
     assert (receipt["ok"], receipt["exit_code"], receipt["manual"]) == (True, 0, True), receipt
-    assert receipt["message"].startswith("Qubit was updated, but"), receipt
+    assert receipt["message"].startswith("Hermes was updated, but"), receipt
     assert [w.split(":")[0] for w in receipt["warnings"]] == ["update"], receipt
     assert f"exited {code} after the commit point" in receipt["warnings"][0]
 
@@ -264,7 +264,7 @@ def test_handoff_interrupted_while_a_committed_update_finishes_is_still_installe
     passed the commit point. The hand-off's own interruption is then an owed follow-up."""
     home, install = _install(tmp_path)
     hold = tmp_path / "release-update"
-    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "QUBIT_HOME": str(home),
            "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
            "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0", "HANDOFF_HOLD": str(hold), "HANDOFF_EXIT": "130",
            "HANDOFF_RECEIPT": "interrupted"}
@@ -302,6 +302,26 @@ def test_nonzero_exit_without_this_runs_committed_receipt_still_fails(tmp_path, 
     assert (outcome["ok"], outcome["exit_code"]) == (False, 130), outcome
 
 
+@pytest.mark.parametrize("output", ["", "sweeping the venv\n\nERROR: the autostash cannot be re-applied"],
+                         ids=["no-output", "names-the-failing-layer"])
+def test_failed_update_carries_the_updaters_own_output(tmp_path, output):
+    """The generic failure copy is the only thing the shim and the next-boot result dialog can
+    show the user; without the updater's tail the exit code names nothing (#137327). Empty
+    updater output keeps the original copy byte-identical."""
+    home, install = _install(tmp_path)
+
+    result = _run(tmp_path, home, install, HANDOFF_EXIT="1", HANDOFF_OUTPUT=output)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    outcome = json.loads((home / ".hermes-update-result.json").read_text(encoding="utf-8-sig"))
+    assert (outcome["ok"], outcome["exit_code"]) == (False, 1), outcome
+    assert outcome["message"].startswith("Update failed (exit 1). Run hermes debug share"), outcome
+    if output:
+        assert "Last output: sweeping the venv ERROR: the autostash cannot be re-applied" in outcome["message"], outcome
+    else:
+        assert "Last output:" not in outcome["message"], outcome
+
+
 def test_interrupted_app_swap_is_rolled_back_at_the_next_run(tmp_path):
     home, install = _install(tmp_path)
     app = tmp_path / "Applications" / "Hermes.app"
@@ -334,13 +354,13 @@ def _ancestry(pid: int) -> list[int]:
 
 
 def test_script_killed_right_after_spawning_the_update_leaves_a_live_marker(tmp_path):
-    """C1 rule 6, written by the script itself: posix.sh dies (SIGKILL) while its `qubit update`
+    """C1 rule 6, written by the script itself: posix.sh dies (SIGKILL) while its `hermes update`
     child is only starting up and has not taken the update lock. The marker must still read LIVE
     through the child named on line 4, and turn dead once that child is gone."""
     home, install = _install(tmp_path)
     hold = tmp_path / "release-update"
     marker = home / ".hermes-update-in-progress"
-    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "HERMES_HOME": str(home),
+    env = {**os.environ, "HOME": str(tmp_path), "TMPDIR": str(tmp_path), "QUBIT_HOME": str(home),
            "HANDOFF_CAPTURE": str(tmp_path / "calls.txt"), "HERMES_RUNTIME_DIR": str(tmp_path / "store"),
            "HERMES_UPDATE_SHIM_GRACE_SECONDS": "0", "HANDOFF_HOLD": str(hold)}
     for key in ("PYTHONPATH", "PYTHONHOME", "HERMES_UPDATE_STARTED_AT"):
