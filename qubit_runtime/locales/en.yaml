@@ -670,7 +670,6 @@ gateway:
     skip_hint: 'Reply "skip" to skip this question.'
 
   errors:
-    cron_session_read_only: "⚠️ This chat belongs to a scheduled job and only runs that job, so your message was not run. Start a new chat to send it."
     rate_limited: "⏱️ The AI model service is rate-limiting requests. Wait a moment, then use /retry."
     auth_failed: "⚠️ Sign-in to the AI model service failed. Use /login to sign in again, or ask whoever runs this bot to run `qubit doctor` on the host."
     bad_request: "⚠️ The AI model service rejected this request. Try rephrasing your message, or use /model to switch models."
@@ -704,9 +703,6 @@ gateway:
     workspace_unavailable: "⚠️ This chat's working folder no longer exists ({path}), so your message was not run. Recreate the folder, or move the chat to another one (`/worktree new` in the CLI, Move to project in the desktop app), then send your message again."
     launch_credentials_unavailable: "⚠️ This chat can't use the API key it was started with any more{detail}, so nothing can run in it. An open chat never switches to a different key on its own, so /retry fails the same way. Use /new to start a new chat on your current key."
 
-    cron_session_read_only: ⚠️ This chat belongs to a scheduled job and only runs that job, so your message was not run. Start a new chat to send it.
-    launch_credentials_unavailable: ⚠️ This chat can't use the API key it was started with any more{detail}, so nothing can run in it. An open chat never switches to a different key on its own, so /retry fails the same way. Use /new to start a new chat on your current key.
-    workspace_unavailable: ⚠️ This chat's working folder no longer exists ({path}), so your message was not run. Recreate the folder, or move the chat to another one (`/worktree new` in the CLI, Move to project in the desktop app), then send your message again.
   skills:
     disabled: "The **{name}** skill is installed but disabled.\nEnable it with: `qubit skills config`"
     not_installed: "The **{name}** skill is available but not installed.\nInstall it with: `qubit skills install {install_name}`"

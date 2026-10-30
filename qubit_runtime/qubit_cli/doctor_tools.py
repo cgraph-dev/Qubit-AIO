@@ -82,12 +82,6 @@ def _run_ok(cmd: list[str], timeout: int, **kw) -> bool:
         return False
 
 
-def _termux_browser_setup_steps(node_installed: bool) -> list[str]:
-    steps = [] if node_installed else ["pkg install nodejs"]
-    steps += ["npm install -g agent-browser", "agent-browser install"]
-    return [f"{i}) {step}" for i, step in enumerate(steps, 1)]
-
-
 _TERMUX_INSTALL_ALL_FALLBACK_NOTES = (
     "Termux uses the Qubit APT package: pkg install hermes-agent.",
     "Matrix E2EE extra is excluded on Termux (python-olm currently fails to build).",
@@ -317,40 +311,6 @@ def _check_terminal_backend(should_fix: bool, f: Finding) -> None:
         _check_plugin_backend(terminal_env, f.issues)
 
 
-def _check_agent_browser(should_fix: bool) -> bool:
-    """Read the runtime's installed selection; only --fix may acquire through PM."""
-    try:
-        from tools.browser_tool_install import _find_agent_browser
-        resolved = _find_agent_browser(validate=False)
-    except Exception:
-        resolved = None
-    if not resolved and should_fix and not _is_termux():
-        try:
-            import pm
-            from tools.browser_tool_install import _find_agent_browser
-            pm.ensure("agent-browser", explicit=True)
-            resolved = _find_agent_browser(validate=False)
-        except Exception as exc:
-            check_warn("agent-browser install failed", f"({exc})")
-    if resolved:
-        check_ok("agent-browser", f"({resolved})")
-        return True
-    if _is_termux():
-        _termux_browser_hints("agent-browser is not installed (expected in the tested Termux path)",
-                              "Install it manually later with: npm install -g agent-browser && agent-browser install", node_installed=True)
-    else:
-        check_warn("agent-browser not installed", "(run: qubit pm install agent-browser)")
-    return False
-
-
-def _termux_browser_hints(*lines: str, node_installed: bool) -> None:
-    for line in lines:
-        check_info(line)
-    check_info("Termux browser setup:")
-    for step in _termux_browser_setup_steps(node_installed=node_installed):
-        check_info(step)
-
-
 def _check_chromium(should_fix: bool) -> None:
     """The Chromium browser_exec launches for a local session (``chromium_executable()``: browser.executable_path,
     pm, the Docker image's baked build, a Termux system build). Only --fix may acquire it through PM."""
@@ -392,18 +352,17 @@ def _check_lightpanda() -> None:
                         ("Lightpanda selected but binary not found", "(browser tools will fail until it is installed)")):
         check_info(LIGHTPANDA_INSTALL_HINT)
 
+@doctor_check()
 def _check_node_and_browser(should_fix: bool, f: Finding) -> None:
-    """Node.js, agent-browser resolution, Playwright Chromium, Lightpanda engine."""
+    """Node.js, the Chromium browser_exec launches, Lightpanda engine."""
     # Only PM's Node counts; Termux's APT distribution is the one that relies on `pkg install nodejs`.
     if _pm_tool_path("node") or (_is_termux() and _safe_which("node")):
         check_ok("Node.js")
     elif _is_termux():
-        _termux_browser_hints("Node.js not found (browser tools are optional in the tested Termux path)",
-                              "Install Node.js on Termux with: pkg install nodejs", node_installed=False)
+        check_info("Node.js not found (optional; install on Termux with: pkg install nodejs)")
     else:
-        check_warn("Node.js not found", "(optional; PM agent-browser is a native executable)")
-    if _check_agent_browser(should_fix) and not _is_termux():
-        _check_chromium(should_fix)
+        check_warn("Node.js not found", "(optional; run: qubit pm install node)")
+    _check_chromium(should_fix)
     _check_lightpanda()
 
 

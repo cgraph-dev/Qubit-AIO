@@ -397,8 +397,16 @@ def _gateway_service_matches_profile(profile: str, service: object) -> bool:
     """
     name = str(service).removesuffix(".service").rsplit("/", 1)[-1]
     if profile == "default":
-        return name in {"hermes-gateway", "ai.hermes.gateway", "gateway", "gateway-default"}
-    return name in {f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}", f"gateway-{profile}"}
+        return name in {
+            "qubit-gateway", "ai.qubit.gateway",
+            "hermes-gateway", "ai.hermes.gateway",  # legacy read-old unit/label
+            "gateway", "gateway-default",
+        }
+    return name in {
+        f"qubit-gateway-{profile}", f"ai.qubit.gateway-{profile}",
+        f"hermes-gateway-{profile}", f"ai.hermes.gateway-{profile}",  # legacy read-old
+        f"gateway-{profile}",
+    }
 
 
 def _gateway_named_in(r: RuntimeRecord, names: set) -> bool:

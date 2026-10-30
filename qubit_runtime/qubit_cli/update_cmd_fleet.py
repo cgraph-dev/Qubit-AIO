@@ -1232,7 +1232,7 @@ def _repair_unit_without_fatal_exit_park(svc_name: str, scope: str) -> None:
     print(
         f"  ⚠ {svc_name} lacks RestartPreventExitStatus={GATEWAY_FATAL_CONFIG_EXIT_CODE}: a permanent refusal "
         f"(exit {GATEWAY_FATAL_CONFIG_EXIT_CODE}) would crash-loop it instead of parking.\n"
-        f"    Repair: {'sudo ' if system else ''}hermes gateway install{' --system' if system else ''}"
+        f"    Repair: {'sudo ' if system else ''}qubit gateway install{' --system' if system else ''}"
     )
 
 

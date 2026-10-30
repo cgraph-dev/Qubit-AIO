@@ -300,7 +300,8 @@ _ACTION_LOG_FILES: dict[str, str] = {
     "gateway-start": "gateway-start.log",
     "gateway-stop": "gateway-stop.log",
     "gateway-migrate": "gateway-migrate.log",
-    "hermes-update": "hermes-update.log",
+    "qubit-update": "qubit-update.log",
+    "hermes-update": "hermes-update.log",  # legacy read-old
     **{name: f"action-{name}.log" for name in (
         "doctor", "security-audit", "backup", "import", "checkpoints-prune", "skills-install",
         "skills-uninstall", "skills-update", "curator-run", "prompt-size", "dump", "config-migrate",
@@ -485,7 +486,8 @@ def _spawn_qubit_action(
     section_start = os.fstat(log_file.fileno()).st_size
     # The header carries the action id durably: the update's completion marker lands in the ROOT
     # update.log every profile shares, and only this id ties one to the action THIS log started.
-    action_id = (env_overrides or {}).get("HERMES_ACTION_ID")
+    action_id = ((env_overrides or {}).get("QUBIT_ACTION_ID")
+                 or (env_overrides or {}).get("HERMES_ACTION_ID"))
     stamp = time.strftime('%Y-%m-%d %H:%M:%S') + (f" {action_id}" if action_id else "")
     log_file.write(f"\n=== {name} started {stamp} ===\n".encode())
     if action_id:

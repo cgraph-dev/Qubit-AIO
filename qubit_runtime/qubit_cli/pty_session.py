@@ -600,9 +600,9 @@ class PtySessionRegistry:
         self._closed = False
 
     async def close_all(self, *, keep_detached: bool = False) -> None:
-        # ``keep_detached`` is accepted for the voicebridge lease-shim wrapper, which owns the
-        # detached-session bookkeeping; the registry itself closes every session.
-        del keep_detached
+        # A backend shutdown must not kill a PTY whose client already left: the next backend
+        # reattaches to it (``keep_detached``). The voicebridge lease shim relies on this and
+        # only releases leases for the sessions actually closed.
         self._closed = True
         # Wait for any admitted spawn before snapshotting shutdown ownership.
         async with self._spawn_lock:
@@ -610,5 +610,7 @@ class PtySessionRegistry:
         if self._spawn_cleanup:
             await asyncio.shield(asyncio.gather(*self._spawn_cleanup))
         # Helper-process grace must run concurrently inside the backend shutdown budget.
-        sessions = [self._sessions.pop(key) for key in list(self._sessions)]
+        doomed = [key for key, session in list(self._sessions.items())
+                  if not (keep_detached and not getattr(session, "attached", False))]
+        sessions = [self._sessions.pop(key) for key in doomed]
         await asyncio.gather(*(s.close() for s in sessions), *self._background_closes, return_exceptions=True)
