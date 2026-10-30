@@ -361,11 +361,17 @@ def route_retired_params(session_key, entry_json, now):
             'retired_prefix': RETIRED_PREFIX, 'fence_prefix': ROUTE_FENCE_PREFIX}
 
 
+def route_retired_in(conn, session_key, entry_json, now=None):
+    """Whether a routing write on *conn* must skip this entry (see :func:`route_retired`)."""
+    return bool(conn.execute('SELECT ' + ROUTE_RETIRED_SQL,
+                             route_retired_params(session_key, entry_json,
+                                                  time.time() if now is None else now)).fetchone()[0])
+
+
 def route_retired(db, session_key, entry_json):
     """A routing save (or the legacy sessions.json import) must skip this entry."""
     with db._read_ctx() as conn:
-        return bool(conn.execute('SELECT ' + ROUTE_RETIRED_SQL,
-                                 route_retired_params(session_key, entry_json, time.time())).fetchone()[0])
+        return route_retired_in(conn, session_key, entry_json)
 
 
 def expiring_retirements(db, session_ids):

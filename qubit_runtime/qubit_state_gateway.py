@@ -298,28 +298,40 @@ class SessionGatewayMixin:
         namespaces the index per sessions_dir so two stores never share routing state."""
         if not session_key or not entry_json:
             return
-        self._write_sql(
-            """INSERT INTO gateway_routing (scope, session_key, entry_json, updated_at)
-               SELECT ?, ?, ?, ? WHERE NOT EXISTS (
-                   SELECT 1 FROM state_meta WHERE key='gateway.retired_session.v1.' || json_extract(?, '$.session_id'))
-               ON CONFLICT(scope, session_key) DO UPDATE SET
-                   entry_json = excluded.entry_json,
-                   updated_at = excluded.updated_at""",
-            (scope, session_key, entry_json, time.time(), entry_json),
-        )
+        from qubit_state_mutation_retirement import route_retired_in
+
+        def _do(conn):
+            if route_retired_in(conn, session_key, entry_json):
+                return
+            conn.execute(
+                """INSERT INTO gateway_routing (scope, session_key, entry_json, updated_at)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(scope, session_key) DO UPDATE SET
+                       entry_json = excluded.entry_json,
+                       updated_at = excluded.updated_at""",
+                (scope, session_key, entry_json, time.time()),
+            )
+        self._execute_write(_do)
 
     def replace_gateway_routing_entries(self, entries: Dict[str, str], *, scope: str = "") -> None:
         """Atomically replace the routing index for *scope* (keys absent from *entries*
         are removed); other scopes untouched."""
+        from qubit_state_mutation_retirement import route_retired_in
         now = time.time()
         def _do(conn):
             conn.execute("DELETE FROM gateway_routing WHERE scope = ?", (scope,))
-            if entries:
-                conn.executemany(
+            for key, value in (entries.items() if entries else ()):
+                if not key or not value:
+                    continue
+                # The delete fence lives in the shared routing database keyed by the deleting
+                # profile's namespace (``retire_gateway_routes``), not necessarily as this store's
+                # own retired-session marker. Check the full predicate so a stale whole-index
+                # snapshot saved after a secondary's delete cannot restore that route.
+                if route_retired_in(conn, key, value, now):
+                    continue
+                conn.execute(
                     "INSERT INTO gateway_routing (scope, session_key, entry_json, updated_at) "
-                    "SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM state_meta "
-                    "WHERE key='gateway.retired_session.v1.' || json_extract(?, '$.session_id'))",
-                    [(scope, k, v, now, v) for k, v in entries.items() if k and v])
+                    "VALUES (?, ?, ?, ?)", (scope, key, value, now))
         self._execute_write(_do)
 
     def load_gateway_routing_entries(self, *, scope: str = "") -> Dict[str, str]:
