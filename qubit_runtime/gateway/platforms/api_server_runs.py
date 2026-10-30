@@ -581,8 +581,8 @@ class _RunLaunch:
     session_history_delivery: bool
     agent_kwargs: dict  # ``_create_agent`` keyword arguments (prompt, model overrides, route, room policy)
     request_profile: Any
-    browser_control_principal: Any
-    browser_control_transport_family: Any
+    browser_control_principal: Any = None
+    browser_control_transport_family: Any = None
     turn_author: Optional[Dict[str, Any]] = None  # memory-attribution label only; grants nothing
     admission: Any = None
     walked_from: Optional[str] = None  # the swept stored session the chain moved past (``bind_api_steps``)

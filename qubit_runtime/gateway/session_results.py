@@ -166,3 +166,4 @@ def close_discarded_turn(db, conn, row, notice=None, *, replace_after=None, disp
         boundary['display_metadata'] = display_metadata
     db._append_messages_in_transaction(conn, target, [boundary])
     return True
+

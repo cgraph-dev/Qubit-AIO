@@ -30,6 +30,11 @@ from gateway.platforms.base import SendResult
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _pm_node(monkeypatch):
+    """Stand-in for PM's Node/npm; the user's PATH copy is never picked up."""
+    from plugins.platforms.whatsapp import adapter as whatsapp_adapter
+    monkeypatch.setattr(whatsapp_adapter, "find_node_executable", lambda name: f"/pm/{name}")
 
 
 def _make_adapter():
@@ -71,7 +76,7 @@ def _connect_patches(mock_proc, mock_fh):
         patch.object(Path, "exists", return_value=True),
         patch.object(Path, "mkdir", return_value=None),
         patch("subprocess.run", return_value=MagicMock(returncode=0)),
-        patch("subprocess.Popen", return_value=mock_proc),
+        patch("plugins.platforms.whatsapp.adapter.spawn_owned", return_value=mock_proc),
         patch("builtins.open", return_value=mock_fh),
         patch("plugins.platforms.whatsapp.adapter.asyncio.sleep", new_callable=AsyncMock),
         patch("plugins.platforms.whatsapp.adapter.asyncio.create_task"),
@@ -543,8 +548,6 @@ class TestNoCredsPreflight:
         assert adapter._fatal_error_code != "whatsapp_not_paired"
 
 
-
-
 class TestNamedConnectFailures:
     """A failed connect names its cause; an unnamed False loops forever as an unclassified failure (#126358)."""
 
@@ -552,7 +555,7 @@ class TestNamedConnectFailures:
     @pytest.mark.parametrize("aiohttp_module, lazy_allowed, cause, retryable", [
         (None, False, "lazy installs are disabled", False),
         # Installed but this process could not adopt it: final would exit the gateway 78 instead of restarting.
-        (None, True, "sms installed; restart Qubit to activate it", True),
+        (None, True, "sms installed; restart Hermes to activate it", True),
         (types.ModuleType("aiohttp"), True, "incomplete install", False),  # a shadowing aiohttp.py has no __path__
     ])
     async def test_missing_aiohttp_is_named_and_final_only_when_pm_cannot_install(

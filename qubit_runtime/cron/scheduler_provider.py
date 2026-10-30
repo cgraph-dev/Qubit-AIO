@@ -571,6 +571,11 @@ class InProcessCronScheduler(CronScheduler):
         # cron workspace via the heartbeat below (#47368).
         for entry in initial_homes:
             _, home = _profile_entry(entry)
+            from qubit_constants import named_profile_is_deleted
+            if named_profile_is_deleted(home):
+                # A rename/delete tombstoned this home between the snapshot and recovery: opening
+                # its cron store now would recreate the old directory as a ghost profile.
+                continue
             try:
                 with _profile_cron_scope(home):
                     recovered = self.recover_interrupted()

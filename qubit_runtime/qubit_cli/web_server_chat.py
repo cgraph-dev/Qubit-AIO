@@ -262,6 +262,58 @@ def _ws_request_view(ws: WebSocket) -> Request:
     })
 
 
+def _ignore_rejection(reason: str) -> None:
+    """The loopback gate keeps no audit record of a refused credential."""
+
+
+def _audit_ws_rejection(ws: WebSocket, reason: str) -> None:
+    """The gated gate's audit record of a refused upgrade credential."""
+    from qubit_cli.dashboard_auth.audit import AuditEvent, audit_log
+    audit_log(AuditEvent.WS_TICKET_REJECTED, reason=reason, ip=(ws.client.host if ws.client else ""),
+              path=ws.url.path)
+
+
+def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
+                       auth_required: bool = False) -> Optional[tuple[Optional[str], str]]:
+    """A one-use ticket offered as the ``qubit-gateway-ticket.`` subprotocol or ``?ticket=``:
+    ``(reason, credential)`` once judged, or None when the upgrade presents none. An accepted ticket
+    stamps the server-minted identity onto the socket; the client never supplies it through RPC
+    params. *socket* is the route's socket (``web_session_sockets.ticket_refusal``); a socket a
+    session-token ticket, or a Webapp login's ticket, opens is tracked so signing out closes it."""
+    from qubit_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_ticket
+    from qubit_cli.web_session_sockets import admitted_with, ticket_refusal, track
+    protocol_ticket, protocol_reason = _gateway_ws_ticket_from_subprotocol(ws)
+    if protocol_reason == "invalid":
+        return "ticket_invalid", "ticket-subprotocol"
+    ticket = protocol_ticket or ws.query_params.get("ticket", "")
+    if not ticket:
+        return None
+    try:
+        info = consume_ticket(ticket)
+    except TicketInvalid as exc:
+        reject(str(exc))
+        return "ticket_invalid", "ticket"
+    refusal = ticket_refusal(info, socket, auth_required=auth_required)
+    if refusal is not None:
+        reject(refusal)
+        return "ticket_invalid", "ticket"
+    if info.get("provider") == "bot-desktop":
+        reject("display ticket presented as a gateway login")
+        return "ticket_invalid", "ticket"
+    ws._qubit_auth_identity = {"user_id": info.get("user_id"), "provider": info.get("provider")}
+    if info.get("issuer"):
+        ws._qubit_auth_identity["issuer"] = info["issuer"]
+    if info.get("profile_home"):
+        ws._qubit_ticket_profile_home = info["profile_home"]
+    if (admitted := admitted_with(info)) is not None:
+        track(ws, admitted)
+    if not protocol_ticket:
+        return None, "ticket"
+    ws._qubit_ws_subprotocol = _GATEWAY_WS_PROTOCOL
+    return None, "ticket-subprotocol"
+
+
+def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False, socket: Optional[str] = None) -> tuple[Optional[str], str]:
 def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
                     socket: Optional[str] = None) -> tuple[Optional[str], str]:
     """Validate WS-upgrade auth; return ``(reason, credential)``.
@@ -421,62 +473,6 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
         track(ws, generation_of(token))
         return None, "token"
     return "token_mismatch", "token"
-
-
-def _ignore_rejection(reason: str) -> None:
-    """The loopback gate keeps no audit record of a refused credential."""
-
-
-def _audit_ws_rejection(ws: WebSocket, reason: str) -> None:
-    """The gated gate's audit record of a refused upgrade credential."""
-    from qubit_cli.dashboard_auth.audit import AuditEvent, audit_log
-    audit_log(AuditEvent.WS_TICKET_REJECTED, reason=reason, ip=(ws.client.host if ws.client else ""),
-              path=ws.url.path)
-
-
-def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
-                       auth_required: bool = False) -> Optional[tuple[Optional[str], str]]:
-    """A one-use ticket offered as the ``hermes-gateway-ticket.`` subprotocol or ``?ticket=``:
-    ``(reason, credential)`` once judged, or None when the upgrade presents none. An accepted ticket
-    stamps the server-minted identity onto the socket; the client never supplies it through RPC
-    params. *socket* is the route's socket (``web_session_sockets.ticket_refusal``); a socket a
-    session-token ticket, or a Webapp login's ticket, opens is tracked so signing out closes it."""
-    from qubit_cli.dashboard_auth.ws_tickets import TicketInvalid, consume_ticket
-    from qubit_cli.web_session_sockets import admitted_with, ticket_refusal, track
-    protocol_ticket, protocol_reason = _gateway_ws_ticket_from_subprotocol(ws)
-    if protocol_reason == "invalid":
-        return "ticket_invalid", "ticket-subprotocol"
-    ticket = protocol_ticket or ws.query_params.get("ticket", "")
-    if not ticket:
-        return None
-    try:
-        info = consume_ticket(ticket)
-    except TicketInvalid as exc:
-        reject(str(exc))
-        return "ticket_invalid", "ticket"
-    refusal = ticket_refusal(info, socket, auth_required=auth_required)
-    if refusal is not None:
-        reject(refusal)
-        return "ticket_invalid", "ticket"
-    if info.get("provider") == "bot-desktop":
-        # A display ticket admits one RFB bridge on /api/display/ws (a watch-only capability handed
-        # to a screen viewer); it must not double as a login here.
-        reject("display ticket presented as a gateway login")
-        return "ticket_invalid", "ticket"
-    # Only identity fields are carried; bookkeeping such as ``minted_at`` is not part of it.
-    ws._qubit_auth_identity = {"user_id": info.get("user_id"), "provider": info.get("provider")}
-    if info.get("issuer"):
-        ws._qubit_auth_identity["issuer"] = info["issuer"]
-    if info.get("profile_home"):
-        ws._qubit_ticket_profile_home = info["profile_home"]
-    if (admitted := admitted_with(info)) is not None:
-        track(ws, admitted)
-    if not protocol_ticket:
-        return None, "ticket"
-    # Select only the stable public protocol during accept. The ticket-bearing protocol is a
-    # credential and must never be reflected back to the browser or retained after admission.
-    ws._qubit_ws_subprotocol = _GATEWAY_WS_PROTOCOL
-    return None, "ticket-subprotocol"
 
 
 def _ws_auth_ok(ws: WebSocket, *, allow_internal: bool = False, socket: Optional[str] = None) -> bool:

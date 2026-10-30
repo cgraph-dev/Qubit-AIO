@@ -525,7 +525,11 @@ class GatewayAuthorizationMixin:
         if adapter is None:
             return False
         extra = _adapter_config_extra(adapter)
-        adapter_allow = extra.get("group_allow_from" if is_group else "allow_from")
+        # ``group_allow_from`` is a separate group list (Telegram); an adapter with a single user
+        # allowlist (Discord) declares ``allow_from_covers_groups`` so its groups read ``allow_from``.
+        groups_use_allow_from = getattr(adapter, "allow_from_covers_groups", False) is True
+        group_key = "allow_from" if groups_use_allow_from else "group_allow_from"
+        adapter_allow = extra.get(group_key if is_group else "allow_from")
         if not adapter_allow:
             # Plugin platforms (Buzz, DingTalk) spell their env allowlist as ``extra.allowed_users``;
             # under multiplex only the default profile's list reaches the env (first-writer-wins
@@ -778,9 +782,11 @@ class GatewayAuthorizationMixin:
                 return "pair"
             if dm_policy in {"allowlist", "disabled"}:
                 return "ignore"
-            env_key = (authz_field(platform.value, "allowed_users_env", _registry_entry(platform)) or ""
-                       if platform in _ALLOWLIST_SUPPRESSES_PAIRING else "")
-            allowlist_keys = [env_key, _GROUP_USER_ENV.get(platform), _GROUP_CHAT_ENV.get(platform), *allowlist_keys]
+            entry = _registry_entry(platform)
+            # A group allowlist alone must not silence DM pairing: only platforms that opt in.
+            if authz_field(platform.value, "allowlist_suppresses_pairing", entry):
+                allowlist_keys = [authz_field(platform.value, "allowed_users_env", entry) or "",
+                                  _GROUP_USER_ENV.get(platform), _group_chat_env(platform, entry), *allowlist_keys]
         if any(key and _auth_env(key).strip() for key in allowlist_keys):
             return "ignore"
         return "pair"

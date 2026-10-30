@@ -386,6 +386,14 @@ def resolve_toolset(name: str, visited: set[str] | None = None, *, include_regis
                 all_tools.update(resolve_toolset(toolset_name, visited.copy(), include_registry=include_registry))
         return sorted(all_tools)
 
+    # Qubit-branded platform composites (``qubit-cli``, ``qubit-api-server``, ``qubit-<platform>``)
+    # are the names the platform registry publishes; the static composite table keeps the historical
+    # ``hermes-`` spelling, so resolve the branded name to it when no Qubit composite exists.
+    if name.startswith("qubit-"):
+        _branded = "hermes-" + name[len("qubit-"):]
+        if get_toolset(_branded, include_registry=include_registry):
+            name = _branded
+
     # Diamond include or cycle: [] silently — the tools are collected via another path.
     if name in visited:
         return []

@@ -667,6 +667,9 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         authority = active_authority(self)
         sid = authority.logical_owner(self.session_store.peek_session_id(_quick_key)) if authority else None
         if not sid or sid not in authority.sessions:
+            if authority is not None:
+                # The chat's first input, and a command's turn, not committed yet never commit.
+                authority.fence_route(_quick_key)
             return
         from gateway.session_contract import Principal, SessionRef
         from qubit_state_runtime import RuntimeStoreError, list_session_admissions
@@ -677,6 +680,12 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         # A FIFO paused on a lost (``unknown``) turn is the operator's to resume: its pause notice
         # promised the queued followers stay saved, so a /new from the chat leaves them queued.
         paused = any(row['status'] == 'unknown' for row in rows)
+        if not paused:
+            # Input (and a command's turn) that arrived before this and is not committed yet never
+            # commits after it; one that committed before the fence is in the second listing and
+            # cancelled below. A paused FIFO keeps both, like its queued followers.
+            authority.fence_route(_quick_key)
+            rows = await asyncio.to_thread(list_session_admissions, authority.db, session_id=sid)
         for row in [] if paused else rows:
             if row['status'] == 'queued' and row['principal_id'].startswith('messaging:'):
                 # Claimed meanwhile (stale_generation): it runs as main's post-claim race does.
@@ -766,6 +775,13 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         _handled, _result = await self._hm_busy_slash_or_photo(event, source, _quick_key)
         if _handled:
             return _result
+        _busy_adapter = self._delivery_adapter_for(source)
+        if _busy_adapter is not None:
+            _skill, _skill_reply = await self._busy_skill_turn(event, source, _quick_key, _busy_adapter)
+            if _skill:
+                if _skill_reply:
+                    await self._send_busy_reply(event, _busy_adapter, _skill_reply)
+                return None
 
         effective_busy_input_mode = self._effective_busy_input_mode(source)
         if self._hm_busy_telegram_grace_queue(event, source, _quick_key, effective_busy_input_mode):
@@ -1228,8 +1244,10 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         self, event: MessageEvent, source: SessionSource, _quick_key: str
     ) -> Optional[str]:
         """Replies owned by in-flight work: pending /update prompt, clarify, slash-confirm.
-        Only events that may control the gateway (``allow_gateway_control``) can answer them."""
-        if not event.allow_gateway_control:
+        Only events that may control the gateway (``allow_gateway_control``) can answer them, never
+        an admitted turn: it was offered here before its commit, or a slash command queued it."""
+        from gateway.session_ingress import executing_admission
+        if not event.allow_gateway_control or getattr(event, "_fifo_only", False) or executing_admission.get():
             return None
         _reply = self._hm_update_prompt_reply(event, _quick_key)
         if _reply is None:
@@ -1241,7 +1259,10 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
     async def _hm_dispatch_idle_commands(
         self, event: "MessageEvent", source: SessionSource, _quick_key: str
     ) -> Tuple[bool, Optional[str]]:
-        """Idle path: resolve + dispatch slash commands; rewriting commands fall through to the agent."""
+        """Idle path: resolve + dispatch slash commands; rewriting commands fall through to the agent.
+        A command rewritten into a turn keeps the /stop and /new epoch it arrived under, read before
+        the (slow, off-loop) rewrite, so a reset during it drops the command, as on the busy path."""
+        stop_epoch = self._route_stop_epoch(_quick_key)
         _handled, _result, command, canonical = await self._hm_resolve_command(event, source, _quick_key)
         if not _handled:
             _handled, _result = await self._hm_dispatch_canonical_command(event, source, _quick_key, canonical)
@@ -1255,6 +1276,8 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
             _result = await self._run_in_executor_with_context(
                 self._hm_skill_slash_rewrite, event, source, _quick_key, command)
             _handled = _result is not None
+        if not _handled and command:  # rewritten into a turn: the authority's FIFO, like text
+            _handled, _result = await self._admit_command_turn(event, source, _quick_key, stop_epoch)
         return _handled, _result
 
     def _hm_rescue_orphaned_fifo(
@@ -1323,13 +1346,17 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
                 # its whole request timeout.
                 # A bare "yes"/"no" to a blocking dangerous-command approval answers it (#46866):
                 # never an interrupt (read as deny) nor a queued turn (auto-deny deadlock).
-                if self._is_session_running(_quick_key) and (
+                if self._is_session_running(_quick_key) and not getattr(event, "_fifo_only", False) and (
                         await self._route_plaintext_approval_while_busy(event, _quick_key)
                         or await self._hm_busy_preempt(event, source, _quick_key)):
                     return True, None
                 _consumed, _consumer_reply = await self._hm_post_admission_consume(event, source, _quick_key)
                 if _consumed:
                     return True, _consumer_reply
+                if getattr(event, "_fifo_only", False) and event._stop_epoch != self._route_stop_epoch(_quick_key):
+                    return True, None  # a /stop or /new came after its command, as it clears the slot
+                # A failed admit stays the authority's answer (refusal notice or turn error), never a
+                # pending legacy turn: that would run unadmitted, outside the FIFO's order.
                 return True, await admit_message(authority, event)
         if (authority is None and not is_internal and not event.get_command()
                 and getattr(self, 'session_authority', None) is not None):
@@ -1363,7 +1390,7 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
             return _paused_notice
 
         _quick_key = self._session_key_for_source(source)
-        _reply = await self._hm_pending_reply_intercepts(event, source, _quick_key)
+        _reply = None if is_internal else await self._hm_pending_reply_intercepts(event, source, _quick_key)
         if _reply is not None:
             return _reply
 

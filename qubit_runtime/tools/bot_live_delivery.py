@@ -430,57 +430,28 @@ def _door(call: Callable[[Path, dict], dict], profile_home, owner, message, *, d
     pinned = _owner(profile_home, owner)
     if not isinstance(message, str):
         raise ValueError("message must be a string")
-    if notification_category not in ("result", "diagnostic"):
+    if notification_category not in ('result', 'diagnostic'):
         raise ValueError("invalid notification category")
-    key = _delivery_id(delivery_id if delivery_id is not None else uuid.uuid4().hex)
     home = Path(profile_home).resolve()
     category = {"notification_category": "diagnostic"} if notification_category == "diagnostic" else {}
-    params = dict(id=key, profile=home.name if home.parent.name == "profiles" else "default",
-                  message=message, **({"session_id": pinned["session_id"]} if pinned["session_id"] else {}),
-                  **({"author": dict(author)} if author else {}), **category)
-    try:
-        return call(home, params)
-    except ValueError as exc:
-        # A store refusal (RuntimeStoreError is a ValueError) is the authority answering: propagate
-        # it. Only an unreachable authority keeps the legacy mailbox queue, and only for a profile
-        # that still advertises a live owner (its poller consumes it); an unadvertised owner is a refusal.
-        from qubit_state_runtime import RuntimeStoreError
-        if isinstance(exc, RuntimeStoreError) or find_canonical_live_owner(profile_home) is None:
-            raise
-    with _locked(profile_home) as root:
-        path = root / f"{key}.json"
-        existing = _read(path)
-        if existing is not None:
-            if (existing.get("owner") != pinned or existing["message"] != message or existing.get("author") != author
-                    or existing.get("notification_category", "result") != notification_category):
-                raise ValueError("delivery id already belongs to a different payload")
-            return existing
-        record = dict(delivery_id=key, id=key, owner=pinned, **pinned,
-                      message=message, status="queued", created_at=time.time_ns(),
-                      sequence=_next_sequence(root), **({"author": dict(author)} if author else {}), **category)
-        _write(path, record)
-        return record
-
-
-def _matches(home: Path | str, record: dict, owner: dict) -> bool:
-    pinned = record["owner"]
-    if any(pinned[key] != owner[key] for key in ("profile_home", "lease_id", "live_session_id")):
-        return False
-    if pinned["session_id"] == owner["session_id"]:
-        return True
-    from qubit_state import SessionDB
-
-    db = SessionDB(db_path=Path(home) / "state.db", read_only=True)
-    try:
-        return db.get_compression_tip(pinned["session_id"]) == owner["session_id"]
-    finally:
-        db.close()
+    # The authority refuses a category-changing replay (admission_conflict), so the admitted
+    # category is the producer's; echo it so callers can check the receipt's identity.
+    return {**call(home, dict(id=_delivery_id(delivery_id if delivery_id is not None else uuid.uuid4().hex),
+        profile=home.name if home.parent.name == "profiles" else "default",
+        message=message, **({"session_id": pinned["session_id"]} if pinned["session_id"] else {}),
+        **({"author": dict(author)} if author else {}), **category)), **category}
 
 
 def owner_holds_delivery(profile_home: Path | str, record: dict) -> bool:
-    """Whether the canonical live owner is still one that could claim ``record``."""
-    owner = find_canonical_live_owner(profile_home)
-    return owner is not None and _matches(profile_home, record, owner)
+    """Whether the profile authority still holds ``record`` (main's bounded DM wait asks this).
+
+    An admission lives in the authority's durable FIFO, so it is held while the authority is
+    reachable; an unreachable one raises (outcome unknown, never cancelled). Only an unadmitted
+    legacy record whose profile has no store is provably ownerless.
+    """
+    owner = find_canonical_live_owner(profile_home)  # raises while the authority is unreachable
+    return owner is not None or bool(record.get("admission_id"))
+
 
 
 def claim_pending_delivery(
