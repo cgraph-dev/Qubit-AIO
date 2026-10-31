@@ -2203,6 +2203,14 @@ def _deliver_result(
                 if receipt and receipt["status"] == "ambiguous":
                     unverified_targets.append(bot_chat_error)
             continue
+        if target["platform"] == "local":
+            from gateway.session_cron import deliver_to_local_chat
+            from qubit_constants import get_qubit_home
+            local_error = deliver_to_local_chat(get_qubit_home(), target["chat_id"],
+                                                cleaned_delivery_content, diagnostic=for_failure)
+            if local_error:
+                delivery_errors.append(local_error)
+            continue
 
         t = _prepare_target_delivery(
             job, target, adapters=adapters, loop=loop, config=config,
