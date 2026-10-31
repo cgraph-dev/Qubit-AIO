@@ -33,6 +33,7 @@ from agent.display import (
 from agent.compression_marker import _COMPRESSION_MARKER_PREFIX
 from agent.interrupt_control import _REASON_USER_INTERRUPT, interrupt_skip_wording
 from agent.message_sanitization import coalesce_tool_call_id
+from agent.session_persistence import sync_rewritten_tool_rows
 from agent import plugin_live_notes
 from agent.onboarding import observe_tool_result as observe_onboarding_result
 from agent.lsp import deferred as lsp_deferred
@@ -1218,6 +1219,7 @@ def _finalize_tool_batch(agent, messages: list, effective_task_id: str, num_tool
     contents_before = [message.get("content") for message in batch]
     enforce_turn_budget(batch, env=get_active_env(effective_task_id), config=budget)
     plugin_live_notes.keep_after_turn_budget(agent, batch)
+    sync_rewritten_tool_rows(agent, batch, contents_before)
     record_tool_batch(agent, batch, contents_before)
     agent._apply_pending_steer_to_tool_results(messages, num_tools)
 
