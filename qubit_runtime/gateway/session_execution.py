@@ -158,35 +158,37 @@ class GatewaySessionAgentMixin:
         from gateway.session_policy import policy_for_source
         from gateway.session_worker_construct import session_prefill
         policy = policy_for_source(runner, src)
-        return ctx.AIAgent(
-            model=turn_route["model"], **turn_route["runtime"], **_checkpoint_agent_kwargs(ctx.user_config),
-            max_iterations=max_iterations, quiet_mode=not bool(policy and policy.verbose), verbose_logging=False,
-            enabled_toolsets=ctx.enabled_toolsets, disabled_toolsets=ctx.disabled_toolsets,
-            ephemeral_system_prompt=combined_ephemeral or None,
-            prefill_messages=(session_prefill(active_authority(runner), policy, src.chat_id) if policy
-                              else runner._prefill_messages) or None,
-            reasoning_config=reasoning_config, service_tier=runner._service_tier,
-            request_overrides=turn_route.get("request_overrides"),
-            providers_allowed=pr.get("only"), providers_ignored=pr.get("ignore"), providers_order=pr.get("order"),
-            provider_sort=pr.get("sort"), provider_require_parameters=pr.get("require_parameters", False),
-            provider_data_collection=pr.get("data_collection"),
-            session_id=ctx.session_id, platform=platform_key,
-            user_id=src.user_id, user_id_alt=src.user_id_alt, user_name=src.user_name,
-            chat_id=src.chat_id, chat_name=src.chat_name, chat_type=src.chat_type, thread_id=src.thread_id,
-            gateway_session_key=ctx.session_key,
-            session_db=getattr(runner._session_db, "_db", runner._session_db),
-            # Reload from disk — do not reuse the startup snapshot.
-            # See #60955.
-            fallback_model=None if api_runtime_locked() else self._runner._refresh_fallback_model(),
-            skip_context_files=skip_context_files,
-            # Keep the persona even with minimal context: soul identity is one small file.
-            load_soul_identity=not bool(policy and policy.ignore_rules),
-            skip_memory=bool(policy and policy.ignore_rules),
-            pass_session_id=bool(policy and policy.pass_session_id),
-            # A local session's frozen budget (`--run-budget` / its profile's agent.run_budget_seconds);
-            # None leaves the agent reading the owner's config, as before.
-            run_budget_seconds=policy.run_budget_seconds if policy else None,
-        )
+        from tools.delegate_tool_config import gateway_delegation_inline_scope
+        with gateway_delegation_inline_scope(bool(getattr(ctx, "delegation_inline", False))):
+            return ctx.AIAgent(
+                model=turn_route["model"], **turn_route["runtime"], **_checkpoint_agent_kwargs(ctx.user_config),
+                max_iterations=max_iterations, quiet_mode=not bool(policy and policy.verbose), verbose_logging=False,
+                enabled_toolsets=ctx.enabled_toolsets, disabled_toolsets=ctx.disabled_toolsets,
+                ephemeral_system_prompt=combined_ephemeral or None,
+                prefill_messages=(session_prefill(active_authority(runner), policy, src.chat_id) if policy
+                                  else runner._prefill_messages) or None,
+                reasoning_config=reasoning_config, service_tier=runner._service_tier,
+                request_overrides=turn_route.get("request_overrides"),
+                providers_allowed=pr.get("only"), providers_ignored=pr.get("ignore"), providers_order=pr.get("order"),
+                provider_sort=pr.get("sort"), provider_require_parameters=pr.get("require_parameters", False),
+                provider_data_collection=pr.get("data_collection"),
+                session_id=ctx.session_id, platform=platform_key,
+                user_id=src.user_id, user_id_alt=src.user_id_alt, user_name=src.user_name,
+                chat_id=src.chat_id, chat_name=src.chat_name, chat_type=src.chat_type, thread_id=src.thread_id,
+                gateway_session_key=ctx.session_key,
+                session_db=getattr(runner._session_db, "_db", runner._session_db),
+                # Reload from disk — do not reuse the startup snapshot.
+                # See #60955.
+                fallback_model=None if api_runtime_locked() else self._runner._refresh_fallback_model(),
+                skip_context_files=skip_context_files,
+                # Keep the persona even with minimal context: soul identity is one small file.
+                load_soul_identity=not bool(policy and policy.ignore_rules),
+                skip_memory=bool(policy and policy.ignore_rules),
+                pass_session_id=bool(policy and policy.pass_session_id),
+                # A local session's frozen budget (`--run-budget` / its profile's agent.run_budget_seconds);
+                # None leaves the agent reading the owner's config, as before.
+                run_budget_seconds=policy.run_budget_seconds if policy else None,
+            )
 
     def _resolve_turn_agent(self, turn_route, platform_key, combined_ephemeral, max_iterations, reasoning_config, pr):
         """Reuse this session's cached AIAgent (frozen system prompt + tool schemas → prompt cache
@@ -200,6 +202,7 @@ class GatewaySessionAgentMixin:
             user_id=getattr(ctx.source, "user_id", None),
             user_id_alt=getattr(ctx.source, "user_id_alt", None),
             skip_context_files=skip_context_files,
+            delegation_inline=bool(getattr(ctx, "delegation_inline", False)),
         )
         cache_lock = getattr(runner, "_agent_cache_lock", None)
         cache = getattr(runner, "_agent_cache", None)

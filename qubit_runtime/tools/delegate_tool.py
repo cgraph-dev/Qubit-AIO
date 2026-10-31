@@ -766,10 +766,15 @@ def _build_dynamic_schema_overrides() -> dict:
         tasks = overrides_params["properties"]["tasks"]
         tasks["items"] = {**tasks["items"], "properties": {**tasks["items"]["properties"], **extra_params}}
     description = _build_top_level_description(independent_completions=independent_completions)
-    return {
+    built = {
         "description": f"{description}\n{addendum}" if addendum else description,
         "parameters": overrides_params,
     }
+    # A gateway session with ``delegation.gateway_mode`` inline sees the joined variant: children run
+    # inside this call and their results return in its tool result (the one-shot shape, with live
+    # control dropped). Dispatch follows these schema bytes (``session_joins_delegation``).
+    from tools.delegate_tool_config import _GATEWAY_DELEGATION_INLINE
+    return oneshot_delegate_function(built) if _GATEWAY_DELEGATION_INLINE.get() else built
 
 def _p(type_: str, description: str, **extra) -> dict:
     return {"type": type_, **extra, "description": description}
