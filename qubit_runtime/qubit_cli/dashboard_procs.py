@@ -169,7 +169,7 @@ def _pid_passwd_home(pid: int) -> str | None:
     return None
 
 
-def _qubit_home_for_pid(pid: int) -> str | None:
+def _qubit_home_for_pid(pid: int, *, require_launch_identity: bool = False) -> str | None:
     """The Qubit home *pid* runs on, tri-state: ``None`` ONLY when its environment is unreadable
     (another user, hardened ``/proc``) — callers spare those, never guess.
 
@@ -209,6 +209,10 @@ def _qubit_home_for_pid(pid: int) -> str | None:
     fixed_identity = supervised_child_marker_present(env) or s6_supervised_child_marker_present(env) \
         or external_supervisor_marker_present(env) or is_desktop_ssh_backend_argv(argv)
     if profile is None and not fixed_identity:
+        if require_launch_identity:
+            # No argv/env identity: the sticky ``active_profile`` is a guess about the PAST, not
+            # proof of this process's launch home. Callers that gate a kill ask for proof only.
+            return None
         profile = get_active_profile(root)
     canon = normalize_profile_name(profile) if profile else "default"
     return str(root) if canon == "default" else str(root / "profiles" / canon)
