@@ -106,7 +106,7 @@ class TestGatewayConnectionErrorReply:
 
     def test_every_reply_names_a_slash_command_and_no_jargon(self):
         """Each shaped reply must give the chat user something they can run; 'provider' and
-        'gateway logs' are operator words (the log pointer is the `hermes logs` command)."""
+        'gateway logs' are operator words (the log pointer is the `qubit logs` command)."""
         from agent.i18n import t
         from gateway.run import _PROVIDER_ERROR_REPLIES
         replies = [t(reply_key) for _, reply_key in _PROVIDER_ERROR_REPLIES] + [_gateway_provider_error_reply("zzz")]
@@ -295,7 +295,7 @@ def test_turn_runner_host_side_resolution_failure_does_not_send_user_to_login(mo
         result = TurnRunner(runner, ctx).run_sync()
         assert result["failed"] is True and result["api_calls"] == 0
         replies[label] = (result["final_response"], result["failure_reason"], result["failure_retryable"])
-    assert "/login" not in replies["oserror"][0] and "hermes logs" in replies["oserror"][0]
+    assert "/login" not in replies["oserror"][0] and "qubit logs" in replies["oserror"][0]
     assert replies["oserror"][1:] == ("host_error", False)
     from agent.error_surface import LAYER_GATEWAY, _REASON_TO_LAYER
     assert _REASON_TO_LAYER["host_error"] == LAYER_GATEWAY  # no "Switch provider" for a host fault

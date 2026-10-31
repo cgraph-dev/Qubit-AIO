@@ -106,9 +106,9 @@ def test_tour_fails_fast_once_no_window_answered(window, monkeypatch):
     monkeypatch.setattr(local_desktop_ui, "_TOUR_PROBE_TIMEOUT_S", 0.3)
     window.silent.add("tour")
     local_viewer_events.wire(window.turn, window.agent)
-    assert "No Hermes Desktop window answered the tour" in window.agent.tour_callback({"action": "start"})
+    assert "No Qubit Desktop window answered the tour" in window.agent.tour_callback({"action": "start"})
     sent = len(window.requests)
-    assert "No Hermes Desktop window answered the tour" in window.agent.tour_callback({"action": "start"})
+    assert "No Qubit Desktop window answered the tour" in window.agent.tour_callback({"action": "start"})
     assert len(window.requests) == sent
 
 

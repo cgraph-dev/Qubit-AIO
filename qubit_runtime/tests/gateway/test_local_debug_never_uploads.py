@@ -99,4 +99,4 @@ async def test_local_debug_local_real_collector_opens_no_socket(tmp_path, monkey
             patch('socket.create_connection', guard):
         out = await _runner()._handle_debug_command(_event(Platform.LOCAL, '/debug local'))
     assert guard.calls == []
-    assert 'hermes dump' in out
+    assert 'qubit dump' in out
