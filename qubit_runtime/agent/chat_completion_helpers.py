@@ -1436,11 +1436,12 @@ def _build_bedrock_kwargs(agent, api_messages, tools_for_api):
 def _build_codex_kwargs(agent, api_messages, tools_for_api, reasoning_config, request_overrides, cache_scope_id):
     from agent.codex_responses_adapter import classify_responses_route
     from agent.native_compaction import native_compaction_context_management
-    is_codex_backend, is_xai_responses, is_github_responses = classify_responses_route(agent)
+    is_codex_backend, is_xai_responses, endpoint = classify_responses_route(agent)
+    is_github_responses = bool(getattr(agent, "_is_copilot_url", lambda: False)())
     # Native server-side compaction (gpt-5.6 on direct OpenAI / ChatGPT Codex routes
     # only) — None on every other route/model, leaving the request unchanged.
     context_management = native_compaction_context_management(agent, is_codex_backend=is_codex_backend,
-        is_xai_responses=is_xai_responses, is_github_responses=is_github_responses)
+        is_xai_responses=is_xai_responses, endpoint=endpoint, is_github_responses=is_github_responses)
     # xAI's /responses endpoint 400s on ``pattern``/``format`` schema keywords and on
     # ``enum`` values containing ``/`` — strip them (#27197). Deep-copy first: the
     # sanitizers mutate in place and tools_for_api aliases agent.tools (#27907).
