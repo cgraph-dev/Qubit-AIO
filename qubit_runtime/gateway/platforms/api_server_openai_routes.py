@@ -1178,6 +1178,7 @@ class OpenAICompatRoutesMixin:
                     if not self._tool_progress_events:
                         continue  # opted out for strict OpenAI clients (#12020)
                     await response.write(_sse_frame(delta[1], event="qubit.tool.progress"))
+                    await response.write(_sse_frame(delta[1], event="hermes.tool.progress"))
                 elif isinstance(delta, tuple) and len(delta) == 2 and delta[0] == "__reasoning__":
                     # DeepSeek-style ``delta.reasoning_content`` (#99552), the field Open WebUI,
                     # opencode and the Vercel AI SDK render as a thinking block.
