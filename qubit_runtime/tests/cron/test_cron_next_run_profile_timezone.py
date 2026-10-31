@@ -70,7 +70,12 @@ def test_foreign_process_tick_persists_owning_profile_offset(
         reset_qubit_home_override(token)
 
     next_run = datetime.fromisoformat(job["next_run_at"])
-    expected_offset = datetime.now(ZoneInfo("America/New_York")).utcoffset()
+    # Compare against the owning profile's offset at the PERSISTED instant,
+    # not the process's current offset. On a DST transition day the next run
+    # can be on the other side of the change (e.g. a 14:00 job after the
+    # fall-back), so ``now()`` would compare against the wrong side and fail
+    # the correct -05:00 persistence once a year.
+    expected_offset = next_run.astimezone(ZoneInfo("America/New_York")).utcoffset()
     assert next_run.utcoffset() == expected_offset, (
         f"next_run_at {job['next_run_at']} persisted with foreign offset "
         f"{next_run.utcoffset()} instead of the owning profile's "
