@@ -20,11 +20,14 @@ class CopilotProfile(ProviderProfile):
     message_carrier_text = "reasoning_text"
     replays_tool_call_signatures = True
 
-    def replays_function_thought_signature(self, *, model=None, base_url="") -> bool:
-        return True
+    def replay_message_carriers(self, values: dict[str, Any], *, model: str | None, base_url: str) -> dict[str, Any]:
+        """Copilot's Gemini 3 messages carry an opaque reasoning blob and its readable text."""
+        return {key: values[key] for key in (self.message_carrier_opaque, self.message_carrier_text) if key in values}
 
-    def replay_message_carriers(self, values, *, model, base_url):
-        return {k: v for k, v in values.items() if k in ("reasoning_opaque", "reasoning_text") and v}
+    def replays_function_thought_signature(self, *, model: str | None, base_url: str) -> bool:
+        """Copilot's Gemini 3 variant signs the tool call inside ``function``."""
+        return str(model or "").lower().startswith("gemini")
+
     def client_headers(
         self, *, base_url: str, api_key: str = "", has_images: bool = False,
     ) -> dict[str, str] | None:
@@ -61,6 +64,8 @@ class CopilotProfile(ProviderProfile):
 copilot = CopilotProfile(
     name="copilot", aliases=("github-copilot", "github-models", "github-model", "github"),
     env_vars=("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"), base_url="https://api.githubcopilot.com",
+    hostnames=("api.githubcopilot.com", "models.github.ai"),
+    message_carrier_opaque="reasoning_opaque", message_carrier_text="reasoning_text",
     auth_type="copilot",
     hostnames=("api.githubcopilot.com", "githubcopilot.com", "models.github.ai"),
     # Dataclass fields: class-level overrides are shadowed by the generated __init__, so set them here.

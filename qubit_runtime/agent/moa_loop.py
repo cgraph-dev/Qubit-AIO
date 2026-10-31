@@ -1442,6 +1442,18 @@ class MoAChatCompletions:
         # Remembered on self so _call_prepared_aggregator redacts the trace consistently.
         self._privacy_mode = _moa_privacy_mode(moa_raw)
         messages = list(api_kwargs.get("messages") or [])
+        # The chat-completions builder strips per-message DATA_USE and carries the turn's requirement
+        # as a top-level kwarg. MoA fans the same conversation out to every reference and the
+        # aggregator, so the requirement must ride each slot's messages: call_llm derives its
+        # data_use from them, and dropping it here would let a no-training turn reach a provider
+        # without the guarantee.
+        data_use = api_kwargs.get(DATA_USE)
+        if data_use:
+            messages = [
+                {**message, DATA_USE: sorted({*(message.get(DATA_USE) or ()), *data_use})}
+                if isinstance(message, dict) else message
+                for message in messages
+            ]
         # A disabled preset = "use the aggregator directly".
         reference_models = [
             slot for slot in (preset.get("reference_models") or []) if slot.get("enabled", True)

@@ -19,7 +19,9 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 from urllib.parse import quote, unquote
 
+from qubit_cli import process_identity
 from qubit_cli._subprocess_compat import windows_hide_flags
+from qubit_cli.process_identity import own_process_groups, register_child
 
 from agent.lsp.protocol import (
     ERROR_CONTENT_MODIFIED, ERROR_METHOD_NOT_FOUND, LSPProtocolError, LSPRequestError, classify_message,
@@ -164,6 +166,8 @@ class LSPClient:
         self._seed_first_push = seed_diagnostics_on_first_push
 
         self._proc: Optional[asyncio.subprocess.Process] = None
+        # Process group handed to the owner-death supervisor; released once teardown empties it.
+        self._owned_pgid: Optional[int] = None
         self._stderr_task: Optional[asyncio.Task] = None
         # Ring buffer of the most recent server stderr lines, surfaced when spawn/initialize fails.
         self._stderr_tail: List[str] = []
@@ -278,6 +282,15 @@ class LSPClient:
             )
         except FileNotFoundError as e:
             raise LSPProtocolError(f"LSP server binary not found: {cmd[0]} ({e})") from e
+        # The server leads its own group (start_new_session), so hand that group to the per-process
+        # owner-death supervisor: a SIGKILL/OOM of Qubit leaves no Python cleanup, and a descendant
+        # that outlived its stdin-EOF leader must still die with the process that started it.
+        if os.name == "posix":
+            self._owned_pgid = self._proc.pid
+            own_process_groups([self._owned_pgid])
+            with contextlib.suppress(Exception):
+                # The spawn ledger can block on another Qubit's lock; never on the event loop.
+                await asyncio.to_thread(register_child, self._owned_pgid, "lsp-server")
         # stderr must be drained or the pipe buffer fills and the server hangs.
         self._stderr_task = asyncio.create_task(self._drain_stderr())
         self._reader_task = asyncio.create_task(self._reader_loop())
@@ -427,6 +440,17 @@ class LSPClient:
             self._state = "stopped"
             await self._cleanup_process()
 
+    def _release_owned_group(self, proc: Optional[asyncio.subprocess.Process]) -> None:
+        """Hand the server's process group back once no member is left. A survivor keeps coverage:
+        it stays registered with the owner-death supervisor and dies with this process."""
+        pgid, self._owned_pgid = self._owned_pgid, None
+        if pgid is None or os.name != "posix":
+            return
+        with contextlib.suppress(Exception):
+            # ``proc`` is asyncio's Process (no ``poll``); the caller has already waited/reaped it,
+            # so the group probe alone decides whether anything survived.
+            process_identity.release_process_group_once_empty(pgid, timeout=SHUTDOWN_GRACE)
+
     async def _cleanup_process(self) -> None:
         async with self._cleanup_lock:
             tasks = [self._reader_task, self._stderr_task]
@@ -437,10 +461,12 @@ class LSPClient:
                 t.cancel()
             await asyncio.gather(*live, return_exceptions=True)
             if proc is None:
+                self._release_owned_group(None)
                 return
             if proc.returncode is not None:
                 if self._exit_code is None:
                     self._exit_code = proc.returncode
+                self._release_owned_group(proc)
                 return
             try:
                 # ``shutdown`` has already given the protocol a grace period.  Hard-kill
@@ -458,6 +484,7 @@ class LSPClient:
                 pass
             if self._exit_code is None and proc.returncode is not None:
                 self._exit_code = proc.returncode
+            self._release_owned_group(proc)
 
     # ---- request / notification plumbing ----
 

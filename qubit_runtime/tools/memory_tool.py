@@ -275,6 +275,14 @@ def _memory_tool(action, target, content, old_text, new_text, operations, store)
             "Missing required parameter: 'operations', a list of {action: add/patch/remove, "
             "content?, old_text?} changes; a single change is a one-item list."
         )
+    if action == "replace":
+        # A background review may still stage a replace it already requested: the gate pins the
+        # target and surfaces the proposal for approval instead of applying it. Foreground callers
+        # keep the "use patch" refusal.
+        denied = _background_delete_gate(store, action, None, target, content, old_text)
+        if denied is not None:
+            return "rejected", denied
+        return _invalid(_REPLACE_REMOVED)
     if action not in _STORE_ACTIONS:
         return _invalid(f"Unknown action '{action}'. Use: add, replace, patch, remove")
     invalid = (_validate_single_op(store, action, target, content, old_text)
