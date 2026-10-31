@@ -691,6 +691,8 @@ gateway:
     generic_failed_with_hint: "⚠️ 發生錯誤，我無法完成這則回覆。{hint}\n請使用 /retry 重試，或使用 /new 開始新的對話。技術細節請見閘道日誌（`qubit logs`）。"
     history_unavailable: "⚠️ 此工作階段的歷史紀錄暫時無法使用，因此這則訊息未被處理。請管理者檢查 state.db，恢復正常後再重新傳送。只有在你確實想開始新對話時才使用 /reset。"
     no_credentials: "⚠️ 我無法連上 AI 模型服務，因此這則訊息未被處理。請使用 /login 重新登入，或使用 /model 選擇其他模型。若持續失敗，請在主機上執行 `qubit doctor`。"
+    launch_credentials_unavailable: "⚠️ 此聊天無法再使用它開始時的 API 金鑰{detail}，因此無法在其中執行任何內容。開啟中的聊天不會自行切換到其他金鑰，所以 /retry 也會以同樣方式失敗。請使用 /new 以目前的金鑰開始新聊天。"
+    workspace_unavailable: "⚠️ 此聊天的工作資料夾已不存在（{path}），因此你的訊息未被執行。請重新建立該資料夾，或將聊天移至其他資料夾（CLI 中使用 `/worktree new`，桌面應用程式中使用「Move to project」），然後再次傳送訊息。"
   skills:
     disabled: "**{name}** 技能已安裝但已停用。\n啟用方式：`qubit skills config`"
     not_installed: "**{name}** 技能可用但尚未安裝。\n安裝方式：`qubit skills install {install_name}`"
@@ -947,6 +949,9 @@ gateway:
     hint: "請在瀏覽器中儲值並管理帳務 — 完成後你的餘額會在此更新。"
   login:
     free_tier_remaining: "\n部分聊天仍在使用免費方案；請在那些聊天中使用 /model 切換。"
+  discard:
+    done: "🗑️ 已捨棄 {count} 個遺失的回合；未重新執行。現在會回覆你已儲存的訊息。"
+    nothing: "沒有可捨棄的內容：此聊天沒有在重新啟動時遺失的回合。"
 platform:
   whatsapp:
     clarify_other_title: "✏️ 其他"
@@ -1001,6 +1006,8 @@ platform:
       resolved_session: "已批准（本工作階段）"
       resolved_always: "已永久批准"
       resolved_deny: "已拒絕"
+      click_failed: "⚠️ 無法記錄你的選擇。請再按一次，或用 /approve 或 /deny 回覆。"
+      no_longer_pending: "⌛ 這個批准請求已不再等待（已逾時或已在其他地方回應）"
     slash_confirm:
       already_resolved: "這個提示已處理過～"
       approve_once: "批准一次"
@@ -1850,6 +1857,20 @@ cli:
     default_ceiling_suffix: " （預設上限）"
     used_this_month: "本月已使用 {spent}／{limit}{ceiling}"
     monthly_limit_read_only: "每月上限在 Portal 設定 — 終端機僅以唯讀方式顯示。"
+    keep_going_choice: "用額度繼續"
+    keep_going_confirm_body: "包含的用量用完後，使用你的額度。關閉時，Qubit 等待重設。"
+    keep_going_confirm_title: "用額度繼續？"
+    keep_going_desc: "包含的用量用完後，使用你的額度"
+    keep_going_is_on_title: "用額度繼續已開啟"
+    keep_going_keep_off_desc: "保持關閉：Qubit 等待重設"
+    keep_going_leave_on: "保持開啟"
+    keep_going_off_line: "用額度繼續：關閉（Qubit 等待重設）"
+    keep_going_on_line: "用額度繼續：開啟（包含的用量用完後，使用你的額度）"
+    keep_going_turn_off: "關閉"
+    keep_going_turn_off_desc: "Qubit 等待重設"
+    keep_going_turn_on: "開啟"
+    keep_going_turned_off: "✅ 用額度繼續：關閉。Qubit 等待重設。"
+    keep_going_turned_on: "✅ 用額度繼續：開啟。包含的用量用完後，使用你的額度。"
   subscription:
     load_failed_label: "無法載入訂閱資訊"
     team_header: "團隊訂閱"
@@ -1983,6 +2004,7 @@ cli:
     restored_from_session: "已從工作階段還原模型：{model}"
     could_not_load_config: "❌ 無法載入設定：{error}"
     tip_reset_new_session: "提示：`/reset` 會立即開始新的工作階段。"
+    confirm_choice_prompt: "選擇 [1/2]："
   single_query:
     query_label: "查詢："
     kanban_run_reclaimed: "kanban：此工作者的執行在開始前已被回收；正在結束"
@@ -2366,6 +2388,14 @@ cli:
     move_out_of_range: "佇列移動超出範圍。目前佇列長度：{size}"
     moved: "已將佇列項目 {source} 移至 {destination}。"
     usage_add: "用法：/queue add <prompt>"
+    already_started: "佇列項目 {index} 已開始執行；將依原樣執行。"
+    change_unknown: "閘道未回應佇列項目 {index}（{error}）；請先查看 /queue list 再重試。"
+    edit_refused: "無法編輯佇列項目 {index}：{error}"
+    gateway_refused: "閘道未將其加入佇列：{error}。未加入任何內容；請在本輪結束後重新傳送。"
+    move_gateway_fifo: "閘道依傳送順序執行佇列中的提示；請改為編輯或刪除其中一則。"
+    remove_refused: "無法移除佇列項目 {index}：{error}"
+    started_stopped: "佇列項目 {index} 已開始執行；閘道已將其停止。"
+    submit_unknown: "閘道未回應（{error}），提示可能已在佇列中。重新傳送前請先查看 /queue list。"
   reload:
     env_reloaded: "已重新載入 .env（更新了 {count} 個變數）"
   steer:
@@ -3301,6 +3331,27 @@ cli:
     uncommitted_keeping: "⚠ 工作樹有未提交的變更，保留：{path}"
     clean_up_manually: "手動清理方式：git worktree remove --force {path}"
     cleaned_up: "✓ 工作樹已清理：{path}"
+    archive_failed: "✗ 無法封存 {path}，保留：{error}"
+    archived: "✓ 工作樹已封存至 {ref} 並移除：{path}"
+    archived_kept: "✓ 工作樹已封存至 {ref}，但已保留（{reason}）：{path}"
+    archiving: "正在封存 {path} …(大型工作樹可能需要一些時間)"
+    discarded: "工作樹已移除，變更已捨棄：{path}"
+    exit_choice_archive: "封存並移除（可還原）"
+    exit_choice_discard: "移除並捨棄變更"
+    exit_choice_keep: "保留工作樹（預設）"
+    restore_hint: "還原方式：qubit worktree restore {name}"
+    sweep_archived_kept: "已封存，保留（{reason}）→ {ref}"
+    sweep_archived_removed: "已封存並移除 → {ref}"
+  modern:
+    hint_commands: "指令"
+    hint_files: "檔案"
+    hint_queue: "排隊"
+    hint_shell: "終端"
+    hint_stop: "停止"
+    preparing: "正在準備 {what}…"
+    thought: "思考"
+    thought_for: "思考了 {seconds} 秒"
+    working: "工作中…"
 display:
   verb:
     web_search: "搜尋網頁中"

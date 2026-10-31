@@ -251,7 +251,13 @@ def _config_cache_key(config_path: Path) -> Optional[Tuple[Any, ...]]:
 
 
 def _load_raw_config() -> Dict[str, Any]:
-    """Read config.yaml with an mtime+size keyed cache (no qubit_cli.config import)."""
+    """Read config.yaml with a per-file signature cache (no qubit_cli.config import).
+
+    The key carries the config path, so a multiplexed watcher rotating through
+    ~32 published profile scopes keeps each profile's unchanged parse instead of
+    evicting every entry on a miss. Parses go through ``utils.fast_safe_load`` so
+    they share one reader with the rest of the runtime.
+    """
     from agent.safe_worker_policy import worker_config_snapshot
 
     snapshot = worker_config_snapshot()
@@ -261,19 +267,31 @@ def _load_raw_config() -> Dict[str, Any]:
     if not config_path.exists():
         return {}
     cache_key = _config_cache_key(config_path)
-    cached = _RAW_CONFIG_CACHE.get(cache_key) if cache_key is not None else None
-    if cached is not None:
-        return cached
+    if cache_key is not None:
+        with _RAW_CONFIG_CACHE_LOCK:
+            cached = _RAW_CONFIG_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
     try:
-        parsed = yaml_load(config_path.read_text(encoding="utf-8-sig"))
+        from utils import fast_safe_load
+
+        with open(config_path, encoding="utf-8-sig") as stream:
+            parsed = fast_safe_load(stream)
     except Exception as e:
         logger.debug("Could not read skill config %s: %s", config_path, e)
         return {}
     if not isinstance(parsed, dict):
         return {}
     if cache_key is not None:
-        _RAW_CONFIG_CACHE.clear()
-        _RAW_CONFIG_CACHE[cache_key] = parsed
+        with _RAW_CONFIG_CACHE_LOCK:
+            if cache_key not in _RAW_CONFIG_CACHE and len(_RAW_CONFIG_CACHE) >= _RAW_CONFIG_CACHE_MAX:
+                # Bounded, oldest-first eviction. Never clear the whole cache:
+                # sibling profile scopes still hold valid parses.
+                try:
+                    _RAW_CONFIG_CACHE.pop(next(iter(_RAW_CONFIG_CACHE)), None)
+                except (KeyError, StopIteration):
+                    pass
+            _RAW_CONFIG_CACHE[cache_key] = parsed
     return parsed
 
 

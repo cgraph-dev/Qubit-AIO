@@ -701,6 +701,8 @@ gateway:
     generic_failed_with_hint: "⚠️ Hiba történt, és nem tudtam befejezni ezt a választ.{hint}\nPróbáld újra a /retry paranccsal, vagy kezdj új beszélgetést a /new paranccsal. A technikai részletek az átjáró naplójában vannak (`qubit logs`)."
     history_unavailable: "⚠️ Ennek a munkamenetnek az előzményei átmenetileg nem érhetők el, ezért ez az üzenet nem lett feldolgozva. Kérd meg az üzemeltetőt, hogy nézze meg a state.db fájlt, majd küldd el újra, amikor rendben van. A /reset parancsot csak akkor használd, ha szándékosan új beszélgetést akarsz kezdeni."
     no_credentials: "⚠️ Nem tudtam kapcsolódni az AI-modellszolgáltatáshoz, ezért ez az üzenet nem lett feldolgozva. Jelentkezz be újra a /login paranccsal, vagy válassz másik modellt a /model paranccsal. Ha továbbra is hibázik, futtasd a `qubit doctor` parancsot a gépen."
+    launch_credentials_unavailable: "⚠️ Ez a csevegés már nem tudja használni azt az API-kulcsot, amellyel elindult{detail}, ezért semmi sem futhat benne. Egy nyitott csevegés soha nem vált magától másik kulcsra, így a /retry ugyanígy hibázik. A /new paranccsal indíts új csevegést a jelenlegi kulcsoddal."
+    workspace_unavailable: "⚠️ Ennek a csevegésnek a munkamappája már nem létezik ({path}), ezért az üzeneted nem futott le. Hozd létre újra a mappát, vagy helyezd át a csevegést egy másikba (`/worktree new` a CLI-ben, „Move to project” az asztali alkalmazásban), majd küldd el újra az üzenetet."
   skills:
     disabled: "A(z) **{name}** skill telepítve van, de ki van kapcsolva.\nBekapcsolás: `qubit skills config`"
     not_installed: "A(z) **{name}** skill elérhető, de nincs telepítve.\nTelepítés: `qubit skills install {install_name}`"
@@ -961,6 +963,9 @@ gateway:
     hint: "Feltöltés és számlázás a böngészőben — az egyenleged utána itt is frissül."
   login:
     free_tier_remaining: "\nNéhány csevegés még az ingyenes szinten van; ott a /model paranccsal válthatsz."
+  discard:
+    done: "🗑️ {count} elveszett kör elvetve; nem futottak újra. A mentett üzeneteidre most válasz érkezik."
+    nothing: "Nincs mit elvetni: ebben a csevegésben nem veszett el kör újraindításkor."
 platform:
   whatsapp:
     clarify_other_title: "✏️ Egyéb"
@@ -1018,6 +1023,8 @@ platform:
       resolved_session: "Jóváhagyva a munkamenetre"
       resolved_always: "Véglegesen jóváhagyva"
       resolved_deny: "Elutasítva"
+      click_failed: "⚠️ Nem sikerült rögzíteni a választásodat. Kattints újra, vagy válaszolj a /approve vagy /deny paranccsal."
+      no_longer_pending: "⌛ Ez a jóváhagyás már nincs függőben (lejárt, vagy máshol válaszoltak rá)"
     slash_confirm:
       already_resolved: "Ez a kérdés már eldőlt~"
       approve_once: "Egyszer jóváhagy"
@@ -1867,6 +1874,20 @@ cli:
     default_ceiling_suffix: " (alapértelmezett plafon)"
     used_this_month: "{spent} / {limit} felhasználva ebben a hónapban{ceiling}"
     monthly_limit_read_only: "A havi limitet a portálon állíthatod be — a terminál csak olvashatóan mutatja."
+    keep_going_choice: "Folytatás kreditekkel"
+    keep_going_confirm_body: "A kreditjeid használata, ha elfogy a csomagban foglalt használat. Ki: a Qubit megvárja a visszaállítást."
+    keep_going_confirm_title: "Folytatás kreditekkel?"
+    keep_going_desc: "a kreditjeid használata, ha elfogy a csomagban foglalt használat"
+    keep_going_is_on_title: "A Folytatás kreditekkel be van kapcsolva"
+    keep_going_keep_off_desc: "maradjon kikapcsolva: a Qubit megvárja a visszaállítást"
+    keep_going_leave_on: "Maradjon bekapcsolva"
+    keep_going_off_line: "Folytatás kreditekkel: ki (a Qubit megvárja a visszaállítást)"
+    keep_going_on_line: "Folytatás kreditekkel: be (a kreditjeid használata, ha elfogy a csomagban foglalt használat)"
+    keep_going_turn_off: "Kikapcsolás"
+    keep_going_turn_off_desc: "a Qubit megvárja a visszaállítást"
+    keep_going_turn_on: "Bekapcsolás"
+    keep_going_turned_off: "✅ Folytatás kreditekkel: ki. A Qubit megvárja a visszaállítást."
+    keep_going_turned_on: "✅ Folytatás kreditekkel: be. A kreditjeid használata, ha elfogy a csomagban foglalt használat."
   subscription:
     load_failed_label: "Nem sikerült betölteni az előfizetést"
     team_header: "Csapat-előfizetés"
@@ -2000,6 +2021,7 @@ cli:
     restored_from_session: "Modell visszaállítva a munkamenetből: {model}"
     could_not_load_config: "❌ nem sikerült betölteni a konfigurációt: {error}"
     tip_reset_new_session: "Tipp: a `/reset` azonnal új munkamenetet indít."
+    confirm_choice_prompt: "Választás [1/2]: "
   single_query:
     query_label: "Lekérdezés:"
     kanban_run_reclaimed: "kanban: ennek a workernek a futását indulás előtt visszavették; kilépés"
@@ -2383,6 +2405,14 @@ cli:
     move_out_of_range: "A mozgatás kívül esik a soron. Jelenlegi méret: {size}"
     moved: "A(z) {source}. sorelem áthelyezve ide: {destination}."
     usage_add: "Használat: /queue add <prompt>"
+    already_started: "A(z) {index}. sorelem már elindult; úgy fut, ahogy elküldték."
+    change_unknown: "Az átjáró nem válaszolt a(z) {index}. sorelemről ({error}); nézd meg a /queue list kimenetét, mielőtt újra próbálod."
+    edit_refused: "Nem sikerült szerkeszteni a(z) {index}. sorelemet: {error}"
+    gateway_refused: "Az átjáró nem állította sorba: {error}. Semmi sem került sorba; küldd újra, amikor a kör véget ér."
+    move_gateway_fifo: "Az átjáró a sorban álló promptokat küldési sorrendben futtatja; inkább szerkessz vagy távolíts el egyet."
+    remove_refused: "Nem sikerült eltávolítani a(z) {index}. sorelemet: {error}"
+    started_stopped: "A(z) {index}. sorelem már elindult; az átjáró leállította."
+    submit_unknown: "Az átjáró nem válaszolt ({error}), így lehet, hogy a prompt már sorban van. Nézd meg a /queue list kimenetét, mielőtt újra elküldöd."
   reload:
     env_reloaded: ".env újratöltve ({count} változó frissült)"
   steer:
@@ -3318,6 +3348,27 @@ cli:
     uncommitted_keeping: "⚠ A worktree-ben nem commitolt változások vannak, megtartva: {path}"
     clean_up_manually: "Kézi takarításhoz: git worktree remove --force {path}"
     cleaned_up: "✓ Worktree eltakarítva: {path}"
+    archive_failed: "✗ {path} archiválása sikertelen, megtartva: {error}"
+    archived: "✓ Worktree archiválva ide: {ref}, és eltávolítva: {path}"
+    archived_kept: "✓ Worktree archiválva ide: {ref}, de megtartva ({reason}): {path}"
+    archiving: "{path} archiválása … (nagy fánál ez eltarthat egy ideig)"
+    discarded: "Worktree eltávolítva, változásai elvetve: {path}"
+    exit_choice_archive: "Archiválás és eltávolítás (visszaállítható)"
+    exit_choice_discard: "Eltávolítás a változások elvetésével"
+    exit_choice_keep: "Worktree megtartása (alapértelmezett)"
+    restore_hint: "Visszaállítás: qubit worktree restore {name}"
+    sweep_archived_kept: "archiválva, megtartva ({reason}) → {ref}"
+    sweep_archived_removed: "archiválva + eltávolítva → {ref}"
+  modern:
+    hint_commands: "parancsok"
+    hint_files: "fájlok"
+    hint_queue: "sorba"
+    hint_shell: "shell"
+    hint_stop: "leállítás"
+    preparing: "{what} előkészítése…"
+    thought: "Gondolkodott"
+    thought_for: "{seconds} mp-ig gondolkodott"
+    working: "Dolgozik…"
 display:
   verb:
     web_search: "Keresés a weben"

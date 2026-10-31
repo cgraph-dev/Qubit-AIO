@@ -691,6 +691,8 @@ gateway:
     generic_failed_with_hint: "⚠️ حدث خطأ ما ولم أستطع إكمال هذا الرد.{hint}\nاستخدم /retry لإعادة المحاولة، أو /new لبدء محادثة جديدة. التفاصيل التقنية في سجل البوّابة (`qubit logs`)."
     history_unavailable: "⚠️ سجل هذه الجلسة غير متاح مؤقتًا، لذا لم تُعالج هذه الرسالة. اطلب من المشغّل فحص state.db، ثم أعد الإرسال بعد أن يعود سليمًا. استخدم /reset فقط إن كنت تريد فعلًا بدء محادثة جديدة."
     no_credentials: "⚠️ تعذّر الاتصال بخدمة نموذج الذكاء الاصطناعي، لذا لم تُعالج هذه الرسالة. استخدم /login لتسجيل الدخول مجددًا، أو /model لاختيار نموذج آخر. إن استمرّ الفشل، شغّل `qubit doctor` على المضيف."
+    launch_credentials_unavailable: "⚠️ لم تعد هذه المحادثة قادرة على استخدام مفتاح API الذي بدأت به{detail}، لذلك لا يمكن تشغيل أي شيء فيها. المحادثة المفتوحة لا تنتقل أبدًا إلى مفتاح مختلف من تلقاء نفسها، لذا سيفشل /retry بالطريقة نفسها. استخدم /new لبدء محادثة جديدة بمفتاحك الحالي."
+    workspace_unavailable: "⚠️ لم يعد مجلد عمل هذه المحادثة موجوداً ({path})، لذا لم تُنفَّذ رسالتك. أعد إنشاء المجلد، أو انقل المحادثة إلى مجلد آخر (`/worktree new` في واجهة سطر الأوامر، أو «Move to project» في تطبيق سطح المكتب)، ثم أرسل رسالتك مجدداً."
   skills:
     disabled: "مهارة **{name}** مثبّتة لكنها معطّلة.\nفعّلها بـ: `qubit skills config`"
     not_installed: "مهارة **{name}** متاحة لكنها غير مثبّتة.\nثبّتها بـ: `qubit skills install {install_name}`"
@@ -947,6 +949,9 @@ gateway:
     hint: "أعد تعبئة الرصيد وأدِر الفوترة في المتصفح — سيتحدّث رصيدك هنا بعد ذلك."
   login:
     free_tier_remaining: "\nما زالت بعض المحادثات على المستوى المجاني؛ استخدم /model في تلك المحادثات للتبديل."
+  discard:
+    done: "🗑️ تم تجاهل {count} جولة مفقودة؛ لم تُعد تشغيلها. سيتم الرد على رسائلك المحفوظة الآن."
+    nothing: "لا شيء لتجاهله: لا توجد في هذه المحادثة جولة فُقدت أثناء إعادة التشغيل."
 platform:
   whatsapp:
     clarify_other_title: "✏️ أخرى"
@@ -1001,6 +1006,8 @@ platform:
       resolved_session: "تمت الموافقة للجلسة"
       resolved_always: "تمت الموافقة بشكل دائم"
       resolved_deny: "مرفوض"
+      click_failed: "⚠️ تعذّر تسجيل اختيارك. انقر مرة أخرى، أو أجب باستخدام /approve أو /deny."
+      no_longer_pending: "⌛ لم تعد هذه الموافقة معلّقة (انتهت مهلتها أو تمت الإجابة عنها في مكان آخر)"
     slash_confirm:
       already_resolved: "تم البتّ في هذه المطالبة مسبقًا~"
       approve_once: "موافقة مرة واحدة"
@@ -1850,6 +1857,20 @@ cli:
     default_ceiling_suffix: " (السقف الافتراضي)"
     used_this_month: "استُخدم {spent} من {limit} هذا الشهر{ceiling}"
     monthly_limit_read_only: "يُعيَّن الحد الشهري من البوابة — وتعرضه الطرفية للقراءة فقط."
+    keep_going_choice: "الاستمرار بالرصيد"
+    keep_going_confirm_body: "استخدم رصيدك عند نفاد الاستخدام المضمّن. عند الإيقاف: ينتظر Qubit إعادة التعيين."
+    keep_going_confirm_title: "الاستمرار بالرصيد؟"
+    keep_going_desc: "استخدام رصيدك عند نفاد الاستخدام المضمّن"
+    keep_going_is_on_title: "الاستمرار بالرصيد مفعّل"
+    keep_going_keep_off_desc: "إبقاؤه معطّلًا: ينتظر Qubit إعادة التعيين"
+    keep_going_leave_on: "إبقاؤه مفعّلًا"
+    keep_going_off_line: "الاستمرار بالرصيد: معطّل (ينتظر Qubit إعادة التعيين)"
+    keep_going_on_line: "الاستمرار بالرصيد: مفعّل (استخدام رصيدك عند نفاد الاستخدام المضمّن)"
+    keep_going_turn_off: "إيقافه"
+    keep_going_turn_off_desc: "ينتظر Qubit إعادة التعيين"
+    keep_going_turn_on: "تفعيل"
+    keep_going_turned_off: "✅ الاستمرار بالرصيد: معطّل. ينتظر Qubit إعادة التعيين."
+    keep_going_turned_on: "✅ الاستمرار بالرصيد: مفعّل. استخدم رصيدك عند نفاد الاستخدام المضمّن."
   subscription:
     load_failed_label: "تعذّر تحميل الاشتراك"
     team_header: "اشتراك الفريق"
@@ -1983,6 +2004,7 @@ cli:
     restored_from_session: "استُعيد النموذج من الجلسة: {model}"
     could_not_load_config: "❌ تعذّر تحميل الإعدادات: {error}"
     tip_reset_new_session: "نصيحة: `/reset` يبدأ جلسة جديدة فورًا."
+    confirm_choice_prompt: "الاختيار [1/2]: "
   single_query:
     query_label: "الاستعلام:"
     kanban_run_reclaimed: "كانبان: استُرجع تشغيل هذا العامل قبل أن يبدأ؛ جارٍ الخروج"
@@ -2366,6 +2388,14 @@ cli:
     move_out_of_range: "النقل خارج نطاق قائمة الانتظار. الحجم الحالي: {size}"
     moved: "نُقل عنصر قائمة الانتظار من {source} إلى {destination}."
     usage_add: "الاستخدام: /queue add <prompt>"
+    already_started: "بدأ عنصر الطابور {index} بالفعل؛ سيُنفَّذ كما أُرسل."
+    change_unknown: "لم تُجب البوابة بشأن عنصر الطابور {index} ({error})؛ راجع /queue list قبل المحاولة مجددًا."
+    edit_refused: "تعذّر تعديل عنصر الطابور {index}: {error}"
+    gateway_refused: "لم تضعه البوابة في الطابور: {error}. لم يُضف شيء؛ أرسله مرة أخرى عند انتهاء الدور."
+    move_gateway_fifo: "تشغّل البوابة المطالبات في الطابور بترتيب إرسالها؛ عدّل واحدة أو احذفها بدلاً من ذلك."
+    remove_refused: "تعذّرت إزالة عنصر الطابور {index}: {error}"
+    started_stopped: "كان عنصر الطابور {index} قد بدأ بالفعل؛ أوقفته البوابة."
+    submit_unknown: "لم تُجب البوابة ({error})، لذا قد تكون الرسالة في الطابور بالفعل. راجع /queue list قبل إرسالها مجددًا."
   reload:
     env_reloaded: "أُعيد تحميل .env (تم تحديث {count} متغيّر)"
   steer:
@@ -3301,6 +3331,27 @@ cli:
     uncommitted_keeping: "⚠ يحتوي worktree على تغييرات غير مودعة، سيُحتفظ به: {path}"
     clean_up_manually: "للتنظيف يدويًا: git worktree remove --force {path}"
     cleaned_up: "✓ تم تنظيف worktree: {path}"
+    archive_failed: "✗ تعذّرت أرشفة {path}، سيُحتفظ به: {error}"
+    archived: "✓ تمت أرشفة الـ worktree في {ref} وإزالته: {path}"
+    archived_kept: "✓ تمت أرشفة الـ worktree في {ref} لكن احتُفظ به ({reason}): {path}"
+    archiving: "جارٍ أرشفة {path} … (قد يستغرق ذلك بعض الوقت لشجرة كبيرة)"
+    discarded: "تمت إزالة الـ worktree وتجاهل تغييراته: {path}"
+    exit_choice_archive: "أرشفته وإزالته (قابل للاستعادة)"
+    exit_choice_discard: "إزالته وتجاهل التغييرات"
+    exit_choice_keep: "الاحتفاظ بالـ worktree (افتراضي)"
+    restore_hint: "لاستعادته: qubit worktree restore {name}"
+    sweep_archived_kept: "أُرشف، واحتُفظ به ({reason}) → {ref}"
+    sweep_archived_removed: "أُرشف + أُزيل → {ref}"
+  modern:
+    hint_commands: "الأوامر"
+    hint_files: "الملفات"
+    hint_queue: "إضافة للطابور"
+    hint_shell: "الطرفية"
+    hint_stop: "إيقاف"
+    preparing: "جارٍ تحضير {what}…"
+    thought: "فكّر"
+    thought_for: "فكّر لمدة {seconds} ث"
+    working: "يعمل…"
 display:
   verb:
     web_search: "يبحث في الويب"

@@ -691,6 +691,8 @@ gateway:
     generic_failed_with_hint: "⚠️ Iets het verkeerd geloop en ek kon hierdie antwoord nie voltooi nie.{hint}\nGebruik /retry om weer te probeer, of /new om 'n vars gesprek te begin. Tegniese besonderhede is in die gateway-log (`qubit logs`)."
     history_unavailable: "⚠️ Hierdie sessie se geskiedenis is tydelik onbeskikbaar, so hierdie boodskap is nie verwerk nie. Vra die operateur om state.db na te gaan en stuur dit weer sodra dit gesond is. Gebruik /reset slegs as jy doelbewus 'n nuwe gesprek wil begin."
     no_credentials: "⚠️ Ek kon nie met die KI-modeldiens verbind nie, so hierdie boodskap is nie verwerk nie. Gebruik /login om weer aan te meld, of /model om 'n ander model te kies. As dit aanhou misluk, voer `qubit doctor` op die gasheer uit."
+    launch_credentials_unavailable: "⚠️ Hierdie klets kan nie meer die API-sleutel gebruik waarmee dit begin is nie{detail}, daarom kan niks daarin loop nie. 'n Oop klets skakel nooit self na 'n ander sleutel oor nie, so /retry misluk op dieselfde manier. Gebruik /new om 'n nuwe klets met jou huidige sleutel te begin."
+    workspace_unavailable: "⚠️ Hierdie klets se werkvouer bestaan nie meer nie ({path}), so jou boodskap is nie uitgevoer nie. Skep die vouer weer, of skuif die klets na 'n ander een (`/worktree new` in die CLI, “Move to project” in die rekenaarprogram), en stuur dan jou boodskap weer."
   skills:
     disabled: "Die **{name}**-vaardigheid is geïnstalleer, maar gedeaktiveer.\nAktiveer dit met: `qubit skills config`"
     not_installed: "Die **{name}**-vaardigheid is beskikbaar, maar nie geïnstalleer nie.\nInstalleer dit met: `qubit skills install {install_name}`"
@@ -947,6 +949,9 @@ gateway:
     hint: "Laai op en bestuur fakturering in die blaaier — jou saldo word daarna hier opgedateer."
   login:
     free_tier_remaining: "\nSommige geselsies is nog op die gratis vlak; gebruik /model in daardie geselsies om oor te skakel."
+  discard:
+    done: "🗑️ {count} verlore beurt(e) weggegooi; hulle is nie weer uitgevoer nie. Jou gestoorde boodskappe word nou beantwoord."
+    nothing: "Niks om weg te gooi nie: hierdie klets het geen beurt wat in 'n herbegin verlore is nie."
 platform:
   whatsapp:
     clarify_other_title: "✏️ Ander"
@@ -1001,6 +1006,8 @@ platform:
       resolved_session: "Vir sessie goedgekeur"
       resolved_always: "Permanent goedgekeur"
       resolved_deny: "Geweier"
+      click_failed: "⚠️ Kon nie jou keuse aanteken nie. Klik weer, of antwoord met /approve of /deny."
+      no_longer_pending: "⌛ Hierdie goedkeuring wag nie meer nie (dit het verval of is elders beantwoord)"
     slash_confirm:
       already_resolved: "Hierdie prompt is reeds afgehandel~"
       approve_once: "Eenmalig goedkeur"
@@ -1850,6 +1857,20 @@ cli:
     default_ceiling_suffix: " (verstekplafon)"
     used_this_month: "{spent} van {limit} hierdie maand gebruik{ceiling}"
     monthly_limit_read_only: "Die maandelikse limiet word op die portaal gestel — die terminale wys dit leesalleen."
+    keep_going_choice: "Gaan voort op krediete"
+    keep_going_confirm_body: "Gebruik jou krediete wanneer ingeslote gebruik opraak. Af: Qubit wag vir die terugstelling."
+    keep_going_confirm_title: "Gaan voort op krediete?"
+    keep_going_desc: "gebruik jou krediete wanneer ingeslote gebruik opraak"
+    keep_going_is_on_title: "Gaan voort op krediete is aan"
+    keep_going_keep_off_desc: "hou dit af: Qubit wag vir die terugstelling"
+    keep_going_leave_on: "Laat dit aan"
+    keep_going_off_line: "Gaan voort op krediete: af (Qubit wag vir die terugstelling)"
+    keep_going_on_line: "Gaan voort op krediete: aan (gebruik jou krediete wanneer ingeslote gebruik opraak)"
+    keep_going_turn_off: "Skakel dit af"
+    keep_going_turn_off_desc: "Qubit wag vir die terugstelling"
+    keep_going_turn_on: "Skakel aan"
+    keep_going_turned_off: "✅ Gaan voort op krediete: af. Qubit wag vir die terugstelling."
+    keep_going_turned_on: "✅ Gaan voort op krediete: aan. Gebruik jou krediete wanneer ingeslote gebruik opraak."
   subscription:
     load_failed_label: "Kon nie intekening laai nie"
     team_header: "Spanintekening"
@@ -1983,6 +2004,7 @@ cli:
     restored_from_session: "Model vanaf sessie herstel: {model}"
     could_not_load_config: "❌ kon nie konfigurasie laai nie: {error}"
     tip_reset_new_session: "Wenk: `/reset` begin dadelik 'n nuwe sessie."
+    confirm_choice_prompt: "Keuse [1/2]: "
   single_query:
     query_label: "Navraag:"
     kanban_run_reclaimed: "kanban: hierdie werker se lopie is teruggeëis voordat dit begin het; sluit af"
@@ -2366,6 +2388,14 @@ cli:
     move_out_of_range: "Tou-verplasing buite bereik. Huidige grootte: {size}"
     moved: "Tou-item {source} na {destination} verplaas."
     usage_add: "Gebruik: /queue add <prompt>"
+    already_started: "Tou-item {index} het reeds begin; dit loop soos dit gestuur is."
+    change_unknown: "Die gateway het nie oor tou-item {index} geantwoord nie ({error}); kyk na /queue list voordat jy weer probeer."
+    edit_refused: "Kon nie tou-item {index} wysig nie: {error}"
+    gateway_refused: "Die gateway het dit nie in die tou geplaas nie: {error}. Niks is in die tou geplaas nie; stuur dit weer wanneer die beurt eindig."
+    move_gateway_fifo: "Die gateway voer toustaande prompts uit in die volgorde waarin dit gestuur is; wysig of verwyder eerder een."
+    remove_refused: "Kon nie tou-item {index} verwyder nie: {error}"
+    started_stopped: "Tou-item {index} het reeds begin; die gateway het dit gestop."
+    submit_unknown: "Die gateway het nie geantwoord nie ({error}), so die opdrag is dalk reeds in die tou. Kyk na /queue list voordat jy dit weer stuur."
   reload:
     env_reloaded: ".env herlaai ({count} veranderlike(s) opgedateer)"
   steer:
@@ -3301,6 +3331,27 @@ cli:
     uncommitted_keeping: "⚠ Werkboom het ongecommitte veranderinge, word behou: {path}"
     clean_up_manually: "Om met die hand op te ruim: git worktree remove --force {path}"
     cleaned_up: "✓ Werkboom opgeruim: {path}"
+    archive_failed: "✗ Kon nie {path} argiveer nie, word behou: {error}"
+    archived: "✓ Werkboom geargiveer na {ref} en verwyder: {path}"
+    archived_kept: "✓ Werkboom geargiveer na {ref} maar behou ({reason}): {path}"
+    archiving: "Argiveer {path} … (dit kan 'n rukkie neem vir 'n groot boom)"
+    discarded: "Werkboom verwyder en sy veranderinge weggegooi: {path}"
+    exit_choice_archive: "Argiveer en verwyder dit (herstelbaar)"
+    exit_choice_discard: "Verwyder dit en gooi die veranderinge weg"
+    exit_choice_keep: "Hou die werkboom (verstek)"
+    restore_hint: "Herstel dit met: qubit worktree restore {name}"
+    sweep_archived_kept: "geargiveer, behou ({reason}) → {ref}"
+    sweep_archived_removed: "geargiveer + verwyder → {ref}"
+  modern:
+    hint_commands: "opdragte"
+    hint_files: "lêers"
+    hint_queue: "in tou"
+    hint_shell: "dop"
+    hint_stop: "stop"
+    preparing: "Berei {what} voor…"
+    thought: "Het gedink"
+    thought_for: "Het {seconds}s gedink"
+    working: "Besig…"
 display:
   verb:
     web_search: "Soek op die web"
