@@ -530,6 +530,22 @@ async def recover_served_native_rows(runner):
             logger.error('Native session recovery failed for %s', authority.profile_id, exc_info=True)
 
 
+async def recover_served_profile_native(runner, home):
+    """Boot's native-row recovery for one hot-served profile, run once its adapters connected (boot
+    runs it after every adapter connects). A store that cannot answer leaves the rows queued for
+    the next start and never stops the reconcile of the other profiles."""
+    registry = getattr(runner, 'session_authorities', None)
+    if registry is None:
+        return
+    authority = registry.for_home(await asyncio.to_thread(Path(home).resolve))
+    if authority is None or getattr(authority, 'retiring', False):
+        return
+    try:
+        await recover_profile_native_sessions(runner, authority)
+    except Exception:  # health: allow BLE001 -- logged; the rows stay queued for the next start
+        logger.error('Native session recovery failed for %s', authority.profile_id, exc_info=True)
+
+
 async def unserve_profile_runtime(runner, home):
     """Retire one profile's authority (deleted while running) and shrink the published set.
     False when one of its turns outlived the Stop deadline (keep the reservation); True otherwise,

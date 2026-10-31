@@ -749,8 +749,19 @@ def _filter_venv_launcher_stubs(pids: list[int]) -> list[int]:
     return [p for p in pids if p not in drop]
 
 
+def _owned_gateway_pid():
+    """This profile's own gateway pid on positive ownership evidence; the host is not it."""
+    from qubit_cli.gateway_profile_lifecycle import owned_gateway_pid
+    return owned_gateway_pid()
+
+
 def find_gateway_pids(exclude_pids: set | None = None, all_profiles: bool = False) -> list:
-    """Find running gateway PIDs for the current profile, or every profile with ``all_profiles`` (``qubit update``)."""
+    """Find running gateway PIDs for the current profile, or every profile with ``all_profiles`` (``qubit update``).
+
+    A served profile's runtime record carries the HOST multiplexer's pid (#141133), so the recorded
+    pid alone is never this profile's gateway: each candidate must prove it runs on this profile's
+    home (``_pid_owned_by_home``, which never dials a non-host pid and refuses the host's record from
+    another home on the record alone)."""
     _exclude = set(exclude_pids or set())
     pids: list[int] = []
     if not all_profiles:
@@ -767,6 +778,19 @@ def find_gateway_pids(exclude_pids: set | None = None, all_profiles: bool = Fals
         include_restart_managers = False
     for pid in _scan_gateway_pids(_exclude, all_profiles=all_profiles, include_restart_managers=include_restart_managers):
         _append_unique_pid(pids, pid, _exclude)
+    if not all_profiles and pids:
+        try:
+            from gateway.status import _get_process_qubit_home
+            from qubit_cli.gateway_profile_lifecycle import _pid_owned_by_home
+            home = _get_process_qubit_home()
+        except Exception:
+            return pids
+        def _owned(pid):
+            try:
+                return _pid_owned_by_home(pid, home)
+            except Exception:
+                return False
+        pids = [pid for pid in pids if _owned(pid)]
     return pids
 
 
@@ -1995,6 +2019,13 @@ def stop_profile_gateway() -> bool:
     pid = get_running_pid()
     if pid is None:
         return _reap_unsupervised_gateway_orphans()
+
+    owned = _owned_gateway_pid()
+    if owned is None:
+        # The recorded pid is the host multiplexer serving this profile (or another home's process):
+        # stopping it would take every served profile offline. Never kill or reap it from here.
+        return False
+    pid = owned
 
     if is_windows():
         # Windows maps SIGTERM to TerminateProcess. The marker watcher is the
@@ -5443,7 +5474,8 @@ def _cmd_stop(args):
     elif stop_profile_gateway():
         print("✓ Stopped gateway for this profile")
     else:
-        print("✗ No gateway running for this profile")
+        from qubit_cli.gateway_profile_lifecycle import report_profile_stop_failure
+        report_profile_stop_failure()
 
 
 def _stop_host_multiplexer(owner) -> int:

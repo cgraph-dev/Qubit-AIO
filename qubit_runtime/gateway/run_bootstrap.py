@@ -343,7 +343,7 @@ async def _start_gateway_start_control_socket(runner):
             try:
                 # Bounded: a token-less create reconciles in milliseconds; a credential-add whose adapter
                 # connect outlasts this keeps running and the caller sees ``pending`` (not an error).
-                return {"multiplex": True, **future.result(timeout=5.0)}
+                return {"multiplex": True, **future.result(timeout=7.0)}
             except concurrent.futures.TimeoutError:
                 return {"multiplex": True, "pending": True, "served_profiles": runner.served_profile_names()}
 

@@ -43,6 +43,9 @@ def refusal_text(error: BaseException | str) -> str:
     reads exactly as before."""
     data = getattr(error, "data", None)
     data = data if isinstance(data, dict) else {}
+    if str(data.get("reason") or "").strip() == "launch_credentials_unavailable":
+        from agent.turn_failure_copy import launch_credentials_copy
+        return launch_credentials_copy(error)
     field, detail = str(data.get("field") or "").strip(), str(data.get("detail") or "").strip()
     if not field and not detail:
         return str(error)

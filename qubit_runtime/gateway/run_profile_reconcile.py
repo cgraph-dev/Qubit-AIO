@@ -264,6 +264,18 @@ class GatewayProfileReconcileMixin:
             await self._unserve_profile(name, known[name])
             result["removed"].append(name)
         for name in list(added):
+            violation = await self._profile_open_policy_violation(live[name])
+            if violation:
+                # Refused before any runtime/store/authority is published for it: an invalid profile
+                # must never become briefly routable. The adapter start repeats this check for
+                # env-derived policy, which the config-only preflight cannot see.
+                added.remove(name)
+                park_profile(self, name, (
+                    f"Profile '{name}' enables {violation}. Enable GATEWAY_ALLOW_ALL_USERS or the "
+                    "platform allow-all flag for that profile, or change dm_policy/group_policy "
+                    "away from 'open'."))
+                result["parked"].append(name)
+                continue
             reason_ = await self._serve_profile_runtime(name, live[name])
             if reason_ is not None:
                 added.remove(name)
