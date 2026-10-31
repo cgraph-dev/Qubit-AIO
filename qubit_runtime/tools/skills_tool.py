@@ -641,7 +641,7 @@ def skill_view(
             from agent.skill_utils import resolve_legacy_skill_name
             legacy = resolve_legacy_skill_name(name)
             if legacy != name:
-                error2, skill_dir2, skill_md2 = _locate_skill(
+                error2, skill_dir2, skill_md2 = locate_skill(
                     legacy, local_category_name, roots)
                 if error2 is None:
                     error, skill_dir, skill_md, name = None, skill_dir2, skill_md2, legacy
