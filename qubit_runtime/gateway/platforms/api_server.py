@@ -3464,6 +3464,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         admitted = await self._admit_to_live_bot_chat(session_id, ctx["user_message"], ctx["run_kwargs"].get("turn_author"))
         if admitted is None:
             return None
+        session_id = admitted[1].get("session_id") or ctx["session_id"]  # a moved-aside API row: the local chat (MSG-21)
         record = await self._await_live_bot_chat_receipt(*admitted)
         delivery_id = record["delivery_id"]
         headers = self._session_headers(session_id, ctx["gateway_session_key"])
@@ -3505,6 +3506,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         admitted = await self._admit_to_live_bot_chat(session_id, ctx["user_message"], ctx["run_kwargs"].get("turn_author"))
         if admitted is None:
             return None
+        session_id = admitted[1].get("session_id") or ctx["session_id"]  # a moved-aside API row: the local chat (MSG-21)
         events = _SessionEventQueue(session_id, f"run_{uuid.uuid4().hex}")
         response = await self._prepare_sse_response(request, session_id, ctx["gateway_session_key"])
 
