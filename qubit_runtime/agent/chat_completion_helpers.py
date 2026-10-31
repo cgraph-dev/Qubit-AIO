@@ -1510,27 +1510,36 @@ def _build_chat_completions_kwargs(agent, api_messages, tools_for_api, reasoning
         qwen_session_metadata=_qwen_meta)
     if _profile:
         # Profiles handle per-provider quirks via hooks fed the context above.
-        return transport.build_kwargs(provider_profile=_profile, **_common)
-
-    # Legacy flag path: only for a provider absent from the providers/ registry.
-    return transport.build_kwargs(
-        **_common,
-        model_lower=(agent.model or "").lower(),
-        is_openrouter=_is_or,
-        is_nous=base_url_host_matches(_host, "nousresearch.com"),
-        is_qwen_portal=_is_qwen,
-        is_github_models=_is_gh,
-        is_nvidia_nim=base_url_host_matches(_host, "integrate.api.nvidia.com"),
-        is_kimi=any(base_url_host_matches(agent.base_url, h) for h in ("api.kimi.com", "moonshot.ai", "moonshot.cn")),
-        is_tokenhub=base_url_host_matches(_host, "tokenhub.tencentmaas.com"),
-        is_custom_provider=agent.provider == "custom",
-        qwen_prepare_fn=agent._qwen_prepare_chat_messages if _is_qwen else None,
-        qwen_prepare_inplace_fn=agent._qwen_prepare_chat_messages_inplace if _is_qwen else None,
-        fixed_temperature=_fixed_temp,
-        omit_temperature=_omit_temp,
-        github_reasoning_extra=agent._github_models_reasoning_extra_body() if _is_gh else None,
-        provider_name=agent.provider,
-    )
+        kwargs = transport.build_kwargs(provider_profile=_profile, **_common)
+    else:
+        # Legacy flag path: only for a provider absent from the providers/ registry.
+        kwargs = transport.build_kwargs(
+            **_common,
+            model_lower=(agent.model or "").lower(),
+            is_openrouter=_is_or,
+            is_nous=base_url_host_matches(_host, "nousresearch.com"),
+            is_qwen_portal=_is_qwen,
+            is_github_models=_is_gh,
+            is_nvidia_nim=base_url_host_matches(_host, "integrate.api.nvidia.com"),
+            is_kimi=any(base_url_host_matches(agent.base_url, h) for h in ("api.kimi.com", "moonshot.ai", "moonshot.cn")),
+            is_tokenhub=base_url_host_matches(_host, "tokenhub.tencentmaas.com"),
+            is_custom_provider=agent.provider == "custom",
+            qwen_prepare_fn=agent._qwen_prepare_chat_messages if _is_qwen else None,
+            qwen_prepare_inplace_fn=agent._qwen_prepare_chat_messages_inplace if _is_qwen else None,
+            fixed_temperature=_fixed_temp,
+            omit_temperature=_omit_temp,
+            github_reasoning_extra=agent._github_models_reasoning_extra_body() if _is_gh else None,
+            provider_name=agent.provider,
+        )
+    # The chat-completions transport strips DATA_USE from each message and folds it into the request's
+    # data-use guarantee. MoA is a virtual provider: its facade fans the same messages out to N real
+    # providers, so the guarantee must travel with the request and be re-stamped by the facade
+    # (agent/moa_loop.py) or a no-training turn could reach an advisor without it.
+    if str(agent.provider or "").lower() == "moa":
+        from agent.message_metadata import data_use_requirement
+        if requirement := data_use_requirement(api_messages):
+            kwargs["data_use"] = requirement
+    return kwargs
 
 
 def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = None) -> dict:
