@@ -114,6 +114,23 @@ def test_pin_rejects_external_default_and_keeps_explicit_home(
     assert os.environ["QUBIT_HOME"] == str(explicit)
 
 
+def test_pin_honours_hermes_home_as_read_old(tmp_path, monkeypatch):
+    """A child launched with only ``HERMES_HOME`` keeps its caller's profile."""
+    inherited = tmp_path / "legacy-home"
+    inherited.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(inherited))
+
+    home = QR.pin_qubit_home()
+
+    assert QR._resolved(home) == QR._resolved(inherited)
+    assert Path(os.environ["QUBIT_HOME"]).resolve() == QR._resolved(inherited)
+
+    explicit = tmp_path / "explicit-qhome"
+    explicit.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(explicit))
+    assert QR.pin_qubit_home() == explicit
+
+
 def test_runtime_home_for_cfg_ignores_external_home(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     external = Path.home() / ".hermes"

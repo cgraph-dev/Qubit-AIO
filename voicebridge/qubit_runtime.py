@@ -296,11 +296,22 @@ def pin_qubit_home() -> Path:
     # importable; run_gateway additionally re-registers after ensure_path().
     _register_foreign_adapters()
     current = os.environ.get("QUBIT_HOME", "").strip()
+    inherited = False
+    if not current:
+        # ``HERMES_HOME`` is the vendored read-old spelling (``get_qubit_home``
+        # already accepts it). Before this boundary is importable the foreign
+        # adapter registration above is a silent no-op, so a child launched with
+        # only ``HERMES_HOME`` must be honoured here too — otherwise it is sent
+        # to the process default instead of its caller's profile.
+        current = os.environ.get("HERMES_HOME", "").strip()
+        inherited = bool(current)
     if current:
         try:
             cand = Path(current).expanduser()
             if cand.resolve(strict=False) != \
                     _external_default_home().resolve(strict=False):
+                if inherited:
+                    os.environ["QUBIT_HOME"] = str(cand)
                 return cand
         except OSError:
             pass
