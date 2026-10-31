@@ -1,0 +1,271 @@
+/* Qubit loading mark: a small animated atom in the dashboard palette,
+   with a cat mascot peeking over the lower-right orbit. Pure SVG/CSS so
+   it costs nothing on the route-fallback path and needs no new deps. */
+
+.qatom {
+  --qatom-teal: #2dd4bf;
+  --qatom-cyan: #22d3ee;
+  --qatom-cream: #ffe6cb;
+  --qatom-amber: #ffbd38;
+  --qatom-violet: #a78bfa;
+  --qatom-deep: #0f766e;
+  --qatom-cat: #2dd4bf;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  color: var(--midground, #ffe6cb);
+  user-select: none;
+}
+
+.qatom-stage {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  isolation: isolate;
+  animation: qatom-float 6s ease-in-out infinite;
+}
+
+.qatom-stage::before {
+  content: "";
+  position: absolute;
+  inset: -22px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--qatom-teal, #2dd4bf) 20%, transparent) 0%,
+    color-mix(in srgb, var(--qatom-cream, #ffe6cb) 7%, transparent) 42%,
+    transparent 68%
+  );
+  filter: blur(6px);
+}
+
+.qatom-svg {
+  width: 132px;
+  height: 132px;
+  overflow: visible;
+}
+
+.qatom-orbit {
+  animation: qatom-orbit-breathe 5.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--qatom-teal, #2dd4bf) 45%, transparent));
+}
+
+.qatom-orbit:nth-of-type(2) {
+  animation-delay: -1.7s;
+}
+
+.qatom-orbit:nth-of-type(3) {
+  animation-delay: -3.4s;
+}
+
+.qatom-electron {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--qatom-cream, #ffe6cb) 70%, transparent));
+}
+
+.qatom-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: qatom-core-pulse 2.6s ease-in-out infinite;
+}
+
+.qatom-core-hot {
+  animation: qatom-core-glint 3.1s ease-in-out infinite;
+}
+
+.qatom-cat {
+  position: absolute;
+  right: -12px;
+  bottom: -20px;
+  width: 48px;
+  height: 35px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+  transform: rotate(4deg);
+  transform-origin: bottom center;
+  animation: qatom-cat-bob 5.4s ease-in-out infinite;
+}
+
+.qatom-cat-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: qatom-cat-blink 4.4s ease-in-out infinite;
+}
+
+.qatom-label {
+  font-size: 0.95rem;
+  line-height: 1.2;
+  letter-spacing: 0.045em;
+  color: var(--color-text-secondary, color-mix(in srgb, #ffe6cb 76%, transparent));
+  text-align: center;
+  animation: qatom-label-pulse 3.4s ease-in-out infinite;
+}
+
+.qatom-bar {
+  width: 190px;
+  max-width: 60vw;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--qatom-cream, #ffe6cb) 15%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--qatom-teal, #2dd4bf) 18%, transparent);
+}
+
+.qatom-bar > span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--qatom-cyan, #22d3ee) 18%,
+    var(--qatom-teal, #2dd4bf) 46%,
+    var(--qatom-cream, #ffe6cb) 70%,
+    transparent
+  );
+  animation: qatom-bar-sweep 1.7s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  box-shadow: 0 0 9px color-mix(in srgb, var(--qatom-teal, #2dd4bf) 65%, transparent);
+}
+
+@keyframes qatom-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes qatom-orbit-breathe {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes qatom-core-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.96;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes qatom-core-glint {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes qatom-cat-bob {
+  0%,
+  100% {
+    transform: rotate(4deg) translateY(0);
+  }
+  50% {
+    transform: rotate(2deg) translateY(-2px);
+  }
+}
+
+@keyframes qatom-cat-blink {
+  0%,
+  43%,
+  47%,
+  100% {
+    transform: scaleY(1);
+  }
+  45% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes qatom-label-pulse {
+  0%,
+  100% {
+    opacity: 0.68;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes qatom-bar-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qatom-stage,
+  .qatom-orbit,
+  .qatom-core,
+  .qatom-core-hot,
+  .qatom-cat,
+  .qatom-cat-eyes,
+  .qatom-label,
+  .qatom-bar > span {
+    animation: none;
+  }
+
+  .qatom-bar > span {
+    width: 58%;
+    transform: translateX(36%);
+  }
+}
+
+/* Compact variants: the transcript/model panels and the inline thinking
+   indicator use the same mark at a smaller scale. */
+.qatom--sm .qatom-stage,
+.qatom--sm .qatom-svg {
+  width: 84px;
+  height: 84px;
+}
+
+.qatom--sm .qatom-cat {
+  right: -8px;
+  bottom: -14px;
+  width: 36px;
+  height: 26px;
+}
+
+.qatom--sm .qatom-stage::before {
+  inset: -14px;
+}
+
+.qatom--inline {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.qatom--inline .qatom-stage,
+.qatom--inline .qatom-svg {
+  width: 18px;
+  height: 18px;
+  animation: none;
+}
+
+.qatom--inline .qatom-stage::before {
+  display: none;
+}
+
+.qatom--inline .qatom-cat {
+  display: none;
+}
