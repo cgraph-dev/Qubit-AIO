@@ -35,7 +35,7 @@ _claims_lock = threading.RLock()  # reentrant: a weakref callback can fire from 
 
 def refused_tool_message(tool_name: str) -> str:
     """What the model/chat sees for a refused memory tool call: no check name, no home paths."""
-    return f"Memory tool '{tool_name}' refused. Ask the operator to check `qubit logs errors`."
+    return f"Memory tool '{tool_name}' refused. Ask the operator to check `hermes logs errors`."
 
 
 def _home_key(home: Any) -> Optional[str]:
@@ -140,7 +140,7 @@ def claim_instance(provider: Any, home: Any) -> bool:
 def in_owner_home(bound: Optional[dict[str, Any]], fn: Callable[[], Any]) -> Callable[[], Any]:
     """``fn`` run under the owning profile's QUBIT_HOME override, set explicitly: a background
     worker must not depend on the submitter's context having carried it."""
-    home = (bound or {}).get("qubit_home")
+    home = (bound or {}).get("qubit_home") or (bound or {}).get("hermes_home")
     if not home:
         return fn
 

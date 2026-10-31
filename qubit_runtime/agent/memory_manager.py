@@ -211,6 +211,9 @@ class MemoryManager:
         self._tool_to_provider: dict[str, MemoryProvider] = {}
         self._external_prefetch_spill_config: Optional[dict[str, Any]] = None
         self._has_external: bool = False
+        # Per-manager view of this provider's live prefetch thread, so a wedged call is not
+        # retried by the next turn from the same agent (the process-wide gate bounds across agents).
+        self._external_prefetch_threads: dict[str, Any] = {}
         timeout = external_prefetch_timeout
         timeout = _EXTERNAL_PREFETCH_TIMEOUT_S if timeout is None else float(timeout)
         if timeout <= 0:
@@ -356,9 +359,14 @@ class MemoryManager:
 
     def _prefetch_provider(self, provider: MemoryProvider, query: str, *, session_id: str = "") -> str:
         """Run one provider's prefetch; external providers are bounded by a timeout. A stuck external
-        call keeps running on its daemon thread; _PREFETCH_GATE decides whether later turns call again."""
+        call keeps running on its daemon thread; _PREFETCH_GATE decides whether later turns call again,
+        and this manager never stacks a second call behind its own still-running one."""
         if provider.name == "builtin":
             return provider.prefetch(query, session_id=session_id)
+
+        running = self._external_prefetch_threads.get(provider.name)
+        if running is not None and running.is_alive():
+            return ""
 
         result_box: dict[str, Any] = {}
 
@@ -371,6 +379,8 @@ class MemoryManager:
                 result_box["error"] = exc
             finally:
                 self._PREFETCH_GATE.leave(key, thread, ok="error" not in result_box)
+                if self._external_prefetch_threads.get(provider.name) is thread:
+                    self._external_prefetch_threads.pop(provider.name, None)
 
         thread = spawn_context_thread(_run, name=f"memory-prefetch-{provider.name}")
         skipped = self._PREFETCH_GATE.enter(key, thread, self._external_prefetch_timeout)
@@ -379,9 +389,11 @@ class MemoryManager:
                          provider.name, *skipped[:2])
             return ""
         try:
+            self._external_prefetch_threads[provider.name] = thread
             thread.start()
         except RuntimeError:
             # Never started, so its finally never runs: drop the entry or it would count forever.
+            self._external_prefetch_threads.pop(provider.name, None)
             self._PREFETCH_GATE.leave(key, thread, ok=False)
             raise
 
