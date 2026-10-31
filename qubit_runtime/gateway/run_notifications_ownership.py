@@ -119,6 +119,16 @@ class GatewayNotificationOwnershipMixin:
                 return "terminal", session_id, row
             if session_id == current_session_id:
                 return "deliver", session_id, row
+            if current_session_id:
+                # The route's current conversation can be this row's compression tip: the child was
+                # resumed on the chat, then compressed. It owns its own completion; do not walk
+                # ``_delegate_from`` out to a parent the chat has since left.
+                try:
+                    tip = await session_db.get_compression_tip(session_id)
+                except Exception:
+                    tip = None
+                if tip and tip == current_session_id:
+                    return "deliver", session_id, row
             config = row.get("model_config")
             try:
                 if isinstance(config, str):

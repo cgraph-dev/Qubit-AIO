@@ -42,7 +42,10 @@ from agent.conversation_compression import (
 from agent.conversation_loop import INTERRUPT_WAITING_FOR_MODEL_PREFIX
 from agent.conversation_compression_archive import MERGED_DURABLE_ROWS, RETIRED_DURABLE_ROWS, UNNAMED_DURABLE_ROWS
 from agent.interrupt_compat import request_hard_interrupt
-from agent.message_metadata import ABSORBED_MESSAGE_UIDS, MESSAGE_UID, copy_identity_fields, is_compaction_scaffolding
+from agent.message_metadata import (
+    ABSORBED_MESSAGE_UIDS, MESSAGE_UID, copy_identity_fields, is_compaction_scaffolding,
+    scaffolding_replay_fields,
+)
 from agent.turn_context import compression_made_progress
 from agent.session_activity import ActivityProvenance, AwakeIdleMeter
 from qubit_cli.config import _is_ssh_remote_tilde_cwd, cfg_get
@@ -1164,6 +1167,9 @@ def _build_replay_entry(
     for stamp in (MERGED_DURABLE_ROWS, UNNAMED_DURABLE_ROWS, RETIRED_DURABLE_ROWS):
         if msg.get(stamp):
             entry[stamp] = msg[stamp]
+    # The compaction provenance (summary flag, restatement marker) rides the replay view: a proactive
+    # prune re-persists these dicts, and a dropped flag would get the row stamped on the next replay.
+    entry.update(scaffolding_replay_fields(msg))
     return entry
 
 
@@ -4253,6 +4259,10 @@ class GatewayRunner(
         """Set session context variables (contextvars, not os.environ, so concurrent messages can't
         overwrite each other). Returns reset tokens for ``_clear_session_env`` in a ``finally``."""
         from gateway.session_context import set_session_vars
+        # A conversation its chat moved past binds the local view a Desktop session's turn binds
+        # (``session_env_source``): whatever it schedules for "here" reaches the apps, never the chat.
+        from gateway.session_detached import session_env_source
+        _env_source = session_env_source(self, context.source)
         # Async-delivery capability tells async tools whether this channel can wake a later turn. Default
         # True keeps CLI/unknown paths working; stateless adapters (api_server) declare False.
         _adapter = (getattr(self, "adapters", None) or {}).get(context.source.platform)
@@ -4264,16 +4274,16 @@ class GatewayRunner(
         _api_vars = api_session_vars()
         _history_delivery = _api_vars.pop("session_history_delivery", None)
         return set_session_vars(
-            platform=context.source.platform.value,
-            chat_id=context.source.chat_id,
-            chat_type=str(context.source.chat_type) if context.source.chat_type else "",
-            chat_name=context.source.chat_name or "",
-            thread_id=str(context.source.thread_id) if context.source.thread_id else "",
-            user_id=str(context.source.user_id) if context.source.user_id else "",
-            user_id_alt=str(context.source.user_id_alt) if context.source.user_id_alt else "",
-            user_name=str(context.source.user_name) if context.source.user_name else "",
-            scope_id=str(getattr(context.source, "scope_id", "") or ""),
-            parent_chat_id=str(getattr(context.source, "parent_chat_id", "") or ""),
+            platform=_env_source.platform.value,
+            chat_id=_env_source.chat_id,
+            chat_type=str(_env_source.chat_type) if _env_source.chat_type else "",
+            chat_name=_env_source.chat_name or "",
+            thread_id=str(_env_source.thread_id) if _env_source.thread_id else "",
+            user_id=str(_env_source.user_id) if _env_source.user_id else "",
+            user_id_alt=str(_env_source.user_id_alt) if _env_source.user_id_alt else "",
+            user_name=str(_env_source.user_name) if _env_source.user_name else "",
+            scope_id=str(getattr(_env_source, "scope_id", "") or ""),
+            parent_chat_id=str(getattr(_env_source, "parent_chat_id", "") or ""),
             session_key=context.session_key,
             # A cached agent binds HERMES_SESSION_ID only on the turn that built it; every later turn
             # (and a command it yields to the background) must still see its own session.
@@ -4545,6 +4555,7 @@ class GatewayRunner(
         log_mode_enabled: Any = None
         log_queue: Any = None
         interim_assistant_messages_enabled: Any = None
+        delegation_inline: Any = False
         _thinking_enabled: Any = None
         _native_slack_task_cards: Any = None
         needs_progress_queue: Any = None

@@ -122,6 +122,8 @@ def _ssl_ctx(use_tls: bool) -> Optional[ssl.SSLContext]:
 class IRCAdapter(BasePlatformAdapter):
     """Async IRC adapter implementing the BasePlatformAdapter interface."""
 
+    serial_receive_loop = True  # _receive_loop awaits each message before reading the next
+
     def __init__(self, config, **kwargs):
         super().__init__(config=config, platform=Platform("irc"))
         extra = getattr(config, "extra", {}) or {}

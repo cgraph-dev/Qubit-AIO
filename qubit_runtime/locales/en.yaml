@@ -672,6 +672,7 @@ gateway:
 
   errors:
     rate_limited: "⏱️ The AI model service is rate-limiting requests. Wait a moment, then use /retry."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ Sign-in to the AI model service failed. Use /login to sign in again, or ask whoever runs this bot to run `qubit doctor` on the host."
     bad_request: "⚠️ The AI model service rejected this request. Try rephrasing your message, or use /model to switch models."
     connection_interrupted: "⚠️ The connection to the AI model service was interrupted mid-request — usually transient. Use /retry to try again; if it keeps happening, run `qubit doctor` on the host."

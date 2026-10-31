@@ -62,6 +62,7 @@ def detach(authority, live, session_id) -> None:
     adapter = local_adapter(authority)  # its delivery; a messaging-only gateway has none yet
     live.route = detached_key(live.route, session_id)
     # No reply anchor: its replies reach the apps, and a background result's event is this very source.
+    # Its session variables are rebound to the local view by ``_set_session_env`` (``session_env_source``).
     live.source = replace_source(live.source, detached_route=live.route, message_id=None)
     adapter.register_source(live.source)  # what admits its background results (``authorize_source``)
 

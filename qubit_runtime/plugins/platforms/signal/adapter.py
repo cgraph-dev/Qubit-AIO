@@ -178,6 +178,7 @@ class SignalAdapter(BasePlatformAdapter):
     """Signal messenger adapter using signal-cli HTTP daemon."""
 
     platform = Platform.SIGNAL
+    serial_receive_loop = True  # _sse_listener awaits each envelope before reading the next
     MAX_MESSAGE_LENGTH = MAX_MESSAGE_LENGTH
     splits_long_messages = True  # send() chunks after markdown → Signal formatting conversion
     # No real edit API; declaring it lets streaming suppress the cursor instead of a stale tofu square.
