@@ -413,6 +413,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
         ``asyncio.TimeoutError`` (idle/ceiling/fence cancel) for the caller's handlers.
 
         Idle timeout (fence ticks per streamed token) + hard ceiling + turn-hold cap."""
+        from agent.conversation_compression_deadline import effective_ceiling
         from gateway.run import HygieneTurnHoldExceeded, hygiene_wait_should_extend
         fence = attempt.commit_fence
         while True:
@@ -420,9 +421,12 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
                 raise TimeoutError
             # Charge the idle budget from the LAST PROGRESS event, else silence can approach 2x timeout.
             _hyg_waited = time.monotonic() - attempt.wait_started
+            # The fence deadline moves as prompt reading reports progress: judge the ceiling against
+            # the deadline as it stands now, not the value it had when the wait started.
+            _ceiling = effective_ceiling(fence, hs.total_ceiling_seconds, attempt.wait_started)
             _slice = min(
                 max(hs.timeout_seconds - fence.seconds_since_progress(), 0.005),
-                max(hs.total_ceiling_seconds - _hyg_waited, 0.005),
+                max(_ceiling - _hyg_waited, 0.005),
             )
             # Cap the slice at the remaining turn-hold budget so a continuously-streaming worker can't
             # hold the turn until the ceiling. Budget exhausted → immediate timeout → abandonment.
@@ -439,6 +443,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
                     raise
                 _hyg_waited = time.monotonic() - attempt.wait_started
                 _idle = fence.seconds_since_progress()
+                _ceiling = effective_ceiling(fence, hs.total_ceiling_seconds, attempt.wait_started)
                 # Never hold the TURN past the budget even while the summary streams: proceed on the
                 # uncompressed transcript so the wire never trips a transport idle-timeout.
                 if _hyg_waited >= hs.max_turn_hold_seconds:
@@ -454,7 +459,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
                     )
                 if hygiene_wait_should_extend(
                     idle=_idle, timeout=hs.timeout_seconds, waited=_hyg_waited,
-                    ceiling=hs.total_ceiling_seconds, fence_cancelled=fence.is_cancelled,
+                    ceiling=_ceiling, fence_cancelled=fence.is_cancelled,
                 ):
                     if _slice >= _idle_left - 1e-9:
                         logger.info(
@@ -1621,6 +1626,11 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
             "interim_assistant_messages", default=True, require_platform_override_for={Platform.MATTERMOST},
         )
         interim_assistant_messages_enabled = not is_webhook and interim_assistant_messages_mode != "off"
+        # The chat's configured interim setting decides ``delegation.gateway_mode: auto``, independent
+        # of a scheduled heartbeat muting interim messages for its own turn.
+        from tools.delegate_tool_config import gateway_delegation_inline
+        delegation_inline = gateway_delegation_inline(
+            user_config, platform_key, interim_enabled=bool(interim_assistant_messages_enabled))
         _thinking_enabled = _display_surface_mode(
             "thinking_progress", default=False, require_platform_override_for={Platform.MATTERMOST},
         ) != "off"
@@ -1652,6 +1662,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
             _live_status_adapter=_live_status_adapter, log_mode_enabled=log_mode_enabled,
             log_queue=queue.Queue() if log_mode_enabled else None,
             interim_assistant_messages_enabled=interim_assistant_messages_enabled,
+            delegation_inline=delegation_inline,
             _thinking_enabled=_thinking_enabled, _native_slack_task_cards=_native_slack_task_cards,
             needs_progress_queue=tool_progress_enabled or _thinking_enabled or _native_slack_task_cards,
             _generic_status_phrase=_generic_status_phrase,
@@ -1663,6 +1674,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
         "progress_grouping", "tool_progress_enabled", "log_queue", "resolve_display_setting",
         "user_config", "enabled_toolsets", "disabled_toolsets", "log_mode_enabled",
         "interim_assistant_messages_enabled", "needs_progress_queue", "_native_slack_task_cards",
+        "delegation_inline",
     )
 
     def _run_agent_build_turn_context(
