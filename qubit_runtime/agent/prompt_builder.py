@@ -1403,8 +1403,11 @@ def _render_skills_index(
             rows.setdefault(name, clip_skill_description(desc) if desc else desc)
         # A one-skill category is a single top-level row: its header would only repeat what the row
         # says (a skill at the top of the tree is its own category, so the name printed twice).
-        indent = "  " if len(rows) == 1 else "    "
-        if len(rows) > 1:
+        # Org namespaces always keep their header: the org id is provenance the row itself never
+        # carries, so collapsing it would drop which org a shared skill belongs to.
+        grouped = len(rows) > 1 or str(category).startswith("org:")
+        indent = "    " if grouped else "  "
+        if grouped:
             index_lines.append(f"  {category}:")
         index_lines.extend(f"{indent}- {name}: {desc}" if desc else f"{indent}- {name}" for name, desc in rows.items())
     from agent.oneshot_footprint import ONESHOT_SKILLS_LOAD_GUIDANCE, is_single_query_session
