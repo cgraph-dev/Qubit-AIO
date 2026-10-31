@@ -14,6 +14,7 @@ import time
 from contextlib import nullcontext, suppress
 from typing import TYPE_CHECKING, Any, Optional
 
+from gateway.config import Platform
 from gateway.platforms.event import MessageEvent, MessageType
 
 if TYPE_CHECKING:  # string annotations only; never imported at runtime (cycle)
@@ -285,7 +286,8 @@ class GatewayGoalsMixin:
         if not sid:
             return None
         await self._warm_goals_session_db(label)
-        return factory(sid)
+        # The manager loads its state from state.db on construction: off the loop, in this scope.
+        return await asyncio.to_thread(factory, sid)
 
     async def _post_turn_goal_continuation(
         self, *, session_entry: Any, source: Any, final_response: str,
@@ -325,8 +327,6 @@ class GatewayGoalsMixin:
         prompt = decision.get("continuation_prompt") or ""
         if not decision.get("should_continue") or not prompt or source is None:
             return
-        from gateway.config import Platform
-
         if getattr(source, "platform", None) == Platform.LOCAL:
             # A local session's adapter FIFO has no reader: its turns are authority admissions.
             # Commit the continuation there, as the TUI chained it after the turn.
@@ -364,15 +364,38 @@ class GatewayGoalsMixin:
             logger.debug("post-turn session resolution failed: %s", exc)
             return
         # Empty interrupted/errored responses must not drive /goal, but an in-flight /loop tick
-        # still needs to be released and rescheduled.
+        # still needs to be released and rescheduled. A failed turn with text (a refusal: its
+        # folder is gone) is no evidence either (the TUI's hook skips it the same way): the tick is
+        # released with no text, so a --until judge never grades it.
+        failed = self._turn_failed()
         hooks = [("loop completion", self._post_turn_loop_completion)]
-        if final_text.strip():
+        if final_text.strip() and not failed:
             hooks.insert(0, ("goal continuation", self._post_turn_goal_continuation))
         for label, hook in hooks:
             try:
-                await hook(session_entry=session_entry, source=source, final_response=final_text)
+                await hook(session_entry=session_entry, source=source,
+                           final_response="" if failed else final_text)
             except Exception as exc:
                 logger.debug("%s hook failed: %s", label, exc)
+        await self._publish_local_control(source, only_if_present=True)
+
+    async def _publish_local_control(self, source: Any, *, only_if_present: bool = False) -> None:
+        """A local (Desktop/Ink) session's goal or loop state just moved here: repaint its viewers' cards,
+        whose loop countdown runs off the snapshot's ``next_due_at``."""
+        if getattr(source, "platform", None) != Platform.LOCAL:
+            return
+        from gateway.session_authorities import active_authority
+        from gateway.session_control_actions import publish_async
+        await publish_async(active_authority(self), source.chat_id, only_if_present=only_if_present)
+
+    @staticmethod
+    def _turn_failed() -> bool:
+        """Whether the owner recorded this turn's result as failed (``session_ingress`` captures it
+        around ``_handle_message``; turns outside an owner capture nothing)."""
+        from gateway.session_results import execution_result
+        captured = execution_result.get() or {}
+        result = captured.get('terminal_result', captured.get('result'))
+        return isinstance(result, dict) and bool(result.get('failed'))
 
     @staticmethod
     def _final_text_for_post_turn_hooks(agent_result, event=None) -> str:
@@ -497,6 +520,8 @@ class GatewayGoalsMixin:
             logger.warning("loop wakeup injection failed for %s: %s", sid, exc)
             with suppress(Exception):
                 mgr.abandon_tick()
+        # Viewers swap the countdown for "running now" (or re-anchor it after a slash tick settled).
+        await self._publish_local_control(source)
 
     async def _loop_wakeup_watcher(self, interval: float = 15.0) -> None:
         """Fire due /loop wakeups for idle gateway sessions: a coarse ticker scans persisted loops
