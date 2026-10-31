@@ -344,6 +344,13 @@ def local_history(authority, ref, prepared=None):
     """
     db = authority.db
     target = transcript_target(authority, ref)
+    live_source = authority.sessions[ref.session_id].source
+    if live_source is None or live_source.platform != Platform.LOCAL:
+        # A messaging (or history-mount) route shows the current physical transcript only: the
+        # authority keeps its admission identity at the compression root, but an archived
+        # ancestor's rows are not part of this conversation's live history.
+        return [{**{k: v for k, v in row.items() if k != '_row_id'}, 'row_id': row['_row_id']}
+                for row in db.get_messages_as_conversation(target, include_row_ids=True)]
     read_live, display, truncated = (prepared[1] if prepared is not None and prepared[0] == target
                                      else display_rows(db, target))
     live = db.get_messages_as_conversation(target, include_row_ids=True)
