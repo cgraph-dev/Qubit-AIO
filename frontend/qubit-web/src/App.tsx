@@ -230,7 +230,7 @@ import { LatencySampler, measureLatency } from "@/lib/latency-sampler";
 function RouteFallback({ label = "Loading…" }: { label?: string }) {
   return (
     <div
-      className="flex min-h-[12rem] flex-1 items-center justify-center"
+      className="flex min-h-[60vh] w-full flex-1 items-center justify-center"
       aria-busy="true"
       aria-live="polite"
     >

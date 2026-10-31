@@ -774,17 +774,6 @@
   font: 550 .7rem/1 var(--qchat-mono);
   letter-spacing: .05em;
 }
-.qchat__activity-mark { display: inline-flex; gap: .18rem; align-items: center; }
-.qchat__activity-mark i {
-  width: .28rem;
-  height: .28rem;
-  border-radius: 0;
-  background: var(--qchat-cyan);
-  animation: qchat-pulse .9s steps(2, end) infinite alternate;
-}
-.qchat__activity-mark i:nth-child(2) { animation-delay: .15s; opacity: .65; }
-.qchat__activity-mark i:nth-child(3) { animation-delay: .3s; opacity: .35; }
-@keyframes qchat-pulse { to { opacity: 1; transform: translateY(-2px); } }
 @keyframes qchat-blink { 50% { opacity: .25; } }
 
 /* ── Composer: the ticket reader ──────────────────────────────────────── */
@@ -1004,31 +993,8 @@
   animation: none !important;
 }
 
-/* ── Loading skeletons: platform dashes ───────────────────────────────── */
+/* ── Loading marks: the Qubit atom (transcript + model panels) ────────── */
 .qchat__transcript-loading { display: flex; min-height: 100%; align-items: center; justify-content: center; padding: 1rem; }
-.qchat__transcript-skeleton { display: grid; width: min(100%, 42rem); gap: 0; }
-.qchat__skeleton-message {
-  display: grid;
-  width: 100%;
-  gap: .5rem;
-  padding: .8rem .4rem .8rem 1.15rem;
-  border: 0;
-  border-left: 1px solid var(--qchat-line);
-  border-radius: 0;
-  background: transparent;
-}
-.qchat__skeleton-message--user { border-left-color: color-mix(in srgb, var(--qchat-signal) 50%, transparent); }
-.qchat__skeleton-message > span,
-.qchat__session-skeleton-row > span,
-.qchat__model-skeleton > span {
-  display: block;
-  height: .42rem;
-  border-radius: 0;
-  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--qchat-ink) 8%, transparent) 0 4px, transparent 4px 8px);
-}
-.qchat__skeleton-message > span:first-child { width: 60%; }
-.qchat__skeleton-message > span:nth-child(2) { width: 94%; }
-.qchat__skeleton-message > span:last-child { width: 45%; }
 .qchat__sessions-skeleton { display: grid; gap: .3rem; padding: .3rem 0; }
 .qchat__session-skeleton-row {
   display: grid;
@@ -1039,23 +1005,25 @@
   border-radius: 0;
   background: transparent;
 }
+.qchat__session-skeleton-row > span {
+  display: block;
+  height: .42rem;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--qchat-ink) 8%, transparent) 0 4px, transparent 4px 8px);
+}
 .qchat__session-skeleton-row > span:first-child { width: 72%; }
 .qchat__session-skeleton-row > span:last-child { width: 42%; height: .3rem; }
 .qchat__model-skeleton {
-  display: grid;
+  display: flex;
   min-height: 3rem;
-  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: .45rem;
+  justify-content: center;
   padding: .5rem 0;
   border: 0;
   border-bottom: 1px solid var(--qchat-line);
   border-radius: 0;
   background: transparent;
 }
-.qchat__model-skeleton > span:first-child { width: 40%; grid-column: 1 / -1; height: .3rem; }
-.qchat__model-skeleton > span:nth-child(2) { width: 62%; }
-.qchat__model-skeleton > .qchat__skeleton-control { width: 3.4rem; height: 1.1rem; }
 
 /* ── Focus: red ring everywhere, consistent with the signal marker ────── */
 .qchat button, .qchat a {

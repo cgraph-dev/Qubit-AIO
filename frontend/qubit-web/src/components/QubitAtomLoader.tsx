@@ -3,6 +3,10 @@ import "./QubitAtomLoader.css";
 type QubitAtomLoaderProps = {
   label?: string;
   className?: string;
+  size?: "md" | "sm" | "inline";
+  showLabel?: boolean;
+  showBar?: boolean;
+  showCat?: boolean;
 };
 
 const ORBITS = [
@@ -18,10 +22,15 @@ function ellipsePath(rx: number, ry: number): string {
 export function QubitAtomLoader({
   label = "Loading…",
   className,
+  size = "md",
+  showLabel = true,
+  showBar = true,
+  showCat = true,
 }: QubitAtomLoaderProps) {
+  const showText = showLabel && size !== "inline";
   return (
     <div
-      className={`qatom${className ? ` ${className}` : ""}`}
+      className={`qatom qatom--${size}${className ? ` ${className}` : ""}`}
       role="status"
       aria-live="polite"
       aria-label={label}
@@ -97,6 +106,7 @@ export function QubitAtomLoader({
           />
         </svg>
 
+        {showCat && size !== "inline" ? (
         <svg className="qatom-cat" viewBox="0 0 72 52" aria-hidden="true">
           <path
             d="M7 50c0-19 12-31 29-31s29 12 29 31z"
@@ -121,12 +131,15 @@ export function QubitAtomLoader({
             strokeLinecap="round"
           />
         </svg>
+        ) : null}
       </div>
 
-      <div className="qatom-label">{label}</div>
-      <div className="qatom-bar" aria-hidden="true">
-        <span />
-      </div>
+      {showText ? <div className="qatom-label">{label}</div> : null}
+      {showText && showBar ? (
+        <div className="qatom-bar" aria-hidden="true">
+          <span />
+        </div>
+      ) : null}
     </div>
   );
 }

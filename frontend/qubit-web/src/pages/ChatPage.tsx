@@ -53,6 +53,7 @@ import {
   FRESH_CHAT_SESSION_ID,
 } from "@/components/ChatSessionList";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
+import { QubitAtomLoader } from "@/components/QubitAtomLoader";
 import { ChatToolsSummary } from "@/components/ChatToolsSummary";
 import { Markdown } from "@/components/Markdown";
 import { firstFileFromTransfer, firstImageFromClipboard } from "@/lib/chatImagePaste";
@@ -2421,21 +2422,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <div
                 data-state="loading"
                 className="qchat__transcript-loading"
-                role="status"
-                aria-label="Loading transcript"
               >
-                <div className="qchat__transcript-skeleton" aria-hidden="true">
-                  <div className="qchat__skeleton-message qchat__skeleton-message--assistant">
-                    <span /><span /><span />
-                  </div>
-                  <div className="qchat__skeleton-message qchat__skeleton-message--user">
-                    <span /><span />
-                  </div>
-                  <div className="qchat__skeleton-message qchat__skeleton-message--assistant">
-                    <span /><span />
-                  </div>
-                </div>
-                <span className="sr-only">Loading transcript…</span>
+                <QubitAtomLoader label="Loading chat…" size="sm" />
               </div>
             ) : !hasMessages && !busy ? (
               <div
@@ -2708,11 +2696,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                     className="qchat__activity"
                     aria-live="polite"
                   >
-                    <span className="qchat__activity-mark" aria-hidden="true">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
+                    <QubitAtomLoader
+                      size="inline"
+                      showLabel={false}
+                      showBar={false}
+                      showCat={false}
+                    />
                     <span>
                       {assistantActivity === "summarizing"
                         ? "Summarizing this session…"
@@ -3045,7 +3034,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               />
               <Suspense fallback={
                 <div className="qchat__model-skeleton" role="status" aria-label="Loading model controls">
-                  <span /><span /><span className="qchat__skeleton-control" />
+                  <QubitAtomLoader
+                    label="Loading model controls…"
+                    size="sm"
+                    showBar={false}
+                  />
                 </div>
               }>
                 <ChatSidebar

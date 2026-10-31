@@ -230,3 +230,42 @@
     transform: translateX(36%);
   }
 }
+
+/* Compact variants: the transcript/model panels and the inline thinking
+   indicator use the same mark at a smaller scale. */
+.qatom--sm .qatom-stage,
+.qatom--sm .qatom-svg {
+  width: 84px;
+  height: 84px;
+}
+
+.qatom--sm .qatom-cat {
+  right: -8px;
+  bottom: -14px;
+  width: 36px;
+  height: 26px;
+}
+
+.qatom--sm .qatom-stage::before {
+  inset: -14px;
+}
+
+.qatom--inline {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.qatom--inline .qatom-stage,
+.qatom--inline .qatom-svg {
+  width: 18px;
+  height: 18px;
+  animation: none;
+}
+
+.qatom--inline .qatom-stage::before {
+  display: none;
+}
+
+.qatom--inline .qatom-cat {
+  display: none;
+}
