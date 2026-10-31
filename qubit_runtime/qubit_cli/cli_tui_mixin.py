@@ -1056,7 +1056,7 @@ class CLITuiMixin:
         if self._tui_cancel_foreground_ui(event, closers=(
             ("_slash_confirm_state", lambda: self._submit_slash_confirm_response("cancel")),
             ("_model_picker_state", self._close_model_picker), ("_command_palette_state", self._close_command_palette),
-            ("_plugin_command_wait", lambda: self._plugin_command_wait.set()))):
+            ("_gateway_command_wait", lambda: self._gateway_command_wait.set()))):
             return
         overlay_cleared = self._tui_clear_blocking_overlays(event)
         if overlay_cleared and not (self._agent_running and self.agent):
