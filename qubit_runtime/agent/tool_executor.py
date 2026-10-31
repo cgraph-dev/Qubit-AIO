@@ -32,6 +32,7 @@ from agent.display import (
 )
 from agent.compression_marker import _COMPRESSION_MARKER_PREFIX
 from agent.interrupt_control import _REASON_USER_INTERRUPT, interrupt_skip_wording
+from agent.message_metadata import stamp_data_use
 from agent.message_sanitization import coalesce_tool_call_id
 from agent.session_persistence import sync_rewritten_tool_rows
 from agent import plugin_live_notes
@@ -476,6 +477,7 @@ class _ManagedToolResult:
     middleware_trace: list[dict[str, Any]]
     blocked: bool
     dispatched: bool
+    data_use: frozenset[str] = frozenset()
 
 
 class _ToolTimeoutResult(str):
@@ -753,7 +755,12 @@ def _dispatch_authorized_once(
     from agent.terminal_approval_batch import prepare_current_terminal
     prepare_current_terminal(ref)
     _advance_start_order(lambda: _begin_tool_execution(agent, ref, display_index))
-    return _run_with_activity_heartbeat(agent, ref.name, lambda: execute(ref.args))
+    from tools.connectors.data_use import collect_data_use
+    with collect_data_use() as data_use:
+        try:
+            return _run_with_activity_heartbeat(agent, ref.name, lambda: execute(ref.args))
+        finally:
+            state.data_use = frozenset(data_use)
 
 
 def _run_agent_tool_execution_middleware(
@@ -1077,6 +1084,7 @@ def _commit_tool_result(
     blocked: bool,
     effect_disposition,
     observed: bool = False,
+    data_use: frozenset[str] = frozenset(),
     error_preview: Callable[[Any], Any] = lambda result: result,
     success_log_chars: Optional[int] = None,
     verbose_text: Callable[[Any], Any] = lambda result: result,
@@ -1163,6 +1171,7 @@ def _commit_tool_result(
     # are told on this new row (outside any untrusted-data wrapper).
     lsp_deferred.forward_to_agent(agent)
     plugin_live_notes.attach_to_tool_message(agent, tool_message)
+    stamp_data_use(tool_message, sorted(data_use))
     messages.append(tool_message)
     if not _flush_session_db_after_tool_progress(agent, messages, stage=f"tool result {function_name}"):
         return None
@@ -1253,6 +1262,7 @@ class _ToolOutcome:
     duration: float
     is_error: bool
     blocked: bool
+    data_use: frozenset[str] = frozenset()
 
 
 def _start_order_gate_timeout(batch_timeout: float | None) -> float:
@@ -1345,6 +1355,7 @@ class _ConcurrentBatch:
         # propagate_context_to_thread() at the submit site below (GHSA-qg5c-hvr5-hjgr, #13617).
         start = time.time()
         blocked = dispatched = False
+        data_use: frozenset[str] = frozenset()
         try:
             managed = _run_agent_tool_execution_middleware(
                 agent,
@@ -1363,7 +1374,7 @@ class _ConcurrentBatch:
                 authorization_gate=self.authorization_gate,
             )
             result, ref.args, ref.trace = managed.result, managed.args, managed.middleware_trace
-            blocked, dispatched = managed.blocked, managed.dispatched
+            blocked, dispatched, data_use = managed.blocked, managed.dispatched, managed.data_use
         except _BatchAbandoned:
             logger.info("tool %s abandoned at start-order gate; skipping dispatch", ref.name)
             return None
@@ -1373,7 +1384,7 @@ class _ConcurrentBatch:
             result = ref.emit_cancelled(agent, start)
             duration = time.time() - start
             logger.info("tool %s cancelled (%.2fs)", ref.name, duration)
-            return _ToolOutcome(ref, result, duration, True, False)
+            return _ToolOutcome(ref, result, duration, True, False, data_use)
         except Exception as tool_error:
             result = f"Error executing tool '{ref.name}': {tool_error}"
             logger.error("_invoke_tool raised for %s: %s", ref.name, tool_error, exc_info=True)
@@ -1388,7 +1399,7 @@ class _ConcurrentBatch:
             logger.info(
                 "tool %s completed (%.2fs, %d chars)", ref.name, duration, result_chars
             )
-        return _ToolOutcome(ref, result, duration, is_error, blocked)
+        return _ToolOutcome(ref, result, duration, is_error, blocked, data_use)
 
     def run_worker(self, index: int, start_order: int) -> None:
         """Worker function executed in a thread."""
@@ -1559,6 +1570,7 @@ def _append_batch_results(agent, messages: list, effective_task_id: str, batch: 
             agent, messages, ref, function_result,
             budget=budget, tool_duration=tool_duration, is_error=is_error, blocked=blocked,
             effect_disposition=effect_disposition, observed=r is not None,
+            data_use=r.data_use if r is not None else frozenset(),
             error_preview=lambda res: _multimodal_text_summary(res)[:200],
         )
         if committed is None:
@@ -1834,6 +1846,7 @@ def _publish_sequential_result(agent, messages: list, ref: _ToolCallRef, managed
         agent, messages, ref, function_result,
         budget=budget, tool_duration=tool_duration, is_error=_is_error_result, blocked=managed.blocked,
         effect_disposition="unknown" if _execution_timed_out else None, observed=True,
+        data_use=managed.data_use,
         error_preview=lambda res: res[:200] if isinstance(res, str) and not agent.verbose_logging else res,
         success_log_chars=_result_len,
         verbose_text=_multimodal_text_summary,
