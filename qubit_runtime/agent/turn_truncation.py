@@ -86,6 +86,11 @@ def collapse_continuation_trail(
     partial = agent._strip_think_blocks(
         _join_truncated_parts(join_parts)
     ).strip()
+    if partial and getattr(agent, "_hold_stream", False) is True:
+        # A held turn showed none of these fragments: the stitched text reaches the user and the
+        # stored row only through the turn's transform snapshot (fail closed: the withheld notice).
+        from agent.turn_finalizer import apply_llm_output_transform
+        partial, _, _ = apply_llm_output_transform(agent, partial, turn_id=getattr(agent, "_current_turn_id", "") or "")
     if partial:
         append_message(messages, {"role": "assistant", "content": partial, "finish_reason": finish_reason})
     agent._session_messages = messages

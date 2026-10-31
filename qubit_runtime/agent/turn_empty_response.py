@@ -313,23 +313,3 @@ def recover_empty_response(
     _turn_exit_reason = "empty_response_exhausted"
     final_response = _terminal_empty(agent, assistant_message, finish_reason, messages)
     return _verdict("break")
-
-
-def housekeeping_reply_line(agent: Any) -> Optional[str]:
-    """The line written beside a housekeeping-only tool round (think blocks stripped), the turn's
-    reply when the follow-up adds nothing; None when there is none (substantive tools mean it was
-    narration)."""
-    fallback = getattr(agent, '_last_content_with_tools', None)
-    if not (fallback and getattr(agent, '_last_content_tools_all_housekeeping', False)):
-        return None
-    return _sanitize_surrogates(agent._strip_think_blocks(fallback).strip())
-
-
-def take_housekeeping_reply_line(agent: Any) -> Optional[str]:
-    """Consume ``housekeeping_reply_line`` as the turn's final response."""
-    final_response = housekeeping_reply_line(agent)
-    if final_response is None:
-        return None
-    agent._last_content_with_tools = None
-    agent._last_content_tools_all_housekeeping = False
-    return final_response
