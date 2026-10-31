@@ -432,7 +432,6 @@ _LANDS_IN_SIBLING_PR: dict[str, str] = {
     # keeps routing their lanes for the fixture; the consumers land with the apps port.
     "apps/bootstrap-installer/src-tauri/src/marker_tests.rs": "apps update-marker port not in this tree",
     "apps/desktop/electron/update-marker-corpus.test.ts": "apps update-marker port not in this tree",
-    "apps/desktop/electron/remote-update-marker-programs.test.ts": "apps update-marker port not in this tree",
     "apps/desktop/electron/remote-lifecycle-v2-marker.test.ts": "apps update-marker port not in this tree",
 }  # #132345 and #132354 landed
 

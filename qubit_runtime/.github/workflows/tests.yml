@@ -191,6 +191,15 @@ jobs:
         run: |
           "$HERMES_PYTHON" -c "import sqlite3, qubit_state_wal as w; print('sqlite', sqlite3.sqlite_version); assert not w.is_sqlite_wal_reset_vulnerable()"
 
+      - name: Install tmux
+        # tests/e2e/core/cli_tmux and the Vertex /bg CLI suite drive real CLIs in tmux. The runner
+        # image ships it today; install it if it ever stops, and require_tmux() fails (not skips)
+        # without it under HERMES_E2E_REQUIRE_TUI=1, so the lane can't go green over zero coverage.
+        run: |
+          set -euo pipefail
+          command -v tmux >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq tmux; }
+          tmux -V
+
       - name: Run messaging-gated gateway cases
         # These gateway files drive the REAL Discord/Telegram SDKs and skip when the
         # `messaging` extra is absent, which it is in the ordinary `test` slices; this is

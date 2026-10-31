@@ -156,7 +156,7 @@ _SCAN_FILES = {"setup.cfg", "pyproject.toml"}
 # (the .rs/Cargo files are the ``rust`` lane's job). Changes here get the
 # bootstrap-installer.yml lane — a real sandboxed install + stamp check.
 _BOOTSTRAP_PATHS = ("apps/bootstrap-installer/",)
-_BOOTSTRAP_FILES = {"scripts/install.sh", "setup-qubit.sh"}
+_BOOTSTRAP_FILES = {"scripts/install.sh", "setup-qubit.sh", "setup-hermes.sh"}
 # Windows desktop-update hand-off (scripts/desktop-update/windows.ps1 + the
 # Electron side that launches it) and the pytest files that spawn it.
 # tests/_fixtures/ holds the conftest's platform gating, so it re-arms the lane too.
@@ -448,6 +448,7 @@ _E2E_LANES: dict[str, tuple[str, ...]] = {
         "pm/",
         "scripts/install.",
         "setup-qubit.sh",
+        "setup-hermes.sh",
         "qubit_cli/update_",
         "qubit_cli/_update_",
         "qubit_cli/old_updater",
@@ -501,6 +502,7 @@ _E2E_LANES: dict[str, tuple[str, ...]] = {
         "apps/desktop/electron/desktop-installation",
         "apps/desktop/electron/backend-discovery",
         "apps/desktop/electron/host-backend-attach",
+        "apps/desktop/electron/local-gateway",  # gateway ensure: code_sha vs checkout, restart on skew
         "apps/desktop/electron/bundle-swap",
         "apps/desktop/electron/app-installer-file",
         "scripts/desktop-update/",

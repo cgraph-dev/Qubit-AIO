@@ -89,6 +89,7 @@ jobs:
       e2e_desktop_update: ${{ steps.gate-lanes.outputs.e2e_desktop_update }}
       rust: ${{ steps.gate-lanes.outputs.rust }}
       catalog: ${{ steps.gate-lanes.outputs.catalog }}
+      remote_backends: ${{ steps.gate-lanes.outputs.remote_backends }}
       docker_meta: ${{ steps.gate-lanes.outputs.docker_meta }}
       mcp_catalog: ${{ steps.gate-lanes.outputs.mcp_catalog }}
       ci_review: ${{ steps.classify.outputs.ci_review }}
@@ -241,6 +242,16 @@ jobs:
     with:
       commit: ${{ inputs.commit }}
 
+  remote-backends:
+    name: Remote terminal backends
+    needs: detect
+    # The SSH and Docker terminal backends against a real sshd container and the
+    # runner's Docker daemon. Only PRs that touch the backends / terminal tool /
+    # their real tests start it (and every push to main); it runs in parallel with
+    # the other lanes and is required whenever detect selects it.
+    if: needs.detect.outputs.remote_backends == 'true'
+    uses: ./.github/workflows/remote-backends.yml
+
   contributor-check:
     name: Check contributors
     needs: detect
@@ -342,6 +353,7 @@ jobs:
       - js-tests
       - rust-tests
       - catalog-tests
+      - remote-backends
       - bootstrap-installer
       - e2e-desktop
       - e2e-desktop-update
