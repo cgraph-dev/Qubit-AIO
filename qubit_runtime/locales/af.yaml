@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "Vir volledige loglae, gebruik `qubit debug share` vanaf die CLI."
     share_hint: "Deel hierdie skakels met die Qubit-span vir ondersteuning."
     report_label: "Verslag"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Opdrag geweier (goedkeuring was verouderd)."
     no_pending: "Geen hangende opdrag om te weier nie."
@@ -663,6 +664,7 @@ gateway:
     skip_hint: 'Antwoord "skip" om hierdie vraag oor te slaan.'
   errors:
     rate_limited: "⏱️ Die KI-modeldiens beperk tans die tempo van versoeke. Wag 'n oomblik en gebruik dan /retry."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ Aanmelding by die KI-modeldiens het misluk. Gebruik /login om weer aan te meld, of vra die persoon wat hierdie bot bedryf om `qubit doctor` op die gasheer uit te voer."
     bad_request: "⚠️ Die KI-modeldiens het hierdie versoek verwerp. Probeer jou boodskap anders formuleer, of gebruik /model om modelle te wissel."
     connection_interrupted: "⚠️ Die verbinding met die KI-modeldiens is halfpad deur die versoek onderbreek — gewoonlik tydelik. Gebruik /retry om weer te probeer; as dit aanhou gebeur, voer `qubit doctor` op die gasheer uit."

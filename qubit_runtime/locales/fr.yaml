@@ -193,6 +193,7 @@ gateway:
     full_logs_hint: "Pour envoyer les journaux complets, utilisez `qubit debug share` depuis la CLI."
     share_hint: "Partagez ces liens avec l'équipe Qubit pour obtenir de l'aide."
     report_label: "Rapport"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Commande refusée (l'approbation était périmée)."
     no_pending: "Aucune commande en attente de refus."
@@ -772,6 +773,7 @@ gateway:
     skip_hint: 'Répondez « skip » pour passer cette question.'
   errors:
     rate_limited: "⏱️ Le service de modèle IA limite le débit des requêtes. Patientez un instant, puis utilisez /retry."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ La connexion au service de modèle IA a échoué. Utilisez /login pour vous reconnecter, ou demandez à la personne qui gère ce bot de lancer `qubit doctor` sur l'hôte."
     bad_request: "⚠️ Le service de modèle IA a rejeté cette requête. Essayez de reformuler votre message, ou utilisez /model pour changer de modèle."
     connection_interrupted: "⚠️ La connexion au service de modèle IA a été interrompue en cours de requête — c'est généralement passager. Utilisez /retry pour réessayer ; si cela se reproduit, lancez `qubit doctor` sur l'hôte."

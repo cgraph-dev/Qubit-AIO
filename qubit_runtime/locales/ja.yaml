@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "完全なログのアップロードには、CLI から `qubit debug share` を使用してください。"
     share_hint: "サポートを受けるには、このリンクを Qubit チームに共有してください。"
     report_label: "レポート"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ コマンドを拒否しました (承認は期限切れでした)。"
     no_pending: "拒否待ちのコマンドはありません。"
@@ -663,6 +664,7 @@ gateway:
     skip_hint: 'この質問をスキップするには「skip」と返信してください。'
   errors:
     rate_limited: "⏱️ AI モデルサービスがリクエストをレート制限しています。少し待ってから /retry を使ってください。"
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ AI モデルサービスへのサインインに失敗しました。/login で再度サインインするか、このボットの運用者にホストで `qubit doctor` を実行するよう依頼してください。"
     bad_request: "⚠️ AI モデルサービスがこのリクエストを拒否しました。メッセージの言い回しを変えるか、/model でモデルを切り替えてください。"
     connection_interrupted: "⚠️ AI モデルサービスへの接続がリクエスト中に途切れました — 通常は一時的なものです。/retry で再試行し、繰り返す場合はホストで `qubit doctor` を実行してください。"

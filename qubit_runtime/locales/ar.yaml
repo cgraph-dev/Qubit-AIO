@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "لرفع السجلات الكاملة، استخدم `qubit debug share` من واجهة الأوامر."
     share_hint: "شارك هذه الروابط مع فريق Qubit للحصول على الدعم."
     report_label: "تقرير"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ رُفض الأمر (الموافقة كانت قديمة)."
     no_pending: "لا يوجد أمر معلّق لرفضه."
@@ -663,6 +664,7 @@ gateway:
     skip_hint: 'رُدّ بـ "skip" لتخطي هذا السؤال.'
   errors:
     rate_limited: "⏱️ خدمة نموذج الذكاء الاصطناعي تحدّ من معدّل الطلبات. انتظر قليلًا، ثم استخدم /retry."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ فشل تسجيل الدخول إلى خدمة نموذج الذكاء الاصطناعي. استخدم /login لتسجيل الدخول مجددًا، أو اطلب ممّن يدير هذا البوت تشغيل `qubit doctor` على المضيف."
     bad_request: "⚠️ رفضت خدمة نموذج الذكاء الاصطناعي هذا الطلب. جرّب إعادة صياغة رسالتك، أو استخدم /model لتبديل النموذج."
     connection_interrupted: "⚠️ انقطع الاتصال بخدمة نموذج الذكاء الاصطناعي أثناء الطلب — وهو أمر عابر عادةً. استخدم /retry لإعادة المحاولة؛ وإن تكرّر، شغّل `qubit doctor` على المضيف."

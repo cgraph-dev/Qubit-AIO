@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "Tam günlük yüklemeleri için CLI'dan `qubit debug share` kullanın."
     share_hint: "Destek için bu bağlantıları Qubit ekibiyle paylaşın."
     report_label: "Rapor"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Komut reddedildi (onay geçersizdi)."
     no_pending: "Reddedilecek bekleyen komut yok."
@@ -663,6 +664,7 @@ gateway:
     skip_hint: 'Bu soruyu atlamak için "skip" yazın.'
   errors:
     rate_limited: "⏱️ Yapay zekâ model servisi istekleri hız sınırlamasına tabi tutuyor. Biraz bekleyin, ardından /retry kullanın."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ Yapay zekâ model servisine giriş başarısız oldu. Yeniden giriş yapmak için /login kullanın veya bu botu işleten kişiden ana makinede `qubit doctor` çalıştırmasını isteyin."
     bad_request: "⚠️ Yapay zekâ model servisi bu isteği reddetti. Mesajınızı farklı ifade etmeyi deneyin veya model değiştirmek için /model kullanın."
     connection_interrupted: "⚠️ Yapay zekâ model servisiyle bağlantı istek sırasında kesildi — genellikle geçicidir. Yeniden denemek için /retry kullanın; tekrarlarsa ana makinede `qubit doctor` çalıştırın."

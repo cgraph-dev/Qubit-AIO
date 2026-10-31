@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "Für vollständige Log-Uploads verwenden Sie `qubit debug share` aus der CLI."
     share_hint: "Teilen Sie diese Links mit dem Qubit-Team, um Unterstützung zu erhalten."
     report_label: "Bericht"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Befehl abgelehnt (Genehmigung war veraltet)."
     no_pending: "Kein ausstehender Befehl zum Ablehnen."
@@ -663,6 +664,7 @@ gateway:
     skip_hint: 'Antworte mit „skip“, um diese Frage zu überspringen.'
   errors:
     rate_limited: "⏱️ Der KI-Modelldienst begrenzt derzeit die Anfragerate. Warten Sie einen Moment und verwenden Sie dann /retry."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ Die Anmeldung beim KI-Modelldienst ist fehlgeschlagen. Verwenden Sie /login, um sich erneut anzumelden, oder bitten Sie den Betreiber dieses Bots, `qubit doctor` auf dem Host auszuführen."
     bad_request: "⚠️ Der KI-Modelldienst hat diese Anfrage abgelehnt. Formulieren Sie Ihre Nachricht um oder wechseln Sie das Modell mit /model."
     connection_interrupted: "⚠️ Die Verbindung zum KI-Modelldienst wurde während der Anfrage unterbrochen — meist nur vorübergehend. Versuchen Sie es mit /retry erneut; falls es weiterhin passiert, führen Sie `qubit doctor` auf dem Host aus."

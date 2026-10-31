@@ -170,6 +170,7 @@ gateway:
     full_logs_hint: "Teljes naplók feltöltéséhez használd a `qubit debug share` parancsot a CLI-ből."
     share_hint: "Oszd meg ezeket a hivatkozásokat a Qubit csapattal támogatásért."
     report_label: "Jelentés"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Parancs elutasítva (a jóváhagyás elavult)."
     no_pending: "Nincs elutasítható függőben lévő parancs."
@@ -673,6 +674,7 @@ gateway:
     skip_hint: 'Válaszolj „skip” szóval a kérdés kihagyásához.'
   errors:
     rate_limited: "⏱️ Az AI-modellszolgáltatás korlátozza a kérések számát. Várj egy kicsit, majd használd a /retry parancsot."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ Nem sikerült bejelentkezni az AI-modellszolgáltatásba. Jelentkezz be újra a /login paranccsal, vagy kérd meg a bot üzemeltetőjét, hogy futtassa a `qubit doctor` parancsot a gépen."
     bad_request: "⚠️ Az AI-modellszolgáltatás visszautasította ezt a kérést. Fogalmazd át az üzenetet, vagy válts modellt a /model paranccsal."
     connection_interrupted: "⚠️ Az AI-modellszolgáltatással a kapcsolat megszakadt a kérés közben — ez általában átmeneti. Próbáld újra a /retry paranccsal; ha ismétlődik, futtasd a `qubit doctor` parancsot a gépen."

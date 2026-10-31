@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "如需上传完整日志，请在 CLI 中使用 `qubit debug share`。"
     share_hint: "请将这些链接分享给 Qubit 团队以获得支持。"
     report_label: "报告"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ 命令已拒绝（批准已过期）。"
     no_pending: "没有待拒绝的命令。"
@@ -663,6 +664,7 @@ gateway:
     skip_hint: '回复“skip”即可跳过此问题。'
   errors:
     rate_limited: "⏱️ AI 模型服务正在限流。请稍等片刻，然后使用 /retry。"
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ 登录 AI 模型服务失败。请使用 /login 重新登录，或请运行此机器人的人在主机上执行 `qubit doctor`。"
     bad_request: "⚠️ AI 模型服务拒绝了此请求。请尝试换种说法，或用 /model 切换模型。"
     connection_interrupted: "⚠️ 与 AI 模型服务的连接在请求过程中中断——通常是暂时性的。使用 /retry 重试；如果反复出现，请在主机上运行 `qubit doctor`。"

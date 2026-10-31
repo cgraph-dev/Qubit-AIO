@@ -167,6 +167,7 @@ gateway:
     full_logs_hint: "Щоб завантажити повні журнали, використайте `qubit debug share` з CLI."
     share_hint: "Поділіться цими посиланнями з командою Qubit для отримання підтримки."
     report_label: "Звіт"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Команду відхилено (схвалення застаріло)."
     no_pending: "Немає команди для відхилення."
@@ -663,6 +664,7 @@ gateway:
     skip_hint: 'Відповідайте «skip», щоб пропустити це питання.'
   errors:
     rate_limited: "⏱️ Сервіс AI-моделі обмежує частоту запитів. Зачекайте трохи, а потім скористайтеся /retry."
+    cron_session_read_only: "This is a scheduled job's session. It only runs its own scheduled job. Start a new chat to send a message."
     auth_failed: "⚠️ Не вдалося ввійти в сервіс AI-моделі. Скористайтеся /login, щоб увійти знову, або попросіть того, хто адмініструє цього бота, виконати `qubit doctor` на хості."
     bad_request: "⚠️ Сервіс AI-моделі відхилив цей запит. Спробуйте переформулювати повідомлення або скористайтеся /model, щоб змінити модель."
     connection_interrupted: "⚠️ З'єднання із сервісом AI-моделі обірвалося посеред запиту — зазвичай це тимчасово. Скористайтеся /retry, щоб повторити; якщо повторюється, виконайте `qubit doctor` на хості."
