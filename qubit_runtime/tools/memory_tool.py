@@ -258,8 +258,6 @@ def _memory_tool(action, target, content, old_text, new_text, operations, store)
     if operations:
         if not isinstance(operations, list):
             return _invalid("operations must be a list of {action, content?, old_text?} objects.")
-        if any(isinstance(op, dict) and op.get("action") == "replace" for op in operations):
-            return _invalid(_REPLACE_REMOVED)
         denied = _background_delete_gate(store, action, operations, target)
         if denied is not None:
             return "rejected", denied
@@ -277,10 +275,8 @@ def _memory_tool(action, target, content, old_text, new_text, operations, store)
             "Missing required parameter: 'operations', a list of {action: add/patch/remove, "
             "content?, old_text?} changes; a single change is a one-item list."
         )
-    if action == "replace":
-        return _invalid(_REPLACE_REMOVED)
     if action not in _STORE_ACTIONS:
-        return _invalid(f"Unknown action '{action}'. Use: add, patch, remove")
+        return _invalid(f"Unknown action '{action}'. Use: add, replace, patch, remove")
     invalid = (_validate_single_op(store, action, target, content, old_text)
                or _background_delete_gate(store, action, None, target, content, old_text)
                or _apply_write_gate(store, action, target, content, old_text))

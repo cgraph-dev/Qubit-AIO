@@ -67,7 +67,6 @@ copilot = CopilotProfile(
     message_carrier_opaque="reasoning_opaque", message_carrier_text="reasoning_text",
     replays_tool_call_signatures=True,
     # Copilot API host family (individual, business, enterprise) plus GitHub Models.
-    hostnames=("githubcopilot.com", "models.github.ai"),
     metadata_hostnames=("models.inference.ai.azure.com",),
     # The backend binds replayed Responses item ids to a connection: a stale id 401s even when short
     # (#32716). It also has no prompt cache key and no server-side compaction.
