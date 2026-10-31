@@ -5474,7 +5474,8 @@ def _cmd_stop(args):
     elif stop_profile_gateway():
         print("✓ Stopped gateway for this profile")
     else:
-        print("✗ No gateway running for this profile")
+        from qubit_cli.gateway_profile_lifecycle import report_profile_stop_failure
+        report_profile_stop_failure()
 
 
 def _stop_host_multiplexer(owner) -> int:
