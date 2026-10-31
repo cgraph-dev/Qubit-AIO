@@ -1826,15 +1826,9 @@ def _runtime_model_config(agent, existing: dict | None = None) -> dict:
     config = dict(existing or {})
     agent = session_runtime_view(agent)
     attr = lambda k: str(getattr(agent, k, "") or "").strip()
-    model, provider, base_url = attr("model"), attr("provider"), attr("base_url")
-    if provider.lower() == "custom":
-        # ``agent.provider`` resolves every named custom entry to the literal "custom", losing the entry
-        # identity (api_key is never persisted): recover ``custom:<name>`` from the endpoint URL.
-        try:
-            from qubit_cli.runtime_provider import canonical_custom_identity
-            provider = canonical_custom_identity(base_url=base_url, model=model or None) or provider
-        except Exception:
-            logger.debug("custom provider identity lookup failed", exc_info=True)
+    model, base_url = attr("model"), attr("base_url")
+    from qubit_cli.runtime_provider_custom import session_provider_identity
+    provider = session_provider_identity(attr("provider"), attr("requested_provider"), base_url, model)
     reasoning_config = getattr(agent, "reasoning_config", None)
     live = {
         "model": model, "provider": provider, "base_url": base_url, "api_mode": attr("api_mode"),
@@ -2459,8 +2453,10 @@ def _live_session_identity(session: dict) -> tuple[str, str]:
     override = session.get("model_override") or {}
     model = (str(pending.get("display_model") or "").strip() or mirror.get("model")
              or getattr(agent, "model", "") or override.get("model"))
+    agent_provider = getattr(agent, "provider", "")
+    agent_provider = _scoped_session_provider(agent, session) if agent_provider == "custom" else agent_provider
     provider = (str(pending.get("display_provider") or "").strip() or mirror.get("provider")
-                or getattr(agent, "provider", "") or override.get("provider"))
+                or agent_provider or override.get("provider"))
     default = ("", "") if model else _session_default_route(session)
     return str(model or default[0]), str(provider or default[1])
 
@@ -2513,10 +2509,7 @@ def _session_info(agent, session: dict | None = None) -> dict:
     pending_provider = str(pending_switch.get("display_provider") or "").strip()
     provider = mirror.get("provider", getattr(agent, "provider", ""))
     if provider == "custom" and "provider" not in mirror and agent is not None:
-        # Clients reuse this identity for new chats without carrying the endpoint or key.
-        # Broadcast/resume callers need not be bound to this session's profile.
-        with _profile_build_scope(sess.get("profile_home") or _qubit_home):
-            provider = _runtime_model_config(agent).get("provider", provider)
+        provider = _scoped_session_provider(agent, sess)
     model = pending_model or mirror.get("model", getattr(agent, "model", ""))
     # The level the route's entry clamp actually sends (== reasoning_effort when verbatim), so the
     # Desktop can say "ultra sends max on this route" like `/reasoning` does instead of presenting a
