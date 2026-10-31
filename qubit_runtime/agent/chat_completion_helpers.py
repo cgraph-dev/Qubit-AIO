@@ -1436,11 +1436,12 @@ def _build_bedrock_kwargs(agent, api_messages, tools_for_api):
 def _build_codex_kwargs(agent, api_messages, tools_for_api, reasoning_config, request_overrides, cache_scope_id):
     from agent.codex_responses_adapter import classify_responses_route
     from agent.native_compaction import native_compaction_context_management
-    is_codex_backend, is_xai_responses, is_github_responses = classify_responses_route(agent)
+    route = classify_responses_route(agent)
+    is_codex_backend, is_xai_responses, endpoint = route.is_codex_backend, route.is_xai_responses, route.endpoint
     # Native server-side compaction (gpt-5.6 on direct OpenAI / ChatGPT Codex routes
     # only) — None on every other route/model, leaving the request unchanged.
     context_management = native_compaction_context_management(agent, is_codex_backend=is_codex_backend,
-        is_xai_responses=is_xai_responses, is_github_responses=is_github_responses)
+        is_xai_responses=is_xai_responses, endpoint=endpoint)
     # xAI's /responses endpoint 400s on ``pattern``/``format`` schema keywords and on
     # ``enum`` values containing ``/`` — strip them (#27197). Deep-copy first: the
     # sanitizers mutate in place and tools_for_api aliases agent.tools (#27907).
@@ -1460,13 +1461,11 @@ def _build_codex_kwargs(agent, api_messages, tools_for_api, reasoning_config, re
         cache_scope_id=cache_scope_id, base_url=agent.base_url,
         max_tokens=ephemeral_out if ephemeral_out is not None else agent.max_tokens,
         timeout=agent._resolved_api_call_timeout(), request_overrides=request_overrides,
-        provider=getattr(agent, "provider", None), is_github_responses=is_github_responses,
+        provider=getattr(agent, "provider", None),
         is_codex_backend=is_codex_backend, is_xai_responses=is_xai_responses,
-        github_reasoning_extra=agent._github_models_reasoning_extra_body() if is_github_responses else None,
+        profile_reasoning=agent._endpoint_reasoning_payload() if endpoint.profile_reasoning else None,
         replay_encrypted_reasoning=bool(getattr(agent, "_codex_reasoning_replay_enabled", True)),
         context_management=context_management, text_verbosity=getattr(agent, "text_verbosity", None))
-
-
 
 def _build_chat_completions_kwargs(agent, api_messages, tools_for_api, reasoning_config, request_overrides, cache_scope_id):
     transport = agent._get_transport()
