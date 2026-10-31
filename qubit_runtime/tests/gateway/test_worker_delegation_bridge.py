@@ -11,6 +11,7 @@ import time
 from types import SimpleNamespace
 
 import psutil
+from qubit_cli.process_identity import worker_birth
 import pytest
 
 from qubit_state import SessionDB
@@ -38,7 +39,7 @@ def test_bridge_publishes_committed_completion_and_rejects_another_principal(tmp
         connection = SimpleNamespace(authority=authority, actor=actor)
         ref = SessionRef('profile', 'parent')
         scope = dict(profile_id='profile', session_id='parent', execution_id='worker', generation=0,
-                     pid=worker.pid, birth=psutil.Process(worker.pid).create_time(), secret='private-worker-secret')
+                     pid=worker.pid, birth=worker_birth(psutil.Process(worker.pid)), secret='private-worker-secret')
         claim = _claim(connection, ref, scope)
         register_worker_execution(db, epoch=epoch, execution_id='worker', session_id='parent', generation=0,
                                   kind='compute', adoption_secret=claim)

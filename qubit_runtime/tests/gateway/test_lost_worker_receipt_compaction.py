@@ -7,6 +7,7 @@ import sys
 from types import SimpleNamespace
 
 import psutil
+from qubit_cli.process_identity import worker_birth
 
 from qubit_state import SessionDB
 from qubit_state_runtime import (
@@ -19,7 +20,7 @@ READ = dict(target='s', include_ancestors=False, include_inactive=False, repair_
 
 
 def hello(process):
-    return {'type': 'hello', 'pid': process.pid, 'birth': psutil.Process(process.pid).create_time(), 'ancestors': [os.getpid()]}
+    return {'type': 'hello', 'pid': process.pid, 'birth': worker_birth(psutil.Process(process.pid)), 'ancestors': [os.getpid()]}
 
 
 def _receipt_sizes(db):
