@@ -327,39 +327,21 @@ def _merge_live_in_stored_order(display, live):
 
 
 def local_history(authority, ref, prepared=None):
-    """Display history of logical *ref*: every stored row the user saw, in display order.
+    """History of logical *ref*: the current physical transcript, in stored order.
 
-    A row outside the current physical transcript's active set (summarized away by a compression)
-    carries ``archived: true``: it is shown, never live, so no undo, retry or rewind may target it.
-    The rows without it are exactly the live transcript's, so a client choosing among live rows sees
-    what it saw before. That includes a micro-compaction merge (``display_metadata.model_only``): its
-    originals are the archived rows renderers show, so renderers skip the merge itself.
-
+    A local session's receipt target can move through compression or reset; the logical ref stays
+    the admission identity but the transcript is always the tip, never an archived ancestor.
     Each row carries its durable ``messages.id`` as ``row_id`` (the ``TranscriptMessage`` field
     Desktop hydration and the legacy ``session.history`` already use): a ``session.mutate`` rewind
     addresses its ``target_message_id`` by it, so a snapshot without it leaves no way to undo/retry.
-    *prepared* (``prepare_history``) is kept while every row it read as live still is; a rewind or
-    compaction since then re-reads the lineage here. When the byte budget left older archived rows out
-    (``display_rows``), the first row carries ``archived_truncated: true``.
     """
     db = authority.db
     target = transcript_target(authority, ref)
-    read_live, display, truncated = (prepared[1] if prepared is not None and prepared[0] == target
-                                     else display_rows(db, target))
-    live = db.get_messages_as_conversation(target, include_row_ids=True)
-    live_ids = {row['_row_id'] for row in live}
-    if not read_live <= live_ids:
-        read_live, display, truncated = display_rows(db, target)
-        live = db.get_messages_as_conversation(target, include_row_ids=True)
-    elif live_ids - read_live:
-        # Rows appended since the prepare count against the archive budget too (no lineage re-read).
-        display, cut = _fit_archive(live, display)
-        truncated = truncated or cut
-    rows = [{**{k: v for k, v in row.items() if k != '_row_id'}, 'row_id': row['_row_id']}
-            for row in _merge_live_in_stored_order(display, live)]
-    if truncated and rows:
-        rows[0]['archived_truncated'] = True  # earlier archived history was left out (the byte budget)
-    return rows
+    # The logical ref stays the admission identity (a compression root, a reset ancestor); the
+    # history is the current physical transcript only. An archived ancestor's rows are not part
+    # of this conversation's live history.
+    return [{**{k: v for k, v in row.items() if k != '_row_id'}, 'row_id': row['_row_id']}
+            for row in db.get_messages_as_conversation(target, include_row_ids=True)]
 
 
 def reopen_local_session(authority, ref):

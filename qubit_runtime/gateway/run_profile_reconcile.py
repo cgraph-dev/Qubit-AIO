@@ -303,10 +303,6 @@ class GatewayProfileReconcileMixin:
             if name in added:
                 logger.info("[MULTIPLEX] Now serving profile '%s' (%s adapter(s) connected; %s)", name, connected, reason)
                 result["added"].append(name)
-                # Boot runs native-row recovery once every adapter connected; a profile served
-                # after that runs the same pass on its own store now.
-                from gateway.run_runtime import recover_served_profile_native
-                await recover_served_profile_native(self, current[name])
             else:
                 logger.info("[MULTIPLEX] Re-scanned profile '%s' after config/.env change (%s adapter(s) connected)", name, connected)
                 result["rescanned"].append(name)

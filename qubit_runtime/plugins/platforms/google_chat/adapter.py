@@ -865,11 +865,27 @@ class GoogleChatAdapter(BasePlatformAdapter):
                 message.ack()
 
     async def dispatch_http_event(self, envelope: Dict[str, Any]) -> Dict[str, Any]:
+        from gateway.parked_route_refusal import ParkedRouteRefused, retryable_ingress
         prepared = self._prepare_inbound(envelope)
         if prepared is None:
             return {}
-        await self._dispatch_message(*prepared)
+        # The callback answers after this dispatch, so the delivery is not acknowledged yet: a route
+        # to a parked profile is answered retryably (Google redelivers a non-2xx), not refused in chat.
+        with retryable_ingress() as scope:
+            await self._dispatch_message(*prepared)
+        if scope.refused:
+            self._release_unadmitted(*prepared)
+            raise ParkedRouteRefused()
         return {}
+
+    def _release_unadmitted(self, msg: Dict[str, Any], envelope: Dict[str, Any]) -> None:
+        """Undo what ingress recorded for a delivery that was not admitted (its dedup claim and DM
+        thread count), so the platform's redelivery is admitted and read as the first delivery."""
+        self._dedup.discard(msg.get("name") or "")
+        space_name = (envelope.get("space") or msg.get("space") or {}).get("name") or ""
+        thread_name = (msg.get("thread") or {}).get("name") or ""
+        if space_name and thread_name:
+            self._thread_count_store.decr(space_name, thread_name)
 
     def verify_http_event_request(self, auth_header: str) -> Tuple[bool, str]:
         if not self._http_events_audience or not self._http_events_service_account_email:

@@ -133,11 +133,10 @@ class WebhookCoalescer:
     def _settle(self, group_key: str, entry: PendingEvent) -> Any:
         logger.info("[webhook] coalesce settled group=%s events=%d delivery=%s", group_key, entry.count,
                     entry.delivery_id)
-        # ``entry.superseded`` is the coalescer's own bookkeeping and is reported to the model
-        # through prompt_with_note(); _spawn_agent_run has no parameter for it, and passing one
-        # raised TypeError inside the dispatch task (silently dropping every coalesced group).
+        # ``entry.superseded`` is reported to the model through prompt_with_note() and handed to
+        # the dispatcher so a failed flush can release those delivery ids for a resend.
         return self._dispatch(entry.payload, entry.prompt_with_note(), entry.delivery_id, time.time(),
-                              **entry.dispatch_kwargs)
+                              **entry.dispatch_kwargs, superseded=entry.superseded)
 
     async def flush(self) -> None:
         """Dispatch every pending group now and wait until each run is handed to the runner, so an adapter

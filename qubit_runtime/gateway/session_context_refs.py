@@ -76,7 +76,10 @@ async def turn_references(runner, event, source, session_key, text):
     if api_text is None:
         return expanded
     rebind_api_text(event.message_id, expanded)
-    return text
+    # The expansion appends its context after the message, so that tail belongs to the stored row too.
+    head = api_text.lstrip()
+    tail = expanded[len(head):] if expanded.startswith(head) else ""
+    return f"{text}{tail}".strip() if tail else text
 
 
 async def managed_turn_text(authority, row, policy):

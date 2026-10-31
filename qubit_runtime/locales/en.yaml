@@ -170,6 +170,7 @@ gateway:
     full_logs_hint: "For full log uploads, use `qubit debug share` from the CLI."
     share_hint: "Share these links with the Qubit team for support."
     report_label: "Report"
+    local_refused: "`/debug local` keeps the report on the machine running Qubit, so it isn't available from a chat. Send `/debug` to upload the summary report."
   deny:
     stale: "❌ Command denied (approval was stale)."
     no_pending: "No pending command to deny."
