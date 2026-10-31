@@ -18,12 +18,14 @@ Test patterns for the marker emit checks adapted from PR #32375
 (@LeonSGP43) with credit.
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 from agent.context_compressor import (
     SKILL_PRUNED_MARKER_PREFIX,
     SUMMARY_PREFIX,
     ContextCompressor,
+    _collect_ghosted_skill_names,
     _extract_pruned_skill_names,
     _reinject_pruned_skill_markers,
     _skill_pruned_marker,
@@ -75,12 +77,25 @@ class TestSkillPrunedMarkerEmit:
         assert _skill_pruned_marker("docker-management") in summary
         assert "reload with skill_view(name='docker-management')" in summary
 
-    def test_small_skill_view_summary_not_marked(self):
+    def test_every_loaded_skill_view_is_marked_failed_views_are_not(self):
+        """Small skills lose their body to the stub too, so they get the marker; a failed view loaded nothing."""
         summary = _summarize_tool_result(
             "skill_view", '{"name":"docker-management"}', "x" * 1234
         )
-        assert summary == "[skill_view] name=docker-management (1,234 chars)"
-        assert SKILL_PRUNED_MARKER_PREFIX not in summary
+        assert summary == "[skill_view] name=docker-management (1,234 chars) " + _skill_pruned_marker("docker-management")
+        failed = json.dumps({"success": False, "error": "Skill 'nope' not found. " + "Available: a, b. " * 30})
+        failed_stub = _summarize_tool_result("skill_view", '{"name":"nope"}', failed)
+        assert SKILL_PRUNED_MARKER_PREFIX not in failed_stub
+        # Neither the raw failure nor its stub is listed for reload later, by the collector or the fallback summary.
+        for content in (failed, failed_stub):
+            turns = _skill_view_pair("call_nope", "nope")
+            turns[1]["content"] = content
+            assert _collect_ghosted_skill_names(turns) == []
+            assert "skill_view(name='nope')" not in _make_compressor()._build_static_fallback_summary(turns)
+        # Parallel loads on one assistant row are each listed under their own name.
+        pair_one, pair_two = _skill_view_pair("call_1", "one", 300), _skill_view_pair("call_2", "two", 300)
+        row = {**pair_one[0], "tool_calls": pair_one[0]["tool_calls"] + pair_two[0]["tool_calls"]}
+        assert _collect_ghosted_skill_names([row, pair_one[1], pair_two[1]]) == ["one", "two"]
 
     def test_marker_extractor_round_trips_the_emitted_marker(self):
         """Emit and check sides share one canonical string.
