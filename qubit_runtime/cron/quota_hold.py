@@ -22,6 +22,8 @@ from typing import Any, Dict, Optional
 
 from qubit_time import now as _qubit_now, safe_strftime
 
+from cron import extra_fire
+
 logger = logging.getLogger("cron.scheduler")
 
 # Persisted while a hold is active: ISO instant the job was parked at.
@@ -131,9 +133,12 @@ def plan_hold(
     if not blocked and not recover:
         clear_state(job)
         return False
-    if kind == "cron" and blocked:
+    if kind == "cron" and blocked and not extra_fire.queued(job):
         # Coalesce cron occurrences inside the closed window to the first legal instant after it.
-        parked = compute_next_run(schedule, window_end.isoformat()) or window_end.isoformat()
+        # A queued run-now is not an occurrence: it waits for the boundary, not the next slot.
+        parked = compute_next_run(
+            schedule, window_end.isoformat(), timezone=job.get("timezone")
+        ) or window_end.isoformat()
     else:
         parked = window_end.isoformat()
     if recover:
@@ -141,7 +146,7 @@ def plan_hold(
         job[SCHEDULE_EXPR_KEY] = schedule.get("expr")
     else:
         job.pop(SCHEDULE_EXPR_KEY, None)
-    job["next_run_at"] = parked
+    extra_fire.reschedule(job, parked)
     job[STATE_KEY] = parked
     logger.warning(
         "Job '%s': provider usage window closed for %.0fs — holding fires until %s instead of "
