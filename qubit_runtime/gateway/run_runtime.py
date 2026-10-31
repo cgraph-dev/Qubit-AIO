@@ -514,18 +514,6 @@ def _recover_published_api_turns(runner, authority):
         recover_authority_api_turns(api, authority)
 
 
-async def recover_served_profile_native(runner, home):
-    """A profile served after boot (a control-socket rescan) runs the boot recovery steps on its own
-    store: queued API turns now that the launch API adapter is published, and queued native rows in
-    every serving ledger once its adapters connected."""
-    from gateway.session_authorities import authority_for_home, owner_scope
-    authority = authority_for_home(runner, home)
-    if authority is not None:
-        with owner_scope(authority):
-            _recover_published_api_turns(runner, authority)
-    await recover_served_native_rows(runner)
-
-
 async def recover_served_native_rows(runner):
     """Boot's native-row recovery once hot-served profiles' adapters connected (boot runs it after
     every adapter connects), in every serving ledger: a ``bot_profile`` route runs a bot's messages
