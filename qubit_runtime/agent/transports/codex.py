@@ -326,7 +326,8 @@ def _resolve_reasoning(model: str, params: dict[str, Any]) -> tuple[Any, bool]:
         if not (is_codex_backend or _is_openai_api_origin(base_url)):
             declared = _profile_declared_efforts(params.get("provider"), model, base_url)
         supported = declared if declared is not None else _codex_efforts_for_route(
-            model, base_url, is_codex_backend=is_codex_backend)
+            model, base_url, is_codex_backend=is_codex_backend,
+            is_github_responses=params.get("is_github_responses") is True)
         if not supported:
             return None, False
     if not reasoning_enabled:
@@ -387,7 +388,8 @@ def _is_official_openai_responses_route(model: Any, base_url: Any) -> bool:
     return is_astra_model(model) and _is_openai_api_origin(base_url)
 
 
-def _codex_efforts_for_route(model: Any, base_url: Any, *, is_codex_backend: bool = False) -> tuple[str, ...]:
+def _codex_efforts_for_route(model: Any, base_url: Any, *, is_codex_backend: bool = False,
+                            is_github_responses: bool = False) -> tuple[str, ...]:
     """Effort vocabulary for a Responses route; ``()`` when the model takes no ``reasoning`` field at all.
 
     Keeps Astra's new vocabulary off unrelated Responses-compatible endpoints, and sends nothing for the
@@ -400,7 +402,7 @@ def _codex_efforts_for_route(model: Any, base_url: Any, *, is_codex_backend: boo
         if openai_model_rejects_reasoning(str(model or "")):
             return ()
     if is_astra_model(model) and not (
-        is_codex_backend or _is_official_openai_responses_route(model, base_url)
+        is_codex_backend or is_github_responses or _is_official_openai_responses_route(model, base_url)
     ):
         return CODEX_LEGACY_EFFORTS
     return codex_supported_efforts(str(model or ""))
@@ -596,6 +598,7 @@ def _sends_all_turns(model: Any, params: dict[str, Any]) -> bool:
 def _reasoning_fields(
     model: str, params: dict[str, Any], *, effort: Any, enabled: bool, replay_encrypted_reasoning: bool,
     is_xai_responses: bool, profile_reasoning: bool, all_turns: bool = False,
+    is_github_responses: bool = False,
 ) -> dict[str, Any]:
     """``reasoning`` / ``include`` request fields for the endpoint family.
 
@@ -615,13 +618,16 @@ def _reasoning_fields(
         if grok_supports_reasoning_effort(model):
             fields["reasoning"] = {"effort": effort}
     elif enabled:
-        if profile_reasoning:
+        if is_github_responses:
+            if params.get("github_reasoning_extra") is not None:
+                fields["reasoning"] = {**params["github_reasoning_extra"], "summary": "auto"}
+        elif profile_reasoning:
             if params.get("profile_reasoning") is not None:
                 fields["reasoning"] = {**params["profile_reasoning"], "summary": "auto"}
         else:
             fields["reasoning"] = {"effort": effort, "summary": "auto", **({"context": "all_turns"} if all_turns else {})}
             fields["include"] = include
-    elif not profile_reasoning and not is_xai_responses:
+    elif not profile_reasoning and not is_xai_responses and not is_github_responses:
         fields["include"] = []
         if effort == "none":
             fields["reasoning"] = {"effort": "none"}
@@ -697,7 +703,7 @@ class ResponsesApiTransport(ProviderTransport):
         endpoint = kwargs.get("endpoint") or responses_endpoint_quirks(kwargs.get("base_url"))
         return _chat_messages_to_responses_input(
             messages, is_xai_responses=kwargs.get("is_xai_responses") is True,
-            drop_replay_item_ids=not endpoint.replay_item_ids,
+            drop_replay_item_ids=kwargs.get("is_github_responses") is True or not endpoint.replay_item_ids,
             replay_encrypted_reasoning=bool(kwargs.get("replay_encrypted_reasoning", True)),
             current_issuer_kind=self._resolve_issuer_kind(kwargs, endpoint),
             current_issuer_model=self._last_issuer_model,
@@ -749,6 +755,7 @@ class ResponsesApiTransport(ProviderTransport):
         endpoint = responses_endpoint_quirks(params.get("base_url"))
         is_codex_backend = params.get("is_codex_backend") is True
         is_xai_responses = params.get("is_xai_responses") is True
+        is_github_responses = params.get("is_github_responses") is True
         # Foundry 400s on encrypted-reasoning replay only in the post-tool follow-up turn.
         replay_encrypted_reasoning = bool(params.get("replay_encrypted_reasoning", True)) and not (
             _is_azure_foundry_responses(params) and _is_post_tool_replay(payload_messages)
@@ -779,6 +786,7 @@ class ResponsesApiTransport(ProviderTransport):
                 payload_messages, is_xai_responses=is_xai_responses, endpoint=endpoint,
                 replay_encrypted_reasoning=replay_encrypted_reasoning, base_url=params.get("base_url"),
                 is_codex_backend=is_codex_backend, context_management=context_management, model=wire_model,
+                is_github_responses=is_github_responses,
             ),
             "store": False,
         }
@@ -797,7 +805,7 @@ class ResponsesApiTransport(ProviderTransport):
         cache_key = _content_cache_key(instructions, response_tools, _cache_scope) or _cache_scope
         # xAI takes prompt_cache_key in extra_body (below); endpoints declaring
         # ``responses_prompt_cache_key=False`` opt out entirely.
-        if endpoint.prompt_cache_key and not is_xai_responses and cache_key:
+        if endpoint.prompt_cache_key and not is_xai_responses and not is_github_responses and cache_key:
             kwargs["prompt_cache_key"] = cache_key
 
         cache_retention = _default_prompt_cache_retention_for_request(model, params.get("base_url"))
@@ -812,6 +820,7 @@ class ResponsesApiTransport(ProviderTransport):
             replay_encrypted_reasoning=replay_encrypted_reasoning,
             is_xai_responses=is_xai_responses, profile_reasoning=endpoint.profile_reasoning,
             all_turns=self._last_sent_all_turns,
+            is_github_responses=params.get("is_github_responses") is True,
         ))
         # agent.text_verbosity -> top-level ``text.verbosity`` (#20203). Unset sends nothing;
         # xAI's /responses rejects unknown top-level fields, same as service_tier below.

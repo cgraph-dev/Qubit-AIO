@@ -67,7 +67,7 @@ class CredentialPoolModelCooldownMixin:
 
         if not model:
             return False
-        if failure_reason == "model_entitlement":
+        if failure_reason in ("model_entitlement", FAILURE_REASON_USAGE_WINDOW):
             return True
         return (
             self.provider == "anthropic" and status_code == 429

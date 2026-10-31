@@ -739,16 +739,18 @@ def _bedrock_converse_call(api_kwargs: dict, *, stream: bool, on_stream_denied=N
     event stream; non-streaming an OpenAI-shaped SimpleNamespace."""
     from agent.bedrock_adapter import (_get_bedrock_runtime_client, invalidate_runtime_client,
         is_stale_connection_error, is_streaming_access_denied_error, normalize_converse_response,
-        recover_from_cache_point_rejection)
+        recover_from_cache_point_rejection, recover_from_redacted_reasoning_rejection)
     region = api_kwargs.pop("__bedrock_region__", "us-east-1")
     api_kwargs.pop("__bedrock_converse__", None)
-    client = _get_bedrock_runtime_client(region)
+    client = _get_bedrock_runtime_client(region, api_kwargs.get("modelId"))
     method = client.converse_stream if stream else client.converse
     finish = (lambda raw: raw.get("stream", [])) if stream else normalize_converse_response
     try:
         raw_response = method(**api_kwargs)
     except Exception as exc:
         retry_kwargs = recover_from_cache_point_rejection(exc, api_kwargs)
+        if retry_kwargs is None:
+            retry_kwargs = recover_from_redacted_reasoning_rejection(exc, api_kwargs)
         if retry_kwargs is not None:
             return finish(method(**retry_kwargs))
         if on_stream_denied is not None and is_streaming_access_denied_error(exc):
@@ -1426,17 +1428,24 @@ def _build_anthropic_kwargs(agent, api_messages, tools_for_api, reasoning_config
     return _merge_nous_portal_messages_extra_body(agent, anthropic_kwargs)
 
 
-def _build_bedrock_kwargs(agent, api_messages, tools_for_api):
-    # Bedrock Converse — the adapter converts messages/tools and calls boto3 directly.
+def _build_bedrock_kwargs(agent, api_messages, tools_for_api, reasoning_config=None):
+    # Bedrock Converse — the adapter converts messages/tools and calls boto3 directly. The
+    # request-shape snapshot pins no ``additionalModelRequestFields`` on this wire; reasoning is
+    # carried by the adapter's own model contract (BedrockTransport.build_kwargs), not injected here.
     return agent._get_transport().build_kwargs(model=agent.model, messages=api_messages, tools=tools_for_api,
         max_tokens=agent.max_tokens, region=getattr(agent, "_bedrock_region", None) or "us-east-1",
         guardrail_config=getattr(agent, "_bedrock_guardrail_config", None))
 
 
 def _build_codex_kwargs(agent, api_messages, tools_for_api, reasoning_config, request_overrides, cache_scope_id):
-    from agent.codex_responses_adapter import classify_responses_route
+    from agent.codex_responses_adapter import classify_responses_route, is_github_responses_route
     from agent.native_compaction import native_compaction_context_management
-    is_codex_backend, is_xai_responses, is_github_responses = classify_responses_route(agent)
+    route = classify_responses_route(agent)
+    is_codex_backend, is_xai_responses = route.is_codex_backend, route.is_xai_responses
+    # GitHub Copilot / GitHub Models is a distinct Responses wire (verbatim reasoning payload,
+    # no encrypted-reasoning include, replay item ids dropped). ``classify_responses_route``
+    # carries endpoint quirks, not this flag, so derive it from the provider/host identity.
+    is_github_responses = is_github_responses_route(agent)
     # Native server-side compaction (gpt-5.6 on direct OpenAI / ChatGPT Codex routes
     # only) — None on every other route/model, leaving the request unchanged.
     context_management = native_compaction_context_management(agent, is_codex_backend=is_codex_backend,
@@ -1543,6 +1552,16 @@ def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = Non
     """
     from agent.opencode_affinity import merge_session_affinity_headers
 
+    # Provider-native reasoning carriers (top-level assistant keys / Gemini thought signatures) are
+    # lifted onto the wire ONLY for the profile that reads them, and stripped everywhere else. Shape
+    # BEFORE the transport sanitizer (which drops the private ``.native_assistant`` record) so the
+    # values are still visible; hook failures stay session-sticky through ``scope=agent``.
+    if getattr(agent, "api_mode", None) == "chat_completions" and isinstance(api_messages, list):
+        from agent.reasoning_carriers import shape_wire_carriers
+        api_messages = shape_wire_carriers(
+            api_messages, model=getattr(agent, "model", None),
+            base_url=getattr(agent, "base_url", None), scope=agent,
+        )
     kwargs = _build_api_kwargs_for_mode(agent, api_messages, tools_for_api)
     return merge_session_affinity_headers(
         kwargs,
@@ -1564,7 +1583,7 @@ def _build_api_kwargs_for_mode(agent, api_messages: list, tools_for_api: list | 
     if agent.api_mode == "anthropic_messages":
         return _build_anthropic_kwargs(agent, api_messages, tools_for_api, reasoning_config, request_overrides)
     if agent.api_mode == "bedrock_converse":
-        return _build_bedrock_kwargs(agent, api_messages, tools_for_api)
+        return _build_bedrock_kwargs(agent, api_messages, tools_for_api, reasoning_config)
     # Rotation-stable logical cache scope shared by every OpenAI-wire branch
     # (memoized on the agent); anthropic/bedrock above don't use it.
     cache_scope_id = _prompt_cache_scope_for_agent(agent)
@@ -1588,6 +1607,16 @@ def _dump_if_model(value):
 def _assistant_reasoning_text(agent, assistant_message) -> Optional[str]:
     """Structured reasoning, else inline ``<think>`` blocks embedded in content."""
     reasoning_text = agent._extract_reasoning(assistant_message)
+    if not reasoning_text:
+        # A provider may return readable reasoning as a declared top-level carrier instead of the
+        # standard ``reasoning``/``reasoning_content`` fields (Copilot's ``reasoning_text``).
+        from agent.reasoning_carriers import declared_carrier_keys, field
+        _opaque_keys, text_keys = declared_carrier_keys()
+        for _key in text_keys:
+            _value = field(assistant_message, _key)
+            if isinstance(_value, str) and _value.strip():
+                reasoning_text = _value
+                break
     if not reasoning_text:
         content = flatten_message_text(getattr(assistant_message, "content", None))
         think_blocks = re.findall(r'<think>(.*?)</think>', content, flags=re.DOTALL)

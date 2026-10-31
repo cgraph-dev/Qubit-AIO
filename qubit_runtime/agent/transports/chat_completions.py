@@ -615,7 +615,20 @@ class ChatCompletionsTransport(ProviderTransport):
         if is_kimi:
             extra_body["thinking"] = {"type": "disabled" if thinking_off else "enabled"}
 
-        if supports_reasoning:
+        if params.get("is_github_models"):
+            # GitHub Models/Copilot chat-completions takes the catalog-clamped reasoning payload
+            # (medium when unset, nothing when thinking is off).
+            _gh_reasoning = params.get("github_reasoning_extra")
+            if _gh_reasoning is not None:
+                extra_body["reasoning"] = dict(_gh_reasoning)
+        elif params.get("is_lmstudio") and supports_reasoning:
+            # LM Studio publishes per-model allowed_options; an unhonorable effort is omitted so the
+            # model's own default applies instead of a silently substituted level (mirrors the profile).
+            from agent.lmstudio_reasoning import resolve_lmstudio_effort
+            _lm_effort = resolve_lmstudio_effort(reasoning_config, params.get("lmstudio_reasoning_options"))
+            if _lm_effort is not None:
+                api_kwargs["reasoning_effort"] = _lm_effort
+        elif supports_reasoning:
             # An endpoint claimed by a profile (providers.profile_for_host) takes its verbatim payload.
             if params.get("profile_endpoint", False):
                 if params.get("endpoint_reasoning") is not None:

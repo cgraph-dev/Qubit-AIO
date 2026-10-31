@@ -50,6 +50,7 @@ def install_truststore() -> bool:
         import truststore
 
         truststore.inject_into_ssl()
+        _rebind_preimported_botocore()
         _installed = True
         logger.debug("TLS trust: platform store (truststore)")
     except Exception as exc:
@@ -61,6 +62,25 @@ def install_truststore() -> bool:
             exc,
         )
     return _installed
+
+
+def _rebind_preimported_botocore() -> None:
+    """Rebind botocore's cached ``SSLContext`` when it was imported BEFORE injection.
+
+    botocore's ``httpsession`` deliberately imports urllib3's *original* stdlib
+    ``SSLContext`` ("always import the original ... even if it has been patched") and
+    calls ``context.options |= ...`` on it. After truststore injection that original
+    class's inherited ``options`` setter resolves ``SSLContext`` in ``ssl`` to the
+    truststore subclass and recurses. Truststore's own class delegates ``options`` to
+    the wrapped original context, so rebinding the module global is the fix. No-op
+    when botocore is not imported yet (the normal startup order: injection first)."""
+    import sys
+
+    httpsession = sys.modules.get("botocore.httpsession")
+    if httpsession is None:
+        return
+    if getattr(httpsession, "SSLContext", None) is not ssl.SSLContext:
+        httpsession.SSLContext = ssl.SSLContext
 
 
 def _coerce_insecure(ssl_verify: Any) -> bool:

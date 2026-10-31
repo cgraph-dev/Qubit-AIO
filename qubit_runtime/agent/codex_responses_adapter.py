@@ -805,25 +805,44 @@ def classify_responses_route(agent: Any) -> ResponsesRouteFlags:
     )
 
 
+def is_github_responses_route(agent: Any) -> bool:
+    """True on GitHub Copilot / GitHub Models Responses endpoints (provider alias or host)."""
+    provider = (getattr(agent, "provider", "") or "").strip().lower()
+    if provider in {"copilot", "github-copilot", "github", "github-models", "github-model"}:
+        return True
+    checker = getattr(agent, "_is_copilot_url", None)
+    if callable(checker):
+        try:
+            return bool(checker())
+        except Exception:  # noqa: BLE001 - identity probe must not break a turn
+            return False
+    return False
+
+
 def _native_responses_replay_items(
     agent: Any, messages: List[Dict[str, Any]]
 ) -> Optional[List[Dict[str, Any]]]:
     """Build the native-compaction-eligible wire items, or ``None`` when ineligible."""
     if getattr(agent, "api_mode", None) != "codex_responses" or not isinstance(messages, list):
         return None
-    route = classify_responses_route(agent)._asdict()
+    route = classify_responses_route(agent)
     from agent.native_compaction import native_compaction_context_management
     from agent.fast_mode import effective_request_overrides
-    if not native_compaction_context_management(agent, **route):
+    if not native_compaction_context_management(
+        agent, is_codex_backend=route.is_codex_backend, is_xai_responses=route.is_xai_responses,
+        is_github_responses=is_github_responses_route(agent),
+    ):
         return None
     # The wire model may be rewritten per request (fast mode); provenance must match what the transport stamps.
     effective_model = effective_request_overrides(agent).get("model", getattr(agent, "model", None))
     try:
         items = _chat_messages_to_responses_input(
-            messages, is_xai_responses=route["is_xai_responses"],
-            drop_replay_item_ids=not route["endpoint"].replay_item_ids,
+            messages, is_xai_responses=route.is_xai_responses,
+            drop_replay_item_ids=is_github_responses_route(agent) or not route.endpoint.replay_item_ids,
             replay_encrypted_reasoning=bool(getattr(agent, "_codex_reasoning_replay_enabled", True)),
-            current_issuer_kind=_classify_responses_issuer(base_url=getattr(agent, "base_url", None), **route),
+            current_issuer_kind=_classify_responses_issuer(
+                is_codex_backend=route.is_codex_backend, is_xai_responses=route.is_xai_responses,
+                base_url=getattr(agent, "base_url", None), endpoint=route.endpoint),
             current_issuer_model=_wire_model_identity(effective_model),
             native_compaction_eligible=True,
         )

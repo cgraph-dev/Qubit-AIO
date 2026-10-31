@@ -14,6 +14,18 @@ from providers.base import ProviderProfile
 class CopilotProfile(ProviderProfile):
     """GitHub Copilot / GitHub Models — editor headers + reasoning."""
 
+    # Copilot's Responses/chat wires return top-level ``reasoning_text`` / ``reasoning_opaque``
+    # carriers (its Gemini route also signs tool calls). Capture and replay them only here.
+    message_carrier_opaque = "reasoning_opaque"
+    message_carrier_text = "reasoning_text"
+    replays_tool_call_signatures = True
+
+    def replays_function_thought_signature(self, *, model=None, base_url="") -> bool:
+        return True
+
+    def replay_message_carriers(self, values, *, model, base_url):
+        return {k: v for k, v in values.items() if k in ("reasoning_opaque", "reasoning_text") and v}
+
     def build_api_kwargs_extras(
         self, *, model: str | None = None, reasoning_config: dict | None = None,
         supports_reasoning: bool = False, **ctx,
@@ -39,6 +51,10 @@ copilot = CopilotProfile(
     name="copilot", aliases=("github-copilot", "github-models", "github-model", "github"),
     env_vars=("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"), base_url="https://api.githubcopilot.com",
     auth_type="copilot",
+    hostnames=("api.githubcopilot.com", "githubcopilot.com", "models.github.ai"),
+    # Dataclass fields: class-level overrides are shadowed by the generated __init__, so set them here.
+    message_carrier_opaque="reasoning_opaque", message_carrier_text="reasoning_text",
+    replays_tool_call_signatures=True,
 )
 
 register_provider(copilot)

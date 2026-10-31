@@ -424,6 +424,9 @@ class AIAgent(
         self._turn_author = None
         # Copilot x-initiator: True for the first API call of a user turn, False for tool-loop follow-ups.
         self._is_user_initiated_turn = False
+        # Per-session provider-hook failure latch: a /new (or resume) re-asks a profile hook that
+        # failed in the previous session instead of keeping the generic answer forever.
+        self._provider_hook_failures = set()
 
         self._transition_context_engine_session(
             old_session_id=old_session_id, new_session_id=getattr(self, "session_id", None),

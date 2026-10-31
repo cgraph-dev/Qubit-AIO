@@ -399,7 +399,17 @@ def _convert_assistant_message(m: Dict[str, Any]) -> Dict[str, Any]:
     # than relocated. #56195 covered the complementary shape (blank content -> top-level marker); this is
     # the interleaved thinking + preamble-text + tool_use shape.
     content = m.get("content", "")
+    # A turn stamped by a non-Claude Converse model carries that model's readable reasoning and
+    # sealed blobs; Claude cannot open another family's redacted_thinking (400 "Invalid `data`").
+    # Drop reasoning minted elsewhere while keeping the turn's text/tool_use, on both wires.
+    try:
+        from agent.bedrock_adapter import reasoning_minted_outside_claude
+        foreign_reasoning = reasoning_minted_outside_claude(m)
+    except Exception:  # noqa: BLE001 - reasoning filter must never block a turn
+        foreign_reasoning = False
     ordered, blocks = assistant_replay_carrier(m)
+    if foreign_reasoning:
+        ordered, blocks = False, []
     if ordered:
         return {"role": "assistant", "content": blocks}
     # Blank text blocks are dropped; a cache marker riding on one is relocated onto the last
@@ -423,7 +433,8 @@ def _convert_assistant_message(m: Dict[str, Any]) -> Dict[str, Any]:
     # See hermes-agent#13848. Accept empty string "" — _copy_reasoning_content_for_api() injects "" as a
     # tier-3 fallback for Kimi tool-call messages that had no reasoning.
     reasoning_content = m.get("reasoning_content")
-    if isinstance(reasoning_content, str) and not _has_block_type(blocks, _THINKING_TYPES):
+    if (not foreign_reasoning and isinstance(reasoning_content, str)
+            and not _has_block_type(blocks, _THINKING_TYPES)):
         blocks.insert(0, {"type": "thinking", "thinking": reasoning_content})
     # Empty assistant content is rejected. Fall back ONLY to the placeholder, never to raw
     # ``content`` — that is the unfiltered blank payload just removed. Markers are applied after

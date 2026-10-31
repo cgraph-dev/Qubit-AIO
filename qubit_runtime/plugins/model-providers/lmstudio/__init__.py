@@ -29,7 +29,9 @@ class LMStudioProfile(ProviderProfile):
         """``supports_reasoning`` is true only when the model publishes a non-``off`` option;
         ``lmstudio_reasoning_options`` is the agent's cached probe of them. Auxiliary calls have no
         probe (``None``) and keep the generic nested ``reasoning`` they always sent."""
-        if lmstudio_reasoning_options is None:
+        if not lmstudio_reasoning_options:
+            # No probe (auxiliary calls) OR an offline/failed probe (empty list): keep the generic
+            # nested payload rather than silently dropping the reasoning request.
             return generic_nested_reasoning(reasoning_config), {}
         if not supports_reasoning:
             return {}, {}

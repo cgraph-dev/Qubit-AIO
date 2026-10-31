@@ -731,6 +731,14 @@ def _provider_override_section(provider: str, *, config: Optional[dict[str, Any]
         return None
     # Forward (Qubit → models.dev id) and reverse (caller passed a models.dev id, config keyed by Qubit id) aliases.
     candidates = [provider_key, models_dev_id_for(provider_key), *_models_dev_to_qubit_ids(provider_key)]
+    # Either id space may be used in config: a registered profile's canonical name and aliases are
+    # all the same provider (``copilot`` <-> ``github-copilot``).
+    with contextlib.suppress(Exception):
+        from providers import get_provider_profile
+        _profile = get_provider_profile(provider_key)
+        if _profile is not None:
+            candidates.extend([_profile.name, *_profile.aliases])
+            candidates.append(models_dev_id_for(_profile.name))
     return next((section for section in (overrides.get(key) if key else None for key in candidates) if isinstance(section, dict)), None)
 
 

@@ -28,6 +28,8 @@ class TurnRetryState:
     # / ``model_not_supported``, not a 401 — separate guard from the 401 one.
     copilot_stale_cred_retry_attempted: bool = False
     vertex_auth_retry_attempted: bool = False
+    # Any profile-declared ``refresh_runtime_credentials`` (hosted/plugin providers) on 401.
+    provider_auth_refresh_attempted: bool = False
 
     # Format / payload recovery guards
     thinking_sig_retry_attempted: bool = False
