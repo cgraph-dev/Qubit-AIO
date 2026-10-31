@@ -151,7 +151,7 @@ class ProviderProfile:
     display_name: str = ""       # e.g. "GMI Cloud" — shown in picker/labels
     description: str = ""        # e.g. "GMI Cloud (multi-model direct API)" — picker subtitle
     signup_url: str = ""         # e.g. "https://www.gmicloud.ai/" — shown during setup
-    models_dev_id: str = ""      # models.dev provider id when it differs from ``name``
+    models_dev_id: str = field(default="", kw_only=True)      # models.dev provider id when it differs from ``name``
 
     # True when the provider is pre-release / not for public listing. Discovery surfaces (provider
     # pickers, the setup provider list, the dashboard accounts tab) skip it unless ``listed()``
@@ -238,12 +238,12 @@ class ProviderProfile:
     # auto-routed aux client at one of them is recognised as this provider (``providers.profile_for_host``).
     # It also makes ``reasoning_payload`` the reasoning gate there, except on hosts core gates itself
     # (OpenRouter, Ollama Cloud, Nous Portal, Vercel AI Gateway, the ``lmstudio`` provider).
-    hostnames: tuple = ()
+    hostnames: tuple = field(default=(), kw_only=True)
     # Hosts that identify this provider's catalog for model metadata (context length, models.dev) but
     # take other credentials; matched only by ``profile_for_host(url, metadata=True)``.
-    metadata_hostnames: tuple = ()
+    metadata_hostnames: tuple = field(default=(), kw_only=True)
     # models.dev provider id when it differs from ``name`` (e.g. ``fireworks`` -> ``fireworks-ai``).
-    models_dev_id: str = ""
+    models_dev_id: str = field(default="", kw_only=True)
 
     # ── Client-level quirks (set once at client construction) ─
     default_headers: dict[str, str] = field(default_factory=dict)
@@ -613,12 +613,12 @@ class ProviderProfile:
     # auto-routed aux client at one of them is recognised as this provider (``providers.profile_for_host``).
     # It also makes ``reasoning_payload`` the reasoning gate there, except on hosts core gates itself
     # (OpenRouter, Ollama Cloud, Nous Portal, Vercel AI Gateway, the ``lmstudio`` provider).
-    hostnames: tuple = ()
+    hostnames: tuple = field(default=(), kw_only=True)
     # Hosts that identify this provider's catalog for model metadata (context length, models.dev) but
     # take other credentials; matched only by ``profile_for_host(url, metadata=True)``.
-    metadata_hostnames: tuple = ()
+    metadata_hostnames: tuple = field(default=(), kw_only=True)
     # models.dev provider id when it differs from ``name`` (e.g. ``fireworks`` -> ``fireworks-ai``).
-    models_dev_id: str = ""
+    models_dev_id: str = field(default="", kw_only=True)
 
     def live_context_length(self, model: str, *, api_key: str = "", base_url: str = "") -> int | None:
         """Context window from the provider's live, credentialed catalog; consulted after the persistent cache."""
