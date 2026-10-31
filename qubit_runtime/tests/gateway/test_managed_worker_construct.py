@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -95,8 +96,15 @@ def run_pair(tmp_path, extra_config, turn, *, before_create=None, **create_param
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=purl)
 
     def query(sql, args=()):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
-            return db.execute(sql, args).fetchall()
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
+                    return db.execute(sql, args).fetchall()
+            except sqlite3.OperationalError as exc:
+                if 'locked' not in str(exc).lower() or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.05)
 
     async def settle(ws, sid, request_id, text):
         submitted = await rpc(ws, 'prompt.submit', session_id=sid, input_id=request_id, text=text)

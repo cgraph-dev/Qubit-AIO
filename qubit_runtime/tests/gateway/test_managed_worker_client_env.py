@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
+import time
 
 import pytest
 
@@ -78,9 +79,17 @@ def test_managed_workers_run_each_sessions_tools_under_its_client_toolchain(tmp_
     sentinels = {name: f'--title=client-env-sentinel-{name}' for name in ('alpha', 'beta')}
 
     def settled(request_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
-            rows = db.execute('SELECT status FROM session_admissions WHERE request_id=?', (request_id,)).fetchall()
-            return rows == [('terminal',)]
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
+                    rows = db.execute('SELECT status FROM session_admissions WHERE request_id=?',
+                                      (request_id,)).fetchall()
+                    return rows == [('terminal',)]
+            except sqlite3.OperationalError as exc:
+                if 'locked' not in str(exc).lower() or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.05)
 
     async def exercise(desc):
         outputs, public = {}, []

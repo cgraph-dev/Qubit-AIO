@@ -9,6 +9,7 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import threading
+import time
 
 import pytest
 
@@ -68,8 +69,17 @@ def test_managed_worker_trims_checkpoints_to_the_configured_max_snapshots(tmp_pa
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def status(request_id):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
-            return db.execute('SELECT status FROM session_admissions WHERE request_id=?', (request_id,)).fetchall()
+        # DELETE-journal readers can be refused while the owner commits; poll instead of failing.
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
+                    return db.execute('SELECT status FROM session_admissions WHERE request_id=?',
+                                      (request_id,)).fetchall()
+            except sqlite3.OperationalError as exc:
+                if 'locked' not in str(exc).lower() or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.05)
 
     async def exercise(desc):
         async with websocket(home, desc) as ws:
@@ -83,8 +93,16 @@ def test_managed_worker_trims_checkpoints_to_the_configured_max_snapshots(tmp_pa
                 assert 'result' in submitted, submitted
                 await async_wait_until(lambda: status(request_id) == [('terminal',)], timeout=90, interval=.05,
                                        what=request_id + ' terminal')
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=30)) as db:
-            return db.execute('SELECT COUNT(*) FROM worker_executions WHERE session_id=?', (sid,)).fetchone()[0]
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
+                    return db.execute('SELECT COUNT(*) FROM worker_executions WHERE session_id=?',
+                                      (sid,)).fetchone()[0]
+            except sqlite3.OperationalError as exc:
+                if 'locked' not in str(exc).lower() or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.05)
     try:
         with daemon(root, home, env, barrier=False) as (_owner, desc):
             workers = asyncio.run(exercise(desc))
