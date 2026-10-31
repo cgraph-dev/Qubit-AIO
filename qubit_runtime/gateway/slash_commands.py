@@ -444,6 +444,25 @@ class GatewaySlashCommandsMixin(
             await _stop(session_key, "stop_command_pending")
             logger.info("STOP (pending) for session %s — sentinel cleared", session_key)
             return EphemeralReply(t("gateway.stop.stopped_pending"))
+        if not agent:
+            # The chat may have /resume'd a conversation an app is already running: its turn keeps
+            # its own (detached) key while the route now names it, so reach that slot too.
+            from gateway.session_authorities import active_authority
+            authority = active_authority(self)
+            sid = authority.logical_owner(self.session_store.peek_session_id(session_key)) if authority else None
+            live = authority.sessions.get(sid) if authority is not None and sid else None
+            if live is not None:
+                from gateway.session_detached import running_key
+                run_key = running_key(self, live.route, sid)
+                if run_key != session_key:
+                    agent = self._running_agents.get(run_key)
+                    if agent is _AGENT_PENDING_SENTINEL:
+                        await _stop(run_key, "stop_command_pending")
+                        logger.info("STOP (pending) for session %s — sentinel cleared", run_key)
+                        return EphemeralReply(t("gateway.stop.stopped_pending"))
+                    if agent:
+                        await _stop(run_key, "stop_command_handler")
+                        return EphemeralReply(t("gateway.stop.stopped"))
         if agent:  # force-clean the session lock so a truly hung agent doesn't keep it forever
             await _stop(session_key, "stop_command_handler")
             return EphemeralReply(t("gateway.stop.stopped"))
