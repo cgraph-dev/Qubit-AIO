@@ -9,6 +9,7 @@ import contextlib
 import copy
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -1519,6 +1520,11 @@ def extract_reasoning(agent, assistant_message) -> Optional[str]:
     for detail in getattr(assistant_message, "reasoning_details", None) or []:
         if isinstance(detail, dict):
             _add(detail.get('summary') or detail.get('thinking') or detail.get('content') or detail.get('text'))
+    # Provider profiles declare their readable reasoning carrier (Copilot: ``reasoning_text``); it is
+    # ordinary reasoning text, not wire metadata, so the stored ``reasoning`` field carries it too.
+    from agent.reasoning_carriers import declared_carrier_keys, field as _carrier_field
+    for key in declared_carrier_keys()[1]:
+        _add(_carrier_field(assistant_message, key))
     # Fall back to reasoning embedded in content only when no structured field was found.
     content = getattr(assistant_message, "content", None)
     if not parts and isinstance(content, list):
@@ -3178,6 +3184,25 @@ _ACK_WORKSPACE_MARKERS = (
 )
 
 
+def _acp_transition_names() -> set[str]:
+    """Lower-cased names an ACP/external-process provider is launched under (profile names, aliases,
+    and its CLI binary). Used to decide whether "launching it on <X>" names an agent or a provider."""
+    try:
+        from providers import list_providers
+
+        names: set[str] = set()
+        for profile in list_providers():
+            if getattr(profile, "auth_type", "") != "external_process":
+                continue
+            names.update(str(n).lower() for n in (profile.name, *profile.aliases) if n)
+            command = str(getattr(profile, "process_command", "") or "").strip()
+            if command:
+                names.add(os.path.basename(command).lower())
+        return names
+    except Exception:
+        return set()
+
+
 def looks_like_codex_intermediate_ack(
     agent, user_message: Any, assistant_content: str, messages: List[Dict[str, Any]],
     require_workspace: bool = True,
@@ -3240,9 +3265,15 @@ def looks_like_codex_intermediate_ack(
         r"\s+now\s*[—–-]\s*see\s+https?://\S+"
         r"(?:\s+for\s+progress)?\s*$"
     )
+    # "Launching it on <agent>" is a pending launch only when <agent> is an ACP/external-process
+    # provider (its profile name, an alias, or the CLI binary it launches). Naming an inference
+    # provider ("... on Nous.") is a final answer, so the set comes from the registered profiles
+    # instead of naming one vendor in core.
+    acp_names = _acp_transition_names()
+    acp_alt = "|".join(re.escape(name) for name in sorted(acp_names, key=len, reverse=True)) or "(?!)"
     provider_tail_pattern = re.compile(
         r"\s+(?:it|(?:the\s+)?(?:session|worker|agent|job|process))\s+"
-        r"on\s+copilot(?:\s+via\s+acpx)?\s*$"
+        rf"on\s+(?:{acp_alt})(?:\s+via\s+acpx)?\s*$"
     )
     actual_log_tail_pattern = re.compile(
         r"\s+(?:the\s+)?actual\s+(?:log|output)\s*$"

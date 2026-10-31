@@ -23,7 +23,7 @@ from utils import atomic_json_write, atomic_yaml_write, base_url_host_matches, b
 from agent.model_metadata_cache import locked_context_cache
 
 from qubit_constants import OPENROUTER_MODELS_URL, openrouter_variant_base
-from agent.message_metadata import PERSISTENCE_ONLY_MESSAGE_FIELDS, without_persistence_fields
+from agent.message_metadata import PERSISTENCE_ONLY_MESSAGE_FIELDS, unpriced_replay_fields, without_persistence_fields
 
 logger = logging.getLogger(__name__)
 
@@ -2597,8 +2597,13 @@ def _wire_message_shadow(msg: Dict[str, Any]) -> Dict[str, Any]:
     _rc = msg.get("reasoning_content")
     drop_reasoning_dup = isinstance(_rc, str) and bool(_rc.strip())
     shadow: Dict[str, Any] = {}
+    # Provider-native replay carriers (Gemini signatures, Copilot reasoning blobs, every key a registered
+    # profile declares) ride the wire for whichever route reads them, but the provider prices them by its
+    # own count, never by their bytes. The preflight estimate must match the compaction tail walk, so an
+    # unpriced carrier costs 0 here instead of inflating the estimate into premature compaction.
+    unpriced = unpriced_replay_fields()
     for k, v in msg.items():
-        if k in ("_anthropic_content_blocks", "reasoning_details") or k in PERSISTENCE_ONLY_MESSAGE_FIELDS or (k == "reasoning" and drop_reasoning_dup):
+        if k in unpriced or k in PERSISTENCE_ONLY_MESSAGE_FIELDS or (k == "reasoning" and drop_reasoning_dup):
             continue
         if k == "api_content":
             if sidecar_wins:

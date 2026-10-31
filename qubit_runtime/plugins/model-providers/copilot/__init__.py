@@ -14,6 +14,14 @@ from providers.base import ProviderProfile
 class CopilotProfile(ProviderProfile):
     """GitHub Copilot / GitHub Models — editor headers + reasoning."""
 
+    def replay_message_carriers(self, values: dict[str, Any], *, model: str | None, base_url: str) -> dict[str, Any]:
+        """Copilot's Gemini 3 messages carry an opaque reasoning blob and its readable text."""
+        return {key: values[key] for key in (self.message_carrier_opaque, self.message_carrier_text) if key in values}
+
+    def replays_function_thought_signature(self, *, model: str | None, base_url: str) -> bool:
+        """Copilot's Gemini 3 variant signs the tool call inside ``function``."""
+        return str(model or "").lower().startswith("gemini")
+
     def build_api_kwargs_extras(
         self, *, model: str | None = None, reasoning_config: dict | None = None,
         supports_reasoning: bool = False, **ctx,
@@ -38,6 +46,8 @@ class CopilotProfile(ProviderProfile):
 copilot = CopilotProfile(
     name="copilot", aliases=("github-copilot", "github-models", "github-model", "github"),
     env_vars=("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"), base_url="https://api.githubcopilot.com",
+    hostnames=("api.githubcopilot.com", "models.github.ai"),
+    message_carrier_opaque="reasoning_opaque", message_carrier_text="reasoning_text",
     auth_type="copilot",
 )
 
