@@ -49,6 +49,9 @@ class SideQuestionCapture:
     turn_id: str
     runtime: tuple  # runtime_key(parent) at capture
     context: contextvars.Context = field(repr=False)
+    # Per-request headers the parent's last physical attempt carried (a managed Relay
+    # traceparent, tenant/routing tags): the side request must extend that same request.
+    extra_headers: dict[str, Any] = field(default_factory=dict)
 
 
 def runtime_key(agent: Any) -> tuple:
@@ -159,6 +162,8 @@ def _send(fork: Any, capture: SideQuestionCapture, prompt: str, audit: _Audit) -
         tools_for_api=assembled.tools_for_api, system_message=None, api_call_count=1,
         api_request_id=api_request_id, effective_task_id=task_id, turn_id=turn_id,
     )
+    if capture.extra_headers:
+        built.api_kwargs["extra_headers"] = dict(capture.extra_headers)
     if has_server_side_tools(built.api_kwargs):
         audit.outcome = "refused:server_side_tools"
         return None

@@ -794,6 +794,11 @@ def _dispatch_nonstreaming_api_request(agent, api_kwargs: dict, *, make_client):
     # request transform. No-op unless this really is the OpenAI SDK, so the
     # MoA facade above and the suite's stand-in clients are unaffected.
     api_kwargs = bypass_chat_sdk_request_transform(api_kwargs, request_client)
+    # Remember the per-request headers the physical attempt carried. A plugin side question
+    # replays that exact request (tools/system/reasoning/headers) to extend the warm prefix,
+    # so a managed Relay traceparent or a tenant tag must ride along.
+    if isinstance(api_kwargs.get("extra_headers"), dict):
+        agent._last_api_request_headers = dict(api_kwargs["extra_headers"])
     return request_client.chat.completions.create(**api_kwargs)
 
 
@@ -3966,10 +3971,7 @@ class _StreamingCall(StreamingWaitMonitor):
             self.clients.close_once("stale_stream_kill")
         self._shutdown_stale_attempt_socket(_killed_response)
         self._count_stale_attempt()
-        # Reset the timer so we don't kill repeatedly while the worker unwinds.
-        self.last_chunk_time["t"] = time.time()
-        self.agent._emit_diagnostic_wait(f"⚠ no output from provider for {int(elapsed)}s — reconnecting...")
-        self.agent._touch_activity(f"stale stream detected after {int(elapsed)}s, reconnecting")
+        self._rearm_or_abandon_after_kill(elapsed)
 
     def _abort_for_interrupt(self, stale_elapsed: float) -> None:
         """/stop seen by the monitor: mark cancelled, abort the request-local
@@ -4013,14 +4015,13 @@ class _StreamingCall(StreamingWaitMonitor):
             return
         self._stream_stale_timeout = _cloud_stale_timeout_for(self.agent, self.api_kwargs)
 
-    def _partial_stream_stub(self):
+    def _partial_stream_stub(self, error):
         """Tokens already reached the platform: a finish_reason="length" stub fires the
         continuation machinery; tool_calls=None blocks executing incomplete calls.
         Content may be EMPTY (dropped tool call, overflow) — the loop skips appending an
         empty stub and only sends the nudge (placeholder text leaked into the stitched
         response). A text-only death with 0 visible chars never gets here: the error
         handler reclassifies it as undelivered (#112419)."""
-        error = self.result["error"]
         _partial_text = (getattr(self.agent, "_current_streamed_assistant_text", "") or "").strip() or None
         _partial_names = list(self.result.get("partial_tool_names") or [])
         if _partial_names:
@@ -4098,16 +4099,23 @@ class _StreamingCall(StreamingWaitMonitor):
             raise InterruptedError("Agent interrupted during streaming API call")
         if self.agent._interrupt_requested:  # worker returned early before the monitor saw the flag
             raise InterruptedError("Agent interrupted during streaming API call (post-worker)")
-        if self.result["error"] is not None:
+        # Read the outcome once: an abandoned worker can still write into ``self.result`` later.
+        error, response = self.result["error"], self.result["response"]
+        if self._abandon_error is not None:
+            # Same bounded Relay join as /stop (#81521), before the retry opens a new scope.
+            _join_worker_for_relay_teardown(self.worker, label="Abandoned streaming")
+            error, response = self._abandon_error, None
+            self._forget_invisible_deltas(error)  # nothing visible: retry, not a stub
+        if error is not None:
             if self.deltas_were_sent["yes"]:
-                return self._partial_stream_stub()
-            raise self.result["error"]
-        if self.result["response"] is not None:
+                return self._partial_stream_stub(error)
+            raise error
+        if response is not None:
             _reset_stale_streak(self.agent)  # provider proved responsive: clear the breaker
         # Propagate first-chunk timing for the ``post_api_request`` hook.
         if isinstance(self.clients.diag, dict) and self.clients.diag.get("first_chunk_at"):
             self.agent._last_api_first_chunk_at = float(self.clients.diag["first_chunk_at"])
-        return self.result["response"]
+        return response
 
 
 def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=None):

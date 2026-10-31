@@ -88,6 +88,7 @@ def issue_side_question_token(agent: Any, messages: list[dict[str, Any]], turn_i
         turn_id=turn_id,
         runtime=runtime_key(agent),
         context=contextvars.copy_context(),
+        extra_headers=copy.deepcopy(getattr(agent, "_last_api_request_headers", None) or {}),
     )
     token = secrets.token_urlsafe(24)
     now = time.monotonic()

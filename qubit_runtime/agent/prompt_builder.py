@@ -257,13 +257,7 @@ SESSION_SEARCH_GUIDANCE = (
 # to save as a skill" and "fix it with skill_manage(action='patch')") and skill_manage's own schema. Only
 # the compaction-pruning contract lives here — nothing else teaches it.
 SKILL_SAFETY_HEADING = "## Skill Safety Rule"
-SKILLS_GUIDANCE = (
-    "When you work out a non-trivial workflow, record it with skill_manage for future reuse.\n\n"
-    f"{SKILL_SAFETY_HEADING}\n"
-    "A skill placeholder containing `[SKILL_PRUNED]` lost its content in context compression and is inaccessible — "
-    "reload it with skill_view(name='...') before acting on anything that depends on it. After reloading, ignore any "
-    "remaining `[SKILL_PRUNED]` markers for that same skill; they are historical artifacts of earlier compactions."
-)
+SKILLS_GUIDANCE = "When you work out a non-trivial workflow, record it with skill_manage for future reuse."
 
 KANBAN_GUIDANCE = (
     "# Kanban task execution protocol\n"
@@ -1429,7 +1423,13 @@ def _render_skills_index(
         "code review, planning, and testing — load them even for tasks you already know how to do, because "
         "the skill defines how it should be done here.\n"
         "If a skill has issues, fix it with skill_manage(action='patch').\n"
-        "\n<available_skills>\n" + "\n".join(index_lines) + "\n</available_skills>"
+        "After difficult/iterative tasks, offer to save as a skill. If a skill you loaded was missing steps, "
+        "had wrong commands, or needed pitfalls you discovered, update it before finishing.\n"
+        "\n"
+        "<available_skills>\n"
+        + "\n".join(index_lines) + "\n"
+        "</available_skills>\n\n"
+        "Only proceed without loading a skill if genuinely none are relevant to the task."
         + hidden_note
     )
 
