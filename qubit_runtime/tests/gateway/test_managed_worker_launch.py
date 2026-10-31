@@ -248,9 +248,13 @@ def test_ordinary_owner_launches_tool_worker_and_detach_does_not_cancel(tmp_path
             # The next admission's worker adopts it from the profile checkpoint (process_manage).
             assert started['pid'] in [e['pid'] for e in json.loads((home / 'processes.json').read_text())]
             gate.touch()
-            await async_wait_until(lambda: not psutil.pid_exists(background.pid)
-                                   or psutil.Process(background.pid).status() == psutil.STATUS_ZOMBIE,
-                                   timeout=120, interval=.05, what='background process exited')
+            def exited(pid):
+                try:
+                    return psutil.Process(pid).status() == psutil.STATUS_ZOMBIE
+                except psutil.NoSuchProcess:
+                    return True  # vanished between the existence check and the status read
+            await async_wait_until(lambda: exited(background.pid), timeout=120, interval=.05,
+                                   what='background process exited')
         else:
             assert any(role == 'tool' and 'MANAGED_TOOL_EFFECT' in content for role, content in rows), rows
         assert query('SELECT status FROM worker_executions WHERE session_id=?', (sid,)) == [('terminal',)]
