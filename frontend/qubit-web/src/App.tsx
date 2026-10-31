@@ -75,6 +75,7 @@ import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { QubitMark } from "@/components/QubitMark";
+import { QubitAtomLoader } from "@/components/QubitAtomLoader";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
@@ -233,10 +234,7 @@ function RouteFallback({ label = "Loading…" }: { label?: string }) {
       aria-busy="true"
       aria-live="polite"
     >
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner />
-        <span>{label}</span>
-      </div>
+      <QubitAtomLoader label={label} />
     </div>
   );
 }
