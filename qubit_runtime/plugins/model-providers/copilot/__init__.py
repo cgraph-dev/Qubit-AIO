@@ -64,8 +64,6 @@ class CopilotProfile(ProviderProfile):
 copilot = CopilotProfile(
     name="copilot", aliases=("github-copilot", "github-models", "github-model", "github"),
     env_vars=("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"), base_url="https://api.githubcopilot.com",
-    hostnames=("api.githubcopilot.com", "models.github.ai"),
-    message_carrier_opaque="reasoning_opaque", message_carrier_text="reasoning_text",
     auth_type="copilot",
     hostnames=("api.githubcopilot.com", "githubcopilot.com", "models.github.ai"),
     # Dataclass fields: class-level overrides are shadowed by the generated __init__, so set them here.
