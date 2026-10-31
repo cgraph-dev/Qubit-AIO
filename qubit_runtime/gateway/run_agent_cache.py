@@ -314,6 +314,12 @@ class GatewayAgentCacheMixin:
             # One structured reset instead of a drifting pop-list. Turn-lease tokens are deliberately NOT
             # cleared here — _release_turn_lease owns them.
             state.turn.clear()
+            retired, state.turn.retired_agents = state.turn.retired_agents, []
+            for agent in retired:
+                # Evicted mid-turn (a one-turn agent): its turn no longer uses it.
+                self._spawn_release_thread(self._release_evicted_agent_soft, (agent,),
+                                           f"agent-retire-{str(session_key)[:24]}", inline_fallback=True,
+                                           session_key=session_key)
         # Turn boundary: a running-agent slot was just released; persist the new (lower) in-flight count
         # so the dashboard readout stays current. Preserves gateway_state (see _persist_active_agents).
         self._persist_active_agents()
@@ -813,7 +819,8 @@ class GatewayAgentCacheMixin:
         )
         return hashlib.sha256(repr(key_tuple).encode("utf-8")).hexdigest()
 
-    def _evict_cached_agent(self, session_key: str, *, commit_memory: bool = False) -> None:
+    def _evict_cached_agent(self, session_key: str, *, commit_memory: bool = False,
+                            release_after_turn: bool = False) -> None:
         """Remove a cached agent (/new, /model, ...) and soft-release its LLM client pool (AIAgent
         holds reference cycles; without it RSS grows across /new). Soft = frees clients and child
         subagents but PRESERVES terminal sandbox / browser / bg processes since the session may
@@ -846,7 +853,11 @@ class GatewayAgentCacheMixin:
                 evicted = _cache.pop(session_key, None)
         agent = _first_agent(evicted)
         # Never tear down an agent that's mid-turn — its client, sandbox and child subagents are in use.
-        if agent is None or agent is _AGENT_PENDING_SENTINEL or id(agent) in self._running_agent_ids():
+        if agent is None or agent is _AGENT_PENDING_SENTINEL:
+            return
+        if id(agent) in self._running_agent_ids():
+            if release_after_turn and state is not None:
+                state.turn.retired_agents.append(agent)
             return
         if commit_memory:
             target, args = self._commit_then_release_soft, (agent, session_key, True)
