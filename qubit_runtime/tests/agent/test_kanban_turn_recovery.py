@@ -95,7 +95,7 @@ def owner_worker(tmp_path, clear_kanban_env, monkeypatch):
             def get_messages_as_conversation(self, _sid):
                 return [{"role": "user", "content": "from-store"}]
 
-            def run_conversation(self, message, conversation_history=None):
+            def run_conversation(self, message, conversation_history=None, **_kwargs):
                 entered.append(message)
                 result = script() if callable(script) else script[seen["n"]]
                 seen["n"] += 1
@@ -131,6 +131,7 @@ def test_worker_client_reports_the_owner_exit_and_reply(owner_worker, monkeypatc
     """The dispatcher-spawned process is the client half: it exits with the code the owner
     booked for this exact attempt, ends its log with the attempt's reply, and writes the
     exit trailer the dead-worker sweep reads — so an exhausted wall still releases as 75."""
+    import asyncio
     from contextlib import asynccontextmanager
 
     from qubit_cli import gateway_client, kanban_worker_client
@@ -141,6 +142,8 @@ def test_worker_client_reports_the_owner_exit_and_reply(owner_worker, monkeypatc
     submitted = []
 
     class _Owner:
+        events: asyncio.Queue = asyncio.Queue()
+
         async def rpc(self, method, **params):
             submitted.append(method)
             assert method == "kanban.run" and params["task_id"] == context["task_id"]
