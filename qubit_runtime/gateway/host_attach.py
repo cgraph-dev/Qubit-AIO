@@ -201,7 +201,9 @@ def _probe_host_gateway(wait_for_channel: float) -> Optional[HostGateway]:
         return None
     # Liveness BEFORE the dial. A record we cannot prove live must not make us open a socket at an
     # address it chose; proving the PID first is also what keeps a stale record from naming a peer.
-    if not hr.liveness_is_proven(record):
+    # A record whose role lock is free is not an owner even when its PID looks alive (a recycled
+    # pid/start-tick collision): the publisher holds that flock for its whole life.
+    if not hr.record_names_live_owner(record):
         return None
     home = record_home(record)
     deadline = time.monotonic() + max(0.0, wait_for_channel)
