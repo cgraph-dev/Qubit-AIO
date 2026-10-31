@@ -691,6 +691,8 @@ gateway:
     generic_failed_with_hint: "⚠️ 問題が発生し、この返答を完了できませんでした。{hint}\n/retry で再試行するか、/new で新しい会話を始めてください。技術的な詳細はゲートウェイのログ (`qubit logs`) にあります。"
     history_unavailable: "⚠️ このセッションの履歴が一時的に利用できないため、このメッセージは処理されませんでした。運用者に state.db の確認を依頼し、正常になってから再送信してください。/reset は意図的に新しい会話を始めたい場合のみ使ってください。"
     no_credentials: "⚠️ AI モデルサービスに接続できなかったため、このメッセージは処理されませんでした。/login で再度サインインするか、/model で別のモデルを選んでください。失敗が続く場合は、ホストで `qubit doctor` を実行してください。"
+    launch_credentials_unavailable: "⚠️ このチャットは開始時の API キーをもう使えないため{detail}、このチャットでは何も実行できません。開いているチャットが自動で別のキーに切り替わることはないので、/retry でも同じように失敗します。/new で現在のキーを使う新しいチャットを始めてください。"
+    workspace_unavailable: "⚠️ このチャットの作業フォルダーが見つかりません（{path}）。そのためメッセージは実行されませんでした。フォルダーを作り直すか、チャットを別のフォルダーへ移動してから（CLI では `/worktree new`、デスクトップアプリでは「Move to project」）、もう一度送信してください。"
   skills:
     disabled: "**{name}** スキルはインストールされていますが無効です。\n有効化するには: `qubit skills config`"
     not_installed: "**{name}** スキルは利用可能ですがインストールされていません。\nインストールするには: `qubit skills install {install_name}`"
@@ -947,6 +949,9 @@ gateway:
     hint: "チャージと請求の管理はブラウザで行ってください — 完了後、ここの残高が更新されます。"
   login:
     free_tier_remaining: "\n一部のチャットはまだ無料プランのままです。それらのチャットでは /model で切り替えてください。"
+  discard:
+    done: "🗑️ 失われたターンを {count} 件破棄しました。再実行はしていません。保存されたメッセージにこれから応答します。"
+    nothing: "破棄するものはありません: このチャットに再起動で失われたターンはありません。"
 platform:
   whatsapp:
     clarify_other_title: "✏️ その他"
@@ -1001,6 +1006,8 @@ platform:
       resolved_session: "セッション中は承認"
       resolved_always: "永続的に承認"
       resolved_deny: "拒否"
+      click_failed: "⚠️ 選択を記録できませんでした。もう一度クリックするか、/approve または /deny で回答してください。"
+      no_longer_pending: "⌛ この承認はもう保留中ではありません（期限切れ、または別の場所で回答済み）"
     slash_confirm:
       already_resolved: "このプロンプトはすでに処理済みです~"
       approve_once: "一度だけ承認"
@@ -1850,6 +1857,20 @@ cli:
     default_ceiling_suffix: " (デフォルト上限)"
     used_this_month: "今月の使用量: {spent} / {limit}{ceiling}"
     monthly_limit_read_only: "月間上限はポータルで設定されています — ターミナルでは読み取り専用で表示されます。"
+    keep_going_choice: "クレジットで続行"
+    keep_going_confirm_body: "含まれる利用量を使い切ったらクレジットを使います。オフ: Qubit はリセットを待ちます。"
+    keep_going_confirm_title: "クレジットで続行しますか？"
+    keep_going_desc: "含まれる利用量を使い切ったらクレジットを使う"
+    keep_going_is_on_title: "クレジットで続行はオンです"
+    keep_going_keep_off_desc: "オフのままにする: Qubit はリセットを待ちます"
+    keep_going_leave_on: "オンのままにする"
+    keep_going_off_line: "クレジットで続行: オフ（Qubit はリセットを待ちます）"
+    keep_going_on_line: "クレジットで続行: オン（含まれる利用量を使い切ったらクレジットを使う）"
+    keep_going_turn_off: "オフにする"
+    keep_going_turn_off_desc: "Qubit はリセットを待ちます"
+    keep_going_turn_on: "オンにする"
+    keep_going_turned_off: "✅ クレジットで続行: オフ。Qubit はリセットを待ちます。"
+    keep_going_turned_on: "✅ クレジットで続行: オン。含まれる利用量を使い切ったらクレジットを使います。"
   subscription:
     load_failed_label: "サブスクリプションを読み込めませんでした"
     team_header: "チームサブスクリプション"
@@ -1983,6 +2004,7 @@ cli:
     restored_from_session: "セッションからモデルを復元しました: {model}"
     could_not_load_config: "❌ 設定を読み込めませんでした: {error}"
     tip_reset_new_session: "ヒント: `/reset` ですぐに新しいセッションを開始できます。"
+    confirm_choice_prompt: "選択 [1/2]: "
   single_query:
     query_label: "クエリ:"
     kanban_run_reclaimed: "kanban: このワーカーの実行は開始前に回収されました。終了します"
@@ -2366,6 +2388,14 @@ cli:
     move_out_of_range: "キューの移動先が範囲外です。現在のサイズ: {size}"
     moved: "キュー項目 {source} を {destination} に移動しました。"
     usage_add: "使い方: /queue add <prompt>"
+    already_started: "キュー項目 {index} はすでに開始しています。送信したとおりに実行されます。"
+    change_unknown: "ゲートウェイからキュー項目 {index} の応答がありません ({error})。再試行する前に /queue list を確認してください。"
+    edit_refused: "キュー項目 {index} を編集できませんでした: {error}"
+    gateway_refused: "ゲートウェイはキューに追加しませんでした: {error}。何も追加されていません。ターン終了後に再送してください。"
+    move_gateway_fifo: "ゲートウェイはキュー内のプロンプトを送信順に実行します。代わりに編集または削除してください。"
+    remove_refused: "キュー項目 {index} を削除できませんでした: {error}"
+    started_stopped: "キュー項目 {index} はすでに開始していたため、ゲートウェイが停止しました。"
+    submit_unknown: "ゲートウェイが応答しませんでした ({error})。プロンプトはすでにキューにある可能性があります。再送する前に /queue list を確認してください。"
   reload:
     env_reloaded: ".env を再読み込みしました（{count} 件の変数を更新）"
   steer:
@@ -3301,6 +3331,27 @@ cli:
     uncommitted_keeping: "⚠ ワークツリーに未コミットの変更があるため保持します: {path}"
     clean_up_manually: "手動でクリーンアップするには: git worktree remove --force {path}"
     cleaned_up: "✓ ワークツリーをクリーンアップしました: {path}"
+    archive_failed: "✗ {path} をアーカイブできなかったため保持します: {error}"
+    archived: "✓ ワークツリーを {ref} にアーカイブして削除しました: {path}"
+    archived_kept: "✓ ワークツリーを {ref} にアーカイブしましたが保持しました ({reason}): {path}"
+    archiving: "{path} をアーカイブしています…(大きなツリーでは時間がかかることがあります)"
+    discarded: "ワークツリーを削除し、変更を破棄しました: {path}"
+    exit_choice_archive: "アーカイブして削除する（復元可能）"
+    exit_choice_discard: "削除して変更を破棄する"
+    exit_choice_keep: "ワークツリーを保持する（デフォルト）"
+    restore_hint: "復元するには: qubit worktree restore {name}"
+    sweep_archived_kept: "アーカイブ済み、保持 ({reason}) → {ref}"
+    sweep_archived_removed: "アーカイブして削除 → {ref}"
+  modern:
+    hint_commands: "コマンド"
+    hint_files: "ファイル"
+    hint_queue: "キュー"
+    hint_shell: "シェル"
+    hint_stop: "停止"
+    preparing: "{what} を準備中…"
+    thought: "考えました"
+    thought_for: "{seconds}秒考えました"
+    working: "作業中…"
 display:
   verb:
     web_search: "ウェブを検索中"

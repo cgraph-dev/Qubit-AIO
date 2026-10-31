@@ -802,6 +802,8 @@ gateway:
       Utilisez /retry pour réessayer, ou /new pour démarrer une nouvelle conversation. Les détails techniques sont dans le journal du gateway (`qubit logs`).
     history_unavailable: "⚠️ L'historique de cette session est temporairement indisponible ; ce message n'a donc pas été traité. Demandez à l'opérateur d'inspecter state.db, puis renvoyez-le une fois le problème réglé. N'utilisez /reset que si vous voulez vraiment démarrer une nouvelle conversation."
     no_credentials: "⚠️ Je n'ai pas pu me connecter au service de modèle IA ; ce message n'a donc pas été traité. Utilisez /login pour vous reconnecter, ou /model pour choisir un autre modèle. Si l'échec persiste, lancez `qubit doctor` sur l'hôte."
+    launch_credentials_unavailable: "⚠️ Cette conversation ne peut plus utiliser la clé API avec laquelle elle a été démarrée{detail}, plus rien ne peut donc s'y exécuter. Une conversation ouverte ne passe jamais d'elle-même à une autre clé, donc /retry échoue de la même façon. Utilisez /new pour démarrer une nouvelle conversation avec votre clé actuelle."
+    workspace_unavailable: "⚠️ Le dossier de travail de cette conversation n'existe plus ({path}) ; votre message n'a donc pas été exécuté. Recréez le dossier ou déplacez la conversation vers un autre (`/worktree new` dans la CLI, « Déplacer vers un projet » dans l'application de bureau), puis renvoyez votre message."
   skills:
     disabled: |-
       La skill **{name}** est installée mais désactivée.
@@ -1138,6 +1140,9 @@ gateway:
     free_tier_remaining: |2-
 
       Certaines discussions sont encore sur l'offre gratuite ; utilisez /model dans ces discussions pour changer de modèle.
+  discard:
+    done: "🗑️ {count} tour(s) perdu(s) ignoré(s) ; ils n'ont pas été relancés. Vos messages enregistrés vont maintenant recevoir une réponse."
+    nothing: "Rien à ignorer : ce chat n'a aucun tour perdu lors d'un redémarrage."
 platform:
   whatsapp:
     clarify_other_title: "✏️ Autre"
@@ -1197,6 +1202,8 @@ platform:
       resolved_session: "Approuvé pour la session"
       resolved_always: "Approuvé définitivement"
       resolved_deny: "Refusé"
+      click_failed: "⚠️ Impossible d'enregistrer ton choix. Clique à nouveau ou réponds avec /approve ou /deny."
+      no_longer_pending: "⌛ Cette approbation n'est plus en attente (expirée ou traitée ailleurs)"
     slash_confirm:
       already_resolved: "Cette demande a déjà été traitée~"
       approve_once: "Approuver une fois"
@@ -2102,6 +2109,20 @@ cli:
     default_ceiling_suffix: " (plafond par défaut)"
     used_this_month: "{spent} sur {limit} consommés ce mois-ci{ceiling}"
     monthly_limit_read_only: "La limite mensuelle se règle sur le portail — le terminal l'affiche en lecture seule."
+    keep_going_choice: "Continuer avec les crédits"
+    keep_going_confirm_body: "Utiliser vos crédits quand l’usage inclus est épuisé. Désactivé : Qubit attend la réinitialisation."
+    keep_going_confirm_title: "Continuer avec les crédits ?"
+    keep_going_desc: "utilise vos crédits quand l’usage inclus est épuisé"
+    keep_going_is_on_title: "Continuer avec les crédits est activé"
+    keep_going_keep_off_desc: "le laisser désactivé : Qubit attend la réinitialisation"
+    keep_going_leave_on: "Le laisser activé"
+    keep_going_off_line: "Continuer avec les crédits : désactivé (Qubit attend la réinitialisation)"
+    keep_going_on_line: "Continuer avec les crédits : activé (utilise vos crédits quand l’usage inclus est épuisé)"
+    keep_going_turn_off: "Le désactiver"
+    keep_going_turn_off_desc: "Qubit attend la réinitialisation"
+    keep_going_turn_on: "Activer"
+    keep_going_turned_off: "✅ Continuer avec les crédits : désactivé. Qubit attend la réinitialisation."
+    keep_going_turned_on: "✅ Continuer avec les crédits : activé. Utiliser vos crédits quand l’usage inclus est épuisé."
   subscription:
     load_failed_label: "Impossible de charger l'abonnement"
     team_header: "Abonnement d'équipe"
@@ -2235,6 +2256,7 @@ cli:
     restored_from_session: "Modèle rétabli depuis la session : {model}"
     could_not_load_config: "❌ impossible de charger la configuration : {error}"
     tip_reset_new_session: "Astuce : `/reset` démarre immédiatement une nouvelle session."
+    confirm_choice_prompt: "Choix [1/2] : "
   single_query:
     query_label: "Requête :"
     kanban_run_reclaimed: "kanban : l'exécution de ce worker a été reprise avant son démarrage ; sortie"
@@ -2639,6 +2661,14 @@ cli:
     move_out_of_range: "Déplacement hors limites de la file. Taille actuelle : {size}"
     moved: "Élément {source} de la file déplacé vers {destination}."
     usage_add: "Usage : /queue add <prompt>"
+    already_started: "L'élément {index} de la file a déjà démarré ; il s'exécute tel qu'envoyé."
+    change_unknown: "Le gateway n'a pas répondu pour l'élément {index} de la file ({error}) ; vérifiez /queue list avant de réessayer."
+    edit_refused: "Impossible de modifier l'élément {index} de la file : {error}"
+    gateway_refused: "Le gateway ne l'a pas mis en file : {error}. Rien n'a été mis en file ; renvoyez-le à la fin du tour."
+    move_gateway_fifo: "Le gateway exécute les prompts en file dans l'ordre d'envoi ; modifiez ou supprimez-en un à la place."
+    remove_refused: "Impossible de retirer l'élément {index} de la file : {error}"
+    started_stopped: "L'élément {index} de la file avait déjà démarré ; le gateway l'a arrêté."
+    submit_unknown: "Le gateway n'a pas répondu ({error}) ; le prompt est peut-être déjà en file. Vérifiez /queue list avant de le renvoyer."
   reload:
     env_reloaded: ".env rechargé ({count} variable(s) mise(s) à jour)"
   steer:
@@ -3618,6 +3648,27 @@ cli:
     uncommitted_keeping: "⚠ Le worktree a des modifications non commitées, conservé : {path}"
     clean_up_manually: "Pour nettoyer manuellement : git worktree remove --force {path}"
     cleaned_up: "✓ Worktree nettoyé : {path}"
+    archive_failed: "✗ Impossible d'archiver {path}, conservé : {error}"
+    archived: "✓ Worktree archivé dans {ref} et supprimé : {path}"
+    archived_kept: "✓ Worktree archivé dans {ref} mais conservé ({reason}) : {path}"
+    archiving: "Archivage de {path} … (cela peut prendre du temps pour un grand arbre)"
+    discarded: "Worktree supprimé et modifications abandonnées : {path}"
+    exit_choice_archive: "L'archiver et le supprimer (restaurable)"
+    exit_choice_discard: "Le supprimer et abandonner les modifications"
+    exit_choice_keep: "Conserver le worktree (par défaut)"
+    restore_hint: "Pour le restaurer : qubit worktree restore {name}"
+    sweep_archived_kept: "archivé, conservé ({reason}) → {ref}"
+    sweep_archived_removed: "archivé + supprimé → {ref}"
+  modern:
+    hint_commands: "commandes"
+    hint_files: "fichiers"
+    hint_queue: "mettre en file"
+    hint_shell: "shell"
+    hint_stop: "arrêter"
+    preparing: "Préparation de {what}…"
+    thought: "Réflexion"
+    thought_for: "Réflexion pendant {seconds}s"
+    working: "En cours…"
 display:
   verb:
     web_search: "Recherche sur le web"

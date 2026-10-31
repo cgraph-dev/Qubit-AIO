@@ -691,6 +691,8 @@ gateway:
     generic_failed_with_hint: "⚠️ Bir sorun oluştu ve bu yanıtı tamamlayamadım.{hint}\nYeniden denemek için /retry, yeni bir konuşma başlatmak için /new kullanın. Teknik ayrıntılar gateway günlüğünde (`qubit logs`)."
     history_unavailable: "⚠️ Bu oturumun geçmişi geçici olarak kullanılamıyor; bu nedenle mesaj işlenmedi. Operatörden state.db dosyasını incelemesini isteyin, düzeldikten sonra yeniden gönderin. /reset komutunu yalnızca bilinçli olarak yeni bir konuşma başlatmak istiyorsanız kullanın."
     no_credentials: "⚠️ Yapay zekâ model servisine bağlanamadım; bu nedenle mesaj işlenmedi. Yeniden giriş yapmak için /login, farklı bir model seçmek için /model kullanın. Sorun sürerse ana makinede `qubit doctor` çalıştırın."
+    launch_credentials_unavailable: "⚠️ Bu sohbet, başlatıldığı API anahtarını artık kullanamıyor{detail}, bu yüzden içinde hiçbir şey çalıştırılamaz. Açık bir sohbet asla kendiliğinden başka bir anahtara geçmez, bu nedenle /retry de aynı şekilde başarısız olur. Mevcut anahtarınla yeni bir sohbet başlatmak için /new kullan."
+    workspace_unavailable: "⚠️ Bu sohbetin çalışma klasörü artık yok ({path}), bu yüzden mesajın çalıştırılmadı. Klasörü yeniden oluştur ya da sohbeti başka bir klasöre taşı (CLI'da `/worktree new`, masaüstü uygulamasında “Move to project”), sonra mesajını yeniden gönder."
   skills:
     disabled: "**{name}** skill'i kurulu ancak devre dışı.\nEtkinleştirmek için: `qubit skills config`"
     not_installed: "**{name}** skill'i mevcut ancak kurulu değil.\nKurmak için: `qubit skills install {install_name}`"
@@ -947,6 +949,9 @@ gateway:
     hint: "Bakiye yükleme ve faturalandırma işlemlerini tarayıcıda yapın — bakiyeniz ardından burada güncellenir."
   login:
     free_tier_remaining: "\nBazı sohbetler hâlâ ücretsiz katmanda; o sohbetlerde geçiş yapmak için /model kullanın."
+  discard:
+    done: "🗑️ Kaybolan {count} tur atıldı; yeniden çalıştırılmadı. Kaydedilen mesajların şimdi yanıtlanacak."
+    nothing: "Atılacak bir şey yok: bu sohbette yeniden başlatmada kaybolan bir tur yok."
 platform:
   whatsapp:
     clarify_other_title: "✏️ Diğer"
@@ -1001,6 +1006,8 @@ platform:
       resolved_session: "Oturum için onaylandı"
       resolved_always: "Kalıcı olarak onaylandı"
       resolved_deny: "Reddedildi"
+      click_failed: "⚠️ Seçimin kaydedilemedi. Tekrar tıkla veya /approve ya da /deny ile yanıtla."
+      no_longer_pending: "⌛ Bu onay artık beklemede değil (süresi doldu veya başka bir yerde yanıtlandı)"
     slash_confirm:
       already_resolved: "Bu istem zaten sonuçlandırıldı~"
       approve_once: "Bir Kez Onayla"
@@ -1850,6 +1857,20 @@ cli:
     default_ceiling_suffix: " (varsayılan üst sınır)"
     used_this_month: "Bu ay {limit} içinden {spent} kullanıldı{ceiling}"
     monthly_limit_read_only: "Aylık limit portalda ayarlanır — terminal yalnızca salt okunur gösterir."
+    keep_going_choice: "Kredilerle devam et"
+    keep_going_confirm_body: "Dahil kullanım bittiğinde kredilerinizi kullanın. Kapalı: Qubit sıfırlanmayı bekler."
+    keep_going_confirm_title: "Kredilerle devam et?"
+    keep_going_desc: "dahil kullanım bittiğinde kredilerinizi kullanın"
+    keep_going_is_on_title: "Kredilerle devam et açık"
+    keep_going_keep_off_desc: "kapalı bırak: Qubit sıfırlanmayı bekler"
+    keep_going_leave_on: "Açık bırak"
+    keep_going_off_line: "Kredilerle devam et: kapalı (Qubit sıfırlanmayı bekler)"
+    keep_going_on_line: "Kredilerle devam et: açık (dahil kullanım bittiğinde kredilerinizi kullanın)"
+    keep_going_turn_off: "Kapat"
+    keep_going_turn_off_desc: "Qubit sıfırlanmayı bekler"
+    keep_going_turn_on: "Aç"
+    keep_going_turned_off: "✅ Kredilerle devam et: kapalı. Qubit sıfırlanmayı bekler."
+    keep_going_turned_on: "✅ Kredilerle devam et: açık. Dahil kullanım bittiğinde kredilerinizi kullanın."
   subscription:
     load_failed_label: "Abonelik yüklenemedi"
     team_header: "Ekip aboneliği"
@@ -1983,6 +2004,7 @@ cli:
     restored_from_session: "Model oturumdan geri yüklendi: {model}"
     could_not_load_config: "❌ yapılandırma yüklenemedi: {error}"
     tip_reset_new_session: "İpucu: `/reset` hemen yeni bir oturum başlatır."
+    confirm_choice_prompt: "Seçim [1/2]: "
   single_query:
     query_label: "Sorgu:"
     kanban_run_reclaimed: "kanban: bu çalışanın çalıştırması başlamadan önce geri alındı; çıkılıyor"
@@ -2366,6 +2388,14 @@ cli:
     move_out_of_range: "Kuyruk taşıma aralık dışında. Geçerli boyut: {size}"
     moved: "Kuyruk öğesi {source}, {destination} konumuna taşındı."
     usage_add: "Kullanım: /queue add <prompt>"
+    already_started: "Kuyruk öğesi {index} zaten başladı; gönderildiği gibi çalışıyor."
+    change_unknown: "Ağ geçidi kuyruk öğesi {index} için yanıt vermedi ({error}); yeniden denemeden önce /queue list ile kontrol edin."
+    edit_refused: "Kuyruk öğesi {index} düzenlenemedi: {error}"
+    gateway_refused: "Ağ geçidi bunu kuyruğa almadı: {error}. Hiçbir şey kuyruğa alınmadı; tur bitince yeniden gönderin."
+    move_gateway_fifo: "Ağ geçidi kuyruktaki istemleri gönderilme sırasıyla çalıştırır; bunun yerine birini düzenleyin veya kaldırın."
+    remove_refused: "Kuyruk öğesi {index} kaldırılamadı: {error}"
+    started_stopped: "Kuyruk öğesi {index} zaten başlamıştı; ağ geçidi onu durdurdu."
+    submit_unknown: "Ağ geçidi yanıt vermedi ({error}); istem zaten kuyrukta olabilir. Yeniden göndermeden önce /queue list ile kontrol edin."
   reload:
     env_reloaded: ".env yeniden yüklendi ({count} değişken güncellendi)"
   steer:
@@ -3301,6 +3331,27 @@ cli:
     uncommitted_keeping: "⚠ Worktree'de commit edilmemiş değişiklikler var, korunuyor: {path}"
     clean_up_manually: "Elle temizlemek için: git worktree remove --force {path}"
     cleaned_up: "✓ Worktree temizlendi: {path}"
+    archive_failed: "✗ {path} arşivlenemedi, korunuyor: {error}"
+    archived: "✓ Worktree {ref} konumuna arşivlendi ve kaldırıldı: {path}"
+    archived_kept: "✓ Worktree {ref} konumuna arşivlendi ama tutuldu ({reason}): {path}"
+    archiving: "{path} arşivleniyor … (büyük bir ağaçta bu biraz sürebilir)"
+    discarded: "Worktree kaldırıldı ve değişiklikleri atıldı: {path}"
+    exit_choice_archive: "Arşivle ve kaldır (geri yüklenebilir)"
+    exit_choice_discard: "Kaldır ve değişiklikleri at"
+    exit_choice_keep: "Worktree'yi koru (varsayılan)"
+    restore_hint: "Geri yüklemek için: qubit worktree restore {name}"
+    sweep_archived_kept: "arşivlendi, tutuldu ({reason}) → {ref}"
+    sweep_archived_removed: "arşivlendi + kaldırıldı → {ref}"
+  modern:
+    hint_commands: "komutlar"
+    hint_files: "dosyalar"
+    hint_queue: "sıraya al"
+    hint_shell: "kabuk"
+    hint_stop: "durdur"
+    preparing: "{what} hazırlanıyor…"
+    thought: "Düşündü"
+    thought_for: "{seconds} sn düşündü"
+    working: "Çalışıyor…"
 display:
   verb:
     web_search: "Web'de arıyor"
