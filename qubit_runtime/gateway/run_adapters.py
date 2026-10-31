@@ -1062,6 +1062,28 @@ class GatewayAdapterLifecycleMixin:
                 from qubit_constants import get_qubit_home
                 publish_record(ROLE_GATEWAY, profiles=tuple(served), home=str(get_qubit_home()))
 
+    async def _profile_open_policy_violation(self, profile_home: Path) -> Optional[str]:
+        """Fail-fast preflight: the config-only open dm/group policy refusal, before any runtime is
+        reserved or authority published for the profile. ``.env``-provided policy is still caught by
+        ``_load_secondary_profile_config``; this only spares an invalid profile the store build."""
+        from gateway.run import _own_policy_open_startup_violation, _profile_runtime_scope
+        from gateway.config import load_gateway_config
+
+        def _load():
+            with _profile_runtime_scope(profile_home, hydrate_secrets=False):
+                return load_gateway_config()
+
+        try:
+            cfg = await asyncio.to_thread(_load)
+        except Exception:
+            logger.debug("open-policy preflight could not load %s", profile_home, exc_info=True)
+            return None
+        try:
+            return await asyncio.to_thread(_own_policy_open_startup_violation, cfg)
+        except Exception:
+            logger.debug("open-policy preflight failed for %s", profile_home, exc_info=True)
+            return None
+
     async def _load_secondary_profile_config(self, profile_name: str, profile_home: Path):
         """Hydrate + enter ``profile_home``'s scope once; return its gateway config. Raises
         ``MultiplexConfigError`` (open dm/group policy). Port-binding platforms are NOT refused: the
