@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
+import time
 
 import pytest
 
@@ -81,8 +82,15 @@ def _setup(tmp_path):
 
 
 def _rows(home, sql, *args):
-    with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
-        return db.execute(sql, args).fetchall()
+    deadline = time.monotonic() + 60
+    while True:
+        try:
+            with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
+                return db.execute(sql, args).fetchall()
+        except sqlite3.OperationalError as exc:
+            if 'locked' not in str(exc).lower() or time.monotonic() >= deadline:
+                raise
+            time.sleep(.05)
 
 
 async def _submit(home, desc, url, text):
