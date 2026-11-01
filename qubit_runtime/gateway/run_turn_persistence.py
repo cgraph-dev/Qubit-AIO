@@ -29,6 +29,7 @@ from gateway.session import (
 )
 from gateway.session_transcript import TranscriptReadError
 from gateway.turn_context import TurnContext
+from gateway.usage_limit_offer import GatewayUsageLimitOfferMixin
 from gateway.warning_notifications import diagnostic_wake_muted
 from gateway.turn_lease import DEFAULT_LEASE_WAIT, TurnLeaseTimeoutError
 from qubit_constants import get_qubit_home_override
@@ -128,7 +129,7 @@ class GatewayTurnPersistenceMixin:
             # model's note to itself, not text for the reader: deliver the reply without it.
             from gateway.response_filters import strip_trailing_silence_marker
             response = strip_trailing_silence_marker(response)
-            response = self._usage_window_chat_wording(agent_result, response)
+            response = GatewayUsageLimitOfferMixin._usage_window_chat_wording(agent_result, response)
 
         # The agent thread already updated the contextvar; propagate to SessionEntry + _save() only
         # if the binding still points at the session this run was launched against.

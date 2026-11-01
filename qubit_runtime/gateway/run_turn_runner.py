@@ -1038,7 +1038,10 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                     'total_tokens': incoming + outgoing,
                     # The rest of the finite viewer's ledger: a committed receipt must carry
                     # what ``run_conversation`` reported, not only the token counts.
-                    **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS if key in result},
+                    # ``total_tokens`` stays the turn's own sum: the result's value is the
+                    # provider's cumulative session total, which would poison a later turn.
+                    **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS
+                       if key != 'total_tokens' and key in result},
                 }
                 _settle_api_runtime_lock(agent, result, captured)
             return result
