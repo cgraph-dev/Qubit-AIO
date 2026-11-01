@@ -3053,6 +3053,19 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
                     sessions = await _list()
             except Exception:
                 pass  # resolution degrades to today's no-row behavior
+        if title_filter and not sessions:
+            # An exact-title row can be a SUPERSEDED segment of a local reset lineage: its title
+            # stays on the creation id while the listing projects the live (untitled) tip, so the
+            # listing lane drops it as an earlier segment. The name is still its identity (Bot
+            # Mode re-resolves it by exact title), so answer with that canonical row.
+            try:
+                row = await asyncio.to_thread(db.get_session_by_title, title_filter)
+                if row is not None and ((row.get("hidden") and not include_hidden) or row.get("archived")):
+                    row = None
+            except Exception:
+                row = None
+            if row is not None:
+                sessions = [row]
         # Back-filled pins arrive PAST the limit, so counting them would report
         # another page that doesn't exist. Only the recency window decides.
         windowed = sum(1 for s in sessions if not s.get("pinned"))
