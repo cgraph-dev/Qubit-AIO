@@ -486,7 +486,15 @@ def _infer_provider_from_url(base_url: str) -> Optional[str]:
     for url_part, provider in _URL_TO_PROVIDER.items():
         if url_part in host:
             return provider
-    return None
+    # A registered profile may claim hosts this table predates (``hostnames`` /
+    # ``metadata_hostnames``); ask it live rather than freezing host claims into the
+    # import-time table. ``profile_for_host`` is exact/subdomain, never a substring.
+    try:
+        from providers import profile_for_host
+        profile = profile_for_host(base_url, metadata=True)
+    except Exception:
+        profile = None
+    return getattr(profile, "name", None)
 
 
 def _strip_openrouter_routing_variant(
@@ -2213,6 +2221,18 @@ def _config_override_context_length(model: str, base_url: str, provider: str, cu
 
 def _resolve_provider_aware_context_length(model: str, base_url: str, api_key: str, provider: str, effective_provider: str) -> Optional[int]:
     """Step 5: provider-specific sources, tried in order; None when all miss."""
+    # 5. A profile that claims this endpoint may answer its own authoritative window from a
+    # credentialed live catalog. Consulted after the persistent cache (step 1) and before the
+    # generic models.dev tables below, so a provider-imposed limit wins for its own host.
+    if base_url or effective_provider:
+        from providers import get_provider_profile, profile_for_host
+        profile = get_provider_profile(effective_provider) if effective_provider else None
+        if profile is None and base_url:
+            profile = profile_for_host(base_url, metadata=True)
+        if profile is not None:
+            ctx = profile.live_context_length(model, api_key=api_key or "", base_url=base_url or "")
+            if ctx:
+                return ctx
     # 5a. Copilot live /models — account-specific models (claude-opus-4.6-1m) absent from
     # models.dev, and the provider-enforced limit for the rest.
     if effective_provider in {"copilot", "copilot-acp", "github-copilot"}:
