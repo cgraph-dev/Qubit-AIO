@@ -192,6 +192,18 @@ def _last_activity(path: str) -> float:
 # ---------------------------------------------------------------- planning
 
 
+def _resumable_session_in_tree(entry: Path) -> bool:
+    """A session with history or pending work keeps its frozen checkout."""
+    try:
+        from qubit_constants import get_qubit_home
+        from qubit_cli.worktree_ops import _retained_tree_is_live
+
+        return _retained_tree_is_live(str(get_qubit_home() / "state.db"), str(entry))
+    except Exception:
+        logger.debug("worktree session retention check failed", exc_info=True)
+        return False
+
+
 def _tier_hours(name: str, max_age_hours: float) -> float:
     from qubit_cli.worktree_ops import prune_tier_hours
     return prune_tier_hours(name, max_age_hours)
@@ -282,6 +294,8 @@ def plan_sweep(repo_root: str, max_age_hours: int = 24, settings: Optional[dict]
             d.action, d.reason = "skip-live-process", f"in use by pid {', '.join(map(str, live[str(entry)][:5]))}"
         elif verdict == "locked-live":
             d.action, d.reason = "skip-live-lock", "lock owner still running"
+        elif _resumable_session_in_tree(entry):
+            d.action, d.reason = "skip-resumable-session", "a resumable session's cwd is inside"
         elif verdict in _ARCHIVE_REASONS and classic_mode(settings):
             d.action, d.reason = f"keep-{verdict}", _ARCHIVE_REASONS[verdict]
         elif verdict in _ARCHIVE_REASONS:

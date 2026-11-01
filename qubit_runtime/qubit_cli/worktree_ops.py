@@ -1257,7 +1257,7 @@ def _cron_bound_to_tree(worktree_path: str, chats: set) -> bool:
     return False
 
 
-_AUTO_TREE_PREFIXES = ("hermes-", "subagent-")
+_AUTO_TREE_PREFIXES = ("qubit-", "hermes-", "subagent-")
 
 
 def prune_tier_hours(name: str, max_age_hours: float) -> float:
