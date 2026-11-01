@@ -38,7 +38,7 @@ def test_spa_documents_share_the_bootstrap_policy(monkeypatch, tmp_path, surface
     if path in ("/", "/chat/session") or (path == "/index.html" and surface == "webapp"):
         # On the Webapp /index.html is included: every entry to the app gets the bootstrap.
         assert "no-store" in response.headers.get("cache-control", "")
-        assert f'window.__HERMES_BASE_PATH__="{prefix}"' in response.text
+        assert f'window.__QUBIT_BASE_PATH__="{prefix}"' in response.text
         assert f'src="{prefix}/assets/app.js"' in response.text
     assert server._SESSION_TOKEN not in response.text
 
@@ -46,17 +46,17 @@ def test_spa_documents_share_the_bootstrap_policy(monkeypatch, tmp_path, surface
 @pytest.mark.parametrize("gated", [False, True])
 def test_the_dashboard_serves_index_html_and_its_bootstrap_as_on_main(monkeypatch, tmp_path, gated):
     """With the Webapp off, ``/index.html`` is the built file itself and the bootstrap names no
-    surface: only the Webapp's page carries ``__HERMES_UI_SURFACE__``, which its renderer reads."""
+    surface: only the Webapp's page carries ``__QUBIT_UI_SURFACE__``, which its renderer reads."""
     client = _spa(monkeypatch, tmp_path, surface=None, gated=gated)
 
     raw = client.get("/index.html")
     assert raw.status_code == 200
     assert raw.text == HTML
-    assert "__HERMES_UI_SURFACE__" not in client.get("/").text
+    assert "__QUBIT_UI_SURFACE__" not in client.get("/").text
 
 
 def test_the_webapp_page_names_its_surface(monkeypatch, tmp_path):
     client = _spa(monkeypatch, tmp_path, surface="webapp", gated=False)
 
     for path in ("/", "/index.html"):
-        assert 'window.__HERMES_UI_SURFACE__="webapp"' in client.get(path).text
+        assert 'window.__QUBIT_UI_SURFACE__="webapp"' in client.get(path).text
