@@ -192,10 +192,20 @@ def test_worker_death_recovers_at_each_durable_publication_boundary(
     from pm.store import tree_digest
 
     worker_toolchain(client, monkeypatch, isolated_python)
+    from tests.pm.test_environment_build import _wheel
+    wheel = _wheel(tmp_path, "publication_dep")
     project = tmp_path / "project"
     project.mkdir()
     monkeypatch.setattr(paths, "repo_root", lambda: project)
-    core = '[project]\nname="death-proof"\nversion="1"\nrequires-python=">=3.11"\n[tool.uv]\npackage=false\n'
+    # A real dependency makes the environment stamp/rebuild paths observable;
+    # the pin contract (`dependencies=[]` installs nothing) is covered by
+    # test_plugin_declarations.py.
+    core = (
+        '[project]\nname="death-proof"\nversion="1"\nrequires-python=">=3.11"\n'
+        'dependencies=["publication-dep==1.0"]\n'
+        '[tool.uv]\npackage=false\nno-index=true\n'
+        f'find-links=[{json.dumps(wheel.parent.as_posix())}]\n'
+    )
     (project / "pyproject.toml").write_text(core)
     client.lock_project(project, offline=True, explicit=True)
     home = tmp_path / "home"
