@@ -6,6 +6,7 @@ import functools
 import importlib.util
 import inspect
 import logging
+import shutil
 import subprocess
 from typing import Any, Dict, Optional
 
@@ -49,7 +50,7 @@ def terminal_backend_unavailable_reason() -> Optional[str]:
 
 _VERCEL_SANDBOX_DEFAULT_CWD = "/vercel/sandbox"
 _SUPPORTED_VERCEL_RUNTIMES = ("node24", "node22", "python3.13")
-_BUILTIN_BACKENDS = "local, docker, modal, daytona, vercel_sandbox, ssh"
+_BUILTIN_BACKENDS = "local, docker, singularity, modal, daytona, vercel_sandbox, ssh"
 
 # Config -> kwargs shapers, driven by (out_key, config_key, default) tables. The container table's
 # (key, default) literal is intentionally greppable; tools/terminal_tool.py keeps its own for the AST test.
@@ -186,6 +187,8 @@ def _build_modal_env(*, image, cwd, timeout, cc, task_id, **_):
 # env_type -> (class getter, takes image, extra kwargs from (cc, resource kwargs)). SDK-backed modules
 # (daytona/vercel) are imported lazily so they are only required when that backend is selected.
 _SANDBOX_ROWS = {
+    "singularity": (lambda: importlib.import_module("tools.environments.singularity").SingularityEnvironment,
+                    True, lambda cc, kw: {}),
     "daytona": (lambda: importlib.import_module("tools.environments.daytona").DaytonaEnvironment, True,
                 lambda cc, kw: {"cpu": int(kw["cpu"])}),
     "vercel_sandbox": (lambda: importlib.import_module("tools.environments.vercel_sandbox").VercelSandboxEnvironment,
@@ -358,6 +361,7 @@ _BACKEND_SPECS: dict[str, dict[str, Any]] = {
     "docker": {"binary": (lambda: importlib.import_module("tools.environments.docker").find_docker(), "version",
                           "Docker is not installed — no docker executable in PATH or the usual install locations")},
     "ssh": {"pre": _ssh_pre},
+    "singularity": {"binary": (lambda: shutil.which("apptainer") or shutil.which("singularity"), "--version", None)},
     "modal": {"pre": _modal_pre,
               "module": ("modal", "modal is required for direct modal terminal backend. Run qubit setup terminal and select Modal.")},
     "vercel_sandbox": {"pre": _check_vercel},
@@ -367,6 +371,7 @@ _BACKEND_SPECS: dict[str, dict[str, Any]] = {
 
 _PROBE_FAILED_REASONS = {
     "docker": "Docker is installed but the Docker daemon is not running",
+    "singularity": "Apptainer/Singularity is installed but `--version` failed, so the install looks broken",
 }
 
 
