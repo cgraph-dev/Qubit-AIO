@@ -915,6 +915,9 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
         self._init_model_routing(model, toolsets, provider, reasoning, api_key, base_url, max_turns, run_budget,
                                  checkpoints, pass_session_id, ignore_rules)
         self._init_runtime_state(resume)
+        # First terminal-command gate lazily checks tirith once; the flag must exist
+        # even when a fast/TUI path reaches the gate before callbacks are installed.
+        self._tirith_security_checked = False
 
 
     def _claim_active_session(self, surface: str = "cli", *, stderr: bool = False) -> bool:
