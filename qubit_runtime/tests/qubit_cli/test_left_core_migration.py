@@ -398,10 +398,10 @@ def test_old_spotify_commands_point_at_the_plugin(tmp_path, monkeypatch):
     hint = lcm.moved_command_hint("qubit auth", "spotify", "status")
     assert "`qubit auth status spotify` is now `qubit spotify status`" in hint
     assert "plugins install spotify" in hint
-    assert "plugins install spotify" in lcm.moved_command_hint("hermes", "spotify")
+    assert "plugins install spotify" in lcm.moved_command_hint("qubit", "spotify")
     (home / "plugins" / "spotify").mkdir(parents=True)  # installed but disabled
-    assert "plugins enable spotify" in lcm.moved_command_hint("hermes", "spotify")
-    assert lcm.moved_command_hint("hermes", "honcho") == ""
+    assert "plugins enable spotify" in lcm.moved_command_hint("qubit", "spotify")
+    assert lcm.moved_command_hint("qubit", "honcho") == ""
 
 
 def test_old_mcp_serve_spelling_names_the_plugin_command(tmp_path, monkeypatch, capsys):
@@ -412,7 +412,7 @@ def test_old_mcp_serve_spelling_names_the_plugin_command(tmp_path, monkeypatch, 
     from qubit_cli import main as main_mod
     home = _home(tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setattr(sys, "argv", ["hermes", "mcp", "serve", "--tools"])
+    monkeypatch.setattr(sys, "argv", ["qubit", "mcp", "serve", "--tools"])
     parser, _ = main_mod._build_cli_parser()
     with pytest.raises(SystemExit) as exc:
         parser.parse_args(["mcp", "serve", "--tools"])

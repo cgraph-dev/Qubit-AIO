@@ -1687,7 +1687,6 @@ def _run_desktop_one_shot(args: argparse.Namespace, desktop_dir: Path, *, bundle
     """Run a host-setup one-shot flag, then exit without building or launching."""
     # macOS: a self-signed code-signing identity so TCC grants survive rebuilds.
     if getattr(args, "setup_tcc_identity", False):
-        from qubit_cli.main_desktop_tcc import _desktop_macos_setup_tcc_identity
         identity = getattr(args, "identity", None) or "Qubit Local Signing"
         sys.exit(0 if _desktop_macos_setup_tcc_identity(identity) else 1)
     # Linux: the per-binary AppArmor profile for Chromium's namespace sandbox (#130177).

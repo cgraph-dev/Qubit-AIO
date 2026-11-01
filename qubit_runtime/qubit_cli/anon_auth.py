@@ -674,6 +674,7 @@ def _reconcile_and_provision(*, timeout_seconds: float, force: bool = False,
             shared = _read_shared_nous_state()
             if shared and _shared_identity_key(shared) != _shared_identity_key(profile_state):
                 state = dict(shared)
+                state.pop("renewal", None)  # a sibling's rotated account token is not this identity
                 _store_provider_state(auth_store, "nous", state, set_active=not is_guest_state(state))
                 _save_auth_store(auth_store)
                 logger.debug("Qubit identity adopted from the shared store")
@@ -746,6 +747,8 @@ def ensure_portal_identity(
         raise err from exc
     if state is not None:
         _clear_mint_failure()
+        from qubit_cli.guest_handoff import drain
+        drain()  # adopting an account from a sibling profile hands over the guest it replaced
     return state
 
 

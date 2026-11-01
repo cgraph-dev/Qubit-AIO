@@ -79,11 +79,13 @@ async def run(params, board_db):
                     # kanban.run subscribes this socket to the card's session, but only receipts
                     # matter here: discard the turn's events, or they fill the client's bounded
                     # queue and its reader stops, with the next receipt behind it.
-                    drain = asyncio.create_task(_discard(client.events))
+                    events = getattr(client, "events", None)
+                    drain = asyncio.create_task(_discard(events)) if events is not None else None
                     try:
                         receipt = await _await_receipt(client, params, board_db, claim)
                     finally:
-                        drain.cancel()
+                        if drain is not None:
+                            drain.cancel()
         # A restart also surfaces as a refused or reset dial, a failed handshake, or an answer
         # that never came.
         except (GatewayClientError, WebSocketException, OSError, TimeoutError) as exc:

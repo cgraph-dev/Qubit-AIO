@@ -2373,6 +2373,7 @@ def release_stale_claims(
     now = int(time.time())
     reclaimed = 0
     host_prefix = _host_prefix()
+    from qubit_cli.kanban_owner_recovery import owner_reclaim_blocked, reclaim_error
     stale = conn.execute(
         "SELECT id, claim_lock, worker_pid, worker_started_at, claim_expires, last_heartbeat_at, "
         "       assignee "
@@ -2392,6 +2393,11 @@ def release_stale_claims(
             _extend_live_stale_claim(conn, row, now)
             continue
 
+        # An unresolved owner receipt holds the claim while the attempt may still run; once
+        # nothing can be executing it, the reclaim proceeds and names what the owner recorded.
+        if owner_reclaim_blocked(conn, row["id"]):
+            continue
+
         termination = _terminate_reclaimed_worker(
             row["worker_pid"], row["claim_lock"], signal_fn=signal_fn, started_at=started_at,
         )
@@ -2403,6 +2409,11 @@ def release_stale_claims(
             )
             continue
         with write_txn(conn):
+            # Re-check under the same write lock as the release: a recovered owner can bind a
+            # live interpreter after the first look without changing claim_lock or worker_pid.
+            if owner_reclaim_blocked(conn, row["id"]):
+                continue
+            error_text = reclaim_error(conn, row["id"], row["claim_lock"])
             retry_status = _retry_status_for_run(conn, row["id"])
             cur = conn.execute(
                 "UPDATE tasks SET status = ?, claim_lock = NULL, "
@@ -2417,7 +2428,7 @@ def release_stale_claims(
                 continue
             run_id = _record_reclaim(
                 conn, row["id"], termination,
-                error=f"stale_lock={row['claim_lock']}",
+                error=error_text,
                 payload={
                     "stale_lock": row["claim_lock"],
                     "worker_pid": _opt_int(row["worker_pid"]),
@@ -2434,7 +2445,7 @@ def release_stale_claims(
         # the run ended without a verdict, so it counts toward the breaker and a
         # trip flips the task to ``blocked`` + ``gave_up`` on top of ``reclaimed``.
         _record_task_failure(
-            conn, row["id"], f"stale_lock={row['claim_lock']}",
+            conn, row["id"], error_text,
             outcome="reclaimed", failure_limit=failure_limit,
             release_claim=False, end_run=False,
             event_payload_extra={"worker_pid": _opt_int(row["worker_pid"]), "retry_status": retry_status},

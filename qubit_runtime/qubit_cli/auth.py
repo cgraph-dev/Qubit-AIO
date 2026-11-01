@@ -869,6 +869,8 @@ def _provider_state_transaction(
 def _store_provider_state(
     auth_store: Dict[str, Any], provider_id: str, state: Dict[str, Any], *, set_active: bool = True,
 ) -> None:
+    from qubit_cli.guest_handoff import note_store_write
+    note_store_write(auth_store, provider_id, state)
     _store_section(auth_store, "providers")[provider_id] = state
     if set_active:
         auth_store["active_provider"] = provider_id
@@ -1411,24 +1413,8 @@ def deactivate_provider() -> None:
 
 def _get_config_hint_for_unknown_provider(provider_name: str) -> str:
     """Return a helpful hint string when provider resolution fails."""
-    if str(provider_name or "").strip().lower() in {"opencode-free", "free", "opencode_free"}:
-        return ("OpenCode discontinued anonymous free-tier access outside its own client "
-                "(relay 403s FreeTierError), so the keyless 'opencode-free' provider was removed. "
-                "Switch to 'opencode-zen' (pay-as-you-go, OPENCODE_ZEN_API_KEY) or 'opencode-go' "
-                "($10/mo subscription, OPENCODE_GO_API_KEY) via 'qubit model'.")
-    try:
-        from qubit_cli.config import validate_config_structure
-        issues = validate_config_structure()
-        if not issues:
-            return ""
-        lines = ["Config issue detected — run 'qubit doctor' for full diagnostics:"]
-        for ci in issues:
-            lines.append(f"  [{'ERROR' if ci.severity == 'error' else 'WARNING'}] {ci.message}")
-            if ci.hint and ci.hint.splitlines()[0]:
-                lines.append(f"    → {ci.hint.splitlines()[0]}")
-        return "\n".join(lines)
-    except Exception:
-        return ""
+    from qubit_cli.auth_error_copy import unknown_provider_hint
+    return unknown_provider_hint(provider_name)
 
 
 def _refuse_env_adoption_if_config_corrupt() -> None:
