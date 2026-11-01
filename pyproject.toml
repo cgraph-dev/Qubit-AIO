@@ -238,10 +238,10 @@ path = "scripts/hatch_build_qubit.py"
 # The docs reorg (2026-09-21) moved the source docs under
 # docs/archive/2026-09-21/; the installed resource names/destinations are
 # unchanged so voicebridge/resources.py and install-time readers keep working.
-"docs/archive/2026-09-21/HowTo.md" = "voicebridge/_data/docs/HowTo.md"
-"docs/archive/2026-09-21/AUDIO_SETUP.md" = "voicebridge/_data/docs/AUDIO_SETUP.md"
-"docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md" = "voicebridge/_data/docs/VOICE_BRIDGE_SYSTEM.md"
-"docs/archive/2026-09-21/QUBIT_MIGRATION.md" = "voicebridge/_data/docs/archive/2026-09-21/QUBIT_MIGRATION.md"
+"README.md" = "voicebridge/_data/docs/HowTo.md"
+"docs/VOICE-BRIDGE-AUDIT.md" = "voicebridge/_data/docs/AUDIO_SETUP.md"
+"docs/ARCHITECTURE.md" = "voicebridge/_data/docs/VOICE_BRIDGE_SYSTEM.md"
+"docs/MIGRATION.md" = "voicebridge/_data/docs/archive/2026-09-21/QUBIT_MIGRATION.md"
 "systemd" = "voicebridge/_data/systemd"
 
 # --- Qubit-owned runtime (Packet 8U, owner amendment 2026-09-11) ----------
@@ -366,7 +366,7 @@ path = "scripts/hatch_build_qubit.py"
 # voicebridge/capability_catalog.py and voicebridge/portable.py resolve them.
 "docs/archive/2026-09-21/PARITY_HERMES.json" = "voicebridge/_data/docs/PARITY_HERMES.json"
 "docs/archive/2026-09-21/MATRIX_8T_F.json" = "voicebridge/_data/docs/MATRIX_8T_F.json"
-"docs/archive/2026-09-21/MIGRATIONS.md" = "voicebridge/_data/docs/MIGRATIONS.md"
+"docs/README.md" = "voicebridge/_data/docs/MIGRATIONS.md"
 
 [tool.hatch.build.targets.sdist]
 # The generated dashboard build ships in the sdist too (reproducible build
