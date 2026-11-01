@@ -958,13 +958,13 @@ app.include_router(_dashboard_auth_router)
 mount_spa(app)
 
 
-def _no_auth_provider_message(host: str) -> str:
+def _no_auth_provider_message(host: str, *, listener_public_url: str | None = None) -> str:
     """Actionable SystemExit text for a gated bind with no registered auth provider.
 
-    Names the exact trigger: on a loopback bind the ONLY trigger is
-    dashboard.public_url, so print the offending URL and the remove-it exit.
-    Bundled providers expose ``LAST_SKIP_REASON`` so an installed-but-
-    unconfigured provider is not reported as merely "no providers".
+    Names the exact trigger: on a loopback bind it is the listener's own public URL
+    (``webapp.public_url``) or the dashboard's; print the offending URL and the
+    remove-it exit. Bundled providers expose ``LAST_SKIP_REASON`` so an
+    installed-but-unconfigured provider is not reported as merely "no providers".
     """
     skip_reasons: list[str] = []
     try:
@@ -976,25 +976,38 @@ def _no_auth_provider_message(host: str) -> str:
         pass
 
     if host in _LOOPBACK_HOST_VALUES:
-        public_url = ""
-        try:
-            from qubit_cli.dashboard_auth.prefix import resolve_public_url
+        if listener_public_url is not None:
+            public_url = listener_public_url
+            gate_reason = (
+                f"webapp.public_url is set to "
+                f"{public_url or '<a non-loopback URL>'} — the Webapp's own "
+                f"external URL engages the auth gate even on a loopback bind"
+            )
+            fix_hint = (
+                "If this Webapp should be LOCAL-ONLY (no reverse proxy), remove "
+                "webapp.public_url from config.yaml to restore the unauthenticated "
+                "loopback mode.\n"
+            )
+        else:
+            public_url = ""
+            try:
+                from qubit_cli.dashboard_auth.prefix import resolve_public_url
 
-            public_url = resolve_public_url()
-        except Exception:
-            pass
-        gate_reason = (
-            f"dashboard.public_url is set to "
-            f"{public_url or '<a non-loopback URL>'} — an "
-            f"operator-declared external URL engages the auth gate "
-            f"even on a loopback bind"
-        )
-        fix_hint = (
-            "If this dashboard should be LOCAL-ONLY (no reverse "
-            "proxy), remove dashboard.public_url from config.yaml "
-            "(and unset HERMES_DASHBOARD_PUBLIC_URL) to restore the "
-            "unauthenticated loopback mode.\n"
-        )
+                public_url = resolve_public_url()
+            except Exception:
+                pass
+            gate_reason = (
+                f"dashboard.public_url is set to "
+                f"{public_url or '<a non-loopback URL>'} — an "
+                f"operator-declared external URL engages the auth gate "
+                f"even on a loopback bind"
+            )
+            fix_hint = (
+                "If this dashboard should be LOCAL-ONLY (no reverse "
+                "proxy), remove dashboard.public_url from config.yaml "
+                "(and unset HERMES_DASHBOARD_PUBLIC_URL) to restore the "
+                "unauthenticated loopback mode.\n"
+            )
     else:
         gate_reason = f"the auth gate engages on non-loopback binds ({host})"
         fix_hint = ""
@@ -1009,8 +1022,9 @@ def _no_auth_provider_message(host: str) -> str:
         "  • OAuth: run `qubit dashboard register` (Qubit Labs) or "
         "install a DashboardAuthProvider plugin.\n"
         "There is no unauthenticated public-dashboard option. For "
-        "local-only use, bind 127.0.0.1 and leave dashboard.public_url "
-        "unset; a configured external public URL requires auth even "
+        "local-only use, bind 127.0.0.1 and leave "
+        + ("webapp.public_url " if listener_public_url is not None else "dashboard.public_url ")
+        + "unset; a configured external public URL requires auth even "
         "when a local reverse proxy reaches a loopback backend."
     )
     # Credentials exist but the bundled provider is disabled (#54489). Basic
@@ -1058,21 +1072,30 @@ def _configure_auth_gate(
     # reverse-proxy deployments; resolved once so middleware never reloads
     # config. A non-loopback public hostname engages the gate even on a loopback
     # backend, else the SPA's local session token becomes remotely reachable.
-    app.state.trusted_public_hosts = _dashboard_public_hosts()
-    # auth_required drives middleware, SPA-token injection, WS auth, the
-    # startup refusal, the gate-on banner and uvicorn proxy_headers.
-    if _desktop_loopback_auth_exempt(host, ssh_session_token, ssh_owner_nonce):
-        # public_url describes the operator's PUBLIC deployment, not this
-        # Desktop-owned loopback backend (#96490), which authenticates with the
-        # per-spawn session token the ticket-only gate would refuse.
-        app.state.auth_required = should_require_auth(host)
-        _log.info(
-            "Desktop-owned loopback backend: dashboard.public_url does not "
-            "engage the ticket gate for this process; the public deployment "
-            "keeps its own gate.",
-        )
+    # The gateway's Webapp listener declares its OWN public URL (webapp.public_url)
+    # before this gate runs: the dashboard's URL never governs that listener.
+    listener_public_url = getattr(app.state, "listener_public_url", None)
+    if listener_public_url is not None:
+        from qubit_cli.web_server_boundary import public_hosts_engage_gate, public_url_hosts
+        app.state.trusted_public_hosts = public_url_hosts(listener_public_url)
+        app.state.auth_required = (should_require_auth(host)
+                                   or public_hosts_engage_gate(app.state.trusted_public_hosts))
     else:
-        app.state.auth_required = should_require_dashboard_auth(host, app.state.trusted_public_hosts)
+        app.state.trusted_public_hosts = _dashboard_public_hosts()
+        # auth_required drives middleware, SPA-token injection, WS auth, the
+        # startup refusal, the gate-on banner and uvicorn proxy_headers.
+        if _desktop_loopback_auth_exempt(host, ssh_session_token, ssh_owner_nonce):
+            # public_url describes the operator's PUBLIC deployment, not this
+            # Desktop-owned loopback backend (#96490), which authenticates with the
+            # per-spawn session token the ticket-only gate would refuse.
+            app.state.auth_required = should_require_auth(host)
+            _log.info(
+                "Desktop-owned loopback backend: dashboard.public_url does not "
+                "engage the ticket gate for this process; the public deployment "
+                "keeps its own gate.",
+            )
+        else:
+            app.state.auth_required = should_require_dashboard_auth(host, app.state.trusted_public_hosts)
 
     # ``--insecure`` no longer disables the gate (June 2026 hermes-0day
     # hardening); warn that it is a no-op rather than silently ignore it.
@@ -1089,7 +1112,7 @@ def _configure_auth_gate(
         # No escape hatch serves a gated dashboard without a provider.
         from qubit_cli.dashboard_auth import list_providers
         if not list_providers():
-            raise SystemExit(_no_auth_provider_message(host))
+            raise SystemExit(_no_auth_provider_message(host, listener_public_url=listener_public_url))
         _log.info(
             "Dashboard binding to %s with auth gate enabled. Providers: %s",
             host,

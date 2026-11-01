@@ -730,6 +730,11 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
         from gateway.run import _drain_gateway_watch_events, _format_gateway_process_notification
         watch_events = _drain_gateway_watch_events(completion_queue)
         for evt in watch_events:
+            now = time.monotonic()
+            next_attempt = evt.get("_watch_next_attempt_at")
+            if isinstance(next_attempt, (int, float)) and now < next_attempt:
+                completion_queue.put(evt)  # bounded backoff: not attempted on every drain tick
+                continue
             async with self._completion_event_scope(evt):
                 from tools.process_registry_notifications import should_surface_notification
                 if not should_surface_notification(evt):
@@ -750,6 +755,21 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
                         delivered = False
             # The original event: a requeued tick folds again from what is still queued.
             if delivered is False:
+                attempts = int(evt.get("_watch_injection_attempts") or 0) + 1
+                evt["_watch_injection_attempts"] = attempts
+                if evt.get("_refusal_permanent") is True and attempts >= _MAX_COMPLETION_INJECTION_ATTEMPTS:
+                    # Only a refusal proven permanent (``not_found``: the route holds no
+                    # session) spends the bounded attempt budget and is then dropped. A
+                    # refusal that may still clear (``runtime_draining``, an unowned or
+                    # foreign pin) is never dropped.
+                    logger.warning(
+                        "Watch notification refused %d times with a permanent verdict; "
+                        "dropping the queued event for %s chat=%s",
+                        attempts, evt.get("platform", "unknown"), evt.get("chat_id", "unknown"))
+                    continue
+                evt["_watch_next_attempt_at"] = now + jittered_backoff(
+                    attempts, base_delay=2.0, max_delay=_COMPLETION_INJECTION_RETRY_MAX_DELAY,
+                    jitter_ratio=0.0)
                 completion_queue.put(evt)
 
     def _adapter_by_platform_value(self, platform_name: str):

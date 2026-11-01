@@ -2215,6 +2215,7 @@ from gateway.run_goals import GatewayGoalsMixin
 from gateway.run_agent_cache import GatewayAgentCacheMixin
 from gateway.run_profile_reconcile import GatewayProfileReconcileMixin
 from gateway.run_plugin_rewire import GatewayPluginRewireMixin
+from gateway.usage_limit_offer import GatewayUsageLimitOfferMixin
 from gateway.platforms.base import (
     BasePlatformAdapter,
     _reply_anchor_for_event,
@@ -3375,7 +3376,8 @@ class GatewayRunner(
     GatewayVoiceMixin, GatewayAdapterLifecycleMixin, GatewayTopicThreadsMixin, GatewayTurnMixin,
     GatewayShutdownMixin, GatewayBusySessionMixin, GatewayConfigLoadersMixin, GatewayStartupMixin,
     GatewaySessionWatchersMixin, GatewayNotificationsMixin, GatewayInboundMixin, GatewayGoalsMixin,
-    GatewayAgentCacheMixin, GatewayProfileReconcileMixin, GatewayPluginRewireMixin):
+    GatewayAgentCacheMixin, GatewayProfileReconcileMixin, GatewayPluginRewireMixin,
+    GatewayUsageLimitOfferMixin):
     """Main gateway controller: manages adapter lifecycles, routes messages to/from the agent."""
 
     def _adapter_for_source(self, source):

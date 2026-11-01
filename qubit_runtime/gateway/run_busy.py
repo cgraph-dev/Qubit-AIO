@@ -125,6 +125,24 @@ class GatewayBusySessionMixin:
             pending_slot[session_key] = queued_event
         queued_event._gateway_accepted = True
 
+    def _pop_admitted_before_drain(self, session_key: str, adapter: Any) -> Optional[MessageEvent]:
+        """The oldest queued follow-up the producer already had acknowledged before the drain.
+
+        Its receipt is final (the producer will not retry it), so the drain must run it rather
+        than discard it; human follow-ups ahead and behind it stay queued in order."""
+        pending_slot = getattr(adapter, "_pending_messages", None) if adapter is not None else None
+        if isinstance(pending_slot, dict):
+            current = pending_slot.get(session_key)
+            if current is not None and getattr(current, "_admitted_before_drain", False):
+                pending_slot.pop(session_key, None)
+                return current
+        overflow = self._overflow_queue(session_key)
+        if overflow:
+            for index, queued in enumerate(overflow):
+                if getattr(queued, "_admitted_before_drain", False):
+                    return overflow.pop(index)
+        return None
+
     def _promote_queued_event(
         self, session_key: str, adapter: Any, pending_event: Optional[MessageEvent]
     ) -> Optional[MessageEvent]:

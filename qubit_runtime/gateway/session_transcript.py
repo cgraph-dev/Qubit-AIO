@@ -110,6 +110,11 @@ class SessionTranscriptMixin:
     def _compression_tip_for_session_id(self, session_id: Optional[str]) -> Optional[str]:
         """Latest compression continuation for *session_id* (heals a mapping left pointing at a
         compressed parent by a restart or failed send)."""
+        # A route transition published this id but has not inserted its row yet (a turn
+        # finishing while /new or /resume writes state.db): it has no compression history, and
+        # reading the shared writer here would block behind that transaction (#140971 family).
+        if session_id and session_id in getattr(self, "_rows_pending", ()):
+            return session_id
         db = self._db_for_session_id(session_id) if session_id else None
         if db is None:
             return session_id

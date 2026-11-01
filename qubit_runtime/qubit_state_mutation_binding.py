@@ -54,7 +54,7 @@ def authorize_history(conn, actor, session_id, *, claim=False):
     binding = json.dumps([actor.profile_id, actor.subject], separators=(',', ':'))
     saved = conn.execute('SELECT value FROM state_meta WHERE key=?', (key,)).fetchone()
     if saved is not None:
-        if saved[0] != binding:
+        if not binding_names(saved[0], actor.profile_id, actor.subject):
             raise RuntimeStoreError('permission_denied')
         return True
     if row['source'] not in _history_sources():
