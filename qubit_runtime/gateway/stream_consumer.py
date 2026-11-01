@@ -30,6 +30,10 @@ from gateway.config import (
 from gateway.response_filters import (
     is_intentional_silence_response as _is_intentional_silence_response,
     is_partial_silence_marker as _is_partial_silence_marker)
+from gateway.stream_consumer_directives import (
+    has_pending_media_directive,
+    strip_image_tags_for_display,
+)
 from gateway.stream_consumer_fences import ensure_closed_code_fences
 from gateway.stream_consumer_transport import StreamTransportMixin
 from gateway.stream_consumer_fallback import StreamFallbackMixin
@@ -159,6 +163,15 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
         self._current_edit_interval = self.cfg.edit_interval  # adaptive backoff
         self._delivered_commentary_texts: list[str] = []
         self._delivered_segment_texts: list[str] = []  # finalized text per past segment
+        # (displayed text, preview ids) per finalized segment.  Kept so a recovered /
+        # plugin-transformed final can replace the segment it rewrites instead of being
+        # appended after the raw one (see _adopt_final_text).
+        self._finalized_segments: list[tuple[str, set[str]]] = []
+        # Recovered-final reconciliation, resolved on the event loop in got_done.
+        self._recovered_replace_ids: set[str] = set()
+        self._recovered_replaced_text: Optional[str] = None
+        self._recovered_already_delivered = False
+        self._recovered_final_done = False
         self._in_think_block = False  # think-tag filter state (mirrors CLI _stream_delta)
         self._think_buffer = ""
         self._before_finalize_notified = False
@@ -455,6 +468,10 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
         finalized = self._clean_for_display(self._last_sent_text).strip()
         if finalized:
             self._delivered_segment_texts.append(finalized)
+            segment_ids = set(self._segment_preview_message_ids)
+            if self._message_id and self._message_id != "__no_edit__":
+                segment_ids.add(str(self._message_id))
+            self._finalized_segments.append((finalized, segment_ids))
         # Also clears the final flags: what we delivered was an interim preamble.  Safe:
         # got_done returns before any reset; run.py reads flags after the task exits.
         self._reset_message_state()
@@ -564,6 +581,7 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
 
                 if tick.got_done:
                     self._flush_think_buffer()
+                    await self._apply_recovered_final()
                     # A bare intentional-silence marker (NO_REPLY / [SILENT]): the
                     # gateway's whole-response filter runs too late for a streamed
                     # preview, so retract it here instead of finalizing.
@@ -701,6 +719,23 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
         if not self._turn_split_delivery:
             final_payload = self._clean_for_display(final_raw)
             if final_payload and final_payload != self._clean_for_display(self._accumulated):
+                # A recovered / plugin-transformed final arriving after the prior segment was
+                # already sealed: what is on screen for the current segment is only a held
+                # silence marker (or nothing), so the final belongs to the LAST sealed segment.
+                # Replace that segment instead of appending the final after the raw one.
+                if self._finalized_segments and self._active_segment_is_recoverable_placeholder():
+                    last_text, last_ids = self._finalized_segments[-1]
+                    if final_payload.strip() == last_text:
+                        # The final is the reply already delivered; do not send it twice.
+                        self._recovered_already_delivered = True
+                        self._recovered_replaced_text = last_text
+                        self._accumulated = self._stream_ledger = ""
+                    else:
+                        self._recovered_replace_ids = set(last_ids)
+                        self._recovered_replaced_text = last_text
+                        self._accumulated = final_raw
+                        self._stream_ledger = final_raw
+                    return
                 self._accumulated = final_raw
                 self._stream_ledger = final_raw
             return
@@ -708,6 +743,34 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
         if ledger and final_raw.startswith(ledger) and len(final_raw) > len(ledger):
             self._accumulated += final_raw[len(ledger):]
             self._stream_ledger = final_raw
+
+    def _active_segment_is_recoverable_placeholder(self) -> bool:
+        """True when the open segment shows nothing but a held silence marker, i.e. an
+        authoritative final arriving now can only describe the previously sealed segment."""
+        active = self._clean_for_display(self._accumulated).strip()
+        return not active or _is_intentional_silence_response(active)
+
+    async def _apply_recovered_final(self) -> None:
+        """Retract the superseded segment and remove it from the delivered set.  Runs on the
+        event loop (deletes are async) before the recovered final is finalized."""
+        if self._recovered_replaced_text is None:
+            return
+        last_text = self._recovered_replaced_text
+        self._recovered_replaced_text = None
+        replaced = bool(self._recovered_replace_ids)
+        if replaced:
+            await self._delete_previews(self._recovered_replace_ids, label="Recovered-final")
+            self._preview_message_ids -= self._recovered_replace_ids
+            self._segment_preview_message_ids -= self._recovered_replace_ids
+            self._recovered_replace_ids = set()
+            if self._finalized_segments and self._finalized_segments[-1][0] == last_text:
+                self._finalized_segments.pop()
+            with contextlib.suppress(ValueError):
+                self._delivered_segment_texts.remove(last_text)
+        if self._recovered_already_delivered:
+            self._recovered_already_delivered = False
+            self._recovered_final_done = True
+            self._mark_final_delivered(record=last_text)
 
     async def _eager_reopen_seed(self) -> None:
         """Eager re-seed after a clarify answer (gate re-checked: state may have advanced).
@@ -745,9 +808,13 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
                                or (len(self._accumulated) >= self.cfg.buffer_threshold
                                    and not self._flood_strikes))
         # Defer mid-stream edits while the buffer could still resolve to a silence
-        # marker ("NO"→"NO_REPLY"); got_done always resolves the buffer.
-        return should_edit and not _is_partial_silence_marker(
-            self._clean_for_display(self._accumulated))
+        # marker ("NO"→"NO_REPLY") or an attachment directive/image tag
+        # ("MEDIA:/…", "![alt](http…)"); got_done always resolves the buffer.
+        if not should_edit:
+            return False
+        cleaned = self._clean_for_display(self._accumulated)
+        return not (_is_partial_silence_marker(cleaned)
+                    or has_pending_media_directive(cleaned))
 
     async def _split_first_send(self, tick: _Tick) -> bool:
         """No message to edit yet and the buffer overflows: seal only the head chunks; the
@@ -848,6 +915,10 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
 
     async def _finalize_turn(self, tick: _Tick) -> None:
         """got_done: final edit without cursor, or one continuation send if edits failed."""
+        if self._recovered_final_done:
+            # The recovered final matched the segment already on screen; sending/editing now
+            # would duplicate it.
+            return
         if self._accumulated or self._message_id is not None or self._already_sent:
             await self._notify_before_finalize()
         if self._reopen_seed_pending() and not self._accumulated:
@@ -969,5 +1040,7 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
     # non-streaming paths share the same regex, so a tag is treated identically whichever path delivered the
     # text.
     def _clean_for_display(text: str) -> str:
-        """Hide MEDIA:<path> / [[audio_as_voice]] directives; media is delivered post-stream."""
-        return _BasePlatformAdapter.strip_media_directives_for_display(text)
+        """Hide MEDIA:<path> / [[audio_as_voice]] directives and markdown/HTML image tags;
+        both are delivered as attachments post-stream."""
+        cleaned = _BasePlatformAdapter.strip_media_directives_for_display(text)
+        return strip_image_tags_for_display(cleaned)

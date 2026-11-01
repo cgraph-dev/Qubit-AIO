@@ -2794,13 +2794,17 @@ def _is_control_interrupt_message(message: Optional[str]) -> bool:
 
 def _strip_response_attachments_for_direct_send(response: str, adapter) -> str:
     """Return the visible text portion of a response before direct send().
-    Only explicit ``MEDIA:`` attachments are stripped; bare paths/URLs stay visible. No broad regex after
-    ``extract_media()``: it deliberately preserves protected code spans and unvalidated tags.
+    Explicit ``MEDIA:`` attachments and markdown/HTML image tags are stripped (both are delivered
+    as attachments); bare paths/URLs stay visible. No broad regex after ``extract_media()``: it
+    deliberately preserves protected code spans and unvalidated tags.
 
-    Queued follow-up resends only replay explicit ``MEDIA:`` attachments in this path. Keep bare local paths
-    and ordinary image URLs visible because the post-stream uploader intentionally ignores them (#20834).
+    Queued follow-up resends replay explicit ``MEDIA:`` attachments and image tags in this path.
+    Keep bare local paths and ordinary image URLs visible because the post-stream uploader
+    intentionally ignores them (#20834).
     """
+    from gateway.stream_consumer_directives import strip_image_tags_for_display
     _, cleaned = adapter.extract_media(response)
+    cleaned = strip_image_tags_for_display(cleaned)
     return cleaned.replace("[[audio_as_voice]]", "").replace("[[as_document]]", "").strip()
 
 
