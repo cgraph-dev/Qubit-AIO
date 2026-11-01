@@ -480,15 +480,15 @@ def test_reconcile_rewrites_an_older_startup_entry_as_utf16(monkeypatch, tmp_pat
     reconcile rewrites it as UTF-16 with a BOM."""
     import codecs
     startup, script = _startup_with_fallback_and_legacy_entries(monkeypatch, tmp_path / "Usuário 方舟")
-    (startup / "Hermes_Gateway_alice.cmd").unlink()
+    (startup / "Qubit_Gateway_alice.cmd").unlink()
     monkeypatch.setattr(gateway_windows, "is_task_registered", lambda: False)
     monkeypatch.setattr(gateway_windows, "get_task_script_path", lambda: script)
 
     assert gateway_windows.reconcile_autostart_launchers() == ([], [])
-    raw = (startup / "Hermes_Gateway_alice.vbs").read_bytes()
+    raw = (startup / "Qubit_Gateway_alice.vbs").read_bytes()
     assert raw.startswith(codecs.BOM_UTF16_LE)
     assert raw.decode("utf-16") == gateway_windows._build_startup_launcher(script)
-    assert sorted(p.name for p in startup.iterdir()) == ["Hermes_Gateway_alice.vbs"]
+    assert sorted(p.name for p in startup.iterdir()) == ["Qubit_Gateway_alice.vbs"]
 
 
 def test_reconcile_warns_when_legacy_entry_cannot_be_removed(monkeypatch, tmp_path):

@@ -25,7 +25,7 @@ from qubit_cli import gateway as gw
 
 def _unit(path, home) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f'[Service]\nEnvironment="QUBIT_HOME={home}"\nExecStart=/usr/bin/hermes gateway run\n',
+    path.write_text(f'[Service]\nEnvironment="QUBIT_HOME={home}"\nExecStart=/usr/bin/qubit gateway run\n',
                     encoding="utf-8")
 
 
@@ -50,17 +50,17 @@ def test_scratch_home_does_not_resolve_the_accounts_bare_gateway_unit(tmp_path, 
     """The incident's resolution: HOME=<scratch>, QUBIT_HOME unset, the account's real bare unit
     pinning the account home. The scratch home must not name that unit."""
     account, scratch = tmp_path / "account", tmp_path / "scratch"
-    (scratch / ".hermes").mkdir(parents=True)
-    real_unit = account / ".config" / "systemd" / "user" / "hermes-gateway.service"
-    _unit(real_unit, account / ".hermes")
+    (scratch / ".qubit").mkdir(parents=True)
+    real_unit = account / ".config" / "systemd" / "user" / "qubit-gateway.service"
+    _unit(real_unit, account / ".qubit")
     monkeypatch.delenv("QUBIT_HOME", raising=False)
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(scratch))
     monkeypatch.setenv("HERMES_REAL_HOME", str(account))
     monkeypatch.setattr(os, "geteuid", lambda: 1000)
 
-    assert gw.get_qubit_home() == scratch / ".hermes"
-    assert gw.get_service_name() != "hermes-gateway"
+    assert gw.get_qubit_home() == scratch / ".qubit"
+    assert gw.get_service_name() != "qubit-gateway"
     assert gw.get_systemd_unit_path() != real_unit
     assert not gw.get_systemd_unit_path().exists()
 
@@ -78,7 +78,7 @@ def test_lifecycle_verb_refuses_a_user_unit_pinning_another_home(tmp_path, monke
     monkeypatch.setenv("XDG_CONFIG_HOME", str(account / ".config"))
     monkeypatch.setattr(os, "geteuid", lambda: 1000)
     unit = gw.get_systemd_unit_path()
-    assert unit.name == "hermes-gateway-coder.service"
+    assert unit.name == "qubit-gateway-coder.service"
     _unit(unit, account / ".hermes" / "profiles" / "coder")
 
     if verb == "uninstall":
@@ -129,7 +129,7 @@ def test_stop_refuses_while_sessions_are_live_and_names_them(monkeypatch, record
     assert "2 live session(s)" in out
     assert "chat turn agent:main:telegram:dm:7" in out
     assert "background delegation deleg_ab12cd34" in out
-    assert "hermes gateway stop --yes" in out
+    assert "qubit gateway stop --yes" in out
 
     gw._cmd_stop(SimpleNamespace(all=False, system=False, interrupt=True))
     assert stopped == [False]
@@ -195,13 +195,13 @@ def test_dashboard_stop_refuses_while_sessions_are_live(monkeypatch):
 
 @pytest.mark.platforms("linux")
 def test_sudo_system_stop_checks_the_units_home_not_roots(tmp_path, monkeypatch, recorded, capsys):
-    """``sudo hermes gateway stop --system``: HOME=/root and QUBIT_HOME stripped, while the system unit
+    """``sudo qubit gateway stop --system``: HOME=/root and QUBIT_HOME stripped, while the system unit
     runs the invoking user's home. The live-work check must ask the unit's home, without adopting it."""
     import qubit_constants
     root_home, user_home = tmp_path / "root", tmp_path / "user" / ".hermes"
     (root_home / ".hermes").mkdir(parents=True)
     user_home.mkdir(parents=True)
-    _unit(tmp_path / "systemd" / "hermes-gateway.service", user_home)
+    _unit(tmp_path / "systemd" / "qubit-gateway.service", user_home)
     monkeypatch.setattr(gw, "_SYSTEM_UNIT_DIR", tmp_path / "systemd")
     monkeypatch.setattr(os, "geteuid", lambda: 0)
     monkeypatch.delenv("SUDO_USER", raising=False)
@@ -227,7 +227,7 @@ def test_sudo_system_stop_checks_the_units_home_not_roots(tmp_path, monkeypatch,
 
 @pytest.mark.parametrize("verb", ["stop", "restart"])
 def test_host_served_profile_refuses_before_unserving_its_live_turns(tmp_path, monkeypatch, capsys, verb):
-    """``hermes -p coder gateway stop|restart`` on a profile the host serves unserves it in the host,
+    """``qubit -p coder gateway stop|restart`` on a profile the host serves unserves it in the host,
     which Stops its executing turns: the live-work policy applies first, scoped to that profile."""
     from gateway import control_socket
     from qubit_cli import gateway_profile_lifecycle as gpl
@@ -256,7 +256,7 @@ def test_host_served_profile_refuses_before_unserving_its_live_turns(tmp_path, m
     assert exc.value.code == 1 and requests == []
     assert asked == [(host_home, {"profile": "coder"})]
     assert "1 live session(s)" in out and "agent:coder:telegram:dm:7" in out
-    assert f"hermes -p coder gateway {verb} --yes" in out
+    assert f"qubit -p coder gateway {verb} --yes" in out
     assert not (profile_home / "gateway.parked").exists()
 
     command(SimpleNamespace(all=False, system=False, force=False, interrupt=True))

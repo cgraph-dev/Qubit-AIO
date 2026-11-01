@@ -205,6 +205,8 @@ class TestServiceIdentityForForeignHome:
         home = tmp_path / "home"
         home.mkdir()
         monkeypatch.setattr(Path, "home", lambda: home)
+        # Naming follows the ACCOUNT home; in a harness that is the home this fixture models.
+        monkeypatch.setattr(qubit_constants, "_account_home", lambda: home)
         # The user unit dir follows the ACCOUNT home (#98699), which is read from the environment.
         monkeypatch.setenv("HOME", str(home))
         monkeypatch.delenv("QUBIT_REAL_HOME", raising=False)

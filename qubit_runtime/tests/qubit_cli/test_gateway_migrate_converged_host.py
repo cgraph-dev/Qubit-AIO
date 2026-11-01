@@ -61,6 +61,9 @@ def converged_host(tmp_path, monkeypatch):
     # The WIRE only: the owner's control socket answer. Everything that reads it is real.
     monkeypatch.setattr("gateway.control_socket.identify_gateway",
                         lambda home: {"pid": pid, "hermes_home": str(root), "served_profiles": served})
+    hr.ensure_host_state_dir()
+    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
+    assert exc is None, f"claim_host_lock failed: {exc}"
     hr.publish_record(hr.ROLE_GATEWAY, profiles=tuple(served), home=str(root))
     host_attach.invalidate_host_gateway_cache()
 
@@ -72,6 +75,7 @@ def converged_host(tmp_path, monkeypatch):
     monkeypatch.setattr(gm, "_host_supports_migration", lambda: None)
     yield type("Fixture", (), {"root": root, "signals": signals, "pid": pid, "served": served})
     hr.clear_record(hr.ROLE_GATEWAY)
+    hr.release_host_lock(hr.ROLE_GATEWAY)
 
 
 def test_the_host_gateway_pid_is_reported_for_every_secondary(converged_host):
