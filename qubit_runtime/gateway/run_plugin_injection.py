@@ -244,9 +244,17 @@ class GatewayPluginInjectionMixin:
         live = self._plugin_local_session(source, entry.session_key, plugin_home=plugin_home, plugin_id=plugin_id)
         if live is None:
             return False
+        adapter = self._adapter_for_source(live.source)
         async with self._plugin_injection_scope(source, plugin_home):
+            # Same durable FIFO producer admission the key-less and messaging paths use: the turn is
+            # queued in the session's ledger, not run on the in-process lane beside an admitted one.
+            admitted = await self._admit_plugin_injection(
+                adapter, live.source, session_key=entry.session_key,
+                session_id=entry.session_id, content=content, plugin_id=plugin_id)
+            if admitted is not None:
+                return bool(admitted)
             return bool(await self._admit_plugin_local_injection(
-                self._adapter_for_source(live.source), live.source, session_key=entry.session_key,
+                adapter, live.source, session_key=entry.session_key,
                 session_id=entry.session_id, content=content, plugin_id=plugin_id))
 
     def _adapter_for_source(self, source: SessionSource):
@@ -395,6 +403,16 @@ class GatewayPluginInjectionMixin:
             return False
         session_key = self._session_key_for_source(source)
         async with self._plugin_injection_scope(source):
+            # An origin that already owns a session joins that session's durable FIFO. A chat with
+            # no session yet (a plugin is not allowed to open one under the authority) still goes
+            # through the adapter's normal session path.
+            entry = await self.async_session_store.lookup_by_session_key(session_key)
+            if entry is not None:
+                admitted = await self._admit_plugin_injection(
+                    adapter, source, session_key=session_key, session_id=entry.session_id,
+                    content=content, plugin_id=plugin_id)
+                if admitted is not None:
+                    return bool(admitted)
             await adapter.handle_message(MessageEvent(
                 text=content, message_type=MessageType.TEXT, source=source, internal=True,
                 allow_gateway_control=False,
