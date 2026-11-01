@@ -29,6 +29,7 @@ class _SignInAttempt:
     key: tuple
     source: Any
     cancelled: bool = False
+    persisting: bool = False
 
 
 # These adapters use "dm" for a broadcast topic, a channel, or an agent peer. Sending a consent
@@ -79,6 +80,29 @@ class GatewayLoginCommandsMixin:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._login_executor(), ctx.run, func)
 
+    def _login_persist_guard(self, attempt: _SignInAttempt):
+        """This attempt's save claim, evaluated atomically under the registry lock.
+
+        Yields True only while *attempt* is still the live sign-in and was not stopped. The claim
+        is made before the lock is released, so a replacing ``/login`` arriving while the save runs
+        is told a sign-in is finishing (``LOGIN_BUSY_ELSEWHERE``) instead of cancelling a done deal.
+        """
+        lock, attempts = self._login_registry()
+
+        @contextlib.contextmanager
+        def _guard():
+            with lock:
+                may_persist = attempts.get(_LOGIN_SINGLE) is attempt and not attempt.cancelled
+                attempt.persisting = may_persist
+            try:
+                yield may_persist
+            finally:
+                if may_persist:
+                    with lock:
+                        attempt.persisting = False
+
+        return _guard()
+
     async def _handle_login_command(self, event) -> str:
         src = event.source
         platform = str(getattr(src.platform, "value", src.platform)).lower()
@@ -105,6 +129,8 @@ class GatewayLoginCommandsMixin:
             if live is not None and live.key != key:
                 return anon_auth.LOGIN_BUSY_ELSEWHERE
             if live is not None:
+                if live.persisting:
+                    return anon_auth.LOGIN_BUSY_ELSEWHERE
                 live.cancelled = True
 
         state = await self._run_login_blocking(anon_auth.current_nous_state)
@@ -116,6 +142,8 @@ class GatewayLoginCommandsMixin:
             if live is not None and live.key != key:
                 return anon_auth.LOGIN_BUSY_ELSEWHERE
             if live is not None:
+                if live.persisting:
+                    return anon_auth.LOGIN_BUSY_ELSEWHERE
                 live.cancelled = True
             attempt = _SignInAttempt(
                 attempt_id=uuid4().hex[:8], key=key, source=src)
@@ -135,6 +163,7 @@ class GatewayLoginCommandsMixin:
             timeout_seconds=15.0,
             cancelled=_cancelled,
             cancel_wins_after_promotion=False,
+            persist_guard=lambda: self._login_persist_guard(attempt),
         )
         pushed_terminal = False
         try:

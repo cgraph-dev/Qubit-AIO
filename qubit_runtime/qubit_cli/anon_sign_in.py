@@ -216,11 +216,17 @@ def _failed_from_exception(exc: BaseException) -> Failed:
     return Failed(reason=reason, detail=str(exc), retry_after=float(err.retry_after or 0.0))
 
 
-def _default_persist_guard(is_cancelled: Callable[[], bool]) -> Callable[[], ContextManager[bool]]:
-    """The persist guard used when a surface brings none: proceed unless the attempt was stopped."""
+def _default_persist_guard(
+    is_cancelled: Callable[[], bool], *, cancel_wins_after_promotion: bool = True,
+) -> Callable[[], ContextManager[bool]]:
+    """The persist guard used when a surface brings none: proceed unless the attempt was stopped.
+
+    *cancel_wins_after_promotion* is the surface's ruling on a cancel that lands after the token was
+    granted but before it is saved: True (the default) discards the grant, False keeps it.
+    """
     @contextlib.contextmanager
     def _guard():
-        yield not is_cancelled()
+        yield not (cancel_wins_after_promotion and is_cancelled())
     return _guard
 
 
@@ -255,6 +261,7 @@ def run_sign_in(
     cancelled: Optional[Callable[[], bool]] = None,
     replace_account: bool = False,
     persist_guard: Optional[Callable[[], ContextManager[bool]]] = None,
+    cancel_wins_after_promotion: bool = True,
     scope: Optional[Callable[[], ContextManager[Any]]] = None,
     client_factory: Optional[Callable[[float, Any], ContextManager[httpx.Client]]] = None,
 ) -> Iterator[SignInState]:
@@ -273,6 +280,8 @@ def run_sign_in(
     *replace_account* lets a signed-in install sign in again (the desktop's "connect another
     account"); without it a signed-in install yields ``AlreadySignedIn`` before any network.
     *persist_guard* lets a surface make its own cancel check and the save atomic under its own lock.
+    *cancel_wins_after_promotion* is that surface's ruling on a cancel that lands after the token
+    was granted but before it is saved; it only applies when the surface brings no *persist_guard*.
     *scope* is entered only around the two non-network blocks (precondition, persist/settle), never
     across a ``yield``: ``run_in_executor`` does not carry contextvars, so the scope has to be
     entered inside the generator, on whichever thread is advancing it.
@@ -341,7 +350,8 @@ def run_sign_in(
         yield TimedOut(detail=str(exc)) if is_device_code_expired(exc) else _failed_from_exception(exc)
         return
 
-    guard = persist_guard or _default_persist_guard(is_cancelled)
+    guard = persist_guard or _default_persist_guard(
+        is_cancelled, cancel_wins_after_promotion=cancel_wins_after_promotion)
     try:
         with open_scope():
             with guard() as may_persist:
