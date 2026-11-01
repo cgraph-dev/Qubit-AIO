@@ -115,17 +115,23 @@ async def get_dashboard_plugins(profile: Optional[str] = None):
     def _run():
         plugins = _get_dashboard_plugins()
         hidden: list = cfg_get(load_config(), "dashboard", "hidden_plugins", default=[]) or []
-        return plugins, hidden, *_plugin_enable_sets()
+        enabled_set, disabled_set = _plugin_enable_sets()
+        # The consent and activation gates read the SAME profile scope as discovery: computing
+        # them after the worker returns would read the launch profile's config and drop a
+        # secondary profile's own user plugins from its ``?profile=`` list.
+        return [
+            p for p in plugins
+            # The consent the asset route and the API gates apply, so no listed tab fails to load.
+            if p.get("name", "") not in hidden and _plugin_activated(p, enabled_set, disabled_set)
+            and not _plugin_consent_withheld(p)
+        ]
 
-    plugins, hidden, enabled_set, disabled_set = await config_scoped_to_thread(profile, _run)
+    plugins = await config_scoped_to_thread(profile, _run)
 
     # Strip internal fields before sending to frontend.
     return [
         {k: v for k, v in p.items() if not k.startswith("_")}
         for p in plugins
-        # The consent the asset route and the API gates apply, so no listed tab fails to load.
-        if p.get("name", "") not in hidden and _plugin_activated(p, enabled_set, disabled_set)
-        and not _plugin_consent_withheld(p)
     ]
 
 
@@ -174,8 +180,9 @@ def _plugin_activated(plugin: dict, enabled_set: set, disabled_set: set) -> bool
 def _plugin_action(result: dict, fallback_error: str, *, rescan: bool) -> dict:
     """Common tail of agent-plugin mutations: 400 on ``ok=False``, then invalidate caches
     (rescanning discovery when files changed on disk). A ``consent_required`` answer is not a failure:
-    nothing changed, the client shows the delta and retries with consent."""
-    if result.get("consent_required"):
+    nothing changed, the client shows the delta and retries with consent. A ``scan_blocked`` answer is
+    the findings the page shows before offering a ``force`` retry, not a transport error."""
+    if result.get("consent_required") or result.get("scan_blocked"):
         return result
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("error") or fallback_error)
@@ -283,9 +290,10 @@ async def post_agent_plugin_update(request: Request, name: str):
     except Exception:
         body = {}
     accept = isinstance(body, dict) and body.get("accept_capabilities") is True
+    force = isinstance(body, dict) and body.get("force") is True
     return await _named_plugin_action(
-        request, name, lambda n: dashboard_update_user_plugin(n, accept_capabilities=accept), "Update failed.",
-        rescan=True)
+        request, name, lambda n: dashboard_update_user_plugin(n, accept_capabilities=accept, force=force),
+        "Update failed.", rescan=True)
 
 
 @router.delete("/api/dashboard/agent-plugins/{name:path}")

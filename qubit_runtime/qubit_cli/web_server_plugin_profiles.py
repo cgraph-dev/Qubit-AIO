@@ -38,7 +38,8 @@ _log = logging.getLogger("qubit_cli.web_server")
 # REAL credential through to a sibling profile's plugin host. Strip both spellings.
 _GATEWAY_CREDENTIAL_HEADERS = frozenset({
     "authorization", "cookie", "host",
-    "x-hermes-gateway-ticket", "x-qubit-gateway-ticket", "x-qubit-session-token"})
+    "x-hermes-gateway-ticket", "x-qubit-gateway-ticket",
+    "x-hermes-session-token", "x-qubit-session-token"})
 # Every query credential the gateway accepts (``web_server_chat._ws_auth_ok``, ``_has_valid_query_token``,
 # the display bridge, the PTY reattach key) and the profile selector; compared after URL-decoding.
 _GATEWAY_QUERY_KEYS = frozenset({"token", "ticket", "internal", "display_ticket", "attach", "profile"})

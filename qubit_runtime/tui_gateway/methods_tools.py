@@ -1795,33 +1795,30 @@ def _plugins_install(rid, params):
 
 
 def _plugins_update(rid, params):
-    """Catalog installs only: re-pin to the current catalog SHA (non-catalog installs update via the CLI).
-    A pin that widens the plugin (new tools/hooks/deps/capabilities/Desktop half) answers
-    ``{ok: false, consent_required: true, delta, delta_lines}`` with nothing changed; the client shows the
-    delta and retries with ``accept_capabilities: true``."""
+    """Update an installed user plugin: a catalog install re-pins to its current catalog SHA, a custom
+    Git install pulls its source. A pin that widens the plugin (new tools/hooks/deps/capabilities/Desktop
+    half) answers ``{ok: false, consent_required: true, delta, delta_lines}`` with nothing changed; the
+    client shows the delta and retries with ``accept_capabilities: true``. A caution scan verdict answers
+    ``{ok: false, scan_blocked: true, ...}`` and retries with ``force: true``."""
     name = (params.get("name") or "").strip()
     if not name:
         return _err(rid, 4019, "plugins.update requires a 'name'")
-    pc, cat = _tools_mod("qubit_cli.plugins_cmd"), _tools_mod("qubit_cli.plugins_cmd_catalog")
-    target = pc._plugins_dir() / name
-    sidecar = cat.catalog_install_record(target) if target.is_dir() else None
-    if not sidecar:
-        return _err(rid, 4020, f"'{name}' is not a catalog install — update it via the CLI")
-    try:
-        result = cat.repin_catalog_plugin(
-            target, sidecar, consent_cb=(lambda _delta: True) if params.get("accept_capabilities") else None)
-    except cat.RepinConsentRequired as e:
-        return _ok(rid, {"ok": False, "consent_required": True, "name": e.name, "sha": e.sha, "delta": e.delta,
-                         "delta_lines": cat.surface_delta_lines(e.delta), "error": str(e)})
-    except pc.PluginOperationError as e:
-        return _err(rid, 4021, str(e))
-    payload = {"ok": True, "unchanged": not result.changed, "sha": result.sha, "name": result.installed_name,
-               "warnings": list(result.warnings)}
-    if result.changed:
-        _ensure_plugin_activation_listener()
-        activate = _tools_mod("qubit_cli.plugins_activation").activate_plugin_now
-        payload = _with_activation({**payload, **activate(result.installed_name)}, result.installed_name)
-    return _ok(rid, payload)
+    pc = _tools_mod("qubit_cli.plugins_cmd")
+    result = pc.dashboard_update_user_plugin(
+        name,
+        accept_capabilities=bool(params.get("accept_capabilities")),
+        force=bool(params.get("force")))
+    if not result.get("ok"):
+        # Structured refusals are answers the client acts on, not transport failures.
+        if result.get("consent_required") or result.get("scan_blocked"):
+            return _ok(rid, result)
+        return _err(rid, 4021, result.get("error") or "update failed")
+    # The RPC result contract carries the structured outcome, not the raw git transcript.
+    payload = {k: v for k, v in result.items() if k != "output"}
+    if payload.get("unchanged"):
+        return _ok(rid, payload)
+    _ensure_plugin_activation_listener()
+    return _ok(rid, _with_activation(payload, str(payload.get("name") or name)))
 
 
 def _plugins_remove(rid, params):

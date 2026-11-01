@@ -422,7 +422,7 @@ def test_memory_category_install_activates_via_memory_provider_not_plugins_enabl
     pc.cmd_install("cat-plugin", enable=enable)
     assert pc._get_current_memory_provider() == ("cat-plugin" if enable else "")
     assert pc._get_enabled_set() == set()
-    assert any("hermes memory setup" in line for line in printed)
+    assert any("qubit memory setup" in line for line in printed)
     assert not any("plugins enable cat-plugin" in line for line in printed)
 
 

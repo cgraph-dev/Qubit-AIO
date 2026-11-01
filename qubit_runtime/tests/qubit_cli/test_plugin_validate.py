@@ -580,9 +580,9 @@ def test_oauth_block_passes_and_a_token_url_in_code_is_only_a_warning(tmp_path):
     ({"authorize_url": "http://accounts.example.com/o/oauth2/auth"}, "authorize_url"),
     ({"authorize_url": "http://127.0.0.1:8080/auth"}, "must use https"),  # no loopback exception
     ({"token_url": "http://[::1]:8080/token"}, "must use https"),
-    ({"client_secret_env": "OPENROUTER_API_KEY"}, "Hermes uses itself"),  # would be POSTed to token_url
-    ({"client_id_env": "TELEGRAM_BOT_TOKEN"}, "Hermes uses itself"),
-    ({"client_secret_env": "MATRIX_PASSWORD"}, "Hermes uses itself"),  # platform secrets too
+    ({"client_secret_env": "OPENROUTER_API_KEY"}, "Qubit uses itself"),  # would be POSTed to token_url
+    ({"client_id_env": "TELEGRAM_BOT_TOKEN"}, "Qubit uses itself"),
+    ({"client_secret_env": "MATRIX_PASSWORD"}, "Qubit uses itself"),  # platform secrets too
     ({"id": 123}, "id"),
     ({"authorize_url": "https://accounts.example.com/o/oauth2/auth#consent"}, "authorize_url"),
     ({"token_url": "https://[oauth2.example.com/token"}, "token_url"),
