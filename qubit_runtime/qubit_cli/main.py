@@ -1356,7 +1356,6 @@ def _session_db():
     db = None
     try:
         from qubit_state import SessionDB
-        from qubit_constants import get_qubit_home
 
         db = SessionDB(db_path=get_qubit_home() / "state.db", read_only=True)
     except Exception:
@@ -1394,16 +1393,23 @@ def _resolve_last_session(source: str = "cli") -> Optional[str]:
     # A finite `qubit -z`/`chat -q` run is CLI history too: `qubit -z … --resume latest` chains on it.
     if source == "cli":
         from agent.session_source import CLI_FAMILY_SOURCES
-        source = sorted(CLI_FAMILY_SOURCES)
+        sources = sorted(CLI_FAMILY_SOURCES)
+    else:
+        sources = [source]
     with _session_db() as db:
         ws_key = _resolve_workspace_key()
-        if ws_key:
-            sessions = db.search_sessions(source=source, limit=1, workspace_key=ws_key)
-            if sessions:
-                return sessions[0]["id"]
-        # Fallback: global MRU for this source.
-        sessions = db.search_sessions(source=source, limit=1)
-        return sessions[0]["id"] if sessions else None
+        # The owner stores a gateway-created session as source='local' with the creating surface in
+        # created_source, and a launch stub (the CLI crashed or a resume failed before the first turn)
+        # is the newest row. Match the family's local rows and skip stubs, as `session.resume latest`
+        # does; a session whose first prompt is admitted but not yet written is not a stub. A legacy
+        # store (no admission table, or rows written directly by an older CLI) keeps its MRU.
+        for scope in ([ws_key] if ws_key else []) + [None]:
+            for skip_stubs in (True, False):
+                sessions = db.search_sessions(source=sources, limit=1, workspace_key=scope,
+                                              skip_launch_stubs=skip_stubs)
+                if sessions:
+                    return sessions[0]["id"]
+        return None
     return None
 
 

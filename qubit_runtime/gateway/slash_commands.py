@@ -1083,7 +1083,18 @@ class GatewaySlashCommandsMixin(
             # A local session writes the ``cli`` key, as /reasoning show|hide saves: every local
             # surface reads it (gateway.display_config.local_display_config), so the setting holds
             # wherever it was set (T7). A chat's /footer keeps the global key it always wrote.
-            leaf = (("display", "platforms", platform_key) if event.source.platform == Platform.LOCAL
+            # The one exception is the classic CLI's own session: its ``/footer`` has always saved
+            # the global key (qubit_cli.cli_commands_mixin), so a gateway turn on source ``cli``
+            # keeps that same write.
+            local = getattr(event.source, "platform", None) == Platform.LOCAL
+            legacy_cli = False
+            if local:
+                try:
+                    from gateway.session_setting_commands import local_policy
+                    legacy_cli = getattr(local_policy(self, event.source), "source", None) == "cli"
+                except Exception:
+                    legacy_cli = False
+            leaf = (("display", "platforms", platform_key) if local and not legacy_cli
                     else ("display",)) + ("runtime_footer", "enabled")
             _write_raw_config_leaf(config_path, leaf, new_state)
         except Exception as e:

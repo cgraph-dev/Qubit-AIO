@@ -230,12 +230,13 @@ class GatewayConfigLoadersMixin:
             _SERVICE_TIER_UNSET if clear else service_tier
         )
 
-    @classmethod
-    def _load_service_tier(cls) -> str | None:
+    def _load_service_tier(self) -> str | None:
         """``agent.service_tier`` parsed like the CLI (``qubit_cli.cli_config_load``); None when unset/unknown."""
         from qubit_cli.cli_config_load import _parse_service_tier_config
+        from gateway.run import _load_gateway_config
 
-        return _parse_service_tier_config(cls._cfg_str("agent", "service_tier"))
+        return _parse_service_tier_config(str(cfg_get(_load_gateway_config(), "agent", "service_tier",
+                                                      default="") or ""))
 
     @staticmethod
     def _load_show_reasoning() -> bool:
