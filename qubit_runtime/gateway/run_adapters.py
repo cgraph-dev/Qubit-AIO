@@ -413,6 +413,12 @@ class GatewayAdapterLifecycleMixin:
                 )
                 self._ensure_reconnect_watcher_running()
                 return
+            # Mid-run twin of the all-fatal startup case: a non-retryable loss of the last
+            # platform parks it and the gateway stays up degraded for local clients and cron.
+            # Another gateway owning the token/profile is the exception: staying up would be a
+            # second, deaf owner, so that case still stops (``_park_last_fatal_platform`` refuses).
+            if self._park_last_fatal_platform(adapter):
+                return
             self._exit_reason = adapter.fatal_error_message or "All messaging adapters disconnected"
             if adapter.fatal_error_retryable:
                 self._exit_with_failure = True
@@ -892,6 +898,12 @@ class GatewayAdapterLifecycleMixin:
         self.adapters[platform] = adapter
         self._sync_voice_mode_state_to_adapter(adapter)
         self._bind_voice_input_callback(adapter)
+        from gateway.config import Platform
+        if platform is Platform.API_SERVER:
+            # Recover committed API work only once the real adapter is published; the launch
+            # profile's retained/parked authority is not served and is never read here.
+            from gateway.session_api_turn import recover_api_turns
+            recover_api_turns(adapter)
 
     def _schedule_planned_restart_replay(self) -> None:
         """Replay the owed planned-restart notice after a reconnect, in the background: notification delivery

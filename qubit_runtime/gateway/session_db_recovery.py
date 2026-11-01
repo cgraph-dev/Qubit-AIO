@@ -19,6 +19,7 @@ class _Unavailable:
     failures: int = 0
     next_retry_at: float = 0.0
     in_flight: bool = False
+    error: Exception | None = None
 
 
 class _HealthSource:
@@ -121,6 +122,7 @@ class RecoverableHandleCache:
                     raise
                 if not stale:
                     unavailable.failures += 1
+                    unavailable.error = exc
                     backoff = self._initial_retry_delay * (2 ** min(unavailable.failures - 1, 30))
                     unavailable.next_retry_at = self._clock() + min(backoff, self._max_retry_delay)
                     unavailable.in_flight = False
@@ -149,6 +151,16 @@ class RecoverableHandleCache:
         if was_unavailable and on_recovered is not None:
             on_recovered()
         return handle
+
+    def last_error(self, path: Path) -> Exception | None:
+        """The exception the most recent failed open of *path* recorded, if any.
+
+        A park reason can name the real cause without reopening (which would create or
+        migrate the store and skip this cache's backoff)."""
+        path = Path(path)
+        with self.lock:
+            unavailable = self._unavailable.get(path)
+            return unavailable.error if unavailable is not None else None
 
     def close_all(self, close: Callable[[Any], None]) -> None:
         """Drain cached handles under the lock and close them outside it."""

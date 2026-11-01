@@ -68,8 +68,14 @@ class MessageDeduplicator:
 
 def inbound_dedup_caches(adapter: Any) -> dict[str, MessageDeduplicator]:
     """The adapter's ``MessageDeduplicator`` attributes, by name (held by reference, so IDs the old
-    adapter admits after this call still reach its replacement)."""
-    return {name: v for name, v in vars(adapter).items() if isinstance(v, MessageDeduplicator)}
+    adapter admits after this call still reach its replacement).
+
+    A platform that never produced an adapter is queued with ``adapter=None``: it has no caches,
+    and asking ``vars()`` about it must not abort the whole startup."""
+    attributes = getattr(adapter, "__dict__", None)
+    if not isinstance(attributes, dict):
+        return {}
+    return {name: v for name, v in attributes.items() if isinstance(v, MessageDeduplicator)}
 
 
 def carry_inbound_dedup(caches: Optional[dict], adapter: Any) -> None:
