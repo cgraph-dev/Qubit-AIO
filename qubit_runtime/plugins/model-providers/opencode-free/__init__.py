@@ -9,7 +9,7 @@ from typing import Any
 
 from qubit_cli.version_info import get_version_info
 from providers import register_provider
-from providers.base import ProviderProfile
+from providers.base import LazyHeaders, ProviderProfile
 
 
 class OpenCodeFreeProfile(ProviderProfile):
@@ -40,12 +40,12 @@ opencode_free = OpenCodeFreeProfile(
     auth_type="keyless",  # no credential surface: not an api_key provider card
     base_url="https://opencode.ai/zen/v1", display_name="OpenCode Free",
     description="OpenCode free models — keyless, no account needed",
-    default_headers={
+    default_headers=LazyHeaders({
         "Authorization": "",
         "HTTP-Referer": "https://github.com/cgraph-dev/Qubit-AIO",
         "X-Title": "Qubit Agent",
-        "User-Agent": f"QubitAgent/{get_version_info().base_version}",
-    },
+        "User-Agent": lambda: f"QubitAgent/{get_version_info().base_version}",
+    }),
     default_aux_model="laguna-s-2.1-free",
 )
 

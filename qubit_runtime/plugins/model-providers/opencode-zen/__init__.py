@@ -9,16 +9,16 @@ from typing import Any
 from agent import reasoning_effort as re_
 from qubit_cli.version_info import get_version_info
 from providers import register_provider
-from providers.base import ProviderProfile
+from providers.base import LazyHeaders, ProviderProfile
 from datetime import UTC
 
 # Attribution headers (same values as OpenRouter / Vercel / Fireworks); via
 # default_headers so they survive model switches and credential rotation.
-_ATTRIBUTION_HEADERS = {
+_ATTRIBUTION_HEADERS = LazyHeaders({
     "HTTP-Referer": "https://github.com/cgraph-dev/Qubit-AIO",
     "X-Title": "Qubit Agent",
-    "User-Agent": f"QubitAgent/{get_version_info().base_version}",
-}
+    "User-Agent": lambda: f"QubitAgent/{get_version_info().base_version}",
+})
 
 
 def _flat_model_name(model: str | None) -> str:
@@ -118,13 +118,13 @@ class OpenCodeZenProfile(ProviderProfile):
 
 opencode_zen = OpenCodeZenProfile(
     name="opencode-zen", aliases=("opencode", "opencode_zen", "zen"), env_vars=("OPENCODE_ZEN_API_KEY",),
-    base_url="https://opencode.ai/zen/v1", default_headers=dict(_ATTRIBUTION_HEADERS),
+    base_url="https://opencode.ai/zen/v1", default_headers=_ATTRIBUTION_HEADERS,
     default_aux_model="gemini-3-flash",
 )
 
 opencode_go = OpenCodeGoProfile(
     name="opencode-go", aliases=("opencode_go", "go", "opencode-go-sub"), env_vars=("OPENCODE_GO_API_KEY",),
-    base_url="https://opencode.ai/zen/go/v1", default_headers=dict(_ATTRIBUTION_HEADERS),
+    base_url="https://opencode.ai/zen/go/v1", default_headers=_ATTRIBUTION_HEADERS,
     default_aux_model="glm-5",
     # The Go relay's upstream validates tool content as a strict string: list-type tool
     # content (native vision embeds) 422s with ``messages.N.tool.content.str Input should

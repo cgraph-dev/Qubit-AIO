@@ -5,7 +5,7 @@ from typing import Any
 
 from qubit_cli.version_info import get_version_info
 from providers import register_provider
-from providers.base import ProviderProfile
+from providers.base import LazyHeaders, ProviderProfile
 
 
 class FireworksProfile(ProviderProfile):
@@ -33,11 +33,11 @@ fireworks = FireworksProfile(
     base_url="https://api.fireworks.ai/inference/v1", auth_type="api_key",
     # Attribution headers (canonical Qubit set); via default_headers so they
     # survive switch_model and credential rotation.
-    default_headers={
+    default_headers=LazyHeaders({
         "HTTP-Referer": "https://github.com/cgraph-dev/Qubit-AIO",
         "X-Title": "Qubit Agent",
-        "User-Agent": f"QubitAgent/{get_version_info().base_version}",
-    },
+        "User-Agent": lambda: f"QubitAgent/{get_version_info().base_version}",
+    }),
     default_aux_model="accounts/fireworks/models/glm-5p2",
     # Picker safety net when the live catalog fetch fails.
     fallback_models=(
