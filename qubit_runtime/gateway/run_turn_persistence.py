@@ -124,6 +124,10 @@ class GatewayTurnPersistenceMixin:
         if not _intentional_silence:
             response = _normalize_empty_agent_response(agent_result, response, history_len=len(history))
             response = _sanitize_gateway_final_response(source.platform, response)
+            # A silence marker that CLOSES a real reply ("answer\n\nNO_REPLY") is the
+            # model's note to itself, not text for the reader: deliver the reply without it.
+            from gateway.response_filters import strip_trailing_silence_marker
+            response = strip_trailing_silence_marker(response)
 
         # The agent thread already updated the contextvar; propagate to SessionEntry + _save() only
         # if the binding still points at the session this run was launched against.

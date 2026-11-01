@@ -345,6 +345,15 @@ def local_history(authority, ref, prepared=None):
     db = authority.db
     target = transcript_target(authority, ref)
     live_source = authority.sessions[ref.session_id].source
+    if live_source is not None and live_source.platform == Platform.LOCAL:
+        # A stored transcript picked from the older picker and adopted on resume: its own
+        # physical rows ARE the conversation. An ancestor stored transcript is a different
+        # picked session's replacement, not archived history of this one (a real compression
+        # receipt names its lineage instead and keeps the lineage display read).
+        with contextlib.suppress(RuntimeStoreError):
+            if local_receipt(db, ref.session_id).get('legacy_session_id'):
+                return [{**{k: v for k, v in row.items() if k != '_row_id'}, 'row_id': row['_row_id']}
+                        for row in db.get_messages_as_conversation(target, include_row_ids=True)]
     if live_source is None or live_source.platform != Platform.LOCAL:
         # A messaging (or history-mount) route shows the current physical transcript only: the
         # authority keeps its admission identity at the compression root, but an archived

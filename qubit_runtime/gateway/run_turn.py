@@ -2263,6 +2263,12 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
             # /queue overflow: promote the next queued event into the consumed "next-up" slot so the
             # recursive drain sees it (keeps FIFO order; a mid-chain /queue can't jump the queue).
             pending_event = self._promote_queued_event(session_key, adapter, pending_event)
+            # A wake/completion admitted before the drain began is receipted: run it next,
+            # ahead of any human follow-up the drain is about to discard (#138123).
+            if self._draining and not getattr(pending_event, "_admitted_before_drain", False):
+                admitted = self._pop_admitted_before_drain(session_key, adapter)
+                if admitted is not None:
+                    pending_event = admitted
             if result.get("interrupted") and not pending_event and result.get("interrupt_message"):
                 interrupt_message = result.get("interrupt_message")
                 from gateway.session_ingress import executing_admission
@@ -2314,7 +2320,8 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
                         pending_event = None
                         pending = None
 
-        if self._draining and (pending_event or pending):
+        if (self._draining and (pending_event or pending)
+                and not getattr(pending_event, "_admitted_before_drain", False)):
             logger.info(
                 "Discarding pending follow-up for session %s during gateway %s",
                 session_key or "?", self._status_action_label(),

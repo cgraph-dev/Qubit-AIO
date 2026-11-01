@@ -372,6 +372,14 @@ async def _start_gateway_start_control_socket(runner):
                            # live adapters' handlers (#87770); tools/prompt still wait for the next session.
                            "reload-plugins": reload_plugins_verb(runner, _main_loop)})
         _control_server.ticket_store = runner.session_ticket_store
+        # The Webapp's private verbs answer from the moment the control socket does: the
+        # listener's own slow start must not make a client read them as unknown verbs.
+        try:
+            from gateway.webapp_listener import register_control_verbs
+            from qubit_constants import get_qubit_home
+            register_control_verbs(runner, get_qubit_home(), _control_server)
+        except Exception:
+            logger.warning("Webapp control verbs could not be registered at startup", exc_info=True)
         if not await _control_server.start():
             _control_server = None
         else:

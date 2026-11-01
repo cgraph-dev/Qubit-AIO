@@ -28,8 +28,10 @@ from gateway.config import (
     DEFAULT_STREAMING_BUFFER_THRESHOLD as _DEFAULT_STREAMING_BUFFER_THRESHOLD,
     DEFAULT_STREAMING_CURSOR as _DEFAULT_STREAMING_CURSOR)
 from gateway.response_filters import (
+    ends_with_partial_silence_marker as _ends_with_partial_silence_marker,
     is_intentional_silence_response as _is_intentional_silence_response,
-    is_partial_silence_marker as _is_partial_silence_marker)
+    is_partial_silence_marker as _is_partial_silence_marker,
+    strip_trailing_silence_marker as _strip_trailing_silence_marker)
 from gateway.stream_consumer_directives import (
     has_pending_media_directive,
     strip_image_tags_for_display,
@@ -588,6 +590,10 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
                     if _is_intentional_silence_response(self._clean_for_display(self._accumulated)):
                         await self._suppress_silence_marker()
                         return
+                    # A marker that CLOSES a real reply ("answer\n\nNO_REPLY") is not
+                    # delivered as its own message: strip it before any overflow split
+                    # or finalize, so the closing line can never be sent alone.
+                    self._accumulated = _strip_trailing_silence_marker(self._accumulated)
 
                 if self._should_edit(tick) and (
                     self._accumulated or (self._use_native_streaming and self._tool_progress_active)
@@ -814,6 +820,7 @@ class GatewayStreamConsumer(StreamTransportMixin, StreamFallbackMixin, StreamThi
             return False
         cleaned = self._clean_for_display(self._accumulated)
         return not (_is_partial_silence_marker(cleaned)
+                    or _ends_with_partial_silence_marker(cleaned)
                     or has_pending_media_directive(cleaned))
 
     async def _split_first_send(self, tick: _Tick) -> bool:

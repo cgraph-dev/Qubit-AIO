@@ -818,7 +818,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         ctx = self._ctx
         from gateway.session_api_turn import api_execution
         api = api_execution.get()
-        if api is not None and api['history'] is not None:
+        if api is not None and api.get('history') is not None:
             from gateway.run import _collect_history_media_paths
             history = api['history']
             tail = history[-1] if history else None
@@ -1033,8 +1033,13 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             if captured is not None:
                 incoming = max(0, (getattr(agent, 'session_prompt_tokens', 0) or 0) - before[0])
                 outgoing = max(0, (getattr(agent, 'session_completion_tokens', 0) or 0) - before[1])
-                captured['usage'] = {'input_tokens': incoming, 'output_tokens': outgoing,
-                                     'total_tokens': incoming + outgoing}
+                captured['usage'] = {
+                    'input_tokens': incoming, 'output_tokens': outgoing,
+                    'total_tokens': incoming + outgoing,
+                    # The rest of the finite viewer's ledger: a committed receipt must carry
+                    # what ``run_conversation`` reported, not only the token counts.
+                    **{key: result.get(key) for key in _LEDGER_PASSTHROUGH_KEYS if key in result},
+                }
                 _settle_api_runtime_lock(agent, result, captured)
             return result
         finally:

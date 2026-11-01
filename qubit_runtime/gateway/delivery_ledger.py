@@ -181,7 +181,9 @@ def _connect() -> sqlite3.Connection:
 
     # Shared state.db: SessionDB owns the durable PRAGMA set; this opener keeps the plain-tuple rows
     # and the 10 s busy timeout it always had.
-    return open_db(_db_path(), db_label="state.db (delivery_ledger)", busy_timeout_ms=10_000,
+    # Same state.db as SessionDB: share its one-per-process db_label, so the once-per-database
+    # journal warnings dedupe instead of firing a second time for this opener.
+    return open_db(_db_path(), db_label="state.db", busy_timeout_ms=10_000,
                    row_factory=None, initialize=_initialize_schema)
 
 

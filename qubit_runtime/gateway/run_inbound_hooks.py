@@ -211,7 +211,9 @@ class GatewayInboundHooksMixin:
     ) -> tuple[bool, Optional[str], Optional[str]]:
         """Drain gate, user-defined quick commands (exec/alias) and plugin slash commands →
         ``(handled, result, command)``; an alias quick command rewrites ``command``."""
-        if self._draining:
+        # A wake/completion the producer was told was delivered BEFORE the drain began
+        # still runs: its receipt is final and the producer will not retry it (#138123).
+        if self._draining and not getattr(event, "_admitted_before_drain", False):
             return True, t("gateway.busy.drain_rejected_new_work", action=self._status_action_gerund()), command
 
         # User-defined quick commands (bypass agent loop, no LLM call)
