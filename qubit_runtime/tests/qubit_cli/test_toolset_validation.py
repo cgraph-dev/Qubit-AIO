@@ -186,7 +186,7 @@ def test_null_plugin_platform_uses_synthetic_default():
         cfg = {platform: None, "telegram": ["hermes-telegram"]}
         warnings = validate_platform_toolsets(cfg, _is_valid)
 
-        assert resolve_toolset(f"hermes-{platform}")
+        assert resolve_toolset(f"qubit-{platform}")
         assert any(
             f"platform '{platform}'" in w
             and f"falling back to 'qubit-{platform}'" in w
