@@ -413,6 +413,12 @@ class GatewayAdapterLifecycleMixin:
                 )
                 self._ensure_reconnect_watcher_running()
                 return
+            # Mid-run twin of the all-fatal startup case: a non-retryable loss of the last
+            # platform parks it and the gateway stays up degraded for local clients and cron.
+            # Another gateway owning the token/profile is the exception: staying up would be a
+            # second, deaf owner, so that case still stops (``_park_last_fatal_platform`` refuses).
+            if self._park_last_fatal_platform(adapter):
+                return
             self._exit_reason = adapter.fatal_error_message or "All messaging adapters disconnected"
             if adapter.fatal_error_retryable:
                 self._exit_with_failure = True
@@ -892,6 +898,12 @@ class GatewayAdapterLifecycleMixin:
         self.adapters[platform] = adapter
         self._sync_voice_mode_state_to_adapter(adapter)
         self._bind_voice_input_callback(adapter)
+        from gateway.config import Platform
+        if platform is Platform.API_SERVER:
+            # Recover committed API work only once the real adapter is published; the launch
+            # profile's retained/parked authority is not served and is never read here.
+            from gateway.session_api_turn import recover_api_turns
+            recover_api_turns(adapter)
 
     def _schedule_planned_restart_replay(self) -> None:
         """Replay the owed planned-restart notice after a reconnect, in the background: notification delivery
@@ -1065,24 +1077,11 @@ class GatewayAdapterLifecycleMixin:
     async def _profile_open_policy_violation(self, profile_home: Path) -> Optional[str]:
         """Fail-fast preflight: the config-only open dm/group policy refusal, before any runtime is
         reserved or authority published for the profile. ``.env``-provided policy is still caught by
-        ``_load_secondary_profile_config``; this only spares an invalid profile the store build."""
-        from gateway.run import _own_policy_open_startup_violation, _profile_runtime_scope
-        from gateway.config import load_gateway_config
+        ``_load_secondary_profile_config``; this only spares an invalid profile the store build.
 
-        def _load():
-            with _profile_runtime_scope(profile_home, hydrate_secrets=False):
-                return load_gateway_config()
-
-        try:
-            cfg = await asyncio.to_thread(_load)
-        except Exception:
-            logger.debug("open-policy preflight could not load %s", profile_home, exc_info=True)
-            return None
-        try:
-            return await asyncio.to_thread(_own_policy_open_startup_violation, cfg)
-        except Exception:
-            logger.debug("open-policy preflight failed for %s", profile_home, exc_info=True)
-            return None
+        Delegates to the shared module-level helper so the reconcile can run it on any runner shape."""
+        from gateway.run_profile_reconcile import _open_policy_violation
+        return await _open_policy_violation(profile_home)
 
     async def _load_secondary_profile_config(self, profile_name: str, profile_home: Path):
         """Hydrate + enter ``profile_home``'s scope once; return its gateway config. Raises
@@ -1818,7 +1817,11 @@ class GatewayAdapterLifecycleMixin:
         credentials after a hosted room flipped the process-wide guard (#112878). Decided per event:
         activation happens after the adapters were wired."""
         async def _handler(*args):
-            with self._standalone_launch_scope():
+            from tui_gateway.launch_profile_policy import launch_body
+            # Mark the body at ENTRY: a second profile may switch the process to fail-closed
+            # secrets while this turn is still running, and its later reads must still resolve
+            # the launch profile's own mapping instead of raising.
+            with launch_body(), self._standalone_launch_scope():
                 return await handler(*args)
 
         return _handler
@@ -1931,6 +1934,22 @@ class GatewayAdapterLifecycleMixin:
                         "(check dependencies and config)", platform.value,
                     )
                 return adapter
+            # Bundled platform plugins register themselves lazily when plugin discovery runs. A
+            # direct caller before startup discovery (a bare runner, a reconnect from a test) has
+            # none registered yet, so materialize the bundled set once and retry.
+            if platform.value in Platform._scan_bundled_plugin_platforms()[0]:
+                from qubit_cli.plugins import discover_plugins
+                with _log_suppressed(logging.DEBUG, "Bundled platform discovery failed for '%s': %s",
+                                     platform.value):
+                    discover_plugins()
+                if platform_registry.is_registered(platform.value):
+                    adapter = platform_registry.create_adapter(platform.value, config)
+                    if adapter is None:
+                        logger.error(
+                            "Platform '%s' is registered but adapter creation failed "
+                            "(check dependencies and config)", platform.value,
+                        )
+                    return adapter
         return _instantiate_builtin_adapter(platform, config)
 
     def _make_adapter_auth_check(

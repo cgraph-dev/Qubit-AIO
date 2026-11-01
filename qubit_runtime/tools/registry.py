@@ -786,6 +786,34 @@ class ToolRegistry:
                 self._toolset_checks[toolset] = check_fn
             self._generation += 1
 
+    def move_to_scope(self, tool_names, scope: str) -> None:
+        """Move host-owned global registrations into *scope*'s overlay in place.
+
+        A process that booted with a single profile registers its live MCP tools in the
+        process-global map (bare names). Once it starts multiplexing for a newly created
+        profile, the launch profile's lookups resolve its own overlay, so those tools must
+        follow their connection keys under ``(launch scope, name)`` — otherwise the launch
+        profile reads them as gone until a restart. Only the named tools move; every other
+        global registration is untouched.
+        """
+        scope = normalize_scope(scope)
+        if scope is None:
+            return
+        with self._lock:
+            target = self._slot(scope, create=True)
+            moved = 0
+            for name in tool_names or ():
+                entry = self._tools.get(name)
+                if entry is None:
+                    continue
+                target.setdefault(name, entry)
+                del self._tools[name]
+                moved += 1
+            if not target:
+                self._scoped_tools.pop(scope, None)
+            if moved:
+                self._generation += 1
+
     def deregister(self, name: str, *, scope: Optional[str] = None) -> None:
         """Remove a tool; drops the toolset check/aliases if it was the last in its toolset.
 

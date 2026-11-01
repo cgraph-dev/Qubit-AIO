@@ -37,6 +37,12 @@ def _is_live_system_guard(exc: BaseException) -> bool:
     return isinstance(exc, RuntimeError) and "live-system guard" in str(exc)
 
 
+@contextlib.contextmanager
+def _null_conn_context():
+    """No database handle: the import loop runs with ``conn is None`` and skips the fence query."""
+    yield None
+
+
 class SessionPersistenceMixin:
     """SessionStore storage plumbing: SessionDB handle resolution and routing-index load/save."""
 
@@ -363,8 +369,13 @@ class SessionPersistenceMixin:
         self._prune_stale_sessions_locked()
 
     def _import_legacy_sessions_json(self, db_had_entries: bool) -> None:
-        """Legacy import: sessions.json fills only keys the DB lacks. Lock held."""
+        """Legacy import: sessions.json fills only keys the DB lacks. Lock held.
+
+        A route retired in the shared index (a secondary's delete/prune fence, or an earlier
+        release's marker) is never imported: without this the mirror brought it back on the next
+        start -- including after the fence aged out."""
         from gateway.session import SessionEntry
+        from qubit_state_mutation_retirement import route_retired_in
         sessions_file = self.sessions_dir / "sessions.json"
         if not sessions_file.exists():
             return
@@ -372,24 +383,25 @@ class SessionPersistenceMixin:
             with open(sessions_file, "r", encoding="utf-8-sig") as f:
                 data = json.load(f)
             imported = 0
-            for key, entry_data in data.items():
-                # "_"-prefixed keys are sentinels (e.g. "_README"), not entries.
-                if key.startswith("_") or key in self._entries:
-                    continue
-                if not isinstance(entry_data, dict):  # corrupt file must not abort the whole load
-                    logger.warning(
-                        "Skipping invalid session entry %r: expected dict, got %s", key,
-                        type(entry_data).__name__)
-                    continue
-                try:
-                    from qubit_state_mutation_retirement import retired_session
-                    db = self._routing_db
-                    if db is not None and retired_session(db, entry_data['session_id']):
+            db = self._routing_db
+            conn_context = db._read_ctx() if db is not None else _null_conn_context()
+            with conn_context as conn:
+                for key, entry_data in data.items():
+                    # "_"-prefixed keys are sentinels (e.g. "_README"), not entries.
+                    if key.startswith("_") or key in self._entries:
                         continue
-                    self._entries[key] = SessionEntry.from_dict(entry_data)
-                    imported += 1
-                except (ValueError, KeyError, TypeError) as e:
-                    logger.warning("Skipping invalid session entry %r: %s", key, e)
+                    if not isinstance(entry_data, dict):  # corrupt file must not abort the whole load
+                        logger.warning(
+                            "Skipping invalid session entry %r: expected dict, got %s", key,
+                            type(entry_data).__name__)
+                        continue
+                    try:
+                        if conn is not None and route_retired_in(conn, key, json.dumps(entry_data)):
+                            continue
+                        self._entries[key] = SessionEntry.from_dict(entry_data)
+                        imported += 1
+                    except (ValueError, KeyError, TypeError) as e:
+                        logger.warning("Skipping invalid session entry %r: %s", key, e)
             if imported and db_had_entries:
                 logger.info(
                     "gateway.session: imported %d legacy sessions.json entr%s missing from "
@@ -576,8 +588,29 @@ class SessionPersistenceMixin:
                     del fast_persisted[key]
 
     def _save_sessions_json(self, data: Dict[str, Any]) -> None:
-        """Write the legacy sessions.json mirror of the routing index (atomic + fsync)."""
+        """Write the legacy sessions.json mirror of the routing index (atomic + fsync).
+
+        Routes retired in the shared index are filtered out here too: a mirror that still names a
+        pruned route would restore it on a later start once the fence aged out."""
+        data = self._without_retired_routes(data)
         atomic_json_write(self.sessions_dir / "sessions.json", {"_README": _SESSIONS_JSON_README, **data}, mode=0o600)
+
+    def _without_retired_routes(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Drop entries retired in the shared routing index (never a sentinel key)."""
+        db = self._routing_db
+        if db is None or not data:
+            return data
+        from qubit_state_mutation_retirement import route_retired_in
+        try:
+            with db._read_ctx() as conn:
+                return {
+                    key: value for key, value in data.items()
+                    if key.startswith("_") or not route_retired_in(
+                        conn, key, value if isinstance(value, str) else json.dumps(value))
+                }
+        except Exception as exc:
+            logger.warning("gateway.session: sessions.json retirement filter failed: %s", exc)
+            return data
 
     def _save_entries(self) -> None:
         """Snapshot latest state under ``_lock`` and persist after releasing it."""

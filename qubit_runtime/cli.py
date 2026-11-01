@@ -1216,20 +1216,20 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
             return self._process_unregistered_slash(cmd_original, cmd_lower)
         from qubit_cli.gateway_cli_commands import REFUSED
         from qubit_cli.gateway_cli_commands import run as run_gateway_command
-        if run_gateway_command(self, canonical, cmd_original):
-            return True  # state the gateway session owns (checkpoints, .env, handoff)
         # Observer-only pre_command plugin hook (return values ignored; never raises), fired by the gateway
         # for a command this process runs (not a named refusal, not a command with no handler here).
+        # Gateway-owned commands (``/diff session``, ``/reload``) still run here, so they are observed
+        # too; the named refusal (``/handoff``) runs nothing and is not.
         from qubit_cli.gateway_plugin_commands import observe
-        runs = entry is not None and canonical not in REFUSED
-        if canonical in {"diff", "reload", "handoff"}:
-            pass
-        elif _cmd_def is not None and not observe(self, _base_word, _slash_args(cmd_original), runs=runs):
+        runs = canonical not in REFUSED
+        if _cmd_def is not None and not observe(self, _base_word, _slash_args(cmd_original), runs=runs):
             from qubit_cli.plugins import fire_pre_command_hook
             fire_pre_command_hook(
                 surface="cli", command=canonical, alias_used=_base_word, args_raw=_slash_args(cmd_original),
                 session_key=getattr(self, "session_id", None), platform="cli",
             )
+        if run_gateway_command(self, canonical, cmd_original):
+            return True  # state the gateway session owns (checkpoints, .env, handoff)
         method_name, pass_arg = entry
         handler = getattr(self, method_name)
         result = handler(cmd_original) if pass_arg else handler()
@@ -1343,6 +1343,11 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
 
     def _run_skill_slash_command(self, base_cmd: str, skill_info: dict, rest: str) -> None:
         """``/<skill> ...``; stacked ``/skill-a /skill-b do XYZ`` loads every leading skill (up to 5)."""
+        # On its gateway session the gateway resolves and loads the skill (plugin skills and stacked
+        # skills included), so this process never scans plugins to build one.
+        from qubit_cli import gateway_plugin_commands
+        if gateway_plugin_commands.run_skill(self, base_cmd, rest):
+            return
         from agent.skill_commands import build_stacked_skill_invocation_message, split_stacked_skill_commands
 
         # Interactive surface: stacked tokens resolve against the interactive
@@ -1593,7 +1598,15 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
     # the rest of the auto-injected context. Resolved here (not lazily in the agent) so the
     # session id is real for ${HERMES_SESSION_ID} and -s can dedupe against it.
     from agent.skill_commands import build_auto_load_prompt, resolve_auto_load_skills
+    from qubit_cli.gateway_session_store import GatewaySessionStore
     auto_load_names = [] if getattr(cli, "ignore_rules", ignore_rules) else resolve_auto_load_skills(CLI_CONFIG)
+    if parsed_skills or auto_load_names:
+        cli._preload_skills_requested = [*auto_load_names, *(s for s in parsed_skills if s not in auto_load_names)]
+    # A gateway-backed CLI never loads skills itself: ``session.create`` renders the typed ``-s`` names
+    # into the session and the gateway's agent loads ``skills.auto_load``, so a plugin skill is resolved
+    # where the plugin lives and this process reaches no plugin entry point.
+    if isinstance(getattr(cli, "_session_db", None), GatewaySessionStore):
+        return cli
     if not auto_load_names:
         cli._auto_load_skills_result = ("", [], [])
     if parsed_skills or auto_load_names:
@@ -1611,7 +1624,6 @@ def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url
             except Exception as exc:  # surfaced by finalize
                 cli._preload_skills_error = exc
 
-        cli._preload_skills_requested = [*auto_load_names, *(s for s in parsed_skills if s not in auto_load_names)]
         cli._preload_skills_thread = threading.Thread(target=_load_preloaded_skills, name="skills-preload", daemon=True)
         cli._preload_skills_thread.start()
     return cli

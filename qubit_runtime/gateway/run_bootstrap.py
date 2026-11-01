@@ -55,6 +55,16 @@ async def _start_gateway_replace_existing_instance(existing_pid: int, replace: b
             "to this profile's gateway (QUBIT_HOME %s). Remove the "
             "stale PID record or stop the owning profile explicitly.",
             existing_pid, _get_process_qubit_home())
+        # Retain the fatal verdict on disk before the caller hard-exits: a queued-only stamp dies
+        # with the process, so the next supervised start would trust the same stale PID and loop.
+        try:
+            from gateway.status import write_runtime_status
+            write_runtime_status(
+                gateway_state="startup_failed",
+                exit_reason="gateway_replace_ownership_unproven",
+                wait_timeout=5.0)
+        except Exception as exc:
+            logger.debug("Could not stamp the ownership refusal: %s", exc)
         return False
     existing_start_time = get_process_start_time(existing_pid)
     logger.info("Replacing existing gateway instance (PID %d) with --replace.", existing_pid)
@@ -336,16 +346,20 @@ async def _start_gateway_start_control_socket(runner):
             """``qubit profile create/delete`` asks the multiplexer to reconcile ``profiles/`` now
             (the watcher also rescans periodically). Runs on the socket executor: marshal onto the loop
             and wait briefly so the caller learns whether the profile is served."""
-            if not getattr(runner.config, "multiplex_profiles", False):
-                return {"multiplex": False, "served_profiles": runner.served_profile_names()}
+            # A single-profile boot still reconciles: a profile created after boot switches this
+            # process to multiplexing in place (no restart), and `reconcile_served_profiles`
+            # reports ``multiplex: False`` while no second profile may be served.
             future = asyncio.run_coroutine_threadsafe(
                 runner.reconcile_served_profiles(reason="control-socket"), _main_loop)
             try:
                 # Bounded: a token-less create reconciles in milliseconds; a credential-add whose adapter
                 # connect outlasts this keeps running and the caller sees ``pending`` (not an error).
-                return {"multiplex": True, **future.result(timeout=7.0)}
+                answer = future.result(timeout=7.0)
             except concurrent.futures.TimeoutError:
                 return {"multiplex": True, "pending": True, "served_profiles": runner.served_profile_names()}
+            answer.setdefault(
+                "multiplex", bool(getattr(runner.config, "multiplex_profiles", False)))
+            return answer
 
         _control_server = GatewayControlServer(
             verb_handlers={"pause-for-update": _pause_for_update_handler, "identify": _identify_runtime,

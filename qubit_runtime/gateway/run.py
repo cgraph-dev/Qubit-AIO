@@ -1789,16 +1789,20 @@ def _terminal_scope_cwd(default: str = "") -> str:
 
 
 def _load_profile_secret_scope(profile_home: Path) -> dict:
-    """Hydrate and load one profile's secrets under its home override."""
+    """Hydrate and load one profile's secrets under its home override.
+
+    The launch profile keeps the env snapshot frozen at activation over its ``.env``
+    (systemd ``Environment=`` / ``op run`` keys have no file to rebuild from); a secondary
+    reads its own files only, so the launch env never leaks into another tenant."""
     from qubit_constants import set_qubit_home_override, reset_qubit_home_override
     # Caller already hydrated external sources off-loop (#99519).
-    from agent.secret_scope import build_profile_secret_scope
+    from tui_gateway.launch_profile_policy import owner_secret_scope
     from qubit_cli.env_loader import hydrate_profile_secret_sources
 
     home_token = set_qubit_home_override(str(profile_home))
     try:
         hydrate_profile_secret_sources(Path(profile_home))
-        return build_profile_secret_scope(Path(profile_home))
+        return owner_secret_scope(Path(profile_home))
     finally:
         reset_qubit_home_override(home_token)
 

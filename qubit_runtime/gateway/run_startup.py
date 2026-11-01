@@ -203,6 +203,12 @@ class GatewayStartupMixin:
                              getattr(fn, "__name__", fn), exc_info=True)
         return await loop.run_in_executor(None, copy_context().run, fn)
 
+    async def _run_free_tier_bootstrap(self) -> None:
+        """Run the free-tier identity bootstrap on the executor under the launch profile's scope
+        when multiplexing: it mints the Portal identity at boot through the same routing override
+        a routed turn reads, so an unscoped call would resolve the override as absent."""
+        await self._run_boot_probe_in_launch_scope(self._start_free_tier_bootstrap)
+
     async def _warm_turn_prerequisites(self) -> None:
         """Initialize turn machinery on an executor thread before the gate opens. Never raises: a
         failed warm-up degrades to lazy init and must not block startup."""
@@ -1714,7 +1720,7 @@ class GatewayStartupMixin:
         startup_retryable_errors: list[str] = []
         self._startup_parked_platforms = False  # fresh boot: no platform has failed yet
         self._startup_ownership_conflict = False
-        self._start_free_tier_bootstrap()
+        await self._run_free_tier_bootstrap()
         (
             _aborted, enabled_platform_count, _multiplex_skipped_platforms, _pending_connects
         ) = await self._start_prefilter_platforms()

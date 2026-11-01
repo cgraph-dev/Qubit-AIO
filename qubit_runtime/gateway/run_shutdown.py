@@ -860,7 +860,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         for count, what in (
             (self._interrupt_api_server_runs(reason), "api_server run(s)"),
             (self._interrupt_deferred_agent_workers(reason), "deferred agent worker(s)"),
-            (stop_managed_turns(self), "managed-worker turn(s)"),
+            (stop_managed_turns(self, reason=reason), "managed-worker turn(s)"),
         ):
             if count:
                 logger.debug("Interrupted %d %s during shutdown", count, what)
