@@ -42,6 +42,12 @@ class SubagentMonitor:
         self.app = None
         self.opening = False
         self.collapsed = False
+        self.detail = False
+
+    def _backend(self):
+        """The gateway session's subagent surface when this CLI is rewired, else this process's."""
+        from qubit_cli import gateway_tools
+        return gateway_tools.process_view() or gateway_tools.LocalSubagents(self.cli)
 
     @property
     def has_rows(self):
@@ -66,17 +72,14 @@ class SubagentMonitor:
         return row if row and row.get('kind') == 'process' else None
 
     def refresh(self, now=None):
-        from tools.delegate_tool_registry import _list_payload, list_active_subagents
         now = time.time() if now is None else now
-        parent = getattr(self.cli, 'agent', None)
-        entries = _list_payload(parent)['subagents'] if parent is not None else []
+        entries = self._backend().subagent_rows(busy=bool(getattr(self.cli, '_agent_running', False)))
         # The scoped control-plane snapshot supplies authority and transcript paths;
         # its matching public lifecycle record supplies the latest observed tool.
-        activity = {r['subagent_id']: r for r in list_active_subagents()} if entries else {}
         for row in entries:
-            live = activity.get(row['subagent_id'], {})
-            row['elapsed'] = max(0, int(now - live.get('started_at', now)))
-            row['last_tool'] = live.get('last_tool') or ''
+            started = row.get('started_at')
+            row['elapsed'] = max(0, int(now - started)) if started else 0
+            row['last_tool'] = row.get('last_tool') or ''
             row['key'] = row['subagent_id']
             row.pop('running_seconds', None)
         processes = procs.process_rows(now)
@@ -112,7 +115,18 @@ class SubagentMonitor:
         if now - self._last_poll < 1:
             return
         self._last_poll = now
-        if self.refresh():
+        try:
+            changed = self.refresh()
+        except Exception:  # health: allow BLE001 -- a failed poll skips a beat, never ends the spinner thread
+            return
+        fetched_tail = False
+        row = self.selected
+        if self.detail and row is not None and row.get('kind') != 'process':
+            try:
+                fetched_tail = self._backend().subagent_tail(row['subagent_id'], fetch=True) is not None
+            except Exception:  # health: allow BLE001 -- the detail view keeps its last cached tail
+                fetched_tail = False
+        if changed or fetched_tail:
             if self.app is not None:
                 self.invalidate()
             else:
@@ -130,8 +144,7 @@ class SubagentMonitor:
             if action != 'stop':
                 return {'error': t('cli.subagents.cannot_steer_process')}
             return procs.kill(target)
-        from tools.delegate_tool_registry import _handle_control_action
-        return json.loads(_handle_control_action(action, target, message, getattr(self.cli, 'agent', None)))
+        return self._backend().subagent_control(action, target, message)
 
     def _counts(self, *, session=True):
         """Count fragment: ``2 live``, ``1 proc``, ``2 live · 3 procs``; the collapsed heading
@@ -259,6 +272,16 @@ def read_tail(path):
         return t('cli.subagents.transcript_unavailable')
 
 
+def subagent_tail(monitor, row):
+    """The cached transcript tail for *row*: the gateway's (fetched by the tick) or this process's
+    file. The detail view repaints every frame and must never block on an RPC here."""
+    if row is None:
+        return None
+    if row.get('kind') == 'process':
+        return procs.process_tail(row['id'])
+    return monitor._backend().subagent_tail(row['subagent_id'], fetch=False)
+
+
 def modal_prompt_active(cli):
     return any(getattr(cli, name, None) for name in (
         '_clarify_state', '_approval_state', '_slash_confirm_state', '_sudo_state',
@@ -308,10 +331,8 @@ def build_monitor_application(monitor, **kwargs):
         row = monitor.selected
         if row is None:
             text = t('cli.subagents.entry_gone')
-        elif row.get('kind') == 'process':
-            text = procs.process_tail(row['id'])
         else:
-            text = read_tail(row.get('live_transcript'))
+            text = subagent_tail(monitor, row) or t('cli.subagents.transcript_unavailable')
         if text != tail.text:
             following = tail.buffer.cursor_position == len(tail.text)
             position = tail.buffer.cursor_position
@@ -357,6 +378,7 @@ def build_monitor_application(monitor, **kwargs):
     def detail(event):
         if monitor.selected:
             state['detail'] = True
+            monitor.detail = True
             update_tail()
             app.layout.focus(tail)
 
@@ -371,11 +393,23 @@ def build_monitor_application(monitor, **kwargs):
     def send_steer(event):
         if not steer.text.strip():
             return
-        result = monitor.control('steer', steer.text, target=state['target'])
-        state['notice'] = result.get('error') or result.get('note') or str(result)
+        text, target = steer.text, state['target']
         steer.text = ''
         state['steering'] = False
         app.layout.focus(tail if state['detail'] else roster)
+
+        # The control call is an RPC (or a file read) and may stall: run it off the UI loop so the
+        # monitor keeps repainting and Esc still closes it; the answer lands in the notice line.
+        def work():
+            try:
+                result = monitor.control('steer', text, target=target)
+            except Exception as exc:  # health: allow BLE001 -- a failed steer must not kill the monitor
+                result = {'error': str(exc)}
+            state['notice'] = result.get('error') or result.get('note') or str(result)
+            if not app.is_done:
+                app.loop.call_soon_threadsafe(app.invalidate)
+
+        app.loop.run_in_executor(None, work)
 
     @kb.add('x', filter=normal)
     def stop(event):
@@ -396,6 +430,7 @@ def build_monitor_application(monitor, **kwargs):
             app.layout.focus(tail if state['detail'] else roster)
         elif state['detail']:
             state['detail'] = False
+            monitor.detail = False
             app.layout.focus(roster)
         else:
             app.exit()
