@@ -3800,6 +3800,10 @@ def set_config_value(key: str, value: str, force: bool = False):
     if _redirect_note:
         print(_redirect_note)
     is_known, suggestion = _validate_config_key(key)
+    # The save is allowed for a runtime-read key DEFAULT_CONFIG leaves unseeded, but the
+    # post-write notice is about the SCHEMA walk: those unseeded keys still get the hedged
+    # warning so a user is never told an unrecognized path is a first-class setting.
+    schema_known, schema_suggestion = _validate_schema_key(key)
     # DEFAULT_CONFIG is an incomplete schema: runtime-read settings may deliberately have no
     # seeded default. Refuse only the positive wrong-prefix case from #112003; other unknown
     # paths keep the post-write warning so valid runtime settings remain configurable.
@@ -3885,8 +3889,8 @@ def set_config_value(key: str, value: str, force: bool = False):
 
     # Post-write unknown-key notice (#34067): value IS saved, but tell the user the runtime may never read
     # it and suggest the likely-intended path.
-    if not is_known and not force:
-        _print_unknown_key_notice(key, suggestion)
+    if not schema_known and not force:
+        _print_unknown_key_notice(key, schema_suggestion)
 
 
 def get_config_value(key: str, *, as_json: bool = False, raw: bool = False):
@@ -3933,7 +3937,7 @@ def get_config_value(key: str, *, as_json: bool = False, raw: bool = False):
     # are bridged into os.environ for skills) and ``_validate_config_key`` already accepts
     # open-subkey sections. stderr keeps stdout/--json parseable; the exit code stays 0.
     if _split_key_path(key)[0] in _known_top_level_keys():
-        is_known, suggestion = _validate_config_key(key)
+        is_known, suggestion = _validate_schema_key(key)
         if not is_known:
             print(color(
                 f"⚠ '{key}' is not a recognized config key — Qubit may not read it; the value "
