@@ -154,7 +154,18 @@ def listener_auth_required(host: str, trusted_public_hosts: frozenset[str]) -> b
 
 
 _GATEWAY_WS_PROTOCOL = "hermes-gateway-v1"
+# Qubit-branded spelling for new clients; the legacy spelling stays accepted on the wire
+# (the gateway contract and installed clients still dial it).
+_GATEWAY_WS_PROTOCOLS = ("qubit-gateway-v1", _GATEWAY_WS_PROTOCOL)
 _GATEWAY_WS_TICKET_PROTOCOL_PREFIX = "hermes-gateway-ticket."
+_GATEWAY_WS_TICKET_PROTOCOL_PREFIXES = ("qubit-gateway-ticket.", _GATEWAY_WS_TICKET_PROTOCOL_PREFIX)
+
+
+def offered_gateway_protocol(ws) -> str:
+    """The public gateway subprotocol the client offered (canonical Qubit first), else ``""``."""
+    raw = str(ws.headers.get("sec-websocket-protocol", "") or "")
+    protocols = [value.strip() for value in raw.split(",") if value.strip()]
+    return next((name for name in _GATEWAY_WS_PROTOCOLS if name in protocols), "")
 
 
 def _gateway_ws_ticket_from_subprotocol(ws) -> tuple[str, str]:
@@ -162,12 +173,13 @@ def _gateway_ws_ticket_from_subprotocol(ws) -> tuple[str, str]:
     raw = str(ws.headers.get("sec-websocket-protocol", "") or "")
     protocols = [value.strip() for value in raw.split(",") if value.strip()]
     ticket_protocols = [
-        value for value in protocols if value.startswith(_GATEWAY_WS_TICKET_PROTOCOL_PREFIX)]
+        value for value in protocols
+        if value.startswith(_GATEWAY_WS_TICKET_PROTOCOL_PREFIXES)]
     if not ticket_protocols:
         return "", "none"
-    if _GATEWAY_WS_PROTOCOL not in protocols or len(ticket_protocols) != 1:
+    if not any(name in protocols for name in _GATEWAY_WS_PROTOCOLS) or len(ticket_protocols) != 1:
         return "", "invalid"
-    ticket = ticket_protocols[0][len(_GATEWAY_WS_TICKET_PROTOCOL_PREFIX):]
+    ticket = ticket_protocols[0].split(".", 1)[1]
     return (ticket, "ok") if ticket else ("", "invalid")
 
 

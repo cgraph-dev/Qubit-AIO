@@ -823,6 +823,16 @@ async def disconnect_oauth_provider(provider_id: str, request: Request, profile:
 # Sessions are in-memory (single-process), expire after 15 min, GC'd on /start.
 
 
+# Provider ids whose Qubit-branded spelling aliases a registered provider (the Nous Portal free
+# tier is served to Qubit clients as ``qubit``). Both spellings address the same sessions.
+_OAUTH_PROVIDER_ALIASES = {"qubit": "nous"}
+
+
+def _canonical_oauth_provider_id(provider_id: str) -> str:
+    raw = str(provider_id or "")
+    return _OAUTH_PROVIDER_ALIASES.get(raw.strip().lower(), raw)
+
+
 def _gc_oauth_sessions() -> None:
     cutoff = time.time() - _OAUTH_SESSION_TTL_SECONDS
     with _oauth_sessions_lock:
@@ -842,6 +852,7 @@ def _validate_oauth_profile(profile: Optional[str]) -> str:
 async def start_oauth_login(provider_id: str, request: Request, profile: Optional[str] = None):
     """Initiate an OAuth login flow. Token-protected."""
     _require_token(request)
+    provider_id = _canonical_oauth_provider_id(provider_id)
     _gc_oauth_sessions()
     _validate_oauth_profile(profile)
     # The whole Accounts catalog, in the request's profile scope: a provider profile's card counts.
@@ -923,6 +934,7 @@ async def poll_oauth_session(provider_id: str, session_id: str, profile: Optiona
     """Poll a session's status (no auth — read-only state). One endpoint serves
     every device-code flow: all report progress via the worker-updated ``status``.
     With *wait* (seconds) it is a long-poll: it answers once the session leaves ``pending``."""
+    provider_id = _canonical_oauth_provider_id(provider_id)
     requested_profile = _validate_oauth_profile(profile)
     with _oauth_sessions_lock:
         sess = _oauth_sessions.get(session_id)
@@ -954,6 +966,7 @@ async def poll_oauth_session(provider_id: str, session_id: str, profile: Optiona
 
 
 @router.get("/api/providers/oauth/nous/handoff")
+@router.get("/api/providers/oauth/qubit/handoff")
 async def nous_handoff_status(
     request: Request, profile: Optional[str] = None, since: Optional[str] = None, wait: float = 0,
 ):

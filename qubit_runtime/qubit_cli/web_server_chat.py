@@ -225,17 +225,15 @@ _GATEWAY_WS_TICKET_PROTOCOL_PREFIX = "hermes-gateway-ticket."
 
 
 def _gateway_ws_ticket_from_subprotocol(ws: WebSocket) -> tuple[str, str]:
-    """Return ``(ticket, reason)`` from an unambiguous gateway protocol set."""
-    raw = str(ws.headers.get("sec-websocket-protocol", "") or "")
-    protocols = [value.strip() for value in raw.split(",") if value.strip()]
-    ticket_protocols = [
-        value for value in protocols if value.startswith(_GATEWAY_WS_TICKET_PROTOCOL_PREFIX)]
-    if not ticket_protocols:
-        return "", "none"
-    if _GATEWAY_WS_PROTOCOL not in protocols or len(ticket_protocols) != 1:
-        return "", "invalid"
-    ticket = ticket_protocols[0][len(_GATEWAY_WS_TICKET_PROTOCOL_PREFIX):]
-    return (ticket, "ok") if ticket else ("", "invalid")
+    """``(ticket, reason)`` from an unambiguous gateway protocol set (Qubit or legacy spelling)."""
+    from qubit_cli.web_server_boundary import _gateway_ws_ticket_from_subprotocol as _impl
+    return _impl(ws)
+
+
+def _offered_gateway_protocol(ws: WebSocket) -> str:
+    """The public gateway subprotocol the client offered, or the legacy default."""
+    from qubit_cli.web_server_boundary import offered_gateway_protocol
+    return offered_gateway_protocol(ws) or _GATEWAY_WS_PROTOCOL
 
 
 def _ws_request_view(ws: WebSocket, app) -> Request:
@@ -313,7 +311,7 @@ def _consume_ws_ticket(ws: WebSocket, reject, socket: Optional[str] = None, *,
         track(ws, admitted)
     if not protocol_ticket:
         return None, "ticket"
-    ws._qubit_ws_subprotocol = _GATEWAY_WS_PROTOCOL
+    ws._qubit_ws_subprotocol = _offered_gateway_protocol(ws)
     return None, "ticket-subprotocol"
 
 
@@ -373,7 +371,7 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
     if grant is not None:
         ws._qubit_auth_identity = {"user_id": grant["subject"], "provider": "local"}
         ws._qubit_native_grant = grant
-        ws._qubit_ws_subprotocol = _GATEWAY_WS_PROTOCOL
+        ws._qubit_ws_subprotocol = _offered_gateway_protocol(ws)
         return None, "native"
     if auth_required:
         # Lazy import — keeps this function importable in test harnesses

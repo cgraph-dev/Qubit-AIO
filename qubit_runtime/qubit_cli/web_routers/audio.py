@@ -62,6 +62,21 @@ def _unlink_quietly(path: str) -> None:
         pass
 
 
+def _grant_profile(ws) -> Optional[str]:
+    """The profile name a native audio grant's home names, else None (launch/current profile).
+
+    A local Desktop's voice sockets carry no ``?profile=``; the one-use ``interactive`` grant
+    that admitted the upgrade decides whose voice config/keys run (RT-71/RT-80).
+    """
+    grant = getattr(ws, "_qubit_native_grant", None)
+    home = getattr(ws, "_qubit_ticket_profile_home", None) or (grant or {}).get("profile_id")
+    if not home:
+        return None
+    from pathlib import Path
+    path = Path(str(home))
+    return path.name if path.parent.name == "profiles" else None
+
+
 async def _run_config_scoped(profile: Optional[str], fn):
     """Run ``fn()`` on a worker thread under the config-only profile scope.
 
@@ -534,9 +549,9 @@ async def transcribe_stream_ws(ws: "WebSocket") -> None:
     if not _ws_request_is_allowed(ws):
         await ws.close(code=4403)
         return
-    await ws.accept()
+    await ws.accept(subprotocol=getattr(ws, "_qubit_ws_subprotocol", None))
 
-    profile = (ws.query_params.get("profile") or "").strip() or None
+    profile = (ws.query_params.get("profile") or "").strip() or _grant_profile(ws)
     loop = asyncio.get_running_loop()
     partials: asyncio.Queue = asyncio.Queue()
 
@@ -581,7 +596,7 @@ async def transcribe_stream_ws(ws: "WebSocket") -> None:
         session.cancel()
         forwarder.cancel()
         return
-    result = await loop.run_in_executor(None, session.finalize)
+    result = await _run_config_scoped(profile, session.finalize)
     await asyncio.sleep(0)  # let the last partial flush before the final frame
     forwarder.cancel()
     with contextlib.suppress(Exception):
@@ -620,12 +635,12 @@ async def speak_stream_ws(ws: "WebSocket") -> None:
     if not _ws_request_is_allowed(ws):
         await ws.close(code=4403)
         return
-    await ws.accept()
+    await ws.accept(subprotocol=getattr(ws, "_qubit_ws_subprotocol", None))
 
     # Profile via query param, like /api/pty and /api/console: the provider
     # chain + API keys must resolve from the requesting profile's config, not
     # the dashboard's own — at resolve time AND in the synthesis thread.
-    profile = (ws.query_params.get("profile") or "").strip() or None
+    profile = (ws.query_params.get("profile") or "").strip() or _grant_profile(ws)
 
     loop = asyncio.get_running_loop()
 

@@ -21,7 +21,7 @@ SPEAK, TRANSCRIBE = "/api/audio/speak-stream", "/api/audio/transcribe-stream"
 def _dial(home, purpose="interactive"):
     ticket = web_server.app.state.gateway_runner.session_ticket_store.mint(
         profile_id=str(home), subject="desktop", purpose=purpose)
-    return ["hermes-gateway-v1", f"hermes-gateway-ticket.{ticket}"]
+    return ["qubit-gateway-v1", f"qubit-gateway-ticket.{ticket}"]
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def scopes(daemon, monkeypatch):
 
 def test_spoken_reply_runs_in_the_grant_profile(daemon, scopes):
     with daemon.client.websocket_connect(SPEAK, subprotocols=_dial(daemon.beta)) as ws:
-        assert ws.accepted_subprotocol == "hermes-gateway-v1"  # the browser fails the handshake otherwise
+        assert ws.accepted_subprotocol == "qubit-gateway-v1"  # the browser fails the handshake otherwise
         ws.send_json({"text": "Hello there.", "done": True})
         assert ws.receive_json()["type"] == "start"
         assert ws.receive_bytes() == b"\0\0"
@@ -76,7 +76,7 @@ def test_spoken_reply_runs_in_the_grant_profile(daemon, scopes):
 
 def test_dictation_runs_in_the_grant_profile(daemon, scopes):
     with daemon.client.websocket_connect(TRANSCRIBE, subprotocols=_dial(daemon.beta)) as ws:
-        assert ws.accepted_subprotocol == "hermes-gateway-v1"
+        assert ws.accepted_subprotocol == "qubit-gateway-v1"
         ws.send_json({"sample_rate": 16000})
         ws.send_bytes(b"\0\0")
         ws.send_json({"eos": True})
