@@ -8,6 +8,15 @@ from typing import Callable
 from qubit_cli.subcommands._shared import add_accept_hooks_flag
 
 
+class _MovedServeFlag(argparse.Action):
+    """The old ``mcp serve --tools`` spelling: argparse otherwise reports only "unrecognized"."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        from qubit_cli.left_core_migration import moved_command_hint
+        hint = moved_command_hint("qubit mcp", "serve")
+        parser.error(hint or f"{option_string} is no longer accepted by `mcp serve`")
+
+
 def build_mcp_parser(subparsers, *, cmd_mcp: Callable) -> None:
     """Attach the ``mcp`` subcommand to ``subparsers``."""
     mcp_parser = subparsers.add_parser(
@@ -22,6 +31,8 @@ def build_mcp_parser(subparsers, *, cmd_mcp: Callable) -> None:
         "serve", help="Run Qubit as an MCP server (expose conversations to other agents)")
     mcp_serve_p.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose logging on stderr")
+    # ``qubit mcp serve`` moved to the ``mcp-serve`` plugin; name where the old flag went.
+    mcp_serve_p.add_argument("--tools", action=_MovedServeFlag, nargs="?", help=argparse.SUPPRESS)
     add_accept_hooks_flag(mcp_serve_p)
 
     mcp_add_p = mcp_sub.add_parser("add", help="Add an MCP server (discovery-first install)")

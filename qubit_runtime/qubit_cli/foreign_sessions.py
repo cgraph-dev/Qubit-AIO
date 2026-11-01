@@ -245,24 +245,53 @@ def import_foreign_session(source: str, path, db=None) -> str:
     first_user = _first_user_line([(t["role"], t["content"]) for t in turns]) or path.stem
     if len(first_user) > _TITLE_MAX:
         first_user = first_user[: _TITLE_MAX - 1] + "…"
-    tool = _SOURCE_DB_NAMES[source]
-    owns_db = db is None
-    if owns_db:
-        from qubit_state_registry import acquire
-        db = acquire()  # the CLI resume that follows acquires this same handle
+    session_id = new_session_id()
+    title = f"Imported from {_SOURCE_LABELS[source]}: {first_user}"
+    cwd = parsed.get("cwd")
+    if cwd and not Path(cwd).expanduser().is_dir():
+        cwd = None  # resume would refuse a folder that does not exist here
+    if db is None:
+        _import_through_gateway(session_id, turns, title, cwd)
+        return session_id
+    owns_db = False  # a passed handle belongs to the caller (run_sessions_import)
     try:
-        session_id = new_session_id()
-        origin = {"imported_from": {"tool": tool, "path": str(path), "foreign_session_id": parsed.get("session_id")}}
-        db.create_session(session_id, source=tool, cwd=parsed.get("cwd"), origin_json=json.dumps(origin))
+        origin = {"imported_from": {"tool": _SOURCE_DB_NAMES[source], "path": str(path),
+                                    "foreign_session_id": parsed.get("session_id")}}
+        db.create_session(session_id, source=_SOURCE_DB_NAMES[source], cwd=cwd, origin_json=json.dumps(origin))
         for turn in turns:
             db.append_message(session_id, turn["role"], turn["content"])
         with contextlib.suppress(Exception):  # title is cosmetic; the import itself succeeded
-            db.set_session_title(session_id, f"Imported from {_SOURCE_LABELS[source]}: {first_user}")
+            db.set_session_title(session_id, title)
         return session_id
     finally:
         if owns_db:
             with contextlib.suppress(Exception):
                 db.close()
+
+
+def _import_through_gateway(session_id: str, turns: List[Dict[str, str]], title: str,
+                            cwd: Optional[str]) -> None:
+    """Write the import through the gateway owner (the only state.db writer, #106742).
+
+    The payload is the store's own import shape; a title is a separate ``rename`` because the
+    column is unique and a re-import reuses the conversation without competing for it."""
+    import uuid
+    from qubit_cli.gateway_client import GatewayClientError
+    from qubit_cli.gateway_session_store import session_store
+    store = session_store()
+    receipt = store.call(
+        "session.mutate", session_id=session_id, request_id=uuid.uuid4().hex,
+        expected_revision=0, operation="import",
+        payload={"sessions": [{"id": session_id, "source": "cli", "cwd": cwd,
+                               "messages": [{"role": turn["role"], "content": turn["content"]}
+                                            for turn in turns]}]},
+    ) or {}
+    with contextlib.suppress(GatewayClientError, KeyError, TypeError, ValueError):
+        store.call(
+            "session.mutate", session_id=session_id, request_id=uuid.uuid4().hex,
+            expected_revision=int(receipt.get("revision") or 0), operation="rename",
+            payload={"title": title},
+        )
 
 
 def gather_foreign_sessions(source: Optional[str] = None, *, claude_root: Optional[Path] = None,

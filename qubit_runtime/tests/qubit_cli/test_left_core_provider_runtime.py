@@ -130,7 +130,7 @@ def test_doctor_installs_nothing_and_names_the_install(tmp_path, monkeypatch, in
     doctor.run_doctor(SimpleNamespace(fix=False, ack=None, live=False))
     assert installs == []
     assert not (home / "plugins" / "github-copilot").exists()
-    assert "hermes plugins install github-copilot" in capsys.readouterr().out
+    assert "qubit plugins install github-copilot" in capsys.readouterr().out
 
 
 def test_an_append_racing_a_claim_is_delivered_not_lost(tmp_path, monkeypatch):
@@ -230,7 +230,7 @@ def test_a_resolution_outcome_reaches_the_first_agent_of_any_process_once(tmp_pa
     assert capsys.readouterr().err == ""
     first, second = _agent_start_in_another_process(), _agent_start_in_another_process()
     assert first.count("GitHub Copilot moved out of core") == 1
-    assert "run `hermes auth add copilot`" in first  # no token the plugin reads: the gh-only hint rides along
+    assert "run `qubit auth add copilot`" in first  # no token the plugin reads: the gh-only hint rides along
     assert "moved out of core" not in second
 
 
@@ -244,7 +244,7 @@ def test_a_tty_without_a_declared_front_end_keeps_the_outcome_for_the_chat_agent
     assert installs_ok == ["github-copilot"]
     assert capsys.readouterr().err == ""
     chat = _agent_start_in_another_process()
-    assert chat.count("GitHub Copilot moved out of core") == 1 and "hermes auth add copilot" in chat
+    assert chat.count("GitHub Copilot moved out of core") == 1 and "qubit auth add copilot" in chat
 
 
 def test_a_piped_cli_front_end_prints_the_outcome_and_what_another_process_kept(tmp_path, monkeypatch,

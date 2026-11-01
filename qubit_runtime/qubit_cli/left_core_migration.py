@@ -607,7 +607,7 @@ def recover_for_provider(name: Optional[str]) -> None:
     ``qubit update`` migrated. Outcomes print in a declared terminal front end (:func:`serve_notices_on_stderr`),
     else wait for the home's next turn someone sees."""
     from qubit_constants import get_qubit_home, qubit_home_key
-    from providers import get_provider_profile
+    from providers import get_provider_profile, provider_source
     home = Path(get_qubit_home())
     name = str(name or "").strip().lower()
     if name in ("", "auto"):  # the auto rung follows auth.json's active_provider (a core-era choice)
@@ -624,10 +624,26 @@ def recover_for_provider(name: Optional[str]) -> None:
             say(message)
     if qubit_home_key(home) in _attempted:  # this process already tried: skip the config/auth/.env reads
         return
-    if plugin_present(feature.plugin, home) or get_provider_profile(name) is not None:
+    if plugin_present(feature.plugin, home):
+        return
+    # A profile a user/pip plugin already serves is the migration; a bundled copy still shipped
+    # for compatibility does not stand in for the catalog plugin a home chose to migrate to.
+    if get_provider_profile(name) is not None and provider_source(name) != "bundled":
         return
     if feature_in_use(feature, home, process_env=True):
         recover_at_startup(say=say)
+
+
+def provider_migration_required(name: Optional[str]) -> bool:
+    """*name* is a left-core provider this home routes inference through and the plugin is not
+    installed: resolution must refuse it rather than fall back to any in-tree profile still
+    shipped for compatibility."""
+    feature = _provider_feature(name)
+    if feature is None:
+        return False
+    from qubit_constants import get_qubit_home
+    home = Path(get_qubit_home())
+    return not plugin_present(feature.plugin, home) and feature_in_use(feature, home, process_env=True)
 
 
 _terminal_front_end = False
@@ -800,7 +816,8 @@ def _core_carried(feature: LeftCoreFeature, selection: list) -> bool:
     def carries(name: str) -> bool:
         if name in feature.toolsets or name in feature.replaces_toolsets or name == "hermes":
             return True
-        return name.startswith("qubit-") and name[len("qubit-"):].replace("-", "_") not in feature.off_platforms
+        return any(name.startswith(prefix) and name[len(prefix):].replace("-", "_") not in feature.off_platforms
+                   for prefix in ("qubit-", "hermes-"))
     return any(carries(str(name)) for name in selection)
 
 

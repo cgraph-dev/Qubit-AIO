@@ -734,7 +734,7 @@ def pid_is_hermes(pid: int, *, expected_start_time: int | None = None) -> bool:
         return False
 
 
-def kill_process_tree(proc: subprocess.Popen) -> None:
+def kill_process_tree(proc: subprocess.Popen, *, grace: float | None = None) -> None:
     """Best-effort terminate *proc* and its descendants on both platforms; never raises.
 
     ``proc.kill()`` alone only terminates the direct child. This is cleanup on an already-failing
@@ -752,6 +752,32 @@ def kill_process_tree(proc: subprocess.Popen) -> None:
     openai/codex#36793 ("Terminate timed-out Git process trees"); generalized for the shell-hook runner via
     openai/codex#37527 ("Terminate timed-out hook process trees").
     """
+    if grace is not None and not IS_WINDOWS:
+        # Coordinated shutdown: TERM the whole group so descendants can clean up, wait for the
+        # leader, then KILL the group — a member that ignored TERM must not outlive the leader.
+        import signal as _signal
+        try:
+            pgid = os.getpgid(proc.pid)
+        except Exception:
+            pgid = None
+        if pgid == proc.pid:
+            try:
+                os.killpg(pgid, _signal.SIGTERM)
+            except Exception:
+                pass
+            try:
+                proc.wait(timeout=grace)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+            try:
+                os.killpg(pgid, _signal.SIGKILL)
+            except Exception:
+                pass
+            try:
+                proc.kill()
+            except OSError:
+                pass
+            return
     try:
         from agent.deadline import kill_process_tree as _deadline_kill_tree
 

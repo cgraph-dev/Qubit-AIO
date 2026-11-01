@@ -146,8 +146,11 @@ def _unknown_provider_exit(provider: str) -> SystemExit:
                    | {entry["name"] for entry in _get_custom_provider_entries()})
     close = difflib.get_close_matches(provider, known, n=3, cutoff=0.5)
     hint = f" Did you mean {', '.join(close)}?" if close else ""
+    from qubit_cli.left_core_migration import provider_install_hint
+    moved = provider_install_hint(provider)
+    tail = f" {moved}" if moved else ""
     return SystemExit(
-        f"Unknown provider '{provider}'.{hint} Run `qubit auth` to see the provider list, or "
+        f"Unknown provider '{provider}'.{hint}{tail} Run `qubit auth` to see the provider list, or "
         "`qubit model` to pick one interactively.")
 
 
@@ -701,6 +704,11 @@ def auth_status_command(args) -> None:
         value = status.get(key)
         if value:
             print(f"  {key}: {value}")
+    if provider == "nous":
+        from qubit_cli.guest_handoff import drain, handoff_status, status_lines
+        drain()  # retry a move a transient failure left pending
+        for line in status_lines(handoff_status()):
+            print(f"  {line}")
 
 
 def auth_logout_command(args) -> None:

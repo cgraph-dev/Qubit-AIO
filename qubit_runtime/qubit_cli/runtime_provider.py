@@ -1062,6 +1062,13 @@ def resolve_runtime_provider(*, requested: Optional[str] = None, explicit_api_ke
     target_model overrides model_cfg["default"] when computing provider-specific api_mode (e.g.
     OpenCode Zen/Go where different models route through different API surfaces)."""
     requested_provider = resolve_requested_provider(requested)
+    from qubit_cli.left_core_migration import (
+        provider_install_hint, provider_migration_required, recover_for_provider)
+    recover_for_provider(requested_provider)
+    if provider_migration_required(requested_provider):
+        hint = provider_install_hint(requested_provider)
+        raise AuthError(f"Unknown provider '{requested_provider}'." + (f" {hint}" if hint else ""),
+                        code="invalid_provider", provider=requested_provider)
     _raise_if_provider_disabled(requested_provider)
     # Same alias expansion the auxiliary client applies, so ``provider: openai`` means one thing on
     # every path (background review, curator, MoA slots, delegation) instead of "Unknown provider".

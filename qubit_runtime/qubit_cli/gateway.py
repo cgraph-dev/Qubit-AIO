@@ -2022,10 +2022,20 @@ def stop_profile_gateway() -> bool:
 
     owned = _owned_gateway_pid()
     if owned is None:
-        # The recorded pid is the host multiplexer serving this profile (or another home's process):
-        # stopping it would take every served profile offline. Never kill or reap it from here.
-        return False
-    pid = owned
+        # Only a live host record naming this pid makes the refusal: a profile's own stale/legacy
+        # pid file (no host record) is still this profile's gateway to stop.
+        try:
+            from gateway import host_rendezvous as _hr
+            record = _hr.read_record(_hr.ROLE_GATEWAY)
+            is_host = record is not None and record.pid == pid and _hr.record_names_live_owner(record)
+        except Exception:
+            is_host = False
+        if is_host:
+            # The recorded pid is the host multiplexer serving this profile (or another home's process):
+            # stopping it would take every served profile offline. Never kill or reap it from here.
+            return False
+    else:
+        pid = owned
 
     if is_windows():
         # Windows maps SIGTERM to TerminateProcess. The marker watcher is the

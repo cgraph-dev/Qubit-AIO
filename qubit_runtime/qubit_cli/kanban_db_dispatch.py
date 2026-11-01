@@ -489,6 +489,9 @@ def _terminate_reclaimed_worker(
         info["terminated"] = True
         return info
     except OSError:
+        # Some platforms report an absent pid as an error (Windows 87). The pid, not the error,
+        # decides: only a live worker that refused the signal is still running.
+        info["terminated"] = not _kb._pid_alive(pid)
         return info
 
     if _poll_worker_exit(pid, started_at):
@@ -657,6 +660,7 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
     timed_out: list[str] = []
     now = int(time.time())
     host_prefix = _kb._host_prefix()
+    from qubit_cli.kanban_owner_recovery import owner_reclaim_blocked, owner_reclaim_blocked_after_kill
 
     rows = conn.execute(
         "SELECT t.id, t.worker_pid, t.worker_started_at, "
@@ -688,14 +692,18 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
             _kb._log.warning("kanban: task %s worker pid %s exceeded max runtime but has no verified "
                              "identity; not signalled", tid, pid)
             continue
+        if not _worker_alive(pid, started_at) and owner_reclaim_blocked(conn, tid):
+            continue
         # SIGTERM then SIGKILL after 5 s grace; workers wanting a cleaner
         # shutdown install their own SIGTERM handler. A recycled PID (fingerprint
         # mismatch) is never signalled: the worker is already gone.
         killed = False
+        signalled = False
         kill = _kill_fn(signal_fn)
         if kill is not None and not (_kb._pid_alive(pid) and _pid_recycled(pid, started_at)):
             with contextlib.suppress(ProcessLookupError, OSError):
                 kill(pid, signal.SIGTERM)
+                signalled = True
             # Short polling wait — no time.sleep on the write txn.
             _poll_worker_exit(pid, started_at)
             if _worker_alive(pid, started_at):
@@ -703,6 +711,11 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
 
         error = f"elapsed {int(elapsed)}s > limit {limit}s"
         with _kb.write_txn(conn):
+            # The kill can make the owner settle its admission ``unknown`` (a pause this path
+            # caused); the under-lock re-check distinguishes that from an owner still in flight.
+            # A recovered owner can also bind a live interpreter after the first look.
+            if owner_reclaim_blocked_after_kill(conn, tid, signalled=signalled):
+                continue
             retry_status = _kb._retry_status_for_run(conn, tid)
             cur = conn.execute(
                 "UPDATE tasks SET status = ?, claim_lock = NULL, "
@@ -767,6 +780,7 @@ def detect_stale_running(
 
     now = int(time.time())
     reclaimed: list[str] = []
+    from qubit_cli.kanban_owner_recovery import owner_reclaim_blocked
 
     rows = conn.execute(
         "SELECT t.id, t.worker_pid, t.worker_started_at, t.last_heartbeat_at, t.claim_lock, "
@@ -792,6 +806,9 @@ def detect_stale_running(
         tid = row["id"]
         lock = row["claim_lock"] or ""
 
+        if owner_reclaim_blocked(conn, tid):
+            continue
+
         termination = _kb._terminate_reclaimed_worker(
             pid, lock, signal_fn=signal_fn, started_at=_kb._row_get(row, "worker_started_at"))
 
@@ -805,6 +822,10 @@ def detect_stale_running(
             continue
 
         with _kb.write_txn(conn):
+            # A recovered owner can bind a live interpreter after the first look; only an
+            # under-lock re-check sees it (binding changes neither claim_lock nor worker_pid).
+            if owner_reclaim_blocked(conn, tid):
+                continue
             retry_status = _kb._retry_status_for_run(conn, tid)
             cur = conn.execute(
                 "UPDATE tasks SET status = ?, claim_lock = NULL, "
@@ -950,7 +971,7 @@ def _protocol_violation_streak(conn: sqlite3.Connection, task_id: str) -> int:
             continue
         if outcome == "crashed" and (
             _kb._json_dict(row["metadata"]).get("protocol_violation")
-            or "protocol violation" in (row["error"] or "")
+            or "protocol violation" in (row["error"] or "").partition(WORKER_OUTPUT_SEP)[0]
         ):
             streak += 1
             continue
@@ -1158,7 +1179,8 @@ def _reclaim_dead_workers(conn: sqlite3.Connection, board: Optional[str] = None)
             "WHERE status = 'running' AND worker_pid IS NOT NULL"
         ).fetchall()
         host_prefix = _kb._host_prefix()
-        from qubit_cli.kanban_owner_recovery import bound_interpreter_gone, managed_run_exit_code, owner_reclaim_paused
+        from qubit_cli.kanban_owner_recovery import (
+            apply_attempt_note, managed_run_exit_code, owner_reclaim_blocked)
         for row in rows:
             lock = row["claim_lock"] or ""
             if not lock.startswith(host_prefix):
@@ -1171,14 +1193,15 @@ def _reclaim_dead_workers(conn: sqlite3.Connection, board: Optional[str] = None)
             if _worker_alive(row["worker_pid"], _kb._row_get(row, "worker_started_at")):
                 continue
             # An ambiguous owner receipt holds the card while the attempt may still run; once the
-            # interpreter the owner bound to this run is dead nothing can, and it is a crash.
-            if owner_reclaim_paused(conn, row["id"]) and not bound_interpreter_gone(conn, row["id"]):
+            # owner settled the admission and no recorded pid can be executing it, it is a crash.
+            if owner_reclaim_blocked(conn, row["id"], crash_sweep=True):
                 continue
 
             pid = int(row["worker_pid"])
             # A managed run's authority-recorded exit (its bound interpreter's, under this claim).
             exit_code = managed_run_exit_code(conn, row["id"], pid, row["claim_lock"])
             dead = _classify_dead_worker(pid, row["claim_lock"], exit_code, task_id=row["id"], board=board)
+            apply_attempt_note(conn, row["id"], pid, dead)
             retry_status = _kb._retry_status_for_run(conn, row["id"])
             dead.event_payload["retry_status"] = retry_status
             cur = conn.execute(
