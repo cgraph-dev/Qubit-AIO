@@ -82,10 +82,11 @@ async def _check_profile_scope(request, profile_id):
             raise PermissionError('profile_scope_mismatch')
     elif path.startswith('/api/profiles/'):
         suffix = path.removeprefix('/api/profiles/')
+        collection = profile_collection_route(path, request.method)
         aggregate_selector = {
             'sessions': 'profile', 'sessions/sidebar': 'recents_profile',
             'projects/tree': 'profile', 'sessions/pull-requests': 'profile',
-        }.get(suffix)
+        }.get(collection)
         if aggregate_selector:
             values = request.query_params.getlist(aggregate_selector)
             if not values:
@@ -93,14 +94,15 @@ async def _check_profile_scope(request, profile_id):
             for value in values:
                 # These routes interpret absent/all differently from /api/config.
                 _own_profile(value, profile_id, current=False)
-        elif suffix == 'active' and request.method == 'GET':
+        elif collection == 'active' and request.method == 'GET':
             return  # Discovery of sticky defaults does not switch this daemon.
-        elif suffix in {'active', 'import'}:
+        elif collection in {'active', 'import'}:
             raise PermissionError('profile_scope_mismatch')
         else:
             _own_profile(suffix.split('/', 1)[0], profile_id, current=False)
             if request.method in {'PATCH', 'DELETE'}:
-                # Moving/deleting the reserved home is not an in-place operation.
+                # Moving/deleting a home is a registry operation, not a profile REST write: it
+                # rides the dedicated ``native-profile-registry`` grant (_check_registry_scope).
                 raise PermissionError('profile_scope_mismatch')
 
 

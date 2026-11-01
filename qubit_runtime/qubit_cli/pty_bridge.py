@@ -115,6 +115,9 @@ class PtyBridge:
         self._proc = proc
         self._fd: int = proc.fd
         self._closed = False
+        # The last size applied to the child, so a resize that undoes the previous one can be
+        # told apart without a TIOCGWINSZ probe (ConPTY and test stubs cannot answer one).
+        self._size: Optional[tuple[int, int]] = None
         # Recorded at spawn: once the leader is reaped getpgid() can no longer find its group,
         # but the helpers it started still belong to it.
         try:
@@ -164,7 +167,9 @@ class PtyBridge:
         # every OS app-switch).
         spawn_env[PTY_HOST_ENV] = PTY_HOST_DASHBOARD
         proc = ptyprocess.PtyProcess.spawn(list(argv), cwd=cwd, env=spawn_env, dimensions=(rows, cols))  # type: ignore[union-attr]
-        return cls(proc)
+        bridge = cls(proc)
+        bridge._size = (_clamp_dimension(cols, _MAX_COLS), _clamp_dimension(rows, _MAX_ROWS))
+        return bridge
 
     @property
     def pid(self) -> int:
@@ -202,9 +207,12 @@ class PtyBridge:
             raise
         return data or None
 
-    async def _wait_writable(self, timeout: float) -> bool:
-        """Wait without blocking the event loop until the master accepts input."""
-        if self._closed or timeout <= 0:
+    async def _wait_writable(self, timeout: Optional[float]) -> bool:
+        """Wait without blocking the event loop until the master accepts input.
+
+        ``None`` waits until the write is cancelled (the host terminal has no deadline).
+        """
+        if self._closed or (timeout is not None and timeout <= 0):
             return False
         loop = asyncio.get_running_loop()
         ready = loop.create_future()
@@ -225,12 +233,14 @@ class PtyBridge:
             except (OSError, ValueError):
                 pass
 
-    async def write(self, data: bytes, *, timeout: float = 10.0) -> bool:
+    async def write(self, data: bytes, *, timeout: float = 10.0, fence=None) -> bool:
         """Write all raw bytes without ever blocking the dashboard event loop.
 
-        Returns ``False`` when the bridge closes or the child leaves its input
-        buffer full for ``timeout`` seconds. Callers can then recycle only the
-        affected terminal session while the rest of the dashboard stays live.
+        ``fence`` wraps one write attempt: it receives a zero-argument callable that performs
+        the ``os.write`` and returns its byte count (or ``None`` when the viewer was superseded),
+        and what the fence raises propagates. Returns ``False`` when the bridge closes or the
+        child leaves its input buffer full for ``timeout`` seconds. Callers can then recycle only
+        the affected terminal session while the rest of the dashboard stays live.
         """
         if self._closed:
             return False
@@ -238,20 +248,32 @@ class PtyBridge:
             return True
 
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + max(0.0, timeout)
+        deadline = None if timeout is None else loop.time() + max(0.0, timeout)
         view = memoryview(data)
         while view:
             if self._closed:
                 return False
+
+            def attempt_write(current=view):
+                # The fence may block (it stats the owner's profile and waits under the viewer
+                # lock), so it runs on the executor, never on the dashboard loop.
+                def write_now():
+                    try:
+                        return os.write(self._fd, current)
+                    except OSError as exc:
+                        if exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
+                            return 0
+                        raise
+                return fence(write_now) if fence is not None else write_now()
+
             try:
-                n = os.write(self._fd, view)
+                n = await loop.run_in_executor(None, attempt_write)
+                if n is None:  # the viewer was superseded before this write landed
+                    return False
             except OSError as exc:
                 if exc.errno in {errno.EIO, errno.EBADF, errno.EPIPE}:
                     return False
-                if exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
-                    n = 0
-                else:
-                    raise
+                raise
             if n > 0:
                 view = view[n:]
                 # A very large paste can otherwise monopolize the loop while
@@ -260,10 +282,14 @@ class PtyBridge:
                     await asyncio.sleep(0)
                 continue
 
-            remaining = deadline - loop.time()
+            remaining = None if deadline is None else deadline - loop.time()
             if not await self._wait_writable(remaining):
                 return False
         return True
+
+    def size(self) -> Optional[tuple[int, int]]:
+        """The last ``(cols, rows)`` applied to the child, or None before any size is known."""
+        return getattr(self, "_size", None)
 
     def resize(self, cols: int, rows: int) -> None:
         """Forward a terminal resize to the child via ``TIOCSWINSZ``.
@@ -274,12 +300,15 @@ class PtyBridge:
         """
         if self._closed:
             return
+        clamped_cols = _clamp_dimension(cols, _MAX_COLS)
+        clamped_rows = _clamp_dimension(rows, _MAX_ROWS)
         # struct winsize: rows, cols, xpixel, ypixel (all unsigned short)
-        winsize = struct.pack("HHHH", _clamp_dimension(rows, _MAX_ROWS), _clamp_dimension(cols, _MAX_COLS), 0, 0)
+        winsize = struct.pack("HHHH", clamped_rows, clamped_cols, 0, 0)
         try:
             fcntl.ioctl(self._fd, termios.TIOCSWINSZ, winsize)
         except OSError:
             pass
+        self._size = (clamped_cols, clamped_rows)
 
     def _discard_output(self, timeout: float) -> None:
         # Exiting children flush their pending terminal output first; on macOS a process stays in
