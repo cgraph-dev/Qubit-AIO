@@ -200,11 +200,6 @@
     "kind": "bare_which"
   },
   {
-    "path": "qubit_cli/gateway_setup_wizard.py",
-    "symbol": "_setup_signal",
-    "kind": "bare_which"
-  },
-  {
     "path": "qubit_cli/gateway_windows.py",
     "symbol": "_exec_schtasks",
     "kind": "bare_which"
@@ -356,7 +351,7 @@
   },
   {
     "path": "qubit_cli/tools_config_post_setup.py",
-    "symbol": "_post_setup_agent_browser",
+    "symbol": "_post_setup_chromium",
     "kind": "bare_which"
   },
   {
@@ -537,11 +532,6 @@
   {
     "path": "tools/skillevaluator_scan.py",
     "symbol": "run_tier1_scan",
-    "kind": "bare_which"
-  },
-  {
-    "path": "tools/terminal_tool_backends.py",
-    "symbol": "<module>",
     "kind": "bare_which"
   },
   {
