@@ -1076,9 +1076,7 @@ def _configure_auth_gate(
     # before this gate runs: the dashboard's URL never governs that listener.
     listener_public_url = getattr(app.state, "listener_public_url", None)
     if listener_public_url is not None:
-        from qubit_cli.web_server_boundary import (
-            public_hosts_engage_gate, public_url_hosts, should_require_auth,
-        )
+        from qubit_cli.web_server_boundary import public_hosts_engage_gate, public_url_hosts
         app.state.trusted_public_hosts = public_url_hosts(listener_public_url)
         app.state.auth_required = (should_require_auth(host)
                                    or public_hosts_engage_gate(app.state.trusted_public_hosts))
