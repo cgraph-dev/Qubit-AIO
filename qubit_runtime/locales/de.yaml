@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "Ein Schnappschuss vor dem Rollback wurde automatisch gespeichert."
       chat_turn_undone: "Chat-Zug rückgängig gemacht, passend zum wiederhergestellten Dateizustand."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "Unbekannter Unterbefehl: {subcommand}"
       usage: "Verwendung: /snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "Noch keine Zustands-Schnappschüsse."

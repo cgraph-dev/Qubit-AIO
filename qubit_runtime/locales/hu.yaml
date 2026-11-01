@@ -2758,6 +2758,7 @@ cli:
       snapshot_saved: "A visszaállítás előtti pillanatkép automatikusan mentve."
       chat_turn_undone: "A csevegési kör visszavonva, hogy egyezzen a visszaállított fájlokkal."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "Ismeretlen alparancs: {subcommand}"
       usage: "Használat: /snapshot [list|create [címke]|restore <id>|prune [N]]"
       none_yet: "Még nincs állapot-pillanatkép."

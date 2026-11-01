@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "롤백 전 스냅샷이 자동으로 저장됐어요."
       chat_turn_undone: "복원된 파일 상태에 맞춰 채팅 턴을 되돌렸어요."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "알 수 없는 하위 명령: {subcommand}"
       usage: "사용법: /snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "아직 상태 스냅샷이 없어요."

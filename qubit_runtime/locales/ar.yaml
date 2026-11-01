@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "حُفظت لقطة تلقائيًا قبل التراجع."
       chat_turn_undone: "تم التراجع عن دور المحادثة ليطابق حالة الملفات المستعادة."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "أمر فرعي غير معروف: {subcommand}"
       usage: "الاستخدام: /snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "لا توجد لقطات حالة بعد."

@@ -3266,6 +3266,8 @@ def _try_fast_serve_launch() -> bool:
     except Exception:
         return False
 
+    from qubit_cli.subcommands.dashboard import build_serve_parser
+
     parser = build_serve_parser(
         cmd_dashboard=cmd_dashboard,
         add_help=False,

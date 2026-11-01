@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "Знімок перед відкатом збережено автоматично."
       chat_turn_undone: "Хід чату скасовано відповідно до відновленого стану файлів."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "Невідома підкоманда: {subcommand}"
       usage: "Використання: /snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "Знімків стану ще немає."

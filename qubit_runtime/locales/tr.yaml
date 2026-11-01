@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "Geri alma öncesi bir anlık görüntü otomatik olarak kaydedildi."
       chat_turn_undone: "Sohbet turu, geri yüklenen dosya durumuyla eşleşmesi için geri alındı."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "Bilinmeyen alt komut: {subcommand}"
       usage: "Kullanım: /snapshot [list|create [etiket]|restore <id>|prune [N]]"
       none_yet: "Henüz durum anlık görüntüsü yok."

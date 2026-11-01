@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "Um instantâneo pré-reversão foi salvo automaticamente."
       chat_turn_undone: "Turno do chat desfeito para corresponder ao estado restaurado dos arquivos."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "Subcomando desconhecido: {subcommand}"
       usage: "Uso: /snapshot [list|create [rótulo]|restore <id>|prune [N]]"
       none_yet: "Ainda não há instantâneos de estado."

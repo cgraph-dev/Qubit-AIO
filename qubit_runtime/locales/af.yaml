@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "'n Voor-terugrol-momentopname is outomaties gestoor."
       chat_turn_undone: "Geselsbeurt ongedaan gemaak om by die herstelde lêertoestand te pas."
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "Onbekende subopdrag: {subcommand}"
       usage: "Gebruik: /snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "Nog geen toestand-momentopnames nie."

@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "ロールバック前のスナップショットが自動的に保存されました。"
       chat_turn_undone: "復元したファイルの状態に合わせてチャットのターンを取り消しました。"
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "不明なサブコマンド: {subcommand}"
       usage: "使い方: /snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "状態のスナップショットはまだありません。"

@@ -2741,6 +2741,7 @@ cli:
       snapshot_saved: "已自動儲存還原前的快照。"
       chat_turn_undone: "已復原聊天回合，以符合還原後的檔案狀態。"
     snapshot:
+      restore_incomplete: "Snapshot {snapshot_id} was not fully restored; the original state is untouched where the restore failed."
       unknown_subcommand: "未知的子指令：{subcommand}"
       usage: "用法：/snapshot [list|create [label]|restore <id>|prune [N]]"
       none_yet: "尚無狀態快照。"
