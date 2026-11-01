@@ -14,7 +14,10 @@ def test_shared_metrics_are_registered_disabled_by_default():
 
 
 def test_setup_telemetry_one_answer_sets_both_keys(monkeypatch):
-    """One question: yes collects and sends, no turns both off. Collect-only is not offered."""
+    """Two answers: collection, then the separate send opt-in. Turning collection off turns send off.
+
+    The wizard asks the send question only after collection was enabled, so a "no" on the first
+    question never reaches it."""
     asked = []
     monkeypatch.setattr(
         "qubit_cli.setup.prompt_yes_no",
@@ -29,12 +32,13 @@ def test_setup_telemetry_one_answer_sets_both_keys(monkeypatch):
     setup_telemetry(config)
     assert config["telemetry"]["shared_metrics"]["enabled"] is False
     assert config["telemetry"]["shared_metrics"]["send"] is False
-    assert asked == ["Send shared metrics to Qubit?"] * 2
+    assert asked == ["Enable local shared metrics?", "Send shared metrics to Nous?",
+                     "Enable local shared metrics?"]
 
 
 def test_setup_telemetry_defaults_a_collect_only_profile_to_no(monkeypatch):
-    """A retired collect-only answer is not sharing: the question defaults to no, and no turns
-    collection off too."""
+    """A collect-only profile keeps collecting but the send question defaults to no: sending is
+    never inferred from collection."""
     defaults = []
     monkeypatch.setattr(
         "qubit_cli.setup.prompt_yes_no",
@@ -44,8 +48,9 @@ def test_setup_telemetry_defaults_a_collect_only_profile_to_no(monkeypatch):
 
     setup_telemetry(config)
 
-    assert defaults == [False]
-    assert config["telemetry"]["shared_metrics"]["enabled"] is False
+    assert defaults == [True, False]
+    assert config["telemetry"]["shared_metrics"]["enabled"] is True
+    assert config["telemetry"]["shared_metrics"]["send"] is False
 
 
 def test_disabling_collection_closes_the_send_consent_window(monkeypatch, tmp_path):
@@ -135,7 +140,7 @@ def test_chat_offer_asks_an_undecided_profile_once(monkeypatch):
     consent.offer_consent_before_chat(argparse.Namespace())
 
     assert len(asked) == 1
-    assert asked[0][1] == ["Share with Qubit", "No thanks"]
+    assert asked[0][1] == ["Collect and send to Nous", "Collect locally only", "No thanks"]
     assert consent.consent_state(read_raw_config()) == {"enabled": True, "send": True, "decided": True, "reask": False}
 
 
