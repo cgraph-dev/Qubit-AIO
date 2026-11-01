@@ -146,7 +146,13 @@ def compress_now(
     if tail and not all(row.get(_DB_PERSISTED_MARKER) is True for row in tail_rows):
         compressed = rejoin_compressed_head_and_tail(compressed, tail)
     after_tokens = estimate_request_tokens(agent, compressed)
-    summary = summarize_manual_compression(before, compressed, before_tokens, after_tokens, compression_state=compressor)
+    # A gateway-hosting agent (GatewayAgent) answers with the owner's own report — including flags
+    # and the redacted failure reason the local compressor view cannot know — because the gateway
+    # ran the compression. Prefer it when present so every surface prints the same report.
+    summary = getattr(agent, "compression_summary", None)
+    if not isinstance(summary, dict) or not summary:
+        summary = summarize_manual_compression(
+            before, compressed, before_tokens, after_tokens, compression_state=compressor)
     return CompressResult("compressed", before, list(compressed), before_tokens, after_tokens, request, summary=summary)
 
 

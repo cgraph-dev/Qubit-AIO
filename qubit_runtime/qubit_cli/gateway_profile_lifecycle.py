@@ -180,7 +180,7 @@ def _pid_owned_by_home(pid: int, home) -> bool:
     """
     from gateway import host_attach, host_rendezvous as hr
     from gateway.status import _same_qubit_home
-    from qubit_cli.dashboard_procs import _qubit_home_for_pid
+    from qubit_cli.dashboard_procs import _pid_environ, _qubit_home_for_pid
 
     record = hr.read_record(hr.ROLE_GATEWAY)
     is_host = record is not None and record.pid == pid and hr.record_names_live_owner(record)
@@ -194,7 +194,17 @@ def _pid_owned_by_home(pid: int, home) -> bool:
         # A verified identity answer from the host's own home needs no argv profile (bare launch).
         if owner is not None and owner.pid == pid and owner.served_known:
             return _same_qubit_home(owner.home, home)
-    process_home = _qubit_home_for_pid(pid, require_launch_identity=True)
+    # Prove the install from argv/fixed identity first. A bare ``gateway run`` has no argv profile,
+    # so a sticky active_profile would otherwise re-home it onto whichever profile is current; its
+    # explicit environment home is the proof instead (the original regression claimed every bare
+    # gateway regardless of that environment).
+    try:
+        process_home = _qubit_home_for_pid(pid, require_launch_identity=True)
+    except TypeError:  # a test double with the older one-argument signature
+        process_home = _qubit_home_for_pid(pid)
+    if process_home is None:
+        env = _pid_environ(pid) or {}
+        process_home = (env.get("QUBIT_HOME") or env.get("HERMES_HOME") or "").strip() or None
     return process_home is not None and _same_qubit_home(process_home, home)
 
 

@@ -54,6 +54,11 @@ class GatewayChatView:
         self.streams = {}
         self.mine = {}
         self.completions = {}
+        # Set once a bounded-backlog overflow cut this viewer's subscription. Text after the hole
+        # is never painted/emitted (a splice would corrupt the answer); the settled reply carries it.
+        self.replay_gap = False
+        # Admissions this view submitted, so a gap can settle only the turn it owns.
+        self.submitted = set()
         self.changed = asyncio.Event()
         self.failure = None
         # Set once with ``failure``: the interactive composer races its line read against it so a
@@ -70,7 +75,7 @@ class GatewayChatView:
     def unknown_admissions(self):
         return [row["admission_id"] for row in self.pending if row["status"] == "unknown"]
 
-    def show_pending(self):
+    def show_pending(self, *, interact=True):
         unknown = bool(self.unknown_admissions())
         if unknown:
             print("Execution outcome unknown after restart. Discard acknowledges the lost turn "
@@ -80,10 +85,13 @@ class GatewayChatView:
             # A queued prompt is not in the transcript yet: show what is about to run (or was lost).
             preview = _pending_preview(row.get("text"))
             if row["status"] == "unknown":
-                print(f"Unknown admission: {admission}{preview}\n/discard {admission}", file=sys.stderr)
+                line = f"Unknown admission: {admission}{preview}"
+                # A one-shot cannot take /discard; its caller names the command that can instead.
+                print(f"{line}\n/discard {admission}" if interact else line, file=sys.stderr)
             elif row["status"] == "queued":
                 context = "waiting behind unknown work" if unknown else "waiting to run"
-                print(f"Queued admission: {admission} ({context}){preview}", file=sys.stderr)
+                suffix = f": {preview}" if preview else ""
+                print(f"Queued admission: {admission} ({context}){suffix}", file=sys.stderr)
 
     def show_prompt(self, prompt):
         print(f"\n{prompt.get('description') or prompt.get('question') or 'Approval required'}", file=sys.stderr)
@@ -104,8 +112,10 @@ class GatewayChatView:
             kind, payload = params.get("type"), params.get("payload", {})
             self.generation = params.get("execution_generation", self.generation)
             if kind == "session.replay_gap":
-                self._fail(GatewayClientError("session_replay_gap"))
-                return
+                # The fanout dropped this viewer (its bounded backlog overflowed): re-attach
+                # with a fresh snapshot instead of failing the run on a gap that replay covers.
+                await self._reattach()
+                continue
             admission = params.get("admission_id") or payload.get("admission_id")
             if self.finite and kind in _BLOCKING_CONTROL_EVENTS:
                 # Gates and unknown executions block the session FIFO, not merely one
@@ -129,6 +139,72 @@ class GatewayChatView:
         self.failure = error
         self.failed.set()
         self.changed.set()
+
+    async def _reattach(self):
+        """Recover from a ``session.replay_gap``: the bounded fanout dropped this viewer, so its
+        subscription is over even though the socket still answers RPCs (the authority retired it).
+        Re-attach with a fresh snapshot; the hole is real, so from here on no streamed text is
+        painted/emitted — the settled reply (or receipt) carries the answer byte for byte."""
+        self.replay_gap = True
+        try:
+            snapshot = await self.client.rpc("session.resume", session_id=self.session_id)
+        except Exception as exc:  # a failed re-attach is a real transport failure, not a gap
+            self._fail(GatewayClientError(f"session_replay_gap: {exc}"))
+            return
+        if not isinstance(snapshot, dict):
+            self._fail(GatewayClientError("session.replay_gap: resume returned no snapshot"))
+            return
+        self._adopt_snapshot(snapshot)
+        if self.finite:
+            await self._settle_after_gap()
+        else:
+            self._settle_lost_turns()
+        self.changed.set()
+
+    def _adopt_snapshot(self, snapshot):
+        """Adopt a resume snapshot in place of the frames the hole swallowed (pending, prompts,
+        generation, model). Unlike ``adopt`` it keeps this terminal's breadcrumb: re-attaching
+        is not a session switch."""
+        self.pending = snapshot.get("pending", self.pending)
+        self.prompts = {p["prompt_id"]: p for p in snapshot.get("prompts", [])}
+        self.generation = snapshot.get("execution_generation", self.generation)
+        model = (snapshot.get("info") or {}).get("model")
+        if model:
+            self.model = str(model).split("/")[-1]
+
+    def _settle_lost_turns(self):
+        """Interactive: a turn this view submitted that the snapshot lists as ``unknown`` ended in
+        the hole without a completion. Settle it and tell the person how to clear it, never replay."""
+        for row in self.pending:
+            if row["status"] != "unknown" or row["admission_id"] not in self.submitted:
+                continue
+            if row["admission_id"] in self.completions:
+                continue
+            self.completions[row["admission_id"]] = {"outcome": "unknown", "text": _UNKNOWN_OUTCOME}
+            if not self.quiet:
+                print(_UNKNOWN_OUTCOME, flush=True)
+
+    async def _settle_after_gap(self):
+        """Finite: the owner's snapshot is authoritative. An admission still listed keeps waiting
+        (the normal loop decides queued/blocked); one no longer listed already settled, so read its
+        committed receipt instead of waiting on a completion frame the hole swallowed."""
+        own = self.finite_admission
+        if own is None or own in self.completions:
+            return
+        if any(row["admission_id"] == own for row in self.pending):
+            return  # still pending: the ordinary wait (or _finite_block) owns it
+        from websockets.exceptions import WebSocketException
+        try:
+            receipt = await self.client.rpc("prompt.receipt", session_id=self.session_id,
+                                            admission_id=own, include_result=True)
+        except (GatewayClientError, OSError, TimeoutError, WebSocketException):
+            return  # cannot settle yet; the caller keeps waiting and a later frame may complete it
+        if receipt.get("status") != "terminal":
+            return
+        result = dict(receipt.get("result") or {})
+        outcome = receipt.get("outcome") or "completed"
+        self.completions[own] = {"text": result.get("final_response") or "", "outcome": outcome,
+                                 "result": result}
 
     async def _read_line(self, prompt, symbol):
         """The next composer line, or ``""`` once the event stream failed first (``self.failure``
@@ -194,6 +270,10 @@ class GatewayChatView:
         text = payload.get("text") or payload.get("delta") or payload.get("content") or ""
         if not isinstance(text, str):
             return
+        if self.replay_gap:
+            # Frames on the far side of the hole are not the whole answer: painting them would
+            # splice a gap into the reply. The settled completion/receipt prints it once instead.
+            return
         if self.emitter is not None:
             self.emitter.on_text_delta(text)
         elif not self.quiet:
@@ -247,6 +327,9 @@ class GatewayChatView:
         if isinstance(receipt, dict) and receipt.get("voice_stopped") is True and not self.quiet:
             from agent.i18n import t
             print(t("cli.voice.stop_phrase_typed"), flush=True)
+        admission = receipt.get("admission_id") if isinstance(receipt, dict) else None
+        if isinstance(admission, str) and admission:
+            self.submitted.add(admission)
         return receipt
 
     async def command(self, text):
@@ -426,7 +509,7 @@ class GatewayChatView:
     async def run(self, query=None, *, oneshot=False):
         self.quiet = self.quiet or oneshot
         self.finite = oneshot
-        self.show_pending()
+        self.show_pending(interact=not oneshot)
         for prompt in self.prompts.values():
             self.show_prompt(prompt)
         if oneshot and self.unknown_admissions():
@@ -474,8 +557,9 @@ class GatewayChatView:
                 if self.usage_file:
                     self._write_usage_file(result, outcome)
                 if self.emitter is not None:
-                    return self.emitter.emit_result({**result, "final_response": text},
-                                                    session_id=self.session_id, exit_code=exit_code)
+                    return self.emitter.emit_result(
+                        {**result, "final_response": text, **({"replay_gap": True} if self.replay_gap else {})},
+                        session_id=self.session_id, exit_code=exit_code)
                 self._report_silent_interrupt(text, result)
                 print(text, flush=True)
                 self._report_no_reply(exit_code)
@@ -541,7 +625,7 @@ def _quoted(row, fallback):
     return f'    "{preview}"' if preview else f"    ({fallback} {row['admission_id']})"
 
 
-_UNKNOWN_OUTCOME = ("Hermes couldn't confirm how this turn ended (usually because it restarted mid-turn). "
+_UNKNOWN_OUTCOME = ("Qubit couldn't confirm how this turn ended (usually because it restarted mid-turn). "
                     "Resume this session and use the /discard <id> command it shows to drop the turn. "
                     "Don't send the same message again until you've checked.")
 

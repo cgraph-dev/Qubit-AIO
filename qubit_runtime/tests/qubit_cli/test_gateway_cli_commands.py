@@ -1,7 +1,7 @@
 """Classic CLI commands whose state lives in the gateway session are answered there (tracker #134889
 CLI-8, CLI-17, CLI-21): ``/diff session`` (the gateway tools' checkpoint baseline), ``/reload``
 (the gateway's ``.env``) and ``/handoff`` (no gateway verb yet: refused, never silent). Driven
-through ``HermesCLI.process_command`` with a scripted gateway connection."""
+through ``QubitCLI.process_command`` with a scripted gateway connection."""
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -108,7 +108,7 @@ def test_handoff_is_refused_with_a_message_on_the_gateway(gateway_cli, capsys):
 def _save_cli(conn, tmp_path, monkeypatch):
     """A gateway-backed CLI with one said line in its mirror, run from ``tmp_path/work``."""
     from qubit_cli.gateway_session_store import GatewaySessionStore
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = QubitCLI.__new__(QubitCLI)
     cli.session_id, cli.conversation_history = "local-s", [{"role": "user", "content": "in-memory only"}]
     cli.model, cli.session_start = "fake-model", datetime(2026, 10, 18)
     cli._session_db = GatewaySessionStore(conn)

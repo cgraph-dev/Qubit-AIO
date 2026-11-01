@@ -355,7 +355,9 @@ def _get_lock_dir() -> Path:
     and the host-role lock + rendezvous record (``gateway/host_rendezvous.py``); the per-home
     ``gateway.pid``/``gateway.lock`` above deliberately stay under each profile's QUBIT_HOME.
     """
-    override = os.getenv("HERMES_GATEWAY_LOCK_DIR")
+    # Canonical Qubit name first, legacy HERMES_ as the read-old fallback: the variable crosses a
+    # process boundary, so the reader must accept both spellings.
+    override = os.getenv("QUBIT_GATEWAY_LOCK_DIR") or os.getenv("HERMES_GATEWAY_LOCK_DIR")
     if override:
         return Path(override)
     # XDG spec: a relative $XDG_STATE_HOME is INVALID and must be ignored. Honouring one made the

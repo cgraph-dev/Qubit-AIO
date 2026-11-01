@@ -123,8 +123,8 @@ def foreign_systemd_unit_home(system: bool) -> str | None:
         return None
     if unit == mine:
         return None
-    from qubit_constants import account_default_qubit_home
-    if mine == account_default_qubit_home().resolve():
+    from qubit_constants import account_default_qubit_homes
+    if any(mine == default.resolve() for default in account_default_qubit_homes()):
         return None
     return unit_home
 

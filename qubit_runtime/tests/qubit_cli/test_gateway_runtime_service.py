@@ -183,7 +183,7 @@ def test_launchd_verifies_the_osascript_wrapped_command_the_installer_writes(cas
         from qubit_cli._launchers import installation_command
         foreign = installation_command(tmp_path / "other-checkout", ["gateway", "run", "--external-supervisor"],
                                        python=sys.executable)
-        assert Path(foreign[0]).name == "hermes"
+        assert Path(foreign[0]).name == "qubit"
         command = foreign if case == "osascript_foreign_bare" else installation_command(
             gw.PROJECT_ROOT, ["--error-log", str(tmp_path / "logs" / "gateway.error.log"), "--", *foreign],
             module="qubit_cli.stderr_timestamp", python=sys.executable)

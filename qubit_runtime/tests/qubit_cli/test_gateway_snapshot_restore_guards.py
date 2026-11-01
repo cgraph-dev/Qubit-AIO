@@ -44,7 +44,7 @@ def _corrupt_manifest(sid):
     ("satellite-not-reserved", lambda sid: True, "manual", "is not served again yet: host operation is still pending"),
     ("invalid-id", lambda sid: False, "manual", "Snapshot not found: ../outside"),
     ("other-pid-paused", None, "manual", "Gateway refused the snapshot maintenance handoff"),
-    ("satellite-unserve-error", None, "manual", "nothing was restored. Park the profile with `hermes -p state"),
+    ("satellite-unserve-error", None, "manual", "nothing was restored. Park the profile with `qubit -p state"),
     # A profile the user parked is restored but stays parked: the restore does not serve it.
     ("satellite-pre-parked", lambda sid: True, "manual", "Restored state from"),
     ("corrupt-manifest", _corrupt_manifest, "manual", "was not fully restored"),

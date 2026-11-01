@@ -50,6 +50,11 @@ def manual_host_gateway(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     home = get_qubit_home()
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    # A live publisher holds the host lock for its whole life; the probe rejects a record whose
+    # flock is free, so the fixture models the real launch.
+    hr.ensure_host_state_dir()
+    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
+    assert exc is None, f"claim_host_lock failed: {exc}"
     _write_record(child.pid, home)
     identity = {"pid": child.pid, "qubit_home": str(home), "supervisor": "none",
                 "launch_supervisor": "manual", "served_profiles": [{"home": str(home)}]}
@@ -60,6 +65,7 @@ def manual_host_gateway(tmp_path, monkeypatch):
         if child.poll() is None:
             child.terminate()
         child.wait(timeout=10)
+        hr.release_host_lock(hr.ROLE_GATEWAY)
 
 
 def test_restart_with_a_warm_probe_does_not_attach_to_the_stopped_gateway(manual_host_gateway, monkeypatch):

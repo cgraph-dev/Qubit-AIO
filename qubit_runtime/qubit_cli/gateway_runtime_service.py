@@ -233,8 +233,9 @@ def _windows(home: Path, deadline: float) -> ExistingService | None:
         return _decode_schtasks_output(result.stdout or b"")
 
     rows = list(csv.reader(io.StringIO(query("service_manager_unavailable", "schtasks.exe", "/Query", "/FO", "CSV", "/NH"))))
-    if any(len(row) != 3 for row in rows if row):
-        raise RuntimeStartError("service_state_unknown")
+    # A localized one-field diagnostic (an orphaned TaskCache entry, an OEM leftover) rides among the
+    # rows; it names no task, so skip it instead of refusing every cold start with service_state_unknown.
+    rows = [row for row in rows if len(row) == 3]
     # A task registered before the rename (``Hermes_Gateway[_<suffix>]``) is the same service under the
     # old name: read it, never write it. The current name wins when both exist.
     legacy = f"{_TASK_NAME_LEGACY}{'_' + suffix if suffix else ''}"

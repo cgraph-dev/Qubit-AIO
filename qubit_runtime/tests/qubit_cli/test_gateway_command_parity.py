@@ -4,7 +4,9 @@ import pytest
 import importlib.util
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+# The runtime tree is ``qubit_runtime/`` (this fork nests it under the worktree root): the
+# generator and every source column it reads live there, not at the outer repository root.
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _generator():

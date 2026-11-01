@@ -34,6 +34,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 from gateway.config import coerce_systemd_watchdog_seconds, load_gateway_config  # noqa: F401 — resolved lazily by siblings through the facade
 from gateway.status import terminate_pid
+from qubit_cli.gateway_host_record import _forget_host_gateway_probe  # noqa: F401 — facade for lifecycle tests
 from gateway.restart import (  # noqa: F401 — resolved lazily by siblings through the facade
     DEFAULT_GATEWAY_RESTART_DRAIN_TIMEOUT,
     EXTERNAL_GATEWAY_SUPERVISOR_ENV,
@@ -1276,6 +1277,30 @@ def _qubit_home_from_systemd_unit_file(system: bool = False) -> str | None:
     return _qubit_home_pinned_by_unit(get_systemd_unit_path(system=system))
 
 
+def _unit_home_is_operative(unit_path: Path) -> bool:
+    """Whether the unit at *unit_path* is this process's service: it pins no home, pins this process's
+    home, or is being operated by the account's own default root (the ``sudo`` remap, #108674).
+
+    A throwaway ``HOME`` used to resolve another install's bare name; naming follows the account home
+    now, but two homes can still share a name, so lifecycle verbs must not act on a unit that pins a
+    foreign home. An unreadable pin is left to the ordinary compare (never guessed foreign)."""
+    pinned = _qubit_home_pinned_by_unit(unit_path)
+    if not pinned:
+        return True
+    try:
+        unit = Path(pinned).expanduser().resolve()
+    except (RuntimeError, ValueError):
+        return True
+    try:
+        mine = get_qubit_home().resolve()
+        if unit == mine:
+            return True
+        from qubit_constants import account_default_qubit_homes
+        return any(mine == default.resolve() for default in account_default_qubit_homes())
+    except OSError:
+        return True
+
+
 def _sync_qubit_home_from_systemd_unit(system: bool) -> None:
     """Adopt a system-scope unit's ``QUBIT_HOME``: under ``sudo`` it is stripped and HOME=/root, so
     get_qubit_home() would pick the wrong profile for runtime-status/PID reads."""
@@ -1283,6 +1308,13 @@ def _sync_qubit_home_from_systemd_unit(system: bool) -> None:
         return
     # On-disk unit first; ``systemctl show`` for units that only exist in the manager.
     unit_home = (_qubit_home_from_systemd_unit_file(system=True) or "").strip()
+    if not unit_home:
+        # Under ``sudo`` the recomputed name has not adopted the home yet, so the installed BARE unit
+        # (the one ``systemctl`` will operate) is the pin to read — but only when that unit is this
+        # process's (or the sudo operator's), never another install's.
+        bare_path = _SYSTEM_UNIT_DIR / f"{_SERVICE_BASE}.service"
+        if bare_path.exists() and _unit_home_is_operative(bare_path):
+            unit_home = (_qubit_home_pinned_by_unit(bare_path) or "").strip()
     if not unit_home:
         env_line = _systemctl_show(("Environment",), system=True).get("Environment", "")
         unit_home = _parse_kv_pairs(env_line.split()).get("QUBIT_HOME", "").strip()
@@ -1748,7 +1780,27 @@ def kill_gateway_processes(force: bool = False, exclude_pids: set | None = None,
     """Kill running gateway processes (force-kill if ``force``); ``exclude_pids`` skips e.g. just-
     restarted service PIDs. Returns count killed."""
     killed = 0
-    for pid in find_gateway_pids(exclude_pids=exclude_pids, all_profiles=all_profiles):
+    pids = find_gateway_pids(exclude_pids=exclude_pids, all_profiles=all_profiles)
+    if all_profiles:
+        # `--all` means every profile of THIS account's root, never a gateway on another home that
+        # happens to run as the same user (a scratch-home `stop --all` must leave it alone).
+        from qubit_cli.dashboard_procs import _qubit_home_for_pid
+        from qubit_constants import get_default_qubit_root
+        try:
+            current_root = get_default_qubit_root().resolve()
+        except Exception:
+            current_root = None
+        if current_root is not None:
+            def _same_account_root(pid: int) -> bool:
+                home = _qubit_home_for_pid(pid)
+                if home is None:
+                    return True  # unreadable ownership keeps the scan's own verdict
+                try:
+                    return get_default_qubit_root(home=home).resolve() == current_root
+                except Exception:
+                    return True
+            pids = [pid for pid in pids if _same_account_root(pid)]
+    for pid in pids:
         try:
             expected_start_time = None
             if force:
@@ -2257,11 +2309,12 @@ def _profile_name_from_home(home: Path, default: Path) -> str | None:
 
 
 def _native_service_homes() -> set[Path]:
-    """This process's native default home plus, when root under sudo, the invoking user's (see
-    ``_profile_suffix`` for why sudo matters)."""
-    from qubit_constants import _get_platform_default_qubit_home, sudo_invoker_default_home
+    """The ACCOUNT's native default home plus, when root under sudo, the invoking user's (see
+    ``_profile_suffix`` for why sudo matters). Never the process ``HOME``: a throwaway ``HOME`` used
+    to look native, name the bare unit, and reach the account's real gateway through it."""
+    from qubit_constants import account_default_qubit_home, sudo_invoker_default_home
 
-    homes = {_get_platform_default_qubit_home().resolve()}
+    homes = {account_default_qubit_home().resolve()}
     sudo_home = sudo_invoker_default_home()
     if sudo_home is not None:
         homes.add(sudo_home.resolve())
@@ -2461,14 +2514,17 @@ def _ensure_user_systemd_env() -> None:
 
 
 def _wait_for_user_dbus_socket(timeout: float = 3.0) -> bool:
-    """Poll up to ``timeout`` s for a user systemd control socket (user@.service takes a moment after enable-linger)."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if _user_systemd_socket_ready():
-            _ensure_user_systemd_env()
-            return True
-        time.sleep(0.2)
-    return _user_systemd_socket_ready()
+    """Poll up to ``timeout`` s for a user systemd control socket (user@.service takes a moment after enable-linger).
+
+    ``poll_until`` cuts the last sleep to the time left, so readiness that only holds at the deadline
+    still counts — and the env is exported exactly once, on that successful check.
+    """
+    from agent.deadline import poll_until
+
+    if poll_until(_user_systemd_socket_ready, timeout, 0.2):
+        _ensure_user_systemd_env()
+        return True
+    return False
 
 
 def _wait_for_target_user_bus(uid: int, timeout: float = 5.0) -> bool:
@@ -3786,12 +3842,21 @@ def _systemd_scope_preamble(
 def _systemd_unit_belongs_to_current_home(system: bool = False) -> bool:
     """False (with a warning) when the installed unit pins a QUBIT_HOME other than this process's: the
     service name then resolved to ANOTHER install's gateway, and stop/disable/unlink would take it down."""
+    path = get_systemd_unit_path(system=system)
+    # Never adopt a foreign unit's home here: the sync below is for the sudo remap (root operating the
+    # invoking user's unit), not a licence to take over another install's service.
+    if not _unit_home_is_operative(path):
+        print_warning(
+            f"Refusing to remove {path}: it runs QUBIT_HOME={_qubit_home_pinned_by_unit(path)}, "
+            f"but this process has QUBIT_HOME={get_qubit_home()}"
+        )
+        return False
     _sync_qubit_home_from_systemd_unit(system=system)  # sudo strips QUBIT_HOME; adopt the unit's first
     unit_home = _qubit_home_from_systemd_unit_file(system=system)
     if unit_home is None or Path(unit_home).expanduser().resolve() == get_qubit_home().resolve():
         return True
     print_warning(
-        f"Refusing to remove {get_systemd_unit_path(system=system)}: it runs QUBIT_HOME={unit_home}, "
+        f"Refusing to remove {path}: it runs QUBIT_HOME={unit_home}, "
         f"but this process has QUBIT_HOME={get_qubit_home()}"
     )
     return False
@@ -3825,8 +3890,15 @@ def _require_service_installed(action: str, system: bool = False) -> None:
         sys.exit(1)
 
 
+def _refuse_foreign_unit(action: str, system: bool) -> None:
+    """Exit 1 before any sync/systemctl when the resolved unit belongs to another install."""
+    from qubit_cli.gateway_service_owner import refuse_foreign_systemd_unit
+    refuse_foreign_systemd_unit(action, system)
+
+
 def systemd_start(system: bool = False):
     system = _systemd_scope_preamble("start", system, preflight_user=True)
+    _refuse_foreign_unit("start", system)
     # QUBIT_HOME sync happens in refresh's systemd_unit_is_current gate; the unit is guaranteed to exist here.
     refresh_systemd_unit_if_needed(system=system)
     _run_systemctl(["start", get_service_name()], system=system, check=True, timeout=30)
@@ -3835,6 +3907,7 @@ def systemd_start(system: bool = False):
 
 def systemd_stop(system: bool = False):
     system = _systemd_scope_preamble("stop", system)
+    _refuse_foreign_unit("stop", system)
     _sync_qubit_home_from_systemd_unit(system=system)
     _mark_planned_stop()
     try:
@@ -3850,6 +3923,7 @@ def systemd_stop(system: bool = False):
 
 def systemd_restart(system: bool = False):
     system = _systemd_scope_preamble("restart", system, preflight_user=True)
+    _refuse_foreign_unit("restart", system)
     # QUBIT_HOME sync happens in refresh's systemd_unit_is_current gate; its os.environ mutation
     # persists for the get_running_pid / drain-timeout reads below.
     refresh_systemd_unit_if_needed(system=system)
@@ -4887,9 +4961,15 @@ def _running_under_s6() -> bool:
 
 
 def _systemd_unit_installed() -> bool:
-    return supports_systemd_services() and (
-        get_systemd_unit_path(system=False).exists() or get_systemd_unit_path(system=True).exists()
-    )
+    """True only for a unit of THIS install (or the sudo-operator's), so a sandbox home whose resolved
+    name collides with another install's unit falls back to the PID path instead of operating it."""
+    if not supports_systemd_services():
+        return False
+    for system in (False, True):
+        path = get_systemd_unit_path(system=system)
+        if path.exists() and _unit_home_is_operative(path):
+            return True
+    return False
 
 
 def _is_service_installed() -> bool:
@@ -5468,6 +5548,10 @@ def _cmd_stop(args):
     if not stop_all and _dispatch_via_service_manager_if_s6("stop"):
         return
 
+    if not stop_all:
+        from qubit_cli.gateway_lifecycle_guards import refuse_while_sessions_live
+        refuse_while_sessions_live("stop", args)
+
     if stop_all:
         # Stop the HOST's installed service (a bare pkill under a supervisor is a restart, not a
         # stop), whichever profile invoked the CLI.
@@ -5511,8 +5595,15 @@ def _discard_dead_host_record() -> bool:
         return False
 
 
+# `_cmd_restart` stashes the verb opts here instead of widening `_restart_all`'s long-standing
+# single-argument call shape (a monkeypatched replacement in the command tests must stay callable).
+_RESTART_ALL_VERB_OPTS = {"detach": False, "force": False}
+
+
 def _restart_all(system: bool) -> None:
     from qubit_cli.gateway_profile_lifecycle import host_scope_for_all_verb
+    detach = bool(_RESTART_ALL_VERB_OPTS.get("detach"))
+    force = bool(_RESTART_ALL_VERB_OPTS.get("force"))
     owner = _host_multiplexer_for_all_verb()
     if owner is not None and not _host_multiplexer_is_ours(owner):
         # `--all` means "restart the ONE host multiplexer" — and this profile does not own it.
@@ -5527,10 +5618,10 @@ def _restart_all(system: bool) -> None:
     # No live owner: stop/kill/start as the host root, not as the invoking profile (whose own
     # gateway the run-side guard would refuse — the host stayed down after a Desktop update).
     with host_scope_for_all_verb(owner):
-        _restart_all_as_host(owner, system)
+        _restart_all_as_host(owner, system, detach=detach, force=force)
 
 
-def _restart_all_as_host(owner, system: bool) -> None:
+def _restart_all_as_host(owner, system: bool, *, detach: bool = False, force: bool = False) -> None:
     service_stopped = _stop_installed_service(system)
     if owner is not None:
         # Stop ONLY the host process: its served set comes back with it, and any per-profile
@@ -5551,8 +5642,11 @@ def _restart_all_as_host(owner, system: bool) -> None:
     # no-op: the re-entered `gateway run` below read the corpse's record and ATTACHED to it.
     _discard_dead_host_record()
     # The retraction only invalidates when it removed a record; the pre-stop memo must go either way.
-    from qubit_cli.gateway_host_record import _forget_host_gateway_probe
     _forget_host_gateway_probe()
+    # The old host was stopped out-of-band, so it never stamped the planned-restart marker itself.
+    # Write it now (after the stop, before the start) or the new host boots silent on every channel.
+    from gateway.restart_notice import write_planned_restart_marker
+    write_planned_restart_marker(via_service=service_stopped, detached=detach)
 
     print("Starting gateway...")
     # Even without a registered task, gateway_windows.start() uses the detached launcher.
@@ -5561,6 +5655,13 @@ def _restart_all_as_host(owner, system: bool) -> None:
         _service_call(kind, "start", system)
         return
     from qubit_constants import get_routing_process_qubit_home, named_profile_home
+    if detach:
+        # `restart --all --detach`: never make the calling client the host gateway.
+        if not _spawn_detached_gateway():
+            print_error("Failed to start the host gateway as a background process.")
+            sys.exit(1)
+        print("✓ Started the host gateway as a background process")
+        return
     if named_profile_home(get_routing_process_qubit_home()) is not None:
         # A named profile's CLI never runs the root IN this process: os.environ holds that profile's
         # .env and the root's dotenv load does not clear inherited keys, so the host served the
@@ -5626,8 +5727,16 @@ def _cmd_restart(args):
         return
     if not restart_all and _dispatch_via_service_manager_if_s6("restart"):
         return
+    if not restart_all:
+        from qubit_cli.gateway_lifecycle_guards import refuse_while_sessions_live
+        refuse_while_sessions_live("restart", args)
     if restart_all:
-        _restart_all(system)
+        global _RESTART_ALL_VERB_OPTS
+        _RESTART_ALL_VERB_OPTS = {"detach": bool(getattr(args, "detach", False)), "force": force}
+        try:
+            _restart_all(system)
+        finally:
+            _RESTART_ALL_VERB_OPTS = {"detach": False, "force": False}
         return
 
     # Reap orphans only past the refusal guards above (#125394): the Desktop backend used to reap
@@ -5692,6 +5801,11 @@ def _cmd_restart(args):
     _wait_for_api_server_port_free()
     from qubit_cli.gateway_host_record import _forget_host_gateway_probe
     _forget_host_gateway_probe()
+    if getattr(args, "detach", False):
+        # Desktop runs `gateway restart --detach` as a bounded, piped client: in the foreground the
+        # client would become the long-lived gateway its own timeout then kills.
+        from qubit_cli.gateway_runtime_start import start_detached_replacement
+        sys.exit(start_detached_replacement(get_qubit_home(), force=force))
     print("Starting gateway...")
     run_gateway(verbose=0, force=force)
 

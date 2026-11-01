@@ -214,11 +214,16 @@ def _launchd_unsupported_marker_exists() -> bool:
 
 def _gateway_run_command() -> list[str]:
     from qubit_cli._launchers import runtime_command
-    from qubit_constants import get_default_qubit_root
+    from qubit_constants import get_default_qubit_root, get_routing_process_qubit_home
     # Every caller spawns an UNSUPERVISED child, which follows the sticky active_profile unless a
     # selector pins it (main._apply_profile_override): the root's replacement booted that profile.
+    # Only the ROOT caller needs the explicit pin: a named-profile caller operating the host under
+    # ``host_scope_for_all_verb`` already hands the child its root QUBIT_HOME, and adding a selector
+    # there re-aims the child at the wrong profile.
     selector = shlex.split(_gw()._profile_arg())
-    if not selector and _gw().get_qubit_home().resolve() == get_default_qubit_root().resolve():
+    if (not selector
+            and _gw().get_qubit_home().resolve() == get_default_qubit_root().resolve()
+            and get_routing_process_qubit_home().resolve() == get_default_qubit_root().resolve()):
         selector = ["--profile", "default"]
     return runtime_command(_gw().PROJECT_ROOT, [*selector, "gateway", "run", "--replace"],
                            python=_gw().get_python_path())

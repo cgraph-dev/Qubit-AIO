@@ -62,6 +62,11 @@ def _write_record(pid: int, home: Path, profiles: tuple[str, ...]) -> None:
 def host_owner(tmp_path, monkeypatch):
     """A REAL live process published as the host gateway, answering identify for three profiles."""
     monkeypatch.setenv("QUBIT_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
+    # A record only names a live owner while its role's host lock is held; a real publishing gateway
+    # claims first, so this fixture models that (``record_names_live_owner`` falsifies a free flock).
+    hr.ensure_host_state_dir()
+    outcome, exc = hr.claim_host_lock(hr.ROLE_GATEWAY)
+    assert exc is None, f"claim_host_lock failed: {exc}"
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
     home = tmp_path / "root"
     _write_record(child.pid, home, ("default", "ops", "coder"))
@@ -74,6 +79,7 @@ def host_owner(tmp_path, monkeypatch):
     finally:
         child.terminate()
         child.wait(timeout=10)
+        hr.release_host_lock(hr.ROLE_GATEWAY)
 
 
 def test_start_all_never_sweeps_a_live_host_multiplexer(host_owner, monkeypatch, capsys):
