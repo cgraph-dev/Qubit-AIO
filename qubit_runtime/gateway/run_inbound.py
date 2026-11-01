@@ -1410,6 +1410,11 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         _run_generation = self._begin_session_run_generation(_quick_key)
 
         try:
+            if not is_internal:  # fail-open plugin consume, inside the claimed slot (#129958)
+                _consumed, _consumer_reply = await self._hm_post_admission_consume(
+                    event, source, _quick_key)
+                if _consumed:
+                    return _consumer_reply
             try:
                 _agent_result = await self._handle_message_with_agent(event, source, _quick_key, _run_generation)
             except TurnLeaseTimeoutError as exc:

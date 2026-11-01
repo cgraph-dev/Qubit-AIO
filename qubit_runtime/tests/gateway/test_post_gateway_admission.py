@@ -15,9 +15,6 @@ from gateway.run import _profile_runtime_scope
 from gateway.session import SessionSource
 from qubit_constants import get_qubit_home
 
-_pg_pga = pytest.mark.xfail(reason="PRODUCT: _handle_message reply delivery differs from frozen", strict=False)
-
-
 HOOK = "post_gateway_admission"
 
 
@@ -68,7 +65,6 @@ def _allow_all(monkeypatch):
 
 
 @pytest.mark.asyncio
-@_pg_pga
 async def test_handled_consumes_the_turn_and_its_reply_is_delivered():
     seen = []
 
@@ -106,7 +102,6 @@ async def test_a_raising_consumer_fails_open_and_the_message_reaches_the_agent()
 
 
 @pytest.mark.asyncio
-@_pg_pga
 async def test_consumer_fires_in_the_routed_profile_scope_only(tmp_path):
     launch, routed = tmp_path / "launch", tmp_path / "profiles" / "beta"
     launch.mkdir()
