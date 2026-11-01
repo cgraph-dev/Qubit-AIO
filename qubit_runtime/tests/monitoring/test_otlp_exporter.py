@@ -35,11 +35,11 @@ def test_gateway_health_event_maps_to_span_with_attrs():
     }])
     assert n == 1
     spans = mem.get_finished_spans()
-    assert spans[0].name == "hermes.gateway_health"
+    assert spans[0].name == "qubit.gateway_health"
     attrs = dict(spans[0].attributes or {})
-    assert attrs["hermes.old_state"] == "starting"
-    assert attrs["hermes.new_state"] == "running"
-    assert attrs["hermes.active_agents"] == 2
+    assert attrs["qubit.old_state"] == "starting"
+    assert attrs["qubit.new_state"] == "running"
+    assert attrs["qubit.active_agents"] == 2
 
 
 
@@ -96,7 +96,7 @@ def test_streamer_receives_events_and_respects_filter(monkeypatch):
     em.close()
 
     spans = mem.get_finished_spans()
-    assert [s.name for s in spans] == ["hermes.gateway_health"]
+    assert [s.name for s in spans] == ["qubit.gateway_health"]
     assert streamer.exported == 1
 
 
