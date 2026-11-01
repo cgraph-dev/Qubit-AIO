@@ -62,11 +62,11 @@ print(result.stdout)
     result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=180, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert Path(json.loads(result.stdout)["tls"]).is_relative_to(home)
-    assert "Preparing the isolated Hermes runtime" in result.stderr
+    assert "Preparing the isolated Qubit runtime" in result.stderr
     assert "must-not-fetch.invalid" not in result.stderr
     warm = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30, check=False)
     assert warm.returncode == 0, warm.stdout + warm.stderr
-    assert "Preparing the isolated Hermes runtime" not in warm.stderr
+    assert "Preparing the isolated Qubit runtime" not in warm.stderr
     assert warm.stdout == result.stdout
     assert not (store / "facts.json").exists(), "preparing PM must not realize its tool closure"
     assert not list(store.glob("python-*"))
