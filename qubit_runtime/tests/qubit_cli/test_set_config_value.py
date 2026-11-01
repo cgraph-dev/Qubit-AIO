@@ -496,10 +496,17 @@ class TestSchemaValidation:
         assert "nothing was written" in err
         assert f"Did you mean: {suggestion}" in err
 
+    def test_unseeded_runtime_selection_key_is_written_silently(self, _isolated_qubit_home, capsys):
+        """``stt.provider`` is a runtime selection key (read_selection honours it), so a stored
+        value is a valid explicit pick and must not warn; see test_config_runtime_keys."""
+        set_config_value("stt.provider", "whisper")
+
+        saved = yaml.safe_load(_read_config(_isolated_qubit_home))
+        assert saved["stt"]["provider"] == "whisper"
+        out = capsys.readouterr().out
+        assert "not a recognized config key" not in out
+
     @pytest.mark.parametrize("key,value,expected,suggestion", [
-        # ``stt.provider`` is read at runtime (tools/transcription_tools.py) but has no seeded
-        # default: a stored value is an explicit user pick, so the schema walk must not refuse it.
-        ("stt.provider", "whisper", "whisper", None),
         # TRADE-OFF made explicit: a same-section typo (``agent.max_turnz``) is indistinguishable
         # from an unseeded key, so it is written too — the user gets the sibling suggestion
         # (``agent.max_turns``) instead of a refusal.
