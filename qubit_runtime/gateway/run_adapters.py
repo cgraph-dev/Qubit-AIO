@@ -1947,6 +1947,22 @@ class GatewayAdapterLifecycleMixin:
                         "(check dependencies and config)", platform.value,
                     )
                 return adapter
+            # Bundled platform plugins register themselves lazily when plugin discovery runs. A
+            # direct caller before startup discovery (a bare runner, a reconnect from a test) has
+            # none registered yet, so materialize the bundled set once and retry.
+            if platform.value in Platform._scan_bundled_plugin_platforms()[0]:
+                from qubit_cli.plugins import discover_plugins
+                with _log_suppressed(logging.DEBUG, "Bundled platform discovery failed for '%s': %s",
+                                     platform.value):
+                    discover_plugins()
+                if platform_registry.is_registered(platform.value):
+                    adapter = platform_registry.create_adapter(platform.value, config)
+                    if adapter is None:
+                        logger.error(
+                            "Platform '%s' is registered but adapter creation failed "
+                            "(check dependencies and config)", platform.value,
+                        )
+                    return adapter
         return _instantiate_builtin_adapter(platform, config)
 
     def _make_adapter_auth_check(
