@@ -36,6 +36,32 @@ from utils import file_cache_version
 
 logger = logging.getLogger(__name__)
 
+
+async def _open_policy_violation(profile_home: Path) -> Optional[str]:
+    """Fail-fast preflight: the config-only open dm/group policy refusal, before any runtime is
+    reserved or authority published for the profile. ``.env``-provided policy is still caught by
+    ``_load_secondary_profile_config``; this only spares an invalid profile the store build.
+
+    Module-level so the reconcile works on any runner shape (the mixin method delegates here)."""
+    from gateway.run import _own_policy_open_startup_violation, _profile_runtime_scope
+    from gateway.config import load_gateway_config
+
+    def _load():
+        with _profile_runtime_scope(profile_home, hydrate_secrets=False):
+            return load_gateway_config()
+
+    try:
+        cfg = await asyncio.to_thread(_load)
+    except Exception:
+        logger.debug("open-policy preflight could not load %s", profile_home, exc_info=True)
+        return None
+    try:
+        return await asyncio.to_thread(_own_policy_open_startup_violation, cfg)
+    except Exception:
+        logger.debug("open-policy preflight failed for %s", profile_home, exc_info=True)
+        return None
+
+
 _PROFILE_RESCAN_INTERVAL_SECS = 30.0
 _PROFILE_SIGNATURE_FILES = (".env",)  # config.yaml: the config backend's version, below
 # Bound for one own-gateway liveness probe (``live_gateway_pid_for_home``): the control-socket
@@ -264,7 +290,7 @@ class GatewayProfileReconcileMixin:
             await self._unserve_profile(name, known[name])
             result["removed"].append(name)
         for name in list(added):
-            violation = await self._profile_open_policy_violation(live[name])
+            violation = await _open_policy_violation(live[name])
             if violation:
                 # Refused before any runtime/store/authority is published for it: an invalid profile
                 # must never become briefly routable. The adapter start repeats this check for

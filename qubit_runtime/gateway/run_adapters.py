@@ -1077,24 +1077,11 @@ class GatewayAdapterLifecycleMixin:
     async def _profile_open_policy_violation(self, profile_home: Path) -> Optional[str]:
         """Fail-fast preflight: the config-only open dm/group policy refusal, before any runtime is
         reserved or authority published for the profile. ``.env``-provided policy is still caught by
-        ``_load_secondary_profile_config``; this only spares an invalid profile the store build."""
-        from gateway.run import _own_policy_open_startup_violation, _profile_runtime_scope
-        from gateway.config import load_gateway_config
+        ``_load_secondary_profile_config``; this only spares an invalid profile the store build.
 
-        def _load():
-            with _profile_runtime_scope(profile_home, hydrate_secrets=False):
-                return load_gateway_config()
-
-        try:
-            cfg = await asyncio.to_thread(_load)
-        except Exception:
-            logger.debug("open-policy preflight could not load %s", profile_home, exc_info=True)
-            return None
-        try:
-            return await asyncio.to_thread(_own_policy_open_startup_violation, cfg)
-        except Exception:
-            logger.debug("open-policy preflight failed for %s", profile_home, exc_info=True)
-            return None
+        Delegates to the shared module-level helper so the reconcile can run it on any runner shape."""
+        from gateway.run_profile_reconcile import _open_policy_violation
+        return await _open_policy_violation(profile_home)
 
     async def _load_secondary_profile_config(self, profile_name: str, profile_home: Path):
         """Hydrate + enter ``profile_home``'s scope once; return its gateway config. Raises
