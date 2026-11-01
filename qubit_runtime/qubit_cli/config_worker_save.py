@@ -27,7 +27,13 @@ def rebase_for_save(config: dict[str, Any], live_raw: dict[str, Any], merge_exis
         # merging the whole snapshot over it (the old `_merge_partial_save` step) re-applied
         # unchanged frozen values and reverted live profile edits. Apply only the caller's
         # ``replace_keys`` paths, which must be authoritative.
-        rebased = _three_way(live_raw or {}, config, _config.load_config())
+        # Diff against the config the caller loaded (snapshot + schema defaults), but decide
+        # deletions from the FROZEN snapshot itself: a branch the operator really had and then
+        # deleted live wins, while a branch that exists only because the schema merged it in is
+        # a default the caller may now set.
+        snapshot = _config._worker_config_snapshot()
+        rebased = _three_way(live_raw or {}, config, _config.load_config(),
+                             snapshot=snapshot, operator=_frozen_for_deletion(snapshot or {}))
         for path in replace_keys or ():
             path = tuple(path)
             parent = rebased
@@ -53,11 +59,20 @@ def rebase_for_save(config: dict[str, Any], live_raw: dict[str, Any], merge_exis
     return config
 
 
-def _three_way(live: Any, desired: Any, base: Any) -> Any:
+def _three_way(live: Any, desired: Any, base: Any, *,
+               snapshot: Any = None, operator: Any = None) -> Any:
     """*live* with the caller's edits (*desired* relative to the *base* it loaded) applied.
     Mappings recurse; list edits add/remove items; a key the caller dropped is left alone. A
     mapping/list branch deleted (or retyped) on *live* since *base* stays as live has it: a
-    leaf edit must not resurrect the stale snapshot subtree around it."""
+    leaf edit must not resurrect the stale snapshot subtree around it.
+
+    *base* carries the schema defaults (the caller loaded them), *snapshot* is the frozen
+    worker config and *operator* its operator-state branches (schema defaults stripped). A
+    changed branch missing from *live* therefore means: an operator branch (in *operator*)
+    was deleted live and wins; a branch the snapshot also carried but the schema supplied is
+    written as its delta over the defaults; a branch the snapshot never had is the caller's
+    new value and is written whole.
+    """
     if desired == base:
         return copy.deepcopy(live)
     if isinstance(desired, dict) and isinstance(base, dict) and isinstance(live, dict):
@@ -68,8 +83,23 @@ def _three_way(live: Any, desired: Any, base: Any) -> Any:
             elif value != base[key]:
                 kind = dict if isinstance(base[key], dict) else list if isinstance(base[key], list) else None
                 if kind is not None and not isinstance(live.get(key), kind):
-                    continue  # concurrently deleted/replaced live branch: live wins
-                merged[key] = _three_way(live.get(key), value, base[key])
+                    if snapshot is None:
+                        continue  # no frozen-snapshot context: base IS operator state, live wins
+                    if isinstance(snapshot, dict) and key in snapshot:
+                        if isinstance(operator, dict) and key in operator:
+                            continue  # concurrently deleted operator branch: live wins
+                        empty_live = {} if kind is dict else []
+                        merged[key] = _three_way(
+                            empty_live, value, base[key],
+                            snapshot=snapshot[key],
+                            operator=operator.get(key) if isinstance(operator, dict) else None)
+                    else:
+                        merged[key] = copy.deepcopy(value)
+                else:
+                    merged[key] = _three_way(
+                        live.get(key), value, base[key],
+                        snapshot=snapshot.get(key) if isinstance(snapshot, dict) else None,
+                        operator=operator.get(key) if isinstance(operator, dict) else None)
         return merged
     if isinstance(desired, list) and isinstance(base, list) and isinstance(live, list):
         removed = [item for item in base if item not in desired]
