@@ -119,7 +119,6 @@ def _wait_for(predicate):
     pytest.fail('Timed out waiting for the admitted turn')
 
 
-@pytest.mark.xfail(strict=True, reason="environment: live daemon boot exceeds the fixture deadline on this host (isolated runtime provisioning)")
 def test_real_daemon_accepts_hud_and_voice_live_submits_and_notes_the_model(tmp_path, monkeypatch):
     from tools.voice_live import VOICE_LIVE_TURN_NOTE
 
