@@ -4392,7 +4392,9 @@ def _inject_platform_plugin_env_vars() -> frozenset[str] | None:
     bundled: list | None = []
     try:
         bundled = list(_platform_plugin_manifests(source="bundled", strict=True))
-    except OSError:
+    except Exception:
+        # Includes a cold path where application modules (agent.safe_worker_policy)
+        # are not importable yet: this optional env enrichment must never break CLI import.
         bundled = None
     manifests = list(bundled or [])
     for source in ("bundled", "user") if bundled is None else ("user",):

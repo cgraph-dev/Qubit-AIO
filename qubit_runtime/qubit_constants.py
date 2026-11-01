@@ -561,6 +561,10 @@ def mkdir_under_qubit_home(path: str | Path) -> Path:
     """Create *path*, but never materialize a deleted/missing named profile."""
     target = Path(path)
     assert_named_profile_home_live(target)
+    if target.is_dir():
+        # Already present: nothing to create or grant. Avoids requiring the ACL module on a
+        # cold source-update path that only rewrites an existing home file.
+        return target
     # Lazy so this module still imports alone; qubit_dir_acl (stdlib only) ships beside it in every
     # closure that creates home dirs, and a missing copy fails loudly instead of silently skipping the
     # elevated grant (tests/pm/test_bootstrap_import_closure.py).
@@ -1335,29 +1339,43 @@ def resolve_reasoning_config(cfg: dict | None, model: str = "") -> dict | None:
 
 def is_termux() -> bool:
     """Delegate Termux detection without making the bootstrap constants module depend on the full package."""
-    from qubit_platform.host.runtime import is_termux as detect
-
+    try:
+        from qubit_platform.host.runtime import is_termux as detect
+    except ImportError:
+        # Cold source-update/repair path: no platform package is installed yet.
+        return os.environ.get("PREFIX", "").startswith("/data/data/com.termux")
     return detect()
 
 
 def is_wsl() -> bool:
     """Delegate WSL detection without making the bootstrap constants module depend on the full package."""
-    from qubit_platform.host.runtime import is_wsl as detect
-
+    try:
+        from qubit_platform.host.runtime import is_wsl as detect
+    except ImportError:
+        try:
+            with open("/proc/version", encoding="utf-8", errors="replace") as handle:
+                return "microsoft" in handle.read().lower()
+        except OSError:
+            return False
     return detect()
 
 
 def is_container() -> bool:
     """Delegate container detection without making the bootstrap constants module depend on the full package."""
-    from qubit_platform.host.runtime import is_container as detect
-
+    try:
+        from qubit_platform.host.runtime import is_container as detect
+    except ImportError:
+        return _detect_container()
     return detect()
 
 
 def _detect_container() -> bool:
     """Keep the historical test seam while delegating canonical detection."""
-    from qubit_platform.host.runtime import _detect_container as detect
-
+    try:
+        from qubit_platform.host.runtime import _detect_container as detect
+    except ImportError:
+        # Cold source-update/repair path: conservative probe only.
+        return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
     return detect()
 
 

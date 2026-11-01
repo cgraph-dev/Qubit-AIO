@@ -84,13 +84,27 @@ def note_first_stamp(home, on_disk: dict, to_write: dict) -> list[str]:
     nothing reads any more. Returns those browser moves."""
     if "_config_version" in on_disk or "_config_version" not in to_write:
         return []
-    from agent.safe_worker_policy import worker_config_snapshot
+    try:
+        from agent.safe_worker_policy import worker_config_snapshot
+    except ModuleNotFoundError as exc:
+        # Cold source-update/install path: no agent package means no worker policy to consult.
+        if exc.name != "agent":
+            raise
+        worker_config_snapshot = lambda: None  # type: ignore[assignment]
     if worker_config_snapshot() is not None:
         return []  # a frozen worker never reads the profile's files; its owner migrates the home
-    from qubit_cli.config_migrations_browser import adopt_agent_browser_env
     from qubit_cli.left_core_migration import LEFT_CORE, record_core_use
     for version in sorted({feature.left_at for feature in LEFT_CORE if feature.left_at}):
-        record_core_use(home, to_write, version)
+        try:
+            record_core_use(home, to_write, version)
+        except ImportError:
+            # Cold install/update path: the dotenv reader this backfill needs is not installed yet.
+            return []
+    try:
+        from qubit_cli.config_migrations_browser import adopt_agent_browser_env
+    except ImportError:
+        # Cold install/update path: the dotenv reader this step needs is not installed yet.
+        return []
     return adopt_agent_browser_env(home, to_write)
 
 

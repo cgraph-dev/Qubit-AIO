@@ -12,9 +12,6 @@ import os
 import subprocess
 from pathlib import Path
 
-from qubit_cli.steward import UPDATE_MECHANISMS
-
-
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -32,7 +29,7 @@ def _is_sealed(project_root: Path) -> bool:
     """
     if (project_root / ".git").exists():
         return False
-    from qubit_cli.steward import read_install_stamp
+    from qubit_cli.steward import UPDATE_MECHANISMS, read_install_stamp
     from pm.paths import install_stamp_path
     stamp_path = install_stamp_path(project_root)
     data = read_install_stamp(project_root)

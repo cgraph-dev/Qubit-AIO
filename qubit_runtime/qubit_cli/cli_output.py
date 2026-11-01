@@ -2,9 +2,16 @@
 
 import sys
 
-from agent.i18n import t
 from qubit_cli.colors import Colors, color
 from qubit_cli.secret_prompt import masked_secret_prompt
+
+
+def t(key: str, **kwargs) -> str:
+    """Translate lazily: the config layer imports this module before application
+    dependencies (agent.i18n) exist on a cold source-update/repair path."""
+    from agent.i18n import t as _translate
+
+    return _translate(key, **kwargs)
 
 
 def print_info(text: str) -> None:

@@ -985,10 +985,11 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
     if create:
         try:
             from qubit_cli.config import load_config
+            cli_cfg = (load_config() or {}).get("cli", {})
         except ImportError:
-            # Installers expose after sync; never invent a config reader here.
+            # Installers expose after sync; never invent a config reader here. A cold
+            # source slice may lack optional platform modules config reaches lazily.
             return {"ok": True, "skipped": "config-unavailable"}
-        cli_cfg = (load_config() or {}).get("cli", {})
         if isinstance(cli_cfg, dict) and not cli_cfg.get("expose_on_path", True):
             return {"ok": True, "skipped": "config-disabled"}
     from qubit_cli.steward import read_install_stamp
