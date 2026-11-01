@@ -126,16 +126,23 @@ def _remove_user_plugin(plugins_dir: Path, name: str, target: Path, *, allow_liv
     and following it deleted that plugin plus its install metadata while the alias stayed dangling.
     Config bookkeeping (aliases, toolset) is gathered before the tree disappears.
     """
+    from qubit_cli.plugin_oauth import forget_plugin_grants
+
     _pc()._refuse_live_gateway_mutation("remove", allow_live_gateway=allow_live_gateway)
     link = plugins_dir / name.strip("/")
     if link.is_symlink():
         link.unlink()
+        forget_plugin_grants(link.name)
         return {"ok": True, "name": name, **_pc()._forget_plugin_config({link.name})}
     entry = next((e for e in _pc()._discover_all_plugins() if Path(str(e[4])) == target), None)
     key = entry[5] if entry else target.name
     aliases = _pc()._plugin_aliases(key) | {target.name}
     _pc()._toggle_plugin_toolset(key, enable=False)
     _remove_plugin_core(target)
+    # Sign-ins belong to the removed plugin, whatever name selected it: a later plugin under the
+    # same key must not inherit a grant the user made for a tree that is gone.
+    for alias in aliases:
+        forget_plugin_grants(alias)
     return {"ok": True, "name": name, **_pc()._forget_plugin_config(aliases)}
 
 
