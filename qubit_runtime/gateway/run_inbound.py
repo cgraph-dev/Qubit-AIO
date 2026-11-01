@@ -1224,7 +1224,9 @@ class GatewayInboundMixin(GatewayPluginInjectionMixin, GatewayInboundHooksMixin)
         """Idle path: resolve + dispatch slash commands; rewriting commands fall through to the agent.
         A command rewritten into a turn keeps the /stop and /new epoch it arrived under, read before
         the (slow, off-loop) rewrite, so a reset during it drops the command, as on the busy path."""
-        stop_epoch = self._route_stop_epoch(_quick_key)
+        # Only a command can be rewritten into a turn that needs the route's /stop and /new epoch;
+        # plain text (including an already-admitted row's execution) never reads it.
+        stop_epoch = self._route_stop_epoch(_quick_key) if event.get_command() else None
         _handled, _result, command, canonical = await self._hm_resolve_command(event, source, _quick_key)
         if not _handled:
             _handled, _result = await self._hm_dispatch_canonical_command(event, source, _quick_key, canonical)
