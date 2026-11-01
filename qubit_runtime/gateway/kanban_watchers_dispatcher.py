@@ -313,14 +313,15 @@ def _default_profile_secret_scope():
     from that same home. No-op for single-profile gateways.
     """
     from agent.secret_scope import (
-        build_profile_secret_scope, is_multiplex_active, reset_secret_scope, set_secret_scope)
+        is_multiplex_active, reset_secret_scope, set_secret_scope)
     from qubit_constants import get_qubit_home
+    from tui_gateway.launch_profile_policy import owner_secret_scope
 
     if not is_multiplex_active():
         yield
         return
-    token = set_secret_scope(
-        build_profile_secret_scope(Path(get_qubit_home())), profile_home=str(get_qubit_home()))
+    home = Path(get_qubit_home())
+    token = set_secret_scope(owner_secret_scope(home), profile_home=str(home))
     try:
         yield
     finally:

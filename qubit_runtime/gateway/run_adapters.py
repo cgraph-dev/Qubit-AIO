@@ -1818,7 +1818,11 @@ class GatewayAdapterLifecycleMixin:
         credentials after a hosted room flipped the process-wide guard (#112878). Decided per event:
         activation happens after the adapters were wired."""
         async def _handler(*args):
-            with self._standalone_launch_scope():
+            from tui_gateway.launch_profile_policy import launch_body
+            # Mark the body at ENTRY: a second profile may switch the process to fail-closed
+            # secrets while this turn is still running, and its later reads must still resolve
+            # the launch profile's own mapping instead of raising.
+            with launch_body(), self._standalone_launch_scope():
                 return await handler(*args)
 
         return _handler
