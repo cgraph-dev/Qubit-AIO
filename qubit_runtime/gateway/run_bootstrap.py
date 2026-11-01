@@ -55,6 +55,16 @@ async def _start_gateway_replace_existing_instance(existing_pid: int, replace: b
             "to this profile's gateway (QUBIT_HOME %s). Remove the "
             "stale PID record or stop the owning profile explicitly.",
             existing_pid, _get_process_qubit_home())
+        # Retain the fatal verdict on disk before the caller hard-exits: a queued-only stamp dies
+        # with the process, so the next supervised start would trust the same stale PID and loop.
+        try:
+            from gateway.status import write_runtime_status
+            write_runtime_status(
+                gateway_state="startup_failed",
+                exit_reason="gateway_replace_ownership_unproven",
+                wait_timeout=5.0)
+        except Exception as exc:
+            logger.debug("Could not stamp the ownership refusal: %s", exc)
         return False
     existing_start_time = get_process_start_time(existing_pid)
     logger.info("Replacing existing gateway instance (PID %d) with --replace.", existing_pid)
