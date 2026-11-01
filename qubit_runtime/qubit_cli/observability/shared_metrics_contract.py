@@ -16,6 +16,13 @@ from qubit_cli.platforms import PLATFORMS
 from tools.connectors.gateway.names import CONNECTOR_NAME_PREFIX
 from toolsets import BUILTIN_TOOL_NAMES, BUILTIN_TOOLSET_NAMES
 
+from .shared_metrics_prepared_compaction import (
+    PREPARED_COMPACTION_DIMENSIONS,
+    PREPARED_COMPACTION_MARK,
+    PREPARED_COMPACTION_METRIC,
+    PREPARED_COMPACTION_SNAPSHOT_DIMENSIONS,
+)
+
 SCHEMA_KEY = "qubit.metrics.schema_version"
 # A random per-emit token (no payload) on rows whose producer waits to learn they were SAVED: facts
 # recovered from a file that is deleted only then. Events persist on the Relay thread.
@@ -460,7 +467,8 @@ INSTALL_RUN_FAILURE_CLASSES = frozenset({
     "download_failed", "filesystem_error", "gateway_failed", "git_checkout_failed", "git_clone_failed",
     "git_extract_failed", "git_fetch_failed", "git_missing", "git_reset_failed", "interrupted",
     "libstdcxx_missing", "local_changes_blocked", "none", "other", "products_build_failed",
-    "python_install_failed", "setup_failed", "unsupported_platform", "uv_unusable",
+    "python_install_failed", "release_checkout_failed", "release_lookup_failed", "setup_failed",
+    "unsupported_platform", "uv_unusable",
 })
 # ---- end iuf c2 ----
 _UPDATE_DURATION_THRESHOLDS = (
@@ -1090,7 +1098,8 @@ INSTALL_RUN_FAILURE_CLASSES = frozenset({
     "download_failed", "filesystem_error", "gateway_failed", "git_checkout_failed", "git_clone_failed",
     "git_extract_failed", "git_fetch_failed", "git_missing", "git_reset_failed", "interrupted",
     "libstdcxx_missing", "local_changes_blocked", "none", "other", "products_build_failed",
-    "python_install_failed", "setup_failed", "unsupported_platform", "uv_unusable",
+    "python_install_failed", "release_checkout_failed", "release_lookup_failed", "setup_failed",
+    "unsupported_platform", "uv_unusable",
 })
 # ---- end iuf c2 ----
 _UPDATE_DURATION_THRESHOLDS = (
@@ -1496,6 +1505,12 @@ _MODEL_CALL_DIMENSIONS: dict[str, frozenset[str]] = {
     "provider_family": _LEGACY_PROVIDER_FAMILIES,
 }
 
+# The prepared-compaction module owns its closed vocabularies; merge its snapshot dimension in here so
+# every later reference (metric fields, legacy shapes) sees the same complete set.
+_INSTALL_V4_SNAPSHOT_DIMENSIONS = {
+    **_INSTALL_V4_SNAPSHOT_DIMENSIONS, **PREPARED_COMPACTION_SNAPSHOT_DIMENSIONS,
+}
+
 _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
     CLIENT_ACTIVE_METRIC: {},
     MODEL_CALL_METRIC: dict(_MODEL_CALL_DIMENSIONS),
@@ -1569,6 +1584,9 @@ _COUNTER_DIMENSION_VALUES: dict[str, dict[str, frozenset[str]]] = {
     COMPRESSION_METRIC: {
         "context_fill_bucket": CONTEXT_FILL_BUCKETS, "failure_class": COMPRESSION_FAILURE_CLASSES,
         "outcome": COMPRESSION_OUTCOMES, "trigger": COMPRESSION_TRIGGERS,
+    },
+    PREPARED_COMPACTION_METRIC: {
+        **PREPARED_COMPACTION_DIMENSIONS, "failure_class": COMPRESSION_FAILURE_CLASSES,
     },
     MODEL_SWITCH_METRIC: {"execution_surface": EXECUTION_SURFACES},
     FALLBACK_METRIC: {"error_class": MODEL_ERROR_CLASSES},
@@ -1787,6 +1805,7 @@ _LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
     },
         # ---- v4 install ----
         _METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - set(_INSTALL_V4_SNAPSHOT_DIMENSIONS),
+        _METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - set(PREPARED_COMPACTION_SNAPSHOT_DIMENSIONS),
     ),
 }
 # Fields v2 carried on the per-task and per-tool-call rows. Together they made nearly every task and
@@ -1817,6 +1836,7 @@ _LEGACY_METRIC_FIELDS: dict[str, tuple[frozenset[str], ...]] = {
     },
         # ---- v4 install ----
         _METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - set(_INSTALL_V4_SNAPSHOT_DIMENSIONS),
+        _METRIC_FIELDS[INSTALL_SNAPSHOT_METRIC] - set(PREPARED_COMPACTION_SNAPSHOT_DIMENSIONS),
     ),
 }
 # ---- v5 engagement ----
@@ -1841,6 +1861,7 @@ _DECISION_MARK_METRICS = {
     COMPRESSION_MARK: COMPRESSION_METRIC, MODEL_SWITCH_MARK: MODEL_SWITCH_METRIC,
     FALLBACK_MARK: FALLBACK_METRIC, SLASH_COMMAND_MARK: SLASH_COMMAND_METRIC,
     EXTENSION_INSTALL_MARK: EXTENSION_INSTALL_METRIC,
+    PREPARED_COMPACTION_MARK: PREPARED_COMPACTION_METRIC,
     # ---- v4 loop ----
     MEMORY_OP_MARK: MEMORY_OP_METRIC, CURATOR_RUN_MARK: CURATOR_RUN_METRIC,
     DELEGATION_RUN_MARK: DELEGATION_RUN_METRIC, EXECUTION_BACKEND_MARK: EXECUTION_BACKEND_METRIC,

@@ -262,16 +262,16 @@ def test_a_lock_refusal_of_the_hand_offs_own_update_child_is_a_failed_run(rows, 
 
     from qubit_cli.update_cmd_common import _record_stop
 
-    monkeypatch.delenv("QUBIT_UPDATE_HANDOFF_PID", raising=False)
+    monkeypatch.delenv("HERMES_UPDATE_HANDOFF_PID", raising=False)
     pid, other = os.getpid(), 999_999
     _marker(rows.home, other, 1, "ct:1.000", f"delegate:{pid} ct:2.000")  # our own hand-off's claim
     _record_stop("lock_held", without_receipt="refused")
     _marker(rows.home, other, 1, "ct:1.000", f"delegate:{os.getppid()} ct:2.000")  # Windows: relaunched child
     _record_stop("lock_held", without_receipt="refused")
-    monkeypatch.setenv("QUBIT_UPDATE_HANDOFF_PID", str(other))
+    monkeypatch.setenv("HERMES_UPDATE_HANDOFF_PID", str(other))
     _marker(rows.home, other, 1, "ct:1.000")
     _record_stop("lock_held", without_receipt="refused")
-    monkeypatch.delenv("QUBIT_UPDATE_HANDOFF_PID")
+    monkeypatch.delenv("HERMES_UPDATE_HANDOFF_PID")
     _record_stop("lock_held", without_receipt="refused")
 
     assert [(r["outcome"], r["kind"], r["failure_class"]) for r in rows.runs()] == [
