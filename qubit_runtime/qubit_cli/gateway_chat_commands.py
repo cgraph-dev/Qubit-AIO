@@ -45,7 +45,7 @@ def _user_turns(snapshot):
     from agent.context_compressor import is_user_originated_turn
     return [row for row in snapshot.get("messages", [])
             if type(row.get("row_id")) is int and row.get("display_kind") in (None, "", "steer")
-            and is_user_originated_turn(row)]
+            and not row.get("archived") and is_user_originated_turn(row)]
 
 
 def _rewind_to(turns_back, *, retry=False):
