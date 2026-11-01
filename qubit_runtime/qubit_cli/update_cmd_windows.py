@@ -1457,21 +1457,30 @@ _READY_INTERVAL_S = 0.4  # gateway_windows._wait_for_gateway_ready's poll interv
 _READY_CONFIRM_S = 2.0   # confirmation window: one hit proves a spawn, not a survived startup
 
 
-def _poll_until_ready(targets: list, deadline: float, taken: set) -> dict:
+def _poll_until_ready(targets: list, deadline: float, taken: set, respawn_window: float = 0.0) -> dict:
     """``{key: pids}`` for each ``(key, probe, claim_all)`` target whose gateway stayed visible for
     a whole confirmation window. All targets share one loop, so N targets cost one window, not N:
     one fleet process scan per tick (``probe(scan)`` calls ``scan()`` only if it needs the fleet),
     and each target is credited only on its own hits. *taken* holds, while a target is probed, the
     PIDs earlier targets vouched for (all of a profile's, the first of an unmapped entry's) so one
     gateway never retires two debts. A hit provisional at the deadline still finishes its window;
-    a probe that raises leaves its target unready."""
+    a probe that raises leaves its target unready.
+
+    *respawn_window* starts the liveness budget when the replacement appears: a target unseen at
+    the shared *deadline* is still polled for one grace window (the spawn may land late), and its
+    first late sighting extends its own wait once by another window. A replacement that never
+    appears is still reported unready, and a flapping one cannot renew the extension forever."""
     from qubit_cli.gateway import find_gateway_pids
     ready: dict = {}
     since: dict = {}
     failed: set = set()
+    window = max(0.0, float(respawn_window or 0.0))
+    limits = {key: max(deadline, deadline + window) for key, _probe, _claim in targets}
+    extended: set = set()
     while True:
         now = _time.monotonic()
-        pending = [t for t in targets if t[0] not in ready and t[0] not in failed and (now < deadline or t[0] in since)]
+        pending = [t for t in targets if t[0] not in ready and t[0] not in failed
+                   and (now < limits[t[0]] or t[0] in since)]
         if not pending:
             return ready
         fleet: list = []
@@ -1492,6 +1501,10 @@ def _poll_until_ready(targets: list, deadline: float, taken: set) -> dict:
             if not pids:
                 since.pop(key, None)
                 continue
+            if window and now >= deadline and key not in extended:
+                # The respawn only landed after the shared budget: give it its own window, once.
+                limits[key] = max(limits[key], now + window)
+                extended.add(key)
             vouched = pids if claim_all else pids[:1]
             taken.update(vouched)
             if now - since.setdefault(key, now) >= _READY_CONFIRM_S:
@@ -1511,14 +1524,15 @@ def _verify_relaunched_gateways_alive(token: dict, profiles: dict, unmapped: lis
         from gateway.status import _pid_exists
         from qubit_cli import gateway_windows
         from qubit_cli.profiles import get_profile_dir
-    deadline = _time.monotonic() + _relaunch_verify_timeout_s(profiles, unmapped, _pid_exists)
+    timeout_s = _relaunch_verify_timeout_s(profiles, unmapped, _pid_exists)
+    deadline = _time.monotonic() + timeout_s
     taken: set = set()
     # Profiles first: a gateway on a profile's home is that profile's, never an unmapped entry's.
     targets = [(("profile", name), lambda _scan, h=Path(get_profile_dir(name)), o=int(old_pid): gateway_windows._live_gateway_pids(
         home=h, pid_filter=lambda ps: [p for p in ps if int(p) != o]), True) for name, old_pid in sorted(profiles.items())]
     targets += [(("unmapped", i), lambda scan, f=_unmapped_ready_filter(entry, taken): f(scan()), False)
                 for i, entry in enumerate(unmapped)]
-    ready = _poll_until_ready(targets, deadline, taken)
+    ready = _poll_until_ready(targets, deadline, taken, respawn_window=timeout_s)
     ready_profiles = [name for name in sorted(profiles) if ("profile", name) in ready]
     ready_unmapped = [entry for i, entry in enumerate(unmapped) if ("unmapped", i) in ready]
     ready_pids = [pid for pids in ready.values() for pid in pids]
