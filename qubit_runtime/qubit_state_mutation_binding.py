@@ -80,7 +80,9 @@ def same_history_owner(conn, anchor_id, session_id):
     carry the anchor's exact (user_id, session_key, chat_id). A routeless member needs the
     anchor's exact import binding; unbound, it must also pass :func:`authorize_history`'s local
     rule (local source, no foreign user_id) — e.g. the pre-adoption ancestors of an adopted
-    legacy CLI conversation. A bound (imported) anchor therefore never reaches unbound rows.
+    legacy CLI conversation — or share the anchor's own source (a pre-update cron run's
+    compression chain, whose unrouted segments are owner history too). A bound (imported) anchor
+    therefore never reaches unbound rows.
     """
     columns = 'SELECT source,user_id,session_key,chat_id,origin_json FROM sessions WHERE id=?'
     anchor, row = (conn.execute(columns, (sid,)).fetchone() for sid in (anchor_id, session_id))
@@ -92,7 +94,8 @@ def same_history_owner(conn, anchor_id, session_id):
     if binding != history_binding(conn, anchor_id):
         return False
     return binding is not None or (
-        row['source'] in _history_sources() and _owner_user(row) in (None, '', anchor['user_id']))
+        (row['source'] in _history_sources() or row['source'] == anchor['source'])
+        and _owner_user(row) in (None, '', anchor['user_id']))
 
 
 # --- ported from upstream 088f657ecf ---
