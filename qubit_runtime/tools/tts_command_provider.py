@@ -180,6 +180,13 @@ def run_command_provider(
     proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, encoding="utf-8", errors="replace", env=delegated_child_subprocess_env(scrubbed),
                             stdin=subprocess.DEVNULL, **group)
+    from qubit_cli.process_identity import own_process_groups, register_child, release_process_group_once_empty
+    pid = getattr(proc, "pid", None)
+    if os.name == "posix" and pid:
+        # Hand the child's own group to the owner-death supervisor (spawn_owned's POSIX half,
+        # inline so the spawn kwargs stay this module's call).
+        own_process_groups([pid])
+        register_child(pid, "tts-command")
     output_queue: "queue.Queue[tuple[str, Optional[str]]]" = queue.Queue()
     chunks: Dict[str, list[str]] = {"stdout": [], "stderr": []}
     open_streams = {"stdout", "stderr"}
@@ -241,6 +248,10 @@ def run_command_provider(
                 stream.close()
             except Exception:
                 pass
+    # The command's own group is covered only while something in it is left; release an empty one
+    # so a finished provider does not keep the owner-death supervisor resident.
+    if pid:
+        release_process_group_once_empty(pid, proc=proc, timeout=1.0)
     stdout, stderr = "".join(chunks["stdout"]), "".join(chunks["stderr"])
     if timed_out:
         raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr) from (

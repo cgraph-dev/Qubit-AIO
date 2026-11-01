@@ -418,10 +418,11 @@ def _spawn_whatsapp_pairing_process(session_path: Path, mode: str) -> subprocess
     env = with_qubit_node_path()
     env["WHATSAPP_MODE"] = mode
     env["WHATSAPP_DM_POLICY"] = "pairing"
-    return subprocess.Popen(
+    from qubit_cli.process_identity import spawn_owned
+    return spawn_owned(
         [node, str(bridge_script), "--pair-only", "--pair-json", "--session", str(session_path)],
-        cwd=str(bridge_dir), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        encoding="utf-8", errors="replace", start_new_session=True, env=env,  # detached-spawn: ok — the child is owned and reaped by the parent process
+        purpose="whatsapp-pairing", cwd=str(bridge_dir), stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env=env,
         creationflags=windows_hide_flags(),
     )
 
@@ -435,6 +436,9 @@ def _terminate_whatsapp_pairing(proc: subprocess.Popen | None) -> None:
     except Exception:
         with contextlib.suppress(Exception):
             proc.kill()
+    finally:
+        from qubit_cli.process_identity import release_process_group_once_empty
+        release_process_group_once_empty(proc.pid, proc=proc, timeout=1.0)
 
 
 _PAIRING_SESSION_PREFIX = "session.pairing-"

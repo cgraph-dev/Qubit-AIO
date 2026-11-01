@@ -469,6 +469,11 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True,
     _cprint(f"\033[32m✓ Worktree created:\033[0m {wt_path}")
     print(f"  Branch: {branch_name}")
     print(f"  Base:   {base_label}")
+    from qubit_cli.worktree_registry import record_worktree_repo
+    record_worktree_repo(repo_root)
+    # A resumed session whose frozen cwd is this tree must get it back if quit removes it.
+    from qubit_cli.tui_worktree_resume import record_tui_worktree
+    record_tui_worktree({"path": str(wt_path), "branch": branch_name, "repo_root": repo_root})
     return {"path": str(wt_path), "branch": branch_name, "repo_root": repo_root, "base": base_ref}
 
 
@@ -556,7 +561,8 @@ def _worktree_is_dirty(worktree_path: str, repo_root, timeout: int = 10) -> bool
 
     Untracked ``.worktreeinclude`` directory symlinks back to the main checkout *repo_root* are
     ignored: they are our own scaffolding, and counting them would keep every worktree of such a
-    repo forever.
+    repo forever. ``--untracked-files=all`` overrides a repo's ``status.showUntrackedFiles=no``,
+    and hidden skip-worktree / assume-unchanged edits (which ``git status`` never reports) count.
     """
     from qubit_cli._subprocess_compat import noninteractive_repo_git_env
     try:
@@ -564,17 +570,18 @@ def _worktree_is_dirty(worktree_path: str, repo_root, timeout: int = 10) -> bool
         env = noninteractive_repo_git_env(worktree_path)
         if env is None:
             return True
-        result = _git(["status", "--porcelain", "-z"], worktree_path, timeout=timeout,
-                      stdin=subprocess.DEVNULL, env=env)
+        result = _git(["status", "--porcelain", "-z", "--untracked-files=all"], worktree_path,
+                      timeout=timeout, stdin=subprocess.DEVNULL, env=env)
         if result.returncode != 0:
             return True
         entries = [e for e in result.stdout.split("\0") if e]
-        if not entries:
-            return False
         if any(not e.startswith("?? ") for e in entries):
             return True
         include_links = _include_symlink_paths(worktree_path, repo_root)
-        return any(e[3:].rstrip("/") not in include_links for e in entries)
+        if any(e[3:].rstrip("/") not in include_links for e in entries):
+            return True
+        from qubit_cli.worktree_retention import hidden_index_edits
+        return bool(hidden_index_edits(worktree_path, env=env))
     except Exception:
         return True
 
@@ -814,10 +821,11 @@ def _retain_worktree_for_session(repo_root: str, worktree_path: str, session_id:
     return result.returncode == 0
 
 
-def _retained_tree_is_live(db_path: str, worktree_path: str) -> bool:
+def _retained_tree_is_live(db_path: str, worktree_path: str, *, pending_only: bool = False) -> bool:
     """Whether a session that can still be resumed has its frozen cwd inside the retained tree:
-    a row with history or pending gateway work. A missing store means the profile is gone;
-    unreadable fails SAFE (live)."""
+    a row with history or pending gateway work. ``pending_only`` counts queued/started work alone
+    (the quit path: an ended history-only row no longer needs the checkout). A missing store
+    means the profile is gone; unreadable fails SAFE (live)."""
     import sqlite3
     from urllib.parse import quote
 
@@ -831,14 +839,16 @@ def _retained_tree_is_live(db_path: str, worktree_path: str) -> bool:
 
     def inside(cwd) -> int:
         return int(bool(cwd) and any(key(cwd) == r or key(cwd).startswith(r + "/") for r in roots))
+    pending = ("EXISTS (SELECT 1 FROM session_admissions a WHERE a.target_session_id=s.id "
+               "AND a.status!='terminal')")
+    condition = pending if pending_only else f"s.message_count>0 OR {pending}"
     try:
         conn = sqlite3.connect(f"file:{quote(str(path))}?mode=ro", uri=True, timeout=2)
         try:
             conn.create_function("hermes_inside_tree", 1, inside, deterministic=True)
             row = conn.execute(
-                "SELECT 1 FROM sessions s WHERE hermes_inside_tree(s.cwd) AND (s.message_count>0 OR EXISTS ("
-                "SELECT 1 FROM session_admissions a WHERE a.target_session_id=s.id AND a.status!='terminal')) "
-                "LIMIT 1").fetchone()
+                f"SELECT 1 FROM sessions s WHERE hermes_inside_tree(s.cwd) AND ({condition}) LIMIT 1"
+            ).fetchone()
         finally:
             conn.close()
     except sqlite3.Error as exc:
@@ -910,15 +920,16 @@ def _worktree_lock_is_live(repo_root: str, worktree_path: str, timeout: int = 10
 def _prune_candidates(worktrees_dir: Path, max_age_hours: int, now: float) -> list:
     """Phase 1, stat-only age filter -> ``[(entry, mtime, force)]`` for trees past their soft cutoff.
 
-    Kanban trees (``t_<hex>``) belong to the kanban gc. ``qubit-*`` trees age on *max_age_hours*,
-    deliberately named trees at 3x; *force* marks the hard (3x) tier.
+    Kanban trees (``t_<hex>``) belong to the kanban gc. Auto-made trees (``qubit-*``,
+    ``hermes-*``, ``subagent-*``) age on *max_age_hours*, deliberately named trees at 3x;
+    *force* marks the hard (3x) tier.
     """
     kanban_re = re.compile(r"^t_[0-9a-f]+$")
     candidates: list = []
     for entry in sorted(worktrees_dir.iterdir()):
         if not entry.is_dir() or kanban_re.match(entry.name):
             continue
-        tier_hours = max_age_hours if entry.name.startswith("qubit-") else max_age_hours * 3
+        tier_hours = prune_tier_hours(entry.name, max_age_hours)
         try:
             mtime = entry.stat().st_mtime
             if mtime > now - (tier_hours * 3600):
@@ -1018,6 +1029,12 @@ def _reap_prune_verdicts(repo_root: str, verdicts: list, stale_work_cutoff: floa
         if verdict == "locked-live":
             logger.debug("Skipping live-locked worktree: %s", entry.name)
             continue
+        # A clean tree can still hide what no branch holds (a per-worktree ref, an embedded
+        # repository, an untracked file): ask the shared retention check before deleting it.
+        blocked = removal_blocked(str(entry))
+        if blocked:
+            logger.debug("Keeping worktree %s: %s (%s)", entry.name, blocked[0], blocked[1])
+            continue
 
         if lock_state == "dead":
             _git_quiet(["worktree", "unlock", str(entry)], repo_root,
@@ -1044,14 +1061,25 @@ def _reap_prune_verdicts(repo_root: str, verdicts: list, stale_work_cutoff: floa
 def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
     """Remove stale worktrees and orphaned branches on startup.
 
-    Guards at every tier and age: dirty trees are never removed; unpushed commits are never
-    removed UNLESS patch-equivalent to upstream, the PR is MERGED on GitHub, or the head EXACTLY
-    matches origin (tree reaped, branch kept). Live-locked trees are skipped; dead locks are
-    unlocked first. Trees preserved >7 days are listed in one WARNING so work can't rot silently.
-    Phases: ``_prune_candidates`` -> ``_classify_prune_candidates`` -> ``_reap_prune_verdicts``
-    -> ``_prune_orphaned_branches``.
+    With ``worktrees.archive_dirty`` on (the default) this is the snapshot-then-delete sweep
+    (``worktree_sweep.run_sweep``): an idle dirty/unpushed tree is archived to
+    ``refs/qubit/archive/<tree>`` before removal, and live/young/kanban trees are untouched.
+    With ``archive_dirty: false`` and no size budget it is the classic pruner: dirty trees are
+    never removed; unpushed commits are never removed UNLESS patch-equivalent to upstream, the
+    PR is MERGED on GitHub, or the head EXACTLY matches origin (tree reaped, branch kept).
+    Live-locked trees are skipped; dead locks are unlocked first. Trees preserved >7 days are
+    listed in one WARNING so work can't rot silently.
     """
     try:
+        from qubit_cli import worktree_sweep
+        settings = worktree_sweep.sweep_settings()
+        if not worktree_sweep.classic_mode(settings):
+            # Shallow clones make every aged tree read as unpushed forever; deepen once (fail-soft),
+            # exactly as the classic pass below does.
+            if _repo_is_shallow(repo_root):
+                _deepen_shallow_repo(repo_root)
+            worktree_sweep.run_sweep(repo_root, max_age_hours, settings)
+            return
         _prune_stale_worktree_trees(repo_root, max_age_hours)
     finally:
         _reclaim_orphan_install_states()

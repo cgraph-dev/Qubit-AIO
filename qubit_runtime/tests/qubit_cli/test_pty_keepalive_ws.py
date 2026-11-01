@@ -59,7 +59,9 @@ def pty_keepalive_harness(monkeypatch):
     monkeypatch.setattr(_web_server_chat, "_resolve_chat_argv_async", fake_argv)
     # TestClient without ``with`` skips the lifespan, which reopens the registry
     # on startup; a test that ran close_all() must not shut it for the next one.
-    monkeypatch.setattr(_web_server_chat.PTY_REGISTRY, "_closed", False)
+    # (The registry may be the lease-shim wrapper, whose attribute writes do not
+    # reach the inner registry — use the production reopen() seam.)
+    _web_server_chat.PTY_REGISTRY.reopen()
 
     try:
         yield spawned
@@ -114,7 +116,7 @@ def test_chat_without_a_pty_bridge_says_what_to_install_as_on_main(pty_keepalive
             ws.receive_text()
 
     assert "Chat unavailable: the embedded terminal requires a POSIX PTY" in text
-    assert "Install Hermes inside WSL2 to use the dashboard's /chat tab" in text
+    assert "Install Qubit inside WSL2 to use the dashboard's /chat tab" in text
     assert closed.value.code == 1011
     assert pty_keepalive_harness == []
 

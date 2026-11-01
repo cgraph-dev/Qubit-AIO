@@ -192,6 +192,7 @@ class _WhatsAppOnboardingSession:
     session_path: str
     expires_at: str
     expires_at_ts: float
+    pairing_session_path: str | None = None
     profile: str | None = None
     status: str = "starting"
     qr_payload: str | None = None

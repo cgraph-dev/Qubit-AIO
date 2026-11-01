@@ -363,6 +363,13 @@ class MCPServerTransportMixin:
         # process (kill -9, crash, force-quit) can't leave this server — or its descendants, e.g.
         # mcp-remote's spawned `node` — running forever. The graceful paths (shutdown,
         # _kill_orphaned_mcp_children) still reap as before; this only covers when they never run.
+        # Two control channels: the canonical process-identity supervisor and the dedicated MCP
+        # one (kept for installs/tests that run mcp_death_supervisor.py).
+        try:
+            from qubit_cli.process_identity import own_process_groups
+            own_process_groups(new_pgids.values())
+        except Exception:
+            logger.debug("process-identity register failed for MCP helpers", exc_info=True)
         _core._update_death_supervisor("register", new_pgids.values())
 
     def _release_spawned_children(self, new_pids: Set[int]) -> None:
@@ -385,6 +392,11 @@ class MCPServerTransportMixin:
                     if dropped is not None:
                         released_pgids.append(dropped)
                     _stdio_starttimes.pop(pid, None)
+        try:
+            from qubit_cli.process_identity import release_process_groups
+            release_process_groups(released_pgids)
+        except Exception:
+            logger.debug("process-identity release failed for MCP helpers", exc_info=True)
         _core._update_death_supervisor("unregister", released_pgids)
 
     async def _run_stdio(self, config: dict):

@@ -253,8 +253,9 @@ class TestMultiplexProfileScope:
 
         monkeypatch.setattr(raft_mod.shutil, "which", lambda name: "/usr/bin/raft")
         spawned = []
+        # The bridge spawns through the owner-death seam (spawn_owned); record the argv it is given.
         monkeypatch.setattr(
-            raft_mod.subprocess, "Popen",
+            raft_mod, "spawn_owned",
             lambda cmd, **kwargs: spawned.append(cmd) or SimpleNamespace(pid=1),
         )
 

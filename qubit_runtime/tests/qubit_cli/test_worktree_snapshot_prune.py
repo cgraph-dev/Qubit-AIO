@@ -67,7 +67,7 @@ def _idle(path, hours=100):
 
 
 def _archives(repo):
-    out = _git(["for-each-ref", "--format=%(refname)", "refs/hermes/archive/"], repo)
+    out = _git(["for-each-ref", "--format=%(refname)", "refs/qubit/archive/"], repo)
     return [line for line in out.splitlines() if line]
 
 
@@ -162,7 +162,7 @@ def test_sweep_archives_idle_work_and_never_touches_live_kanban_or_young_trees(r
     archived = {ref.rsplit("/", 1)[-1] for ref in _archives(repo)}
     assert archived == {"lane-dirty", "hermes-unpushed", "subagent-done"}
     assert (deleted / "sub" / "y.py").exists(), "a fresh deletion is activity: the tree is not idle"
-    assert _git(["show", "refs/hermes/archive/lane-dirty:notes.md"], repo) == "uncommitted"
+    assert _git(["show", "refs/qubit/archive/lane-dirty:notes.md"], repo) == "uncommitted"
     for kept in (live_cwd, live_lock, kanban, young, unarchivable):
         assert kept.exists() and (kept / "notes.md").read_text(encoding="utf-8-sig") == "uncommitted\n", kept.name
 
@@ -203,8 +203,8 @@ def test_a_tree_resumed_mid_sweep_is_never_removed(repo, monkeypatch, capsys):
     assert second.exists() and (second / "notes.md").read_text(encoding="utf-8-sig") == "uncommitted\n"
     assert staged.exists() and _git(["show", ":b.py"], staged) == "NEW STAGED CONTENT"
     assert sorted(ref.rsplit("/", 1)[-1] for ref in _archives(repo)) == ["lane-a", "lane-staged"]
-    assert sorted(actions) == ["archived, kept (changed 0s ago) → refs/hermes/archive/lane-a",
-                               "archived, kept (staged changes since the snapshot) → refs/hermes/archive/lane-staged"]
+    assert sorted(actions) == ["archived, kept (changed 0s ago) → refs/qubit/archive/lane-a",
+                               "archived, kept (staged changes since the snapshot) → refs/qubit/archive/lane-staged"]
 
 
 def test_dirty_submodule_work_is_never_archived_away(repo, tmp_path, monkeypatch):

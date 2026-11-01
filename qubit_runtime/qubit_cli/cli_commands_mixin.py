@@ -1298,12 +1298,13 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         wt_info = _cli._setup_worktree(repo_root=repo_root, sync_base=sync_base, name=rest or None)
         if not wt_info:
             return  # _setup_worktree already printed the failure
-        # Retarget the session's terminal/file tools at the new tree (as `qubit -w` does).
-        try:
-            os.chdir(wt_info["path"])
-        except OSError as e:
-            print(f"  {_t('worktree.enter_failed', error=e)}")
-        os.environ["TERMINAL_CWD"] = wt_info["path"]
+        # Retarget the session's terminal/file tools at the new tree (as `qubit -w` does). A
+        # gateway-attached session's tools run under the gateway's frozen cwd, so the move goes
+        # through ``session.mutate workspace`` first; a refusal removes the fresh tree and leaves
+        # the session (and this process) where it was.
+        from qubit_cli.cli_commands_worktree import enter_new_worktree
+        if not enter_new_worktree(self, wt_info):
+            return
         # Same keep-if-unpushed cleanup as `qubit -w`. Only one tree is "active" per process;
         # an earlier one keeps its own atexit registration (explicit info arg).
         _cli._active_worktree = wt_info

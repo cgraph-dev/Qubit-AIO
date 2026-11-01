@@ -651,6 +651,9 @@ class TestStopProfileGateway:
         calls = {"kill": 0, "alive_probes": 0, "remove": 0, "reap_calls": 0}
 
         monkeypatch.setattr("gateway.status.get_running_pid", lambda: 12345)
+        # Ownership is the gate that decides whether this profile may signal the pid; this case
+        # exercises the stop mechanics once that gate returned the pid.
+        monkeypatch.setattr(gateway, "_owned_gateway_pid", lambda: 12345)
         # Post-#21561: the stop loop sends one SIGTERM via ``os.kill`` then
         # polls liveness via ``gateway.status._pid_exists`` (safe on
         # Windows — bpo-14484). Instrument both seams separately.
@@ -688,6 +691,8 @@ class TestStopProfileGateway:
         reap_extra_excludes = []
 
         monkeypatch.setattr("gateway.status.get_running_pid", lambda: killed_pid)
+        # Owned by this profile: the case is the orphan-sweep exclusion, not ownership proof.
+        monkeypatch.setattr(gateway, "_owned_gateway_pid", lambda: killed_pid)
         monkeypatch.setattr(gateway.os, "kill", lambda pid, sig: None)
         monkeypatch.setattr("gateway.status._pid_exists", lambda pid: False)
         monkeypatch.setattr("time.sleep", lambda _: None)
