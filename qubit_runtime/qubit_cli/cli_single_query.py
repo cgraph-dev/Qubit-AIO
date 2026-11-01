@@ -511,10 +511,8 @@ def _run_single_query_mode(cli, query, image, quiet, oneshot, stream_json: bool 
         cli._seeded_first_message = _SeededQueryMessage(seeded_query, seeded_images)
         return cli.run()
     cli._single_query_mode = True  # agent waits the full MCP cold-start before its only tool snapshot
-    # Only the interactive run loop set this, so plugin tools dispatched from a `-q`/`-Q` turn got no
-    # parent_agent (PluginContext.dispatch_tool reads it) — #67597.
-    from qubit_cli.plugins import get_plugin_manager
-    get_plugin_manager()._cli_ref = cli
+    # No ``PluginManager._cli_ref``: plugins load in the gateway, not in this thin CLI (PLG-7), and
+    # the one-shot turn's plugin tools run there with the session's own parent agent.
     # No user can answer approval prompts: the approval gate takes the deterministic path.
     # One-shot mode: no between-turns MCP late-binding refresh, so the agent must wait the full MCP
     # cold-start bound before its first (and only) tool snapshot. See #51316.
