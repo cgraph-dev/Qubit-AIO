@@ -1074,6 +1074,10 @@ def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
         from qubit_cli import worktree_sweep
         settings = worktree_sweep.sweep_settings()
         if not worktree_sweep.classic_mode(settings):
+            # Shallow clones make every aged tree read as unpushed forever; deepen once (fail-soft),
+            # exactly as the classic pass below does.
+            if _repo_is_shallow(repo_root):
+                _deepen_shallow_repo(repo_root)
             worktree_sweep.run_sweep(repo_root, max_age_hours, settings)
             return
         _prune_stale_worktree_trees(repo_root, max_age_hours)
