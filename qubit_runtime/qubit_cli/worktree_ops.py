@@ -471,6 +471,9 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True,
     print(f"  Base:   {base_label}")
     from qubit_cli.worktree_registry import record_worktree_repo
     record_worktree_repo(repo_root)
+    # A resumed session whose frozen cwd is this tree must get it back if quit removes it.
+    from qubit_cli.tui_worktree_resume import record_tui_worktree
+    record_tui_worktree({"path": str(wt_path), "branch": branch_name, "repo_root": repo_root})
     return {"path": str(wt_path), "branch": branch_name, "repo_root": repo_root, "base": base_ref}
 
 

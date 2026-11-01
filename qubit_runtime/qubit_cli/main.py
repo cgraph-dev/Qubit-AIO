@@ -1572,6 +1572,10 @@ def _resolve_chat_session_args(args, use_tui: bool) -> None:
     if resume_val:
         # On miss keep the original so _init_agent reports "Session not found" with it.
         args.resume = _resolve_session_by_name_or_id(resume_val) or resume_val
+        # A quit may have removed this session's ``-w`` / ``--tui -w`` tree; recreate it before
+        # the cwd restore below, or the owner refuses every resumed turn workspace_unavailable.
+        from qubit_cli.main_resume_args import recreate_resumed_tui_worktree
+        recreate_resumed_tui_worktree(args)
 
     # cd back into a resumed session's recorded cwd (opt out: --no-restore-cwd;
     # --worktree owns its own dir). A missing dir warns and stays put.
