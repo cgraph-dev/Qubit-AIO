@@ -20,7 +20,19 @@ def repair_windows_home_acl(*, elevated: bool | None = None) -> None:
 
     *elevated* is the host fact (default: probed; False on every host but an elevated Windows one).
     """
-    from qubit_dir_acl import grant_tree_user_access, process_is_elevated
+    if elevated is None:
+        import sys
+
+        # Only Windows can be elevated for this purpose; never import the Windows-only
+        # ACL helper (absent on a cold source slice) just to discover a no-op.
+        if sys.platform != "win32":
+            return
+    try:
+        from qubit_dir_acl import grant_tree_user_access, process_is_elevated
+    except ImportError:
+        if elevated:
+            raise
+        return
     if not (process_is_elevated() if elevated is None else elevated):
         # Only an elevated update leaves Administrators-only entries, and only an elevated token
         # can rewrite them; a recursive grant over the whole home on every update costs minutes.

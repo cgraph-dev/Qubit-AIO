@@ -708,7 +708,8 @@ def cmd_update(args) -> int:
         print("::warning::--target is a CHECK-only cross-resolution flag; ignoring it for apply (the lockfile pins every target)")
         args.target = None
 
-    resolved, failures = _resolve_updates(names, lockfile, args.target, frozenset(args.skip_target))
+    resolved, failures = _resolve_updates(names, lockfile, args.target,
+                                           frozenset(getattr(args, "skip_target", None) or ()))
     changed = [d for d in resolved if d.changed]
     if not resolved:
         print("pm update: nothing to check (no resolvable packages)")

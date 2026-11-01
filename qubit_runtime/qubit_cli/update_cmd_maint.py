@@ -22,6 +22,16 @@ from qubit_cli.update_cmd_common import _best_effort
 logger = logging.getLogger("qubit_cli.update_cmd")
 
 
+def _project_root() -> Path:
+    """The checkout root, without importing the application CLI on a cold update path."""
+    try:
+        from qubit_cli import main
+
+        return Path(main.PROJECT_ROOT)
+    except Exception:
+        return Path(__file__).resolve().parents[1]
+
+
 def _prepare_updated_checkout(project_root: Path, *, desktop: bool) -> None:
     """Historical updater hook: never complete inside the pre-swap interpreter."""
     from qubit_cli._old_updater import stop_for_relaunch
@@ -50,7 +60,7 @@ def _sqlite_partial_completion_lines(sqlite_version: str) -> list[str]:
     return [
         f"⚠ Update partially complete — your Python's SQLite ({sqlite_version}) has a known "
         "corruption bug. Qubit works, but sessions could be damaged.",
-        f"  Fix: run the installer again ({_REINSTALL_ONE_LINER[bool(_m()._is_windows())]}) "
+        f"  Fix: run the installer again ({_REINSTALL_ONE_LINER[sys.platform == 'win32']}) "
         "which installs a safe Python, then run `qubit doctor` to confirm.",
     ]
 
@@ -338,10 +348,9 @@ def _print_update_completion(message: str) -> None:
 def _read_project_version() -> str | None:
     """``version`` from the checkout's pyproject.toml (not importlib.metadata, which still
     describes the OLD version after a pull). None on any failure — cosmetic, never breaks."""
-    from qubit_cli.update_cmd import _m
     try:
         import tomllib
-        with open(_m().PROJECT_ROOT / "pyproject.toml", "rb") as fh:  # windows-footgun: ok — binary mode, tomllib requires bytes
+        with open(_project_root() / "pyproject.toml", "rb") as fh:  # windows-footgun: ok — binary mode, tomllib requires bytes
             version = tomllib.load(fh).get("project", {}).get("version")
         return str(version) if version else None
     except Exception:
@@ -354,9 +363,8 @@ def _checkout_version() -> str | None:
     pyproject.toml is an inert 0.0.0 on source checkouts; the release a checkout
     runs is derived from its reachable tags.
     """
-    from qubit_cli.update_cmd import _m
     from qubit_cli.version_info import _git_version_info
-    info = _git_version_info(Path(_m().PROJECT_ROOT), include_untracked=True)
+    info = _git_version_info(_project_root(), include_untracked=True)
     return info.derived_version if info.commit else None
 
 
@@ -545,8 +553,7 @@ def _ensure_fhs_path_guard() -> None:
     """Ensure /usr/local/bin is on PATH for RHEL-family root non-login shells (su, sudo -s,
     tmux), where neither /etc/bashrc nor .bash_profile adds it. Mirrors install.sh. Idempotent;
     no-op on non-Linux/non-root/non-FHS or when ``bash -i -c 'command -v qubit'`` resolves."""
-    from qubit_cli.update_cmd import _m
-    if _m().sys.platform != "linux":
+    if sys.platform != "linux":
         return
     try:
         if os.geteuid() != 0:  # windows-footgun: ok — Linux FHS helper, guarded by sys.platform == "linux" above + AttributeError catch
@@ -621,8 +628,7 @@ def _ensure_fhs_path_guard() -> None:
 def _ensure_acp_launcher() -> None:
     """Historical export; launcher policy belongs to the launcher owner."""
     from qubit_cli import _launchers
-    from qubit_cli.update_cmd import _m
-    _launchers.expose_cli(_m().PROJECT_ROOT)
+    _launchers.expose_cli(_project_root())
 
 
 _BACKUP_MODE_ALIASES = {
@@ -939,7 +945,7 @@ def _print_post_update_notices_and_self_heals() -> None:
         # Windows launchers into the managed bin dir: in-checkout launchers were swept by the
         # autostash (--include-untracked) and updates never run install.ps1. No-op on POSIX.
         from qubit_cli._install_repair import migrate_windows_bin_path
-        migrate_windows_bin_path(_m().PROJECT_ROOT)
+        migrate_windows_bin_path(_project_root())
 
     for message, step in (
         # v23 FTS layout is opt-in (existing indexes untouched); surface the command here.
@@ -947,7 +953,7 @@ def _print_post_update_notices_and_self_heals() -> None:
         ('Curator first-run notice failed: %s', _print_curator_first_run_notice),
         ('Curator recent-run notice failed: %s', _print_curator_recent_run_notice),
         ('FHS PATH guard check failed: %s', _ensure_fhs_path_guard),
-        ('CLI launcher exposure failed: %s', lambda: _launchers.expose_cli(_m().PROJECT_ROOT)),
+        ('CLI launcher exposure failed: %s', lambda: _launchers.expose_cli(_project_root())),
         ('Windows bin launcher migration failed: %s', _migrate_windows_bin_path),
         ('cua-driver refresh failed: %s', _refresh_cua_driver_after_update),
         ('Default PM tool install failed: %s', _install_default_tools_after_update),
@@ -1025,7 +1031,7 @@ def _run_post_update_maintenance(
     try:
         from qubit_cli.gitlock import fetch_full_commit_graph
         from qubit_cli.update_cmd import _no_prompt_git_kwargs
-        if fetch_full_commit_graph(Path(_m().PROJECT_ROOT), **_no_prompt_git_kwargs()):
+        if fetch_full_commit_graph(_project_root(), **_no_prompt_git_kwargs()):
             print("  ✓ Fetched release history (commits only) for version identity")
     except (OSError, subprocess.SubprocessError) as exc:
         detail = (getattr(exc, "stderr", None) or str(exc)).strip().splitlines()[-1:] or [type(exc).__name__]
@@ -1034,7 +1040,7 @@ def _run_post_update_maintenance(
     # Seed the model-catalog cache from the checkout instead of a bot-gated, flaky fetch.
     with _best_effort('Model catalog seed during update failed: %s'):
         from qubit_cli.model_catalog import seed_cache_from_checkout
-        if seed_cache_from_checkout(_m().PROJECT_ROOT):
+        if seed_cache_from_checkout(_project_root()):
             print("  ✓ Model catalog cache refreshed from checkout")
 
     # Drop the cached live plugin catalog under every profile: the checkout is shared, so a

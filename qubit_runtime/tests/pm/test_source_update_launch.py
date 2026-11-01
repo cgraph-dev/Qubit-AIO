@@ -193,7 +193,7 @@ def test_launcher_publication_failure_retries_without_rebuilding_dependencies(so
     committed = runtime_facts_path(root).read_bytes()
     assert venv_sync.prepare_launch(root, []) == store_python
     assert runtime_facts_path(root).read_bytes() == committed
-    assert (root / ".hermes" / "bin" / "hermes").is_file()
+    assert (root / ".qubit" / "bin" / "qubit").is_file()
 
 
 @pytest.mark.platforms("posix")

@@ -345,6 +345,15 @@ _startup_fast.ensure_project_root_on_path()
 if _startup_fast.try_fast_version():
     raise SystemExit(0)
 
+# PM manages install state before any application dependency is importable: a
+# cold checkout has only stdlib + pm/qubit_cli, so dispatch it here, ahead of
+# profile resolution and the application import wall. A ``-p`` before ``pm``
+# still reaches the later post-profile dispatch below.
+if sys.argv[1:2] == ["pm"]:
+    from pm.cli import main as _pm_main
+
+    raise SystemExit(_pm_main(sys.argv[2:]))
+
 import argparse
 import contextlib
 import json
@@ -354,79 +363,6 @@ from pathlib import Path
 from typing import Optional
 
 
-from qubit_cli.subcommands.cron import build_cron_parser
-from qubit_cli.subcommands.sync import build_sync_parser
-from qubit_cli.subcommands.gateway import build_gateway_parser
-from qubit_cli.subcommands.profile import build_profile_parser
-from qubit_cli.subcommands.model import build_model_parser
-from qubit_cli.subcommands.setup import build_setup_parser
-
-from qubit_cli.subcommands.whatsapp import build_whatsapp_parser, build_whatsapp_cloud_parser
-from qubit_cli.subcommands.slack import build_slack_parser
-from qubit_cli.subcommands.login import build_login_parser
-from qubit_cli.subcommands.logout import build_logout_parser
-from qubit_cli.subcommands.auth import build_auth_parser
-from qubit_cli.subcommands.connectors import build_connectors_parser
-from qubit_cli.subcommands.status import build_status_parser
-from qubit_cli.subcommands.pause import build_pause_parser
-from qubit_cli.subcommands.webhook import build_webhook_parser
-from qubit_cli.subcommands.hooks import build_hooks_parser
-from qubit_cli.subcommands.doctor import build_doctor_parser
-from qubit_cli.subcommands.runtime import build_runtime_parser
-from qubit_cli.runtime_cmd import cmd_runtime
-from qubit_cli.subcommands.agent import build_agent_parser
-from qubit_cli.agent_cmd import cmd_agent
-from qubit_cli.subcommands.recipe import build_recipe_parser
-from qubit_cli.recipe_cmd import cmd_recipe
-from qubit_cli.subcommands.traces import build_traces_parser
-from qubit_cli.traces_cmd import cmd_traces
-from qubit_cli.subcommands.evals import build_evals_parser
-from qubit_cli.evals_cmd import cmd_evals
-from qubit_cli.subcommands.optimize import build_optimize_parser
-from qubit_cli.optimize_cmd import cmd_optimize
-from qubit_cli.subcommands.verify import build_verify_parser
-from qubit_cli.subcommands.security import build_security_parser
-from qubit_cli.subcommands.approvals import build_approvals_parser
-from qubit_cli.subcommands.dump import build_dump_parser
-from qubit_cli.subcommands.debug import build_debug_parser
-from qubit_cli.subcommands.backup import build_backup_parser
-from qubit_cli.subcommands.import_cmd import build_import_cmd_parser
-from qubit_cli.subcommands.config import build_config_parser
-from qubit_cli.subcommands.skin import build_skin_parser
-from qubit_cli.subcommands.console import build_console_parser
-from qubit_cli.subcommands.update import build_update_parser
-from qubit_cli.subcommands.uninstall import build_uninstall_parser
-from qubit_cli.subcommands.dashboard import build_dashboard_parser, build_serve_parser
-from qubit_cli.subcommands.gui import build_gui_parser
-from qubit_cli.subcommands.logs import build_logs_parser
-from qubit_cli.subcommands.prompt_size import build_prompt_size_parser
-from qubit_cli.subcommands.memory import build_memory_parser
-from qubit_cli.subcommands.acp import build_acp_parser
-from qubit_cli.subcommands.tools import build_tools_parser
-from qubit_cli.subcommands.insights import build_insights_parser
-from qubit_cli.subcommands.usage import build_usage_parser
-from qubit_cli.subcommands.monitoring import build_monitoring_parser
-from qubit_cli.subcommands.skills import build_skills_parser
-from qubit_cli.subcommands.pairing import build_pairing_parser
-from qubit_cli.subcommands.plugins import build_plugins_parser
-from qubit_cli.subcommands.mcp import build_mcp_parser
-from qubit_cli.subcommands.vault import build_vault_parser
-from qubit_cli.subcommands.moa import build_moa_parser
-from qubit_cli.subcommands.fallback import build_fallback_parser
-from qubit_cli.subcommands.worktree import build_worktree_parser
-from qubit_cli.subcommands.browser import build_browser_parser
-from qubit_cli.subcommands.secrets import build_secrets_parser
-from qubit_cli.subcommands.codex_runtime import build_codex_runtime_parser
-from qubit_cli.subcommands.egress import build_egress_parser
-from qubit_cli.subcommands.migrate import build_migrate_parser
-from qubit_cli.subcommands.checkpoints import build_checkpoints_parser
-from qubit_cli.subcommands.bundles import build_bundles_parser
-from qubit_cli.subcommands.curator import build_curator_parser
-from qubit_cli.subcommands.pets import build_pets_parser
-from qubit_cli.subcommands.journey import build_journey_parser
-from qubit_cli.subcommands.computer_use import build_computer_use_parser
-from qubit_cli.subcommands.sessions import build_sessions_parser, cmd_sessions_lazy
-from qubit_cli.subcommands.completion import build_completion_parser
 
 
 def _require_tty(command_name: str) -> None:
@@ -738,7 +674,7 @@ try:
 except Exception:
     pass  # an unwritable home leaves the system temp dir in place; never block startup
 
-# PM runs after profile resolution but before application dependency imports.
+# ``qubit -p NAME pm ...`` reaches here after profile resolution stripped ``-p``.
 if sys.argv[1:2] == ["pm"]:
     from pm.cli import main as _pm_main
 
@@ -3560,6 +3496,80 @@ def _build_cli_parser():
     live in ``qubit_cli/subcommands/<group>.py`` with handlers injected so
     those modules never import main.
     """
+
+    from qubit_cli.subcommands.cron import build_cron_parser
+    from qubit_cli.subcommands.sync import build_sync_parser
+    from qubit_cli.subcommands.gateway import build_gateway_parser
+    from qubit_cli.subcommands.profile import build_profile_parser
+    from qubit_cli.subcommands.model import build_model_parser
+    from qubit_cli.subcommands.setup import build_setup_parser
+
+    from qubit_cli.subcommands.whatsapp import build_whatsapp_parser, build_whatsapp_cloud_parser
+    from qubit_cli.subcommands.slack import build_slack_parser
+    from qubit_cli.subcommands.login import build_login_parser
+    from qubit_cli.subcommands.logout import build_logout_parser
+    from qubit_cli.subcommands.auth import build_auth_parser
+    from qubit_cli.subcommands.connectors import build_connectors_parser
+    from qubit_cli.subcommands.status import build_status_parser
+    from qubit_cli.subcommands.pause import build_pause_parser
+    from qubit_cli.subcommands.webhook import build_webhook_parser
+    from qubit_cli.subcommands.hooks import build_hooks_parser
+    from qubit_cli.subcommands.doctor import build_doctor_parser
+    from qubit_cli.subcommands.runtime import build_runtime_parser
+    from qubit_cli.runtime_cmd import cmd_runtime
+    from qubit_cli.subcommands.agent import build_agent_parser
+    from qubit_cli.agent_cmd import cmd_agent
+    from qubit_cli.subcommands.recipe import build_recipe_parser
+    from qubit_cli.recipe_cmd import cmd_recipe
+    from qubit_cli.subcommands.traces import build_traces_parser
+    from qubit_cli.traces_cmd import cmd_traces
+    from qubit_cli.subcommands.evals import build_evals_parser
+    from qubit_cli.evals_cmd import cmd_evals
+    from qubit_cli.subcommands.optimize import build_optimize_parser
+    from qubit_cli.optimize_cmd import cmd_optimize
+    from qubit_cli.subcommands.verify import build_verify_parser
+    from qubit_cli.subcommands.security import build_security_parser
+    from qubit_cli.subcommands.approvals import build_approvals_parser
+    from qubit_cli.subcommands.dump import build_dump_parser
+    from qubit_cli.subcommands.debug import build_debug_parser
+    from qubit_cli.subcommands.backup import build_backup_parser
+    from qubit_cli.subcommands.import_cmd import build_import_cmd_parser
+    from qubit_cli.subcommands.config import build_config_parser
+    from qubit_cli.subcommands.skin import build_skin_parser
+    from qubit_cli.subcommands.console import build_console_parser
+    from qubit_cli.subcommands.update import build_update_parser
+    from qubit_cli.subcommands.uninstall import build_uninstall_parser
+    from qubit_cli.subcommands.dashboard import build_dashboard_parser, build_serve_parser
+    from qubit_cli.subcommands.gui import build_gui_parser
+    from qubit_cli.subcommands.logs import build_logs_parser
+    from qubit_cli.subcommands.prompt_size import build_prompt_size_parser
+    from qubit_cli.subcommands.memory import build_memory_parser
+    from qubit_cli.subcommands.acp import build_acp_parser
+    from qubit_cli.subcommands.tools import build_tools_parser
+    from qubit_cli.subcommands.insights import build_insights_parser
+    from qubit_cli.subcommands.usage import build_usage_parser
+    from qubit_cli.subcommands.monitoring import build_monitoring_parser
+    from qubit_cli.subcommands.skills import build_skills_parser
+    from qubit_cli.subcommands.pairing import build_pairing_parser
+    from qubit_cli.subcommands.plugins import build_plugins_parser
+    from qubit_cli.subcommands.mcp import build_mcp_parser
+    from qubit_cli.subcommands.vault import build_vault_parser
+    from qubit_cli.subcommands.moa import build_moa_parser
+    from qubit_cli.subcommands.fallback import build_fallback_parser
+    from qubit_cli.subcommands.worktree import build_worktree_parser
+    from qubit_cli.subcommands.browser import build_browser_parser
+    from qubit_cli.subcommands.secrets import build_secrets_parser
+    from qubit_cli.subcommands.codex_runtime import build_codex_runtime_parser
+    from qubit_cli.subcommands.egress import build_egress_parser
+    from qubit_cli.subcommands.migrate import build_migrate_parser
+    from qubit_cli.subcommands.checkpoints import build_checkpoints_parser
+    from qubit_cli.subcommands.bundles import build_bundles_parser
+    from qubit_cli.subcommands.curator import build_curator_parser
+    from qubit_cli.subcommands.pets import build_pets_parser
+    from qubit_cli.subcommands.journey import build_journey_parser
+    from qubit_cli.subcommands.computer_use import build_computer_use_parser
+    from qubit_cli.subcommands.sessions import build_sessions_parser, cmd_sessions_lazy
+    from qubit_cli.subcommands.completion import build_completion_parser
     from qubit_cli._parser import build_top_level_parser
 
     # ``import-agent`` / ``claw`` left core for the agent-importers catalog plugin. A home that

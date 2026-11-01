@@ -87,7 +87,7 @@ def test_fresh_takeover_prepares_generation_and_runs_selected_python(tmp_path):
     output = json.loads(result.read_text())
     assert Path(output['python']).is_relative_to(store)
     assert Path(output['dep']).is_relative_to(home / "installs")
-    assert (root / ".hermes/bin/hermes").is_file()
+    assert (root / ".qubit/bin/qubit").is_file()
     assert not (root / "venv").exists()
     assert Facts(store / "facts.json").get("dmgbuild") is None
     venv_fact = json.loads(next((home / "installs").glob("*/facts.json")).read_text())["packages"]["venv"]
