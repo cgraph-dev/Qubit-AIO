@@ -81,7 +81,7 @@ _DISPATCHED_SOURCES = frozenset({"a2a", "kanban"})
 
 def _with_launch_entrypoint(event: dict[str, Any]) -> dict[str, Any]:
     """Declare the entrypoint of a finite CLI run (``qubit -z``, ``chat -q`` off a TTY, ``-Q``): the
-    ``QUBIT_SINGLE_QUERY_SESSION`` marker those paths set (the same one ``cache_ttl: auto`` and the session
+    ``HERMES_SINGLE_QUERY_SESSION`` marker those paths set (the same one ``cache_ttl: auto`` and the session
     source read). ``background`` for a dispatcher-spawned child, else ``one_shot``; the REPL, other surfaces,
     delegated children and an already-declared entrypoint are untouched."""
     if (event.get("entrypoint") or event.get("parent_task_id") or event.get("parent_session_id")
@@ -93,7 +93,7 @@ def _with_launch_entrypoint(event: dict[str, Any]) -> dict[str, Any]:
         return event
     from gateway.session_context import get_session_env
 
-    source = str(get_session_env("QUBIT_SESSION_SOURCE", "") or "").strip().lower()
+    source = str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip().lower()
     return {**event, "entrypoint": "background" if source in _DISPATCHED_SOURCES else "one_shot"}
 
 

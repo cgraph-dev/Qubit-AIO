@@ -225,7 +225,7 @@ class _Relay:
         self.events.append(("subscribers.flush",))
 
 
-_EXPORT_WORKER = "hermes-shared-metrics-flush"
+_EXPORT_WORKER = "qubit-shared-metrics-flush"
 
 
 def _join_export_workers() -> None:
