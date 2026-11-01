@@ -770,9 +770,12 @@ def ensure_matrix_deps() -> bool:
             "UserID": UserID,
         }
 
-    # A complete install (module-level imports already bound the types) needs no sync; only a
-    # partial one goes through ensure_and_bind, which rebinds after the install.
-    if extras.missing("matrix") and not extras.ensure_and_bind("matrix", _import, globals()):
+    # Always go through ensure_and_bind: it no-ops the install when every declared package is
+    # already importable, then rebinds the type globals from a fresh import. The rebind matters
+    # even on a complete install because the module-level import above may have fallen back to
+    # the stubs (a fresh install bound before the packages landed) — a `missing()` short-circuit
+    # would leave those globals stubbed forever.
+    if not extras.ensure_and_bind("matrix", _import, globals()):
         logger.warning(
             "Matrix: required packages not installed or need a restart. "
             "Run `qubit pm install`, then restart Qubit."

@@ -755,6 +755,13 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
                         delivered = False
             # The original event: a requeued tick folds again from what is still queued.
             if delivered is False:
+                # A refusal (``_inject_watch_notification`` stamps ``_refusal_permanent`` for a
+                # ``WakeNotAccepted``) is paced on a bounded backoff. A plain transport/adapter
+                # failure is retryable work the next drain tick can attempt again immediately;
+                # spacing it out would leave a queued notice undelivered while the route is fine.
+                if "_refusal_permanent" not in evt:
+                    completion_queue.put(evt)
+                    continue
                 attempts = int(evt.get("_watch_injection_attempts") or 0) + 1
                 evt["_watch_injection_attempts"] = attempts
                 if evt.get("_refusal_permanent") is True and attempts >= _MAX_COMPLETION_INJECTION_ATTEMPTS:
