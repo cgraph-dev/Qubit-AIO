@@ -649,11 +649,26 @@ class _ProfileRoutingFileHandler(logging.Handler):
         self._backup_count = getattr(existing, "backupCount", 0)
         self._profile_handlers: dict[Path, _ManagedRotatingFileHandler] = {}
         self._profile_handlers_lock = threading.RLock()
+        self._closed = False
         # Home -> monotonic time of its last liveness check (see _PROFILE_LIVENESS_RECHECK_S).
         self._liveness_checked_at: dict[Path, float] = {}
         self.setFormatter(existing.formatter)
         for log_filter in existing.filters:
             self.addFilter(log_filter)
+
+    def handle(self, record: logging.LogRecord) -> bool:
+        """Route a record without holding this handler's own lock across ``emit``.
+
+        Stdlib ``Handler.handle`` acquires ``self.lock`` for the whole ``emit``. Here ``emit``
+        delegates to per-home child handlers, and building one takes ``logging._lock`` — the
+        module lock ``logging.shutdown`` holds while it waits on ``self.lock``. That inversion
+        hung ``test_runtime_listener_supervision`` on CI. The router's own lock guards only its
+        handler map (``_profile_handlers_lock``), so filtering + routing need no ``self.lock``.
+        """
+        if not self.filter(record):
+            return False
+        self.emit(record)
+        return True
 
     def _home_for_record(self, record: logging.LogRecord) -> Path:
         raw_home = getattr(record, "qubit_home", "")
@@ -687,43 +702,80 @@ class _ProfileRoutingFileHandler(logging.Handler):
         self.release_profile(home)
         return True
 
-    def _handler_for_home(self, home: Path) -> _ManagedRotatingFileHandler:
+    def _handler_for_home(self, home: Path) -> Optional[_ManagedRotatingFileHandler]:
+        # Building a child handler instantiates a logging.Handler, which takes ``logging._lock``.
+        # ``logging.shutdown`` (uvicorn's dictConfig) holds that module lock and then waits on
+        # this router's lock, so the build MUST happen with no router lock held or the two sides
+        # deadlock (test_hermes_logging T23). Publish under the lock afterwards, and drop the
+        # freshly-built handler if the router was closed meanwhile.
         with self._profile_handlers_lock:
-            if home not in self._profile_handlers:
-                handler = _new_file_handler(
-                    home / "logs" / self._filename, level=self.level, max_bytes=self._max_bytes,
-                    backup_count=self._backup_count, formatter=self.formatter,
-                )
-                handler._skip_write_when_dir_missing = home != self._default_home
-                self._profile_handlers[home] = handler
-            return self._profile_handlers[home]
+            handler = self._profile_handlers.get(home)
+            if handler is not None:
+                return handler
+            if self._closed:
+                return None
+        handler = _new_file_handler(
+            home / "logs" / self._filename, level=self.level, max_bytes=self._max_bytes,
+            backup_count=self._backup_count, formatter=self.formatter,
+        )
+        handler._skip_write_when_dir_missing = home != self._default_home
+        stale: Optional[_ManagedRotatingFileHandler] = None
+        with self._profile_handlers_lock:
+            if self._closed:
+                stale, handler = handler, None
+            else:
+                existing = self._profile_handlers.setdefault(home, handler)
+                if existing is not handler:
+                    stale, handler = handler, existing
+        if stale is not None:
+            # Close outside the lock: Handler.close() takes logging._lock.
+            _quietly(stale.close)
+        return handler
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
             home = self._home_for_record(record)
             handler = self._handler_for_home(home)
+            if handler is None:
+                return
             if home == self._default_home:
-                handler.handle(record)
+                # Serialise the write against close(): a shutdown that cleared the handler set
+                # must not let an in-flight record reopen the file it just closed.
+                with self._profile_handlers_lock:
+                    if self._closed or self._profile_handlers.get(home) is not handler:
+                        return
+                    handler.handle(record)
                 return
             # Formatted here, on the listener thread, where the record's profile scope is gone: bind its home so
             # RedactingFormatter applies THAT profile's redact_secrets policy and vault values, not the launch's.
             from qubit_constants import reset_qubit_home_override, set_qubit_home_override
-            token = set_qubit_home_override(str(home))
-            try:
-                handler.handle(record)
-            finally:
-                reset_qubit_home_override(token)
+            with self._profile_handlers_lock:
+                if self._closed or self._profile_handlers.get(home) is not handler:
+                    return
+                token = set_qubit_home_override(str(home))
+                try:
+                    handler.handle(record)
+                finally:
+                    reset_qubit_home_override(token)
+                skipped_missing_dir = handler.skipped_missing_dir
             # The write was skipped because logs/ is gone (an rmtree inside the liveness interval,
             # see _ManagedRotatingFileHandler.emit): re-check now, and keep the record in the
             # default log either way (a live profile whose logs/ was removed by hand included).
-            if handler.skipped_missing_dir:
+            if skipped_missing_dir:
                 self._release_if_deleted(home)
-                self._handler_for_home(self._default_home).handle(record)
+                fallback = self._handler_for_home(self._default_home)
+                if fallback is not None:
+                    with self._profile_handlers_lock:
+                        if (self._closed
+                                or self._profile_handlers.get(self._default_home) is not fallback):
+                            return
+                        fallback.handle(record)
         except Exception:
             self.handleError(record)
 
     def close(self) -> None:
         with self._profile_handlers_lock:
+            self._closed = True
             handlers = list(self._profile_handlers.values())
             self._profile_handlers.clear()
         for handler in handlers:

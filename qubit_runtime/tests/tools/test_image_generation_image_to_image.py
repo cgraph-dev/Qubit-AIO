@@ -113,6 +113,9 @@ class TestMandatoryKeysSurviveWhitelist:
 class TestFalRouting:
     def _patch_submit(self, monkeypatch, image_tool, capture: dict):
         class _Handler:
+            def iter_events(self_inner, **_):
+                return iter(())
+
             def get(self_inner):
                 return {"images": [{"url": "https://out/img.png", "width": 1, "height": 1}]}
 

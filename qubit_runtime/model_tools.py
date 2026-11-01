@@ -342,9 +342,10 @@ def _select_tool_names(enabled_toolsets: Optional[List[str]], disabled_toolsets:
             if validate_toolset(name):
                 role_granted.update(resolve_toolset(name))
     else:
-        from toolsets import get_all_toolsets
+        from toolsets import TOOLSET_SESSION_PLATFORMS, get_all_toolsets
         for ts_name in get_all_toolsets():
-            tools.update(resolve_toolset(ts_name))
+            if ts_name not in TOOLSET_SESSION_PLATFORMS:
+                tools.update(resolve_toolset(ts_name))
     # Subtract role-reserved toolsets that were not legitimately granted above.
     for ts_name in denied_role_toolsets:
         tools.difference_update(set(resolve_toolset(ts_name)) - role_granted)

@@ -47,21 +47,6 @@ def wait_fal_queue_result(handle: Any, *, interval: float = FAL_QUEUE_POLL_SECON
     return handle.get()
 
 
-
-# Queue status poll cadence. ``handle.get()`` polls every 0.1 s (+RTT): one 12 s image cost
-# ~208 requests/min against the Qubit gateway's 200/min window, so a second job 429s. 2 s is
-# ~25 requests/min per job (8 concurrent jobs fit) for at most +2 s latency per job.
-FAL_QUEUE_POLL_SECONDS = 2.0
-
-
-def wait_fal_queue_result(handle: Any, *, interval: float = FAL_QUEUE_POLL_SECONDS) -> Any:
-    """``handle.get()`` without the SDK's 0.1 s status poll: drain ``iter_events`` at ``interval``,
-    then ``get()`` sees Completed on its first status check and fetches the result."""
-    for _ in handle.iter_events(with_logs=False, interval=interval):
-        pass
-    return handle.get()
-
-
 def import_fal_client() -> Any:
     """Import ``fal_client`` (via ``pm`` when available) and return
     the module reference.

@@ -1007,6 +1007,7 @@ def _build_dynamic_image_schema() -> Dict[str, Any]:
     static_props = IMAGE_GENERATE_SCHEMA["parameters"]["properties"]
     properties: Dict[str, Any] = {
         "prompt": static_props["prompt"], "aspect_ratio": static_props["aspect_ratio"]}
+    style_refs = info.get("source_image_role") == "style"
     if can_edit:
         if style_refs:
             lead = "Generate images, optionally styled on reference images, via configured model."
@@ -1029,11 +1030,7 @@ def _build_dynamic_image_schema() -> Dict[str, Any]:
                 "type": "array",
                 "items": {"type": "string"},
                 "maxItems": max_refs,
-                "description": (
-                    f"Up to {max_refs} additional reference images (style, "
-                    "character, or composition) guiding an edit. URLs or "
-                    "absolute local paths."
-                ),
+                "description": refs_desc,
             }
     else:
         lead = "Generate images from text with the configured model (it cannot edit images)."

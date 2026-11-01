@@ -179,7 +179,7 @@ def test_a_short_lived_process_still_completes_its_due_prune(tmp_path):
         assert not doomed.exists() and kept.exists() and shell_entry.exists()
         assert user_shell.poll() is None, "the user's shell was signalled"
         log = log_file.read_text(encoding="utf-8-sig")
-        assert f"kept {str(shell_entry)!r} — live Hermes process pid={user_shell.pid}" in log, log
+        assert f"kept {str(shell_entry)!r} — live Qubit process pid={user_shell.pid}" in log, log
     finally:
         user_shell.kill()
         user_shell.wait(timeout=30)
@@ -709,7 +709,7 @@ def test_prune_keeps_entry_a_registered_qubit_process_works_in_but_reaps_orphans
                 return True
         wait_until(_orphan_gone, timeout=10, what="orphan reaped")
         log = (tmp_path / "logs" / "scratch-prune.log").read_text(encoding="utf-8-sig")
-        assert f"kept {str(owned_dir)!r} — live Hermes process pid=" in log, log
+        assert f"kept {str(owned_dir)!r} — live Qubit process pid=" in log, log
     finally:
         registry.kill_process(worker.id)
         with contextlib.suppress(psutil.Error):

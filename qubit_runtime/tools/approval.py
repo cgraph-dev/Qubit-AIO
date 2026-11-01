@@ -685,10 +685,18 @@ def _unattended_deny(command: str, ctx: _Unattended) -> dict | None:
         return result
     # A content threat only the scanner sees (homograph URL, injection payload) is
     # still a refusal in every deny-mode unattended context; a warn is advisory.
-    verdict = _scan_command(command)
+    try:
+        from tools.tirith_security import check_command_security
+    except ImportError:
+        # No scanner to consult, and nobody present to approve a fail-open. Honour
+        # the operator's policy: only fail open when security.tirith_fail_open says so.
+        if not approval_context._tirith_fail_open():
+            return block("The security scanner (tirith) is unavailable and "
+                         "security.tirith_fail_open is false")
+        return None
+    verdict = check_command_security(command)
     if isinstance(verdict, dict) and verdict.get("action") == "block":
-        summary = str(verdict.get("summary") or "content threat").strip()
-        return block(f"Security scan blocked this command ({summary})")
+        return block(_format_tirith_description(verdict))
     return None
 
 
@@ -1062,7 +1070,7 @@ def _should_skip_container_guards(env_type: str, has_host_access: bool = False) 
     exception once host paths are bind-mounted: ``rm -rf /workspace`` then reaches host files."""
     if env_type == "docker":
         return not has_host_access
-    if env_type in ("modal", "daytona", "vercel_sandbox"):
+    if env_type in ("singularity", "modal", "daytona", "vercel_sandbox"):
         return True
     # Plugin backends declare the same classification through the provider ABI (#94400);
     # fail-soft to False so an unknown or raising backend — or a raising registry
@@ -1179,6 +1187,24 @@ def _scan_command(command: str) -> dict | None:
     return check_command_security(command)
 
 
+def _format_tirith_description(tirith_result: dict) -> str:
+    """Human-readable severity/title/description summary of tirith findings."""
+    parts = []
+    for finding in tirith_result.get("findings") or []:
+        if not isinstance(finding, dict):
+            continue
+        severity = finding.get("severity", "")
+        title = finding.get("title", "")
+        desc = finding.get("description", "")
+        if title:
+            text = f"{title}: {desc}" if desc else title
+            parts.append(f"[{severity}] {text}" if severity else text)
+    if not parts:
+        summary = tirith_result.get("summary") or "security issue detected"
+        return f"Security scan: {summary}"
+    return "Security scan — " + "; ".join(parts)
+
+
 def _tirith_findings(command: str, session_key: str) -> tuple[list[str], str]:
     """Advisory scan findings not already approved for this session.
 
@@ -1229,17 +1255,20 @@ def check_all_command_guards(command: str, env_type: str,
     approval_mode = approval_context._get_approval_mode()
     if _yolo_active() or approval_mode == "off":
         return _approved()
-    if _command_matches_permanent_allowlist(command):
-        return _approved()
 
     approval_callback, is_cli, is_gateway, is_ask = _presence(approval_callback)
     # Outside CLI/gateway/ask flows we never block on approvals: each
-    # unattended context applies its configured deny/approve mode, else allow.
+    # unattended context applies its configured deny/approve mode, else allow. The
+    # permanent allowlist is a human's decision for a dangerous PATTERN; it must not
+    # also silence an independent content finding, so unattended deny evaluates the
+    # scanner itself (where the allowlist suppresses only the pattern finding).
     if not is_cli and not is_gateway and not is_ask:
         for ctx in _unattended_contexts():
             result = _unattended_deny(command, ctx)
             if result is not None:
                 return result
+        return _approved()
+    if _command_matches_permanent_allowlist(command):
         return _approved()
 
     is_dangerous, pattern_key, description = detect_dangerous_command(command)
