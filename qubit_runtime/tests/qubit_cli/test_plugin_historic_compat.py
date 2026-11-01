@@ -25,7 +25,10 @@ def _plugin(home, name, *, dependencies=True):
     path.mkdir(parents=True)
     (path / "plugin.yaml").write_text(f"name: {name}\n", encoding="utf-8")
     if dependencies:
-        (path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+        # A workspace member is a plugin whose pyproject actually installs something; an empty
+        # ``[project]`` installs nothing and is deliberately not a member (pm.plugin_declarations).
+        (path / "pyproject.toml").write_text(
+            "[project]\nname = \"member\"\ndependencies = [\"packaging\"]\n", encoding="utf-8")
     return path
 
 

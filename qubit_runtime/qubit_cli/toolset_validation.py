@@ -49,7 +49,9 @@ def is_known_platform_bundle(platform: object, name: str) -> bool:
     registered. Installs seeded from cli-config.yaml.example carry such rows for platforms nobody set up
     (teams, google_chat, homeassistant), inert until the plugin loads. A misspelt platform key naming its
     own bundle (``telegarm: [qubit-telegarm]``) is not known, so it is still reported."""
-    if name != _platform_default_toolset(platform):
+    # Both canonical spellings name the same bundle: the installers seed ``qubit-<platform>`` while
+    # core's internal fallback for a plugin platform is the historical ``hermes-<platform>``.
+    if name not in {_platform_default_toolset(platform), f"qubit-{platform}"}:
         return False
     key = str(platform)
     if key in PLATFORMS or key in _bundled_platform_names():

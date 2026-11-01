@@ -527,8 +527,15 @@ def agent_tool_surface(agent: Any, tools: list[dict[str, Any]]) -> list[dict[str
 
 
 def validate_toolset(name: str) -> bool:
-    return (name in {"all", "*"} or canonical_toolset_name(name) in TOOLSETS
-            or name in _get_plugin_toolset_names() or name in _get_registry_toolset_aliases())
+    if (name in {"all", "*"} or canonical_toolset_name(name) in TOOLSETS
+            or name in _get_plugin_toolset_names() or name in _get_registry_toolset_aliases()):
+        return True
+    # A plugin platform's own ``qubit-<platform>`` bundle resolves at session time even before the
+    # plugin is installed; the installers seed these rows for platforms a user has not set up.
+    if isinstance(name, str) and name.startswith("qubit-"):
+        from qubit_cli.toolset_validation import is_known_platform_bundle
+        return is_known_platform_bundle(name[len("qubit-"):], name)
+    return False
 
 
 def create_custom_toolset(name: str, description: str, tools: list[str] | None = None, includes: list[str] | None = None) -> None:

@@ -43,8 +43,12 @@ def _read_cfg(home):
 
 class TestRegistry:
     def test_every_capability_has_legacy_gate(self):
+        # Upstream's contract: a capability maps to an existing legacy gate, except one born after
+        # the consent flow whose only gate is declare + consent (llm.side_question). Both must be
+        # documented, and anything else must not silently lose its gate.
+        consent_only = {"llm.side_question"}
         for spec in CAPABILITY_REGISTRY.values():
-            assert spec.legacy_path, spec.id
+            assert spec.legacy_path or spec.id in consent_only, spec.id
             assert spec.description
 
 
