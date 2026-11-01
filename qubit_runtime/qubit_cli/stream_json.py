@@ -122,6 +122,10 @@ class StreamJsonEmitter:
                    "duration_ms": int((time.time() - self._start) * 1000)}
         if data.get("error"):
             payload["error"] = str(data["error"])
+        if data.get("replay_gap"):
+            # A bounded-backlog overflow cut the stream; the text field is the whole committed
+            # reply, not the frames the consumer saw before the hole.
+            payload["replay_gap"] = True
         self._emit(payload)
         print(f"\nsession_id: {session_id or self._session_id}", file=sys.stderr)  # same stderr contract as -Q
         return exit_code

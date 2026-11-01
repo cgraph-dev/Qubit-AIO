@@ -58,6 +58,11 @@ def describe_active_work_unit(unit: dict, home: Optional[Path] = None) -> str:
         label = f"cron job {job_id}" + (f" ({name})" if name else "")
         where = f" in external worker{pid_part}" if unit.get("external") else f" in-process{pid_part}"
         return f"{label}{where}{elapsed_part}"
+    if kind in ("delegation", "async_delegation"):
+        delegation_id = str(unit.get("delegation_id") or unit.get("id") or "?")
+        goal = unit.get("goal")
+        label = f"background delegation {delegation_id}"
+        return f"{label}{pid_part}{elapsed_part}" + (f" [{goal}]" if goal else "")
     if kind == "chat":
         session = str(unit.get("session") or "?")
         model = unit.get("model")

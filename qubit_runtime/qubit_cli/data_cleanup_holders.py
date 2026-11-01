@@ -29,7 +29,9 @@ def manual_gateway_identity(home: Path) -> dict | None:
         if get_running_pid_identity_strict(home / "gateway.pid") is not None:
             raise RuntimeError(f"gateway has no usable control socket for {home}; stop it through its owner and retry")
         return None
-    if not identity.get("hermes_home") or Path(identity["hermes_home"]).resolve() != home:
+    # ``identify`` publishes the canonical ``qubit_home``; accept the legacy spelling read-old.
+    advertised = identity.get("qubit_home") or identity.get("hermes_home")
+    if not advertised or Path(advertised).resolve() != home:
         raise RuntimeError(f"gateway control identity does not match {home}")
     owner = launch_supervisor(identity)
     if owner != "manual":

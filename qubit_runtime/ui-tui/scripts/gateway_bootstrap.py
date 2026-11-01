@@ -65,11 +65,19 @@ def bootstrap(start: bool, recover: bool = False) -> dict:
     # Kanban board `qubit --tui` pins at launch (_pin_kanban_board_env): a daemon started from
     # here would otherwise resolve every later chat's, Desktop window's and cron job's board to
     # this terminal's launch-time board instead of the profile's `kanban/current`.
-    for key in ("QUBIT_MODEL", "QUBIT_INFERENCE_MODEL", "QUBIT_TUI_PROVIDER",
-                "QUBIT_INFERENCE_PROVIDER", "QUBIT_TUI_TOOLSETS", "QUBIT_TUI_SKILLS",
-                "QUBIT_CWD", "TERMINAL_CWD", "QUBIT_YOLO", "QUBIT_ACCEPT_HOOKS",
-                "QUBIT_TUI_CHECKPOINTS", "QUBIT_TUI_PASS_SESSION_ID", "QUBIT_KANBAN_BOARD",
-                "HERMES_KANBAN_BOARD", "QUBIT_TUI_CLIENT_ENV"):
+    for key in ("QUBIT_MODEL", "HERMES_MODEL",
+                "QUBIT_INFERENCE_MODEL", "HERMES_INFERENCE_MODEL",
+                "QUBIT_TUI_PROVIDER", "HERMES_TUI_PROVIDER",
+                "QUBIT_INFERENCE_PROVIDER", "HERMES_INFERENCE_PROVIDER",
+                "QUBIT_TUI_TOOLSETS", "HERMES_TUI_TOOLSETS",
+                "QUBIT_TUI_SKILLS", "HERMES_TUI_SKILLS",
+                "QUBIT_CWD", "HERMES_CWD", "TERMINAL_CWD",
+                "QUBIT_YOLO", "HERMES_YOLO",
+                "QUBIT_ACCEPT_HOOKS", "HERMES_ACCEPT_HOOKS",
+                "QUBIT_TUI_CHECKPOINTS", "HERMES_TUI_CHECKPOINTS",
+                "QUBIT_TUI_PASS_SESSION_ID", "HERMES_TUI_PASS_SESSION_ID",
+                "QUBIT_KANBAN_BOARD", "HERMES_KANBAN_BOARD",
+                "QUBIT_TUI_CLIENT_ENV", "HERMES_TUI_CLIENT_ENV"):
         os.environ.pop(key, None)
     receipt = (ensure_gateway_runtime(home, timeout=60, idle_exit=True) if start
                else discover_gateway_endpoint(home, timeout=5))

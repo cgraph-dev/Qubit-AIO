@@ -388,5 +388,8 @@ def print_session_diff(cli, result: dict, stat_only: bool) -> None:
         return print(f"  {_t('diff.no_session_changes')}")
     if stat:
         cli._print_diff_text(f"\n{stat}")
-    if diff and not stat_only:
-        cli._print_diff_body(diff, _t("diff.stat_hint_session"), total=int(result.get("diff_lines") or 0))
+    # The owner may have cut the body below one frame and sent ``diff_lines`` alone; the cut is
+    # still named even when no body line survives the trip.
+    total = int(result.get("diff_lines") or 0)
+    if not stat_only and (diff or total):
+        cli._print_diff_body(diff, _t("diff.stat_hint_session"), total=total)

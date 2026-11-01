@@ -119,7 +119,17 @@ def account_default_qubit_home() -> Path:
         same = Path.home().resolve() == account.resolve()
     except (OSError, RuntimeError):
         same = False
-    return _get_platform_default_qubit_home() if same else _platform_default_qubit_home(os.environ, lambda: account)
+    return _get_platform_default_qubit_home() if same else _platform_default_qubit_home(
+        os.environ, lambda: account)
+
+
+def account_default_qubit_homes() -> tuple[Path, ...]:
+    """The account's canonical default home and its read-old legacy sibling.
+
+    ``sudo`` from the account home may run the pre-rebrand ``~/.hermes`` install, so an operator
+    check must recognize both spellings without treating a foreign process ``HOME`` as native."""
+    canonical = account_default_qubit_home()
+    return (canonical, canonical.parent / _LEGACY_HOME_DIR)
 
 
 def _qubit_root_of(native_home: Path, env_path: Path | None) -> Path:

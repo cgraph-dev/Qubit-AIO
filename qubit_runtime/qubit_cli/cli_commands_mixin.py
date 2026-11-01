@@ -658,11 +658,15 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         """Print a diff, capped at ``limit`` lines (of ``total`` when its sender cut it) with a pointer to the --stat form."""
         print()
         diff_lines = diff.splitlines()
-        if (total := max(total, len(diff_lines))) > limit:
-            self._print_diff_text("\n".join(diff_lines[:limit]))
-            print(f"\n  {_t('diff.more_lines', count=total - limit, hint=stat_hint)}")
-        else:
-            self._print_diff_text(diff)
+        shown = diff_lines[:limit]
+        total = max(total, len(diff_lines))
+        if shown:
+            self._print_diff_text("\n".join(shown))
+        # The sender may have cut the body below ``limit`` to fit one frame: name every line that is
+        # still not on screen, not merely the part beyond the local cap.
+        missing = total - len(shown)
+        if missing > 0:
+            print(f"\n  {_t('diff.more_lines', count=missing, hint=stat_hint)}")
 
     def _print_session_diff(self, cwd: str, stat_only: bool):
         """Print the cumulative checkpoint-baseline diff (/diff session)."""
@@ -725,37 +729,13 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
               else f"  {_t('snapshot.nothing_to_snapshot')}")
 
     def _snapshot_restore(self, parts) -> None:
-        from qubit_cli.backup import list_quick_snapshots, restore_quick_snapshot
-        if len(parts) < 3:
-            print(f"  {_t('snapshot.usage_restore')}")
-            snaps = list_quick_snapshots(limit=1)
-            if snaps:
-                print(f"  {_t('snapshot.most_recent', snapshot_id=snaps[0]['id'])}")
-            return
-        snap_id = parts[2]
-        try:
-            idx = int(snap_id)  # restore by number (1-indexed)
-        except ValueError:
-            idx = None
-        if idx is not None:
-            snaps = list_quick_snapshots()
-            if not 1 <= idx <= len(snaps):
-                return print(f"  {_t('snapshot.invalid_number', max=len(snaps))}")
-            snap_id = snaps[idx - 1]["id"]
-        # Close our own SessionDB first (restore contention); an open gateway session's store must stay.
-        local_session_db = getattr(self, "_session_db", None)
-        if local_session_db is not None and not getattr(self, "_gateway_session_open", False):
-            with suppress(Exception):
-                local_session_db.close()
-                self._session_db = None
-        if restore_quick_snapshot(snap_id):
-            _pr(f"  {_t('snapshot.restored', snapshot_id=snap_id)}",
-                f"  {_t('snapshot.restart_recommended')}")
-        elif snap_id in {s.get("id") for s in list_quick_snapshots(limit=10**6)}:
-            # False also means the auth.json merge was refused; don't call an existing snapshot missing.
-            print(f"  {_t('snapshot.restore_incomplete', snapshot_id=snap_id)}")
-        else:
-            print(f"  {_t('snapshot.not_found', snapshot_id=snap_id)}")
+        """``/snapshot restore`` (and ``rewind``): hand the profile offline, restore, rejoin its authority.
+
+        The guarded implementation lives in ``qubit_cli.cli_snapshot`` — a supervised owner or a bad
+        id must never take a working gateway offline, and the restore's own outcome (not a failed
+        rejoin) decides the reply."""
+        from qubit_cli.cli_snapshot import restore_snapshot_command
+        restore_snapshot_command(self, parts)
 
     def _snapshot_prune(self, parts) -> None:
         from qubit_cli.backup import prune_quick_snapshots

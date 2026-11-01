@@ -66,19 +66,26 @@ def _rewind_to(turns_back, *, retry=False):
     return payload
 
 
-async def _mutate(view, operation, payload):
+async def _mutate(view, operation, payload, *, acknowledge=True):
     result = await view.mutations.apply(view.client, view.session_id, operation, payload)
-    view.mutations.acknowledge(view.session_id, operation, payload)
+    if acknowledge:
+        view.mutations.acknowledge(view.session_id, operation, payload)
     return result
 
 
 async def _rewind(view, turns_back, *, retry=False):
     """The rewound user turn's text (``/retry``: its lossless resend text), or None when there was
     nothing to rewind."""
-    result = await _mutate(view, "rewind", _rewind_to(turns_back, retry=retry))
+    prepared = _rewind_to(turns_back, retry=retry)
+    # Retain the prepared rewind until the post-rewind refresh lands: a repeat after a lost
+    # refresh replays the same target (and the owner's cached receipt), never a re-derivation
+    # from the already-shortened transcript.
+    result = await _mutate(view, "rewind", prepared, acknowledge=False)
     if result.get("status") == "nothing" or not result.get("rewound_count"):
+        view.mutations.acknowledge(view.session_id, "rewind", prepared)
         return None
     snapshot = await view.client.rpc("session.resume", session_id=view.session_id)
+    view.mutations.acknowledge(view.session_id, "rewind", prepared)
     view.generation = snapshot["execution_generation"]
     content = (result.get("target_message") or {}).get("content")
     if retry:
@@ -130,6 +137,10 @@ async def _new(view, rest):
                if key in accepted and key not in {"request_id", "title"}}
     if info.get("cwd") and "cwd" in accepted:
         request["cwd"] = info["cwd"]
+    # This shell's allowlisted environment: a fresh session on a shared gateway must see the same
+    # client policy the launcher's session does (LC-8), and only when the gateway lists the field.
+    from qubit_cli.gateway_chat import client_env_policy
+    request.update(client_env_policy(accepted))
     # The frozen request never holds the launch key; the one this terminal supplied rides along.
     if getattr(view, "launch_api_key", None) and "api_key" in accepted:
         request["api_key"] = view.launch_api_key

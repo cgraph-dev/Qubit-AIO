@@ -25,7 +25,9 @@ def _checkpoint_rows(result):
 
 def rollback(cli, connection, command):
     from tools.checkpoint_manager import format_checkpoint_list
-    args = [a for a in command.split()[1:] if a.lower() not in ("--all", "--force")]
+    raw = command.split()[1:]
+    restore_all = any(a.lower() == "--all" for a in raw)
+    args = [a for a in raw if a.lower() not in ("--all", "--force")]
     cwd = os.getenv("TERMINAL_CWD", os.getcwd())
     sid = cli.session_id
     try:
@@ -41,6 +43,9 @@ def rollback(cli, connection, command):
         params = {"session_id": sid, "hash": args[0]}
         if len(args) > 1:
             params["file_path"] = args[1]
+        elif restore_all:
+            # The owner's whole-tree restore keeps hand-edits unless the caller overrides it.
+            params["all"] = True
         _restored(cli, connection, connection.call("rollback.restore", **params), params.get("file_path"))
     except GatewayClientError as exc:
         print(f"  ❌ {exc}")
@@ -68,6 +73,8 @@ def _restored(cli, connection, result, file_path):
     print(f"  {_t('rollback.restored_file', file=file_path, **restored)}" if file_path
           else f"  {_t('rollback.restored_all', **restored)}")
     print(f"  {_t('rollback.snapshot_saved')}")
+    from qubit_cli.cli_commands_session_tools import _rollback_kept
+    _rollback_kept(result)
     if result.get("history_removed"):
         snapshot = connection.call("session.resume", session_id=cli.session_id)
         connection.state(cli.session_id).adopt_snapshot(snapshot)
