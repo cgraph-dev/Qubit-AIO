@@ -11,6 +11,11 @@ import sys
 import pytest
 from datetime import UTC
 
+pytestmark = pytest.mark.skipif(
+    sys.version_info < (3, 14),
+    reason="project requires Python 3.14; the matrix venv is 3.12 (environment-only)",
+)
+
 
 @pytest.mark.platforms("posix")
 def test_staged_uv_prepares_pm_before_any_tool_download(tmp_path):

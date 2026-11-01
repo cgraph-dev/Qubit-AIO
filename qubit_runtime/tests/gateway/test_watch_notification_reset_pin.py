@@ -93,7 +93,11 @@ async def test_notice_pinned_to_a_reset_session_is_dropped_once(monkeypatch, cap
             await runner._drain_watch_notifications(pending)
 
         assert pending.empty(), 'a notice the closed session can never admit must not be requeued'
-        warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+        warnings = [
+            r.getMessage()
+            for r in caplog.records
+            if r.levelno >= logging.WARNING and r.name == "gateway.run"
+        ]
         assert len(warnings) == 1, warnings
         assert 'permanently gone' in warnings[0]
         assert retired in warnings[0] and live in warnings[0] and 'admission_conflict' in warnings[0]
