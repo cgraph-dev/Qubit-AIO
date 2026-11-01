@@ -19,6 +19,8 @@ import os
 from pathlib import Path
 from typing import Callable, Optional
 
+from gateway.restart import GATEWAY_SERVICE_RESTART_EXIT_CODE
+
 logger = logging.getLogger(__name__)
 
 POLL_S = 30.0
@@ -50,12 +52,18 @@ def downgrade_reason(skew, *, update_in_progress: bool, predates: Callable[[], b
 async def _stop_or_exit(runner, *, hard_exit: Callable[[int], None] = os._exit) -> None:
     """The normal drain, and a hard exit if it raises. The stop path lazily imports modules that
     the older tree on disk no longer has; a stop that raised never sets the shutdown event and has
-    already disarmed its own watchdog, so without this the process idles on forever."""
+    already disarmed its own watchdog, so without this the process idles on forever.
+
+    A plain (non-restarting) stop still exits with the service-restart code: the process that
+    loaded the head runtime must not keep serving, but the service manager has to relaunch the
+    settled tree on disk so the older release's own gateway runs."""
     try:
         await runner.stop()
     except Exception:  # health: allow BLE001 -- any failure of the stop on a downgraded tree ends the same way
         logger.exception("Gateway stop failed on the downgraded checkout; exiting now")
         hard_exit(1)
+        return
+    runner._exit_code = GATEWAY_SERVICE_RESTART_EXIT_CODE
 
 
 async def runtime_downgrade_watcher(runner, *, poll_s: float = POLL_S, skew_fn=None, update_probe=None,
