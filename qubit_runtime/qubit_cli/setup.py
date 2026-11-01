@@ -286,15 +286,19 @@ def is_noninteractive() -> bool:
     return os.environ.get("HERMES_NONINTERACTIVE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def prompt_yes_no(question: str, default: bool = True) -> bool:
+def prompt_yes_no(question: str, default: bool = True, *, description: str | None = None) -> bool:
     """Prompt for yes/no. Ctrl+C exits; empty input, ``HERMES_NONINTERACTIVE=1`` or a
-    closed/redirected stdin return ``default`` instead of aborting the whole process."""
+    closed/redirected stdin return ``default`` instead of aborting the whole process.
+
+    *description* travels with a full-screen setup menu, which clears the screen: it keeps
+    the context that was printed before the question visible beside it."""
     if is_noninteractive():
         return default
     # Inside setup, route binary selections through the curses menu so ESC and left-arrow work
     # consistently; every other caller keeps the traditional line prompt.
     if _SETUP_NAVIGATION.get() is not None:
-        return _curses_prompt_choice(question, ["Yes", "No"], 0 if default else 1) == 0
+        return _curses_prompt_choice(
+            question, ["Yes", "No"], 0 if default else 1, description=description) == 0
     default_str = "Y/n" if default else "y/N"
     while True:
         try:
