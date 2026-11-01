@@ -1,5 +1,5 @@
 """#134593: Blank Slate wrote the subset toolset `search` (only web_search) into agent.disabled_toolsets;
-enabling `web` via `hermes tools` left it there, silently stripping web_search."""
+enabling `web` via `qubit tools` left it there, silently stripping web_search."""
 from unittest.mock import patch
 
 from qubit_cli.setup_quick import _blank_slate_minimal_toolsets
@@ -24,8 +24,8 @@ def test_legacy_search_entry_is_reported_then_cleared_by_enabling_web():
               "agent": {"disabled_toolsets": ["search", "terminal_tools", "browser", "memory"]}}
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     assert toolsets_partially_stripped(config, enabled) == {
-        "terminal": (["terminal"], ["terminal_tools"], "run `hermes tools enable terminal` to restore"),
-        "web": (["web_search"], ["search"], "run `hermes tools enable web` to restore"),
+        "terminal": (["terminal"], ["terminal_tools"], "run `qubit tools enable terminal` to restore"),
+        "web": (["web_search"], ["search"], "run `qubit tools enable web` to restore"),
     }
 
     with patch("qubit_cli.tools_config.save_config"):

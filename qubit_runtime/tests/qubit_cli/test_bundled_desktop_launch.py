@@ -248,6 +248,8 @@ class TestCmdGuiOnABundle:
         monkeypatch.setattr(main_desktop, "_stop_desktop_processes_locking_build", lambda *a, **k: [])
         monkeypatch.setattr(main_desktop, "_desktop_linux_sandbox_fixup", lambda *a, **k: launcher_ok)
         monkeypatch.setattr(main_desktop, "_desktop_linux_needs_no_sandbox", lambda: not launcher_ok)
+        # A successful fixup means the setuid helper is healthy: no extra launch flag.
+        monkeypatch.setattr(main_desktop, "_desktop_linux_needs_disable_setuid_sandbox", lambda *a, **k: False)
         monkeypatch.setattr(main_desktop, "_desktop_linux_sandbox_helper_is_regular_file", lambda *a, **k: True)
         monkeypatch.setattr(main_desktop, "_detect_linux_password_store", lambda: None)
 

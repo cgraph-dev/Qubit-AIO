@@ -201,7 +201,7 @@ class TestA2AClientToolsInCliProcess:
         assert "a2a" in {key for key, _, _ in get_plugin_toolsets()}
 
     def test_platform_bundle_includes_the_client_tools(self):
-        """``hermes-a2a`` sessions get the client tools too.
+        """`qubit-a2a` sessions get the client tools too.
 
         The bundle path read the tool registry behind a deliberately cheap
         ``is_registered()`` check, so a deferred platform's own tools were
@@ -213,7 +213,7 @@ class TestA2AClientToolsInCliProcess:
         mgr = PluginManager()
         mgr.discover_and_load()
 
-        assert A2A_CLIENT_TOOLS.issubset(set(resolve_toolset("hermes-a2a")))
+        assert A2A_CLIENT_TOOLS.issubset(set(resolve_toolset("qubit-a2a")))
 
 
 # ── the general mechanism ──────────────────────────────────────────────────

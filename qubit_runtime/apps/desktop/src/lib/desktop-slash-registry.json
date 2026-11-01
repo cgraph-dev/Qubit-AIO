@@ -31,6 +31,7 @@
   "/debug": null,
   "/deny": "messaging",
   "/diff": null,
+  "/discard": null,
   "/egress": null,
   "/exit": "terminal",
   "/export": null,
