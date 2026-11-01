@@ -107,14 +107,19 @@ def server_child_env(base_env: Mapping[str, str]) -> dict[str, str]:
     }
 
 
-def spawn_server(cmd, **kwargs) -> tuple[subprocess.Popen, _WindowsJob | None]:
+def spawn_server(cmd, *, owned: bool = False, **kwargs) -> tuple[subprocess.Popen, _WindowsJob | None]:
     """Start a router, returning its process and an owner-held containment handle.
 
     Keep the job until shutdown and call close() to terminate the entire tree.
     Windows closes it automatically if the owner dies. Other hosts retain Popen's
-    ordinary behavior. Assignment happens before the child's first instruction.
+    ordinary behavior unless ``owned`` is set, in which case the POSIX owner-death
+    supervisor covers the child's process group so the whole tree dies with us.
+    Assignment happens before the child's first instruction.
     """
     if sys.platform != "win32":
+        if owned:
+            from qubit_cli.process_identity import spawn_owned
+            return spawn_owned(cmd, purpose="local-runtime", **kwargs), None
         return subprocess.Popen(cmd, **kwargs), None
     job = _WindowsJob()
     proc = None

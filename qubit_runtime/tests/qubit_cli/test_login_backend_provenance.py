@@ -1,6 +1,6 @@
 """Who may register a password-manager login backend (``ctx.register_login_backend``).
 
-Only plugins bundled with Hermes, or installed from the plugin catalog at tier ``verified`` or ``official``
+Only plugins bundled with Qubit, or installed from the plugin catalog at tier ``verified`` or ``official``
 and at the catalog's reviewed pin, are accepted. Provenance comes from the installer-owned
 ``.install-metadata.json`` record, never from the plugin tree. Real git, file:// repos, the real installer,
 and the real plugin manager loading into a temp ``QUBIT_HOME``.
@@ -145,7 +145,7 @@ def test_local_directory_plugin_is_refused(world, caplog):
     (plugin / "__init__.py").write_text(_PLUGIN)
     with caplog.at_level(logging.WARNING):
         assert world["load"]() is None
-    assert RULE in caplog.text and "not installed from the Hermes plugin catalog" in caplog.text
+    assert RULE in caplog.text and "not installed from the Qubit plugin catalog" in caplog.text
 
 
 def test_url_install_with_forged_in_tree_catalog_file_is_refused(world, caplog):
