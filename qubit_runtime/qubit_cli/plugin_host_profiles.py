@@ -29,14 +29,26 @@ _EXTRACT_TIMEOUT_SECS = 60.0
 _CACHE_VERSION = 1
 
 
-def load_hosted_profiles(plugin_dir: Path, module_name: str) -> List[Any]:
-    """ProviderProfile proxies for a model-provider plugin whose code runs in the plugin host."""
+def load_hosted_profiles(plugin_dir: Path, module_name: str) -> tuple[List[Any], Dict[str, str]]:
+    """ProviderProfile proxies for a model-provider plugin whose code runs in the plugin host.
+
+    Returns ``(hosted, in_process)``: the profiles that can cross the host boundary, and a
+    ``{profile name: reason}`` map for the ones that cannot (``create_client()`` and the like) so
+    the caller can import just those in-process without taking their hosted siblings down.
+    """
     from providers.base import ProviderProfile
     payload = _cached_extraction(Path(plugin_dir), module_name)
     if payload.get("error"):
         raise PluginHostUnavailable(str(payload["error"]))
-    return [_profile_proxy(ProviderProfile, str(plugin_dir), module_name, entry)
-            for entry in payload.get("profiles") or []]
+    hosted: List[Any] = []
+    in_process: Dict[str, str] = {}
+    for entry in payload.get("profiles") or []:
+        reason = entry.get("in_process")
+        if reason:
+            in_process[str(entry["name"])] = str(reason)
+        else:
+            hosted.append(_profile_proxy(ProviderProfile, str(plugin_dir), module_name, entry))
+    return hosted, in_process
 
 
 def _fingerprint(plugin_dir: Path) -> str:
@@ -89,7 +101,9 @@ def _extract(plugin_dir: Path, module_name: str) -> Dict[str, Any]:
     argv = [*host_launcher(), sys.executable, "-m", "qubit_cli.plugin_host_child", "--extract-profiles",
             str(plugin_dir), module_name]
     try:
-        done = subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, env=env,
+        # Run from the Qubit tree: ``-m`` otherwise puts the caller's cwd first on sys.path, so a
+        # same-named ``qubit_cli`` package in a cloned repo would shadow ours.
+        done = subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, env=env, cwd=repo_root,
                               timeout=_EXTRACT_TIMEOUT_SECS, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"error": f"profile extraction failed: {exc}"}

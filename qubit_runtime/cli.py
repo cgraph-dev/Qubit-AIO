@@ -1314,8 +1314,15 @@ class QubitCLI(CLIInitMixin, CLITuiRuntimeMixin, CLIProcessNotificationsMixin, C
         plugin_handler = get_plugin_command_handler(base_cmd.lstrip("/"))
         if not plugin_handler:
             return
+        from contextlib import nullcontext
+        from qubit_cli.plugin_choices import bind_asker, clarify_asker
+        callback = getattr(self, "_clarify_callback", None)
+        # A plugin command asks its picker through the CLI's own clarify panel, exactly like a
+        # skill that clarifies; with no panel bound (hooks, cron) ask_choice returns None.
+        asker = bind_asker(clarify_asker(callback)) if callable(callback) else nullcontext()
         try:
-            result = resolve_plugin_command_result(plugin_handler(user_args))
+            with asker:
+                result = resolve_plugin_command_result(plugin_handler(user_args))
             if result:
                 _cprint(str(result))
         except Exception as e:

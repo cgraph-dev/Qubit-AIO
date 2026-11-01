@@ -70,6 +70,7 @@ HOST_OBJECT_BASES: Dict[str, str] = {
     "register_context_engine": "agent.context_engine:ContextEngine",
     "register_context_reference": "agent.context_references:ContextReferenceProvider",
     "register_memory_provider": "agent.memory_provider:MemoryProvider",
+    "register_delegation_provider": "agent.delegation_provider:DelegationProvider",
 }
 
 # Hooks whose payload carries live handles (the gateway runner, the session store). In the host the

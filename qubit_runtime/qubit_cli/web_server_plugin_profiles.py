@@ -27,6 +27,7 @@ from starlette import status
 from starlette._utils import get_route_path
 from starlette.websockets import WebSocket
 
+from qubit_cli.plugin_host_http_auth import admitted_for_sensitive_route
 from qubit_constants import get_process_qubit_home
 
 _log = logging.getLogger("qubit_cli.web_server")
@@ -258,11 +259,13 @@ async def forward_secondary_plugin_request(request, name: str) -> Optional[Respo
     headers = [(k, v) for k, v in request.headers.items() if k.lower() not in _GATEWAY_CREDENTIAL_HEADERS]
     body = await request.body()
 
+    authenticated = admitted_for_sensitive_route(request)
+
     def call(timeout: float) -> dict[str, Any]:
         from qubit_cli.plugins import get_plugin_manager
         host = get_plugin_manager()._plugin_host()  # the active (secondary) profile's own host
         return host.asgi_request(name, str(plugin["_dir"]), str(plugin["_api_file"]), request.method, path,
-                                 query, headers, body, timeout=timeout)
+                                 query, headers, body, timeout=timeout, authenticated=authenticated)
 
     try:
         return await run_hosted_request(home, name, call)

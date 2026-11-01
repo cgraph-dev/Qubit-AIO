@@ -30,15 +30,22 @@ BUILTIN_PREFIXES = frozenset({"diff", "staged", "file", "folder", "git", "url"})
 _context_reference_providers: dict[str, ContextReferenceProvider] = {}
 
 
+@dataclass
 class ContextCompletionItem:
-    """A single autocomplete result from a context reference provider."""
+    """A single autocomplete result from a context reference provider.
 
-    __slots__ = ("text", "display", "meta")
+    A dataclass (rather than a plain ``__slots__`` object) so the value survives the plugin-host
+    boundary as a record instead of an opaque placeholder: a hosted provider's autocomplete items
+    are rebuilt as real items in the Qubit process.
+    """
 
-    def __init__(self, text: str, display: str = "", meta: str = "") -> None:
-        self.text = text
-        self.display = display or text
-        self.meta = meta
+    text: str
+    display: str = ""
+    meta: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.display:
+            self.display = self.text
 
 
 class ContextReferenceProvider(ABC):

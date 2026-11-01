@@ -404,6 +404,13 @@ class PluginContext(PluginCapabilityCtxMixin):
         from agent.subagent_lifecycle import SubagentLifecycleService, get_active_subagent_parent
         return SubagentLifecycleService(get_active_subagent_parent)
 
+    @cached_property
+    def delegation_backends(self) -> Any:
+        """Delegation backend list/switch API as plain data; a host remote facade, so a hosted plugin
+        switches the owner process's backend and sessions, not copies in its own process."""
+        from agent.delegation_backends import DelegationBackends
+        return DelegationBackends()
+
     @property
     def profile_name(self) -> str:
         """Active profile name (``"default"``, the ``~/.qubit/profiles/<name>`` id, or ``"custom"``),

@@ -353,6 +353,10 @@ def _require_token(request: Request) -> None:
     """
     if getattr(request.state, "native_http_principal", None):
         return
+    # A dashboard plugin request served by the plugin host carries the admission decision the
+    # core guard already made for this IPC call; it is strict-True and never derived from HTTP.
+    if getattr(request.state, "hosted_http_authenticated", False) is True:
+        return
     if getattr(request.app.state, "auth_required", False):
         ok = getattr(request.state, "session", None) is not None
     else:
