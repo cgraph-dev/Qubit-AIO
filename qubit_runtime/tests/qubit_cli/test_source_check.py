@@ -6,9 +6,16 @@ import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+
+from qubit_cli import source_releases
+
+# The product's official source identity lives in install_source; the release tests must
+# agree with it instead of naming the upstream repository.
+OFFICIAL_REPOSITORY = source_releases.OFFICIAL_REPOSITORY
 
 # The fixture below serves channel records over loopback; the reader's real HTTP path is the subject.
 pytestmark = pytest.mark.real_release_channels
@@ -20,6 +27,14 @@ def source_channel(name, repository, branch="main"):
     return {"schema": 1, "name": name, "repository": repository, "policy": "source-branch",
             "state": "active", "revision": 1, "nextSequence": 1, "identity": None, "head": None,
             "delivery": {"kind": "source-branch", "branch": branch}}
+
+
+def stable_record(commit, *, version="1.2.3", repository=None):
+    """The fork's R2 ``stable`` record (pinned manifest), as ``ChannelReader.resolve`` returns it."""
+    record = {"name": "stable", "repository": repository or OFFICIAL_REPOSITORY,
+              "state": "active", "policy": "pinned"}
+    return SimpleNamespace(requested=record, terminal=record, manifest={
+        "request": {"commit": commit, "sourceVersion": version, "buildId": "fixture-build"}})
 
 
 class Installation(tuple):
@@ -136,7 +151,9 @@ def test_target_worktree_owns_admission_and_fork_comparison(installation, monkey
     assert status["behind"] == 3
     assert status["hermesRoot"] == str(linked)
     assert check_for_updates(install_root=root, home=home, cache_path=cache)["supported"] is False
-    assert requests == ["/repos/fixture/fork/commits/feature%2Fgui",
+    # main's R2 record is consulted for a retirement, then the branch probe follows.
+    assert requests == [MAIN_CHANNEL,
+                        "/repos/fixture/fork/commits/feature%2Fgui",
                         f"/repos/fixture/fork/compare/{head}...{target}"]
     assert all(not any(arg in {"fetch", "checkout", "reset", "update-ref", "stash"} for arg in cmd) for cmd in commands)
     assert git("rev-parse", "HEAD", cwd=linked) == head
@@ -180,7 +197,7 @@ def test_counts_are_honest_without_fetch(installation, tip_kind, compare, expect
     assert status["behind"] == expected
     assert status["updateAvailable"] is (expected != 0)
     if tip_kind != "unknown":
-        assert requests == ["/repos/fixture/fork/commits/main"]
+        assert requests == [MAIN_CHANNEL, "/repos/fixture/fork/commits/main"]
 
 
 def test_cache_force_expiry_and_passive_opt_out(installation, monkeypatch):
@@ -234,7 +251,7 @@ def test_explicit_and_current_branch_heal_only_after_confirmed_absence(installat
     assert failed["branch"] == "deleted"
     assert failed["error"] == "fetch-failed"
     assert git("branch", "--show-current", cwd=linked) == "feature/gui"
-    assert requests == []
+    assert requests == [MAIN_CHANNEL]  # only main's retirement record, then git probes
 
 
 @pytest.mark.parametrize("selection", ["explicit", "configured", "current", "detached"])
@@ -308,8 +325,11 @@ def test_channel_failure_never_probes_or_heals_a_branch(installation, name, fail
 
 
 def test_main_follows_the_branch_without_reading_a_channel_record(installation):
-    """main IS the git branch: no R2 record is requested (a regional WAF can answer
-    it 403), the configured branch is probed, and the Desktop branch setting is left alone."""
+    """main IS the git branch, so a failed main record never stops the branch follow.
+
+    Fork contract: main's R2 record is consulted for a retirement and an unreadable one
+    (here a 403 WAF) is tolerated; the configured branch is then probed and the Desktop
+    branch setting is left alone."""
     from qubit_cli.source_check import check_for_updates
 
     _root, linked, home, _base, head, responses, requests, _git = installation
@@ -325,7 +345,7 @@ def test_main_follows_the_branch_without_reading_a_channel_record(installation):
     assert status.get("branch") == "desktop-choice", status
     assert status.get("targetSha") == head, status
     assert status["behind"] == 0
-    assert requests == [branch_path]
+    assert requests == [MAIN_CHANNEL, branch_path]
     assert json.loads(branch_file.read_text())["branch"] == "desktop-choice"
 
 
@@ -338,8 +358,8 @@ def test_running_revision_is_not_applied_to_an_explicit_target(installation, mon
     assert check_for_updates(install_root=linked, home=home)["currentSha"] == head
     # Default invocation retains the Nix revision probe even without a Git checkout.
     monkeypatch.setattr("qubit_cli.config.get_project_root", lambda: home)
-    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/hermes-agent"))
-    responses["/repos/NousResearch/hermes-agent/commits/main"] = (200, "e" * 40)
+    responses[MAIN_CHANNEL] = (200, source_channel("main", OFFICIAL_REPOSITORY))
+    responses[f"/repos/{OFFICIAL_REPOSITORY}/commits/main"] = (200, "e" * 40)
     assert check_for_updates(home=home)["behind"] == 0
 
 
@@ -401,7 +421,7 @@ def test_never_pushed_branch_keeps_its_pin(installation, pinned_by):
         assert json.loads(branch_file.read_text()) == {"branch": "local-work"}
     else:
         assert not branch_file.exists()
-    assert requests == []
+    assert requests == [MAIN_CHANNEL]
 
 
 @pytest.mark.parametrize("merge", ["fast-forward", "rebase", "unmerged"])
@@ -458,7 +478,7 @@ def test_source_admission_is_stamp_owned_not_path_owned(installation, mechanism)
     responses["/repos/fixture/fork/commits/feature%2Fgui"] = (200, head)
     status = check_for_updates(install_root=linked, home=home)
     assert status["supported"] is (mechanism in ("self", None))
-    assert requests == (["/repos/fixture/fork/commits/feature%2Fgui"]
+    assert requests == ([MAIN_CHANNEL, "/repos/fixture/fork/commits/feature%2Fgui"]
                         if status["supported"] else [])
     empty = home / "no-source"
     empty.mkdir()
@@ -472,7 +492,7 @@ def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, 
     monkeypatch.setenv("HERMES_REVISION", head)
     monkeypatch.setattr("qubit_cli.config.get_project_root", lambda: home)
     monkeypatch.setattr("qubit_cli.config.detect_install_method", lambda root: "nix")
-    responses[MAIN_CHANNEL] = (200, source_channel("main", "NousResearch/hermes-agent"))
+    responses[MAIN_CHANNEL] = (200, source_channel("main", OFFICIAL_REPOSITORY))
     original = subprocess.run
     probes = []
 
@@ -485,7 +505,7 @@ def test_embedded_revision_keeps_https_ref_advertisement_recovery(installation, 
     monkeypatch.setattr(subprocess, "run", advertise)
     assert check_for_updates(home=home)["behind"] == 0
     assert len(probes) == 1
-    assert "https://github.com/NousResearch/hermes-agent.git" in probes[0][0]
+    assert f"https://github.com/{OFFICIAL_REPOSITORY}.git" in probes[0][0]
     assert probes[0][1]["stdin"] == subprocess.DEVNULL
     assert probes[0][1]["env"]["GIT_TERMINAL_PROMPT"] == "0"
 
@@ -505,17 +525,17 @@ def test_malformed_optional_changelog_and_cache_do_not_hide_the_update(installat
     data["status"] = None
     cache.write_text(json.dumps(data))
     assert check_for_updates(install_root=root, home=home, cache_path=cache)["behind"] == 2
-    assert requests == ["/repos/fixture/fork/commits/main",
+    assert requests == [MAIN_CHANNEL, "/repos/fixture/fork/commits/main",
                         f"/repos/fixture/fork/compare/{head}...{'a' * 40}"] * 2
 
 
-@pytest.mark.parametrize("repository,heals", [("NousResearch/hermes-agent", True), ("fixture/fork", False)])
+@pytest.mark.parametrize("repository,heals", [(OFFICIAL_REPOSITORY, True), ("fixture/fork", False)])
 def test_official_ssh_healing_uses_public_https_without_retargeting_forks(installation, monkeypatch, repository, heals):
     from qubit_cli.source_check import check_for_updates
     from qubit_cli.update_channel import set_install_channel
     root, linked, home, _base, head, responses, _requests, git = installation
     git("remote", "set-url", "origin", f"git@github.com:{repository}.git")
-    git("config", f"url.{root.as_uri()}.insteadOf", "https://github.com/NousResearch/hermes-agent.git")
+    git("config", f"url.{root.as_uri()}.insteadOf", f"https://github.com/{OFFICIAL_REPOSITORY}.git")
     # The branch heal is a main-channel concern; an official checkout's default is stable.
     set_install_channel("main", linked)
     monkeypatch.setenv("GIT_SSH_COMMAND", "false")
@@ -570,7 +590,8 @@ def test_branch_tip_failure_names_the_cause(installation):
 
 
 @pytest.mark.parametrize("on,release,rollback", [("head", "base", True), ("base", "head", False)])
-def test_stable_release_the_checkout_already_contains_is_a_rollback(installation, tmp_path, on, release, rollback):
+def test_stable_release_the_checkout_already_contains_is_a_rollback(
+        installation, tmp_path, monkeypatch, on, release, rollback):
     """A release HEAD contains is a move back (#137714); an older checkout is a real update."""
     from qubit_cli.source_check import check_for_updates
 
@@ -581,9 +602,11 @@ def test_stable_release_the_checkout_already_contains_is_a_rollback(installation
     git("tag", "v1.2.3", shas[release], cwd=bare)
     git("remote", "set-url", "origin", str(bare))
     git("checkout", "-q", "--detach", shas[on])
-    api = "/repos/NousResearch/hermes-agent"
+    api = f"/repos/{OFFICIAL_REPOSITORY}"
     responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
     responses[f"{api}/commits/v1.2.3"] = (200, {"sha": shas[release]})
+    monkeypatch.setattr(source_releases, "_resolve_channel",
+                        lambda name, repository: stable_record(shas[release]))
 
     status = check_for_updates(install_root=root, home=home, channel="stable", force=True)
 
@@ -623,9 +646,11 @@ def test_stable_release_the_updater_refuses_is_held_not_offered(
     git("checkout", "-q", "main")
     if ledgered:
         _ledgered_store(sibling)
-    api = "/repos/NousResearch/hermes-agent"
+    api = f"/repos/{OFFICIAL_REPOSITORY}"
     responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
     responses[f"{api}/commits/v1.2.3"] = (200, {"sha": release})
+    monkeypatch.setattr(source_releases, "_resolve_channel",
+                        lambda name, repository: stable_record(release))
 
     status = check_for_updates(install_root=root, home=home, channel="stable", force=True)
 
@@ -679,18 +704,20 @@ def test_an_unfetched_release_is_judged_from_github(installation, tmp_path, monk
     git("remote", "set-url", "origin", str(bare))
     assert subprocess.run(["git", "cat-file", "-e", f"{release}^{{commit}}"], cwd=root,
                           stderr=subprocess.DEVNULL, check=False).returncode != 0
-    api = "/repos/NousResearch/hermes-agent"
+    api = f"/repos/{OFFICIAL_REPOSITORY}"
     responses[f"{api}/releases/latest"] = (200, {"draft": False, "prerelease": False, "tag_name": "v1.2.3"})
     responses[f"{api}/commits/v1.2.3"] = (200, {"sha": release})
     responses[f"{api}/compare/{git('rev-parse', 'HEAD')}...{release}"] = (200, {"status": "diverged"})
     responses[f"{api}/git/trees/{release}"] = (200, {"truncated": False, "tree": [
         {"path": "qubit_state.py", "type": "blob"}, {"path": "qubit_state_common.py", "type": "blob"},
         {"path": "run_agent.py", "type": "blob"}]})
-    responses[f"/NousResearch/hermes-agent/{release}/qubit_state.py"] = (200, "from qubit_state_common import *\n")
-    responses[f"/NousResearch/hermes-agent/{release}/qubit_state_common.py"] = (
+    responses[f"/{OFFICIAL_REPOSITORY}/{release}/qubit_state.py"] = (200, "from qubit_state_common import *\n")
+    responses[f"/{OFFICIAL_REPOSITORY}/{release}/qubit_state_common.py"] = (
         200, "SCHEMA_SQL = 'CREATE TABLE IF NOT EXISTS sessions (id)'\n")
     if ledgered:
         _ledgered_store(home)
+    monkeypatch.setattr(source_releases, "_resolve_channel",
+                        lambda name, repository: stable_record(release))
 
     status = check_for_updates(install_root=root, home=home, channel="stable", force=True)
 
