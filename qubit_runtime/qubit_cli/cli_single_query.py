@@ -444,6 +444,10 @@ def _install_single_query_signal_handlers(cli):
         with suppress(Exception):
             from tools.environments.base import kill_live_foreground_processes
             kill_live_foreground_processes(now=True)
+        # os._exit skips the shared-metrics atexit flush; write open sessions before leaving (bounded).
+        with suppress(Exception):
+            from qubit_cli.observability.shared_metrics_process import flush_before_hard_exit
+            flush_before_hard_exit()
         os._exit(0)
 
     def _signal_handler_q(signum, frame):

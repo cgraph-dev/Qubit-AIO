@@ -5561,7 +5561,13 @@ def _exit_after_graceful_shutdown(exit_code: int) -> None:
         from qubit_logging import drain_log_queue
         drain_log_queue(timeout=1.0)
 
-    for _step in (_release_locks, _mark_exited, _drain_logs):
+    def _flush_metrics() -> None:
+        # ``os._exit`` also skips the shared-metrics atexit flush; write open sessions here, after the
+        # clean-exit stamp so a supervisor kill during a wedged flush never reads as an unclean death.
+        from qubit_cli.observability.shared_metrics_process import flush_before_hard_exit
+        flush_before_hard_exit()
+
+    for _step in (_release_locks, _mark_exited, _flush_metrics, _drain_logs):
         _best_effort(_step)
     os._exit(exit_code)
 
