@@ -902,7 +902,11 @@ def _api_key_provider_runtime(provider, pconfig, requested_provider, model_cfg, 
     # to the first request and make a later fallback look like a silent provider switch.
     if not has_usable_secret(creds.get("api_key")):
         hint = f" Set {', '.join(pconfig.api_key_env_vars)}." if pconfig.api_key_env_vars else ""
-        raise AuthError(f"No usable credentials found for provider '{provider}'.{hint}", provider=provider, code="missing_api_key")
+        # The provider may know its own sign-in path (``missing_credentials_hint``). A raising
+        # plugin hook is logged once and never replaces the AuthError, so the fallback chain runs.
+        from qubit_cli.runtime_readiness import missing_credentials_suffix
+        raise AuthError(f"No usable credentials found for provider '{provider}'.{hint}{missing_credentials_suffix(provider)}",
+                        provider=provider, code="missing_api_key")
     # Honour model.base_url when the configured provider matches (e.g. api.minimaxi.com China endpoint).
     base_url = _actual_url(provider, _config_base_url_for_provider(model_cfg, provider) or creds.get("base_url", "").rstrip("/"))
     api_mode = _api_key_provider_api_mode(provider, model_cfg, creds.get("api_key", ""), base_url,
