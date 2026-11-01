@@ -857,9 +857,11 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
                 request_hard_interrupt(agent, reason, tool_reason=_INTERRUPT_TOOL_REASON_GATEWAY_SHUTDOWN)
                 logger.debug("Interrupted running agent for session %s during shutdown", session_key)
         # API-server / desk / managed-worker turns never enter _running_agents: the drain waited on them.
+        from gateway.run_runtime import interrupt_side_agents
         for count, what in (
             (self._interrupt_api_server_runs(reason), "api_server run(s)"),
             (self._interrupt_deferred_agent_workers(reason), "deferred agent worker(s)"),
+            (interrupt_side_agents(self, reason), "side agent(s)"),
             (stop_managed_turns(self), "managed-worker turn(s)"),
         ):
             if count:
