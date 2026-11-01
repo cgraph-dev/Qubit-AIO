@@ -618,6 +618,12 @@ def _restart_systemd_gateway_units_best_effort(failed: list, listings) -> None:
     failed.extend(f"systemd-{scope} (listing unavailable)" for scope, _ in _SYSTEMD_SCOPES if scope not in answered)
 
 
+def _live_gateway_pids_from_fleet(fleet_rows: list) -> dict:
+    """Profile -> gateway PIDs alive after the restart phase (see ``update_cmd_fleet_verify``)."""
+    from qubit_cli.update_cmd_fleet_verify import _live_gateway_pids_from_fleet as impl
+    return impl(fleet_rows)
+
+
 def _live_fleet_current_rows() -> list[dict] | None:
     """The fleet matrix when the probe finds at least one gateway and every row is ``current``
     at the checkout SHA (identity known); ``None`` on any unknown/stale/down row or a failed

@@ -374,16 +374,20 @@ def print_update_plan(plan: UpdatePlan) -> None:
 
 
 def _serve_unit_matches_profile(profile: str, unit: object) -> bool:
-    """Does *unit* name a ``hermes-serve*``/``hermes-dashboard*`` unit for *profile*? (OWN vocabulary;
-    the gateway's ``hermes-gateway*`` names never cover serve/dashboard runtimes.)
+    """Does *unit* name a ``qubit-serve*``/``qubit-dashboard*`` unit for *profile*? (OWN vocabulary;
+    the gateway's ``qubit-gateway*`` names never cover serve/dashboard runtimes.)
 
-    Exact names only — ``work`` must not claim ``hermes-serve-workbench`` — and a scope prefix
-    (``user/hermes-serve``) is tolerated because the restart phase records scope-qualified identities in
-    some lists. See #100479.
+    Exact names only — ``work`` must not claim ``qubit-serve-workbench`` — and a scope prefix
+    (``user/qubit-serve``) is tolerated because the restart phase records scope-qualified identities in
+    some lists. Both the canonical ``qubit-`` spelling and the legacy ``hermes-`` one are read.
+    See #100479.
     """
     name = str(unit).removesuffix(".service").rsplit("/", 1)[-1]
     suffix = "" if profile == "default" else f"-{profile}"
-    return name in {f"hermes-serve{suffix}", f"hermes-dashboard{suffix}"}
+    return name in {
+        f"qubit-serve{suffix}", f"qubit-dashboard{suffix}",
+        f"hermes-serve{suffix}", f"hermes-dashboard{suffix}",  # legacy read-old
+    }
 
 
 def _gateway_service_matches_profile(profile: str, service: object) -> bool:
