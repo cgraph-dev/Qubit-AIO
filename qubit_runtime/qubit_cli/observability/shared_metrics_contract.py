@@ -141,7 +141,7 @@ SKILL_POST_PATCH_STATES = frozenset({"no_new_patch", "not_applicable", "reused_a
 CLIENT_OS_FAMILIES = frozenset({"linux", "macos", "unknown", "windows"})
 CLIENT_ARCHITECTURES = frozenset({"arm", "arm64", "unknown", "x86", "x86_64"})
 CLIENT_INSTALL_METHODS = frozenset({
-    "apt", "docker", "git", "home-manager", "homebrew", "nixos", "pip", "unknown",
+    "apt", "docker", "git", "home-manager", "homebrew", "microsoft-store", "nixos", "pip", "unknown",
 })
 CLIENT_RESOURCE_KEYS = frozenset({"architecture", "qubit_version", "install_method", "os_family"})
 
@@ -1454,10 +1454,24 @@ def client_resource(
 
 
 def client_resource_is_valid(resource: Any) -> bool:
-    """Return whether a package resource exactly matches the bounded contract."""
-    if not isinstance(resource, dict) or set(resource) != CLIENT_RESOURCE_KEYS:
+    """Return whether a package resource exactly matches the bounded contract.
+
+    The on-disk column is the historical ``hermes_version``; callers that build a
+    client resource from a row keep that spelling, so it is the read-old alias for
+    ``qubit_version`` here too. Supplying both is ambiguous and rejected.
+    """
+    if not isinstance(resource, dict):
         return False
-    version = resource.get("qubit_version")
+    has_legacy = "hermes_version" in resource
+    has_canonical = "qubit_version" in resource
+    if has_legacy and has_canonical:
+        return False
+    keys = set(resource)
+    if has_legacy:
+        keys = (keys - {"hermes_version"}) | {"qubit_version"}
+    if keys != CLIENT_RESOURCE_KEYS:
+        return False
+    version = resource["qubit_version"] if has_canonical else resource.get("hermes_version")
     return (
         isinstance(version, str)
         and 0 < len(version) <= 64

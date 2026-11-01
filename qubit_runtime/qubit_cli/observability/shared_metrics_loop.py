@@ -10,6 +10,7 @@ This module imports only the stdlib at load time so tool modules can import it o
 
 from __future__ import annotations
 
+import inspect
 import contextlib
 import contextvars
 import json
@@ -366,10 +367,28 @@ def record_terminal_backend(plan: Any, result: Any, *, error_class: str | None =
     return record_execution_backend("terminal", getattr(plan, "env_type", None), result, error_class=error_class)
 
 
-def record_browser_call(call: Callable[[Callable[[Callable[[], Any]], Any]], Any], resolve_backend: Callable[[], str]) -> Any:
-    """Run one browser tool call and count it against the backend that served it. ``call`` receives a
-    wrapper for the legacy-backend fallback: when the extension controller serves the call instead,
-    the fallback never runs and the backend is ``extension``."""
+def record_browser_call(call: Callable[..., Any], resolve_backend: Callable[[], str]) -> Any:
+    """Run one browser tool call and count it against the backend that served it.
+
+    A legacy-aware caller receives a wrapper for the extension-controller
+    fallback: when the extension serves the call instead, the fallback never runs
+    and the backend is ``extension``. A plain thunk (the direct browser_exec
+    route) has no extension split, so the resolved backend always names it.
+    """
+    try:
+        parameters = inspect.signature(call).parameters.values()
+    except (TypeError, ValueError):
+        accepts_legacy = True
+    else:
+        accepts_legacy = any(
+            parameter.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.VAR_POSITIONAL,
+            )
+            for parameter in parameters
+        )
+
     served_by_legacy = []
 
     def backend() -> str:
@@ -380,11 +399,13 @@ def record_browser_call(call: Callable[[Callable[[Callable[[], Any]], Any]], Any
         return fallback()
 
     try:
-        result = call(legacy)
+        result = call(legacy) if accepts_legacy else call()
     except Exception:
-        _safe_record_browser(backend, None, "exception")
+        # Never name the provider that may have failed: a private/unreachable
+        # backend must not leak into the aggregate.
+        _safe_record_browser(lambda: "other", None, "exception")
         raise
-    _safe_record_browser(backend, result, None)
+    _safe_record_browser(backend if accepts_legacy else resolve_backend, result, None)
     return result
 
 

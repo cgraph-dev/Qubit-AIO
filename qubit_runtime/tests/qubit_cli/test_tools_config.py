@@ -169,7 +169,7 @@ def test_get_platform_tools_legacy_qubit_alias_expands():
 
     Regression test for issue #41579.
     """
-    config = {"platform_toolsets": {"cli": ["qubit", "kanban"]}}
+    config = {"platform_toolsets": {"cli": ["hermes", "kanban"]}}
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
@@ -188,7 +188,7 @@ def test_get_platform_tools_legacy_qubit_alias_expands():
 
 def test_get_platform_tools_legacy_qubit_alias_alone():
     """``"hermes"`` alone (no other toolsets) must still produce tools."""
-    config = {"platform_toolsets": {"cli": ["qubit"]}}
+    config = {"platform_toolsets": {"cli": ["hermes"]}}
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     reference = _get_platform_tools(
@@ -467,7 +467,7 @@ class TestBrowserExecEngineCheckedForEveryBrowserRow:
         ensure.assert_called_once()
 
     def test_ensure_helper_missing_harness_is_non_fatal(self):
-        """A missing harness must warn and point at `hermes update`, never raise."""
+        """A missing harness must warn and point at `qubit update`, never raise."""
         from qubit_cli.tools_config import _ensure_browser_use_cli
 
         with patch("tools.browser_use_cli._find_cli", return_value=None), patch(
@@ -476,7 +476,7 @@ class TestBrowserExecEngineCheckedForEveryBrowserRow:
             _ensure_browser_use_cli()  # must not raise
 
         assert any("browser-harness" in c.args[0] for c in warn.call_args_list)
-        assert any("hermes update" in c.args[0] for c in info.call_args_list)
+        assert any("qubit update" in c.args[0] for c in info.call_args_list)
 
 
 class TestImagegenBackendRegistry:

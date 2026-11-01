@@ -70,6 +70,7 @@
             "git",
             "home-manager",
             "homebrew",
+            "microsoft-store",
             "nixos",
             "pip",
             "unknown"
@@ -96,6 +97,9 @@
           },
           {
             "$ref": "#/$defs/model_call_counter"
+          },
+          {
+            "$ref": "#/$defs/legacy_model_call_counter"
           },
           {
             "$ref": "#/$defs/model_route_counter"
@@ -333,6 +337,93 @@
       "properties": {
         "name": {
           "const": "qubit.model_call.count"
+        },
+        "type": {
+          "const": "counter"
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "call_role",
+            "locality",
+            "model_family",
+            "outcome",
+            "provider_family"
+          ],
+          "properties": {
+            "call_role": {
+              "const": "primary"
+            },
+            "locality": {
+              "enum": [
+                "local",
+                "remote",
+                "unknown"
+              ]
+            },
+            "model_family": {
+              "enum": [
+                "claude",
+                "deepseek",
+                "gemini",
+                "gemma",
+                "glm",
+                "gpt",
+                "grok",
+                "kimi",
+                "llama",
+                "mimo",
+                "minimax",
+                "mistral",
+                "nemotron",
+                "nova",
+                "o1",
+                "o3",
+                "o4",
+                "qwen",
+                "step",
+                "trinity",
+                "unknown"
+              ]
+            },
+            "outcome": {
+              "enum": [
+                "cancelled",
+                "failed",
+                "success"
+              ]
+            },
+            "provider_family": {
+              "enum": [
+                "aggregator",
+                "custom",
+                "direct",
+                "local",
+                "unknown"
+              ]
+            }
+          }
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+
+    "legacy_model_call_counter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "dimensions",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "const": "hermes.model_call.count"
         },
         "type": {
           "const": "counter"

@@ -414,7 +414,9 @@ def _persist_choice(session_key: str, choice: str, keys: list[str]) -> None:
         if choice not in ("session", "always"):
             continue
         approve_session(session_key, key)
-        if choice == "always":
+        # Tirith findings are advisory scan results, not a command class: an
+        # "always" on a mixed prompt must never silence the scanner permanently.
+        if choice == "always" and not key.startswith("tirith:"):
             approve_permanent(key)
             # Pass only this process's grants, taken against the baseline of the same snapshot. A
             # check that syncs a hand removal before the save runs advances the baseline, so a
@@ -681,6 +683,12 @@ def _unattended_deny(command: str, ctx: _Unattended) -> dict | None:
         if ctx.name == "single_query":
             result.update(pattern_key=pattern_key, description=description)
         return result
+    # A content threat only the scanner sees (homograph URL, injection payload) is
+    # still a refusal in every deny-mode unattended context; a warn is advisory.
+    verdict = _scan_command(command)
+    if isinstance(verdict, dict) and verdict.get("action") == "block":
+        summary = str(verdict.get("summary") or "content threat").strip()
+        return block(f"Security scan blocked this command ({summary})")
     return None
 
 
@@ -806,7 +814,8 @@ def _smart_gate(spec: _GateSpec, command: str, description: str, pattern_key: st
 def _human_decision(spec: _GateSpec, *, command: str, description: str,
                     pattern_key: str, pattern_keys: list[str],
                     session_key: str, approval_callback, is_cli: bool, is_gateway: bool,
-                    is_ask: bool, smart: bool = False, pending_body=None) -> dict:
+                    is_ask: bool, smart: bool = False, pending_body=None,
+                    allow_permanent_override: bool | None = None) -> dict:
     """Ask a human (after the optional guardian-LLM step) and turn the answer into the gate result.
 
     ``pattern_keys`` are what :func:`_persist_choice` stores on session/always; a smart-DENY
@@ -822,7 +831,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
         if result is not None:
             return result
     pending_body = pending_body() if pending_body else None
-    allow_permanent = not smart_denied
+    allow_permanent = not smart_denied if allow_permanent_override is None else allow_permanent_override and not smart_denied
 
     def deny(template: str, outcome: str, **fmt) -> dict:
         breaker = ""
@@ -1158,6 +1167,47 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
 
 # --- Combined pre-exec guard (floors + dangerous command detection) ------------------------------------------------
 
+def _scan_command(command: str) -> dict | None:
+    """Run the advisory scanner; ``None`` when the module is unavailable.
+
+    A missing module is an allow; any other wrapper failure propagates: a bug in
+    the guard must not be reported as "no findings"."""
+    try:
+        from tools.tirith_security import check_command_security
+    except ImportError:
+        return None
+    return check_command_security(command)
+
+
+def _tirith_findings(command: str, session_key: str) -> tuple[list[str], str]:
+    """Advisory scan findings not already approved for this session.
+
+    Called only where a human is present; the unattended deny path checks blocking
+    verdicts separately."""
+    verdict = _scan_command(command)
+    if not isinstance(verdict, dict) or verdict.get("action") not in ("warn", "block"):
+        return [], ""
+    findings = verdict.get("findings") or []
+    keys: list[str] = []
+    labels: list[str] = []
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        rule_id = finding.get("rule_id")
+        if isinstance(rule_id, str) and rule_id:
+            key = f"tirith:{rule_id}"
+            if key not in keys:
+                keys.append(key)
+                labels.append(rule_id.replace("_", " "))
+    if not keys:
+        keys = [f"tirith:{verdict.get('action') or 'warning'}"]
+    approved = [key for key in keys if is_approved(session_key, key)]
+    if keys and len(approved) == len(keys):
+        return [], ""
+    summary = str(verdict.get("summary") or "").strip()
+    return keys, summary or ", ".join(labels) or "advisory finding"
+
+
 def check_all_command_guards(command: str, env_type: str,
                              approval_callback=None,
                              has_host_access: bool = False) -> dict:
@@ -1194,13 +1244,29 @@ def check_all_command_guards(command: str, env_type: str,
 
     is_dangerous, pattern_key, description = detect_dangerous_command(command)
     session_key = get_current_session_key()
-    if not is_dangerous or is_approved(session_key, pattern_key):
+    dangerous_pending = is_dangerous and not is_approved(session_key, pattern_key)
+    tirith_keys, tirith_description = _tirith_findings(command, session_key)
+    if not dangerous_pending and not tirith_keys:
         return _approved()
+
+    pattern_keys: list[str] = []
+    if dangerous_pending:
+        pattern_keys.append(pattern_key)
+        primary = pattern_key
+        allow_permanent = True
+    else:
+        primary = tirith_keys[0]
+        allow_permanent = False
+    pattern_keys.extend(key for key in tirith_keys if key not in pattern_keys)
+    if tirith_keys:
+        description = (f"{description}; security scan: {tirith_description}"
+                       if dangerous_pending else f"Security scan: {tirith_description}")
     return _human_decision(
         _COMMAND_GATE, command=command, description=description,
-        pattern_key=pattern_key, pattern_keys=[pattern_key],
+        pattern_key=primary, pattern_keys=pattern_keys,
         session_key=session_key, approval_callback=approval_callback,
         is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask, smart=approval_mode == "smart",
+        allow_permanent_override=allow_permanent,
     )
 
 

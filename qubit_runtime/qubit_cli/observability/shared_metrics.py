@@ -33,7 +33,7 @@ from .shared_metrics_contract import (
 from .shared_metrics_drift import conform_counter_dimensions, counter_dimensions_shape_is_known
 
 
-_PACKAGE_SCHEMA_VERSION = "hermes.shared_metrics.v4"
+_PACKAGE_SCHEMA_VERSION = "qubit.shared_metrics.v4"
 _STORE_SCHEMA_VERSION = "2"
 _BUSY_TIMEOUT_MS = 250
 _SCHEMA_BUSY_TIMEOUT_MS = 5_000
@@ -200,7 +200,16 @@ def _compact_json(value: Any) -> str:
 
 
 def _row_resource(row: sqlite3.Row) -> dict[str, str]:
-    return {column: row[column] for column in _RESOURCE_COLUMNS}
+    """Read the stored resource into the client contract's spelling.
+
+    The on-disk column keeps the historical ``hermes_version`` name while the
+    contract key is ``qubit_version``; validators and package payloads take the
+    contract shape.
+    """
+    return {
+        ("qubit_version" if column == "hermes_version" else column): row[column]
+        for column in _RESOURCE_COLUMNS
+    }
 
 
 def _ensure_private(path: Path, mode: int) -> None:
@@ -628,7 +637,7 @@ class SharedMetricsStore:
         period_value = period_row["period_start"]
 
         resource = _row_resource(period_row)
-        resource_values = tuple(resource[column] for column in _RESOURCE_COLUMNS)
+        resource_values = tuple(_resource_value(resource, column) for column in _RESOURCE_COLUMNS)
         rows = connection.execute(
             """
                 SELECT metric_name, dimensions_json, value, packaged_value FROM counter_aggregates

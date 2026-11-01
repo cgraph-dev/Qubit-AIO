@@ -28,7 +28,7 @@ def relay_home(tmp_path, monkeypatch):
     relay = pytest.importorskip("nemo_relay")
     if getattr(relay, "_native", None) is None:
         pytest.skip("NeMo Relay native binding is unavailable on this platform")
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit-home"))
     monkeypatch.setattr(
         "qubit_cli.config.read_raw_config_readonly",
         lambda: {"telemetry": {"shared_metrics": {"enabled": True}}},
@@ -38,7 +38,7 @@ def relay_home(tmp_path, monkeypatch):
     manager = PluginManager()
     manager._discovered = True  # a runtime with zero plugins loaded (#64178)
     monkeypatch.setattr(plugins, "_plugin_manager", manager)
-    yield tmp_path / "hermes-home"
+    yield tmp_path / "qubit-home"
     relay_shared_metrics._reset_for_tests()
     relay_runtime._reset_for_tests()
 
@@ -58,9 +58,9 @@ def _recorded(home) -> dict[str, int]:
     found = {"slash": 0, "aux_input": 0}
     for row in SharedMetricsStore(root / "metrics.sqlite3", root / "outbox").counter_snapshot():
         dims = row["dimensions"]
-        if row["metric_name"] == "hermes.slash_command.count" and dims.get("command") == "help":
+        if row["metric_name"] == "qubit.slash_command.count" and dims.get("command") == "help":
             found["slash"] += row["value"]
-        elif row["metric_name"] == "hermes.model_tokens.sum" and dims.get("token_type") == "input":
+        elif row["metric_name"] == "qubit.model_tokens.sum" and dims.get("token_type") == "input":
             found["aux_input"] += row["value"]
     return found
 

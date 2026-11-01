@@ -71,7 +71,7 @@ def _zero_plugin_runtimes(monkeypatch) -> None:
 def metrics_home(tmp_path, monkeypatch):
     """Real NeMo Relay runtime over a temp QUBIT_HOME; ``policy['on']`` is the opt-in answer."""
     _require_native_relay()
-    home = tmp_path / "hermes-home"
+    home = tmp_path / "qubit-home"
     policy = {"on": True}
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setattr(
@@ -102,14 +102,14 @@ def test_graceful_gateway_exit_writes_the_open_sessions_summary(metrics_home, mo
 
     home, _ = metrics_home
     _finished_task_in_open_session()
-    _wait_for(home, "hermes.task_run.finished")  # the task flush runs on its own worker
-    assert "hermes.session.count" not in _metric_names(home)
+    _wait_for(home, "qubit.task_run.finished")  # the task flush runs on its own worker
+    assert "qubit.session.count" not in _metric_names(home)
 
     monkeypatch.setattr(gateway_run.os, "_exit", _fake_exit)
     with pytest.raises(_Exited):
         gateway_run._exit_after_graceful_shutdown(1)
 
-    assert "hermes.session.count" in _metric_names(home)
+    assert "qubit.session.count" in _metric_names(home)
 
 
 def test_compute_host_shutdown_frame_writes_the_open_sessions_summary(metrics_home):
@@ -119,12 +119,12 @@ def test_compute_host_shutdown_frame_writes_the_open_sessions_summary(metrics_ho
 
     home, _ = metrics_home
     _finished_task_in_open_session()
-    _wait_for(home, "hermes.task_run.finished")
+    _wait_for(home, "qubit.task_run.finished")
     host = ComputeHost(stdout=io.StringIO(), heartbeat_secs=0)
 
     host.handle_frame({"type": "shutdown"})  # the reader thread os._exit(0)s right after this
 
-    assert "hermes.session.count" in _metric_names(home)
+    assert "qubit.session.count" in _metric_names(home)
 
 
 def test_sigtermed_kanban_worker_writes_the_open_sessions_summary(metrics_home, monkeypatch):
@@ -135,7 +135,7 @@ def test_sigtermed_kanban_worker_writes_the_open_sessions_summary(metrics_home, 
 
     home, _ = metrics_home
     _finished_task_in_open_session()
-    _wait_for(home, "hermes.task_run.finished")
+    _wait_for(home, "qubit.task_run.finished")
     handlers = {}
     monkeypatch.setenv("HERMES_KANBAN_TASK", "t-1")
     monkeypatch.setattr(signal, "signal", lambda signum, handler: handlers.__setitem__(signum, handler))
@@ -150,7 +150,7 @@ def test_sigtermed_kanban_worker_writes_the_open_sessions_summary(metrics_home, 
     with pytest.raises(_Exited):
         handlers[signal.SIGTERM](signal.SIGTERM, None)
 
-    assert "hermes.session.count" in _metric_names(home)
+    assert "qubit.session.count" in _metric_names(home)
 
 
 @pytest.mark.platforms("posix")  # the legacy parent watchdog is POSIX-only
@@ -159,7 +159,7 @@ def test_orphaned_slash_worker_writes_the_open_sessions_summary(metrics_home, mo
 
     home, _ = metrics_home
     _finished_task_in_open_session()
-    _wait_for(home, "hermes.task_run.finished")
+    _wait_for(home, "qubit.task_run.finished")
     exited = threading.Event()
     monkeypatch.setattr(slash_worker.os, "_exit", lambda code: exited.set())
 
@@ -167,7 +167,7 @@ def test_orphaned_slash_worker_writes_the_open_sessions_summary(metrics_home, mo
     slash_worker._start_legacy_parent_watchdog(os.getppid() + 1_000_000, poll_s=0.01, grace_s=0)
 
     assert exited.wait(10)
-    assert "hermes.session.count" in _metric_names(home)
+    assert "qubit.session.count" in _metric_names(home)
 
 
 def test_graceful_exit_with_collection_off_creates_no_store(metrics_home, monkeypatch):
@@ -218,7 +218,7 @@ def test_exit_flush_applies_each_profiles_own_consent(tmp_path, monkeypatch):
                 runtime = relay_shared_metrics._get_runtime()
                 assert runtime is not None
                 runtime.relay.subscribers.flush()
-                assert "hermes.task_run.finished" in _metric_names(home)
+                assert "qubit.task_run.finished" in _metric_names(home)
             finally:
                 reset_qubit_home_override(token)
         _write_policy(revoked, enabled=False, send=False)
@@ -228,7 +228,7 @@ def test_exit_flush_applies_each_profiles_own_consent(tmp_path, monkeypatch):
         with pytest.raises(_Exited):
             gateway_run._exit_after_graceful_shutdown(0)
 
-        assert "hermes.session.count" in _metric_names(send_off)  # its own consent still flushes it
+        assert "qubit.session.count" in _metric_names(send_off)  # its own consent still flushes it
         assert _open_consent_windows(send_off) == []
         assert _metric_names(revoked) == rows_before_exit
     finally:
@@ -246,7 +246,7 @@ def test_a_wedged_exit_flush_is_bounded_and_runs_after_the_clean_exit_stamp(metr
 
     home, _ = metrics_home
     _finished_task_in_open_session()
-    _wait_for(home, "hermes.task_run.finished")
+    _wait_for(home, "qubit.task_run.finished")
     entered, release = threading.Event(), threading.Event()
 
     def wedged_tool(_args):
