@@ -146,10 +146,14 @@ def launch_secret_scope(launch_home: str | Path) -> dict[str, str]:
     not purely "stricter" for the launch tenant, it also changes which of the launch profile's own
     two values it sees. Env-only keys (systemd ``Environment=``, ``op run``, Compose) are unaffected:
     nothing in the files shadows them.
+
+    A profile that yields no mapping (``build_profile_secret_scope`` is a seam: a test double or an
+    alternate backend may return ``None``) contributes nothing; the env-only launch keys still bind
+    rather than the whole scope collapsing with ``TypeError`` on the fire/turn path.
     """
     from agent.secret_scope import _is_global_env, build_profile_secret_scope
     scope = {k: v for k, v in _launch_env().items() if not _is_global_env(k)}
-    scope.update(build_profile_secret_scope(Path(launch_home)))
+    scope.update(build_profile_secret_scope(Path(launch_home)) or {})
     return scope
 
 
@@ -164,7 +168,7 @@ def owner_secret_scope(home: str | Path) -> dict[str, str]:
     from agent.secret_scope import _is_process_home, build_profile_secret_scope
     if _is_process_home(Path(home)):
         return launch_secret_scope(home)
-    return build_profile_secret_scope(Path(home))
+    return build_profile_secret_scope(Path(home)) or {}
 
 
 @contextlib.contextmanager
