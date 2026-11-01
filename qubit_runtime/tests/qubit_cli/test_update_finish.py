@@ -422,6 +422,7 @@ def test_selected_child_builds_and_finalizes_under_parent_lock(completion):
 
 
 @pytest.mark.platforms("posix")
+@pytest.mark.skip(reason="superseded by the C3 owed-build contract (test_real_compiler_failure_is_owed_build_and_completion_continues, 2026-10-22): the code is committed, so a failed product build is an owed follow-up, never a failed update; this older expectation cannot coexist with that test")
 def test_real_compiler_failure_retains_receipt_and_skips_completion(completion):
     source, home, request, context, result, run = completion
     _npm_graph(source)
@@ -522,7 +523,6 @@ def test_interrupt_after_verification_closed_the_run_keeps_gateway_status_0(comp
 
 
 @pytest.mark.platforms("posix")
-@pytest.mark.skip(reason="wave-30 environment: this host ships PyYAML in the base interpreter and its linked SQLite 3.45.1 trips the updater degradation gate, so the no-yaml takeover scenario cannot be constructed here")
 def test_real_compiler_failure_is_owed_build_and_completion_continues(completion):
     """Contract C3 for the historical takeover child: the code is committed, so a failed product
     build is an owed ``build`` follow-up, never a failed update. Maintenance (config migration)
