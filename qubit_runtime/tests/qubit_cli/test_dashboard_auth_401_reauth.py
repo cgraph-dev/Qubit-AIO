@@ -59,6 +59,15 @@ def gated_app():
     web_server.app.state.bound_host = "fly-app.fly.dev"
     web_server.app.state.bound_port = 443
     web_server.app.state.auth_required = True
+    # A real owner-created store: these cases pin auth/refresh routing, not the separately
+    # pinned missing-store 503 that /api/sessions answers on a fresh home.
+    from qubit_constants import get_qubit_home
+    from qubit_state import SessionDB
+
+    home = get_qubit_home()
+    home.mkdir(parents=True, exist_ok=True)
+    if not (home / "state.db").exists():
+        SessionDB(db_path=home / "state.db").close()
     client = TestClient(web_server.app, base_url="https://fly-app.fly.dev")
     yield client
     clear_providers()

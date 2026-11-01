@@ -156,7 +156,8 @@ def _owning_gateway_restart(home: Path) -> str:
     from gateway.runtime_ownership import canonical_home
     from gateway.status import _read_gateway_lock_record
     record = _read_gateway_lock_record(canonical_home(home) / 'gateway.lock') or {}
-    owner_home = record.get('qubit_home')
+    # Read-old: a lock written by a pre-rebrand gateway records ``hermes_home``.
+    owner_home = record.get('qubit_home') or record.get('hermes_home')
     if isinstance(owner_home, str) and owner_home and canonical_home(Path(owner_home)) != canonical_home(home):
         return _owner_remedy(Path(owner_home))[1]
     return _owner_remedy(home)[1]

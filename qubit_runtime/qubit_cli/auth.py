@@ -32,7 +32,7 @@ from urllib.parse import urlparse
 
 from qubit_constants import OPENROUTER_BASE_URL, qubit_home_key, secure_parent_dir
 from agent.credential_persistence import sanitize_borrowed_credential_payload
-from utils import atomic_json_write, env_float, file_signature, is_truthy_value  # noqa: F401  (env_float: agent.credential_pool reads auth_mod.env_float)
+from utils import atomic_json_write, env_float, file_cache_version, file_signature, is_truthy_value  # noqa: F401  (env_float: agent.credential_pool reads auth_mod.env_float)
 from qubit_cli.auth_zai_kimi import (  # noqa: F401  re-exported
     KIMI_CODE_BASE_URL, ZAI_ENDPOINTS, _normalize_lmstudio_runtime_base_url, _resolve_kimi_base_url,
     _resolve_zai_base_url, detect_zai_endpoint)
@@ -528,8 +528,8 @@ def _load_global_auth_store() -> Dict[str, Any]:
         _global_auth_store_cache = None
         return {}
     try:
-        cache_key: Optional[Tuple[str, Tuple[int, int, int, int]]] = (
-            str(global_path.resolve(strict=False)), file_signature(global_path.stat()))
+        cache_key: Optional[Tuple[str, Tuple[Any, ...]]] = (
+            str(global_path.resolve(strict=False)), file_cache_version(global_path))
     except Exception:
         cache_key = None
     cached = _global_auth_store_cache
@@ -2130,6 +2130,20 @@ def _external_process_auth_evidence(provider_id: str, resolved_command: Optional
     ``explicit_only`` picker) like the bundled one, whose CLI additionally exposes readable token stores."""
     if provider_id == "copilot-acp":
         return _copilot_acp_auth_evidence()
+    try:
+        from providers import get_provider_profile
+        profile = get_provider_profile(provider_id)
+    except Exception:
+        profile = None
+    evidence_fn = getattr(profile, "external_auth_evidence", None)
+    if callable(evidence_fn):
+        try:
+            evidence = evidence_fn()
+        except Exception as exc:  # an unreadable store means "not verifiable", never a crash
+            logger.debug("%s external auth evidence check failed: %s", provider_id, exc)
+            evidence = None
+        if isinstance(evidence, tuple) and len(evidence) == 2 and evidence[0] is not None:
+            return bool(evidence[0]), evidence[1]
     return (True, f"command: {resolved_command}") if resolved_command else (False, None)
 
 

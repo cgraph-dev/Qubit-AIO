@@ -19,6 +19,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "clamp-test-token")
+    # Create the per-test store the owner gateway would: these cases pin param validation,
+    # not the (separately pinned) missing-store 503.
+    import qubit_state
+    from qubit_state import SessionDB
+
+    db_path = tmp_path / "state.db"
+    monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", db_path)
+    SessionDB(db_path=db_path).close()
     from qubit_cli import web_server
 
     with TestClient(web_server.app, raise_server_exceptions=False) as c:

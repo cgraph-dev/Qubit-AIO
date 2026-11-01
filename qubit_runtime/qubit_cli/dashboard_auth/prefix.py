@@ -77,8 +77,13 @@ def normalise_prefix(raw: Optional[str]) -> str:
 
 
 def prefix_from_request(request) -> str:
-    """Normalised ``X-Forwarded-Prefix`` from a Starlette request, or ``""``."""
-    return normalise_prefix(request.headers.get("x-forwarded-prefix"))
+    """Normalised ``X-Forwarded-Prefix`` from a Starlette request, or ``""``.
+
+    Tolerates a request-like object without headers (validation helpers are unit-tested with a
+    bare ``url`` stand-in); it has no proxy prefix."""
+    headers = getattr(request, "headers", None)
+    raw = headers.get("x-forwarded-prefix") if headers is not None else None
+    return normalise_prefix(raw)
 
 
 # --- HERMES_DASHBOARD_PUBLIC_URL / dashboard.public_url --------------------

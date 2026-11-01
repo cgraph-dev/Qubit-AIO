@@ -184,7 +184,13 @@ def validate_env_var_name_for_write(key: str) -> None:
     if not _ENV_VAR_NAME_RE.match(key):
         raise ValueError(f"Invalid environment variable name: {key!r}")
     policy_name = _env_var_policy_name(key)
-    if policy_name in _ENV_VAR_NAME_DENYLIST or policy_name.startswith(_ENV_VAR_NAME_DENY_PREFIXES):
+    try:
+        from qubit_cli.auth_external_process import env_writer_launch_denylist
+        launch_denied = env_writer_launch_denylist()
+    except Exception:
+        launch_denied = frozenset()
+    if (policy_name in _ENV_VAR_NAME_DENYLIST or policy_name in launch_denied
+            or policy_name.startswith(_ENV_VAR_NAME_DENY_PREFIXES)):
         raise ValueError(
             f"Environment variable {key!r} is on the writer denylist. "
             "Names that influence subprocess execution (LD_PRELOAD, PYTHONPATH, PATH, EDITOR, ...) "
@@ -2990,7 +2996,16 @@ def reload_env() -> int:
     """Re-read ~/.qubit/.env into os.environ; returns count of vars changed.
     Removes deleted vars only when known to Qubit (OPTIONAL_ENV_VARS and _EXTRA_ENV_KEYS) so
     unrelated environment is never clobbered."""
-    env_vars = load_env()
+    from qubit_cli.env_loader import dotenv_unreadable
+
+    if dotenv_unreadable(get_env_path()):
+        # The file exists but this process may not read it (a sandbox launcher withholding it):
+        # keep whatever the launcher exported instead of clearing known keys.
+        return 0
+    try:
+        env_vars = load_env()
+    except PermissionError:
+        return 0
     count = 0
     for key, value in env_vars.items():
         if os.environ.get(key) != value:

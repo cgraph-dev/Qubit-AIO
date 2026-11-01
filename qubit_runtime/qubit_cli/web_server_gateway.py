@@ -430,6 +430,7 @@ def _profile_action_environment(
     # inheriting it trips the child's in-process restart-loop guard (exit 1). Drop it, like
     # the gateway's own restart watcher does (gateway/run.py, #52470).
     action_env.pop("_HERMES_GATEWAY", None)
+    action_env.pop("_QUBIT_GATEWAY", None)
     if env_overrides:
         action_env.update(env_overrides)
     return action_env

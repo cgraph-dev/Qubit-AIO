@@ -230,6 +230,12 @@ def _settle_install() -> bool:
     except Exception:
         settled = False
         logger.warning("free tier: could not settle an interrupted claim", exc_info=True)
+    try:
+        from qubit_cli.welcome_trial import grandfather_existing_guest
+        grandfather_existing_guest()
+    except Exception:
+        settled = False
+        logger.warning("free tier: could not check for an existing free-model guest", exc_info=True)
     return settled
 
 

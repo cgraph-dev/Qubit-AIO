@@ -742,6 +742,12 @@ def integrity_damage_is_structural(integrity_lines, master_rows) -> bool:
     return False
 
 
+def _fts_damage_error(exc: BaseException) -> bool:
+    """An integrity-check failure naming an FTS shadow object (``messages_fts``/``archive_fts``)."""
+    text = str(exc).lower()
+    return "fts" in text or "vtable constructor failed" in text
+
+
 def state_db_has_structural_damage(db_path: Path) -> bool:
     """Read-only ``integrity_check`` + ``sqlite_master`` rootpage map on a fresh connection;
     ``integrity_damage_is_structural`` over the result. A check that RAISES instead of
@@ -758,8 +764,12 @@ def state_db_has_structural_damage(db_path: Path) -> bool:
         lines = [str(r[0]) for r in conn.execute("PRAGMA integrity_check").fetchall()]
     except sqlite3.OperationalError:
         return False
-    except sqlite3.DatabaseError:
-        return True
+    except sqlite3.DatabaseError as exc:
+        # A torn FTS shadow table can make integrity_check itself raise ("vtable constructor
+        # failed: messages_fts") while every canonical table reads cleanly; that is the FTS repair
+        # ladder's job, not structural recovery. Any other DatabaseError under the walk means the
+        # canonical b-trees are damaged: structural.
+        return not _fts_damage_error(exc)
     finally:
         conn.close()
     return integrity_damage_is_structural(
