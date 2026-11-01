@@ -172,7 +172,7 @@ def completion(tmp_path, monkeypatch):
 
                     from pm.environments import project_python
 
-                    def provision(name, *, base_env, explicit):
+                    def provision(name, *, base_env, explicit, verify=True):
                         assert name == 'npm' and explicit
                         assert shutil.which('node', path=base_env['PATH'])
                         assert shutil.which('npm', path=base_env['PATH'])
