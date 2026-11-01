@@ -564,7 +564,7 @@ def create_titled_session(title):
     params["row_cwd"] = ""
     try:
         store = session_store()
-        params.update(store.client_env())
+        params.update(store.client_env() if hasattr(store, "client_env") else {})
         snapshot = store.call("session.create", request_id=uuid.uuid4().hex, title=title, **params)
     except GatewayClientError as exc:
         logger.warning("Failed to create titled session %r on the gateway: %s", title, exc)

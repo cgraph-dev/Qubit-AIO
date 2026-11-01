@@ -391,7 +391,6 @@ from qubit_cli.subcommands.dump import build_dump_parser
 from qubit_cli.subcommands.debug import build_debug_parser
 from qubit_cli.subcommands.backup import build_backup_parser
 from qubit_cli.subcommands.import_cmd import build_import_cmd_parser
-from qubit_cli.subcommands.import_agent import build_import_agent_parser
 from qubit_cli.subcommands.config import build_config_parser
 from qubit_cli.subcommands.skin import build_skin_parser
 from qubit_cli.subcommands.console import build_console_parser
@@ -411,7 +410,6 @@ from qubit_cli.subcommands.skills import build_skills_parser
 from qubit_cli.subcommands.pairing import build_pairing_parser
 from qubit_cli.subcommands.plugins import build_plugins_parser
 from qubit_cli.subcommands.mcp import build_mcp_parser
-from qubit_cli.subcommands.claw import build_claw_parser
 from qubit_cli.subcommands.vault import build_vault_parser
 from qubit_cli.subcommands.moa import build_moa_parser
 from qubit_cli.subcommands.fallback import build_fallback_parser
@@ -707,7 +705,30 @@ def _apply_profile_override() -> None:
         sys.argv = sys.argv[:start] + sys.argv[start + consume :]
 
 
-_apply_profile_override()
+def _profile_override_already_applied() -> bool:
+    """A second import of this module in one process must not re-run the profile override.
+
+    ``python -m qubit_cli.main`` executes this file as ``__main__``; a handler that later imports
+    ``qubit_cli.main`` gets a second module instance whose import would re-read the already-stripped
+    argv and fall back to the sticky ``active_profile`` (losing an explicit ``--profile default``).
+    The marker lives on the shared package object, so both instances see it.
+    """
+    package = sys.modules.get("qubit_cli")
+    return bool(package is not None and getattr(package, "_profile_override_applied", False))
+
+
+def _mark_profile_override_applied() -> None:
+    package = sys.modules.get("qubit_cli")
+    if package is not None:
+        package._profile_override_applied = True
+
+
+if __name__ == "__main__":
+    _apply_profile_override()
+    _mark_profile_override_applied()
+elif not _profile_override_already_applied():
+    _apply_profile_override()
+    _mark_profile_override_applied()
 # ``-p``/active_profile re-homed the process after qubit_bootstrap ran: re-point the temp vars
 # at THIS home's scratch dir (a user-set TMPDIR is still left alone).
 try:
@@ -2600,7 +2621,7 @@ def _coalesce_session_name_args(argv: list) -> list:
         "chat", "model", "gateway", "setup", "whatsapp", "whatsapp-cloud", "login", "logout",
         "auth", "status", "cron", "doctor", "config", "pairing", "skills", "tools", "mcp",
         "sessions", "insights", "update", "uninstall", "profile", "dashboard", "serve",
-        "desktop", "gui", "honcho", "claw", "plugins", "security", "acp", "webhook", "peer",
+        "desktop", "gui", "honcho", "plugins", "security", "acp", "webhook", "peer",
         "memory", "dump", "debug", "backup", "import", "completion", "logs", "usage",
     }
     _SESSION_FLAGS = {"-c", "--continue", "-r", "--resume"}
@@ -2921,10 +2942,10 @@ def cmd_console(args):
 # entry would let a plugin command silently fail to parse.
 _BUILTIN_SUBCOMMANDS = frozenset(
     {
-        "acp", "approvals", "auth", "backup", "bundles", "checkpoints", "claw", "codex-runtime", "completion",
+        "acp", "approvals", "auth", "backup", "bundles", "checkpoints", "codex-runtime", "completion",
         "computer-use",
         "config", "console", "cron", "curator", "dashboard", "serve", "debug", "doctor",
-        "dump", "egress", "evals", "fallback", "gateway", "hooks", "import", "import-agent", "insights",
+        "dump", "egress", "evals", "fallback", "gateway", "hooks", "import", "insights",
         "optimize",
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
@@ -3541,6 +3562,15 @@ def _build_cli_parser():
     """
     from qubit_cli._parser import build_top_level_parser
 
+    # ``import-agent`` / ``claw`` left core for the agent-importers catalog plugin. A home that
+    # uses them and lacks the plugin installs it now, before plugin commands are discovered, so
+    # this same invocation parses the plugin's own command.
+    try:
+        from qubit_cli.left_core_migration import recover_for_command
+        recover_for_command(_first_positional_argv())
+    except Exception:  # a migration failure must never break the CLI
+        logger.debug("left-core command recovery failed", exc_info=True)
+
     parser, subparsers, chat_parser = build_top_level_parser()
     chat_parser.set_defaults(func=cmd_chat)
 
@@ -3611,7 +3641,6 @@ def _build_cli_parser():
     build_backup_parser(subparsers, cmd_backup=cmd_backup)
     build_checkpoints_parser(subparsers)
     build_import_cmd_parser(subparsers, cmd_import=cmd_import)
-    build_import_agent_parser(subparsers, cmd_import_agent=cmd_import_agent)
     build_config_parser(subparsers, cmd_config=cmd_config)
     build_skin_parser(subparsers, cmd_skin=cmd_skin)
     build_console_parser(subparsers, cmd_console=cmd_console)
@@ -3633,7 +3662,6 @@ def _build_cli_parser():
     build_insights_parser(subparsers, cmd_insights=cmd_insights)
     build_usage_parser(subparsers)
     build_monitoring_parser(subparsers, cmd_monitoring=cmd_monitoring)
-    build_claw_parser(subparsers, cmd_claw=cmd_claw)
     build_vault_parser(subparsers)
     build_update_parser(subparsers, cmd_update=cmd_update)
     build_uninstall_parser(subparsers, cmd_uninstall=cmd_uninstall)

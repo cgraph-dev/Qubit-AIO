@@ -95,6 +95,12 @@ def build_cron_parser(subparsers, *, cmd_cron: Callable) -> None:
             "into its prompt, so it can dedupe against what was already "
             "reported and continue where the last run left off (scouts, "
             "monitors, incremental digests). First run is unchanged.")
+    cron_create.add_argument("--timezone",
+        help="IANA timezone pinning this job's wall clock (e.g. Asia/Hong_Kong). "
+            "Empty clears the pin (inherit the profile zone).")
+    cron_create.add_argument("--grace-minutes", dest="grace_minutes",
+        help="Catch-up window override for cron schedules, in minutes (0 = never catch up). "
+            "Empty clears the pin.")
 
     _flag(cron_create, "--paused", default=False,
         help="Create disabled in one write; resume to schedule, or explicitly run now.")
@@ -159,6 +165,11 @@ def build_cron_parser(subparsers, *, cmd_cron: Callable) -> None:
     cron_edit.add_argument("--interpreter",
         help="Absolute or ~ path to a Python for a .py script / monitor script. "
             "Pass empty string to clear (back to Hermes' Python).")
+    cron_edit.add_argument("--timezone",
+        help="New IANA timezone pin for this job's wall clock. Pass empty string to clear.")
+    cron_edit.add_argument("--grace-minutes", dest="grace_minutes",
+        help="New catch-up window override, in minutes (0 = never catch up). "
+            "Pass empty string to clear.")
 
     # lifecycle actions
     cron_pause = cron_subparsers.add_parser("pause", help="Pause a scheduled job")

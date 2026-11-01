@@ -389,7 +389,7 @@ class PluginManifest:
     portable: bool = False
     # ``plugin-data/<data_namespace>`` for a portable plugin; its skills are named after the plugin
     # itself (``<name>:<skill>``), like every native plugin's.
-    data_namespace: str = ""
+    skill_namespace: str = ""
     # Declared capability ids, normalized to KNOWN ids. Declaration is consent metadata, NOT a grant: live
     # only via plugins.entries.<id>.granted_capabilities or the legacy allow_* key.
     # See #64228.
@@ -422,6 +422,15 @@ class PluginManifest:
     # Dotted paths in Qubit' own config sections the plugin reads (``memory.retaindb``), so
     # ``qubit config get/set`` recognizes them while the plugin is active (qubit_cli/config_runtime_keys.py).
     config_keys: list[str] = field(default_factory=list)
+
+    @property
+    def data_namespace(self) -> str:
+        """Read-new alias for :attr:`skill_namespace` (the 088f657ecf spelling)."""
+        return self.skill_namespace
+
+    @data_namespace.setter
+    def data_namespace(self, value: str) -> None:
+        self.skill_namespace = value
 
 
 def parse_provides_locales(raw: Any, key: str = "") -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
@@ -528,7 +537,7 @@ def portable_plugin_manifest(child: Path, source: str, prefix: str) -> PluginMan
     return PluginManifest(
         name=data["name"], version=data.get("version", ""), description=data.get("description", ""),
         author=_display_author(data.get("author", "")), source=source, path=str(child), key=key,
-        portable=True, data_namespace=_portable_data_namespace(key),
+        portable=True, skill_namespace=_portable_data_namespace(key),
         config_schema=_config_schema_entries(key, manifest_config_schema(data)),
         config_keys=manifest_config_keys(manifest_hermes_extension(data), key),
     )

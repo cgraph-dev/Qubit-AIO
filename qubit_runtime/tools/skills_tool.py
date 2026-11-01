@@ -283,6 +283,10 @@ def find_all_skills(*, skip_disabled: bool = False) -> list[dict[str, Any]]:
             for s in _skill_catalog(skip_disabled=skip_disabled) if s["load_name"]]
 
 
+# Read-old alias: the pre-088f657ecf spelling every older caller and test patches.
+_find_all_skills = find_all_skills
+
+
 def sort_skills(skills: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep every skill listing path ordered the same way."""
     return sorted(skills, key=lambda s: (s.get("category") or "", s["name"]))

@@ -2512,12 +2512,24 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         parts = _command_arg(cmd).split(None, 1)
         word = parts[0].lower() if parts else "status"
         rest = parts[1].strip() if len(parts) > 1 else ""
+        # ``/browser use`` was removed with the built-in browser tools: usage, never a gateway call.
         handler = _BROWSER_SUBCOMMANDS.get(word)
-        if handler is None:
+        if word == "use" or handler is None:
             _say_block(
                 _t("browser.usage"), "",
-                *(f"   {_t(f'browser.usage_{sub}')}" for sub in ("connect", "disconnect", "status", "use")))
+                *(f"   {_t(f'browser.usage_{sub}')}" for sub in ("connect", "disconnect", "status")))
             return
+        # The browser tools run in the gateway, so connect/disconnect/status are ``browser.manage``
+        # there (CLI-9), exactly as Ink and Desktop send it. Without a rewired gateway session the
+        # classic process-local implementation still applies.
+        try:
+            from qubit_cli.gateway_side import connection_for
+            connection = connection_for(self)
+        except Exception:
+            connection = None
+        if connection is not None:
+            from qubit_cli.cli_browser_gateway import gateway_browser
+            return gateway_browser(self, connection, word, rest.strip())
         handler(self, rest.strip())
 
     # ---- /heartbeat, /refine, /review -----------------------------------------------------
