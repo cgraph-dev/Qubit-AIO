@@ -172,8 +172,10 @@ def _run_start_phase(
     port = port_override or recipe.port or 8000
     url = f"http://127.0.0.1:{port}{recipe.readiness_path}"
     started = time.monotonic()
-    # start_new_session: own process group for clean teardown.
-    proc = subprocess.Popen(recipe.start, cwd=str(root), start_new_session=True, **_SUBPROCESS_KW)  # detached-spawn: ok — the child is owned and reaped by the parent process
+    # The app leads its own process group (spawn_owned owns it for clean teardown and, on POSIX,
+    # hands it to the owner-death supervisor so it cannot outlive a killed verify run).
+    from qubit_cli.process_identity import release_process_group_once_empty, spawn_owned
+    proc = spawn_owned(recipe.start, purpose="verify-app", cwd=str(root), **_SUBPROCESS_KW)
     output = ""
     try:
         ready, status, error = _poll_readiness(url, ready_timeout)
@@ -183,6 +185,7 @@ def _run_start_phase(
             output = proc.stdout.read() or "" if proc.stdout is not None else ""
         except (OSError, ValueError):
             output = ""
+        release_process_group_once_empty(proc.pid, proc=proc, timeout=1.0)
     return ReadinessResult(url, ready, status, time.monotonic() - started, error, _tail(output))
 
 

@@ -177,9 +177,12 @@ def run_command_provider(
     # flashes a window on windowless hosts). Lossy UTF-8 decode: locale-mismatched bytes
     # must not raise in the reader threads.
     group = provider_popen_group_kwargs(os.name)
-    proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            text=True, encoding="utf-8", errors="replace", env=delegated_child_subprocess_env(scrubbed),
-                            stdin=subprocess.DEVNULL, **group)
+    from qubit_cli.process_identity import release_process_group_once_empty, spawn_owned
+    if os.name != "nt":
+        group.pop("start_new_session", None)  # spawn_owned owns the session/group itself
+    proc = spawn_owned(command, purpose="tts-command", shell=True, stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                       env=delegated_child_subprocess_env(scrubbed), stdin=subprocess.DEVNULL, **group)
     output_queue: "queue.Queue[tuple[str, Optional[str]]]" = queue.Queue()
     chunks: Dict[str, list[str]] = {"stdout": [], "stderr": []}
     open_streams = {"stdout", "stderr"}
@@ -241,6 +244,9 @@ def run_command_provider(
                 stream.close()
             except Exception:
                 pass
+    # The command's own group is covered only while something in it is left; release an empty one
+    # so a finished provider does not keep the owner-death supervisor resident.
+    release_process_group_once_empty(proc.pid, proc=proc, timeout=1.0)
     stdout, stderr = "".join(chunks["stdout"]), "".join(chunks["stderr"])
     if timed_out:
         raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr) from (
