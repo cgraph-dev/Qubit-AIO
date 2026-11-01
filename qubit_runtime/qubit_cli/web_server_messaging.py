@@ -199,6 +199,7 @@ class _WhatsAppOnboardingSession:
     account_name: str | None = None
     account_phone: str | None = None
     error: str | None = None
+    pairing_session_path: str | None = None
     starting_process: bool = False
     session_reserved: bool = False
     expiry_timer: threading.Timer | None = None

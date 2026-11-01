@@ -1604,7 +1604,9 @@ def _scoped_lock_record_is_stale(existing: dict[str, Any], existing_pid: Optiona
     current_start = _get_process_start_time(existing_pid)
     if _start_times_conflict(recorded_start, current_start):
         return True
-    if not _looks_like_gateway_process(existing_pid):
+    metadata = existing.get("metadata")
+    process_owner = isinstance(metadata, dict) and metadata.get("owner_kind") == "process"
+    if not process_owner and not _looks_like_gateway_process(existing_pid):
         if _read_process_cmdline(existing_pid) is not None:
             return True
         if None in (recorded_start, current_start) and not _record_looks_like_gateway(existing):

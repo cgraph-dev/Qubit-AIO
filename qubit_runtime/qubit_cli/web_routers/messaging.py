@@ -31,6 +31,7 @@ from qubit_constants import get_process_qubit_home
 from qubit_cli.env_loader import get_secret_source_values
 from qubit_cli.web_deps import LateState, late
 from qubit_cli.web_server_gateway import _restart_gateway_after
+from qubit_cli.web_whatsapp_session import _backup_whatsapp_session
 from qubit_cli.web_server_messaging import (
     _TelegramOnboardingPairing, _WhatsAppOnboardingSession, _messaging_platform_catalog, _telegram_onboarding_error_message, _telegram_onboarding_lock, _telegram_onboarding_pairings, _whatsapp_onboarding_payload, _whatsapp_onboarding_sessions,
 )
@@ -531,6 +532,8 @@ def _watch_whatsapp_pairing(pairing_id: str, proc: subprocess.Popen) -> None:
                 record = _whatsapp_onboarding_sessions.get(pairing_id)
                 if not record or record.proc is not proc:
                     return
+                if record.status in {"expired", "cancelled"}:
+                    continue
                 _apply_pairing_event(record, payload)
         returncode = proc.wait()
     except Exception as exc:
@@ -548,7 +551,11 @@ def _run_whatsapp_pairing(pairing_id: str, session_path: Path, mode: str) -> Non
         record = _whatsapp_onboarding_sessions.get(pairing_id)
         if not record or record.status in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES:
             _remove_whatsapp_pairing_dir(str(session_path))
+            if record is not None:
+                record.starting_process = False
+                _release_whatsapp_reservation(record)
             return
+        record.starting_process = True
         record.status = "installing"
 
     try:
@@ -556,18 +563,29 @@ def _run_whatsapp_pairing(pairing_id: str, session_path: Path, mode: str) -> Non
     except Exception as exc:
         _remove_whatsapp_pairing_dir(str(session_path))
         _fail_whatsapp_pairing(pairing_id, str(exc))
+        with _whatsapp_onboarding_lock:
+            record = _whatsapp_onboarding_sessions.get(pairing_id) or record
+            record.starting_process = False
+            _release_whatsapp_reservation(record)
         return
 
     with _whatsapp_onboarding_lock:
-        record = _whatsapp_onboarding_sessions.get(pairing_id)
-        if not record or record.status in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES:
+        record = _whatsapp_onboarding_sessions.get(pairing_id) or record
+        record.starting_process = False
+        if record.status in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES:
             _terminate_whatsapp_pairing(proc)
             _remove_whatsapp_pairing_dir(str(session_path))
+            _release_whatsapp_reservation(record)
             return
         record.proc = proc
         record.status = "starting"
 
     _watch_whatsapp_pairing(pairing_id, proc)
+
+    with _whatsapp_onboarding_lock:
+        record = _whatsapp_onboarding_sessions.get(pairing_id) or record
+        record.starting_process = False
+        _release_whatsapp_reservation(record)
 
 
 def _prune_whatsapp_onboarding_sessions() -> None:
@@ -584,6 +602,8 @@ def _prune_whatsapp_onboarding_sessions() -> None:
             record.error = "WhatsApp QR setup expired. Start a new setup."
             _cleanup_whatsapp_pairing_record(record)
             live = False
+        if record.status in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES:
+            _release_whatsapp_reservation(record)
         if record.status in _WHATSAPP_ONBOARDING_TERMINAL_STATUSES and record.expires_at_ts + 300 <= now:
             remove_ids.append(pairing_id)
     for pairing_id in remove_ids:
@@ -614,18 +634,32 @@ def _register_whatsapp_session(session_path: Path, record) -> str:
 
 
 @router.post("/api/messaging/whatsapp/onboarding/start")
-async def start_whatsapp_onboarding(body: WhatsAppOnboardingStart):
+async def start_whatsapp_onboarding(body: WhatsAppOnboardingStart, profile: Optional[str] = None):
     mode = _normalize_whatsapp_onboarding_mode(body.mode)
     allowed_users = _normalize_whatsapp_allowed_users(body.allowed_users)
+    effective_profile = body.profile or profile
 
-    with _config_profile_scope(body.profile):
+    with _config_profile_scope(effective_profile):
         session_path = _whatsapp_session_path()
         expires_at_ts = time.time() + _WHATSAPP_ONBOARDING_TTL_SECONDS
         fields = dict(
             proc=None, mode=mode, allowed_users=allowed_users, session_path=str(session_path),
             expires_at=datetime.fromtimestamp(expires_at_ts, timezone.utc).isoformat().replace("+00:00", "Z"),
-            expires_at_ts=expires_at_ts, profile=body.profile,
+            expires_at_ts=expires_at_ts, profile=effective_profile,
         )
+        if body.reset_session:
+            record = _WhatsAppOnboardingSession(**fields, status="starting")
+            _reserve_whatsapp_session(record)
+            try:
+                _backup_whatsapp_session(session_path)
+            except BaseException:
+                record.status = "error"
+                _release_whatsapp_reservation(record)
+                raise
+            pairing_id = _register_whatsapp_session(session_path, record)
+            _launch_whatsapp_pairing(pairing_id, record, session_path)
+            return _whatsapp_onboarding_payload(pairing_id, record)
+
         already_linked = False
         account_id, account_name, account_phone = _whatsapp_linked_account_from_session(session_path)
         pairing_session_path: str | None = None
@@ -640,12 +674,12 @@ async def start_whatsapp_onboarding(body: WhatsAppOnboardingStart):
             pairing_session_path = tempfile.mkdtemp(prefix=_PAIRING_SESSION_PREFIX, dir=str(session_path.parent))
         fields["pairing_session_path"] = pairing_session_path
 
-    record = _WhatsAppOnboardingSession(**fields)
-    pairing_id = _register_whatsapp_session(session_path, record)
-    if not already_linked:
-        pairing_dir = Path(record.pairing_session_path) if record.pairing_session_path else session_path
-        threading.Thread(target=_run_whatsapp_pairing, args=(pairing_id, pairing_dir, mode), daemon=True).start()
-    return _whatsapp_onboarding_payload(pairing_id, record)
+        record = _WhatsAppOnboardingSession(**fields)
+        pairing_id = _register_whatsapp_session(session_path, record)
+        if not already_linked:
+            pairing_dir = Path(pairing_session_path) if pairing_session_path else session_path
+            _launch_whatsapp_pairing(pairing_id, record, pairing_dir)
+        return _whatsapp_onboarding_payload(pairing_id, record)
 
 
 def _whatsapp_record_or_404(pairing_id: str):
@@ -680,6 +714,7 @@ async def apply_whatsapp_onboarding(pairing_id: str, body: WhatsAppOnboardingApp
         live_session_path = Path(record.session_path)
         pairing_record = record
 
+    await _wait_whatsapp_pairing_flush(pairing_id)
     _promote_whatsapp_pairing_dir(pairing_record, live_session_path)
 
     effective_profile = body.profile or profile or record_profile
@@ -695,7 +730,9 @@ async def apply_whatsapp_onboarding(pairing_id: str, body: WhatsAppOnboardingApp
             _write_platform_enabled("whatsapp", True)
 
     with _whatsapp_onboarding_lock:
-        _whatsapp_onboarding_sessions.pop(pairing_id, None)
+        current = _whatsapp_onboarding_sessions.get(pairing_id)
+        if current is None or current.proc is None or current.proc.poll() is not None:
+            _whatsapp_onboarding_sessions.pop(pairing_id, None)
 
     restart_result = _restart_gateway_after_whatsapp_onboarding(effective_profile)
     return {"ok": True, "platform": "whatsapp", "needs_restart": not restart_result["restart_started"], **restart_result}
@@ -709,6 +746,8 @@ async def cancel_whatsapp_onboarding(pairing_id: str):
     if record:
         record.status = "cancelled"
         _cleanup_whatsapp_pairing_record(record)
+        with _whatsapp_onboarding_lock:
+            _release_whatsapp_reservation(record)
     return {"ok": True}
 
 
