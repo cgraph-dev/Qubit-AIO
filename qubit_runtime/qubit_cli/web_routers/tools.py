@@ -202,11 +202,18 @@ def _find_toolset_provider_row(
     return next((p for p in rows if _is_provider_active(p, config, force_fresh=True)), None)
 
 
-def _require_known_toolset(name: str) -> None:
-    """400 for toolset keys outside the effective configurable set."""
+def _require_known_toolset(name: str, profile: Optional[str] = None) -> None:
+    """400 for toolset keys outside the TARGET profile's effective configurable set.
+
+    A plugin toolset installed only in a secondary profile must be configurable
+    there and stay unknown for the dashboard's own profile, so the lookup runs
+    inside the requested profile's scope.
+    """
     from qubit_cli.tools_config import _get_effective_configurable_toolsets
 
-    if name not in {ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()}:
+    with _profile_scope(profile):
+        known = {ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()}
+    if name not in known:
         raise _bad_request(f"Unknown toolset: {name}")
 
 
@@ -286,9 +293,9 @@ async def toggle_toolset(name: str, body: ToolsetToggle, profile: Optional[str] 
         _CONFIG_ONLY_TOOLSETS, _get_platform_tools, _save_platform_tools,
         _toolset_configuration_platform)
 
-    _require_known_toolset(name)
-    target_platform = _toolset_configuration_platform(name)
     scope_profile = body.profile or profile
+    _require_known_toolset(name, scope_profile)
+    target_platform = _toolset_configuration_platform(name)
 
     def _run():
         with config_write_scope(scope_profile):
@@ -352,7 +359,7 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
     from qubit_cli.config import get_env_value
     from qubit_cli.nous_subscription import get_nous_subscription_features
 
-    _require_known_toolset(name)
+    _require_known_toolset(name, profile)
 
     def _read():
         with _profile_scope(profile):
@@ -513,7 +520,7 @@ async def select_toolset_provider(
     from qubit_cli.nous_subscription import (
         MANAGED_FEATURE_COVERAGE_CATEGORY, get_nous_subscription_features)
 
-    _require_known_toolset(name)
+    _require_known_toolset(name, body.profile or profile)
 
     if body.capability is not None:
         if name != "web":
@@ -590,7 +597,7 @@ async def save_toolset_env(name: str, body: ToolsetEnvUpdate, profile: Optional[
     can't write arbitrary env vars; a blank value means "leave unchanged"."""
     from qubit_cli.config import get_env_value, save_env_value
 
-    _require_known_toolset(name)
+    _require_known_toolset(name, body.profile or profile)
 
     def _run():
         with _profile_scope(body.profile or profile):
@@ -632,7 +639,7 @@ async def run_toolset_post_setup(
     ``profile`` is threaded so hooks see the drawer's QUBIT_HOME."""
     from qubit_cli.tools_config import valid_post_setup_keys
 
-    _require_known_toolset(name)
+    _require_known_toolset(name, body.profile or profile)
     if body.key not in valid_post_setup_keys():
         raise _bad_request(f"Unknown post-setup key: {body.key}")
 

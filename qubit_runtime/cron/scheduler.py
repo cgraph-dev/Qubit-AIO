@@ -1692,6 +1692,16 @@ def _load_cron_job_config(job: dict, job_id: str, job_name: str) -> _CronJobConf
     except Exception as e:  # ConfigBackendUnavailable is not one: run_job fails this fire, never defaults
         logger.warning("Job '%s': failed to load config.yaml, using defaults: %s", job_id, e)
 
+    # Last rung, below every model the user named: the desktop's welcome trial carries
+    # ``qubit/welcome`` until a real model is configured (``anon_auth.trial_model``).
+    if not (isinstance(model, str) and model.strip()):
+        try:
+            from qubit_cli.anon_auth import trial_model
+
+            model = trial_model() or model
+        except Exception:  # health: allow BLE001 -- a trial probe never hides the real model error
+            pass
+
     # Fail fast: an empty model otherwise reaches the provider as an opaque 400.
     # See #23979.
     if not (isinstance(model, str) and model.strip()):

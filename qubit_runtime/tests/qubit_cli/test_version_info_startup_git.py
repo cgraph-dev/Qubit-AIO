@@ -106,7 +106,7 @@ def test_provider_headers_run_no_git_until_read_and_stay_a_dict_for_overrides(tm
     result, calls = _run_logging_git(tmp_path, code)
 
     assert result["before"] == [], "importing config + every provider plugin spawned git"
-    ua = f"HermesAgent/{result['base']}"
+    ua = f"QubitAgent/{result['base']}"
     assert result["ua"] == ua
     assert calls, "reading the header resolves the release on demand"
     assert result["found"] == {

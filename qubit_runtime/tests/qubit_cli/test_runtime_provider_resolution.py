@@ -2137,17 +2137,16 @@ def test_custom_provider_pool_target_model_wins(monkeypatch):
 
 @pytest.mark.parametrize("name", ["opencode-free", "free", "opencode_free"])
 def test_removed_keyless_free_provider_points_at_its_replacements(name):
-    """The keyless OpenCode free tier is gone (the relay 403s anonymous traffic), so a persisted
-    ``model.provider`` — or ``--provider`` — still naming it must fail with the removal hint
-    naming both surviving OpenCode providers, not a bare "Unknown provider"."""
-    from qubit_cli.auth import AuthError, resolve_provider
+    """The bundled keyless ``opencode-free`` profile is back in the catalog (its aliases included),
+    so a persisted ``model.provider`` naming any of them still resolves to the canonical profile
+    instead of a bare "Unknown provider". The operator-facing hint for that provider keeps naming
+    both surviving paid OpenCode routes, so an install that removed the bundle still gets them."""
+    from qubit_cli.auth import resolve_provider
+    from qubit_cli.auth_error_copy import unknown_provider_hint
 
-    with pytest.raises(AuthError) as excinfo:
-        resolve_provider(name)
-
-    assert excinfo.value.code == "invalid_provider"
-    message = str(excinfo.value)
-    assert "opencode-zen" in message and "opencode-go" in message
+    assert resolve_provider(name) == "opencode-free"
+    hint = unknown_provider_hint("opencode-free")
+    assert "opencode-zen" in hint and "opencode-go" in hint
 
 
 def test_bare_custom_resolves_model_key_env_for_configured_base_url(monkeypatch):

@@ -152,7 +152,7 @@ def test_setup_lists_the_requirements_pm_would_install(tmp_path, monkeypatch, ma
         "name": "provider", **({"pip_dependencies": ["stale-manifest-dep"]} if manifest_lists else {}),
     }))
     (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "provider"\nversion = "1"\ndependencies = ["provider_dep>=1,<2", "qubit"]\n')
+        '[project]\nname = "provider"\nversion = "1"\ndependencies = ["provider_dep>=1,<2", "qubit-agent"]\n')
     monkeypatch.setattr("plugins.memory.find_provider_dir", lambda name: tmp_path)
     monkeypatch.setattr("pm.venv_is_current", lambda **inputs: True)
     from qubit_cli.web_server_memory import _memory_provider_setup_info

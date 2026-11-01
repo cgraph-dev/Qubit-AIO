@@ -104,8 +104,11 @@ def applicable_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, ..
     from packaging.requirements import Requirement
     from packaging.utils import canonicalize_name
 
+    # The application distribution is provided by this checkout under its canonical name;
+    # the legacy upstream spelling stays excluded so an old plugin declaration is not installed.
     return tuple(spec for spec in specs
-                 if not (req := Requirement(spec)).url and canonicalize_name(req.name) != "hermes-agent")
+                 if not (req := Requirement(spec)).url
+                 and canonicalize_name(req.name) not in {"qubit-agent", "hermes-agent"})
 
 
 def unsupported_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, ...]:

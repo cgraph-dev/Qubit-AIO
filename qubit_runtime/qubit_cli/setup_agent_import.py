@@ -31,7 +31,7 @@ class ImportSource(NamedTuple):
 IMPORT_SOURCES: tuple[ImportSource, ...] = (
     # Core's setup step migrated Qubit's allowlisted API keys and bot tokens after the preview, so
     # the provider and messaging sections that follow find them already set; kept.
-    ImportSource("openclaw", "Qubit", (".qubit", ".clawdbot", ".moltbot"), ("--migrate-secrets",)),
+    ImportSource("openclaw", "OpenClaw", (".openclaw", ".clawdbot", ".moltbot"), ("--migrate-secrets",)),
     ImportSource("claude-code", "Claude Code", (".claude",)),
     ImportSource("codex", "Codex CLI", (".codex",)),
     ImportSource("cursor", "Cursor", (".cursor",)),

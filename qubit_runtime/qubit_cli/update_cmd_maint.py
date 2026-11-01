@@ -23,11 +23,16 @@ logger = logging.getLogger("qubit_cli.update_cmd")
 
 
 def _project_root() -> Path:
-    """The checkout root, without importing the application CLI on a cold update path."""
-    try:
-        from qubit_cli import main
+    """The checkout root, without importing the application CLI on a cold update path.
 
-        return Path(main.PROJECT_ROOT)
+    Resolves through ``update_cmd._m`` so the historical test surface
+    (``qubit_cli.main.PROJECT_ROOT``, patched via ``update_cmd``) still reaches
+    every split-out maintenance helper.
+    """
+    try:
+        from qubit_cli.update_cmd import _m
+
+        return Path(_m().PROJECT_ROOT)
     except Exception:
         return Path(__file__).resolve().parents[1]
 

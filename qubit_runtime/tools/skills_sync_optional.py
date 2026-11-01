@@ -109,7 +109,7 @@ def _optional_skill_index() -> Dict[str, Tuple[str, str, Path]]:
     if optional_dir.exists():
         for skill_md, src, install_path in _iter_optional_skills(optional_dir, root_relative=True):
             value = (src.name, install_path, src)
-            index[src.name] = index[ss._read_skill_name(skill_md, src.name)] = value
+            index[src.name] = index[ss.read_skill_name(skill_md, src.name)] = value
     return index
 
 
@@ -147,11 +147,11 @@ def restore_official_optional_skill(name: str, *, restore: bool = False) -> dict
         canonical_ok = dest.exists() and ss._dir_hash(dest) == ss._dir_hash(src)
         # Active copies by frontmatter name or folder slug (the curator may have moved the skill
         # into another category); ``dest`` itself is handled below.
-        names = {folder_name, ss._read_skill_name(src / "SKILL.md", folder_name)}
+        names = {folder_name, ss.read_skill_name(src / "SKILL.md", folder_name)}
         for md in ss._iter_active_skill_mds(sort=True):
             match = md.parent
             if match != dest and match.exists() and (
-                    match.name == folder_name or ss._read_skill_name(md, match.name) in names):
+                    match.name == folder_name or ss.read_skill_name(md, match.name) in names):
                 backed_up.append(_move_to_restore_backup(match, backup_root))
         if dest.exists() and not canonical_ok:
             backed_up.append(_move_to_restore_backup(dest, backup_root))

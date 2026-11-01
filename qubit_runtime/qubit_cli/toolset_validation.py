@@ -32,8 +32,17 @@ def parse_platform_toolsets_value(value: object) -> Optional[list[str]]:
 
 
 def _platform_default_toolset(platform: object) -> str:
+    """The canonical ``qubit-<platform>`` default a null/scalar value falls back to.
+
+    The platform table keeps the historical ``hermes-*`` spelling internally, and
+    both spellings are published in ``TOOLSETS``; the user-facing warning names the
+    canonical Qubit bundle.
+    """
     info = PLATFORMS.get(platform)
-    return info.default_toolset if info is not None else f"hermes-{platform}"
+    name = info.default_toolset if info is not None else f"qubit-{platform}"
+    if name.startswith("hermes-"):
+        return "qubit-" + name[len("hermes-"):]
+    return name
 
 
 @cache

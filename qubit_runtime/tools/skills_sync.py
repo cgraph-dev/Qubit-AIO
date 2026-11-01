@@ -26,6 +26,9 @@ for _stream in (sys.stdout, sys.stderr):
 from qubit_constants import get_bundled_skills_dir, get_qubit_home, get_optional_skills_dir
 from agent.skill_utils import ESSENTIAL_SKILLS, is_excluded_skill_path
 from tools.skill_usage import read_skill_name
+
+# Historical private spelling other modules (and tests) import from this seam.
+_read_skill_name = read_skill_name
 from tools.skills_sync_optional import (
     _backfill_optional_provenance, _ignore_runtime_cache, _is_runtime_cache, _read_hub_install_paths,
 )
