@@ -531,6 +531,21 @@ def release_for_agent(agent: Any) -> None:
         prepared.discard("agent released", "agent_released")
 
 
+def record_failed_splice(compressor: Any, attempt_id: str | None, failure_class: str | None) -> None:
+    """Count a compaction that spliced the prepared summary and then did not commit.
+
+    ``adopt`` remembers the attempt that took the summary; the first non-committed emit for that
+    attempt is the failed splice. Counted once, and only for that attempt."""
+    state = getattr(compressor, "prepared_compaction", None)
+    if state is None or not attempt_id:
+        return
+    with state._lock:
+        if state.spliced_attempt_id != attempt_id:
+            return
+        state.spliced_attempt_id = None
+    _record("compaction_failed", failure_class=failure_class)
+
+
 def adopt(compressor: Any, prepared: PreparedSummary) -> None:
     """Leave the live compressor as the inline summary call would have: the summary is the iterative base,
     failure state cleared, the pass's main-model fallback (if any) carried over, its call in the telemetry."""

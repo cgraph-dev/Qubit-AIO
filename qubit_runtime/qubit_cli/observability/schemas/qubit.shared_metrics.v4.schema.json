@@ -1309,9 +1309,15 @@
                 "lt_7d",
                 "unknown"
               ]
+            },
+            "compression_prepare_ahead": {
+              "enum": [
+                "off",
+                "on"
+              ]
             }
           },
-          "description": "The five decision-data fields are absent on snapshots counted before they existed. The six version-lag/channel/hardware fields are absent on snapshots counted before they existed."
+          "description": "The five decision-data fields are absent on snapshots counted before they existed. The six version-lag/channel/hardware fields are absent on snapshots counted before they existed. compression_prepare_ahead is absent on snapshots counted before it existed."
         },
         "value": {
           "const": 1
@@ -5193,6 +5199,8 @@
                 "other",
                 "products_build_failed",
                 "python_install_failed",
+                "release_checkout_failed",
+                "release_lookup_failed",
                 "setup_failed",
                 "unsupported_platform",
                 "uv_unusable"

@@ -141,6 +141,11 @@ def _emit_compression_attempt_telemetry(
         )
         _log_attempt_record(payload)
         publish_attempt(agent, payload)
+        if commit_status != "committed":
+            # A compaction that took the prepared summary and then did not commit wasted the pass.
+            from agent.prepared_compaction import record_failed_splice
+
+            record_failed_splice(compressor, seed["attempt_id"], payload.get("failure_class"))
         from qubit_cli.observability.shared_metrics_events import finish_compression_attempt
 
         finish_compression_attempt(
