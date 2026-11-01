@@ -256,7 +256,7 @@ def test_auxiliary_provider_fallback_records_one_terminal_model_route(
     snapshot = store.counter_snapshot()
     assert len(snapshot) == 1
     assert snapshot[0]["metric_name"] == MODEL_ROUTE_METRIC
-    assert snapshot[0]["resource"]["hermes_version"] == "test-version"
+    assert snapshot[0]["resource"]["qubit_version"] == "test-version"
     assert snapshot[0]["dimensions"] == {
         "call_role": "auxiliary",
         # The success keeps the error it recovered from; an invalid shape classifies as unknown.
