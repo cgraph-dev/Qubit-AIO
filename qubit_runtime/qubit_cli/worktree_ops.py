@@ -818,10 +818,11 @@ def _retain_worktree_for_session(repo_root: str, worktree_path: str, session_id:
     return result.returncode == 0
 
 
-def _retained_tree_is_live(db_path: str, worktree_path: str) -> bool:
+def _retained_tree_is_live(db_path: str, worktree_path: str, *, pending_only: bool = False) -> bool:
     """Whether a session that can still be resumed has its frozen cwd inside the retained tree:
-    a row with history or pending gateway work. A missing store means the profile is gone;
-    unreadable fails SAFE (live)."""
+    a row with history or pending gateway work. ``pending_only`` counts queued/started work alone
+    (the quit path: an ended history-only row no longer needs the checkout). A missing store
+    means the profile is gone; unreadable fails SAFE (live)."""
     import sqlite3
     from urllib.parse import quote
 
@@ -835,14 +836,16 @@ def _retained_tree_is_live(db_path: str, worktree_path: str) -> bool:
 
     def inside(cwd) -> int:
         return int(bool(cwd) and any(key(cwd) == r or key(cwd).startswith(r + "/") for r in roots))
+    pending = ("EXISTS (SELECT 1 FROM session_admissions a WHERE a.target_session_id=s.id "
+               "AND a.status!='terminal')")
+    condition = pending if pending_only else f"s.message_count>0 OR {pending}"
     try:
         conn = sqlite3.connect(f"file:{quote(str(path))}?mode=ro", uri=True, timeout=2)
         try:
             conn.create_function("hermes_inside_tree", 1, inside, deterministic=True)
             row = conn.execute(
-                "SELECT 1 FROM sessions s WHERE hermes_inside_tree(s.cwd) AND (s.message_count>0 OR EXISTS ("
-                "SELECT 1 FROM session_admissions a WHERE a.target_session_id=s.id AND a.status!='terminal')) "
-                "LIMIT 1").fetchone()
+                f"SELECT 1 FROM sessions s WHERE hermes_inside_tree(s.cwd) AND ({condition}) LIMIT 1"
+            ).fetchone()
         finally:
             conn.close()
     except sqlite3.Error as exc:
