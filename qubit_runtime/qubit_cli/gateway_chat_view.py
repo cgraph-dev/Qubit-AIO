@@ -205,6 +205,11 @@ class GatewayChatView:
 
     def _complete(self, admission, payload):
         text = payload.get("text") or payload.get("content") or ""
+        # A turn the owner's restart/stop interrupted names why in ``warning``; print it on stderr so
+        # the attached classic CLI says the admission will not be replayed. Other endings stay quiet.
+        warning = payload.get("warning")
+        if payload.get("status") == "interrupted" and warning and not self.quiet:
+            print(warning, file=sys.stderr, flush=True)
         streamed = self.streams.pop(admission, "")
         if not self.quiet:
             # The final's deltas carry the agent's segment break (leading blank lines after a
