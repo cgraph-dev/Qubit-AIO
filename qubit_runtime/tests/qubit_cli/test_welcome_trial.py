@@ -40,7 +40,7 @@ BLOCKED = {
     "the CLI": lambda mp, home: None,
     "an SSH backend": lambda mp, home: (mp.setenv("HERMES_DESKTOP", "1"), mp.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)),
     "guests switched off": lambda mp, home: (as_local_desktop_backend(mp),
-                                              (home / "config.yaml").write_text("qubit:\n  guest: false\n", encoding="utf-8")),
+                                              (home / "config.yaml").write_text("nous:\n  guest: false\n", encoding="utf-8")),
     "a provider key": lambda mp, home: (as_local_desktop_backend(mp), mp.setenv("OPENROUTER_API_KEY", "sk-or-test")),
     "a used machine": lambda mp, home: (as_local_desktop_backend(mp), install_state.mark_machine_used()),
 }
@@ -230,7 +230,7 @@ def test_a_missed_first_launch_stays_due_and_keeps_the_trial(portal, monkeypatch
     assert should_run() is True
     assert welcome_trial.claim_blocker() is None
     assert welcome_trial.claim_desktop_free_tier() is not None
-    assert welcome_trial.claim_blocker() == "a Qubit identity exists"
+    assert welcome_trial.claim_blocker() == "a Nous identity exists"
 
 
 def test_a_claim_cut_off_before_its_marker_write_never_claims_twice(portal, monkeypatch):
