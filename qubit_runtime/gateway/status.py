@@ -2117,6 +2117,26 @@ def get_running_pid(
     return runtime_pid
 
 
+def _same_incarnation(record: Optional[dict[str, Any]], lock_record: Optional[dict[str, Any]]) -> bool:
+    """Whether a PID-file record describes the lock holder's process, not a replaced gateway.
+
+    The start-time fingerprint identifies one process incarnation; a leftover PID file from a
+    previous gateway carries an older start (or a dead/recycled PID), while a record written by
+    the SAME incarnation but naming another PID is a genuine identity disagreement."""
+    if not isinstance(record, dict) or not isinstance(lock_record, dict):
+        return False
+    if _pid_from_record(record) == _pid_from_record(lock_record):
+        return True
+    recorded_start = record.get("start_time")
+    lock_start = lock_record.get("start_time")
+    if recorded_start is None or lock_start is None:
+        return False
+    try:
+        return start_time_fingerprints_match(recorded_start, lock_start)
+    except (TypeError, ValueError):
+        return False
+
+
 def get_running_pid_identity_strict(pid_path: Path) -> Optional[tuple[int, float]]:
     """Return a verified process identity or fail on ambiguous runtime state."""
     resolved_pid_path = Path(pid_path)
@@ -2136,6 +2156,11 @@ def get_running_pid_identity_strict(pid_path: Path) -> Optional[tuple[int, float
     records = (_read_pid_record(resolved_pid_path), lock_record) if pid_exists else (lock_record,)
     if not all(records):
         raise RuntimeError("gateway PID or lock metadata is malformed")
+    if pid_exists and not _same_incarnation(records[0], lock_record):
+        # A leftover PID file from a previous gateway (its own PID, an earlier start) is not a rival
+        # identity: the held lock's record is authoritative. A record for the same incarnation that
+        # disagrees on the PID is a real ambiguity and still fails closed below.
+        records = (lock_record,)
     pid = _pid_from_record(records[0])
     if pid is None or pid <= 0 or any(_pid_from_record(record) != pid for record in records[1:]):
         raise RuntimeError("gateway PID and lock identities disagree")
