@@ -129,7 +129,7 @@ def test_disable_without_an_answering_gateway_says_a_restart_is_needed(home, mon
 
     out = capsys.readouterr().out
     assert "next session" not in out
-    assert "hermes gateway restart" in out
+    assert "qubit gateway restart" in out
 
 
 def test_disable_says_the_running_gateway_unloaded_it(home, monkeypatch, capsys):
@@ -142,7 +142,7 @@ def test_disable_says_the_running_gateway_unloaded_it(home, monkeypatch, capsys)
     assert "running gateway reloaded its plugins and unloaded probe" in out, out
     assert "new sessions" not in out, out
     # callbacks the plugin already wired into platform adapters outlive the reload (plugin guide)
-    assert "platform hooks it already wired up stay until" in out and "hermes gateway restart" in out, out
+    assert "platform hooks it already wired up stay until" in out and "qubit gateway restart" in out, out
 
 
 @pytest.mark.parametrize("reloaded", [True, False])
@@ -162,4 +162,4 @@ def test_enable_prints_only_the_outcome_that_applies(home, monkeypatch, capsys, 
     out = " ".join(capsys.readouterr().out.split())
     assert "Plugin probe enabled." in out and "next session" not in out, out
     assert ("active in the running gateway now" in out) is reloaded, out
-    assert ("hermes gateway restart" in out) is (not reloaded), out
+    assert ("qubit gateway restart" in out) is (not reloaded), out

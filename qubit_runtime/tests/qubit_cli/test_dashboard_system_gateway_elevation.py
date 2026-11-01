@@ -1,6 +1,6 @@
 """Dashboard gateway lifecycle actions must elevate on a system-scope install.
 
-Regression for #110820: the Restart Gateway button spawned ``hermes gateway restart`` as the
+Regression for #110820: the Restart Gateway button spawned ``qubit gateway restart`` as the
 dashboard's own user, and the CLI refuses system-scope verbs below root, so the button could
 never work on a systemd *system* install — the refusal only reached the action log while the
 endpoint reported a started action.

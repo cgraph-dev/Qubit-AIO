@@ -1,6 +1,6 @@
 """A Web Access restart whose child exits without replacing the gateway says why on ``/status``.
 
-The restart route answers ``restart_started: true`` as soon as ``hermes gateway restart`` is
+The restart route answers ``restart_started: true`` as soon as ``qubit gateway restart`` is
 spawned. When that child exits at once (a missing dependency environment prints ``run `hermes pm
 repair```), the old gateway keeps serving the old config, so the pane polling ``/status`` for the
 new one needs the failure and its cause there, not a 90-second timeout.
@@ -26,7 +26,7 @@ def client(monkeypatch):
 @pytest.fixture()
 def restart_child(monkeypatch, tmp_path):
     """The real restart spawn (``_spawn_gateway_restart`` → ``_spawn_qubit_action``, log header
-    included), with the ``hermes gateway restart`` argv swapped for a stand-in child whose output
+    included), with the ``qubit gateway restart`` argv swapped for a stand-in child whose output
     and exit code each test picks: no gateway lifecycle code runs."""
     import qubit_cli._launchers as launchers
     from qubit_cli import web_server

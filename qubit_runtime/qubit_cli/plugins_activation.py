@@ -174,13 +174,13 @@ def gateway_reload_hint(answer: Optional[dict[str, Any]], name: str) -> str:
     wired into platform adapters outlive a reload (the plugin guide), so a restart still ends those."""
     if answer and answer.get("reloaded"):
         return (f"The running gateway reloaded its plugins and unloaded {name}; platform hooks it already "
-                "wired up stay until a gateway restart (hermes gateway restart).")
+                "wired up stay until a gateway restart (qubit gateway restart).")
     if answer is not None:  # a gateway answered and refused: say so, with its reason
         return (f"The running gateway refused to reload its plugins: {answer.get('error') or 'no reason given'}.\n"
                 "Only the saved config changed; restart the gateway serving this profile to apply it:\n"
-                "  hermes gateway restart")
+                "  qubit gateway restart")
     return ("No running gateway answered. If one is running, restart it for this to take effect:\n"
-            "  hermes gateway restart")
+            "  qubit gateway restart")
 
 
 def load_and_go_live(name: str) -> Optional[dict[str, Any]]:
@@ -277,7 +277,7 @@ def _gateway_present() -> bool:
             or _installed_service_kind() is not None)
 
 
-_RESTART_LINES = {"gateway": "  hermes gateway restart",
+_RESTART_LINES = {"gateway": "  qubit gateway restart",
                   "backend": "  quit and reopen the Hermes desktop app (or restart hermes dashboard)"}
 
 
@@ -320,7 +320,7 @@ def activation_hint(result: dict[str, Any]) -> str:
         # a messaging gateway that starts later loads it at boot, so a restart applies to nothing.
         if lines or not _gateway_present():
             return "\n".join(lines)
-        return "\n".join([*lines, "Restart the gateway for the plugin to take effect:\n  hermes gateway restart"])
+        return "\n".join([*lines, "Restart the gateway for the plugin to take effect:\n  qubit gateway restart"])
     now, deferred = act.get("activated_now") or {}, act.get("deferred") or {}
     parts = []
     if now:

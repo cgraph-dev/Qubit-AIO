@@ -113,7 +113,7 @@ async def test_resume_after_a_restart_resupplies_the_launch_key(tmp_path, monkey
 
 @pytest.mark.asyncio
 async def test_a_reconnect_after_a_restart_resupplies_the_launch_key(tmp_path, monkeypatch):
-    """A classic CLI left open across ``hermes gateway restart``: its redial resubscribes with the key, and
+    """A classic CLI left open across ``qubit gateway restart``: its redial resubscribes with the key, and
     a session launched without it is still resubscribed."""
     owners = await _Owners().start(tmp_path, monkeypatch)
     conn = GatewayConnection(connect=owners.dial)
