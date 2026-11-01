@@ -59,8 +59,13 @@ def is_known_platform_bundle(platform: object, name: str) -> bool:
     (teams, google_chat, homeassistant), inert until the plugin loads. A misspelt platform key naming its
     own bundle (``telegarm: [qubit-telegarm]``) is not known, so it is still reported."""
     # Both canonical spellings name the same bundle: the installers seed ``qubit-<platform>`` while
-    # core's internal fallback for a plugin platform is the historical ``hermes-<platform>``.
-    if name not in {_platform_default_toolset(platform), f"qubit-{platform}"}:
+    # core's internal fallback for a plugin platform is the historical ``hermes-<platform>``. Keep
+    # the read-old spelling valid here even though warnings now name the canonical one.
+    allowed = {f"qubit-{platform}", f"hermes-{platform}"}
+    info = PLATFORMS.get(platform) if isinstance(platform, str) else None
+    if info is not None:
+        allowed.add(info.default_toolset)
+    if name not in allowed:
         return False
     key = str(platform)
     if key in PLATFORMS or key in _bundled_platform_names():
