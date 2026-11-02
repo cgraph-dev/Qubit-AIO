@@ -535,11 +535,6 @@
     "kind": "bare_which"
   },
   {
-    "path": "tools/terminal_tool_backends.py",
-    "symbol": "<module>",
-    "kind": "bare_which"
-  },
-  {
     "path": "tools/tirith_security.py",
     "symbol": "_local_tirith",
     "kind": "bare_which"
