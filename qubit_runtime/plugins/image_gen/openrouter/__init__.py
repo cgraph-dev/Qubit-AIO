@@ -558,6 +558,11 @@ class OpenRouterCompatImageProvider(ImageGenProvider):
         merged: Dict[str, Dict[str, Any]] = {}
         if self._supports_image_api:
             merged = {entry["id"]: entry for entry in self._image_api_live_models()}
+            # Curated entries are the offline contract and may be newer than a cached/live
+            # catalog; a live fetch must never hide a model the plugin advertises.
+            for model_id, meta in _IMAGE_API_MODELS.items():
+                merged.setdefault(model_id, {"id": model_id, "display": meta["display"],
+                                             "strengths": f"{meta['strengths']} (Image API)"})
         for entry in self._live_models():
             merged.setdefault(entry["id"], entry)
         if merged:
