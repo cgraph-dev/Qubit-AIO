@@ -558,15 +558,11 @@ export default function PluginsPage() {
       // Surface the typed refusal honestly and persistently. A staged
       // confirmation owns the shared settle round-trip (installAgentPlugin
       // sends confirm: true), so anything reaching here is a real policy
-      // refusal — remote Git installs answer BLOCKED_REMOTE_PLUGIN, an
-      // unreviewed/absent path answers PLUGIN_INSTALL_SOURCE. Name the
-      // prerequisite rather than a raw "400: {…}" string, never claim success,
-      // and keep the reason visible (the transient toast can be missed).
+      // refusal from the canonical installer (bad source, kill list, scan,
+      // admission, or a missing dependency). Name the reason rather than a raw
+      // "400: {…}" string and never claim success.
       const detail = e instanceof Error ? e.message : String(e);
-      const remote = detail.includes("BLOCKED_REMOTE_PLUGIN");
-      const message = remote
-        ? "Remote Git install refused by policy (BLOCKED_REMOTE_PLUGIN). Use a reviewed local directory or *.json manifest, or the operator-gated `qubit agent plugins install`."
-        : refusalOrError(e, detail || "Install failed");
+      const message = refusalOrError(e, detail || "Install failed");
       setInstallError(message);
       showToast(message, "error");
     } finally {
@@ -1008,20 +1004,17 @@ export default function PluginsPage() {
 
           <CardContent className="flex flex-col gap-4">
 
-            {/* Capability note: this box accepts reviewed local directories /
-                *.json manifests. For remote plugins, use the pinned index
-                below — every entry installs at its pinned SHA. Arbitrary
-                non-index URLs stay refused (typed BLOCKED_REMOTE_PLUGIN). */}
+            {/* The canonical installer resolves owner/repo shorthand and full
+                Git clone URLs (including a subdirectory). The pinned index
+                below remains the reviewed, exact-SHA path. */}
             <p
-              data-testid="plugin-install-remote-gate"
-              className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
+              data-testid="plugin-install-source-hint"
+              className="border border-border bg-background/40 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
             >
-              This control accepts only a <span className="font-mono">reviewed local directory</span>{" "}
-              or a reviewed <span className="font-mono">*.json</span> manifest
-              path. For remote plugins, install from the pinned index below
-              (every entry fetches at its pinned SHA). Arbitrary remote URLs
-              stay refused (typed{" "}
-              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span>).
+              Remote installs clone the repository and run the same kill-list,
+              scan, and admission gates as the CLI. For a reviewed version at an
+              exact commit, install from the{" "}
+              <span className="font-mono">pinned index</span> below.
             </p>
 
             <div className="flex flex-col gap-2">
@@ -1031,7 +1024,7 @@ export default function PluginsPage() {
               <Input
                 className="font-mono-ui lowercase"
                 id="install-url"
-                placeholder="/path/to/reviewed-plugin or /path/to/plugin.json"
+                placeholder="owner/repo, owner/repo/path/to/plugin, or https://github.com/owner/repo"
                 spellCheck={false}
                 aria-invalid={installError ? true : undefined}
                 aria-describedby={installError ? "plugin-install-error" : undefined}
