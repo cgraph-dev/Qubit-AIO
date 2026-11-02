@@ -202,6 +202,10 @@ def dir_hash(directory: Path, *, include_runtime_cache: bool = False) -> str:
     return hasher.hexdigest()
 
 
+# Historical private spelling other modules (and tests) import from this seam.
+_dir_hash = dir_hash
+
+
 def _matches_origin_hash(directory: Path, origin_hash: str, user_hash: Optional[str] = None) -> bool:
     """Prove unchanged package ownership against a clean OR exact legacy hash.
 
