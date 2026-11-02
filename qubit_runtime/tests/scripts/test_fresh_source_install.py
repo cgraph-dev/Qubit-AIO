@@ -46,7 +46,7 @@ def test_current_installer_publishes_real_dependencies_and_warm_path(tmp_path, s
     shutil.copy2(python, bootstrap / f"bin/python{minor}")
     (bootstrap / "bin/python3").symlink_to(f"python{minor}")
     env = {"PATH": os.environ["PATH"], "HOME": str(home), "LANG": "C.UTF-8",
-           "QUBIT_HOME": str(home / ".hermes"), "UV_PYTHON_INSTALL_DIR": str(managed),
+           "QUBIT_HOME": str(home / ".qubit"), "UV_PYTHON_INSTALL_DIR": str(managed),
            "UV_PYTHON_DOWNLOADS": "never", "UV_CACHE_DIR": str(tmp_path / "cache")}
     canary = tmp_path / "ambient-bin"
     canary.mkdir()
@@ -131,17 +131,17 @@ def test_current_installer_publishes_real_dependencies_and_warm_path(tmp_path, s
     result = run(command, expected=1 if fault else 0)
     assert not npm_called.exists()
     if fault:
-        assert not (install / ".hermes-bootstrap-complete").exists()
-        assert not (home / ".local/bin/hermes").exists()
-        for facts in (home / ".hermes/installs").glob("*/facts.json"):
+        assert not (install / ".qubit-bootstrap-complete").exists()
+        assert not (home / ".local/bin/qubit").exists()
+        for facts in (home / ".qubit/installs").glob("*/facts.json"):
             assert "venv" not in json.loads(facts.read_text())["packages"]
         assert '"stage":"python-deps"' in result.stdout
         return
     assert '"stage":"python-deps"' in result.stdout
-    assert json.loads((install / ".hermes-bootstrap-complete").read_text())["pinnedCommit"] == commit
-    facts = next((home / ".hermes/installs").glob("*/facts.json"))
+    assert json.loads((install / ".qubit-bootstrap-complete").read_text())["pinnedCommit"] == commit
+    facts = next((home / ".qubit/installs").glob("*/facts.json"))
     selection = json.loads(facts.read_text())["packages"]["venv"]
-    launcher = home / ".local/bin/hermes"
+    launcher = home / ".local/bin/qubit"
     child = json.loads(run([str(launcher), "from elsewhere"]).stdout)
     assert child["argv"] == ["from elsewhere"]
     assert Path(child["module"]).is_relative_to(Path(selection["environment"]))
