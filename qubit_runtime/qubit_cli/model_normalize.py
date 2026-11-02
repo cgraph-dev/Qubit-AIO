@@ -207,6 +207,18 @@ def normalize_model_for_provider(model_input: str, target_provider: str) -> str:
         return name
     provider = _normalize_provider_alias(target_provider)
 
+    # A provider profile that owns its id space repairs ids before the generic rules.
+    try:
+        from providers import get_provider_profile
+        profile = get_provider_profile(provider)
+        hook = getattr(profile, "normalize_model_id", None)
+        if callable(hook):
+            normalized = hook(name)
+            if normalized:
+                return normalized
+    except Exception:
+        pass
+
     if provider in _AGGREGATOR_PROVIDERS:
         return _prepend_vendor(name)
 

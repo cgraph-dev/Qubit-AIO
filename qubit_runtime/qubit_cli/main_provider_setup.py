@@ -678,6 +678,18 @@ def _main_model_reasoning_efforts(model: str, provider: str) -> Optional[list[st
     """Levels to offer for *model* on *provider*: None when the route has no reasoning control."""
     from qubit_constants import VALID_REASONING_EFFORTS
     slug = (provider or "").strip().lower()
+    # A provider plugin may declare the levels it actually accepts (the ``qubit model`` step
+    # lives on its profile); an empty sequence means "no reasoning control" for that model.
+    try:
+        from providers import get_provider_profile
+        profile = get_provider_profile(slug)
+        hook = getattr(profile, "setup_reasoning_efforts", None)
+        if callable(hook):
+            declared = hook(model)
+            if declared is not None:
+                return list(declared) or None
+    except Exception:
+        pass
     if slug == "copilot":
         from qubit_cli.models import github_model_reasoning_efforts
         return github_model_reasoning_efforts(model) or None
