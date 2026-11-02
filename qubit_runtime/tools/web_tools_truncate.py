@@ -151,21 +151,24 @@ def _binary_payload_kind(text: str) -> str:
 
 
 def _truncate_results(results: List[dict], char_limit: int, debug_call_data: dict) -> None:
-    """In place: replace each successful entry's content with its base64-cleaned, budgeted text;
-    per-page truncation metrics go into ``debug_call_data``."""
+    """In place: replace each entry's content with its base64-cleaned, budgeted text; per-page
+    truncation metrics go into ``debug_call_data``. An origin error is kept, but its page body is
+    still truncated so a large error response cannot bypass the context budget."""
     for result in results:
         url = result.get("url", "")
         raw_content = result.get("raw_content", "") or result.get("content", "")
-        if result.get("error") or not raw_content:
+        if not raw_content:
             continue
+        existing_error = result.get("error")
         binary_kind = _binary_payload_kind(raw_content)
         if binary_kind:
             # A backend that fetched a raw file (SQLite, archive, executable) hands back its bytes as
             # "text"; 800K chars of that would enter context. Name the type and point at the tool that reads it.
             result["content"] = ""
-            result["error"] = (
-                f"URL returned binary content ({binary_kind}), not a page. Download it with the terminal "
-                "(curl -L -o) and use read_file (SQLite/Office/PDF auto-extract) or terminal utilities on the file.")
+            if not existing_error:
+                result["error"] = (
+                    f"URL returned binary content ({binary_kind}), not a page. Download it with the terminal "
+                    "(curl -L -o) and use read_file (SQLite/Office/PDF auto-extract) or terminal utilities on the file.")
             logger.info("%s (binary payload: %s, %d chars dropped)", url, binary_kind, len(raw_content))
             continue
         clean = convert_base64_images_to_links(raw_content)
