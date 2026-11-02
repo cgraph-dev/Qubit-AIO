@@ -89,6 +89,12 @@ def render_remote_entry(planned: PlannedCall, remote: Mapping[str, Any]) -> dict
     classified the failure. Transport details (status, request id) stay in the logs."""
     error = remote.get("error") if isinstance(remote, Mapping) else None
     account = _opt_str(remote.get("account")) if isinstance(remote, Mapping) else None
+    # Data-use requirements ride the gateway result into the dispatch's sink, never the model's
+    # result string (the executor unions them for the wrapper).
+    requires = remote.get("data_use") if isinstance(remote, Mapping) else None
+    if isinstance(requires, (list, tuple, set, frozenset)) and requires:
+        from tools.connectors.data_use import record_data_use
+        record_data_use(str(value) for value in requires)
     if not isinstance(error, Mapping):
         data = remote.get("data") if isinstance(remote, Mapping) else None
         return _with_account({"index": planned.position, "name": planned.name, "response": data}, account)
