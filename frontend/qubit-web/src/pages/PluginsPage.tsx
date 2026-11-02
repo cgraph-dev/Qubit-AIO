@@ -31,79 +31,36 @@ import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { cn } from "@/lib/utils";
-import { refusalOrError } from "@/lib/policy-refusal";
+import {
+  parsePolicyRefusal,
+  policyRefusalMessage,
+  refusalOrError,
+  type PolicyRefusal,
+} from "@/lib/policy-refusal";
 import { usePageHeader } from "@/contexts/usePageHeader";
-import { rebrand } from "@/lib/rebrand";
+import { brandText } from "@/lib/catalog-brand";
 
-// Serve-boundary de-brand for catalog copy authored by vendored plugin
-// manifests (`qubit_runtime/plugins/**/plugin.yaml`) and the curated pinned
-// index. The legacy vendor tokens are carried as encoded fragments so this
-// product source (and the compiled bundle) never contains them as literals.
-// Genuine third-party repo/install URLs are never passed through this — they
-// stay real and are presented as third-party.
-const _decodeBrand = (b64: string): string => {
-  try {
-    return atob(b64);
-  } catch {
-    return "";
+/** Collapse rows that share a stable identity while keeping every distinct
+ *  provider. Duplicate manifest names are legal (e.g. `xai` is an image
+ *  backend, a video backend and a web search plugin), so the id must include
+ *  the on-disk path/source rather than the bare name. */
+function dedupeBy<T>(rows: readonly T[], keyOf: (row: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
   }
-};
-const _escapeBrandRe = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const LEGACY_ORG = _decodeBrand("Tm91c1Jlc2VhcmNo");
-const LEGACY_ORG_SPACED = _decodeBrand("Tm91cyBSZXNlYXJjaA==");
-const LEGACY_PORTAL = _decodeBrand("Tm91c1BvcnRhbA==");
-const LEGACY_PORTAL_SPACED = _decodeBrand("Tm91cyBQb3J0YWw=");
-const LEGACY_DOMAIN = _decodeBrand("bm91c3Jlc2VhcmNoLmNvbQ==");
-const LEGACY_ACCOUNT = _decodeBrand("bm91cy1hY2NvdW50LXNlcnZpY2U=");
-const LEGACY_HOME = _decodeBrand("fi8uaGVybWVz");
-const QUBIT_HOME = _decodeBrand("fi8uY29uZmlnL3F1Yml0LXZvaWNlYnJpZGdl");
-const BRAND_RULES: ReadonlyArray<readonly [RegExp, string]> = [
-  [
-    new RegExp(
-      "https?://(?:[a-z0-9-]+\\.)*" +
-        _escapeBrandRe(LEGACY_DOMAIN) +
-        "[^\\s\"'`<>)\\]]*",
-      "gi",
-    ),
-    "the portal",
-  ],
-  [
-    new RegExp("\\b(?:[a-z0-9-]+\\.)*" + _escapeBrandRe(LEGACY_DOMAIN) + "\\b", "gi"),
-    "the portal",
-  ],
-  [new RegExp(_escapeBrandRe(LEGACY_ACCOUNT), "g"), "Qubit account service"],
-  [new RegExp(_escapeBrandRe(LEGACY_HOME), "g"), QUBIT_HOME],
-  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG) + "\\b", "g"), "Qubit"],
-  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG_SPACED) + "\\b", "g"), "Qubit"],
-  [new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL) + "\\b", "g"), "Qubit"],
-  [
-    new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL_SPACED) + "\\b", "g"),
-    "Qubit",
-  ],
-];
+  return out;
+}
 
-/** Normalise vendored catalog copy: legacy vendor names render as Qubit and
- *  legacy home paths as the Qubit config path. A whole-string third-party
- *  source URL is kept verbatim — real provenance is never rewritten into a
- *  fabricated Qubit URL. */
-function brandText(value: string | null | undefined): string {
-  if (!value) return "";
-  const s = String(value);
-  if (
-    /^https?:\/\/\S+$/i.test(s) &&
-    !new RegExp(
-      "^https?://(?:[a-z0-9-]+\\.)*" +
-        _escapeBrandRe(LEGACY_DOMAIN) +
-        "\\b",
-      "i",
-    ).test(s)
-  ) {
-    return s;
-  }
-  let out = s;
-  for (const [re, to] of BRAND_RULES) out = out.replace(re, to);
-  return rebrand(out);
+/** React key for an installed plugin row. `path` is unique per plugin
+ *  directory; provider rows that share a manifest name but live in different
+ *  category directories must not collide. */
+function hubRowKey(row: HubAgentPluginRow): string {
+  return `${row.name}::${row.path || row.source}`;
 }
 
 /** Select value for built-in memory (`config` uses empty string). Never use `""` — UI Select maps empty value to an empty label. */
@@ -365,6 +322,7 @@ export default function PluginsPage() {
   const [memoryConfig, setMemoryConfig] = useState<MemoryProviderConfig | null>(null);
   const [memoryValues, setMemoryValues] = useState<Record<string, MemoryFormValue>>({});
   const [memoryConfigBusy, setMemoryConfigBusy] = useState(false);
+  const [memoryConfigRefusal, setMemoryConfigRefusal] = useState<PolicyRefusal | null>(null);
   const [secretVisible, setSecretVisible] = useState<Record<string, boolean>>({});
   const [contextSel, setContextSel] = useState("compressor");
   const [memoryBusy, setMemoryBusy] = useState(false);
@@ -414,7 +372,9 @@ export default function PluginsPage() {
         source: catalogSource || undefined,
       })
       .then((res) => {
-        setCatalog(res.entries ?? []);
+        setCatalog(
+          dedupeBy(res.entries ?? [], (row) => `${row.id}::${row.path || row.source}`),
+        );
         setPinnedIndex(res.pinned_index ?? null);
       })
       .catch((e) => {
@@ -527,6 +487,7 @@ export default function PluginsPage() {
       if (cancelled) return;
       setSecretVisible({});
       setMemorySetupResults(null);
+      setMemoryConfigRefusal(null);
 
       if (!provider) {
         setMemoryConfig(null);
@@ -549,9 +510,18 @@ export default function PluginsPage() {
         })
         .catch((e) => {
           if (!cancelled) {
+            const refusal = parsePolicyRefusal(e);
             setMemoryConfig(null);
             setMemoryValues({});
-            showToast(e instanceof Error ? e.message : "Failed to load provider config", "error");
+            setMemoryConfigRefusal(refusal);
+            showToast(
+              refusal
+                ? policyRefusalMessage(refusal)
+                : e instanceof Error
+                  ? e.message
+                  : "Failed to load provider config",
+              "error",
+            );
           }
         })
         .finally(() => {
@@ -717,7 +687,7 @@ export default function PluginsPage() {
     }
   };
 
-  const rows = hub?.plugins ?? [];
+  const rows = dedupeBy(hub?.plugins ?? [], hubRowKey);
   const providers = hub?.providers;
   const selectedMemoryName = memorySel === MEMORY_PROVIDER_BUILTIN ? "" : memorySel;
   const selectedMemoryInfo = selectedMemoryName
@@ -730,20 +700,23 @@ export default function PluginsPage() {
     memoryConfig?.fields.filter((field) => fieldIsVisible(field, memoryValues)) ?? [];
 
   const indexNeedle = indexQuery.trim().toLowerCase();
-  const indexEntries = (pinnedIndex?.entries ?? []).filter(
-    (entry) =>
-      !indexNeedle ||
-      [
-        entry.name,
-        entry.label,
-        entry.description,
-        entry.repo,
-        entry.maintainer,
-        entry.category,
-        entry.tier,
-        ...entry.tags,
-        ...entry.capabilities,
-      ].some((value) => String(value).toLowerCase().includes(indexNeedle)),
+  const indexEntries = dedupeBy(
+    (pinnedIndex?.entries ?? []).filter(
+      (entry) =>
+        !indexNeedle ||
+        [
+          entry.name,
+          entry.label,
+          entry.description,
+          entry.repo,
+          entry.maintainer,
+          entry.category,
+          entry.tier,
+          ...entry.tags,
+          ...entry.capabilities,
+        ].some((value) => String(value).toLowerCase().includes(indexNeedle)),
+    ),
+    (entry) => `${entry.id || entry.name}::${entry.pinned_ref}`,
   );
 
   return (
@@ -768,12 +741,22 @@ export default function PluginsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Label htmlFor="mem-provider">{t.pluginsPage.memoryProviderLabel}</Label>
                       {selectedMemoryName && selectedMemoryInfo && (
-                        <Badge tone={MEMORY_STATUS_TONE[selectedMemoryInfo.status]}>
-                          {MEMORY_STATUS_LABEL[selectedMemoryInfo.status]}
+                        <Badge
+                          tone={
+                            memoryConfigRefusal
+                              ? "warning"
+                              : MEMORY_STATUS_TONE[selectedMemoryInfo.status]
+                          }
+                        >
+                          {memoryConfigRefusal
+                            ? "dashboard read-only"
+                            : MEMORY_STATUS_LABEL[selectedMemoryInfo.status]}
                         </Badge>
                       )}
                       {selectedMemoryName && selectedMemoryName === providers.memory_provider && (
-                        <Badge tone="outline">active</Badge>
+                        <Badge tone={memoryConfigRefusal ? "warning" : "outline"}>
+                          {memoryConfigRefusal ? "active (agent config)" : "active"}
+                        </Badge>
                       )}
                       {!selectedMemoryName && !providers.memory_provider && (
                         <Badge tone="success">active</Badge>
@@ -790,7 +773,7 @@ export default function PluginsPage() {
                         {`(${t.pluginsPage.providerDefaults})`}
                       </SelectOption>
 
-                      {providers.memory_options.map((o) => (
+                      {dedupeBy(providers.memory_options, (o) => o.name).map((o) => (
                         <SelectOption key={o.name} value={o.name}>
                           {o.name}
                         </SelectOption>
@@ -816,6 +799,18 @@ export default function PluginsPage() {
                     </p>
                   )}
 
+                  {memoryConfigRefusal ? (
+                    <p
+                      data-testid="memory-config-refusal"
+                      role="status"
+                      className="border border-warning/50 px-3 py-2 text-xs text-warning"
+                    >
+                      {memoryConfigRefusal.code === "MEMORY_LOCAL_ONLY"
+                        ? "This provider is configured in the agent, but the dashboard can only edit the Qubit local memory store (MEMORY_LOCAL_ONLY). Use `qubit memory` to inspect it."
+                        : policyRefusalMessage(memoryConfigRefusal)}
+                    </p>
+                  ) : null}
+
                   {selectedMemoryName && selectedMemoryInfo && (
                     <MemoryProviderSetupHint
                       installing={memorySetupBusy}
@@ -837,11 +832,14 @@ export default function PluginsPage() {
                     </div>
                   )}
 
-                  {selectedMemoryName && !memoryConfigBusy && visibleMemoryFields.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      This provider does not expose dashboard settings.
-                    </p>
-                  )}
+                  {selectedMemoryName &&
+                    !memoryConfigBusy &&
+                    !memoryConfigRefusal &&
+                    visibleMemoryFields.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        This provider does not expose dashboard settings.
+                      </p>
+                    )}
 
                   {selectedMemoryName && !memoryConfigBusy && visibleMemoryFields.length > 0 && (
                     <div className="grid gap-4 border border-border p-4">
@@ -953,7 +951,9 @@ export default function PluginsPage() {
                   <Button
                     className="w-fit uppercase"
                     size="sm"
-                    disabled={memoryBusy || memoryConfigBusy || memorySetupBusy}
+                    disabled={
+                      memoryBusy || memoryConfigBusy || memorySetupBusy || !!memoryConfigRefusal
+                    }
                     onClick={() => void onSaveMemoryProvider()}
                     prefix={memoryBusy ? <Spinner /> : undefined}
                   >
@@ -972,9 +972,10 @@ export default function PluginsPage() {
                   >
                     <SelectOption value="compressor">compressor</SelectOption>
 
-                    {providers.context_options
-                      .filter((o) => o.name !== "compressor")
-                      .map((o) => (
+                    {dedupeBy(
+                      providers.context_options.filter((o) => o.name !== "compressor"),
+                      (o) => o.name,
+                    ).map((o) => (
                         <SelectOption key={o.name} value={o.name}>
                           {o.name}
                         </SelectOption>
@@ -1163,7 +1164,7 @@ export default function PluginsPage() {
             ) : (
               <ul className="flex flex-col gap-2">
                 {catalog.map((row) => (
-                  <li key={row.id}>
+                  <li key={`${row.id}::${row.path || row.source}`}>
                     <PluginCatalogCard
                       row={row}
                       busy={catalogBusy === row.id}
@@ -1219,7 +1220,7 @@ export default function PluginsPage() {
               <ul className="flex flex-col gap-2">
                 {indexEntries.map((entry) => (
                   <PinnedIndexRow
-                    key={entry.id}
+                    key={`${entry.id || entry.name}::${entry.pinned_ref}`}
                     entry={entry}
                     busy={indexBusy === entry.name}
                     onInstall={onIndexInstall}
@@ -1267,7 +1268,7 @@ export default function PluginsPage() {
 
               {rows.map((row: HubAgentPluginRow) => (
 
-                <li key={row.name}>
+                <li key={hubRowKey(row)}>
 
 
                   <PluginRowCard
@@ -1293,10 +1294,13 @@ export default function PluginsPage() {
 
               {hub!.orphan_dashboard_plugins.map((m) => (
 
-                <li className="text-xs text-text-secondary" key={m.name}>
+                <li
+                  className="text-xs text-text-secondary"
+                  key={`${m.name}::${m.tab?.path ?? ""}`}
+                >
 
 
-                  {m.label ?? m.name} — {m.description || m.tab?.path}
+                  {brandText(m.label ?? m.name)} — {brandText(m.description) || m.tab?.path}
 
 
                   {!m.tab?.hidden ? (
@@ -1552,7 +1556,9 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
     <li className="border border-border bg-background/20 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-semibold">{entry.label || entry.name}</span>
+          <span className="truncate text-sm font-semibold">
+            {entry.label ? brandText(entry.label) : entry.name}
+          </span>
           {entry.curated ? (
             <Badge tone="secondary">curated</Badge>
           ) : (
@@ -1587,7 +1593,7 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
         </div>
       </div>
       {entry.description ? (
-        <p className="mt-2 text-xs text-text-secondary">{entry.description}</p>
+        <p className="mt-2 text-xs text-text-secondary">{brandText(entry.description)}</p>
       ) : null}
       {entry.install_state === "BROKEN" ? (
         <p className="mt-1 text-xs text-destructive">
@@ -1673,7 +1679,9 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: Plug
     <div className="border border-border bg-background/20 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-semibold">{row.label || row.name}</span>
+          <span className="truncate text-sm font-semibold">
+            {row.label ? brandText(row.label) : row.name}
+          </span>
           <Badge tone="outline">{row.source}</Badge>
           <Badge tone="outline">{row.kind}</Badge>
           {row.version ? <Badge tone="outline">v{row.version}</Badge> : null}
