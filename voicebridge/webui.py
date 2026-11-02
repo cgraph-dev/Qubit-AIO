@@ -1797,6 +1797,39 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # fetches send it automatically, so the front door still answers the app.
         return self._office_nonce_ok()
 
+    def _office_client_mutation_ok(self) -> bool:
+        """Auth for the vendored office client's LITERAL ``/api/*`` mutations.
+
+        The SAME tight boundary as the read gate — loopback peer, same-origin
+        Host, own-app Referer, and the live server-issued load nonce — with the
+        method restriction removed. It is deliberately not a token bypass:
+
+          * a supplied header token is always validated (a wrong one is refused
+            and never falls through to the loopback exemption);
+          * a query token is never accepted here;
+          * a non-loopback peer or foreign Host is refused outright.
+
+        The capability that answers is still confined to the office compat
+        family, and every org mutation it reaches is either settled through the
+        shared confirmation journal or a typed refusal. So this widens the
+        *verbs* the real app can send, not the network or the authority.
+        """
+        if "token=" in self.path.split("?", 1)[-1]:
+            return False
+        if self.headers.get("X-Qubit-Session-Token", "") or \
+                self.headers.get("X-Api-Token", ""):
+            return self._qubit_token_ok() or self._api_token_ok()
+        peer = self.client_address[0] if self.client_address else ""
+        if peer not in ("127.0.0.1", "::1", "localhost"):
+            return False
+        host = (self.headers.get("Host", "") or "").split(":")[0]
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            return False
+        referer = self.headers.get("Referer", "") or ""
+        if OFFICE_APP_PREFIX not in referer:
+            return False
+        return self._office_nonce_ok()
+
     def _serve_office_client_api(self, method: str) -> None:
         """The vendored office client's LITERAL ``/api/*`` front door.
 
@@ -1818,10 +1851,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         """
         from . import qubit_compat as HC
 
-        if method != "GET" and not self._office_app_caller_ok():
-            self._send(401, b"unauthorized")
-            return
-        if method == "GET" and not self._office_client_read_ok():
+        if method == "GET":
+            if not self._office_client_read_ok():
+                self._send(401, b"unauthorized")
+                return
+        elif not self._office_client_mutation_ok():
             self._send(401, b"unauthorized")
             return
 
@@ -2009,9 +2043,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # handler reads it (`self.app.orch.cfg`).
         cfg = self.app.orch.cfg
 
-        # Same HTTP/1.1 one-response-per-connection shape as the events feed:
-        # BaseHTTPRequestHandler defaults to 1.0, which has no keep-alive, so a
-        # length-less SSE body is terminated by connection close.
+        # HTTP/1.1 + CHUNKED is the shape a browser's EventSource actually
+        # consumes. The previous response was length-less with
+        # `Connection: keep-alive` and no `Transfer-Encoding`: curl streamed it,
+        # but a browser waited for framing that never came, fired `open`, and
+        # then stayed on "Connecting to the office…" forever because no
+        # `snapshot` event was ever delivered. Each frame is one chunk; the
+        # terminating chunk is written when the stream loop ends.
         self.protocol_version = "HTTP/1.1"
         self.close_connection = True
 
@@ -2019,10 +2057,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
         self.end_headers()
         if getattr(self, "_head_only", False):
             return
+
+        def write_frame(frame: bytes) -> None:
+            self.wfile.write(("%X\r\n" % len(frame)).encode("ascii")
+                             + frame + b"\r\n")
+            self.wfile.flush()
 
         start = time.time()
         revision = 0
@@ -2038,31 +2082,63 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     # The frame carries the client's full toast contract
                     # (`level` + `at`), not just `{kind, text}` -- a notice with
                     # no `level` arms no dismissal timer and sticks forever.
-                    self.wfile.write(OS.sse("notice", OS.notice(
+                    write_frame(OS.sse("notice", OS.notice(
                         f"the office store could not be read: {str(exc)[:200]}",
                         level="warn", kind="error")))
-                    self.wfile.flush()
                     time.sleep(OS.SNAPSHOT_INTERVAL_SECONDS)
                     continue
 
                 revision += 1
                 for frame in OS.stream_frames(tower, revision, start):
-                    self.wfile.write(frame)
-                self.wfile.flush()
+                    write_frame(frame)
                 # Every frame comes from office_stream's explicit client schema.
                 # The raw tower report and its internal field names stay server-side.
                 time.sleep(OS.SNAPSHOT_INTERVAL_SECONDS)
         except (BrokenPipeError, ConnectionResetError):
             # The client navigated away or reconnected. Not an error.
+            return
+        # Close the chunked body cleanly so an idle client's reader completes.
+        try:
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
             pass
 
+    def _serve_office_snapshot(self) -> None:
+        """GET /api/snapshot — the same snapshot as one JSON document.
+
+        `/api/stream` is the live SSE feed; this is its one-shot form. It is a
+        read, never a mutation, and uses the same loopback/own-app/nonce gate as
+        the other office reads (or a valid header token). A client whose
+        EventSource is blocked can poll this and still settle.
+        """
+        from . import office_stream as OS
+        from .office import tower as TWR
+
+        if not (self._office_client_read_ok() or self._office_app_caller_ok()):
+            self._send(401, b"unauthorized")
+            return
+        cfg = self.app.orch.cfg
+        try:
+            tower = TWR.state(cfg)
+            snap = OS.to_snapshot(tower, 1, time.time())
+        except Exception as exc:  # noqa: BLE001 - a read must not 500
+            self._json({"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
+                        "detail": f"the office store could not be read: "
+                                  f"{str(exc)[:200]}"}, 503)
+            return
+        snap["ok"] = True
+        self._json(snap)
+
     def _serve_office_access(self) -> None:
-        """Read-only, conservative capability discovery for Habblaud.
+        """Capability discovery for Habblaud.
 
         The vendored client enables actions from this response. It must not
         infer that Qubit supports upstream agent/session operations just
-        because an endpoint is absent, so every unsupported capability stays
-        false; only local read/render access is enabled.
+        because an endpoint is absent. The write verbs Qubit DOES own are
+        reported here (permission decisions settle through the shared approval
+        journal; messages become real seat tasks; spawn queues a real office
+        task). Raw terminal/PTY stays false because Qubit refuses it by policy.
         """
         if not self._office_app_caller_ok(blind_probe=True):
             self._send(401, b"unauthorized")
@@ -2070,10 +2146,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
         self._json({
             "remote": False,
             "local": True,
-            "permissions": False,
-            "messages": False,
+            "permissions": True,
+            "messages": True,
             "terminal": False,
-            "spawn": False,
+            "spawn": True,
         })
 
     def _serve_office_agent(self, agent_id: str) -> None:
@@ -3222,9 +3298,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # The office client's live feed. `/api/stream` is what the vendored app
         # asks for; Qubit's own API lives under `/agent/api/`, so this one path
         # is served directly rather than through the compat dispatch (which
-        # returns JSON bodies, not a stream).
-        if path.split("?")[0] in ("/api/stream", "/api/snapshot"):
+        # returns JSON bodies, not a stream). `/api/snapshot` is the one-shot
+        # JSON form of the same translation, NOT a second stream.
+        if path == "/api/stream":
             self._serve_office_stream()
+            return
+        if path == "/api/snapshot":
+            self._serve_office_snapshot()
             return
         # Runtime image may be a packaged wheel with its own _data tree; expose
         # these source checkout-only read routes only when the implementation
@@ -3357,6 +3437,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
                             "detail": "user guide is not in this install; "
                                       "see the repository docs/"},
                            503)
+        elif path == "/api/status" and self._office_client_read_ok():
+            # The vendored office client asks for its own status document at
+            # this literal path. Only a request carrying the office nonce
+            # (loopback + same-origin + own-app Referer) is routed here; every
+            # other caller keeps the classic bridge-status contract below.
+            self._serve_office_client_api("GET")
         elif path == "/api/status":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")

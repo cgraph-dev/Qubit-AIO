@@ -5058,15 +5058,16 @@ def h_office_habblaud_access(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
     Every flag is the REAL Qubit position, not Habblaud's server's:
       * ``local``       — this is a loopback/local view (always true here; the
-                          route is token-gated and served on the dashboard host).
+                          route is gated by the office load nonce).
       * ``remote``      — false: Qubit exposes no remote office session.
-      * ``permissions`` — false: answering a permission is an org mutation that
-                          must go through the confirmation authority (C4), so a
-                          direct answer is NOT available from this view.
-      * ``messages``    — false: sending a message is the same C4-gated mutation.
+      * ``permissions`` — true: a decision is settled through the SAME shared
+                          approval journal the CLI/voice/dashboard use. The
+                          decision is the human action; no second runtime.
+      * ``messages``    — true: a message is persisted and delivered as a real
+                          office task for the seat (``voicebridge.office.messages``).
       * ``terminal``    — false: Qubit forbids raw shell/PTY (PTY_NO_SHELL).
-    ``spawn``/``renameRoom`` mirror the same honest positions; ``renameRoom`` is
-    true because room rename IS wired (to the real office store).
+    ``spawn`` is true because a spawn request is turned into a real queued
+    office task; ``renameRoom`` is true because it mutates the real store.
     """
     # A local view is the only view Qubit serves on this surface.
     local = True
@@ -5075,17 +5076,194 @@ def h_office_habblaud_access(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # The five booleans the client's `g()` validator requires.
         remote=False,
         local=local,
-        permissions=False,
-        messages=False,
+        permissions=True,
+        messages=True,
         terminal=False,
         # Optional capabilities the client reads if present.
-        spawn=False,
+        spawn=True,
         dictation=True,
         renameRoom=True,
-        read_only=True,
-        detail=("local read-only office view; permission/message mutations are "
-                "gated by the Qubit confirmation authority (C4); no raw PTY"),
+        read_only=False,
+        detail=("local office view; permission decisions settle through the "
+                "shared Qubit approval journal, messages become real seat "
+                "tasks, and raw PTY stays disabled"),
     )
+
+
+def h_office_habblaud_rooms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/rooms -> the real office rooms.
+
+    The ids are the SAME composite ``f<floor>r<roomid>`` ids the stream's
+    snapshot uses, so a client that reads the list and then the stream joins on
+    one key. An empty floorplan is an empty list, never an invented room.
+    """
+    from . import office_stream as OS
+    from .office import tower as TWR
+
+    try:
+        plan = TWR.floorplan(cfg)
+    except Exception as exc:  # noqa: BLE001 - a read surface must not 500
+        return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
+                     "detail": f"the office floorplan could not be read: "
+                               f"{str(exc)[:200]}"}
+    out: List[Dict[str, Any]] = []
+    for floor in plan.get("floors") or []:
+        number = floor.get("number", 0)
+        for room in floor.get("rooms") or []:
+            out.append({
+                "id": OS.room_id_for(room, number),
+                "name": room.get("slug") or room.get("kind")
+                        or OS.room_id_for(room, number),
+                "kind": room.get("kind") or "work",
+                "floor": number,
+                "floorName": floor.get("name") or "",
+                "departmentId": room.get("department_id"),
+                "seats": len(room.get("seats") or []),
+            })
+    return _ok(schema="qubit-office-habblaud-rooms/1", rooms=out,
+               count=len(out), detail="real office rooms from the office store")
+
+
+def h_office_habblaud_agents(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/agents -> every seated live agent.
+
+    Derived from the SAME tower state and the SAME translation the stream uses,
+    so a client that lists agents and a client that reads the stream cannot
+    disagree. Seats the tower cannot place in a declared room are omitted here
+    exactly as they are omitted from the snapshot; the agent detail route still
+    resolves them by id.
+    """
+    from . import office_stream as OS
+    from .office import tower as TWR
+
+    try:
+        tower = TWR.state(cfg)
+        snap = OS.to_snapshot(tower, 1, time.time())
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
+                     "detail": f"the office store could not be read: "
+                               f"{str(exc)[:200]}"}
+    return _ok(schema="qubit-office-habblaud-agents/1",
+               agents=snap.get("agents") or [],
+               count=len(snap.get("agents") or []),
+               detail="real seated agents from the office tower")
+
+
+def h_office_habblaud_snapshot(cfg: Any, q: Dict[str, str],
+                               b: Dict[str, Any], p: Dict[str, str]
+                               ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/snapshot -> the JSON form of the stream snapshot.
+
+    The SSE route is the live feed; this is the same translation available as a
+    single JSON read. It exists so a client whose EventSource is blocked can
+    still settle its connection state by polling, and so a probe can assert the
+    exact payload without holding a stream open. It is a read and writes
+    nothing.
+    """
+    from . import office_stream as OS
+    from .office import tower as TWR
+
+    try:
+        tower = TWR.state(cfg)
+        snap = OS.to_snapshot(tower, 1, time.time())
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
+                     "detail": f"the office store could not be read: "
+                               f"{str(exc)[:200]}"}
+    return _ok(schema="qubit-office-habblaud-snapshot/1", **snap)
+
+
+def h_office_habblaud_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/status -> office connection/store health.
+
+    The client's connection state is its own; this route reports the SERVER
+    side plainly: whether the office store could be folded, how many real rooms
+    and agents the tower sees, and which write capabilities are bound. It never
+    says "connected" for a store it could not read.
+    """
+    from . import office_stream as OS
+    from .office import tower as TWR
+
+    try:
+        tower = TWR.state(cfg)
+        snap = OS.to_snapshot(tower, 1, time.time())
+    except Exception as exc:  # noqa: BLE001
+        return 503, {
+            "ok": False, "state": "UNAVAILABLE", "connected": False,
+            "code": "OFFICE_TOWER_UNAVAILABLE",
+            "detail": f"the office store could not be read: {str(exc)[:200]}",
+            "store": "office.db",
+        }
+    return _ok(
+        schema="qubit-office-habblaud-status/1",
+        state="OK", connected=True, store="office.db",
+        empty=bool(tower.get("empty")),
+        now=tower.get("now"), serverTime=snap.get("serverTime"),
+        schema_version=tower.get("schema"),
+        rooms=len(snap.get("rooms") or []),
+        agents=len(snap.get("agents") or []),
+        read_only=False,
+        writes={
+            "permissions": True, "messages": True, "spawn": True,
+            "renameRoom": True, "terminal": False,
+        },
+        detail="office store readable; real tower data",
+    )
+
+
+def h_office_habblaud_permissions(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any], p: Dict[str, str]
+                                  ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/permissions -> pending Qubit approvals.
+
+    The shared approval journal is the one authority for a permission decision
+    (CLI `qubit approvals`, voice yes/no, the dashboard banner and this route).
+    Only real pending records are listed; an empty journal is an empty list.
+    """
+    try:
+        from .approvals import ApprovalJournal
+        journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                                  default_ttl_s=120.0)
+        rows = [{
+            "id": a.id,
+            "capability": str(getattr(a, "capability", "") or ""),
+            "summary": _redact(getattr(a, "summary", ""))[:300],
+            "createdAt": int(float(getattr(a, "created_at", 0) or 0) * 1000),
+            "expiresAt": int(float(getattr(a, "expires_at", 0) or 0) * 1000),
+            "state": str(getattr(a, "state", "") or ""),
+        } for a in journal.pending()]
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "PERMISSIONS_UNAVAILABLE",
+                     "detail": f"the approval journal could not be read: "
+                               f"{str(exc)[:200]}"}
+    return _ok(schema="qubit-office-habblaud-permissions/1",
+               permissions=rows, count=len(rows),
+               detail="real pending approvals on the shared journal")
+
+
+def h_office_habblaud_messages(cfg: Any, q: Dict[str, str],
+                               b: Dict[str, Any], p: Dict[str, str]
+                               ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/messages -> recent owner->seat messages."""
+    from .office import messages as OMSG
+
+    try:
+        limit = int((q or {}).get("limit", 50) or 50)
+    except (TypeError, ValueError):
+        limit = 50
+    agent_raw = str((q or {}).get("agentId", "") or "").strip()
+    agent_id = int(agent_raw) if agent_raw.isdigit() else None
+    try:
+        rows = OMSG.recent(cfg, limit=limit, agent_id=agent_id)
+    except Exception as exc:  # noqa: BLE001
+        return 503, {"ok": False, "code": "MESSAGES_UNAVAILABLE",
+                     "detail": f"the message store could not be read: "
+                               f"{str(exc)[:200]}"}
+    return _ok(schema="qubit-office-habblaud-messages/1", messages=rows,
+               count=len(rows), detail="real owner->seat message deliveries")
 
 
 def h_office_habblaud_agent(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5400,18 +5578,24 @@ def h_office_habblaud_permission(cfg: Any, q: Dict[str, str],
 def h_office_habblaud_message(cfg: Any, q: Dict[str, str],
                               b: Dict[str, Any], p: Dict[str, str]
                               ) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/office/habblaud/messages/<id> -> a real queued/sent message.
+    """GET /api/office/habblaud/messages/<id> -> the real delivery state.
 
-    The client's ``messageStatus`` treats a 404 as ``null`` (no such message) and
-    stops polling. Qubit has no outbound message queue on this surface, so every
-    id is a typed ``MESSAGE_NOT_FOUND`` 404 — honest "no message", never a
-    fabricated delivery state.
+    The client's ``messageStatus`` treats a 404 as ``null`` and stops polling;
+    a row that exists reports the REAL state of its hand-off (queued/delivered/
+    failed), never a fabricated success. Unknown ids stay the typed 404.
     """
+    from .office import messages as OMSG
+
     mid = str((p or {}).get("id", "") or "").strip()
-    return 404, {"ok": False, "code": "MESSAGE_NOT_FOUND",
-                 "detail": f"no queued message {mid!r}; sending is gated by the "
-                           "confirmation authority (C4)",
-                 "qubit_counterpart": "Qubit Chat (POST /api/qubit/chat)"}
+    try:
+        row = OMSG.get(cfg, mid)
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    if row is None:
+        return 404, {"ok": False, "code": "MESSAGE_NOT_FOUND",
+                     "detail": f"no message {mid!r}",
+                     "qubit_counterpart": "POST /api/messages"}
+    return _ok(schema="qubit-office-habblaud-message/1", **row)
 
 
 def h_office_habblaud_updates_check(cfg: Any, q: Dict[str, str],
@@ -5688,33 +5872,125 @@ def h_office_habblaud_logout(cfg: Any, q: Dict[str, str],
                  "qubit_counterpart": "CLI `qubit auth logout` (remote auth)"}
 
 
+def _office_decision(value: Any) -> str:
+    """Normalise the client's many decision spellings to approve/deny."""
+    text = str(value or "").strip().lower()
+    if text in ("approve", "approved", "allow", "allowed", "accept",
+                "accepted", "yes", "y", "once", "always"):
+        return "approve"
+    if text in ("deny", "denied", "reject", "rejected", "no", "n",
+                "block", "blocked", "abort"):
+        return "deny"
+    return ""
+
+
 def h_office_habblaud_permission_decision(cfg: Any, q: Dict[str, str],
                                           b: Dict[str, Any], p: Dict[str, str]
                                           ) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/office/habblaud/permissions/<id>/decision -> C4 staged refusal.
+    """POST /api/office/habblaud/permissions/<id>/decision -> settle once.
 
-    Answering an office permission is an org mutation; it must settle through
-    the Qubit confirmation authority, never a direct POST from the embed.
+    A permission decision is the human action the client already collected
+    (the click on Allow/Deny). It is routed through the SAME shared approval
+    journal the CLI, voice and dashboard use: approve executes the real backend
+    exactly once, deny cancels it. There is no second permission runtime and no
+    direct "200, trust me" — an approval with no executable Qubit backend is the
+    journal's own typed failure, reported as such.
     """
     pid = str((p or {}).get("id", "") or "").strip()
-    return _staged(
-        f"Answering office permission {pid!r} is an org mutation and must go "
-        "through the Qubit confirmation authority (C4).",
-        f"office-habblaud-permission-decision:{pid}")
+    if not pid:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "permission id is required",
+                     "qubit_counterpart": "GET /api/ops/approvals"}
+    decision = ""
+    for key in ("decision", "behavior", "action", "answer"):
+        decision = _office_decision(b.get(key))
+        if decision:
+            break
+    if not decision:
+        return 400, {"ok": False, "code": "BAD_DECISION",
+                     "detail": "decision must be approve/allow or deny/reject",
+                     "qubit_counterpart": "GET /api/ops/approvals"}
+    try:
+        from .approvals import ApprovalJournal
+        journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                                  default_ttl_s=120.0)
+        target = journal.get(pid)
+        pending = target is not None and target.state == "in_progress" \
+            and (target.expires_at or 0) > time.time()
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    if not pending:
+        return 404, {"ok": False, "code": "PERMISSION_NOT_FOUND",
+                     "detail": f"no pending permission {pid!r}",
+                     "qubit_counterpart": "GET /api/ops/approvals"}
+    from . import dashboard_ops as OPS
+
+    if decision == "approve":
+        out = OPS.confirm_op(cfg, pid, actor="dashboard:office",
+                             session="dashboard")
+        if out.get("state") != "executed":
+            return 409, {
+                "ok": False, "state": "REFUSED",
+                "code": str(out.get("code") or "PERMISSION_REFUSED"),
+                "detail": _redact(out.get("detail", ""))[:300],
+                "confirmation_id": pid,
+                "qubit_counterpart": "GET /api/ops/approvals",
+            }
+        return _ok(schema="qubit-office-habblaud-permission-decision/1",
+                   id=pid, decision="approve", state="executed",
+                   receipt=out.get("receipt"),
+                   detail="permission approved through the shared journal")
+    out = OPS.cancel_op(cfg, pid, actor="dashboard:office",
+                        session="dashboard")
+    if out.get("state") != "executed":
+        return 409, {
+            "ok": False, "state": "REFUSED",
+            "code": str(out.get("code") or "PERMISSION_REFUSED"),
+            "detail": _redact(out.get("detail", ""))[:300],
+            "confirmation_id": pid,
+            "qubit_counterpart": "GET /api/ops/approvals",
+        }
+    store_audit = {"permission_id": pid, "decision": "deny"}
+    _audit("office.permission_decision", "dashboard:office", store_audit)
+    return _ok(schema="qubit-office-habblaud-permission-decision/1",
+               id=pid, decision="deny", state="denied",
+               receipt=out.get("receipt"),
+               detail="permission denied through the shared journal")
 
 
 def h_office_habblaud_message_send(cfg: Any, q: Dict[str, str],
                                    b: Dict[str, Any], p: Dict[str, str]
                                    ) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/office/habblaud/messages -> C4 staged refusal.
+    """POST /api/office/habblaud/messages -> deliver a real seat task.
 
-    Sending a message to an office agent is an org mutation; it must settle
-    through the Qubit confirmation authority, never a direct POST.
+    The send button is an explicit human action. The message is persisted and
+    handed to the SAME work loop the dispatcher uses: a real ``office_task`` is
+    created and claimed for the seat, and the row reports ``delivered`` only
+    after that succeeded. A refused delivery is a typed failure on the row, not
+    a fabricated success.
     """
-    return _staged(
-        "Sending a message to an office agent is an org mutation and must go "
-        "through the Qubit confirmation authority (C4).",
-        "office-habblaud-message-send")
+    from .office import messages as OMSG
+    from .office.errors import OfficeError
+
+    raw_agent = b.get("agentId", b.get("agent_id", b.get("id")))
+    if isinstance(raw_agent, str):
+        raw_agent = raw_agent.strip()
+    if not str(raw_agent or "").isdigit():
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "agentId is required",
+                     "qubit_counterpart": "GET /api/agents"}
+    text = str(b.get("text", b.get("message", "")) or "")
+    try:
+        out = OMSG.send(cfg, int(raw_agent), text,
+                        actor="dashboard:office", confirmed=True)
+    except OfficeError as exc:
+        code = 404 if exc.code == "OFFICE_NOT_FOUND" else (
+            403 if exc.code == "OFFICE_ESTOP" else 400)
+        return code, {"ok": False, "code": exc.code,
+                      "detail": _redact(exc.detail)[:300]}
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return 201, out
 
 
 def h_office_habblaud_character(cfg: Any, q: Dict[str, str],
@@ -5732,22 +6008,145 @@ def h_office_habblaud_character(cfg: Any, q: Dict[str, str],
         f"office-habblaud-character:{aid}")
 
 
+def _office_pick_spawn_seat(cfg: Any, wanted: Any) -> Optional[Dict[str, Any]]:
+    """Resolve the seat a spawn request runs as: an explicit id/slug or the
+    least-loaded active leaf. ``None`` when the org has no eligible seat."""
+    from .office import store as OSS
+
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        ref = str(wanted or "").strip()
+        if ref:
+            row = (conn.execute("SELECT * FROM office_agent WHERE id=?",
+                                (int(ref),)).fetchone()
+                   if ref.isdigit()
+                   else conn.execute("SELECT * FROM office_agent WHERE slug=?",
+                                     (ref,)).fetchone())
+            return dict(row) if row is not None else None
+        row = conn.execute(
+            "SELECT * FROM office_agent WHERE status='active'"
+            " AND seat_type IN ('worker','analyst','researcher','support',"
+            " 'scraper')"
+            " AND id NOT IN (SELECT supervisor_id FROM office_agent"
+            "                WHERE status='active'"
+            "                  AND supervisor_id IS NOT NULL)"
+            " ORDER BY id LIMIT 1").fetchone()
+        return dict(row) if row is not None else None
+    finally:
+        conn.close()
+
+
+def h_office_habblaud_spawn(cfg: Any, q: Dict[str, str],
+                            b: Dict[str, Any], p: Dict[str, str]
+                            ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/habblaud/spawn -> queue a real office task.
+
+    Upstream opened a new Claude Code session in a folder. Qubit has no second
+    agent runtime to open; the honest equivalent is the work loop it already
+    owns. The prompt becomes an ordinary task (with the folder recorded in its
+    brief) claimed for an active seat, so it is visible to the dispatcher and
+    the office. No process is started and no provider is called here.
+    """
+    from .office import store as OSS
+    from .office import work as W
+    from .office.errors import OfficeError
+
+    prompt = str(b.get("prompt", b.get("text", "")) or "").strip()
+    folder = str(b.get("folder", b.get("path", "")) or "").strip()
+    if not prompt:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "prompt is required",
+                     "qubit_counterpart": "qubit office task-create"}
+    if OSS.estop_engaged(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; spawn refused"}
+    seat = _office_pick_spawn_seat(cfg, b.get("agentId",
+                                              b.get("agent_id")))
+    if seat is None:
+        return 404, {"ok": False, "code": "AGENT_NOT_FOUND",
+                     "detail": "no eligible office seat to run the task",
+                     "qubit_counterpart": "qubit office roster"}
+    try:
+        task = W.create(
+            cfg, title=(prompt.splitlines()[0] or "Spawned task")[:120],
+            brief=(f"folder: {folder}\n\n{prompt}" if folder else prompt),
+            # NEVER take a shell command from the embedded client: the
+            # dispatcher runs the exit check with a shell. A spawn is a queued
+            # task, and "the task ran" is checked by the POSIX `true` command.
+            exit_check="true",
+            department_id=seat.get("department_id"),
+            created_by=int(seat["id"]), turn_budget=1, max_attempts=1,
+            confirmed=True, requested_by="dashboard:office")
+        W.claim(cfg, int(task["id"]), agent_id=int(seat["id"]),
+                confirmed=True, reason="office spawn",
+                requested_by="dashboard:office")
+    except OfficeError as exc:
+        return 409, {"ok": False, "code": exc.code,
+                     "detail": _redact(exc.detail)[:300]}
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    OSS.audit("spawn", "dashboard:office",
+              {"task_id": int(task["id"]), "agent_id": int(seat["id"]),
+               "folder": folder[:200]})
+    return 201, {
+        "ok": True, "id": str(task["id"]), "status": "opened",
+        "how": "office", "agentId": str(seat["id"]),
+        "note": ("queued as a real office task for the seat; it runs on the "
+                 "next dispatch turn, not in a second Claude session"),
+        "detail": "office task queued for an active seat",
+    }
+
+
+def h_office_habblaud_spawn_status(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any], p: Dict[str, str]
+                                   ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/spawn/<id> -> the real task's state."""
+    from .office import store as OSS
+
+    ref = str((p or {}).get("id", "") or "").strip()
+    if not ref.isdigit():
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "spawn id must be an integer task id"}
+    conn = OSS.connect(cfg)
+    try:
+        OSS.migrate(conn)
+        row = conn.execute("SELECT id, status, assignee_id FROM office_task"
+                           " WHERE id=?", (int(ref),)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return 404, {"ok": False, "code": "SPAWN_NOT_FOUND",
+                     "detail": f"no spawned task {ref!r}"}
+    status = str(row["status"] or "")
+    opened = status in ("running", "review", "accepted", "fixing")
+    return _ok(schema="qubit-office-habblaud-spawn/1", id=str(row["id"]),
+               status=("opened" if opened
+                       else ("failed" if status == "abandoned" else "queued")),
+               taskStatus=status,
+               agentId=(str(row["assignee_id"])
+                        if row["assignee_id"] is not None else None),
+               how="office",
+               detail="real office task state")
+
+
 def h_office_habblaud_refuse(cfg: Any, q: Dict[str, str],
                              b: Dict[str, Any], p: Dict[str, str]
                              ) -> Tuple[int, Dict[str, Any]]:
     """Every genuinely-unsupported Habblaud capability -> a typed refusal.
 
     Dispatch routes a family of paths here (PTY/terminal control, takeover,
-    stop, sessions terminal, deliveries file, dictation write, spawn). The
-    refusal names what Qubit does expose instead, so the page reports a missing
-    binding rather than rendering nothing.
+    stop, sessions terminal, deliveries file, spawn attachments, dictation
+    write). The refusal names what Qubit does expose instead, so the page
+    reports a missing binding rather than rendering nothing.
     """
     path = str((p or {}).get("sub", "") or (p or {}).get("_path", "") or "")
     return 403, {"ok": False, "state": "UNAVAILABLE",
                  "code": "OFFICE_CLIENT_UNSUPPORTED",
                  "detail": (f"the {path or 'requested'} capability is not "
-                            "exposed by Qubit (no raw PTY, no spawn, no "
-                            "deliveries store)."),
+                            "exposed by Qubit (no raw PTY, no attachment "
+                            "upload, no deliveries store)."),
                  "qubit_counterpart": "Qubit Chat + dashboard /ops + approvals"}
 
 
@@ -10427,6 +10826,15 @@ _r("GET", r"/api/office/tower", "h_office_tower")
 # compat route" 404. Reads answer real Qubit state; unsupported actions are
 # typed refusals. Specific patterns precede any wildcard catch-all.
 _r("GET", r"/api/office/habblaud/access", "h_office_habblaud_access")
+# Connection/store status, a one-shot JSON snapshot, and the list reads. These
+# are exact paths, so they cannot be swallowed by the ``<id>`` patterns below.
+_r("GET", r"/api/office/habblaud/status", "h_office_habblaud_status")
+_r("GET", r"/api/office/habblaud/snapshot", "h_office_habblaud_snapshot")
+_r("GET", r"/api/office/habblaud/rooms", "h_office_habblaud_rooms")
+_r("GET", r"/api/office/habblaud/agents", "h_office_habblaud_agents")
+_r("GET", r"/api/office/habblaud/permissions", "h_office_habblaud_permissions")
+_r("GET", r"/api/office/habblaud/messages", "h_office_habblaud_messages")
+_r("POST", r"/api/office/habblaud/spawn", "h_office_habblaud_spawn")
 # Per-seat model routing. Registered BEFORE the ``agents/<id>`` read and the
 # ``agents/<id>/<sub>`` catch-all below, because both would otherwise swallow
 # this path (a regex alternation matches the first pattern that fits, and
@@ -10446,6 +10854,9 @@ _r("GET", r"/api/office/habblaud/stats/days", "h_office_habblaud_stats_days")
 _r("GET", r"/api/office/habblaud/stats", "h_office_habblaud_stats_day")
 _r("GET", r"/api/office/habblaud/spawn/folders",
    "h_office_habblaud_spawn_folders")
+# After the exact `folders` route so it cannot be read as a task id.
+_r("GET", r"/api/office/habblaud/spawn/(?P<id>[^/]+)",
+   "h_office_habblaud_spawn_status")
 _r("GET", r"/api/office/habblaud/dictation", "h_office_habblaud_dictation")
 _r("GET", r"/api/office/habblaud/dictation/(?P<id>[^/]+)",
    "h_office_habblaud_refuse")
@@ -10484,7 +10895,8 @@ _r("POST", r"/api/office/habblaud/dictation/(?P<id>[^/]+)",
 _r("POST", r"/api/office/habblaud/dictation", "h_office_habblaud_refuse")
 _r("POST", r"/api/office/habblaud/spawn/attachments",
    "h_office_habblaud_refuse")
-_r("POST", r"/api/office/habblaud/spawn", "h_office_habblaud_refuse")
+# (POST /api/office/habblaud/spawn is a real queued-task route, registered
+# above; it is intentionally not part of this typed-refusal block.)
 _r("POST", r"/api/office/habblaud/pty/(?P<id>[^/]+)/(?P<sub>[^/]+)",
    "h_office_habblaud_refuse")
 _r("POST", r"/api/office/habblaud/pty", "h_office_habblaud_refuse")
@@ -18670,7 +19082,17 @@ HANDLERS: Dict[str, Handler] = {
     "h_curator": h_curator, "h_curator_paused": h_curator_paused,
     "h_office_tower": h_office_tower,
     "h_office_habblaud_access": h_office_habblaud_access,
+    "h_office_habblaud_status": h_office_habblaud_status,
+    "h_office_habblaud_snapshot": h_office_habblaud_snapshot,
+    "h_office_habblaud_rooms": h_office_habblaud_rooms,
+    "h_office_habblaud_agents": h_office_habblaud_agents,
+    "h_office_habblaud_permissions": h_office_habblaud_permissions,
+    "h_office_habblaud_messages": h_office_habblaud_messages,
+    "h_office_habblaud_spawn": h_office_habblaud_spawn,
+    "h_office_habblaud_spawn_status": h_office_habblaud_spawn_status,
     "h_office_habblaud_agent": h_office_habblaud_agent,
+    "h_office_habblaud_agent_model": h_office_habblaud_agent_model,
+    "h_office_habblaud_agent_model_set": h_office_habblaud_agent_model_set,
     "h_office_habblaud_sessions_recent": h_office_habblaud_sessions_recent,
     "h_office_habblaud_timeline_days": h_office_habblaud_timeline_days,
     "h_office_habblaud_timeline_day": h_office_habblaud_timeline_day,

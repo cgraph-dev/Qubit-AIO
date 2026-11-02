@@ -429,6 +429,26 @@ CREATE TABLE IF NOT EXISTS office_event(
 
 CREATE INDEX IF NOT EXISTS idx_event_ts ON office_event(ts);
 
+-- Owner -> seat messages. This is the delivery ledger the Habblaud client's
+-- message pane polls (GET /api/messages/:id). A row is QUEUED, then DELIVERED
+-- when it has been turned into a real office task the seat owns, or FAILED
+-- with the refusal. Nothing here is a chat transcript: it is the durable
+-- hand-off record, and the task it points at is the work the seat will do.
+CREATE TABLE IF NOT EXISTS office_message(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts REAL NOT NULL,
+  agent_id INTEGER NOT NULL REFERENCES office_agent(id),
+  text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK(status IN ('queued','sent','delivered','failed')),
+  task_id INTEGER,
+  error TEXT NOT NULL DEFAULT '',
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL);
+
+CREATE INDEX IF NOT EXISTS idx_message_agent ON office_message(agent_id);
+CREATE INDEX IF NOT EXISTS idx_message_created ON office_message(created_at);
+
 -- The two rules that make this store a ledger rather than a table ---------
 -- NOTE: RAISE(ABORT, …) takes ONE string literal — SQLite does not
 -- juxtapose adjacent literals the way C does, so these messages are single

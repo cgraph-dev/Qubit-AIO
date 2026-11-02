@@ -49,6 +49,9 @@ def test_access_route_is_bound_and_write_routes_are_explicitly_gated():
     src = (GAME / "app/office-api.ts").read_text()
     assert 'client: "access", qubit: "/api/access"' in src
     assert 'client: "agents/:id", qubit: "/api/agents/:id"' in src
-    assert 'client: "permissions/:id", qubit: null' in src
-    assert 'client: "messages", qubit: null' in src
+    # The write verbs are bound to real backends but stay confirmation-gated.
+    assert 'client: "permissions/:id", qubit: "/api/permissions/:id"' in src
+    assert 'client: "messages", qubit: "/api/messages"' in src
+    assert 'client: "spawn", qubit: "/api/spawn"' in src
+    assert 'client: "renameRoom", qubit: "/api/rooms/rename"' in src
     assert "gated: true" in src
