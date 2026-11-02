@@ -171,12 +171,16 @@ summarizer:
   max_words: 40             # HARD cap on every spoken response (save time)
 
 # ---------------------------------------------------------------------------
-# Voice dashboard (web UI): talk from your phone + live activity feed.
-#   http://<this-pc-ip>:8890   (chat)   ·   /activity  (agent dashboard)
+# Voice dashboard (web UI): talk from your PC + live activity feed.
+#   http://127.0.0.1:8890      (chat)   ·   /activity  (agent dashboard)
+# LAN access (phone) is an explicit opt-in: set allow_lan: true, a non-loopback
+# host, and a non-empty token below.
 webui:
   enabled: true
   speak_web_locally: false # browser plays the reply once; keep false to avoid double-speech
-  host: 0.0.0.0            # 0.0.0.0 = reachable from the LAN (phone)
+  host: 127.0.0.1          # loopback only by default (session-token bootstrap stays local)
+  allow_lan: false         # explicit opt-in: required before a non-loopback host is honoured
+  token: ""                # REQUIRED when allow_lan is true (X-Api-Token / session token)
   port: 8890
   script_timeout_s: 60     # local-script tools (e.g. Perplexity search) cap
 

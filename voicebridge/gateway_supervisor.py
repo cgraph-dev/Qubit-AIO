@@ -125,7 +125,10 @@ def _systemctl_argv(cfg: Any, *args: str) -> List[str]:
 
 
 def _host_port(cfg: Any) -> Tuple[str, int]:
-    host = str(_get(cfg, "webui", "host", default="127.0.0.1") or "127.0.0.1")
+    from .config import resolve_webui_bind_host
+    host = resolve_webui_bind_host(
+        _get(cfg, "webui", "host", default="127.0.0.1") or "127.0.0.1",
+        _get(cfg, "webui", "allow_lan", default=False))
     try:
         port = int(_get(cfg, "webui", "port", default=DEFAULT_PORT) or DEFAULT_PORT)
     except (TypeError, ValueError):

@@ -269,7 +269,11 @@ what the agent is doing live.
   in URLs, history, or logs.
 
 Find your PC's LAN IP with `ip -4 addr show | grep inet`. The dashboard
-binds `0.0.0.0:8890` by default (`webui.host` / `webui.port` in config).
+binds **loopback only** (`127.0.0.1:8890`) by default. To reach it from another
+device, set `webui.allow_lan: true`, a non-loopback `webui.host` (for example
+`0.0.0.0`), and a non-empty `webui.token`; without the explicit `allow_lan`
+opt-in a LAN host is ignored and the listener stays on loopback, so the
+session-token bootstrap is never handed to other machines by a copied config.
 
 ### Hosted frontend (when you're ready)
 

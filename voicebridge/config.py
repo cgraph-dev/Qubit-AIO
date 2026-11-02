@@ -263,6 +263,31 @@ def _coerce_bool(value: Any) -> Optional[bool]:
     return None
 
 
+_LOOPBACK_WEBUI_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
+
+
+def is_loopback_webui_host(host: Any) -> bool:
+    """True for the loopback spellings the dashboard may bind without a token."""
+    text = str(host or "").strip().lower()
+    if text.startswith("[") and text.endswith("]"):
+        text = text[1:-1]
+    return text in _LOOPBACK_WEBUI_HOSTS
+
+
+def resolve_webui_bind_host(configured_host: Any, allow_lan: Any = False) -> str:
+    """Resolve the effective dashboard bind address.
+
+    The safe default is loopback. A non-loopback ``webui.host`` is honoured
+    only when ``webui.allow_lan`` is explicitly true; otherwise it is ignored
+    so a copied/stale LAN config cannot silently expose the session-token
+    bootstrap. Callers still require ``webui.token`` for a non-loopback bind.
+    """
+    host = str(configured_host or "").strip() or "127.0.0.1"
+    if is_loopback_webui_host(host):
+        return host
+    return host if _coerce_bool(allow_lan) is True else "127.0.0.1"
+
+
 def model_profile_overrides(cfg: Any, profile_id: str) -> Dict[str, Any]:
     """Validated per-profile selection overrides (fail-closed: ``{}``).
 
@@ -644,8 +669,9 @@ DEFAULTS: Dict[str, Any] = {
         "jsonl_path": None,     # default: $STATE_DIR/events.jsonl
     },
     "webui": {
-        "host": "127.0.0.1",    # loopback default; LAN requires host override + token
-        "token": "",            # REQUIRED when host is non-loopback (Packet 1B)
+        "host": "127.0.0.1",    # loopback default; LAN requires allow_lan + token
+        "allow_lan": False,     # explicit opt-in; a non-loopback host is ignored until true
+        "token": "",            # REQUIRED when allow_lan binds a non-loopback host
         "allowed_origins": [],  # exact Origin list for CORS; empty = no cross-origin
         # Dashboard frontend directory. Empty = repository-relative frontend/.
         # Set to an absolute path to serve an external dashboard checkout
@@ -744,6 +770,12 @@ class Config:
     # --- helpers ---
     def section(self, name: str) -> Dict[str, Any]:
         return self.data.get(name, {})
+
+    def webui_bind_host(self) -> str:
+        """The effective dashboard bind host (loopback unless LAN is opted in)."""
+        return resolve_webui_bind_host(
+            self.get("webui", "host", default="127.0.0.1"),
+            self.get("webui", "allow_lan", default=False))
 
     def get(self, *path: str, default: Any = None) -> Any:
         node: Any = self.data

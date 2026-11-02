@@ -12229,7 +12229,10 @@ def _cmd_webui(cfg, args) -> int:
     import urllib.request
     import webbrowser
     from . import product as P
-    host = cfg.get("webui", "host", default="127.0.0.1") or "127.0.0.1"
+    from .config import resolve_webui_bind_host
+    host = resolve_webui_bind_host(
+        cfg.get("webui", "host", default="127.0.0.1") or "127.0.0.1",
+        cfg.get("webui", "allow_lan", default=False))
     port = args.port or int(cfg.get("webui", "port", default=8890))
     url = f"http://{host}:{port}/"
     try:
