@@ -256,6 +256,45 @@ def _publish_qubit_home(home: Path) -> None:
     _PINNED_QUBIT_HOME = str(_resolved(home))
 
 
+@contextmanager
+def _preserved_import_environment():
+    """Keep THIS interpreter's import environment across a vendored bootstrap import.
+
+    Importing the vendored tree can execute ``qubit_bootstrap`` (the foreign-import
+    aliaser preloads it), and that module calls
+    ``pm.environments.activate_dependencies()`` at import time. In a long-lived
+    service interpreter (the voice bridge, the gateway daemon) that call is
+    destructive: it drops the service venv's site-packages from ``sys.path`` and
+    replaces them with the managed generation's, so optional extension packages
+    such as ``numpy``, ``faster_whisper`` and ``sherpa_onnx`` stop resolving
+    mid-process and accurate ASR/TTS break. ``activate_dependencies`` also rewrites
+    ``PYTHONPATH``/``VIRTUAL_ENV`` and prepends its own ``bin`` to ``PATH``.
+
+    Snapshot and restore all four around the boundary import. The vendored modules
+    that were imported stay in ``sys.modules`` (so they remain usable), and the
+    runtime root already added by :func:`ensure_path` is part of the snapshot, so
+    the fork stays importable from the repo afterwards.
+    """
+    saved_path = list(sys.path)
+    missing = object()
+    saved_pythonpath = os.environ.get("PYTHONPATH", missing)
+    saved_virtualenv = os.environ.get("VIRTUAL_ENV", missing)
+    saved_env_path = os.environ.get("PATH", missing)
+    try:
+        yield
+    finally:
+        sys.path[:] = saved_path
+        for key, value in (
+            ("PYTHONPATH", saved_pythonpath),
+            ("VIRTUAL_ENV", saved_virtualenv),
+            ("PATH", saved_env_path),
+        ):
+            if value is missing:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def _register_foreign_adapters() -> None:
     """Hand our foreign-agent adapters to the vendored runtime's neutral registry.
 
@@ -270,12 +309,17 @@ def _register_foreign_adapters() -> None:
     compat layer (module/env aliases, skills, MCP, plugin discovery) was inert and a
     foreign plugin reading its own ``HERMES_HOME`` fell back to a missing ``~/.hermes``.
 
+    The import runs inside :func:`_preserved_import_environment` so a vendored
+    bootstrap that eagerly activates the managed dependency environment cannot
+    evict this interpreter's own packages.
+
     Best-effort and idempotent — a failure degrades to "no foreign content", never a
     broken home resolution.
     """
     try:
-        from . import agent_compat
-        agent_compat.register_with_vendored_runtime()
+        with _preserved_import_environment():
+            from . import agent_compat
+            agent_compat.register_with_vendored_runtime()
     except Exception:  # noqa: BLE001 - foreign support is optional capability
         pass
 
