@@ -211,3 +211,90 @@ class TestUpgradeFromPreSendDatabase:
         finally:
             connection.close()
         assert rows == []
+
+
+class TestUpgradeFromQubitVersionSpelling:
+    """A Qubit build created the aggregate column as ``qubit_version``.
+
+    The aggregate SQL (and the primary key) uses the historical
+    ``hermes_version`` name, so opening the store must rename the column in
+    place instead of failing every metric write with ``no column named
+    hermes_version``.
+    """
+
+    @pytest.fixture
+    def qubit_db(self, tmp_path):
+        path = tmp_path / "metrics.sqlite3"
+        connection = sqlite3.connect(path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE telemetry_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "INSERT INTO telemetry_state(key, value) VALUES ('schema_version', '2')"
+            )
+            connection.execute(
+                """
+                CREATE TABLE counter_aggregates (
+                    period_start TEXT NOT NULL,
+                    metric_name TEXT NOT NULL,
+                    qubit_version TEXT NOT NULL,
+                    os_family TEXT NOT NULL,
+                    architecture TEXT NOT NULL,
+                    install_method TEXT NOT NULL,
+                    dimensions_json TEXT NOT NULL,
+                    value INTEGER NOT NULL,
+                    packaged_value INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (
+                        period_start, metric_name, qubit_version, os_family,
+                        architecture, install_method, dimensions_json
+                    )
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO counter_aggregates(
+                    period_start, metric_name, qubit_version, os_family,
+                    architecture, install_method, dimensions_json, value
+                ) VALUES ('2026-01-01', 'qubit.model_call.count', '0.1.0',
+                          'linux', 'x86_64', 'git', '{}', 7)
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        return path
+
+    def test_upgrade_renames_the_column_and_preserves_rows(self, qubit_db, tmp_path):
+        SharedMetricsStore(database_path=qubit_db, outbox_directory=tmp_path / "outbox")
+        connection = sqlite3.connect(qubit_db)
+        try:
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(counter_aggregates)")
+            }
+            value = connection.execute(
+                "SELECT value FROM counter_aggregates"
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        assert "hermes_version" in columns
+        assert "qubit_version" not in columns
+        assert value == 7
+
+    def test_upgrade_is_idempotent(self, qubit_db, tmp_path):
+        for _ in range(3):
+            SharedMetricsStore(database_path=qubit_db, outbox_directory=tmp_path / "outbox")
+        columns = [
+            row[1]
+            for row in sqlite3.connect(qubit_db).execute(
+                "PRAGMA table_info(counter_aggregates)"
+            )
+        ]
+        assert columns.count("hermes_version") == 1

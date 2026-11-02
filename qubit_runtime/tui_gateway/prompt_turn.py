@@ -812,7 +812,8 @@ def _invoke_agent(
         if prelude is None:
             # The setup_beat onboarding opening is a different flow from /initiate-setup:
             # it plays the greeting and the name card, and keeps the fork's flow first.
-            prelude = _onboarding_prelude(agent, st.history)
+            from agent.onboarding_session import onboarding_prelude
+            prelude = onboarding_prelude(agent, st.history)
         if prelude is not None:
             run_kwargs["prelude"] = prelude
     _adopt_submit_user_row(session, agent, run_kwargs["persist_user_message"], text)

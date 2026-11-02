@@ -563,6 +563,7 @@ class SharedMetricsStore:
                     f"Unsupported shared-metrics store schema version: {schema_version}"
                 )
             connection.execute(_CREATE_COUNTER_AGGREGATES_SQL)
+            self._ensure_counter_version_column(connection)
             connection.execute(_CREATE_PACKAGE_OUTBOX_SQL)
             # Send bookkeeping columns are ADDITIVE and nullable; the schema version is
             # deliberately NOT bumped because the check above raises on unknown versions,
@@ -581,6 +582,23 @@ class SharedMetricsStore:
                 "INSERT INTO telemetry_state(key, value) VALUES ('schema_version', ?)"
                 " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (_STORE_SCHEMA_VERSION,),
+            )
+
+    @staticmethod
+    def _ensure_counter_version_column(connection: sqlite3.Connection) -> None:
+        """Accept both on-disk spellings of the client-version column.
+
+        Older/newer Qubit builds created ``qubit_version`` while the aggregate
+        SQL is keyed on the historical ``hermes_version`` name. Rename it in
+        place so the primary key and its rows survive.
+        """
+        columns = {
+            str(row["name"])
+            for row in connection.execute("PRAGMA table_info(counter_aggregates)")
+        }
+        if "hermes_version" not in columns and "qubit_version" in columns:
+            connection.execute(
+                "ALTER TABLE counter_aggregates RENAME COLUMN qubit_version TO hermes_version"
             )
 
     def _install_id(self, connection: sqlite3.Connection) -> str:

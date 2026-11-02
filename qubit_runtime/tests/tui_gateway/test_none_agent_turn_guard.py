@@ -125,3 +125,38 @@ def test_build_finishing_after_close_records_reason_and_closes_orphan(monkeypatc
     assert session["agent"] is None
     assert session["agent_ready"].is_set()
     assert session["agent_error"] == AGENT_BUILD_ABANDONED
+
+
+def test_setup_beat_prelude_is_wired_when_initiate_setup_declines(monkeypatch, tmp_path):
+    """The fork's setup_beat opening must not die on an undefined helper name.
+
+    Regression: the call site imported nothing and referenced ``_onboarding_prelude``;
+    every dashboard turn raised ``NameError`` before reaching the model.
+    """
+    from agent import onboarding_session
+
+    emitted = _turn_env(monkeypatch, tmp_path)
+    sentinel = object()
+
+    def run_conversation(_message, prelude=None, **_kwargs):
+        captured["prelude"] = prelude
+        return {"final_response": "done"}
+
+    captured = {}
+    agent = types.SimpleNamespace(
+        session_id="agent-sid-prelude",
+        run_conversation=run_conversation,
+        clear_interrupt=lambda: None,
+        valid_tool_names=set(),
+    )
+    monkeypatch.setattr(
+        "agent.initiate_setup_prompt.initiate_setup_prelude", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        onboarding_session, "onboarding_prelude", lambda _agent, _history: sentinel
+    )
+
+    server._run_prompt_submit("rid", "ui-sid", _session(agent), "hello")
+
+    assert captured["prelude"] is sentinel
+    assert [p["status"] for (t, _sid, p) in emitted if t == "message.complete"] == ["complete"]
