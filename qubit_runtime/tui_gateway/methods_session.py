@@ -229,11 +229,6 @@ def _billing_invalid(rid, message: str, error: str = "invalid_request") -> dict:
     return _ok(rid, {"ok": False, "error": error, "message": message})
 
 
-def _billing_pick(result: dict, **fields) -> dict:
-    """``{"ok": True, <snake>: result[<camel>], ...}`` in ``fields`` order."""
-    return {"ok": True, **{key: result.get(src) for key, src in fields.items()}}
-
-
 def _billing_pending_change(result: dict) -> dict:
     return {"ok": True, "message": result.get("message"), "payload": result}
 
