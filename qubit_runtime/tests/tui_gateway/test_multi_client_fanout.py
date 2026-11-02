@@ -56,13 +56,27 @@ def _overflow_slow_peer(fan, healthy, slow):
     raise AssertionError("slow peer never overflowed")
 
 
+class _SignallingStdio(StdioTransport):
+    """StdioTransport that records the moment its first (blocking) write starts."""
+
+    def __init__(self, getter, lock, started):
+        super().__init__(getter, lock)
+        self._started = started
+
+    def write(self, obj):
+        self._started.set()
+        return super().write(obj)
+
+
 class PipeClient:
-    def __init__(self, stack, *, reading=True):
+    def __init__(self, stack, *, reading=True, write_started=None):
         read_fd, write_fd = os.pipe()
         self.reader = stack.enter_context(os.fdopen(read_fd, "r", encoding="utf-8"))
         self.writer = os.fdopen(write_fd, "w", encoding="utf-8")
         stack.callback(self._cleanup)
-        self.transport = StdioTransport(lambda: self.writer, threading.Lock())
+        transport_cls = StdioTransport if write_started is None else _SignallingStdio
+        extra = () if write_started is None else (write_started,)
+        self.transport = transport_cls(lambda: self.writer, threading.Lock(), *extra)
         self._closed = False
         self.writes = 0
         self.frames = queue.Queue()
@@ -109,9 +123,10 @@ class _SocketWS:
 
 class SocketClient(WSTransport):
     """Real WSTransport with its ASGI send backed by a kernel socketpair."""
-    def __init__(self, stack, *, reading=True):
+    def __init__(self, stack, *, reading=True, write_started=None):
         self.reader, self.writer = socket.socketpair()
         self.writer.setblocking(False)
+        self._write_started = write_started
         loop = asyncio.new_event_loop()
         super().__init__(_SocketWS(self), loop)
         self.writes = 0
@@ -126,6 +141,8 @@ class SocketClient(WSTransport):
 
     async def send_text(self, payload):
         self.writes += 1
+        if self._write_started is not None:
+            self._write_started.set()
         await self._loop.sock_sendall(self.writer, (payload + "\n").encode())
 
     def _read(self):
@@ -237,7 +254,9 @@ def test_backpressure_never_blocks_later_frames_or_other_subscribers(slow_first,
     monkeypatch.setattr("tui_gateway.ws._WS_WRITE_TIMEOUT_S", 0.01)
     monkeypatch.setattr("tui_gateway.ws._TOKEN_COALESCE_S", 0)
     with ExitStack() as stack:
-        healthy, slow = client_type(stack), client_type(stack, reading=False)
+        slow_started = threading.Event()
+        healthy = client_type(stack)
+        slow = client_type(stack, reading=False, write_started=slow_started)
         # Fill the actual kernel pipe, not a fake wait in a transport.write().
         fd = slow.writer.fileno()
         os.set_blocking(fd, False)
@@ -271,6 +290,13 @@ def test_backpressure_never_blocks_later_frames_or_other_subscribers(slow_first,
             assert not errors
             assert [healthy.receive()["params"]["type"] for _ in range(3)] == [
                 "message.start", "message.delta", "message.complete"]
+            # Readiness, not a sleep: wait until the slow peer's one writer has
+            # entered its blocking send. If it were still unscheduled it could
+            # capture a mid-loop batch (clearing pending) and the bounded
+            # cap+1 writes would no longer exhaust the backlog, which was the
+            # loaded-host flake. Once inside the send it cannot take another
+            # batch until the pipe drains, so the fill below is deterministic.
+            assert slow_started.wait(5.0), "slow subscriber writer never started"
             # Exhaust only the slow peer's bounded backlog; pace the healthy
             # reader by receipts so scheduler latency cannot make it overflow.
             # The fork deliberately raised the frame cap (a 256-frame cap dropped a healthy
