@@ -18283,6 +18283,23 @@ def _stub_urlopen_capture(monkeypatch, *, ok: bool):
     return urls
 
 
+def _patch_browser_cleanup(monkeypatch, on_cleanup=None):
+    """Patch the per-profile browser reaper ``/browser connect|disconnect`` calls."""
+    from tools import browser_session_lifecycle
+
+    def _cleanup(home_key):  # noqa: ARG001 — production passes the profile home key
+        if on_cleanup is not None:
+            on_cleanup()
+
+    monkeypatch.setattr(browser_session_lifecycle, "cleanup_profile_browsers", _cleanup)
+
+
+def _live_cdp_url() -> str:
+    from tools.browser_session_cdp import live_cdp_override
+
+    return live_cdp_override()
+
+
 def test_browser_manage_status_reads_env_var(monkeypatch):
     """Status returns the env var verbatim (no network I/O)."""
     monkeypatch.setenv("BROWSER_CDP_URL", "http://127.0.0.1:9222")
@@ -18298,15 +18315,21 @@ def test_browser_manage_status_reads_env_var(monkeypatch):
 def test_browser_manage_status_falls_back_to_config_cdp_url(monkeypatch):
     """When env is unset, status surfaces ``browser.cdp_url`` from
     config.yaml so users see what the next tool call will read."""
-    monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
+    from tools import browser_session_cloud, browser_session_cdp
 
-    fake_cfg = types.SimpleNamespace(
-        read_raw_config=lambda: {"browser": {"cdp_url": "http://lan:9222"}}
+    monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
+    browser_session_cdp.set_live_cdp_override(None)
+    monkeypatch.setattr(
+        browser_session_cloud,
+        "browser_cfg",
+        lambda key, default, parse=lambda v: v: (
+            "http://lan:9222" if key == "cdp_url" else default
+        ),
     )
-    with patch.dict(sys.modules, {"qubit_cli.config": fake_cfg}):
-        resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "status"}}
-        )
+
+    resp = server.handle_request(
+        {"id": "1", "method": "browser.manage", "params": {"action": "status"}}
+    )
 
     assert {k: resp["result"][k] for k in ("connected", "url")} == {"connected": True, "url": "http://lan:9222"}
 
@@ -18329,30 +18352,25 @@ def test_browser_manage_connect_sets_env_and_cleans_twice(monkeypatch):
     sessions before AND after publishing the new URL.  The double-cleanup
     closes the supervisor swap window where ``_ensure_cdp_supervisor``
     could re-attach to the *old* CDP endpoint between steps."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
+    set_live_cdp_override(None)
     cleanup_calls: list[str] = []
-
-    def _cleanup_all():
-        cleanup_calls.append(os.environ.get("BROWSER_CDP_URL", ""))
-
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=_cleanup_all,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
+    _patch_browser_cleanup(monkeypatch, lambda: cleanup_calls.append(_live_cdp_url()))
+    _stub_urlopen(monkeypatch, ok=True)
+    resp = server.handle_request(
+        {
+            "id": "1",
+            "method": "browser.manage",
+            "params": {"action": "connect", "url": "http://127.0.0.1:9222"},
+        }
     )
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        _stub_urlopen(monkeypatch, ok=True)
-        resp = server.handle_request(
-            {
-                "id": "1",
-                "method": "browser.manage",
-                "params": {"action": "connect", "url": "http://127.0.0.1:9222"},
-            }
-        )
 
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == "http://127.0.0.1:9222"
-    assert os.environ.get("BROWSER_CDP_URL") == "http://127.0.0.1:9222"
-    # First cleanup runs against the OLD env (none here), second against the NEW.
+    assert _live_cdp_url() == "http://127.0.0.1:9222"
+    # First cleanup runs against the OLD override (none here), second against the NEW.
     assert cleanup_calls == ["", "http://127.0.0.1:9222"]
 
 
@@ -18502,12 +18520,12 @@ def test_browser_manage_connect_rejects_non_string_url(monkeypatch):
 
 
 def test_browser_manage_connect_default_local_retries_after_launch(monkeypatch):
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
+    set_live_cdp_override(None)
     monkeypatch.setattr(server.time, "sleep", lambda _seconds: None)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
-    )
+    _patch_browser_cleanup(monkeypatch)
 
     class _Resp:
         status = 200
@@ -18534,32 +18552,31 @@ def test_browser_manage_connect_default_local_retries_after_launch(monkeypatch):
 
     monkeypatch.setattr(urllib.request.OpenerDirector, "open", lambda _self, url, *a, timeout=2.0, **k: _opener(url, timeout=timeout))
     launched = ChromeDebugLaunch(launched=True)
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        with (
-            patch(
-                "qubit_cli.browser_connect.launch_chrome_debug",
-                return_value=launched,
-            ),
-            patch("qubit_cli.browser_connect.local_port_in_use", return_value=False),
-        ):
-            resp = server.handle_request(
-                {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
-            )
+    with (
+        patch(
+            "qubit_cli.browser_connect.launch_chrome_debug",
+            return_value=launched,
+        ),
+        patch("qubit_cli.browser_connect.local_port_in_use", return_value=False),
+    ):
+        resp = server.handle_request(
+            {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
+        )
 
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == "http://127.0.0.1:9222"
-    assert os.environ["BROWSER_CDP_URL"] == "http://127.0.0.1:9222"
+    assert _live_cdp_url() == "http://127.0.0.1:9222"
 
 
 def test_browser_manage_connect_finds_ipv6_only_browser(monkeypatch):
     """Regression: an IDE debugger squatting 127.0.0.1:9222 pushes the debug
     browser onto [::1]:9222. Connect must discover and adopt the IPv6
     endpoint instead of timing out against the squatter."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
-    )
+    set_live_cdp_override(None)
+    _patch_browser_cleanup(monkeypatch)
 
     class _Resp:
         status = 200
@@ -18578,26 +18595,25 @@ def test_browser_manage_connect_finds_ipv6_only_browser(monkeypatch):
     import urllib.request
 
     monkeypatch.setattr(urllib.request.OpenerDirector, "open", lambda _self, url, *a, timeout=2.0, **k: _opener(url, timeout=timeout))
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
-        )
+    resp = server.handle_request(
+        {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
+    )
 
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == "http://[::1]:9222"
-    assert os.environ["BROWSER_CDP_URL"] == "http://[::1]:9222"
+    assert _live_cdp_url() == "http://[::1]:9222"
 
 
 def test_browser_manage_connect_squatted_port_launches_on_alternate(monkeypatch):
     """When neither loopback speaks CDP but the port is held by another
     application, connect must pick an alternate port for the launch and
     say so — never fight the squatter for 9222."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
+    set_live_cdp_override(None)
     monkeypatch.setattr(server.time, "sleep", lambda _seconds: None)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
-    )
+    _patch_browser_cleanup(monkeypatch)
 
     class _Resp:
         status = 200
@@ -18622,20 +18638,19 @@ def test_browser_manage_connect_squatted_port_launches_on_alternate(monkeypatch)
         launch_ports.append(port)
         return ChromeDebugLaunch(launched=True)
 
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        with (
-            patch("qubit_cli.browser_connect.launch_chrome_debug", side_effect=_launch),
-            patch("qubit_cli.browser_connect.local_port_in_use", return_value=True),
-            patch("qubit_cli.browser_connect.find_free_debug_port", return_value=9223),
-        ):
-            resp = server.handle_request(
-                {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
-            )
+    with (
+        patch("qubit_cli.browser_connect.launch_chrome_debug", side_effect=_launch),
+        patch("qubit_cli.browser_connect.local_port_in_use", return_value=True),
+        patch("qubit_cli.browser_connect.find_free_debug_port", return_value=9223),
+    ):
+        resp = server.handle_request(
+            {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
+        )
 
     assert launch_ports == [9223]
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == "http://127.0.0.1:9223"
-    assert os.environ["BROWSER_CDP_URL"] == "http://127.0.0.1:9223"
+    assert _live_cdp_url() == "http://127.0.0.1:9223"
 
 
 def test_browser_manage_connect_rejects_unreachable_endpoint(monkeypatch):
@@ -18668,25 +18683,24 @@ def test_browser_manage_connect_normalizes_bare_host_port(monkeypatch):
     """Persist a parsed `scheme://host:port` URL so `_get_cdp_override`
     can normalize it; storing a bare host:port would break subsequent
     tool calls (Copilot review on #17120)."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
+    set_live_cdp_override(None)
+    _patch_browser_cleanup(monkeypatch)
+    _stub_urlopen(monkeypatch, ok=True)
+    resp = server.handle_request(
+        {
+            "id": "1",
+            "method": "browser.manage",
+            "params": {"action": "connect", "url": "127.0.0.1:9222"},
+        }
     )
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        _stub_urlopen(monkeypatch, ok=True)
-        resp = server.handle_request(
-            {
-                "id": "1",
-                "method": "browser.manage",
-                "params": {"action": "connect", "url": "127.0.0.1:9222"},
-            }
-        )
 
     assert resp["result"]["connected"] is True
     # Bare host:port got promoted to a full URL with explicit scheme.
     assert resp["result"]["url"].startswith("http://")
-    assert os.environ["BROWSER_CDP_URL"].startswith("http://")
+    assert _live_cdp_url().startswith("http://")
 
 
 def test_browser_manage_connect_strips_discovery_path(monkeypatch):
@@ -18694,34 +18708,33 @@ def test_browser_manage_connect_strips_discovery_path(monkeypatch):
     must collapse to bare `scheme://host:port`; otherwise
     ``_resolve_cdp_override`` will append ``/json/version`` again and
     produce a duplicate path (Copilot review round-2 on #17120)."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
+    set_live_cdp_override(None)
+    _patch_browser_cleanup(monkeypatch)
+    _stub_urlopen(monkeypatch, ok=True)
+    resp = server.handle_request(
+        {
+            "id": "1",
+            "method": "browser.manage",
+            "params": {"action": "connect", "url": "http://127.0.0.1:9222/json"},
+        }
     )
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        _stub_urlopen(monkeypatch, ok=True)
-        resp = server.handle_request(
-            {
-                "id": "1",
-                "method": "browser.manage",
-                "params": {"action": "connect", "url": "http://127.0.0.1:9222/json"},
-            }
-        )
 
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == "http://127.0.0.1:9222"
-    assert os.environ["BROWSER_CDP_URL"] == "http://127.0.0.1:9222"
+    assert _live_cdp_url() == "http://127.0.0.1:9222"
 
 
 def test_browser_manage_connect_preserves_devtools_browser_endpoint(monkeypatch):
     """Concrete devtools websocket endpoints (e.g. Browserbase) must
     survive verbatim — we only collapse discovery-style paths."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
-    )
+    set_live_cdp_override(None)
+    _patch_browser_cleanup(monkeypatch)
     concrete = "ws://browserbase.example/devtools/browser/abc123"
 
     class _OkSocket:
@@ -18731,46 +18744,12 @@ def test_browser_manage_connect_preserves_devtools_browser_endpoint(monkeypatch)
         def __exit__(self, *a):
             return False
 
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        # If urlopen is reached for a concrete ws endpoint, the test
-        # would still pass because _stub_urlopen returned ok=True before;
-        # patch it to assert-fail so we prove the HTTP probe is skipped.
-        with patch(
-            "urllib.request.urlopen", side_effect=AssertionError("urlopen called")
-        ):
-            with patch("socket.create_connection", return_value=_OkSocket()):
-                resp = server.handle_request(
-                    {
-                        "id": "1",
-                        "method": "browser.manage",
-                        "params": {"action": "connect", "url": concrete},
-                    }
-                )
-
-    assert resp["result"]["connected"] is True
-    assert resp["result"]["url"] == concrete
-    assert os.environ["BROWSER_CDP_URL"] == concrete
-
-
-def test_browser_manage_connect_local_devtools_ws_preserves_path(monkeypatch):
-    """Regression: ``ws://127.0.0.1:9222/devtools/browser/<id>`` is a real
-    connectable endpoint; default-local normalization must not strip the
-    ``/devtools/browser/...`` path or it breaks valid local CDP connects."""
-    monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: None,
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
-    )
-    concrete = "ws://127.0.0.1:9222/devtools/browser/abc123"
-
-    class _OkSocket:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
+    # If urlopen is reached for a concrete ws endpoint, the test
+    # would still pass because _stub_urlopen returned ok=True before;
+    # patch it to assert-fail so we prove the HTTP probe is skipped.
+    with patch(
+        "urllib.request.urlopen", side_effect=AssertionError("urlopen called")
+    ):
         with patch("socket.create_connection", return_value=_OkSocket()):
             resp = server.handle_request(
                 {
@@ -18782,7 +18761,39 @@ def test_browser_manage_connect_local_devtools_ws_preserves_path(monkeypatch):
 
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == concrete
-    assert os.environ["BROWSER_CDP_URL"] == concrete
+    assert _live_cdp_url() == concrete
+
+
+def test_browser_manage_connect_local_devtools_ws_preserves_path(monkeypatch):
+    """Regression: ``ws://127.0.0.1:9222/devtools/browser/<id>`` is a real
+    connectable endpoint; default-local normalization must not strip the
+    ``/devtools/browser/...`` path or it breaks valid local CDP connects."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
+    monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
+    set_live_cdp_override(None)
+    _patch_browser_cleanup(monkeypatch)
+    concrete = "ws://127.0.0.1:9222/devtools/browser/abc123"
+
+    class _OkSocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    with patch("socket.create_connection", return_value=_OkSocket()):
+        resp = server.handle_request(
+            {
+                "id": "1",
+                "method": "browser.manage",
+                "params": {"action": "connect", "url": concrete},
+            }
+        )
+
+    assert resp["result"]["connected"] is True
+    assert resp["result"]["url"] == concrete
+    assert _live_cdp_url() == concrete
 
 
 def test_browser_manage_connect_rejects_invalid_port(monkeypatch):
@@ -18883,22 +18894,25 @@ def test_browser_manage_connect_concrete_ws_tcp_unreachable(monkeypatch):
 
 
 def test_browser_manage_disconnect_drops_env_and_cleans(monkeypatch):
+    """A disconnect drops this profile's live CDP override (the env var is config, not the
+    connection) and reaps its browsers once before and once after, matching connect."""
+    from tools.browser_session_cdp import set_live_cdp_override
+
     monkeypatch.setenv("BROWSER_CDP_URL", "http://127.0.0.1:9222")
+    set_live_cdp_override("http://127.0.0.1:9222")
     cleanup_count = {"n": 0}
-    fake = types.SimpleNamespace(
-        cleanup_all_browsers=lambda: cleanup_count.__setitem__(
-            "n", cleanup_count["n"] + 1
-        ),
-        _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
+    _patch_browser_cleanup(
+        monkeypatch, lambda: cleanup_count.__setitem__("n", cleanup_count["n"] + 1)
     )
-    with patch.dict(sys.modules, {"tools.browser_tool_lifecycle": fake}):
-        resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "disconnect"}}
-        )
+    resp = server.handle_request(
+        {"id": "1", "method": "browser.manage", "params": {"action": "disconnect"}}
+    )
 
     assert resp["result"] == {"connected": False}
-    assert "BROWSER_CDP_URL" not in os.environ
-    # Two cleanups: once before env removal, once after, matching connect.
+    assert _live_cdp_url() == ""
+    # The configured environment default is not the live connection; disconnect leaves it alone.
+    assert os.environ["BROWSER_CDP_URL"] == "http://127.0.0.1:9222"
+    # Two cleanups: once before clearing the override, once after.
     assert cleanup_count["n"] == 2
 
 
@@ -19438,7 +19452,7 @@ def test_notification_poller_emits_distinct_watch_matches_once(monkeypatch):
     turns = []
     emitted = []
 
-    def _fake_run_prompt_submit(rid, sid, session, text):
+    def _fake_run_prompt_submit(rid, sid, session, text, **_kwargs):
         turns.append(text)
         with session["history_lock"]:
             session["running"] = False
@@ -19693,14 +19707,18 @@ def test_decode_attach_base64_helper():
     import base64 as _b64
 
     raw = _b64.b64encode(b"hello").decode("ascii")
-    assert server._decode_attach_base64(raw, mime_prefix="image/") == b"hello"
+    assert server._decode_attach_base64(raw, mime_prefix="image/", max_bytes=1024) == b"hello"
     assert (
-        server._decode_attach_base64(f"data:image/png;base64,{raw}", mime_prefix="image/")
+        server._decode_attach_base64(
+            f"data:image/png;base64,{raw}", mime_prefix="image/", max_bytes=1024
+        )
         == b"hello"
     )
     # whitespace inside payload is tolerated
-    assert server._decode_attach_base64(raw[:4] + "\n" + raw[4:], mime_prefix="image/") == b"hello"
-    assert server._decode_attach_base64("@@@", mime_prefix="image/") is None
+    assert server._decode_attach_base64(
+        raw[:4] + "\n" + raw[4:], mime_prefix="image/", max_bytes=1024
+    ) == b"hello"
+    assert server._decode_attach_base64("@@@", mime_prefix="image/", max_bytes=1024) is None
 
 
 def test_sniff_image_ext_magic_and_filename():
@@ -19714,9 +19732,12 @@ def test_sniff_image_ext_magic_and_filename():
     assert server._sniff_image_ext(b"\x89PNG", "photo.jpeg") == ".jpeg"
 
 
-def test_slash_worker_close_reaps_zombie_and_closes_fds():
-    """A hung worker is SIGKILLed, the zombie reaped, all pipes closed — once."""
-    calls = {k: 0 for k in ("terminate", "kill", "wait", "stdin", "stdout", "stderr")}
+def test_slash_worker_close_reaps_zombie_and_closes_fds(monkeypatch):
+    """A hung worker is TERMed then KILLed as a group, the zombie reaped, all pipes closed — once."""
+    import signal
+
+    calls = {k: 0 for k in ("wait", "stdin", "stdout", "stderr")}
+    signals: list[tuple[int, int]] = []
 
     class FakeStream:
         def __init__(self, name):
@@ -19726,20 +19747,18 @@ def test_slash_worker_close_reaps_zombie_and_closes_fds():
             calls[self.name] += 1
 
     class FakeProc:
+        pid = 4242
         stdin, stdout, stderr = (FakeStream(n) for n in ("stdin", "stdout", "stderr"))
 
         def poll(self):
-            return None  # always alive -> forces terminate then kill
-
-        def terminate(self):
-            calls["terminate"] += 1
-
-        def kill(self):
-            calls["kill"] += 1
+            return None  # always alive -> forces TERM then KILL
 
         def wait(self, timeout=None):
             calls["wait"] += 1
             raise subprocess.TimeoutExpired(cmd="x", timeout=timeout)
+
+    monkeypatch.setattr(server.os, "killpg", lambda pgid, sig: signals.append((pgid, sig)))
+    monkeypatch.setattr(server, "release_process_group_once_empty", lambda *a, **k: True)
 
     worker = object.__new__(server._SlashWorker)
     worker.proc = FakeProc()
@@ -19747,9 +19766,8 @@ def test_slash_worker_close_reaps_zombie_and_closes_fds():
     worker.close()
     worker.close()  # idempotent
 
-    assert calls["terminate"] == 1
-    assert calls["kill"] == 1
-    assert calls["wait"] >= 2  # reaped after both terminate and kill
+    assert signals == [(4242, signal.SIGTERM), (4242, signal.SIGKILL)]
+    assert calls["wait"] >= 2  # reaped after both TERM and KILL
     assert calls["stdin"] == calls["stdout"] == calls["stderr"] == 1
 
 
