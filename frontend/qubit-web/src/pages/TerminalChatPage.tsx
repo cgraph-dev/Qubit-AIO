@@ -17,7 +17,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal as XtermTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { Mic, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Copy, Mic, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { api, withBackoff } from "@/lib/api";
 import type { WsTicketGrant } from "@/lib/api";
@@ -278,6 +278,13 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // we proved does NOT. The page must not dial the PTY for a missing id.
   const [resumeVerifiedId, setResumeVerifiedId] = useState<string | null>(null);
   const [resumeMissingId, setResumeMissingId] = useState<string | null>(null);
+  // Visible "copy last response" control over the terminal pane, matching the
+  // reference. The terminal canvas is not readable text, so the copy reads the
+  // canonical session store for the live session id instead of scraping xterm.
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "empty" | "failed">(
+    "idle",
+  );
+  const [copyBusy, setCopyBusy] = useState(false);
   // Mirror of the resume probe for `connect()` (a stable callback that must not
   // re-create on every probe transition). `connect` refuses to dial while a
   // resume id is still being verified or is known-missing.
@@ -1335,6 +1342,42 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     return () => window.clearInterval(timer);
   }, []);
 
+  const copyLastResponse = useCallback(async () => {
+    const id = (resumeTarget || resumeParam || "").trim();
+    if (!id) {
+      setCopyState("empty");
+      return;
+    }
+    setCopyBusy(true);
+    try {
+      const res = await api.getSessionMessages(id);
+      const last = [...res.messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === "assistant" &&
+            typeof message.content === "string" &&
+            message.content.trim().length > 0,
+        );
+      if (!last?.content) {
+        setCopyState("empty");
+        return;
+      }
+      const copied = await copyTextToClipboard(last.content);
+      setCopyState(copied ? "copied" : "failed");
+    } catch {
+      setCopyState("failed");
+    } finally {
+      setCopyBusy(false);
+    }
+  }, [resumeParam, resumeTarget]);
+
+  useEffect(() => {
+    if (copyState === "idle") return undefined;
+    const timer = window.setTimeout(() => setCopyState("idle"), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+
   const modelToolsLabel = `${t.app.modelToolsSheetTitle} ${t.app.modelToolsSheetSubtitle}`;
   // Wait notice only while a resumed chat is still blank; reconnect/closed
   // states keep their own copy and must not stack it.
@@ -1423,6 +1466,23 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             hidden={resumeProbe === "missing"}
             className="min-h-0 flex-1 overflow-hidden rounded-lg border border-current/15 bg-background-base/60 p-2 [&_.xterm]:h-full [&_.xterm-viewport]:!bg-transparent"
           />
+          <Button
+            ghost
+            onClick={() => void copyLastResponse()}
+            disabled={copyBusy || resumeProbe === "missing"}
+            title="Copy last assistant response as raw markdown"
+            aria-label="Copy last assistant response"
+            className="absolute bottom-3 right-3 z-10 rounded border border-current/30 bg-background-base/70 px-2 py-1 text-xs font-normal normal-case tracking-normal opacity-80 transition-opacity hover:border-current/60 hover:opacity-100 disabled:opacity-50"
+            prefix={<Copy className="h-3 w-3" />}
+          >
+            {copyState === "copied"
+              ? "copied"
+              : copyState === "empty"
+                ? "no response yet"
+                : copyState === "failed"
+                  ? "copy failed"
+                  : "copy last response"}
+          </Button>
         </section>
 
         {sidePanelOpen ? (

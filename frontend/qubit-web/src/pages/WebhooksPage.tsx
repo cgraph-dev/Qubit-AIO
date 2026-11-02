@@ -721,21 +721,33 @@ export default function WebhooksPage() {
         </div>
       )}
 
-      {!enabled && (
-        <Card className="border-warning/50">
-          <CardContent className="flex flex-col gap-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <Webhook className="h-5 w-5 shrink-0 text-warning" />
-              <div className="flex flex-col gap-1">
-                <span className="font-medium">Webhook receiver disabled</span>
-                <span className="text-muted-foreground">
-                  Webhooks are their own gateway platform. Enable them here to
-                  accept incoming HTTP events; chat channels are only needed
-                  when a subscription delivers to Telegram, Discord, Slack, or
-                  another channel.
-                </span>
+      {/* Always render the receiver state. The reference only surfaces the
+          disabled warning, which made the enabled state invisible (and with it
+          any indication the receiver is accepting events). */}
+      <Card className={enabled ? "border-success/40" : "border-warning/50"}>
+        <CardContent className="flex flex-col gap-4 py-6 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Webhook
+              className={cn(
+                "h-5 w-5 shrink-0",
+                enabled ? "text-success" : "text-warning",
+              )}
+            />
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">Webhook receiver</span>
+                <Badge tone={enabled ? "success" : "warning"}>
+                  {enabled ? "enabled" : "disabled"}
+                </Badge>
               </div>
+              <span className="text-muted-foreground">
+                {enabled
+                  ? "Incoming HTTP events are accepted. Subscription changes hot-reload without a gateway restart."
+                  : "Webhooks are their own gateway platform. Enable them here to accept incoming HTTP events; chat channels are only needed when a subscription delivers to Telegram, Discord, Slack, or another channel."}
+              </span>
             </div>
+          </div>
+          {!enabled && (
             <Button
               size="sm"
               className="uppercase shrink-0"
@@ -745,9 +757,9 @@ export default function WebhooksPage() {
             >
               {enabling ? "Enabling…" : "Enable webhooks"}
             </Button>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {restartMessage && !restartNeeded && (
         <Card className="border-border">

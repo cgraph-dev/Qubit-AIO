@@ -48,17 +48,19 @@
     window.__QUBIT_PLUGINS__.registerSlot("qubit-brand", "docs:top", DocsNotice);
   }
 
-  /* Docs page notice: the built-in Docs tab embeds the upstream docs site
-   * (third-party reference content). The Qubit operator guide lives in the
-   * checkout (`docs/`) and the CLI (`qubit --help`); we deliberately do NOT
-   * link to /docs here — the notice is rendered on /docs, so that link would
-   * be a dead (self-referential) control. */
+  /* Docs page notice: the built-in Docs tab renders the running Qubit
+   * backend's own OpenAPI document (no upstream frame, no third-party docs
+   * site). The Qubit operator guide lives in the checkout (`docs/`) and the
+   * CLI (`qubit --help`); we deliberately do NOT link to /docs here — the
+   * notice is rendered on /docs, so that link would be a dead
+   * (self-referential) control. */
   function DocsNotice() {
     return e("div", {role: "note", style: {margin: 12, padding: 10,
       border: "1px solid", borderRadius: 8, fontSize: 13}},
       e("strong", null, "Qubit docs: "),
-      e("span", null, "the frame below is the upstream reference site. "),
-      e("span", null, "For Qubit-specific operation, run `qubit --help` or " +
+      e("span", null, "the reference below is this dashboard's own OpenAPI " +
+        "surface for the running Qubit Agent backend. "),
+      e("span", null, "For operator guidance, run `qubit --help` or " +
         "read the docs/ directory in the Qubit checkout."));
   }
 })();

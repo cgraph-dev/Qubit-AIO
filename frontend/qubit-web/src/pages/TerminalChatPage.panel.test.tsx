@@ -69,6 +69,13 @@ const apiMocks = vi.hoisted(() => ({
       message_count: 2,
     },
   })),
+  getSessionMessages: vi.fn(async (id: string) => ({
+    session_id: id,
+    messages: [
+      { role: "user", content: "hello", timestamp: 1 },
+      { role: "assistant", content: "the last answer", timestamp: 2 },
+    ],
+  })),
   createChatSession: vi.fn(async () => ({
     session: { id: "dashboard-abc123def456" },
   })),
@@ -133,6 +140,7 @@ vi.mock("@/lib/api", () => ({
     getMcpServers: apiMocks.getMcpServers,
     getChatWorkspaces: apiMocks.getChatWorkspaces,
     getSessionDetail: apiMocks.getSessionDetail,
+    getSessionMessages: apiMocks.getSessionMessages,
   },
   // PTY resume/session reads go through the backoff wrapper (same rationale
   // as the ChatPage mock); passthrough matches a healthy backend.
@@ -1083,5 +1091,28 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
     } finally {
       (mod as unknown as { WebglAddon: unknown }).WebglAddon = original;
     }
+  });
+});
+
+describe("Qubit TerminalChatPage copy last response", () => {
+  it("copies from the canonical session store for the live session", async () => {
+    apiMocks.getSessionMessages.mockClear();
+    apiMocks.wsTicket.mockImplementation(() => new Promise(() => {}));
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    await render(
+      <MemoryRouter initialEntries={["/chat?resume=session-1"]}>
+        <TerminalChatPage isActive />
+      </MemoryRouter>,
+    );
+
+    const copy = await vi.waitFor(() => {
+      const button = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Copy last assistant response"]',
+      );
+      expect(button).not.toBeNull();
+      return button!;
+    });
+    await act(async () => copy.click());
+    expect(apiMocks.getSessionMessages).toHaveBeenCalledWith("session-1");
   });
 });

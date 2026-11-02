@@ -17,6 +17,7 @@ const apiMocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
   getModelsAnalytics: vi.fn(),
   getAuxiliaryModels: vi.fn(),
+  getMoaModels: vi.fn(),
   getTerminalProfiles: vi.fn(),
   getActiveTerminalProfile: vi.fn(),
   setTerminalProfile: vi.fn(),
@@ -95,6 +96,19 @@ beforeEach(() => {
     tasks: [],
     main: { provider: "ollama", model: "qubit-brain4" },
   });
+  apiMocks.getMoaModels.mockResolvedValue({
+    default_preset: "none",
+    active_preset: "none",
+    presets: {},
+    reference_models: [],
+    aggregator: { provider: "", model: "", enabled: false },
+    reference_temperature: 0,
+    aggregator_temperature: 0,
+    reference_timeout: null,
+    degraded_reference_policy: "loud",
+    enabled: false,
+    detail: "MoA fan-out is not shipped",
+  });
   apiMocks.getTerminalProfiles.mockResolvedValue([
     PROFILE({ id: "qubit-brain4", provider: "ollama", model: "qubit-brain4" }),
     PROFILE({
@@ -168,5 +182,23 @@ describe("ModelsPage USE AS actions (drift A20)", () => {
     });
 
     expect(apiMocks.setTerminalProfile).toHaveBeenCalledWith("qubit-go");
+  });
+});
+
+describe("ModelsPage Mixture of Agents card", () => {
+  it("renders the canonical MoA state and keeps Configure disabled when no preset exists", async () => {
+    await renderModels();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Mixture of Agents"),
+    );
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("MoA fan-out is not shipped"),
+    );
+
+    const configureButtons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).filter((button) => button.textContent?.trim() === "Configure");
+    expect(configureButtons.some((button) => button.disabled)).toBe(true);
+    expect(apiMocks.getMoaModels).toHaveBeenCalled();
   });
 });

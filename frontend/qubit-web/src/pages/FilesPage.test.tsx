@@ -130,3 +130,44 @@ describe("FilesPage root-level download path resolution", () => {
     expect(apiMocks.readFile).toHaveBeenCalledWith("/repo/AGENTS.md");
   });
 });
+
+describe("FilesPage path navigation", () => {
+  it("shows the editable path + Go even when the listing is locked to a project", async () => {
+    apiMocks.listFiles.mockResolvedValue({
+      ok: true,
+      root: "/repo",
+      path: "/repo",
+      locked_root: "/repo",
+      can_change_path: false,
+      entries: [],
+    });
+
+    await renderFiles();
+    await waitFor(() => container.querySelector('input[aria-label="Path"]') !== null);
+
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Path"]',
+    )!;
+    const form = input.closest("form")!;
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setValue?.call(input, "/repo/docs");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() =>
+      apiMocks.listFiles.mock.calls.some((call) => call[0] === "/repo/docs"),
+    );
+    expect(
+      Array.from(container.querySelectorAll("button")).some(
+        (button) => button.textContent?.trim() === "Go",
+      ),
+    ).toBe(true);
+  });
+});
