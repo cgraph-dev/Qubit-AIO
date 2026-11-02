@@ -124,7 +124,7 @@ def test_first_gateway_ws_client_starts_the_armed_discovery_once(monkeypatch):
     )
     assert calls == []
 
-    async def _allowed(ws):
+    async def _allowed(ws, **kwargs):
         return True
 
     async def _handle_ws(ws, **kwargs):

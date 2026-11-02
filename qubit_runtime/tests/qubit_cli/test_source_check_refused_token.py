@@ -49,4 +49,4 @@ def test_a_spent_rate_limit_still_fails(api, monkeypatch):
     monkeypatch.setattr(_Api, "spent", True)
     with pytest.raises(urllib.error.HTTPError) as caught:
         source_check._request(api)
-    assert caught.value.code == 403 and caught.value.hermes_authenticated is True
+    assert caught.value.code == 403 and caught.value.qubit_authenticated is True

@@ -707,7 +707,9 @@ def test_overlay_provider_row_merges_configured_models(monkeypatch):
         current_provider="azure-foundry", max_models=50,
         user_providers={"azure-foundry": {"models": ["gpt-5.5", "shared", "gpt-4.1-mini"]}})
     row = next(r for r in rows if r["slug"] == "azure-foundry")
-    assert row["source"] == "qubit"
+    # "hermes" is the overlay-origin label for ``HERMES_OVERLAYS`` rows (an internal
+    # contract name, not a product surface); the product is Qubit everywhere else.
+    assert row["source"] == "hermes"
     assert row["models"] == ["gpt-5.5", "shared", "gpt-4.1-mini", "gpt-5.6-sol"]
     assert row["total_models"] == 4
 

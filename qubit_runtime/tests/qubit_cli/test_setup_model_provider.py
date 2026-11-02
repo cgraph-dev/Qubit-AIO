@@ -83,13 +83,13 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
     save_config(cfg)
 
     # Only stub the readiness probes; the feature resolver itself is real.
-    monkeypatch.setattr("qubit_cli.nous_subscription._has_agent_browser", lambda: True)
+    # The local engine is browser-harness; local mode still needs a Chromium it can launch.
+    monkeypatch.setattr("qubit_cli.nous_subscription._has_browser_harness", lambda: True)
     monkeypatch.setattr(
         "qubit_cli.nous_subscription.get_nous_portal_account_info",
         lambda *a, **k: None,
     )
-    monkeypatch.setattr("tools.browser_tool_install._chromium_installed", lambda: False)
-    monkeypatch.setattr("tools.browser_tool_lightpanda_fallback._using_lightpanda_engine", lambda: False)
+    monkeypatch.setattr("qubit_cli.browser_runtime.chromium_executable", lambda: None)
     monkeypatch.setattr(
         "agent.auxiliary_client.get_available_vision_backends", lambda: []
     )
