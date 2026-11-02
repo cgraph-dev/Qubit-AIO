@@ -4593,6 +4593,8 @@ export interface MoaConfigResponse {
   degraded_reference_policy: "loud" | "silent";
 
   enabled: boolean;
+  /** Backend note when the surface is present but not shipped/configured. */
+  detail?: string;
 }
 
 export interface ModelAssignmentRequest {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Brain,
   ChevronDown,
@@ -18,6 +19,8 @@ import type {
   AuxiliaryTaskAssignment,
   ModelsAnalyticsModelEntry,
   ModelsAnalyticsResponse,
+  MoaConfigResponse,
+  MoaModelSlot,
   TerminalProfileInfo,
 } from "@/lib/api";
 import { timeAgo, cn, themedBody } from "@/lib/utils";
@@ -25,10 +28,17 @@ import { formatTokenCount } from "@/lib/format";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Stats } from "@nous-research/ui/ui/components/stats";
+import { Input } from "@nous-research/ui/ui/components/input";
+import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
+import {
+  DASHBOARD_MODAL_BACKDROP,
+  DASHBOARD_MODAL_PANEL,
+  shouldCloseOuterModalOnEscape,
+} from "@/lib/dashboard-modal-shell";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
@@ -688,6 +698,352 @@ function AuxiliaryTasksModal({
   );
 }
 
+type MoaPickerTarget =
+  | { kind: "reference"; index: number }
+  | { kind: "aggregator" };
+
+/**
+ * Mixture-of-Agents preset editor.
+ *
+ * Consumes the canonical `GET/PUT /api/model/moa` payload (named presets +
+ * the flat compatibility view). When the backend reports no presets it also
+ * carries a `detail` saying why the surface is inert; the page renders that
+ * state instead of inventing a configuration.
+ */
+function MoaModelsModal({
+  config,
+  refreshKey,
+  onClose,
+  onSaved,
+}: {
+  config: MoaConfigResponse;
+  refreshKey: number;
+  onClose(): void;
+  onSaved(next: MoaConfigResponse): void;
+}) {
+  const [draft, setDraft] = useState<MoaConfigResponse>(config);
+  const presetNames = Object.keys(draft.presets || {});
+  const [selected, setSelected] = useState(() => {
+    const preferred = draft.default_preset;
+    if (preferred && draft.presets[preferred]) return preferred;
+    return presetNames[0] ?? "";
+  });
+  const [newName, setNewName] = useState("");
+  const [picker, setPicker] = useState<MoaPickerTarget | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // The nested ModelPickerDialog owns Escape while open.
+  const closeMoaUnlessPickerOpen = useCallback(() => {
+    if (!shouldCloseOuterModalOnEscape(picker !== null)) return;
+    onClose();
+  }, [picker, onClose]);
+  const modalRef = useModalBehavior({
+    open: true,
+    onClose: closeMoaUnlessPickerOpen,
+  });
+
+  const preset = draft.presets[selected];
+  const slotLabel = (slot: MoaModelSlot) =>
+    `${slot.provider || "(provider)"} · ${slot.model || "(model)"}`;
+
+  const updateSelectedPreset = (
+    updater: (preset: MoaConfigResponse["presets"][string]) =>
+      MoaConfigResponse["presets"][string],
+  ) => {
+    if (!preset) return;
+    setDraft((prev) => ({
+      ...prev,
+      presets: { ...prev.presets, [selected]: updater(prev.presets[selected]) },
+    }));
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await api.saveMoaModels(draft);
+      onSaved(saved);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addPreset = () => {
+    const name = newName.trim();
+    if (!name || draft.presets[name]) return;
+    const seed = preset ?? {
+      reference_models: draft.reference_models,
+      aggregator: draft.aggregator,
+      reference_temperature: draft.reference_temperature,
+      aggregator_temperature: draft.aggregator_temperature,
+      reference_timeout: draft.reference_timeout,
+      degraded_reference_policy: draft.degraded_reference_policy,
+      enabled: draft.enabled,
+    };
+    setDraft((prev) => ({
+      ...prev,
+      default_preset: prev.default_preset || name,
+      presets: {
+        ...prev.presets,
+        [name]: {
+          ...seed,
+          reference_models: seed.reference_models.map((slot) => ({ ...slot })),
+          aggregator: { ...seed.aggregator },
+        },
+      },
+    }));
+    setSelected(name);
+    setNewName("");
+  };
+
+  const deletePreset = () => {
+    if (presetNames.length <= 1) return;
+    const remaining = presetNames.filter((name) => name !== selected);
+    const nextSelected = remaining[0];
+    setDraft((prev) => {
+      const next = { ...prev.presets };
+      delete next[selected];
+      return {
+        ...prev,
+        presets: next,
+        default_preset:
+          prev.default_preset === selected ? nextSelected : prev.default_preset,
+        active_preset: prev.active_preset === selected ? "" : prev.active_preset,
+      };
+    });
+    setSelected(nextSelected);
+  };
+
+  return createPortal(
+    <div
+      ref={modalRef}
+      className={DASHBOARD_MODAL_BACKDROP}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) closeMoaUnlessPickerOpen();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="moa-modal-title"
+    >
+      <div
+        className={cn(
+          themedBody,
+          DASHBOARD_MODAL_PANEL,
+          "flex max-h-[85vh] max-w-2xl flex-col overflow-auto",
+        )}
+      >
+        <header className="border-b border-border p-5 pb-3">
+          <h2
+            id="moa-modal-title"
+            className="font-mondwest text-display text-base tracking-wider"
+          >
+            Configure Mixture of Agents presets
+          </h2>
+        </header>
+        <div className="space-y-4 p-5">
+          <p className="text-xs text-text-secondary">
+            Presets appear as models under the Mixture of Agents provider.
+            References produce perspectives; the aggregator is the acting model
+            that answers and calls tools.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="border border-border bg-background px-2 py-1 text-xs"
+              value={selected}
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {presetNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              outlined
+              onClick={() =>
+                setDraft((prev) => ({ ...prev, default_preset: selected }))
+              }
+            >
+              Set default
+            </Button>
+            <Button
+              size="sm"
+              ghost
+              disabled={presetNames.length <= 1}
+              onClick={deletePreset}
+            >
+              Delete
+            </Button>
+            <Input
+              className="h-8 max-w-40 text-xs"
+              placeholder="new preset name"
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+            />
+            <Button
+              size="sm"
+              outlined
+              disabled={!newName.trim() || !!draft.presets[newName.trim()]}
+              onClick={addPreset}
+            >
+              Add preset
+            </Button>
+          </div>
+
+          <div className="text-xs text-text-secondary">
+            Default: <span className="font-mono">{draft.default_preset}</span>
+          </div>
+
+          {preset ? (
+            <>
+              <div className="space-y-2">
+                <div className="text-display text-xs font-medium tracking-wider">
+                  Reference models
+                </div>
+                {preset.reference_models.map((slot, index) => (
+                  <div
+                    key={`${selected}-${slot.provider}-${slot.model}-${index}`}
+                    className={cn(
+                      "flex items-center gap-2 border border-border/50 bg-muted/20 px-3 py-2",
+                      slot.enabled === false && "opacity-60",
+                    )}
+                  >
+                    <Switch
+                      checked={slot.enabled !== false}
+                      onCheckedChange={(checked) =>
+                        updateSelectedPreset((prev) => ({
+                          ...prev,
+                          reference_models: prev.reference_models.map((s, i) =>
+                            i === index
+                              ? { ...s, enabled: checked === true }
+                              : s,
+                          ),
+                        }))
+                      }
+                    />
+                    <div className="min-w-0 flex-1 truncate font-mono text-xs text-text-secondary">
+                      {slotLabel(slot)}
+                    </div>
+                    <Button
+                      size="sm"
+                      outlined
+                      onClick={() => setPicker({ kind: "reference", index })}
+                    >
+                      Change
+                    </Button>
+                    <Button
+                      size="sm"
+                      ghost
+                      disabled={preset.reference_models.length <= 1}
+                      onClick={() =>
+                        updateSelectedPreset((prev) => ({
+                          ...prev,
+                          reference_models: prev.reference_models.filter(
+                            (_, i) => i !== index,
+                          ),
+                        }))
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  size="sm"
+                  outlined
+                  onClick={() =>
+                    updateSelectedPreset((prev) => ({
+                      ...prev,
+                      reference_models: [
+                        ...prev.reference_models,
+                        { ...prev.aggregator, enabled: true },
+                      ],
+                    }))
+                  }
+                >
+                  Add reference model
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-display text-xs font-medium tracking-wider">
+                  Aggregator
+                </div>
+                <div className="flex items-center gap-2 border border-border/50 bg-muted/20 px-3 py-2">
+                  <div className="min-w-0 flex-1 truncate font-mono text-xs text-text-secondary">
+                    {slotLabel(preset.aggregator)}
+                  </div>
+                  <Button
+                    size="sm"
+                    outlined
+                    onClick={() => setPicker({ kind: "aggregator" })}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-text-secondary">
+              No presets configured yet. Name one above, then choose an
+              aggregator and reference models before saving.
+            </p>
+          )}
+
+          {error && <div className="text-xs text-destructive">{error}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button ghost onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void save()} disabled={busy || !preset}>
+              {busy ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {picker && preset && (
+        <ModelPickerDialog
+          key={`moa-picker-${refreshKey}-${selected}-${picker.kind}-${
+            picker.kind === "reference" ? picker.index : "agg"
+          }`}
+          loader={api.getModelOptions}
+          alwaysGlobal
+          title="Select MoA Model"
+          onApply={async ({ provider, model }) => {
+            if ((provider || "").toLowerCase() === "moa") {
+              setError(
+                "MoA presets can't reference or aggregate the Mixture of Agents provider (no recursive MoA).",
+              );
+              return;
+            }
+            setError(null);
+            updateSelectedPreset((prev) => {
+              if (picker.kind === "aggregator") {
+                return { ...prev, aggregator: { provider, model } };
+              }
+              return {
+                ...prev,
+                reference_models: prev.reference_models.map((slot, i) =>
+                  i === picker.index ? { ...slot, provider, model } : slot,
+                ),
+              };
+            });
+          }}
+          onClose={() => setPicker(null)}
+        />
+      )}
+    </div>,
+    document.body,
+  );
+}
+
 function ModelSettingsPanel({
   aux,
   activeProfile,
@@ -704,11 +1060,31 @@ function ModelSettingsPanel({
   onSaved(): void;
 }) {
   const [auxModalOpen, setAuxModalOpen] = useState(false);
+  const [moaModalOpen, setMoaModalOpen] = useState(false);
+  const [moa, setMoa] = useState<MoaConfigResponse | null>(null);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [pendingReloadModel, setPendingReloadModel] = useState<string | null>(
     null,
   );
   const [mainNotice, setMainNotice] = useState<string | null>(null);
+
+  // MoA is a real backend surface (`GET/PUT /api/model/moa`). Load it with the
+  // rest of the settings panel; a transport failure leaves the row "not loaded"
+  // rather than fabricating a configuration.
+  useEffect(() => {
+    let live = true;
+    api
+      .getMoaModels()
+      .then((next) => {
+        if (live) setMoa(next);
+      })
+      .catch(() => {
+        if (live) setMoa(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [refreshKey]);
 
   const mainProv = activeProfile?.provider ?? aux?.main?.provider ?? "";
   const mainModel = activeProfile?.model ?? aux?.main?.model ?? "";
@@ -804,6 +1180,60 @@ function ModelSettingsPanel({
           </Button>
         </div>
 
+        {/* Mixture of Agents — same card/control as the reference. The backend
+            may report no presets (with a `detail` explaining the surface is
+            inert); render that state honestly and keep Configure disabled. */}
+        {(() => {
+          const presetCount = moa ? Object.keys(moa.presets || {}).length : 0;
+          const configurable = presetCount > 0;
+          const summary = !moa
+            ? "not loaded"
+            : configurable
+              ? `${moa.reference_models.length} reference${
+                  moa.reference_models.length === 1 ? "" : "s"
+                } · ${moa.aggregator.provider}/${shortModelName(
+                  moa.aggregator.model,
+                )}`
+              : moa.detail || "no presets configured";
+          return (
+            <div className="flex min-w-0 flex-col gap-2 bg-muted/20 border border-border/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Brain className="h-3 w-3 text-text-tertiary" />
+                  <span className="text-display text-xs font-medium tracking-wider">
+                    Mixture of Agents
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-text-secondary [overflow-wrap:anywhere]">
+                  {summary}
+                </div>
+                {!configurable && moa?.detail && (
+                  <div className="mt-1 text-xs text-text-tertiary [overflow-wrap:anywhere]">
+                    Configured presets appear here once the backend enables the
+                    MoA surface.
+                  </div>
+                )}
+              </div>
+              <Button
+                size="sm"
+                outlined
+                onClick={() => setMoaModalOpen(true)}
+                disabled={!moa || !configurable}
+                title={
+                  !moa
+                    ? "MoA configuration is unavailable"
+                    : !configurable
+                      ? moa.detail || "No MoA presets are configured"
+                      : undefined
+                }
+                className="shrink-0 self-start text-xs uppercase sm:self-center"
+              >
+                Configure
+              </Button>
+            </div>
+          );
+        })()}
+
         {picker && (
           <ModelPickerDialog
             key={`picker-${refreshKey}`}
@@ -844,6 +1274,18 @@ function ModelSettingsPanel({
             refreshKey={refreshKey}
             onSaved={onSaved}
             onClose={() => setAuxModalOpen(false)}
+          />
+        )}
+
+        {moaModalOpen && moa && (
+          <MoaModelsModal
+            config={moa}
+            refreshKey={refreshKey}
+            onSaved={(next) => {
+              setMoa(next);
+              onSaved();
+            }}
+            onClose={() => setMoaModalOpen(false)}
           />
         )}
 
