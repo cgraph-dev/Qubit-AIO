@@ -68,6 +68,17 @@ _SELF_CLEARING_STORAGE_CAUSES = frozenset({"compression", "compression_closed", 
 # Process-watcher retries of a refused completion: ~5 min at the default 5 s check interval.
 _MAX_COMPLETION_INJECTION_ATTEMPTS = 8
 _COMPLETION_INJECTION_RETRY_MAX_DELAY = 60
+# Drain retries of a refused watch event follow the same bounded-backoff policy, keyed to the
+# 2 s drain cadence instead of the watcher's check interval (#140899).
+_WATCH_INJECTION_RETRY_BASE_DELAY = 4.0
+
+
+def _refusal_retry_at(step: int) -> float:
+    """When a refused queued notice is next offered: exponential from the drain base, capped."""
+    return time.monotonic() + jittered_backoff(
+        step, base_delay=_WATCH_INJECTION_RETRY_BASE_DELAY,
+        max_delay=_COMPLETION_INJECTION_RETRY_MAX_DELAY, jitter_ratio=0.0)
+
 # Durable async-delegation claim transitions: kind -> (tools.async_delegation function, failure log).
 _DURABLE_CLAIM_OPS = {
     "drop": ("drop_completion_delivery", "Could not drop durable completion claim"),
@@ -730,10 +741,11 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
         from gateway.run import _drain_gateway_watch_events, _format_gateway_process_notification
         watch_events = _drain_gateway_watch_events(completion_queue)
         for evt in watch_events:
-            now = time.monotonic()
-            next_attempt = evt.get("_watch_next_attempt_at")
-            if isinstance(next_attempt, (int, float)) and now < next_attempt:
-                completion_queue.put(evt)  # bounded backoff: not attempted on every drain tick
+            next_retry_at = evt.get("_watch_next_retry_at")
+            if next_retry_at is not None and next_retry_at > time.monotonic():
+                # Backoff between refused injections: hold the event for a later drain tick
+                # instead of re-attempting admission every 2 s (#140899).
+                completion_queue.put(evt)
                 continue
             async with self._completion_event_scope(evt):
                 from tools.process_registry_notifications import should_surface_notification
@@ -755,29 +767,33 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
                         delivered = False
             # The original event: a requeued tick folds again from what is still queued.
             if delivered is False:
-                # A refusal (``_inject_watch_notification`` stamps ``_refusal_permanent`` for a
-                # ``WakeNotAccepted``) is paced on a bounded backoff. A plain transport/adapter
-                # failure is retryable work the next drain tick can attempt again immediately;
-                # spacing it out would leave a queued notice undelivered while the route is fine.
-                if "_refusal_permanent" not in evt:
-                    completion_queue.put(evt)
-                    continue
-                attempts = int(evt.get("_watch_injection_attempts") or 0) + 1
-                evt["_watch_injection_attempts"] = attempts
-                if evt.get("_refusal_permanent") is True and attempts >= _MAX_COMPLETION_INJECTION_ATTEMPTS:
-                    # Only a refusal proven permanent (``not_found``: the route holds no
-                    # session) spends the bounded attempt budget and is then dropped. A
-                    # refusal that may still clear (``runtime_draining``, an unowned or
-                    # foreign pin) is never dropped.
-                    logger.warning(
-                        "Watch notification refused %d times with a permanent verdict; "
-                        "dropping the queued event for %s chat=%s",
-                        attempts, evt.get("platform", "unknown"), evt.get("chat_id", "unknown"))
-                    continue
-                evt["_watch_next_attempt_at"] = now + jittered_backoff(
-                    attempts, base_delay=2.0, max_delay=_COMPLETION_INJECTION_RETRY_MAX_DELAY,
-                    jitter_ratio=0.0)
-                completion_queue.put(evt)
+                self._requeue_refused_watch_event(completion_queue, evt)
+
+    @staticmethod
+    def _requeue_refused_watch_event(completion_queue, evt: dict) -> None:
+        """Retry a refused watch event on a bounded backoff, never on every 2 s tick (#140899).
+
+        Only a refusal proven permanent (``WakeNotAccepted.permanent``: the route has no session,
+        or the payload is invalid) counts toward the cap that drops it. A transient one (a restart's
+        after-turn wait, a parked profile, a full owner FIFO) or one whose owner may still appear (an
+        unowned or foreign-pinned notice) waits it out however long it lasts.
+        """
+        step = int(evt.get("_watch_retry_step") or 0) + 1
+        evt["_watch_retry_step"] = step
+        if evt.pop("_refusal_permanent", False):
+            refusals = int(evt.get("_watch_injection_attempts") or 0) + 1
+            evt["_watch_injection_attempts"] = refusals
+            if refusals >= _MAX_COMPLETION_INJECTION_ATTEMPTS:
+                logger.warning(
+                    "Watch notification for %s chat=%s (type=%s session_id=%s) was refused "
+                    "%d times; dropping the queued event (output remains available via "
+                    "process(action='log'))",
+                    evt.get("platform") or "?", evt.get("chat_id") or "?",
+                    evt.get("type") or "?", evt.get("session_id", "unknown"), refusals,
+                )
+                return
+        evt["_watch_next_retry_at"] = _refusal_retry_at(step)
+        completion_queue.put(evt)
 
     def _adapter_by_platform_value(self, platform_name: str):
         """Literal ``p.value == platform_name`` scan over connected adapters (native adapters only)."""
@@ -1657,9 +1673,14 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
                     self._enrich_async_delegation_routing(evt)
                     groups.setdefault(self._event_route_key(evt, self._ASYNC_GROUP_KEY_FIELDS), []).append(evt)
                 for group in groups.values():
+                    if any(evt.get("_watch_next_retry_at", 0) > time.monotonic() for evt in group):
+                        for evt in group:
+                            _pr.completion_queue.put(evt)
+                        continue
                     try:
                         delivered = await self._deliver_async_delegation_group(group)
                         if delivered is False:
+                            self._back_off_refused_completions(group)
                             for evt in group:
                                 _pr.completion_queue.put(evt)
                     except Exception as e:
@@ -1667,6 +1688,16 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
                             _pr.completion_queue.put(evt)
                         logger.error("Async delegation injection error: %s", e)
             await asyncio.sleep(interval)
+
+    @staticmethod
+    def _back_off_refused_completions(group: list[dict]) -> None:
+        """Space out an undelivered async group's retries instead of re-offering it every 2 s pass.
+        The backoff only paces; the durable ledger decides when a row gives up (a permanent refusal
+        spends a delivery attempt there, so the count survives restarts) (#141153)."""
+        for evt in group:
+            step = int(evt.get("_watch_retry_step") or 0) + 1
+            evt["_watch_retry_step"] = step
+            evt["_watch_next_retry_at"] = _refusal_retry_at(step)
 
     @staticmethod
     def _redacted_output_tail(session, limit: int) -> str:
