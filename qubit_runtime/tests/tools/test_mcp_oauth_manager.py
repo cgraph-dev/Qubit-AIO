@@ -189,7 +189,10 @@ def _fake_response(status, url, body):
     """A minimal stand-in for the httpx.Response the SDK feeds our bridge."""
     resp = MagicMock()
     resp.status_code = status
-    resp.request = SimpleNamespace(url=url)
+    # Match the httpx2 Response surface the SDK's redirect helper reads: a
+    # concrete request object and no follow-up request (these fakes never redirect).
+    resp.request = SimpleNamespace(url=url, method="POST")
+    resp.next_request = None
 
     async def _aread():
         return body
