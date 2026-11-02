@@ -31,6 +31,7 @@ import {
   History,
   Shield,
   FileOutput,
+  FolderTree,
   RefreshCw,
 } from "lucide-react";
 import { api, ConfirmRequiredError } from "@/lib/api";
@@ -81,6 +82,8 @@ const CATEGORY_ICONS: Record<
   tool_loop_guardrails: Shield,
   tool_output: FileOutput,
   updates: RefreshCw,
+  hosted_rooms: Users,
+  worktrees: FolderTree,
 };
 
 function CategoryIcon({
