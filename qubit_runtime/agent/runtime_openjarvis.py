@@ -302,7 +302,15 @@ class OpenJarvisRuntime:
             home = Path(self._home_raw).expanduser()
             if not home.is_absolute():
                 home = Path.cwd() / home
-            return home.resolve()
+            resolved = home.resolve()
+            # ``Path.resolve(strict=False)`` returns the unresolved spelling for a symlink loop
+            # (and ``exists()`` swallows ELOOP as False), so stat the path to surface an
+            # unreadable/unresolvable home before the executable probe can answer first.
+            try:
+                home.stat()
+            except FileNotFoundError:
+                pass
+            return resolved
         except (OSError, RuntimeError, UnicodeError) as exc:
             raise RuntimeRefusalError(
                 "openjarvis_home_unavailable",
