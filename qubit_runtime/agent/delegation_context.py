@@ -133,6 +133,10 @@ def scrub_kanban_env(env: Mapping[str, str] | MutableMapping[str, str]) -> dict[
     onto its scratch root and unfence the real one).
     """
     cleaned = {k: v for k, v in env.items() if k not in KANBAN_ENV_KEYS}
+    # ``kanban`` is a gateway-minted session source; a worker's shell/CLI descendants must
+    # not re-claim it as their own conversation label.
+    if cleaned.get("HERMES_SESSION_SOURCE") == "kanban":
+        cleaned.pop("HERMES_SESSION_SOURCE", None)
     inherited = str(env.get(DELEGATED_CHILD_ENV_MARKER) or "")
     cleaned[DELEGATED_CHILD_ENV_MARKER] = inherited if inherited and inherited != "1" else _fenced_kanban_root()
     return cleaned
