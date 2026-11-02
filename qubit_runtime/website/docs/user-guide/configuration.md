@@ -1009,6 +1009,30 @@ You can also list gitignored files to copy into worktrees via `.worktreeinclude`
 node_modules/
 ```
 
+### Worktree retention
+
+Idle worktrees are swept at `qubit -w` startup and every six hours. Clean, merged trees older than their tier (24h for `qubit-*`/`subagent-*`, 72h for named trees) are removed; dirty or unpushed trees are archived under `refs/qubit/archive/<tree>` first and can be restored with `qubit worktree restore <name>`.
+
+```yaml
+worktrees:
+  archive_dirty: true              # false keeps dirty/unpushed trees instead of archiving them
+  archive_max_file_mb: 50          # untracked files larger than this are not archived; the tree is kept
+  archive_retention_days: 30       # delete archive refs older than this; 0 keeps them forever
+  max_total_gb: 0                  # size budget for idle trees; oldest are archived first; 0 = off
+  install_state_retention_days: 14 # remove installs/<key> of a missing checkout after this many unused days; 0 = never
+```
+
+## Hosted-room discussion limits
+
+Native hosted rooms share one discussion ceiling per discussion, read from the root owner's config at service startup. Restart the owning service after changing these values. Both must be positive integers.
+
+```yaml
+hosted_rooms:
+  discussion:
+    max_rounds: 3
+    max_messages: 10
+```
+
 ## Context Compression
 
 Qubit automatically compresses long conversations to stay within your model's context window. The compression summarizer is a separate LLM call — you can point it at any provider or endpoint.
