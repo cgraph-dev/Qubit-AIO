@@ -72,6 +72,7 @@ from qubit_cli.web_server_lifecycle import (  # noqa: E402
     _read_bound_port,
     _report_port_in_use,
     _start_parent_death_watchdog,
+    _uvicorn_console_logging,
     _warm_gateway_module,
     _write_dashboard_ready_file,
     _write_machine_sentinel_line,
@@ -1169,8 +1170,14 @@ def _build_uvicorn_server(host: str, port: int, *, ssh_isolated: bool = False):
         served_app = wrap_asgi_with_ws_tracking(app, app.state.ssh_isolated_clients)
         ping_interval, ping_timeout = TUNNEL_WS_PING_INTERVAL_S, TUNNEL_WS_PING_TIMEOUT_S
 
+    # uvicorn's default log_config calls logging.config.dictConfig, which runs
+    # logging.shutdown() on every live handler; the multiplexed gateway's profile
+    # log routers are installed before this listener boots and stay closed after
+    # that, silencing agent.log/errors.log/gateway.log. Install uvicorn's console
+    # loggers directly and pass no log_config, exactly like build_listener_server.
+    _uvicorn_console_logging()
     config = uvicorn.Config(
-        served_app, host=host, port=port, log_level="warning",
+        served_app, host=host, port=port, log_level="warning", log_config=None,
         # Off by default so _ws_client_is_allowed sees the real peer, not
         # X-Forwarded-For. Gated mode runs behind a TLS terminator and needs
         # X-Forwarded-Proto for cookie Secure flags.

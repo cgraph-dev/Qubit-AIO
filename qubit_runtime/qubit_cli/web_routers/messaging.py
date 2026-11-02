@@ -1180,10 +1180,11 @@ def _messaging_platform_posture(platform_id: str, entry: dict[str, Any], scoped:
 
 @router.post("/api/messaging/platforms/{platform_id}/test")
 async def test_messaging_platform(platform_id: str, profile: Optional[str] = None):
-    entry = _require_platform(platform_id)
-
     def _run():
         with _profile_scope(profile) as scoped_dir:
+            # Plugin platforms are registered per profile: resolve the catalog entry in
+            # the target's scope, the same list GET /api/messaging/platforms?profile= shows.
+            entry = _require_platform(platform_id)
             payload = _platform_payloads(scoped_dir, [entry])[0]
             posture = None
             if payload["state"] == "connected":
@@ -1191,9 +1192,9 @@ async def test_messaging_platform(platform_id: str, profile: Optional[str] = Non
                 # must resolve the ACTIVE profile's env/config/pairing store, not the
                 # dashboard process's root home.
                 posture = _messaging_platform_posture(platform_id, entry, scoped_dir is not None)
-            return payload, posture
+            return entry, payload, posture
 
-    payload, posture = await asyncio.to_thread(_run)
+    entry, payload, posture = await asyncio.to_thread(_run)
 
     def result(ok: bool, message: str) -> dict[str, Any]:
         return {"ok": ok, "state": payload["state"], "message": message}

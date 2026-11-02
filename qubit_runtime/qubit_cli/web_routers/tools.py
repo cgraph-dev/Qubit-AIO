@@ -683,14 +683,14 @@ async def select_terminal_backend(
     """Persist ``terminal.backend``.  A backend that still needs setup is
     allowed — the picker shows guidance instead of blocking, like the CLI."""
     backend = (body.backend or "").strip().lower()
-    valid_names = {row["name"] for row in _terminal_backend_rows()}
-    if backend not in valid_names:
-        raise _bad_request(
-            f"Unknown terminal backend: {body.backend!r}. "
-            f"Use one of: {', '.join(sorted(valid_names))}")
 
     def _run():
         with config_write_scope(body.profile or profile):
+            valid_names = {row["name"] for row in _terminal_backend_rows()}
+            if backend not in valid_names:
+                raise _bad_request(
+                    f"Unknown terminal backend: {body.backend!r}. "
+                    f"Use one of: {', '.join(sorted(valid_names))}")
             config = load_config()
             _dict_section(config, "terminal")["backend"] = backend
             save_config(config)
