@@ -81,8 +81,10 @@ def _seed(cfg):
     from voicebridge.office import store as OSS
 
     ledger.health(cfg)
+    floor = O.floor_create(cfg, 1, "Operations", role="operations",
+                           confirmed=True)["id"]
     ceo = O.hire(cfg, "ceo", seat_type="ceo", confirmed=True)["id"]
-    dept = O.department_create(cfg, "ops", name="Operations",
+    dept = O.department_create(cfg, "ops", name="Operations", floor_id=floor,
                                kill_criteria="net negative for 30 days",
                                confirmed=True)["id"]
     room = O.room_create(cfg, dept, "workshop", confirmed=True)["id"]
@@ -347,3 +349,70 @@ def test_the_six_live_404s_are_now_answered(tmp_path, monkeypatch):
         sent = _Handler.run(_Handler(cfg, path=bare), "GET")
         assert sent[0] == 200, (bare, sent)
         assert _json_body(sent).get("ok") is True, bare
+
+
+# --------------------------------------------------------------------------
+# 6. the write half: the SAME office gate, and real allowed/denied paths
+# --------------------------------------------------------------------------
+def test_mutation_gate_requires_the_live_office_nonce_not_just_a_referer():
+    """A write is authorised by the same loopback + Host + own-app Referer +
+    live nonce triple as a read. A forged Referer without the nonce is refused,
+    and the gate still validates a supplied header token."""
+    cfg = type("C", (), {})()
+    assert _Handler(cfg, method="POST").h._office_client_mutation_ok() is True
+    assert not _Handler(cfg, method="POST", nonce=None) \
+        .h._office_client_mutation_ok()
+    assert not _Handler(cfg, method="POST", nonce="attacker") \
+        .h._office_client_mutation_ok()
+    assert not _Handler(cfg, method="POST", peer="192.168.1.9") \
+        .h._office_client_mutation_ok()
+    assert not _Handler(cfg, method="POST", host="evil.example:8890") \
+        .h._office_client_mutation_ok()
+    assert not _Handler(cfg, method="POST", query="token=configured") \
+        .h._office_client_mutation_ok()
+    assert _Handler(cfg, method="POST", header="configured") \
+        .h._office_client_mutation_ok() is True
+    assert not _Handler(cfg, method="POST", header="wrong") \
+        .h._office_client_mutation_ok()
+
+
+def test_front_door_post_without_the_nonce_is_401(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    _seed(cfg)
+    body = json.dumps({"agentId": 1, "text": "hello"}).encode()
+    sent = _Handler.run(_Handler(cfg, path="/api/messages", method="POST",
+                                 body=body, nonce=None), "POST")
+    assert sent[0] == 401, sent
+
+
+def test_front_door_post_with_the_nonce_delivers_a_message(tmp_path,
+                                                           monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    wk = _seed(cfg)
+    body = json.dumps({"agentId": wk, "text": "review the ledger"}).encode()
+    sent = _Handler.run(_Handler(cfg, path="/api/messages", method="POST",
+                                 body=body), "POST")
+    assert sent[0] == 201, sent
+    msg = _json_body(sent)
+    assert msg["ok"] is True and msg["status"] == "delivered", msg
+    # The client polls its own status route; the row is real.
+    got = _Handler.run(_Handler(cfg, path=f"/api/messages/{msg['id']}"), "GET")
+    assert got[0] == 200, got
+    assert _json_body(got)["status"] == "delivered"
+
+
+def test_status_rooms_and_snapshot_reads_are_bound(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    _seed(cfg)
+    for bare in ("/api/status", "/api/rooms", "/api/agents",
+                 "/api/permissions", "/api/messages", "/api/snapshot"):
+        sent = _Handler.run(_Handler(cfg, path=bare), "GET")
+        assert sent[0] == 200, (bare, sent)
+        body = _json_body(sent)
+        assert body.get("ok") is True, (bare, body)
+    status = _json_body(_Handler.run(_Handler(cfg, path="/api/status"), "GET"))
+    assert status["connected"] is True and status["rooms"] >= 1, status
+    assert status["agents"] >= 1, status
+    assert status["writes"]["messages"] is True
+    snap = _json_body(_Handler.run(_Handler(cfg, path="/api/snapshot"), "GET"))
+    assert snap["rooms"] and snap["agents"], snap

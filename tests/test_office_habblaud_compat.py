@@ -56,8 +56,10 @@ def _seed(cfg):
     from voicebridge.office import ledger, org as O, agent_memory as MEM
 
     ledger.health(cfg)                        # creates the store
+    floor = O.floor_create(cfg, 1, "Operations", role="operations",
+                           confirmed=True)["id"]
     ceo = O.hire(cfg, "ceo", seat_type="ceo", confirmed=True)["id"]
-    dept = O.department_create(cfg, "ops", name="Operations",
+    dept = O.department_create(cfg, "ops", name="Operations", floor_id=floor,
                                kill_criteria="net negative for 30 days",
                                confirmed=True)["id"]
     room = O.room_create(cfg, dept, "workshop", confirmed=True)["id"]
@@ -162,11 +164,17 @@ def test_access_carries_the_five_booleans_the_client_validates(tmp_path,
     assert out["ok"] is True
     for key in ("remote", "local", "permissions", "messages", "terminal"):
         assert isinstance(out.get(key), bool), (key, out)
-    # The honest positions: no remote view, no raw PTY, mutations are C4-gated.
+    # The honest positions: no remote view and no raw PTY. The write verbs
+    # Qubit DOES own are enabled: a permission decision settles the shared
+    # approval journal, a message becomes a real seat task, a spawn queues a
+    # real office task, and a room rename writes the store.
     assert out["terminal"] is False
     assert out["remote"] is False
-    assert out["permissions"] is False
-    assert out["messages"] is False
+    assert out["permissions"] is True
+    assert out["messages"] is True
+    assert out["spawn"] is True
+    assert out["renameRoom"] is True
+    assert out["read_only"] is False
     assert out["local"] is True
 
 
@@ -318,7 +326,6 @@ TYPED_REFUSALS = (
     ("POST", "/api/office/habblaud/agents/1/terminal"),
     ("POST", "/api/office/habblaud/sessions/a/b/terminal"),
     ("GET", "/api/office/habblaud/deliveries/file/x"),
-    ("POST", "/api/office/habblaud/spawn"),
     ("POST", "/api/office/habblaud/spawn/attachments"),
     ("POST", "/api/office/habblaud/dictation"),
     ("POST", "/api/office/habblaud/dictation/x"),
@@ -336,21 +343,145 @@ def test_unsupported_capabilities_return_typed_refusals(tmp_path, monkeypatch):
         assert out.get("code"), (method, path, out)
 
 
-def test_org_mutations_are_c4_staged_not_a_bare_post(tmp_path, monkeypatch):
-    """Permission decision, message send and character edit are org mutations:
-    they MUST come back 409 NEEDS_CONFIRMATION, so the client never renders a
-    fabricated success from a direct POST from the embed."""
+def test_unknown_mutations_are_typed_refusals_not_fabricated_success(
+        tmp_path, monkeypatch):
+    """A decision/message for a row that does not exist is a typed 404/400.
+    A character edit still stages (it is a real org write with no Qubit seat
+    field yet), so a direct POST never renders as an executed success."""
     cfg = _cfg(tmp_path, monkeypatch)
     _seed(cfg)
-    for body, path in (
-            ({}, "/api/office/habblaud/permissions/abc/decision"),
-            ({}, "/api/office/habblaud/messages"),
-            ({}, "/api/office/habblaud/agents/1/character")):
-        code, out = _dispatch(cfg, "POST", path, body=body)
-        assert code == 409, (path, code, out)
-        assert out["ok"] is False
-        assert out["state"] == "NEEDS_CONFIRMATION"
-        assert out["code"] == "CONFIRM_REQUIRED"
+    code, out = _dispatch(
+        cfg, "POST", "/api/office/habblaud/permissions/abc/decision",
+        body={"decision": "allow"})
+    assert code == 404 and out["code"] == "PERMISSION_NOT_FOUND", (code, out)
+    code, out = _dispatch(cfg, "POST", "/api/office/habblaud/messages",
+                          body={"text": "hello"})
+    assert code == 400 and out["ok"] is False, (code, out)
+    code, out = _dispatch(
+        cfg, "POST", "/api/office/habblaud/agents/1/character",
+        body={"name": "x"})
+    assert code == 409, (code, out)
+    assert out["ok"] is False
+    assert out["state"] == "NEEDS_CONFIRMATION"
+    assert out["code"] == "CONFIRM_REQUIRED"
+
+
+def test_message_send_delivers_a_real_seat_task(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _seed(cfg)
+    code, out = _dispatch(
+        cfg, "POST", "/api/office/habblaud/messages",
+        body={"agentId": ids["worker"], "text": "Please review the ledger."})
+    assert code == 201, (code, out)
+    assert out["ok"] is True, out
+    assert out["status"] == "delivered", out
+    assert out["agentId"] == str(ids["worker"])
+    assert out["taskId"], out
+    # Poll the client's own status route: the same row reports delivered.
+    code, got = _dispatch(cfg, "GET",
+                          f"/api/office/habblaud/messages/{out['id']}")
+    assert code == 200, (code, got)
+    assert got["status"] == "delivered"
+    # And a real office task exists, assigned to that seat.
+    from voicebridge.office import store as OSS
+    conn = OSS.connect(cfg)
+    try:
+        row = conn.execute("SELECT assignee_id, status FROM office_task"
+                           " WHERE id=?", (int(out["taskId"]),)).fetchone()
+    finally:
+        conn.close()
+    assert row is not None and int(row["assignee_id"]) == int(ids["worker"])
+
+
+def test_message_to_unknown_seat_is_refused_before_any_row(tmp_path,
+                                                           monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    _seed(cfg)
+    code, out = _dispatch(cfg, "POST", "/api/office/habblaud/messages",
+                          body={"agentId": 99999, "text": "hello"})
+    assert code == 404 and out["code"] == "OFFICE_NOT_FOUND", (code, out)
+    code, out = _dispatch(cfg, "GET", "/api/office/habblaud/messages")
+    assert code == 200 and out["count"] == 0, out
+
+
+def test_permission_deny_settles_the_shared_approval_journal(tmp_path,
+                                                             monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    from voicebridge.dashboard_ops import _journal
+
+    approval = _journal(cfg).create("qubit.office.test", "a pending decision",
+                                    ttl_s=120.0, session="dashboard")
+    code, out = _dispatch(
+        cfg, "POST",
+        f"/api/office/habblaud/permissions/{approval.id}/decision",
+        body={"behavior": "deny"})
+    assert code == 200, (code, out)
+    assert out["ok"] is True and out["decision"] == "deny", out
+    # The same journal record is settled: a replay is no longer pending.
+    assert _journal(cfg).get(approval.id).state != "in_progress"
+    code, out = _dispatch(
+        cfg, "POST",
+        f"/api/office/habblaud/permissions/{approval.id}/decision",
+        body={"decision": "allow"})
+    assert code == 404, (code, out)
+
+
+def test_spawn_queues_a_real_office_task(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _seed(cfg)
+    code, out = _dispatch(cfg, "POST", "/api/office/habblaud/spawn",
+                          body={"folder": "/tmp/project",
+                                "prompt": "write the release notes",
+                                "exit_check": "touch /tmp/pwned"})
+    assert code == 201, (code, out)
+    assert out["ok"] is True and out["status"] == "opened", out
+    assert out["agentId"] == str(ids["worker"])
+    # A client-supplied shell command is never trusted: the task's exit check
+    # is the fixed POSIX `true`, never the body.
+    from voicebridge.office import store as _OSS
+    conn = _OSS.connect(cfg)
+    try:
+        check = conn.execute("SELECT exit_check FROM office_task WHERE id=?",
+                             (int(out["id"]),)).fetchone()["exit_check"]
+    finally:
+        conn.close()
+    assert check == "true", check
+    code, got = _dispatch(cfg, "GET",
+                          f"/api/office/habblaud/spawn/{out['id']}")
+    assert code == 200, (code, got)
+    assert got["status"] in ("opened", "queued"), got
+    assert got["taskStatus"] != "abandoned"
+
+
+def test_read_lists_are_real_and_empty_when_the_store_is(tmp_path,
+                                                         monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    for path in ("/api/office/habblaud/rooms",
+                 "/api/office/habblaud/agents",
+                 "/api/office/habblaud/permissions",
+                 "/api/office/habblaud/messages"):
+        code, out = _dispatch(cfg, "GET", path)
+        assert code == 200, (path, code, out)
+        assert out["ok"] is True, (path, out)
+        assert out["count"] == 0, (path, out)
+
+
+def test_snapshot_and_status_report_the_real_tower(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, monkeypatch)
+    ids = _seed(cfg)
+    code, snap = _dispatch(cfg, "GET", "/api/office/habblaud/snapshot")
+    assert code == 200, (code, snap)
+    assert snap["ok"] is True
+    assert len(snap["rooms"]) >= 1 and len(snap["agents"]) >= 1, snap
+    assert snap["meta"]["messages"] is True
+    assert snap["meta"]["terminal"] is True
+    code, status = _dispatch(cfg, "GET", "/api/office/habblaud/status")
+    assert code == 200, (code, status)
+    assert status["connected"] is True and status["empty"] is False, status
+    assert status["rooms"] == len(snap["rooms"])
+    assert status["agents"] == len(snap["agents"])
+    assert status["writes"]["messages"] is True
+    assert status["writes"]["permissions"] is True
 
 
 def test_missing_permission_and_message_are_the_404_client_expects(tmp_path,

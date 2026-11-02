@@ -14,13 +14,15 @@ the tower report, and a field the tower does not carry is omitted rather than
 defaulted (the client has its own unknown-handling and a fabricated `0` would
 render as a confident zero).
 
-WHAT IT DELIBERATELY DOES NOT DO
---------------------------------
-The client also wants `/api/agents/:id`, `/api/permissions/:id` and
-`/api/messages/:id`, and can POST to them. Those are org MUTATIONS and, per
-contract C4, must go through the confirmation authority rather than a direct
-POST from a view. They are not bound here, and the client's own binding status
-reports them as missing.
+WHAT THIS MODULE DOES NOT DO
+----------------------------
+It does not own the write half. The snapshot only advertises the capabilities
+the compat layer really binds (`meta.terminal`/`meta.messages`) and marks each
+agent `canMessage` because the message route is real. Permission decisions
+settle the shared approval journal and messages become real office tasks in
+`voicebridge/qubit_compat.py` + `voicebridge/office/messages.py`; raw PTY stays
+a typed refusal. Nothing in this translation invents an agent, a room or a
+delivery state.
 """
 
 from __future__ import annotations
@@ -260,6 +262,11 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
             "supervisorId": (str(ch.get("supervisor_id"))
                              if ch.get("supervisor_id") is not None else None),
             "departmentId": ch.get("department_id"),
+            # The message pane gates on this per-agent flag. It is TRUE because
+            # the message route is really bound (`voicebridge.office.messages`):
+            # a send becomes a claimed task for this seat. It is not a claim of
+            # an upstream Claude session.
+            "canMessage": True,
         })
 
     return {
@@ -276,8 +283,16 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
             "sources": [],
             "startedAt": int(start_time * 1000),
             "version": "qubit-office",
-            "terminal": False,
-            "messages": False,
+            # `terminal` here is the client's gate for the permission-decision
+            # and room-rename controls, NOT a claim that Qubit exposes a raw
+            # PTY (the `/api/access` `terminal` flag stays false, and every PTY
+            # route is still a typed refusal). Both write controls are really
+            # bound: a permission decision settles the shared approval journal
+            # and a room rename writes the office store.
+            "terminal": True,
+            # The message pane is bound to the real owner->seat delivery store
+            # (`voicebridge.office.messages`); a send becomes a claimed task.
+            "messages": True,
         },
         # NOT part of the client's type, carried because the office's own HUD
         # reads them and a reader should be able to see the fold it is looking

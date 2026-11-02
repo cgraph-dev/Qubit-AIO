@@ -610,8 +610,8 @@ def test_office_access_is_bound_read_only_and_disables_unavailable_actions():
     code, body = h._captured_json
     assert code == 200
     assert body == {
-        "remote": False, "local": True, "permissions": False,
-        "messages": False, "terminal": False, "spawn": False,
+        "remote": False, "local": True, "permissions": True,
+        "messages": True, "terminal": False, "spawn": True,
     }
 
 

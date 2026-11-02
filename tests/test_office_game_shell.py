@@ -632,7 +632,8 @@ def test_the_default_renderer_is_the_app_and_the_shell_is_opt_in():
         "is the ROLLBACK and must stay one query param away")
     # And the branch shapes: shell -> createOfficeComponent, else -> createOfficeApp.
     shell_branch = re.search(
-        r"wantShell\s*\?\s*createOfficeComponent\([^)]*\)\s*:\s*createOfficeApp\(",
+        r"wantShell\s*\?\s*createOfficeComponent\([^)]*\)\s*:\s*"
+        r"createOffice(?:App|WithSeatRouting)\(",
         code)
     assert shell_branch, (
         "the switch is not `wantShell ? createOfficeComponent(...) : "
@@ -749,10 +750,11 @@ def test_the_stream_is_bound_and_the_writes_are_gated_not_missing(tmp_path):
             f"{gated_client} is reported MISSING, not gated — the mutation "
             f"route is a confirmed refusal, not an unwired gap")
 
-    # The read-only routes are BOUND, never missing.
+    # Only genuinely unavailable capabilities are missing. Spawn and room
+    # rename are bound to real office-store backends; permissions/messages
+    # stay gated rather than missing.
     assert set(got["missing"]) == {
-        "terminal/pty", "spawn", "renameRoom", "deliveries",
-        "recording/replay"}, (
+        "terminal/pty", "deliveries", "recording/replay"}, (
         f"the missing set is wrong: {got['missing']} — only genuinely "
         f"unavailable capabilities may be missing")
     for bound_client in ("agents/:id", "access", "sessions/recent"):
@@ -764,8 +766,9 @@ def test_the_stream_is_bound_and_the_writes_are_gated_not_missing(tmp_path):
         "Habblaud's read-only agent profile route lacks its binding")
     assert got["canRender"] is True, (
         "the renderer is reported as unable to render")
-    assert got["viewOnly"] is True, (
-        "the writes are gated, so the client must read as view-only")
+    assert got["viewOnly"] is False, (
+        "the real write paths (messages, spawn, room rename) are bound; the "
+        "client is no longer view-only")
 
 
 def test_the_binding_summary_counts_the_new_truth(tmp_path):
@@ -792,9 +795,11 @@ def test_the_binding_summary_counts_the_new_truth(tmp_path):
         f"the summary does not report the gated count ({got['gated']}): {s!r}")
     assert "bound" in s and "unavailable" in s and "confirmation-gated" in s, (
         f"the summary does not name all three buckets: {s!r}")
-    # And it must not under-report: every bound route appears by name.
-    assert "0 bound" not in s and "0 unavailable" not in s, (
-        f"the summary reports an empty bucket that is not empty: {s!r}")
+    # And it must not under-report: every non-empty bucket is reported. (The
+    # old substring form `"0 bound" not in s` was false for `10 bound`; compare
+    # the bucket counts themselves.)
+    assert got["bound"] > 0 and got["missing"] > 0 and got["gated"] > 0, (
+        f"a bucket that is not empty is reported as empty: {s!r}")
 
     # Cross-check the numbers against the route list itself, so a summary that
     # agreed only with a stale `bindingVerdict` would still fail here.
