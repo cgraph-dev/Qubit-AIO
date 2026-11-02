@@ -571,7 +571,12 @@ class FontSetBody(BaseModel):
     font: str
 
 class _AgentPluginInstallBody(BaseModel):
-    identifier: str
+    # A local manifest/dir, a reviewed catalog identifier, or a Git URL /
+    # ``owner/repo`` shorthand. Defaulted so a caller may send only ``url``.
+    identifier: str = ""
+    # GitHub/Git clone URL (or ``owner/repo`` shorthand). Alias of
+    # ``identifier`` for the dashboard's "install from URL" field.
+    url: Optional[str] = None
     force: bool = False
     enable: bool = True
     # Install by curated-catalog name (resolves repo + pinned SHA server-side).

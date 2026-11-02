@@ -24,7 +24,10 @@ from qubit_cli.config import redact_key
 from qubit_cli.web_deps import late
 from qubit_cli.web_server_files import _path_is_under
 from qubit_cli.web_server_gateway import _restart_gateway_after
-from qubit_cli.web_server_memory import _normalize_memory_provider_name, _require_memory_provider_ready
+from qubit_cli.web_server_memory import (
+    _normalize_memory_provider_name, _require_memory_provider_ready,
+    invalidate_memory_provider_discovery,
+)
 from qubit_cli.web_models import (
     BackupRequest, CredentialPoolAdd, HookCreate, HookDelete, ImportRequest, MemoryProviderSelect,
     MemoryReset, PairingApprove, PairingRevoke, WebhookCreate, WebhookEnabledToggle,
@@ -527,6 +530,7 @@ async def set_memory_provider(body: MemoryProviderSelect, profile: Optional[str]
                 cfg["memory"] = {}
             cfg["memory"]["provider"] = provider
             save_config(cfg)
+            invalidate_memory_provider_discovery()
         return {"ok": True, "active": provider}
 
     return await asyncio.to_thread(_run)

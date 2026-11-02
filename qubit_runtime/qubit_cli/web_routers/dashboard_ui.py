@@ -239,9 +239,9 @@ async def post_agent_plugin_install(request: Request, body: _AgentPluginInstallB
     from qubit_cli.plugins_cmd import dashboard_install_plugin
 
     catalog_name = (body.catalog_name or "").strip()
-    identifier = body.identifier.strip()
+    identifier = (body.url or body.identifier or "").strip()
     if not identifier and not catalog_name:
-        raise HTTPException(status_code=400, detail="Provide an identifier or a catalog_name.")
+        raise HTTPException(status_code=400, detail="Provide an identifier, a url, or a catalog_name.")
     result = await _plugin_mutation(lambda: _plugin_action(
         dashboard_install_plugin(
             identifier, force=body.force, enable=body.enable, catalog_name=catalog_name or None,

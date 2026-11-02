@@ -1084,6 +1084,14 @@ QUBIT_READ_AUTHORITY: tuple = (
     # Qubit product version (``qubit_version``); serve it from the Qubit
     # boundary.
     "/api/system/stats",
+    # Memory-wiki read surface (installed user dashboard plugin). The plugin's
+    # own FastAPI route scans every recent session's messages per request; on a
+    # populated profile that exceeded the dashboard timeout and stalled the
+    # page. The compat handlers call the plugin's own core against a read-only
+    # state.db with a bounded message window and a short response cache, so the
+    # page loads in seconds and repeated loads are instant. Same queries/shapes
+    # as the plugin (no reimplementation of its aggregation).
+    "/api/plugins/memory-wiki",
 )
 
 

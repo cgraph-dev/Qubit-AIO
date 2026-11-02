@@ -1,17 +1,38 @@
 """Memory-provider dashboard helpers: manifest/schema loading, setup-env and dependency probes, configured-status discovery.
 """
 
+import copy
 import logging
 import json
 import os
 import shlex
 import subprocess
+import threading
+import time
 from fastapi import HTTPException
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Same logger the code used before extraction (record parity).
 _log = logging.getLogger("qubit_cli.web_server")
+
+# Discovery runs an external dependency ``check`` command per provider (each
+# with its own subprocess timeout), so an uncached page load can take seconds
+# and a slow check can block far longer. The dashboard polls this on every
+# /api/memory and /api/dashboard/plugins/hub read; a short TTL keeps the read
+# honest while bounding that work. Mutations call
+# ``invalidate_memory_provider_discovery()`` so a just-installed/configured
+# provider is visible immediately.
+_DISCOVERY_TTL_S = 5.0
+_discovery_cache: Optional[tuple] = None
+_discovery_lock = threading.Lock()
+
+
+def invalidate_memory_provider_discovery() -> None:
+    """Drop the cached discovery rows (called after a provider write)."""
+    global _discovery_cache
+    with _discovery_lock:
+        _discovery_cache = None
 
 def _normalize_memory_provider_name(name: Any) -> str:
     from agent.memory_provider import is_core_memory_provider
@@ -329,6 +350,32 @@ def _memory_provider_status(row: Dict[str, Any], setup: Dict[str, Any], configur
 
 
 def _discover_memory_provider_statuses() -> List[Dict[str, Any]]:
+    """TTL-cached discovery (see ``_DISCOVERY_TTL_S``); returns an independent copy.
+
+    The cache is scoped to the current Qubit home: a process that switches
+    profiles (or a test suite using a fresh home per case) must never read
+    another home's provider rows.
+    """
+    global _discovery_cache
+    try:
+        from qubit_constants import get_qubit_home
+        home_key = str(get_qubit_home())
+    except Exception:
+        home_key = ""
+    now = time.monotonic()
+    with _discovery_lock:
+        cached = _discovery_cache
+    if cached is not None and cached[0] == home_key \
+            and now - cached[1] < _DISCOVERY_TTL_S:
+        return copy.deepcopy(cached[2])
+    providers = _discover_memory_provider_statuses_uncached()
+    with _discovery_lock:
+        _discovery_cache = (home_key, time.monotonic(),
+                            copy.deepcopy(providers))
+    return providers
+
+
+def _discover_memory_provider_statuses_uncached() -> List[Dict[str, Any]]:
     from qubit_cli.config import load_config
     discovered: Dict[str, Dict[str, Any]] = {}
     try:
