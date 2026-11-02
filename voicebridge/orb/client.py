@@ -230,7 +230,10 @@ def service_base(cfg: Any) -> str:
         explicit = str(_cfg_get(cfg, "voice_edit", "service_url", default="") or "")
         if explicit:
             return explicit.rstrip("/")
-        host = str(_cfg_get(cfg, "webui", "host", default="127.0.0.1") or "127.0.0.1")
+        from voicebridge.config import resolve_webui_bind_host
+        host = resolve_webui_bind_host(
+            _cfg_get(cfg, "webui", "host", default="127.0.0.1") or "127.0.0.1",
+            _cfg_get(cfg, "webui", "allow_lan", default=False))
         try:
             port = int(_cfg_get(cfg, "webui", "port", default=8890) or 8890)
         except (TypeError, ValueError):
