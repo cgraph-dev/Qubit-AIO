@@ -941,6 +941,12 @@ def _b_chat_sessions(ctx, args):
     if action == "search":
         return {"sessions": store.list(limit=20,
                                        query=str(args.get("query", "") or ""))}
+    if action == "create":
+        # The real create-session action behind "new session"/"new chat". The
+        # deterministic registry entry owns this phrase so L1.5 can never route
+        # it to a rename/resume of an existing session.
+        created = store.create(str(args.get("name", "") or ""))
+        return {"session": created, "created": True}
     if action == "resume":
         # Webchat resume: the canonical store has no re-activate verb —
         # delete is a tombstone and archive is a flag — so resume clears
@@ -6320,9 +6326,9 @@ _E("session_show", "Show a session",
 _E("session_rename", "Rename a session",
    ("rename session", "name session"),
    "sessions", ("sessions",), args=(_S("session_id", True), _S("name", True)),
-   fixed=(("action", "rename"),), summary="sessions",
+   fixed=(("action", "rename"),), confirm=True, summary="sessions",
    examples=("qubit, rename session 12 to invoices",),
-   help="Set a session display name.")
+   help="Set a session display name (confirmed).")
 _E("session_archive", "Archive a session",
    ("archive session",),
    "sessions", ("sessions",), args=(_S("session_id", True),),
@@ -6348,6 +6354,14 @@ _E("chat_sessions", "List chat sessions",
    fixed=(("action", "list"),), summary="sessions",
    examples=("qubit, list my chats",),
    help="Canonical chat sessions (state.db), including migrated legacy history.")
+_E("chat_session_new", "New chat session",
+   ("new session", "new chat", "start a new session", "start a new chat",
+    "create a new session", "create new chat", "fresh chat", "fresh session"),
+   "chat_sessions", ("sessions",),
+   fixed=(("action", "create"),), summary="sessions",
+   examples=("qubit, new session",),
+   help="Create a new canonical chat session (state.db). The deterministic "
+        "create action; it never renames or resumes an existing session.")
 _E("chat_session_show", "Show a chat session",
    ("show chat session", "show my chat", "open chat session"),
    "chat_sessions", ("sessions",), args=(_S("session_id", True),),

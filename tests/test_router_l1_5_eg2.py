@@ -261,6 +261,35 @@ def test_l1_5_adds_zero_high_risk_routes_to_resolve():
             assert resolution.kind == VC.UNKNOWN
 
 
+# ------------------------------------------------- write-class entry veto
+def test_mutating_session_entries_are_high_risk():
+    """A rename/create entry is never a safe L1.5 candidate. Live defect:
+    ``new session`` was semantically routed to ``session_rename`` (write
+    without confirmation) because the marker table lacked rename/create."""
+    assert l1_5.entry_is_high_risk(VC.REGISTRY["session_rename"]) is True
+    assert l1_5.entry_is_high_risk(VC.REGISTRY["chat_session_new"]) is True
+    assert l1_5.entry_is_high_risk(VC.REGISTRY["chat_sessions"]) is False
+
+
+def test_l1_5_cannot_route_new_session_to_rename():
+    """An adversarial embedder that maps ``new session`` to session_rename
+    must be vetoed; the deterministic create entry is the only route."""
+    entries = _sub_entries("session_rename")
+    embedder = OneHotEmbedder(entries, {"new session": "session_rename"})
+    decision = l1_5.augment_unknown(
+        "new session", cfg=FakeCfg(enabled=True, threshold=0.5, margin=0.0),
+        entries=entries, embedder=embedder)
+    assert decision is None
+
+
+def test_new_session_resolves_to_the_create_entry_not_rename():
+    """The deterministic registry owns the phrase, so L1.5 is never consulted."""
+    resolution = VC.resolve("new session")
+    assert resolution.kind == VC.MATCH
+    assert resolution.entry is not None
+    assert resolution.entry.id == "chat_session_new"
+
+
 # --------------------------------------------------------- real model (opt)
 MODEL_DIR = Path(l1_5.DEFAULT_MODEL_DIR).expanduser()
 

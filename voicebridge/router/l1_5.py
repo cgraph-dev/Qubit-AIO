@@ -56,7 +56,7 @@ _ENTRY_MARKERS = re.compile(
     r"rollback|enable|disable|configure|unconfigure|grant|link|write|set|"
     r"patch|reset|clear|cancel|abort|kill|shutdown|reboot|restart|stop|pause|"
     r"resume|emergency|e-?stop|danger|destructive|overwrite|truncate|upload|"
-    r"download|sync|migrate|archive)\b",
+    r"download|sync|migrate|archive|rename|create)\b",
     re.I,
 )
 

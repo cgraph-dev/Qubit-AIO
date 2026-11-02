@@ -4735,7 +4735,8 @@ def main(argv: Optional[list] = None) -> int:
     # is alive; schedule the loop and the hotkey listener.
     from .hotkeys import HotkeyListener
     listener = HotkeyListener(hold_key="ctrl_r", tap_cancel="esc")
-    if not listener.start(lambda event, key: helper.on_hotkey(event, key)):
+    if not listener.start_with_retry(
+            lambda event, key: helper.on_hotkey(event, key)):
         overlay.set_status("error", "no global hotkey backend available")
         print("hotkey backend unavailable; run under an X11 session",
               file=sys.stderr)

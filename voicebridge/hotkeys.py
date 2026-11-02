@@ -42,6 +42,12 @@ class HotkeyListener:
     # How long _start_xinput waits to catch an xinput child that exits
     # immediately (cannot connect to the display).
     XINPUT_READY_S = 2.0
+    # Bounded startup retry. The desktop helper service can start before the
+    # X/Wayland session has accepted clients (observed live: ``hotkey.unavailable
+    # xinput could not connect to :0`` at boot, then the hotkey never returned).
+    # The first attempt is immediate; the rest sleep through these delays, so
+    # startup waits at most ~3.75 s for the display instead of dying.
+    START_RETRY_DELAYS = (0.25, 0.5, 1.0, 2.0)
 
     def __init__(self, hold_key: str = "ctrl_r", tap_cancel: str = "esc",
                  alt_hold_key: str = "") -> None:
@@ -89,6 +95,24 @@ class HotkeyListener:
             log.warning("hotkeys disabled (listener failed: %s)", exc)
             self._listener = None
             return False
+
+    def start_with_retry(self, on_event, *, delays=None) -> bool:
+        """Start with a bounded retry for a display that is not ready yet.
+
+        ``start()`` is tried immediately, then once per entry in ``delays``
+        (default :attr:`START_RETRY_DELAYS`). The total wait is bounded, so a
+        permanently headless host still fails promptly; a graphical session
+        that appears a moment after service startup recovers without a restart.
+        """
+        schedule = tuple(self.START_RETRY_DELAYS if delays is None else delays)
+        for attempt in range(len(schedule) + 1):
+            if self.start(on_event):
+                if attempt:
+                    log_event("hotkey.startup.recovered", attempt=attempt + 1)
+                return True
+            if attempt < len(schedule):
+                time.sleep(max(0.0, float(schedule[attempt])))
+        return False
 
     # keycode -> name map used by the xinput backend
     _KEYCODES = {37: "ctrl_l", 105: "ctrl_r", 9: "esc", 133: "super_l",
