@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 from qubit_cli.web_deps import late
 from qubit_cli.web_server_dashboard import _invalidate_plugins_hub_cache
 from qubit_cli.web_server_memory import (
-    _coerce_bool, _field_default, _field_is_set, _field_value, _field_visible, _load_memory_provider, _memory_provider_manifest, _memory_provider_setup_info, _memory_provider_setup_manifest, _normalize_memory_provider_schema, _read_memory_provider_existing_values, _require_memory_provider_ready, _run_setup_command,
+    _coerce_bool, _field_default, _field_is_set, _field_value, _field_visible, _load_memory_provider, _memory_provider_manifest, _memory_provider_setup_info, _memory_provider_setup_manifest, _normalize_memory_provider_name, _normalize_memory_provider_schema, _read_memory_provider_existing_values, _require_memory_provider_ready, _run_setup_command, invalidate_memory_provider_discovery,
 )
 from qubit_cli.web_models import MemoryProviderConfigUpdate, MemoryProviderSetupRequest
 from qubit_cli.web_routers._common import _CONFIG_MUTATION_LOCK, scoped_to_thread
@@ -505,6 +505,23 @@ def _require_valid_memory_provider_name(name: str) -> None:
         raise _unknown_provider(name)
 
 
+@router.get("/api/memory/providers")
+async def list_memory_providers(profile: Optional[str] = None):
+    """List discovered memory providers (the reference selector's data source).
+
+    ``GET /api/memory`` embeds the same rows; this standalone read is what a
+    provider selector or a plugin options list calls. Discovery runs off the
+    event loop and is TTL-cached in ``web_server_memory``.
+    """
+    def _run():
+        cfg = load_config()
+        mem = cfg.get("memory")
+        active = _normalize_memory_provider_name(mem.get("provider")) if isinstance(mem, dict) else ""
+        return {"providers": _discover_memory_provider_statuses(), "active": active}
+
+    return await scoped_to_thread(profile, _run)
+
+
 @router.get("/api/memory/providers/{name}/config")
 async def get_memory_provider_config(name: str, surface: Optional[str] = None, profile: Optional[str] = None):
     _require_valid_memory_provider_name(name)
@@ -543,6 +560,7 @@ async def setup_memory_provider(name: str, body: MemoryProviderSetupRequest,
                                        passthrough_http=False):
                 _write_memory_provider_config_values(name, provider, body.values)
         _invalidate_plugins_hub_cache()
+        invalidate_memory_provider_discovery()
         return _install_memory_provider_setup(name)
 
     return await scoped_to_thread(profile, _run)
@@ -562,11 +580,15 @@ async def update_memory_provider_config(
                 raise _unknown_provider(name)
             _update_memory_provider_config(declared, {k: _stringify_submitted(v) for k, v in values.items()})
             _invalidate_plugins_hub_cache()
+            invalidate_memory_provider_discovery()
             return {"ok": True}
         provider = _load_memory_provider(name)
         if provider is None:
             raise _unknown_provider(name)
         _write_memory_provider_config_values(name, provider, values)
+        # The config just changed on disk; readiness must not read the pre-write
+        # discovery snapshot from the TTL cache.
+        invalidate_memory_provider_discovery()
         _require_memory_provider_ready(name)
         with _CONFIG_MUTATION_LOCK:  # RMW span vs. the dashboard's config autosave
             config = load_config()

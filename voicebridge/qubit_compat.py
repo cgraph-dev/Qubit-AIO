@@ -19,6 +19,7 @@ from ``frontend/qubit-app/`` (overlay).
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
 import os
@@ -3217,14 +3218,68 @@ def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         qv = "1.0.0"
     # SystemStats wire shape; hermes_version carries the Qubit product
     # version (wire-compat label, honest value + provenance in detail).
-    return _ok(os=_pl.system(), os_release=_pl.release(),
-               os_version=_pl.version(), platform=_pl.system().lower(),
-               arch=_pl.machine(), hostname=_pl.node(),
-               python_version=_pl.python_version(),
-               python_impl=_pl.python_implementation(),
-               qubit_version="qubit-" + qv, cpu_count=os.cpu_count(),
-               psutil=False,
-               detail="Qubit single-authority host; no upstream gateway process")
+    # psutil enriches CPU / memory / disk / uptime / load / process when it is
+    # importable; every probe is optional so a missing extra degrades to the
+    # stdlib identity block (never a fabricated metric). Reference parity:
+    # web_routers/status.py::get_system_stats.
+    info: Dict[str, Any] = dict(
+        os=_pl.system(), os_release=_pl.release(),
+        os_version=_pl.version(), platform=_pl.system().lower(),
+        arch=_pl.machine(), hostname=_pl.node(),
+        python_version=_pl.python_version(),
+        python_impl=_pl.python_implementation(),
+        qubit_version="qubit-" + qv, cpu_count=os.cpu_count(),
+        psutil=False,
+        detail="Qubit single-authority host; no upstream gateway process")
+    try:
+        import psutil  # type: ignore
+    except Exception:
+        try:
+            info["load_avg"] = list(os.getloadavg())
+        except (OSError, AttributeError):
+            pass
+        return _ok(**info)
+    try:
+        vm = psutil.virtual_memory()
+        info["memory"] = {"total": vm.total, "available": vm.available,
+                          "used": vm.used, "percent": vm.percent}
+    except Exception:
+        pass
+    try:
+        from . import qubit_runtime as _QR
+        disk_root = Path(_QR.runtime_home_for_cfg(cfg))
+        # The configured home may not exist yet (fresh profile) — report the
+        # filesystem it WILL live on, not a fabricated path.
+        while not disk_root.exists() and disk_root.parent != disk_root:
+            disk_root = disk_root.parent
+        du = psutil.disk_usage(str(disk_root))
+        info["disk"] = {"total": du.total, "used": du.used,
+                        "free": du.free, "percent": du.percent}
+    except Exception:
+        pass
+    try:
+        info["cpu_percent"] = psutil.cpu_percent(interval=0.1)
+        la = getattr(psutil, "getloadavg", None)
+        if la:
+            info["load_avg"] = list(la())
+    except Exception:
+        try:
+            info["load_avg"] = list(os.getloadavg())
+        except (OSError, AttributeError):
+            pass
+    try:
+        info["uptime_seconds"] = int(time.time() - psutil.boot_time())
+    except Exception:
+        pass
+    try:
+        proc = psutil.Process()
+        info["process"] = {"pid": proc.pid, "rss": proc.memory_info().rss,
+                           "create_time": int(proc.create_time()),
+                           "num_threads": proc.num_threads()}
+    except Exception:
+        pass
+    info["psutil"] = True
+    return _ok(**info)
 
 
 def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -4593,6 +4648,48 @@ def h_tg_ob_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """DELETE /api/messaging/telegram/onboarding/{id} -> cancel pairing."""
     return _run_onboarding(cfg, "cancel_telegram_onboarding",
                            p.get("pairing_id", ""))
+
+
+def h_memory_providers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/memory/providers -> provider rows for a selector.
+
+    The vendored runtime owns the full discovered provider list (that is what
+    the proxy serves once it declares the route). The compat fallback keeps the
+    honest local-only gate: one ``qubit-local`` row, never a fabricated cloud
+    provider and never the old 404. Shape: ``{ok, active, providers[],
+    local_only, qubit_counterpart}``.
+    """
+    active = "qubit-local"
+    providers: List[Dict[str, Any]] = []
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.web_server_memory import (  # type: ignore
+            _discover_memory_provider_statuses)
+        providers = list(_discover_memory_provider_statuses())
+    except Exception:
+        providers = []
+    try:
+        from . import active_memory as AM
+        status = AM.status(cfg)
+    except Exception:
+        status = {}
+    state = str(status.get("state", "OK") or "OK")
+    local_row = {
+        "name": "qubit-local",
+        "description": "local-only SQLite/FTS5 MemoryStore "
+                       "(core/working/recall/archive tiers)",
+        "available": state in ("OK", "EMPTY", "DEGRADED"),
+        "configured": True,
+        "status": ("ready" if state == "OK" else
+                   "empty" if state == "EMPTY" else "degraded"),
+        "detail": str(status.get("store_state", "") or ""),
+    }
+    if not any(str(row.get("name", "")) == "qubit-local" for row in providers):
+        providers.insert(0, local_row)
+    return _ok(active=active, providers=providers, local_only=True,
+               count=len(providers),
+               qubit_counterpart="CLI `qubit memory` (same local store)")
 
 
 def h_memory(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -10867,6 +10964,11 @@ _r("POST", r"/api/skills/hub/update", "h_skills_hub_update")
 # Wave 3 real reads that must precede the parameterized GATED wildcards:
 # provider config (the memory-provider wildcard would otherwise shadow it) and
 # the toolset config/model matrix.
+# Provider LIST (the reference selector's options URL). Declared here as an
+# exact route so it is never swallowed by the parameterized provider wildcard;
+# when the vendored fork also declares it, the proxy serves that richer
+# discovery, and this stays the compat fallback (one provider, never a 404).
+_r("GET", r"/api/memory/providers", "h_memory_providers")
 _r("GET", r"/api/memory/providers/(?P<id>[^/]+)/config", "mem_config")
 _r("GET", r"/api/tools/toolsets/(?P<id>[^/]+)/config", "toolset_config")
 _r("GET", r"/api/tools/toolsets/(?P<id>[^/]+)/models", "toolset_models")
@@ -14683,6 +14785,65 @@ def agent_remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(ok=True, name=name, removed=True, runtime="permission-grant")
 
 
+_GIT_URL_PREFIXES = ("https://", "http://", "git@", "ssh://", "git://",
+                     "file://")
+
+
+def _looks_like_git_url(value: str) -> bool:
+    """True only for an explicit clone URL (never a local path/manifest)."""
+    text = str(value or "").strip()
+    return bool(text) and text.lower().startswith(_GIT_URL_PREFIXES)
+
+
+def _install_git_plugin(cfg: Any, source: str, *, confirm: bool,
+                        confirmation_id: str, force: bool, enable: bool,
+                        ref: str) -> Tuple[int, Dict[str, Any]]:
+    """Install a plugin from a Git URL / ``owner/repo`` through the runtime.
+
+    Uses the vendored ``dashboard_install_plugin`` pipeline (kill list,
+    platform check, optional exact-SHA checkout, pre-publish malware scan,
+    admission-gated enable) so the dashboard URL field cannot bypass the CLI
+    contract. The Qubit e-stop is checked first and the mutation is audited;
+    confirmation stays mandatory (staged on the shared approval journal).
+    """
+    from . import plugin_runtime as PR
+    if PR.estop_engaged(cfg):
+        return 403, {"ok": False, **PR.refuse_estop("plugin install")}
+    if not confirm and not confirmation_id:
+        return _staged(
+            "installing a plugin from a Git source requires confirmation: "
+            "re-POST with {\"confirm\": true} or settle the pending approval",
+            "")
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.plugins_cmd import (  # type: ignore
+            dashboard_install_plugin)
+        out = dashboard_install_plugin(
+            source, force=bool(force), enable=bool(enable),
+            ref=(ref or None))
+    except Exception as exc:
+        _audit("plugin_git_install_refused", "dashboard:user",
+               {"source": source[:120], "error": str(exc)[:120]})
+        return 400, {"ok": False, "code": "PLUGIN_GIT_INSTALL_FAILED",
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit plugin install <git-url>`"}
+    if not isinstance(out, dict) or not out.get("ok"):
+        detail = (out.get("error") if isinstance(out, dict) else "") or \
+            "plugin install failed"
+        _audit("plugin_git_install_refused", "dashboard:user",
+               {"source": source[:120], "error": str(detail)[:120]})
+        return 400, {"ok": False, "code": "PLUGIN_GIT_INSTALL_FAILED",
+                     "detail": _redact(str(detail))[:300],
+                     "qubit_counterpart": "CLI `qubit plugin install <git-url>`"}
+    plugin_name = str(out.get("plugin_name", "") or "")
+    _audit("plugin_git_install", "dashboard:user",
+           {"source": source[:120], "plugin_name": plugin_name[:120],
+            "enabled": out.get("enabled")})
+    out = dict(out)
+    out.pop("after_install_path", None)
+    return _ok(ok=True, **out)
+
+
 def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/dashboard/agent-plugins/install -> ``plugin_runtime.install``.
@@ -14709,12 +14870,16 @@ def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return 400, {"ok": False, "code": PR.INVALID_MANIFEST_CODE,
                          "detail": "manifest must be a JSON object",
                          "qubit_counterpart": "CLI `qubit plugin install`"}
+    url = str(b.get("url", b.get("git_url", "")) or "").strip()
     identifier = str(
         b.get("identifier", b.get("source", b.get("path", ""))) or "").strip()
     confirm = bool(b.get("confirm", False))
     confirmation_id = str(b.get("confirmation_id", "") or "").strip()
     catalog_name = str(b.get("catalog_name", "") or "").strip()
     ref = str(b.get("ref", "") or "").strip()
+    force = bool(b.get("force", False))
+    enable = b.get("enable", True)
+    enable = True if enable is None else bool(enable)
     if catalog_name and manifest is None and not identifier:
         from . import plugin_catalog as PC
         try:
@@ -14739,6 +14904,14 @@ def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 "pinned_ref": str(out.get("pinned_ref", ""))[:40],
                 "enabled": out.get("enabled")})
         return 200, {"ok": True, **out}
+    if manifest is None and not catalog_name:
+        git_source = url or (identifier if _looks_like_git_url(identifier)
+                            else "")
+        if git_source:
+            return _install_git_plugin(
+                cfg, git_source, confirm=confirm,
+                confirmation_id=confirmation_id, force=force,
+                enable=enable, ref=ref)
     if manifest is None and not identifier:
         return 400, {"ok": False, "code": PR.BAD_INPUT_CODE,
                      "detail": "install needs a manifest, an identifier, a "
@@ -17326,10 +17499,15 @@ def _memwiki_paths(cfg: Any) -> Optional[Tuple[Any, Any]]:
 def _memwiki_core(core_file: Any) -> Any:
     import importlib.util as _ilu
     import sys as _sys
+    target = str(core_file)
     mod = _sys.modules.get(_MEMWIKI_CORE_MODULE)
-    if mod is not None:
+    # Key the loaded module by its real file: a process that switches profiles
+    # (or a test suite with a fresh home) must never keep another home's core.
+    if mod is not None and str(getattr(mod, "__file__", "")) == target:
         return mod
-    spec = _ilu.spec_from_file_location(_MEMWIKI_CORE_MODULE, str(core_file))
+    if mod is not None:
+        _sys.modules.pop(_MEMWIKI_CORE_MODULE, None)
+    spec = _ilu.spec_from_file_location(_MEMWIKI_CORE_MODULE, target)
     mod = _ilu.module_from_spec(spec)
     _sys.modules[_MEMWIKI_CORE_MODULE] = mod
     try:
@@ -17351,8 +17529,81 @@ def _memwiki_db(cfg: Any) -> Any:
     return SessionDB(db_path=db_path, read_only=True)
 
 
+# The plugin core scans every message of up to 25 sessions per requested day
+# (30 days -> ~750 sessions) with several regexes per message. On a populated
+# profile one overview took >13 s and the dashboard request timed out. Bound
+# the per-session message window to the most recent messages and cache the
+# aggregated response; the shapes and queries stay the plugin's own.
+_MEMWIKI_MAX_MESSAGES_PER_SESSION = 40
+_MEMWIKI_CACHE_TTL_S = 60.0
+_MEMWIKI_MAX_CACHE_ENTRIES = 32
+_MEMWIKI_CACHE: Dict[tuple, Tuple[float, Any]] = {}
+_MEMWIKI_CACHE_LOCK = threading.Lock()
+
+
+class _BoundedSessionMessages:
+    """Read-only ``SessionDB`` proxy that clips ``get_messages`` to a tail.
+
+    The plugin core only reads sessions/messages; every other attribute is
+    delegated unchanged. Clipping keeps the derived summary bounded on a large
+    state.db without changing the plugin's aggregation code.
+    """
+
+    __slots__ = ("_db", "_limit")
+
+    def __init__(self, db: Any, limit: int) -> None:
+        self._db = db
+        self._limit = max(0, int(limit))
+
+    def get_messages(self, session_id: str) -> list:
+        rows = self._db.get_messages(session_id)
+        if self._limit and isinstance(rows, list) and len(rows) > self._limit:
+            return rows[-self._limit:]
+        return rows
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._db, name)
+
+
+def _memwiki_cache_key(cfg: Any, label: str,
+                       extra: Any = None) -> tuple:
+    """Cache identity: canonical state.db + sidecars + memories mtime + args."""
+    from . import qubit_runtime as _QR
+    home = _QR.runtime_home_for_cfg(cfg)
+    db_path = Path(home) / "state.db"
+    stamps = []
+    for path in (db_path,
+                 db_path.with_name(db_path.name + "-wal"),
+                 db_path.with_name(db_path.name + "-shm"),
+                 Path(home) / "memories"):
+        try:
+            stamps.append(path.stat().st_mtime_ns)
+        except OSError:
+            stamps.append(0)
+    return (str(db_path), tuple(stamps), label, extra)
+
+
+def _memwiki_cached(key: tuple) -> Optional[Any]:
+    now = time.monotonic()
+    with _MEMWIKI_CACHE_LOCK:
+        hit = _MEMWIKI_CACHE.get(key)
+    if hit is not None and now - hit[0] < _MEMWIKI_CACHE_TTL_S:
+        return copy.deepcopy(hit[1])
+    return None
+
+
+def _memwiki_store(key: tuple, value: Any) -> None:
+    with _MEMWIKI_CACHE_LOCK:
+        _MEMWIKI_CACHE[key] = (time.monotonic(), copy.deepcopy(value))
+        if len(_MEMWIKI_CACHE) > _MEMWIKI_MAX_CACHE_ENTRIES:
+            oldest = sorted(_MEMWIKI_CACHE.items(),
+                            key=lambda item: item[1][0])
+            for stale_key, _ in oldest[:len(_MEMWIKI_CACHE) - _MEMWIKI_MAX_CACHE_ENTRIES]:
+                _MEMWIKI_CACHE.pop(stale_key, None)
+
+
 def _memwiki_call(cfg: Any, q: Dict[str, str], label: str,
-                  fn: Any) -> Tuple[int, Any]:
+                  fn: Any, *, cache_extra: Any = None) -> Tuple[int, Any]:
     paths = _memwiki_paths(cfg)
     if paths is None:
         return 404, {"ok": False, "code": "PLUGIN_NOT_FOUND",
@@ -17360,6 +17611,14 @@ def _memwiki_call(cfg: Any, q: Dict[str, str], label: str,
                                "installed",
                      "qubit_counterpart": "dashboard /plugins"}
     core_file, memories_dir = paths
+    try:
+        key = _memwiki_cache_key(cfg, label, cache_extra)
+    except Exception:
+        key = None
+    if key is not None:
+        cached = _memwiki_cached(key)
+        if cached is not None:
+            return 200, cached
     try:
         core = _memwiki_core(core_file)
     except Exception as exc:
@@ -17369,7 +17628,9 @@ def _memwiki_call(cfg: Any, q: Dict[str, str], label: str,
         if db is None:
             return _fail(ValueError("state.db missing"))
         try:
-            return 200, fn(core, db, memories_dir)
+            bounded = _BoundedSessionMessages(
+                db, _MEMWIKI_MAX_MESSAGES_PER_SESSION)
+            result = fn(core, bounded, memories_dir)
         finally:
             try:
                 db.close()
@@ -17377,6 +17638,9 @@ def _memwiki_call(cfg: Any, q: Dict[str, str], label: str,
                 pass
     except Exception as exc:
         return _fail(exc)
+    if key is not None:
+        _memwiki_store(key, result)
+    return 200, result
 
 
 def _memwiki_clamp(value: Any, low: int, high: int) -> int:
@@ -17394,7 +17658,8 @@ def h_memwiki_overview(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _memwiki_call(
         cfg, q, "overview",
         lambda core, db, mdir: core.build_memory_overview(
-            db, subject_limit=s_lim, day_limit=d_lim))
+            db, subject_limit=s_lim, day_limit=d_lim),
+        cache_extra=(s_lim, d_lim))
 
 
 def h_memwiki_subjects(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -17405,7 +17670,8 @@ def h_memwiki_subjects(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     code, out = _memwiki_call(
         cfg, q, "subjects",
         lambda core, db, mdir: core.build_memory_subjects(
-            db, limit=safe_limit, query=query or None))
+            db, limit=safe_limit, query=query or None),
+        cache_extra=(safe_limit, query))
     if code != 200:
         return code, out
     return 200, {"subjects": out, "query": query, "limit": safe_limit}
@@ -17417,7 +17683,8 @@ def h_memwiki_subject(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     slug = str(p.get("slug", "") or "")
     code, out = _memwiki_call(
         cfg, q, "subject",
-        lambda core, db, mdir: core.get_memory_subject(db, slug))
+        lambda core, db, mdir: core.get_memory_subject(db, slug),
+        cache_extra=slug)
     if code != 200:
         return code, out
     if out is None:
@@ -17433,7 +17700,8 @@ def h_memwiki_days(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     code, out = _memwiki_call(
         cfg, q, "days",
         lambda core, db, mdir: core.build_daily_logs(
-            db, limit_days=safe_limit))
+            db, limit_days=safe_limit),
+        cache_extra=safe_limit)
     if code != 200:
         return code, out
     return 200, {"daily_logs": out, "limit": safe_limit}
@@ -17445,7 +17713,8 @@ def h_memwiki_day(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     date = str(p.get("date", "") or "")
     code, out = _memwiki_call(
         cfg, q, "day",
-        lambda core, db, mdir: core.get_daily_log(db, date))
+        lambda core, db, mdir: core.get_daily_log(db, date),
+        cache_extra=date)
     if code != 200:
         return code, out
     if out is None:
@@ -18660,6 +18929,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_tg_ob_start": h_tg_ob_start, "h_tg_ob_status": h_tg_ob_status,
     "h_tg_ob_apply": h_tg_ob_apply, "h_tg_ob_cancel": h_tg_ob_cancel,
     "h_memory": h_memory,
+    "h_memory_providers": h_memory_providers,
     "h_analytics": h_analytics, "h_files": h_files, "h_gateway": h_gateway,
     "h_gateway_migrate_plan": h_gateway_migrate_plan,
     "h_host_identity": h_host_identity,
