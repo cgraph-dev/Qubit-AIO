@@ -538,6 +538,10 @@ def _under_gateway_supervisor(argv: list) -> bool:
         for name in (
             EXTERNAL_GATEWAY_SUPERVISOR_ENV,
             *EXTERNAL_GATEWAY_SUPERVISOR_ENV_ALIASES,
+            # The tool-child env drops the supervisor marker but keeps this pin, so the
+            # gateway's own `qubit ...` commands stay on its profile (#74872).
+            "HERMES_GATEWAY_PROFILE_PIN",
+            "QUBIT_GATEWAY_PROFILE_PIN",
         )
     )
 
