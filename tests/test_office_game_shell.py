@@ -630,13 +630,22 @@ def test_the_default_renderer_is_the_app_and_the_shell_is_opt_in():
     assert 'has("shell")' in code, (
         "there is no `?shell=1` opt-out, so the old shell is unreachable — it "
         "is the ROLLBACK and must stay one query param away")
-    # And the branch shapes: shell -> createOfficeComponent, else -> createOfficeApp.
+    # And the branch shapes: shell -> createOfficeComponent, else -> the app.
+    # The default branch is `createOfficeWithSeatRouting(...)`, the wrapper that
+    # renders `createOfficeApp` plus the seat panel — it is the app, not a third
+    # renderer, and accepting it here keeps the test about the DEFAULT rather
+    # than about which wrapper name happens to be inlined.
     shell_branch = re.search(
-        r"wantShell\s*\?\s*createOfficeComponent\([^)]*\)\s*:\s*createOfficeApp\(",
+        r"wantShell\s*\?\s*createOfficeComponent\([^)]*\)\s*:\s*"
+        r"createOffice(?:App|WithSeatRouting)\(",
         code)
     assert shell_branch, (
         "the switch is not `wantShell ? createOfficeComponent(...) : "
         "createOfficeApp(...)` — the app is not the default branch")
+    assert re.search(
+        r"function createOfficeWithSeatRouting\([^)]*\)\s*\{", code
+    ) and "const OfficeApp = createOfficeApp(R, H);" in code, (
+        "the default branch's seat wrapper no longer renders createOfficeApp")
     assert "createOfficeComponent" in code and "createOfficeApp" in code, (
         "one of the two renderers is not referenced; the fallback or the "
         "default was removed rather than kept")

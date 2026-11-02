@@ -1,5 +1,5 @@
 (function() {
-	//#region node_modules/phaser/dist/phaser.esm.js
+	//#region ../../../../Projects/Repos/qubit-voicebridge/frontend/qubit-web/node_modules/phaser/dist/phaser.esm.js
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";
@@ -192864,6 +192864,19 @@ create: function(game) {
 	}
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
+	function connectionText(props) {
+		const state = props.officeState ?? "connecting";
+		const rooms = props.officeRooms ?? 0;
+		const agents = props.officeAgents ?? 0;
+		const detail = props.officeError?.trim();
+		if (state === "error") return `Office backend unavailable${detail ? ` — ${detail}` : ""}.`;
+		if (state === "stale") return `Office showing its last known state${detail ? ` — ${detail}` : ""}.`;
+		if (state === "connected") {
+			if (rooms === 0 && agents === 0) return "Office connected — no rooms yet.";
+			return `Office connected — ${rooms} room${rooms === 1 ? "" : "s"} · ${agents} agent${agents === 1 ? "" : "s"}.`;
+		}
+		return "Connecting to the office backend…";
+	}
 	/**
 	* Build the component. React and hooks arrive as arguments, exactly as the rest
 	* of the plugin does it.
@@ -192950,6 +192963,17 @@ create: function(game) {
 				key: "p",
 				style: { fontSize: "var(--office-fs-xs)" }
 			}, OFFICE_APP_PATH)]));
+			if (props.officeState) {
+				const state = props.officeState;
+				children.push(R.createElement("div", {
+					key: "connection",
+					className: "office-game__connection",
+					"data-testid": "office-app-connection",
+					"data-state": state,
+					role: state === "error" ? "alert" : "status",
+					"aria-live": state === "connecting" ? "polite" : "assertive"
+				}, connectionText(props)));
+			}
 			const verdict = bindingVerdict();
 			children.push(R.createElement("div", {
 				key: "status",
@@ -193009,7 +193033,13 @@ create: function(game) {
 	var EXPECTED_SCHEMA = "qubit-office-tower/1";
 	//#endregion
 	//#region ../qubit-app/plugins/qubit-office/game/adapter.ts
-	var DEFAULT_INTERVAL_MS = 400;
+	/**
+	* Poll cadence. It is deliberately slower than the store's animation tick: the
+	* tower fold takes hundreds of milliseconds, and a sub-second abort/restart
+	* loop starves both this read and the iframe's `/api/stream` (see the header).
+	* `POLL_INTERVAL_MS` in `office-api.ts` states the same 2 s contract.
+	*/
+	var DEFAULT_INTERVAL_MS = 2e3;
 	var OfficeAdapter = class {
 		revision = 0;
 		payload = null;
@@ -193039,12 +193069,13 @@ create: function(game) {
 			};
 		}
 		/**
-		* One serialized load. A call while one is in flight ABORTS the earlier one
-		* and supersedes it, so two responses can never race.
+		* One serialized load. A call while one is already in flight is a no-op, so
+		* a timer tick can never abort the request before it returns: the next tick
+		* simply asks again. One request is on the wire at a time, and two responses
+		* can never race.
 		*/
 		async load() {
-			if (this.disposed) return;
-			this.inflight?.abort();
+			if (this.disposed || this.inflight !== null) return;
 			const ctl = new AbortController();
 			this.inflight = ctl;
 			const requestedAt = this.revision;
@@ -193197,18 +193228,34 @@ create: function(game) {
 			const [seats, setSeats] = H.useState([]);
 			const [seatId, setSeatId] = H.useState(null);
 			const [seatError, setSeatError] = H.useState("");
+			const [connection, setConnection] = H.useState({
+				state: "connecting",
+				rooms: 0,
+				agents: 0,
+				error: ""
+			});
 			H.useEffect(() => {
-				const adapter = new OfficeAdapter({ onSnapshot: (s) => {
-					if (s.error) setSeatError(s.error);
-					else setSeatError("");
-					const characters = s.payload?.characters ?? [];
-					if (characters.length === 0) return;
-					setSeats(characters.map((c) => ({
-						agent_id: c.agent_id,
-						slug: c.slug
-					})));
-					setSeatId((current) => current !== null && characters.some((c) => c.agent_id === current) ? current : characters[0].agent_id);
-				} });
+				const adapter = new OfficeAdapter({
+					intervalMs: POLL_INTERVAL_MS,
+					onSnapshot: (s) => {
+						if (s.error) setSeatError(s.error);
+						else setSeatError("");
+						const characters = s.payload?.characters ?? [];
+						const rooms = (s.payload?.floorplan?.floors ?? []).reduce((total, floor) => total + (floor.rooms?.length ?? 0), 0);
+						setConnection({
+							state: s.error ? s.payload ? "stale" : "error" : s.payload ? "connected" : "connecting",
+							rooms,
+							agents: characters.length,
+							error: s.error ?? ""
+						});
+						if (characters.length === 0) return;
+						setSeats(characters.map((c) => ({
+							agent_id: c.agent_id,
+							slug: c.slug
+						})));
+						setSeatId((current) => current !== null && characters.some((c) => c.agent_id === current) ? current : characters[0].agent_id);
+					}
+				});
 				adapter.start();
 				return () => adapter.dispose();
 			}, []);
@@ -193217,6 +193264,10 @@ create: function(game) {
 				seatAgentId: seatId ?? void 0,
 				seatLabel: seatId === null ? void 0 : seats.find((s) => s.agent_id === seatId)?.slug,
 				seatError,
+				officeState: connection.state,
+				officeRooms: connection.rooms,
+				officeAgents: connection.agents,
+				officeError: connection.error,
 				onSeatChange: setSeatId
 			});
 		};

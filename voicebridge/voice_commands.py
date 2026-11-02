@@ -2467,6 +2467,29 @@ def _b_tui_guidance(ctx, args):
                         "dashboard for the visual surface"}
 
 
+def _b_open_page(ctx, args):
+    """Open one Qubit dashboard PAGE in the browser (read-only navigation).
+
+    This is the dashboard counterpart of the existing local `open_website`
+    action: it launches the SERVED page URL and speaks the handler's own result.
+    It never claims success when `_a_open_website` refused or xdg-open failed —
+    the spoken guidance is the handler's reply, not a fixed "opened".
+    """
+    from .local import actions as _LA
+
+    page = str((args or {}).get("page", "") or "").strip().lower()
+    urls = {
+        "office": "http://127.0.0.1:8890/qubit-office",
+        "quest": "http://127.0.0.1:8890/qubit-office2",
+    }
+    url = urls.get(page)
+    if not url:
+        raise ValueError(f"unknown dashboard page {page!r}")
+    reply = _LA._a_open_website({"url": url})
+    return {"guidance": reply, "page": page, "url": url,
+            "opened": reply.startswith("Opened ")}
+
+
 def _b_console_guidance(ctx, args):
     return {"guidance": "the terminal REPL runs on your machine: launch "
                         "`qubit-dev` and type /help for slash commands"}
@@ -5556,6 +5579,7 @@ _BACKENDS: Dict[str, Callable] = {
     "worktree": _b_worktree,
     "completions": _b_completions,
     "tui_guidance": _b_tui_guidance,
+    "pages": _b_open_page,
     "console_guidance": _b_console_guidance,
     "mic_guidance": _b_mic_guidance,
     "curator": _b_curator,
@@ -6905,6 +6929,7 @@ _E("tui_help", "Open the board",
    summary="guidance",
    examples=("qubit, open dashboard",),
    help="How to open the visual surface.")
+
 _E("console_help", "Terminal help",
    ("open terminal", "terminal help", "command line help"),
    "console_guidance", ("console", "--safe-mode/--dev/--cli",
@@ -10492,6 +10517,27 @@ _CB("skills_install", "Install a skill manifest",
     examples=("qubit, skills install",),
     help="Validate + stage a local reviewed skill manifest disabled; remote "
          "identifiers are typed-refused and never fetched (confirmed).")
+# Dashboard pages that voice could previously only reach by accident: the L1.5
+# semantic layer mapped "open office" to the worktree sweep and "open agent
+# quest" to the skills workshop. These deterministic entries win at L0 and open
+# the actual page. They are READ-ONLY navigation, so they are never confirm-tier
+# (the same immediate class as "open youtube"), and the spoken text is the
+# opener's own reply, never a fabricated success. Kept in the additive bridge
+# registry so the frozen wave-1..3 example table is not disturbed.
+_CB("office_page", "Open Qubit Office",
+    # `_norm` strips a leading "qubit", so the spoken "qubit office" arrives as
+    # "office"; the bare alias is what makes that form deterministic.
+    ("open office", "qubit office", "open qubit office", "open the office",
+     "office", "the office", "office page", "show the office", "show office"),
+    "pages", fixed=(("page", "office"),), summary="guidance",
+    examples=("qubit, open office",),
+    help="Opens /qubit-office in the browser (read-only navigation).")
+_CB("quest_page", "Open Agent Quest",
+    ("open agent quest", "agent quest", "open the agent quest",
+     "open qubit quest", "qubit quest", "quest page", "show agent quest"),
+    "pages", fixed=(("page", "quest"),), summary="guidance",
+    examples=("qubit, open agent quest",),
+    help="Opens /qubit-office2 (Agent Quest) in the browser (read-only).")
 _CB("recipe_morning_digest", "Morning digest",
     ("give me my morning digest", "morning digest", "my morning digest",
      "daily digest", "run my morning digest", "get my morning digest"),

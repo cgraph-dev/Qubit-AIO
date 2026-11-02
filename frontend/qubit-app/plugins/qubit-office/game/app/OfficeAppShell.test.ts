@@ -136,4 +136,43 @@ describe("Habblaud embedding", () => {
     expect(h.tree.find(
       (e) => e.props["data-testid"] === "seat-model-seat-error")).toBeUndefined();
   });
+
+  it("states the real backend connection and room/agent counts", () => {
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({
+      officeState: "connected",
+      officeRooms: 4,
+      officeAgents: 10,
+    });
+    const banner = h.tree.find(
+      (e) => e.props["data-testid"] === "office-app-connection");
+    expect(banner).toBeDefined();
+    expect(String(banner?.props.children)).toContain("4 rooms");
+    expect(String(banner?.props.children)).toContain("10 agents");
+    expect(banner?.props.role).toBe("status");
+  });
+
+  it("names a backend failure instead of showing a fake connection", () => {
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({
+      officeState: "error",
+      officeError: "HTTP 401",
+    });
+    const banner = h.tree.find(
+      (e) => e.props["data-testid"] === "office-app-connection");
+    expect(banner).toBeDefined();
+    expect(String(banner?.props.children)).toContain("HTTP 401");
+    expect(banner?.props.role).toBe("alert");
+    expect(banner?.props["data-state"]).toBe("error");
+  });
+
+  it("keeps the plain game view when no host status is supplied", () => {
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({});
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-app-connection")).toBeUndefined();
+  });
 });

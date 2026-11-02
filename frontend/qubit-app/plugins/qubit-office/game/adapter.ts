@@ -12,8 +12,13 @@
  *    an empty office. An unavailable backend must never look like an empty one.
  * 3. **A hidden tab keeps spending.** Polling pauses when the document is
  *    hidden and resumes on visibility, without touching org state.
- * 4. **Two loads in flight.** Loads are SERIALIZED: a new load supersedes and
- *    aborts the one before it rather than racing it.
+ * 4. **Two loads in flight.** Loads are SERIALIZED: a load requested while one
+ *    is already in flight is skipped, never stacked and never allowed to abort
+ *    the request it would otherwise duplicate. The tower fold is not free, so
+ *    abort-and-restart on every timer tick starved the office store (measured:
+ *    every `/agent/api/office/tower` poll ended `net::ERR_ABORTED`, the stream
+ *    never delivered its first snapshot, and the iframe stayed on
+ *    "Connecting…"). Skipping keeps one request on the wire at a time.
  *
  * The `preview` flag is passed through untouched and never cleared. The
  * recording fixture sets `preview: true` conceptually (see PROVENANCE.md); a
@@ -54,7 +59,13 @@ export interface AdapterOptions {
   onSnapshot: (snap: OfficeSnapshot) => void;
 }
 
-const DEFAULT_INTERVAL_MS = 400;
+/**
+ * Poll cadence. It is deliberately slower than the store's animation tick: the
+ * tower fold takes hundreds of milliseconds, and a sub-second abort/restart
+ * loop starves both this read and the iframe's `/api/stream` (see the header).
+ * `POLL_INTERVAL_MS` in `office-api.ts` states the same 2 s contract.
+ */
+const DEFAULT_INTERVAL_MS = 2000;
 
 export class OfficeAdapter {
   private revision = 0;
@@ -89,12 +100,13 @@ export class OfficeAdapter {
   }
 
   /**
-   * One serialized load. A call while one is in flight ABORTS the earlier one
-   * and supersedes it, so two responses can never race.
+   * One serialized load. A call while one is already in flight is a no-op, so
+   * a timer tick can never abort the request before it returns: the next tick
+   * simply asks again. One request is on the wire at a time, and two responses
+   * can never race.
    */
   async load(): Promise<void> {
-    if (this.disposed) return;
-    this.inflight?.abort();
+    if (this.disposed || this.inflight !== null) return;
     const ctl = new AbortController();
     this.inflight = ctl;
     const requestedAt = this.revision;
