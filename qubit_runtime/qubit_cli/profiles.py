@@ -2025,6 +2025,11 @@ def _cleanup_gateway_service(name: str, profile_dir: Path) -> bool:
                 _run("systemctl", "--user", "daemon-reload")
                 print(f"✓ Service {svc_name} removed")
                 removed = True
+            elif svc_file.exists():
+                # The unit dir is account-anchored and the name follows the profile name, so a
+                # delete from a scratch HOME can resolve a unit that belongs to another install
+                # (or a different home). Leave it alone and say so.
+                print(f"  ℹ {svc_name}: another install's service, left alone")
             # `gateway install --system` writes the same name under /etc; a survivor there
             # restarts the removed profile at boot exactly like the user unit at login.
             removed = remove_system_systemd_unit(profile_dir) or removed

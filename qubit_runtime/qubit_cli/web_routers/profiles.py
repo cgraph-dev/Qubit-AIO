@@ -514,6 +514,11 @@ def get_profiles_sessions(
 
     sort_key = "last_active" if order == "recent" else "started_at"
     merged.sort(key=lambda s: s.get(sort_key) or s.get("started_at") or 0, reverse=True)
+    if archived == "only":
+        # The archived-only view pages over ARCHIVED rows; a pinned row that is not archived is
+        # an extra back-fill and must not take a page slot (that is how a page lost a real
+        # archived row). Keep recency order within each group, archived first.
+        merged.sort(key=lambda s: 0 if s.get("archived") else 1)
     window = _pinned_window(merged, offset, limit)
     if not full:
         _strip_session_list_rows(window)

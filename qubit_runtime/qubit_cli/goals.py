@@ -1104,6 +1104,10 @@ class GoalManager:
     def state(self) -> Optional[GoalState]:
         return self._state
 
+    def refresh(self) -> None:
+        """Re-read state from the DB (cross-process safety for the gateway/dock)."""
+        self._state = load_goal(self.session_id)
+
     def is_active(self) -> bool:
         return self._state is not None and self._state.status == "active"
 

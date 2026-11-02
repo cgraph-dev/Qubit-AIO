@@ -73,6 +73,9 @@ class SubagentMonitor:
 
     def refresh(self, now=None):
         now = time.time() if now is None else now
+        # A mid-turn ``session.control.update`` frame (a plugin tool moved the goal/loop) marks the
+        # mirrored managers stale; re-read them ONCE here, on the next poll, never at turn end.
+        session_rows.sync_automation(self.cli)
         entries = self._backend().subagent_rows(busy=bool(getattr(self.cli, '_agent_running', False)))
         # The scoped control-plane snapshot supplies authority and transcript paths;
         # its matching public lifecycle record supplies the latest observed tool.
