@@ -40,8 +40,36 @@ export interface OfficeAppProps {
    * than because the office has no seats. Shown as a banner, never swallowed.
    */
   seatError?: string;
+  /**
+   * The host's own read of the tower report. It mirrors the backend the iframe
+   * streams from, so the page can settle out of "connecting" and show its real
+   * room/agent counts (or the real error) instead of assuming success.
+   */
+  officeState?: "connecting" | "connected" | "stale" | "error";
+  officeRooms?: number;
+  officeAgents?: number;
+  officeError?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
+}
+
+function connectionText(props: OfficeAppProps): string {
+  const state = props.officeState ?? "connecting";
+  const rooms = props.officeRooms ?? 0;
+  const agents = props.officeAgents ?? 0;
+  const detail = props.officeError?.trim();
+  if (state === "error") {
+    return `Office backend unavailable${detail ? ` — ${detail}` : ""}.`;
+  }
+  if (state === "stale") {
+    return `Office showing its last known state${detail ? ` — ${detail}` : ""}.`;
+  }
+  if (state === "connected") {
+    if (rooms === 0 && agents === 0) return "Office connected — no rooms yet.";
+    return `Office connected — ${rooms} room${rooms === 1 ? "" : "s"} · `
+      + `${agents} agent${agents === 1 ? "" : "s"}.`;
+  }
+  return "Connecting to the office backend\u2026";
 }
 
 /**
@@ -149,6 +177,21 @@ export function createOfficeApp(
           key: "p", style: { fontSize: "var(--office-fs-xs)" },
         }, OFFICE_APP_PATH),
       ]));
+    }
+
+    // The host's tower read is the only connection state this page can prove.
+    // Show it, so "Connecting…" is never a permanent lie and a failure is named
+    // rather than hidden behind a silent spinner.
+    if (props.officeState) {
+      const state = props.officeState;
+      children.push(R.createElement("div", {
+        key: "connection",
+        className: "office-game__connection",
+        "data-testid": "office-app-connection",
+        "data-state": state,
+        role: state === "error" ? "alert" : "status",
+        "aria-live": state === "connecting" ? "polite" : "assertive",
+      }, connectionText(props)));
     }
 
     // Keep binding diagnostics available to assistive technology, but do not

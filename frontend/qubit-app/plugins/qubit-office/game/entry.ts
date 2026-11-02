@@ -36,6 +36,7 @@ import { OfficeAdapter } from "./adapter";
 import { buildHeadquartersPortals } from "./navigation";
 import { HQ_SLUG } from "./WorldAssembler";
 import type { OfficeTowerPayload } from "./types";
+import { POLL_INTERVAL_MS } from "./app/office-api";
 
 declare global {
   interface Window {
@@ -111,9 +112,19 @@ function createOfficeWithSeatRouting(
     const [seats, setSeats] = H.useState<Array<{ agent_id: number; slug: string }>>([]);
     const [seatId, setSeatId] = H.useState<number | null>(null);
     const [seatError, setSeatError] = H.useState<string>("");
+    // The host's own view of the SAME tower report the iframe streams. It is
+    // what lets a banner say "connected, 4 rooms, 10 agents" or name the real
+    // HTTP error, instead of the page claiming a connection it never made.
+    const [connection, setConnection] = H.useState<{
+      state: "connecting" | "connected" | "stale" | "error";
+      rooms: number;
+      agents: number;
+      error: string;
+    }>({ state: "connecting", rooms: 0, agents: 0, error: "" });
 
     H.useEffect(() => {
       const adapter = new OfficeAdapter({
+        intervalMs: POLL_INTERVAL_MS,
         onSnapshot: (s) => {
           // Name a failed read rather than rendering an empty seat list: an
           // office with no seats and an office whose poll 401'd look identical
@@ -124,6 +135,17 @@ function createOfficeWithSeatRouting(
             setSeatError("");
           }
           const characters = s.payload?.characters ?? [];
+          const rooms = (s.payload?.floorplan?.floors ?? []).reduce(
+            (total, floor) => total + (floor.rooms?.length ?? 0), 0);
+          setConnection({
+            // A retained payload with a failed refresh is STALE, not live; a
+            // failure before the first success is an ERROR. Neither is "ready".
+            state: s.error ? (s.payload ? "stale" : "error")
+              : s.payload ? "connected" : "connecting",
+            rooms,
+            agents: characters.length,
+            error: s.error ?? "",
+          });
           if (characters.length === 0) return;
           setSeats(characters.map((c) => ({ agent_id: c.agent_id, slug: c.slug })));
           // Select the first seat once, then keep the operator's choice.
@@ -144,6 +166,10 @@ function createOfficeWithSeatRouting(
         ? undefined
         : seats.find((s) => s.agent_id === seatId)?.slug,
       seatError,
+      officeState: connection.state,
+      officeRooms: connection.rooms,
+      officeAgents: connection.agents,
+      officeError: connection.error,
       onSeatChange: setSeatId,
     });
   };

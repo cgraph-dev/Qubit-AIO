@@ -651,6 +651,16 @@ _SITE_SHORTCUTS = {
     "qubit web dashboard": "http://127.0.0.1:8890/",
     "qubit tv": "http://127.0.0.1:8890/qubit-tv",
     "qubit-tv": "http://127.0.0.1:8890/qubit-tv",
+    # The Office and Agent Quest dashboard pages. "qubit office"/"agent quest"
+    # are longer than the bare words, and the lookup prefers the longest match,
+    # so "open qubit office" cannot fall through to the dashboard root.
+    "qubit office": "http://127.0.0.1:8890/qubit-office",
+    "office page": "http://127.0.0.1:8890/qubit-office",
+    "office view": "http://127.0.0.1:8890/qubit-office",
+    "office": "http://127.0.0.1:8890/qubit-office",
+    "agent quest": "http://127.0.0.1:8890/qubit-office2",
+    "qubit quest": "http://127.0.0.1:8890/qubit-office2",
+    "quest page": "http://127.0.0.1:8890/qubit-office2",
     "qubit": "http://127.0.0.1:8890/",
     "netflix": "https://www.netflix.com/",
     "prime video": "https://www.primevideo.com/",
@@ -2406,7 +2416,14 @@ ACTIONS: Dict[str, LocalAction] = {
                          patterns=[r"\bclose (this |the |current )?window\b"]),
     "open_website": LocalAction("open_website", "open a website in the browser", _a_open_website,
                                 patterns=[r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b.{0,30}?\b(https?://\S+|(?<!://)www\.\S+|(?<!://)[a-z0-9-]+\.(?:com|ro|org|net|io|dev|app|eu|uk|de|fr|md|gov|edu)\b\S*)",
-                                            r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b[,\s]+(?:the\s+)?(youtube music|youtube|you\s*tube|your\s*tube|youtub|your\s*tool|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|qubit[\s-]*tv|netflix|prime\s+video|amazon\s+prime|disney(?:\s*\+|\s*plus)?|hulu|hbo(?:\s*max)?|apple\s*tv(?:\s*\+|\s*plus)?|peacock|paramount(?:\s*\+|\s*plus)?|google|duckduckgo|wikipedia|dexonline)\b"]),
+                                            r"\b(?:open|opa|opah|launch|go to|visit|pop on|pull up|bring up)\b[,\s]+(?:the\s+)?(qubit\s+office|office(?:\s+(?:page|view))?(?!\s+(?:documents?|files?|notes?)\b)|agent\s+quest|qubit\s+quest|quest\s+page|youtube music|youtube|you\s*tube|your\s*tube|youtub|your\s*tool|gmail|mail|messenger|instagram|facebook|github|opencode(?:\.ai)?|qubit(?:\s+(?:web\s+)?dashboard)?|qubit[\s-]*tv|netflix|prime\s+video|amazon\s+prime|disney(?:\s*\+|\s*plus)?|hulu|hbo(?:\s*max)?|apple\s*tv(?:\s*\+|\s*plus)?|peacock|paramount(?:\s*\+|\s*plus)?|google|duckduckgo|wikipedia|dexonline)\b",
+                                            # Bare page names, with or without the wake
+                                            # word ("qubit office", "qubit, office",
+                                            # "agent quest"). These are pages, not tasks.
+                                            r"^\s*(?:hey\s+|ok\s+|okay\s+)?qubit[,.]?\s+(?:office|agent\s+quest)\s*[.!?]*$",
+                                            r"^\s*(?:the\s+)?office(?:\s+(?:page|view))?\s*[.!?]*$",
+                                            r"^\s*(?:the\s+)?agent\s+quest(?:\s+(?:page|view))?\s*[.!?]*$",
+                                            r"^\s*(?:the\s+)?qubit\s+quest(?:\s+(?:page|view))?\s*[.!?]*$"]),
     "open_folder": LocalAction("open_folder", "open Downloads/Documents in Files", _a_open_folder,
                              patterns=[r"\b(open|launch|show|go to)\b.{0,30}?\bdownloads?\b",
                                        r"\b(open|launch|show|go to)\b.{0,30}?\bdocuments?\s+(folder|directory|dir)\b"]),

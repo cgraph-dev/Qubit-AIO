@@ -109,6 +109,34 @@
   pointer-events: auto;
 }
 
+/* The host's real backend status for the embedded app. It sits above the frame
+   but never accepts pointer events, so it cannot steal input from the game. */
+.office-game__connection {
+  position: absolute;
+  z-index: 2;
+  left: var(--office-s3);
+  bottom: var(--office-s3);
+  max-width: min(28rem, calc(100% - 2rem));
+  padding: var(--office-s1) var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius, 6px);
+  background: rgba(11, 15, 22, 0.88);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.office-game__connection[data-state="error"] {
+  border-color: var(--office-bad, #e0554a);
+  color: var(--office-bad, #e0554a);
+}
+
+.office-game__connection[data-state="stale"] {
+  border-color: var(--office-warn, #e6b45a);
+  color: var(--office-warn, #e6b45a);
+}
+
 .office-game__sr-only {
   position: absolute;
   width: 1px;
