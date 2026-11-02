@@ -187,3 +187,12 @@ describe("WebhooksPage create validation", () => {
     expect(document.getElementById("webhook-name")).not.toBeNull();
   });
 });
+
+describe("WebhooksPage receiver state", () => {
+  it("renders the enabled receiver state instead of hiding it", async () => {
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Webhook receiver") === true);
+    expect(container.textContent).toContain("enabled");
+    expect(container.textContent).not.toContain("Webhook receiver disabled");
+  });
+});
