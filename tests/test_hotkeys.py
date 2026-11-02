@@ -282,3 +282,33 @@ def test_restart_xinput_joins_old_thread_before_spawn(monkeypatch):
     assert hk._restart_xinput() is True
     started.wait(timeout=1.0)
     assert joined, "old listener thread must be joined before the new one"
+
+def test_start_with_retry_recovers_from_first_failure(monkeypatch):
+    """A display that appears a moment after startup must recover: a mocked
+    first failure is retried and the second attempt succeeds."""
+    hk = HotkeyListener(hold_key="ctrl_r")
+    attempts = []
+
+    def _start(on_event):
+        attempts.append(True)
+        return len(attempts) >= 2
+
+    monkeypatch.setattr(hk, "start", _start)
+    assert hk.start_with_retry(lambda ev, key: None, delays=(0.0,)) is True
+    assert len(attempts) == 2, attempts
+
+
+def test_start_with_retry_is_bounded(monkeypatch):
+    """A permanently unavailable display must stop after the retry budget,
+    never hot-loop."""
+    hk = HotkeyListener(hold_key="ctrl_r")
+    attempts = []
+
+    def _start(on_event):
+        attempts.append(True)
+        return False
+
+    monkeypatch.setattr(hk, "start", _start)
+    assert hk.start_with_retry(lambda ev, key: None,
+                               delays=(0.0, 0.0, 0.0)) is False
+    assert len(attempts) == 4, attempts
