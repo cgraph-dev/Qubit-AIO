@@ -678,7 +678,10 @@ def resolve_service_base(cfg: Any) -> str:
     explicit = str(_read_cfg(cfg, "voice_edit", "service_url", default="") or "")
     if explicit:
         return explicit.rstrip("/")
-    host = str(_read_cfg(cfg, "webui", "host", default="127.0.0.1") or "127.0.0.1")
+    from .config import resolve_webui_bind_host
+    host = resolve_webui_bind_host(
+        _read_cfg(cfg, "webui", "host", default="127.0.0.1") or "127.0.0.1",
+        _read_cfg(cfg, "webui", "allow_lan", default=False))
     port = int(_read_cfg(cfg, "webui", "port", default=8890) or 8890)
     if host in ("0.0.0.0", "::"):
         host = "127.0.0.1"

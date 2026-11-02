@@ -5186,8 +5186,22 @@ class WebUI:
                  asr_factory: Any = None, tts: Any = None,
                  state_dir: Optional[Path] = None) -> None:
         self.orch = orchestrator
-        cfg_host = orchestrator.cfg.get("webui", "host") if orchestrator is not None else None
-        self.host = host or cfg_host or "127.0.0.1"   # loopback by default (Packet 1B)
+        cfg = getattr(orchestrator, "cfg", None) if orchestrator is not None else None
+        cfg_host = cfg.get("webui", "host") if cfg is not None else None
+        allow_lan = cfg.get("webui", "allow_lan", default=False) if cfg is not None else False
+        requested_host = host or cfg_host or "127.0.0.1"
+        # Safe default: a non-loopback bind is honoured only after an explicit
+        # ``webui.allow_lan: true`` opt-in. A copied/stale ``host: 0.0.0.0``
+        # alone must never expose the session-token bootstrap to the LAN.
+        from . import config as _config_mod
+        self.host = _config_mod.resolve_webui_bind_host(requested_host, allow_lan)
+        if self.host != requested_host:
+            log.warning(
+                "webui.host %r is not loopback and webui.allow_lan is not true; "
+                "binding %s instead (set webui.allow_lan: true and webui.token "
+                "to opt in to LAN access)", requested_host, self.host)
+            log_event("webui.host.loopback_default",
+                      requested=str(requested_host), bound=self.host)
         self.port = port
         self.feed = ActivityFeed()
         self._asr_factory = asr_factory or _default_asr_factory(orchestrator)

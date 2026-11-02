@@ -1619,7 +1619,7 @@ class VoiceOrchestrator:
                 from .webui import WebUI
                 self._webui = WebUI(
                     self,
-                    host=wu_cfg.get("host", "0.0.0.0"),
+                    host=wu_cfg.get("host", "127.0.0.1"),
                     port=int(wu_cfg.get("port", 8890)),
                     state_dir=self.cfg.state_dir())
                 # Publish the live listener so the SIGTERM handler can detach

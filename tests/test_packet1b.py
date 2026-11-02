@@ -171,6 +171,7 @@ def test_webui_start_fails_closed_on_lan_without_token(tmp_path):
     orch = StubOrch()
     orch.cfg = Config.load()
     orch.cfg.data["webui"]["host"] = "0.0.0.0"
+    orch.cfg.data["webui"]["allow_lan"] = True
     orch.cfg.data["webui"]["token"] = ""
     w = WebUI(orchestrator=orch, state_dir=tmp_path)
     with pytest.raises(RuntimeError, match="requires webui.token"):
