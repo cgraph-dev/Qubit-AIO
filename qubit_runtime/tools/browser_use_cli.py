@@ -323,16 +323,49 @@ def _harness_site_dir() -> Optional[str]:
     return str(Path(spec.origin).resolve().parent.parent)
 
 
-def _find_cli() -> Optional[list[str]]:
-    """The Browser Use CLI's engine (browser-harness) is a core dependency of Qubit's own venv,
-    so every install, the Desktop bundle included, runs it on the current interpreter."""
+_CLI_REQUIREMENTS = ("browser-use==0.13.10",)
+
+
+def _find_harness_cli() -> Optional[list[str]]:
+    """The Browser Use CLI's engine (browser-harness) on Qubit's own interpreter.
+
+    This is the fallback when PM has not provisioned the managed ``browser-use`` CLI; every
+    Qubit install (Desktop bundle included) ships it as a core dependency."""
     if _harness_site_dir() is None:
         return None
     return [sys.executable, "-m", "browser_harness.run"]
 
 
+def _find_cli_unpatched() -> Optional[list[str]]:
+    """Read PM's selected managed CLI without installing anything during discovery."""
+    try:
+        import pm
+        binary = pm.python_tool("browser-use", "browser-use")
+    except Exception as exc:
+        logger.debug("browser-use CLI discovery failed: %s", exc)
+        return None
+    return [str(binary)] if binary is not None else None
+
+
+def _find_cli() -> Optional[list[str]]:
+    """The managed CLI when installed, else the bundled browser-harness engine."""
+    return _find_cli_unpatched() or _find_harness_cli()
+
+
+def install_cli(timeout_s: int = 600) -> tuple[bool, str]:
+    """Provision the pinned CLI in PM's isolated environment; never raises."""
+    try:
+        import pm
+        binary = pm.ensure_python_tool(
+            "browser-use", _CLI_REQUIREMENTS, "browser-use", explicit=True, timeout=timeout_s,
+        )
+    except Exception as exc:
+        return False, f"Could not install browser-use CLI: {exc}"
+    return True, f"browser-use CLI installed ({binary})"
+
+
 def browser_exec_available() -> bool:
-    """check_fn: browser-harness is importable (a core dependency). Never launches or opens sockets."""
+    """check_fn: a managed CLI is installed or browser-harness is importable."""
     return _find_cli() is not None
 
 
@@ -851,9 +884,16 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
     cmd = _find_cli()
     if not cmd:
         return tool_error("browser-harness is missing from Qubit's Python environment. "
-                          "Run `qubit update` to re-sync it.")
+                          "Run `qubit update` to re-sync it, or install the browser-use CLI "
+                          "from `qubit tools`.")
 
+    harness_cli = bool(cmd) and cmd[0] == sys.executable
     env = _base_subprocess_env()
+    if not harness_cli:
+        # A PM-managed CLI runs under its own interpreter: Qubit's import paths must never win
+        # over its site-packages (wrong-ABI C extensions, #83427/#84841/#86006/#86104).
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
     if session:
         if not _SESSION_RE.match(session):
             return tool_error(f"Invalid session name {session!r}: use 1-64 letters, digits, "

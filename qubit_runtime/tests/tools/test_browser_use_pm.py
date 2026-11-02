@@ -13,7 +13,7 @@ from tools import browser_use_cli as bu
 
 @pytest.mark.platforms("posix", "windows")
 def test_installed_cli_selection_and_child_environment(build_worker, tmp_path, monkeypatch):
-    from tools import browser_tool_session, browser_supervisor
+    from tools import browser_session, browser_supervisor
 
     wheel = _wheel(tmp_path, "browser_use_probe")
     with zipfile.ZipFile(wheel, "a") as archive:
@@ -26,14 +26,16 @@ def main():
     monkeypatch.setattr(bu, "_CLI_REQUIREMENTS", (f"browser-use-probe @ {wheel.as_uri()}",))
     monkeypatch.setattr(bu, "_find_cli", bu._find_cli_unpatched)
     monkeypatch.setattr("qubit_cli.config.read_raw_config", lambda: {"browser": {"backend": "browser-use"}})
-    monkeypatch.setattr("tools.browser_tool_cdp._get_cdp_override", lambda: "")
-    monkeypatch.setattr("tools.browser_tool_cdp._resolve_cdp_override", lambda url: url)
-    monkeypatch.setattr("tools.browser_tool_cloud._get_cloud_provider", lambda: None)
-    monkeypatch.setattr("tools.browser_tool_lightpanda_fallback._using_lightpanda_engine", lambda: False)
-    def local_browser(task_id, command, args, **kwargs):
-        assert (task_id, command, args) == ("bu-named-research", "get", ["cdp-url"])
-        return {"success": True, "data": {"cdpUrl": "ws://127.0.0.1:47000/private"}}
-    monkeypatch.setattr(browser_tool_session, "_run_browser_command", local_browser)
+    monkeypatch.setattr("qubit_cli.config_effective.load_user_config_effective",
+                        lambda: {"browser": {"backend": "browser-use"}})
+    monkeypatch.setattr("tools.browser_session_cdp.get_cdp_override", lambda: "")
+    monkeypatch.setattr("tools.browser_session_cdp.resolve_cdp_override", lambda url: url)
+    monkeypatch.setattr("tools.browser_session_cloud.get_cloud_provider", lambda: None)
+    monkeypatch.setattr("tools.browser_lightpanda.using_lightpanda_engine", lambda: False)
+    def local_browser(cache_key):
+        assert cache_key == "bu-named-research"
+        return {"cdp_url": "ws://127.0.0.1:47000/private", "features": {"local": True}}
+    monkeypatch.setattr(browser_session, "get_session_info", local_browser)
     attached = []
     monkeypatch.setattr(browser_supervisor.SUPERVISOR_REGISTRY, "get_or_start",
                         lambda task_id, cdp_url, **kw: attached.append((task_id, cdp_url)))
@@ -64,12 +66,12 @@ def main():
     # Windows console-script launchers report sys.argv[0] without the .exe suffix.
     assert Path(child["argv"][0]).with_suffix("") == binary.with_suffix("")
     assert child["stdin"] == "print('payload')"
-    for key in ("PYTHONPATH", "PYTHONHOME", "OPENAI_API_KEY", "_HERMES_BU_PRIVATE_BROWSER"):
+    for key in ("PYTHONPATH", "PYTHONHOME", "OPENAI_API_KEY", "BROWSERBASE_API_KEY",
+                "_HERMES_BU_PRIVATE_BROWSER"):
         assert key not in child["env"]
     assert child["env"]["BU_NAME"] == "research"
     assert child["env"]["BU_CDP_WS"] == "ws://127.0.0.1:47000/private"
     assert child["env"]["ANONYMIZED_TELEMETRY"] == "false"
-    assert child["env"]["BROWSERBASE_API_KEY"] == "browser-key"
     assert child["env"]["KEEP_BROWSER_PROBE"] == "kept"
     assert attached == [("owner", "ws://127.0.0.1:47000/private")]
     # Invalid wheel reaches real worker/uv failure, and leaves the old CLI selected.

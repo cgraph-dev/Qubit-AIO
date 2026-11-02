@@ -115,7 +115,8 @@ class SubagentWorktreeTests(unittest.TestCase):
         branches = _git(["branch", "--list", info["branch"]], repo).stdout
         self.assertEqual(branches.strip(), "")
 
-    def test_finalize_keeps_worktree_with_commits(self):
+    def test_finalize_archives_worktree_with_commits(self):
+        """A child that left commits is archived to a ref and removed; its branch stays."""
         repo = _make_repo(self.tmp)
         info = sw.create_subagent_worktree(str(repo), "work1")
         assert info is not None
@@ -126,19 +127,24 @@ class SubagentWorktreeTests(unittest.TestCase):
         _git(["config", "user.name", "Child"], wt)
         _git(["commit", "-q", "-m", "child work"], wt)
         payload = sw.finalize_subagent_worktree(info)
-        self.assertFalse(payload["pruned"])
+        self.assertTrue(payload["pruned"])
         self.assertEqual(payload["commits"], 1)
-        self.assertTrue(os.path.isdir(info["path"]))
+        self.assertTrue(payload.get("archive"))
+        self.assertFalse(os.path.isdir(info["path"]))
+        self.assertNotEqual(_git(["branch", "--list", info["branch"]], repo).stdout.strip(), "")
 
-    def test_finalize_keeps_dirty_worktree(self):
+    def test_finalize_archives_dirty_worktree(self):
+        """Uncommitted child edits are archived (restorable) before the tree is removed."""
         repo = _make_repo(self.tmp)
         info = sw.create_subagent_worktree(str(repo), "dirty1")
         assert info is not None
         (Path(info["path"]) / "wip.txt").write_text("uncommitted\n", encoding="utf-8")
         payload = sw.finalize_subagent_worktree(info)
-        self.assertFalse(payload["pruned"])
+        self.assertTrue(payload["pruned"])
         self.assertTrue(payload["dirty"])
-        self.assertTrue(os.path.isdir(info["path"]))
+        self.assertTrue(payload.get("archive"))
+        self.assertFalse(os.path.isdir(info["path"]))
+        self.assertNotEqual(_git(["branch", "--list", info["branch"]], repo).stdout.strip(), "")
 
     def test_finalize_keeps_worktree_when_git_inspection_fails(self):
         """#88113: a non-zero git status exit must not be read as "clean".

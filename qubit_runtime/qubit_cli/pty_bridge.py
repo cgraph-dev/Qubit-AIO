@@ -115,6 +115,9 @@ class PtyBridge:
         self._proc = proc
         self._fd: int = proc.fd
         self._closed = False
+        # One selector per reader lifetime (epoll/kqueue are fds themselves); built lazily so a
+        # bridge that never reads pays nothing.
+        self._waiter = None
         # The last size applied to the child, so a resize that undoes the previous one can be
         # told apart without a TIOCGWINSZ probe (ConPTY and test stubs cannot answer one).
         self._size: Optional[tuple[int, int]] = None
@@ -188,8 +191,17 @@ class PtyBridge:
         """
         if self._closed:
             return None
+        from tools.environments.fd_wait import open_fd_waiter
+        if self._waiter is None:
+            try:
+                self._waiter = open_fd_waiter(self._fd)
+            except OSError:
+                # No safe wait exists (macOS poll on a PTY, EMFILE); treat as EOF like a closed fd.
+                return None
+        if self._waiter is None:
+            return None
         try:
-            readable, _, _ = select.select([self._fd], [], [], timeout)
+            readable = self._waiter.wait(timeout)
         except (OSError, ValueError):
             return None
         if not readable:
@@ -336,6 +348,12 @@ class PtyBridge:
         if self._closed:
             return
         self._closed = True
+        if self._waiter is not None:
+            try:
+                self._waiter.close()
+            except Exception:
+                pass
+            self._waiter = None
 
         pgid = self._pgid
         leader_was_alive = self._proc.isalive()

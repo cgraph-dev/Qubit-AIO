@@ -1002,8 +1002,12 @@ def _push_completion_event(record: Dict[str, Any], result: Dict[str, Any], statu
             **({"group": result["group"]} if result.get("group") is not None else {})}
     else:
         payload = {
-            "summary": result.get("summary"), "error": result.get("error"), "api_calls": result.get("api_calls", 0),
+            "summary": result.get("summary"), "error": result.get("error"),
             "duration_seconds": result.get("duration_seconds", round(completed_at - dispatched_at, 2))}
+        # A runner with no run session (a refused cron fire) reports no usage at all; an
+        # invented 0 would render "API calls: 0" as if the job had run.
+        if "api_calls" in result:
+            payload["api_calls"] = result["api_calls"]
     evt = {
         "type": "async_delegation", "delegation_id": record.get("delegation_id"),
         # session_key routes back to the originating gateway session; "" => CLI.

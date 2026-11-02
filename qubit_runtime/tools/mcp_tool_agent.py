@@ -102,7 +102,7 @@ def _publish_tool_snapshot(
 
 def refresh_agent_mcp_tools(
     agent, *, enabled_override=None, disabled_override=None, quiet_mode: bool = True,
-    content_aware: bool = False, preserve_prefix: bool = False) -> set:
+    content_aware: Optional[bool] = None, preserve_prefix: bool = False) -> set:
     """Re-derive an already-built agent's tool snapshot from the live registry; returns the
     newly-added tool names (empty when unchanged). The agent snapshots ``agent.tools`` at build
     time, so servers that connect later (slow OAuth, ``/reload-mcp``) are invisible until
@@ -147,8 +147,11 @@ def refresh_agent_mcp_tools(
             pass  # fail open to the plain rebuild
     else:
         # Explicit reload and pre-first-turn rebuild. A same-name description
-        # change has to publish; between-turns refresh keeps preserve_prefix.
-        content_aware = True
+        # change has to publish unless the caller pinned name-only behavior
+        # (MCP-reload callers); between-turns refresh keeps preserve_prefix.
+        if content_aware is None:
+            content_aware = True
+    content_aware = bool(content_aware)
     added = _publish_tool_snapshot(
         agent, new_defs, new_names, snapshot_generation=snapshot_generation,
         staged_engine_names=staged_engine_names, content_aware=content_aware, prefix_registered=prefix_registered)

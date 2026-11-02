@@ -14,7 +14,7 @@ def test_harness_runs_on_an_interpreter_without_its_own_site_packages(monkeypatc
     """The Desktop bundle boots its store interpreter with no venv to activate (``-S`` emulates
     that); the harness and its daemon must import from the PYTHONPATH the tool env supplies,
     never from what the agent process inherited."""
-    monkeypatch.setattr(bu, "_find_cli", bu._find_cli_unpatched)
+    monkeypatch.setattr(bu, "_find_cli", bu._find_harness_cli)
     monkeypatch.setenv("PYTHONPATH", "/wrong-abi")
     monkeypatch.setenv("PYTHONHOME", "/wrong-python")
     cmd = bu._find_cli()

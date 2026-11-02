@@ -50,8 +50,6 @@ def _raise_sdk_sse_default() -> None:
         logger.debug("could not raise the SDK SSE event bound", exc_info=True)
 
 
-_raise_sdk_sse_default()
-
 
 _PROBE_INITIALIZE_BODY = (  # JSON-RPC ``initialize`` body for the content-type preflight POST
     '{"jsonrpc":"2.0","id":"_probe","method":"initialize","params":{"protocolVersion":"2025-03-26",'
@@ -601,6 +599,9 @@ class MCPServerTransportMixin:
                                    strict_cfg_headers: bool, configured_header_names: set):
         """Streamable HTTP context manager: mcp >= 1.24.0 gets a caller-owned httpx client; on the
         deprecated API (mcp < 1.24.0) the SDK owns the client."""
+        # Patching the SDK's SSE bound needs the SDK; keep that work on the connect path so
+        # merely importing tools.mcp_tool stays lazy (startup latency).
+        _raise_sdk_sse_default()
         if not _core._MCP_NEW_HTTP:
             if strict_cfg_headers:  # fail closed: without an owned client redirects can't be hooked
                 raise ImportError(f"MCP server '{self.name}' requires mcp >= 1.24.0 to "
