@@ -489,8 +489,13 @@ def _held_disposition(record: dict | None) -> bool:
     return bool(record) and record.get("refused") is True and record.get("reason") == HELD_NOT_SENT
 
 
-def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dict] = None) -> dict | None:
-    """Pin intent before admission; retries may inspect, never change transport."""
+def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dict] = None, *,
+                   allow_no_owner: bool = False) -> dict | None:
+    """Pin intent before admission; retries may inspect, never change transport.
+
+    ``allow_no_owner`` is for the background runner: a profile with no store has no Bot Chat
+    to admit to, so it may fall through to the caller's explicit transport. The tool path
+    keeps the refusal (a DM must not silently become an unowned local turn)."""
     from tools.bot_live_delivery import (PreDialError, deliver_to_live_owner, find_canonical_live_owner,
                                          read_delivery_result)
     from utils import fsync_directory
@@ -505,9 +510,17 @@ def _admit_live_dm(profile_home: Path | None, dm_file: str, author: Optional[dic
         try:
             owner = find_canonical_live_owner(profile_home)
         except Exception as exc:
+            if allow_no_owner and not (Path(profile_home) / "state.db").is_file():
+                # The background runner may fall through to its explicit transport for a profile
+                # with no store at all; do not require an authority that could only create one.
+                return None
             # Discovery runs before the intent exists and never admits: definite, not ambiguous.
             raise LiveTargetUnavailableError(f"canonical Bot Chat target is unavailable ({exc})") from exc
         if owner is None:
+            if allow_no_owner:
+                # No store in this profile: there is no live Bot Chat to admit to, so let the
+                # runner fall through to the explicit peer transport.
+                return None
             raise LiveTargetUnavailableError("canonical Bot Chat target is unavailable")
         intent = dict(owner=owner, message=Path(dm_file).read_text(encoding="utf-8-sig"),
                       delivery_id=_dm_delivery_id(dm_file),
@@ -704,7 +717,7 @@ def _run_delivery(argv: list[str], dm_file: str, *, stdin_file: bool,
         home = profile_home or _local_delivery_home(argv)
         if home is not None or os.path.exists(_live_intent_file(dm_file)):
             try:
-                record = _admit_live_dm(home, dm_file, author)
+                record = _admit_live_dm(home, dm_file, author, allow_no_owner=True)
             except LiveTargetHeldError as exc:
                 print(_settled_no_send(dm_file, exc))  # the owner settled the id: drop the payload too
                 return 1
