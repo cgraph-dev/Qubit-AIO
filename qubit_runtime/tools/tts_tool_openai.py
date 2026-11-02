@@ -24,7 +24,7 @@ logger = logging.getLogger("tools.tts_tool")
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini-tts"
 # The managed OpenAI audio gateway only proxies these; anything else is 400 "Unsupported".
-MANAGED_OPENAI_TTS_MODELS = frozenset({"gpt-4o-mini-tts"})
+MANAGED_OPENAI_TTS_MODELS = frozenset({"gpt-4o-mini-tts", "tts-1", "tts-1-hd"})
 DEFAULT_OPENAI_VOICE = "alloy"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 # DeepInfra base URL is resolved via qubit_cli.models.deepinfra_base_url (shared).
