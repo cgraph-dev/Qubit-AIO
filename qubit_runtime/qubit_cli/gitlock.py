@@ -19,6 +19,9 @@ from qubit_cli._subprocess_compat import (
     noninteractive_git_env,
     windows_hide_flags,
 )
+# THE updater git runner (custody/job binding); re-exported so the fetch below goes through the
+# same seam every other update step uses and tests can patch it.
+from qubit_cli.update_custody import run_git
 
 logger = logging.getLogger(__name__)
 
@@ -749,8 +752,9 @@ def fetch_full_commit_graph(repo_root: Path, *extra_refspecs: str, **run_kwargs)
     if converts:
         fetch_filter = "blob:none"
     try:
-        subprocess.run(
-            ["git", "fetch", "--quiet", *(["--unshallow"] if shallow else []),
+        run_git(
+            ["git"],
+            ["fetch", "--quiet", *(["--unshallow"] if shallow else []),
              *([f"--filter={fetch_filter}"] if fetch_filter else []),
              "--no-tags", "origin", "refs/tags/v*:refs/tags/v*", *extra_refspecs],
             cwd=str(repo_root), check=True, capture_output=True, text=True,

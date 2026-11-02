@@ -393,16 +393,28 @@ class CLIChatTurnMixin:
                     # session summary) is unchanged; only the engine boundary moved.
                     from qubit_cli.oneshot import run_agent_through_port
 
+                    # A bot-to-bot dispatcher's HERMES_TURN_AUTHOR names who wrote the
+                    # prompt. Consume it here (before the turn) so the turn is attributed
+                    # and tool subprocesses do not inherit it — the non-quiet ``-q`` path
+                    # used to reach memory providers as the operator's.
+                    extra_kwargs = {
+                        "persist_user_message": _persist_clean_user_message,
+                        "moa_config": _moa_cfg,
+                    }
+                    from agent.turn_author import take_turn_author_from_env
+                    _author = take_turn_author_from_env()
+                    if _author is not None:
+                        from agent.interrupt_compat import _accepts_keyword
+                        if _accepts_keyword(self.agent.run_conversation, "turn_author"):
+                            extra_kwargs["turn_author"] = _author
+
                     turn.result = run_agent_through_port(
                         self.agent, agent_message,
                         session_id=self.session_id or "",
                         history=self.conversation_history[:-1],
                         task_id=self.session_id,
                         stream=None if muted else turn.stream_callback,
-                        extra_kwargs={
-                            "persist_user_message": _persist_clean_user_message,
-                            "moa_config": _moa_cfg,
-                        },
+                        extra_kwargs=extra_kwargs,
                         setup=_bind_thread_context,
                     )[1]
                 else:

@@ -132,9 +132,13 @@ class TestSidebarFailedLoad:
             _assert_failed_load(payload[key], "worker")
         assert "heal exhausted" in payload["errors"][0]["error"]
 
-    def test_unfixable_schema_is_healed_once_then_a_failed_load(
+    def test_a_probe_failure_that_is_not_real_drift_is_refused_without_a_writable_open(
         self, client, profiles_on_disk, monkeypatch
     ):
+        """A read-probe failure only heals when the declared schema is genuinely behind.
+        A probe that is not backed by real declared-schema drift (e.g. a bad custom probe
+        statement) must be refused as a failed load without a writable open and without
+        latching ``heal exhausted`` — the store was never written."""
         home = profiles_on_disk["worker"]
         _seed_session(home, "worker-chat")
         from qubit_cli import web_server_sessions as sessions_mod
@@ -155,20 +159,12 @@ class TestSidebarFailedLoad:
             return real_init(self, *args, **kwargs)
 
         monkeypatch.setattr(qubit_state.SessionDB, "__init__", counting_init)
-        real_list = qubit_state.SessionDB.list_sessions_rich
-
-        def list_then_miss(self, *args, **kwargs):
-            if str(getattr(self, "_db_path", home / "state.db")):
-                raise sqlite3.OperationalError("no such column: s.not_a_real_column")
-            return real_list(self, *args, **kwargs)
-
-        monkeypatch.setattr(qubit_state.SessionDB, "list_sessions_rich", list_then_miss)
 
         first = _sidebar(client, "worker")
         second = _sidebar(client, "worker")
 
-        assert len(writable_opens) == 1
-        assert str(home / "state.db") in sessions_mod._session_db_heal_exhausted
+        assert writable_opens == []
+        assert str(home / "state.db") not in sessions_mod._session_db_heal_exhausted
         for payload in (first, second):
             _assert_failed_load(payload["recents"], "worker")
 

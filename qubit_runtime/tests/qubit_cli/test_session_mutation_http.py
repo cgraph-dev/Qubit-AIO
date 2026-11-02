@@ -118,9 +118,10 @@ async def test_http_import_and_delete_keep_atomic_receipts(tmp_path, monkeypatch
 
 @pytest.mark.asyncio
 async def test_delete_reports_already_absent_only_for_rows_that_are_gone(tmp_path, monkeypatch):
-    """M3: the authority also answers ``not_found`` for an EXISTING cold row it cannot restore
-    (an API-server row with no binding). That is not an idempotent success — Desktop would drop
-    the row and it reappears on reload. Only a genuinely absent id is ``already_absent``."""
+    """M3/RT-30b: an EXISTING cold row that no loader restores (an API-server row with no
+    binding) now mounts read-only and the owner deletes it — that is NOT an idempotent
+    ``already_absent`` success, because the row really existed. Only a genuinely absent id is
+    ``already_absent``."""
     from qubit_cli.web_routers.sessions import manage_router
     from qubit_cli import web_server as web
     monkeypatch.setattr(web, '_SESSION_TOKEN', 'fixture-token')
@@ -136,8 +137,9 @@ async def test_delete_reports_already_absent_only_for_rows_that_are_gone(tmp_pat
         query = {'request_id': 'delete', 'expected_revision': 0, 'expected_generation': 0}
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://localhost',
                                      headers={'Authorization': 'Bearer fixture-token'}) as client:
-            unrestorable = await client.delete('/api/sessions/cold-api', params=query)
+            cold = await client.delete('/api/sessions/cold-api', params=query)
             gone = await client.delete('/api/sessions/never-existed', params=query)
-        assert unrestorable.status_code == 404 and unrestorable.json()['detail'] == 'not_found', unrestorable.text
-        assert db.get_session('cold-api') is not None
+        assert cold.status_code == 200, cold.text
+        assert cold.json()['deleted_ids'] == ['cold-api']
+        assert db.get_session('cold-api') is None
         assert gone.status_code == 200 and gone.json() == {'ok': True, 'already_absent': True}, gone.text

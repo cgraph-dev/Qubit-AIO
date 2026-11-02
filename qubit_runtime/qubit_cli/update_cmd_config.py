@@ -57,10 +57,24 @@ def _migrate_sibling_profile_configs() -> list[tuple[str, int, int]]:
                 current_ver, latest_ver = check_config_version(raise_on_parse_error=True)
                 if current_ver >= latest_ver:
                     continue
-                migrate_config(interactive=False, quiet=True)
+                step_results = migrate_config(interactive=False, quiet=True)
                 after_ver, _ = check_config_version(raise_on_parse_error=True)
                 if after_ver > current_ver:
-                    migrated.append((name, current_ver, after_ver))
+                    # Carry the step notices (``config_added``/``warnings``) so the caller can
+                    # print what RESET/REMOVED a setting, exactly as it does for the active
+                    # profile — a quiet sibling must not mutate config silently (#81946).
+                    # ``migrate_config`` also appends bare new-config keys to ``config_added``;
+                    # those are new defaults, not changes, so drop them (the active path only
+                    # prints its step mutations too).
+                    step_results = dict(step_results or {})
+                    try:
+                        from qubit_cli.config import get_missing_config_fields
+                        _new_keys = {f.get("key") for f in get_missing_config_fields()}
+                        step_results["config_added"] = [
+                            n for n in step_results.get("config_added") or [] if n not in _new_keys]
+                    except Exception:
+                        pass
+                    migrated.append((name, current_ver, after_ver, step_results))
             except Exception as exc:
                 logger.debug("Config migration for profile %s failed: %s", name, exc)
             finally:
@@ -243,8 +257,14 @@ def _check_and_apply_config_migration(
     # The migration above touched only the active profile; run the same NON-INTERACTIVE
     # migration per sibling home via the context-local QUBIT_HOME override (never os.environ).
     with _best_effort('Sibling config migration failed: %s'):
-        for _name, _from_ver, _to_ver in _migrate_sibling_profile_configs():
+        for _entry in _migrate_sibling_profile_configs():
+            _name, _from_ver, _to_ver = _entry[0], _entry[1], _entry[2]
+            _steps = _entry[3] if len(_entry) > 3 else {}
             print(f"  ✓ Profile '{_name}': config format updated (v{_from_ver} → v{_to_ver})")
+            for _note in (_steps.get("config_added") or []):
+                print(f"  ℹ {_note}")
+            for _warn in (_steps.get("warnings") or []):
+                print(f"  ⚠️  {_warn}")
 
     _restore_snapshot_safety_nets(pre_update_snapshot_id)
     if owed_error is not None:

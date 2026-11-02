@@ -740,7 +740,7 @@ def _check_profiles(should_fix: bool, f: Finding) -> None:
                 _m = _re.search(r"qubit -p (\S+)", wrapper.read_text(encoding="utf-8-sig"))
                 if _m and not profile_exists(_m.group(1)):
                     alias = wrapper.stem if wrapper.suffix in (".sh", ".bat", "") else wrapper.name
-                    fix = f"qubit profile alias {alias} --remove" if _PROFILE_ID_RE.match(alias) else f"delete {wrapper}"
+                    fix = f"qubit profile alias {alias} --remove" if PROFILE_ID_RE.match(alias) else f"delete {wrapper}"
                     check_warn(f"Orphan alias: {alias} → profile '{_m.group(1)}' no longer exists", f"(remove with: {fix})")
     # Same helper as the multiplex migration preflight, so doctor names the duplicates that make
     # `qubit gateway migrate --multiplex` refuse (and made pre-multiplex standalone gateways race).

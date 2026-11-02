@@ -322,6 +322,10 @@ def _api_key_provider_api_mode(provider: str, model_cfg: Dict[str, Any], api_key
         # the host_mandated_api_mode clause in qubit_cli/providers.py so the runtime resolver stays in
         # lockstep. Exact hostname per #32243.
         return "codex_responses"
+    if _per_model_profile(provider) is not None:
+        # A provider that routes its wire per model (a Responses default with chat-only
+        # exceptions): the hook's None keeps the declared default, a raising hook degrades to it.
+        return _profile_runtime_api_mode(provider, model_cfg, api_key, target_model=effective_model)
     return _configured_or_fallback_api_mode(provider, model_cfg, base_url, effective_model, opencode_by_model=opencode_by_model)
 
 
@@ -611,6 +615,11 @@ def _pool_entry_mode_and_url(provider, entry, model_cfg, effective_model, base_u
             api_mode = _parse_api_mode(model_cfg.get("api_mode")) or api_mode
         api_mode = _azure_inferred_api_mode(effective_model, api_mode)
         return api_mode, (re.sub(r"/v1/?$", "", base_url) if api_mode == "anthropic_messages" else base_url)
+    if _per_model_profile(provider) is not None:
+        # Per-model wire routing (see ``_profile_runtime_api_mode``) applies to pooled/env
+        # credentials too, not only an explicit ``--api-key`` rung.
+        return _profile_runtime_api_mode(provider, model_cfg, _pool_entry_api_key(entry),
+                                         target_model=effective_model), base_url
     # Missing and registry-default endpoints may use this provider's configured URL.
     # An explicit per-credential endpoint remains authoritative.
     pconfig = PROVIDER_REGISTRY.get(provider)
