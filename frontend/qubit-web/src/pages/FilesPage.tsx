@@ -357,30 +357,33 @@ export default function FilesPage() {
       />
 
       <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        {canChangePath ? (
-          <form
-            className="flex min-w-0 flex-1 items-center gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void goToPath();
-            }}
-          >
-            <Input
-              value={pathInput}
-              onChange={(event) => setPathInput(event.target.value)}
-              aria-label="Path"
-              placeholder="Path"
-              className="h-9 min-w-0 flex-1 font-mono"
-            />
-            <Button type="submit" size="sm" outlined className="uppercase">
-              Go
-            </Button>
-          </form>
-        ) : (
-          <div className="min-w-0 truncate font-mono text-sm text-text-secondary" title={activePath}>
-            {activePath}
-          </div>
-        )}
+        {/* The reference dashboard always exposes an editable path + Go. Qubit
+            keeps its approved-root policy in the backend (an outside path
+            answers a typed FILES_OUTSIDE_ROOT), so the navigation control must
+            not disappear just because this listing is rooted at a project. */}
+        <form
+          className="flex min-w-0 flex-1 items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void goToPath();
+          }}
+          title={
+            canChangePath
+              ? undefined
+              : "Only approved project folders can be listed; register another with `qubit project add-folder`."
+          }
+        >
+          <Input
+            value={pathInput}
+            onChange={(event) => setPathInput(event.target.value)}
+            aria-label="Path"
+            placeholder="Path"
+            className="h-9 min-w-0 flex-1 font-mono"
+          />
+          <Button type="submit" size="sm" outlined className="uppercase">
+            Go
+          </Button>
+        </form>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button
             type="button"
