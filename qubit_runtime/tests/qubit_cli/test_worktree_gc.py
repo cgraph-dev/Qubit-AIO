@@ -418,7 +418,8 @@ class TestCmdWorktreeJson:
         _add_worktree(repo, "hermes-json")
         assert cmd_worktree(self._ns(repo, "list")) == 0
         payload = json.loads(capsys.readouterr().out)
-        assert set(payload) == {"repo", "trees", "external_trees", "branches"}
+        assert set(payload) == {"repo", "trees", "external_trees", "branches", "archives"}
+        assert payload["archives"] == []
         names = [t["name"] for t in payload["trees"]]
         assert "hermes-json" in names
         tree = [t for t in payload["trees"] if t["name"] == "hermes-json"][0]
