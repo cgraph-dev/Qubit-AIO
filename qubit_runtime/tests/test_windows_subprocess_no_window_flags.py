@@ -278,6 +278,7 @@ def test_lsp_client_spawn_hides_console_window(monkeypatch):
     captured = []
 
     class _FakeProc:
+        pid = 4242
         stdin = None
         stdout = None
         stderr = None

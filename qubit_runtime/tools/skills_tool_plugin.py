@@ -125,10 +125,14 @@ def _serve_plugin_skill(
     preprocess: bool = True, session_id: str | None = None) -> str:
     """Read a plugin-provided skill, apply guards, return JSON."""
     from qubit_cli.plugins import _get_disabled_plugins, get_plugin_manager
+    from qubit_cli.plugins_content import plugin_skill_owners
     from tools import skills_tool as _st
-    if namespace in _get_disabled_plugins():
-        return _fail(f"Plugin '{namespace}' is disabled. Re-enable with: qubit plugins enable {namespace}")
     qualified_name = f"{namespace}:{bare}"
+    # The prefix is a slug of a portable plugin's name (``foo.bar`` -> ``foo-bar``), so it can name a
+    # DIFFERENT plugin from the one that registered this skill; check the registered owner's keys.
+    disabled = _get_disabled_plugins()
+    if blocked := sorted(plugin_skill_owners(get_plugin_manager(), qualified_name) & disabled):
+        return _fail(f"Plugin '{blocked[0]}' is disabled. Re-enable with: qubit plugins enable {blocked[0]}")
     try:
         content = _read_skill_text(skill_md)
     except Exception as e:

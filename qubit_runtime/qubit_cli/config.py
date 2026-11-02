@@ -4189,7 +4189,11 @@ def _worker_config_snapshot() -> Optional[dict[str, Any]]:
     try:
         from agent.safe_worker_policy import worker_config_snapshot
     except ModuleNotFoundError as exc:
-        if exc.name != "agent":
+        # The package itself may be absent, or present as a minimal slice (the installer's
+        # completion step ships ``agent.i18n`` for user-facing text but no worker policy).
+        # Only that exact missing module means "no worker policy"; a dependency missing from
+        # inside the policy module must still surface.
+        if exc.name not in ("agent", "agent.safe_worker_policy"):
             raise
         return None
     return worker_config_snapshot()

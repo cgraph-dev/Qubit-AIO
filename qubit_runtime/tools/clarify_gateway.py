@@ -123,6 +123,14 @@ def get_pending_for_session(session_key: str, *, include_choice_prompts: bool = 
         return None
 
 
+def get_pending(session_key: str, *, include_choice_prompts: bool = False) -> Optional[_ClarifyEntry]:
+    """Public platform-plugin seam: the session's oldest pending clarify entry.
+
+    Documented alongside ``resolve_gateway_clarify``/``mark_awaiting_text`` for adapter authors;
+    the internal spelling is :func:`get_pending_for_session`."""
+    return get_pending_for_session(session_key, include_choice_prompts=include_choice_prompts)
+
+
 def _match_label(text: str, choices: List[str]) -> Optional[str]:
     """Stripped choice text matching ``text`` case-insensitively, ignoring the '(Recommended)'
     suffix the first choice carries by the time it reaches adapters; None if no match."""
