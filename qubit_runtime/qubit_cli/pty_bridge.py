@@ -192,16 +192,17 @@ class PtyBridge:
         if self._closed:
             return None
         from tools.environments.fd_wait import open_fd_waiter
-        if self._waiter is None:
+        waiter = getattr(self, "_waiter", None)
+        if waiter is None:
             try:
-                self._waiter = open_fd_waiter(self._fd)
+                waiter = self._waiter = open_fd_waiter(self._fd)
             except OSError:
                 # No safe wait exists (macOS poll on a PTY, EMFILE); treat as EOF like a closed fd.
                 return None
-        if self._waiter is None:
+        if waiter is None:
             return None
         try:
-            readable = self._waiter.wait(timeout)
+            readable = waiter.wait(timeout)
         except (OSError, ValueError):
             return None
         if not readable:
@@ -348,9 +349,10 @@ class PtyBridge:
         if self._closed:
             return
         self._closed = True
-        if self._waiter is not None:
+        waiter = getattr(self, "_waiter", None)
+        if waiter is not None:
             try:
-                self._waiter.close()
+                waiter.close()
             except Exception:
                 pass
             self._waiter = None

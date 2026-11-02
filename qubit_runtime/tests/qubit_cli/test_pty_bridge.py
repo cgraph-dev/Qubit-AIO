@@ -14,6 +14,7 @@ import shutil
 import signal
 import sys
 import time
+import types
 
 import pytest
 
@@ -136,6 +137,7 @@ class TestPtyBridgeIO:
         bridge = PtyBridge.__new__(PtyBridge)
         bridge._fd = 123
         bridge._closed = False
+        bridge._waiter = types.SimpleNamespace(wait=lambda _timeout: True, close=lambda: None)
 
         monkeypatch.setattr(select, "select", lambda *_args: ([123], [], []))
 
@@ -274,6 +276,7 @@ class TestPtyBridgeClose:
         # recorded at spawn; the child leads its own group (pgid == pid)
         bridge._pgid = 12345
         bridge._closed = False
+        bridge._waiter = None
 
         bridge.close()
 
