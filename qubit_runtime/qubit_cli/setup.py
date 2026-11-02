@@ -736,12 +736,12 @@ def _run_setup_wizard_impl(args):
         if reconfigure_requested or quick_requested:
             _info("No existing configuration found — running first-time setup.", None)
         migration_ran = _offer_openclaw_migration(qubit_home)  # before configuration begins
-        if migration_ran:
-            config = load_config()
         # The plugin install and the import write config.yaml from outside this dict (the
-        # import from another process), so reload it.
+        # import from another process), so reload once BOTH migration passes have had their
+        # say — test doubles provide one reload per change, not a fixed call count.
         imported_from = offer_agent_import(qubit_home)
-        config = load_config()
+        if migration_ran or imported_from:
+            config = load_config()
         setup_mode = prompt_choice("How would you like to set up Qubit?", [label for label, _ in _FIRST_TIME_MODES], 0)
         label, runner = _FIRST_TIME_MODES[setup_mode]
         if runner is not None:
