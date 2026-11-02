@@ -276,8 +276,14 @@ def _(rid, params: dict) -> dict:
         root = _completion_cwd(params)
     else:
         # The composer's explicit cwd (Desktop sends it) wins; otherwise the session's terminal
-        # cwd, which for a session-less composer is the profile's configured backend cwd.
-        root = params.get("cwd") or _terminal_task_cwd(session) or "."
+        # cwd, which for a session-less composer is the profile's configured backend cwd. A TUI
+        # echoes ``session.info``'s cwd back as ``params.cwd`` even when nobody picked a
+        # workspace — that is the gateway's host launch dir, which does not exist in the sandbox,
+        # so completing against it would list a plausible but wrong tree (#112963).
+        cwd = params.get("cwd")
+        if cwd and session and cwd == session.get("cwd") and not session.get("explicit_cwd"):
+            cwd = None
+        root = cwd or _terminal_task_cwd(session) or "."
     session_key = session.get("session_key") if session else None
     return _ok(rid, {"items": _path_completion_items(word, root, session_key, local)})
 

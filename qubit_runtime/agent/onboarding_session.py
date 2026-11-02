@@ -20,11 +20,13 @@ def with_onboarding(enabled) -> list[str]:
     """*enabled* plus onboarding. None (every toolset outside the session-gated ones, which onboarding
     is) is spelled out by name: the agent's other toolset gates read the names, as they read None."""
     if enabled is None:
-        from toolsets import get_all_toolsets
-        # Everything the unrestricted selection resolves, except ``onboarding`` itself (appended
-        # below). Other platform-gated toolsets (``catalog``) are session-subtracted later, so
-        # naming them here keeps the same tool array an unrestricted agent gets.
-        enabled = [name for name in get_all_toolsets() if name != "onboarding"]
+        from toolsets import TOOLSET_SESSION_PLATFORMS, get_all_toolsets
+        # Exactly what the unrestricted selection resolves (it skips the session-platform gated
+        # toolsets too), plus ``onboarding`` below. A desktop session still gets client-surface
+        # toolsets such as ``catalog`` from the gateway's `_with_session_toolsets` fold-in, so this
+        # must not name them here: adding them would hand an unrestricted onboarding chat tools
+        # the unrestricted selection itself excludes.
+        enabled = [name for name in get_all_toolsets() if name not in TOOLSET_SESSION_PLATFORMS]
     return [*enabled, "onboarding"]
 
 

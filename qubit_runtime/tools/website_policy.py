@@ -155,10 +155,14 @@ def check_website_access(url: str, config_path: Optional[Path] = None) -> Option
     an explicit ``config_path`` (tests), where errors propagate.
     """
     # Fast path: cached policy disabled/empty → no YAML read, no host extraction.
+    # The cache entry must belong to the current profile's config path and still be
+    # within TTL; otherwise a disabled policy in one profile would short-circuit
+    # another profile (or a config edit) for the whole TTL window.
     if config_path is None:
-        with _cache_lock:
-            if _cached_policy is not None and not _cached_policy.get("enabled"):
-                return None
+        resolved_path = str(get_qubit_home() / "config.yaml")
+        cached = _fresh_cached_policy(resolved_path, time.monotonic())
+        if cached is not None and not cached.get("enabled"):
+            return None
     host = _extract_host_from_urlish(url)
     if not host:
         return None
