@@ -458,7 +458,7 @@ def test_synthetic_prior_artifact_upgrade_contract(tmp_path):
     joined = " ".join(str(x) for x in plan["does_not"]).lower()
     assert "delete state" in joined
     # report the limitation honestly: real previous-release upgrade untested
-    assert D.PACKAGE_VERSION == "1.0.0"
+    assert D.PACKAGE_VERSION == "0.0.1"
 
 
 # ========================================================================

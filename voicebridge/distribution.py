@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 PACKAGE_NAME = "qubit-voicebridge"
-PACKAGE_VERSION = "1.0.0"
+PACKAGE_VERSION = "0.0.1"
 SUPPORTED_TARGET = {
     "os": "ubuntu",
     "arches": ["x86_64", "amd64"],
