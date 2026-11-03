@@ -901,6 +901,8 @@ class ChatConsole:
         yield self
 
 
+_GHOST_COMPACT = ['······························', '·······················●●●●••·', '··············●●●●●●·••●●●●●••', '·············●●●●●●●●••••●••••', '············●●●•●●●•●●•••••••·', '············●●●•●●●•●●●•••••••', '············●●●●●·●●●●●•••••••', '··········●●●●●●●●●●●●•●••••••', '··••••••••··●●•●●●•●●•••••••••', '•••••••••••••●••●•••••••••••••', '•••┼•••••••••••••••••••••••┼••', '••••••••••••••••··············', '··••••••••••••·········••·····', '······························']
+
 def _build_compact_banner() -> str:
     """Build a compact banner that fits the current terminal width."""
     try:
@@ -931,8 +933,9 @@ def _build_compact_banner() -> str:
         version_line = format_banner_version_label()
 
     w = min(shutil.get_terminal_size().columns - 2, 88)
+    ghost = "\n".join(f"[{title_color}]{line}[/]" for line in _GHOST_COMPACT)
     if w < 30:
-        return f"\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- Qubit Labs[/]\n"
+        return f"\n{ghost}\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- Qubit Labs[/]\n"
 
     inner = w - 2  # inside the box border
     bar = "═" * w
@@ -942,7 +945,7 @@ def _build_compact_banner() -> str:
     line2 = version_line[:content_width].ljust(content_width)
 
     return (
-        f"\n[bold {border_color}]╔{bar}╗[/]\n"
+        f"\n{ghost}\n[bold {border_color}]╔{bar}╗[/]\n"
         f"[bold {border_color}]║[/] [{title_color}]{line1}[/] [bold {border_color}]║[/]\n"
         f"[bold {border_color}]║[/] [dim {dim_color}]{line2}[/] [bold {border_color}]║[/]\n"
         f"[bold {border_color}]╚{bar}╝[/]\n"

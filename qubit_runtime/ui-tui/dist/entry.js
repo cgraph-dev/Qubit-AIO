@@ -89873,12 +89873,14 @@ function lum(h) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
-var GHOST_COLS, GHOST_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines;
+var GHOST_COLS, GHOST_ROWS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines, ghostLinesCompact;
 var init_ghost = __esm({
   "src/ghost.ts"() {
     "use strict";
     GHOST_COLS = 60;
     GHOST_ROWS = 28;
+    GHOST_COMPACT_COLS = 30;
+    GHOST_COMPACT_ROWS = 14;
     clamp4 = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
     smooth = (t2) => t2 * t2 * (3 - 2 * t2);
     lerp = (a, b, t2) => a + (b - a) * t2;
@@ -90200,6 +90202,17 @@ var init_ghost = __esm({
       return tint(accent, raw);
     };
     ghostLines = (c, t2) => ghostDots(t2).map((row) => ["", colorRow(row, c)]);
+    ghostLinesCompact = (c, t2) => {
+      const rows = ghostDots(t2);
+      const out = [];
+      for (let y = 0; y < GHOST_ROWS; y += 2) {
+        const row = rows[y];
+        const compact = [];
+        for (let x = 0; x < GHOST_COLS; x += 2) compact.push(row[x]);
+        out.push(["", colorRow(compact, c)]);
+      }
+      return out;
+    };
   }
 });
 
@@ -90218,8 +90231,8 @@ function InlineLoader({ label, t: t2 }) {
     label
   ] });
 }
-function GhostArt({ lines }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(RawAnsi, { lines: lines.map(([, text2]) => text2), width: GHOST_COLS });
+function GhostArt({ lines, width }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", width, children: lines.map(([, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { wrap: "truncate-end", children: stripAnsi2(text2) }, i)) });
 }
 function ArtLines({ lines }) {
   return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", height: lines.length, width: artWidth(lines), children: lines.map(([c, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: c, wrap: "truncate-end", children: text2 }, i)) });
@@ -90236,12 +90249,45 @@ function CompactBanner({ cols, t: t2 }) {
 function Banner({ maxWidth, t: t2 }) {
   const T = useT().chatBits.branding;
   const term = useStdout().stdout?.columns ?? 80;
+  const rows = useStdout().stdout?.rows ?? 30;
   const cols = Math.max(1, Math.min(term, maxWidth ?? term));
   if (cols < HIDE_BELOW) {
     return null;
   }
   const logoLines = logo(t2.color, t2.bannerLogo || void 0);
   const logoW = t2.bannerLogo ? artWidth(logoLines) : LOGO_WIDTH;
+  const compactGhost = cols >= GHOST_COMPACT_COLS + 10;
+  const compactGhostArt = compactGhost ? ghostLinesCompact(t2.color, 0) : [];
+  if (compactGhost) {
+    return /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: compactGhostArt, width: GHOST_COMPACT_COLS }),
+      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
+        WidgetGrid,
+        {
+          cols,
+          columns: 1,
+          gap: 0,
+          paddingX: 0,
+          paddingY: 0,
+          rowGap: 0,
+          widgets: [
+            {
+              children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { bold: true, color: t2.color.primary, wrap: "truncate-end", children: t2.brand.name }),
+              id: "banner-compact-name"
+            },
+            {
+              children: /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.muted, wrap: "truncate-end", children: [
+                t2.brand.icon,
+                " ",
+                T.tagFull
+              ] }),
+              id: "banner-compact-tag"
+            }
+          ]
+        }
+      )
+    ] });
+  }
   if (cols >= logoW + 2) {
     return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
       WidgetGrid,
@@ -90326,15 +90372,19 @@ function useGhostTime(enabled2) {
 function SessionPanel({ info, maxWidth, sid, t: t2 }) {
   const T = useT().chatBits.branding;
   const term = useStdout().stdout?.columns ?? 100;
+  const rows = useStdout().stdout?.rows ?? 30;
   const cols = Math.max(20, Math.min(term, maxWidth ?? term));
-  const ghostFits = cols >= GHOST_COLS + 30;
+  const ghostFull = cols >= GHOST_COLS && rows >= 40;
+  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4;
+  const ghostFits = ghostFull || ghostCompact;
+  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS;
   const ghostTime = useGhostTime(ghostFits);
-  const ghostArt = ghostFits ? ghostLines(t2.color, ghostTime) : [];
+  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t2.color, ghostTime) : [];
   const heroLines = caduceus(t2.color, t2.bannerHero || void 0);
-  const heroArtWidth = ghostFits ? GHOST_COLS : artWidth(heroLines) || CADUCEUS_WIDTH;
-  const leftW = ghostFits ? GHOST_COLS : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));
+  const heroArtWidth = ghostFits ? ghostWidth : artWidth(heroLines) || CADUCEUS_WIDTH;
+  const leftW = ghostFits ? ghostWidth : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));
   const wide = ghostFits || heroArtWidth > 0 && leftW + 40 < cols;
-  const w = Math.max(20, wide ? cols - leftW - 8 : cols - 12);
+  const w = Math.max(10, wide ? cols - leftW - 8 : cols - 12);
   const lineBudget = Math.max(12, w - 2);
   const strip = (s) => s.endsWith("_tools") ? s.slice(0, -6) : s;
   const listFade = mix(t2.color.muted, t2.color.text, 0.5);
@@ -90423,7 +90473,7 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
     return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, children: info.system_prompt });
   };
   const heroColumn = wide ? /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", width: "100%", children: [
-    ghostFits ? /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: ghostArt }) : /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(ArtLines, { lines: heroLines }),
+    ghostFits ? /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: ghostArt, width: ghostWidth }) : /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(ArtLines, { lines: heroLines }),
     !ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, {}),
     !ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(import_jsx_runtime48.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.accent, children: [
@@ -90560,6 +90610,7 @@ var init_branding = __esm({
   "src/components/branding.tsx"() {
     "use strict";
     init_entry_exports();
+    init_ansi2();
     init_color();
     import_react91 = __toESM(require_react(), 1);
     init_dist4();
