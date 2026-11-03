@@ -21,6 +21,16 @@ import { memo, useEffect, useState } from "react";
 export const BACKDROP_VIDEO_SRC = "/media/qubit-backdrop.mp4";
 
 /**
+ * First-frame still of the same clip, used as the video's `poster`.
+ *
+ * The backdrop used to ship `preload="auto"`, so a cold load pulled 4 MB of
+ * decorative video while the entry JS was still downloading. `preload="metadata"`
+ * plus this poster keeps the first paint cheap: the poster paints instantly and
+ * the video still starts by itself, so what the operator sees is unchanged.
+ */
+export const BACKDROP_POSTER_SRC = "/media/qubit-backdrop-poster.jpg";
+
+/**
  * Scrim strength, per polarity.
  *
  * The scrim is painted in the theme's OWN canvas colour, so it already adapts;
@@ -97,7 +107,8 @@ export function QubitAmbient() {
         loop
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
+        poster={BACKDROP_POSTER_SRC}
         src={BACKDROP_VIDEO_SRC}
       />
       {/* Scrim: the skin's canvas over the video. Tinted from --background-base

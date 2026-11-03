@@ -218,6 +218,7 @@ import { PluginPage, PluginSlot, usePlugins } from "@/plugins";
 import type { PluginManifest } from "@/plugins";
 import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
+import { prefetchRoute } from "@/lib/route-prefetch";
 import { latchChatActivation } from "@/lib/chat-activation";
 import { isChatPath, isFullHeightPath, isNativeChatPath } from "@/lib/chat-routes";
 import { ROUTE_TITLES } from "@/lib/resolve-page-title";
@@ -1230,6 +1231,69 @@ function ProfileKeyedRoutes({ children }: { children: ReactNode }) {
   return <div key={profile || "__own__"} className="contents">{children}</div>;
 }
 
+
+/**
+ * Lazy route importers, keyed by route path. The sidebar calls these on
+ * hover/focus so the chunk for the page you are about to open is already in
+ * flight. Prefetch never renders anything: the same `React.lazy` call still
+ * owns the render, so a prefetch can only make the eventual load faster.
+ */
+const ROUTE_IMPORTERS: Record<string, () => Promise<unknown>> = {
+  "/sessions": () => import("@/pages/SessionsPage"),
+  "/files": () => import("@/pages/FilesPage"),
+  "/analytics": () => import("@/pages/AnalyticsPage"),
+  "/models": () => import("@/pages/ModelsPage"),
+  "/logs": () => import("@/pages/LogsPage"),
+  "/cron": () => import("@/pages/CronPage"),
+  "/skills": () => import("@/pages/SkillsPage"),
+  "/plugins": () => import("@/pages/PluginsPage"),
+  "/mcp": () => import("@/pages/McpPage"),
+  "/pairing": () => import("@/pages/PairingPage"),
+  "/channels": () => import("@/pages/ChannelsPage"),
+  "/webhooks": () => import("@/pages/WebhooksPage"),
+  "/system": () => import("@/pages/SystemPage"),
+  "/agents": () => import("@/pages/AgentsPage"),
+  "/profiles": () => import("@/pages/ProfilesPage"),
+  "/profiles/new": () => import("@/pages/ProfileBuilderPage"),
+  "/config": () => import("@/pages/ConfigPage"),
+  "/env": () => import("@/pages/EnvPage"),
+  "/docs": () => import("@/pages/DocsPage"),
+  "/voice-edit": () => import("@/pages/VoiceEditPage"),
+  "/agent-workspace": () => import("@/pages/AgentWorkspacePage"),
+  "/nodes": () => import("@/pages/NodesPage"),
+  "/devices": () => import("@/pages/DevicesPage"),
+  "/session-ops": () => import("@/pages/SessionOpsPage"),
+  "/worktrees": () => import("@/pages/WorktreesPage"),
+  "/checkpoints": () => import("@/pages/CheckpointsPage"),
+  "/qubit-board-admin": () => import("@/pages/BoardAdminPage"),
+  "/qubit-task-inbox": () => import("@/pages/TaskInboxPage"),
+  "/qubit-talk": () => import("@/pages/TalkPage"),
+  "/qubit-scheduler": () => import("@/pages/SchedulerMediaPage"),
+  "/admin/skills-review": () => import("@/pages/SkillsReviewPage"),
+  "/admin/mcp-calls": () => import("@/pages/McpCallsPage"),
+  "/admin/users": () => import("@/pages/UsersAdminPage"),
+  "/canvas": () => import("@/pages/CanvasPage"),
+  "/qubit-taskflows": () => import("@/pages/TaskflowsPage"),
+  "/qubit-tasks": () => import("@/pages/TasksPage"),
+  "/qubit-memory": () => import("@/pages/MemoryBackendsPage"),
+  "/webchat": () => import("@/pages/WebChatPage"),
+  "/qubit-bot": () => import("@/pages/QubitBotPage"),
+  "/qubit-harness-router": () => import("@/pages/HarnessRouterPage"),
+  "/open-viking": () => import("@/pages/OpenVikingStudioPage"),
+  "/open-viking/retrieval": () => import("@/pages/OpenVikingRetrievalPage"),
+  "/open-viking/uploads": () => import("@/pages/OpenVikingUploadsPage"),
+  "/open-viking/agent-hub": () => import("@/pages/OpenVikingAgentHubPage"),
+  "/open-viking/resources": () => import("@/pages/OpenVikingResourcesPage"),
+  "/open-viking/context-store": () => import("@/pages/OpenVikingPage"),
+  "/computer": () => import("@/pages/ComputerWorkspacePage"),
+  "/agent-cards": () => import("@/pages/AgentCardsPage"),
+  "/kitchen": () => import("@/pages/KitchenPage"),
+  "/omniroute": () => import("@/pages/OmniRoutePage"),
+  "/qubit-tv": () => import("@/pages/QubitTvPage"),
+  "/qubit-chat": () => import("@/pages/ChatPage"),
+  "/chat": () => import("@/pages/TerminalChatPage"),
+};
+
 function SidebarNavLink({
   closeMobile,
   collapsed,
@@ -1260,7 +1324,12 @@ function SidebarNavLink({
 
   return (
     <li
-      onMouseEnter={collapsed ? showTooltip : undefined}
+      onMouseEnter={(event) => {
+        // Warm the chunk for the page this row opens. Purely a network
+        // prefetch — the lazy route still owns rendering and errors.
+        prefetchRoute(path, ROUTE_IMPORTERS[path]);
+        if (collapsed) showTooltip(event);
+      }}
       onMouseLeave={collapsed ? hideTooltip : undefined}
     >
       <NavLink
@@ -1273,7 +1342,10 @@ function SidebarNavLink({
         }}
         title={collapsed ? undefined : navLabel}
         aria-label={navLabel}
-        onFocus={collapsed ? showTooltip : undefined}
+        onFocus={(event) => {
+          prefetchRoute(path, ROUTE_IMPORTERS[path]);
+          if (collapsed) showTooltip(event);
+        }}
         onBlur={collapsed ? hideTooltip : undefined}
         className={({ isActive }) =>
           cn(
