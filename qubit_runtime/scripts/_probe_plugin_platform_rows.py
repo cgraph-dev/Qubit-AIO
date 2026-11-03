@@ -13,7 +13,9 @@ import sys
 import tempfile
 
 _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_MAIN = "/home/trick/Projects/Repos/qubit-voicebridge"
+# Derived from this file's location, never hardcoded — a literal path goes stale on a rename
+# and the filter silently becomes a no-op.
+_MAIN = os.path.dirname(_HERE)
 _STALE = {_MAIN, os.path.join(_MAIN, "qubit_runtime")}
 sys.path[:] = [p for p in sys.path if os.path.abspath(p or ".") not in _STALE]
 sys.path.insert(0, _HERE)

@@ -35,7 +35,9 @@ import tempfile
 # ``accept_result`` from the main checkout silently reported the ledger missing). Drop the main
 # checkout, then prepend this worktree's qubit_runtime.
 _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_MAIN = "/home/trick/Projects/Repos/qubit-voicebridge"
+# Derived, never hardcoded: the main checkout is this file's own tree. A literal path here
+# goes stale on every rename and silently stops filtering (the probe then reads the main tree).
+_MAIN = os.path.dirname(_HERE)
 _STALE = {_MAIN, os.path.join(_MAIN, "qubit_runtime")}
 
 
