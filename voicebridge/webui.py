@@ -2118,6 +2118,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         elif low.endswith(".json"): ctype = "application/json"
         elif low.endswith(".svg"): ctype = "image/svg+xml"
         elif low.endswith(".png"): ctype = "image/png"
+        elif low.endswith(".jpg") or low.endswith(".jpeg"): ctype = "image/jpeg"
         elif low.endswith(".ico"): ctype = "image/x-icon"
         elif low.endswith(".woff2"): ctype = "font/woff2"
         elif low.endswith(".woff"): ctype = "font/woff"
