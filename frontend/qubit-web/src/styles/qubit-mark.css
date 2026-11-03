@@ -33,30 +33,45 @@
   vector-effect: non-scaling-stroke;
   transform-box: view-box;
   transform-origin: 20px 20px;
-  animation-name: qubit-mark-ring-spin;
-  animation-timing-function: linear;
+  /* A WOBBLE, not a spin.
+   *
+   * A full 360° rotation sweeps every ring through the plane's own tilt and
+   * back — and at the moment two rings pass each other the pair stacks into one
+   * horizontal band, which is the "single line" frame. So the guides oscillate
+   * around their tilt instead: they visibly move at all times and structurally
+   * cannot align, because each one turns about a different centre angle.
+   *
+   * `alternate` + an odd iteration count keeps every ring in permanent motion and
+   * symmetric, so it never parks at an end pose. */
+  animation-name: qubit-mark-ring-wobble;
+  animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
+  animation-direction: alternate;
   will-change: transform;
 }
 
-/* Three different periods, one of them reversed, so no two rings ever move
- * together and the lattice never visibly loops. */
+/* Three different periods, none a multiple of another: the lattice only
+ * re-aligns after minutes and never pulses. */
 .qubit-mark__ring--near {
-  animation-duration: 17s;
+  animation-duration: 9.1s;
 }
 
 .qubit-mark__ring--far {
-  animation-duration: 23s;
-  animation-direction: reverse;
+  animation-duration: 13.7s;
 }
 
 .qubit-mark__ring--deep {
-  animation-duration: 29s;
+  animation-duration: 17.3s;
 }
 
-@keyframes qubit-mark-ring-spin {
+/* Small arc either side of 0 — plus a breath of scale so the ring is moving
+ * even at the instant it passes through the middle of the wobble. */
+@keyframes qubit-mark-ring-wobble {
+  from {
+    transform: rotate(-11deg) scale(0.955, 1);
+  }
   to {
-    transform: rotate(360deg);
+    transform: rotate(11deg) scale(1.045, 1);
   }
 }
 

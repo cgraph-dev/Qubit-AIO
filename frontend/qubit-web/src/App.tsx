@@ -954,7 +954,7 @@ export default function App() {
                 )}
               >
                 <PluginSlot name="header-left" />
-                <QubitMark className="h-12 w-12 shrink-0 text-midground" />
+                <QubitMark className="h-14 w-14 shrink-0 text-midground" />
                 <span
                   className="qagent-sidebar__brand-name"
                   data-brand={t.app.brand}

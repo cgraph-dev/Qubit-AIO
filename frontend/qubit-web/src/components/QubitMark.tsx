@@ -36,12 +36,13 @@ interface OrbitSpec {
 }
 
 const ORBITS: Record<OrbitName, OrbitSpec> = {
-  // Near: widest and flattest, reads as an orbit seen almost edge-on.
-  a: { tilt: -28, rx: 15.2, ry: 4.6 },
-  // Far: rounder, so its arc clears the flat near line instead of tracing it.
-  b: { tilt: 34, rx: 13.0, ry: 7.4 },
-  // Deep: narrow and tall, the upright counter-arc.
-  c: { tilt: 88, rx: 9.6, ry: 5.2 },
+  // Near: wide and gently flattened — a real orbit at a shallow angle, never a
+  // needle. (An almost edge-on squash is what made glyph-like slivers at 48px.)
+  a: { tilt: -28, rx: 15.2, ry: 6.6 },
+  // Far: roundest of the three, so its arc always clears the others.
+  b: { tilt: 62, rx: 12.2, ry: 8.6 },
+  // Deep: upright and narrow — the counter-arc that closes the lattice.
+  c: { tilt: 132, rx: 9.8, ry: 6.2 },
 };
 
 type OrbitName = "a" | "b" | "c";
