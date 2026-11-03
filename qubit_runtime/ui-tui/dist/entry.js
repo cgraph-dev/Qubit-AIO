@@ -89939,14 +89939,12 @@ function lum(h) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
-var GHOST_COLS, GHOST_ROWS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines, ghostLinesCompact;
+var GHOST_COLS, GHOST_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines;
 var init_ghost = __esm({
   "src/ghost.ts"() {
     "use strict";
     GHOST_COLS = 60;
     GHOST_ROWS = 28;
-    GHOST_COMPACT_COLS = 30;
-    GHOST_COMPACT_ROWS = 14;
     clamp4 = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
     smooth = (t2) => t2 * t2 * (3 - 2 * t2);
     lerp = (a, b, t2) => a + (b - a) * t2;
@@ -90268,17 +90266,6 @@ var init_ghost = __esm({
       return tint(accent, raw);
     };
     ghostLines = (c, t2) => ghostDots(t2).map((row) => ["", colorRow(row, c)]);
-    ghostLinesCompact = (c, t2) => {
-      const rows = ghostDots(t2);
-      const out = [];
-      for (let y = 0; y < GHOST_ROWS; y += 2) {
-        const row = rows[y];
-        const compact = [];
-        for (let x = 0; x < GHOST_COLS; x += 2) compact.push(row[x]);
-        out.push(["", colorRow(compact, c)]);
-      }
-      return out;
-    };
   }
 });
 
@@ -90322,38 +90309,6 @@ function Banner({ maxWidth, t: t2 }) {
   }
   const logoLines = logo(t2.color, t2.bannerLogo || void 0);
   const logoW = t2.bannerLogo ? artWidth(logoLines) : LOGO_WIDTH;
-  const compactGhost = cols >= GHOST_COMPACT_COLS + 10;
-  const compactGhostArt = compactGhost ? ghostLinesCompact(t2.color, 0) : [];
-  if (compactGhost) {
-    return /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: compactGhostArt, width: GHOST_COMPACT_COLS }),
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
-        WidgetGrid,
-        {
-          cols,
-          columns: 1,
-          gap: 0,
-          paddingX: 0,
-          paddingY: 0,
-          rowGap: 0,
-          widgets: [
-            {
-              children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { bold: true, color: t2.color.primary, wrap: "truncate-end", children: t2.brand.name }),
-              id: "banner-compact-name"
-            },
-            {
-              children: /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.muted, wrap: "truncate-end", children: [
-                t2.brand.icon,
-                " ",
-                T.tagFull
-              ] }),
-              id: "banner-compact-tag"
-            }
-          ]
-        }
-      )
-    ] });
-  }
   if (cols >= logoW + 2) {
     return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
       WidgetGrid,
@@ -90441,11 +90396,10 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
   const rows = useStdout().stdout?.rows ?? 30;
   const cols = Math.max(20, Math.min(term, maxWidth ?? term));
   const ghostFull = cols >= GHOST_COLS && rows >= 40;
-  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4;
-  const ghostFits = ghostFull || ghostCompact;
-  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS;
+  const ghostFits = ghostFull;
+  const ghostWidth = GHOST_COLS;
   const ghostTime = useGhostTime(ghostFits);
-  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t2.color, ghostTime) : [];
+  const ghostArt = ghostFits ? ghostLines(t2.color, ghostTime) : [];
   const heroLines = caduceus(t2.color, t2.bannerHero || void 0);
   const heroArtWidth = ghostFits ? ghostWidth : artWidth(heroLines) || CADUCEUS_WIDTH;
   const leftW = ghostFits ? ghostWidth : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));

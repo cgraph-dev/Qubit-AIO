@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
 import { artWidth, caduceus, CADUCEUS_WIDTH, logo, LOGO_WIDTH } from '../banner.js'
-import { GHOST_COLS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, ghostLines, ghostLinesCompact } from '../ghost.js'
+import { GHOST_COLS, ghostLines } from '../ghost.js'
 import { useT } from '../i18n/useT.js'
 import { flat } from '../lib/text.js'
 import type { Theme } from '../theme.js'
@@ -137,47 +137,11 @@ export function Banner({ maxWidth, t }: { maxWidth?: number; t: Theme }) {
 
   const logoLines = logo(t.color, t.bannerLogo || undefined)
   const logoW = t.bannerLogo ? artWidth(logoLines) : LOGO_WIDTH
-  const compactGhost = cols >= GHOST_COMPACT_COLS + 10
-  const compactGhostArt = compactGhost ? ghostLinesCompact(t.color, 0) : []
 
   // Each tier renders its rows through a single-column WidgetGrid sized to
   // the available columns — same visual output as the old plain flex column
   // (cells clip where truncate-end used to), but the banner is now a
   // layout-engine surface.
-  if (compactGhost) {
-    return (
-      <Box flexDirection="column" marginBottom={1}>
-        <GhostArt lines={compactGhostArt} width={GHOST_COMPACT_COLS} />
-        <WidgetGrid
-          cols={cols}
-          columns={1}
-          gap={0}
-          paddingX={0}
-          paddingY={0}
-          rowGap={0}
-          widgets={[
-            {
-              children: (
-                <Text bold color={t.color.primary} wrap="truncate-end">
-                  {t.brand.name}
-                </Text>
-              ),
-              id: 'banner-compact-name'
-            },
-            {
-              children: (
-                <Text color={t.color.muted} wrap="truncate-end">
-                  {t.brand.icon} {T.tagFull}
-                </Text>
-              ),
-              id: 'banner-compact-tag'
-            }
-          ]}
-        />
-      </Box>
-    )
-  }
-
   if (cols >= logoW + 2) {
     return (
       <Box flexDirection="column" marginBottom={1}>
@@ -304,11 +268,10 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   // genuinely wide enough; below that no art is drawn and the panel keeps its
   // plain header rather than showing a cropped scene.
   const ghostFull = cols >= GHOST_COLS && rows >= 40
-  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4
-  const ghostFits = ghostFull || ghostCompact
-  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS
+  const ghostFits = ghostFull
+  const ghostWidth = GHOST_COLS
   const ghostTime = useGhostTime(ghostFits)
-  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t.color, ghostTime) : []
+  const ghostArt = ghostFits ? ghostLines(t.color, ghostTime) : []
   const heroLines = caduceus(t.color, t.bannerHero || undefined)
   // The ghost renders in the hero track, beside the text — the same two-column
   // grid the caduceus used, with the ghost taking the art track. Drawn above
