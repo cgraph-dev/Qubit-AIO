@@ -19,23 +19,45 @@
   overflow: visible;
 }
 
-/* The rings are FIXED-SHAPE ellipses. They do NOT spin.
+/* Each guide ring ROTATES as a flat 2D shape about its own centre, on its own
+ * period. That is a different motion from a 3D sweep (which needs the ellipse
+ * to change shape per frame) — a 2D spin reads as a slowly turning orbit and,
+ * because every plane carries a DIFFERENT squash, the three silhouettes never
+ * collapse onto one line the way identical ellipses did.
  *
- * They used to run `qubit-mark-ring-spin`, which rotated each ellipse about the
- * nucleus. An ellipse rotated about its centre does not sweep like a disc — it
- * only changes its tilt, and once every plane shares the same Rx/Ry the whole
- * lattice keeps collapsing toward one silhouette: at some phases the three
- * orbits line up and the mark reads as a single flat line. That is exactly what
- * made the sidebar logo look wrong.
- *
- * Motion belongs to the PARTICLES (which travel the ellipse) and to the nucleus.
- * Keeping the guide lines still is what preserves the atom silhouette at every
- * frame — the crossed ellipses stay crossed instead of sliding over each other.
- * The tilt per plane is carried by a wrapper <g transform="rotate(...)">. */
+ * The spin lives on the <ellipse>. The per-plane TILT is carried by the wrapper
+ * <g transform="rotate(...)">, so spinning never fights the tilt. */
 .qubit-mark__ring {
   fill: none;
   stroke-width: 1.1;
   vector-effect: non-scaling-stroke;
+  transform-box: view-box;
+  transform-origin: 20px 20px;
+  animation-name: qubit-mark-ring-spin;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* Three different periods, one of them reversed, so no two rings ever move
+ * together and the lattice never visibly loops. */
+.qubit-mark__ring--near {
+  animation-duration: 17s;
+}
+
+.qubit-mark__ring--far {
+  animation-duration: 23s;
+  animation-direction: reverse;
+}
+
+.qubit-mark__ring--deep {
+  animation-duration: 29s;
+}
+
+@keyframes qubit-mark-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* The near ring keeps the mark's own colour (currentColor from the caller);
