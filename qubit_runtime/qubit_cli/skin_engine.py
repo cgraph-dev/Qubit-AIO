@@ -652,8 +652,9 @@ def _build_skin_config(data: Dict[str, Any]) -> SkinConfig:
 
 def list_skins() -> List[Dict[str, str]]:
     """List all available skins (built-in + user-installed); user skins never shadow built-ins."""
+    # `default` is an internal fallback only; Qubit is the user-facing base.
     result = [{"name": name, "description": data.get("description", ""), "source": "builtin"}
-              for name, data in _BUILTIN_SKINS.items()]
+              for name, data in _BUILTIN_SKINS.items() if name != "default"]
     skins_path = _skins_dir()
     for f in sorted(skins_path.glob("*.yaml")) if skins_path.is_dir() else ():
         data = _load_skin_from_yaml(f)
