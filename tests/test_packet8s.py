@@ -791,7 +791,9 @@ def test_uninstall_preserves_state_by_default():
 
 
 def test_repo_folder_is_canonical():
-    assert REPO.name == "qubit-voicebridge"
+    # The checkout may be named Qubit or qubit-voicebridge; identity is the
+    # runtime tree, not the directory basename.
+    assert (REPO / "qubit_runtime").is_dir()
     assert (REPO / "systemd" / "qubit-voicebridge.service").exists()
     assert (REPO / "voicebridge" / "__init__.py").exists()
 
@@ -816,9 +818,10 @@ def test_live_canonical_unit_points_at_canonical_tree():
     if not unit.exists():
         pytest.skip("canonical unit not installed here")
     text = unit.read_text()
-    assert "/qubit-voicebridge/.venv/bin/python -m voicebridge run" in text
     root = Path(__file__).resolve().parents[1]
-    assert f"WorkingDirectory={root}" in text or         "WorkingDirectory=%h/Projects/Repos/Qubit" in text
+    assert f"{root}/.venv/bin/python -m voicebridge run" in text
+    assert f"WorkingDirectory={root}" in text or \
+        "WorkingDirectory=%h/Projects/Repos/Qubit" in text
     assert "qubit-voicebridge/voice.yaml" in text
     assert "openclaw-voice-bridge" not in text.replace(
         "openclaw-voice-bridge.service", "")
