@@ -27,54 +27,39 @@
  *
  * The spin lives on the <ellipse>. The per-plane TILT is carried by the wrapper
  * <g transform="rotate(...)">, so spinning never fights the tilt. */
+/* Each ring TURNS about the nucleus, as a flat 2D rotation.
+ *
+ * The rings used to wobble ±11°, which never produced a full revolution — the
+ * mark read as frozen. They now rotate a full 360° on their own periods. That is
+ * safe only because the three rings carry clearly different squashes (0.46 /
+ * 0.70 / 0.86) and tilts well apart: a rotating ellipse passes through its own
+ * tilt pose each half-turn, and identical squashes are what made all three do
+ * that simultaneously and stack into one line. Distinct squashes mean no two
+ * ever share a silhouette, so the lattice stays a lattice while it turns.
+ *
+ * The turn lives on the <ellipse>; the per-plane TILT is carried by the wrapper
+ * <g transform="rotate(...)">, so the animation never fights the tilt. */
 .qubit-mark__ring {
   fill: none;
   stroke-width: 1.1;
   vector-effect: non-scaling-stroke;
   transform-box: view-box;
   transform-origin: 20px 20px;
-  /* A WOBBLE, not a spin.
-   *
-   * A full 360° rotation sweeps every ring through the plane's own tilt and
-   * back — and at the moment two rings pass each other the pair stacks into one
-   * horizontal band, which is the "single line" frame. So the guides oscillate
-   * around their tilt instead: they visibly move at all times and structurally
-   * cannot align, because each one turns about a different centre angle.
-   *
-   * `alternate` + an odd iteration count keeps every ring in permanent motion and
-   * symmetric, so it never parks at an end pose. */
-  animation-name: qubit-mark-ring-wobble;
-  animation-timing-function: ease-in-out;
+  animation-name: qubit-mark-ring-turn;
+  animation-timing-function: linear;
   animation-iteration-count: infinite;
-  animation-direction: alternate;
+  animation-direction: var(--ring-direction, normal);
   will-change: transform;
 }
 
-/* Three different periods, none a multiple of another: the lattice only
- * re-aligns after minutes and never pulses. */
-.qubit-mark__ring--near {
-  animation-duration: 9.1s;
-}
-
-.qubit-mark__ring--far {
-  animation-duration: 13.7s;
-}
-
-.qubit-mark__ring--deep {
-  animation-duration: 17.3s;
-}
-
-/* Small arc either side of 0 — plus a breath of scale so the ring is moving
- * even at the instant it passes through the middle of the wobble. */
-@keyframes qubit-mark-ring-wobble {
-  from {
-    transform: rotate(-11deg) scale(0.955, 1);
-  }
+@keyframes qubit-mark-ring-turn {
   to {
-    transform: rotate(11deg) scale(1.045, 1);
+    transform: rotate(360deg);
   }
 }
 
+/* Periods are set inline per orbit (21s / 31s reversed / 43s) so the three
+ * rings never travel together and the lattice never visibly loops. */
 /* The near ring keeps the mark's own colour (currentColor from the caller);
  * the far ring is dimmer so the two fields read as depth. */
 /* Low base opacity: the chromatic copies below are the visible line, so a

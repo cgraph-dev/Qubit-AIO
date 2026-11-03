@@ -1,51 +1,62 @@
 /**
- * The Qubit wordmark glyph.
+ * The Qubit atom mark — several orbit rings turning around one nucleus.
  *
- * A qubit schematized as an orbit read edge-on: a nucleus and two steering
- * fields, with particles travelling the ellipses. Deliberately NOT a letterform
- * in a rounded box — the box was the upstream-adjacent tile the brand retired.
+ * VISUAL LANGUAGE: thin chromatic outline, not a glow. The mark is a hairline
+ * construction drawing — 1px strokes with a red/green/blue fringe and small
+ * solid beads on a transparent field. No bloom, no drop-shadow, no radial
+ * gradient; those read as a toy app icon.
  *
- * VISUAL LANGUAGE: thin RGB outline, not a glow. The mark is a hairline
- * construction drawing — 1px chromatic strokes and small solid particles on a
- * transparent field. No bloom, no drop-shadow, no radial gradients: those read
- * as a toy app icon. The only "colour" is the red/green/blue fringe along the
- * thin outline, which is what makes it look like a technical diagram rather
- * than a sticker.
+ * GEOMETRY — why the rings no longer collapse into one line.
  *
- * MOTION: every particle sits at its own orbital seed on a tilted ellipse, and
- * an inner group spins it about the nucleus at a per-particle duration. The
- * seed offset is what distributes them — a bead placed at cx=20+RX with
- * rotate(0) just piles every particle on the same point, which is the bug that
- * made the previous version look empty and static.
+ * Every ring is a true ellipse seen in perspective at its own tilt, and each one
+ * turns. Earlier versions flattened all three by the same ratio, and a set of
+ * identically-squashed ellipses passes through a common horizontal pose every
+ * half-turn — that common pose IS the "all circles stack on one line" frame.
+ *
+ * The three rings now have clearly different squashes and widely separated
+ * tilts (0.46 at −24°, 0.70 at 58°, 0.86 at 116°). No two share a silhouette, so
+ * the mark reads as a lattice at every instant while still turning.
+ *
+ * MOTION — two independent, non-harmonic motions per ring:
+ *   1. the RING rotates about the nucleus (its own period),
+ *   2. each BEAD travels its orbit (its own period, unrelated to the ring's).
+ * Neither is a multiple of the other, so the system does not visibly repeat.
+ *
+ * The ring turn lives in CSS on `.qubit-mark__ring`; the bead travel lives in CSS
+ * on `.qubit-mark__spin`. The wrapper groups carry only the static tilt, so a
+ * running transform animation never fights an inline transform.
+ *
+ * CONTRACT: `aria-hidden`, `pointer-events: none`, and every animation disabled
+ * under `prefers-reduced-motion` (see qubit-mark.css).
  */
 
-/**
- * Orbit radii. The three planes are deliberately DIFFERENT squashes — a near
- * orbit seen almost edge-on, a rounder far orbit, and a narrow upright one.
- * Shared radii were the reason the mark collapsed into a single line: three
- * identically-squashed ellipses at different tilts still intersect along one
- * axis and read as one line at small sizes.
- */
+type OrbitName = "a" | "b" | "c";
+
 interface OrbitSpec {
-  /** Tilt in degrees — the static plane rotation. */
+  /** Static plane tilt in degrees. */
   tilt: number;
   /** Semi-axis along the plane's local x. */
   rx: number;
-  /** Semi-axis along the plane's local y (the foreshortening). */
+  /** Semi-axis along the plane's local y — the perspective foreshortening. */
   ry: number;
+  /** Seconds for one full turn of the RING itself. */
+  ringDur: number;
+  /** Ring turns the other way — extra variety, a further distinct phase. */
+  reverse: boolean;
 }
 
+/**
+ * Squash ratios, deliberately far apart:
+ *   a  6.9 / 15.0 = 0.46  wide and shallow — an orbit at a glancing angle
+ *   b  8.4 / 12.0 = 0.70  a rounder orbit on a clearly different axis
+ *   c  6.6 /  7.7 = 0.86  nearly circular — the face-on ring
+ * That spread is what keeps them from ever aligning into one line.
+ */
 const ORBITS: Record<OrbitName, OrbitSpec> = {
-  // Near: wide and gently flattened — a real orbit at a shallow angle, never a
-  // needle. (An almost edge-on squash is what made glyph-like slivers at 48px.)
-  a: { tilt: -28, rx: 15.2, ry: 6.6 },
-  // Far: roundest of the three, so its arc always clears the others.
-  b: { tilt: 62, rx: 12.2, ry: 8.6 },
-  // Deep: upright and narrow — the counter-arc that closes the lattice.
-  c: { tilt: 132, rx: 9.8, ry: 6.2 },
+  a: { tilt: -24, rx: 15.0, ry: 6.9, ringDur: 21, reverse: false },
+  b: { tilt: 58, rx: 12.0, ry: 8.4, ringDur: 31, reverse: true },
+  c: { tilt: 116, rx: 7.7, ry: 6.6, ringDur: 43, reverse: false },
 };
-
-type OrbitName = "a" | "b" | "c";
 
 interface Particle {
   /** Orbit this particle rides. */
@@ -54,49 +65,39 @@ interface Particle {
   seed: number;
   /** Radius in user units. */
   r: number;
-  /** Seconds for one full revolution. Deliberately non-harmonic. */
+  /** Seconds for one full revolution around the nucleus. Non-harmonic. */
   dur: number;
 }
 
 /**
- * No two particles share a period, so the system only re-aligns after minutes.
- * That irregularity is what stops the mark reading as a spinner.
+ * No two particles share a period, so the beads never travel in lockstep and
+ * the mark never reads as a spinner. The seed offset distributes them around
+ * the ellipse — a bead placed at rx with no seed would pile every particle on
+ * the same point and leave the ring looking empty.
  */
 const PARTICLES: Particle[] = [
-  // Near field (tilted -30deg): faster, drawn over the nucleus.
+  // Near field: fastest, drawn over the nucleus.
   { orbit: "a", seed: 18, r: 1.15, dur: 7.3 },
   { orbit: "a", seed: 97, r: 0.9, dur: 9.1 },
   { orbit: "a", seed: 165, r: 1.0, dur: 6.4 },
   { orbit: "a", seed: 249, r: 0.85, dur: 10.7 },
   { orbit: "a", seed: 318, r: 1.1, dur: 8.2 },
-  // Far field (tilted +30deg): slower, dimmer, drawn behind the nucleus.
+  // A second pass over the same ring, so one orbit carries several travellers.
+  { orbit: "a", seed: 58, r: 0.7, dur: 5.9 },
+  { orbit: "a", seed: 212, r: 0.65, dur: 7.7 },
+  // Middle plane: slower, dimmer, drawn behind the nucleus.
   { orbit: "b", seed: 41, r: 0.85, dur: 15.4 },
   { orbit: "b", seed: 128, r: 1.0, dur: 13.7 },
   { orbit: "b", seed: 212, r: 0.8, dur: 18.9 },
   { orbit: "b", seed: 291, r: 0.95, dur: 16.3 },
-  // Third plane (upright): the near-vertical arc. Slower and dimmer than the
-  // near field so it reads as the deepest lattice line, never as a fourth
-  // competing ring.
+  // Innermost, slowest field.
   { orbit: "c", seed: 63, r: 0.8, dur: 19.6 },
   { orbit: "c", seed: 154, r: 0.9, dur: 21.2 },
   { orbit: "c", seed: 243, r: 0.75, dur: 17.8 },
-  // Extra near-field beads: a second pass over the same ellipse so one orbit
-  // carries several particles instead of reading as a single travelling dot.
-  { orbit: "a", seed: 58, r: 0.7, dur: 5.9 },
-  { orbit: "a", seed: 134, r: 0.75, dur: 11.6 },
-  { orbit: "a", seed: 212, r: 0.65, dur: 7.7 },
-  { orbit: "a", seed: 288, r: 0.8, dur: 9.4 },
 ];
 
-const TILT: Record<OrbitName, number> = {
-  a: ORBITS.a.tilt,
-  b: ORBITS.b.tilt,
-  c: ORBITS.c.tilt,
-};
-
 /** Unrotated point on `orbit` at orbital parameter `deg`, in the plane's own
- *  pre-tilt frame (the wrapper <g> applies the tilt). Each orbit has its own
- *  radii, so a bead sits on the ellipse it actually travels. */
+ *  pre-tilt frame (the wrapper <g> applies the tilt). */
 function orbitPoint(orbit: OrbitName, deg: number) {
   const rad = (deg * Math.PI) / 180;
   const spec = ORBITS[orbit];
@@ -104,17 +105,15 @@ function orbitPoint(orbit: OrbitName, deg: number) {
 }
 
 export function QubitMark({ className }: { className?: string }) {
-  /**
-   * Particles of one orbit. The OUTER group applies the orbit tilt (static) and
-   * the INNER group spins about the nucleus. The bead is placed at its seed
-   * angle so the particles start distributed around the ellipse; the spin then
-   * carries each one at its own rate.
-   */
+  /** Beads of one orbit. Outer group = static tilt, inner group = bead travel. */
   const beads = (orbit: OrbitName) =>
     PARTICLES.filter((p) => p.orbit === orbit).map((p) => {
       const { cx, cy } = orbitPoint(orbit, p.seed);
       return (
-        <g key={`${orbit}-${p.seed}`} transform={`rotate(${TILT[orbit]} 20 20)`}>
+        <g
+          key={`${orbit}-${p.seed}`}
+          transform={`rotate(${ORBITS[orbit].tilt} 20 20)`}
+        >
           <g
             className="qubit-mark__spin"
             style={{
@@ -137,6 +136,26 @@ export function QubitMark({ className }: { className?: string }) {
       );
     });
 
+  /** One turning ring plus its travelling beads. */
+  const ring = (orbit: OrbitName, kind: "far" | "deep" | "near") => (
+    <g className={`qubit-mark__field qubit-mark__field--${kind}`}>
+      <g transform={`rotate(${ORBITS[orbit].tilt} 20 20)`}>
+        <ellipse
+          className={`qubit-mark__ring qubit-mark__ring--${kind}`}
+          cx="20"
+          cy="20"
+          rx={ORBITS[orbit].rx}
+          ry={ORBITS[orbit].ry}
+          style={{
+            animationDuration: `${ORBITS[orbit].ringDur}s`,
+            animationDirection: ORBITS[orbit].reverse ? "reverse" : "normal",
+          }}
+        />
+      </g>
+      {beads(orbit)}
+    </g>
+  );
+
   return (
     <svg
       aria-hidden="true"
@@ -145,56 +164,10 @@ export function QubitMark({ className }: { className?: string }) {
       viewBox="0 0 40 40"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Far field: hairline ring, particles behind the nucleus.
-       * The tilt lives on the wrapper <g>; the ellipse itself is free for CSS
-       * to rotate, so the ring actually spins instead of sitting static while
-       * only the particles travel. */}
-      <g className="qubit-mark__field qubit-mark__field--far">
-        <g transform={`rotate(${ORBITS.b.tilt} 20 20)`}>
-          <ellipse
-            className="qubit-mark__ring qubit-mark__ring--far"
-            cx="20"
-            cy="20"
-            rx={ORBITS.b.rx}
-            ry={ORBITS.b.ry}
-          />
-        </g>
-        {beads("b")}
-      </g>
-
-      {/* Third lattice line: upright, drawn first so both crossed fields paint
-          over it. Static tilt only — its own slow spin comes from the bead
-          group, so the ring reads as the deepest layer rather than a third
-          competing spinner. */}
-      <g className="qubit-mark__field qubit-mark__field--deep">
-        <g transform={`rotate(${ORBITS.c.tilt} 20 20)`}>
-          <ellipse
-            className="qubit-mark__ring qubit-mark__ring--deep"
-            cx="20"
-            cy="20"
-            rx={ORBITS.c.rx}
-            ry={ORBITS.c.ry}
-          />
-        </g>
-        {beads("c")}
-      </g>
-
-      {/* Nucleus: a small solid dot, no bloom. */}
+      {ring("b", "far")}
+      {ring("c", "deep")}
       <circle className="qubit-mark__nucleus" cx="20" cy="20" r="2.4" />
-
-      {/* Near field: hairline ring over the nucleus, particles on top. */}
-      <g className="qubit-mark__field qubit-mark__field--near">
-        <g transform={`rotate(${ORBITS.a.tilt} 20 20)`}>
-          <ellipse
-            className="qubit-mark__ring qubit-mark__ring--near"
-            cx="20"
-            cy="20"
-            rx={ORBITS.a.rx}
-            ry={ORBITS.a.ry}
-          />
-        </g>
-        {beads("a")}
-      </g>
+      {ring("a", "near")}
     </svg>
   );
 }
