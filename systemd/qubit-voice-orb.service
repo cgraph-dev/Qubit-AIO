@@ -30,9 +30,9 @@ Type=simple
 # no hardcoded display index) and returns as soon as the socket answers. It
 # exits 0 on timeout as well, so a genuinely headless host keeps today's
 # graceful ORB_NO_DISPLAY exit rather than turning into a restart storm.
-ExecStartPre=%h/Projects/Repos/qubit-voicebridge/.venv/bin/python %h/Projects/Repos/qubit-voicebridge/scripts/wait_for_display.py --timeout 45
-ExecStart=%h/Projects/Repos/qubit-voicebridge/.venv/bin/python -m voicebridge.orb
-WorkingDirectory=%h/Projects/Repos/qubit-voicebridge
+ExecStartPre=__PROJECT_DIR__/.venv/bin/python __PROJECT_DIR__/scripts/wait_for_display.py --timeout 45
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge.orb
+WorkingDirectory=__PROJECT_DIR__
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
