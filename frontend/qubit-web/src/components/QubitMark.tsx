@@ -19,18 +19,30 @@
  * made the previous version look empty and static.
  */
 
-/** Orbit radii, shared by the guide ellipses and the particle offsets. */
-const RX = 14.5;
-const RY = 5.6;
-/** Orbit tilts in degrees, matching the guide ellipses. */
-const TILT_A = -30;
-const TILT_B = 30;
 /**
- * A third lattice plane at its own tilt. Two crossed ellipses read as an atom
- * logo; the third plane makes the nucleus sit inside a lattice, which is the
- * silhouette the sidebar rail wants at 28px.
+ * Orbit radii. The three planes are deliberately DIFFERENT squashes — a near
+ * orbit seen almost edge-on, a rounder far orbit, and a narrow upright one.
+ * Shared radii were the reason the mark collapsed into a single line: three
+ * identically-squashed ellipses at different tilts still intersect along one
+ * axis and read as one line at small sizes.
  */
-const TILT_C = 90;
+interface OrbitSpec {
+  /** Tilt in degrees — the static plane rotation. */
+  tilt: number;
+  /** Semi-axis along the plane's local x. */
+  rx: number;
+  /** Semi-axis along the plane's local y (the foreshortening). */
+  ry: number;
+}
+
+const ORBITS: Record<OrbitName, OrbitSpec> = {
+  // Near: widest and flattest, reads as an orbit seen almost edge-on.
+  a: { tilt: -28, rx: 15.2, ry: 4.6 },
+  // Far: rounder, so its arc clears the flat near line instead of tracing it.
+  b: { tilt: 34, rx: 13.0, ry: 7.4 },
+  // Deep: narrow and tall, the upright counter-arc.
+  c: { tilt: 88, rx: 9.6, ry: 5.2 },
+};
 
 type OrbitName = "a" | "b" | "c";
 
@@ -75,12 +87,19 @@ const PARTICLES: Particle[] = [
   { orbit: "a", seed: 288, r: 0.8, dur: 9.4 },
 ];
 
-const TILT: Record<OrbitName, number> = { a: TILT_A, b: TILT_B, c: TILT_C };
+const TILT: Record<OrbitName, number> = {
+  a: ORBITS.a.tilt,
+  b: ORBITS.b.tilt,
+  c: ORBITS.c.tilt,
+};
 
-/** Unrotated point on the orbit at orbital parameter `deg`. */
-function orbitPoint(deg: number) {
+/** Unrotated point on `orbit` at orbital parameter `deg`, in the plane's own
+ *  pre-tilt frame (the wrapper <g> applies the tilt). Each orbit has its own
+ *  radii, so a bead sits on the ellipse it actually travels. */
+function orbitPoint(orbit: OrbitName, deg: number) {
   const rad = (deg * Math.PI) / 180;
-  return { cx: 20 + RX * Math.cos(rad), cy: 20 + RY * Math.sin(rad) };
+  const spec = ORBITS[orbit];
+  return { cx: 20 + spec.rx * Math.cos(rad), cy: 20 + spec.ry * Math.sin(rad) };
 }
 
 export function QubitMark({ className }: { className?: string }) {
@@ -92,7 +111,7 @@ export function QubitMark({ className }: { className?: string }) {
    */
   const beads = (orbit: OrbitName) =>
     PARTICLES.filter((p) => p.orbit === orbit).map((p) => {
-      const { cx, cy } = orbitPoint(p.seed);
+      const { cx, cy } = orbitPoint(orbit, p.seed);
       return (
         <g key={`${orbit}-${p.seed}`} transform={`rotate(${TILT[orbit]} 20 20)`}>
           <g
@@ -130,13 +149,13 @@ export function QubitMark({ className }: { className?: string }) {
        * to rotate, so the ring actually spins instead of sitting static while
        * only the particles travel. */}
       <g className="qubit-mark__field qubit-mark__field--far">
-        <g transform={`rotate(${TILT_B} 20 20)`}>
+        <g transform={`rotate(${ORBITS.b.tilt} 20 20)`}>
           <ellipse
             className="qubit-mark__ring qubit-mark__ring--far"
             cx="20"
             cy="20"
-            rx={RX}
-            ry={RY}
+            rx={ORBITS.b.rx}
+            ry={ORBITS.b.ry}
           />
         </g>
         {beads("b")}
@@ -147,13 +166,13 @@ export function QubitMark({ className }: { className?: string }) {
           group, so the ring reads as the deepest layer rather than a third
           competing spinner. */}
       <g className="qubit-mark__field qubit-mark__field--deep">
-        <g transform={`rotate(${TILT_C} 20 20)`}>
+        <g transform={`rotate(${ORBITS.c.tilt} 20 20)`}>
           <ellipse
             className="qubit-mark__ring qubit-mark__ring--deep"
             cx="20"
             cy="20"
-            rx={RX}
-            ry={RY}
+            rx={ORBITS.c.rx}
+            ry={ORBITS.c.ry}
           />
         </g>
         {beads("c")}
@@ -164,13 +183,13 @@ export function QubitMark({ className }: { className?: string }) {
 
       {/* Near field: hairline ring over the nucleus, particles on top. */}
       <g className="qubit-mark__field qubit-mark__field--near">
-        <g transform={`rotate(${TILT_A} 20 20)`}>
+        <g transform={`rotate(${ORBITS.a.tilt} 20 20)`}>
           <ellipse
             className="qubit-mark__ring qubit-mark__ring--near"
             cx="20"
             cy="20"
-            rx={RX}
-            ry={RY}
+            rx={ORBITS.a.rx}
+            ry={ORBITS.a.ry}
           />
         </g>
         {beads("a")}
