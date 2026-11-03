@@ -2083,6 +2083,36 @@ class WebUIHandler(BaseHTTPRequestHandler):
                   'window.__QUBIT_THEME_DEF__=%s;</script>'
                   % ("\"\"" if not self._peer_is_loopback() else safe,
                      json.dumps(theme_name), json.dumps(theme_def)))
+        # Paint the pre-hydration splash in the ACTIVE theme, not the hardcoded
+        # default teal. The splash is visible for 1-2 s while the SPA chunks
+        # load; leaving it teal/amber makes a midnight/cyberpunk install flash
+        # the old palette before React applies the saved theme.
+        _boot_palettes = {
+            "default": ("#041c1c", "#0a2e2e", "#7dd3c8"),
+            "default-large": ("#041c1c", "#0a2e2e", "#7dd3c8"),
+            "midnight": ("#0a0a1f", "#171033", "#d4c8ff"),
+            "ember": ("#1a0a06", "#2a1008", "#ffd8b0"),
+            "mono": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
+            "cyberpunk": ("#040608", "#07140b", "#9bffcf"),
+            "rose": ("#1a0f15", "#2a1620", "#ffd4e1"),
+            "qubit-blue": ("#f4f0e8", "#e7e1d2", "#1f4f8f"),
+        }
+        _boot_bg, _boot_mid, _boot_fg = _boot_palettes.get(
+            theme_name, ("#041c1c", "#0a2e2e", "#7dd3c8"))
+        try:
+            _bp = (theme_def or {}).get("palette", {})
+            _boot_bg = (_bp.get("background") or {}).get("hex") or _boot_bg
+            _boot_fg = (_bp.get("midground") or {}).get("hex") or _boot_fg
+        except Exception:
+            pass
+        boot_style = (
+            '<style id="qubit-boot-theme">'
+            'html,body{background:%s !important;}'
+            '#qubit-boot{background:radial-gradient(ellipse at 50%% 60%%, %s 0%%, %s 70%%) !important;color:%s !important;}'
+            '#qubit-boot button{color:%s !important;background:%s !important;}'
+            '</style>' % (_boot_bg, _boot_mid, _boot_bg, _boot_fg, _boot_bg, _boot_fg)
+        )
+        inject = boot_style + inject
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
         else:
