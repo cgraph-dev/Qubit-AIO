@@ -1,3 +1,6 @@
+// Qubit product release shown in the TUI header/session panel.
+export const QUBIT_PRODUCT_VERSION = process.env.QUBIT_VERSION || '0.0.1'
+
 import type { MouseTrackingMode } from '@qubit/ink'
 
 import { isTermuxTuiMode } from '../lib/termux.js'

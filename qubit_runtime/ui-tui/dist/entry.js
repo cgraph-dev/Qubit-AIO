@@ -2780,11 +2780,12 @@ var init_termux = __esm({
 });
 
 // src/config/env.ts
-var truthy2, falsy, parseToggle, TERMUX_TUI_MODE, STARTUP_RESUME_ID, STARTUP_QUERY, STARTUP_IMAGE, STARTUP_WORKSPACE_CWD, mouseTrackingOverride, mouseTrackingDisabledLegacy, NATIVE_MODE, resolvedBootMouseEnabled, MOUSE_TRACKING, NO_CONFIRM_DESTRUCTIVE, DASHBOARD_TUI_MODE, PIN_SPAWN_MODEL, STARTUP_MODEL, STARTUP_PROVIDER, DEV_CREDITS_MODE, inlineOverride, INLINE_MODE, SHOW_FPS;
+var QUBIT_PRODUCT_VERSION, truthy2, falsy, parseToggle, TERMUX_TUI_MODE, STARTUP_RESUME_ID, STARTUP_QUERY, STARTUP_IMAGE, STARTUP_WORKSPACE_CWD, mouseTrackingOverride, mouseTrackingDisabledLegacy, NATIVE_MODE, resolvedBootMouseEnabled, MOUSE_TRACKING, NO_CONFIRM_DESTRUCTIVE, DASHBOARD_TUI_MODE, PIN_SPAWN_MODEL, STARTUP_MODEL, STARTUP_PROVIDER, DEV_CREDITS_MODE, inlineOverride, INLINE_MODE, SHOW_FPS;
 var init_env = __esm({
   "src/config/env.ts"() {
     "use strict";
     init_termux();
+    QUBIT_PRODUCT_VERSION = process.env.QUBIT_VERSION || "0.0.1";
     truthy2 = (v) => /^(?:1|true|yes|on)$/i.test((v ?? "").trim());
     falsy = (v) => /^(?:0|false|no|off)$/i.test((v ?? "").trim());
     parseToggle = (v) => {
@@ -82436,14 +82437,39 @@ function useMainApp(gw2) {
       return;
     }
     let timer;
+    let lastCols = stdout.columns ?? 80;
+    let lastRows = stdout.rows ?? 24;
     const onResize = () => {
+      const cols2 = stdout.columns ?? 80;
+      const rows = stdout.rows ?? 24;
+      const shrank = cols2 < lastCols || rows < lastRows;
+      lastCols = cols2;
+      lastRows = rows;
       clearTimeout(timer);
       timer = setTimeout(() => {
         timer = void 0;
+        if (shrank) {
+          try {
+            stdout.write("\x1B[2J\x1B[H\x1B[3J");
+            forceRedraw(stdout);
+          } catch {
+          }
+        }
         if (scrollRef.current?.isSticky()) {
           scrollRef.current.scrollToBottom();
         }
-        void rpc("terminal.resize", { cols: stdout.columns ?? 80, session_id: ui.sid });
+        const targetSid = ui.sid;
+        void gw2.request("terminal.resize", { cols: cols2, session_id: targetSid }).catch((err) => {
+          if (!/session not found/i.test(String(err?.message ?? err))) {
+            return;
+          }
+          const recover = ui.storedSid ?? recoverSidRef.current;
+          if (!recover) {
+            return;
+          }
+          recoverSidRef.current = recover;
+          void session.resumeById(recover);
+        });
       }, 100);
     };
     stdout.on("resize", onResize);
@@ -82451,7 +82477,7 @@ function useMainApp(gw2) {
       clearTimeout(timer);
       stdout.off("resize", onResize);
     };
-  }, [rpc, stdout, ui.sid]);
+  }, [gw2, session.resumeById, stdout, ui.sid, ui.storedSid]);
   const cancelClarify = (0, import_react65.useCallback)(() => {
     const clarify = overlay.clarify;
     if (!clarify) {
@@ -89939,12 +89965,14 @@ function lum(h) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
-var GHOST_COLS, GHOST_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines;
+var GHOST_COLS, GHOST_ROWS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines, ghostLinesCompact;
 var init_ghost = __esm({
   "src/ghost.ts"() {
     "use strict";
     GHOST_COLS = 60;
     GHOST_ROWS = 28;
+    GHOST_COMPACT_COLS = 30;
+    GHOST_COMPACT_ROWS = 14;
     clamp4 = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
     smooth = (t2) => t2 * t2 * (3 - 2 * t2);
     lerp = (a, b, t2) => a + (b - a) * t2;
@@ -90266,6 +90294,17 @@ var init_ghost = __esm({
       return tint(accent, raw);
     };
     ghostLines = (c, t2) => ghostDots(t2).map((row) => ["", colorRow(row, c)]);
+    ghostLinesCompact = (c, t2) => {
+      const rows = ghostDots(t2);
+      const out = [];
+      for (let y = 0; y < GHOST_ROWS; y += 2) {
+        const row = rows[y];
+        const compact = [];
+        for (let x = 0; x < GHOST_COLS; x += 2) compact.push(row[x]);
+        out.push(["", colorRow(compact, c)]);
+      }
+      return out;
+    };
   }
 });
 
@@ -90285,7 +90324,7 @@ function InlineLoader({ label, t: t2 }) {
   ] });
 }
 function GhostArt({ lines, width }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", width, children: lines.map(([, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { wrap: "truncate-end", children: stripAnsi2(text2) }, i)) });
+  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(RawAnsi, { lines: lines.map(([, text2]) => text2), width });
 }
 function ArtLines({ lines }) {
   return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", height: lines.length, width: artWidth(lines), children: lines.map(([c, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: c, wrap: "truncate-end", children: text2 }, i)) });
@@ -90396,10 +90435,11 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
   const rows = useStdout().stdout?.rows ?? 30;
   const cols = Math.max(20, Math.min(term, maxWidth ?? term));
   const ghostFull = cols >= GHOST_COLS && rows >= 40;
-  const ghostFits = ghostFull;
-  const ghostWidth = GHOST_COLS;
+  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4;
+  const ghostFits = ghostFull || ghostCompact;
+  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS;
   const ghostTime = useGhostTime(ghostFits);
-  const ghostArt = ghostFits ? ghostLines(t2.color, ghostTime) : [];
+  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t2.color, ghostTime) : [];
   const heroLines = caduceus(t2.color, t2.bannerHero || void 0);
   const heroArtWidth = ghostFits ? ghostWidth : artWidth(heroLines) || CADUCEUS_WIDTH;
   const leftW = ghostFits ? ghostWidth : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));
@@ -90511,7 +90551,7 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
     wide ? /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
       /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { bold: true, color: t2.color.primary, children: [
         t2.brand.name,
-        info.version ? ` ${/^v/i.test(info.version) ? info.version : `v${info.version}`}` : " v0.0.1"
+        ` v${QUBIT_PRODUCT_VERSION}`
       ] }),
       ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(import_jsx_runtime48.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.accent, wrap: "truncate-end", children: [
@@ -90630,12 +90670,12 @@ var init_branding = __esm({
   "src/components/branding.tsx"() {
     "use strict";
     init_entry_exports();
-    init_ansi2();
     init_color();
     import_react91 = __toESM(require_react(), 1);
     init_dist4();
     init_banner();
     init_ghost();
+    init_env();
     init_useT();
     init_text();
     init_accordion();

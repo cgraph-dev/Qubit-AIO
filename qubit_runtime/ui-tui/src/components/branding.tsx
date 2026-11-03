@@ -1,11 +1,11 @@
-import { Box, Text, useStdout } from '@qubit/ink'
-import { stripAnsi } from '@qubit/shared/ansi'
+import { Box, RawAnsi, Text, useStdout } from '@qubit/ink'
 import { mix } from '@qubit/shared/color'
 import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
 import { artWidth, caduceus, CADUCEUS_WIDTH, logo, LOGO_WIDTH } from '../banner.js'
-import { GHOST_COLS, ghostLines } from '../ghost.js'
+import { GHOST_COLS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, ghostLines, ghostLinesCompact } from '../ghost.js'
+import { QUBIT_PRODUCT_VERSION } from '../config/env.js'
 import { useT } from '../i18n/useT.js'
 import { flat } from '../lib/text.js'
 import type { Theme } from '../theme.js'
@@ -45,15 +45,10 @@ function InlineLoader({ label, t }: { label: string; t: Theme }) {
  * a background colour, which half-block packing needs.
  */
 function GhostArt({ lines, width }: { lines: [string, string][]; width: number }) {
-  return (
-    <Box flexDirection="column" width={width}>
-      {lines.map(([, text], i) => (
-        <Text key={i} wrap="truncate-end">
-          {stripAnsi(text)}
-        </Text>
-      ))}
-    </Box>
-  )
+  // RawAnsi is required: the ghost's cells carry the piece's truecolor palette
+  // (moon cream, lavender body, pink cheeks). Stripping ANSI to plain Text
+  // flattened the whole scene to a single theme tint.
+  return <RawAnsi lines={lines.map(([, text]) => text)} width={width} />
 }
 
 export function ArtLines({ lines }: { lines: [string, string][] }) {
@@ -268,10 +263,11 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   // genuinely wide enough; below that no art is drawn and the panel keeps its
   // plain header rather than showing a cropped scene.
   const ghostFull = cols >= GHOST_COLS && rows >= 40
-  const ghostFits = ghostFull
-  const ghostWidth = GHOST_COLS
+  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4
+  const ghostFits = ghostFull || ghostCompact
+  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS
   const ghostTime = useGhostTime(ghostFits)
-  const ghostArt = ghostFits ? ghostLines(t.color, ghostTime) : []
+  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t.color, ghostTime) : []
   const heroLines = caduceus(t.color, t.bannerHero || undefined)
   // The ghost renders in the hero track, beside the text — the same two-column
   // grid the caduceus used, with the ghost taking the art track. Drawn above
@@ -477,7 +473,7 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
             {/* The backend sends a full version identity: a release tag already
                 starts with `v`, a tagless checkout sends `git.<sha>`. Prefixing
                 blindly produced `vgit.75b06fc`. */}
-            {info.version ? ` ${/^v/i.test(info.version) ? info.version : `v${info.version}`}` : ' v0.0.1'}
+            {` v${QUBIT_PRODUCT_VERSION}`}
           </Text>
           {ghostFits && (
             <>

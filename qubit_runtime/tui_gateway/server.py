@@ -2547,7 +2547,15 @@ def _session_info(agent, session: dict | None = None) -> dict:
         # display_version, never base_version: a checkout with no release tag
         # has base_version "unknown" while its real identity is `git.<sha>`.
         # Printing base_version put the literal word "unknown" in the banner.
-        info.update(version=get_version_info().display_version, release_date=__release_date__)
+        # The product version is the Qubit release identity; the runtime's git
+        # description can still point at an older v1.0.0 tag after the product
+        # was deliberately versioned 0.0.1.
+        try:
+            from voicebridge.product import PRODUCT_VERSION as _product_version
+        except Exception:
+            _product_version = None
+        info.update(version=_product_version or get_version_info().display_version,
+                    release_date=__release_date__)
     live_agent = agent is not None and not sess.get("_compute_host_active")
     if live_agent:
         with contextlib.suppress(Exception):

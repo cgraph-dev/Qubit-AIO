@@ -536,9 +536,9 @@ def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         state_dir = ""
     try:
         from . import distribution as D
-        version = str(getattr(D, "VERSION", "1.0.0"))
+        version = str(getattr(D, "PACKAGE_VERSION", "0.0.1"))
     except Exception:
-        version = "1.0.0"
+        version = "0.0.1"
     sessions_count = 0
     try:
         from .auth_status import recent_sessions as _rs
@@ -692,7 +692,7 @@ def h_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         state = "DEGRADED"
         detail = "installation-health inventory unavailable: " + \
             _redact(str(exc))[:160]
-    return _ok(version=status_out.get("version", "qubit-1.0.0"),
+    return _ok(version=status_out.get("version", "qubit-0.0.1"),
                auth_required=bool(status_out.get("auth_required", False)),
                state=state, detail=detail)
 

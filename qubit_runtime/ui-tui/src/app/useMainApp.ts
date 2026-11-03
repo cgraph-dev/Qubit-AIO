@@ -713,6 +713,8 @@ export function useMainApp(gw: GatewayClient) {
     }
 
     let timer: ReturnType<typeof setTimeout> | undefined
+    let lastCols = stdout.columns ?? 80
+    let lastRows = stdout.rows ?? 24
 
     // Resize reflows wrapped lines; if the user is still pinned to the tail
     // we need to re-snap once React has remeasured. virtualRows is keyed on
@@ -720,15 +722,51 @@ export function useMainApp(gw: GatewayClient) {
     // this timer fires. Re-check isSticky() inside the timeout — a manual
     // scroll during the 100ms window otherwise yanks the user back to tail.
     const onResize = () => {
+      const cols = stdout.columns ?? 80
+      const rows = stdout.rows ?? 24
+      const shrank = cols < lastCols || rows < lastRows
+      lastCols = cols
+      lastRows = rows
       clearTimeout(timer)
       timer = setTimeout(() => {
         timer = undefined
+
+        // Ink only owns the live viewport. After a shrink, the previous,
+        // larger frame can remain above it (the old giant hero/banner), so
+        // clear the visible frame and scrollback before the redraw.
+        if (shrank) {
+          try {
+            stdout.write('\x1b[2J\x1b[H\x1b[3J')
+            forceRedraw(stdout)
+          } catch {
+            // A dead PTY is handled by the graceful-exit path.
+          }
+        }
 
         if (scrollRef.current?.isSticky()) {
           scrollRef.current.scrollToBottom()
         }
 
-        void rpc<TerminalResizeResponse>('terminal.resize', { cols: stdout.columns ?? 80, session_id: ui.sid })
+        // terminal.resize is advisory. A stale runtime id must not print the
+        // scary "session not found" line on every window resize: recover the
+        // stored session instead, then let the normal ready/session path
+        // paint it.
+        const targetSid = ui.sid
+
+        void gw.request<TerminalResizeResponse>('terminal.resize', { cols, session_id: targetSid }).catch((err: unknown) => {
+          if (!/session not found/i.test(String((err as Error)?.message ?? err))) {
+            return
+          }
+
+          const recover = ui.storedSid ?? recoverSidRef.current
+
+          if (!recover) {
+            return
+          }
+
+          recoverSidRef.current = recover
+          void session.resumeById(recover)
+        })
       }, 100)
     }
 
@@ -738,7 +776,7 @@ export function useMainApp(gw: GatewayClient) {
       clearTimeout(timer)
       stdout.off('resize', onResize)
     }
-  }, [rpc, stdout, ui.sid])
+  }, [gw, session.resumeById, stdout, ui.sid, ui.storedSid])
 
   const cancelClarify = useCallback(() => {
     const clarify = overlay.clarify
