@@ -32,9 +32,9 @@ var __export = (target, all) => {
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    for (let key2 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key2) && key2 !== except)
+        __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
   }
   return to;
 };
@@ -228,11 +228,11 @@ var init_lifecycle = __esm({
 });
 
 // ../node_modules/nanostores/warn/index.js
-function warn(text) {
-  if (!warned[text]) {
-    warned[text] = true;
+function warn(text2) {
+  if (!warned[text2]) {
+    warned[text2] = true;
     if (typeof console !== "undefined" && console.warn) {
-      console.groupCollapsed("Nano Stores: " + text);
+      console.groupCollapsed("Nano Stores: " + text2);
       console.trace("Source of deprecated call");
       console.groupEnd();
     }
@@ -318,7 +318,7 @@ var init_computed = __esm({
 function listenKeys($store, keys, listener) {
   let keysSet = new Set(keys);
   return $store.listen((value, oldValue, changed) => {
-    if (changed === void 0 ? keys.some((key) => value[key] !== oldValue[key]) : keysSet.has(changed) || keysSet.has(changed.split(/\.|\[/)[0])) {
+    if (changed === void 0 ? keys.some((key2) => value[key2] !== oldValue[key2]) : keysSet.has(changed) || keysSet.has(changed.split(/\.|\[/)[0])) {
       listener(value, oldValue, changed);
     }
   });
@@ -1877,7 +1877,7 @@ var init_ops = __esm({
         },
         ownedBy: (surface) => `owned by ${surface}`,
         // {0}=text, {1}=hint from the gateway
-        withHint: (text, hint) => `${text} \u2014 ${hint}`,
+        withHint: (text2, hint) => `${text2} \u2014 ${hint}`,
         notStarted: (reason) => `wake: not started \u2014 ${reason}`,
         forPhrase: (phrase) => `for \u201C${phrase}\u201D`,
         // {0}=detail suffix (" for “phrase” · provider · enabled in config" or empty)
@@ -2255,7 +2255,7 @@ var init_userMessages = __esm({
     userMessagesEn = {
       userMessages: {
         /** `{0}` = the (already clipped) raw detail text. */
-        details: (text) => `Details: ${text}`,
+        details: (text2) => `Details: ${text2}`,
         backend: {
           restarting: "Qubit stopped unexpectedly \u2014 restarting and reopening your chat (the reply in progress was lost).",
           restartingActivity: "Qubit stopped unexpectedly \xB7 restarting\u2026",
@@ -2457,12 +2457,12 @@ function mergeTranslations(base, overrides) {
     return overrides ?? base;
   }
   const result = { ...base };
-  for (const [key, value] of Object.entries(overrides)) {
+  for (const [key2, value] of Object.entries(overrides)) {
     if (value === void 0) {
       continue;
     }
-    const baseValue = result[key];
-    result[key] = isRecord(baseValue) && isRecord(value) ? mergeTranslations(baseValue, value) : value;
+    const baseValue = result[key2];
+    result[key2] = isRecord(baseValue) && isRecord(value) ? mergeTranslations(baseValue, value) : value;
   }
   return result;
 }
@@ -2479,8 +2479,8 @@ function formatPositional(template, args) {
     return value === void 0 ? match : String(value);
   });
 }
-function resolvePath(source, key) {
-  return key.split(".").reduce((current, part) => isRecord(current) ? current[part] : void 0, source);
+function resolvePath(source, key2) {
+  return key2.split(".").reduce((current, part) => isRecord(current) ? current[part] : void 0, source);
 }
 function render(value, args) {
   if (typeof value === "string") {
@@ -2491,23 +2491,23 @@ function render(value, args) {
   }
   return null;
 }
-function translateFrom(source, locale, key, args) {
-  const active = render(resolvePath(source(locale), key), args);
+function translateFrom(source, locale, key2, args) {
+  const active = render(resolvePath(source(locale), key2), args);
   if (active !== null) {
     return active;
   }
   if (locale !== DEFAULT_LOCALE) {
-    const fallback = render(resolvePath(source(DEFAULT_LOCALE), key), args);
+    const fallback = render(resolvePath(source(DEFAULT_LOCALE), key2), args);
     if (fallback !== null) {
       return fallback;
     }
   }
-  return key;
+  return key2;
 }
 function nestPack(base, messages2) {
   const out = {};
-  for (const [flatKey, text] of Object.entries(messages2)) {
-    if (typeof text !== "string") {
+  for (const [flatKey, text2] of Object.entries(messages2)) {
+    if (typeof text2 !== "string") {
       continue;
     }
     const baseLeaf = resolvePath(base, flatKey);
@@ -2527,7 +2527,7 @@ function nestPack(base, messages2) {
         cursor = created;
       }
     }
-    cursor[leafKey] = typeof baseLeaf === "function" ? (...args) => formatPositional(text, args) : text;
+    cursor[leafKey] = typeof baseLeaf === "function" ? (...args) => formatPositional(text2, args) : text2;
   }
   return out;
 }
@@ -2541,8 +2541,8 @@ function applyLocale(lang, pack) {
   $locale.set(lang || DEFAULT_LOCALE);
   $catalog.set(catalogFromPack(pack?.messages));
 }
-function t(key, ...args) {
-  return translateFrom((locale) => locale === DEFAULT_LOCALE ? en : $catalog.get(), $locale.get(), key, args);
+function t(key2, ...args) {
+  return translateFrom((locale) => locale === DEFAULT_LOCALE ? en : $catalog.get(), $locale.get(), key2, args);
 }
 var DEFAULT_LOCALE, $locale, $catalog, getLocale, messages;
 var init_runtime = __esm({
@@ -2572,11 +2572,11 @@ var init_userMessages2 = __esm({
     DETAIL_LIMIT = 300;
     rpcShape = (err) => err instanceof Error ? { code: err.code, message: err.message } : {};
     detailLine = (raw) => {
-      const text = (raw ?? "").replace(/\s+/g, " ").trim();
-      if (!text) {
+      const text2 = (raw ?? "").replace(/\s+/g, " ").trim();
+      if (!text2) {
         return null;
       }
-      return t("userMessages.details", text.length > DETAIL_LIMIT ? `${text.slice(0, DETAIL_LIMIT - 1)}\u2026` : text);
+      return t("userMessages.details", text2.length > DETAIL_LIMIT ? `${text2.slice(0, DETAIL_LIMIT - 1)}\u2026` : text2);
     };
     backendRestarting = () => t("userMessages.backend.restarting");
     backendRestartingActivity = () => t("userMessages.backend.restartingActivity");
@@ -2616,43 +2616,43 @@ var init_userMessages2 = __esm({
     TIMED_OUT_RE = /^request timed out after (\d+)s/;
     RPC_ERROR_ROWS = [
       [
-        (code, text) => (code === RPC_SESSION_NOT_FOUND || code === void 0) && SESSION_NOT_FOUND_RE.test(text),
+        (code, text2) => (code === RPC_SESSION_NOT_FOUND || code === void 0) && SESSION_NOT_FOUND_RE.test(text2),
         () => t("userMessages.rpc.sessionNotFound")
       ],
-      [(_code, text) => NOT_CONNECTED_RE.test(text), () => t("userMessages.rpc.notConnected")],
-      [(_code, text) => TIMED_OUT_RE.exec(text), (m) => t("userMessages.rpc.timedOut", m?.[1] ?? "?")]
+      [(_code, text2) => NOT_CONNECTED_RE.test(text2), () => t("userMessages.rpc.notConnected")],
+      [(_code, text2) => TIMED_OUT_RE.exec(text2), (m) => t("userMessages.rpc.timedOut", m?.[1] ?? "?")]
     ];
     rpcErrorLogSink = null;
     setRpcErrorLogSink = (sink) => {
       rpcErrorLogSink = sink;
     };
-    logReplacedWireText = (code, text) => {
-      rpcErrorLogSink?.(`[rpc] ${code === void 0 ? "" : `code=${code} `}${text}`);
+    logReplacedWireText = (code, text2) => {
+      rpcErrorLogSink?.(`[rpc] ${code === void 0 ? "" : `code=${code} `}${text2}`);
     };
     describeRpcError = (err) => {
       const { code, message } = rpcShape(err);
-      const text = message ?? (typeof err === "string" && err.trim() ? err : t("rpc.requestFailed"));
+      const text2 = message ?? (typeof err === "string" && err.trim() ? err : t("rpc.requestFailed"));
       if (isVersionSkewError(err)) {
-        logReplacedWireText(code, text);
+        logReplacedWireText(code, text2);
         return versionSkewMessage();
       }
       for (const [matcher, render2] of RPC_ERROR_ROWS) {
-        const m = matcher(code, text);
+        const m = matcher(code, text2);
         if (m) {
-          logReplacedWireText(code, text);
+          logReplacedWireText(code, text2);
           return render2(m === true ? null : m);
         }
       }
-      return text;
+      return text2;
     };
     describeSlashExecError = (command, err) => {
       const { message } = rpcShape(err);
-      const text = message ?? "";
-      if (/slash worker timed out/.test(text)) {
+      const text2 = message ?? "";
+      if (/slash worker timed out/.test(text2)) {
         return t("userMessages.rpc.slashTimedOut", command);
       }
-      if (/slash worker (?:exited|closed pipe|start failed)/.test(text)) {
-        const detail = detailLine(text.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
+      if (/slash worker (?:exited|closed pipe|start failed)/.test(text2)) {
+        const detail = detailLine(text2.replace(/^slash worker (?:exited|closed pipe:?|start failed:?)\s*/, ""));
         return [t("userMessages.rpc.slashCrashed", command), detail].filter(Boolean).join("\n");
       }
       return describeRpcError(err);
@@ -2704,8 +2704,8 @@ var init_userMessages2 = __esm({
       const raw = (payload.error ?? "").replace(/^Error:\s*/, "");
       return [t("userMessages.turn.notAnswered", title), detailLine(raw), nextStep].filter(Boolean).join("\n");
     };
-    isBareErrorText = (text, error) => {
-      const t2 = text.trim();
+    isBareErrorText = (text2, error) => {
+      const t2 = text2.trim();
       return !t2 || t2 === `Error: ${error ?? ""}`.trim() || t2 === (error ?? "").trim();
     };
     PROMPT_TIMEOUT_KEY = {
@@ -2716,8 +2716,8 @@ var init_userMessages2 = __esm({
       "vault.unlock_prompt": "vaultUnlockPrompt"
     };
     promptTimeoutNotice = (method, reason) => {
-      const key = reason === "timeout" && method ? PROMPT_TIMEOUT_KEY[method] : void 0;
-      return key ? messages().userMessages.promptTimeout[key] : null;
+      const key2 = reason === "timeout" && method ? PROMPT_TIMEOUT_KEY[method] : void 0;
+      return key2 ? messages().userMessages.promptTimeout[key2] : null;
     };
     MISSING_KEY_RE = /^No API key configured for provider '([^']*)'/;
     describeCredentialWarning = (warning) => {
@@ -3031,10 +3031,10 @@ var init_json_rpc_channel = __esm({
        * on it too (mirror it, record seq, …) or `null` when the text was not
        * JSON or not a JSON object (`null`, a scalar).
        */
-      handleFrame(text) {
+      handleFrame(text2) {
         let frame;
         try {
-          frame = JSON.parse(text);
+          frame = JSON.parse(text2);
         } catch {
           return null;
         }
@@ -3692,9 +3692,9 @@ var require_constants = __commonJS({
       "X-XSS-Protection"
     ];
     for (let i = 0; i < wellknownHeaderNames.length; ++i) {
-      const key = wellknownHeaderNames[i];
-      const lowerCasedKey = key.toLowerCase();
-      headerNameLowerCasedRecord[key] = headerNameLowerCasedRecord[lowerCasedKey] = lowerCasedKey;
+      const key2 = wellknownHeaderNames[i];
+      const lowerCasedKey = key2.toLowerCase();
+      headerNameLowerCasedRecord[key2] = headerNameLowerCasedRecord[lowerCasedKey] = lowerCasedKey;
     }
     Object.setPrototypeOf(headerNameLowerCasedRecord, null);
     module.exports = {
@@ -3728,16 +3728,16 @@ var require_tree = __commonJS({
        * @param {any} value
        * @param {number} index
        */
-      constructor(key, value, index) {
-        if (index === void 0 || index >= key.length) {
+      constructor(key2, value, index) {
+        if (index === void 0 || index >= key2.length) {
           throw new TypeError("Unreachable");
         }
-        const code = this.code = key.charCodeAt(index);
+        const code = this.code = key2.charCodeAt(index);
         if (code > 127) {
           throw new TypeError("key must be ascii string");
         }
-        if (key.length !== ++index) {
-          this.middle = new _TstNode(key, value, index);
+        if (key2.length !== ++index) {
+          this.middle = new _TstNode(key2, value, index);
         } else {
           this.value = value;
         }
@@ -3746,15 +3746,15 @@ var require_tree = __commonJS({
        * @param {string} key
        * @param {any} value
        */
-      add(key, value) {
-        const length = key.length;
+      add(key2, value) {
+        const length = key2.length;
         if (length === 0) {
           throw new TypeError("Unreachable");
         }
         let index = 0;
         let node = this;
         while (true) {
-          const code = key.charCodeAt(index);
+          const code = key2.charCodeAt(index);
           if (code > 127) {
             throw new TypeError("key must be ascii string");
           }
@@ -3765,20 +3765,20 @@ var require_tree = __commonJS({
             } else if (node.middle !== null) {
               node = node.middle;
             } else {
-              node.middle = new _TstNode(key, value, index);
+              node.middle = new _TstNode(key2, value, index);
               break;
             }
           } else if (node.code < code) {
             if (node.left !== null) {
               node = node.left;
             } else {
-              node.left = new _TstNode(key, value, index);
+              node.left = new _TstNode(key2, value, index);
               break;
             }
           } else if (node.right !== null) {
             node = node.right;
           } else {
-            node.right = new _TstNode(key, value, index);
+            node.right = new _TstNode(key2, value, index);
             break;
           }
         }
@@ -3787,12 +3787,12 @@ var require_tree = __commonJS({
        * @param {Uint8Array} key
        * @return {TstNode | null}
        */
-      search(key) {
-        const keylength = key.length;
+      search(key2) {
+        const keylength = key2.length;
         let index = 0;
         let node = this;
         while (node !== null && index < keylength) {
-          let code = key[index];
+          let code = key2[index];
           if (code <= 90 && code >= 65) {
             code |= 32;
           }
@@ -3817,25 +3817,25 @@ var require_tree = __commonJS({
        * @param {string} key
        * @param {any} value
        * */
-      insert(key, value) {
+      insert(key2, value) {
         if (this.node === null) {
-          this.node = new TstNode(key, value, 0);
+          this.node = new TstNode(key2, value, 0);
         } else {
-          this.node.add(key, value);
+          this.node.add(key2, value);
         }
       }
       /**
        * @param {Uint8Array} key
        * @return {any}
        */
-      lookup(key) {
-        return this.node?.search(key)?.value ?? null;
+      lookup(key2) {
+        return this.node?.search(key2)?.value ?? null;
       }
     };
     var tree = new TernarySearchTree();
     for (let i = 0; i < wellknownHeaderNames.length; ++i) {
-      const key = headerNameLowerCasedRecord[wellknownHeaderNames[i]];
-      tree.insert(key, key);
+      const key2 = headerNameLowerCasedRecord[wellknownHeaderNames[i]];
+      tree.insert(key2, key2);
     }
     module.exports = {
       TernarySearchTree,
@@ -4059,20 +4059,20 @@ var require_util = __commonJS({
     function parseHeaders(headers, obj) {
       if (obj === void 0) obj = {};
       for (let i = 0; i < headers.length; i += 2) {
-        const key = headerNameToString(headers[i]);
-        let val = obj[key];
+        const key2 = headerNameToString(headers[i]);
+        let val = obj[key2];
         if (val) {
           if (typeof val === "string") {
             val = [val];
-            obj[key] = val;
+            obj[key2] = val;
           }
           val.push(headers[i + 1].toString("utf8"));
         } else {
           const headersValue = headers[i + 1];
           if (typeof headersValue === "string") {
-            obj[key] = headersValue;
+            obj[key2] = headersValue;
           } else {
-            obj[key] = Array.isArray(headersValue) ? headersValue.map((x) => x.toString("utf8")) : headersValue.toString("utf8");
+            obj[key2] = Array.isArray(headersValue) ? headersValue.map((x) => x.toString("utf8")) : headersValue.toString("utf8");
           }
         }
       }
@@ -4086,21 +4086,21 @@ var require_util = __commonJS({
       const ret = new Array(len);
       let hasContentLength = false;
       let contentDispositionIdx = -1;
-      let key;
+      let key2;
       let val;
       let kLen = 0;
       for (let n = 0; n < headers.length; n += 2) {
-        key = headers[n];
+        key2 = headers[n];
         val = headers[n + 1];
-        typeof key !== "string" && (key = key.toString());
+        typeof key2 !== "string" && (key2 = key2.toString());
         typeof val !== "string" && (val = val.toString("utf8"));
-        kLen = key.length;
-        if (kLen === 14 && key[7] === "-" && (key === "content-length" || key.toLowerCase() === "content-length")) {
+        kLen = key2.length;
+        if (kLen === 14 && key2[7] === "-" && (key2 === "content-length" || key2.toLowerCase() === "content-length")) {
           hasContentLength = true;
-        } else if (kLen === 19 && key[7] === "-" && (key === "content-disposition" || key.toLowerCase() === "content-disposition")) {
+        } else if (kLen === 19 && key2[7] === "-" && (key2 === "content-disposition" || key2.toLowerCase() === "content-disposition")) {
           contentDispositionIdx = n + 1;
         }
-        ret[n] = key;
+        ret[n] = key2;
         ret[n + 1] = val;
       }
       if (hasContentLength && contentDispositionIdx !== -1) {
@@ -4785,20 +4785,20 @@ var require_request = __commonJS({
           this.endHandler = null;
         }
       }
-      addHeader(key, value) {
-        processHeader(this, key, value);
+      addHeader(key2, value) {
+        processHeader(this, key2, value);
         return this;
       }
     };
-    function processHeader(request, key, val) {
+    function processHeader(request, key2, val) {
       if (val && (typeof val === "object" && !Array.isArray(val))) {
-        throw new InvalidArgumentError(`invalid ${key} header`);
+        throw new InvalidArgumentError(`invalid ${key2} header`);
       } else if (val === void 0) {
         return;
       }
-      let headerName = headerNameLowerCasedRecord[key];
+      let headerName = headerNameLowerCasedRecord[key2];
       if (headerName === void 0) {
-        headerName = key.toLowerCase();
+        headerName = key2.toLowerCase();
         if (headerNameLowerCasedRecord[headerName] === void 0 && !isValidHTTPToken(headerName)) {
           throw new InvalidArgumentError("invalid header key");
         }
@@ -4808,17 +4808,17 @@ var require_request = __commonJS({
         for (let i = 0; i < val.length; i++) {
           if (typeof val[i] === "string") {
             if (!isValidHeaderValue(val[i])) {
-              throw new InvalidArgumentError(`invalid ${key} header`);
+              throw new InvalidArgumentError(`invalid ${key2} header`);
             }
             arr.push(val[i]);
           } else if (val[i] === null) {
             arr.push("");
           } else if (typeof val[i] === "object") {
-            throw new InvalidArgumentError(`invalid ${key} header`);
+            throw new InvalidArgumentError(`invalid ${key2} header`);
           } else {
             const str3 = `${val[i]}`;
             if (!isValidHeaderValue(str3)) {
-              throw new InvalidArgumentError(`invalid ${key} header`);
+              throw new InvalidArgumentError(`invalid ${key2} header`);
             }
             arr.push(str3);
           }
@@ -4826,14 +4826,14 @@ var require_request = __commonJS({
         val = arr;
       } else if (typeof val === "string") {
         if (!isValidHeaderValue(val)) {
-          throw new InvalidArgumentError(`invalid ${key} header`);
+          throw new InvalidArgumentError(`invalid ${key2} header`);
         }
       } else if (val === null) {
         val = "";
       } else {
         val = `${val}`;
         if (!isValidHeaderValue(val)) {
-          throw new InvalidArgumentError(`invalid ${key} header`);
+          throw new InvalidArgumentError(`invalid ${key2} header`);
         }
       }
       if (headerName === "host") {
@@ -4854,7 +4854,7 @@ var require_request = __commonJS({
         }
       } else if (request.contentType === null && headerName === "content-type") {
         request.contentType = val;
-        request.headers.push(key, val);
+        request.headers.push(key2, val);
       } else if (headerName === "transfer-encoding" || headerName === "keep-alive" || headerName === "upgrade") {
         throw new InvalidArgumentError(`invalid ${headerName} header`);
       } else if (headerName === "connection") {
@@ -4868,7 +4868,7 @@ var require_request = __commonJS({
       } else if (headerName === "expect") {
         throw new NotSupportedError("expect header not supported");
       } else {
-        request.headers.push(key, val);
+        request.headers.push(key2, val);
       }
     }
     module.exports = Request;
@@ -5348,13 +5348,13 @@ var require_connect = __commonJS({
         constructor(maxCachedSessions) {
           this._maxCachedSessions = maxCachedSessions;
           this._sessionCache = /* @__PURE__ */ new Map();
-          this._sessionRegistry = new global.FinalizationRegistry((key) => {
+          this._sessionRegistry = new global.FinalizationRegistry((key2) => {
             if (this._sessionCache.size < this._maxCachedSessions) {
               return;
             }
-            const ref = this._sessionCache.get(key);
+            const ref = this._sessionCache.get(key2);
             if (ref !== void 0 && ref.deref() === void 0) {
-              this._sessionCache.delete(key);
+              this._sessionCache.delete(key2);
             }
           });
         }
@@ -5518,10 +5518,10 @@ var require_utils = __commonJS({
     exports.enumToMap = void 0;
     function enumToMap(obj) {
       const res = {};
-      Object.keys(obj).forEach((key) => {
-        const value = obj[key];
+      Object.keys(obj).forEach((key2) => {
+        const value = obj[key2];
         if (typeof value === "number") {
-          res[key] = value;
+          res[key2] = value;
         }
       });
       return res;
@@ -5698,9 +5698,9 @@ var require_constants2 = __commonJS({
     ];
     exports.METHOD_MAP = utils_1.enumToMap(METHODS);
     exports.H_METHOD_MAP = {};
-    Object.keys(exports.METHOD_MAP).forEach((key) => {
-      if (/^H/.test(key)) {
-        exports.H_METHOD_MAP[key] = exports.METHOD_MAP[key];
+    Object.keys(exports.METHOD_MAP).forEach((key2) => {
+      if (/^H/.test(key2)) {
+        exports.H_METHOD_MAP[key2] = exports.METHOD_MAP[key2];
       }
     });
     var FINISH;
@@ -6671,19 +6671,19 @@ var require_webidl = __commonJS({
         const result = {};
         if (!types.isProxy(O)) {
           const keys2 = [...Object.getOwnPropertyNames(O), ...Object.getOwnPropertySymbols(O)];
-          for (const key of keys2) {
-            const typedKey = keyConverter(key, prefix, argument);
-            const typedValue = valueConverter(O[key], prefix, argument);
+          for (const key2 of keys2) {
+            const typedKey = keyConverter(key2, prefix, argument);
+            const typedValue = valueConverter(O[key2], prefix, argument);
             result[typedKey] = typedValue;
           }
           return result;
         }
         const keys = Reflect.ownKeys(O);
-        for (const key of keys) {
-          const desc = Reflect.getOwnPropertyDescriptor(O, key);
+        for (const key2 of keys) {
+          const desc = Reflect.getOwnPropertyDescriptor(O, key2);
           if (desc?.enumerable) {
-            const typedKey = keyConverter(key, prefix, argument);
-            const typedValue = valueConverter(O[key], prefix, argument);
+            const typedKey = keyConverter(key2, prefix, argument);
+            const typedValue = valueConverter(O[key2], prefix, argument);
             result[typedKey] = typedValue;
           }
         }
@@ -6714,29 +6714,29 @@ var require_webidl = __commonJS({
           });
         }
         for (const options of converters) {
-          const { key, defaultValue, required, converter } = options;
+          const { key: key2, defaultValue, required, converter } = options;
           if (required === true) {
-            if (!Object.hasOwn(dictionary, key)) {
+            if (!Object.hasOwn(dictionary, key2)) {
               throw webidl.errors.exception({
                 header: prefix,
-                message: `Missing required key "${key}".`
+                message: `Missing required key "${key2}".`
               });
             }
           }
-          let value = dictionary[key];
+          let value = dictionary[key2];
           const hasDefault = Object.hasOwn(options, "defaultValue");
           if (hasDefault && value !== null) {
             value ??= defaultValue();
           }
           if (required || hasDefault || value !== void 0) {
-            value = converter(value, prefix, `${argument}.${key}`);
+            value = converter(value, prefix, `${argument}.${key2}`);
             if (options.allowedValues && !options.allowedValues.includes(value)) {
               throw webidl.errors.exception({
                 header: prefix,
                 message: `${value} is not an accepted type. Expected one of ${options.allowedValues.join(", ")}.`
               });
             }
-            dict[key] = value;
+            dict[key2] = value;
           }
         }
         return dict;
@@ -6913,7 +6913,7 @@ var require_util2 = __commonJS({
     try {
       crypto = __require("node:crypto");
       const possibleRelevantHashes = ["sha256", "sha384", "sha512"];
-      supportedHashes = crypto.getHashes().filter((hash2) => possibleRelevantHashes.includes(hash2));
+      supportedHashes = crypto.getHashes().filter((hash3) => possibleRelevantHashes.includes(hash3));
     } catch {
     }
     function responseURL(response) {
@@ -7351,18 +7351,18 @@ var require_util2 = __commonJS({
               done: true
             };
           }
-          const { [keyIndex]: key, [valueIndex]: value } = values[index];
+          const { [keyIndex]: key2, [valueIndex]: value } = values[index];
           this.#index = index + 1;
           let result;
           switch (this.#kind) {
             case "key":
-              result = key;
+              result = key2;
               break;
             case "value":
               result = value;
               break;
             case "key+value":
-              result = [key, value];
+              result = [key2, value];
               break;
           }
           return {
@@ -7428,8 +7428,8 @@ var require_util2 = __commonJS({
                 `Failed to execute 'forEach' on '${name}': parameter 1 is not of type 'Function'.`
               );
             }
-            for (const { 0: key, 1: value } of makeIterator(this, "key+value")) {
-              callbackfn.call(thisArg, value, key, this);
+            for (const { 0: key2, 1: value } of makeIterator(this, "key+value")) {
+              callbackfn.call(thisArg, value, key2, this);
             }
           }
         }
@@ -8872,15 +8872,15 @@ var require_client_h1 = __commonJS({
         } else {
           this.headers[len - 1] = Buffer.concat([this.headers[len - 1], buf]);
         }
-        const key = this.headers[len - 2];
-        if (key.length === 10) {
-          const headerName = util.bufferToLowerCasedHeaderName(key);
+        const key2 = this.headers[len - 2];
+        if (key2.length === 10) {
+          const headerName = util.bufferToLowerCasedHeaderName(key2);
           if (headerName === "keep-alive") {
             this.keepAlive += buf.toString();
           } else if (headerName === "connection") {
             this.connection += buf.toString();
           }
-        } else if (key.length === 14 && util.bufferToLowerCasedHeaderName(key) === "content-length") {
+        } else if (key2.length === 14 && util.bufferToLowerCasedHeaderName(key2) === "content-length") {
           this.contentLength += buf.toString();
         }
         this.trackHeader(buf.length);
@@ -9373,15 +9373,15 @@ upgrade: ${upgrade}\r
       }
       if (Array.isArray(headers)) {
         for (let n = 0; n < headers.length; n += 2) {
-          const key = headers[n + 0];
+          const key2 = headers[n + 0];
           const val = headers[n + 1];
           if (Array.isArray(val)) {
             for (let i = 0; i < val.length; i++) {
-              header += `${key}: ${val[i]}\r
+              header += `${key2}: ${val[i]}\r
 `;
             }
           } else {
-            header += `${key}: ${val}\r
+            header += `${key2}: ${val}\r
 `;
           }
         }
@@ -9888,18 +9888,18 @@ var require_client_h2 = __commonJS({
       }
       const headers = {};
       for (let n = 0; n < reqHeaders.length; n += 2) {
-        const key = reqHeaders[n + 0];
+        const key2 = reqHeaders[n + 0];
         const val = reqHeaders[n + 1];
         if (Array.isArray(val)) {
           for (let i = 0; i < val.length; i++) {
-            if (headers[key]) {
-              headers[key] += `,${val[i]}`;
+            if (headers[key2]) {
+              headers[key2] += `,${val[i]}`;
             } else {
-              headers[key] = val[i];
+              headers[key2] = val[i];
             }
           }
         } else {
-          headers[key] = val;
+          headers[key2] = val;
         }
       }
       let stream;
@@ -10364,9 +10364,9 @@ var require_redirect_handler = __commonJS({
           }
         }
       } else if (headers && typeof headers === "object") {
-        for (const key of Object.keys(headers)) {
-          if (!shouldRemoveHeader(key, removeContent, unknownOrigin)) {
-            ret.push(key, headers[key]);
+        for (const key2 of Object.keys(headers)) {
+          if (!shouldRemoveHeader(key2, removeContent, unknownOrigin)) {
+            ret.push(key2, headers[key2]);
           }
         }
       } else {
@@ -11443,16 +11443,16 @@ var require_agent = __commonJS({
         return ret;
       }
       [kDispatch](opts, handler) {
-        let key;
+        let key2;
         if (opts.origin && (typeof opts.origin === "string" || opts.origin instanceof URL)) {
-          key = String(opts.origin);
+          key2 = String(opts.origin);
         } else {
           throw new InvalidArgumentError("opts.origin must be a non-empty string or URL.");
         }
-        let dispatcher2 = this[kClients].get(key);
+        let dispatcher2 = this[kClients].get(key2);
         if (!dispatcher2) {
           dispatcher2 = this[kFactory](opts.origin, this[kOptions]).on("drain", this[kOnDrain]).on("connect", this[kOnConnect]).on("disconnect", this[kOnDisconnect]).on("connectionError", this[kOnConnectionError]);
-          this[kClients].set(key, dispatcher2);
+          this[kClients].set(key2, dispatcher2);
         }
         return dispatcher2.dispatch(opts, handler);
       }
@@ -11691,7 +11691,7 @@ var require_proxy_agent = __commonJS({
       return headers;
     }
     function throwIfProxyAuthIsSent(headers) {
-      const existProxyAuth = headers && Object.keys(headers).find((key) => key.toLowerCase() === "proxy-authorization");
+      const existProxyAuth = headers && Object.keys(headers).find((key2) => key2.toLowerCase() === "proxy-authorization");
       if (existProxyAuth) {
         throw new InvalidArgumentError("Proxy-Authorization should be sent in ProxyAgent constructor");
       }
@@ -13446,18 +13446,18 @@ var require_mock_utils = __commonJS({
         })
       );
     }
-    function getHeaderByName(headers, key) {
+    function getHeaderByName(headers, key2) {
       if (Array.isArray(headers)) {
         for (let i = 0; i < headers.length; i += 2) {
-          if (headers[i].toLocaleLowerCase() === key.toLocaleLowerCase()) {
+          if (headers[i].toLocaleLowerCase() === key2.toLocaleLowerCase()) {
             return headers[i + 1];
           }
         }
         return void 0;
       } else if (typeof headers.get === "function") {
-        return headers.get(key);
+        return headers.get(key2);
       } else {
-        return lowerCaseEntries(headers)[key.toLocaleLowerCase()];
+        return lowerCaseEntries(headers)[key2.toLocaleLowerCase()];
       }
     }
     function buildHeadersFromArray(headers) {
@@ -13521,41 +13521,41 @@ var require_mock_utils = __commonJS({
         return data.toString();
       }
     }
-    function getMockDispatch(mockDispatches, key) {
-      const basePath = key.query ? buildURL(key.path, key.query) : key.path;
+    function getMockDispatch(mockDispatches, key2) {
+      const basePath = key2.query ? buildURL(key2.path, key2.query) : key2.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
       let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path }) => matchValue(safeUrl(path), resolvedPath));
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
       }
-      matchedMockDispatches = matchedMockDispatches.filter(({ method }) => matchValue(method, key.method));
+      matchedMockDispatches = matchedMockDispatches.filter(({ method }) => matchValue(method, key2.method));
       if (matchedMockDispatches.length === 0) {
-        throw new MockNotMatchedError(`Mock dispatch not matched for method '${key.method}' on path '${resolvedPath}'`);
+        throw new MockNotMatchedError(`Mock dispatch not matched for method '${key2.method}' on path '${resolvedPath}'`);
       }
-      matchedMockDispatches = matchedMockDispatches.filter(({ body }) => typeof body !== "undefined" ? matchValue(body, key.body) : true);
+      matchedMockDispatches = matchedMockDispatches.filter(({ body }) => typeof body !== "undefined" ? matchValue(body, key2.body) : true);
       if (matchedMockDispatches.length === 0) {
-        throw new MockNotMatchedError(`Mock dispatch not matched for body '${key.body}' on path '${resolvedPath}'`);
+        throw new MockNotMatchedError(`Mock dispatch not matched for body '${key2.body}' on path '${resolvedPath}'`);
       }
-      matchedMockDispatches = matchedMockDispatches.filter((mockDispatch2) => matchHeaders(mockDispatch2, key.headers));
+      matchedMockDispatches = matchedMockDispatches.filter((mockDispatch2) => matchHeaders(mockDispatch2, key2.headers));
       if (matchedMockDispatches.length === 0) {
-        const headers = typeof key.headers === "object" ? JSON.stringify(key.headers) : key.headers;
+        const headers = typeof key2.headers === "object" ? JSON.stringify(key2.headers) : key2.headers;
         throw new MockNotMatchedError(`Mock dispatch not matched for headers '${headers}' on path '${resolvedPath}'`);
       }
       return matchedMockDispatches[0];
     }
-    function addMockDispatch(mockDispatches, key, data) {
+    function addMockDispatch(mockDispatches, key2, data) {
       const baseData = { timesInvoked: 0, times: 1, persist: false, consumed: false };
       const replyData = typeof data === "function" ? { callback: data } : { ...data };
-      const newMockDispatch = { ...baseData, ...key, pending: true, data: { error: null, ...replyData } };
+      const newMockDispatch = { ...baseData, ...key2, pending: true, data: { error: null, ...replyData } };
       mockDispatches.push(newMockDispatch);
       return newMockDispatch;
     }
-    function deleteMockDispatch(mockDispatches, key) {
+    function deleteMockDispatch(mockDispatches, key2) {
       const index = mockDispatches.findIndex((dispatch) => {
         if (!dispatch.consumed) {
           return false;
         }
-        return matchKey(dispatch, key);
+        return matchKey(dispatch, key2);
       });
       if (index !== -1) {
         mockDispatches.splice(index, 1);
@@ -13575,9 +13575,9 @@ var require_mock_utils = __commonJS({
       const keys = Object.keys(data);
       const result = [];
       for (let i = 0; i < keys.length; ++i) {
-        const key = keys[i];
-        const value = data[key];
-        const name = Buffer.from(`${key}`);
+        const key2 = keys[i];
+        const value = data[key2];
+        const name = Buffer.from(`${key2}`);
         if (Array.isArray(value)) {
           for (let j = 0; j < value.length; ++j) {
             result.push(name, Buffer.from(`${value[j]}`));
@@ -13599,8 +13599,8 @@ var require_mock_utils = __commonJS({
       return Buffer.concat(buffers).toString("utf8");
     }
     function mockDispatch(opts, handler) {
-      const key = buildKey(opts);
-      const mockDispatch2 = getMockDispatch(this[kDispatches], key);
+      const key2 = buildKey(opts);
+      const mockDispatch2 = getMockDispatch(this[kDispatches], key2);
       mockDispatch2.timesInvoked++;
       if (mockDispatch2.data.callback) {
         mockDispatch2.data = { ...mockDispatch2.data, ...mockDispatch2.data.callback(opts) };
@@ -13610,7 +13610,7 @@ var require_mock_utils = __commonJS({
       mockDispatch2.consumed = !persist && timesInvoked >= times;
       mockDispatch2.pending = timesInvoked < times;
       if (error !== null) {
-        deleteMockDispatch(this[kDispatches], key);
+        deleteMockDispatch(this[kDispatches], key2);
         handler.onError(error);
         return true;
       }
@@ -13635,7 +13635,7 @@ var require_mock_utils = __commonJS({
         handler.onHeaders?.(statusCode, responseHeaders, resume, getStatusText(statusCode));
         handler.onData?.(Buffer.from(responseData));
         handler.onComplete?.(responseTrailers);
-        deleteMockDispatch(mockDispatches, key);
+        deleteMockDispatch(mockDispatches, key2);
       }
       function resume() {
       }
@@ -15542,16 +15542,16 @@ var require_dispatcher_weakref = __commonJS({
       constructor(finalizer) {
         this.finalizer = finalizer;
       }
-      register(dispatcher2, key) {
+      register(dispatcher2, key2) {
         if (dispatcher2.on) {
           dispatcher2.on("disconnect", () => {
             if (dispatcher2[kConnected] === 0 && dispatcher2[kSize] === 0) {
-              this.finalizer(key);
+              this.finalizer(key2);
             }
           });
         }
       }
-      unregister(key) {
+      unregister(key2) {
       }
     };
     module.exports = function() {
@@ -19038,8 +19038,8 @@ var require_util6 = __commonJS({
         if (!part.includes("=")) {
           throw new Error("Invalid unparsed");
         }
-        const [key, ...value] = part.split("=");
-        const trimmedKey = key.trim();
+        const [key2, ...value] = part.split("=");
+        const trimmedKey = key2.trim();
         const joinedValue = value.join("=");
         validateCookieName(trimmedKey);
         validateCookieValue(joinedValue);
@@ -21967,12 +21967,12 @@ var require_react_production = __commonJS({
     }
     var ReactSharedInternals = { H: null, A: null, T: null, S: null };
     var hasOwnProperty2 = Object.prototype.hasOwnProperty;
-    function ReactElement(type, key, props) {
+    function ReactElement(type, key2, props) {
       var refProp = props.ref;
       return {
         $$typeof: REACT_ELEMENT_TYPE,
         type,
-        key,
+        key: key2,
         ref: void 0 !== refProp ? refProp : null,
         props
       };
@@ -21983,9 +21983,9 @@ var require_react_production = __commonJS({
     function isValidElement(object) {
       return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
     }
-    function escape(key) {
+    function escape(key2) {
       var escaperLookup = { "=": "=0", ":": "=2" };
-      return "$" + key.replace(/[=:]/g, function(match) {
+      return "$" + key2.replace(/[=:]/g, function(match) {
         return escaperLookup[match];
       });
     }
@@ -22191,9 +22191,9 @@ var require_react_production = __commonJS({
         throw Error(
           "The argument must be a React element, but you passed " + element + "."
         );
-      var props = assign({}, element.props), key = element.key;
+      var props = assign({}, element.props), key2 = element.key;
       if (null != config)
-        for (propName in void 0 !== config.key && (key = "" + config.key), config)
+        for (propName in void 0 !== config.key && (key2 = "" + config.key), config)
           !hasOwnProperty2.call(config, propName) || "key" === propName || "__self" === propName || "__source" === propName || "ref" === propName && void 0 === config.ref || (props[propName] = config[propName]);
       var propName = arguments.length - 2;
       if (1 === propName) props.children = children;
@@ -22202,7 +22202,7 @@ var require_react_production = __commonJS({
           childArray[i] = arguments[i + 2];
         props.children = childArray;
       }
-      return ReactElement(element.type, key, props);
+      return ReactElement(element.type, key2, props);
     };
     exports.createContext = function(defaultValue) {
       defaultValue = {
@@ -22221,9 +22221,9 @@ var require_react_production = __commonJS({
       return defaultValue;
     };
     exports.createElement = function(type, config, children) {
-      var propName, props = {}, key = null;
+      var propName, props = {}, key2 = null;
       if (null != config)
-        for (propName in void 0 !== config.key && (key = "" + config.key), config)
+        for (propName in void 0 !== config.key && (key2 = "" + config.key), config)
           hasOwnProperty2.call(config, propName) && "key" !== propName && "__self" !== propName && "__source" !== propName && (props[propName] = config[propName]);
       var childrenLength = arguments.length - 2;
       if (1 === childrenLength) props.children = children;
@@ -22235,7 +22235,7 @@ var require_react_production = __commonJS({
       if (type && type.defaultProps)
         for (propName in childrenLength = type.defaultProps, childrenLength)
           void 0 === props[propName] && (props[propName] = childrenLength[propName]);
-      return ReactElement(type, key, props);
+      return ReactElement(type, key2, props);
     };
     exports.createRef = function() {
       return { current: null };
@@ -22499,12 +22499,12 @@ var require_react_development = __commonJS({
         componentName = this.props.ref;
         return void 0 !== componentName ? componentName : null;
       }
-      function ReactElement(type, key, props, owner, debugStack, debugTask) {
+      function ReactElement(type, key2, props, owner, debugStack, debugTask) {
         var refProp = props.ref;
         type = {
           $$typeof: REACT_ELEMENT_TYPE,
           type,
-          key,
+          key: key2,
           props,
           _owner: owner
         };
@@ -22558,9 +22558,9 @@ var require_react_development = __commonJS({
       function isValidElement(object) {
         return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
       }
-      function escape(key) {
+      function escape(key2) {
         var escaperLookup = { "=": "=0", ":": "=2" };
-        return "$" + key.replace(/[=:]/g, function(match) {
+        return "$" + key2.replace(/[=:]/g, function(match) {
           return escaperLookup[match];
         });
       }
@@ -23038,7 +23038,7 @@ var require_react_development = __commonJS({
           throw Error(
             "The argument must be a React element, but you passed " + element + "."
           );
-        var props = assign({}, element.props), key = element.key, owner = element._owner;
+        var props = assign({}, element.props), key2 = element.key, owner = element._owner;
         if (null != config) {
           var JSCompiler_inline_result;
           a: {
@@ -23052,7 +23052,7 @@ var require_react_development = __commonJS({
             JSCompiler_inline_result = void 0 !== config.ref;
           }
           JSCompiler_inline_result && (owner = getOwner());
-          hasValidKey(config) && (checkKeyStringCoercion(config.key), key = "" + config.key);
+          hasValidKey(config) && (checkKeyStringCoercion(config.key), key2 = "" + config.key);
           for (propName in config)
             !hasOwnProperty2.call(config, propName) || "key" === propName || "__self" === propName || "__source" === propName || "ref" === propName && void 0 === config.ref || (props[propName] = config[propName]);
         }
@@ -23066,14 +23066,14 @@ var require_react_development = __commonJS({
         }
         props = ReactElement(
           element.type,
-          key,
+          key2,
           props,
           owner,
           element._debugStack,
           element._debugTask
         );
-        for (key = 2; key < arguments.length; key++)
-          validateChildKeys(arguments[key]);
+        for (key2 = 2; key2 < arguments.length; key2++)
+          validateChildKeys(arguments[key2]);
         return props;
       };
       exports.createContext = function(defaultValue) {
@@ -23098,11 +23098,11 @@ var require_react_development = __commonJS({
         for (var i = 2; i < arguments.length; i++)
           validateChildKeys(arguments[i]);
         i = {};
-        var key = null;
+        var key2 = null;
         if (null != config)
           for (propName in didWarnAboutOldJSXRuntime || !("__self" in config) || "key" in config || (didWarnAboutOldJSXRuntime = true, console.warn(
             "Your app (or one of its dependencies) is using an outdated JSX transform. Update to the modern JSX transform for faster performance: https://react.dev/link/new-jsx-transform"
-          )), hasValidKey(config) && (checkKeyStringCoercion(config.key), key = "" + config.key), config)
+          )), hasValidKey(config) && (checkKeyStringCoercion(config.key), key2 = "" + config.key), config)
             hasOwnProperty2.call(config, propName) && "key" !== propName && "__self" !== propName && "__source" !== propName && (i[propName] = config[propName]);
         var childrenLength = arguments.length - 2;
         if (1 === childrenLength) i.children = children;
@@ -23115,14 +23115,14 @@ var require_react_development = __commonJS({
         if (type && type.defaultProps)
           for (propName in childrenLength = type.defaultProps, childrenLength)
             void 0 === i[propName] && (i[propName] = childrenLength[propName]);
-        key && defineKeyPropWarningGetter(
+        key2 && defineKeyPropWarningGetter(
           i,
           "function" === typeof type ? type.displayName || type.name || "Unknown" : type
         );
         var propName = 1e4 > ReactSharedInternals.recentlyCreatedOwnerStacks++;
         return ReactElement(
           type,
-          key,
+          key2,
           i,
           getOwner(),
           propName ? Error("react-stack-top-frame") : unknownOwnerDebugStack,
@@ -23405,9 +23405,9 @@ var require_react_jsx_runtime_production = __commonJS({
     var REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element");
     var REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment");
     function jsxProd(type, config, maybeKey) {
-      var key = null;
-      void 0 !== maybeKey && (key = "" + maybeKey);
-      void 0 !== config.key && (key = "" + config.key);
+      var key2 = null;
+      void 0 !== maybeKey && (key2 = "" + maybeKey);
+      void 0 !== config.key && (key2 = "" + config.key);
       if ("key" in config) {
         maybeKey = {};
         for (var propName in config)
@@ -23417,7 +23417,7 @@ var require_react_jsx_runtime_production = __commonJS({
       return {
         $$typeof: REACT_ELEMENT_TYPE,
         type,
-        key,
+        key: key2,
         ref: void 0 !== config ? config : null,
         props: maybeKey
       };
@@ -23547,12 +23547,12 @@ var require_react_jsx_runtime_development = __commonJS({
         componentName = this.props.ref;
         return void 0 !== componentName ? componentName : null;
       }
-      function ReactElement(type, key, props, owner, debugStack, debugTask) {
+      function ReactElement(type, key2, props, owner, debugStack, debugTask) {
         var refProp = props.ref;
         type = {
           $$typeof: REACT_ELEMENT_TYPE,
           type,
-          key,
+          key: key2,
           props,
           _owner: owner
         };
@@ -24469,13 +24469,13 @@ function shouldUseNativeClipboard(env3 = process.env, terminal = env.terminal) {
 function tmuxPassthrough(payload) {
   return `${ESC}Ptmux;${payload.replaceAll(ESC, ESC + ESC)}${ST}`;
 }
-async function tmuxLoadBuffer(text) {
+async function tmuxLoadBuffer(text2) {
   if (!process.env["TMUX"]) {
     return false;
   }
   const args = process.env["LC_TERMINAL"] === "iTerm2" ? ["load-buffer", "-"] : ["load-buffer", "-w", "-"];
   const { code } = await execFileNoThrow("tmux", args, {
-    input: text,
+    input: text2,
     useCwd: false,
     timeout: 2e3,
     // tmux may daemonize a server while retaining the inherited stdio pipes;
@@ -24484,12 +24484,12 @@ async function tmuxLoadBuffer(text) {
   });
   return code === 0;
 }
-async function setClipboard(text) {
-  const b64 = Buffer2.from(text, "utf8").toString("base64");
+async function setClipboard(text2) {
+  const b64 = Buffer2.from(text2, "utf8").toString("base64");
   const raw = osc(OSC.CLIPBOARD, "c", b64);
   const emitSequence = shouldEmitClipboardSequence(process.env);
-  const nativeAttempted = shouldUseNativeClipboard(process.env, env.terminal) && copyNative(text);
-  const tmuxBufferLoaded = await tmuxLoadBuffer(text);
+  const nativeAttempted = shouldUseNativeClipboard(process.env, env.terminal) && copyNative(text2);
+  const tmuxBufferLoaded = await tmuxLoadBuffer(text2);
   const sequence = emitSequence ? tmuxBufferLoaded ? tmuxPassthrough(`${ESC}]52;c;${b64}${BEL}`) : raw : "";
   const success = nativeAttempted || tmuxBufferLoaded || sequence.length > 0;
   return { sequence, success };
@@ -24517,8 +24517,8 @@ async function probeLinuxCopy() {
   const r3 = await execFileNoThrow("xsel", linuxCopyArgs("xsel"), opts);
   return r3.code === 0 ? "xsel" : null;
 }
-function copyNative(text) {
-  const opts = { input: text, useCwd: false, timeout: 2e3, resolveOnExit: true };
+function copyNative(text2) {
+  const opts = { input: text2, useCwd: false, timeout: 2e3, resolveOnExit: true };
   switch (process.platform) {
     case "darwin":
       void execFileNoThrow("pbcopy", [], opts);
@@ -24595,31 +24595,31 @@ function parseOSC(content) {
   return { type: "unknown", sequence: `\x1B]${content}` };
 }
 function parseOscColor(spec) {
-  const hex2 = spec.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-  if (hex2) {
+  const hex3 = spec.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hex3) {
     return {
       type: "rgb",
-      r: parseInt(hex2[1], 16),
-      g: parseInt(hex2[2], 16),
-      b: parseInt(hex2[3], 16)
+      r: parseInt(hex3[1], 16),
+      g: parseInt(hex3[2], 16),
+      b: parseInt(hex3[3], 16)
     };
   }
-  const rgb2 = spec.match(/^rgb:([0-9a-f]{1,4})\/([0-9a-f]{1,4})\/([0-9a-f]{1,4})$/i);
-  if (rgb2) {
+  const rgb3 = spec.match(/^rgb:([0-9a-f]{1,4})\/([0-9a-f]{1,4})\/([0-9a-f]{1,4})$/i);
+  if (rgb3) {
     const scale = (s) => Math.round(parseInt(s, 16) / (16 ** s.length - 1) * 255);
     return {
       type: "rgb",
-      r: scale(rgb2[1]),
-      g: scale(rgb2[2]),
-      b: scale(rgb2[3])
+      r: scale(rgb3[1]),
+      g: scale(rgb3[2]),
+      b: scale(rgb3[3])
     };
   }
   return null;
 }
 function parseTabStatus(data) {
   const action2 = {};
-  for (const [key, value] of splitTabStatusPairs(data)) {
-    switch (key) {
+  for (const [key2, value] of splitTabStatusPairs(data)) {
+    switch (key2) {
       case "indicator":
         action2.indicator = value === "" ? null : parseOscColor(value);
         break;
@@ -24634,7 +24634,7 @@ function parseTabStatus(data) {
   return action2;
 }
 function* splitTabStatusPairs(data) {
-  let key = "";
+  let key2 = "";
   let val = "";
   let inVal = false;
   let esc = false;
@@ -24643,14 +24643,14 @@ function* splitTabStatusPairs(data) {
       if (inVal) {
         val += c;
       } else {
-        key += c;
+        key2 += c;
       }
       esc = false;
     } else if (c === "\\") {
       esc = true;
     } else if (c === ";") {
-      yield [key, val];
-      key = "";
+      yield [key2, val];
+      key2 = "";
       val = "";
       inVal = false;
     } else if (c === "=" && !inVal) {
@@ -24658,11 +24658,11 @@ function* splitTabStatusPairs(data) {
     } else if (inVal) {
       val += c;
     } else {
-      key += c;
+      key2 += c;
     }
   }
-  if (key || inVal) {
-    yield [key, val];
+  if (key2 || inVal) {
+    yield [key2, val];
   }
 }
 function link(url, params) {
@@ -24685,15 +24685,15 @@ function supportsTabStatus() {
 }
 function tabStatus(fields) {
   const parts = [];
-  const rgb2 = (c) => c.type === "rgb" ? `#${[c.r, c.g, c.b].map((n) => n.toString(16).padStart(2, "0")).join("")}` : "";
+  const rgb3 = (c) => c.type === "rgb" ? `#${[c.r, c.g, c.b].map((n) => n.toString(16).padStart(2, "0")).join("")}` : "";
   if ("indicator" in fields) {
-    parts.push(`indicator=${fields.indicator ? rgb2(fields.indicator) : ""}`);
+    parts.push(`indicator=${fields.indicator ? rgb3(fields.indicator) : ""}`);
   }
   if ("status" in fields) {
     parts.push(`status=${fields.status?.replaceAll("\\", "\\\\").replaceAll(";", "\\;") ?? ""}`);
   }
   if ("statusColor" in fields) {
-    parts.push(`status-color=${fields.statusColor ? rgb2(fields.statusColor) : ""}`);
+    parts.push(`status-color=${fields.statusColor ? rgb3(fields.statusColor) : ""}`);
   }
   return osc(OSC.TAB_STATUS, parts.join(";"));
 }
@@ -25094,9 +25094,9 @@ function tokenize(input, initialState2, initialBuffer, flush, x10Mouse, legacyAl
   let seqStart = 0;
   const flushText = () => {
     if (i > textStart) {
-      const text = data.slice(textStart, i);
-      if (text) {
-        tokens.push({ type: "text", value: text });
+      const text2 = data.slice(textStart, i);
+      if (text2) {
+        tokens.push({ type: "text", value: text2 });
       }
     }
     textStart = i;
@@ -25476,10 +25476,10 @@ var init_parser = __esm({
             return this.processSequence(token.value);
         }
       }
-      processText(text) {
+      processText(text2) {
         const actions = [];
         let current = "";
-        for (const char of text) {
+        for (const char of text2) {
           if (char.charCodeAt(0) === C0.BEL) {
             if (current) {
               const graphemes2 = [...segmentGraphemes(current)];
@@ -25577,8 +25577,8 @@ function parseToSpans(input) {
       continue;
     }
     if (action2.type === "text") {
-      const text = action2.graphemes.map((g) => g.value).join("");
-      if (!text) {
+      const text2 = action2.graphemes.map((g) => g.value).join("");
+      if (!text2) {
         continue;
       }
       const props = textStyleToSpanProps(action2.style);
@@ -25587,10 +25587,10 @@ function parseToSpans(input) {
       }
       const lastSpan = spans[spans.length - 1];
       if (lastSpan && propsEqual(lastSpan.props, props)) {
-        lastSpan.text += text;
+        lastSpan.text += text2;
       } else {
         spans.push({
-          text,
+          text: text2,
           props
         });
       }
@@ -25883,8 +25883,8 @@ function assembleStyles() {
       enumerable: false
     },
     hexToRgb: {
-      value(hex2) {
-        const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex2.toString(16));
+      value(hex3) {
+        const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex3.toString(16));
         if (!matches) {
           return [0, 0, 0];
         }
@@ -25904,7 +25904,7 @@ function assembleStyles() {
       enumerable: false
     },
     hexToAnsi256: {
-      value: (hex2) => styles.rgbToAnsi256(...styles.hexToRgb(hex2)),
+      value: (hex3) => styles.rgbToAnsi256(...styles.hexToRgb(hex3)),
       enumerable: false
     },
     ansi256ToAnsi: {
@@ -25946,7 +25946,7 @@ function assembleStyles() {
       enumerable: false
     },
     hexToAnsi: {
-      value: (hex2) => styles.ansi256ToAnsi(styles.hexToAnsi256(hex2)),
+      value: (hex3) => styles.ansi256ToAnsi(styles.hexToAnsi256(hex3)),
       enumerable: false
     }
   });
@@ -26638,18 +26638,18 @@ function sliceAnsi(str3, start, end) {
     return "";
   }
   if (end !== void 0) {
-    const key = `${start}|${end}|${str3}`;
-    const cached = sliceCache.get(key);
+    const key2 = `${start}|${end}|${str3}`;
+    const cached = sliceCache.get(key2);
     if (cached !== void 0) {
-      sliceCache.delete(key);
-      sliceCache.set(key, cached);
+      sliceCache.delete(key2);
+      sliceCache.set(key2, cached);
       return cached;
     }
     const result = computeSlice(str3, start, end);
     if (sliceCache.size >= SLICE_CACHE_LIMIT) {
       sliceCache.delete(sliceCache.keys().next().value);
     }
-    sliceCache.set(key, result);
+    sliceCache.set(key2, result);
     return result;
   }
   return computeSlice(str3, start, end);
@@ -26972,47 +26972,47 @@ var init_wrapAnsi = __esm({
 });
 
 // packages/qubit-ink/src/ink/wrap-text.ts
-function memoizedWrap(text, maxWidth, wrapType) {
-  const key = `${maxWidth}|${wrapType}|${text}`;
-  const cached = wrapCache.get(key);
+function memoizedWrap(text2, maxWidth, wrapType) {
+  const key2 = `${maxWidth}|${wrapType}|${text2}`;
+  const cached = wrapCache.get(key2);
   if (cached !== void 0) {
-    wrapCache.delete(key);
-    wrapCache.set(key, cached);
+    wrapCache.delete(key2);
+    wrapCache.set(key2, cached);
     return cached;
   }
-  const result = computeWrap(text, maxWidth, wrapType);
+  const result = computeWrap(text2, maxWidth, wrapType);
   if (wrapCache.size >= WRAP_CACHE_LIMIT) {
     wrapCache.delete(wrapCache.keys().next().value);
   }
-  wrapCache.set(key, result);
+  wrapCache.set(key2, result);
   return result;
 }
-function sliceFit(text, start, end) {
-  const s = sliceAnsi(text, start, end);
-  return stringWidth(s) > end - start ? sliceAnsi(text, start, end - 1) : s;
+function sliceFit(text2, start, end) {
+  const s = sliceAnsi(text2, start, end);
+  return stringWidth(s) > end - start ? sliceAnsi(text2, start, end - 1) : s;
 }
-function truncate(text, columns, position) {
+function truncate(text2, columns, position) {
   if (columns < 1) {
     return "";
   }
   if (columns === 1) {
     return ELLIPSIS;
   }
-  const length = stringWidth(text);
+  const length = stringWidth(text2);
   if (length <= columns) {
-    return text;
+    return text2;
   }
   if (position === "start") {
-    return ELLIPSIS + sliceFit(text, length - columns + 1, length);
+    return ELLIPSIS + sliceFit(text2, length - columns + 1, length);
   }
   if (position === "middle") {
     const half = Math.floor(columns / 2);
-    return sliceFit(text, 0, half) + ELLIPSIS + sliceFit(text, length - (columns - half) + 1, length);
+    return sliceFit(text2, 0, half) + ELLIPSIS + sliceFit(text2, length - (columns - half) + 1, length);
   }
-  return sliceFit(text, 0, columns - 1) + ELLIPSIS;
+  return sliceFit(text2, 0, columns - 1) + ELLIPSIS;
 }
-function trimSoftWrapBoundaries(text, maxWidth) {
-  return text.split("\n").map((line) => {
+function trimSoftWrapBoundaries(text2, maxWidth) {
+  return text2.split("\n").map((line) => {
     const pieces = wrapAnsi2(line, maxWidth, { trim: false, hard: true }).split("\n");
     if (pieces.length === 1) {
       return pieces[0];
@@ -27029,27 +27029,27 @@ function trimSoftWrapBoundaries(text, maxWidth) {
     return pieces.join("\n");
   }).join("\n");
 }
-function computeWrap(text, maxWidth, wrapType) {
+function computeWrap(text2, maxWidth, wrapType) {
   if (wrapType === "wrap") {
-    return wrapAnsi2(text, maxWidth, { trim: false, hard: true });
+    return wrapAnsi2(text2, maxWidth, { trim: false, hard: true });
   }
   if (wrapType === "wrap-char") {
-    return wrapAnsi2(text, maxWidth, { trim: false, hard: true, wordWrap: false });
+    return wrapAnsi2(text2, maxWidth, { trim: false, hard: true, wordWrap: false });
   }
   if (wrapType === "wrap-trim") {
-    return trimSoftWrapBoundaries(text, maxWidth);
+    return trimSoftWrapBoundaries(text2, maxWidth);
   }
   if (wrapType.startsWith("truncate")) {
     const position = wrapType === "truncate-middle" ? "middle" : wrapType === "truncate-start" ? "start" : "end";
-    return truncate(text, maxWidth, position);
+    return truncate(text2, maxWidth, position);
   }
-  return text;
+  return text2;
 }
-function wrapText(text, maxWidth, wrapType) {
-  if (!text || maxWidth <= 0) {
-    return computeWrap(text, maxWidth, wrapType);
+function wrapText(text2, maxWidth, wrapType) {
+  if (!text2 || maxWidth <= 0) {
+    return computeWrap(text2, maxWidth, wrapType);
   }
-  return memoizedWrap(text, maxWidth, wrapType);
+  return memoizedWrap(text2, maxWidth, wrapType);
 }
 function wrapCacheSize() {
   return wrapCache.size;
@@ -27144,8 +27144,8 @@ function assembleStyles2() {
       enumerable: false
     },
     hexToRgb: {
-      value(hex2) {
-        const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex2.toString(16));
+      value(hex3) {
+        const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex3.toString(16));
         if (!matches) {
           return [0, 0, 0];
         }
@@ -27165,7 +27165,7 @@ function assembleStyles2() {
       enumerable: false
     },
     hexToAnsi256: {
-      value: (hex2) => styles2.rgbToAnsi256(...styles2.hexToRgb(hex2)),
+      value: (hex3) => styles2.rgbToAnsi256(...styles2.hexToRgb(hex3)),
       enumerable: false
     },
     ansi256ToAnsi: {
@@ -27207,7 +27207,7 @@ function assembleStyles2() {
       enumerable: false
     },
     hexToAnsi: {
-      value: (hex2) => styles2.ansi256ToAnsi(styles2.hexToAnsi256(hex2)),
+      value: (hex3) => styles2.ansi256ToAnsi(styles2.hexToAnsi256(hex3)),
       enumerable: false
     }
   });
@@ -27356,7 +27356,7 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
     return 1;
   }
   if ("CI" in env2) {
-    if (["GITHUB_ACTIONS", "GITEA_ACTIONS", "CIRCLECI"].some((key) => key in env2)) {
+    if (["GITHUB_ACTIONS", "GITEA_ACTIONS", "CIRCLECI"].some((key2) => key2 in env2)) {
       return 3;
     }
     if (["TRAVIS", "APPVEYOR", "GITLAB_CI", "BUILDKITE", "DRONE"].some((sign) => sign in env2) || env2.CI_NAME === "codeship") {
@@ -27652,8 +27652,8 @@ function clampChalkLevelForTmux() {
   }
   return false;
 }
-function applyTextStyles(text, styles5) {
-  let result = text;
+function applyTextStyles(text2, styles5) {
+  let result = text2;
   if (styles5.inverse) {
     result = source_default.inverse(result);
   }
@@ -27680,11 +27680,11 @@ function applyTextStyles(text, styles5) {
   }
   return result;
 }
-function applyColor(text, color) {
+function applyColor(text2, color) {
   if (!color) {
-    return text;
+    return text2;
   }
-  return colorize(text, color, "foreground");
+  return colorize(text2, color, "foreground");
 }
 var CHALK_BOOSTED_FOR_XTERMJS, CHALK_CLAMPED_FOR_TMUX, CHALK_USES_RICH_EIGHT_BIT_DOWNGRADE, RGB_REGEX, ANSI_REGEX, HEX_REGEX, colorize;
 var init_colorize = __esm({
@@ -28681,27 +28681,27 @@ var require_lrucache = __commonJS({
         this.max = 1e3;
         this.map = /* @__PURE__ */ new Map();
       }
-      get(key) {
-        const value = this.map.get(key);
+      get(key2) {
+        const value = this.map.get(key2);
         if (value === void 0) {
           return void 0;
         } else {
-          this.map.delete(key);
-          this.map.set(key, value);
+          this.map.delete(key2);
+          this.map.set(key2, value);
           return value;
         }
       }
-      delete(key) {
-        return this.map.delete(key);
+      delete(key2) {
+        return this.map.delete(key2);
       }
-      set(key, value) {
-        const deleted = this.delete(key);
+      set(key2, value) {
+        const deleted = this.delete(key2);
         if (!deleted && value !== void 0) {
           if (this.map.size >= this.max) {
             const firstKey = this.map.keys().next().value;
             this.delete(firstKey);
           }
-          this.map.set(key, value);
+          this.map.set(key2, value);
         }
         return this;
       }
@@ -29891,13 +29891,13 @@ function reportedColorSlot() {
   const listeners2 = /* @__PURE__ */ new Set();
   return {
     // First writer wins (defend against re-probe).
-    set(hex2) {
+    set(hex3) {
       if (value !== void 0) {
         return;
       }
-      value = hex2;
+      value = hex3;
       for (const listener of listeners2) {
-        listener(hex2);
+        listener(hex3);
       }
       listeners2.clear();
     },
@@ -29933,14 +29933,14 @@ function parseOscColor2(data) {
   if (!hexMatch) {
     return void 0;
   }
-  const hex2 = hexMatch[1];
-  if (hex2.length === 6) {
-    return `#${hex2}`;
+  const hex3 = hexMatch[1];
+  if (hex3.length === 6) {
+    return `#${hex3}`;
   }
-  if (hex2.length === 3) {
-    return `#${hex2[0]}${hex2[0]}${hex2[1]}${hex2[1]}${hex2[2]}${hex2[2]}`;
+  if (hex3.length === 3) {
+    return `#${hex3[0]}${hex3[0]}${hex3[1]}${hex3[1]}${hex3[2]}${hex3[2]}`;
   }
-  return `#${hex2.slice(0, 2)}${hex2.slice(4, 6)}${hex2.slice(8, 10)}`;
+  return `#${hex3.slice(0, 2)}${hex3.slice(4, 6)}${hex3.slice(8, 10)}`;
 }
 function supportsExtendedKeys() {
   return EXTENDED_KEYS_TERMINALS.includes(env.terminal ?? "");
@@ -30009,10 +30009,10 @@ var init_terminal = __esm({
     init_osc();
     background = reportedColorSlot();
     foreground = reportedColorSlot();
-    setTerminalBackgroundHex = (hex2) => background.set(hex2);
+    setTerminalBackgroundHex = (hex3) => background.set(hex3);
     terminalBackgroundHex = () => background.get();
     onTerminalBackground = (listener) => background.on(listener);
-    setTerminalForegroundHex = (hex2) => foreground.set(hex2);
+    setTerminalForegroundHex = (hex3) => foreground.set(hex3);
     terminalForegroundHex = () => foreground.get();
     onTerminalForeground = (listener) => foreground.on(listener);
     EXTENDED_KEYS_TERMINALS = ["iTerm.app", "kitty", "WezTerm", "ghostty", "tmux", "windows-terminal", "vscode"];
@@ -31181,9 +31181,9 @@ function layoutNode(node, availableWidth, availableHeight, widthMode, heightMode
         break;
       case Align.Stretch:
         if (lineCount > 0 && remCross > 0) {
-          const add = remCross / lineCount;
+          const add2 = remCross / lineCount;
           for (let i = 0; i < lineCount; i++) {
-            lineCrossSizes[i] += add;
+            lineCrossSizes[i] += add2;
           }
         }
         break;
@@ -32691,8 +32691,8 @@ var init_engine = __esm({
 });
 
 // packages/qubit-ink/src/ink/measure-text.ts
-function measureText(text, maxWidth) {
-  if (text.length === 0) {
+function measureText(text2, maxWidth) {
+  if (text2.length === 0) {
     return {
       width: 0,
       height: 0
@@ -32702,9 +32702,9 @@ function measureText(text, maxWidth) {
   let height = 0;
   let width = 0;
   let start = 0;
-  while (start <= text.length) {
-    const end = text.indexOf("\n", start);
-    const line = end === -1 ? text.substring(start) : text.substring(start, end);
+  while (start <= text2.length) {
+    const end = text2.indexOf("\n", start);
+    const line = end === -1 ? text2.substring(start) : text2.substring(start, end);
     const w = lineWidth(line);
     width = Math.max(width, w);
     if (noWrap) {
@@ -32780,20 +32780,20 @@ function squashTextNodesToSegments(node, inheritedStyles = {}, inheritedHyperlin
   return out;
 }
 function squashTextNodes(node) {
-  let text = "";
+  let text2 = "";
   for (const childNode of node.childNodes) {
     if (childNode === void 0) {
       continue;
     }
     if (childNode.nodeName === "#text") {
-      text += childNode.nodeValue;
+      text2 += childNode.nodeValue;
     } else if (childNode.nodeName === "ink-text" || childNode.nodeName === "ink-virtual-text") {
-      text += squashTextNodes(childNode);
+      text2 += squashTextNodes(childNode);
     } else if (childNode.nodeName === "ink-link") {
-      text += squashTextNodes(childNode);
+      text2 += squashTextNodes(childNode);
     }
   }
-  return text;
+  return text2;
 }
 var squash_text_nodes_default;
 var init_squash_text_nodes = __esm({
@@ -32804,12 +32804,12 @@ var init_squash_text_nodes = __esm({
 });
 
 // packages/qubit-ink/src/ink/tabstops.ts
-function expandTabs(text, interval = DEFAULT_TAB_INTERVAL) {
-  if (!text.includes("	")) {
-    return text;
+function expandTabs(text2, interval = DEFAULT_TAB_INTERVAL) {
+  if (!text2.includes("	")) {
+    return text2;
   }
   const tokenizer = createTokenizer();
-  const tokens = tokenizer.feed(text);
+  const tokens = tokenizer.feed(text2);
   tokens.push(...tokenizer.flush());
   let result = "";
   let column = 0;
@@ -32876,8 +32876,8 @@ function shallowEqual(a, b) {
   if (aKeys.length !== bKeys.length) {
     return false;
   }
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) {
+  for (const key2 of aKeys) {
+    if (a[key2] !== b[key2]) {
       return false;
     }
   }
@@ -32963,14 +32963,14 @@ var init_dom = __esm({
       }
       markDirty(node);
     };
-    setAttribute = (node, key, value) => {
-      if (key === "children") {
+    setAttribute = (node, key2, value) => {
+      if (key2 === "children") {
         return;
       }
-      if (node.attributes[key] === value) {
+      if (node.attributes[key2] === value) {
         return;
       }
-      node.attributes[key] = value;
+      node.attributes[key2] = value;
       markDirty(node);
     };
     setStyle = (node, style) => {
@@ -32987,15 +32987,15 @@ var init_dom = __esm({
       node.textStyles = textStyles;
       markDirty(node);
     };
-    createTextNode = (text) => {
+    createTextNode = (text2) => {
       const node = {
         nodeName: "#text",
-        nodeValue: text,
+        nodeValue: text2,
         yogaNode: void 0,
         parentNode: void 0,
         style: {}
       };
-      setTextNodeValue(node, text);
+      setTextNodeValue(node, text2);
       return node;
     };
     MEASURE_CACHE_CAP = 16;
@@ -33007,8 +33007,8 @@ var init_dom = __esm({
           cache4 = { gen: 0, entries: /* @__PURE__ */ new Map() };
           elem._textMeasureCache = cache4;
         }
-        const key = `${width}|${widthMode}`;
-        const hit = cache4.entries.get(key);
+        const key2 = `${width}|${widthMode}`;
+        const hit = cache4.entries.get(key2);
         if (hit && hit._gen === cache4.gen) {
           return hit.result;
         }
@@ -33019,27 +33019,27 @@ var init_dom = __esm({
             cache4.entries.delete(firstKey);
           }
         }
-        cache4.entries.set(key, { _gen: cache4.gen, result });
+        cache4.entries.set(key2, { _gen: cache4.gen, result });
         return result;
       }
       return computeTextMeasure(node, width, widthMode);
     };
     computeTextMeasure = function(node, width, widthMode) {
       const rawText = node.nodeName === "#text" ? node.nodeValue : squash_text_nodes_default(node);
-      const text = expandTabs(rawText);
-      const dimensions = measure_text_default(text, width);
+      const text2 = expandTabs(rawText);
+      const dimensions = measure_text_default(text2, width);
       if (dimensions.width <= width) {
         return dimensions;
       }
       if (dimensions.width >= 1 && width > 0 && width < 1) {
         return dimensions;
       }
-      if (text.includes("\n") && widthMode === LayoutMeasureMode.Undefined) {
+      if (text2.includes("\n") && widthMode === LayoutMeasureMode.Undefined) {
         const effectiveWidth = Math.max(width, dimensions.width);
-        return measure_text_default(text, effectiveWidth);
+        return measure_text_default(text2, effectiveWidth);
       }
       const textWrap = node.style?.textWrap ?? "wrap";
-      const wrappedText = wrapText(text, width, textWrap);
+      const wrappedText = wrapText(text2, width, textWrap);
       return measure_text_default(wrappedText, width);
     };
     measureRawAnsiNode = function(node) {
@@ -33076,14 +33076,14 @@ var init_dom = __esm({
         cur.onRender?.();
       }
     };
-    setTextNodeValue = (node, text) => {
-      if (typeof text !== "string") {
-        text = String(text);
+    setTextNodeValue = (node, text2) => {
+      if (typeof text2 !== "string") {
+        text2 = String(text2);
       }
-      if (node.nodeValue === text) {
+      if (node.nodeValue === text2) {
         return;
       }
-      node.nodeValue = text;
+      node.nodeValue = text2;
       markDirty(node);
     };
     clearYogaNodeReferences = (node) => {
@@ -33647,8 +33647,8 @@ var require_react_reconciler_production = __commonJS({
   "../node_modules/react-reconciler/cjs/react-reconciler.production.js"(exports, module) {
     "use strict";
     module.exports = function($$$config) {
-      function createFiber(tag, pendingProps, key, mode) {
-        return new FiberNode(tag, pendingProps, key, mode);
+      function createFiber(tag, pendingProps, key2, mode) {
+        return new FiberNode(tag, pendingProps, key2, mode);
       }
       function noop2() {
       }
@@ -34879,13 +34879,13 @@ var require_react_reconciler_production = __commonJS({
           current.return = returnFiber;
           return current;
         }
-        function updateFragment(returnFiber, current, fragment, lanes, key) {
+        function updateFragment(returnFiber, current, fragment, lanes, key2) {
           if (null === current || 7 !== current.tag)
             return current = createFiberFromFragment(
               fragment,
               returnFiber.mode,
               lanes,
-              key
+              key2
             ), current.return = returnFiber, current;
           current = useFiber(current, fragment);
           current.return = returnFiber;
@@ -34938,20 +34938,20 @@ var require_react_reconciler_production = __commonJS({
           return null;
         }
         function updateSlot(returnFiber, oldFiber, newChild, lanes) {
-          var key = null !== oldFiber ? oldFiber.key : null;
+          var key2 = null !== oldFiber ? oldFiber.key : null;
           if ("string" === typeof newChild && "" !== newChild || "number" === typeof newChild || "bigint" === typeof newChild)
-            return null !== key ? null : updateTextNode(returnFiber, oldFiber, "" + newChild, lanes);
+            return null !== key2 ? null : updateTextNode(returnFiber, oldFiber, "" + newChild, lanes);
           if ("object" === typeof newChild && null !== newChild) {
             switch (newChild.$$typeof) {
               case REACT_ELEMENT_TYPE:
-                return newChild.key === key ? updateElement(returnFiber, oldFiber, newChild, lanes) : null;
+                return newChild.key === key2 ? updateElement(returnFiber, oldFiber, newChild, lanes) : null;
               case REACT_PORTAL_TYPE:
-                return newChild.key === key ? updatePortal(returnFiber, oldFiber, newChild, lanes) : null;
+                return newChild.key === key2 ? updatePortal(returnFiber, oldFiber, newChild, lanes) : null;
               case REACT_LAZY_TYPE:
                 return newChild = resolveLazy(newChild), updateSlot(returnFiber, oldFiber, newChild, lanes);
             }
             if (isArrayImpl(newChild) || getIteratorFn(newChild))
-              return null !== key ? null : updateFragment(returnFiber, oldFiber, newChild, lanes, null);
+              return null !== key2 ? null : updateFragment(returnFiber, oldFiber, newChild, lanes, null);
             if ("function" === typeof newChild.then)
               return updateSlot(
                 returnFiber,
@@ -35112,10 +35112,10 @@ var require_react_reconciler_production = __commonJS({
             switch (newChild.$$typeof) {
               case REACT_ELEMENT_TYPE:
                 a: {
-                  for (var key = newChild.key; null !== currentFirstChild; ) {
-                    if (currentFirstChild.key === key) {
-                      key = newChild.type;
-                      if (key === REACT_FRAGMENT_TYPE) {
+                  for (var key2 = newChild.key; null !== currentFirstChild; ) {
+                    if (currentFirstChild.key === key2) {
+                      key2 = newChild.type;
+                      if (key2 === REACT_FRAGMENT_TYPE) {
                         if (7 === currentFirstChild.tag) {
                           deleteRemainingChildren(
                             returnFiber,
@@ -35129,7 +35129,7 @@ var require_react_reconciler_production = __commonJS({
                           returnFiber = lanes;
                           break a;
                         }
-                      } else if (currentFirstChild.elementType === key || "object" === typeof key && null !== key && key.$$typeof === REACT_LAZY_TYPE && resolveLazy(key) === currentFirstChild.type) {
+                      } else if (currentFirstChild.elementType === key2 || "object" === typeof key2 && null !== key2 && key2.$$typeof === REACT_LAZY_TYPE && resolveLazy(key2) === currentFirstChild.type) {
                         deleteRemainingChildren(
                           returnFiber,
                           currentFirstChild.sibling
@@ -35162,8 +35162,8 @@ var require_react_reconciler_production = __commonJS({
                 return placeSingleChild(returnFiber);
               case REACT_PORTAL_TYPE:
                 a: {
-                  for (key = newChild.key; null !== currentFirstChild; ) {
-                    if (currentFirstChild.key === key)
+                  for (key2 = newChild.key; null !== currentFirstChild; ) {
+                    if (currentFirstChild.key === key2)
                       if (4 === currentFirstChild.tag && currentFirstChild.stateNode.containerInfo === newChild.containerInfo && currentFirstChild.stateNode.implementation === newChild.implementation) {
                         deleteRemainingChildren(
                           returnFiber,
@@ -35204,10 +35204,10 @@ var require_react_reconciler_production = __commonJS({
                 lanes
               );
             if (getIteratorFn(newChild)) {
-              key = getIteratorFn(newChild);
-              if ("function" !== typeof key)
+              key2 = getIteratorFn(newChild);
+              if ("function" !== typeof key2)
                 throw Error(formatProdErrorMessage(150));
-              newChild = key.call(newChild);
+              newChild = key2.call(newChild);
               return reconcileChildrenIterator(
                 returnFiber,
                 currentFirstChild,
@@ -36594,8 +36594,8 @@ var require_react_reconciler_production = __commonJS({
         var ref = workInProgress2.ref;
         if ("ref" in nextProps) {
           var propsWithoutRef = {};
-          for (var key in nextProps)
-            "ref" !== key && (propsWithoutRef[key] = nextProps[key]);
+          for (var key2 in nextProps)
+            "ref" !== key2 && (propsWithoutRef[key2] = nextProps[key2]);
         } else propsWithoutRef = nextProps;
         prepareToReadContext(workInProgress2);
         nextProps = renderWithHooks(
@@ -36606,10 +36606,10 @@ var require_react_reconciler_production = __commonJS({
           ref,
           renderLanes2
         );
-        key = checkDidRenderIdHook();
+        key2 = checkDidRenderIdHook();
         if (null !== current && !didReceiveUpdate)
           return bailoutHooks(current, workInProgress2, renderLanes2), bailoutOnAlreadyFinishedWork(current, workInProgress2, renderLanes2);
-        isHydrating && key && pushMaterializedTreeId(workInProgress2);
+        isHydrating && key2 && pushMaterializedTreeId(workInProgress2);
         workInProgress2.flags |= 1;
         reconcileChildren(current, workInProgress2, nextProps, renderLanes2);
         return workInProgress2.child;
@@ -40795,9 +40795,9 @@ var require_react_reconciler_production = __commonJS({
       function scheduleCallback(priorityLevel, callback) {
         return scheduleCallback$3(priorityLevel, callback);
       }
-      function FiberNode(tag, pendingProps, key, mode) {
+      function FiberNode(tag, pendingProps, key2, mode) {
         this.tag = tag;
-        this.key = key;
+        this.key = key2;
         this.sibling = this.child = this.return = this.stateNode = this.type = this.elementType = null;
         this.index = 0;
         this.refCleanup = this.ref = null;
@@ -40848,7 +40848,7 @@ var require_react_reconciler_production = __commonJS({
         });
         return workInProgress2;
       }
-      function createFiberFromTypeAndProps(type, key, pendingProps, owner, mode, lanes) {
+      function createFiberFromTypeAndProps(type, key2, pendingProps, owner, mode, lanes) {
         var fiberTag = 0;
         owner = type;
         if ("function" === typeof type) shouldConstruct(type) && (fiberTag = 1);
@@ -40861,24 +40861,24 @@ var require_react_reconciler_production = __commonJS({
         else
           a: switch (type) {
             case REACT_ACTIVITY_TYPE:
-              return type = createFiber(31, pendingProps, key, mode), type.elementType = REACT_ACTIVITY_TYPE, type.lanes = lanes, type;
+              return type = createFiber(31, pendingProps, key2, mode), type.elementType = REACT_ACTIVITY_TYPE, type.lanes = lanes, type;
             case REACT_FRAGMENT_TYPE:
               return createFiberFromFragment(
                 pendingProps.children,
                 mode,
                 lanes,
-                key
+                key2
               );
             case REACT_STRICT_MODE_TYPE:
               fiberTag = 8;
               mode |= 24;
               break;
             case REACT_PROFILER_TYPE:
-              return type = createFiber(12, pendingProps, key, mode | 2), type.elementType = REACT_PROFILER_TYPE, type.lanes = lanes, type;
+              return type = createFiber(12, pendingProps, key2, mode | 2), type.elementType = REACT_PROFILER_TYPE, type.lanes = lanes, type;
             case REACT_SUSPENSE_TYPE:
-              return type = createFiber(13, pendingProps, key, mode), type.elementType = REACT_SUSPENSE_TYPE, type.lanes = lanes, type;
+              return type = createFiber(13, pendingProps, key2, mode), type.elementType = REACT_SUSPENSE_TYPE, type.lanes = lanes, type;
             case REACT_SUSPENSE_LIST_TYPE:
-              return type = createFiber(19, pendingProps, key, mode), type.elementType = REACT_SUSPENSE_LIST_TYPE, type.lanes = lanes, type;
+              return type = createFiber(19, pendingProps, key2, mode), type.elementType = REACT_SUSPENSE_LIST_TYPE, type.lanes = lanes, type;
             default:
               if ("object" === typeof type && null !== type)
                 switch (type.$$typeof) {
@@ -40909,14 +40909,14 @@ var require_react_reconciler_production = __commonJS({
               );
               owner = null;
           }
-        key = createFiber(fiberTag, pendingProps, key, mode);
-        key.elementType = type;
-        key.type = owner;
-        key.lanes = lanes;
-        return key;
+        key2 = createFiber(fiberTag, pendingProps, key2, mode);
+        key2.elementType = type;
+        key2.type = owner;
+        key2.lanes = lanes;
+        return key2;
       }
-      function createFiberFromFragment(elements, mode, lanes, key) {
-        elements = createFiber(7, elements, key, mode);
+      function createFiberFromFragment(elements, mode, lanes, key2) {
+        elements = createFiber(7, elements, key2, mode);
         elements.lanes = lanes;
         return elements;
       }
@@ -41583,10 +41583,10 @@ var require_react_reconciler_production = __commonJS({
         return initialChildren;
       };
       exports2.createPortal = function(children, containerInfo, implementation) {
-        var key = 3 < arguments.length && void 0 !== arguments[3] ? arguments[3] : null;
+        var key2 = 3 < arguments.length && void 0 !== arguments[3] ? arguments[3] : null;
         return {
           $$typeof: REACT_PORTAL_TYPE,
-          key: null == key ? null : "" + key,
+          key: null == key2 ? null : "" + key2,
           children,
           containerInfo,
           implementation
@@ -41598,8 +41598,8 @@ var require_react_reconciler_production = __commonJS({
       exports2.createTestNameSelector = function(id) {
         return { $$typeof: TEST_NAME_TYPE, value: id };
       };
-      exports2.createTextSelector = function(text) {
-        return { $$typeof: TEXT_TYPE, value: text };
+      exports2.createTextSelector = function(text2) {
+        return { $$typeof: TEXT_TYPE, value: text2 };
       };
       exports2.defaultOnCaughtError = function(error) {
         console.error(error);
@@ -41833,8 +41833,8 @@ var require_react_reconciler_development = __commonJS({
       }
       function copyWithSetImpl(obj, path, index, value) {
         if (index >= path.length) return value;
-        var key = path[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
-        updated[key] = copyWithSetImpl(obj[key], path, index + 1, value);
+        var key2 = path[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
+        updated[key2] = copyWithSetImpl(obj[key2], path, index + 1, value);
         return updated;
       }
       function copyWithRename(obj, oldPath, newPath) {
@@ -41862,10 +41862,10 @@ var require_react_reconciler_development = __commonJS({
         return updated;
       }
       function copyWithDeleteImpl(obj, path, index) {
-        var key = path[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
+        var key2 = path[index], updated = isArrayImpl(obj) ? obj.slice() : assign({}, obj);
         if (index + 1 === path.length)
-          return isArrayImpl(updated) ? updated.splice(key, 1) : delete updated[key], updated;
-        updated[key] = copyWithDeleteImpl(obj[key], path, index + 1);
+          return isArrayImpl(updated) ? updated.splice(key2, 1) : delete updated[key2], updated;
+        updated[key2] = copyWithDeleteImpl(obj[key2], path, index + 1);
         return updated;
       }
       function shouldSuspendImpl() {
@@ -41874,8 +41874,8 @@ var require_react_reconciler_development = __commonJS({
       function shouldErrorImpl() {
         return null;
       }
-      function createFiber(tag, pendingProps, key, mode) {
-        return new FiberNode(tag, pendingProps, key, mode);
+      function createFiber(tag, pendingProps, key2, mode) {
+        return new FiberNode(tag, pendingProps, key2, mode);
       }
       function scheduleRoot(root2, element) {
         root2.context === emptyContextObject && (updateContainerSync(element, root2, null, null), flushSyncWork());
@@ -42445,8 +42445,8 @@ var require_react_reconciler_development = __commonJS({
         return kind;
       }
       function addObjectToProperties(object, properties, indent, prefix2) {
-        for (var key in object)
-          hasOwnProperty2.call(object, key) && "_" !== key[0] && addValueToProperties(key, object[key], properties, indent, prefix2);
+        for (var key2 in object)
+          hasOwnProperty2.call(object, key2) && "_" !== key2[0] && addValueToProperties(key2, object[key2], properties, indent, prefix2);
       }
       function addValueToProperties(propertyName, value, properties, indent, prefix2) {
         switch (typeof value) {
@@ -42456,14 +42456,14 @@ var require_react_reconciler_development = __commonJS({
               break;
             } else {
               if (value.$$typeof === REACT_ELEMENT_TYPE) {
-                var typeName = getComponentNameFromType(value.type) || "\u2026", key = value.key;
+                var typeName = getComponentNameFromType(value.type) || "\u2026", key2 = value.key;
                 value = value.props;
                 var propsKeys = Object.keys(value), propsLength = propsKeys.length;
-                if (null == key && 0 === propsLength) {
+                if (null == key2 && 0 === propsLength) {
                   value = "<" + typeName + " />";
                   break;
                 }
-                if (3 > indent || 1 === propsLength && "children" === propsKeys[0] && null == key) {
+                if (3 > indent || 1 === propsLength && "children" === propsKeys[0] && null == key2) {
                   value = "<" + typeName + " \u2026 />";
                   break;
                 }
@@ -42471,9 +42471,9 @@ var require_react_reconciler_development = __commonJS({
                   prefix2 + "\xA0\xA0".repeat(indent) + propertyName,
                   "<" + typeName
                 ]);
-                null !== key && addValueToProperties(
+                null !== key2 && addValueToProperties(
                   "key",
-                  key,
+                  key2,
                   properties,
                   indent + 1,
                   prefix2
@@ -42575,16 +42575,16 @@ var require_react_reconciler_development = __commonJS({
       }
       function addObjectDiffToProperties(prev, next, properties, indent) {
         var isDeeplyEqual = true;
-        for (key in prev)
-          key in next || (properties.push([
-            "\u2013\xA0" + "\xA0\xA0".repeat(indent) + key,
+        for (key2 in prev)
+          key2 in next || (properties.push([
+            "\u2013\xA0" + "\xA0\xA0".repeat(indent) + key2,
             "\u2026"
           ]), isDeeplyEqual = false);
         for (var _key in next)
           if (_key in prev) {
-            var key = prev[_key];
+            var key2 = prev[_key];
             var nextValue = next[_key];
-            if (key !== nextValue) {
+            if (key2 !== nextValue) {
               if (0 === indent && "children" === _key)
                 isDeeplyEqual = "\xA0\xA0".repeat(indent) + _key, properties.push(
                   ["\u2013\xA0" + isDeeplyEqual, "\u2026"],
@@ -42592,21 +42592,21 @@ var require_react_reconciler_development = __commonJS({
                 );
               else {
                 if (!(3 <= indent)) {
-                  if ("object" === typeof key && "object" === typeof nextValue && null !== key && null !== nextValue && key.$$typeof === nextValue.$$typeof)
+                  if ("object" === typeof key2 && "object" === typeof nextValue && null !== key2 && null !== nextValue && key2.$$typeof === nextValue.$$typeof)
                     if (nextValue.$$typeof === REACT_ELEMENT_TYPE) {
-                      if (key.type === nextValue.type && key.key === nextValue.key) {
-                        key = getComponentNameFromType(nextValue.type) || "\u2026";
+                      if (key2.type === nextValue.type && key2.key === nextValue.key) {
+                        key2 = getComponentNameFromType(nextValue.type) || "\u2026";
                         isDeeplyEqual = "\xA0\xA0".repeat(indent) + _key;
-                        key = "<" + key + " \u2026 />";
+                        key2 = "<" + key2 + " \u2026 />";
                         properties.push(
-                          ["\u2013\xA0" + isDeeplyEqual, key],
-                          ["+\xA0" + isDeeplyEqual, key]
+                          ["\u2013\xA0" + isDeeplyEqual, key2],
+                          ["+\xA0" + isDeeplyEqual, key2]
                         );
                         isDeeplyEqual = false;
                         continue;
                       }
                     } else {
-                      var prevKind = Object.prototype.toString.call(key), nextKind = Object.prototype.toString.call(nextValue);
+                      var prevKind = Object.prototype.toString.call(key2), nextKind = Object.prototype.toString.call(nextValue);
                       if (prevKind === nextKind && ("[object Object]" === nextKind || "[object Array]" === nextKind)) {
                         prevKind = [
                           "\u2007\xA0" + "\xA0\xA0".repeat(indent) + _key,
@@ -42615,7 +42615,7 @@ var require_react_reconciler_development = __commonJS({
                         properties.push(prevKind);
                         nextKind = properties.length;
                         addObjectDiffToProperties(
-                          key,
+                          key2,
                           nextValue,
                           properties,
                           indent + 1
@@ -42623,18 +42623,18 @@ var require_react_reconciler_development = __commonJS({
                         continue;
                       }
                     }
-                  else if ("function" === typeof key && "function" === typeof nextValue && key.name === nextValue.name && key.length === nextValue.length && (prevKind = Function.prototype.toString.call(key), nextKind = Function.prototype.toString.call(nextValue), prevKind === nextKind)) {
-                    key = "" === nextValue.name ? "() => {}" : nextValue.name + "() {}";
+                  else if ("function" === typeof key2 && "function" === typeof nextValue && key2.name === nextValue.name && key2.length === nextValue.length && (prevKind = Function.prototype.toString.call(key2), nextKind = Function.prototype.toString.call(nextValue), prevKind === nextKind)) {
+                    key2 = "" === nextValue.name ? "() => {}" : nextValue.name + "() {}";
                     properties.push([
                       "\u2007\xA0" + "\xA0\xA0".repeat(indent) + _key,
-                      key + " Referentially unequal function closure. Consider memoization."
+                      key2 + " Referentially unequal function closure. Consider memoization."
                     ]);
                     continue;
                   }
                 }
                 addValueToProperties(
                   _key,
-                  key,
+                  key2,
                   properties,
                   indent,
                   "\u2013\xA0"
@@ -44454,8 +44454,8 @@ var require_react_reconciler_development = __commonJS({
       }
       function validateFragmentProps(element, fiber, returnFiber) {
         for (var keys = Object.keys(element.props), i = 0; i < keys.length; i++) {
-          var key = keys[i];
-          if ("children" !== key && "key" !== key) {
+          var key2 = keys[i];
+          if ("children" !== key2 && "key" !== key2) {
             null === fiber && (fiber = createFiberFromElement(element, returnFiber.mode, 0), fiber._debugInfo = currentDebugInfo, fiber.return = returnFiber);
             runWithFiberInDEV(
               fiber,
@@ -44465,7 +44465,7 @@ var require_react_reconciler_development = __commonJS({
                   erroredKey
                 );
               },
-              key
+              key2
             );
             break;
           }
@@ -44613,13 +44613,13 @@ var require_react_reconciler_development = __commonJS({
           current2._debugInfo = currentDebugInfo;
           return current2;
         }
-        function updateFragment(returnFiber, current2, fragment, lanes, key) {
+        function updateFragment(returnFiber, current2, fragment, lanes, key2) {
           if (null === current2 || 7 !== current2.tag)
             return current2 = createFiberFromFragment(
               fragment,
               returnFiber.mode,
               lanes,
-              key
+              key2
             ), current2.return = returnFiber, current2._debugOwner = returnFiber, current2._debugTask = returnFiber._debugTask, current2._debugInfo = currentDebugInfo, current2;
           current2 = useFiber(current2, fragment);
           current2.return = returnFiber;
@@ -44680,31 +44680,31 @@ var require_react_reconciler_development = __commonJS({
           return null;
         }
         function updateSlot(returnFiber, oldFiber, newChild, lanes) {
-          var key = null !== oldFiber ? oldFiber.key : null;
+          var key2 = null !== oldFiber ? oldFiber.key : null;
           if ("string" === typeof newChild && "" !== newChild || "number" === typeof newChild || "bigint" === typeof newChild)
-            return null !== key ? null : updateTextNode(returnFiber, oldFiber, "" + newChild, lanes);
+            return null !== key2 ? null : updateTextNode(returnFiber, oldFiber, "" + newChild, lanes);
           if ("object" === typeof newChild && null !== newChild) {
             switch (newChild.$$typeof) {
               case REACT_ELEMENT_TYPE:
-                return newChild.key === key ? (key = pushDebugInfo(newChild._debugInfo), returnFiber = updateElement(
+                return newChild.key === key2 ? (key2 = pushDebugInfo(newChild._debugInfo), returnFiber = updateElement(
                   returnFiber,
                   oldFiber,
                   newChild,
                   lanes
-                ), currentDebugInfo = key, returnFiber) : null;
+                ), currentDebugInfo = key2, returnFiber) : null;
               case REACT_PORTAL_TYPE:
-                return newChild.key === key ? updatePortal(returnFiber, oldFiber, newChild, lanes) : null;
+                return newChild.key === key2 ? updatePortal(returnFiber, oldFiber, newChild, lanes) : null;
               case REACT_LAZY_TYPE:
-                return key = pushDebugInfo(newChild._debugInfo), newChild = resolveLazy(newChild), returnFiber = updateSlot(
+                return key2 = pushDebugInfo(newChild._debugInfo), newChild = resolveLazy(newChild), returnFiber = updateSlot(
                   returnFiber,
                   oldFiber,
                   newChild,
                   lanes
-                ), currentDebugInfo = key, returnFiber;
+                ), currentDebugInfo = key2, returnFiber;
             }
             if (isArrayImpl(newChild) || getIteratorFn(newChild)) {
-              if (null !== key) return null;
-              key = pushDebugInfo(newChild._debugInfo);
+              if (null !== key2) return null;
+              key2 = pushDebugInfo(newChild._debugInfo);
               returnFiber = updateFragment(
                 returnFiber,
                 oldFiber,
@@ -44712,16 +44712,16 @@ var require_react_reconciler_development = __commonJS({
                 lanes,
                 null
               );
-              currentDebugInfo = key;
+              currentDebugInfo = key2;
               return returnFiber;
             }
             if ("function" === typeof newChild.then)
-              return key = pushDebugInfo(newChild._debugInfo), returnFiber = updateSlot(
+              return key2 = pushDebugInfo(newChild._debugInfo), returnFiber = updateSlot(
                 returnFiber,
                 oldFiber,
                 unwrapThenable(newChild),
                 lanes
-              ), currentDebugInfo = key, returnFiber;
+              ), currentDebugInfo = key2, returnFiber;
             if (newChild.$$typeof === REACT_CONTEXT_TYPE)
               return updateSlot(
                 returnFiber,
@@ -44802,21 +44802,21 @@ var require_react_reconciler_development = __commonJS({
             case REACT_ELEMENT_TYPE:
             case REACT_PORTAL_TYPE:
               warnForMissingKey(returnFiber, workInProgress2, child);
-              var key = child.key;
-              if ("string" !== typeof key) break;
+              var key2 = child.key;
+              if ("string" !== typeof key2) break;
               if (null === knownKeys) {
                 knownKeys = /* @__PURE__ */ new Set();
-                knownKeys.add(key);
+                knownKeys.add(key2);
                 break;
               }
-              if (!knownKeys.has(key)) {
-                knownKeys.add(key);
+              if (!knownKeys.has(key2)) {
+                knownKeys.add(key2);
                 break;
               }
               runWithFiberInDEV(workInProgress2, function() {
                 console.error(
                   "Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted \u2014 the behavior is unsupported and could change in a future version.",
-                  key
+                  key2
                 );
               });
               break;
@@ -44963,10 +44963,10 @@ var require_react_reconciler_development = __commonJS({
               case REACT_ELEMENT_TYPE:
                 var prevDebugInfo = pushDebugInfo(newChild._debugInfo);
                 a: {
-                  for (var key = newChild.key; null !== currentFirstChild; ) {
-                    if (currentFirstChild.key === key) {
-                      key = newChild.type;
-                      if (key === REACT_FRAGMENT_TYPE) {
+                  for (var key2 = newChild.key; null !== currentFirstChild; ) {
+                    if (currentFirstChild.key === key2) {
+                      key2 = newChild.type;
+                      if (key2 === REACT_FRAGMENT_TYPE) {
                         if (7 === currentFirstChild.tag) {
                           deleteRemainingChildren(
                             returnFiber,
@@ -44983,10 +44983,10 @@ var require_react_reconciler_development = __commonJS({
                           returnFiber = lanes;
                           break a;
                         }
-                      } else if (currentFirstChild.elementType === key || isCompatibleFamilyForHotReloading(
+                      } else if (currentFirstChild.elementType === key2 || isCompatibleFamilyForHotReloading(
                         currentFirstChild,
                         newChild
-                      ) || "object" === typeof key && null !== key && key.$$typeof === REACT_LAZY_TYPE && resolveLazy(key) === currentFirstChild.type) {
+                      ) || "object" === typeof key2 && null !== key2 && key2.$$typeof === REACT_LAZY_TYPE && resolveLazy(key2) === currentFirstChild.type) {
                         deleteRemainingChildren(
                           returnFiber,
                           currentFirstChild.sibling
@@ -45068,19 +45068,19 @@ var require_react_reconciler_development = __commonJS({
               ), currentDebugInfo = prevDebugInfo, returnFiber;
             if (getIteratorFn(newChild)) {
               prevDebugInfo = pushDebugInfo(newChild._debugInfo);
-              key = getIteratorFn(newChild);
-              if ("function" !== typeof key)
+              key2 = getIteratorFn(newChild);
+              if ("function" !== typeof key2)
                 throw Error(
                   "An object is not an iterable. This error is likely caused by a bug in React. Please file an issue."
                 );
-              var newChildren = key.call(newChild);
+              var newChildren = key2.call(newChild);
               if (newChildren === newChild) {
                 if (0 !== returnFiber.tag || "[object GeneratorFunction]" !== Object.prototype.toString.call(returnFiber.type) || "[object Generator]" !== Object.prototype.toString.call(newChildren))
                   didWarnAboutGenerators || console.error(
                     "Using Iterators as children is unsupported and will likely yield unexpected results because enumerating a generator mutates it. You may convert it to an array with `Array.from()` or the `[...spread]` operator before rendering. You can also use an Iterable that can iterate multiple times over the same items."
                   ), didWarnAboutGenerators = true;
               } else
-                newChild.entries !== key || didWarnAboutMaps || (console.error(
+                newChild.entries !== key2 || didWarnAboutMaps || (console.error(
                   "Using Maps as children is not supported. Use an array of keyed ReactElements instead."
                 ), didWarnAboutMaps = true);
               returnFiber = reconcileChildrenIterator(
@@ -46785,8 +46785,8 @@ var require_react_reconciler_development = __commonJS({
       }
       function warnOnInvalidCallback(callback) {
         if (null !== callback && "function" !== typeof callback) {
-          var key = String(callback);
-          didWarnOnInvalidCallback.has(key) || (didWarnOnInvalidCallback.add(key), console.error(
+          var key2 = String(callback);
+          didWarnOnInvalidCallback.has(key2) || (didWarnOnInvalidCallback.add(key2), console.error(
             "Expected the last optional `callback` argument to be a function. Instead received: %s.",
             callback
           ));
@@ -47048,8 +47048,8 @@ var require_react_reconciler_development = __commonJS({
         var ref = workInProgress2.ref;
         if ("ref" in nextProps) {
           var propsWithoutRef = {};
-          for (var key in nextProps)
-            "ref" !== key && (propsWithoutRef[key] = nextProps[key]);
+          for (var key2 in nextProps)
+            "ref" !== key2 && (propsWithoutRef[key2] = nextProps[key2]);
         } else propsWithoutRef = nextProps;
         prepareToReadContext(workInProgress2);
         nextProps = renderWithHooks(
@@ -47060,10 +47060,10 @@ var require_react_reconciler_development = __commonJS({
           ref,
           renderLanes2
         );
-        key = checkDidRenderIdHook();
+        key2 = checkDidRenderIdHook();
         if (null !== current2 && !didReceiveUpdate)
           return bailoutHooks(current2, workInProgress2, renderLanes2), bailoutOnAlreadyFinishedWork(current2, workInProgress2, renderLanes2);
-        isHydrating && key && pushMaterializedTreeId(workInProgress2);
+        isHydrating && key2 && pushMaterializedTreeId(workInProgress2);
         workInProgress2.flags |= 1;
         reconcileChildren(current2, workInProgress2, nextProps, renderLanes2);
         return workInProgress2.child;
@@ -53328,9 +53328,9 @@ var require_react_reconciler_development = __commonJS({
           fiber = sibling;
         } while (1);
       }
-      function FiberNode(tag, pendingProps, key, mode) {
+      function FiberNode(tag, pendingProps, key2, mode) {
         this.tag = tag;
-        this.key = key;
+        this.key = key2;
         this.sibling = this.child = this.return = this.stateNode = this.type = this.elementType = null;
         this.index = 0;
         this.refCleanup = this.ref = null;
@@ -53405,7 +53405,7 @@ var require_react_reconciler_development = __commonJS({
         }, workInProgress2.selfBaseDuration = current2.selfBaseDuration, workInProgress2.treeBaseDuration = current2.treeBaseDuration);
         return workInProgress2;
       }
-      function createFiberFromTypeAndProps(type, key, pendingProps, owner, mode, lanes) {
+      function createFiberFromTypeAndProps(type, key2, pendingProps, owner, mode, lanes) {
         var fiberTag = 0, resolvedType = type;
         if ("function" === typeof type)
           shouldConstruct(type) && (fiberTag = 1), resolvedType = resolveFunctionForHotReloading(resolvedType);
@@ -53414,13 +53414,13 @@ var require_react_reconciler_development = __commonJS({
         else
           a: switch (type) {
             case REACT_ACTIVITY_TYPE:
-              return key = createFiber(31, pendingProps, key, mode), key.elementType = REACT_ACTIVITY_TYPE, key.lanes = lanes, key;
+              return key2 = createFiber(31, pendingProps, key2, mode), key2.elementType = REACT_ACTIVITY_TYPE, key2.lanes = lanes, key2;
             case REACT_FRAGMENT_TYPE:
               return createFiberFromFragment(
                 pendingProps.children,
                 mode,
                 lanes,
-                key
+                key2
               );
             case REACT_STRICT_MODE_TYPE:
               fiberTag = 8;
@@ -53430,11 +53430,11 @@ var require_react_reconciler_development = __commonJS({
               return type = pendingProps, owner = mode, "string" !== typeof type.id && console.error(
                 'Profiler must specify an "id" of type `string` as a prop. Received the type `%s` instead.',
                 typeof type.id
-              ), key = createFiber(12, type, key, owner | 2), key.elementType = REACT_PROFILER_TYPE, key.lanes = lanes, key.stateNode = { effectDuration: 0, passiveEffectDuration: 0 }, key;
+              ), key2 = createFiber(12, type, key2, owner | 2), key2.elementType = REACT_PROFILER_TYPE, key2.lanes = lanes, key2.stateNode = { effectDuration: 0, passiveEffectDuration: 0 }, key2;
             case REACT_SUSPENSE_TYPE:
-              return key = createFiber(13, pendingProps, key, mode), key.elementType = REACT_SUSPENSE_TYPE, key.lanes = lanes, key;
+              return key2 = createFiber(13, pendingProps, key2, mode), key2.elementType = REACT_SUSPENSE_TYPE, key2.lanes = lanes, key2;
             case REACT_SUSPENSE_LIST_TYPE:
-              return key = createFiber(19, pendingProps, key, mode), key.elementType = REACT_SUSPENSE_LIST_TYPE, key.lanes = lanes, key;
+              return key2 = createFiber(19, pendingProps, key2, mode), key2.elementType = REACT_SUSPENSE_LIST_TYPE, key2.lanes = lanes, key2;
             default:
               if ("object" === typeof type && null !== type)
                 switch (type.$$typeof) {
@@ -53468,12 +53468,12 @@ var require_react_reconciler_development = __commonJS({
               );
               resolvedType = null;
           }
-        key = createFiber(fiberTag, pendingProps, key, mode);
-        key.elementType = type;
-        key.type = resolvedType;
-        key.lanes = lanes;
-        key._debugOwner = owner;
-        return key;
+        key2 = createFiber(fiberTag, pendingProps, key2, mode);
+        key2.elementType = type;
+        key2.type = resolvedType;
+        key2.lanes = lanes;
+        key2._debugOwner = owner;
+        return key2;
       }
       function createFiberFromElement(element, mode, lanes) {
         mode = createFiberFromTypeAndProps(
@@ -53489,8 +53489,8 @@ var require_react_reconciler_development = __commonJS({
         mode._debugTask = element._debugTask;
         return mode;
       }
-      function createFiberFromFragment(elements, mode, lanes, key) {
-        elements = createFiber(7, elements, key, mode);
+      function createFiberFromFragment(elements, mode, lanes, key2) {
+        elements = createFiber(7, elements, key2, mode);
         elements.lanes = lanes;
         return elements;
       }
@@ -55284,20 +55284,20 @@ var require_react_reconciler_development = __commonJS({
         return initialChildren;
       };
       exports2.createPortal = function(children, containerInfo, implementation) {
-        var key = 3 < arguments.length && void 0 !== arguments[3] ? arguments[3] : null;
+        var key2 = 3 < arguments.length && void 0 !== arguments[3] ? arguments[3] : null;
         try {
-          testStringCoercion(key);
+          testStringCoercion(key2);
           var JSCompiler_inline_result = false;
         } catch (e$6) {
           JSCompiler_inline_result = true;
         }
         JSCompiler_inline_result && (console.error(
           "The provided key is an unsupported type %s. This value must be coerced to a string before using it here.",
-          "function" === typeof Symbol && Symbol.toStringTag && key[Symbol.toStringTag] || key.constructor.name || "Object"
-        ), testStringCoercion(key));
+          "function" === typeof Symbol && Symbol.toStringTag && key2[Symbol.toStringTag] || key2.constructor.name || "Object"
+        ), testStringCoercion(key2));
         return {
           $$typeof: REACT_PORTAL_TYPE,
-          key: null == key ? null : "" + key,
+          key: null == key2 ? null : "" + key2,
           children,
           containerInfo,
           implementation
@@ -55309,8 +55309,8 @@ var require_react_reconciler_development = __commonJS({
       exports2.createTestNameSelector = function(id) {
         return { $$typeof: TEST_NAME_TYPE, value: id };
       };
-      exports2.createTextSelector = function(text) {
-        return { $$typeof: TEXT_TYPE, value: text };
+      exports2.createTextSelector = function(text2) {
+        return { $$typeof: TEXT_TYPE, value: text2 };
       };
       exports2.defaultOnCaughtError = function(error) {
         var componentNameMessage = componentName ? "The above error occurred in the <" + componentName + "> component." : "The above error occurred in one of your React components.", recreateMessage = "React will try to recreate this component tree from scratch using the error boundary you provided, " + ((errorBoundaryName || "Anonymous") + ".");
@@ -56388,32 +56388,32 @@ var init_devtools = __esm({
 });
 
 // packages/qubit-ink/src/ink/reconciler.ts
-function setEventHandler(node, key, value) {
+function setEventHandler(node, key2, value) {
   if (!node._eventHandlers) {
     node._eventHandlers = {};
   }
-  node._eventHandlers[key] = value;
+  node._eventHandlers[key2] = value;
 }
-function applyProp(node, key, value) {
-  if (key === "children") {
+function applyProp(node, key2, value) {
+  if (key2 === "children") {
     return;
   }
-  if (key === "style") {
+  if (key2 === "style") {
     setStyle(node, value);
     if (node.yogaNode) {
       styles_default(node.yogaNode, value);
     }
     return;
   }
-  if (key === "textStyles") {
+  if (key2 === "textStyles") {
     node.textStyles = value;
     return;
   }
-  if (EVENT_HANDLER_PROPS.has(key)) {
-    setEventHandler(node, key, value);
+  if (EVENT_HANDLER_PROPS.has(key2)) {
+    setEventHandler(node, key2, value);
     return;
   }
-  setAttribute(node, key, value);
+  setAttribute(node, key2, value);
 }
 function recordYogaMs(ms) {
   _lastYogaMs = ms;
@@ -56472,17 +56472,17 @@ $ npm install --save-dev react-devtools-core
       }
       const changed = {};
       let isChanged = false;
-      for (const key of Object.keys(before)) {
-        const isDeleted = after ? !Object.hasOwn(after, key) : true;
+      for (const key2 of Object.keys(before)) {
+        const isDeleted = after ? !Object.hasOwn(after, key2) : true;
         if (isDeleted) {
-          changed[key] = void 0;
+          changed[key2] = void 0;
           isChanged = true;
         }
       }
       if (after) {
-        for (const key of Object.keys(after)) {
-          if (after[key] !== before[key]) {
-            changed[key] = after[key];
+        for (const key2 of Object.keys(after)) {
+          if (after[key2] !== before[key2]) {
+            changed[key2] = after[key2];
             isChanged = true;
           }
         }
@@ -56539,24 +56539,24 @@ $ npm install --save-dev react-devtools-core
         }
         const type = originalType === "ink-text" && hostContext.isInsideText ? "ink-virtual-text" : originalType;
         const node = createNode(type);
-        for (const [key, value] of Object.entries(newProps)) {
-          applyProp(node, key, value);
+        for (const [key2, value] of Object.entries(newProps)) {
+          applyProp(node, key2, value);
         }
         return node;
       },
-      createTextInstance(text, _root, hostContext) {
+      createTextInstance(text2, _root, hostContext) {
         if (!hostContext.isInsideText) {
-          throw new Error(`Text string "${text}" must be rendered inside <Text> component`);
+          throw new Error(`Text string "${text2}" must be rendered inside <Text> component`);
         }
-        return createTextNode(text);
+        return createTextNode(text2);
       },
       resetTextContent() {
       },
       hideTextInstance(node) {
         setTextNodeValue(node, "");
       },
-      unhideTextInstance(node, text) {
-        setTextNodeValue(node, text);
+      unhideTextInstance(node, text2) {
+        setTextNodeValue(node, text2);
       },
       getPublicInstance: (instance) => instance,
       hideInstance(node) {
@@ -56608,20 +56608,20 @@ $ npm install --save-dev react-devtools-core
         const props = diff(oldProps, newProps);
         const style = diff(oldProps["style"], newProps["style"]);
         if (props) {
-          for (const [key, value] of Object.entries(props)) {
-            if (key === "style") {
+          for (const [key2, value] of Object.entries(props)) {
+            if (key2 === "style") {
               setStyle(node, value);
               continue;
             }
-            if (key === "textStyles") {
+            if (key2 === "textStyles") {
               setTextStyles(node, value);
               continue;
             }
-            if (EVENT_HANDLER_PROPS.has(key)) {
-              setEventHandler(node, key, value);
+            if (EVENT_HANDLER_PROPS.has(key2)) {
+              setEventHandler(node, key2, value);
               continue;
             }
-            setAttribute(node, key, value);
+            setAttribute(node, key2, value);
           }
         }
         if (style && node.yogaNode) {
@@ -57280,9 +57280,9 @@ var init_use_input = __esm({
         if (options.isActive === false) {
           return;
         }
-        const { input, key } = event;
-        if (!(input === "c" && key.ctrl) || !exitOnCtrlC) {
-          inputHandler(input, key, event);
+        const { input, key: key2 } = event;
+        if (!(input === "c" && key2.ctrl) || !exitOnCtrlC) {
+          inputHandler(input, key2, event);
         }
       });
       (0, import_react18.useEffect)(() => {
@@ -58093,13 +58093,13 @@ var init_screen = __esm({
        * with a single bitmask check on the packed word.
        */
       intern(styles5) {
-        const key = styles5.length === 0 ? "" : styles5.map((s) => s.code).join("\0");
-        let id = this.ids.get(key);
+        const key2 = styles5.length === 0 ? "" : styles5.map((s) => s.code).join("\0");
+        let id = this.ids.get(key2);
         if (id === void 0) {
           const rawId = this.styles.length;
           this.styles.push(styles5.length === 0 ? [] : styles5);
           id = rawId << 1 | (styles5.length > 0 && hasVisibleSpaceEffect(styles5) ? 1 : 0);
-          this.ids.set(key, id);
+          this.ids.set(key2, id);
         }
         return id;
       }
@@ -58118,14 +58118,14 @@ var init_screen = __esm({
         if (fromId === toId) {
           return "";
         }
-        const key = fromId * 1048576 + toId;
-        let str3 = this.transitionCache.get(key);
+        const key2 = fromId * 1048576 + toId;
+        let str3 = this.transitionCache.get(key2);
         if (str3 === void 0) {
           if (this.transitionCache.size >= MAX_TRANSITION_CACHE) {
             this.transitionCache.clear();
           }
           str3 = ansiCodesToString(transitionAnsiCodes(this.get(fromId), this.get(toId)));
-          this.transitionCache.set(key, str3);
+          this.transitionCache.set(key2, str3);
         }
         return str3;
       }
@@ -58702,11 +58702,11 @@ function extractRowText(screen, row, colStart, colEnd) {
   }
   return contentEnd > 0 ? line : line.replace(/\s+$/, "");
 }
-function joinRows(lines, text, sw) {
+function joinRows(lines, text2, sw) {
   if (sw && lines.length > 0) {
-    lines[lines.length - 1] += text;
+    lines[lines.length - 1] += text2;
   } else {
-    lines.push(text);
+    lines.push(text2);
   }
 }
 function trimEmptyEdgeRows(lines) {
@@ -59298,11 +59298,11 @@ function styleBorderLine(line, color, dim) {
   }
   return styled;
 }
-function sliceAnsiToWidth(text, start, end) {
-  const leadingColumns = Math.max(0, stringWidth(sliceAnsi(text, 0, start)) - start);
-  let sliced = sliceAnsi(text, start, end);
+function sliceAnsiToWidth(text2, start, end) {
+  const leadingColumns = Math.max(0, stringWidth(sliceAnsi(text2, 0, start)) - start);
+  let sliced = sliceAnsi(text2, start, end);
   if (stringWidth(sliced) > end - start - leadingColumns) {
-    sliced = sliceAnsi(text, start, end - 1);
+    sliced = sliceAnsi(text2, start, end - 1);
   }
   return { leadingColumns, text: sliced };
 }
@@ -59325,9 +59325,9 @@ function renderHorizontalBorder(x, y, width, output, visibleX1, visibleX2, borde
     return;
   }
   const writeBorderRun = (start, end) => {
-    const text = borderRun(start, end, borderLength, borderChar, startCorner, endCorner);
-    if (text) {
-      output.write(x + start, y, styleBorderLine(text, color, dim));
+    const text2 = borderRun(start, end, borderLength, borderChar, startCorner, endCorner);
+    if (text2) {
+      output.write(x + start, y, styleBorderLine(text2, color, dim));
     }
   };
   if (!borderText) {
@@ -59336,9 +59336,9 @@ function renderHorizontalBorder(x, y, width, output, visibleX1, visibleX2, borde
   }
   const textLength = stringWidth(borderText.content);
   if (textLength >= borderLength - 2) {
-    const { leadingColumns, text } = sliceAnsiToWidth(borderText.content, sliceStart, sliceEnd);
-    if (text) {
-      output.write(x + sliceStart + leadingColumns, y, text);
+    const { leadingColumns, text: text2 } = sliceAnsiToWidth(borderText.content, sliceStart, sliceEnd);
+    if (text2) {
+      output.write(x + sliceStart + leadingColumns, y, text2);
     }
     return;
   }
@@ -59355,13 +59355,13 @@ function renderHorizontalBorder(x, y, width, output, visibleX1, visibleX2, borde
   const visibleTextStart = Math.max(sliceStart, position);
   const visibleTextEnd = Math.min(sliceEnd, position + textLength);
   if (visibleTextStart < visibleTextEnd) {
-    const { leadingColumns, text } = sliceAnsiToWidth(
+    const { leadingColumns, text: text2 } = sliceAnsiToWidth(
       borderText.content,
       visibleTextStart - position,
       visibleTextEnd - position
     );
-    if (text) {
-      output.write(x + visibleTextStart + leadingColumns, y, text);
+    if (text2) {
+      output.write(x + visibleTextStart + leadingColumns, y, text2);
     }
   }
   writeBorderRun(Math.max(sliceStart, position + textLength), sliceEnd);
@@ -59552,8 +59552,8 @@ function drainProportional(node, pending, innerHeight) {
   node.pendingScrollDelta = pending - applied;
   return applied;
 }
-function wrapWithOsc8Link(text, url) {
-  return `${OSC2}8;;${url}${BEL2}${text}${OSC2}8;;${BEL2}`;
+function wrapWithOsc8Link(text2, url) {
+  return `${OSC2}8;;${url}${BEL2}${text2}${OSC2}8;;${BEL2}`;
 }
 function buildCharToSegmentMap(segments) {
   const map = [];
@@ -59632,7 +59632,7 @@ function wrapWithSoftWrap(plainText, maxWidth, textWrap) {
   }
   return { wrapped: outLines.join("\n"), softWrap };
 }
-function applyPaddingToText(node, text, softWrap, maxOffsetX, maxOffsetY) {
+function applyPaddingToText(node, text2, softWrap, maxOffsetX, maxOffsetY) {
   const yogaNode = node.childNodes[0]?.yogaNode;
   if (yogaNode) {
     const offsetX = yogaNode.getComputedLeft();
@@ -59640,12 +59640,12 @@ function applyPaddingToText(node, text, softWrap, maxOffsetX, maxOffsetY) {
     if (!Number.isSafeInteger(offsetX) || offsetX < 0 || offsetX > maxOffsetX || !Number.isSafeInteger(offsetY) || offsetY < 0 || offsetY > maxOffsetY) {
       return "";
     }
-    text = "\n".repeat(offsetY) + indentString(text, offsetX);
+    text2 = "\n".repeat(offsetY) + indentString(text2, offsetX);
     if (softWrap && offsetY > 0) {
       softWrap.unshift(...Array(offsetY).fill(false));
     }
   }
-  return text;
+  return text2;
 }
 function renderNodeToOutput(node, output, {
   offsetX = 0,
@@ -59751,9 +59751,9 @@ function renderNodeToOutput(node, output, {
       return;
     }
     if (node.nodeName === "ink-raw-ansi") {
-      const text = node.attributes["rawText"];
-      if (text) {
-        output.write(x, y, text);
+      const text2 = node.attributes["rawText"];
+      if (text2) {
+        output.write(x, y, text2);
       }
     } else if (node.nodeName === "ink-text") {
       const segments = squashTextNodesToSegments(
@@ -59765,13 +59765,13 @@ function renderNodeToOutput(node, output, {
         const maxWidth = Math.min(get_max_width_default(yogaNode), output.width - x);
         const textWrap = node.style.textWrap ?? "wrap";
         const needsWrapping = widestLine(plainText) > maxWidth;
-        let text;
+        let text2;
         let softWrap;
         if (needsWrapping && segments.length === 1) {
           const segment = segments[0];
           const w = wrapWithSoftWrap(plainText, maxWidth, textWrap);
           softWrap = w.softWrap;
-          text = w.wrapped.split("\n").map((line) => {
+          text2 = w.wrapped.split("\n").map((line) => {
             let styled = applyTextStyles(line, segment.styles);
             if (segment.hyperlink) {
               styled = wrapWithOsc8Link(styled, segment.hyperlink);
@@ -59782,9 +59782,9 @@ function renderNodeToOutput(node, output, {
           const w = wrapWithSoftWrap(plainText, maxWidth, textWrap);
           softWrap = w.softWrap;
           const charToSegment = buildCharToSegmentMap(segments);
-          text = applyStylesToWrappedText(w.wrapped, segments, charToSegment, plainText, textWrap === "wrap-trim");
+          text2 = applyStylesToWrappedText(w.wrapped, segments, charToSegment, plainText, textWrap === "wrap-trim");
         } else {
-          text = segments.map((segment) => {
+          text2 = segments.map((segment) => {
             let styledText = applyTextStyles(segment.text, segment.styles);
             if (segment.hyperlink) {
               styledText = wrapWithOsc8Link(styledText, segment.hyperlink);
@@ -59792,8 +59792,8 @@ function renderNodeToOutput(node, output, {
             return styledText;
           }).join("");
         }
-        text = applyPaddingToText(node, text, softWrap, output.width, output.height);
-        output.write(x, y, text, softWrap);
+        text2 = applyPaddingToText(node, text2, softWrap, output.width, output.height);
+        output.write(x, y, text2, softWrap);
       }
     } else if (node.nodeName === "ink-box") {
       const boxBackgroundColor = node.style.backgroundColor ?? inheritedBackgroundColor;
@@ -60461,8 +60461,8 @@ var init_render_node_to_output = __esm({
 
 // ../node_modules/auto-bind/index.js
 function autoBind(self2, { include, exclude } = {}) {
-  const filter = (key) => {
-    const match = (pattern) => typeof pattern === "string" ? key === pattern : pattern.test(key);
+  const filter = (key2) => {
+    const match = (pattern) => typeof pattern === "string" ? key2 === pattern : pattern.test(key2);
     if (include) {
       return include.some(match);
     }
@@ -60471,13 +60471,13 @@ function autoBind(self2, { include, exclude } = {}) {
     }
     return true;
   };
-  for (const [object, key] of getAllProperties(self2.constructor.prototype)) {
-    if (key === "constructor" || !filter(key)) {
+  for (const [object, key2] of getAllProperties(self2.constructor.prototype)) {
+    if (key2 === "constructor" || !filter(key2)) {
       continue;
     }
-    const descriptor = Reflect.getOwnPropertyDescriptor(object, key);
+    const descriptor = Reflect.getOwnPropertyDescriptor(object, key2);
     if (descriptor && typeof descriptor.value === "function") {
-      self2[key] = self2[key].bind(self2);
+      self2[key2] = self2[key2].bind(self2);
     }
   }
   return self2;
@@ -60488,8 +60488,8 @@ var init_auto_bind = __esm({
     getAllProperties = (object) => {
       const properties = /* @__PURE__ */ new Set();
       do {
-        for (const key of Reflect.ownKeys(object)) {
-          properties.add([object, key]);
+        for (const key2 of Reflect.ownKeys(object)) {
+          properties.add([object, key2]);
         }
       } while ((object = Reflect.getPrototypeOf(object)) && object !== Object.prototype);
       return properties;
@@ -61208,22 +61208,22 @@ function isControlChar(ch) {
   }
   return code < 32 || code === 127;
 }
-function parseTextKeypresses(text) {
+function parseTextKeypresses(text2) {
   const keys = [];
   let textStart = 0;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+  for (let i = 0; i < text2.length; i++) {
+    const ch = text2[i];
     if (!isControlChar(ch)) {
       continue;
     }
     if (i > textStart) {
-      keys.push(parseKeypress(text.slice(textStart, i)));
+      keys.push(parseKeypress(text2.slice(textStart, i)));
     }
     keys.push(parseKeypress(ch));
     textStart = i + 1;
   }
-  if (textStart < text.length) {
-    keys.push(parseKeypress(text.slice(textStart)));
+  if (textStart < text2.length) {
+    keys.push(parseKeypress(text2.slice(textStart)));
   }
   return keys;
 }
@@ -61388,7 +61388,7 @@ function parseMouseEvent(s) {
 }
 function parseKeypress(s = "") {
   let parts;
-  const key = {
+  const key2 = {
     kind: "key",
     name: "",
     fn: false,
@@ -61401,7 +61401,7 @@ function parseKeypress(s = "") {
     raw: s,
     isPasted: false
   };
-  key.sequence = key.sequence || s || key.name;
+  key2.sequence = key2.sequence || s || key2.name;
   let match;
   if (match = CSI_U_RE.exec(s)) {
     const codepoint = parseInt(match[1], 10);
@@ -61460,62 +61460,62 @@ function parseKeypress(s = "") {
     return createNavKey(s, "mouse", false);
   }
   if (s === "\r" || s === "\n" || s === "\x1B\r" || s === "\x1B\n") {
-    key.raw = void 0;
-    key.name = "return";
-    key.meta = s.startsWith("\x1B");
+    key2.raw = void 0;
+    key2.name = "return";
+    key2.meta = s.startsWith("\x1B");
   } else if (s === "	") {
-    key.name = "tab";
+    key2.name = "tab";
   } else if (s === "\b" || s === "\x1B\b") {
-    key.name = "backspace";
-    key.meta = s.charAt(0) === "\x1B";
+    key2.name = "backspace";
+    key2.meta = s.charAt(0) === "\x1B";
   } else if (s === "\x7F" || s === "\x1B\x7F") {
-    key.name = "backspace";
-    key.meta = s.charAt(0) === "\x1B";
+    key2.name = "backspace";
+    key2.meta = s.charAt(0) === "\x1B";
   } else if (s === "\x1B" || s === "\x1B\x1B") {
-    key.name = "escape";
-    key.meta = s.length === 2;
+    key2.name = "escape";
+    key2.meta = s.length === 2;
   } else if (s === " " || s === "\x1B ") {
-    key.name = "space";
-    key.meta = s.length === 2;
+    key2.name = "space";
+    key2.meta = s.length === 2;
   } else if (s === "") {
-    key.name = "_";
-    key.ctrl = true;
+    key2.name = "_";
+    key2.ctrl = true;
   } else if (s <= "" && s.length === 1) {
-    key.name = String.fromCharCode(s.charCodeAt(0) + "a".charCodeAt(0) - 1);
-    key.ctrl = true;
+    key2.name = String.fromCharCode(s.charCodeAt(0) + "a".charCodeAt(0) - 1);
+    key2.ctrl = true;
   } else if (s.length === 1 && s >= "0" && s <= "9") {
-    key.name = "number";
+    key2.name = "number";
   } else if (s.length === 1 && s >= "a" && s <= "z") {
-    key.name = s;
+    key2.name = s;
   } else if (s.length === 1 && s >= "A" && s <= "Z") {
-    key.name = s.toLowerCase();
-    key.shift = true;
+    key2.name = s.toLowerCase();
+    key2.shift = true;
   } else if (parts = META_KEY_CODE_RE.exec(s)) {
-    key.meta = true;
-    key.shift = /^[A-Z]$/.test(parts[1]);
+    key2.meta = true;
+    key2.shift = /^[A-Z]$/.test(parts[1]);
   } else if (parts = FN_KEY_RE.exec(s)) {
     const segs = [...s];
     if (segs[0] === "\x1B" && segs[1] === "\x1B") {
-      key.option = true;
+      key2.option = true;
     }
     const code = [parts[1], parts[2], parts[4], parts[6]].filter(Boolean).join("");
     const modifier = (parts[3] || parts[5] || 1) - 1;
-    key.ctrl = !!(modifier & 4);
-    key.meta = !!(modifier & 2);
-    key.super = !!(modifier & 8);
-    key.shift = !!(modifier & 1);
-    key.code = code;
-    key.name = keyName[code];
-    key.fn = Boolean(key.name?.startsWith("f"));
-    key.shift = isShiftKey(code) || key.shift;
-    key.ctrl = isCtrlKey(code) || key.ctrl;
+    key2.ctrl = !!(modifier & 4);
+    key2.meta = !!(modifier & 2);
+    key2.super = !!(modifier & 8);
+    key2.shift = !!(modifier & 1);
+    key2.code = code;
+    key2.name = keyName[code];
+    key2.fn = Boolean(key2.name?.startsWith("f"));
+    key2.shift = isShiftKey(code) || key2.shift;
+    key2.ctrl = isCtrlKey(code) || key2.ctrl;
   }
-  if (key.raw === "\x1Bb") {
-    key.meta = true;
-    key.name = "left";
-  } else if (key.raw === "\x1Bf") {
-    key.meta = true;
-    key.name = "right";
+  if (key2.raw === "\x1Bb") {
+    key2.meta = true;
+    key2.name = "left";
+  } else if (key2.raw === "\x1Bf") {
+    key2.meta = true;
+    key2.name = "right";
   }
   switch (s) {
     case "\x1B[1~":
@@ -61531,7 +61531,7 @@ function parseKeypress(s = "") {
     case "\x1B[1;5C":
       return createNavKey(s, "right", true);
   }
-  return key;
+  return key2;
 }
 function createNavKey(s, name, ctrl) {
   return {
@@ -61719,7 +61719,7 @@ var init_parse_keypress = __esm({
 
 // packages/qubit-ink/src/ink/events/input-event.ts
 function parseKey(keypress) {
-  const key = {
+  const key2 = {
     upArrow: keypress.name === "up",
     downArrow: keypress.name === "down",
     leftArrow: keypress.name === "left",
@@ -61786,9 +61786,9 @@ function parseKey(keypress) {
     input = "";
   }
   if (input.length === 1 && typeof input[0] === "string" && input[0] >= "A" && input[0] <= "Z") {
-    key.shift = true;
+    key2.shift = true;
   }
-  return [key, input];
+  return [key2, input];
 }
 function isControlChord(keypress) {
   return keypress.ctrl && !keypress.isPasted;
@@ -61814,10 +61814,10 @@ var init_input_event = __esm({
       input;
       constructor(keypress) {
         super();
-        const [key, input] = parseKey(keypress);
+        const [key2, input] = parseKey(keypress);
         this.isControlChord = isControlChord(keypress);
         this.keypress = keypress;
-        this.key = key;
+        this.key = key2;
         this.input = input;
       }
     };
@@ -62573,8 +62573,8 @@ function handleMouseEvent(app, m) {
         if (!app.props.getSelectedText()) {
           return;
         }
-        void app.props.onCopySelectionNoClear().then((text) => {
-          if (text) {
+        void app.props.onCopySelectionNoClear().then((text2) => {
+          if (text2) {
             clearSelection(sel);
             app.props.onSelectionChange();
           } else {
@@ -62852,7 +62852,7 @@ var init_App = __esm({
                 this.querier.send(oscColor(11)),
                 this.querier.send(oscColor(10)),
                 this.querier.flush()
-              ]).then(([r, bg, fg]) => {
+              ]).then(([r, bg, fg2]) => {
                 if (r) {
                   setXtversionName(r.name);
                   logForDebugging(`XTVERSION: terminal identified as "${r.name}"`);
@@ -62860,7 +62860,7 @@ var init_App = __esm({
                   logForDebugging("XTVERSION: no reply (terminal ignored query)");
                 }
                 const bgHex = bg ? parseOscColor2(bg.data) : void 0;
-                const fgHex = fg ? parseOscColor2(fg.data) : void 0;
+                const fgHex = fg2 ? parseOscColor2(fg2.data) : void 0;
                 if (bgHex) {
                   setTerminalBackgroundHex(bgHex);
                   logForDebugging(`OSC11: terminal background is ${bgHex}`);
@@ -64460,8 +64460,8 @@ var require_bidi = __commonJS({
               var ref = parseCharacterMap(data, true);
               var map2 = ref.map;
               var reverseMap = ref.reverseMap;
-              reverseMap.forEach(function(value, key) {
-                map2.set(key, value);
+              reverseMap.forEach(function(value, key2) {
+                map2.set(key2, value);
               });
               mirrorMap = map2;
             }
@@ -64639,9 +64639,9 @@ function reverseRangeNumbers(arr, start, end) {
     end--;
   }
 }
-function hasRTLCharacters(text) {
+function hasRTLCharacters(text2) {
   return /[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0780-\u07BF\u0700-\u074F]/u.test(
-    text
+    text2
   );
 }
 var import_bidi_js, bidiInstance, needsSoftwareBidi;
@@ -64896,15 +64896,15 @@ var init_output = __esm({
       noSelect(region) {
         this.operations.push({ type: "noSelect", region });
       }
-      write(x, y, text, softWrap) {
-        if (!text) {
+      write(x, y, text2, softWrap) {
+        if (!text2) {
           return;
         }
         this.operations.push({
           type: "write",
           x,
           y,
-          text,
+          text: text2,
           softWrap
         });
       }
@@ -65013,9 +65013,9 @@ var init_output = __esm({
               continue;
             }
             case "write": {
-              const { text, softWrap } = operation;
+              const { text: text2, softWrap } = operation;
               let { x, y } = operation;
-              let lines = text.split("\n");
+              let lines = text2.split("\n");
               let swFrom = 0;
               let prevContentEnd = 0;
               const clip2 = clips.at(-1);
@@ -65023,7 +65023,7 @@ var init_output = __esm({
                 const clipHorizontally = typeof clip2?.x1 === "number" && typeof clip2?.x2 === "number";
                 const clipVertically = typeof clip2?.y1 === "number" && typeof clip2?.y2 === "number";
                 if (clipHorizontally) {
-                  const width = widestLine(text);
+                  const width = widestLine(text2);
                   if (x + width <= clip2.x1 || x >= clip2.x2) {
                     continue;
                   }
@@ -65120,7 +65120,7 @@ function scanPositions(screen, query) {
   const t0 = performance.now();
   for (let row = 0; row < h; row++) {
     const rowOff = row * w;
-    let text = "";
+    let text2 = "";
     const colOf = [];
     const codeUnitToCell = [];
     for (let col = 0; col < w; col++) {
@@ -65134,17 +65134,17 @@ function scanPositions(screen, query) {
       for (let i = 0; i < lc.length; i++) {
         codeUnitToCell.push(cellIdx);
       }
-      text += lc;
+      text2 += lc;
       colOf.push(col);
     }
-    let pos = text.indexOf(lq);
+    let pos = text2.indexOf(lq);
     while (pos >= 0) {
       const startCi = codeUnitToCell[pos];
       const endCi = codeUnitToCell[pos + qlen - 1];
       const col = colOf[startCi];
       const endCol = colOf[endCi] + 1;
       positions.push({ row, col, len: endCol - col });
-      pos = text.indexOf(lq, pos + qlen);
+      pos = text2.indexOf(lq, pos + qlen);
     }
   }
   timing.scan += performance.now() - t0;
@@ -65295,7 +65295,7 @@ function applySearchHighlight(screen, query, stylePool) {
   let applied = false;
   for (let row = 0; row < height; row++) {
     const rowOff = row * w;
-    let text = "";
+    let text2 = "";
     const colOf = [];
     const codeUnitToCell = [];
     for (let col = 0; col < w; col++) {
@@ -65309,10 +65309,10 @@ function applySearchHighlight(screen, query, stylePool) {
       for (let i = 0; i < lc.length; i++) {
         codeUnitToCell.push(cellIdx);
       }
-      text += lc;
+      text2 += lc;
       colOf.push(col);
     }
-    let pos = text.indexOf(lq);
+    let pos = text2.indexOf(lq);
     while (pos >= 0) {
       applied = true;
       const startCi = codeUnitToCell[pos];
@@ -65322,7 +65322,7 @@ function applySearchHighlight(screen, query, stylePool) {
         const cell = cellAtIndex(screen, rowOff + col);
         setCellStyleId(screen, col, row, stylePool.withInverse(cell.styleId));
       }
-      pos = text.indexOf(lq, pos + qlen);
+      pos = text2.indexOf(lq, pos + qlen);
     }
   }
   return applied;
@@ -66365,7 +66365,7 @@ var init_ink = __esm({
       resetFramesForAltScreen() {
         const rows = this.terminalRows;
         const cols = this.terminalColumns;
-        const blank = () => ({
+        const blank2 = () => ({
           screen: createScreen(cols, rows, this.stylePool, this.charPool, this.hyperlinkPool),
           viewport: {
             width: cols,
@@ -66377,8 +66377,8 @@ var init_ink = __esm({
             visible: true
           }
         });
-        this.frontFrame = blank();
-        this.backFrame = blank();
+        this.frontFrame = blank2();
+        this.backFrame = blank2();
         this.log.reset();
         this.displayCursor = null;
         this.prevFrameContaminated = true;
@@ -66394,15 +66394,15 @@ var init_ink = __esm({
         if (!hasSelection(this.selection)) {
           return "";
         }
-        const text = this.getTextSelectionText();
-        if (text) {
+        const text2 = this.getTextSelectionText();
+        if (text2) {
           try {
-            const { sequence, success } = await setClipboard(text);
+            const { sequence, success } = await setClipboard(text2);
             if (sequence) {
               this.options.stdout.write(sequence);
             }
             if (success) {
-              return text;
+              return text2;
             }
           } catch {
           }
@@ -66421,10 +66421,10 @@ var init_ink = __esm({
         if (!hasSelection(this.selection)) {
           return "";
         }
-        const text = await this.copySelectionNoClear();
+        const text2 = await this.copySelectionNoClear();
         clearSelection(this.selection);
         this.notifySelectionChange();
-        return text;
+        return text2;
       }
       /** Clear the current text selection without copying. */
       clearTextSelection() {
@@ -66649,8 +66649,8 @@ var init_ink = __esm({
         if (!this.altScreenActive) {
           return false;
         }
-        const blank = isEmptyCellAt(this.frontFrame.screen, col, row);
-        return dispatchClick(this.rootNode, col, row, blank);
+        const blank2 = isEmptyCellAt(this.frontFrame.screen, col, row);
+        return dispatchClick(this.rootNode, col, row, blank2);
       }
       dispatchMouseDown(col, row, button) {
         if (!this.altScreenActive) {
@@ -67169,8 +67169,8 @@ var init_ink = __esm({
           }
           reentered = true;
           try {
-            const text = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
-            logForDebugging(`[stderr] ${text}`, {
+            const text2 = typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+            logForDebugging(`[stderr] ${text2}`, {
               level: "warn"
             });
             if (this.altScreenActive && !this.isUnmounted && !this.isPaused) {
@@ -67491,17 +67491,17 @@ var init_terminalModes = __esm({
     "use strict";
     TERMINAL_MODE_RESET = "\x1B[0'z\x1B[0'{\x1B[?2029l\x1B[?1016l\x1B[?1015l\x1B[?1006l\x1B[?1005l\x1B[?1003l\x1B[?1002l\x1B[?1001l\x1B[?1000l\x1B[?9l\x1B[?1004l\x1B[?2004l\x1B[?1049l\x1B[<u\x1B[>4m\x1B[0m\x1B[?25h";
     HEX_RE = /^#[0-9a-f]{6}$/i;
-    isPaintableHex = (hex2) => HEX_RE.test(hex2);
+    isPaintableHex = (hex3) => HEX_RE.test(hex3);
     defaultColorSlot = (osc2) => {
       const restore = `\x1B]1${osc2}\x07`;
       let painted = false;
-      const set = (hex2, stream = process.stdout) => {
+      const set = (hex3, stream = process.stdout) => {
         if (!stream.isTTY) {
           return;
         }
         try {
-          if (HEX_RE.test(hex2)) {
-            stream.write(`\x1B]${osc2};${hex2}\x07`);
+          if (HEX_RE.test(hex3)) {
+            stream.write(`\x1B]${osc2};${hex3}\x07`);
             painted = true;
           } else if (painted) {
             stream.write(restore);
@@ -67699,8 +67699,8 @@ function channelLuminance(value) {
   return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
 }
 function relativeLuminance(color) {
-  const rgb2 = parseColor(color);
-  return rgb2 ? 0.2126 * channelLuminance(rgb2[0]) + 0.7152 * channelLuminance(rgb2[1]) + 0.0722 * channelLuminance(rgb2[2]) : null;
+  const rgb3 = parseColor(color);
+  return rgb3 ? 0.2126 * channelLuminance(rgb3[0]) + 0.7152 * channelLuminance(rgb3[1]) + 0.0722 * channelLuminance(rgb3[2]) : null;
 }
 function contrastRatio(a, b) {
   const la = relativeLuminance(a);
@@ -67719,21 +67719,21 @@ var init_color = __esm({
     HEX3_RE = /^#?([0-9a-f]{3})$/i;
     RGB_FN_RE = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i;
     clampChannel = (v) => Math.max(0, Math.min(255, Math.round(v)));
-    toHex = (rgb2) => "#" + rgb2.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
+    toHex = (rgb3) => "#" + rgb3.map((c) => clampChannel(c).toString(16).padStart(2, "0")).join("");
   }
 });
 
 // src/lib/color.ts
 function liftForContrast(color, bg, ratio) {
-  const fg = parseColor(color);
+  const fg2 = parseColor(color);
   const bgLum = relativeLuminance(bg);
-  if (!fg || bgLum === null) {
+  if (!fg2 || bgLum === null) {
     return color;
   }
   if ((contrastRatio(color, bg) ?? 21) >= ratio) {
     return color;
   }
-  let [r, g, b] = fg;
+  let [r, g, b] = fg2;
   if (bgLum > 0.5) {
     let cr = contrastRatio(toHex([r, g, b]), bg) ?? 21;
     while (cr < ratio && (r > 0 || g > 0 || b > 0)) {
@@ -67754,11 +67754,11 @@ function liftForContrast(color, bg, ratio) {
   return toHex([r, g, b]);
 }
 function grayOf(color) {
-  const rgb2 = parseColor(color);
-  if (!rgb2) {
+  const rgb3 = parseColor(color);
+  if (!rgb3) {
     return color;
   }
-  const gray = clampChannel2(0.2126 * rgb2[0] + 0.7152 * rgb2[1] + 0.0722 * rgb2[2]);
+  const gray = clampChannel2(0.2126 * rgb3[0] + 0.7152 * rgb3[1] + 0.0722 * rgb3[2]);
   return toHex([gray, gray, gray]);
 }
 var clampChannel2, desaturate;
@@ -67842,13 +67842,13 @@ function bestReadableAnsiColor(red, green, blue) {
   return bestColor;
 }
 function normalizeAnsiForeground(color) {
-  const rgb2 = parseColor(color);
-  if (!rgb2) {
+  const rgb3 = parseColor(color);
+  if (!rgb3) {
     return color;
   }
-  const richAnsi = richEightBitColorNumber2(rgb2[0], rgb2[1], rgb2[2]);
+  const richAnsi = richEightBitColorNumber2(rgb3[0], rgb3[1], rgb3[2]);
   const richRgb = xtermEightBitRgb(richAnsi);
-  const ansi = rgbLuminance(richRgb[0], richRgb[1], richRgb[2]) > ANSI_LIGHT_MAX_LUMINANCE ? bestReadableAnsiColor(rgb2[0], rgb2[1], rgb2[2]) : richAnsi;
+  const ansi = rgbLuminance(richRgb[0], richRgb[1], richRgb[2]) > ANSI_LIGHT_MAX_LUMINANCE ? bestReadableAnsiColor(rgb3[0], rgb3[1], rgb3[2]) : richAnsi;
   return `ansi256(${ansi})`;
 }
 function themeToneHex(tone) {
@@ -67857,8 +67857,8 @@ function themeToneHex(tone) {
     const n = Number(ansi[1]);
     return n <= 255 ? toHex(xtermEightBitRgb(n)) : "";
   }
-  const rgb2 = parseColor(tone);
-  return rgb2 ? toHex(rgb2) : "";
+  const rgb3 = parseColor(tone);
+  return rgb3 ? toHex(rgb3) : "";
 }
 function buildPalette(seeds, isLight) {
   const tones = deriveTones(seeds);
@@ -67909,19 +67909,19 @@ function adaptColorsToBackground(colors, isLight, base, bg) {
   const out = { ...colors };
   const displayFloor = isLight ? LIGHT_DISPLAY_MIN_CONTRAST : DISPLAY_MIN_CONTRAST;
   const semanticFloor = isLight ? LIGHT_SEMANTIC_MIN_CONTRAST : SEMANTIC_MIN_CONTRAST;
-  for (const key of DISPLAY_FOREGROUNDS) {
-    out[key] = liftForContrast(out[key], bg, displayFloor);
+  for (const key2 of DISPLAY_FOREGROUNDS) {
+    out[key2] = liftForContrast(out[key2], bg, displayFloor);
   }
-  for (const key of SEMANTIC_FOREGROUNDS) {
-    out[key] = liftForContrast(out[key], bg, semanticFloor);
+  for (const key2 of SEMANTIC_FOREGROUNDS) {
+    out[key2] = liftForContrast(out[key2], bg, semanticFloor);
   }
-  for (const key of ADAPTIVE_BACKGROUNDS) {
-    const luminance2 = relativeLuminance(out[key]);
+  for (const key2 of ADAPTIVE_BACKGROUNDS) {
+    const luminance2 = relativeLuminance(out[key2]);
     if (luminance2 === null) {
       continue;
     }
     if (isLight ? luminance2 < LIGHT_BG_MIN_LUMINANCE : luminance2 > DARK_BG_MAX_LUMINANCE) {
-      out[key] = base[key];
+      out[key2] = base[key2];
     }
   }
   return out;
@@ -67934,7 +67934,7 @@ function referenceBackground(isLight, env3 = process.env) {
   return isLight ? "#ffffff" : "#101014";
 }
 function deriveTones(seeds) {
-  const { accent, bg, text } = seeds;
+  const { accent, bg, text: text2 } = seeds;
   const isLight = (relativeLuminance(bg) ?? 0) > 0.5;
   const surface = mix(bg, desaturate(accent, 0.15), isLight ? 0.045 : 0.09);
   return {
@@ -67943,8 +67943,8 @@ function deriveTones(seeds) {
     // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
     // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
     muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
-    statusFg: grayOf(mix(text, bg, isLight ? 0.3 : 0.24)),
+    label: isLight ? desaturate(mix(accent, text2, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    statusFg: grayOf(mix(text2, bg, isLight ? 0.3 : 0.24)),
     surface,
     activeRow: mix(surface, accent, 0.25),
     selection: isLight && seeds.shellDollar ? mix(bg, seeds.shellDollar, 0.2) : mix(surface, accent, 0.28),
@@ -67956,12 +67956,12 @@ function backgroundLuminance(raw) {
   if (!v) {
     return null;
   }
-  const hex2 = v.startsWith("#") ? v.slice(1) : v;
-  const rgb2 = HEX_6_RE.test(hex2) ? [parseInt(hex2.slice(0, 2), 16), parseInt(hex2.slice(2, 4), 16), parseInt(hex2.slice(4, 6), 16)] : HEX_3_RE.test(hex2) ? [parseInt(hex2[0] + hex2[0], 16), parseInt(hex2[1] + hex2[1], 16), parseInt(hex2[2] + hex2[2], 16)] : null;
-  if (!rgb2) {
+  const hex3 = v.startsWith("#") ? v.slice(1) : v;
+  const rgb3 = HEX_6_RE.test(hex3) ? [parseInt(hex3.slice(0, 2), 16), parseInt(hex3.slice(2, 4), 16), parseInt(hex3.slice(4, 6), 16)] : HEX_3_RE.test(hex3) ? [parseInt(hex3[0] + hex3[0], 16), parseInt(hex3[1] + hex3[1], 16), parseInt(hex3[2] + hex3[2], 16)] : null;
+  if (!rgb3) {
     return null;
   }
-  return (0.2126 * rgb2[0] + 0.7152 * rgb2[1] + 0.0722 * rgb2[2]) / 255;
+  return (0.2126 * rgb3[0] + 0.7152 * rgb3[1] + 0.0722 * rgb3[2]) / 255;
 }
 function detectLightMode(env3 = process.env, lightDefaultTermPrograms = LIGHT_DEFAULT_TERM_PROGRAMS) {
   const lightFlag = (env3.HERMES_TUI_LIGHT ?? "").trim().toLowerCase();
@@ -68008,11 +68008,11 @@ function normalizeThemeForAnsiLightTerminal(theme, env3 = process.env, isLight =
     return theme;
   }
   const color = { ...theme.color };
-  for (const key of ANSI_NORMALIZED_FOREGROUNDS) {
-    color[key] = normalizeAnsiForeground(color[key]);
+  for (const key2 of ANSI_NORMALIZED_FOREGROUNDS) {
+    color[key2] = normalizeAnsiForeground(color[key2]);
   }
-  for (const key of ANSI_MUTED_FOREGROUNDS) {
-    color[key] = `ansi256(${ANSI_MUTED_BUCKET})`;
+  for (const key2 of ANSI_MUTED_FOREGROUNDS) {
+    color[key2] = `ansi256(${ANSI_MUTED_BUCKET})`;
   }
   return { ...theme, color };
 }
@@ -68511,17 +68511,17 @@ var init_slash2 = __esm({
       return kept.length ? `${kept.join(" ")} --session` : "";
     };
     INLINE_SLASH_RE = /\s\/([a-zA-Z][\w-]*)?$/;
-    inlineSlashTrigger = (text) => {
-      const match = INLINE_SLASH_RE.exec(text);
+    inlineSlashTrigger = (text2) => {
+      const match = INLINE_SLASH_RE.exec(text2);
       if (!match) {
         return null;
       }
       const query = match[1] ?? "";
-      return { query, start: text.length - query.length - 1 };
+      return { query, start: text2.length - query.length - 1 };
     };
     applyCompletion = (value, rowText2, compReplace) => {
-      const text = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
-      return value.slice(0, compReplace) + text;
+      const text2 = value[compReplace - 1] === "/" && rowText2.startsWith("/") ? rowText2.slice(1) : rowText2;
+      return value.slice(0, compReplace) + text2;
     };
     completionToApplyOnSubmit = (value, rowText2, compReplace) => {
       if (!rowText2) {
@@ -68810,8 +68810,8 @@ function useVirtualHistory(scrollRef, items, columns, {
     }
   }
   const measureRef = (0, import_react30.useCallback)(
-    (key) => {
-      let fn = refs.current.get(key);
+    (key2) => {
+      let fn = refs.current.get(key2);
       if (!fn) {
         const refGeneration = generationRef.current;
         fn = (el) => {
@@ -68819,20 +68819,20 @@ function useVirtualHistory(scrollRef, items, columns, {
             return;
           }
           if (el) {
-            nodes.current.set(key, el);
+            nodes.current.set(key2, el);
             return;
           }
           if (skipMeasurement.current) {
-            nodes.current.delete(key);
-            measuredBottoms.current.delete(key);
+            nodes.current.delete(key2);
+            measuredBottoms.current.delete(key2);
             return;
           }
-          const existing = nodes.current.get(key);
+          const existing = nodes.current.get(key2);
           const h = Math.ceil(existing?.yogaNode?.getComputedHeight?.() ?? 0);
-          const previousHeight = heights.current.get(key);
+          const previousHeight = heights.current.get(key2);
           if (validVirtualItemHeight(h) && previousHeight !== h) {
             const s = scrollRef.current;
-            const measuredBottom = measuredBottoms.current.get(key);
+            const measuredBottom = measuredBottoms.current.get(key2);
             const viewport = unmountViewport.current ??= {
               sticky: s?.isSticky() ?? true,
               top: safeUnsignedGeometry3(s?.getScrollTop() ?? 0)
@@ -68840,14 +68840,14 @@ function useVirtualHistory(scrollRef, items, columns, {
             if (s && previousHeight !== void 0 && measuredBottom !== void 0 && measuredBottom <= viewport.top && !viewport.sticky) {
               s.adjustScrollTop(h - previousHeight);
             }
-            heights.current.set(key, h);
+            heights.current.set(key2, h);
             offsetVersion.current++;
             onHeightsChangeRef.current?.(heights.current);
           }
-          nodes.current.delete(key);
-          measuredBottoms.current.delete(key);
+          nodes.current.delete(key2);
+          measuredBottoms.current.delete(key2);
         };
-        refs.current.set(key, fn);
+        refs.current.set(key2, fn);
       }
       return fn;
     },
@@ -68972,9 +68972,9 @@ var init_useVirtualHistory = __esm({
     safeSignedGeometry3 = (value, fallback = 0) => Number.isFinite(value) && Math.abs(value) <= MAX_VIRTUAL_GEOMETRY ? value : fallback;
     pruneVirtualHeightCache = (cache4, items) => {
       const active = new Set(items.map((item) => item.key));
-      for (const key of cache4.keys()) {
-        if (!active.has(key) || !validVirtualItemHeight(cache4.get(key))) {
-          cache4.delete(key);
+      for (const key2 of cache4.keys()) {
+        if (!active.has(key2) || !validVirtualItemHeight(cache4.get(key2))) {
+          cache4.delete(key2);
         }
       }
     };
@@ -69002,18 +69002,18 @@ var init_useVirtualHistory = __esm({
       sticky,
       viewportHeight
     }) => itemCount > 0 && viewportHeight > 0 && !sticky && !liveTailActive;
-    ensureVirtualItemHeight = (heights, key, index, estimate, estimateHeight) => {
-      const cached = heights.get(key);
+    ensureVirtualItemHeight = (heights, key2, index, estimate, estimateHeight) => {
+      const cached = heights.get(key2);
       if (cached !== void 0 && validVirtualItemHeight(cached)) {
         return Math.floor(cached);
       }
       if (cached !== void 0) {
-        heights.delete(key);
+        heights.delete(key2);
       }
       const fallback = validVirtualItemHeight(estimate) ? Math.floor(estimate) : estimate === 0 ? 1 : ESTIMATE;
-      const candidate = estimateHeight?.(index, key) ?? fallback;
+      const candidate = estimateHeight?.(index, key2) ?? fallback;
       const seeded2 = validVirtualItemHeight(candidate) ? Math.floor(candidate) : candidate === 0 ? 1 : fallback;
-      heights.set(key, seeded2);
+      heights.set(key2, seeded2);
       return seeded2;
     };
   }
@@ -69226,14 +69226,14 @@ var init_platform = __esm({
   "src/lib/platform.ts"() {
     "use strict";
     isMac = process.platform === "darwin";
-    isActionMod = (key) => isMac ? key.meta || key.super === true : key.ctrl;
-    isMacActionFallback = (key, ch, target) => isMac && key.ctrl && !key.meta && key.super !== true && ch.toLowerCase() === target;
-    isAction = (key, ch, target) => isActionMod(key) && ch.toLowerCase() === target;
+    isActionMod = (key2) => isMac ? key2.meta || key2.super === true : key2.ctrl;
+    isMacActionFallback = (key2, ch, target) => isMac && key2.ctrl && !key2.meta && key2.super !== true && ch.toLowerCase() === target;
+    isAction = (key2, ch, target) => isActionMod(key2) && ch.toLowerCase() === target;
     isRemoteShell = (env3 = process.env) => Boolean(env3.SSH_CONNECTION || env3.SSH_CLIENT || env3.SSH_TTY);
-    isCopyShortcut = (key, ch, env3 = process.env) => ch.toLowerCase() === "c" && (isAction(key, ch, "c") || isRemoteShell(env3) && (key.meta || key.super === true) || // VS Code/Cursor/Windsurf terminal setup forwards Cmd+C as a CSI-u
+    isCopyShortcut = (key2, ch, env3 = process.env) => ch.toLowerCase() === "c" && (isAction(key2, ch, "c") || isRemoteShell(env3) && (key2.meta || key2.super === true) || // VS Code/Cursor/Windsurf terminal setup forwards Cmd+C as a CSI-u
     // sequence with the super bit plus a benign ctrl bit. Accept that shape
     // even though raw Ctrl+C should remain interrupt on local macOS.
-    isMac && key.ctrl && (key.meta || key.super === true));
+    isMac && key2.ctrl && (key2.meta || key2.super === true));
     DEFAULT_VOICE_RECORD_KEY = {
       ch: "b",
       mod: "ctrl",
@@ -69266,20 +69266,20 @@ var init_platform = __esm({
     _RESERVED_CTRL_CHARS = /* @__PURE__ */ new Set(["c", "d", "l", "r"]);
     _RESERVED_SUPER_CHARS = /* @__PURE__ */ new Set(["c", "d", "l", "v"]);
     _RESERVED_ALT_CHARS_MAC = /* @__PURE__ */ new Set(["c", "d", "l"]);
-    _matchesNamedKey = (named, key, ch) => {
+    _matchesNamedKey = (named, key2, ch) => {
       switch (named) {
         case "backspace":
-          return key.backspace === true;
+          return key2.backspace === true;
         case "delete":
-          return key.delete === true;
+          return key2.delete === true;
         case "enter":
-          return key.return === true;
+          return key2.return === true;
         case "escape":
-          return key.escape === true;
+          return key2.escape === true;
         case "space":
           return ch === " ";
         case "tab":
-          return key.tab === true;
+          return key2.tab === true;
       }
     };
     parseVoiceRecordKey = (raw) => {
@@ -69331,27 +69331,27 @@ var init_platform = __esm({
       return `${modLabel}+${keyLabel}`;
     };
     _isDefaultVoiceKey = (parsed) => parsed.mod === DEFAULT_VOICE_RECORD_KEY.mod && parsed.ch === DEFAULT_VOICE_RECORD_KEY.ch && parsed.named === DEFAULT_VOICE_RECORD_KEY.named;
-    isVoiceToggleKey = (key, ch, configured = DEFAULT_VOICE_RECORD_KEY) => {
+    isVoiceToggleKey = (key2, ch, configured = DEFAULT_VOICE_RECORD_KEY) => {
       if (configured.named) {
-        if (!_matchesNamedKey(configured.named, key, ch)) {
+        if (!_matchesNamedKey(configured.named, key2, ch)) {
           return false;
         }
       } else if (ch.toLowerCase() !== configured.ch) {
         return false;
       }
-      if (key.shift === true) {
+      if (key2.shift === true) {
         return false;
       }
       switch (configured.mod) {
         case "alt":
-          return (key.alt === true || key.meta && key.escape !== true) && !key.ctrl && key.super !== true;
+          return (key2.alt === true || key2.meta && key2.escape !== true) && !key2.ctrl && key2.super !== true;
         case "ctrl":
-          if (key.ctrl) {
-            return !key.alt && !key.meta && key.super !== true;
+          if (key2.ctrl) {
+            return !key2.alt && !key2.meta && key2.super !== true;
           }
-          return _isDefaultVoiceKey(configured) && isMac && key.super === true && !key.alt && !key.meta;
+          return _isDefaultVoiceKey(configured) && isMac && key2.super === true && !key2.alt && !key2.meta;
         case "super":
-          return key.super === true && !key.ctrl && !key.alt && !key.meta;
+          return key2.super === true && !key2.ctrl && !key2.alt && !key2.meta;
       }
     };
   }
@@ -69885,13 +69885,13 @@ var init_text = __esm({
       const one = s.replace(WS_RE, " ").trim();
       return !one ? "" : one.length > max ? one.slice(0, max - 1) + "\u2026" : one;
     };
-    estimateTokensRough = (text) => !text ? 0 : text.length + 3 >> 2;
+    estimateTokensRough = (text2) => !text2 ? 0 : text2.length + 3 >> 2;
     edgePreview = (s, head = 16, tail = 28) => {
       const one = s.replace(WS_RE, " ").trim().replace(/\]\]/g, "] ]");
       return !one ? "" : one.length <= head + tail + 4 ? one : `${one.slice(0, head).trimEnd()}.. ${one.slice(-tail).trimStart()}`;
     };
-    pasteTokenLabel = (text, lineCount) => {
-      const preview = edgePreview(text);
+    pasteTokenLabel = (text2, lineCount) => {
+      const preview = edgePreview(text2);
       const chip = t("libText.text.pasteLinesChip", compactNumber(lineCount));
       if (!preview) {
         return `[[ ${chip} ]]`;
@@ -69909,45 +69909,45 @@ var init_text = __esm({
       const raw = cleanThinkingText(bounded);
       return !raw || mode === "collapsed" ? "" : mode === "full" ? raw : compactPreview(raw.replace(WS_RE, " "), max);
     };
-    boundedLiveRenderText = (text, { maxChars = LIVE_RENDER_MAX_CHARS, maxLines = LIVE_RENDER_MAX_LINES } = {}) => boundedRenderText(text, t("libText.text.showingLiveTail"), { maxChars, maxLines });
-    boundedRenderText = (text, labelPrefix, { maxChars, maxLines }) => {
-      if (text.length <= maxChars && text.split("\n", maxLines + 1).length <= maxLines) {
-        return text;
+    boundedLiveRenderText = (text2, { maxChars = LIVE_RENDER_MAX_CHARS, maxLines = LIVE_RENDER_MAX_LINES } = {}) => boundedRenderText(text2, t("libText.text.showingLiveTail"), { maxChars, maxLines });
+    boundedRenderText = (text2, labelPrefix, { maxChars, maxLines }) => {
+      if (text2.length <= maxChars && text2.split("\n", maxLines + 1).length <= maxLines) {
+        return text2;
       }
       let start = 0;
-      let idx = text.length;
+      let idx = text2.length;
       for (let seen = 0; seen < maxLines && idx > 0; seen++) {
-        idx = text.lastIndexOf("\n", idx - 1);
+        idx = text2.lastIndexOf("\n", idx - 1);
         start = idx < 0 ? 0 : idx + 1;
         if (idx < 0) {
           break;
         }
       }
       const lineStart = start;
-      start = Math.max(lineStart, text.length - maxChars);
+      start = Math.max(lineStart, text2.length - maxChars);
       if (start > lineStart) {
-        const nextBreak = text.indexOf("\n", start);
-        if (nextBreak >= 0 && nextBreak < text.length - 1) {
+        const nextBreak = text2.indexOf("\n", start);
+        if (nextBreak >= 0 && nextBreak < text2.length - 1) {
           start = nextBreak + 1;
         }
       }
-      const tail = text.slice(start).trimStart();
-      const omittedLines = countNewlines(text, start);
-      const omittedChars = Math.max(0, text.length - tail.length);
+      const tail = text2.slice(start).trimStart();
+      const omittedLines = countNewlines(text2, start);
+      const omittedChars = Math.max(0, text2.length - tail.length);
       const label = omittedLines > 0 ? t("libText.text.omittedLinesChars", labelPrefix, compactNumber(omittedLines), compactNumber(omittedChars)) : t("libText.text.omittedChars", labelPrefix, compactNumber(omittedChars));
       return `${label}
 ${tail}`;
     };
-    countNewlines = (text, end) => {
+    countNewlines = (text2, end) => {
       let count = 0;
       for (let i = 0; i < end; i++) {
-        if (text.charCodeAt(i) === 10) {
+        if (text2.charCodeAt(i) === 10) {
           count++;
         }
       }
       return count;
     };
-    stripTrailingPasteNewlines = (text) => /[^\n]/.test(text) ? text.replace(/\n+$/, "") : text;
+    stripTrailingPasteNewlines = (text2) => /[^\n]/.test(text2) ? text2.replace(/\n+$/, "") : text2;
     toolTrailLabel = (name) => name.split("_").filter(Boolean).map((p) => p[0].toUpperCase() + p.slice(1)).join(" ") || name;
     formatToolCall = (name, context = "") => {
       const label = toolTrailLabel(name);
@@ -69968,8 +69968,8 @@ ${tail}`;
       return `${call}${took}${detail ? ` :: ${detail}` : ""} ${error ? "\u2717" : "\u2713"}`;
     };
     buildToolTrailLine = (name, context, error, note, duration) => toolTrailLine(formatToolCall(name, context), error, note, duration);
-    verboseToolBlock = (label, text) => {
-      const body = (text ?? "").trim();
+    verboseToolBlock = (label, text2) => {
+      const body = (text2 ?? "").trim();
       return body ? `${label}:
 ${boundedLiveRenderText(body, {
         maxChars: VERBOSE_TRAIL_MAX_CHARS,
@@ -70047,7 +70047,7 @@ ${boundedLiveRenderText(body, {
     };
     flat = (r) => Object.values(r).flat();
     pick = (a) => a[Math.floor(Math.random() * a.length)];
-    isPasteBackedText = (text) => /\[\[paste:\d+(?:[^\n]*?)\]\]|\[paste #\d+ (?:attached|excerpt)(?:[^\n]*?)\]/.test(text);
+    isPasteBackedText = (text2) => /\[\[paste:\d+(?:[^\n]*?)\]\]|\[paste #\d+ (?:attached|excerpt)(?:[^\n]*?)\]/.test(text2);
   }
 });
 
@@ -70058,10 +70058,10 @@ var init_virtualHeights = __esm({
     "use strict";
     init_env();
     init_inputMetrics();
-    hashText = (text) => {
+    hashText = (text2) => {
       let h = 5381;
-      for (let i = 0; i < text.length; i++) {
-        h = (h << 5) + h ^ text.charCodeAt(i);
+      for (let i = 0; i < text2.length; i++) {
+        h = (h << 5) + h ^ text2.charCodeAt(i);
       }
       return (h >>> 0).toString(36);
     };
@@ -70076,13 +70076,13 @@ var init_virtualHeights = __esm({
       ].join(":");
     };
     MAX_ESTIMATE_LINES = 800;
-    wrappedLines = (text, width, maxLines = MAX_ESTIMATE_LINES) => {
+    wrappedLines = (text2, width, maxLines = MAX_ESTIMATE_LINES) => {
       const w = Math.max(1, width);
-      const budget = Math.min(text.length, maxLines * w + maxLines);
+      const budget = Math.min(text2.length, maxLines * w + maxLines);
       let n = 0;
       let start = 0;
       for (let i = 0; i <= budget; i++) {
-        if (i === text.length || i === budget || text.charCodeAt(i) === 10) {
+        if (i === text2.length || i === budget || text2.charCodeAt(i) === 10) {
           const rows = Math.max(1, Math.ceil((i - start) / w));
           n += rows >= maxLines - n ? maxLines - n : rows;
           start = i + 1;
@@ -70116,10 +70116,10 @@ var init_virtualHeights = __esm({
         return Math.max(2, msg.todos.length + 2);
       }
       const bodyWidth = transcriptBodyWidth(cols, msg.role, userPrompt, TERMUX_TUI_MODE);
-      const text = msg.text;
-      let h = wrappedLines(text || " ", bodyWidth);
+      const text2 = msg.text;
+      let h = wrappedLines(text2 || " ", bodyWidth);
       if (!compact && msg.role === "assistant") {
-        const scan = text.length > 16e3 ? text.slice(0, 16e3) : text;
+        const scan = text2.length > 16e3 ? text2.slice(0, 16e3) : text2;
         h += Math.min(6, (scan.match(/\n\s*\n/g) ?? []).length);
       }
       if (details) {
@@ -70913,7 +70913,7 @@ var init_overlayStore = __esm({
       (overlay, ui) => Boolean(overlay.widget || ui.statusBar === "top" && hasFloatingPanel(overlay))
     );
     SENSITIVE_PROMPTS = ["sudo", "secret", "vaultUnlock", "vaultSaveLogin", "vaultCode"];
-    hasSensitivePrompt = (overlay) => SENSITIVE_PROMPTS.some((key) => Boolean(overlay[key]));
+    hasSensitivePrompt = (overlay) => SENSITIVE_PROMPTS.some((key2) => Boolean(overlay[key2]));
     getOverlayState = () => $overlayState.get();
     patchOverlayState = (next) => $overlayState.set(typeof next === "function" ? next($overlayState.get()) : { ...$overlayState.get(), ...next });
     resetFlowOverlays = () => $overlayState.set({
@@ -71124,7 +71124,7 @@ var isCtrl;
 var init_types2 = __esm({
   "src/sdk/types.ts"() {
     "use strict";
-    isCtrl = (key, ch, target) => key.ctrl && ch.toLowerCase() === target;
+    isCtrl = (key2, ch, target) => key2.ctrl && ch.toLowerCase() === target;
   }
 });
 
@@ -71885,11 +71885,11 @@ var init_startupLatency = __esm({
 
 // src/lib/reasoning.ts
 function splitReasoning(input) {
-  let text = input;
+  let text2 = input;
   const reasoning = [];
   for (const tag of TAGS) {
     const paired = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>\\s*`, "gi");
-    text = text.replace(paired, (_m, inner) => {
+    text2 = text2.replace(paired, (_m, inner) => {
       const trimmed = inner.trim();
       if (trimmed) {
         reasoning.push(trimmed);
@@ -71897,7 +71897,7 @@ function splitReasoning(input) {
       return "";
     });
     const unclosed = new RegExp(`^\\s*<${tag}>([\\s\\S]*)$`, "i");
-    text = text.replace(unclosed, (_m, inner) => {
+    text2 = text2.replace(unclosed, (_m, inner) => {
       const trimmed = inner.trim();
       if (trimmed) {
         reasoning.push(trimmed);
@@ -71907,7 +71907,7 @@ function splitReasoning(input) {
   }
   return {
     reasoning: reasoning.join("\n\n").trim(),
-    text: text.trim()
+    text: text2.trim()
   };
 }
 var TAGS, hasReasoningTag;
@@ -72092,8 +72092,8 @@ var init_turnController = __esm({
     textSegments = (segments) => segments.filter((msg) => msg.role === "assistant" && msg.kind !== "diff").map((msg) => msg.text);
     finalTail = (finalText, segments) => {
       let tail = finalText;
-      for (const text of textSegments(segments)) {
-        const trimmed = text.trim();
+      for (const text2 of textSegments(segments)) {
+        const trimmed = text2.trim();
         if (trimmed && tail.startsWith(trimmed)) {
           tail = tail.slice(trimmed.length).trimStart();
         }
@@ -72192,11 +72192,11 @@ var init_turnController = __esm({
       // `notification.clear` only clears the visible notice when its key
       // matches — a stale/late clear must not wipe a NEWER notice. Always drop
       // a matching pending notice so it can't resurface at the next turn end.
-      clearNotice(key) {
-        if (this.pendingNotice && this.pendingNotice.key === key) {
+      clearNotice(key2) {
+        if (this.pendingNotice && this.pendingNotice.key === key2) {
           this.pendingNotice = null;
         }
-        if (getUiState().notice?.key === key) {
+        if (getUiState().notice?.key === key2) {
           this.clearNoticeTimer();
           patchUiState({ notice: null });
         }
@@ -72292,9 +72292,9 @@ var init_turnController = __esm({
           appendMessage(msg);
         }
         if (partial || tools.length) {
-          const text = interruptedText(partial);
-          appendMessage({ role: "assistant", text, ...tools.length && { tools } });
-          this.sealedInterrupt = { partial, text };
+          const text2 = interruptedText(partial);
+          appendMessage({ role: "assistant", text: text2, ...tools.length && { tools } });
+          this.sealedInterrupt = { partial, text: text2 };
         } else {
           sys(t("session.turn.interrupted"));
           this.sealedInterrupt = { partial: "", text: null };
@@ -72424,14 +72424,14 @@ ${stripped}
         ];
         patchTurnState({ streamSegments: this.segmentMessages });
       }
-      pushActivity(text, tone = "info", replaceLabel) {
+      pushActivity(text2, tone = "info", replaceLabel) {
         patchTurnState((state) => {
           const base = replaceLabel ? state.activity.filter((item) => !sameToolTrailGroup(replaceLabel, item.text)) : state.activity;
           const tail = base.at(-1);
-          if (tail?.text === text && tail.tone === tone) {
+          if (tail?.text === text2 && tail.tone === tone) {
             return state;
           }
-          return { ...state, activity: [...base, { id: ++this.activityId, text, tone }].slice(-ACTIVITY_LIMIT) };
+          return { ...state, activity: [...base, { id: ++this.activityId, text: text2, tone }].slice(-ACTIVITY_LIMIT) };
         });
       }
       pushTrail(line) {
@@ -72525,22 +72525,22 @@ ${stripped}
         this.flushPendingNotice();
         return { finalMessages, finalText, interruptedReply, wasInterrupted };
       }
-      recordMessageDelta({ text }) {
-        if (this.interrupted || !text) {
+      recordMessageDelta({ text: text2 }) {
+        if (this.interrupted || !text2) {
           return;
         }
         this.pruneTransient();
         this.endReasoningPhase();
-        this.bufRef += text;
+        this.bufRef += text2;
         if (getUiState().streaming) {
           this.scheduleStreaming();
         }
       }
-      recordInterimMessage(text) {
+      recordInterimMessage(text2) {
         if (this.interrupted) {
           return;
         }
-        const authoritativeText = text.trimStart();
+        const authoritativeText = text2.trimStart();
         if (!authoritativeText) {
           return;
         }
@@ -72550,11 +72550,11 @@ ${stripped}
         this.flushStreamingSegment();
         this.interimBoundaryIndex = this.segmentMessages.length;
       }
-      recordReasoningAvailable(text, force = false) {
+      recordReasoningAvailable(text2, force = false) {
         if (this.interrupted || !force && !getUiState().showReasoning) {
           return;
         }
-        const incoming = text.trim();
+        const incoming = text2.trim();
         if (!incoming || this.reasoningText.trim()) {
           return;
         }
@@ -72572,13 +72572,13 @@ ${stripped}
        * thinking-style segment tagged with the source model, so a multi-reference
        * preset builds a stack the user can scroll.
        */
-      recordMoaReference(label, text, index, count) {
+      recordMoaReference(label, text2, index, count) {
         if (this.interrupted) {
           return;
         }
         this.closeReasoningSegment();
         const header = index && count ? `\u25C7 Reference ${index}/${count} \u2014 ${label}` : `\u25C7 Reference \u2014 ${label}`;
-        const body = text.trim();
+        const body = text2.trim();
         const thinking = body ? `${header}
 ${body}` : header;
         this.pushSegment({
@@ -72591,15 +72591,15 @@ ${body}` : header;
         });
         patchTurnState({ streamSegments: this.segmentMessages });
       }
-      recordReasoningDelta(text, force = false) {
+      recordReasoningDelta(text2, force = false) {
         if (this.interrupted || !force && !getUiState().showReasoning) {
           return;
         }
         if (!this.activeReasoningText.trim() && this.pendingSegmentTools.length) {
           this.flushStreamingSegment();
         }
-        this.reasoningText += text;
-        this.activeReasoningText += text;
+        this.reasoningText += text2;
+        this.activeReasoningText += text2;
         if (this.reasoningText.length > 8e4) {
           this.reasoningText = this.reasoningText.slice(-6e4);
         }
@@ -72710,9 +72710,9 @@ ${body}` : header;
           patchTurnState({ streaming: boundedLiveRenderText(visible) });
         }, this.streamDelay);
       }
-      hydrateStreamingText(text) {
+      hydrateStreamingText(text2) {
         this.streamTimer = clear(this.streamTimer);
-        this.bufRef = text;
+        this.bufRef = text2;
         const raw = this.bufRef.trimStart();
         const visible = hasReasoningTag(raw) ? splitReasoning(raw).text : raw;
         patchTurnState({ streaming: boundedLiveRenderText(visible) });
@@ -72831,9 +72831,9 @@ function applyConfiguredTuiTheme(raw) {
   }
   reapplyTheme();
 }
-function polarityBackgroundFromForeground(hex2) {
-  const luminance2 = relativeLuminance(hex2);
-  if (luminance2 === null || hex2 === "#000000" || hex2 === "#ffffff") {
+function polarityBackgroundFromForeground(hex3) {
+  const luminance2 = relativeLuminance(hex3);
+  if (luminance2 === null || hex3 === "#000000" || hex3 === "#ffffff") {
     return void 0;
   }
   if (luminance2 >= 0.45) {
@@ -72850,8 +72850,8 @@ function syncThemeToTerminalBackground() {
   }
   themeBackgroundSyncStarted = true;
   let resolved = false;
-  onTerminalBackground((hex2) => {
-    if (hex2 === "#000000") {
+  onTerminalBackground((hex3) => {
+    if (hex3 === "#000000") {
       if (invalidateBootBackground()) {
         setTimeout(() => {
           if (!resolved) {
@@ -72862,14 +72862,14 @@ function syncThemeToTerminalBackground() {
       return;
     }
     resolved = true;
-    process.env.HERMES_TUI_BACKGROUND = hex2;
+    process.env.HERMES_TUI_BACKGROUND = hex3;
     reapplyTheme();
   });
-  onTerminalForeground((hex2) => {
+  onTerminalForeground((hex3) => {
     if (resolved || process.env.HERMES_TUI_THEME || process.env.HERMES_TUI_LIGHT) {
       return;
     }
-    const inferred = polarityBackgroundFromForeground(hex2);
+    const inferred = polarityBackgroundFromForeground(hex3);
     if (!inferred) {
       return;
     }
@@ -73165,9 +73165,9 @@ function createGatewayEventHandler(ctx) {
         if (!getUiState().busy) {
           return;
         }
-        const text = ev.payload?.text;
-        if (text !== void 0) {
-          const value = String(text);
+        const text2 = ev.payload?.text;
+        if (text2 !== void 0) {
+          const value = String(text2);
           scheduleThinkingStatus(value || statusFromBusy());
           if (value) {
             turnController.recordReasoningDelta(value);
@@ -73303,18 +73303,18 @@ function createGatewayEventHandler(ctx) {
           sys(t("gatewayMsg.voice.noSpeechLimit"));
           return;
         }
-        const text = String(ev.payload?.text ?? "").trim();
-        if (!text) {
+        const text2 = String(ev.payload?.text ?? "").trim();
+        if (!text2) {
           return;
         }
         void getFullConfigOnce().then((cfg) => {
           const submitMode = normalizeVoiceSubmitMode(cfg?.config?.voice?.submit_mode);
           if (submitMode === "draft") {
-            setInput((current) => current.trim() ? `${current.trimEnd()} ${text}` : text);
+            setInput((current) => current.trim() ? `${current.trimEnd()} ${text2}` : text2);
             return;
           }
           setInput("");
-          setTimeout(() => submitRef.current(text), 0);
+          setTimeout(() => submitRef.current(text2), 0);
         });
         return;
       }
@@ -73464,9 +73464,9 @@ function createGatewayEventHandler(ctx) {
         patchOverlayState((prev) => {
           const next = { ...prev };
           let changed = false;
-          for (const key of ["approval", "clarify", ...SENSITIVE_PROMPTS]) {
-            if (prev[key]?.requestId === id) {
-              next[key] = null;
+          for (const key2 of ["approval", "clarify", ...SENSITIVE_PROMPTS]) {
+            if (prev[key2]?.requestId === id) {
+              next[key2] = null;
               changed = true;
             }
           }
@@ -73488,9 +73488,9 @@ function createGatewayEventHandler(ctx) {
         sys(`[btw${ev.payload.question ? ` "${ev.payload.question}"` : ""}] ${ev.payload.text}`);
         return;
       case "review.summary": {
-        const text = String(ev.payload?.text ?? "").trim();
-        if (text) {
-          sys(text);
+        const text2 = String(ev.payload?.text ?? "").trim();
+        if (text2) {
+          sys(text2);
         }
         return;
       }
@@ -73517,15 +73517,15 @@ function createGatewayEventHandler(ctx) {
         if (!ev.payload) {
           return;
         }
-        const text = String(ev.payload.text ?? "").trim();
-        if (!text) {
+        const text2 = String(ev.payload.text ?? "").trim();
+        if (!text2) {
           return;
         }
         turnController.upsertSubagent(
           ev.payload,
           (c) => ({
             status: keepTerminalElseRunning(c.status),
-            thinking: pushThinking(c.thinking, text)
+            thinking: pushThinking(c.thinking, text2)
           }),
           { createIfMissing: false }
         );
@@ -73553,14 +73553,14 @@ function createGatewayEventHandler(ctx) {
         if (!ev.payload) {
           return;
         }
-        const text = String(ev.payload.text ?? "").trim();
-        if (!text) {
+        const text2 = String(ev.payload.text ?? "").trim();
+        if (!text2) {
           return;
         }
         turnController.upsertSubagent(
           ev.payload,
           (c) => ({
-            notes: pushNote(c.notes, text),
+            notes: pushNote(c.notes, text2),
             status: keepTerminalElseRunning(c.status)
           }),
           { createIfMissing: false }
@@ -73587,9 +73587,9 @@ function createGatewayEventHandler(ctx) {
         turnController.recordMessageDelta(ev.payload ?? {});
         return;
       case "message.interim": {
-        const text = ev.payload?.text;
-        if (typeof text === "string" && text.trim()) {
-          turnController.recordInterimMessage(text);
+        const text2 = ev.payload?.text;
+        if (typeof text2 === "string" && text2.trim()) {
+          turnController.recordInterimMessage(text2);
         }
         return;
       }
@@ -73706,8 +73706,8 @@ var init_createGatewayEventHandler = __esm({
     normalizeVoiceSubmitMode = (value) => typeof value === "string" && value.trim().toLowerCase() === "draft" ? "draft" : "direct";
     usageChanged = (prev, next) => {
       const keys = /* @__PURE__ */ new Set([...Object.keys(prev), ...Object.keys(next)]);
-      for (const key of keys) {
-        if (prev[key] !== next[key]) {
+      for (const key2 of keys) {
+        if (prev[key2] !== next[key2]) {
           return true;
         }
       }
@@ -73750,8 +73750,8 @@ var init_createGatewayEventHandler = __esm({
       if (a === b) {
         return true;
       }
-      for (const key of Object.keys(a.color)) {
-        if (a.color[key] !== b.color[key]) {
+      for (const key2 of Object.keys(a.color)) {
+        if (a.color[key2] !== b.color[key2]) {
           return false;
         }
       }
@@ -73918,7 +73918,7 @@ var init_slash3 = __esm({
   "../apps/shared/src/slash.ts"() {
     "use strict";
     SLASH_COMMAND_RE = /^\/[^\s/]*(?:\s|$)/;
-    looksLikeSlashCommand = (text) => SLASH_COMMAND_RE.test(text);
+    looksLikeSlashCommand = (text2) => SLASH_COMMAND_RE.test(text2);
     SLASH_PARTS_RE = /^(\S+)([\s\S]*)$/;
     str2 = (value) => typeof value === "string" ? value : void 0;
   }
@@ -74036,22 +74036,22 @@ var init_hotkeys = __esm({
 // src/lib/clipboard.ts
 import { execFile as execFile3, spawn as spawn4 } from "node:child_process";
 import { promisify as promisify2 } from "node:util";
-function isUsableClipboardText(text) {
-  if (!text || !/[^\s]/.test(text)) {
+function isUsableClipboardText(text2) {
+  if (!text2 || !/[^\s]/.test(text2)) {
     return false;
   }
-  if (text.includes("\0")) {
+  if (text2.includes("\0")) {
     return false;
   }
   let suspicious = 0;
-  for (const ch of text) {
+  for (const ch of text2) {
     const code = ch.charCodeAt(0);
     const isControl = code < 32 && ch !== "\n" && ch !== "\r" && ch !== "	";
     if (isControl || ch === "\uFFFD") {
       suspicious += 1;
     }
   }
-  return suspicious <= Math.max(2, Math.floor(text.length * 0.02));
+  return suspicious <= Math.max(2, Math.floor(text2.length * 0.02));
 }
 function readClipboardCommands(platform2, env3) {
   if (platform2 === "darwin") {
@@ -74110,7 +74110,7 @@ function writeClipboardCommands(platform2, env3) {
   attempts.push({ cmd: "xsel", args: ["--clipboard", "--input"], stdin: true });
   return attempts;
 }
-async function writeClipboardText(text, platform2 = process.platform, start = spawn4, env3 = process.env) {
+async function writeClipboardText(text2, platform2 = process.platform, start = spawn4, env3 = process.env) {
   const candidates = writeClipboardCommands(platform2, env3);
   for (const cmdEntry of candidates) {
     try {
@@ -74123,9 +74123,9 @@ async function writeClipboardText(text, platform2 = process.platform, start = sp
           child.unref();
           child.once("error", () => resolve3(false));
           child.once("close", (code) => resolve3(code === 0));
-          child.stdin?.end(text);
+          child.stdin?.end(text2);
         } else {
-          const b64 = Buffer.from(text, "utf8").toString("base64");
+          const b64 = Buffer.from(text2, "utf8").toString("base64");
           const script = _powershellWriteScript(b64);
           const child = start(cmdEntry.cmd, [...cmdEntry.args, "-Command", script], {
             stdio: ["ignore", "ignore", "ignore"],
@@ -74271,7 +74271,7 @@ var init_core2 = __esm({
     RESET_WORDS = /* @__PURE__ */ new Set(["reset", "clear", "default"]);
     CYCLE_WORDS = /* @__PURE__ */ new Set(["cycle", "toggle"]);
     PREVIEW_CHARS = 50;
-    previewOf = (text) => `${text.slice(0, PREVIEW_CHARS)}${text.length > PREVIEW_CHARS ? "\u2026" : ""}`;
+    previewOf = (text2) => `${text2.slice(0, PREVIEW_CHARS)}${text2.length > PREVIEW_CHARS ? "\u2026" : ""}`;
     coreCommands = [
       {
         help: "list commands + hotkeys",
@@ -74485,11 +74485,11 @@ var init_core2 = __esm({
         help: "local fortune",
         name: "fortune",
         run: (arg, ctx) => {
-          const key = arg.trim().toLowerCase();
-          if (!arg || key === "random") {
+          const key2 = arg.trim().toLowerCase();
+          if (!arg || key2 === "random") {
             return ctx.transcript.sys(randomFortune());
           }
-          if (["daily", "stable", "today"].includes(key)) {
+          if (["daily", "stable", "today"].includes(key2)) {
             return ctx.transcript.sys(dailyFortune(ctx.sid));
           }
           ctx.transcript.sys(t("slashCmd.core.fortune.usage"));
@@ -74501,12 +74501,12 @@ var init_core2 = __esm({
         run: async (arg, ctx) => {
           const { sys } = ctx.transcript;
           if (!arg && ctx.composer.hasSelection) {
-            const text = await ctx.composer.selection.copySelection();
-            if (text) {
+            const text2 = await ctx.composer.selection.copySelection();
+            if (text2) {
               return sys(
                 t(
-                  text.length === 1 ? "slashCmd.core.copy.copiedCharsOne" : "slashCmd.core.copy.copiedCharsOther",
-                  String(text.length)
+                  text2.length === 1 ? "slashCmd.core.copy.copiedCharsOne" : "slashCmd.core.copy.copiedCharsOther",
+                  String(text2.length)
                 )
               );
             } else {
@@ -74589,8 +74589,8 @@ var init_core2 = __esm({
         help: "view gateway logs",
         name: "logs",
         run: (arg, ctx) => {
-          const text = ctx.gateway.gw.getLogTail(Math.min(80, Math.max(1, parseInt(arg, 10) || 20)));
-          text ? ctx.transcript.page(text, t("slashCmd.core.logs.pageTitle")) : ctx.transcript.sys(t("slashCmd.core.logs.none"));
+          const text2 = ctx.gateway.gw.getLogTail(Math.min(80, Math.max(1, parseInt(arg, 10) || 20)));
+          text2 ? ctx.transcript.page(text2, t("slashCmd.core.logs.pageTitle")) : ctx.transcript.sys(t("slashCmd.core.logs.none"));
         }
       },
       {
@@ -74833,8 +74833,8 @@ var init_dialogTest = __esm({
         }
         return { body: defaultBody(zone), hint: "Esc/q/Enter close \xB7 Ctrl+C close", title: "Dialog primitive", zone };
       },
-      reduce(state, { ch, key }) {
-        return key.escape || key.return || ch === "q" || isCtrl(key, ch, "c") ? null : state;
+      reduce(state, { ch, key: key2 }) {
+        return key2.escape || key2.return || ch === "q" || isCtrl(key2, ch, "c") ? null : state;
       },
       render({ cols, state }) {
         return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Overlay, { backdrop: true, zone: state.zone, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Dialog, { hint: state.hint ?? "Esc/q close", title: state.title, width: Math.min(60, cols - 8), children: state.body.split("\n").map((line, i) => /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Text, { children: line || " " }, i)) }) });
@@ -75231,11 +75231,11 @@ var init_messages2 = __esm({
     init_runtime();
     init_text();
     introMsg = (info) => ({ info, kind: "intro", role: "system", text: "" });
-    userDisplay = (text) => {
-      if (text.length <= LONG_MSG) {
-        return text;
+    userDisplay = (text2) => {
+      if (text2.length <= LONG_MSG) {
+        return text2;
       }
-      const first = text.split("\n")[0]?.trim() ?? "";
+      const first = text2.split("\n")[0]?.trim() ?? "";
       const words = first.split(/\s+/).filter(Boolean);
       const prefix = (words.length > 1 ? words.slice(0, 4).join(" ") : first).slice(0, 80);
       return t("libText.messages.longMessage", prefix || t("libText.messages.messageFallback"));
@@ -75250,13 +75250,13 @@ var init_messages2 = __esm({
         if (!row || typeof row !== "object") {
           continue;
         }
-        const { context, display_kind, name, role, text, timestamp } = row;
+        const { context, display_kind, name, role, text: text2, timestamp } = row;
         const createdAt = typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0 ? timestamp : void 0;
         if (role === "tool") {
           pending.push(buildToolTrailLine(name ?? "tool", context ?? ""));
           continue;
         }
-        if (typeof text !== "string" || !text.trim()) {
+        if (typeof text2 !== "string" || !text2.trim()) {
           continue;
         }
         if (display_kind === "hidden") {
@@ -75293,10 +75293,10 @@ var init_messages2 = __esm({
           continue;
         }
         if (role === "assistant") {
-          out.push({ role, text, ...createdAt !== void 0 && { createdAt }, ...pending.length && { tools: pending } });
+          out.push({ role, text: text2, ...createdAt !== void 0 && { createdAt }, ...pending.length && { tools: pending } });
           pending = [];
         } else if (role === "user" || role === "system") {
-          out.push({ role, text, ...createdAt !== void 0 && { createdAt } });
+          out.push({ role, text: text2, ...createdAt !== void 0 && { createdAt } });
           pending = [];
         }
       }
@@ -75406,14 +75406,14 @@ function scrollbarSnapshotKey(v) {
   return `${v.top}:${v.viewportHeight}:${v.scrollHeight}`;
 }
 function useViewportSnapshot(scrollRef) {
-  const key = (0, import_react42.useSyncExternalStore)(
+  const key2 = (0, import_react42.useSyncExternalStore)(
     (0, import_react42.useCallback)((cb) => scrollRef.current?.subscribe(cb) ?? (() => {
     }), [scrollRef]),
     () => viewportSnapshotKey(getViewportSnapshot(scrollRef.current)),
     () => viewportSnapshotKey(EMPTY2)
   );
   return (0, import_react42.useMemo)(() => {
-    const [atBottom = "1", top = "0", viewportHeight = "0", scrollHeight = "0", pending = "0"] = key.split(":");
+    const [atBottom = "1", top = "0", viewportHeight = "0", scrollHeight = "0", pending = "0"] = key2.split(":");
     return {
       atBottom: atBottom === "1",
       bottom: Number(top) + Number(viewportHeight),
@@ -75422,23 +75422,23 @@ function useViewportSnapshot(scrollRef) {
       top: Number(top),
       viewportHeight: Number(viewportHeight)
     };
-  }, [key]);
+  }, [key2]);
 }
 function useScrollbarSnapshot(scrollRef) {
-  const key = (0, import_react42.useSyncExternalStore)(
+  const key2 = (0, import_react42.useSyncExternalStore)(
     (0, import_react42.useCallback)((cb) => scrollRef.current?.subscribe(cb) ?? (() => {
     }), [scrollRef]),
     () => scrollbarSnapshotKey(getScrollbarSnapshot(scrollRef.current)),
     () => scrollbarSnapshotKey(EMPTY_SCROLLBAR)
   );
   return (0, import_react42.useMemo)(() => {
-    const [top = "0", viewportHeight = "0", scrollHeight = "0"] = key.split(":");
+    const [top = "0", viewportHeight = "0", scrollHeight = "0"] = key2.split(":");
     return {
       scrollHeight: Number(scrollHeight),
       top: Number(top),
       viewportHeight: Number(viewportHeight)
     };
-  }, [key]);
+  }, [key2]);
 }
 var import_react42, EMPTY2, EMPTY_SCROLLBAR;
 var init_viewportStore = __esm({
@@ -75474,20 +75474,20 @@ function scrollbarColors(t2, hover, grabbed) {
 }
 function useMenu(rows, onEscape, onKey) {
   const [sel, setSel] = (0, import_react43.useState)(0);
-  use_input_default((ch, key) => {
-    if (onKey?.(ch, key)) {
+  use_input_default((ch, key2) => {
+    if (onKey?.(ch, key2)) {
       return;
     }
-    if (key.escape) {
+    if (key2.escape) {
       return onEscape();
     }
-    if (key.upArrow && sel > 0) {
+    if (key2.upArrow && sel > 0) {
       setSel((v) => v - 1);
     }
-    if (key.downArrow && sel < rows.length - 1) {
+    if (key2.downArrow && sel < rows.length - 1) {
       setSel((v) => v + 1);
     }
-    if (key.return) {
+    if (key2.return) {
       return rows[sel]?.run();
     }
     const n = parseInt(ch, 10);
@@ -75815,8 +75815,8 @@ function GoodVibesHeart({ tick, t: t2 }) {
     if (tick <= 0) {
       return;
     }
-    const palette = [t2.color.error, t2.color.warn, t2.color.accent];
-    setColor(palette[Math.floor(Math.random() * palette.length)]);
+    const palette2 = [t2.color.error, t2.color.warn, t2.color.accent];
+    setColor(palette2[Math.floor(Math.random() * palette2.length)]);
     setActive(true);
     const id = setTimeout(() => setActive(false), 650);
     return () => clearTimeout(id);
@@ -76043,8 +76043,8 @@ function FloatBox({ children, color }) {
 }
 function StickyPromptTracker({ messages: messages2, offsets, scrollRef, onChange }) {
   const { atBottom, bottom, top } = useViewportSnapshot(scrollRef);
-  const text = stickyPromptFromViewport(messages2, offsets, top, bottom, atBottom);
-  (0, import_react45.useEffect)(() => onChange(text), [onChange, text]);
+  const text2 = stickyPromptFromViewport(messages2, offsets, top, bottom, atBottom);
+  (0, import_react45.useEffect)(() => onChange(text2), [onChange, text2]);
   return null;
 }
 function TranscriptScrollbar({ scrollRef, t: t2 }) {
@@ -76718,20 +76718,20 @@ function parseSize(arg) {
   }
   return { cols: clampSize(Number(cols), 4), rows: clampSize(Number(rows), 3) };
 }
-function reduceStreams(grid, { ch, key }) {
-  if (key.escape || ch === "q" || ch === "s") {
+function reduceStreams(grid, { ch, key: key2 }) {
+  if (key2.escape || ch === "q" || ch === "s") {
     return update(grid, (g) => ({ ...g, streams: false }));
   }
-  if (key.return) {
+  if (key2.return) {
     return update(grid, (g) => ({ ...g, streamMain: g.streamFocus }));
   }
   if (ch === "r") {
     return initialState(4, 3, false);
   }
-  if (key.leftArrow || key.upArrow || ch === "h" || ch === "k") {
+  if (key2.leftArrow || key2.upArrow || ch === "h" || ch === "k") {
     return update(grid, (g) => ({ ...g, streamFocus: (g.streamFocus + GRID_STREAM_COUNT - 1) % GRID_STREAM_COUNT }));
   }
-  if (key.rightArrow || key.downArrow || ch === "l" || ch === "j") {
+  if (key2.rightArrow || key2.downArrow || ch === "l" || ch === "j") {
     return update(grid, (g) => ({ ...g, streamFocus: (g.streamFocus + 1) % GRID_STREAM_COUNT }));
   }
   return grid;
@@ -76784,8 +76784,8 @@ var init_gridTest = __esm({
         return size ? initialState(size.cols, size.rows, streams) : null;
       },
       reduce(grid, input) {
-        const { ch, key } = input;
-        if (isCtrl(key, ch, "c")) {
+        const { ch, key: key2 } = input;
+        if (isCtrl(key2, ch, "c")) {
           return null;
         }
         if (ch === "d") {
@@ -76800,13 +76800,13 @@ var init_gridTest = __esm({
         if (grid.streams) {
           return reduceStreams(grid, input);
         }
-        if (grid.zoomed && (key.escape || ch === "q")) {
+        if (grid.zoomed && (key2.escape || ch === "q")) {
           return update(grid, (g) => ({ ...g, zoomed: false }));
         }
-        if (key.escape || ch === "q") {
+        if (key2.escape || ch === "q") {
           return null;
         }
-        if (key.return) {
+        if (key2.return) {
           return update(grid, (g) => ({ ...g, nested: true, zoomed: true }));
         }
         if (ch === "n") {
@@ -76839,16 +76839,16 @@ var init_gridTest = __esm({
         if (ch === "[") {
           return update(grid, (g) => ({ ...g, rows: clamp3(g.rows - 1, 1, MAX_SIZE) }));
         }
-        if (key.leftArrow || ch === "h") {
+        if (key2.leftArrow || ch === "h") {
           return update(grid, (g) => ({ ...g, activeCol: g.activeCol - 1 }));
         }
-        if (key.rightArrow || ch === "l") {
+        if (key2.rightArrow || ch === "l") {
           return update(grid, (g) => ({ ...g, activeCol: g.activeCol + 1 }));
         }
-        if (key.upArrow || ch === "k") {
+        if (key2.upArrow || ch === "k") {
           return update(grid, (g) => ({ ...g, activeRow: g.activeRow - 1 }));
         }
-        if (key.downArrow || ch === "j") {
+        if (key2.downArrow || ch === "j") {
           return update(grid, (g) => ({ ...g, activeRow: g.activeRow + 1 }));
         }
         return grid;
@@ -76919,8 +76919,8 @@ var init_ticker = __esm({
         return { symbol };
       },
       // Never receives input while ambient; contract-complete for modal reuse.
-      reduce(state, { ch, key }) {
-        return key.escape || ch === "q" || isCtrl(key, ch, "c") ? null : state;
+      reduce(state, { ch, key: key2 }) {
+        return key2.escape || ch === "q" || isCtrl(key2, ch, "c") ? null : state;
       },
       render({ state, t: t2 }) {
         return /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(Dialog, { width: Math.max(32, POINTS + 6), children: /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(Chart, { symbol: state.symbol, t: t2 }) });
@@ -77123,8 +77123,8 @@ var init_weather = __esm({
         load2(location);
         return { location, phase: { kind: "loading" } };
       },
-      reduce(state, { ch, key }) {
-        if (key.escape || key.return || ch === "q" || isCtrl(key, ch, "c")) {
+      reduce(state, { ch, key: key2 }) {
+        if (key2.escape || key2.return || ch === "q" || isCtrl(key2, ch, "c")) {
           return null;
         }
         if (ch === "r") {
@@ -77437,26 +77437,26 @@ var init_ops2 = __esm({
             ).catch(ctx.guardedErr);
           }
           if (lower === "diff") {
-            const hash3 = rest[0];
-            if (!hash3) {
+            const hash4 = rest[0];
+            if (!hash4) {
               return ctx.transcript.sys(t("slashCmd.ops.rollback.usageDiff"));
             }
-            return ctx.gateway.rpc("rollback.diff", { hash: hash3, session_id: ctx.sid }).then(
+            return ctx.gateway.rpc("rollback.diff", { hash: hash4, session_id: ctx.sid }).then(
               ctx.guarded((r) => {
                 const body = (r.rendered || r.diff || "").trim();
                 if (!body && !r.stat) {
                   return ctx.transcript.sys(t("slashCmd.ops.rollback.noChanges"));
                 }
-                const text = [r.stat || "", body].filter(Boolean).join("\n\n");
-                ctx.transcript.page(text, t("slashCmd.ops.rollback.diffTitle"));
+                const text2 = [r.stat || "", body].filter(Boolean).join("\n\n");
+                ctx.transcript.page(text2, t("slashCmd.ops.rollback.diffTitle"));
               })
             ).catch(ctx.guardedErr);
           }
-          const hash2 = first;
+          const hash3 = first;
           const filePath = rest.join(" ").trim();
           return ctx.gateway.rpc("rollback.restore", {
             ...filePath ? { file_path: filePath } : {},
-            hash: hash2,
+            hash: hash3,
             session_id: ctx.sid
           }).then(
             ctx.guarded((r) => {
@@ -77632,11 +77632,11 @@ var init_ops2 = __esm({
         help: "browse, inspect, install skills",
         name: "skills",
         run: (arg, ctx, cmd) => {
-          const text = arg.trim();
-          if (!text) {
+          const text2 = arg.trim();
+          if (!text2) {
             return patchOverlayState({ skillsHub: true });
           }
-          const [sub, ...rest] = text.split(/\s+/);
+          const [sub, ...rest] = text2.split(/\s+/);
           const query = rest.join(" ").trim();
           const { rpc } = ctx.gateway;
           const { panel, sys } = ctx.transcript;
@@ -77773,10 +77773,10 @@ ${body}` : body;
               return;
             }
             const body = r?.output || t("slashCmd.ops.slashWorker.pluginsNoOutput");
-            const text = r?.warning ? `${t("slashCmd.ops.slashWorker.warning", r.warning)}
+            const text2 = r?.warning ? `${t("slashCmd.ops.slashWorker.warning", r.warning)}
 ${body}` : body;
-            const long = text.length > 180 || text.split("\n").filter(Boolean).length > 2;
-            long ? ctx.transcript.page(text, t("slashCmd.ops.slashWorker.pluginsTitle")) : ctx.transcript.sys(text);
+            const long = text2.length > 180 || text2.split("\n").filter(Boolean).length > 2;
+            long ? ctx.transcript.page(text2, t("slashCmd.ops.slashWorker.pluginsTitle")) : ctx.transcript.sys(text2);
           }).catch(ctx.guardedErr);
         }
       },
@@ -77791,10 +77791,10 @@ ${body}` : body;
                 return;
               }
               const body = r?.output || t("slashCmd.ops.slashWorker.toolsNoOutput");
-              const text = r?.warning ? `${t("slashCmd.ops.slashWorker.warning", r.warning)}
+              const text2 = r?.warning ? `${t("slashCmd.ops.slashWorker.warning", r.warning)}
 ${body}` : body;
-              const long = text.length > 180 || text.split("\n").filter(Boolean).length > 2;
-              long ? ctx.transcript.page(text, t("slashCmd.ops.slashWorker.toolsTitle")) : ctx.transcript.sys(text);
+              const long = text2.length > 180 || text2.split("\n").filter(Boolean).length > 2;
+              long ? ctx.transcript.page(text2, t("slashCmd.ops.slashWorker.toolsTitle")) : ctx.transcript.sys(text2);
             }).catch(ctx.guardedErr);
             return;
           }
@@ -78968,10 +78968,10 @@ var init_wake = __esm({
       owned: "slashCmd.wake.reason.owned",
       unavailable: "slashCmd.wake.reason.unavailable"
     };
-    withHint = (text, hint) => hint?.trim() ? t("slashCmd.wake.withHint", text, hint.trim()) : text;
+    withHint = (text2, hint) => hint?.trim() ? t("slashCmd.wake.withHint", text2, hint.trim()) : text2;
     startFailureLine = (r) => {
-      const key = r.reason ? START_REASON_KEY[r.reason] : void 0;
-      const base = key ? t(key) : r.reason ?? t("slashCmd.wake.reason.unknown");
+      const key2 = r.reason ? START_REASON_KEY[r.reason] : void 0;
+      const base = key2 ? t(key2) : r.reason ?? t("slashCmd.wake.reason.unknown");
       const owner = r.owner_surface ? ` (${t("slashCmd.wake.ownedBy", r.owner_surface)})` : "";
       return withHint(t("slashCmd.wake.notStarted", `${base}${owner}`), r.hint);
     };
@@ -79188,10 +79188,10 @@ function createSlashHandler(ctx) {
         return handleDispatch(r);
       }
       const body = r?.output || `/${parsed.name}: no output`;
-      const text = r?.warning ? `warning: ${r.warning}
+      const text2 = r?.warning ? `warning: ${r.warning}
 ${body}` : body;
-      const long = text.length > 180 || text.split("\n").filter(Boolean).length > 2;
-      long ? page(text, parsed.name[0].toUpperCase() + parsed.name.slice(1)) : sys(text);
+      const long = text2.length > 180 || text2.split("\n").filter(Boolean).length > 2;
+      long ? page(text2, parsed.name[0].toUpperCase() + parsed.name.slice(1)) : sys(text2);
     }).catch((execErr) => {
       if (!shouldFallbackToDispatch(execErr)) {
         if (!stale()) {
@@ -79283,9 +79283,9 @@ var init_processRoster = __esm({
     };
     lastOutputLine = (preview) => {
       for (const line of (preview ?? "").split("\n").reverse()) {
-        const text = line.replace(/\s+/g, " ").trim();
-        if (text) {
-          return text;
+        const text2 = line.replace(/\s+/g, " ").trim();
+        if (text2) {
+          return text2;
         }
       }
       return "";
@@ -79683,11 +79683,11 @@ function useQueue() {
     if (!sid) {
       return unbound.current;
     }
-    const key = JSON.stringify([info?.profile_name || "default", sid]);
-    let queue = queues.current.get(key);
+    const key2 = JSON.stringify([info?.profile_name || "default", sid]);
+    let queue = queues.current.get(key2);
     if (!queue) {
       queue = { edit: null, items: [] };
-      queues.current.set(key, queue);
+      queues.current.set(key2, queue);
     }
     if (unbound.current.items.length) {
       const offset = queue.items.length;
@@ -79729,8 +79729,8 @@ function useQueue() {
     [queueEditRef, syncQueue]
   );
   const enqueue = (0, import_react55.useCallback)(
-    (text, display = text) => {
-      queueRef.current.push(queueItem(text, display));
+    (text2, display = text2) => {
+      queueRef.current.push(queueItem(text2, display));
       syncQueue();
     },
     [queueRef, syncQueue]
@@ -79783,7 +79783,7 @@ var init_useQueue = __esm({
     init_react();
     import_react55 = __toESM(require_react(), 1);
     init_uiStore();
-    queueItem = (text, display = text) => ({ display, text });
+    queueItem = (text2, display = text2) => ({ display, text: text2 });
   }
 });
 
@@ -79841,17 +79841,17 @@ import { spawnSync as spawnSync2 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, readFileSync as readFileSync5, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
 import { join as join8 } from "node:path";
-function insertAtCursor(value, cursor, text) {
+function insertAtCursor(value, cursor, text2) {
   const lead = cursor > 0 && !/\s/.test(value[cursor - 1] ?? "") ? " " : "";
   const tail = cursor < value.length && !/\s/.test(value[cursor] ?? "") ? " " : "";
-  const insert = `${lead}${text}${tail}`;
+  const insert = `${lead}${text2}${tail}`;
   return {
     cursor: cursor + insert.length,
     value: value.slice(0, cursor) + insert + value.slice(cursor)
   };
 }
-function looksLikeDroppedPath(text) {
-  const trimmed = text.trim();
+function looksLikeDroppedPath(text2) {
+  const trimmed = text2.trim();
   if (!trimmed || trimmed.includes("\n")) {
     return false;
   }
@@ -79947,8 +79947,8 @@ function useComposerState({ gw: gw2, submitRef, sys }) {
     [attachImageToken, gw2, sys]
   );
   const handleResolvedPaste = (0, import_react57.useCallback)(
-    async ({ bracketed, cursor, text, value }) => {
-      const cleanedText = stripTrailingPasteNewlines(text);
+    async ({ bracketed, cursor, text: text2, value }) => {
+      const cleanedText = stripTrailingPasteNewlines(text2);
       if (!cleanedText || !/[^\n]/.test(cleanedText)) {
         return bracketed ? pasteClipboardImage(value, cursor, true) : null;
       }
@@ -80002,7 +80002,7 @@ function useComposerState({ gw: gw2, submitRef, sys }) {
     [attachImageToken, gw2, pasteClipboardImage, setComposerTokens]
   );
   const handleTextPaste = (0, import_react57.useCallback)(
-    ({ bracketed, cursor, hotkey, text, value }) => {
+    ({ bracketed, cursor, hotkey, text: text2, value }) => {
       if (hotkey) {
         const preferOsc52 = isRemoteShellSession(process.env);
         const readPreferredText = preferOsc52 ? readOsc52Clipboard(querier).then(async (osc52Text) => {
@@ -80023,7 +80023,7 @@ function useComposerState({ gw: gw2, submitRef, sys }) {
           return pasteClipboardImage(value, cursor, false);
         });
       }
-      return handleResolvedPaste({ bracketed: !!bracketed, cursor, text, value });
+      return handleResolvedPaste({ bracketed: !!bracketed, cursor, text: text2, value });
     },
     [handleResolvedPaste, pasteClipboardImage, querier]
   );
@@ -80069,13 +80069,13 @@ function useComposerState({ gw: gw2, submitRef, sys }) {
       if (exitCode !== 0) {
         return;
       }
-      const text = readFileSync5(file2, "utf8").trimEnd();
-      if (!text) {
+      const text2 = readFileSync5(file2, "utf8").trimEnd();
+      if (!text2) {
         return;
       }
       setInput("");
       setInputBuf([]);
-      submitRef.current(text);
+      submitRef.current(text2);
     } finally {
       rmSync2(dir2, { force: true, recursive: true });
     }
@@ -80360,7 +80360,7 @@ var init_useConfigSync = __esm({
     };
     FALSEY_MOUSE = /* @__PURE__ */ new Set(["0", "false", "no", "off"]);
     TRUTHY_MOUSE_ALL = /* @__PURE__ */ new Set(["1", "true", "yes", "on", "all", "full", "any"]);
-    hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+    hasOwn = (obj, key2) => Object.prototype.hasOwnProperty.call(obj, key2);
     normalizeMouseTracking = (display, bootPolicy = MOUSE_TRACKING) => {
       const raw = hasOwn(display, "mouse_tracking") ? display.mouse_tracking : display.tui_mouse;
       if (raw === false || raw === 0) {
@@ -80666,14 +80666,14 @@ function resolveDoubleEscAction(opts) {
   }
   return "none";
 }
-function shouldFallThroughForScroll(key) {
-  if (key.wheelUp || key.wheelDown) {
+function shouldFallThroughForScroll(key2) {
+  if (key2.wheelUp || key2.wheelDown) {
     return true;
   }
-  if (key.pageUp || key.pageDown) {
+  if (key2.pageUp || key2.pageDown) {
     return true;
   }
-  if (key.shift && (key.upArrow || key.downArrow)) {
+  if (key2.shift && (key2.upArrow || key2.downArrow)) {
     return true;
   }
   return false;
@@ -80691,11 +80691,11 @@ function applyVoiceRecordResponse(response, starting, voice, sys) {
   }
 }
 function dismissSensitivePrompt(overlay, rpc, sys) {
-  for (const key of SENSITIVE_PROMPTS) {
-    const req = overlay[key];
+  for (const key2 of SENSITIVE_PROMPTS) {
+    const req = overlay[key2];
     if (req) {
-      patchOverlayState({ [key]: null });
-      sys(dismissedNotice(key, req));
+      patchOverlayState({ [key2]: null });
+      sys(dismissedNotice(key2, req));
       respondToServerRequest(req.requestId, { value: "" });
       return;
     }
@@ -80846,10 +80846,10 @@ function useInputHandlers(ctx) {
     });
   };
   const lastEscRef = (0, import_react60.useRef)(0);
-  use_input_default((ch, key, event) => {
+  use_input_default((ch, key2, event) => {
     const live = getUiState();
-    if (key.escape) {
-      if (isVoiceToggleKey(key, ch, voice.recordKey)) {
+    if (key2.escape) {
+      if (isVoiceToggleKey(key2, ch, voice.recordKey)) {
         lastEscRef.current = 0;
       } else {
         const now2 = Date.now();
@@ -80880,15 +80880,15 @@ function useInputHandlers(ctx) {
     }
     if (isBlocked) {
       const promptOverlay = overlay.approval || overlay.billing || overlay.clarify || overlay.confirm || overlay.connection || overlay.subscription;
-      const fallThroughForScroll = promptOverlay && shouldFallThroughForScroll(key);
+      const fallThroughForScroll = promptOverlay && shouldFallThroughForScroll(key2);
       if (promptOverlay && !fallThroughForScroll) {
-        if (isCtrl2(key, ch, "c")) {
+        if (isCtrl2(key2, ch, "c")) {
           cancelOverlayFromCtrlC();
         }
         return;
       }
       if (overlay.pager) {
-        if (key.escape || isCtrl2(key, ch, "c") || ch === "q") {
+        if (key2.escape || isCtrl2(key2, ch, "c") || ch === "q") {
           return patchOverlayState({ pager: null });
         }
         const move = (delta) => patchOverlayState((prev) => {
@@ -80901,13 +80901,13 @@ function useInputHandlers(ctx) {
           const next = Math.max(0, Math.min(offset + step, max));
           return next === offset ? prev : { ...prev, pager: { ...prev.pager, offset: next } };
         });
-        if (key.upArrow || ch === "k") {
+        if (key2.upArrow || ch === "k") {
           return move(-1);
         }
-        if (key.downArrow || ch === "j") {
+        if (key2.downArrow || ch === "j") {
           return move(1);
         }
-        if (key.pageUp || ch === "b") {
+        if (key2.pageUp || ch === "b") {
           return move(-pagerPageSize);
         }
         if (ch === "g") {
@@ -80916,7 +80916,7 @@ function useInputHandlers(ctx) {
         if (ch === "G") {
           return move("bottom");
         }
-        if (key.return || ch === " " || key.pageDown) {
+        if (key2.return || ch === " " || key2.pageDown) {
           patchOverlayState((prev) => {
             if (!prev.pager) {
               return prev;
@@ -80928,27 +80928,27 @@ function useInputHandlers(ctx) {
         }
         return;
       }
-      if (overlay.widget && dispatchWidgetInput({ ch, key })) {
+      if (overlay.widget && dispatchWidgetInput({ ch, key: key2 })) {
         return;
       }
-      if (isCtrl2(key, ch, "c") || key.escape && hasSensitivePrompt(overlay)) {
+      if (isCtrl2(key2, ch, "c") || key2.escape && hasSensitivePrompt(overlay)) {
         cancelOverlayFromCtrlC();
-      } else if (key.escape && overlay.sessions) {
+      } else if (key2.escape && overlay.sessions) {
         patchOverlayState({ sessions: false });
       }
       if (!fallThroughForScroll) {
         return;
       }
     }
-    if (cState.completions.length && cState.input && cState.historyIdx === null && (key.upArrow || key.downArrow)) {
+    if (cState.completions.length && cState.input && cState.historyIdx === null && (key2.upArrow || key2.downArrow)) {
       const len = cState.completions.length;
-      cActions.setCompIdx((i) => key.upArrow ? (i - 1 + len) % len : (i + 1) % len);
+      cActions.setCompIdx((i) => key2.upArrow ? (i - 1 + len) % len : (i + 1) % len);
       return;
     }
-    if (key.wheelUp || key.wheelDown) {
-      const dir2 = key.wheelUp ? -1 : 1;
+    if (key2.wheelUp || key2.wheelDown) {
+      const dir2 = key2.wheelUp ? -1 : 1;
       const now2 = Date.now();
-      const hasModifier = key.meta || key.ctrl;
+      const hasModifier = key2.meta || key2.ctrl;
       const precision = computePrecisionWheelStep(precisionWheelRef.current, dir2, hasModifier, now2);
       if (precision.active) {
         if (precision.entered) {
@@ -80959,27 +80959,27 @@ function useInputHandlers(ctx) {
       const rows = computeWheelStep(wheelAccelRef.current, dir2, now2);
       return rows ? scrollTranscript(dir2 * rows * wheelStep) : void 0;
     }
-    if (key.shift && key.upArrow) {
+    if (key2.shift && key2.upArrow) {
       return scrollTranscript(-1);
     }
-    if (key.shift && key.downArrow) {
+    if (key2.shift && key2.downArrow) {
       return scrollTranscript(1);
     }
-    if (key.pageUp || key.pageDown) {
+    if (key2.pageUp || key2.pageDown) {
       const viewport = terminal.scrollRef.current?.getViewportHeight() ?? Math.max(6, (terminal.stdout?.rows ?? 24) - 8);
       const step = Math.max(4, Math.floor(viewport / 2));
-      return scrollTranscript(key.pageUp ? -step : step);
+      return scrollTranscript(key2.pageUp ? -step : step);
     }
-    if (key.escape && isVoiceToggleKey(key, ch, voice.recordKey)) {
+    if (key2.escape && isVoiceToggleKey(key2, ch, voice.recordKey)) {
       return voiceRecordToggle();
     }
-    if (key.escape && cState.queueEditIdx !== null) {
+    if (key2.escape && cState.queueEditIdx !== null) {
       return cActions.clearIn();
     }
-    if (key.escape && terminal.hasSelection) {
+    if (key2.escape && terminal.hasSelection) {
       return clearSelection2();
     }
-    if (key.upArrow && !cState.inputBuf.length) {
+    if (key2.upArrow && !cState.inputBuf.length) {
       const inputSel = getInputSelection();
       const cursor = inputSel && inputSel.start === inputSel.end ? inputSel.start : null;
       const noLineAbove = !cState.input || cursor !== null && cState.input.lastIndexOf("\n", Math.max(0, cursor - 1)) < 0;
@@ -80988,7 +80988,7 @@ function useInputHandlers(ctx) {
         return;
       }
     }
-    if (key.downArrow && !cState.inputBuf.length) {
+    if (key2.downArrow && !cState.inputBuf.length) {
       const inputSel = getInputSelection();
       const cursor = inputSel && inputSel.start === inputSel.end ? inputSel.start : null;
       const noLineBelow = !cState.input || cursor !== null && cState.input.indexOf("\n", cursor) < 0;
@@ -80997,7 +80997,7 @@ function useInputHandlers(ctx) {
         return;
       }
     }
-    if (isCopyShortcut(key, ch)) {
+    if (isCopyShortcut(key2, ch)) {
       if (terminal.hasSelection) {
         return copySelection();
       }
@@ -81009,27 +81009,27 @@ function useInputHandlers(ctx) {
         return;
       }
     }
-    if (isCtrl2(key, ch, "x") && handleInputSelectionClipboard(getInputSelection(), "cut")) {
+    if (isCtrl2(key2, ch, "x") && handleInputSelectionClipboard(getInputSelection(), "cut")) {
       return;
     }
-    if (isCtrl2(key, ch, "x") && cState.queueEditIdx !== null) {
+    if (isCtrl2(key2, ch, "x") && cState.queueEditIdx !== null) {
       cActions.removeQueue(cState.queueEditIdx);
       return cActions.clearIn();
     }
-    if (isCtrl2(key, ch, "x")) {
+    if (isCtrl2(key2, ch, "x")) {
       return patchOverlayState({ sessions: true });
     }
-    if ((event.keypress.name === "f7" && !key.ctrl || isCtrl2(key, ch, "r")) && !key.meta && !key.shift && !key.super) {
+    if ((event.keypress.name === "f7" && !key2.ctrl || isCtrl2(key2, ch, "r")) && !key2.meta && !key2.shift && !key2.super) {
       $agentDockCollapsed.set(!$agentDockCollapsed.get());
       return;
     }
-    if (isCtrl2(key, ch, "t")) {
+    if (isCtrl2(key2, ch, "t")) {
       return patchOverlayState({ agents: true, agentsInitialHistoryIndex: 0 });
     }
-    if (isCtrl2(key, ch, "o")) {
+    if (isCtrl2(key2, ch, "o")) {
       return patchOverlayState({ modelPicker: true });
     }
-    if (key.ctrl && ch.toLowerCase() === "c") {
+    if (key2.ctrl && ch.toLowerCase() === "c") {
       const ctrlC = resolveCtrlCComposerAction({
         busy: live.busy,
         hasDraft: Boolean(cState.input || cState.inputBuf.length),
@@ -81054,7 +81054,7 @@ function useInputHandlers(ctx) {
         });
       });
     }
-    if ((isAction(key, ch, "d") || isMacActionFallback(key, ch, "d")) && !composerHasDraft(cState)) {
+    if ((isAction(key2, ch, "d") || isMacActionFallback(key2, ch, "d")) && !composerHasDraft(cState)) {
       return handleIdleHotkeyExit(actions, DASHBOARD_TUI_MODE, () => {
         gateway.gw.publishLocalEvent({
           payload: { reason: "idle_exit_hotkey" },
@@ -81063,22 +81063,22 @@ function useInputHandlers(ctx) {
         });
       });
     }
-    if (isAction(key, ch, "l")) {
+    if (isAction(key2, ch, "l")) {
       clearSelection2();
       forceRedraw(terminal.stdout ?? process.stdout);
       return;
     }
-    if (isVoiceToggleKey(key, ch, voice.recordKey)) {
+    if (isVoiceToggleKey(key2, ch, voice.recordKey)) {
       return voiceRecordToggle();
     }
-    if (ch.toLowerCase() === "g" && (isAction(key, ch, "g") || key.meta)) {
+    if (ch.toLowerCase() === "g" && (isAction(key2, ch, "g") || key2.meta)) {
       return void cActions.openEditor().catch((err) => {
         actions.sys(
           err instanceof Error ? t("session.input.failedToOpenEditorWith", err.message) : t("session.input.failedToOpenEditor")
         );
       });
     }
-    if (key.shift && key.tab && !cState.completions.length) {
+    if (key2.shift && key2.tab && !cState.completions.length) {
       if (!live.sid) {
         return void actions.sys(t("session.input.yoloNeedsSession"));
       }
@@ -81094,14 +81094,14 @@ function useInputHandlers(ctx) {
         }
       });
     }
-    if (key.tab && cState.completions.length) {
+    if (key2.tab && cState.completions.length) {
       const row = cState.completions[cState.compIdx];
       if (row?.text) {
         cActions.setInput(applyCompletion(cState.input, row.text, cState.compReplace));
       }
       return;
     }
-    if (isAction(key, ch, "k") && cRefs.queueRef.current.length && live.sid) {
+    if (isAction(key2, ch, "k") && cRefs.queueRef.current.length && live.sid) {
       const next = cActions.dequeue();
       if (next) {
         cActions.setQueueEdit(null);
@@ -81133,7 +81133,7 @@ var init_useInputHandlers = __esm({
     init_turnController();
     init_turnStore();
     init_uiStore();
-    isCtrl2 = (key, ch, target) => key.ctrl && ch.toLowerCase() === target;
+    isCtrl2 = (key2, ch, target) => key2.ctrl && ch.toLowerCase() === target;
     shouldAllowIdleHotkeyExit = (dashboardTuiMode = DASHBOARD_TUI_MODE) => !dashboardTuiMode;
     composerHasDraft = (cState) => Boolean(cState.input || cState.inputBuf.length || cState.tokens?.length);
     DISMISSED_PROMPT_NOTICE = {
@@ -81143,7 +81143,7 @@ var init_useInputHandlers = __esm({
       vaultSaveLogin: (req) => t("session.input.loginNotSaved", req.site),
       vaultCode: (req) => t("session.input.codeSkipped", req.site)
     };
-    dismissedNotice = (key, req) => DISMISSED_PROMPT_NOTICE[key](req);
+    dismissedNotice = (key2, req) => DISMISSED_PROMPT_NOTICE[key2](req);
   }
 });
 
@@ -81172,9 +81172,9 @@ function useLongRunToolCharms() {
       }
       const now2 = Date.now();
       const liveIds = new Set(tools.map((t2) => t2.id));
-      for (const key of Array.from(slots.current.keys())) {
-        if (!liveIds.has(key)) {
-          slots.current.delete(key);
+      for (const key2 of Array.from(slots.current.keys())) {
+        if (!liveIds.has(key2)) {
+          slots.current.delete(key2);
         }
       }
       for (const tool of tools) {
@@ -81606,7 +81606,7 @@ var init_interpolation = __esm({
 function markSubmitting() {
   patchUiState({ busy: true, status: "running\u2026" });
 }
-function submitPrompt(text, deps, showUserMessage = true, displayOverride, opts = {}) {
+function submitPrompt(text2, deps, showUserMessage = true, displayOverride, opts = {}) {
   const sid = getUiState().sid;
   if (!sid) {
     return deps.sys("session not ready yet");
@@ -81618,7 +81618,7 @@ function submitPrompt(text, deps, showUserMessage = true, displayOverride, opts 
       return deps.sys("session not ready yet");
     }
     turnController.clearStatusTimer();
-    deps.setLastUserMsg(text);
+    deps.setLastUserMsg(text2);
     if (show) {
       deps.appendMessage({ role: "user", text: displayOverride || displayText });
     }
@@ -81640,14 +81640,14 @@ function submitPrompt(text, deps, showUserMessage = true, displayOverride, opts 
     });
   };
   if (opts.skipDetectDrop) {
-    return startSubmit(text, deps.expand(text), showUserMessage);
+    return startSubmit(text2, deps.expand(text2), showUserMessage);
   }
-  deps.gw.request("input.detect_drop", { session_id: sid, text }).then((r) => {
+  deps.gw.request("input.detect_drop", { session_id: sid, text: text2 }).then((r) => {
     if (!r?.matched) {
-      return startSubmit(text, deps.expand(text), showUserMessage);
+      return startSubmit(text2, deps.expand(text2), showUserMessage);
     }
-    startSubmit(r.text || text, deps.expand(r.text || text), showUserMessage);
-  }).catch(() => startSubmit(text, deps.expand(text), showUserMessage));
+    startSubmit(r.text || text2, deps.expand(r.text || text2), showUserMessage);
+  }).catch(() => startSubmit(text2, deps.expand(text2), showUserMessage));
 }
 var SESSION_BUSY_RE, isSessionBusyError;
 var init_submissionCore = __esm({
@@ -81689,10 +81689,10 @@ function useSubmission(opts) {
     };
   }, [composerState.input, composerState.inputBuf]);
   const send = (0, import_react63.useCallback)(
-    (text, showUserMessage = true, displayText, expandOverride, submitOpts = {}) => {
+    (text2, showUserMessage = true, displayText, expandOverride, submitOpts = {}) => {
       const expand = expandOverride ?? expandTokens(composerRefs.tokensRef.current);
       submitPrompt(
-        text,
+        text2,
         {
           appendMessage,
           enqueue: composerActions.enqueue,
@@ -81729,9 +81729,9 @@ function useSubmission(opts) {
     [appendMessage, gw2, sys]
   );
   const interpolate = (0, import_react63.useCallback)(
-    (text, then) => {
+    (text2, then) => {
       patchUiState({ status: "interpolating\u2026" });
-      const matches = [...text.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))];
+      const matches = [...text2.matchAll(new RegExp(INTERPOLATION_RE.source, "g"))];
       Promise.all(
         matches.map(
           (m) => gw2.request("shell.exec", { command: m[1] }).then((raw) => {
@@ -81739,20 +81739,20 @@ function useSubmission(opts) {
             return [r?.stdout, r?.stderr].filter(Boolean).join("\n").trim();
           }).catch(() => "(error)")
         )
-      ).then((results) => then(spliceMatches(text, matches, results)));
+      ).then((results) => then(spliceMatches(text2, matches, results)));
     },
     [gw2]
   );
   const sendQueued = (0, import_react63.useCallback)(
-    (text) => {
-      if (text.startsWith("!")) {
-        return shellExec(text.slice(1).trim());
+    (text2) => {
+      if (text2.startsWith("!")) {
+        return shellExec(text2.slice(1).trim());
       }
-      if (hasInterpolation(text)) {
+      if (hasInterpolation(text2)) {
         patchUiState({ busy: true });
-        return interpolate(text, send);
+        return interpolate(text2, send);
       }
-      send(text);
+      send(text2);
     },
     [interpolate, send, shellExec]
   );
@@ -81846,7 +81846,7 @@ function useSubmission(opts) {
         patchUiState({ busy: true });
         return interpolate(
           full,
-          (text) => send(prepareSubmission(text, submissionTokens).text, true, text, (value) => value)
+          (text2) => send(prepareSubmission(text2, submissionTokens).text, true, text2, (value) => value)
         );
       }
       send(submission.text, true, submission.display, (value) => value);
@@ -81930,7 +81930,7 @@ var init_useSubmission = __esm({
     init_turnController();
     init_uiStore();
     DOUBLE_ENTER_MS = 450;
-    spliceMatches = (text, matches, results) => matches.reduceRight((acc, m, i) => acc.slice(0, m.index) + results[i] + acc.slice(m.index + m[0].length), text);
+    spliceMatches = (text2, matches, results) => matches.reduceRight((acc, m, i) => acc.slice(0, m.index) + results[i] + acc.slice(m.index + m[0].length), text2);
     expandPasteTokens = (tokens) => expandTokens(tokens.filter((token) => token.kind === "paste"));
     slashArgument = (command) => /^\/\S+\s+([\s\S]+)$/.exec(command)?.[1] ?? "";
     queueItemFromSlash = (displayCommand, expandedCommand) => {
@@ -82100,7 +82100,7 @@ function useMainApp(gw2) {
   const composer = useComposerState({
     gw: gw2,
     submitRef,
-    sys: (text) => sysRef.current(text)
+    sys: (text2) => sysRef.current(text2)
   });
   const { actions: composerActions, refs: composerRefs, state: composerState } = composer;
   const empty = !historyItems.some((msg) => msg.kind !== "intro");
@@ -82211,7 +82211,7 @@ function useMainApp(gw2) {
     (msg) => setHistoryItems((prev) => appendTranscriptMessage(prev, msg)),
     [setHistoryItems]
   );
-  const sys = (0, import_react65.useCallback)((text) => appendMessage({ role: "system", text }), [appendMessage]);
+  const sys = (0, import_react65.useCallback)((text2) => appendMessage({ role: "system", text: text2 }), [appendMessage]);
   (0, import_react65.useEffect)(
     () => onUserWidgets(({ added, errors, removed }) => {
       for (const id of added) {
@@ -82227,7 +82227,7 @@ function useMainApp(gw2) {
     [sys]
   );
   const page = (0, import_react65.useCallback)(
-    (text, title) => patchOverlayState({ pager: { lines: text.split("\n"), offset: 0, title } }),
+    (text2, title) => patchOverlayState({ pager: { lines: text2.split("\n"), offset: 0, title } }),
     []
   );
   const panel = (0, import_react65.useCallback)(
@@ -83425,9 +83425,9 @@ var init_composerHighlights = __esm({
     slashRe = () => /(?<=^|\s)(?:\/[a-zA-Z][\w-]*(?![\w-]*\/)|\/$)/g;
     atRe = () => /(?<=^|\s)@(?:[\w-]+:(?:`[^`\n]*`?|"[^"\n]*"?|'[^'\n]*'?|\S*)|\S*)/g;
     tokenRe = () => new RegExp(PASTE_SNIPPET_RE.source, "g");
-    matchSpans = (text, re) => [...text.matchAll(re)].filter((m) => m[0]).map((m) => ({ end: (m.index ?? 0) + m[0].length, start: m.index ?? 0 }));
-    splitComposerHighlights = (text) => {
-      const spans = [...matchSpans(text, tokenRe()), ...matchSpans(text, atRe()), ...matchSpans(text, slashRe())].sort((a, b) => a.start - b.start).reduce((kept, span) => {
+    matchSpans = (text2, re) => [...text2.matchAll(re)].filter((m) => m[0]).map((m) => ({ end: (m.index ?? 0) + m[0].length, start: m.index ?? 0 }));
+    splitComposerHighlights = (text2) => {
+      const spans = [...matchSpans(text2, tokenRe()), ...matchSpans(text2, atRe()), ...matchSpans(text2, slashRe())].sort((a, b) => a.start - b.start).reduce((kept, span) => {
         if (!kept.some((prev) => span.start < prev.end && span.end > prev.start)) {
           kept.push(span);
         }
@@ -83437,20 +83437,20 @@ var init_composerHighlights = __esm({
       let last = 0;
       for (const span of spans) {
         if (span.start > last) {
-          out.push({ ref: false, text: text.slice(last, span.start) });
+          out.push({ ref: false, text: text2.slice(last, span.start) });
         }
-        out.push({ ref: true, text: text.slice(span.start, span.end) });
+        out.push({ ref: true, text: text2.slice(span.start, span.end) });
         last = span.end;
       }
-      if (last < text.length || !out.length) {
-        out.push({ ref: false, text: text.slice(last) });
+      if (last < text2.length || !out.length) {
+        out.push({ ref: false, text: text2.slice(last) });
       }
       return out;
     };
-    highlightMask = (text) => {
-      const mask = new Array(text.length).fill(false);
+    highlightMask = (text2) => {
+      const mask = new Array(text2.length).fill(false);
       let offset = 0;
-      for (const segment of splitComposerHighlights(text)) {
+      for (const segment of splitComposerHighlights(text2)) {
         if (segment.ref) {
           mask.fill(true, offset, offset + segment.text.length);
         }
@@ -83501,19 +83501,19 @@ function snapPos(s, p) {
   }
   return last;
 }
-function applyPrintableInsert(value, cursor, text, range) {
-  if (!PRINTABLE.test(text)) {
+function applyPrintableInsert(value, cursor, text2, range) {
+  if (!PRINTABLE.test(text2)) {
     return null;
   }
   if (range) {
     return {
-      cursor: range.start + text.length,
-      value: value.slice(0, range.start) + text + value.slice(range.end)
+      cursor: range.start + text2.length,
+      value: value.slice(0, range.start) + text2 + value.slice(range.end)
     };
   }
   return {
-    cursor: cursor + text.length,
-    value: value.slice(0, cursor) + text + value.slice(cursor)
+    cursor: cursor + text2.length,
+    value: value.slice(0, cursor) + text2 + value.slice(cursor)
   };
 }
 function valueForReturnSubmit(value, cursor, input, range) {
@@ -83527,8 +83527,8 @@ function valueForReturnSubmit(value, cursor, input, range) {
   }
   return applyPrintableInsert(value, cursor, beforeReturn, range) ?? { cursor, value };
 }
-async function cutSelection(text, write, removeSelection) {
-  const ok = await write(text);
+async function cutSelection(text2, write, removeSelection) {
+  const ok = await write(text2);
   if (ok) {
     removeSelection();
   }
@@ -83552,8 +83552,8 @@ function shouldPreserveCtrlJNewline(env3 = process.env) {
   }
   return (env3.WSL_DISTRO_NAME ?? "").toLowerCase().includes("microsoft");
 }
-function shouldInsertNewlineOnReturn(key, sequence = "") {
-  if (key.shift || key.ctrl || (isMac ? isActionMod(key) : key.meta)) {
+function shouldInsertNewlineOnReturn(key2, sequence = "") {
+  if (key2.shift || key2.ctrl || (isMac ? isActionMod(key2) : key2.meta)) {
     return true;
   }
   return sequence === "\n" && (isMac || shouldPreserveCtrlJNewline());
@@ -83634,8 +83634,8 @@ function killToLineEnd(value, cursor) {
   const to = nl < 0 ? value.length : nl === cursor ? nl + 1 : nl;
   return { value: value.slice(0, cursor) + value.slice(to), cursor };
 }
-function isLineKillModifier(key) {
-  return key.super === true;
+function isLineKillModifier(key2) {
+  return key2.super === true;
 }
 function fastBackspaceEffect(current, cursor) {
   const t2 = prevPos(current, cursor);
@@ -83648,15 +83648,15 @@ function fastBackspaceEffect(current, cursor) {
     write: "\b \b"
   };
 }
-function fastAppendEffect(current, cursor, text) {
+function fastAppendEffect(current, cursor, text2) {
   return {
-    advanceDelta: text.length,
-    newCursor: cursor + text.length,
-    newValue: current.slice(0, cursor) + text + current.slice(cursor),
-    write: text
+    advanceDelta: text2.length,
+    newCursor: cursor + text2.length,
+    newValue: current.slice(0, cursor) + text2 + current.slice(cursor),
+    write: text2
   };
 }
-function canFastAppendShape(current, cursor, text, columns, currentLineWidth) {
+function canFastAppendShape(current, cursor, text2, columns, currentLineWidth) {
   if (cursor !== current.length) {
     return false;
   }
@@ -83666,10 +83666,10 @@ function canFastAppendShape(current, cursor, text, columns, currentLineWidth) {
   if (current.includes("\n")) {
     return false;
   }
-  if (!ASCII_PRINTABLE_RE.test(text)) {
+  if (!ASCII_PRINTABLE_RE.test(text2)) {
     return false;
   }
-  return currentLineWidth + text.length < Math.max(1, columns);
+  return currentLineWidth + text2.length < Math.max(1, columns);
 }
 function canFastBackspaceShape(current, cursor, columns) {
   if (cursor !== current.length) {
@@ -83899,8 +83899,8 @@ function TextInput({
         if (!range) {
           return;
         }
-        const text = vRef.current.slice(range.start, range.end);
-        void cutSelection(text, writeClipboardText, () => {
+        const text2 = vRef.current.slice(range.start, range.end);
+        void cutSelection(text2, writeClipboardText, () => {
           const current = selRange();
           if (!current || current.start !== range.start || current.end !== range.end) {
             return;
@@ -83967,10 +83967,10 @@ function TextInput({
     }, FRAME_BATCH_MS);
   };
   const canFastEchoBase = () => supportsFastEchoTerminal() && focus && termFocus && !selected && !mask && !!stdout?.isTTY;
-  const canFastAppend = (current, cursor, text) => canFastEchoBase() && canFastAppendShape(current, cursor, text, columns, lineWidthRef.current) && // Typing can RE-COLOR cells already on screen: `]` closing a `[[ token ]]`,
+  const canFastAppend = (current, cursor, text2) => canFastEchoBase() && canFastAppendShape(current, cursor, text2, columns, lineWidthRef.current) && // Typing can RE-COLOR cells already on screen: `]` closing a `[[ token ]]`,
   // or a second `/` demoting `/usr` to a path. The bypass only writes the new
   // cells, so anything that repaints old ones must take the Ink path.
-  (!accentOpen || highlightsStable(current, current.slice(0, cursor) + text + current.slice(cursor)));
+  (!accentOpen || highlightsStable(current, current.slice(0, cursor) + text2 + current.slice(cursor)));
   const canFastBackspace = (current, cursor) => !inkRepaintedRef.current && canFastEchoBase() && canFastBackspaceShape(current, cursor, columns) && // Deleting can re-color survivors too (erasing `]` re-opens the token).
   (!accentOpen || highlightsStable(current, current.slice(0, prevPos(current, cursor)) + current.slice(cursor)));
   const commit = (next, nextCur, track = true, syncParent = true, syncLocal = true, nextLineWidth) => {
@@ -84100,8 +84100,8 @@ function TextInput({
     return range && range.start !== range.end ? { end: Math.max(range.start, range.end), start: Math.min(range.start, range.end) } : null;
   };
   const ins = (v, c, s) => v.slice(0, c) + s + v.slice(c);
-  const pastePlainText = (text) => {
-    const cleaned = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const pastePlainText = (text2) => {
+    const cleaned = text2.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     if (!cleaned) {
       return;
     }
@@ -84169,9 +84169,9 @@ function TextInput({
           return void emitPaste({ cursor: curRef.current, hotkey: true, text: "", value: vRef.current });
         }
         if (isMac) {
-          void readClipboardText().then((text) => {
-            if (text) {
-              pastePlainText(text);
+          void readClipboardText().then((text2) => {
+            if (text2) {
+              pastePlainText(text2);
             }
           });
         }
@@ -84181,8 +84181,8 @@ function TextInput({
         flushKeyBurst();
         const range2 = selRange();
         if (range2) {
-          const text = vRef.current.slice(range2.start, range2.end);
-          void writeClipboardText(text);
+          const text2 = vRef.current.slice(range2.start, range2.end);
+          void writeClipboardText(text2);
         }
         return;
       }
@@ -84339,25 +84339,25 @@ function TextInput({
         }
       } else if (event.keypress.isPasted || inp.length > 0 && !event.isControlChord) {
         const bracketed = event.keypress.isPasted || inp.includes("[200~");
-        const text = inp.replace(BRACKET_PASTE, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-        if (bracketed && emitPaste({ bracketed: true, cursor: c, text, value: v })) {
+        const text2 = inp.replace(BRACKET_PASTE, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        if (bracketed && emitPaste({ bracketed: true, cursor: c, text: text2, value: v })) {
           return;
         }
-        if (!text) {
+        if (!text2) {
           return;
         }
-        if (text === "\n") {
+        if (text2 === "\n") {
           return commit(ins(v, c, "\n"), c + 1);
         }
-        if (text.length > 1 || text.includes("\n")) {
-          if (shouldRouteMultiCharInputAsPaste(text)) {
+        if (text2.length > 1 || text2.includes("\n")) {
+          if (shouldRouteMultiCharInputAsPaste(text2)) {
             flushKeyBurst();
-            if (!emitPaste({ cursor: c, text, value: v })) {
-              commit(ins(v, c, text), c + text.length);
+            if (!emitPaste({ cursor: c, text: text2, value: v })) {
+              commit(ins(v, c, text2), c + text2.length);
             }
             return;
           }
-          const inserted = applyPrintableInsert(v, c, text, range);
+          const inserted = applyPrintableInsert(v, c, text2, range);
           if (!inserted) {
             return;
           }
@@ -84367,7 +84367,7 @@ function TextInput({
           return;
         }
         {
-          const inserted = applyPrintableInsert(v, c, text, range);
+          const inserted = applyPrintableInsert(v, c, text2, range);
           if (!inserted) {
             return;
           }
@@ -84375,13 +84375,13 @@ function TextInput({
             v = inserted.value;
             c = inserted.cursor;
           } else {
-            const simpleAppend = canFastAppend(v, c, text);
+            const simpleAppend = canFastAppend(v, c, text2);
             const preInsertValue = v;
             const preInsertCursor = c;
             v = inserted.value;
             c = inserted.cursor;
             if (simpleAppend) {
-              const effect = fastAppendEffect(preInsertValue, preInsertCursor, text);
+              const effect = fastAppendEffect(preInsertValue, preInsertCursor, text2);
               stdout.write(colorizeEcho(effect.write, highlightMask(v)[preInsertCursor] ? accentColor : color));
               inkRepaintedRef.current = false;
               if (inkRepaintResetTimer.current) {
@@ -84389,7 +84389,7 @@ function TextInput({
                 inkRepaintResetTimer.current = null;
               }
               noteCursorAdvance(effect.advanceDelta);
-              commit(v, c, true, false, false, lineWidthRef.current + stringWidth3(text));
+              commit(v, c, true, false, false, lineWidthRef.current + stringWidth3(text2));
               return;
             }
           }
@@ -84459,9 +84459,9 @@ function TextInput({
 }
 function decideRightClickAction(value, range) {
   if (range && range.end > range.start) {
-    const text = value.slice(range.start, range.end);
-    if (text) {
-      return { action: "copy", text };
+    const text2 = value.slice(range.start, range.end);
+    if (text2) {
+      return { action: "copy", text: text2 };
     }
   }
   return { action: "paste" };
@@ -84502,12 +84502,12 @@ var init_textInput = __esm({
     MULTI_CLICK_MS = 500;
     invert = (s) => INV + s + INV_OFF;
     HINT_FALLBACK = "#808080";
-    hintRgb = (hex2) => {
-      const n = parseInt(/^#([0-9a-f]{6})$/i.exec(hex2 ?? "")?.[1] ?? HINT_FALLBACK.slice(1), 16);
+    hintRgb = (hex3) => {
+      const n = parseInt(/^#([0-9a-f]{6})$/i.exec(hex3 ?? "")?.[1] ?? HINT_FALLBACK.slice(1), 16);
       return [n >> 16 & 255, n >> 8 & 255, n & 255];
     };
-    hintHex = (hex2) => /^#[0-9a-f]{6}$/i.test(hex2 ?? "") ? hex2 : HINT_FALLBACK;
-    colorizeHint = (s, hex2) => colorize2(s, hintHex(hex2), "foreground");
+    hintHex = (hex3) => /^#[0-9a-f]{6}$/i.test(hex3 ?? "") ? hex3 : HINT_FALLBACK;
+    colorizeHint = (s, hex3) => colorize2(s, hintHex(hex3), "foreground");
     fgSeq = (tone) => {
       const value = (tone ?? "").trim();
       if (!value) {
@@ -84516,23 +84516,23 @@ var init_textInput = __esm({
       const [open2 = ""] = colorize2("\0", value, "foreground").split("\0");
       return open2;
     };
-    colorizeEcho = (s, hex2) => {
-      const open2 = fgSeq(hex2);
+    colorizeEcho = (s, hex3) => {
+      const open2 = fgSeq(hex3);
       return open2 ? `${open2}${s}${ESC4}[39m` : s;
     };
-    hintCursorCell = (ch, hex2) => {
-      const [r, g, b] = hintRgb(hex2);
+    hintCursorCell = (ch, hex3) => {
+      const [r, g, b] = hintRgb(hex3);
       const ink3 = 0.2126 * r + 0.7152 * g + 0.0722 * b > 140 ? "#000000" : "#ffffff";
-      return colorize2(colorize2(ch, ink3, "foreground"), hintHex(hex2), "background");
+      return colorize2(colorize2(ch, ink3, "foreground"), hintHex(hex3), "background");
     };
     _seg2 = null;
     seg2 = () => _seg2 ??= new Intl.Segmenter(void 0, { granularity: "grapheme" });
     STOP_CACHE_MAX = 32;
     stopCache = /* @__PURE__ */ new Map();
-    shouldRouteMultiCharInputAsPaste = (text) => text.includes("\n");
+    shouldRouteMultiCharInputAsPaste = (text2) => text2.includes("\n");
     ASCII_PRINTABLE_RE = /^[\x20-\x7e]+$/;
     isPasteResultPromise = (value) => !!value && typeof value.then === "function";
-    shouldPassThroughToGlobalHandler = (input, key, voiceRecordKey = DEFAULT_VOICE_RECORD_KEY) => key.ctrl && input === "c" || key.ctrl && input === "x" || key.ctrl && input === "o" || key.ctrl && (input === "r" || input === "t") || key.tab || key.shift && key.tab || key.pageUp || key.pageDown || key.escape || isVoiceToggleKey(key, input, voiceRecordKey);
+    shouldPassThroughToGlobalHandler = (input, key2, voiceRecordKey = DEFAULT_VOICE_RECORD_KEY) => key2.ctrl && input === "c" || key2.ctrl && input === "x" || key2.ctrl && input === "o" || key2.ctrl && (input === "r" || input === "t") || key2.tab || key2.shift && key2.tab || key2.pageUp || key2.pageDown || key2.escape || isVoiceToggleKey(key2, input, voiceRecordKey);
   }
 });
 
@@ -84543,9 +84543,9 @@ function rosterViewport(height, count, cursor) {
   const start = Math.max(0, Math.min(Math.max(0, count - rows), cursor - Math.floor(rows / 2)));
   return { rows, start, timelineRows };
 }
-async function sendAgentSteer(gw2, sid, id, text) {
+async function sendAgentSteer(gw2, sid, id, text2) {
   const result = asRpcResult(
-    await gw2.request("subagent.steer", { session_id: sid, subagent_id: id, text })
+    await gw2.request("subagent.steer", { session_id: sid, subagent_id: id, text: text2 })
   );
   const accepted = result?.status === "queued";
   const T = messages().hubs.agentControls;
@@ -84563,21 +84563,21 @@ function AgentSteerForm({
   onClose
 }) {
   const T = useT().hubs.agentControls;
-  const [text, setText] = (0, import_react69.useState)("");
+  const [text2, setText] = (0, import_react69.useState)("");
   const [feedback, setFeedback] = (0, import_react69.useState)("");
   const [pending, setPending] = (0, import_react69.useState)(false);
-  use_input_default((_ch, key) => {
-    if (key.escape && !pending) {
+  use_input_default((_ch, key2) => {
+    if (key2.escape && !pending) {
       onClose();
     }
   });
   const submit = async () => {
-    if (!text.trim() || pending) {
+    if (!text2.trim() || pending) {
       return;
     }
     setPending(true);
     try {
-      const result = await sendAgentSteer(gw2, sid, id, text);
+      const result = await sendAgentSteer(gw2, sid, id, text2);
       setFeedback(result.message);
       if (result.accepted) {
         setText("");
@@ -84601,7 +84601,7 @@ function AgentSteerForm({
           focus: !pending,
           onChange: setText,
           onSubmit: () => void submit(),
-          value: text
+          value: text2
         }
       )
     ] }),
@@ -85215,9 +85215,9 @@ function ListRow({
 }) {
   const T = useT().hubs.agents;
   const { color, glyph } = statusGlyph2(node.item, t2);
-  const palette = heatPalette(t2);
-  const heatIdx = hotnessBucket(node.aggregate.hotness, peak, palette.length);
-  const heatMarker = heatIdx >= 2 ? palette[heatIdx] : null;
+  const palette2 = heatPalette(t2);
+  const heatIdx = hotnessBucket(node.aggregate.hotness, peak, palette2.length);
+  const heatMarker = heatIdx >= 2 ? palette2[heatIdx] : null;
   const goal = compactPreview(node.item.goal || T.subagentFallback, width - 28 - node.item.depth * 2);
   const toolsCount = node.aggregate.totalTools > 0 ? ` \xB7${node.aggregate.totalTools}t` : "";
   const kids = node.children.length ? ` \xB7${node.children.length}\u2193` : "";
@@ -85226,19 +85226,19 @@ function ListRow({
   const toolShort = line ? (paren > 0 ? line.slice(0, paren) : line).trim() : "";
   const trailing = toolShort ? ` \xB7 ${compactPreview(toolShort, 14)}` : "";
   const row = listRowStyle(t2, active);
-  const fg = active ? row.color ?? t2.color.accent : t2.color.text;
-  return /* @__PURE__ */ (0, import_jsx_runtime35.jsxs)(Text, { backgroundColor: row.backgroundColor, bold: active, color: fg, wrap: "truncate-end", children: [
+  const fg2 = active ? row.color ?? t2.color.accent : t2.color.text;
+  return /* @__PURE__ */ (0, import_jsx_runtime35.jsxs)(Text, { backgroundColor: row.backgroundColor, bold: active, color: fg2, wrap: "truncate-end", children: [
     " ",
-    /* @__PURE__ */ (0, import_jsx_runtime35.jsxs)(Text, { color: active ? fg : t2.color.muted, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime35.jsxs)(Text, { color: active ? fg2 : t2.color.muted, children: [
       formatRowId(index),
       " "
     ] }),
     indentFor(node.item.depth),
-    heatMarker ? /* @__PURE__ */ (0, import_jsx_runtime35.jsx)(Text, { color: active ? fg : heatMarker, children: "\u258D" }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime35.jsx)(Text, { color: active ? fg : color, children: glyph }),
+    heatMarker ? /* @__PURE__ */ (0, import_jsx_runtime35.jsx)(Text, { color: active ? fg2 : heatMarker, children: "\u258D" }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime35.jsx)(Text, { color: active ? fg2 : color, children: glyph }),
     " ",
     goal,
-    /* @__PURE__ */ (0, import_jsx_runtime35.jsxs)(Text, { color: active ? fg : t2.color.muted, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime35.jsxs)(Text, { color: active ? fg2 : t2.color.muted, children: [
       toolsCount,
       kids,
       trailing
@@ -85277,8 +85277,8 @@ function DiffView({
   const aTotals = (0, import_react74.useMemo)(() => treeTotals(buildSubagentTree(pair.baseline.subagents)), [pair.baseline]);
   const bTotals = (0, import_react74.useMemo)(() => treeTotals(buildSubagentTree(pair.candidate.subagents)), [pair.candidate]);
   const paneWidth = Math.floor((cols - 4) / 2);
-  use_input_default((ch, key) => {
-    if (key.escape || ch === "q") {
+  use_input_default((ch, key2) => {
+    if (key2.escape || ch === "q") {
       onClose();
     }
   });
@@ -85423,26 +85423,26 @@ function AgentsOverlay({ gw: gw2, initialHistoryIndex = 0, onClose, t: t2 }) {
   const detailPageSize = Math.max(4, rowsH - 2);
   const wheelDetailDy = 3;
   const scrollDetail = (dy) => detailScrollRef.current?.scrollBy(dy);
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (mode === "steer") {
       return;
     }
-    if (key.ctrl && ch === "t") {
+    if (key2.ctrl && ch === "t") {
       return closeWithCleanup();
     }
     if (ch === "e" && selected && sid && !replayMode) {
       return setMode("steer");
     }
-    if (ch === "t" && !key.ctrl && selected) {
+    if (ch === "t" && !key2.ctrl && selected) {
       return setMode("tail");
     }
-    if (ch === "d" && !key.ctrl && selected) {
+    if (ch === "d" && !key2.ctrl && selected) {
       return setMode("detail");
     }
     if (ch === "q") {
       return closeWithCleanup();
     }
-    if (key.escape) {
+    if (key2.escape) {
       return mode !== "list" ? setMode("list") : closeWithCleanup();
     }
     if (ch === "<" || ch === "[") {
@@ -85461,25 +85461,25 @@ function AgentsOverlay({ gw: gw2, initialHistoryIndex = 0, onClose, t: t2 }) {
       return killSubtree(selected);
     }
     if (mode === "detail" || mode === "tail") {
-      if (key.leftArrow || ch === "h") {
+      if (key2.leftArrow || ch === "h") {
         return setMode("list");
       }
-      if (key.pageUp || key.ctrl && ch === "u") {
+      if (key2.pageUp || key2.ctrl && ch === "u") {
         return scrollDetail(-detailPageSize);
       }
-      if (key.pageDown || key.ctrl && ch === "d") {
+      if (key2.pageDown || key2.ctrl && ch === "d") {
         return scrollDetail(detailPageSize);
       }
-      if (key.wheelUp) {
+      if (key2.wheelUp) {
         return scrollDetail(-wheelDetailDy);
       }
-      if (key.wheelDown) {
+      if (key2.wheelDown) {
         return scrollDetail(wheelDetailDy);
       }
-      if (key.upArrow || ch === "k") {
+      if (key2.upArrow || ch === "k") {
         return scrollDetail(-2);
       }
-      if (key.downArrow || ch === "j") {
+      if (key2.downArrow || ch === "j") {
         return scrollDetail(2);
       }
       if (ch === "g") {
@@ -85490,13 +85490,13 @@ function AgentsOverlay({ gw: gw2, initialHistoryIndex = 0, onClose, t: t2 }) {
       }
       return;
     }
-    if ((key.return || key.rightArrow || ch === "l") && selected) {
-      return setMode(key.return && !replayMode ? "tail" : "detail");
+    if ((key2.return || key2.rightArrow || ch === "l") && selected) {
+      return setMode(key2.return && !replayMode ? "tail" : "detail");
     }
-    if (key.upArrow || ch === "k" || key.wheelUp) {
+    if (key2.upArrow || ch === "k" || key2.wheelUp) {
       return setCursor((c) => Math.max(0, c - 1));
     }
-    if (key.downArrow || ch === "j" || key.wheelDown) {
+    if (key2.downArrow || ch === "j" || key2.wheelDown) {
       return setCursor((c) => Math.min(Math.max(0, rows.length - 1), c + 1));
     }
     if (ch === "g") {
@@ -85514,8 +85514,8 @@ function AgentsOverlay({ gw: gw2, initialHistoryIndex = 0, onClose, t: t2 }) {
   });
   const mix3 = Object.entries(
     subagents.reduce((acc, it) => {
-      const key = it.model ? it.model.split("/").pop() : T.inheritModel;
-      acc[key] = (acc[key] ?? 0) + 1;
+      const key2 = it.model ? it.model.split("/").pop() : T.inheritModel;
+      acc[key2] = (acc[key2] ?? 0) + 1;
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k}\xD7${v}`).join(" \xB7 ");
@@ -85820,14 +85820,14 @@ var init_providers = __esm({
 
 // src/components/overlayControls.tsx
 function useOverlayKeys({ disabled = false, onBack, onClose }) {
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (disabled) {
       return;
     }
     if (ch === "q") {
       return onClose();
     }
-    if (key.escape) {
+    if (key2.escape) {
       return onBack ? onBack() : onClose();
     }
   });
@@ -86006,12 +86006,12 @@ function ModelPicker({
   };
   const listStage = stage === "provider" || stage === "model" || stage === "reasoning";
   useOverlayKeys({ disabled: listStage, onBack: back, onClose: onCancel });
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (stage === "key") {
       if (keySaving) {
         return;
       }
-      if (key.return) {
+      if (key2.return) {
         if (!keyInput.trim()) {
           return;
         }
@@ -86039,7 +86039,7 @@ function ModelPicker({
         });
         return;
       }
-      if (key.backspace || key.delete) {
+      if (key2.backspace || key2.delete) {
         setKeyInput((v) => v.slice(0, -1));
         return;
       }
@@ -86047,13 +86047,13 @@ function ModelPicker({
         setKeyInput("");
         return;
       }
-      if (ch && !key.ctrl && !key.meta) {
+      if (ch && !key2.ctrl && !key2.meta) {
         setKeyInput((v) => v + ch);
       }
       return;
     }
     if (stage === "disconnect") {
-      if (ch.toLowerCase() === "y" || key.return) {
+      if (ch.toLowerCase() === "y" || key2.return) {
         if (!provider) {
           setStage("provider");
           return;
@@ -86085,14 +86085,14 @@ function ModelPicker({
         });
         return;
       }
-      if (ch.toLowerCase() === "n" || key.escape) {
+      if (ch.toLowerCase() === "n" || key2.escape) {
         setStage("provider");
         return;
       }
       return;
     }
     if (stage === "reasoning") {
-      if (key.escape) {
+      if (key2.escape) {
         back();
         return;
       }
@@ -86100,19 +86100,19 @@ function ModelPicker({
         onCancel();
         return;
       }
-      if (key.upArrow && reasoningIdx > 0) {
+      if (key2.upArrow && reasoningIdx > 0) {
         setReasoningIdx((v) => v - 1);
         return;
       }
-      if (key.downArrow && reasoningIdx < reasoningRows.length - 1) {
+      if (key2.downArrow && reasoningIdx < reasoningRows.length - 1) {
         setReasoningIdx((v) => v + 1);
         return;
       }
-      if (allowPersistGlobal && key.ctrl && ch === "g") {
+      if (allowPersistGlobal && key2.ctrl && ch === "g") {
         setPersistGlobal((v) => !v);
         return;
       }
-      if (key.return && provider && pendingModel) {
+      if (key2.return && provider && pendingModel) {
         onSelect(
           modelPickerCommand(
             pendingModel,
@@ -86124,7 +86124,7 @@ function ModelPicker({
       }
       return;
     }
-    if (key.escape) {
+    if (key2.escape) {
       back();
       return;
     }
@@ -86135,15 +86135,15 @@ function ModelPicker({
     const count = stage === "provider" ? filteredProviderRows.length : models.length;
     const sel = stage === "provider" ? providerIdx : modelIdx;
     const setSel = stage === "provider" ? setProviderIdx : setModelIdx;
-    if (key.upArrow && sel > 0) {
+    if (key2.upArrow && sel > 0) {
       setSel((v) => v - 1);
       return;
     }
-    if (key.downArrow && sel < count - 1) {
+    if (key2.downArrow && sel < count - 1) {
       setSel((v) => v + 1);
       return;
     }
-    if (key.return) {
+    if (key2.return) {
       if (stage === "provider") {
         if (!provider) {
           return;
@@ -86184,21 +86184,21 @@ function ModelPicker({
       }
       return;
     }
-    if (key.backspace || key.delete) {
+    if (key2.backspace || key2.delete) {
       setFilter((v) => v.slice(0, -1));
       setSel(0);
       return;
     }
-    if (key.ctrl && ch === "u") {
+    if (key2.ctrl && ch === "u") {
       setFilter("");
       setSel(0);
       return;
     }
-    if (allowPersistGlobal && key.ctrl && ch === "g") {
+    if (allowPersistGlobal && key2.ctrl && ch === "g") {
       setPersistGlobal((v) => !v);
       return;
     }
-    if (key.ctrl && ch === "d" && stage === "provider" && provider?.authenticated !== false) {
+    if (key2.ctrl && ch === "d" && stage === "provider" && provider?.authenticated !== false) {
       const fullProviderIdx = providerIndexAfterClearingFilter(providerRows, provider);
       if (fullProviderIdx >= 0) {
         setProviderIdx(fullProviderIdx);
@@ -86207,7 +86207,7 @@ function ModelPicker({
       setFilter("");
       return;
     }
-    if (ch && !key.ctrl && !key.meta && ch.length === 1 && ch >= " ") {
+    if (ch && !key2.ctrl && !key2.meta && ch.length === 1 && ch >= " ") {
       setFilter((v) => v + ch);
       setSel(0);
     }
@@ -86472,15 +86472,15 @@ function ActiveSessionSwitcher({
           }
           const prevItems = itemsRef.current;
           const prevHist = historyDisplayRef.current;
-          const clamp4 = () => Math.max(0, Math.min(s, maxSel));
+          const clamp5 = () => Math.max(0, Math.min(s, maxSel));
           if (s - 1 < prevItems.length) {
             const id2 = prevItems[s - 1]?.id;
             const i2 = id2 ? next.findIndex((x) => x.id === id2) : -1;
-            return i2 >= 0 ? i2 + 1 : clamp4();
+            return i2 >= 0 ? i2 + 1 : clamp5();
           }
           const id = prevHist[s - 1 - prevItems.length]?.id;
           const i = id ? hist.findIndex((x) => x.id === id) : -1;
-          return i >= 0 ? 1 + next.length + i : clamp4();
+          return i >= 0 ? 1 + next.length + i : clamp5();
         });
         setErr(histError);
         setLoading(false);
@@ -86590,7 +86590,7 @@ function ActiveSessionSwitcher({
   const selectedKind = rowKind(sel);
   const newSelected = selectedKind === "new";
   const draftHasText = Boolean(draft.trim());
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (pickingModel || deleting) {
       return;
     }
@@ -86605,8 +86605,8 @@ function ActiveSessionSwitcher({
       return;
     }
     const lower = ch?.toLowerCase() ?? "";
-    const isCtrl3 = (letter) => key.ctrl && (lower === letter || ch === ctrlChar(letter));
-    if (key.escape) {
+    const isCtrl3 = (letter) => key2.ctrl && (lower === letter || ch === ctrlChar(letter));
+    if (key2.escape) {
       return onCancel();
     }
     if (isCtrl3("n")) {
@@ -86616,7 +86616,7 @@ function ActiveSessionSwitcher({
       void load4();
       return;
     }
-    if (key.tab) {
+    if (key2.tab) {
       if (newSelected) {
         setPickingModel(true);
       }
@@ -86628,20 +86628,20 @@ function ActiveSessionSwitcher({
       }
       return;
     }
-    if (lower === "d" && !key.ctrl && selectedKind === "history") {
+    if (lower === "d" && !key2.ctrl && selectedKind === "history") {
       setConfirmDelete(history[sel - 1 - items.length]?.id ?? null);
       return;
     }
     if (newSelected && draftHasText) {
       return;
     }
-    if (key.upArrow && sel > 0) {
+    if (key2.upArrow && sel > 0) {
       return setSel((s) => Math.max(0, s - 1));
     }
-    if (key.downArrow && sel < total - 1) {
+    if (key2.downArrow && sel < total - 1) {
       return setSel((s) => Math.min(total - 1, s + 1));
     }
-    if (key.return) {
+    if (key2.return) {
       if (newSelected) {
         if (!draftHasText) {
           return onNew();
@@ -87139,20 +87139,20 @@ function BuyScreen({ ctx, onPatch, s, t: t2 }) {
       onPatch({ screen: "overview" });
     }
   };
-  use_input_default((ch, key) => {
-    if (key.escape) {
+  use_input_default((ch, key2) => {
+    if (key2.escape) {
       return typing ? (setTyping(false), setError(null)) : onPatch({ screen: "overview" });
     }
     if (typing) {
       return;
     }
-    if (key.upArrow && sel > 0) {
+    if (key2.upArrow && sel > 0) {
       setSel((v) => v - 1);
     }
-    if (key.downArrow && sel < rows.length - 1) {
+    if (key2.downArrow && sel < rows.length - 1) {
       setSel((v) => v + 1);
     }
-    if (key.return) {
+    if (key2.return) {
       return choose(Math.min(sel, rows.length - 1));
     }
     const n = parseInt(ch, 10);
@@ -87228,8 +87228,8 @@ function ConfirmScreen({
     });
   };
   const back = () => onBack();
-  use_input_default((ch, key) => {
-    if (key.escape) {
+  use_input_default((ch, key2) => {
+    if (key2.escape) {
       return back();
     }
     const lower = ch.toLowerCase();
@@ -87239,13 +87239,13 @@ function ConfirmScreen({
     if (lower === "n") {
       return back();
     }
-    if (key.upArrow) {
+    if (key2.upArrow) {
       setSel(0);
     }
-    if (key.downArrow) {
+    if (key2.downArrow) {
       setSel(1);
     }
-    if (key.return) {
+    if (key2.return) {
       return sel === 0 ? pay() : back();
     }
   });
@@ -87305,23 +87305,23 @@ function StepUpScreen({
     ctx.sys(B.stepUp.declined);
     onClose();
   };
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (phase === "waiting" || phase === "resuming") {
-      if (key.escape) {
+      if (key2.escape) {
         onClose();
       }
       return;
     }
     if (phase === "granted") {
-      if (key.escape) {
+      if (key2.escape) {
         return onClose();
       }
-      if (key.return) {
+      if (key2.return) {
         return resume();
       }
       return;
     }
-    if (key.escape) {
+    if (key2.escape) {
       return decline();
     }
     const lower = ch.toLowerCase();
@@ -87331,13 +87331,13 @@ function StepUpScreen({
     if (lower === "n") {
       return decline();
     }
-    if (key.upArrow) {
+    if (key2.upArrow) {
       setSel(0);
     }
-    if (key.downArrow) {
+    if (key2.downArrow) {
       setSel(1);
     }
-    if (key.return) {
+    if (key2.return) {
       return sel === 0 ? allow() : decline();
     }
   });
@@ -87471,24 +87471,24 @@ function AutoReloadScreen({ ctx, onClose, onPatch, s, t: t2 }) {
     }
   };
   const editingField = row < FIELD_ROWS;
-  use_input_default((ch, key) => {
-    if (key.escape) {
+  use_input_default((ch, key2) => {
+    if (key2.escape) {
       return onPatch({ screen: "overview" });
     }
-    if (key.upArrow && row > 0) {
+    if (key2.upArrow && row > 0) {
       setRow((v) => v - 1);
       setField(row - 1 === 0 ? "threshold" : "reloadTo");
     }
-    if (key.downArrow && row < FIELD_ROWS + actionRows.length - 1) {
+    if (key2.downArrow && row < FIELD_ROWS + actionRows.length - 1) {
       setRow((v) => v + 1);
       setField(row + 1 === 0 ? "threshold" : "reloadTo");
     }
-    if (key.tab && editingField) {
+    if (key2.tab && editingField) {
       const next = field === "threshold" ? "reloadTo" : "threshold";
       setField(next);
       setRow(next === "threshold" ? 0 : 1);
     }
-    if (key.return && !editingField) {
+    if (key2.return && !editingField) {
       const idx = row - FIELD_ROWS;
       return onAction(actionRows[idx] ?? "cancel");
     }
@@ -87501,7 +87501,7 @@ function AutoReloadScreen({ ctx, onClose, onPatch, s, t: t2 }) {
   });
   const cardLine = s.card ? B.autoReload.cardOnFile(s.card.masked) : B.common.noSavedCard;
   const chargeCardName = distinctCardName ?? (s.card ? s.card.masked : B.autoReload.yourCard);
-  const fieldBox = (label, value, onChange, focused, key) => /* @__PURE__ */ (0, import_jsx_runtime39.jsxs)(Box_default, { flexDirection: "column", children: [
+  const fieldBox = (label, value, onChange, focused, key2) => /* @__PURE__ */ (0, import_jsx_runtime39.jsxs)(Box_default, { flexDirection: "column", children: [
     /* @__PURE__ */ (0, import_jsx_runtime39.jsx)(Text, { color: focused ? t2.color.label : t2.color.muted, children: label }),
     /* @__PURE__ */ (0, import_jsx_runtime39.jsxs)(Box_default, { borderColor: focused ? t2.color.accent : t2.color.border, borderStyle: "round", paddingX: 1, children: [
       /* @__PURE__ */ (0, import_jsx_runtime39.jsx)(Text, { color: t2.color.label, children: "$" }),
@@ -87513,7 +87513,7 @@ function AutoReloadScreen({ ctx, onClose, onPatch, s, t: t2 }) {
           focus: focused,
           onChange,
           onSubmit: () => {
-            if (key === "threshold") {
+            if (key2 === "threshold") {
               setField("reloadTo");
               setRow(1);
             } else {
@@ -87524,7 +87524,7 @@ function AutoReloadScreen({ ctx, onClose, onPatch, s, t: t2 }) {
         }
       )
     ] })
-  ] }, key);
+  ] }, key2);
   return /* @__PURE__ */ (0, import_jsx_runtime39.jsxs)(Box_default, { flexDirection: "column", children: [
     /* @__PURE__ */ (0, import_jsx_runtime39.jsx)(Text, { bold: true, color: t2.color.accent, children: B.autoReload.title }),
     /* @__PURE__ */ (0, import_jsx_runtime39.jsx)(Text, { color: t2.color.muted, children: B.autoReload.description }),
@@ -87625,20 +87625,20 @@ function FieldRow({ cols, draftValue, field, focused, onChange, onSubmit, sendin
     ) })
   ] });
 }
-function handleNavKey(key, h) {
-  const up = key.upArrow && !key.shift;
-  const down = key.downArrow && !key.shift;
+function handleNavKey(key2, h) {
+  const up = key2.upArrow && !key2.shift;
+  const down = key2.downArrow && !key2.shift;
   const back = () => (h.row - 1 + h.rows) % h.rows;
   const forward = () => (h.row + 1) % h.rows;
-  if (key.shift && key.tab) {
+  if (key2.shift && key2.tab) {
     h.setFocus(back);
-  } else if (key.tab || down && !h.selectorFocused) {
+  } else if (key2.tab || down && !h.selectorFocused) {
     h.setFocus(forward);
   } else if (up && !h.selectorFocused) {
     h.setFocus(back);
-  } else if (h.selectorFocused && (key.leftArrow || key.rightArrow || up || down)) {
+  } else if (h.selectorFocused && (key2.leftArrow || key2.rightArrow || up || down)) {
     h.setAction((value) => value === 0 ? 1 : 0);
-  } else if (h.selectorFocused && key.return) {
+  } else if (h.selectorFocused && key2.return) {
     h.confirm();
   }
 }
@@ -87652,8 +87652,8 @@ function Selector({ action: action2, focused, primary, t: t2 }) {
     T.connection.selector.skip
   ] });
 }
-function DetailLine({ t: t2, text }) {
-  return text ? /* @__PURE__ */ (0, import_jsx_runtime40.jsx)(Text, { color: t2.color.error, wrap: "wrap", children: text }) : null;
+function DetailLine({ t: t2, text: text2 }) {
+  return text2 ? /* @__PURE__ */ (0, import_jsx_runtime40.jsx)(Text, { color: t2.color.error, wrap: "wrap", children: text2 }) : null;
 }
 function FinishingPhase({ t: t2 }) {
   const T = useT();
@@ -87847,24 +87847,24 @@ function ConnectionSetupOverlay({ cols, t: t2 }) {
     }
     setNotice(openExternalUrl(target.connect_url) ? "" : T.connection.notice.browserDidNotOpen);
   };
-  use_input_default((_ch, key) => {
+  use_input_default((_ch, key2) => {
     if (!target) {
-      if (key.escape && operation) {
+      if (key2.escape && operation) {
         dismissConnectionOperation(operation.opId);
       }
       return;
     }
     if (phase === "authorized") {
-      if ((key.escape || key.return) && !sending) {
+      if ((key2.escape || key2.return) && !sending) {
         respond({ settled_by: "continue" }, answeredNow());
       }
       return;
     }
-    if (key.escape) {
+    if (key2.escape) {
       return skip();
     }
     if (phase === "browser") {
-      if (key.return) {
+      if (key2.return) {
         openLink();
       }
       return;
@@ -87872,7 +87872,7 @@ function ConnectionSetupOverlay({ cols, t: t2 }) {
     if (phase === "working") {
       return;
     }
-    handleNavKey(key, {
+    handleNavKey(key2, {
       confirm: () => action2 === 1 ? skip() : phase === "retry" ? tryAgain() : connect(),
       rows,
       selectorFocused,
@@ -88129,28 +88129,28 @@ function PetPicker({ gw: gw2, maxWidth, onClose, t: t2 }) {
       setBusy(false);
     });
   };
-  use_input_default((input, key) => {
+  use_input_default((input, key2) => {
     if (busy) {
       return;
     }
-    if (key.escape) {
+    if (key2.escape) {
       return onClose();
     }
-    if (key.upArrow) {
+    if (key2.upArrow) {
       return setIdx((i) => Math.max(0, i - 1));
     }
-    if (key.downArrow) {
+    if (key2.downArrow) {
       return setIdx((i) => Math.min(view.length - 1, i + 1));
     }
-    if (key.return) {
+    if (key2.return) {
       const pet = view[idx];
       return pet ? adopt(pet.slug) : void 0;
     }
-    if (key.backspace || key.delete) {
+    if (key2.backspace || key2.delete) {
       setQuery((q) => q.slice(0, -1));
       return setIdx(0);
     }
-    if (input && input.length === 1 && input >= " " && !key.ctrl && !key.meta) {
+    if (input && input.length === 1 && input >= " " && !key2.ctrl && !key2.meta) {
       setQuery((q) => q + input);
       setIdx(0);
     }
@@ -88258,25 +88258,25 @@ function PluginsHub({ gw: gw2, maxWidth, onClose, t: t2 }) {
       }
     }).catch((e) => setErr(rpcErrorMessage(e))).finally(() => setBusy(false));
   };
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (busy) {
       return;
     }
     const count = effectiveRows.length;
-    if (key.upArrow && clampedIdx > 0) {
+    if (key2.upArrow && clampedIdx > 0) {
       setIdx(clampedIdx - 1);
       return;
     }
-    if (key.downArrow && clampedIdx < count - 1) {
+    if (key2.downArrow && clampedIdx < count - 1) {
       setIdx(clampedIdx + 1);
       return;
     }
-    if (key.tab) {
+    if (key2.tab) {
       setScope((s) => s === "user" ? "all" : "user");
       setIdx(0);
       return;
     }
-    if (key.return || ch === " ") {
+    if (key2.return || ch === " ") {
       const row = effectiveRows[clampedIdx];
       if (row) {
         toggle(row);
@@ -88380,21 +88380,21 @@ function approvalOptions(req) {
   }
   return req.allowPermanent === false ? APPROVAL_OPTS_NO_ALWAYS : APPROVAL_OPTS;
 }
-function approvalAction(ch, key, sel, opts = APPROVAL_OPTS) {
-  if (key.escape) {
+function approvalAction(ch, key2, sel, opts = APPROVAL_OPTS) {
+  if (key2.escape) {
     return { kind: "choose", choice: "deny" };
   }
   const n = parseInt(ch, 10);
   if (n >= 1 && n <= opts.length) {
     return { kind: "choose", choice: opts[n - 1] };
   }
-  if (key.return) {
+  if (key2.return) {
     return { kind: "choose", choice: opts[sel] };
   }
-  if (key.upArrow && sel > 0) {
+  if (key2.upArrow && sel > 0) {
     return { kind: "move", delta: -1 };
   }
-  if (key.downArrow && sel < opts.length - 1) {
+  if (key2.downArrow && sel < opts.length - 1) {
     return { kind: "move", delta: 1 };
   }
   return { kind: "noop" };
@@ -88403,8 +88403,8 @@ function ApprovalPrompt({ cols = 80, onChoice, req, t: t2 }) {
   const T = useT();
   const [sel, setSel] = (0, import_react86.useState)(0);
   const opts = approvalOptions(req);
-  use_input_default((ch, key) => {
-    const action2 = approvalAction(ch, key, sel, opts);
+  use_input_default((ch, key2) => {
+    const action2 = approvalAction(ch, key2, sel, opts);
     if (action2.kind === "choose") {
       onChoice(action2.choice);
     } else if (action2.kind === "move") {
@@ -88496,8 +88496,8 @@ function ClarifyPrompt({ cols = 80, onCancel, onQuestionAnswer, req, t: t2 }) {
     lockActive(values.length ? JSON.stringify(values) : "");
   };
   const togglePick = (choice) => setPicked((current) => current.includes(choice) ? current.filter((v) => v !== choice) : [...current, choice]);
-  use_input_default((ch, key) => {
-    if (key.escape) {
+  use_input_default((ch, key2) => {
+    if (key2.escape) {
       if (typing) {
         setTyping(false);
         return;
@@ -88508,8 +88508,8 @@ function ClarifyPrompt({ cols = 80, onCancel, onQuestionAnswer, req, t: t2 }) {
     if (typing) {
       return;
     }
-    if (key.tab) {
-      moveActive(key.shift ? -1 : 1);
+    if (key2.tab) {
+      moveActive(key2.shift ? -1 : 1);
       return;
     }
     if (!activeQuestion) {
@@ -88519,13 +88519,13 @@ function ClarifyPrompt({ cols = 80, onCancel, onQuestionAnswer, req, t: t2 }) {
       setTyping(true);
       return;
     }
-    if (key.upArrow && sel > 0) {
+    if (key2.upArrow && sel > 0) {
       setSel((s) => s - 1);
     }
-    if (key.downArrow && sel < activeChoices.length) {
+    if (key2.downArrow && sel < activeChoices.length) {
       setSel((s) => s + 1);
     }
-    if (key.return) {
+    if (key2.return) {
       if (sel === activeChoices.length) {
         setTyping(true);
       } else if (multi) {
@@ -88606,21 +88606,21 @@ function ClarifyPrompt({ cols = 80, onCancel, onQuestionAnswer, req, t: t2 }) {
 function ConfirmPrompt({ onCancel, onConfirm, req, t: t2 }) {
   const T = useT();
   const [sel, setSel] = (0, import_react86.useState)(0);
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     const lower = ch.toLowerCase();
-    if (key.escape || key.ctrl && lower === "c" || lower === "n") {
+    if (key2.escape || key2.ctrl && lower === "c" || lower === "n") {
       return onCancel();
     }
     if (lower === "y") {
       return onConfirm();
     }
-    if (key.upArrow) {
+    if (key2.upArrow) {
       setSel(0);
     }
-    if (key.downArrow) {
+    if (key2.downArrow) {
       setSel(1);
     }
-    if (key.return) {
+    if (key2.return) {
       sel === 0 ? onCancel() : onConfirm();
     }
   });
@@ -88721,12 +88721,12 @@ function SkillsHub({ gw: gw2, maxWidth, onClose, t: t2 }) {
     setErr("");
     gw2.request("skills.manage", { action: "install", query: name }).then(() => onClose()).catch((e) => setErr(rpcErrorMessage(e))).finally(() => setInstalling(false));
   };
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (installing) {
       return;
     }
     if (stage === "actions") {
-      if (key.return) {
+      if (key2.return) {
         setStage("skill");
         setInfo(null);
         setErr("");
@@ -88744,15 +88744,15 @@ function SkillsHub({ gw: gw2, maxWidth, onClose, t: t2 }) {
     const count = stage === "category" ? cats.length : skills.length;
     const sel = stage === "category" ? catIdx : skillIdx;
     const setSel = stage === "category" ? setCatIdx : setSkillIdx;
-    if (key.upArrow && sel > 0) {
+    if (key2.upArrow && sel > 0) {
       setSel((v) => v - 1);
       return;
     }
-    if (key.downArrow && sel < count - 1) {
+    if (key2.downArrow && sel < count - 1) {
       setSel((v) => v + 1);
       return;
     }
-    if (key.return) {
+    if (key2.return) {
       if (stage === "category") {
         const cat = cats[catIdx];
         if (!cat) {
@@ -89434,8 +89434,8 @@ function StepUpScreen2({ onPatch, overlay, t: t2 }) {
 }
 function TeamContextScreen({ onClose, s, t: t2 }) {
   const T = useT().subscription;
-  use_input_default((_ch, key) => {
-    if (key.escape || key.return) {
+  use_input_default((_ch, key2) => {
+    if (key2.escape || key2.return) {
       return onClose();
     }
   });
@@ -89814,15 +89814,392 @@ var init_banner = __esm({
     ];
     LOGO_GRADIENT = [0, 0, 1, 1, 2, 2];
     CADUC_GRADIENT = [2, 2, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 3, 3, 3];
-    colorize3 = (art, gradient, c) => {
+    colorize3 = (art, gradient2, c) => {
       const p = [c.primary, c.accent, c.border, c.muted];
-      return art.map((text, i) => [p[gradient[i]] ?? c.muted, text]);
+      return art.map((text2, i) => [p[gradient2[i]] ?? c.muted, text2]);
     };
     LOGO_WIDTH = Math.max(...LOGO_ART.map((line) => line.length));
     CADUCEUS_WIDTH = Math.max(...CADUCEUS_ART.map((line) => line.length));
     logo = (c, customLogo) => customLogo ? parseRichMarkup(customLogo) : colorize3(LOGO_ART, LOGO_GRADIENT, c);
     caduceus = (c, customHero) => customHero ? parseRichMarkup(customHero) : colorize3(CADUCEUS_ART, CADUC_GRADIENT, c);
     artWidth = (lines) => lines.reduce((m, [, t2]) => Math.max(m, t2.length), 0);
+  }
+});
+
+// src/ghost.ts
+function hash2(x, y, s) {
+  let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 2147483647) | 0;
+  h = Math.imul(h ^ h >>> 13, 1274126177);
+  return ((h ^ h >>> 16) >>> 0) / 4294967296;
+}
+function noise2(x, y, seed = 0) {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = smooth(x - xi);
+  const yf = smooth(y - yi);
+  const a = hash2(xi, yi, seed);
+  const b = hash2(xi + 1, yi, seed);
+  const c = hash2(xi, yi + 1, seed);
+  const d = hash2(xi + 1, yi + 1, seed);
+  return lerp(lerp(a, b, xf), lerp(c, d, xf), yf);
+}
+function fbm(x, y, octaves = 4, seed = 0) {
+  let v = 0;
+  let amp = 0.5;
+  let f = 1;
+  let norm2 = 0;
+  for (let i = 0; i < octaves; i++) {
+    v += amp * noise2(x * f, y * f, seed + i * 17);
+    norm2 += amp;
+    amp *= 0.5;
+    f *= 2;
+  }
+  return v / norm2;
+}
+function rng(seed = 1) {
+  let a = seed >>> 0;
+  return () => {
+    a = a + 1831565813 >>> 0;
+    let t2 = a;
+    t2 = Math.imul(t2 ^ t2 >>> 15, t2 | 1);
+    t2 ^= t2 + Math.imul(t2 ^ t2 >>> 7, t2 | 61);
+    return ((t2 ^ t2 >>> 14) >>> 0) / 4294967296;
+  };
+}
+function lum(h) {
+  if (!h) {
+    return 0.88;
+  }
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+var GHOST_COLS, GHOST_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines;
+var init_ghost = __esm({
+  "src/ghost.ts"() {
+    "use strict";
+    GHOST_COLS = 60;
+    GHOST_ROWS = 28;
+    clamp4 = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+    smooth = (t2) => t2 * t2 * (3 - 2 * t2);
+    lerp = (a, b, t2) => a + (b - a) * t2;
+    jsround = (v) => Math.floor(v + 0.5);
+    palette = [];
+    add = (hexes) => {
+      const at = palette.length;
+      palette.push(...hexes);
+      return at;
+    };
+    gradient = (stops, n = 10) => {
+      const rgb3 = stops.map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const t2 = i / (n - 1) * (rgb3.length - 1);
+        const j = Math.min(rgb3.length - 2, Math.floor(t2));
+        const f = t2 - j;
+        out.push(
+          "#" + rgb3[j].map((v, k) => Math.round(lerp(v, rgb3[j + 1][k], f)).toString(16).padStart(2, "0")).join("")
+        );
+      }
+      return out;
+    };
+    SKY = add(gradient(["#0a0618", "#160c2c", "#24143e", "#341e52", "#462a62"], 10));
+    MIST = add(gradient(["#4a3a6a", "#6a5a8a", "#8a7aa8"], 3));
+    HILL = add(gradient(["#06040c", "#0e0a18", "#181226"], 3));
+    STONE = add(["#2a2638", "#3a3650", "#4a4662"]);
+    MOON = add(["#d8d4b8", "#f4f0d8"]);
+    GHOST = add(gradient(["#6a6a9a", "#9898c4", "#c4c4e4", "#e4e4f6", "#ffffff"], 10));
+    EYE = add(["#14102a", "#ffffff"]);
+    PINK = add(["#ff9ab8", "#ffc4d6"]);
+    PALETTE_KEYS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    key = (i) => PALETTE_KEYS[i];
+    blank = () => Array.from({ length: GHOST_COLS * GHOST_ROWS }, () => ({ ch: " ", co: key(SKY) }));
+    put = (cells, x, y, ch, co) => {
+      const px = Math.floor(x);
+      const py = Math.floor(y);
+      if (px < 0 || py < 0 || px >= GHOST_COLS || py >= GHOST_ROWS) {
+        return;
+      }
+      cells[px + py * GHOST_COLS] = { ch, co };
+    };
+    BG = (() => {
+      const cells = [];
+      for (let y = 0; y < GHOST_ROWS; y++) {
+        cells.push(Array.from({ length: GHOST_COLS }, () => ({ ch: " ", co: key(SKY) })));
+      }
+      const hill = (x) => 22 + Math.sin(x * 0.11) * 1.2 + Math.sin(x * 0.27 + 1) * 0.6;
+      const set = (x, y, ch, co) => {
+        if (x >= 0 && y >= 0 && x < GHOST_COLS && y < GHOST_ROWS) {
+          cells[y][x] = { ch, co };
+        }
+      };
+      for (let y = 0; y < GHOST_ROWS; y++) {
+        for (let x = 0; x < GHOST_COLS; x++) {
+          if (y >= hill(x)) {
+            const d = y - hill(x);
+            set(x, y, d < 1 ? "\u2584" : "\u2588", key(HILL + (d < 1 ? 2 : y > 25 ? 0 : 1)));
+            continue;
+          }
+          const md = Math.hypot((x - 50) / 2, y - 4);
+          const v = clamp4(
+            0.3 + y / 22 * 0.4 + Math.exp(-md / 6) * 0.5 + (fbm(x * 0.07, y * 0.15, 3, 3) - 0.5) * 0.2
+          );
+          set(x, y, " \u2591\u2592\u2593"[1 + Math.min(2, Math.floor(v * 3))], key(SKY + Math.min(9, Math.floor(v * 10))));
+        }
+      }
+      const r = rng(7);
+      for (let i = 0; i < 18; i++) {
+        set(Math.floor(r() * GHOST_COLS), Math.floor(r() * 12), "\xB7", key(MIST + 2));
+      }
+      for (let y = 1; y < 8; y++) {
+        for (let x = 44; x < 57; x++) {
+          const dx = (x + 0.5 - 50) / 5;
+          const dy = (y + 0.5 - 4) / 2.6;
+          if (dx * dx + dy * dy <= 1) {
+            set(x, y, "\u2588", key(MOON + (dx < 0.2 ? 1 : 0)));
+          }
+        }
+      }
+      for (const [sx, h] of [[5, 3], [14, 2], [44, 3], [53, 2]]) {
+        const top = Math.floor(hill(sx + 2)) - h;
+        for (let y = top; y < top + h + 1; y++) {
+          for (let x = sx; x < sx + 4; x++) {
+            set(x, y, y === top && (x === sx || x === sx + 3) ? "\u2584" : "\u2588", key(STONE + (x === sx ? 2 : 1)));
+          }
+        }
+        set(sx + 1, top + 1, "\u253C", key(STONE));
+      }
+      return cells;
+    })();
+    text = (cells, x, y, s, co) => {
+      for (let k = 0; k < s.length; k++) {
+        put(cells, x + k, y, s[k], co);
+      }
+    };
+    ell = (cells, cx, cy, rx, ry, fn) => {
+      for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+        for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+          const dx = (x + 0.5 - cx) / rx;
+          const dy = (y + 0.5 - cy) / ry;
+          if (dx * dx + dy * dy <= 1) {
+            fn(x, y, dx, dy);
+          }
+        }
+      }
+    };
+    ghostFrame = (t2) => {
+      const cells = blank();
+      for (let y = 0; y < GHOST_ROWS; y++) {
+        for (let x = 0; x < GHOST_COLS; x++) {
+          cells[x + y * GHOST_COLS] = BG[y][x];
+        }
+      }
+      for (let y = 18; y < 25; y++) {
+        for (let x = 0; x < GHOST_COLS; x++) {
+          const m = fbm(x * 0.08 - t2 * 0.35, y * 0.4, 3, 9);
+          if (m > 0.55) {
+            put(cells, x, y, m > 0.66 ? "\u2592" : "\u2591", key(MIST + (m > 0.66 ? 1 : 0)));
+          }
+        }
+      }
+      const cx = 30 + Math.sin(t2 * 0.785) * 4;
+      const cy = 11 + Math.sin(t2 * 2.2) * 2;
+      const sw = 7 - (cy - 9.7) * 0.8;
+      ell(cells, cx, 24.5, sw, 0.9, (x, y) => put(cells, x, y, "\u2593", key(HILL)));
+      const wave = Math.sin(t2 * 6.28);
+      for (const [s, lift] of [
+        [-1, 0.3 + Math.sin(t2 * 3.14) * 0.3],
+        [1, -0.6 + wave * 0.9]
+      ]) {
+        const ax = cx + s * 11.5;
+        const ay = cy + 2.2 + lift * -1.6;
+        ell(cells, ax, ay, 2.6, 1.3, (x, y, _dx, dy) => {
+          put(cells, x, y, "\u2588", key(GHOST + (dy < 0 ? 8 : 6)));
+        });
+      }
+      const top = cy - 9;
+      const base = cy + 5.5;
+      for (let y = Math.floor(top); y <= base + 2; y++) {
+        for (let x = Math.floor(cx - 12); x <= cx + 12; x++) {
+          const dx = (x + 0.5 - cx) / 11;
+          const ok = y + 0.5 < cy ? dx * dx + ((y + 0.5 - cy) / 9) ** 2 <= 1 : Math.abs(dx) <= 1 + (y - cy) * 0.015 && y + 0.5 <= base + Math.sin((x - cx) * 0.95 - t2 * 6.28) * 1.3;
+          if (!ok) {
+            continue;
+          }
+          const vy = (y - top) / 15;
+          const lit = clamp4(0.95 - vy * 0.45 - dx * 0.3 - dx * dx * 0.25);
+          const k = key(GHOST + Math.min(9, Math.floor(lit * 10)));
+          put(cells, x, y, Math.abs(dx) > 0.88 ? "\u2593" : "\u2588", k);
+        }
+      }
+      const bp = t2 % 4;
+      const blink = Math.abs(bp - 3.1) < 0.14 || Math.abs(bp - 3.45) < 0.12;
+      const ey = cy - 2.5;
+      const lookX = Math.sin(t2 * 0.785) * 0.7;
+      for (const ex of [cx - 4.2, cx + 4.2]) {
+        if (blink) {
+          text(cells, jsround(ex - 1.5), jsround(ey), "\u2580\u2580\u2580", key(EYE));
+          continue;
+        }
+        ell(cells, ex + lookX, ey, 1.7, 2.2, (x, y) => put(cells, x, y, "\u2588", key(EYE)));
+        put(cells, ex + lookX - 0.6, ey - 1.2, "\u2580", key(EYE + 1));
+      }
+      for (const ex of [cx - 7.5, cx + 6.5]) {
+        text(cells, jsround(ex), jsround(ey + 2), "\u2584\u2584", key(PINK));
+      }
+      const opened = Math.sin(t2 * 1.57) > 0.4;
+      const mx = jsround(cx - 1);
+      const my = jsround(ey + 3);
+      if (opened) {
+        text(cells, mx, my, "\u2584\u2584", key(EYE));
+        text(cells, mx, my + 1, "\u2580\u2580", key(EYE));
+      } else {
+        text(cells, mx, my, "\u2580\u2580", key(EYE));
+      }
+      const rows = [];
+      for (let y = 0; y < GHOST_ROWS; y++) {
+        rows.push(cells.slice(y * GHOST_COLS, (y + 1) * GHOST_COLS));
+      }
+      return rows;
+    };
+    hex = (k) => palette[PALETTE_KEYS.indexOf(k)] ?? palette[0];
+    ESC5 = String.fromCharCode(27);
+    SGR = `${ESC5}[0m`;
+    fg = (h) => `${ESC5}[38;2;${rgb2(h)}m`;
+    rgb2 = (h) => {
+      const v = parseInt(h.slice(1), 16);
+      return `${v >> 16 & 255};${v >> 8 & 255};${v & 255}`;
+    };
+    COVER = {
+      " ": 0,
+      "\u2591": 25,
+      "\u2592": 50,
+      "\u2593": 75,
+      "\u2588": 100,
+      "\xB7": 4.054054054054054,
+      "\u2022": 12.162162162162163,
+      "\u25CF": 48.64864864864865,
+      "\u253C": 25.675675675675677,
+      "\u2584": 51.351351351351354,
+      "\u2580": 51.351351351351354
+    };
+    cover = (ch) => COVER[ch] ?? 30;
+    DOTS = [" ", "\xB7", "\u2022", "\u25CF"];
+    isShade = (ch) => {
+      const c = ch.codePointAt(0);
+      return c >= 9600 && c <= 9631;
+    };
+    RAMP_PUNCT = new Set(".,:;-~=+*!#%@$&");
+    rampShaded = (rows) => {
+      let ink3 = 0;
+      let ramp = 0;
+      let alnum = 0;
+      for (const row of rows) {
+        for (const cell of row) {
+          if (cell.ch === " ") {
+            continue;
+          }
+          ink3++;
+          if (RAMP_PUNCT.has(cell.ch)) {
+            ramp++;
+          } else {
+            const c = cell.ch.charCodeAt(0);
+            if (c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122) {
+              alnum++;
+            }
+          }
+        }
+      }
+      return ink3 > 0 && ramp >= ink3 * 0.5 && alnum < ink3 * 0.05;
+    };
+    ghostDots = (t2) => {
+      const rows = ghostFrame(t2);
+      const shaded = rampShaded(rows);
+      const D = rows.map(
+        (row) => row.map((cell) => {
+          if (cell.ch === " ") {
+            return -1;
+          }
+          if (!isShade(cell.ch) && !(shaded && RAMP_PUNCT.has(cell.ch))) {
+            return -1;
+          }
+          return cover(cell.ch) / 100 * lum(cell.co === " " ? void 0 : hex(cell.co));
+        })
+      );
+      let max = 0;
+      let min = Infinity;
+      for (const row of D) {
+        for (const d of row) {
+          if (d > max) {
+            max = d;
+          }
+          if (d >= 4e-3 && d < min) {
+            min = d;
+          }
+        }
+      }
+      const spread = max - min > 0.05;
+      const span = spread ? max - min : max;
+      const lo = spread ? min : 0;
+      const gamma = 0.35;
+      const n = DOTS.length - 1;
+      return rows.map(
+        (row, y) => row.map((cell, x) => {
+          const d = D[y][x];
+          if (d < 0) {
+            return cell;
+          }
+          const v = d < 4e-3 || !span ? 0 : Math.max(1e-4, (Math.max(0, d - lo) / span) ** gamma);
+          return { ch: v === 0 ? " " : DOTS[1 + Math.min(n - 1, Math.floor(v * n))], co: cell.co };
+        })
+      );
+    };
+    tint = (hue, hexColor, mixIn = 0.72, gain = 1) => {
+      const v = parseInt(hue.slice(1), 16);
+      const h = [v >> 16 & 255, v >> 8 & 255, v & 255];
+      const r = parseInt(hexColor.slice(1), 16);
+      const p = [r >> 16 & 255, r >> 8 & 255, r & 255];
+      const lumC = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255;
+      const lumH = Math.max(0.04, (0.2126 * h[0] + 0.7152 * h[1] + 0.0722 * h[2]) / 255);
+      const out = p.map((ch, i) => Math.round(ch + (h[i] * (lumC / lumH) * gain - ch) * mixIn));
+      return "#" + out.map((ch) => Math.max(0, Math.min(255, ch)).toString(16).padStart(2, "0")).join("");
+    };
+    moonGain = 0.55;
+    colorRow = (row, c) => {
+      let out = "";
+      let cur = "";
+      for (const cell of row) {
+        const style = cell.ch === " " ? SGR : fg(themeInk(cell.co, c));
+        if (style !== cur) {
+          out += style;
+          cur = style;
+        }
+        out += cell.ch;
+      }
+      return out + SGR;
+    };
+    themeInk = (key2, c) => {
+      const raw = hex(key2);
+      const rank = PALETTE_KEYS.indexOf(key2) - GHOST;
+      if (rank >= 0 && rank <= 9) {
+        return raw;
+      }
+      const idx = PALETTE_KEYS.indexOf(key2);
+      const accent = c.label || c.primary || c.accent || c.text;
+      if (idx === EYE + 1) {
+        return "#ffffff";
+      }
+      if (idx === EYE) {
+        return c.text || raw;
+      }
+      if (idx >= MOON && idx < MOON + 2) {
+        return tint(accent, raw, 0.8, moonGain);
+      }
+      if (idx >= PINK) {
+        return tint("#ff9ab8", raw, 0.55);
+      }
+      return tint(accent, raw);
+    };
+    ghostLines = (c, t2) => ghostDots(t2).map((row) => ["", colorRow(row, c)]);
   }
 });
 
@@ -89841,8 +90218,11 @@ function InlineLoader({ label, t: t2 }) {
     label
   ] });
 }
+function GhostArt({ lines }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(RawAnsi, { lines: lines.map(([, text2]) => text2), width: GHOST_COLS });
+}
 function ArtLines({ lines }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", height: lines.length, width: artWidth(lines), children: lines.map(([c, text], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: c, wrap: "truncate-end", children: text }, i)) });
+  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", height: lines.length, width: artWidth(lines), children: lines.map(([c, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: c, wrap: "truncate-end", children: text2 }, i)) });
 }
 function CompactBanner({ cols, t: t2 }) {
   const T = useT().chatBits.branding;
@@ -89932,14 +90312,29 @@ function Banner({ maxWidth, t: t2 }) {
     }
   ) });
 }
+function useGhostTime(enabled2) {
+  const [t2, setT] = (0, import_react91.useState)(0);
+  (0, import_react91.useEffect)(() => {
+    if (!enabled2) {
+      return;
+    }
+    const id = setInterval(() => setT((v) => v + GHOST_STEP_S), GHOST_TICK_MS);
+    return () => clearInterval(id);
+  }, [enabled2]);
+  return t2;
+}
 function SessionPanel({ info, maxWidth, sid, t: t2 }) {
   const T = useT().chatBits.branding;
   const term = useStdout().stdout?.columns ?? 100;
   const cols = Math.max(20, Math.min(term, maxWidth ?? term));
+  const ghostFits = cols >= GHOST_COLS + 30;
+  const ghostTime = useGhostTime(ghostFits);
+  const ghostArt = ghostFits ? ghostLines(t2.color, ghostTime) : [];
   const heroLines = caduceus(t2.color, t2.bannerHero || void 0);
-  const leftW = Math.min((artWidth(heroLines) || CADUCEUS_WIDTH) + 4, Math.floor(cols * 0.4));
-  const wide = cols >= 90 && leftW + 40 < cols;
-  const w = Math.max(20, wide ? cols - leftW - 14 : cols - 12);
+  const heroArtWidth = ghostFits ? GHOST_COLS : artWidth(heroLines) || CADUCEUS_WIDTH;
+  const leftW = ghostFits ? GHOST_COLS : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));
+  const wide = ghostFits || heroArtWidth > 0 && leftW + 40 < cols;
+  const w = Math.max(20, wide ? cols - leftW - 8 : cols - 12);
   const lineBudget = Math.max(12, w - 2);
   const strip = (s) => s.endsWith("_tools") ? s.slice(0, -6) : s;
   const listFade = mix(t2.color.muted, t2.color.text, 0.5);
@@ -90028,24 +90423,38 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
     return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, children: info.system_prompt });
   };
   const heroColumn = wide ? /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", width: "100%", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(ArtLines, { lines: heroLines }),
-    /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, {}),
-    /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.accent, children: [
-      (info.model ?? "").split("/").pop(),
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, children: " \xB7 Qubit Labs" })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, wrap: "truncate-end", children: info.cwd || process.cwd() }),
-    sid && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.sessionLabel, children: T.sessionLabel }),
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.sessionBorder, children: sid })
+    ghostFits ? /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: ghostArt }) : /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(ArtLines, { lines: heroLines }),
+    !ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, {}),
+    !ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(import_jsx_runtime48.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.accent, children: [
+        (info.model ?? "").split("/").pop(),
+        /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, children: " \xB7 Qubit Labs" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, wrap: "truncate-end", children: info.cwd || process.cwd() }),
+      sid && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.sessionLabel, children: T.sessionLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.sessionBorder, children: sid })
+      ] })
     ] })
   ] }) : null;
   const infoColumn = /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", width: "100%", children: [
-    wide ? /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { justifyContent: "center", marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { bold: true, color: t2.color.primary, children: [
-      t2.brand.name,
-      info.version ? ` v${info.version}` : "",
-      info.release_date ? ` (${info.release_date})` : ""
-    ] }) }) : (
+    wide ? /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { bold: true, color: t2.color.primary, children: [
+        t2.brand.name,
+        info.version ? ` ${/^v/i.test(info.version) ? info.version : `v${info.version}`}` : " v0.0.1"
+      ] }),
+      ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(import_jsx_runtime48.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.accent, wrap: "truncate-end", children: [
+          (info.model ?? "").split("/").pop(),
+          /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, children: " \xB7 Qubit Labs" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, wrap: "truncate-end", children: info.cwd || process.cwd() }),
+        sid && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { wrap: "truncate-end", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.sessionLabel, children: T.sessionLabel }),
+          /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.sessionBorder, children: sid })
+        ] })
+      ] })
+    ] }) : (
       // Narrow layout hides the hero column; surface model/cwd/session
       // here so they aren't lost.
       /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
@@ -90116,12 +90525,12 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
       info.install_warning
     ] })
   ] });
-  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { borderColor: t2.color.border, borderStyle: "round", marginBottom: 1, paddingX: 2, paddingY: 1, children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { borderColor: t2.color.border, borderStyle: "round", flexDirection: "column", marginBottom: 1, paddingX: 2, paddingY: 1, children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
     WidgetGrid,
     {
       cols: wide ? leftW + 2 + w : w,
       columns: wide ? [leftW, { fr: 1 }] : 1,
-      gap: 2,
+      gap: 1,
       paddingX: 0,
       paddingY: 0,
       rowGap: 0,
@@ -90146,7 +90555,7 @@ function Panel({ sections, t: t2, title }) {
     ] }, si))
   ] });
 }
-var import_react91, import_jsx_runtime48, LOADER_TICK_MS, TAG_TINY, HIDE_BELOW, COMPACT_FROM, clip, centerIn, ruleIn, SKELETON_ROWS, SKILLS_MAX, TOOLSETS_MAX;
+var import_react91, import_jsx_runtime48, LOADER_TICK_MS, TAG_TINY, HIDE_BELOW, COMPACT_FROM, clip, centerIn, ruleIn, SKELETON_ROWS, SKILLS_MAX, TOOLSETS_MAX, GHOST_TICK_MS, GHOST_STEP_S;
 var init_branding = __esm({
   "src/components/branding.tsx"() {
     "use strict";
@@ -90155,6 +90564,7 @@ var init_branding = __esm({
     import_react91 = __toESM(require_react(), 1);
     init_dist4();
     init_banner();
+    init_ghost();
     init_useT();
     init_text();
     init_accordion();
@@ -90188,6 +90598,8 @@ var init_branding = __esm({
     ];
     SKILLS_MAX = 8;
     TOOLSETS_MAX = 8;
+    GHOST_TICK_MS = 80;
+    GHOST_STEP_S = 0.08;
   }
 });
 
@@ -90350,8 +90762,8 @@ var init_helpHint = __esm({
 });
 
 // src/lib/starmapPalette.ts
-function hexToRgb(hex2) {
-  let s = hex2.trim().replace(/^#/, "");
+function hexToRgb(hex3) {
+  let s = hex3.trim().replace(/^#/, "");
   if (s.length === 3) {
     s = s.split("").map((c) => c + c).join("");
   }
@@ -90414,16 +90826,16 @@ function deriveStarmapPalette(primaryHex, fgHex) {
     skill: mix2(complementaryInk(primary), bg, 0.45)
   };
 }
-function fadeHex(palette, hex2, alpha) {
-  const base = hexToRgb(hex2);
-  return rgbToHex(alpha >= 0.999 ? base : mix2(palette.bg, base, alpha));
+function fadeHex(palette2, hex3, alpha) {
+  const base = hexToRgb(hex3);
+  return rgbToHex(alpha >= 0.999 ? base : mix2(palette2.bg, base, alpha));
 }
-function fadeInk(palette, style, alpha) {
-  const base = style === "skill" ? palette.skill : style === "memory" ? palette.memory : style === "label" ? palette.label : style === "dim" ? palette.dim : null;
+function fadeInk(palette2, style, alpha) {
+  const base = style === "skill" ? palette2.skill : style === "memory" ? palette2.memory : style === "label" ? palette2.label : style === "dim" ? palette2.dim : null;
   if (!base) {
     return void 0;
   }
-  return rgbToHex(alpha >= 0.999 ? base : mix2(palette.bg, base, alpha));
+  return rgbToHex(alpha >= 0.999 ? base : mix2(palette2.bg, base, alpha));
 }
 var init_starmapPalette = __esm({
   "src/lib/starmapPalette.ts"() {
@@ -90432,16 +90844,16 @@ var init_starmapPalette = __esm({
 });
 
 // src/components/journey.tsx
-function ChartRow({ palette, row }) {
+function ChartRow({ palette: palette2, row }) {
   if (!row.length) {
     return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: " " });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: row.map((run, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: run[3] ? fadeHex(palette, run[3], run[2] ?? 1) : fadeInk(palette, run[1], run[2] ?? 1), children: run[0] }, i)) });
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: row.map((run, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: run[3] ? fadeHex(palette2, run[3], run[2] ?? 1) : fadeInk(palette2, run[1], run[2] ?? 1), children: run[0] }, i)) });
 }
 function ListRow2({ active, cells, t: t2 }) {
   const row = listRowStyle(t2, active);
-  const fg = active ? row.color ?? t2.color.accent : t2.color.text;
-  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { backgroundColor: row.backgroundColor, bold: active, color: fg, wrap: "truncate-end", children: cells.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: active ? fg : c.color ?? t2.color.text, children: c.text }, i)) });
+  const fg2 = active ? row.color ?? t2.color.accent : t2.color.text;
+  return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { backgroundColor: row.backgroundColor, bold: active, color: fg2, wrap: "truncate-end", children: cells.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { color: active ? fg2 : c.color ?? t2.color.text, children: c.text }, i)) });
 }
 function Journey({ gw: gw2, onClose, t: t2 }) {
   const T = useT();
@@ -90450,7 +90862,7 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
   const rows = Math.max(16, (stdout?.rows ?? 30) - 2);
   const chartRows = Math.max(5, Math.min(MAX_CHART_ROWS, Math.floor(rows * 0.32)));
   const page = Math.max(4, rows - 6);
-  const palette = deriveStarmapPalette(t2.color.primary, t2.color.text);
+  const palette2 = deriveStarmapPalette(t2.color.primary, t2.color.text);
   const [data, setData] = (0, import_react94.useState)(null);
   const [err, setErr] = (0, import_react94.useState)("");
   const [cursor, setCursor] = (0, import_react94.useState)(0);
@@ -90548,7 +90960,7 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
     }
     return stepRow(c, 1) === c ? stepRow(c, -1) : stepRow(c, 1);
   };
-  use_input_default((ch, key) => {
+  use_input_default((ch, key2) => {
     if (busy) {
       return;
     }
@@ -90558,11 +90970,11 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
       }
       return setConfirmDelete(false);
     }
-    const back = key.escape || key.leftArrow || ch === "h";
+    const back = key2.escape || key2.leftArrow || ch === "h";
     if (ch === "q") {
       return onClose();
     }
-    if (activeNode && ch === "d" && !key.ctrl) {
+    if (activeNode && ch === "d" && !key2.ctrl) {
       setNotice("");
       return setConfirmDelete(true);
     }
@@ -90574,16 +90986,16 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
       if (back) {
         return setMode("timeline");
       }
-      if (key.upArrow || ch === "k") {
+      if (key2.upArrow || ch === "k") {
         return scrollItem(-2);
       }
-      if (key.downArrow || ch === "j") {
+      if (key2.downArrow || ch === "j") {
         return scrollItem(2);
       }
-      if (key.pageUp || key.ctrl && ch === "u") {
+      if (key2.pageUp || key2.ctrl && ch === "u") {
         return scrollItem(-page);
       }
-      if (key.pageDown || key.ctrl && ch === "d" || ch === " ") {
+      if (key2.pageDown || key2.ctrl && ch === "d" || ch === " ") {
         return scrollItem(page);
       }
       if (ch === "g") {
@@ -90599,19 +91011,19 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
     if (back) {
       return onClose();
     }
-    if ((key.return || key.rightArrow || ch === "l") && activeNode?.body) {
+    if ((key2.return || key2.rightArrow || ch === "l") && activeNode?.body) {
       return setMode("item");
     }
-    if (key.upArrow || ch === "k") {
+    if (key2.upArrow || ch === "k") {
       return setCursor((v) => stepRow(v, -1));
     }
-    if (key.downArrow || ch === "j") {
+    if (key2.downArrow || ch === "j") {
       return setCursor((v) => stepRow(v, 1));
     }
-    if (key.pageUp || key.ctrl && ch === "u") {
+    if (key2.pageUp || key2.ctrl && ch === "u") {
       return setCursor((v) => snapRow(v - page));
     }
-    if (key.pageDown || key.ctrl && ch === "d") {
+    if (key2.pageDown || key2.ctrl && ch === "d") {
       return setCursor((v) => snapRow(v + page));
     }
     if (ch === "g") {
@@ -90634,7 +91046,7 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
     const body = activeNode.body ? activeNode.body.split(/\r?\n/) : [T.journey.noDetail];
     return /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { alignItems: "stretch", flexDirection: "column", flexGrow: 1, paddingX: 1, paddingY: 1, children: [
       /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { wrap: "truncate-end", children: /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { bold: true, color: fadeInk(palette, activeNode.style, 1), children: [
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { wrap: "truncate-end", children: /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { bold: true, color: fadeInk(palette2, activeNode.style, 1), children: [
           activeNode.glyph,
           " ",
           activeNode.fullLabel || activeNode.label
@@ -90674,7 +91086,7 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { wrap: "wrap", children: data.legend.map((item, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
         i ? "   " : "",
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: fadeInk(palette, item.style ?? "dim", 1), children: [
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: fadeInk(palette2, item.style ?? "dim", 1), children: [
           item.glyph,
           " "
         ] }),
@@ -90682,7 +91094,7 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
       ] }, item.label)) }),
       data.categories?.length ? /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { wrap: "wrap", children: data.categories.map((item, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { children: [
         i ? "  " : "",
-        /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: item.color ? fadeHex(palette, item.color, 1) : t2.color.muted, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: item.color ? fadeHex(palette2, item.color, 1) : t2.color.muted, children: [
           item.glyph,
           " "
         ] }),
@@ -90690,14 +91102,14 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
       ] }, item.label)) }) : null
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-      chartGrid.map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ChartRow, { palette, row }, i)),
+      chartGrid.map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(ChartRow, { palette: palette2, row }, i)),
       /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Text, { color: t2.color.muted, children: [
         data.axis.start,
         " ".repeat(axisGap),
         data.axis.end
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexDirection: "column", flexGrow: 1, flexShrink: 1, minHeight: 0, overflow: "hidden", children: tree.slice(start, start + listH).map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(TreeLine, { active: start + i === cursor, palette, row, t: t2 }, start + i)) }),
+    /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Box_default, { flexDirection: "column", flexGrow: 1, flexShrink: 1, minHeight: 0, overflow: "hidden", children: tree.slice(start, start + listH).map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(TreeLine, { active: start + i === cursor, palette: palette2, row, t: t2 }, start + i)) }),
     /* @__PURE__ */ (0, import_jsx_runtime52.jsxs)(Footer, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(
         StatusLines,
@@ -90720,7 +91132,7 @@ function Journey({ gw: gw2, onClose, t: t2 }) {
     ] })
   ] });
 }
-function TreeLine({ active, palette, row, t: t2 }) {
+function TreeLine({ active, palette: palette2, row, t: t2 }) {
   const T = useT();
   if (row.kind === "gap") {
     return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Text, { children: " " });
@@ -90732,7 +91144,7 @@ function TreeLine({ active, palette, row, t: t2 }) {
       {
         active,
         cells: [
-          { color: bucket.color ? fadeHex(palette, bucket.color, 0.85) : t2.color.label, text: bucket.label },
+          { color: bucket.color ? fadeHex(palette2, bucket.color, 0.85) : t2.color.label, text: bucket.label },
           { color: t2.color.muted, text: sliceMeta(T, bucket) }
         ],
         t: t2
@@ -90746,7 +91158,7 @@ function TreeLine({ active, palette, row, t: t2 }) {
       active,
       cells: [
         { color: t2.color.muted, text: ` ${last ? "\u2514\u2500" : "\u251C\u2500"} ` },
-        { color: fadeInk(palette, node.style, 1), text: `${node.glyph} ${node.fullLabel || node.label}` },
+        { color: fadeInk(palette2, node.style, 1), text: `${node.glyph} ${node.fullLabel || node.label}` },
         { color: t2.color.muted, text: `  ${node.meta}${node.body ? "  \u203A" : ""}` }
       ],
       t: t2
@@ -90832,27 +91244,27 @@ var init_roles = __esm({
 });
 
 // src/lib/emoji.ts
-function ensureEmojiPresentation(text) {
-  if (!text || !MAYBE_TEXT_EMOJI_RE.test(text)) {
-    return text;
+function ensureEmojiPresentation(text2) {
+  if (!text2 || !MAYBE_TEXT_EMOJI_RE.test(text2)) {
+    return text2;
   }
   let out = null;
   let last = 0;
   let i = 0;
-  while (i < text.length) {
-    const cp = text.codePointAt(i);
+  while (i < text2.length) {
+    const cp = text2.codePointAt(i);
     const size = cp > 65535 ? 2 : 1;
     if (TEXT_DEFAULT_EMOJI.has(cp)) {
-      const next = text.codePointAt(i + size);
+      const next = text2.codePointAt(i + size);
       if (next !== VS16 && next !== VS15) {
         out ??= "";
-        out += text.slice(last, i + size) + "\uFE0F";
+        out += text2.slice(last, i + size) + "\uFE0F";
         last = i + size;
       }
     }
     i += size;
   }
-  return out === null ? text : out + text.slice(last);
+  return out === null ? text2 : out + text2.slice(last);
 }
 var VS15, VS16, TEXT_DEFAULT_EMOJI, MAYBE_TEXT_EMOJI_RE;
 var init_emoji = __esm({
@@ -91664,14 +92076,14 @@ var init_syntax = __esm({
 });
 
 // src/components/markdown.tsx
-function MdInline({ color, t: t2, text }) {
+function MdInline({ color, t: t2, text: text2 }) {
   const parts = [];
   let last = 0;
-  for (const m of text.matchAll(INLINE_RE)) {
+  for (const m of text2.matchAll(INLINE_RE)) {
     const i = m.index ?? 0;
     const k = parts.length;
     if (i > last) {
-      parts.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: text.slice(last, i) }, k));
+      parts.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: text2.slice(last, i) }, k));
     }
     if (m[1] && m[2]) {
       parts.push(
@@ -91741,20 +92153,20 @@ function MdInline({ color, t: t2, text }) {
     }
     last = i + m[0].length;
   }
-  if (last < text.length) {
-    parts.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: text.slice(last) }, parts.length));
+  if (last < text2.length) {
+    parts.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: text2.slice(last) }, parts.length));
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { ...color ? { color } : {}, wrap: "wrap-trim", children: parts.length ? parts : text });
+  return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { ...color ? { color } : {}, wrap: "wrap-trim", children: parts.length ? parts : text2 });
 }
-function MdImpl({ cols, compact, t: t2, text }) {
+function MdImpl({ cols, compact, t: t2, text: text2 }) {
   const nodes = (0, import_react96.useMemo)(() => {
     const bucket = cacheBucket(t2);
-    const cacheKey = `${compact ? "1" : "0"}|${cols ?? ""}|${text}`;
+    const cacheKey = `${compact ? "1" : "0"}|${cols ?? ""}|${text2}`;
     const cached = cacheGet(bucket, cacheKey);
     if (cached) {
       return cached;
     }
-    const lines = ensureEmojiPresentation(text).split("\n");
+    const lines = ensureEmojiPresentation(text2).split("\n");
     const nodes2 = [];
     let prevKind = null;
     let i = 0;
@@ -91772,7 +92184,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
     };
     while (i < lines.length) {
       const line = lines[i];
-      const key = nodes2.length;
+      const key2 = nodes2.length;
       if (!line.trim()) {
         if (!compact) {
           gap();
@@ -91791,7 +92203,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
           /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: [
             "\u25B8 ",
             /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Link, { url: /^(?:\/|[a-z]:[\\/])/i.test(media) ? `file://${media}` : media, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.accent, underline: true, children: media }) })
-          ] }, key)
+          ] }, key2)
         );
         i++;
         continue;
@@ -91814,7 +92226,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
         }
         if (["md", "markdown"].includes(lang)) {
           start("paragraph");
-          nodes2.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Md, { cols, compact, t: t2, text: block.join("\n") }, key));
+          nodes2.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Md, { cols, compact, t: t2, text: block.join("\n") }, key2));
           continue;
         }
         start("code");
@@ -91826,24 +92238,24 @@ function MdImpl({ cols, compact, t: t2, text }) {
             block.map((l, j) => {
               if (highlighted) {
                 return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: highlightLine(l, lang, t2).map(
-                  ([color, text2], kk) => color ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color, children: text2 }, kk) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: text2 }, kk)
+                  ([color, text3], kk) => color ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color, children: text3 }, kk) : /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { children: text3 }, kk)
                 ) }, j);
               }
-              const add = isDiff && l.startsWith("+");
+              const add2 = isDiff && l.startsWith("+");
               const del = isDiff && l.startsWith("-");
               const hunk = isDiff && l.startsWith("@@");
               return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(
                 Text,
                 {
-                  backgroundColor: add ? t2.color.diffAdded : del ? t2.color.diffRemoved : void 0,
-                  color: add ? t2.color.diffAddedWord : del ? t2.color.diffRemovedWord : hunk ? t2.color.muted : void 0,
-                  dimColor: isDiff && !add && !del && !hunk && l.startsWith(" "),
+                  backgroundColor: add2 ? t2.color.diffAdded : del ? t2.color.diffRemoved : void 0,
+                  color: add2 ? t2.color.diffAddedWord : del ? t2.color.diffRemovedWord : hunk ? t2.color.muted : void 0,
+                  dimColor: isDiff && !add2 && !del && !hunk && l.startsWith(" "),
                   children: l
                 },
                 j
               );
             })
-          ] }, key)
+          ] }, key2)
         );
         continue;
       }
@@ -91858,7 +92270,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
           const inner = sameLineClose[1].trim();
           start("code");
           nodes2.push(
-            /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", paddingLeft: 2, children: inner ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.accent, children: renderMath(texToUnicode(inner)) }) : null }, key)
+            /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", paddingLeft: 2, children: inner ? /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.accent, children: renderMath(texToUnicode(inner)) }) : null }, key2)
           );
           i++;
           continue;
@@ -91872,7 +92284,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
         }
         if (closeIdx < 0) {
           start("paragraph");
-          nodes2.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: line }, key));
+          nodes2.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: line }, key2));
           i++;
           continue;
         }
@@ -91888,7 +92300,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
         }
         start("code");
         nodes2.push(
-          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", paddingLeft: 2, children: block.map((l, j) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.accent, children: renderMath(texToUnicode(l)) }, j)) }, key)
+          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", paddingLeft: 2, children: block.map((l, j) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.accent, children: renderMath(texToUnicode(l)) }, j)) }, key2)
         );
         i = closeIdx + 1;
         continue;
@@ -91897,7 +92309,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
       if (heading) {
         start("heading");
         nodes2.push(
-          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: true, color: t2.color.accent, wrap: "wrap-trim", children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: heading }) }, key)
+          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: true, color: t2.color.accent, wrap: "wrap-trim", children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: heading }) }, key2)
         );
         i++;
         continue;
@@ -91905,7 +92317,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
       if (i + 1 < lines.length && SETEXT_RE.test(lines[i + 1])) {
         start("heading");
         nodes2.push(
-          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: true, color: t2.color.accent, wrap: "wrap-trim", children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: line.trim() }) }, key)
+          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: true, color: t2.color.accent, wrap: "wrap-trim", children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: line.trim() }) }, key2)
         );
         i += 2;
         continue;
@@ -91913,7 +92325,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
       if (HR_RE.test(line)) {
         start("rule");
         nodes2.push(
-          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, children: "\u2500".repeat(36) }, key)
+          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, children: "\u2500".repeat(36) }, key2)
         );
         i++;
         continue;
@@ -91927,12 +92339,12 @@ function MdImpl({ cols, compact, t: t2, text }) {
             footnote[1],
             "] ",
             /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: footnote[2] ?? "" })
-          ] }, key)
+          ] }, key2)
         );
         i++;
         while (i < lines.length && /^\s{2,}\S/.test(lines[i])) {
           nodes2.push(
-            /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { paddingLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: lines[i].trim() }) }) }, `${key}-cont-${i}`)
+            /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { paddingLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: lines[i].trim() }) }) }, `${key2}-cont-${i}`)
           );
           i++;
         }
@@ -91941,7 +92353,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
       if (i + 1 < lines.length && DEF_RE.test(lines[i + 1])) {
         start("list");
         nodes2.push(
-          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: true, wrap: "wrap-trim", children: line.trim() }, key)
+          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: true, wrap: "wrap-trim", children: line.trim() }, key2)
         );
         i++;
         while (i < lines.length) {
@@ -91953,7 +92365,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
             /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { wrap: "wrap-trim", children: [
               /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, children: " \xB7 " }),
               /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: def })
-            ] }, `${key}-def-${i}`)
+            ] }, `${key2}-def-${i}`)
           );
           i++;
         }
@@ -91971,7 +92383,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
               " "
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: task ? task[2] : bullet[2] })
-          ] }) }, key)
+          ] }) }, key2)
         );
         i++;
         continue;
@@ -91986,7 +92398,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
               ". "
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: numbered[3] })
-          ] }) }, key)
+          ] }) }, key2)
         );
         i++;
         continue;
@@ -92003,7 +92415,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
           /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", children: quoteLines.map((ql, qi) => /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { paddingLeft: Math.max(0, ql.depth - 1) * 2, children: /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: [
             "\u2502 ",
             /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { t: t2, text: ql.text })
-          ] }) }, qi)) }, key)
+          ] }) }, qi)) }, key2)
         );
         continue;
       }
@@ -92013,7 +92425,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
         for (i += 2; i < lines.length && lines[i].includes("|") && lines[i].trim(); i++) {
           rows.push(splitRow(lines[i]));
         }
-        nodes2.push(renderTable(key, rows, t2, cols));
+        nodes2.push(renderTable(key2, rows, t2, cols));
         continue;
       }
       if (/^<\/?details\b/i.test(line)) {
@@ -92027,7 +92439,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
           /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: [
             "\u25B6 ",
             summary
-          ] }, key)
+          ] }, key2)
         );
         i++;
         continue;
@@ -92035,7 +92447,7 @@ function MdImpl({ cols, compact, t: t2, text }) {
       if (/^<\/?[^>]+>$/.test(line.trim())) {
         start("paragraph");
         nodes2.push(
-          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: line.trim() }, key)
+          /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { color: t2.color.muted, wrap: "wrap-trim", children: line.trim() }, key2)
         );
         i++;
         continue;
@@ -92051,17 +92463,17 @@ function MdImpl({ cols, compact, t: t2, text }) {
           i++;
         }
         if (rows.length) {
-          nodes2.push(renderTable(key, rows, t2, cols));
+          nodes2.push(renderTable(key2, rows, t2, cols));
         }
         continue;
       }
       start("paragraph");
-      nodes2.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: line }, key));
+      nodes2.push(/* @__PURE__ */ (0, import_jsx_runtime53.jsx)(MdInline, { color: t2.color.text, t: t2, text: line }, key2));
       i++;
     }
     cacheSet(bucket, cacheKey, nodes2);
     return nodes2;
-  }, [cols, compact, t2, text]);
+  }, [cols, compact, t2, text2]);
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", children: nodes });
 }
 var import_react96, import_jsx_runtime53, renderMath, FENCE_RE, FENCE_CLOSE_RE, HR_RE, HEADING_RE, SETEXT_RE, FOOTNOTE_RE, DEF_RE, BULLET_RE, TASK_RE, NUMBERED_RE, QUOTE_RE, TABLE_DIVIDER_CELL_RE, MD_URL_RE, MD_IDENTIFIER_RE, MD_DUNDER_IDENTIFIER_RE, MD_UNDERSCORE_BOLD_RE, MD_UNDERSCORE_ITALIC_RE, STRIP_UNDERSCORE_BOLD_RE, STRIP_UNDERSCORE_ITALIC_RE, MATH_BLOCK_OPEN_RE, MATH_BLOCK_CLOSE_DOLLAR_RE, MATH_BLOCK_CLOSE_BRACKET_RE, MEDIA_LINE_RE, AUDIO_DIRECTIVE_RE, INLINE_RE, indentDepth, splitRow, isTableDivider, autolinkUrl, urlAsText, authoredLabel, renderLink, stripInlineMarkup, SAFETY_MARGIN, MIN_COL_WIDTH, COL_GAP, TABLE_PADDING_LEFT, renderTable, MD_CACHE_LIMIT, mdCache, cacheBucket, cacheGet, cacheSet, Md;
@@ -92075,33 +92487,33 @@ var init_markdown = __esm({
     init_mathUnicode();
     init_syntax();
     import_jsx_runtime53 = __toESM(require_jsx_runtime(), 1);
-    renderMath = (text) => {
-      if (!text.includes(BOX_OPEN)) {
-        return text;
+    renderMath = (text2) => {
+      if (!text2.includes(BOX_OPEN)) {
+        return text2;
       }
       const out = [];
       let i = 0;
-      let key = 0;
-      while (i < text.length) {
-        const start = text.indexOf(BOX_OPEN, i);
+      let key2 = 0;
+      while (i < text2.length) {
+        const start = text2.indexOf(BOX_OPEN, i);
         if (start < 0) {
-          out.push(text.slice(i));
+          out.push(text2.slice(i));
           break;
         }
         if (start > i) {
-          out.push(text.slice(i, start));
+          out.push(text2.slice(i, start));
         }
-        const end = text.indexOf(BOX_CLOSE, start + 1);
+        const end = text2.indexOf(BOX_CLOSE, start + 1);
         if (end < 0) {
-          out.push(text.slice(start));
+          out.push(text2.slice(start));
           break;
         }
         out.push(
           /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(Text, { bold: true, inverse: true, children: [
             " ",
-            text.slice(start + 1, end),
+            text2.slice(start + 1, end),
             " "
-          ] }, key++)
+          ] }, key2++)
         );
         i = end + 1;
       }
@@ -92196,8 +92608,8 @@ var init_markdown = __esm({
       }
       const cellDisplayWidth = (raw) => stringWidth(stripInlineMarkup(raw));
       const minCellWidth = (raw) => {
-        const text = stripInlineMarkup(raw);
-        const words = text.split(/\s+/).filter((w) => w.length > 0);
+        const text2 = stripInlineMarkup(raw);
+        const words = text2.split(/\s+/).filter((w) => w.length > 0);
         if (words.length === 0) {
           return MIN_COL_WIDTH;
         }
@@ -92262,14 +92674,14 @@ var init_markdown = __esm({
       const segmenter2 = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter(void 0, { granularity: "grapheme" }) : null;
       const graphemes2 = (s) => segmenter2 ? [...segmenter2.segment(s)].map((seg3) => seg3.segment) : [...s];
       const wrapCell = (raw, width, hard) => {
-        const text = stripInlineMarkup(raw);
+        const text2 = stripInlineMarkup(raw);
         if (width <= 0) {
-          return [text];
+          return [text2];
         }
-        if (stringWidth(text) <= width) {
-          return [text];
+        if (stringWidth(text2) <= width) {
+          return [text2];
         }
-        const words = text.split(/\s+/).filter((w) => w.length > 0);
+        const words = text2.split(/\s+/).filter((w) => w.length > 0);
         const lines = [];
         let current = "";
         let currentWidth = 0;
@@ -92309,10 +92721,10 @@ var init_markdown = __esm({
       const sep = columnWidths.map((w) => "\u2500".repeat(Math.max(1, w))).join("  ");
       if (!needsWrap) {
         const buildRowString = (row) => row.map((cell, ci) => {
-          const text = stripInlineMarkup(cell);
-          const pad = " ".repeat(Math.max(0, columnWidths[ci] - stringWidth(text)));
+          const text2 = stripInlineMarkup(cell);
+          const pad = " ".repeat(Math.max(0, columnWidths[ci] - stringWidth(text2)));
           const gap = ci < numCols - 1 ? "  " : "";
-          return text + pad + gap;
+          return text2 + pad + gap;
         }).join("");
         return /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Box_default, { flexDirection: "column", paddingLeft: TABLE_PADDING_LEFT, children: normalizedRows.map((row, ri) => /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(import_react96.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime53.jsx)(Text, { bold: ri === 0, color: ri === 0 ? t2.color.accent : void 0, wrap: "truncate-end", children: buildRowString(row) }),
@@ -92343,7 +92755,7 @@ var init_markdown = __esm({
       normalizedRows.forEach((row, ri) => {
         const kind = ri === 0 ? "header" : "body";
         const rowLines = buildRowLines(row);
-        rowLines.forEach((text) => allEntries.push({ text, kind }));
+        rowLines.forEach((text2) => allEntries.push({ text: text2, kind }));
         if (ri > 0) {
           tallestBodyRow = Math.max(tallestBodyRow, rowLines.length);
         }
@@ -92401,16 +92813,16 @@ var init_markdown = __esm({
       mdCache.set(t2, fresh);
       return fresh;
     };
-    cacheGet = (b, key) => {
-      const v = b.get(key);
+    cacheGet = (b, key2) => {
+      const v = b.get(key2);
       if (v) {
-        b.delete(key);
-        b.set(key, v);
+        b.delete(key2);
+        b.set(key2, v);
       }
       return v;
     };
-    cacheSet = (b, key, v) => {
-      b.set(key, v);
+    cacheSet = (b, key2, v) => {
+      b.set(key2, v);
       if (b.size > MD_CACHE_LIMIT) {
         b.delete(b.keys().next().value);
       }
@@ -92455,39 +92867,39 @@ var init_streamingMarkdown = __esm({
         state.mathOpener = null;
       }
     };
-    advanceScan = (text, state) => {
+    advanceScan = (text2, state) => {
       const start = state.scanned.length;
       let i = start;
-      while (i < text.length) {
-        const nl = text.indexOf("\n", i);
+      while (i < text2.length) {
+        const nl = text2.indexOf("\n", i);
         if (nl < 0) {
           break;
         }
         if (nl === i) {
           if (i > 0 && !state.codeOpen && !state.mathOpener) {
-            const block = text.slice(state.settledLen, nl + 1);
+            const block = text2.slice(state.settledLen, nl + 1);
             if (/\S/.test(block)) {
               state.blocks.push(block);
               state.settledLen = nl + 1;
             }
           }
         } else {
-          applyLine(state, text.slice(i, nl).trim());
+          applyLine(state, text2.slice(i, nl).trim());
         }
         i = nl + 1;
       }
       if (i > start) {
-        state.scanned += text.slice(start, i);
+        state.scanned += text2.slice(start, i);
       }
     };
-    StreamingMd = (0, import_react97.memo)(function StreamingMd2({ cols, compact, t: t2, text }) {
+    StreamingMd = (0, import_react97.memo)(function StreamingMd2({ cols, compact, t: t2, text: text2 }) {
       const scanRef = (0, import_react97.useRef)(createScanState());
       let state = scanRef.current;
-      if (!text.startsWith(state.scanned)) {
+      if (!text2.startsWith(state.scanned)) {
         state = scanRef.current = createScanState();
       }
-      advanceScan(text, state);
-      const tail = text.slice(state.settledLen);
+      advanceScan(text2, state);
+      const tail = text2.slice(state.settledLen);
       return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(Box_default, { flexDirection: "column", children: [
         state.blocks.map((block, i) => /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Md, { cols, compact, t: t2, text: block }, i)),
         tail ? /* @__PURE__ */ (0, import_jsx_runtime54.jsx)(Md, { cols, compact, t: t2, text: tail }) : null
@@ -92520,8 +92932,8 @@ function TreeTextRow({
   t: t2,
   wrap = "wrap-trim"
 }) {
-  const text = dimColor ? /* @__PURE__ */ (0, import_jsx_runtime55.jsx)(Text, { color, dim: true, wrap, children: content }) : /* @__PURE__ */ (0, import_jsx_runtime55.jsx)(Text, { color, wrap, children: content });
-  return /* @__PURE__ */ (0, import_jsx_runtime55.jsx)(TreeRow, { branch, rails, t: t2, children: text });
+  const text2 = dimColor ? /* @__PURE__ */ (0, import_jsx_runtime55.jsx)(Text, { color, dim: true, wrap, children: content }) : /* @__PURE__ */ (0, import_jsx_runtime55.jsx)(Text, { color, wrap, children: content });
+  return /* @__PURE__ */ (0, import_jsx_runtime55.jsx)(TreeRow, { branch, rails, t: t2, children: text2 });
 }
 function TreeNode({
   branch,
@@ -92604,12 +93016,12 @@ function Chevron({
   ] }) });
 }
 function heatColor(node, peak, theme) {
-  const palette = [theme.color.border, theme.color.accent, theme.color.primary, theme.color.warn, theme.color.error];
-  const idx = hotnessBucket(node.aggregate.hotness, peak, palette.length);
+  const palette2 = [theme.color.border, theme.color.accent, theme.color.primary, theme.color.warn, theme.color.error];
+  const idx = hotnessBucket(node.aggregate.hotness, peak, palette2.length);
   if (idx < 2) {
     return void 0;
   }
-  return palette[idx];
+  return palette2[idx];
 }
 function SubagentAccordion({
   branch,
@@ -93652,7 +94064,7 @@ var init_messageLine = __esm({
 });
 
 // src/components/petSprite.tsx
-var import_react102, import_jsx_runtime58, UPPER_HALF, LOWER_HALF, hex, PetSprite, PetKitty;
+var import_react102, import_jsx_runtime58, UPPER_HALF, LOWER_HALF, hex2, PetSprite, PetKitty;
 var init_petSprite = __esm({
   "src/components/petSprite.tsx"() {
     "use strict";
@@ -93661,7 +94073,7 @@ var init_petSprite = __esm({
     import_jsx_runtime58 = __toESM(require_jsx_runtime(), 1);
     UPPER_HALF = "\u2580";
     LOWER_HALF = "\u2584";
-    hex = (r, g, b) => `#${[r, g, b].map(
+    hex2 = (r, g, b) => `#${[r, g, b].map(
       (v) => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, "0")
     ).join("")}`;
     PetSprite = (0, import_react102.memo)(function PetSprite2({ grid }) {
@@ -93676,9 +94088,9 @@ var init_petSprite = __esm({
           return /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { children: " " }, x);
         }
         if (top && bot) {
-          return /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { backgroundColor: hex(br, bg, bb), color: hex(tr, tg, tb), children: UPPER_HALF }, x);
+          return /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { backgroundColor: hex2(br, bg, bb), color: hex2(tr, tg, tb), children: UPPER_HALF }, x);
         }
-        return top ? /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { color: hex(tr, tg, tb), children: UPPER_HALF }, x) : /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { color: hex(br, bg, bb), children: LOWER_HALF }, x);
+        return top ? /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { color: hex2(tr, tg, tb), children: UPPER_HALF }, x) : /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(Text, { color: hex2(br, bg, bb), children: LOWER_HALF }, x);
       }) }, y)) });
     });
     PetKitty = (0, import_react102.memo)(function PetKitty2({ color, placeholder: placeholder2 }) {
@@ -94717,21 +95129,21 @@ var GatewayClient = class extends EventEmitter {
     this.publish(ev);
   }
   handleWebSocketFrame(raw) {
-    const text = wireFrameText(raw);
-    if (!text) {
+    const text2 = wireFrameText(raw);
+    if (!text2) {
       return;
     }
-    const frame = this.channel.handleFrame(text);
+    const frame = this.channel.handleFrame(text2);
     if (!frame) {
-      this.protocolError("malformed websocket frame", text, "(empty frame)");
+      this.protocolError("malformed websocket frame", text2, "(empty frame)");
       return;
     }
     if (frame.method === "event") {
-      this.mirrorEventToSidecar(text);
+      this.mirrorEventToSidecar(text2);
     }
   }
-  protocolError(what, text, emptyLabel) {
-    const preview = text.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
+  protocolError(what, text2, emptyLabel) {
+    const preview = text2.trim().slice(0, MAX_LOG_PREVIEW) || emptyLabel;
     this.pushLog(`[protocol] ${what}: ${preview}`);
     this.publish({ type: "gateway.protocol_error", payload: { preview } });
   }
@@ -94746,7 +95158,7 @@ var GatewayClient = class extends EventEmitter {
     this.proc = spawn(python, ["-m", "tui_gateway.entry"], { cwd, env: env3, stdio: ["pipe", "pipe", "pipe"] });
     this.lifecycle(`[lifecycle] spawned gateway child ${describeChild(this.proc)} python=${python} cwd=${cwd}`);
     const stdin = this.proc.stdin;
-    this.channel.attach({ send: (text) => void stdin.write(text + "\n") });
+    this.channel.attach({ send: (text2) => void stdin.write(text2 + "\n") });
     this.stdoutRl = createInterface({ input: this.proc.stdout });
     this.stdoutRl.on("line", (raw) => {
       if (!this.channel.handleFrame(raw)) {
@@ -94803,7 +95215,7 @@ var GatewayClient = class extends EventEmitter {
       const ws = new WebSocketCtor(attachUrl);
       let settled = false;
       this.ws = ws;
-      this.channel.attach({ send: (text) => ws.send(text) });
+      this.channel.attach({ send: (text2) => ws.send(text2) });
       const connectPromise = new Promise((resolve3, reject) => {
         ws.addEventListener(
           "open",

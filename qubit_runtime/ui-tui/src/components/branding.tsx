@@ -1,9 +1,10 @@
-import { Box, Text, useStdout } from '@qubit/ink'
+import { Box, RawAnsi, Text, useStdout } from '@qubit/ink'
 import { mix } from '@qubit/shared/color'
 import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
 import { artWidth, caduceus, CADUCEUS_WIDTH, logo, LOGO_WIDTH } from '../banner.js'
+import { GHOST_COLS, ghostLines } from '../ghost.js'
 import { useT } from '../i18n/useT.js'
 import { flat } from '../lib/text.js'
 import type { Theme } from '../theme.js'
@@ -31,6 +32,19 @@ function InlineLoader({ label, t }: { label: string; t: Theme }) {
       <Text color={t.color.accent}>{frame}</Text> {label}
     </Text>
   )
+}
+
+/**
+ * Hero art whose rows carry their own truecolor.
+ *
+ * The ghost paints the reference piece's palette, so every row is already one
+ * terminal-ready SGR line with its own foreground/background pairs. <RawAnsi>
+ * hands those rows to the writer as-is instead of rebuilding a React Text per
+ * style run (60 cells times 14 rows, every 80ms) — and a Text span cannot carry
+ * a background colour, which half-block packing needs.
+ */
+function GhostArt({ lines }: { lines: [string, string][] }) {
+  return <RawAnsi lines={lines.map(([, text]) => text)} width={GHOST_COLS} />
 }
 
 export function ArtLines({ lines }: { lines: [string, string][] }) {
@@ -212,14 +226,58 @@ const SKELETON_ROWS: readonly (readonly [number, number])[] = [
 const SKILLS_MAX = 8
 const TOOLSETS_MAX = 8
 
+// The ghost is a continuous animation, so it is driven by a clock rather than
+// a frame counter: `t` advances a fixed step per tick and the piece derives
+// every position from it. ~12fps keeps the bob smooth without repainting the
+// whole panel faster than a terminal can usefully show.
+const GHOST_TICK_MS = 80
+const GHOST_STEP_S = 0.08
+
+function useGhostTime(enabled: boolean) {
+  const [t, setT] = useState(0)
+
+  useEffect(() => {
+    if (!enabled) {
+      return
+    }
+
+    const id = setInterval(() => setT(v => v + GHOST_STEP_S), GHOST_TICK_MS)
+
+    return () => clearInterval(id)
+  }, [enabled])
+
+  return t
+}
+
 export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   const T = useT().chatBits.branding
   const term = useStdout().stdout?.columns ?? 100
   const cols = Math.max(20, Math.min(term, maxWidth ?? term))
+  // The ghost is a fixed 60-column scene, so it is drawn only when the panel is
+  // genuinely wide enough; below that no art is drawn and the panel keeps its
+  // plain header rather than showing a cropped scene.
+  const ghostFits = cols >= GHOST_COLS + 30
+  const ghostTime = useGhostTime(ghostFits)
+  const ghostArt = ghostFits ? ghostLines(t.color, ghostTime) : []
   const heroLines = caduceus(t.color, t.bannerHero || undefined)
-  const leftW = Math.min((artWidth(heroLines) || CADUCEUS_WIDTH) + 4, Math.floor(cols * 0.4))
-  const wide = cols >= 90 && leftW + 40 < cols
-  const w = Math.max(20, wide ? cols - leftW - 14 : cols - 12)
+  // The ghost renders in the hero track, beside the text — the same two-column
+  // grid the caduceus used, with the ghost taking the art track. Drawn above
+  // the info it cost a full 28-row block and pushed the text to the far edge;
+  // beside it, the art and the text share one band and both sit near the edge.
+  const heroArtWidth = ghostFits ? GHOST_COLS : artWidth(heroLines) || CADUCEUS_WIDTH
+  // Ghost docked close to the text (gap 2) rather than centred with dead space
+  // either side; the caduceus keeps its old breathing room.
+  const leftW = ghostFits ? GHOST_COLS : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4))
+  // Two columns are needed whenever art renders (ghost or caduceus), so the
+  // panel is wide when the art track plus a readable text track fits.
+  // Ghost track + a 30-column text track must fit before the two-column band is
+  // used; below that the caduceus (or nothing) keeps the panel one column.
+  const wide = ghostFits || (heroArtWidth > 0 && leftW + 40 < cols)
+  // WidgetGrid's cols total must cover both tracks and the gap; the info track
+  // is what is left after the art track, minus the border and the gap. A wide
+  // terminal therefore holds a readable tools list beside the ghost instead of
+  // a 30-column sliver jammed against the frame.
+  const w = Math.max(20, wide ? cols - leftW - 8 : cols - 12)
   const lineBudget = Math.max(12, w - 2)
   const strip = (s: string) => (s.endsWith('_tools') ? s.slice(0, -6) : s)
 
@@ -366,23 +424,33 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   // hand-rolled widths exactly: usable = (leftW + 2 + w) - gap = leftW + w.
   const heroColumn = wide ? (
     <Box flexDirection="column" width="100%">
-      <ArtLines lines={heroLines} />
-      <Text />
+      {/* The ghost is the hero when it renders, and it takes the art track
+          itself; the caduceus stands in below the ghost's width threshold. */}
+      {ghostFits ? <GhostArt lines={ghostArt} /> : <ArtLines lines={heroLines} />}
 
-      <Text color={t.color.accent}>
-        {(info.model ?? '').split('/').pop()}
-        <Text color={t.color.muted}> · Qubit Labs</Text>
-      </Text>
+      {/* With the ghost in the art track the model/cwd/session lines move to
+          the right column (they read as the panel's header there, and the
+          ghost band stays exactly as tall as the art). The caduceus keeps them
+          underneath, as before. */}
+      {!ghostFits && <Text />}
+      {!ghostFits && (
+        <>
+          <Text color={t.color.accent}>
+            {(info.model ?? '').split('/').pop()}
+            <Text color={t.color.muted}> · Qubit Labs</Text>
+          </Text>
 
-      <Text color={t.color.muted} wrap="truncate-end">
-        {info.cwd || process.cwd()}
-      </Text>
+          <Text color={t.color.muted} wrap="truncate-end">
+            {info.cwd || process.cwd()}
+          </Text>
 
-      {sid && (
-        <Text>
-          <Text color={t.color.sessionLabel}>{T.sessionLabel}</Text>
-          <Text color={t.color.sessionBorder}>{sid}</Text>
-        </Text>
+          {sid && (
+            <Text>
+              <Text color={t.color.sessionLabel}>{T.sessionLabel}</Text>
+              <Text color={t.color.sessionBorder}>{sid}</Text>
+            </Text>
+          )}
+        </>
       )}
     </Box>
   ) : null
@@ -390,12 +458,31 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   const infoColumn = (
     <Box flexDirection="column" width="100%">
       {wide ? (
-        <Box justifyContent="center" marginBottom={1}>
+        <Box flexDirection="column" marginBottom={1}>
           <Text bold color={t.color.primary}>
             {t.brand.name}
-            {info.version ? ` v${info.version}` : ''}
-            {info.release_date ? ` (${info.release_date})` : ''}
+            {/* The backend sends a full version identity: a release tag already
+                starts with `v`, a tagless checkout sends `git.<sha>`. Prefixing
+                blindly produced `vgit.75b06fc`. */}
+            {info.version ? ` ${/^v/i.test(info.version) ? info.version : `v${info.version}`}` : ' v0.0.1'}
           </Text>
+          {ghostFits && (
+            <>
+              <Text color={t.color.accent} wrap="truncate-end">
+                {(info.model ?? '').split('/').pop()}
+                <Text color={t.color.muted}> · Qubit Labs</Text>
+              </Text>
+              <Text color={t.color.muted} wrap="truncate-end">
+                {info.cwd || process.cwd()}
+              </Text>
+              {sid && (
+                <Text wrap="truncate-end">
+                  <Text color={t.color.sessionLabel}>{T.sessionLabel}</Text>
+                  <Text color={t.color.sessionBorder}>{sid}</Text>
+                </Text>
+              )}
+            </>
+          )}
         </Box>
       ) : (
         // Narrow layout hides the hero column; surface model/cwd/session
@@ -511,11 +598,11 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   )
 
   return (
-    <Box borderColor={t.color.border} borderStyle="round" marginBottom={1} paddingX={2} paddingY={1}>
+    <Box borderColor={t.color.border} borderStyle="round" flexDirection="column" marginBottom={1} paddingX={2} paddingY={1}>
       <WidgetGrid
         cols={wide ? leftW + 2 + w : w}
         columns={wide ? [leftW, { fr: 1 }] : 1}
-        gap={2}
+        gap={1}
         paddingX={0}
         paddingY={0}
         rowGap={0}

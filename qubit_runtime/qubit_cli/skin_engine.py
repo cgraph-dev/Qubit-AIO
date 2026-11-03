@@ -295,6 +295,248 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
 [#656565]⠀⠀⠀━━━━━━━━━━━━━━━━━━━━━━━⠀⠀⠀[/]
 [dim #4A4A4A]⠀⠀⠀⠀⠀⠀⠀⠀⠀the boulder⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
     },
+    # The dashboard picker's own palette (frontend/qubit-web/src/themes/presets.ts
+    # `cyberpunkTheme`) — mint #9bffcf ink on near-black #040608, with the same
+    # #00ff88 success and #ff0055 destructive. An earlier pass used a matrix
+    # #00ff41 green, which did not match what the picker swatch advertised.
+    "cyberpunk": {
+        "name": "cyberpunk", "description": "Neon mint on near-black — matrix terminal",
+        "colors": {
+            "banner_border": "#1c4a3c", "banner_title": "#9bffcf", "banner_accent": "#00ff88",
+            "banner_dim": "#4e8a76", "banner_text": "#9bffcf", "ui_accent": "#00ff88",
+            "ui_label": "#7de8b8", "ui_ok": "#00ff88", "ui_error": "#ff0055", "ui_warn": "#ffd700",
+            "prompt": "#9bffcf", "input_rule": "#1c4a3c", "response_border": "#2f7a5f",
+            "status_bar_bg": "#040608", "status_bar_text": "#7de8b8",
+            "status_bar_strong": "#9bffcf", "status_bar_dim": "#3d6e5e",
+            "status_bar_good": "#00ff88", "status_bar_warn": "#ffd700", "status_bar_bad": "#ff8a3d",
+            "status_bar_critical": "#ff0055", "session_label": "#7de8b8",
+            "session_border": "#1c4a3c", "completion_menu_bg": "#040608",
+            "completion_menu_current_bg": "#0d2a22", "completion_menu_meta_bg": "#020405",
+            "completion_menu_meta_current_bg": "#102f26", "selection_bg": "#123a2d",
+            "background": "#040608", "shell_dollar": "#00ff88", "voice_status_bg": "#040608"},
+        "spinner": {
+            "waiting_faces": ["(▚)", "(▞)", "(◢)", "(◣)", "(01)"],
+            "thinking_faces": ["(▚)", "(▞)", "(◢)", "(◤)", "(10)"],
+            "thinking_verbs": [
+                "jacking in", "spinning the deck", "parsing the ICE",
+                "grepping the net", "burning cycles", "tracing the packet",
+                "cracking the sha", "ghosting the shell"],
+            "wings": _wings("▚", "▞", "▓", "░")},
+        "branding": _branding("Qubit", "▚", "Jack out. ▚"),
+        "tool_prefix": "▚",
+        "banner_logo": "",
+        "banner_hero": "",
+    },
+    # ── the dashboard picker's remaining themes, so display.skin and
+    # dashboard.theme can name the same thing ───────────────────────────
+    # Colours are each preset's own palette from presets.ts; the dashboard owns
+    # the background, so these are ink/border/status only.
+    "qubit-blue": {
+        "name": "qubit-blue", "description": "Light mode — vivid Qubit-blue on cream",
+        "colors": {
+            "banner_border": "#1d4ed8", "banner_title": "#1d4ed8", "banner_accent": "#2563eb",
+            "banner_dim": "#6b7280", "banner_text": "#1f2937", "ui_accent": "#2563eb",
+            "ui_label": "#1d4ed8", "ui_ok": "#15803d", "ui_error": "#b91c1c", "ui_warn": "#b45309",
+            "prompt": "#111827", "input_rule": "#1d4ed8", "response_border": "#2563eb",
+            "status_bar_bg": "#f5f1e8", "status_bar_text": "#1f2937",
+            "status_bar_strong": "#1d4ed8", "status_bar_dim": "#6b7280",
+            "status_bar_good": "#15803d", "status_bar_warn": "#b45309", "status_bar_bad": "#c2410c",
+            "status_bar_critical": "#b91c1c", "session_label": "#1d4ed8",
+            "session_border": "#93b4f5", "completion_menu_bg": "#fbf8f1",
+            "completion_menu_current_bg": "#dbe7fd", "completion_menu_meta_bg": "#f5f1e8",
+            "completion_menu_meta_current_bg": "#e8f0fe", "selection_bg": "#dbe7fd",
+            "background": "#faf6ec", "shell_dollar": "#2563eb", "voice_status_bg": "#f5f1e8"},
+        "spinner": {
+            "waiting_faces": ["(◇)", "(○)", "(◌)", "(<>)", "(/)"],
+            "thinking_faces": ["(◇)", "(◈)", "(◌)", "(⌁)", "(-)"],
+            "thinking_verbs": ["drafting", "inking lines", "weighing options", "sketching"],
+            "wings": _wings("◇", "◈", "○", "◌")},
+        "branding": _branding("Qubit", "◇", "See you. ◇"),
+        "tool_prefix": "│",
+        "banner_logo": "",
+        "banner_hero": "",
+    },
+    "rose": {
+        "name": "rose", "description": "Rose — soft pink and warm ivory",
+        "colors": {
+            "banner_border": "#8b3a5c", "banner_title": "#ffd4e1", "banner_accent": "#f9a8d4",
+            "banner_dim": "#a8758c", "banner_text": "#ffeaf1", "ui_accent": "#f9a8d4",
+            "ui_label": "#ffd4e1", "ui_ok": "#86efac", "ui_error": "#ff5b7a", "ui_warn": "#ffc46b",
+            "prompt": "#ffeaf1", "input_rule": "#8b3a5c", "response_border": "#d98aae",
+            "status_bar_bg": "#1a0f15", "status_bar_text": "#ffd4e1",
+            "status_bar_strong": "#ffd4e1", "status_bar_dim": "#8f6274",
+            "status_bar_good": "#86efac", "status_bar_warn": "#ffc46b", "status_bar_bad": "#ff9a6b",
+            "status_bar_critical": "#ff5b7a", "session_label": "#f9a8d4",
+            "session_border": "#8b3a5c", "completion_menu_bg": "#1a0f15",
+            "completion_menu_current_bg": "#3a1f2c", "completion_menu_meta_bg": "#140b10",
+            "completion_menu_meta_current_bg": "#40232f", "selection_bg": "#3a1f2c",
+            "background": "#1a0f15", "shell_dollar": "#f9a8d4", "voice_status_bg": "#1a0f15"},
+        "spinner": {
+            "waiting_faces": ["(✿)", "(❀)", "(◕ᴗ◕)", "(<>)", "(/)"],
+            "thinking_faces": ["(✿)", "(❀)", "(◕‿◕)", "(⌁)", "(-)"],
+            "thinking_verbs": ["petalling", "arranging", "softening", "breathing in"],
+            "wings": _wings("✿", "❀", "◕", "❁")},
+        "branding": _branding("Qubit", "✿", "Bye for now. ✿"),
+        "tool_prefix": "│",
+        "banner_logo": "",
+        "banner_hero": "",
+    },
+    "midnight": {
+        "name": "midnight", "description": "Midnight — deep blue-violet with cool accents",
+        "colors": {
+            "banner_border": "#3b2f7a", "banner_title": "#d4c8ff", "banner_accent": "#a78bfa",
+            "banner_dim": "#6b5fa8", "banner_text": "#e6e0ff", "ui_accent": "#a78bfa",
+            "ui_label": "#c4b5fd", "ui_ok": "#4ade80", "ui_error": "#f87171", "ui_warn": "#fbbf24",
+            "prompt": "#e6e0ff", "input_rule": "#3b2f7a", "response_border": "#7c6fd6",
+            "status_bar_bg": "#0a0a1f", "status_bar_text": "#d4c8ff",
+            "status_bar_strong": "#d4c8ff", "status_bar_dim": "#5b5285",
+            "status_bar_good": "#4ade80", "status_bar_warn": "#fbbf24", "status_bar_bad": "#fb923c",
+            "status_bar_critical": "#f87171", "session_label": "#c4b5fd",
+            "session_border": "#3b2f7a", "completion_menu_bg": "#0a0a1f",
+            "completion_menu_current_bg": "#221d4d", "completion_menu_meta_bg": "#080819",
+            "completion_menu_meta_current_bg": "#2a2457", "selection_bg": "#2a2457",
+            "background": "#0a0a1f", "shell_dollar": "#a78bfa", "voice_status_bg": "#0a0a1f"},
+        "spinner": {
+            "waiting_faces": ["(☾)", "(✦)", "(·)", "(<>)", "(/)"],
+            "thinking_faces": ["(☾)", "(✧)", "(·)", "(⌁)", "(-)"],
+            "thinking_verbs": ["stargazing", "counting constellations", "drifting", "humming"],
+            "wings": _wings("☾", "✧", "✦", "·")},
+        "branding": _branding("Qubit", "☾", "Good night. ☾"),
+        "tool_prefix": "│",
+        "banner_logo": "",
+        "banner_hero": "",
+    },
+    "ember": {
+        "name": "ember", "description": "Ember — warm crimson and bronze",
+        "colors": {
+            "banner_border": "#7a2f14", "banner_title": "#ffd8b0", "banner_accent": "#f97316",
+            "banner_dim": "#b5703f", "banner_text": "#ffe9d5", "ui_accent": "#f97316",
+            "ui_label": "#fdba74", "ui_ok": "#65a30d", "ui_error": "#dc2626", "ui_warn": "#eab308",
+            "prompt": "#ffe9d5", "input_rule": "#7a2f14", "response_border": "#c2410c",
+            "status_bar_bg": "#1a0a06", "status_bar_text": "#ffd8b0",
+            "status_bar_strong": "#ffd8b0", "status_bar_dim": "#8a4f2a",
+            "status_bar_good": "#65a30d", "status_bar_warn": "#eab308", "status_bar_bad": "#f97316",
+            "status_bar_critical": "#dc2626", "session_label": "#fdba74",
+            "session_border": "#7a2f14", "completion_menu_bg": "#1a0a06",
+            "completion_menu_current_bg": "#3d1708", "completion_menu_meta_bg": "#120704",
+            "completion_menu_meta_current_bg": "#451a09", "selection_bg": "#451a09",
+            "background": "#1a0a06", "shell_dollar": "#f97316", "voice_status_bg": "#1a0a06"},
+        "spinner": {
+            "waiting_faces": ["(▲)", "(◭)", "(✧)", "(<>)", "(/)"],
+            "thinking_faces": ["(▲)", "(◮)", "(✧)", "(⌁)", "(-)"],
+            "thinking_verbs": ["stoking embers", "banking the fire", "reading the coals", "forging"],
+            "wings": _wings("▲", "◭", "✧", "◮")},
+        "branding": _branding("Qubit", "▲", "Embers out. ▲"),
+        "tool_prefix": "│",
+        "banner_logo": "",
+        "banner_hero": "",
+    },
+    # The `qubit` overlay theme (frontend/qubit-app/qubit-theme.json): graphite
+    # #10141c with signal-lime #a3e635. Its picker label is "Qubit Command".
+    "qubit-command": {
+        "name": "qubit-command", "description": "Qubit graphite/navy with signal-lime accents",
+        "colors": {
+            "banner_border": "#2b3441", "banner_title": "#a3e635", "banner_accent": "#a3e635",
+            "banner_dim": "#7f8c7a", "banner_text": "#e8f0e4", "ui_accent": "#a3e635",
+            "ui_label": "#c8e6a0", "ui_ok": "#4ade80", "ui_error": "#e5484d", "ui_warn": "#f5a524",
+            "prompt": "#e8f0e4", "input_rule": "#2b3441", "response_border": "#5c7a2e",
+            "status_bar_bg": "#10141c", "status_bar_text": "#aab6a4",
+            "status_bar_strong": "#a3e635", "status_bar_dim": "#5a6659",
+            "status_bar_good": "#4ade80", "status_bar_warn": "#f5a524", "status_bar_bad": "#e8825d",
+            "status_bar_critical": "#e5484d", "session_label": "#c8e6a0",
+            "session_border": "#2b3441", "completion_menu_bg": "#10141c",
+            "completion_menu_current_bg": "#1c232e", "completion_menu_meta_bg": "#0d1117",
+            "completion_menu_meta_current_bg": "#202836", "selection_bg": "#202836",
+            "background": "#10141c", "shell_dollar": "#a3e635", "voice_status_bg": "#10141c"},
+        "spinner": {
+            "waiting_faces": ["(▮)", "(▯)", "(◢)", "(<>)", "(/)"],
+            "thinking_faces": ["(▮)", "(▯)", "(◢)", "(⌁)", "(-)"],
+            "thinking_verbs": ["routing", "priming the shell", "checking the gate", "holding the line"],
+            "wings": _wings("▮", "▯", "◢", "◣")},
+        "branding": _branding("Qubit", "▮", "Standing down. ▮"),
+        "tool_prefix": "▮",
+        "banner_logo": "",
+        "banner_hero": "",
+    },
+    # "Qubit Teal (Large)" is Qubit Teal at a bigger type scale — a dashboard
+    # concern (terminal cell size belongs to the user's font), so the skin is
+    # the same palette under the picker's id.
+    "default-large": {
+        "name": "default-large", "description": "Qubit Teal (Large) — the canonical look, roomier",
+        "colors": {
+            "banner_border": "#CD7F32", "banner_title": "#FFD700", "banner_accent": "#FFBF00",
+            "banner_dim": "#B8860B", "banner_text": "#FFF8DC", "ui_accent": "#FFBF00",
+            "ui_label": "#DAA520", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#ffa726",
+            "prompt": "#FFF8DC", "input_rule": "#CD7F32", "response_border": "#FFD700",
+            "status_bar_bg": "#1a1a2e", "status_bar_text": "#C0C0C0",
+            "status_bar_strong": "#FFD700", "status_bar_dim": "#8A7A4A",
+            "status_bar_good": "#8FBC8F", "status_bar_warn": "#FFD700", "status_bar_bad": "#FF8C00",
+            "status_bar_critical": "#FF6B6B", "session_label": "#DAA520",
+            "session_border": "#8B8682", "completion_menu_bg": "#1a1a2e",
+            "completion_menu_current_bg": "#333355", "selection_bg": "#3a3a55",
+            "shell_dollar": "#4dabf7", "voice_status_bg": "#1a1a2e"},
+        # Light overlay (merged onto `colors`). Goldenrod ladder: on white the vivid
+        # #FFD700/#FFBF00 read as glare and WCAG-darkened mustard (#867000) as mud; the
+        # statusbar's goldenrod family (#B8860B/#DAA520) keeps the hue, tames saturation.
+        # Hierarchy on white: ink body 8.9:1 > fade 5.2 > label 3.7 > muted 3.3 > title 2.7 >
+        # headers 2.4. Fills (*_bg) flip the dark navy surfaces to light polarity.
+        "light_colors": {
+            "banner_title": "#C8961E", "banner_accent": "#D89B04", "banner_dim": "#B8860B",
+            "banner_text": "#5C4718", "ui_accent": "#D89B04", "ui_label": "#A97E10",
+            "ui_ok": "#2E7D32", "ui_error": "#C62828", "ui_warn": "#D97706", "prompt": "#5C4718",
+            "response_border": "#C8961E", "session_label": "#A97E10", "status_bar_text": "#6F6F6F",
+            "status_bar_strong": "#C8961E", "status_bar_dim": "#9A8A5A",
+            "status_bar_good": "#2E7D32", "status_bar_warn": "#C8961E", "status_bar_bad": "#C2410C",
+            "status_bar_critical": "#B91C1C", "shell_dollar": "#1E6FC0",
+            "completion_menu_bg": "#F5F5F5", "completion_menu_current_bg": "#E0D1BF",
+            "selection_bg": "#D4E4F7", "status_bar_bg": "#F5F5F5", "voice_status_bg": "#F5F5F5"},
+        "spinner": {},  # empty = hardcoded defaults in display.py
+        "branding": _HERMES_BRANDING,
+        "tool_prefix": "┊"},
+    "ares": {
+        "name": "ares", "description": "War-god theme — crimson and bronze",
+        "colors": {
+            "banner_border": "#A93333", "banner_title": "#C7A96B", "banner_accent": "#DD4A3A",
+            "banner_dim": "#905151", "banner_text": "#F1E6CF", "ui_accent": "#DD4A3A",
+            "ui_label": "#C7A96B", "ui_ok": "#4caf50", "ui_error": "#ef5350", "ui_warn": "#ffa726",
+            "prompt": "#F1E6CF", "input_rule": "#A93333", "response_border": "#C7A96B",
+            "status_bar_bg": "#2A1212", "status_bar_text": "#F1E6CF",
+            "status_bar_strong": "#C7A96B", "status_bar_dim": "#756054",
+            "status_bar_good": "#7BC96F", "status_bar_warn": "#C7A96B", "status_bar_bad": "#DD4A3A",
+            "status_bar_critical": "#EF5350", "session_label": "#C7A96B",
+            "session_border": "#6E584B", "completion_menu_bg": "#2A1212",
+            "completion_menu_current_bg": "#5C221D", "selection_bg": "#692620",
+            "shell_dollar": "#DD4A3A", "voice_status_bg": "#2A1212"},
+        "spinner": {
+            "waiting_faces": ["(⚔)", "(⛨)", "(▲)", "(<>)", "(/)"],
+            "thinking_faces": ["(⚔)", "(⛨)", "(▲)", "(⌁)", "(<>)"],
+            "thinking_verbs": [
+                "forging", "marching", "sizing the field", "holding the line",
+                "hammering plans", "tempering steel", "plotting impact", "raising the shield"],
+            "wings": _wings("⚔", "▲", ("╸", "╺"), "⛨")},
+        "branding": _branding("Ares", "⚔", "Farewell, warrior! ⚔"),
+        "tool_prefix": "╎",
+        "banner_logo": """[bold #A3261F] █████╗ ██████╗ ███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
+[bold #B73122]██╔══██╗██╔══██╗██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
+[#C93C24]███████║██████╔╝█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
+[#D84A28]██╔══██║██╔══██╗██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
+[#E15A2D]██║  ██║██║  ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
+[#EB6C32]╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]""",
+        "banner_hero": """[#9F1C1C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#9F1C1C]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⠟⠻⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#C7A96B]⠀⠀⠀⠀⠀⠀⠀⣠⣾⡿⠋⠀⠀⠀⠙⢿⣷⣄⠀⠀⠀⠀⠀⠀⠀[/]
+[#C7A96B]⠀⠀⠀⠀⠀⢀⣾⡿⠋⠀⠀⢠⡄⠀⠀⠙⢿⣷⡀⠀⠀⠀⠀⠀[/]
+[#DD4A3A]⠀⠀⠀⠀⣰⣿⠟⠀⠀⠀⣰⣿⣿⣆⠀⠀⠀⠻⣿⣆⠀⠀⠀⠀[/]
+[#DD4A3A]⠀⠀⠀⢰⣿⠏⠀⠀⢀⣾⡿⠉⢿⣷⡀⠀⠀⠹⣿⡆⠀⠀⠀[/]
+[#9F1C1C]⠀⠀⠀⣿⡟⠀⠀⣠⣿⠟⠀⠀⠀⠻⣿⣄⠀⠀⢻⣿⠀⠀⠀[/]
+[#9F1C1C]⠀⠀⠀⣿⡇⠀⠀⠙⠋⠀⠀⚔⠀⠀⠙⠋⠀⠀⢸⣿⠀⠀⠀[/]
+[#6B1717]⠀⠀⠀⢿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡿⠀⠀⠀[/]
+[#6B1717]⠀⠀⠀⠘⢿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⡿⠃⠀⠀⠀[/]
+[#C7A96B]⠀⠀⠀⠀⠈⠻⣿⣷⣦⣤⣀⣀⣤⣤⣶⣿⠿⠋⠀⠀⠀⠀[/]
+[#C7A96B]⠀⠀⠀⠀⠀⠀⠀⠉⠛⠿⠿⠿⠿⠛⠉⠀⠀⠀⠀⠀⠀⠀[/]
+[#DD4A3A]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⚔⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[dim #6B1717]⠀⠀⠀⠀⠀⠀⠀⠀war god online⠀⠀⠀⠀⠀⠀⠀⠀[/]""",
+    },
     "charizard": {
         "name": "charizard", "description": "Volcanic theme — burnt orange and ember",
         "colors": {
