@@ -29,11 +29,12 @@ def main() -> int:
     colors = theme.get("color") if isinstance(theme.get("color"), dict) else {}
     background = data.get("background") or colors.get("background")
     foreground = colors.get("text")
-    out = ["\x1b[0m", "\x1b[2J", "\x1b[H", "\x1b[3J"]
+    out = ["\x1b[0m"]
     if isinstance(background, str) and background:
         out.append(f"\x1b]11;{background}\x07")
     if isinstance(foreground, str) and foreground:
         out.append(f"\x1b]10;{foreground}\x07")
+    out.extend(["\x1b[2J", "\x1b[H", "\x1b[3J"])
     sys.stdout.write("".join(out))
     sys.stdout.flush()
     return 0
