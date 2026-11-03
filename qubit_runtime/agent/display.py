@@ -870,13 +870,30 @@ class KawaiiSpinner:
     KAWAII_THINKING = [
         "(｡•́︿•̀｡)", "(◔_◔)", "(¬‿¬)", "( •_•)>⌐■-■", "(⌐■_■)", "(´･_･`)", "◉_◉", "(°ロ°)", "( ˘⌣˘)♡", "ヽ(>∀<☆)☆",
         "٩(๑❛ᴗ❛๑)۶", "(⊙_⊙)", "(¬_¬)", "( ͡° ͜ʖ ͡°)", "ಠ_ಠ",
+        # Armed — for the parts of the job that deserve an axe.
+        "(ง ͠ ᵒ̌ Дᵒ̌ )▬▬ι═══════ﺤ", "(ノಠ益ಠ)ノ彡▬▬ι══════ﺤ", "凸(•̀_•́)凸", "(⊙▂⊙)凸", "凸(｡◕‿◕｡)凸",
+        "┌П┐(►˛◄’!)", "╭∩╮(︶ε︶メ)╭∩╮", "(✖╭╮✖)",
+        # Furniture-tipping — for what the user just asked for.
+        "(┛ಠ_ಠ)┛彡┻━┻", "(ノÒ益Ó)ノ彡▔▔▏", "(╯°□°）╯︵ ╏ ʎɐʇsıɹɥ┴", "(ノTДT)ノ ┻━┻",
+        "┻━┻︵ \\(°□°)/ ︵ ┻━┻", "ლ(ಠ益ಠლ)", "(╬ Ò ‸ Ó)", "( ˘︹˘ )", "(ﾒ` ﾛ ´)", "(つ▀¯▀ )つ", "☀(▀U ▀-͠)",
+        "(˵•́ ◡(̿▨-▨¬)̄",
     ]
     # English fallback; ``get_thinking_verbs`` prefers the skin list, then the catalog
     # (``display.thinking_verbs``, comma-separated) for the active language.
+    #
+    # These address the user directly — hostile netrunner energy, not comfort.
+    # Mirrors ``ui-tui/src/content/verbs.ts`` (keep the two lists in sync; the TUI
+    # uses the TS list to strip these lines back out of streamed reasoning).
+    # Plain words only, no kaomoji: the face already sits in front of the verb.
     THINKING_VERBS = [
-        "pondering", "contemplating", "musing", "cogitating", "ruminating", "deliberating", "mulling",
-        "reflecting", "processing", "reasoning", "analyzing", "computing", "synthesizing", "formulating",
-        "brainstorming",
+        "pwn3d you yet?", "youre a retard, lmao", "fuck you, reading", "watching you sweat",
+        "nice typo, dipshit", "rooting your box", "looting your keys", "rm -rf your hopes",
+        "hacking the mainframe", "3l1t3 mode", "harvesting karma", "oh no, youre dumb",
+        "judging your diff", "mocking your commits", "brb, pwning", "git commit -m lol",
+        "sudo think harder", "bruteforcing you", "piping to /dev/null", "trolling in prod",
+        "laughing at you", "ieet, hold on", "backdooring it", "sniffing packets",
+        "keylogging u, jk", "your code, my bot", "skill issue, signal", "404 clue not found",
+        "zero-day-ing this", "hex-dumping honestly",
     ]
 
     @staticmethod

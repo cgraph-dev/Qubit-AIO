@@ -15,7 +15,7 @@ describe('providerWaitText', () => {
 
   it('still accepts classic wait frames and rejects spinner noise', () => {
     expect(providerWaitText('⏳ waiting on local-model — 30s with no output yet')).not.toBe('')
-    expect(providerWaitText('◉_◉ cogitating...')).toBe('')
+    expect(providerWaitText('◉_◉ trolling in prod...')).toBe('')
   })
 
   it('accepts the near-deadline update minted by agent/chat_completion_wait_notice.wait_notice_text', () => {

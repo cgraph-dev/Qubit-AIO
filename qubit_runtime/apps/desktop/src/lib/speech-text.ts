@@ -13,8 +13,12 @@ const SOFT_BREAK_RE = /[ \t]*\n[ \t]*/g
 const MEDIA_PATH_RE = /[ \t]*MEDIA:\S+?(?=[.,;:!?)\]]*(?:\s|$))/g
 const LINE_FINAL_COLON_RE = /:\s*$/gm
 
+// Mirror of the status-ticker vocabulary in ui-tui/src/content/verbs.ts and
+// lib/chat-runtime.ts — keep the three in sync (legacy pondering/musing verbs
+// stay so older backends' frames are still stripped). These lines must never
+// be spoken: the user hears the reply, not the spinner.
 const THINKING_PREFIX_RE =
-  /^\s*(?:\([^)\n]{1,48}\)\s*)?(?:processing|thinking|reasoning|analyzing|pondering|contemplating|musing|cogitating|ruminating|deliberating|mulling|reflecting|computing|synthesizing|formulating|brainstorming)\.\.\.\s*/i
+  /^\s*(?:\([^)\n]{1,48}\)\s*)?(?:processing|thinking|reasoning|analyzing|pondering|contemplating|musing|cogitating|ruminating|deliberating|mulling|reflecting|computing|synthesizing|formulating|brainstorming|pwn3d you yet\?|youre a retard, lmao|fuck you, reading|watching you sweat|nice typo, dipshit|rooting your box|looting your keys|rm -rf your hopes|hacking the mainframe|3l1t3 mode|harvesting karma|oh no, youre dumb|judging your diff|mocking your commits|brb, pwning|git commit -m lol|sudo think harder|bruteforcing you|piping to \/dev\/null|trolling in prod|laughing at you|ieet, hold on|backdooring it|sniffing packets|keylogging u, jk|your code, my bot|skill issue, signal|404 clue not found|zero-day-ing this|hex-dumping honestly)(?:\.\.\.|…)?\s*/i
 
 const URL_RE = /\bhttps?:\/\/\S+/gi
 

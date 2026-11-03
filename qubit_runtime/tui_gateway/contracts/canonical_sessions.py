@@ -50,6 +50,10 @@ class CanonicalCreateParams(ProfileParams):
     run_budget: float | None = None
     # The classic CLI's `-v`: the session agent's status lines are not quieted.
     verbose: bool = False
+    # A renderer's terminal width (the Ink TUI's ``session.create`` sends its
+    # ``cols``; ``session.resume`` already declares the same field). Accepted
+    # and frozen with the launch request; sessions render client-side.
+    cols: int | None = None
     # A shell-launched client's allowlisted environment (HERMES_* behaviour values, toolchain PATH/venv),
     # applied to this session only; never echoed in ``launch_request``.
     client_env: dict[str, str] | None = None

@@ -101,6 +101,29 @@ def test_only_unchanged_secret_leaves_is_no_fields(tmp_path, monkeypatch):
 
 
 def test_newly_provided_secret_leaf_is_refused(tmp_path, monkeypatch):
+    """A newly provided secret-shaped leaf is refused as a secret write.
+
+    ``terminal.*`` later became read-only (5b468fc24: the served block is the
+    live /chat model slot), and that refusal is checked first. Use a
+    secret-shaped leaf in a writable section so this still pins the actual
+    contract: a *new* secret value is refused, not silently persisted.
+    """
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
+                            {"config": {"webui": {"token": "brand-new-secret"}},
+                             "confirm": True})
+    assert (code, out["code"]) == (403, "SECRET_WRITE_REFUSED"), (code, out)
+
+
+def test_terminal_section_write_is_read_only(tmp_path, monkeypatch):
+    """The served ``terminal`` block is display-only by contract.
+
+    5b468fc24 made ``terminal.*`` a live mirror of the /chat model slot; a PUT
+    carrying it is refused rather than stored, so /config can never overwrite
+    the terminal slot behind /chat's back.
+    """
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -109,7 +132,7 @@ def test_newly_provided_secret_leaf_is_refused(tmp_path, monkeypatch):
                                         {"docker_shared_container_key":
                                             "sk-new"}},
                              "confirm": True})
-    assert (code, out["code"]) == (403, "SECRET_WRITE_REFUSED"), (code, out)
+    assert (code, out["code"]) == (403, "READ_ONLY_SECTION"), (code, out)
 
 
 # ---------------------------------------------------------------------------

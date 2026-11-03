@@ -87,7 +87,11 @@ def _request(ui, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=8) as resp:
             return resp.status, json.loads(resp.read().decode() or "{}")
     except urllib.error.HTTPError as exc:
-        return exc.code, json.loads(exc.read().decode() or "{}")
+        # An HTTPError is also a response object: close it, or CPython 3.14
+        # reports "Implicitly cleaning up <HTTPError ...>" as a ResourceWarning
+        # at collection, which pytest surfaces as a test error.
+        with exc:
+            return exc.code, json.loads(exc.read().decode() or "{}")
 
 
 def test_put_config_raw_is_actionable_typed_refusal(ui):

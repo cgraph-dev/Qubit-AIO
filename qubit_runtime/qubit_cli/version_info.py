@@ -71,9 +71,14 @@ def _run_git(repo_dir: Path, *args: str) -> str | None:
 
 def _resolve_repo_dir() -> Path | None:
     """Use the executing checkout before a profile's optional clone."""
-    repo_dir = Path(__file__).parent.parent.resolve()
-    if (repo_dir / ".git").exists():
-        return repo_dir
+    # Walk UP from the package: the checkout that runs this code is the nearest
+    # ancestor holding .git, whether the package sits at the checkout root or one
+    # level down in a monorepo. Checking only `parent.parent` reported "unknown"
+    # for such a layout even though git was right there.
+    here = Path(__file__).resolve()
+    for candidate_dir in here.parents[:4]:
+        if (candidate_dir / ".git").exists():
+            return candidate_dir
     # The PROCESS home: this is the running code's identity and is cached
     # process-wide, so a profile's context-local override must not pick it.
     from qubit_constants import get_process_qubit_home

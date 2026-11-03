@@ -219,6 +219,67 @@ function useStatusHint(compacting: boolean, drafting: DraftingTool | null, provi
   return revealed && name ? toolPresentVerb(name) : ''
 }
 
+// Rotating troll copy for the unnamed "still working, nothing to name" wait.
+// Same vocabulary as the TUI status bar (ui-tui/src/content/verbs.ts) so both
+// surfaces heckle with one voice; plain text only — this is read, not spoken,
+// and lib/chat-runtime.ts/lib/speech-text.ts strip these lines from reasoning.
+const TROLL_LINES = [
+  'pwn3d you yet?',
+  'youre a retard, lmao',
+  'fuck you, reading',
+  'watching you sweat',
+  'nice typo, dipshit',
+  'rooting your box',
+  'looting your keys',
+  'rm -rf your hopes',
+  'hacking the mainframe',
+  '3l1t3 mode',
+  'harvesting karma',
+  'oh no, youre dumb',
+  'judging your diff',
+  'mocking your commits',
+  'brb, pwning',
+  'git commit -m lol',
+  'sudo think harder',
+  'bruteforcing you',
+  'piping to /dev/null',
+  'trolling in prod',
+  'laughing at you',
+  'ieet, hold on',
+  'backdooring it',
+  'sniffing packets',
+  'keylogging u, jk',
+  'your code, my bot',
+  'skill issue, signal',
+  '404 clue not found',
+  'zero-day-ing this',
+  'hex-dumping honestly'
+] as const
+
+// Slow enough to be read, fast enough to land on a fresh line mid-wait.
+const TROLL_ROTATE_MS = 4_000
+
+/** The heckle currently on deck, or '' when heckling is off. Advanced by a
+ *  fixed cadence rather than per render so a re-render storm (streamed tool
+ *  args) can't strobe the label. */
+function useTrollLine(active: boolean): string {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * TROLL_LINES.length))
+
+  useEffect(() => {
+    if (!active) {
+      return
+    }
+
+    setIndex(n => n + 1)
+
+    const id = window.setInterval(() => setIndex(n => n + 1), TROLL_ROTATE_MS)
+
+    return () => window.clearInterval(id)
+  }, [active])
+
+  return active ? (TROLL_LINES[index % TROLL_LINES.length] ?? '') : ''
+}
+
 export const CenteredThreadSpinner: FC = () => {
   const { t } = useI18n()
 
@@ -249,9 +310,13 @@ export const ResponseLoadingIndicator: FC = () => {
   // can't narrate (gateway still initializing, or an auxiliary call — not
   // the main request — triggered the autoload). A real wait frame wins.
   const localLoad = useLocalModelLoad(!hint)
+  // Nothing to name yet — cover the gap with the ticker's heckle instead of
+  // a static label. A named wait (tool draft, provider frame, progress bar)
+  // always outranks it.
+  const troll = useTrollLine(!hint && !localLoad)
 
   return (
-    <StatusRow data-slot="aui_response-loading" label={hint || t.assistant.thread.loadingResponse}>
+    <StatusRow data-slot="aui_response-loading" label={hint || troll || t.assistant.thread.loadingResponse}>
       <StatusPulse
         aria-hidden="true"
         className="dither inline-block size-3 rounded-[2px] text-midground/80"
@@ -259,6 +324,8 @@ export const ResponseLoadingIndicator: FC = () => {
       />
       {hint ? (
         <WaitHint hint={hint} />
+      ) : troll ? (
+        <HintText>{troll}</HintText>
       ) : localLoad ? (
         <ProgressHint label={t.assistant.thread.loadingLocalModel(localLoad.model)} percent={localLoad.percent} />
       ) : null}
@@ -351,6 +418,10 @@ export const TurnActivityIndicator: FC = () => {
   const active =
     working && !awaitingInput && !toolNarrating && (Boolean(hint) || localLoad !== null || quietSince !== undefined)
 
+  // Same rule as the loading row: a named wait wins, the heckle covers the
+  // unnamed gap (here: the quiet spell that already earned a row).
+  const troll = useTrollLine(active && !hint && localLoad === null)
+
   // Compaction owns the whole turn, so it keeps counting from the turn's start;
   // anything else counts from the moment the turn last produced something — the
   // gap's own mark, or the draft's, whichever named the wait first.
@@ -381,7 +452,7 @@ export const TurnActivityIndicator: FC = () => {
       className={cn(!active && 'sr-only')}
       data-slot="aui_turn-activity"
       data-state={active ? 'active' : 'idle'}
-      label={active ? hint || 'Qubit is working' : ''}
+      label={active ? hint || troll || 'Qubit is working' : ''}
     >
       {active && (
         <>
@@ -392,6 +463,8 @@ export const TurnActivityIndicator: FC = () => {
           />
           {hint ? (
             <WaitHint hint={hint} />
+          ) : troll ? (
+            <HintText>{troll}</HintText>
           ) : localLoad ? (
             <ProgressHint label={t.assistant.thread.loadingLocalModel(localLoad.model)} percent={localLoad.percent} />
           ) : null}

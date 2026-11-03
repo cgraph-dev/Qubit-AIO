@@ -12,8 +12,18 @@ import type { SessionInfo } from '@/types/hermes'
 
 export { BUILTIN_PERSONALITIES } from '@/lib/personalities'
 
+// Alternative sources for the status-ticker vocabulary. The desktop has no
+// import path onto ui-tui/src/content/verbs.ts, so the same list is restated
+// here (and in lib/speech-text.ts) — three copies, kept in sync by hand.
+// `…` covers the TUI's padVerb trailer, `...` the CLI spinner's.
+// Alternative sources for the status-ticker vocabulary (TUI's
+// ui-tui/src/content/verbs.ts plus the legacy pondering/musing set older builds
+// still emit). The desktop has no import path onto ui-tui, so the list is
+// restated here and in lib/speech-text.ts — three copies, kept in sync by hand.
+// Order matters: `processing` must precede `processing prompt` so the shorter,
+// more general verb wins. `…` covers the TUI's padVerb trailer, `...` the CLI's.
 const THINKING_STATUS_PREFIX_RE =
-  /^\s*(?:(?:[^\s.]{1,16})\s+)?(?:processing|thinking|reasoning|analyzing|pondering|contemplating|musing|cogitating|ruminating|deliberating|mulling|reflecting|computing|synthesizing|formulating|brainstorming)\.\.\.\s*/i
+  /^\s*(?:(?:[^\s.]{1,16})\s+)?(?:processing|thinking|reasoning|analyzing|pondering|contemplating|musing|cogitating|ruminating|deliberating|mulling|reflecting|computing|synthesizing|formulating|brainstorming|pwn3d you yet\?|youre a retard, lmao|fuck you, reading|watching you sweat|nice typo, dipshit|rooting your box|looting your keys|rm -rf your hopes|hacking the mainframe|3l1t3 mode|harvesting karma|oh no, youre dumb|judging your diff|mocking your commits|brb, pwning|git commit -m lol|sudo think harder|bruteforcing you|piping to \/dev\/null|trolling in prod|laughing at you|ieet, hold on|backdooring it|sniffing packets|keylogging u, jk|your code, my bot|skill issue, signal|404 clue not found|zero-day-ing this|hex-dumping honestly)(?:\.\.\.|…)?\s*/i
 
 const EMPTY_THINKING_PLACEHOLDER_RE =
   /\b(?:current rewritten thinking|next thinking to process|provide the thinking content|don't see any .*thinking)\b/i
