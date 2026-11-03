@@ -28,6 +28,7 @@ Only stdlib + the bridge's own packages.
 from __future__ import annotations
 
 import base64
+import gzip
 import json
 import re
 import struct
@@ -1350,10 +1351,118 @@ class WebUIHandler(BaseHTTPRequestHandler):
         self._send(code, page.encode(), "text/html; charset=utf-8")
 
     def _file(self, path: Path, ctype: str) -> None:
+        if ctype.startswith(("video/", "audio/")) or path.stat().st_size > 4 * 1024 * 1024:
+            self._send_file_ranged(path, ctype)
+            return
         try:
-            self._send(200, path.read_bytes(), ctype)
+            body = path.read_bytes()
         except OSError:
             self._send(404, b"not found")
+            return
+        # Gzip is negotiated per request and only affects the wire form: the
+        # browser decodes to the identical bytes, so the UI cannot change.
+        wire, gzipped = self._gzip_if_wanted(body, path)
+        extra = None
+        if gzipped:
+            extra = [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]
+        self._send(200, wire, ctype, extra_headers=extra)
+
+    # Text assets that compress well. Images, video, audio, fonts and maps are
+    # already compressed (or binary) — gzipping them burns CPU for no wire win.
+    _COMPRESSIBLE = (
+        ".js", ".mjs", ".css", ".html", ".json", ".svg", ".txt", ".xml",
+        ".webmanifest",
+    )
+
+    # Never gzip something so small the header overhead cancels the win.
+    _MIN_GZIP_BYTES = 1024
+
+    def _accepts_gzip(self) -> bool:
+        enc = (self.headers.get("Accept-Encoding") or "").lower()
+        return "gzip" in enc
+
+    def _gzip_if_wanted(self, body: bytes, path: Path) -> tuple[bytes, bool]:
+        """Wire-only compression for text assets.
+
+        A dashboard hard-refresh re-downloads every JS/CSS chunk; gzip cuts
+        that transfer roughly 3-4x on the wire without touching the bytes the
+        browser ends up executing, so nothing looks different. Small bodies stay
+        uncompressed (header overhead would cancel the win), and anything not on
+        the compressible list is passed through untouched.
+
+        Returns ``(wire_bytes, was_gzipped)``. The caller emits the matching
+        headers: a request handler must never write headers here, because
+        ``send_header`` before ``send_response`` puts raw header bytes on the
+        socket ahead of the status line and the browser rejects the response
+        outright (``ERR_INVALID_HTTP_RESPONSE``).
+        """
+        if (
+            len(body) < self._MIN_GZIP_BYTES
+            or path.suffix.lower() not in self._COMPRESSIBLE
+            or not self._accepts_gzip()
+        ):
+            return body, False
+        try:
+            return gzip.compress(body, 6), True
+        except Exception:  # noqa: BLE001 - never fail a request over gzip
+            return body, False
+
+    def _send_file_ranged(self, path: Path, ctype: str) -> None:
+        """Stream a media file, honouring a single ``Range`` request.
+
+        `_file` reads the whole body into memory and offers no `Accept-Ranges`,
+        which is fine for a CSS chunk and wrong for the ambient video: HTML5
+        video scrubs and loops through byte ranges, and a server that answers
+        every range with a full 200 makes the element refetch the whole file on
+        each seek. One range is enough for `<video>`; multi-range requests fall
+        back to the full body, which is still valid HTTP.
+        """
+        try:
+            size = path.stat().st_size
+        except OSError:
+            self._send(404, b"not found")
+            return
+        start, end = 0, size - 1
+        status = 200
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", (self.headers.get("Range") or "").strip())
+        if match and size:
+            first, last = match.group(1), match.group(2)
+            if first:
+                start = int(first)
+                end = int(last) if last else size - 1
+            elif last:
+                start = max(0, size - int(last))
+            if start > end or start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            end = min(end, size - 1)
+            status = 206
+        length = end - start + 1
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(length))
+            self.send_header("Accept-Ranges", "bytes")
+            if status == 206:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            if getattr(self, "_head_only", False):
+                return
+            with path.open("rb") as fh:
+                fh.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = fh.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
 
     def _redirect(self, location: str) -> None:
         try:
@@ -2012,6 +2121,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
         elif low.endswith(".ico"): ctype = "image/x-icon"
         elif low.endswith(".woff2"): ctype = "font/woff2"
         elif low.endswith(".woff"): ctype = "font/woff"
+        # Ambient background media. Without the video types the browser gets
+        # application/octet-stream and refuses to play the backdrop.
+        elif low.endswith(".mp4"): ctype = "video/mp4"
+        elif low.endswith(".webm"): ctype = "video/webm"
+        elif low.endswith(".webp"): ctype = "image/webp"
+        elif low.endswith(".avif"): ctype = "image/avif"
         elif low.endswith(".map"): ctype = "application/json"
         else: ctype = "application/octet-stream"
         self._file(fp, ctype)
@@ -3268,6 +3383,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # Built dashboard assets are served from Qubit-owned root paths.
         if (path.startswith("/assets/") or path.startswith("/fonts/")
                 or path.startswith("/fonts-terminal/")
+                or path.startswith("/media/")
                 or path.startswith("/plugins/")):
             self._serve_qubit_static(path)
             return
@@ -5575,6 +5691,16 @@ class WebUI:
         self._thread = threading.Thread(target=self._server.serve_forever,
                                         daemon=True, name="webui-http")
         self._thread.start()
+        # Start the PTY reaper up front, not lazily on the first connect: the
+        # terminals it retires are orphans whose browser is already gone, and
+        # those never connect. Only when the PTY server already exists — this
+        # must not spawn one just to reap it.
+        pty = getattr(self, "_pty_ws", None)
+        if pty is not None:
+            try:
+                pty.start_reaper()
+            except Exception:
+                log.exception("webui.start: pty start_reaper failed")
         log_event("webui.started", host=self.host, port=self.port)
         log.info("voice dashboard listening on http://%s:%s", self.host, self.port)
         self._prewarm_stt()
@@ -5649,10 +5775,18 @@ class WebUI:
                 # Detach, do not cancel: a terminal whose turn is still running
                 # (unattended work) must outlive this listener so the operator
                 # finds it continued instead of having to retype `continue`.
-                # The idle-TTL reaper still retires it.
                 pty.detach_all()
             except Exception:
                 log.exception("webui.stop: pty detach_all failed")
+            # Detaching is only half the contract: the detached terminal is
+            # retired by the idle reaper, and a stopped listener accepts no
+            # connections to trigger it. Without this the reaper thread keeps
+            # the terminals (and their session leases) alive for the life of
+            # the process.
+            try:
+                pty.stop_reaper()
+            except Exception:
+                log.exception("webui.stop: pty stop_reaper failed")
         hub = getattr(self, "_events_hub", None)
         if hub is not None:
             try:

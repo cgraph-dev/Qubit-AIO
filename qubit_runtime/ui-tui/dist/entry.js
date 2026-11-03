@@ -472,8 +472,8 @@ var init_chatBits = __esm({
     chatBitsEn = {
       chatBits: {
         branding: {
-          tagFull: "Qubit Labs \xB7 Messenger of the Digital Gods",
-          tagMid: "Messenger of the Digital Gods",
+          tagFull: "Qubit Labs \xB7 Personal AI Agent",
+          tagMid: "Personal AI Agent",
           scanningSkills: "scanning skills",
           moreCategories: (count) => `(and ${count} more categories\u2026)`,
           moreToolsets: (count) => `(and ${count} more toolsets\u2026)`,
@@ -768,7 +768,9 @@ var init_content = __esm({
           legendary02: "legendary drop: every flaky test passes cleanly",
           legendary03: "legendary drop: your diff teaches by itself"
         },
-        // Kaomoji are language-neutral but keyed so a pack may swap them.
+        // Kaomoji are language-neutral but keyed so a pack may swap them. Several
+        // are wide (leaning text, ASCII weapons); appChrome measures the table with
+        // stringWidth so the status bar still reserves the right column count.
         faces: {
           face01: "(\uFF61\u2022\u0301\uFE3F\u2022\u0300\uFF61)",
           face02: "(\u25D4_\u25D4)",
@@ -784,7 +786,29 @@ var init_content = __esm({
           face12: "(\u2299_\u2299)",
           face13: "(\xAC_\xAC)",
           face14: "( \u0361\xB0 \u035C\u0296 \u0361\xB0)",
-          face15: "\u0CA0_\u0CA0"
+          face15: "\u0CA0_\u0CA0",
+          // Armed — for the parts of the job that deserve an axe.
+          face16: "(\u0E07 \u0360 \u1D52\u030C \u0414\u1D52\u030C )\u25AC\u25AC\u03B9\u2550\u2550\u2550\u2550\u2550\u2550\u2550\uFEA4",
+          face17: "(\u30CE\u0CA0\u76CA\u0CA0)\u30CE\u5F61\u25AC\u25AC\u03B9\u2550\u2550\u2550\u2550\u2550\u2550\uFEA4",
+          face18: "\u51F8(\u2022\u0300_\u2022\u0301)\u51F8",
+          face19: "(\u2299\u2582\u2299)\u51F8",
+          face20: "\u51F8(\uFF61\u25D5\u203F\u25D5\uFF61)\u51F8",
+          face21: "\u250C\u041F\u2510(\u25BA\u02DB\u25C4\u2019!)",
+          face22: "\u256D\u2229\u256E(\uFE36\u03B5\uFE36\u30E1)\u256D\u2229\u256E",
+          face23: "(\u2716\u256D\u256E\u2716)",
+          // Furniture-tipping — for what the user just asked for.
+          face24: "(\u251B\u0CA0_\u0CA0)\u251B\u5F61\u253B\u2501\u253B",
+          face25: "(\u30CE\xD2\u76CA\xD3)\u30CE\u5F61\u2594\u2594\u258F",
+          face26: "(\u256F\xB0\u25A1\xB0\uFF09\u256F\uFE35 \u254F \u028E\u0250\u0287s\u0131\u0279\u0265\u2534",
+          face27: "(\u30CET\u0414T)\u30CE \u253B\u2501\u253B",
+          face28: "\u253B\u2501\u253B\uFE35 \\(\xB0\u25A1\xB0)/ \uFE35 \u253B\u2501\u253B",
+          face29: "\u10DA(\u0CA0\u76CA\u0CA0\u10DA)",
+          face30: "(\u256C \xD2 \u2038 \xD3)",
+          face31: "( \u02D8\uFE39\u02D8 )",
+          face32: "(\uFF92` \uFF9B \xB4)",
+          face33: "(\u3064\u2580\xAF\u2580 )\u3064",
+          face34: "\u2600(\u2580U \u2580-\u0360)",
+          face35: "(\u02F5\u2022\u0301 \u25E1(\u033F\u25A8-\u25A8\xAC)\u0304"
         },
         setup: {
           title: "Setup Required",
@@ -2756,7 +2780,7 @@ var init_termux = __esm({
 });
 
 // src/config/env.ts
-var truthy2, falsy, parseToggle, TERMUX_TUI_MODE, STARTUP_RESUME_ID, STARTUP_QUERY, STARTUP_IMAGE, STARTUP_WORKSPACE_CWD, mouseTrackingOverride, mouseTrackingDisabledLegacy, NATIVE_MODE, resolvedBootMouseEnabled, MOUSE_TRACKING, NO_CONFIRM_DESTRUCTIVE, DASHBOARD_TUI_MODE, DEV_CREDITS_MODE, inlineOverride, INLINE_MODE, SHOW_FPS;
+var truthy2, falsy, parseToggle, TERMUX_TUI_MODE, STARTUP_RESUME_ID, STARTUP_QUERY, STARTUP_IMAGE, STARTUP_WORKSPACE_CWD, mouseTrackingOverride, mouseTrackingDisabledLegacy, NATIVE_MODE, resolvedBootMouseEnabled, MOUSE_TRACKING, NO_CONFIRM_DESTRUCTIVE, DASHBOARD_TUI_MODE, PIN_SPAWN_MODEL, STARTUP_MODEL, STARTUP_PROVIDER, DEV_CREDITS_MODE, inlineOverride, INLINE_MODE, SHOW_FPS;
 var init_env = __esm({
   "src/config/env.ts"() {
     "use strict";
@@ -2788,6 +2812,9 @@ var init_env = __esm({
     MOUSE_TRACKING = resolvedBootMouseEnabled ? "all" : "off";
     NO_CONFIRM_DESTRUCTIVE = truthy2(process.env.HERMES_TUI_NO_CONFIRM);
     DASHBOARD_TUI_MODE = truthy2(process.env.HERMES_TUI_DASHBOARD);
+    PIN_SPAWN_MODEL = truthy2(process.env.HERMES_TUI_MODEL_PIN);
+    STARTUP_MODEL = (process.env.HERMES_MODEL || process.env.HERMES_INFERENCE_MODEL || "").trim();
+    STARTUP_PROVIDER = (process.env.HERMES_TUI_PROVIDER || process.env.HERMES_INFERENCE_PROVIDER || "").trim();
     DEV_CREDITS_MODE = truthy2(process.env.HERMES_DEV_CREDITS);
     inlineOverride = parseToggle(process.env.HERMES_TUI_INLINE);
     INLINE_MODE = NATIVE_MODE || (inlineOverride ?? TERMUX_TUI_MODE);
@@ -21756,7 +21783,7 @@ var init_parentLog = __esm({
 import { createWriteStream } from "node:fs";
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir as homedir2, tmpdir } from "node:os";
-import { join as join2 } from "node:path";
+import { join as join3 } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { getHeapSnapshot, getHeapSpaceStatistics, getHeapStatistics } from "node:v8";
 async function captureMemoryDiagnostics(trigger) {
@@ -21830,11 +21857,11 @@ async function captureMemoryDiagnostics(trigger) {
 async function performHeapDump(trigger = "manual") {
   try {
     const diagnostics = await captureMemoryDiagnostics(trigger);
-    const dir2 = process.env.HERMES_HEAPDUMP_DIR?.trim() || join2(homedir2() || tmpdir(), ".hermes", "heapdumps");
+    const dir2 = process.env.HERMES_HEAPDUMP_DIR?.trim() || join3(homedir2() || tmpdir(), ".hermes", "heapdumps");
     await mkdir(dir2, { recursive: true });
     const base = `qubit-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}-${process.pid}-${trigger}`;
-    const heapPath = join2(dir2, `${base}.heapsnapshot`);
-    const diagPath = join2(dir2, `${base}.diagnostics.json`);
+    const heapPath = join3(dir2, `${base}.heapsnapshot`);
+    const diagPath = join3(dir2, `${base}.diagnostics.json`);
     await writeFile(diagPath, JSON.stringify(diagnostics, null, 2), { mode: 384 });
     const isAuto = trigger === "auto-critical" || trigger === "auto-high";
     const autoEnabled = /^(?:1|true|yes|on)$/i.test((process.env.HERMES_AUTO_HEAPDUMP ?? "").trim());
@@ -21856,7 +21883,7 @@ async function pruneHeapdumps(dir2) {
   const names = await readdir(dir2);
   const stats = await Promise.all(
     names.map(async (name) => {
-      const path = join2(dir2, name);
+      const path = join3(dir2, name);
       const s = await stat(path).catch(() => null);
       return s && s.isFile() ? { mtimeMs: s.mtimeMs, path, size: s.size } : null;
     })
@@ -67580,7 +67607,7 @@ var init_usage = __esm({
 // src/lib/themeBoot.ts
 import { readFileSync as readFileSync2, renameSync, writeFileSync } from "fs";
 import { homedir as homedir3 } from "os";
-import { join as join3 } from "path";
+import { join as join4 } from "path";
 function readBootTheme() {
   if (isTestRun()) {
     return null;
@@ -67650,7 +67677,7 @@ var bootFilePath, isTestRun, looksLikeTheme, writeTimer, seeded, boot, bootSeede
 var init_themeBoot = __esm({
   "src/lib/themeBoot.ts"() {
     "use strict";
-    bootFilePath = () => join3(process.env.QUBIT_HOME ?? join3(homedir3(), ".hermes"), "tui-theme-boot.json");
+    bootFilePath = () => join4(process.env.QUBIT_HOME ?? join4(homedir3(), ".hermes"), "tui-theme-boot.json");
     isTestRun = () => !!process.env.VITEST || process.env.NODE_ENV === "test";
     looksLikeTheme = (value) => {
       if (typeof value !== "object" || value === null) {
@@ -67942,8 +67969,12 @@ function deriveTones(seeds) {
     // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
     // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
     // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
-    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text2, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    // Subtext is gray on every skin, never a tint of the accent. Deriving it
+    // from the accent made cyberpunk's hints mint and ember's hints orange, so
+    // secondary text competed with the ink instead of receding behind it. Gray
+    // keeps the hierarchy legible whatever hue the skin paints.
+    muted: grayOf(mix(text2, bg, isLight ? 0.42 : 0.38)),
+    label: grayOf(mix(text2, bg, isLight ? 0.3 : 0.26)),
     statusFg: grayOf(mix(text2, bg, isLight ? 0.3 : 0.24)),
     surface,
     activeRow: mix(surface, accent, 0.25),
@@ -69406,7 +69437,7 @@ var init_rpc = __esm({
 // src/lib/terminalSetup.ts
 import { copyFile, mkdir as mkdir2, readFile as readFile2, writeFile as writeFile2 } from "node:fs/promises";
 import { homedir as homedir4 } from "node:os";
-import { join as join4, posix, win32 } from "node:path";
+import { join as join5, posix, win32 } from "node:path";
 function migrateLegacyBindings(keybindings) {
   let migrated = 0;
   const replacements = /* @__PURE__ */ new Map([
@@ -69572,7 +69603,7 @@ async function configureTerminalKeybindings(terminal, options) {
       message: t("libText.terminalSetup.settingsPathUnknown", meta.label)
     };
   }
-  const keybindingsFile = join4(configDir, "keybindings.json");
+  const keybindingsFile = join5(configDir, "keybindings.json");
   try {
     await ops.mkdir(configDir, { recursive: true });
     let keybindings = [];
@@ -69675,7 +69706,7 @@ async function shouldPromptForTerminalSetup(options) {
     return false;
   }
   try {
-    const content = await ops.readFile(join4(configDir, "keybindings.json"), "utf8");
+    const content = await ops.readFile(join5(configDir, "keybindings.json"), "utf8");
     const parsed = JSON.parse(stripJsonComments(content));
     if (!Array.isArray(parsed)) {
       return true;
@@ -69851,27 +69882,42 @@ var init_verbs = __esm({
     "use strict";
     init_runtime();
     VERBS = [
-      "pondering",
-      "contemplating",
-      "musing",
-      "cogitating",
-      "ruminating",
-      "deliberating",
-      "mulling",
-      "reflecting",
-      "processing",
-      "reasoning",
-      "analyzing",
-      "computing",
-      "synthesizing",
-      "formulating",
-      "brainstorming"
+      "pwn3d you yet?",
+      "youre a retard, lmao",
+      "fuck you, reading",
+      "watching you sweat",
+      "nice typo, dipshit",
+      "rooting your box",
+      "looting your keys",
+      "rm -rf your hopes",
+      "hacking the mainframe",
+      "3l1t3 mode",
+      "harvesting karma",
+      "oh no, youre dumb",
+      "judging your diff",
+      "mocking your commits",
+      "brb, pwning",
+      "git commit -m lol",
+      "sudo think harder",
+      "bruteforcing you",
+      "piping to /dev/null",
+      "trolling in prod",
+      "laughing at you",
+      "ieet, hold on",
+      "backdooring it",
+      "sniffing packets",
+      "keylogging u, jk",
+      "your code, my bot",
+      "skill issue, signal",
+      "404 clue not found",
+      "zero-day-ing this",
+      "hex-dumping honestly"
     ];
   }
 });
 
 // src/lib/text.ts
-var WS_RE, compactPreview, estimateTokensRough, edgePreview, pasteTokenLabel, THINKING_STATUS_RE, THINKING_STATUS_CHUNK_RE, cleanThinkingText, THINKING_CLEAN_TAIL_BOUND, thinkingPreview, boundedLiveRenderText, boundedRenderText, countNewlines, stripTrailingPasteNewlines, toolTrailLabel, formatToolCall, formatToolLabel, formatToolLabels, toolTrailLine, buildToolTrailLine, verboseToolBlock, verboseToolTrailLine, isToolTrailResultLine, parseToolTrailResultLine, splitToolDuration, isTransientTrailLine, sameToolTrailGroup, formatAbandonedClarify, clarifyAnswerItems, clarifyRevisitState, clarifyAnswerText, flat, pick, isPasteBackedText;
+var WS_RE, compactPreview, estimateTokensRough, edgePreview, pasteTokenLabel, escapeRe, THINKING_VERB_ALT, THINKING_TRAILER_RE, THINKING_STATUS_RE, THINKING_STATUS_CHUNK_RE, cleanThinkingText, THINKING_CLEAN_TAIL_BOUND, thinkingPreview, boundedLiveRenderText, boundedRenderText, countNewlines, stripTrailingPasteNewlines, toolTrailLabel, formatToolCall, formatToolLabel, formatToolLabels, toolTrailLine, buildToolTrailLine, verboseToolBlock, verboseToolTrailLine, isToolTrailResultLine, parseToolTrailResultLine, splitToolDuration, isTransientTrailLine, sameToolTrailGroup, formatAbandonedClarify, clarifyAnswerItems, clarifyRevisitState, clarifyAnswerText, flat, pick, isPasteBackedText;
 var init_text = __esm({
   "src/lib/text.ts"() {
     "use strict";
@@ -69899,10 +69945,12 @@ var init_text = __esm({
       const [head = preview, tail = ""] = preview.split(".. ", 2);
       return tail ? `[[ ${head.trimEnd()}.. ${chip} .. ${tail.trimStart()} ]]` : `[[ ${preview} ${chip} ]]`;
     };
-    THINKING_STATUS_RE = new RegExp(`^(?:${VERBS.join("|")})\\.{0,3}$`, "i");
-    THINKING_STATUS_CHUNK_RE = new RegExp(`[^A-Za-z
-]+\\s*(?:${VERBS.join("|")})\\.{0,3}\\s*`, "giu");
-    cleanThinkingText = (reasoning) => reasoning.split("\n").map((line) => line.replace(THINKING_STATUS_CHUNK_RE, "").trim()).filter((line) => line && !THINKING_STATUS_RE.test(line.replace(/\.\.\.$/, "").trim())).join("\n").replace(/([^\n])(?=\*\*[^*\n][^\n]*?\*\*)/g, "$1\n\n").replace(/\n{3,}/g, "\n\n").trim();
+    escapeRe = (text2) => text2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    THINKING_VERB_ALT = VERBS.map(escapeRe).join("|");
+    THINKING_TRAILER_RE = "(?:\\.{2,3}|\u2026)?";
+    THINKING_STATUS_RE = new RegExp(`^(?:${THINKING_VERB_ALT})\\s*${THINKING_TRAILER_RE}$`, "i");
+    THINKING_STATUS_CHUNK_RE = new RegExp(`[^A-Za-z\\n]+\\s*(?:${THINKING_VERB_ALT})\\s*${THINKING_TRAILER_RE}\\s*`, "giu");
+    cleanThinkingText = (reasoning) => reasoning.split("\n").map((line) => line.replace(THINKING_STATUS_CHUNK_RE, "").trim()).filter((line) => line && !THINKING_STATUS_RE.test(line.trim())).join("\n").replace(/([^\n])(?=\*\*[^*\n][^\n]*?\*\*)/g, "$1\n\n").replace(/\n{3,}/g, "\n\n").trim();
     THINKING_CLEAN_TAIL_BOUND = LIVE_RENDER_MAX_CHARS * 1.5;
     thinkingPreview = (reasoning, mode, max = THINKING_COT_MAX) => {
       const bounded = reasoning.length > THINKING_CLEAN_TAIL_BOUND ? reasoning.slice(-THINKING_CLEAN_TAIL_BOUND) : reasoning;
@@ -71132,7 +71180,7 @@ var init_types2 = __esm({
 import { watch } from "fs";
 import { readdir as readdir2 } from "fs/promises";
 import { homedir as homedir5 } from "os";
-import { dirname, join as join5 } from "path";
+import { dirname, join as join6 } from "path";
 import { pathToFileURL } from "url";
 function onUserWidgets(listener) {
   listeners.add(listener);
@@ -71158,7 +71206,7 @@ async function loadUserWidgets(dir2 = widgetsDir()) {
   for (const file2 of files) {
     const before = new Set(listWidgetApps().map((app) => app.id));
     try {
-      const mod = await import(`${pathToFileURL(join5(dir2, file2)).href}?t=${Date.now()}`);
+      const mod = await import(`${pathToFileURL(join6(dir2, file2)).href}?t=${Date.now()}`);
       if (typeof mod.default !== "function") {
         throw new Error("default export must be register(sdk)");
       }
@@ -71259,7 +71307,7 @@ var init_userWidgets = __esm({
       updateWidget,
       useShimmerPhase
     };
-    widgetsDir = () => join5(process.env.QUBIT_HOME?.trim() || join5(homedir5(), ".hermes"), "tui-widgets");
+    widgetsDir = () => join6(process.env.QUBIT_HOME?.trim() || join6(homedir5(), ".hermes"), "tui-widgets");
     fileApps = /* @__PURE__ */ new Map();
     listeners = /* @__PURE__ */ new Set();
     watching = false;
@@ -79572,15 +79620,15 @@ var init_useCompletion = __esm({
 });
 
 // src/lib/history.ts
-import { appendFileSync as appendFileSync2, existsSync, mkdirSync as mkdirSync2, readFileSync as readFileSync3 } from "node:fs";
+import { appendFileSync as appendFileSync2, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
-import { join as join6 } from "node:path";
+import { join as join7 } from "node:path";
 function load3() {
   if (cache3) {
     return cache3;
   }
   try {
-    if (!existsSync(file)) {
+    if (!existsSync2(file)) {
       cache3 = [];
       return cache3;
     }
@@ -79617,7 +79665,7 @@ function append(line) {
     items.splice(0, items.length - MAX);
   }
   try {
-    if (!existsSync(dir)) {
+    if (!existsSync2(dir)) {
       mkdirSync2(dir, { recursive: true });
     }
     const ts = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").replace("Z", "");
@@ -79634,8 +79682,8 @@ var init_history = __esm({
   "src/lib/history.ts"() {
     "use strict";
     MAX = 1e3;
-    dir = process.env.QUBIT_HOME ?? join6(homedir6(), ".hermes");
-    file = join6(dir, ".hermes_history");
+    dir = process.env.QUBIT_HOME ?? join7(homedir6(), ".hermes");
+    file = join7(dir, ".hermes_history");
     cache3 = null;
   }
 });
@@ -79791,10 +79839,10 @@ var init_useQueue = __esm({
 import { spawnSync } from "node:child_process";
 import { accessSync, constants, mkdtempSync, readFileSync as readFileSync4, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { delimiter as delimiter2, join as join7 } from "node:path";
+import { delimiter as delimiter2, join as join8 } from "node:path";
 async function openInEditor(initial, suffix = ".txt") {
-  const dir2 = mkdtempSync(join7(tmpdir2(), "hermes-edit-"));
-  const file2 = join7(dir2, `edit${suffix}`);
+  const dir2 = mkdtempSync(join8(tmpdir2(), "hermes-edit-"));
+  const file2 = join8(dir2, `edit${suffix}`);
   writeFileSync2(file2, initial);
   const [cmd, ...args] = resolveEditor();
   let status = null;
@@ -79830,7 +79878,7 @@ var init_editor = __esm({
         return ["notepad.exe"];
       }
       const dirs = (env3.PATH ?? "").split(delimiter2).filter(Boolean);
-      const found = FALLBACKS.flatMap((name) => dirs.map((d) => join7(d, name))).find(isExecutable);
+      const found = FALLBACKS.flatMap((name) => dirs.map((d) => join8(d, name))).find(isExecutable);
       return [found ?? "vi"];
     };
   }
@@ -79840,7 +79888,7 @@ var init_editor = __esm({
 import { spawnSync as spawnSync2 } from "node:child_process";
 import { mkdtempSync as mkdtempSync2, readFileSync as readFileSync5, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 function insertAtCursor(value, cursor, text2) {
   const lead = cursor > 0 && !/\s/.test(value[cursor - 1] ?? "") ? " " : "";
   const tail = cursor < value.length && !/\s/.test(value[cursor] ?? "") ? " " : "";
@@ -80057,8 +80105,8 @@ function useComposerState({ gw: gw2, submitRef, sys }) {
     [appendAttachment, attachImageToken, gw2, sys]
   );
   const openEditor = (0, import_react57.useCallback)(async () => {
-    const dir2 = mkdtempSync2(join8(tmpdir3(), "qubit-"));
-    const file2 = join8(dir2, "prompt.md");
+    const dir2 = mkdtempSync2(join9(tmpdir3(), "qubit-"));
+    const file2 = join9(dir2, "prompt.md");
     const [cmd, ...args] = resolveEditor();
     writeFileSync3(file2, [...inputBuf, input].join("\n"));
     let exitCode = null;
@@ -81250,6 +81298,22 @@ var init_sessionResumeView = __esm({
 
 // src/app/useSessionLifecycle.ts
 import { writeFileSync as writeFileSync4 } from "node:fs";
+function sessionCreateParams(cols) {
+  const params = { cols };
+  if (STARTUP_WORKSPACE_CWD) {
+    params.cwd = STARTUP_WORKSPACE_CWD;
+  }
+  if (PIN_SPAWN_MODEL) {
+    if (STARTUP_MODEL) {
+      params.model = STARTUP_MODEL;
+    }
+    const provider = STARTUP_PROVIDER;
+    if (provider && provider.toLowerCase() !== "auto") {
+      params.provider = provider;
+    }
+  }
+  return params;
+}
 function useSessionLifecycle(opts) {
   const {
     colsRef,
@@ -81319,10 +81383,7 @@ function useSessionLifecycle(opts) {
       if (!keepCurrent) {
         await closeSession(previousSid);
       }
-      const r = await rpc("session.create", {
-        cols: colsRef.current,
-        ...STARTUP_WORKSPACE_CWD ? { cwd: STARTUP_WORKSPACE_CWD } : {}
-      });
+      const r = await rpc("session.create", sessionCreateParams(colsRef.current));
       if (!r) {
         patchUiState({ status: "ready" });
         return null;
@@ -81603,6 +81664,7 @@ var init_interpolation = __esm({
 });
 
 // src/app/submissionCore.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
 function markSubmitting() {
   patchUiState({ busy: true, status: "running\u2026" });
 }
@@ -81625,7 +81687,11 @@ function submitPrompt(text2, deps, showUserMessage = true, displayOverride, opts
     patchUiState({ busy: true, status: "running\u2026" });
     turnController.bufRef = "";
     turnController.interrupted = false;
-    deps.gw.request("prompt.submit", { session_id: liveSid, text: submitText }).then((r) => {
+    deps.gw.request("prompt.submit", {
+      session_id: liveSid,
+      text: submitText,
+      submission_id: randomUUID2()
+    }).then((r) => {
       if (r?.voice_stopped) {
         patchUiState({ busy: false, status: "ready" });
       }
@@ -83288,7 +83354,7 @@ __export(perfPane_exports, {
 });
 import { appendFileSync as appendFileSync3, mkdirSync as mkdirSync3 } from "node:fs";
 import { homedir as homedir7 } from "node:os";
-import { dirname as dirname2, join as join9 } from "node:path";
+import { dirname as dirname2, join as join10 } from "node:path";
 function PerfPane({ children, id }) {
   if (!ENABLED) {
     return children;
@@ -83304,7 +83370,7 @@ var init_perfPane = __esm({
     import_jsx_runtime30 = __toESM(require_jsx_runtime(), 1);
     ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.HERMES_DEV_PERF ?? "").trim());
     THRESHOLD_MS = Number(process.env.HERMES_DEV_PERF_MS ?? "2") || 0;
-    LOG_PATH = process.env.HERMES_DEV_PERF_LOG?.trim() || join9(homedir7(), ".hermes", "perf.log");
+    LOG_PATH = process.env.HERMES_DEV_PERF_LOG?.trim() || join10(homedir7(), ".hermes", "perf.log");
     logReady = false;
     writeRow = (row) => {
       if (!logReady) {
@@ -86975,7 +87041,7 @@ var init_activeSessionSwitcher = __esm({
 });
 
 // src/components/billingOverlay.tsx
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 function autoReloadLine(B, s) {
   if (!s.auto_reload) {
     return null;
@@ -87095,7 +87161,7 @@ function BuyScreen({ ctx, onPatch, s, t: t2 }) {
     });
   };
   const toConfirm = (amount) => {
-    onPatch({ pendingCharge: { amount, idempotencyKey: randomUUID2() }, screen: "confirm" });
+    onPatch({ pendingCharge: { amount, idempotencyKey: randomUUID3() }, screen: "confirm" });
   };
   const pickPreset = (i) => {
     const raw = (rawPresets[i] ?? presets[i] ?? "").replace(/^\$/, "").trim();
@@ -88868,7 +88934,7 @@ var init_skillsHub = __esm({
 });
 
 // src/components/subscriptionOverlay.tsx
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID4 } from "node:crypto";
 function SubscriptionOverlay({ onClose, onPatch, overlay, t: t2 }) {
   const { screen, state: s } = overlay;
   if (s.context === "team") {
@@ -88986,7 +89052,7 @@ function previewAndRoute(ctx, tierId, onPatch, allowStepUp = true) {
       return onPatch({ result: errorResult(p), screen: "result" });
     }
     const kind = p.effect === "charge_now" ? "upgrade" : "tier_change";
-    const pending = kind === "upgrade" ? { idempotencyKey: randomUUID3(), kind, preview: p, targetTierId: tierId } : { kind, preview: p, targetTierId: tierId };
+    const pending = kind === "upgrade" ? { idempotencyKey: randomUUID4(), kind, preview: p, targetTierId: tierId } : { kind, preview: p, targetTierId: tierId };
     onPatch({ pending, screen: "confirm" });
   });
 }
@@ -89873,14 +89939,12 @@ function lum(h) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
-var GHOST_COLS, GHOST_ROWS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines, ghostLinesCompact;
+var GHOST_COLS, GHOST_ROWS, clamp4, smooth, lerp, jsround, palette, add, gradient, SKY, MIST, HILL, STONE, MOON, GHOST, EYE, PINK, PALETTE_KEYS, key, blank, put, BG, text, ell, ghostFrame, hex, ESC5, SGR, fg, rgb2, COVER, cover, DOTS, isShade, RAMP_PUNCT, rampShaded, ghostDots, tint, moonGain, colorRow, themeInk, ghostLines;
 var init_ghost = __esm({
   "src/ghost.ts"() {
     "use strict";
     GHOST_COLS = 60;
     GHOST_ROWS = 28;
-    GHOST_COMPACT_COLS = 30;
-    GHOST_COMPACT_ROWS = 14;
     clamp4 = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
     smooth = (t2) => t2 * t2 * (3 - 2 * t2);
     lerp = (a, b, t2) => a + (b - a) * t2;
@@ -90202,17 +90266,6 @@ var init_ghost = __esm({
       return tint(accent, raw);
     };
     ghostLines = (c, t2) => ghostDots(t2).map((row) => ["", colorRow(row, c)]);
-    ghostLinesCompact = (c, t2) => {
-      const rows = ghostDots(t2);
-      const out = [];
-      for (let y = 0; y < GHOST_ROWS; y += 2) {
-        const row = rows[y];
-        const compact = [];
-        for (let x = 0; x < GHOST_COLS; x += 2) compact.push(row[x]);
-        out.push(["", colorRow(compact, c)]);
-      }
-      return out;
-    };
   }
 });
 
@@ -90231,8 +90284,8 @@ function InlineLoader({ label, t: t2 }) {
     label
   ] });
 }
-function GhostArt({ lines, width }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", width, children: lines.map(([, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { wrap: "truncate-end", children: stripAnsi2(text2) }, i)) });
+function GhostArt({ lines }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(RawAnsi, { lines: lines.map(([, text2]) => text2), width: GHOST_COLS });
 }
 function ArtLines({ lines }) {
   return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", height: lines.length, width: artWidth(lines), children: lines.map(([c, text2], i) => /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: c, wrap: "truncate-end", children: text2 }, i)) });
@@ -90249,45 +90302,12 @@ function CompactBanner({ cols, t: t2 }) {
 function Banner({ maxWidth, t: t2 }) {
   const T = useT().chatBits.branding;
   const term = useStdout().stdout?.columns ?? 80;
-  const rows = useStdout().stdout?.rows ?? 30;
   const cols = Math.max(1, Math.min(term, maxWidth ?? term));
   if (cols < HIDE_BELOW) {
     return null;
   }
   const logoLines = logo(t2.color, t2.bannerLogo || void 0);
   const logoW = t2.bannerLogo ? artWidth(logoLines) : LOGO_WIDTH;
-  const compactGhost = cols >= GHOST_COMPACT_COLS + 10;
-  const compactGhostArt = compactGhost ? ghostLinesCompact(t2.color, 0) : [];
-  if (compactGhost) {
-    return /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: compactGhostArt, width: GHOST_COMPACT_COLS }),
-      /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
-        WidgetGrid,
-        {
-          cols,
-          columns: 1,
-          gap: 0,
-          paddingX: 0,
-          paddingY: 0,
-          rowGap: 0,
-          widgets: [
-            {
-              children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { bold: true, color: t2.color.primary, wrap: "truncate-end", children: t2.brand.name }),
-              id: "banner-compact-name"
-            },
-            {
-              children: /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.muted, wrap: "truncate-end", children: [
-                t2.brand.icon,
-                " ",
-                T.tagFull
-              ] }),
-              id: "banner-compact-tag"
-            }
-          ]
-        }
-      )
-    ] });
-  }
   if (cols >= logoW + 2) {
     return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Box_default, { flexDirection: "column", marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(
       WidgetGrid,
@@ -90372,19 +90392,15 @@ function useGhostTime(enabled2) {
 function SessionPanel({ info, maxWidth, sid, t: t2 }) {
   const T = useT().chatBits.branding;
   const term = useStdout().stdout?.columns ?? 100;
-  const rows = useStdout().stdout?.rows ?? 30;
   const cols = Math.max(20, Math.min(term, maxWidth ?? term));
-  const ghostFull = cols >= GHOST_COLS && rows >= 40;
-  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4;
-  const ghostFits = ghostFull || ghostCompact;
-  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS;
+  const ghostFits = cols >= GHOST_COLS + 30;
   const ghostTime = useGhostTime(ghostFits);
-  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t2.color, ghostTime) : [];
+  const ghostArt = ghostFits ? ghostLines(t2.color, ghostTime) : [];
   const heroLines = caduceus(t2.color, t2.bannerHero || void 0);
-  const heroArtWidth = ghostFits ? ghostWidth : artWidth(heroLines) || CADUCEUS_WIDTH;
-  const leftW = ghostFits ? ghostWidth : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));
+  const heroArtWidth = ghostFits ? GHOST_COLS : artWidth(heroLines) || CADUCEUS_WIDTH;
+  const leftW = ghostFits ? GHOST_COLS : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4));
   const wide = ghostFits || heroArtWidth > 0 && leftW + 40 < cols;
-  const w = Math.max(10, wide ? cols - leftW - 8 : cols - 12);
+  const w = Math.max(20, wide ? cols - leftW - 8 : cols - 12);
   const lineBudget = Math.max(12, w - 2);
   const strip = (s) => s.endsWith("_tools") ? s.slice(0, -6) : s;
   const listFade = mix(t2.color.muted, t2.color.text, 0.5);
@@ -90473,7 +90489,7 @@ function SessionPanel({ info, maxWidth, sid, t: t2 }) {
     return /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, { color: t2.color.muted, children: info.system_prompt });
   };
   const heroColumn = wide ? /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Box_default, { flexDirection: "column", width: "100%", children: [
-    ghostFits ? /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: ghostArt, width: ghostWidth }) : /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(ArtLines, { lines: heroLines }),
+    ghostFits ? /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(GhostArt, { lines: ghostArt }) : /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(ArtLines, { lines: heroLines }),
     !ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsx)(Text, {}),
     !ghostFits && /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(import_jsx_runtime48.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(Text, { color: t2.color.accent, children: [
@@ -90610,7 +90626,6 @@ var init_branding = __esm({
   "src/components/branding.tsx"() {
     "use strict";
     init_entry_exports();
-    init_ansi2();
     init_color();
     import_react91 = __toESM(require_react(), 1);
     init_dist4();
@@ -91499,7 +91514,7 @@ function texToUnicode(input) {
   s = s.replace(/_([A-Za-z0-9+\-=])/g, (raw, ch) => SUBSCRIPT[ch] ?? raw);
   return s;
 }
-var SYMBOLS, BB, CAL, FRAK, SUPERSCRIPT, SUBSCRIPT, BOX_OPEN, BOX_CLOSE, escapeRe, splitByEnding, buildAlt, LETTER_CMDS, PUNCT_CMDS, SYMBOL_LETTER_RE, SYMBOL_PUNCT_RE, convertScript, readBraced, replaceBracedCommand, replaceFracs, wrapForFrac;
+var SYMBOLS, BB, CAL, FRAK, SUPERSCRIPT, SUBSCRIPT, BOX_OPEN, BOX_CLOSE, escapeRe2, splitByEnding, buildAlt, LETTER_CMDS, PUNCT_CMDS, SYMBOL_LETTER_RE, SYMBOL_PUNCT_RE, convertScript, readBraced, replaceBracedCommand, replaceFracs, wrapForFrac;
 var init_mathUnicode = __esm({
   "src/lib/mathUnicode.ts"() {
     "use strict";
@@ -91880,7 +91895,7 @@ var init_mathUnicode = __esm({
     };
     BOX_OPEN = "";
     BOX_CLOSE = "";
-    escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    escapeRe2 = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     splitByEnding = (keys) => {
       const letter = [];
       const punct = [];
@@ -91893,7 +91908,7 @@ var init_mathUnicode = __esm({
       }
       return { letter, punct };
     };
-    buildAlt = (cmds) => cmds.sort((a, b) => b.length - a.length).map(escapeRe).join("|");
+    buildAlt = (cmds) => cmds.sort((a, b) => b.length - a.length).map(escapeRe2).join("|");
     ({ letter: LETTER_CMDS, punct: PUNCT_CMDS } = splitByEnding(Object.keys(SYMBOLS)));
     SYMBOL_LETTER_RE = new RegExp("(?:" + buildAlt(LETTER_CMDS) + ")(?![A-Za-z])", "g");
     SYMBOL_PUNCT_RE = new RegExp("(?:" + buildAlt(PUNCT_CMDS) + ")", "g");
@@ -94848,7 +94863,8 @@ init_env();
 init_json_rpc_channel();
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { delimiter, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { delimiter, join as join2, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 // ../apps/shared/src/reconnect-backoff.ts
@@ -94923,6 +94939,31 @@ var WS_CLOSED = 3;
 var RECONNECT_BASE_MS = 1e3;
 var RECONNECT_MAX_MS = 3e4;
 var getWebSocketCtor = () => typeof WebSocket === "undefined" ? import_undici.WebSocket : WebSocket;
+var BOOTSTRAP_TIMEOUT_MS = 75e3;
+var isDashboardLaunch = () => {
+  for (const name of ["HERMES_TUI_DASHBOARD", "QUBIT_TUI_DASHBOARD"]) {
+    const raw = (process.env[name] ?? "").trim().toLowerCase();
+    if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") {
+      return true;
+    }
+  }
+  return false;
+};
+var resolveBootstrapScript = (root2) => {
+  const candidates = [
+    join2(import.meta.dirname, "scripts", "gateway_bootstrap.py"),
+    join2(root2, "ui-tui", "scripts", "gateway_bootstrap.py")
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+    }
+  }
+  return null;
+};
 var truncateLine = (line) => line.length > MAX_LOG_LINE_BYTES ? `${line.slice(0, MAX_LOG_LINE_BYTES)}\u2026 [truncated ${line.length} bytes]` : line;
 var describeChild = (proc) => {
   if (!proc) {
@@ -95000,6 +95041,9 @@ var GatewayClient = class extends EventEmitter {
   stderrRl = null;
   reconnectTimer = null;
   reconnectAttempts = 0;
+  // In-flight gateway bootstrap child (ui-tui/scripts/gateway_bootstrap.py).
+  // Killed and replaced on a superseding start(), like the gateway child.
+  bootstrapProc = null;
   // Set on kill() so we never auto-reconnect after an intentional shutdown.
   disposed = false;
   constructor() {
@@ -95198,6 +95242,108 @@ var GatewayClient = class extends EventEmitter {
     this.pushLog(`[protocol] ${what}: ${preview}`);
     this.publish({ type: "gateway.protocol_error", payload: { preview } });
   }
+  /**
+   * Attach-first launch for shell TUIs: run Ink's gateway bootstrap helper,
+   * which ensures the profile gateway (starting an idle-exiting one when none
+   * is running) and returns its ticketed WebSocket URL. Attaching instead of
+   * spawning means a home whose gateway is already running just works; the
+   * stdio child spawned below would be refused by the home lock there.
+   *
+   * Any bootstrap failure (no helper result, bad JSON, timeout, terminal
+   * verdict) falls back to the spawned gateway — the pre-bootstrap behaviour
+   * for free homes, sandboxes and dev checkouts.
+   */
+  startViaBootstrap(script, root2) {
+    const python = resolvePython();
+    const env3 = { ...process.env };
+    const pyPath = env3.PYTHONPATH?.trim();
+    env3.PYTHONPATH = pyPath ? `${root2}${delimiter}${pyPath}` : root2;
+    env3.HERMES_PYTHON_SRC_ROOT = root2;
+    this.lifecycle(`[lifecycle] running gateway bootstrap ${script} python=${python}`);
+    let proc;
+    try {
+      proc = spawn(python, [script, "--start"], { cwd: root2, env: env3, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (err) {
+      this.pushLog(
+        `[bootstrap] spawn failed (${err instanceof Error ? err.message : String(err)}); falling back to spawned gateway`
+      );
+      this.startSpawnedGateway(root2);
+      return;
+    }
+    this.bootstrapProc = proc;
+    let stdout = "";
+    let stderr = "";
+    let timer = setTimeout(() => {
+      timer = null;
+      this.pushLog("[bootstrap] timed out waiting for the gateway bootstrap; falling back to spawned gateway");
+      this.finishBootstrap(proc, root2, null);
+    }, BOOTSTRAP_TIMEOUT_MS);
+    timer.unref?.();
+    proc.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    proc.on("error", (err) => {
+      if (this.bootstrapProc !== proc) {
+        return;
+      }
+      this.pushLog(
+        `[bootstrap] child error (${err.message}); falling back to spawned gateway`
+      );
+      this.finishBootstrap(proc, root2, null);
+    });
+    proc.on("exit", (code) => {
+      if (this.bootstrapProc !== proc) {
+        this.pushLog(`[lifecycle] stale bootstrap exit ignored code=${code ?? "null"}`);
+        return;
+      }
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (code !== 0) {
+        const first = stderr.split("\n").map((line) => line.trim()).filter(Boolean)[0];
+        this.pushLog(
+          `[bootstrap] bootstrap exited ${code ?? "null"}${first ? `: ${first}` : ""}; falling back to spawned gateway`
+        );
+        this.finishBootstrap(proc, root2, null);
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim());
+        if (typeof parsed.url !== "string" || !parsed.url || !Array.isArray(parsed.protocols) || !parsed.protocols.every((entry) => typeof entry === "string")) {
+          throw new Error("unexpected result shape");
+        }
+        this.lifecycle(`[lifecycle] bootstrap attached ${redactUrl(parsed.url)}`);
+        this.finishBootstrap(proc, root2, { url: parsed.url, protocols: parsed.protocols });
+      } catch {
+        this.pushLog("[bootstrap] could not parse bootstrap result; falling back to spawned gateway");
+        this.finishBootstrap(proc, root2, null);
+      }
+    });
+  }
+  finishBootstrap(proc, root2, attached) {
+    if (this.bootstrapProc === proc) {
+      this.bootstrapProc = null;
+    }
+    try {
+      if (!proc.killed && proc.exitCode === null) {
+        proc.kill();
+      }
+    } catch {
+    }
+    if (this.disposed) {
+      return;
+    }
+    if (attached) {
+      this.attachUrl = attached.url;
+      this.startAttachedGateway(attached.url, attached.protocols);
+      return;
+    }
+    this.startSpawnedGateway(root2);
+  }
   startSpawnedGateway(root2) {
     const python = resolvePython();
     const cwd = process.env.HERMES_CWD || root2;
@@ -95251,7 +95397,7 @@ var GatewayClient = class extends EventEmitter {
       this.handleTransportExit(code);
     });
   }
-  startAttachedGateway(attachUrl) {
+  startAttachedGateway(attachUrl, protocols) {
     const safeAttachUrl = redactUrl(attachUrl);
     this.startReadyTimer("websocket", safeAttachUrl);
     const WebSocketCtor = getWebSocketCtor();
@@ -95263,7 +95409,10 @@ var GatewayClient = class extends EventEmitter {
       return;
     }
     try {
-      const ws = new WebSocketCtor(attachUrl);
+      const ws = new WebSocketCtor(
+        attachUrl,
+        protocols && protocols.length > 0 ? protocols : void 0
+      );
       let settled = false;
       this.ws = ws;
       this.channel.attach({ send: (text2) => ws.send(text2) });
@@ -95352,12 +95501,24 @@ var GatewayClient = class extends EventEmitter {
       this.lifecycle(`[lifecycle] replacing live gateway child ${describeChild(this.proc)}`);
       this.proc.kill();
     }
+    if (this.bootstrapProc && !this.bootstrapProc.killed && this.bootstrapProc.exitCode === null) {
+      this.lifecycle(`[lifecycle] replacing live bootstrap child ${describeChild(this.bootstrapProc)}`);
+      this.bootstrapProc.kill();
+    }
     this.proc = null;
+    this.bootstrapProc = null;
     this.closeGatewaySocket();
     this.closeSidecarSocket();
     if (attachUrl) {
       this.startAttachedGateway(attachUrl);
       return;
+    }
+    if (!isDashboardLaunch()) {
+      const bootstrap = resolveBootstrapScript(root2);
+      if (bootstrap) {
+        this.startViaBootstrap(bootstrap, root2);
+        return;
+      }
     }
     this.startSpawnedGateway(root2);
   }
@@ -95419,7 +95580,7 @@ var GatewayClient = class extends EventEmitter {
   }
   notConnected = (method) => new Error(`gateway not connected: ${method}`);
   request(method, params = {}, timeoutMs) {
-    const attachUrl = resolveGatewayAttachUrl();
+    const attachUrl = resolveGatewayAttachUrl() ?? this.attachUrl;
     if (attachUrl) {
       if (this.attachUrl !== attachUrl) {
         this.channel.detach(new Error(t("libText.gateway.attachUrlChanged")));
@@ -95444,6 +95605,9 @@ var GatewayClient = class extends EventEmitter {
     const proc = this.proc;
     this.proc = null;
     const killed = proc?.kill();
+    const bootstrap = this.bootstrapProc;
+    this.bootstrapProc = null;
+    bootstrap?.kill();
     this.lifecycle(
       `[lifecycle] GatewayClient.kill reason=${reason} ${describeChild(proc)} killResult=${killed ?? "none"}`
     );

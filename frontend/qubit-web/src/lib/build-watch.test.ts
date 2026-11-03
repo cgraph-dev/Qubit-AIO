@@ -116,4 +116,30 @@ describe("showBuildNotice", () => {
     showBuildNotice("index-newer.js", document, () => {});
     expect(document.getElementById("qubit-build-notice")).not.toBeNull();
   });
+
+  it("takes its colours from the active theme, never a fixed hex", () => {
+    // The banner is injected into <body>, outside the React tree, so a fixed
+    // palette is the only way it can be theme-blind — and it was: a hardcoded
+    // teal meant a Midnight user saw the cyberpunk-looking green notice.
+    showBuildNotice("index-new.js", document, () => {});
+    const banner = document.getElementById("qubit-build-notice")!;
+    const style = banner.getAttribute("style") ?? "";
+
+    // Every surface colour resolves through theme custom properties.
+    expect(style).toContain("var(--midground)");
+    expect(style).toContain("var(--background-base)");
+    expect(style).toContain("var(--midground-base)");
+
+    // No literal colour may survive anywhere in the banner or its controls.
+    const all = [style]
+      .concat(
+        Array.from(banner.querySelectorAll("button")).map(
+          (b) => b.getAttribute("style") ?? "",
+        ),
+      )
+      .join(";");
+    expect(all).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    // A neutral shadow is fine; a coloured literal (the old teal) is not.
+    expect(all).not.toMatch(/rgba?\(\s*(?!0[\s,])/);
+  });
 });

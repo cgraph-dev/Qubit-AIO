@@ -24,8 +24,6 @@ import type { ThemeColors } from './theme.js'
 
 export const GHOST_COLS = 60
 export const GHOST_ROWS = 28
-export const GHOST_COMPACT_COLS = 30
-export const GHOST_COMPACT_ROWS = 14
 /** Terminal lines ghostLines() returns: one grid row per line, as published. */
 export const GHOST_LINES = GHOST_ROWS
 
@@ -639,19 +637,6 @@ const themeInk = (key: string, c: ThemeColors): string => {
  * piece paints its own palette, so the active theme does not enter here.
  */
 export const ghostLines = (c: ThemeColors, t: number): Line[] => ghostDots(t).map(row => ['', colorRow(row, c)])
-
-/** Half-resolution ghost for short terminals; same piece, sampled 2x2. */
-export const ghostLinesCompact = (c: ThemeColors, t: number): Line[] => {
-  const rows = ghostDots(t)
-  const out: Line[] = []
-  for (let y = 0; y < GHOST_ROWS; y += 2) {
-    const row = rows[y]!
-    const compact: Cell[] = []
-    for (let x = 0; x < GHOST_COLS; x += 2) compact.push(row[x]!)
-    out.push(['', colorRow(compact, c)])
-  }
-  return out
-}
 
 type Cell = { ch: string; co: string }
 type Line = [string, string]

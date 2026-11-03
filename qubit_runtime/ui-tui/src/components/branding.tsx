@@ -1,11 +1,10 @@
-import { Box, Text, useStdout } from '@qubit/ink'
-import { stripAnsi } from '@qubit/shared/ansi'
+import { Box, RawAnsi, Text, useStdout } from '@qubit/ink'
 import { mix } from '@qubit/shared/color'
 import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
 import { artWidth, caduceus, CADUCEUS_WIDTH, logo, LOGO_WIDTH } from '../banner.js'
-import { GHOST_COLS, GHOST_COMPACT_COLS, GHOST_COMPACT_ROWS, ghostLines, ghostLinesCompact } from '../ghost.js'
+import { GHOST_COLS, ghostLines } from '../ghost.js'
 import { useT } from '../i18n/useT.js'
 import { flat } from '../lib/text.js'
 import type { Theme } from '../theme.js'
@@ -44,16 +43,8 @@ function InlineLoader({ label, t }: { label: string; t: Theme }) {
  * style run (60 cells times 14 rows, every 80ms) — and a Text span cannot carry
  * a background colour, which half-block packing needs.
  */
-function GhostArt({ lines, width }: { lines: [string, string][]; width: number }) {
-  return (
-    <Box flexDirection="column" width={width}>
-      {lines.map(([, text], i) => (
-        <Text key={i} wrap="truncate-end">
-          {stripAnsi(text)}
-        </Text>
-      ))}
-    </Box>
-  )
+function GhostArt({ lines }: { lines: [string, string][] }) {
+  return <RawAnsi lines={lines.map(([, text]) => text)} width={GHOST_COLS} />
 }
 
 export function ArtLines({ lines }: { lines: [string, string][] }) {
@@ -128,7 +119,6 @@ function CompactBanner({ cols, t }: { cols: number; t: Theme }) {
 export function Banner({ maxWidth, t }: { maxWidth?: number; t: Theme }) {
   const T = useT().chatBits.branding
   const term = useStdout().stdout?.columns ?? 80
-  const rows = useStdout().stdout?.rows ?? 30
   const cols = Math.max(1, Math.min(term, maxWidth ?? term))
 
   if (cols < HIDE_BELOW) {
@@ -137,47 +127,11 @@ export function Banner({ maxWidth, t }: { maxWidth?: number; t: Theme }) {
 
   const logoLines = logo(t.color, t.bannerLogo || undefined)
   const logoW = t.bannerLogo ? artWidth(logoLines) : LOGO_WIDTH
-  const compactGhost = cols >= GHOST_COMPACT_COLS + 10
-  const compactGhostArt = compactGhost ? ghostLinesCompact(t.color, 0) : []
 
   // Each tier renders its rows through a single-column WidgetGrid sized to
   // the available columns — same visual output as the old plain flex column
   // (cells clip where truncate-end used to), but the banner is now a
   // layout-engine surface.
-  if (compactGhost) {
-    return (
-      <Box flexDirection="column" marginBottom={1}>
-        <GhostArt lines={compactGhostArt} width={GHOST_COMPACT_COLS} />
-        <WidgetGrid
-          cols={cols}
-          columns={1}
-          gap={0}
-          paddingX={0}
-          paddingY={0}
-          rowGap={0}
-          widgets={[
-            {
-              children: (
-                <Text bold color={t.color.primary} wrap="truncate-end">
-                  {t.brand.name}
-                </Text>
-              ),
-              id: 'banner-compact-name'
-            },
-            {
-              children: (
-                <Text color={t.color.muted} wrap="truncate-end">
-                  {t.brand.icon} {T.tagFull}
-                </Text>
-              ),
-              id: 'banner-compact-tag'
-            }
-          ]}
-        />
-      </Box>
-    )
-  }
-
   if (cols >= logoW + 2) {
     return (
       <Box flexDirection="column" marginBottom={1}>
@@ -298,26 +252,22 @@ function useGhostTime(enabled: boolean) {
 export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   const T = useT().chatBits.branding
   const term = useStdout().stdout?.columns ?? 100
-  const rows = useStdout().stdout?.rows ?? 30
   const cols = Math.max(20, Math.min(term, maxWidth ?? term))
   // The ghost is a fixed 60-column scene, so it is drawn only when the panel is
   // genuinely wide enough; below that no art is drawn and the panel keeps its
   // plain header rather than showing a cropped scene.
-  const ghostFull = cols >= GHOST_COLS && rows >= 40
-  const ghostCompact = cols >= GHOST_COMPACT_COLS + 10 && rows < 40 && rows >= GHOST_COMPACT_ROWS + 4
-  const ghostFits = ghostFull || ghostCompact
-  const ghostWidth = ghostFull ? GHOST_COLS : GHOST_COMPACT_COLS
+  const ghostFits = cols >= GHOST_COLS + 30
   const ghostTime = useGhostTime(ghostFits)
-  const ghostArt = ghostFits ? (ghostFull ? ghostLines : ghostLinesCompact)(t.color, ghostTime) : []
+  const ghostArt = ghostFits ? ghostLines(t.color, ghostTime) : []
   const heroLines = caduceus(t.color, t.bannerHero || undefined)
   // The ghost renders in the hero track, beside the text — the same two-column
   // grid the caduceus used, with the ghost taking the art track. Drawn above
   // the info it cost a full 28-row block and pushed the text to the far edge;
   // beside it, the art and the text share one band and both sit near the edge.
-  const heroArtWidth = ghostFits ? ghostWidth : artWidth(heroLines) || CADUCEUS_WIDTH
+  const heroArtWidth = ghostFits ? GHOST_COLS : artWidth(heroLines) || CADUCEUS_WIDTH
   // Ghost docked close to the text (gap 2) rather than centred with dead space
   // either side; the caduceus keeps its old breathing room.
-  const leftW = ghostFits ? ghostWidth : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4))
+  const leftW = ghostFits ? GHOST_COLS : Math.min(heroArtWidth + 4, Math.floor(cols * 0.4))
   // Two columns are needed whenever art renders (ghost or caduceus), so the
   // panel is wide when the art track plus a readable text track fits.
   // Ghost track + a 30-column text track must fit before the two-column band is
@@ -327,7 +277,7 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
   // is what is left after the art track, minus the border and the gap. A wide
   // terminal therefore holds a readable tools list beside the ghost instead of
   // a 30-column sliver jammed against the frame.
-  const w = Math.max(10, wide ? cols - leftW - 8 : cols - 12)
+  const w = Math.max(20, wide ? cols - leftW - 8 : cols - 12)
   const lineBudget = Math.max(12, w - 2)
   const strip = (s: string) => (s.endsWith('_tools') ? s.slice(0, -6) : s)
 
@@ -476,7 +426,7 @@ export function SessionPanel({ info, maxWidth, sid, t }: SessionPanelProps) {
     <Box flexDirection="column" width="100%">
       {/* The ghost is the hero when it renders, and it takes the art track
           itself; the caduceus stands in below the ghost's width threshold. */}
-      {ghostFits ? <GhostArt lines={ghostArt} width={ghostWidth} /> : <ArtLines lines={heroLines} />}
+      {ghostFits ? <GhostArt lines={ghostArt} /> : <ArtLines lines={heroLines} />}
 
       {/* With the ghost in the art track the model/cwd/session lines move to
           the right column (they read as the panel's header there, and the

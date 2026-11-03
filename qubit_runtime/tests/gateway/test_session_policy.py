@@ -511,6 +511,20 @@ def test_run_budget_passes_the_session_create_contract():
     assert CREATE_FIELDS <= declared | {'request_id'}, CREATE_FIELDS - declared
 
 
+def test_cols_passes_the_session_create_contract(tmp_path):
+    """The Ink TUI sends its terminal width on session.create (as it already
+    does on session.resume): the canonical dispatcher must accept it, and the
+    policy must freeze it with the launch request instead of refusing it."""
+    import json
+    from tui_gateway.contracts.registry import CANONICAL_METHODS, canonical_param_problems
+    from gateway.session_policy import CREATE_FIELDS, build_policy
+    contract = CANONICAL_METHODS['session.create']
+    assert canonical_param_problems(contract, {'request_id': 'r', 'source': 'tui', 'cols': 80}) == []
+    assert 'cols' in CREATE_FIELDS
+    policy = build_policy(dict(cwd=str(tmp_path), source='tui', cols=80), {})
+    assert json.loads(policy.request_json)['cols'] == 80
+
+
 def test_verbose_is_a_frozen_launch_option(tmp_path):
     """`qubit chat -v` (main: AIAgent(quiet_mode=False)): the session agent's status lines are not quieted."""
     from gateway.session_policy import build_policy

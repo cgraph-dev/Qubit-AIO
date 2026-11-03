@@ -69,8 +69,16 @@ describe('cleanThinkingText', () => {
   it('removes face/status ticker fragments while preserving real reasoning', () => {
     expect(
       cleanThinkingText(
-        '(¬_¬) synthesizing...**Resolving comments on GitHub**\n( ͡° ͜ʖ ͡°) musing...\nActual step\n٩(๑❛ᴗ❛๑)۶ contemplating...next step'
+        '(¬_¬) trolling in prod...**Resolving comments on GitHub**\n( ͡° ͜ʖ ͡°) brb, pwning…\nActual step\n٩(๑❛ᴗ❛๑)۶ hex-dumping honestly...next step'
       )
     ).toBe('**Resolving comments on GitHub**\nActual step\nnext step')
+  })
+
+  it('escapes regex metacharacters in verbs and matches the single-glyph ellipsis', () => {
+    // `pwn3d you yet?` ends in `?` and `brb, pwning` carries a comma; unescaped
+    // they would turn the alternation into broken patterns.
+    expect(cleanThinkingText('(◔_◔) pwn3d you yet?...\nkept line')).toBe('kept line')
+    expect(cleanThinkingText('(◔_◔) pwn3d you yet?…\nkept line')).toBe('kept line')
+    expect(cleanThinkingText('(◔_◔) nice typo, dipshit…\nkept line')).toBe('kept line')
   })
 })

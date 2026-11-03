@@ -5,7 +5,7 @@ import { evictInkCaches } from '@qubit/ink'
 import type { InflightTurn, SessionResumeResult, Usage } from '@qubit/shared/gateway-events'
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { STARTUP_WORKSPACE_CWD } from '../config/env.js'
+import { STARTUP_MODEL, STARTUP_PROVIDER, STARTUP_WORKSPACE_CWD, PIN_SPAWN_MODEL } from '../config/env.js'
 import { buildSetupRequiredSections, setupRequiredTitle } from '../content/setup.js'
 import { introMsg, toTranscriptMessages } from '../domain/messages.js'
 import { ZERO } from '../domain/usage.js'
@@ -33,6 +33,36 @@ import { describeCredentialWarning } from './userMessages.js'
 export { refreshSessionView, scheduleResumeScrollToBottom } from './sessionResumeView.js'
 
 const usageFrom = (info: null | SessionInfo): Usage => (info?.usage ? { ...ZERO, ...info.usage } : ZERO)
+
+/**
+ * session.create params for a fresh TUI session. The terminal width always
+ * rides along; the launcher-seeded model/provider ride only while the spawn
+ * pinned them (dashboard per-chat pick): the server freezes them as the
+ * session's model_override so later chats with other providers cannot migrate
+ * this one via the shared home default. An `auto` provider is the "no pick"
+ * sentinel, never a route — omit it like an absent one.
+ */
+export function sessionCreateParams(cols: number): Record<string, unknown> {
+  const params: Record<string, unknown> = { cols }
+
+  if (STARTUP_WORKSPACE_CWD) {
+    params.cwd = STARTUP_WORKSPACE_CWD
+  }
+
+  if (PIN_SPAWN_MODEL) {
+    if (STARTUP_MODEL) {
+      params.model = STARTUP_MODEL
+    }
+
+    const provider = STARTUP_PROVIDER
+
+    if (provider && provider.toLowerCase() !== 'auto') {
+      params.provider = provider
+    }
+  }
+
+  return params
+}
 
 const statusFromLiveSession = (status?: string, running = false) => {
   if (status === 'waiting') {
@@ -212,10 +242,7 @@ export function useSessionLifecycle(opts: UseSessionLifecycleOptions) {
         await closeSession(previousSid)
       }
 
-      const r = await rpc<SessionCreateResponse>('session.create', {
-        cols: colsRef.current,
-        ...(STARTUP_WORKSPACE_CWD ? { cwd: STARTUP_WORKSPACE_CWD } : {})
-      })
+      const r = await rpc<SessionCreateResponse>('session.create', sessionCreateParams(colsRef.current))
 
       if (!r) {
         patchUiState({ status: 'ready' })

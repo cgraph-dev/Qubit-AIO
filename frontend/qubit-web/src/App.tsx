@@ -97,10 +97,13 @@ import "@/styles/qplate.css";
 import "@/styles/sidebar-studio.css";
 import "@/styles/qubit-mark.css";
 
-// The ambient scene pulls in three.js (~1 MB). Keep it behind React.lazy so a
-// slow/failed 3D chunk can never block or break the shell mount.
+// The ambient backdrop is a looping video, so it no longer drags three.js
+// (~1 MB) into the shell chunk. Lazy stays: a missing asset or a failed chunk
+// must never block or break the shell mount.
 const QubitAmbient = lazy(() =>
-  import("@/components/QubitAmbient").then((m) => ({ default: m.QubitAmbient })),
+  import("@/components/QubitAmbient").then((m) => ({
+    default: m.QubitAmbientMemo,
+  })),
 );
 
 class AmbientFailSafe extends Component<
@@ -850,6 +853,9 @@ export default function App() {
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 z-0"
+        /* The backdrop is a full-viewport layer, not an inset panel: it runs
+           edge to edge so the fixed header's translucent surface shows it
+           through instead of sealing it off. */
       >
         <Suspense fallback={null}>
           <AmbientFailSafe>
@@ -866,11 +872,11 @@ export default function App() {
           "border-b border-current/20",
         )}
         style={{
-          /* Theme-derived, same ladder as the rail: a pinned navy here was the
-             header half of the theme-blindness bug (it never changed with the
-             theme). */
-          background: "color-mix(in srgb, var(--midground-base) 4%, var(--background-base))",
-          color: "var(--midground-base)",
+          /* Opaque navy plate. The previous translucent + blur pass let the
+             ambient backdrop ghost through and read as a stray overlay bar. */
+          background: "#0a1730",
+          borderBottom: "1px solid rgb(179 199 224 / 22%)",
+          color: "#e8eef7",
         }}
       >
         <Button

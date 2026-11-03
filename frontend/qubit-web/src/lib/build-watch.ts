@@ -103,43 +103,51 @@ export function showBuildNotice(
   wrap.id = "qubit-build-notice";
   wrap.setAttribute("role", "status");
   wrap.setAttribute("aria-live", "polite");
-  wrap.setAttribute(
-    "style",
-    [
-      "position:fixed",
-      "right:16px",
-      "bottom:16px",
-      "z-index:2147483000",
-      "display:flex",
-      "align-items:center",
-      "gap:10px",
-      "max-width:min(92vw,420px)",
-      "padding:10px 12px",
-      "border:1px solid rgba(125,211,200,.45)",
-      "border-radius:10px",
-      "background:#06201f",
-      "color:#cdece7",
-      "font:13px/1.4 system-ui,sans-serif",
-      "box-shadow:0 8px 30px rgba(0,0,0,.45)",
-    ].join(";"),
-  );
+
+  // Painted from the ACTIVE theme's tokens, never from fixed hexes. The banner is
+  // injected into <body> outside the React tree, so it gets no className — the
+  // only way it can follow a skin is to read the same custom properties the app
+  // renders from. An earlier build hardcoded a teal (#06201f / #7dd3c8), which
+  // is why a Midnight user saw the cyberpunk-looking green banner.
+  const looks = [
+    "position:fixed",
+    "right:16px",
+    "bottom:16px",
+    "z-index:2147483000",
+    "display:flex",
+    "align-items:center",
+    "gap:10px",
+    "max-width:min(92vw,420px)",
+    "padding:10px 12px",
+    "border:1px solid color-mix(in srgb, var(--midground) 35%, transparent)",
+    "border-radius:var(--theme-radius, 10px)",
+    "background:color-mix(in srgb, var(--midground-base) 6%, var(--background-base))",
+    "color:var(--midground)",
+    "font:13px/1.4 system-ui,sans-serif",
+    "box-shadow:0 10px 34px rgb(0 0 0 / 45%)",
+  ];
+  wrap.setAttribute("style", looks.join(";"));
+
   const text = doc.createElement("span");
   text.textContent = "A new Qubit build is available.";
+  text.setAttribute("style", "flex:1 1 auto");
+
   const reloadBtn = doc.createElement("button");
   reloadBtn.type = "button";
   reloadBtn.textContent = "Reload";
-  reloadBtn.setAttribute(
-    "style",
-    "padding:4px 10px;border:0;border-radius:6px;cursor:pointer;background:#7dd3c8;color:#041c1c;font:inherit;font-weight:600",
-  );
+  const accentStyle =
+    "padding:4px 10px;border:0;border-radius:calc(var(--theme-radius, 10px) - 4px);cursor:pointer;" +
+    "background:var(--midground);color:var(--background-base);font:inherit;font-weight:600";
+  reloadBtn.setAttribute("style", accentStyle);
   reloadBtn.addEventListener("click", reload);
+
   const closeBtn = doc.createElement("button");
   closeBtn.type = "button";
   closeBtn.textContent = "×";
   closeBtn.setAttribute("aria-label", "Dismiss update notice");
   closeBtn.setAttribute(
     "style",
-    "border:0;background:transparent;color:#7dd3c8;font-size:16px;line-height:1;cursor:pointer",
+    "border:0;background:transparent;color:var(--midground);opacity:.7;font-size:16px;line-height:1;cursor:pointer",
   );
   closeBtn.addEventListener("click", () => {
     try {
@@ -149,6 +157,7 @@ export function showBuildNotice(
     }
     wrap.remove();
   });
+
   wrap.append(text, reloadBtn, closeBtn);
   doc.body.appendChild(wrap);
 }

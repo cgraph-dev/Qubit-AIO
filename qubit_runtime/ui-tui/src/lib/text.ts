@@ -76,14 +76,20 @@ export const pasteTokenLabel = (text: string, lineCount: number) => {
   return tail ? `[[ ${head.trimEnd()}.. ${chip} .. ${tail.trimStart()} ]]` : `[[ ${preview} ${chip} ]]`
 }
 
-const THINKING_STATUS_RE = new RegExp(`^(?:${VERBS.join('|')})\\.{0,3}$`, 'i')
-const THINKING_STATUS_CHUNK_RE = new RegExp(`[^A-Za-z\n]+\\s*(?:${VERBS.join('|')})\\.{0,3}\\s*`, 'giu')
+// Status verbs carry regex metacharacters (`?`, `-`, `'`), so every entry is
+// escaped before it is joined into the alternation. `padVerb` appends a single
+// `…` while the legacy CLI spinner appends `...`, so both trailers are matched.
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const THINKING_VERB_ALT = VERBS.map(escapeRe).join('|')
+const THINKING_TRAILER_RE = '(?:\\.{2,3}|…)?'
+const THINKING_STATUS_RE = new RegExp(`^(?:${THINKING_VERB_ALT})\\s*${THINKING_TRAILER_RE}$`, 'i')
+const THINKING_STATUS_CHUNK_RE = new RegExp(`[^A-Za-z\\n]+\\s*(?:${THINKING_VERB_ALT})\\s*${THINKING_TRAILER_RE}\\s*`, 'giu')
 
 export const cleanThinkingText = (reasoning: string) =>
   reasoning
     .split('\n')
     .map(line => line.replace(THINKING_STATUS_CHUNK_RE, '').trim())
-    .filter(line => line && !THINKING_STATUS_RE.test(line.replace(/\.\.\.$/, '').trim()))
+    .filter(line => line && !THINKING_STATUS_RE.test(line.trim()))
     .join('\n')
     .replace(/([^\n])(?=\*\*[^*\n][^\n]*?\*\*)/g, '$1\n\n')
     .replace(/\n{3,}/g, '\n\n')

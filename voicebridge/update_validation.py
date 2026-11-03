@@ -45,6 +45,11 @@ CRITICAL_MODULES: Tuple[str, ...] = (
 
 FRONTEND_DIST = ("frontend", "qubit-dist")
 FRONTEND_INDEX = "index.html"
+# Media the shell loads by URL, not through the bundle graph: a missing file
+# here is not a broken startup, so it is reported as its own check rather than
+# failing the update — but the backdrop silently vanishing is exactly the kind
+# of half-update that needs to be visible in the receipt.
+FRONTEND_MEDIA: Tuple[str, ...] = ("media/qubit-backdrop.mp4",)
 
 Runner = Callable[[Sequence[str], float], Tuple[int, str, str]]
 
@@ -222,6 +227,15 @@ def validate_installation(cfg: Any, *, runner: Optional[Runner] = None,
     else:
         checks.append({"name": "frontend.assets", "kind": "asset", "ok": True,
                        "detail": ""})
+
+    # Background media: reported, never fatal (the shell degrades to no video).
+    fe_dir = root.joinpath(*FRONTEND_DIST)
+    for rel in FRONTEND_MEDIA:
+        media = fe_dir / rel
+        present = media.is_file() and media.stat().st_size > 0
+        checks.append({"name": f"frontend.media:{rel}", "kind": "asset",
+                       "ok": present,
+                       "detail": "" if present else f"missing {media}"})
 
     ok = not failures
     return {

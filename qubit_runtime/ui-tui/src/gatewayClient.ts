@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { delimiter, resolve } from 'node:path'
+import { existsSync } from 'node:fs'
+import { delimiter, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 
 import type { GatewayEvent } from '@qubit/shared/gateway-events'
@@ -43,6 +44,53 @@ export const RECONNECT_MAX_MS = 30_000
 
 const getWebSocketCtor = (): typeof WebSocket =>
   typeof WebSocket === 'undefined' ? (UndiciWebSocket as unknown as typeof WebSocket) : WebSocket
+
+// Bound for the gateway bootstrap child (ui-tui/scripts/gateway_bootstrap.py
+// --start): the ensure inside may take up to its own 60 s timeout before the
+// ticket grant, so this must comfortably exceed that instead of racing it.
+const BOOTSTRAP_TIMEOUT_MS = 75_000
+
+const isDashboardLaunch = (): boolean => {
+  // Mirrors tui_gateway/entry.py::_dashboard_launch: dashboard /chat terminals
+  // share the canonical home by design (voicebridge/pty_lease_shim.py) and
+  // must keep their current stdio behaviour. Every other launcher without an
+  // explicit attach URL goes through the bootstrap so a shell TUI attaches to
+  // the running gateway instead of spawning a second writer beside it.
+  for (const name of ['HERMES_TUI_DASHBOARD', 'QUBIT_TUI_DASHBOARD'] as const) {
+    const raw = (process.env[name] ?? '').trim().toLowerCase()
+
+    if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Locate Ink's gateway bootstrap helper in both product layouts: beside the
+ * running bundle (packaged `dist/scripts/`) and in the source tree
+ * (`<root>/ui-tui/scripts/`). Null when neither exists — callers fall back to
+ * spawning the stdio gateway child, the pre-bootstrap behaviour.
+ */
+export const resolveBootstrapScript = (root: string): string | null => {
+  const candidates = [
+    join(import.meta.dirname, 'scripts', 'gateway_bootstrap.py'),
+    join(root, 'ui-tui', 'scripts', 'gateway_bootstrap.py')
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) {
+        return candidate
+      }
+    } catch {
+      // An unreadable layout probe is not a startup failure; try the next one.
+    }
+  }
+
+  return null
+}
 
 const truncateLine = (line: string) =>
   line.length > MAX_LOG_LINE_BYTES ? `${line.slice(0, MAX_LOG_LINE_BYTES)}… [truncated ${line.length} bytes]` : line
@@ -159,6 +207,9 @@ export class GatewayClient extends EventEmitter {
   private stderrRl: ReturnType<typeof createInterface> | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectAttempts = 0
+  // In-flight gateway bootstrap child (ui-tui/scripts/gateway_bootstrap.py).
+  // Killed and replaced on a superseding start(), like the gateway child.
+  private bootstrapProc: ChildProcess | null = null
   // Set on kill() so we never auto-reconnect after an intentional shutdown.
   private disposed = false
 
@@ -441,6 +492,143 @@ export class GatewayClient extends EventEmitter {
     this.publish({ type: 'gateway.protocol_error', payload: { preview } })
   }
 
+  /**
+   * Attach-first launch for shell TUIs: run Ink's gateway bootstrap helper,
+   * which ensures the profile gateway (starting an idle-exiting one when none
+   * is running) and returns its ticketed WebSocket URL. Attaching instead of
+   * spawning means a home whose gateway is already running just works; the
+   * stdio child spawned below would be refused by the home lock there.
+   *
+   * Any bootstrap failure (no helper result, bad JSON, timeout, terminal
+   * verdict) falls back to the spawned gateway — the pre-bootstrap behaviour
+   * for free homes, sandboxes and dev checkouts.
+   */
+  private startViaBootstrap(script: string, root: string) {
+    const python = resolvePython()
+    const env = { ...process.env }
+    const pyPath = env.PYTHONPATH?.trim()
+
+    env.PYTHONPATH = pyPath ? `${root}${delimiter}${pyPath}` : root
+    env.HERMES_PYTHON_SRC_ROOT = root
+    this.lifecycle(`[lifecycle] running gateway bootstrap ${script} python=${python}`)
+
+    let proc: ChildProcess
+
+    try {
+      proc = spawn(python, [script, '--start'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (err) {
+      this.pushLog(
+        `[bootstrap] spawn failed (${err instanceof Error ? err.message : String(err)}); falling back to spawned gateway`
+      )
+      this.startSpawnedGateway(root)
+
+      return
+    }
+
+    this.bootstrapProc = proc
+    let stdout = ''
+    let stderr = ''
+    let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      timer = null
+      this.pushLog('[bootstrap] timed out waiting for the gateway bootstrap; falling back to spawned gateway')
+      this.finishBootstrap(proc, root, null)
+    }, BOOTSTRAP_TIMEOUT_MS)
+    timer.unref?.()
+
+    proc.stdout?.on('data', chunk => {
+      stdout += chunk.toString()
+    })
+    proc.stderr?.on('data', chunk => {
+      stderr += chunk.toString()
+    })
+    proc.on('error', err => {
+      if (this.bootstrapProc !== proc) {
+        return
+      }
+
+      this.pushLog(
+        `[bootstrap] child error (${err.message}); falling back to spawned gateway`
+      )
+      this.finishBootstrap(proc, root, null)
+    })
+    proc.on('exit', code => {
+      if (this.bootstrapProc !== proc) {
+        this.pushLog(`[lifecycle] stale bootstrap exit ignored code=${code ?? 'null'}`)
+
+        return
+      }
+
+      if (timer !== null) {
+        clearTimeout(timer)
+        timer = null
+      }
+
+      if (code !== 0) {
+        const first = stderr
+          .split('\n')
+          .map(line => line.trim())
+          .filter(Boolean)[0]
+
+        this.pushLog(
+          `[bootstrap] bootstrap exited ${code ?? 'null'}${first ? `: ${first}` : ''}; falling back to spawned gateway`
+        )
+        this.finishBootstrap(proc, root, null)
+
+        return
+      }
+
+      try {
+        const parsed = JSON.parse(stdout.trim()) as { url?: unknown; protocols?: unknown }
+
+        if (
+          typeof parsed.url !== 'string' ||
+          !parsed.url ||
+          !Array.isArray(parsed.protocols) ||
+          !parsed.protocols.every((entry): entry is string => typeof entry === 'string')
+        ) {
+          throw new Error('unexpected result shape')
+        }
+
+        this.lifecycle(`[lifecycle] bootstrap attached ${redactUrl(parsed.url)}`)
+        this.finishBootstrap(proc, root, { url: parsed.url, protocols: parsed.protocols })
+      } catch {
+        this.pushLog('[bootstrap] could not parse bootstrap result; falling back to spawned gateway')
+        this.finishBootstrap(proc, root, null)
+      }
+    })
+  }
+
+  private finishBootstrap(
+    proc: ChildProcess,
+    root: string,
+    attached: { url: string; protocols: string[] } | null
+  ) {
+    if (this.bootstrapProc === proc) {
+      this.bootstrapProc = null
+    }
+
+    try {
+      if (!proc.killed && proc.exitCode === null) {
+        proc.kill()
+      }
+    } catch {
+      // best effort
+    }
+
+    if (this.disposed) {
+      return
+    }
+
+    if (attached) {
+      this.attachUrl = attached.url
+      this.startAttachedGateway(attached.url, attached.protocols)
+
+      return
+    }
+
+    this.startSpawnedGateway(root)
+  }
+
   private startSpawnedGateway(root: string) {
     const python = resolvePython()
     const cwd = process.env.HERMES_CWD || root
@@ -519,7 +707,7 @@ export class GatewayClient extends EventEmitter {
     })
   }
 
-  private startAttachedGateway(attachUrl: string) {
+  private startAttachedGateway(attachUrl: string, protocols?: string[]) {
     const safeAttachUrl = redactUrl(attachUrl)
     this.startReadyTimer('websocket', safeAttachUrl)
 
@@ -536,7 +724,13 @@ export class GatewayClient extends EventEmitter {
     }
 
     try {
-      const ws = new WebSocketCtor(attachUrl)
+      // The bootstrap grant carries the session ticket as a subprotocol
+      // (hermes-gateway-ticket.…); without it a ticketed endpoint refuses
+      // the socket. Env-provided URLs carry their own credentials.
+      const ws = new WebSocketCtor(
+        attachUrl,
+        protocols && protocols.length > 0 ? protocols : undefined
+      )
       let settled = false
 
       this.ws = ws
@@ -662,7 +856,17 @@ export class GatewayClient extends EventEmitter {
       this.proc.kill()
     }
 
+    if (
+      this.bootstrapProc &&
+      !this.bootstrapProc.killed &&
+      this.bootstrapProc.exitCode === null
+    ) {
+      this.lifecycle(`[lifecycle] replacing live bootstrap child ${describeChild(this.bootstrapProc)}`)
+      this.bootstrapProc.kill()
+    }
+
     this.proc = null
+    this.bootstrapProc = null
     this.closeGatewaySocket()
     this.closeSidecarSocket()
 
@@ -670,6 +874,20 @@ export class GatewayClient extends EventEmitter {
       this.startAttachedGateway(attachUrl)
 
       return
+    }
+
+    // No explicit attach URL (a shell launch, not the dashboard): ask the
+    // bootstrap for the profile gateway's WebSocket first. On a home whose
+    // gateway is already running this attaches to it; spawning stdio there
+    // would be refused by the home lock (exit 1, "could not be restarted").
+    if (!isDashboardLaunch()) {
+      const bootstrap = resolveBootstrapScript(root)
+
+      if (bootstrap) {
+        this.startViaBootstrap(bootstrap, root)
+
+        return
+      }
     }
 
     this.startSpawnedGateway(root)
@@ -773,7 +991,10 @@ export class GatewayClient extends EventEmitter {
   private notConnected = (method: string) => new Error(`gateway not connected: ${method}`)
 
   request<T = unknown>(method: string, params: Record<string, unknown> = {}, timeoutMs?: number): Promise<T> {
-    const attachUrl = resolveGatewayAttachUrl()
+    // Prefer the explicit env URL, but honour a bootstrap-attached URL too:
+    // after startViaBootstrap there is no env URL and no spawned child, so
+    // without this every request would restart the transport in a loop.
+    const attachUrl = resolveGatewayAttachUrl() ?? this.attachUrl
 
     if (attachUrl) {
       if (this.attachUrl !== attachUrl) {
@@ -815,6 +1036,14 @@ export class GatewayClient extends EventEmitter {
     // replacement gateway onto the vanished pipes.
     this.proc = null
     const killed = proc?.kill()
+
+    // Same detach-before-kill for an in-flight bootstrap child: its late
+    // `exit` is identity-gated on `this.bootstrapProc`, so it can neither
+    // trigger a fallback spawn nor an attach after the intentional kill.
+    const bootstrap = this.bootstrapProc
+
+    this.bootstrapProc = null
+    bootstrap?.kill()
 
     this.lifecycle(
       `[lifecycle] GatewayClient.kill reason=${reason} ${describeChild(proc)} killResult=${killed ?? 'none'}`

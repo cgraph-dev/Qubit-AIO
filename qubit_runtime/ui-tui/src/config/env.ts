@@ -62,6 +62,22 @@ export const NO_CONFIRM_DESTRUCTIVE = truthy(process.env.HERMES_TUI_NO_CONFIRM)
 // browser-embedded TUI has no healthy restart path after an idle exit.
 export const DASHBOARD_TUI_MODE = truthy(process.env.HERMES_TUI_DASHBOARD)
 
+// Model/provider the launcher seeded for THIS chat (dashboard PTY spawn env),
+// and whether the TUI should pin the session to it on session.create.
+//
+// The dashboard resolves a model profile per chat and injects it as env seeds
+// plus a shared-home config write. Without a pin the session would resolve
+// the seed at build and then track the shared default afterwards — so opening
+// a second chat with a different provider would migrate the first chat's next
+// turn onto the new provider. While pinned, session.create carries the pair
+// and the server freezes it as the session's model_override (the same pin a
+// /model session pick records), which the per-turn config sync and resume
+// both honour. Shell launches never set the flag, so a shell TUI keeps
+// following the config default like upstream `hermes --tui`.
+export const PIN_SPAWN_MODEL = truthy(process.env.HERMES_TUI_MODEL_PIN)
+export const STARTUP_MODEL = (process.env.HERMES_MODEL || process.env.HERMES_INFERENCE_MODEL || '').trim()
+export const STARTUP_PROVIDER = (process.env.HERMES_TUI_PROVIDER || process.env.HERMES_INFERENCE_PROVIDER || '').trim()
+
 // HERMES_DEV_CREDITS — dev-only live-spend readout (Δ status segment + "(dev credits)"
 // banner). Throwaway dev scaffolding; the whole readout gates on this one flag.
 export const DEV_CREDITS_MODE = truthy(process.env.HERMES_DEV_CREDITS)

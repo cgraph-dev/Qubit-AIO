@@ -85,6 +85,9 @@ def test_profile_env_bridge_sets_model_and_provider(tmp_path, monkeypatch):
     assert env["HERMES_INFERENCE_MODEL"] == "big-model"
     assert env["HERMES_TUI_PROVIDER"] == "opencode"
     assert env["HERMES_INFERENCE_PROVIDER"] == "opencode"
+    # The chat's route is pinned at session.create so later chats with other
+    # providers cannot migrate this one via the shared home default.
+    assert env["HERMES_TUI_MODEL_PIN"] == "1"
     # An env: reference is already present in the child env; never re-export.
     assert "OPENCODE_API_KEY" not in env
 

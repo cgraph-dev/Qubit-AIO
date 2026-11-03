@@ -394,15 +394,15 @@ describe('derived tone ladder', () => {
     const light = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
 
     const cases: Array<[string, string, string]> = [
-      [dark.DARK_THEME.color.muted, '#CC9B1F', 'dark muted'],
-      [dark.DARK_THEME.color.label, '#DAA520', 'dark label'],
+      // Subtext is deliberately GRAY now (see the next test): the fitted-gold
+      // redemption no longer applies to muted/label, only to the surface tones.
+
       [dark.DARK_THEME.color.statusFg, '#C0C0C0', 'dark statusFg'],
       [dark.DARK_THEME.color.completionBg, '#1a1a2e', 'dark surface'],
       [dark.DARK_THEME.color.completionCurrentBg, '#333355', 'dark chip'],
       [dark.DARK_THEME.color.selectionBg, '#3a3a55', 'dark selection'],
       // Light canon = liftForContrast(dark literal, white, 4.5): the exact
       // colors xterm's minimumContrastRatio rendered on light hosts.
-      [light.LIGHT_THEME.color.muted, '#946C08', 'light muted'],
       [light.LIGHT_THEME.color.statusFg, '#6F6F6F', 'light statusFg'],
       [light.LIGHT_THEME.color.completionBg, '#F5F5F5', 'light surface'],
       [light.LIGHT_THEME.color.completionCurrentBg, '#e0d1bf', 'light chip'],
@@ -420,15 +420,18 @@ describe('derived tone ladder', () => {
     // A seeds-only skin (no dim/label/menu keys authored at all).
     const { color } = fromSkin({ banner_accent: '#DD4A3A', banner_text: '#F1E6CF', banner_title: '#C7A96B' }, {})
 
-    // Muted recedes from THIS skin's text toward the background with an
-    // accent tint — a red-family derivative, never another skin's gold.
+    // Subtext is GRAY on every skin — it must recede from the text without
+    // taking on the skin's hue, or hints compete with the ink (cyberpunk hints
+    // went mint, ember hints went orange). Channel spread of ≤ 8 keeps it
+    // neutral while still leaving it visibly dimmer than the text.
     expect(color.muted).not.toBe(color.text)
     expect(luminance(color.muted)).toBeLessThan(luminance(color.text))
 
     const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
-    const [mr, , mb] = rgb(color.muted)
+    const channelSpread = (hex: string) => Math.max(...rgb(hex)) - Math.min(...rgb(hex))
 
-    expect(mr).toBeGreaterThan(mb!)
+    expect(channelSpread(color.muted)).toBeLessThanOrEqual(8)
+    expect(channelSpread(color.label)).toBeLessThanOrEqual(8)
 
     // The active-row chip is the surface tinted with the skin accent —
     // redder than the plain surface.

@@ -94,3 +94,84 @@ describe('live session activation in-flight state', () => {
     expect(getTurnState().streaming).toBe('')
   })
 })
+
+describe('sessionCreateParams', () => {
+  const PIN_VARS = [
+    'HERMES_TUI_MODEL_PIN',
+    'HERMES_MODEL',
+    'HERMES_INFERENCE_MODEL',
+    'HERMES_TUI_PROVIDER',
+    'HERMES_INFERENCE_PROVIDER',
+    'HERMES_TUI_CWD'
+  ] as const
+
+  let saved: Record<string, string | undefined>
+
+  beforeEach(() => {
+    saved = {}
+
+    for (const key of PIN_VARS) {
+      saved[key] = process.env[key]
+      delete process.env[key]
+    }
+
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    for (const key of PIN_VARS) {
+      if (saved[key] === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = saved[key]
+      }
+    }
+
+    vi.resetModules()
+  })
+
+  async function createParams() {
+    const m = await import('../app/useSessionLifecycle.js')
+
+    return m.sessionCreateParams(100) as Record<string, unknown>
+  }
+
+  it('sends only cols and cwd by default', async () => {
+    expect(await createParams()).toEqual({ cols: 100 })
+  })
+
+  it('pins the spawn model/provider when the dashboard spawn flag is set', async () => {
+    process.env.HERMES_TUI_MODEL_PIN = '1'
+    process.env.HERMES_MODEL = 'deepseek-v4.1-flash'
+    process.env.HERMES_TUI_PROVIDER = 'opencode-go'
+
+    expect(await createParams()).toEqual({
+      cols: 100,
+      model: 'deepseek-v4.1-flash',
+      provider: 'opencode-go'
+    })
+  })
+
+  it('falls back to the inference env spellings', async () => {
+    process.env.HERMES_TUI_MODEL_PIN = 'yes'
+    process.env.HERMES_INFERENCE_MODEL = 'm'
+    process.env.HERMES_INFERENCE_PROVIDER = 'p'
+
+    expect(await createParams()).toEqual({ cols: 100, model: 'm', provider: 'p' })
+  })
+
+  it('omits an auto provider sentinel instead of pinning it', async () => {
+    process.env.HERMES_TUI_MODEL_PIN = '1'
+    process.env.HERMES_MODEL = 'm'
+    process.env.HERMES_TUI_PROVIDER = 'auto'
+
+    expect(await createParams()).toEqual({ cols: 100, model: 'm' })
+  })
+
+  it('ignores launch seeds without the pin flag', async () => {
+    process.env.HERMES_MODEL = 'm'
+    process.env.HERMES_TUI_PROVIDER = 'p'
+
+    expect(await createParams()).toEqual({ cols: 100 })
+  })
+})

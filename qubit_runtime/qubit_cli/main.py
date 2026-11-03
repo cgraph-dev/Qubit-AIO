@@ -1736,12 +1736,12 @@ def _read_query_file(args) -> None:
         sys.exit(2)
 
 
-# args attr -> (kwarg, default) passed through to _launch_tui / cli.main.
+# args attr -> (kwarg, default) passed through to _launch_tui / cli.main; only cli.main takes --api-key/--base-url.
 _CHAT_PASSTHROUGH = (
     ("provider", None), ("toolsets", None), ("skills", None), ("verbose", None),
     ("quiet", False), ("query", None), ("image", None), ("resume", None),
     ("worktree", False), ("checkpoints", False), ("pass_session_id", False),
-    ("max_turns", None), ("base_url", None), ("api_key", None),
+    ("max_turns", None),
 )
 
 
@@ -1880,7 +1880,7 @@ def cmd_chat(args):
         "ignore_rules": getattr(args, "ignore_rules", False) or safe_mode,
         "ignore_user_config": getattr(args, "ignore_user_config", False) or safe_mode,
         "compact": getattr(args, "compact", False),
-        **{k: getattr(args, k, d) for k, d in _CHAT_PASSTHROUGH},
+        **{k: getattr(args, k, d) for k, d in _CHAT_PASSTHROUGH + (("api_key", None), ("base_url", None))},
     }
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 

@@ -2,6 +2,8 @@ import type { GatewayClient } from '../gatewayClient.js'
 import type { InputDetectDropResponse, PromptSubmitResponse } from '../gatewayTypes.js'
 import type { Msg } from '../types.js'
 
+import { randomUUID } from 'node:crypto'
+
 import { turnController } from './turnController.js'
 import { getUiState, patchUiState } from './uiStore.js'
 
@@ -80,7 +82,14 @@ export function submitPrompt(
     turnController.interrupted = false
 
     deps.gw
-      .request<PromptSubmitResponse>('prompt.submit', { session_id: liveSid, text: submitText })
+      // The messaging gateway requires an idempotency key per admission
+      // (retry/Alt+K replays share it); the TUI-dialect gateway ignores it.
+      // Minted here so every transport accepts the same submit.
+      .request<PromptSubmitResponse>('prompt.submit', {
+        session_id: liveSid,
+        text: submitText,
+        submission_id: randomUUID()
+      })
       .then(r => {
         // The gateway consumed a typed voice stop phrase server-side (voice
         // chat ended, no turn started) — release the busy latch; the

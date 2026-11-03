@@ -591,6 +591,14 @@ def terminal_profile_env(cfg: Any = None, guard: Optional[Dict[str, Any]] = None
     precedence over ``QUBIT_HOME`` config) and injects a ``file:`` credential
     under the provider's key env var. An ``env:`` reference is already present
     in the child environment and is left untouched (never re-exported).
+
+    Also sets ``HERMES_TUI_MODEL_PIN=1``: the TUI then carries the seeded pair
+    on session.create so the server freezes it as the session's model_override
+    (the same pin a ``/model`` session pick records). Without the pin the
+    session would track the shared home default afterwards, so opening a
+    second chat with a different provider would migrate the first chat's next
+    turn onto the new provider. Shell launches never set the flag, so a shell
+    TUI keeps following the config default.
     """
     if guard is None:
         try:
@@ -609,6 +617,8 @@ def terminal_profile_env(cfg: Any = None, guard: Optional[Dict[str, Any]] = None
     if provider:
         overrides["HERMES_TUI_PROVIDER"] = provider
         overrides["HERMES_INFERENCE_PROVIDER"] = provider
+    if model or provider:
+        overrides["HERMES_TUI_MODEL_PIN"] = "1"
     key_ref = str(guard.get("key_ref") or "").strip()
     if key_ref.startswith("file:"):
         secret = _read_secret_ref(key_ref)
@@ -679,6 +689,14 @@ class PtyWsServer:
         # keep the bridge alive under its conversation key and re-attach on the
         # next connect with the same key instead of tearing it down.
         self._detached: Dict[str, _Session] = {}
+        # Orphan reaper. `_sweep_idle_detached` used to run ONLY from the
+        # connect path, so a listener that stopped accepting connections never
+        # reaped its detached terminals: every `qubit --tui` child — and the
+        # single-writer session lease each holds — outlived the gateway that
+        # spawned it, which is what surfaced as "This chat is open in another
+        # Qubit window" on a later resume. A daemon ticker closes that hole.
+        self._reaper_stop = threading.Event()
+        self._reaper: Optional[threading.Thread] = None
 
     def _resolve_guard(self, profile_id: str = "",
                        session_id: str = "") -> Optional[Dict[str, Any]]:
@@ -1181,6 +1199,38 @@ class PtyWsServer:
             except Exception:
                 pass
         return len(stale)
+
+    def start_reaper(self) -> None:
+        """Run the idle sweep on a timer instead of only on connect.
+
+        Idempotent: a second call is a no-op, because the listener can be
+        started more than once in a long-lived test process.
+        """
+        if self._reaper is not None and self._reaper.is_alive():
+            return
+        self._reaper_stop.clear()
+        th = threading.Thread(target=self._reaper_loop, name="pty-reaper", daemon=True)
+        self._reaper = th
+        th.start()
+
+    def stop_reaper(self) -> None:
+        """Wake and join the reaper. Best-effort: a stuck thread must not stall shutdown."""
+        self._reaper_stop.set()
+        th = self._reaper
+        self._reaper = None
+        if th is not None and th is not threading.current_thread():
+            th.join(timeout=2.0)
+
+    def _reaper_loop(self) -> None:
+        # Wake often enough that a detached terminal is retired promptly after
+        # its idle window, without burning a thread on a busy wait. The sweep
+        # itself only walks the detached dict, so a short period is cheap.
+        period = max(5.0, min(60.0, self._idle / 4.0 if self._idle > 0 else 60.0))
+        while not self._reaper_stop.wait(period):
+            try:
+                self._sweep_idle_detached()
+            except Exception as exc:  # noqa: BLE001 - reaper must survive a bad session
+                log_event("webui.pty.idle_sweep_failed", detail=redact_text(str(exc))[:200])
 
     def _teardown(self, session: _Session) -> None:
         with self._lock:

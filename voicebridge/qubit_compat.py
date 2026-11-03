@@ -25,6 +25,7 @@ import json
 import os
 import re
 import secrets
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -15515,15 +15516,31 @@ def _load_json_store(path: Path) -> Dict[str, Any]:
 
 def _save_json_store(path: Path, data: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+    # The staged temp name must be UNIQUE per writer. A fixed `<store>.tmp`
+    # makes concurrent saves of the same store race: writer A stages, writer B
+    # overwrites the same temp, A's rename publishes it, then B's rename fails
+    # with ENOENT — surfacing as a bogus EXECUTOR_ERROR after the write had in
+    # fact been applied. tempfile.mkstemp gives each writer its own file in the
+    # publish directory, so the only surviving contention is last-writer-wins
+    # on the rename, which is the intended semantics.
+    fd, tmp_name = tempfile.mkstemp(
+        prefix="." + path.name + ".", suffix=".tmp", dir=str(path.parent))
     try:
-        if path.exists():
-            backup = path.with_suffix(path.suffix + ".bak")
-            backup.write_bytes(path.read_bytes())
-    except OSError:
-        pass
-    tmp.replace(path)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(data, indent=2, sort_keys=True))
+        try:
+            if path.exists():
+                backup = path.with_suffix(path.suffix + ".bak")
+                backup.write_bytes(path.read_bytes())
+        except OSError:
+            pass
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
     _audit("store_write", "dashboard:user",
            {"path": path.name, "keys": sorted(data)[:20]})
 
@@ -15683,15 +15700,16 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # are skipped, leaving the control dead for a different reason.
     for record in served_records:
         known.update(_config_scalar_paths(record))
-    unknown = sorted(k for k in values if k not in known)
-    if unknown:
-        return _gate("UNKNOWN_CONFIG_KEY",
-                     "unknown settings key(s): " + ", ".join(unknown[:5]) +
-                     "; see GET /api/config/schema",
-                     "GET /api/config/schema")
     # The served record carries a read-only `terminal` block (live /chat model
     # slot). It is display-only by contract: the terminal slot is owned by the
     # /chat + Models surfaces, so a PUT carrying it is refused, never stored.
+    #
+    # This runs BEFORE the unknown-key check on purpose. The block is injected
+    # by GET, not present in DEFAULTS, so in a home that does not serve it the
+    # same write fell through to UNKNOWN_CONFIG_KEY — the identical request
+    # behaved differently per host and the operator saw "unknown key" for a
+    # section the UI said was read-only. Section ownership is a property of the
+    # contract, not of what a given home happens to serve.
     readonly = sorted(k for k in values
                       if k == "terminal" or k.startswith("terminal."))
     if readonly:
@@ -15699,6 +15717,12 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "terminal.* is read-only here; switch the /chat model "
                      "from /chat or the Models page",
                      "/chat + Models page")
+    unknown = sorted(k for k in values if k not in known)
+    if unknown:
+        return _gate("UNKNOWN_CONFIG_KEY",
+                     "unknown settings key(s): " + ", ".join(unknown[:5]) +
+                     "; see GET /api/config/schema",
+                     "GET /api/config/schema")
     # A whole-tree Save round-trips every leaf it read. Drop ANY leaf whose
     # value already equals a served record, so an unchanged leaf never re-enters
     # the override store and the reported change set is the real edit only; then

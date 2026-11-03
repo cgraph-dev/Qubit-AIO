@@ -628,8 +628,12 @@ export function deriveTones(seeds: {
     // 4.5 of the classic dark golds against white — see LIGHT_SEEDS), not
     // to ink blends: muted #946C08 ≈ desat(accent .05), label #8E6B13 ≈
     // desat(mix(accent, text, .03), .15), statusFg #6F6F6F ≈ gray 30% lift.
-    muted: isLight ? desaturate(accent, 0.05) : desaturate(mix(accent, bg, 0.19), 0.16),
-    label: isLight ? desaturate(mix(accent, text, 0.03), 0.15) : desaturate(mix(accent, bg, 0.13), 0.16),
+    // Subtext is gray on every skin, never a tint of the accent. Deriving it
+    // from the accent made cyberpunk's hints mint and ember's hints orange, so
+    // secondary text competed with the ink instead of receding behind it. Gray
+    // keeps the hierarchy legible whatever hue the skin paints.
+    muted: grayOf(mix(text, bg, isLight ? 0.42 : 0.38)),
+    label: grayOf(mix(text, bg, isLight ? 0.3 : 0.26)),
     statusFg: grayOf(mix(text, bg, isLight ? 0.3 : 0.24)),
     surface,
     activeRow: mix(surface, accent, 0.25),

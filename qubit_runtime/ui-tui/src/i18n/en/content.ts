@@ -45,7 +45,9 @@ export const contentEn = {
       legendary02: 'legendary drop: every flaky test passes cleanly',
       legendary03: 'legendary drop: your diff teaches by itself'
     },
-    // Kaomoji are language-neutral but keyed so a pack may swap them.
+    // Kaomoji are language-neutral but keyed so a pack may swap them. Several
+    // are wide (leaning text, ASCII weapons); appChrome measures the table with
+    // stringWidth so the status bar still reserves the right column count.
     faces: {
       face01: '(｡•́︿•̀｡)',
       face02: '(◔_◔)',
@@ -61,7 +63,29 @@ export const contentEn = {
       face12: '(⊙_⊙)',
       face13: '(¬_¬)',
       face14: '( ͡° ͜ʖ ͡°)',
-      face15: 'ಠ_ಠ'
+      face15: 'ಠ_ಠ',
+      // Armed — for the parts of the job that deserve an axe.
+      face16: '(ง ͠ ᵒ̌ Дᵒ̌ )▬▬ι═══════ﺤ',
+      face17: '(ノಠ益ಠ)ノ彡▬▬ι══════ﺤ',
+      face18: '凸(•̀_•́)凸',
+      face19: '(⊙▂⊙)凸',
+      face20: '凸(｡◕‿◕｡)凸',
+      face21: '┌П┐(►˛◄’!)',
+      face22: '╭∩╮(︶ε︶メ)╭∩╮',
+      face23: '(✖╭╮✖)',
+      // Furniture-tipping — for what the user just asked for.
+      face24: '(┛ಠ_ಠ)┛彡┻━┻',
+      face25: '(ノÒ益Ó)ノ彡▔▔▏',
+      face26: '(╯°□°）╯︵ ╏ ʎɐʇsıɹɥ┴',
+      face27: '(ノTДT)ノ ┻━┻',
+      face28: '┻━┻︵ \\(°□°)/ ︵ ┻━┻',
+      face29: 'ლ(ಠ益ಠლ)',
+      face30: '(╬ Ò ‸ Ó)',
+      face31: '( ˘︹˘ )',
+      face32: '(ﾒ` ﾛ ´)',
+      face33: '(つ▀¯▀ )つ',
+      face34: '☀(▀U ▀-͠)',
+      face35: '(˵•́ ◡(̿▨-▨¬)̄'
     },
     setup: {
       title: 'Setup Required',

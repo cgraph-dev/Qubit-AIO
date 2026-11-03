@@ -60,6 +60,13 @@ export function PageHeaderProvider({
             // Mobile stacks title + toolbar — fixed h-14 clips content; desktop stays one row.
             "min-h-0 overflow-x-hidden overflow-y-visible py-3 sm:h-14 sm:min-h-[3.5rem] sm:overflow-hidden sm:py-0",
           )}
+          style={{
+            // Opaque plate: a translucent/backdrop header let the ambient scene
+            // ghost through under the "Chat" bar.
+            background: "#0a1730",
+            borderBottom: "1px solid rgb(179 199 224 / 22%)",
+            color: "#e8eef7",
+          }}
           role="banner"
         >
           <div
