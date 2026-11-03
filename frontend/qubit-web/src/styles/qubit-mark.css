@@ -47,6 +47,13 @@
   animation-direction: reverse;
 }
 
+/* The deepest lattice line: slowest, and it counter-rotates like the far ring
+ * so no two rings ever travel together. */
+.qubit-mark__ring--deep {
+  animation-duration: 41s;
+  animation-direction: reverse;
+}
+
 @keyframes qubit-mark-ring-spin {
   to {
     transform: rotate(360deg);
@@ -67,6 +74,12 @@
   stroke-opacity: 0.2;
 }
 
+/* Deepest line stays the faintest — it is a depth cue, not a third feature. */
+.qubit-mark__ring--deep {
+  stroke: currentColor;
+  stroke-opacity: 0.13;
+}
+
 /* RGB fringe.
  *
  * The base stroke is the SAME hairline drawn three times, once per channel,
@@ -76,7 +89,8 @@
  * chromatic copies carry the visible line. Overlap reads near-white; edges
  * split into red/blue. */
 .qubit-mark__ring--near,
-.qubit-mark__ring--far {
+.qubit-mark__ring--far,
+.qubit-mark__ring--deep {
   filter:
     drop-shadow(0.7px 0 0 rgb(255 45 85 / 0.95))
     drop-shadow(-0.7px 0 0 rgb(45 130 255 / 0.95))
@@ -166,6 +180,11 @@
   opacity: 0.75;
 }
 
+/* Deepest plane sits behind both crossed fields. */
+.qubit-mark__field--deep {
+  opacity: 0.6;
+}
+
 .qubit-mark__ring {
   transition: stroke-opacity 320ms ease;
 }
@@ -179,6 +198,14 @@
 .qagent-sidebar__brand-row:focus-within .qubit-mark__field--far {
   transform: rotate(-7deg) scale(1.03);
   opacity: 1;
+}
+
+/* The deep plane opens in the opposite direction, so hovering splays the whole
+ * lattice instead of sliding two rings together. */
+.qagent-sidebar__brand-row:hover .qubit-mark__field--deep,
+.qagent-sidebar__brand-row:focus-within .qubit-mark__field--deep {
+  transform: rotate(4deg) scale(1.02);
+  opacity: 0.9;
 }
 
 .qagent-sidebar__brand-row:hover .qubit-mark__ring--far {

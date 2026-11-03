@@ -79,6 +79,15 @@ const SPARKS: Spark[] = [
   { plane: "near", seed: 147, rx: 33, ry: 12, size: 2.0, dur: 14.1 },
   { plane: "near", seed: 205, rx: 24, ry: 9, size: 2.6, dur: 10.6 },
   { plane: "near", seed: 261, rx: 29, ry: 10, size: 2.1, dur: 11.9 },
+  // Second near band: a tighter, faster inner ring so the cloud has density
+  // near the letters as well as a wide sweep — one radius alone reads as a
+  // single hoop, not a cloud.
+  { plane: "near", seed: 34, rx: 17, ry: 6, size: 2.2, dur: 7.1 },
+  { plane: "near", seed: 96, rx: 20, ry: 7, size: 2.5, dur: 9.7 },
+  { plane: "near", seed: 158, rx: 16, ry: 5.5, size: 2.0, dur: 8.9 },
+  { plane: "near", seed: 214, rx: 21, ry: 7.5, size: 2.4, dur: 10.3 },
+  { plane: "near", seed: 287, rx: 18, ry: 6.5, size: 2.1, dur: 12.3 },
+  { plane: "near", seed: 331, rx: 22, ry: 8, size: 2.7, dur: 13.1 },
   // Far plane: behind the letters, drawn smaller and dimmer.
   { plane: "far", seed: 48, rx: 38, ry: 14, size: 1.9, dur: 18.6 },
   { plane: "far", seed: 103, rx: 34, ry: 12, size: 2.1, dur: 16.2 },
@@ -86,6 +95,14 @@ const SPARKS: Spark[] = [
   { plane: "far", seed: 228, rx: 35, ry: 13, size: 2.0, dur: 17.7 },
   { plane: "far", seed: 292, rx: 37, ry: 14, size: 1.8, dur: 19.8 },
   { plane: "far", seed: 340, rx: 33, ry: 11, size: 2.1, dur: 15.3 },
+  // Second far band: a wide, slow halo that keeps the corners of the wordmark
+  // populated once the inner bands are busy.
+  { plane: "far", seed: 14, rx: 44, ry: 16, size: 1.6, dur: 23.7 },
+  { plane: "far", seed: 76, rx: 46, ry: 17, size: 1.5, dur: 25.9 },
+  { plane: "far", seed: 137, rx: 42, ry: 15, size: 1.7, dur: 22.3 },
+  { plane: "far", seed: 198, rx: 47, ry: 17, size: 1.5, dur: 27.1 },
+  { plane: "far", seed: 256, rx: 43, ry: 16, size: 1.6, dur: 24.4 },
+  { plane: "far", seed: 314, rx: 45, ry: 16, size: 1.7, dur: 26.3 },
 ];
 
 /**

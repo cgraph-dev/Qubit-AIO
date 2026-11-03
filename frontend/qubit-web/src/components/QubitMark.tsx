@@ -25,8 +25,14 @@ const RY = 5.6;
 /** Orbit tilts in degrees, matching the guide ellipses. */
 const TILT_A = -30;
 const TILT_B = 30;
+/**
+ * A third lattice plane at its own tilt. Two crossed ellipses read as an atom
+ * logo; the third plane makes the nucleus sit inside a lattice, which is the
+ * silhouette the sidebar rail wants at 28px.
+ */
+const TILT_C = 90;
 
-type OrbitName = "a" | "b";
+type OrbitName = "a" | "b" | "c";
 
 interface Particle {
   /** Orbit this particle rides. */
@@ -55,9 +61,21 @@ const PARTICLES: Particle[] = [
   { orbit: "b", seed: 128, r: 1.0, dur: 13.7 },
   { orbit: "b", seed: 212, r: 0.8, dur: 18.9 },
   { orbit: "b", seed: 291, r: 0.95, dur: 16.3 },
+  // Third plane (upright): the near-vertical arc. Slower and dimmer than the
+  // near field so it reads as the deepest lattice line, never as a fourth
+  // competing ring.
+  { orbit: "c", seed: 63, r: 0.8, dur: 19.6 },
+  { orbit: "c", seed: 154, r: 0.9, dur: 21.2 },
+  { orbit: "c", seed: 243, r: 0.75, dur: 17.8 },
+  // Extra near-field beads: a second pass over the same ellipse so one orbit
+  // carries several particles instead of reading as a single travelling dot.
+  { orbit: "a", seed: 58, r: 0.7, dur: 5.9 },
+  { orbit: "a", seed: 134, r: 0.75, dur: 11.6 },
+  { orbit: "a", seed: 212, r: 0.65, dur: 7.7 },
+  { orbit: "a", seed: 288, r: 0.8, dur: 9.4 },
 ];
 
-const TILT: Record<OrbitName, number> = { a: TILT_A, b: TILT_B };
+const TILT: Record<OrbitName, number> = { a: TILT_A, b: TILT_B, c: TILT_C };
 
 /** Unrotated point on the orbit at orbital parameter `deg`. */
 function orbitPoint(deg: number) {
@@ -122,6 +140,23 @@ export function QubitMark({ className }: { className?: string }) {
           />
         </g>
         {beads("b")}
+      </g>
+
+      {/* Third lattice line: upright, drawn first so both crossed fields paint
+          over it. Static tilt only — its own slow spin comes from the bead
+          group, so the ring reads as the deepest layer rather than a third
+          competing spinner. */}
+      <g className="qubit-mark__field qubit-mark__field--deep">
+        <g transform={`rotate(${TILT_C} 20 20)`}>
+          <ellipse
+            className="qubit-mark__ring qubit-mark__ring--deep"
+            cx="20"
+            cy="20"
+            rx={RX}
+            ry={RY}
+          />
+        </g>
+        {beads("c")}
       </g>
 
       {/* Nucleus: a small solid dot, no bloom. */}
