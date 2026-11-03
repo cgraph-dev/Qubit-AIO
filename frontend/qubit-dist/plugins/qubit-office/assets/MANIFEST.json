@@ -1,0 +1,3084 @@
+{
+  "asset_base_url": "/plugins/qubit-office",
+  "excluded_families": [
+    "approved_alien",
+    "approved_baddie",
+    "approved_bear",
+    "approved_bikini",
+    "approved_bunnycutie",
+    "approved_candyprincess",
+    "approved_capybara",
+    "approved_caseyjones",
+    "approved_catinthehat",
+    "approved_catwoman",
+    "approved_crewmate",
+    "approved_crthead",
+    "approved_dario",
+    "approved_elonmusk",
+    "approved_endoskeleton",
+    "approved_finn",
+    "approved_freddyfazbear",
+    "approved_ghostface",
+    "approved_gothgirl",
+    "approved_grimreaper",
+    "approved_harrypotter",
+    "approved_heisenberg",
+    "approved_masterchief",
+    "approved_morpheus",
+    "approved_ninjaturtle",
+    "approved_pepe",
+    "approved_plaguedoctor",
+    "approved_reptilian",
+    "approved_ricksanchez",
+    "approved_rickybobby",
+    "approved_robocop",
+    "approved_robot",
+    "approved_samaltman",
+    "approved_secretagent",
+    "approved_skeleton",
+    "approved_station_minion",
+    "approved_tonymontana",
+    "approved_tylerdurden",
+    "approved_ultron",
+    "approved_ultrondroid",
+    "approved_vaultboy",
+    "approved_voidwizard",
+    "approved_xenomorph"
+  ],
+  "file_count": 605,
+  "files": [
+    {
+      "bytes": 17936,
+      "path": "fonts/vt323.woff2",
+      "sha256": "8ddbebcc1048154132e1d78eb9b1f7850bca1b7d857035ccf1cb4318ebc615b6"
+    },
+    {
+      "bytes": 3885,
+      "path": "furniture/arcade.png",
+      "sha256": "66fd394612c8452fddba8841fc5a231091f1f68beaec1e062f2835313d81dbe1"
+    },
+    {
+      "bytes": 4644,
+      "path": "furniture/arcade2.png",
+      "sha256": "ddbf13493f53ad69fa40eb8bae955da39405f6846df5661f16dc6785da8f29d7"
+    },
+    {
+      "bytes": 4434,
+      "path": "furniture/bar.png",
+      "sha256": "21e2814cb3395aaf11eb83c2ccb40aa9364da5a469b203ec7fa2c20eaed3dcdc"
+    },
+    {
+      "bytes": 3138,
+      "path": "furniture/beltH.png",
+      "sha256": "4300f19c4ed2b0db9269a659a95893663c2e2c97ef6dfa20dfe0bb63a6893e51"
+    },
+    {
+      "bytes": 13729,
+      "path": "furniture/bench.png",
+      "sha256": "a7a48e1f41ac82b4bf5f8cd8cc9c7e78815840a7673fcd96913314ce43f3ffb5"
+    },
+    {
+      "bytes": 1181,
+      "path": "furniture/bigscreen.png",
+      "sha256": "d4b7d45630f82ddd9645c33920d8764fbb04b7d31d157b9e657ba64fa090b02b"
+    },
+    {
+      "bytes": 1120,
+      "path": "furniture/boxes.png",
+      "sha256": "7076d9532c10f4bedecf66f28fbcad455cc8ae8d4876e8a11c6460e81d488a5c"
+    },
+    {
+      "bytes": 2659,
+      "path": "furniture/bunk.png",
+      "sha256": "718a4ec9ec1d1730b3c0644a5b3e0c6b1fb62a99b8dc8df3398d5fbf5b980032"
+    },
+    {
+      "bytes": 6562,
+      "path": "furniture/calwall.png",
+      "sha256": "3556cff08a69977249adfe6a8131501050c05a0399c7ddd9ca76a0fdf62af831"
+    },
+    {
+      "bytes": 2067,
+      "path": "furniture/cans.png",
+      "sha256": "b1ac2830c9372ea4b1b01039378fac8cd5aa99e3c9a52ee4a82b57b7edb560c6"
+    },
+    {
+      "bytes": 1141,
+      "path": "furniture/chair.png",
+      "sha256": "71a7d54b3253568f2d05bfec3f78cbca44da6f15aaa6af08ad61366344636498"
+    },
+    {
+      "bytes": 2993,
+      "path": "furniture/chairbig.png",
+      "sha256": "5dfae16966f86ff76a3b778f9d787149d542f8eaf49138492520896f530600af"
+    },
+    {
+      "bytes": 3488,
+      "path": "furniture/chartwall.png",
+      "sha256": "68ebb2867abcb75acd22f90635a4e9425a09c74e0efdc19b9fa387a0e06d8c40"
+    },
+    {
+      "bytes": 1639,
+      "path": "furniture/coffee.png",
+      "sha256": "17b067a9bb2bde413375a70e859a7ef8bb0c4044a1d7d36f90d040f387ba14b0"
+    },
+    {
+      "bytes": 10810,
+      "path": "furniture/commswall.png",
+      "sha256": "e3f605502e0a1f8eb1f93aa4c3dbc9184112a04955b8668ec4740e3364cb14c6"
+    },
+    {
+      "bytes": 4110,
+      "path": "furniture/console.png",
+      "sha256": "23a16975a1f49f8530c4b798a60523366dc4abc92467c8dc95eef1dcce299da2"
+    },
+    {
+      "bytes": 4299,
+      "path": "furniture/consoleL.png",
+      "sha256": "d309db079019ade99e930578eef9a0fe8a66520a941d5951ad85e6b5a0fea3dd"
+    },
+    {
+      "bytes": 3771,
+      "path": "furniture/core.png",
+      "sha256": "5a1da8ef693eb769964f703268254fbfaf491761184b1b7187fb04eed49dea82"
+    },
+    {
+      "bytes": 3466,
+      "path": "furniture/couch.png",
+      "sha256": "9bce12e288f172768d26d875b9b1fe6eeb2d52c8146bfe0ae24ee3fd7c3e4b18"
+    },
+    {
+      "bytes": 3747,
+      "path": "furniture/crate.png",
+      "sha256": "5794361e3d9a68da56cd85ffc00e099a828e1af1265157fc6fde45fc6f7c6548"
+    },
+    {
+      "bytes": 5366,
+      "path": "furniture/desk.png",
+      "sha256": "4b5434630b7b403a05f10f9cbb554bf5c3bb2393783542deafe173a1095ae21f"
+    },
+    {
+      "bytes": 1900,
+      "path": "furniture/desk2.png",
+      "sha256": "1a6335aa317a43361b9d6370e20f2585ca541803396923880a86a80e87120b0c"
+    },
+    {
+      "bytes": 11186,
+      "path": "furniture/djbooth.png",
+      "sha256": "c0ce571f77957b4c3601927f23359916516fed827135583645dc0cc57d228bbb"
+    },
+    {
+      "bytes": 4084,
+      "path": "furniture/easel.png",
+      "sha256": "b7b875df4e754fd4c9a2b429442ff4e5c11052da9341bc11a93ed1afa8be3508"
+    },
+    {
+      "bytes": 3873,
+      "path": "furniture/fabricator.png",
+      "sha256": "8b9e0150cda867b06be147f37c55471a11115d59877206b5c92e713eb402e844"
+    },
+    {
+      "bytes": 3223,
+      "path": "furniture/goldcrate.png",
+      "sha256": "e01d793b76248d5f4ffb80de4a5e5850bdeb7cba21709e06f5af6b0faa70a3ef"
+    },
+    {
+      "bytes": 4127,
+      "path": "furniture/holotable.png",
+      "sha256": "abb3aa30036ecfc4b352f424fc0428f9953740f534ed7bf8c92ec0d572834ff9"
+    },
+    {
+      "bytes": 5791,
+      "path": "furniture/jukebox.png",
+      "sha256": "895afe9e22934f0b33beb2b4753f44207c9158ae094052fc2d0eecb2ac712168"
+    },
+    {
+      "bytes": 1739,
+      "path": "furniture/parcels.png",
+      "sha256": "fc5eb05c4c4a1f617bbb44b4907a0d0cbfd1228ef4b8e3088d5590ff9cedad63"
+    },
+    {
+      "bytes": 3899,
+      "path": "furniture/pixelrig.png",
+      "sha256": "9140dd28e251a852c828fbce1008ab80f5eba76ef1f8ce3c18465c1397ef2885"
+    },
+    {
+      "bytes": 1610,
+      "path": "furniture/plant.png",
+      "sha256": "d90d2f63b8a84f2cea6acf8152e82821cca4b9209d1f059781264f3e57c0cc54"
+    },
+    {
+      "bytes": 2179,
+      "path": "furniture/poster.png",
+      "sha256": "227c5498036ce1843624f10b861dcf4980923b282082711f96bcc5adaa057170"
+    },
+    {
+      "bytes": 3925,
+      "path": "furniture/rack.png",
+      "sha256": "9792a05f9bf275fc11cd680f8c0df163a39b85c0a68e5ca0e56c95024fb7f3f3"
+    },
+    {
+      "bytes": 2967,
+      "path": "furniture/rackV.png",
+      "sha256": "b231601bd962f91b1fd3bea5fba5c4762007fce5bed8bdd082dc9c99774d692c"
+    },
+    {
+      "bytes": 20285,
+      "path": "furniture/rug.png",
+      "sha256": "34db96d421c7f3d788ce0641d52468ab5166f057c3bc3e87769c1d65510ccc3f"
+    },
+    {
+      "bytes": 994,
+      "path": "furniture/safe.png",
+      "sha256": "55a1ba3e00d51fd482b8287c63f8b7960257245b9ed9bd59773bb66213251b62"
+    },
+    {
+      "bytes": 1532,
+      "path": "furniture/screens.png",
+      "sha256": "7b9080f7b8ca929d53ac0838da6aa9f1eb68217b63ce920c598e01210724e7f0"
+    },
+    {
+      "bytes": 12997,
+      "path": "furniture/shelf.png",
+      "sha256": "870a70b670a3491485183cf2bf4bf56279053bf0b06e91d730d4933a5da9451d"
+    },
+    {
+      "bytes": 1696,
+      "path": "furniture/speaker.png",
+      "sha256": "2726be28a597c521d54de1598abc11c310390dd4d3277431ffcae435af0a9678"
+    },
+    {
+      "bytes": 1723,
+      "path": "furniture/stool.png",
+      "sha256": "fe2d9a8f9ec675aa18f6824715d92af671693e44a4d50cb114a8da67d8922e7f"
+    },
+    {
+      "bytes": 2746,
+      "path": "furniture/tank.png",
+      "sha256": "3f2be390eb84b232d488cfdbb8e3a20ceb26ef8ce3e9da6199af5d9da814f862"
+    },
+    {
+      "bytes": 6711,
+      "path": "furniture/ticker.png",
+      "sha256": "f0bbfa30ff677fadba4b7aae6273eafa02af38c2873ff70c196bdd66019e8523"
+    },
+    {
+      "bytes": 4605,
+      "path": "furniture/tube.png",
+      "sha256": "eba07fc0f621425deaf57c970139bdcac6fe90ffb37a181173a144f5ca937f31"
+    },
+    {
+      "bytes": 1098,
+      "path": "furniture/tv.png",
+      "sha256": "651cdff4d26f60bcc4430b5eb6e6c35830ac9041819a66b448e97018dbdc6a5c"
+    },
+    {
+      "bytes": 6877,
+      "path": "furniture/vat.png",
+      "sha256": "8770865a4f6d9b05ad12e064bec5af0d4b25d850a0c33a4eff667b2063ffdd6e"
+    },
+    {
+      "bytes": 9325,
+      "path": "furniture/vault.png",
+      "sha256": "197b5c5714eca72d398318fc32384e4b8e8cf18b30d22f625e94b2e498fa13a7"
+    },
+    {
+      "bytes": 6322,
+      "path": "furniture/wartable.png",
+      "sha256": "a8d83e81fd96a726ac646888f166c5419ef7fb7a1b11892907fb1b507b3eb3ab"
+    },
+    {
+      "bytes": 6533,
+      "path": "furniture/whiteboard.png",
+      "sha256": "c1318b342ae9cc249e19984bb470b344b601838ab1c0797c5297bed3990db552"
+    },
+    {
+      "bytes": 3710,
+      "path": "sprites/approved_android/rot_east.png",
+      "sha256": "546604862d13b275d5cf1315a2ff745d6145ade8b4d98002d29b0b9c1dafdec7"
+    },
+    {
+      "bytes": 5125,
+      "path": "sprites/approved_android/rot_north-east.png",
+      "sha256": "81d6cb2a4e11d4b018ebda734aa73e74eeea97f63deed9f63fba7bbeb1dd0180"
+    },
+    {
+      "bytes": 5098,
+      "path": "sprites/approved_android/rot_north-west.png",
+      "sha256": "630d28e471281bd3c1a1e7e18b46c003301967e4d3b5c6066051bd603eebffba"
+    },
+    {
+      "bytes": 1575,
+      "path": "sprites/approved_android/rot_north.png",
+      "sha256": "1c0bc17caf7a321718ac7e9010465b6c8b91e31a4a31a970bbd7560252cb0ddc"
+    },
+    {
+      "bytes": 4748,
+      "path": "sprites/approved_android/rot_south-east.png",
+      "sha256": "744b395b0889009aee7b3b28bda846ebb9e321ee52f7bb4913bd76163c5fce21"
+    },
+    {
+      "bytes": 4882,
+      "path": "sprites/approved_android/rot_south-west.png",
+      "sha256": "8d5661492da90e25aa04ec4bf9ba352e5964c41c4c6bc6703c1887c6627d6c42"
+    },
+    {
+      "bytes": 6713,
+      "path": "sprites/approved_android/rot_south.png",
+      "sha256": "290fd18769a03c2607db8dff834e766e5608d2b98b17cc8a035b3ca7f7b7f35d"
+    },
+    {
+      "bytes": 3655,
+      "path": "sprites/approved_android/rot_west.png",
+      "sha256": "172ea046ea7536029ee03d38ee68b648e9397ae794f0f21cbaac9d1ade63bc21"
+    },
+    {
+      "bytes": 1559,
+      "path": "sprites/approved_android/sit_east_4.png",
+      "sha256": "5923eba2d36a9a6510a0ee715da57eeac9f2a751696de8d37a21a4c2c482d246"
+    },
+    {
+      "bytes": 1297,
+      "path": "sprites/approved_android/sit_north_4.png",
+      "sha256": "75f0634bc8d538352d6aa4030d76cc415dfb09badb8583f57ccb7d321ebbf77b"
+    },
+    {
+      "bytes": 1611,
+      "path": "sprites/approved_android/sit_south_4.png",
+      "sha256": "14d27a3ee31e8c913c4897413be426502714cad9899130bc0d2eea6b9f7602e0"
+    },
+    {
+      "bytes": 1436,
+      "path": "sprites/approved_android/sit_west_4.png",
+      "sha256": "7adbeb41f4e1f5f52c91044bc89057b478e5ca67f699f0742f078114ca05674c"
+    },
+    {
+      "bytes": 1283,
+      "path": "sprites/approved_android/type_north_1.png",
+      "sha256": "3b4a8b4c7bb9f714efd717a3c415624ac4b2933a034d391630bb82c3242d467d"
+    },
+    {
+      "bytes": 1263,
+      "path": "sprites/approved_android/type_north_2.png",
+      "sha256": "17dbbc63ead61757eb7d93a7dac85b9d5104d422f5f129c0716b78bd5bd4fbf6"
+    },
+    {
+      "bytes": 1353,
+      "path": "sprites/approved_android/type_north_3.png",
+      "sha256": "4d4ddfcf32578ed00d80f785fe9487ef3072b0cec77b343ff7333f7854e5aab4"
+    },
+    {
+      "bytes": 1320,
+      "path": "sprites/approved_android/type_north_4.png",
+      "sha256": "f8d339806bc9cb144e4f3518a19a84b9c134adfa5a5197f650fa9265efdf972e"
+    },
+    {
+      "bytes": 4993,
+      "path": "sprites/approved_android/walk_east_1.png",
+      "sha256": "e59589d6bb60bbca83e857eecc340fce57e7fa15a97c5a2b343cbf50146ded52"
+    },
+    {
+      "bytes": 6037,
+      "path": "sprites/approved_android/walk_east_2.png",
+      "sha256": "f51f95d4ec42ebeb5e8934b8e943dd92610111c15256e1fe64f8f150aaace130"
+    },
+    {
+      "bytes": 5507,
+      "path": "sprites/approved_android/walk_east_3.png",
+      "sha256": "b42d1792ecbe476cf99c09ace01dedf67da6dcf6f7146e8f507021a3c182555b"
+    },
+    {
+      "bytes": 4803,
+      "path": "sprites/approved_android/walk_east_4.png",
+      "sha256": "135f7fc7b6d3d8e043fcd40542bca77a806b8642f943805dd4d2e0e0f400c703"
+    },
+    {
+      "bytes": 5929,
+      "path": "sprites/approved_android/walk_east_5.png",
+      "sha256": "0441ac158932b3f8e00864420f9bf55ff78cf037c8a8580c41559b6291b5ddd7"
+    },
+    {
+      "bytes": 5453,
+      "path": "sprites/approved_android/walk_east_6.png",
+      "sha256": "713f7bcb9a9957155f0f1472f0f3017404e9b2f48933391234136efa866b888e"
+    },
+    {
+      "bytes": 5048,
+      "path": "sprites/approved_android/walk_north-east_1.png",
+      "sha256": "a000690bbac8e62d6b3956a8873f906da71ef668cd2943fc4743391187a1df47"
+    },
+    {
+      "bytes": 5562,
+      "path": "sprites/approved_android/walk_north-east_2.png",
+      "sha256": "2b59adf48ac0c927ad154c946e024b4b63180d49ffdc57b208dd7084f5eefff9"
+    },
+    {
+      "bytes": 5229,
+      "path": "sprites/approved_android/walk_north-east_3.png",
+      "sha256": "35c6a791d1ce4f984fcacab47645eb4bb2f6a3c629f44c96fd5a0aa3c068d527"
+    },
+    {
+      "bytes": 4993,
+      "path": "sprites/approved_android/walk_north-east_4.png",
+      "sha256": "bb190ff04ab5ed4d117529fba043f336eabd6cfa19797fb7aa8ed1f35d5fa207"
+    },
+    {
+      "bytes": 5283,
+      "path": "sprites/approved_android/walk_north-east_5.png",
+      "sha256": "2fd4d89dea2dadbfb4a63b586a17a98339a919626dbef37e4c5fea738cfd5c27"
+    },
+    {
+      "bytes": 5431,
+      "path": "sprites/approved_android/walk_north-east_6.png",
+      "sha256": "320cf3e28d6158aaf4d55e5883cd7f950fccc605011595225f1a32e77fa0364e"
+    },
+    {
+      "bytes": 4958,
+      "path": "sprites/approved_android/walk_north-west_1.png",
+      "sha256": "699832285482b848446dbed8fdfcc9b407837f440c00f4fee7522c9b7aa24b92"
+    },
+    {
+      "bytes": 5200,
+      "path": "sprites/approved_android/walk_north-west_2.png",
+      "sha256": "4235de59f67c2f9aed5b3f3d802d9a40dd99d7902d72028a1ca96124d0621d67"
+    },
+    {
+      "bytes": 5050,
+      "path": "sprites/approved_android/walk_north-west_3.png",
+      "sha256": "de0dd47cee11f38fadb5a3d6cecaeba2ef13802e5d2a421acf102aed4b1de320"
+    },
+    {
+      "bytes": 5033,
+      "path": "sprites/approved_android/walk_north-west_4.png",
+      "sha256": "a7bff0b83353e7f6d53b9d4152e96ff72b0cccd1fea9d2489666a2874d951677"
+    },
+    {
+      "bytes": 5741,
+      "path": "sprites/approved_android/walk_north-west_5.png",
+      "sha256": "09587e355e23e3cea6d82d6b2f067094a0885298b5d466c94ec71149f023ddaf"
+    },
+    {
+      "bytes": 5131,
+      "path": "sprites/approved_android/walk_north-west_6.png",
+      "sha256": "d41dafda195f8bed1914c125b5b71e28e3a1a60ad344d31a79a08300733de5a7"
+    },
+    {
+      "bytes": 5152,
+      "path": "sprites/approved_android/walk_north_1.png",
+      "sha256": "69e98fb9c6d5fc55de0a3678d4b91fe64a7f2a7c7d410719780be1cf8ab6c5bd"
+    },
+    {
+      "bytes": 4782,
+      "path": "sprites/approved_android/walk_north_2.png",
+      "sha256": "e0f25442d9947999d85105e66a987e5a4051b14135bd32af5c02426568a45145"
+    },
+    {
+      "bytes": 4831,
+      "path": "sprites/approved_android/walk_north_3.png",
+      "sha256": "dea2b08e2fd7ea25378b902c208a0d46359b95b78d26e5375824b27bc31855de"
+    },
+    {
+      "bytes": 5288,
+      "path": "sprites/approved_android/walk_north_4.png",
+      "sha256": "c9b237d0bc8e2885d9a6d510cf915930c160e355e027e26f83c3f7ed3d227ee3"
+    },
+    {
+      "bytes": 4779,
+      "path": "sprites/approved_android/walk_north_5.png",
+      "sha256": "5d46b239f57484c239eb89147d68ec6ef74e437e3f78afcfc8349c6f146e0d3a"
+    },
+    {
+      "bytes": 5015,
+      "path": "sprites/approved_android/walk_north_6.png",
+      "sha256": "68f5bdf09cf1048e24246d0baf2f8df5b36ac1e14c2bbe8011520ed31d387579"
+    },
+    {
+      "bytes": 5207,
+      "path": "sprites/approved_android/walk_south-east_1.png",
+      "sha256": "e75ad578b598eb34d1090eedcdbdf98654b5421d53edfef4c80faf35f9e55b95"
+    },
+    {
+      "bytes": 5367,
+      "path": "sprites/approved_android/walk_south-east_2.png",
+      "sha256": "a2f99b4aa1ad7ec7554f7f2f6d81a55d529ead80f1fe572103fd3a65bad1cc35"
+    },
+    {
+      "bytes": 5193,
+      "path": "sprites/approved_android/walk_south-east_3.png",
+      "sha256": "ebe06b954ae1bc26de7d01681c57adfdbc137af978ae74d181e990bd63ce245d"
+    },
+    {
+      "bytes": 4937,
+      "path": "sprites/approved_android/walk_south-east_4.png",
+      "sha256": "fd6eb2eab624ba2f81fdfe7b5b67ff2263e48572f76fd34f201b3bbb53b24899"
+    },
+    {
+      "bytes": 5896,
+      "path": "sprites/approved_android/walk_south-east_5.png",
+      "sha256": "bfbc763cf007b1d81cf2d5ef4d29fe18ae9ce52be2bec72b09c672fab1a75a46"
+    },
+    {
+      "bytes": 5339,
+      "path": "sprites/approved_android/walk_south-east_6.png",
+      "sha256": "e24c9973da67f355ca2389f27c7ec4dc34b2783b24bb1d5001e5856eec4129ff"
+    },
+    {
+      "bytes": 5351,
+      "path": "sprites/approved_android/walk_south-west_1.png",
+      "sha256": "bc1a159fab0baaea4cb1354212cc2e8e242385a5081f0b92e8fef5af84fbc40b"
+    },
+    {
+      "bytes": 5812,
+      "path": "sprites/approved_android/walk_south-west_2.png",
+      "sha256": "d437bd892938ad38cb577a5f08bf8d0eb725a68cbb539883ff747d8d293af8ca"
+    },
+    {
+      "bytes": 5758,
+      "path": "sprites/approved_android/walk_south-west_3.png",
+      "sha256": "dd31829c225c749f5a84eba9ecb4e866e3d7581b577b329d3f5a314aafb611cd"
+    },
+    {
+      "bytes": 5145,
+      "path": "sprites/approved_android/walk_south-west_4.png",
+      "sha256": "093f881bf823e1e0c8edd539626b30f8855b91e14771d2e48a239bae668b5526"
+    },
+    {
+      "bytes": 5594,
+      "path": "sprites/approved_android/walk_south-west_5.png",
+      "sha256": "8c0ad061af24ee54cef3b266bd03c9ef77ba8218632289e3fda5c19d1d3e7188"
+    },
+    {
+      "bytes": 5589,
+      "path": "sprites/approved_android/walk_south-west_6.png",
+      "sha256": "11c9853880601f411d59502264729dc83d1a5d884e24e7a016401a87017ab474"
+    },
+    {
+      "bytes": 1682,
+      "path": "sprites/approved_android/walk_south_1.png",
+      "sha256": "273209ec1a9c3891f0a5219615bffb1114e3f04aa1400a18572bd25d9a346f0b"
+    },
+    {
+      "bytes": 1600,
+      "path": "sprites/approved_android/walk_south_2.png",
+      "sha256": "0dba087fec1866a021f1d6cbd1683e0c2dbef1225a64d3c575ee694ea88d1992"
+    },
+    {
+      "bytes": 1631,
+      "path": "sprites/approved_android/walk_south_3.png",
+      "sha256": "4292dbaa45ce79ead76d86203a736ca733089bd6043377f97f719ff8f30ed198"
+    },
+    {
+      "bytes": 1665,
+      "path": "sprites/approved_android/walk_south_4.png",
+      "sha256": "6afaa72ce5a996292416b04c931934d2c2fc8b808f0cd4ba3b46f218cb6a9621"
+    },
+    {
+      "bytes": 1590,
+      "path": "sprites/approved_android/walk_south_5.png",
+      "sha256": "0080c517e204635dbaadf4bf8fe89ca80e386a2fdbcbcaad9d27793d921b20b2"
+    },
+    {
+      "bytes": 1633,
+      "path": "sprites/approved_android/walk_south_6.png",
+      "sha256": "30cc4c87545ba08e4b4a8c0d843abdab708d0337aaf65bea47a49455760ddd3d"
+    },
+    {
+      "bytes": 4751,
+      "path": "sprites/approved_android/walk_west_1.png",
+      "sha256": "58db82d80e85e5ef6acc809e997e6e9e058670dd1636028025443bdd0df9f38b"
+    },
+    {
+      "bytes": 5798,
+      "path": "sprites/approved_android/walk_west_2.png",
+      "sha256": "f29eac100a4dc2ce27edbcb076748ade2edce33fe474eaa1e0af6e425576450b"
+    },
+    {
+      "bytes": 5507,
+      "path": "sprites/approved_android/walk_west_3.png",
+      "sha256": "eb9a42361f59ec12dcce561bb7cd58b7901dcb9723dfb42e5dbaab8c487e8018"
+    },
+    {
+      "bytes": 4490,
+      "path": "sprites/approved_android/walk_west_4.png",
+      "sha256": "22af8b9a96dfbd1900bd700a241b976490cd767e3b1f18f5b690d2c850ff4a0c"
+    },
+    {
+      "bytes": 5839,
+      "path": "sprites/approved_android/walk_west_5.png",
+      "sha256": "008aee5e9a65f194356c731134f3e5d6f3c0ccfb0de14cd68a2968366a70f2d7"
+    },
+    {
+      "bytes": 5131,
+      "path": "sprites/approved_android/walk_west_6.png",
+      "sha256": "2c0c45065a0cacf90707756efffd0a187bd35f5f7397d3f720a7e621af30bf9d"
+    },
+    {
+      "bytes": 2372,
+      "path": "sprites/approved_animegirl/rot_east.png",
+      "sha256": "e38fa5d4bd3c5c3fde23187a78c230b2ff42750222a7fafe91e421bbd04ecf58"
+    },
+    {
+      "bytes": 2685,
+      "path": "sprites/approved_animegirl/rot_north-east.png",
+      "sha256": "dd7431d57f5ce488c76fea95cecba87635f5ab4306bbfe1a2f40b2ea73c46f13"
+    },
+    {
+      "bytes": 2737,
+      "path": "sprites/approved_animegirl/rot_north-west.png",
+      "sha256": "571985b77bdcc5fc33cdd3c0c7298b54fa52ea7a9b33c6495e122291a36939d1"
+    },
+    {
+      "bytes": 2763,
+      "path": "sprites/approved_animegirl/rot_north.png",
+      "sha256": "4f93f12df5dcd0d543552427c53768f9643367aa3e829b2ffddd6b9433eb8c20"
+    },
+    {
+      "bytes": 3136,
+      "path": "sprites/approved_animegirl/rot_south-east.png",
+      "sha256": "3df68277f6b9b926ef54fb5fceb6413ee242f050725b50d98b22816d0e5ff167"
+    },
+    {
+      "bytes": 8331,
+      "path": "sprites/approved_animegirl/rot_south-west.png",
+      "sha256": "6b1e849fbcea8e60d0622b36f7a5202cd627f47c35d4dfe7f5c0dcaa949a6321"
+    },
+    {
+      "bytes": 8643,
+      "path": "sprites/approved_animegirl/rot_south.png",
+      "sha256": "014dd5d95633f2ab0b30f1e09a4387efbd084c062e0d7673309620fc89b910da"
+    },
+    {
+      "bytes": 2365,
+      "path": "sprites/approved_animegirl/rot_west.png",
+      "sha256": "1eebc45b7de3c6b4e659c3557114f7b07b713d3aae0988d5896188bf14574c86"
+    },
+    {
+      "bytes": 2449,
+      "path": "sprites/approved_animegirl/sit_east_4.png",
+      "sha256": "6092b8f1c6b6dbdb9b37bb73cb9b63807c4243816f3c321808982f2c61d1ba07"
+    },
+    {
+      "bytes": 2360,
+      "path": "sprites/approved_animegirl/sit_north_4.png",
+      "sha256": "04bdda32e8b5b61b0327f703d3fb634d18580bca749c3cfd7a8ee7760e97811c"
+    },
+    {
+      "bytes": 3265,
+      "path": "sprites/approved_animegirl/sit_south_4.png",
+      "sha256": "61d6036a0f40f961ccbc9ade880ab2fc20f0f2524d5a6b5dc0f828d298408465"
+    },
+    {
+      "bytes": 2467,
+      "path": "sprites/approved_animegirl/sit_west_4.png",
+      "sha256": "f407c645af040c91ccb8e080308c6fca6adafd352acf188e4ede63e137f15d99"
+    },
+    {
+      "bytes": 2291,
+      "path": "sprites/approved_animegirl/type_north_1.png",
+      "sha256": "8fe9ff62ea2d95541063bae284719301bd97e2654e7dbc9a5d7c5bc8ca6938bc"
+    },
+    {
+      "bytes": 2286,
+      "path": "sprites/approved_animegirl/type_north_2.png",
+      "sha256": "5c1ae648da068f47c810ff22c5b5cb4611010e1562f49079590ce43a9d8a3b36"
+    },
+    {
+      "bytes": 2154,
+      "path": "sprites/approved_animegirl/type_north_3.png",
+      "sha256": "6acef24c8b33da8149596902afa37ff15417f73858023cb973c87ee69732d99f"
+    },
+    {
+      "bytes": 2244,
+      "path": "sprites/approved_animegirl/type_north_4.png",
+      "sha256": "02c68d6bc3693a602deb94bdfe38ab517bfca06f837c49aa755ec974e1ac4eb6"
+    },
+    {
+      "bytes": 2411,
+      "path": "sprites/approved_animegirl/walk_east_1.png",
+      "sha256": "e60ef7373503d53008fbfd20c0ebee75925d471dcaef2b872170a0d140791281"
+    },
+    {
+      "bytes": 2679,
+      "path": "sprites/approved_animegirl/walk_east_2.png",
+      "sha256": "7119360a58558b9975dd4d322ef215fd9a6dee5d608b9e0bf85d754b76e05303"
+    },
+    {
+      "bytes": 2578,
+      "path": "sprites/approved_animegirl/walk_east_3.png",
+      "sha256": "52a840fe269baedd7d4118d6a62a780532a7425eb78bf46351c64bba6dcb2709"
+    },
+    {
+      "bytes": 2373,
+      "path": "sprites/approved_animegirl/walk_east_4.png",
+      "sha256": "9575ef96d93fa8df3f34dc8df78ccb3c2099d74e30a7b21e2405fcd9e35378ef"
+    },
+    {
+      "bytes": 2716,
+      "path": "sprites/approved_animegirl/walk_east_5.png",
+      "sha256": "077d458f8af89ba4a9345e02492eff05b491b89f1f0551120f6a52b31d11a550"
+    },
+    {
+      "bytes": 2693,
+      "path": "sprites/approved_animegirl/walk_east_6.png",
+      "sha256": "4a90e20ab6615302b03871bdee33a4de47447f1d78d0f7d9742f93f5bb3ec0b1"
+    },
+    {
+      "bytes": 2490,
+      "path": "sprites/approved_animegirl/walk_north-east_1.png",
+      "sha256": "1771a50bc30ceed5881daef6ce9d939a10c4d6b7881c0f18119de6df9ffbf031"
+    },
+    {
+      "bytes": 2711,
+      "path": "sprites/approved_animegirl/walk_north-east_2.png",
+      "sha256": "0d4d875265caa29eff72d71a7bccd177a81cd46d4046f2f7670b24d1ac51d819"
+    },
+    {
+      "bytes": 2680,
+      "path": "sprites/approved_animegirl/walk_north-east_3.png",
+      "sha256": "ce1c85dd8e376193781a1435669a7c9ec4128f2fdf02539e8030e124d4f893c6"
+    },
+    {
+      "bytes": 2459,
+      "path": "sprites/approved_animegirl/walk_north-east_4.png",
+      "sha256": "ec236d25456d88772979400fcfac08d1003616a577d3f6a757f10c5d69a03be1"
+    },
+    {
+      "bytes": 2811,
+      "path": "sprites/approved_animegirl/walk_north-east_5.png",
+      "sha256": "8918dc8a9f5232302772bdf4b7ca9a8ca2b251ab27a3fb1d6d9697a09a759800"
+    },
+    {
+      "bytes": 2686,
+      "path": "sprites/approved_animegirl/walk_north-east_6.png",
+      "sha256": "1a7e3f4629a9f6f5afe08943c53273514a34cd9129d0b3a05f05a2ff5d93fc0b"
+    },
+    {
+      "bytes": 2529,
+      "path": "sprites/approved_animegirl/walk_north-west_1.png",
+      "sha256": "88e8335079f6ece41c6ffca7e6ccb4cb36fd7cacb5b8536a2382c04bbeb4d804"
+    },
+    {
+      "bytes": 2663,
+      "path": "sprites/approved_animegirl/walk_north-west_2.png",
+      "sha256": "b63c80f673a76c73ae37ec2ef904af62a7812bd06e39849191d24cefe82b96fa"
+    },
+    {
+      "bytes": 2621,
+      "path": "sprites/approved_animegirl/walk_north-west_3.png",
+      "sha256": "e23103974c478c85cd34494ab8c728c7426c2179bdd90358ff17d59832afeb47"
+    },
+    {
+      "bytes": 2428,
+      "path": "sprites/approved_animegirl/walk_north-west_4.png",
+      "sha256": "faea856189a4330652088fdab7678e1a776e006ca86197d41a4bfada54292605"
+    },
+    {
+      "bytes": 2632,
+      "path": "sprites/approved_animegirl/walk_north-west_5.png",
+      "sha256": "e05e5b15251c0cced660339f79fe893a8234941bdc63f6eea460d1801bb6ea55"
+    },
+    {
+      "bytes": 2555,
+      "path": "sprites/approved_animegirl/walk_north-west_6.png",
+      "sha256": "4f22951d674a8cea33ecae77c2480d6558799bb1f216bdba1d03fa5409df6122"
+    },
+    {
+      "bytes": 2644,
+      "path": "sprites/approved_animegirl/walk_north_1.png",
+      "sha256": "145d2bc1fdb8f126d2b9b7f0a71f1bb3bf8a844e6aedc47034c428219d906ccf"
+    },
+    {
+      "bytes": 2643,
+      "path": "sprites/approved_animegirl/walk_north_2.png",
+      "sha256": "06c2d524432d46080bbb69319f9353bb63c3f34f91705fafb006dacec796d098"
+    },
+    {
+      "bytes": 2592,
+      "path": "sprites/approved_animegirl/walk_north_3.png",
+      "sha256": "15bacd50c1502dfca6f4905a564e67744165252cb2d10f55054fc7a6c8585a91"
+    },
+    {
+      "bytes": 2624,
+      "path": "sprites/approved_animegirl/walk_north_4.png",
+      "sha256": "0b546db0f335613945ad664de1f46b1f5633ae5cd3c679eb909474e0b983919e"
+    },
+    {
+      "bytes": 2607,
+      "path": "sprites/approved_animegirl/walk_north_5.png",
+      "sha256": "ce571d86e72a28769ea64f29982ee3e7f3153b2b81589b3519bc56c7c2967b28"
+    },
+    {
+      "bytes": 2601,
+      "path": "sprites/approved_animegirl/walk_north_6.png",
+      "sha256": "26bd49a21cd7b21421ae048419625a013f3416ec4a78425018b66a97c6abd377"
+    },
+    {
+      "bytes": 2936,
+      "path": "sprites/approved_animegirl/walk_south-east_1.png",
+      "sha256": "1da765b7afa3aaf0b030a5ab1e6872fa401fa2ad2b4f2957d788f26d26379c66"
+    },
+    {
+      "bytes": 2994,
+      "path": "sprites/approved_animegirl/walk_south-east_2.png",
+      "sha256": "44b04d4f4262005e389a6baf5b3f8a97c0bdf4f617b5e9f77554a831da5c7ad3"
+    },
+    {
+      "bytes": 2942,
+      "path": "sprites/approved_animegirl/walk_south-east_3.png",
+      "sha256": "2171f6bbb7457f70c3cee7c13f90c909d1700ead89c8643016b4034c43a00769"
+    },
+    {
+      "bytes": 2845,
+      "path": "sprites/approved_animegirl/walk_south-east_4.png",
+      "sha256": "c24ca2bad95c529d2b1ac3b9f0b7910d89ba603403ec525a3242755328fce301"
+    },
+    {
+      "bytes": 2986,
+      "path": "sprites/approved_animegirl/walk_south-east_5.png",
+      "sha256": "81ff21ab560c33e3c410580da0496f283c8ff7134c9ac6621699c673d3b4c381"
+    },
+    {
+      "bytes": 2985,
+      "path": "sprites/approved_animegirl/walk_south-east_6.png",
+      "sha256": "1acff7e97783cbd614192105518b9dd82b33005565bb35edf657c6236a3dc45a"
+    },
+    {
+      "bytes": 8721,
+      "path": "sprites/approved_animegirl/walk_south-west_1.png",
+      "sha256": "4f39a10a2cb58dde05551fd9ef6f3199837aed179c3a7a6ad63f1e6f0c599524"
+    },
+    {
+      "bytes": 9405,
+      "path": "sprites/approved_animegirl/walk_south-west_2.png",
+      "sha256": "5aa2b36e1585a9a2b860aeea5f5b4fbd1e8b62790481ecc2a61a36cd7376154f"
+    },
+    {
+      "bytes": 9126,
+      "path": "sprites/approved_animegirl/walk_south-west_3.png",
+      "sha256": "e7fc48c3498f001027141f2a5014f96846094cd473a9f06f400a0a898e30cd1c"
+    },
+    {
+      "bytes": 8846,
+      "path": "sprites/approved_animegirl/walk_south-west_4.png",
+      "sha256": "ec47979cbd4cec47623981e564a1f5bd4864d7d88e51dec87e4baa741e55142d"
+    },
+    {
+      "bytes": 9242,
+      "path": "sprites/approved_animegirl/walk_south-west_5.png",
+      "sha256": "8eaba8dceef7267367d2c96e9a55ecb16e51b527ac54a57bdcdf96a9ac86b6b1"
+    },
+    {
+      "bytes": 9211,
+      "path": "sprites/approved_animegirl/walk_south-west_6.png",
+      "sha256": "094a015b57e94db042393d18298263840a387ffa5aced0e09dce99fad02d3a00"
+    },
+    {
+      "bytes": 3058,
+      "path": "sprites/approved_animegirl/walk_south_1.png",
+      "sha256": "64bd179c0fbdd433b98b8e0c43557cd8a44a89d19417b85de23a2abf0676f03c"
+    },
+    {
+      "bytes": 3044,
+      "path": "sprites/approved_animegirl/walk_south_2.png",
+      "sha256": "05114176b89b6f86bf2978c0166e4cf7619894b1e1d7556d49a03f90c735e18a"
+    },
+    {
+      "bytes": 3087,
+      "path": "sprites/approved_animegirl/walk_south_3.png",
+      "sha256": "90be22f6d5a2c50343c7fdc568cabda9514cde1c5765adc6d68471ad5f07fd00"
+    },
+    {
+      "bytes": 3090,
+      "path": "sprites/approved_animegirl/walk_south_4.png",
+      "sha256": "0268d33033dca0c044542198db06455bff92e13f98f180a25276d17c4e49d736"
+    },
+    {
+      "bytes": 3049,
+      "path": "sprites/approved_animegirl/walk_south_5.png",
+      "sha256": "791ec79b1962368c587d3e8a5c27eb6a860ed21727111937e6653761f4e234ab"
+    },
+    {
+      "bytes": 3028,
+      "path": "sprites/approved_animegirl/walk_south_6.png",
+      "sha256": "8a4e8e957ee79aab10cd321cca8023c7e54d17603200a03e57059105638d8a8e"
+    },
+    {
+      "bytes": 2365,
+      "path": "sprites/approved_animegirl/walk_west_1.png",
+      "sha256": "a7c998bdff5825f28774b8e4210a79f1688d39a6e86aa486f8c541da942a153d"
+    },
+    {
+      "bytes": 2549,
+      "path": "sprites/approved_animegirl/walk_west_2.png",
+      "sha256": "42e64de7f987f34f3ca2f3afcc4cd5bbc914e692e788c35af7d6e01509677355"
+    },
+    {
+      "bytes": 2509,
+      "path": "sprites/approved_animegirl/walk_west_3.png",
+      "sha256": "6f4fac0052e019c13e9ff8acc112b898c4c72e307779fce610d8bac835547795"
+    },
+    {
+      "bytes": 2236,
+      "path": "sprites/approved_animegirl/walk_west_4.png",
+      "sha256": "b169ca1fa159a23c6c6a23715904fdb9c052eede5518ad804c5cccbe803df956"
+    },
+    {
+      "bytes": 2489,
+      "path": "sprites/approved_animegirl/walk_west_5.png",
+      "sha256": "6fbb4dbeb13c83865dfc580a5cbb462c235adc4041e0d3566a771d893323b111"
+    },
+    {
+      "bytes": 2566,
+      "path": "sprites/approved_animegirl/walk_west_6.png",
+      "sha256": "c24a381c613744740b77204a72dcc47dfda6a6a373b91b1673e906e9d8b26739"
+    },
+    {
+      "bytes": 5141,
+      "path": "sprites/approved_astronaut/rot_east.png",
+      "sha256": "cbce0431ec6be4627538e94f40b773e918f37c6e76eb32b6a956fdd4bbfed03a"
+    },
+    {
+      "bytes": 6598,
+      "path": "sprites/approved_astronaut/rot_north-east.png",
+      "sha256": "4c51c651aff263d446dc092a9e29e4a376ac85cf2dfcfd64fc09d3837381d2ec"
+    },
+    {
+      "bytes": 6496,
+      "path": "sprites/approved_astronaut/rot_north-west.png",
+      "sha256": "6d0cd7f1a63e35d18e0a4983d9d2fae3b6517a8ed7c958fd4396b55ea5c85492"
+    },
+    {
+      "bytes": 2581,
+      "path": "sprites/approved_astronaut/rot_north.png",
+      "sha256": "52c0d0ef5226d077a863aaf54a429764eff726242f9e7ff09a62981423404828"
+    },
+    {
+      "bytes": 6608,
+      "path": "sprites/approved_astronaut/rot_south-east.png",
+      "sha256": "4caa13c5e7e846981261c2a33086d5901293334c2a898678717c485f6a33680f"
+    },
+    {
+      "bytes": 6894,
+      "path": "sprites/approved_astronaut/rot_south-west.png",
+      "sha256": "99dee2ddcffb2ad7c360dfcd60225f955b7e6b33d110124101b98b7df5e77a5f"
+    },
+    {
+      "bytes": 7582,
+      "path": "sprites/approved_astronaut/rot_south.png",
+      "sha256": "8108d9fafcc23b9e37055fc56dcd678bea8aebe881c8bb3b43dc5195bd832d3e"
+    },
+    {
+      "bytes": 5176,
+      "path": "sprites/approved_astronaut/rot_west.png",
+      "sha256": "e8ae81752a54648ac1b5f4c4df15ce6f8c72bf6f16eee1b14f9bc474d02a20c4"
+    },
+    {
+      "bytes": 2231,
+      "path": "sprites/approved_astronaut/sit_east_4.png",
+      "sha256": "a9c8fca670677fe5df64d8e1d2b9e9ced55188fa666c38d835f1233947d92e10"
+    },
+    {
+      "bytes": 1637,
+      "path": "sprites/approved_astronaut/sit_north_4.png",
+      "sha256": "556ba99ef68d68eb0f6e98dee0dcd702cc720f4f9c2720b7650a6a47c171603b"
+    },
+    {
+      "bytes": 2645,
+      "path": "sprites/approved_astronaut/sit_south_4.png",
+      "sha256": "bf5a72bfac6db29ff91638b7a5f16569aaf351f5d128ee75a37e34b37ac1b143"
+    },
+    {
+      "bytes": 1938,
+      "path": "sprites/approved_astronaut/sit_west_4.png",
+      "sha256": "32cd5a513bf48a88a95c580e581c75c2c471d51774f2647d2dedd65900442f08"
+    },
+    {
+      "bytes": 1562,
+      "path": "sprites/approved_astronaut/type_north_1.png",
+      "sha256": "79674290e4998a676ef19f5858752b4419bd073ea0d054b19fbe96e034ce96ce"
+    },
+    {
+      "bytes": 1573,
+      "path": "sprites/approved_astronaut/type_north_2.png",
+      "sha256": "7ea36864465fce5d02fbce609a57399001373f5373f7db121c35cb21b475b299"
+    },
+    {
+      "bytes": 1563,
+      "path": "sprites/approved_astronaut/type_north_3.png",
+      "sha256": "aee7929384c90b307c9cf0b9ab6f7308065ad619ffe0c3de10e3ad0c605e4d06"
+    },
+    {
+      "bytes": 1563,
+      "path": "sprites/approved_astronaut/type_north_4.png",
+      "sha256": "658f085797eb88cbb125219f6bccdab7dee54b02fb25a8f68b308989619bd509"
+    },
+    {
+      "bytes": 5736,
+      "path": "sprites/approved_astronaut/walk_east_1.png",
+      "sha256": "cc871118b0e768da31033216629308f0d68d91cefafa0ef5661ba2ead98ce378"
+    },
+    {
+      "bytes": 6585,
+      "path": "sprites/approved_astronaut/walk_east_2.png",
+      "sha256": "40220bdbbc423b69c8092786b7a21c36007330387271f24780992d604dd0e2ac"
+    },
+    {
+      "bytes": 6334,
+      "path": "sprites/approved_astronaut/walk_east_3.png",
+      "sha256": "220ef6a90b3bbd6706a4eacd46e9d71c6670eb69ca425ce9fbd710f8b1302792"
+    },
+    {
+      "bytes": 5559,
+      "path": "sprites/approved_astronaut/walk_east_4.png",
+      "sha256": "56f522493e05d4ee8a7c837b8db42e77d437f71551a44778359bcc7ef25e8f70"
+    },
+    {
+      "bytes": 6446,
+      "path": "sprites/approved_astronaut/walk_east_5.png",
+      "sha256": "2ff1704c2d5126bab725928049f07a62b98d0dbc27d948807f152faa0a98a4b8"
+    },
+    {
+      "bytes": 6282,
+      "path": "sprites/approved_astronaut/walk_east_6.png",
+      "sha256": "0ac8a817c87663c9174df44822eb876819047752b59fa3b41bd1c4774d98a99e"
+    },
+    {
+      "bytes": 7117,
+      "path": "sprites/approved_astronaut/walk_north-east_1.png",
+      "sha256": "712b6599b6f4df1acdec9b854dc9ba55703c7c3f89889547ae9197e96bdd4e95"
+    },
+    {
+      "bytes": 7008,
+      "path": "sprites/approved_astronaut/walk_north-east_2.png",
+      "sha256": "e85c513c1a8adb26258d99d57118c54979c3f2de6bb6d7e95b22bfc14f5b174e"
+    },
+    {
+      "bytes": 6839,
+      "path": "sprites/approved_astronaut/walk_north-east_3.png",
+      "sha256": "d47fb0a2b68b77ed587b26f4c5687a17c7df478e4de388d52c8b6b565d04602f"
+    },
+    {
+      "bytes": 7355,
+      "path": "sprites/approved_astronaut/walk_north-east_4.png",
+      "sha256": "f91b1c88dc5c4b571cc0b3b774a20c1bf3cecf75dba67aaba6279aeb75dd131e"
+    },
+    {
+      "bytes": 6793,
+      "path": "sprites/approved_astronaut/walk_north-east_5.png",
+      "sha256": "f935108ce4c7b4cf8baf9b38636e2f6d395ae1b585e0c7a3a6f92e33d1d23213"
+    },
+    {
+      "bytes": 7072,
+      "path": "sprites/approved_astronaut/walk_north-east_6.png",
+      "sha256": "2677a9b4e7c20087e838c8ee45a44dbf1e344bb1e7472c0e2b4e67704b1c4d7e"
+    },
+    {
+      "bytes": 7012,
+      "path": "sprites/approved_astronaut/walk_north-west_1.png",
+      "sha256": "ad4421f683ff639fdae041e27abd60539c3e90e7dc692ba7120545de2a41e269"
+    },
+    {
+      "bytes": 6828,
+      "path": "sprites/approved_astronaut/walk_north-west_2.png",
+      "sha256": "da1d00fc32fb768cf7541b246cad0a4a46a19d31b60fc574def7736b043749b7"
+    },
+    {
+      "bytes": 6844,
+      "path": "sprites/approved_astronaut/walk_north-west_3.png",
+      "sha256": "2d7ce39bf349bb9bc4a85d621e902ded2387c3899c30de828372cadb9e715a9b"
+    },
+    {
+      "bytes": 7087,
+      "path": "sprites/approved_astronaut/walk_north-west_4.png",
+      "sha256": "7b92f165fde3d283ef88eb6bc25d4909795227a70c011ff58d228a49bdc9c674"
+    },
+    {
+      "bytes": 7027,
+      "path": "sprites/approved_astronaut/walk_north-west_5.png",
+      "sha256": "927af9a6829df840ac11a417a8dc62bc83dbc9db054803945f31adf7fbdd4a96"
+    },
+    {
+      "bytes": 6817,
+      "path": "sprites/approved_astronaut/walk_north-west_6.png",
+      "sha256": "04711e3e3d1e2c6a0170ef51a2c3265a8b7e6d1b3de6e19bbebd3b2847a4742a"
+    },
+    {
+      "bytes": 2485,
+      "path": "sprites/approved_astronaut/walk_north_1.png",
+      "sha256": "e812279786b0f163c1e57ae43a524430a781beb82ba02faac7b8172d785d780c"
+    },
+    {
+      "bytes": 2401,
+      "path": "sprites/approved_astronaut/walk_north_2.png",
+      "sha256": "25ef0d4412ea9774604bda4ef493855f15b2d4f615a2d7636500ab98a81cec8a"
+    },
+    {
+      "bytes": 2401,
+      "path": "sprites/approved_astronaut/walk_north_3.png",
+      "sha256": "80df53bfce5aff562d2aad4753f86e11c09ffc054ae8b6a25625052833e34b70"
+    },
+    {
+      "bytes": 2450,
+      "path": "sprites/approved_astronaut/walk_north_4.png",
+      "sha256": "06ae3064936db6c1b932dd5c1111327b7a9fa722dc8e3a01d50a5a069e6d1be2"
+    },
+    {
+      "bytes": 2395,
+      "path": "sprites/approved_astronaut/walk_north_5.png",
+      "sha256": "a5c315eb1caa0981edae3e58449312b4c55db862877895b6755514de2af9d54e"
+    },
+    {
+      "bytes": 2439,
+      "path": "sprites/approved_astronaut/walk_north_6.png",
+      "sha256": "8eeb0dca3e61325c99ce4b91810dac44d2b3735f7c04deaab046b4ba9d60592f"
+    },
+    {
+      "bytes": 7285,
+      "path": "sprites/approved_astronaut/walk_south-east_1.png",
+      "sha256": "1c08705cbe47d1dedf1b11f7d739d2012aea44289329b036f67b79dc7a532004"
+    },
+    {
+      "bytes": 6985,
+      "path": "sprites/approved_astronaut/walk_south-east_2.png",
+      "sha256": "f4b5722e834ecf7b8a4c3c161c3f3cfa674497195e0172cfaa94c196c2cd9a4b"
+    },
+    {
+      "bytes": 6922,
+      "path": "sprites/approved_astronaut/walk_south-east_3.png",
+      "sha256": "2ac89b28aaa3aa39f84ee4ecf94b47243922d2ea128683d602304ac5967426c7"
+    },
+    {
+      "bytes": 7141,
+      "path": "sprites/approved_astronaut/walk_south-east_4.png",
+      "sha256": "20e86b67862c749fc285976aca1c45e00bece406aa46e3bf0788e33e757f3ae9"
+    },
+    {
+      "bytes": 7136,
+      "path": "sprites/approved_astronaut/walk_south-east_5.png",
+      "sha256": "84a87b82d559ee2b743d1085990a8c707d8c2559bbf4ad11c44caf59a55942e1"
+    },
+    {
+      "bytes": 7038,
+      "path": "sprites/approved_astronaut/walk_south-east_6.png",
+      "sha256": "1a3a85bd3df7bc55cd051e8ecb72711f29c17c1fb2c5746636a499e5dda09f1d"
+    },
+    {
+      "bytes": 7414,
+      "path": "sprites/approved_astronaut/walk_south-west_1.png",
+      "sha256": "8de150c282655eafeb6bc5f4fcb1eafe6757d73d2fc613a39d54706e34bcb876"
+    },
+    {
+      "bytes": 7241,
+      "path": "sprites/approved_astronaut/walk_south-west_2.png",
+      "sha256": "a3a73550a358cd039ec173699cfef1119662a1b9f36bc783dae4a5cc71aeddbe"
+    },
+    {
+      "bytes": 6921,
+      "path": "sprites/approved_astronaut/walk_south-west_3.png",
+      "sha256": "6195054fb386ab1ba3fab081b03a52566dba512ec37a71d94e015550e7a577d8"
+    },
+    {
+      "bytes": 7299,
+      "path": "sprites/approved_astronaut/walk_south-west_4.png",
+      "sha256": "fe3c52935fbc03490745a6b492db78057fe94fd69a51051a50357d11ab05e3ea"
+    },
+    {
+      "bytes": 6955,
+      "path": "sprites/approved_astronaut/walk_south-west_5.png",
+      "sha256": "afe88a052ff87e31195e5092dad957c2728fbb0c106d8b3c5bcfb17d3cd02063"
+    },
+    {
+      "bytes": 7250,
+      "path": "sprites/approved_astronaut/walk_south-west_6.png",
+      "sha256": "081c1f9b615eb4f9e32aafece551e2c434caaea138cca7c448a5f07b217e3e85"
+    },
+    {
+      "bytes": 2856,
+      "path": "sprites/approved_astronaut/walk_south_1.png",
+      "sha256": "d0a1f85e1f10def9173b1ff0b17aecdde18c0a767583de0b78f5dd6c73c9853c"
+    },
+    {
+      "bytes": 2742,
+      "path": "sprites/approved_astronaut/walk_south_2.png",
+      "sha256": "9607dc01c4ba9499c88398476793c5ee4e5e3f3c0ead67021686ff705d1d55ee"
+    },
+    {
+      "bytes": 2780,
+      "path": "sprites/approved_astronaut/walk_south_3.png",
+      "sha256": "37ca9df53eab2fc5845c02baf46e8a9332df33f00fc3ab81b90f1c48c82a0a7d"
+    },
+    {
+      "bytes": 2819,
+      "path": "sprites/approved_astronaut/walk_south_4.png",
+      "sha256": "6cc05655ebd79f513104edb6d4287396357dd006e1f970b5288ac76d9f8331c4"
+    },
+    {
+      "bytes": 2777,
+      "path": "sprites/approved_astronaut/walk_south_5.png",
+      "sha256": "73c0e30bf8df6688ca25c59aacd7b615e3c22284cb81ce79c30e11311862a8b8"
+    },
+    {
+      "bytes": 2789,
+      "path": "sprites/approved_astronaut/walk_south_6.png",
+      "sha256": "fa533fa17bd156d71f2799b74e8e75056063328f0139936e006c46f2cc451619"
+    },
+    {
+      "bytes": 5771,
+      "path": "sprites/approved_astronaut/walk_west_1.png",
+      "sha256": "51c3a375c885562d2191576a2e6e4b21046432d2b0dc5ebc8e3a28cfcb07ee08"
+    },
+    {
+      "bytes": 6633,
+      "path": "sprites/approved_astronaut/walk_west_2.png",
+      "sha256": "3790345428e83f5d7c33ae1e08ba0d1c3544c5ac75bb16166424c8af6599f541"
+    },
+    {
+      "bytes": 6256,
+      "path": "sprites/approved_astronaut/walk_west_3.png",
+      "sha256": "a6ae7823036b9269626b60f396b751d49498dcd7e60ea4a20497f0f81901ecf3"
+    },
+    {
+      "bytes": 5431,
+      "path": "sprites/approved_astronaut/walk_west_4.png",
+      "sha256": "8b1b9c5cb677c0557eba11905e0d1cf1b266eac638d4ffca14bd4142ffed1bf5"
+    },
+    {
+      "bytes": 6512,
+      "path": "sprites/approved_astronaut/walk_west_5.png",
+      "sha256": "decf6af32e8e1fd31bc5121f85b8f3b6f17e1139f53955a91e640a66ad1fa349"
+    },
+    {
+      "bytes": 6220,
+      "path": "sprites/approved_astronaut/walk_west_6.png",
+      "sha256": "a824240eeda78b471c3c760231428f8f32105551402aab3fc771a470a8c7f123"
+    },
+    {
+      "bytes": 3831,
+      "path": "sprites/approved_blank_amber/rot_east.png",
+      "sha256": "e0c4604ae53dfa2e0126eb17f3785043eb2c1079c6f2bfc7f3404432b8007700"
+    },
+    {
+      "bytes": 5706,
+      "path": "sprites/approved_blank_amber/rot_north-east.png",
+      "sha256": "5415e271c4cb283a07745f96916027cb9a5dbe1c9dcc41db7b001c6a89aaa2ed"
+    },
+    {
+      "bytes": 4980,
+      "path": "sprites/approved_blank_amber/rot_north-west.png",
+      "sha256": "f73896f1be3c57e323b145a71f937fc7443e8d0a7d7e4002d9b1fc5aa3788b4a"
+    },
+    {
+      "bytes": 6017,
+      "path": "sprites/approved_blank_amber/rot_north.png",
+      "sha256": "3c6b50f6d1d0097a8a1a09bb8dbbd4df088b3ed88fd11375a812349017b24b01"
+    },
+    {
+      "bytes": 5183,
+      "path": "sprites/approved_blank_amber/rot_south-east.png",
+      "sha256": "04565576013e736ef50c9a7bf24e222093bd972e378f2c95be1e68a4587f7c34"
+    },
+    {
+      "bytes": 5892,
+      "path": "sprites/approved_blank_amber/rot_south-west.png",
+      "sha256": "4781f727ddb581152367a8b1d4da90016a06a218f1e89d2cfcabd3bebff2d3a1"
+    },
+    {
+      "bytes": 7234,
+      "path": "sprites/approved_blank_amber/rot_south.png",
+      "sha256": "37369714e84dd07530f5f691aaf4e1970f8dcbbf03d49d22e8e9946c1508ccd3"
+    },
+    {
+      "bytes": 1372,
+      "path": "sprites/approved_blank_amber/rot_west.png",
+      "sha256": "3bef32ead652e0153c402eb54537e8318f39ccdc26ad3531e541c24952bbcfa2"
+    },
+    {
+      "bytes": 1614,
+      "path": "sprites/approved_blank_amber/sit_east_4.png",
+      "sha256": "2cd7e4173d225d019840dcf133e0a2a5a6c8532722a0cd2fda468c5cb0d8fd2a"
+    },
+    {
+      "bytes": 1568,
+      "path": "sprites/approved_blank_amber/sit_north_4.png",
+      "sha256": "be01aa3b59f52c79dad0b101464734639c261c51f1b5d03a68bfebfb2539aa9b"
+    },
+    {
+      "bytes": 1742,
+      "path": "sprites/approved_blank_amber/sit_south_4.png",
+      "sha256": "a2cadd2a0cb7a75f51d78a3f44fc2e1af2448b1c6c579ee7917d2415c27a5319"
+    },
+    {
+      "bytes": 1460,
+      "path": "sprites/approved_blank_amber/sit_west_4.png",
+      "sha256": "6daf95f2bd3d45b71b0cfa427513b5f7ff5acc0164d073c8295e630ee9e366b7"
+    },
+    {
+      "bytes": 1443,
+      "path": "sprites/approved_blank_amber/type_north_1.png",
+      "sha256": "9368de5af818200d55b57936745818dbd0974c0597c7fa46858df93162e04c63"
+    },
+    {
+      "bytes": 1420,
+      "path": "sprites/approved_blank_amber/type_north_2.png",
+      "sha256": "49feb01dbe367c37757e47ee04a1158f2f28e6ee5ec58e2e6c4d65ab3d147009"
+    },
+    {
+      "bytes": 1442,
+      "path": "sprites/approved_blank_amber/type_north_3.png",
+      "sha256": "bb88455c0461e5d824b2942e2e4de7a75e584f5c0428ddf2b6a2da1597a260df"
+    },
+    {
+      "bytes": 1429,
+      "path": "sprites/approved_blank_amber/type_north_4.png",
+      "sha256": "03922b80861682bfdf08e954916895dceff5bdc7b2412230ea50b398a224d5c1"
+    },
+    {
+      "bytes": 4730,
+      "path": "sprites/approved_blank_amber/walk_east_1.png",
+      "sha256": "0ef850455dc11f81631d46aab0f85594da4c2ec94ed0415e0a9a782a94e132e3"
+    },
+    {
+      "bytes": 5565,
+      "path": "sprites/approved_blank_amber/walk_east_2.png",
+      "sha256": "cc02035bc498c66108d0e50f69d60ae822dbdc55f7f1d67e494550dd17a6a427"
+    },
+    {
+      "bytes": 5265,
+      "path": "sprites/approved_blank_amber/walk_east_3.png",
+      "sha256": "89be6827937a4bb2ef7c3af240e72e9b09aab6b3cdb0a612aae736079464c575"
+    },
+    {
+      "bytes": 4656,
+      "path": "sprites/approved_blank_amber/walk_east_4.png",
+      "sha256": "c9d220811c7940473abfa63e7c82e2485c0c5417e4ff52c2c65f52849b9ce32b"
+    },
+    {
+      "bytes": 5482,
+      "path": "sprites/approved_blank_amber/walk_east_5.png",
+      "sha256": "ed92083880ba3a669ebb54070c0b1bfbe1d261ba4d5191cc46bf2526549a24a0"
+    },
+    {
+      "bytes": 5186,
+      "path": "sprites/approved_blank_amber/walk_east_6.png",
+      "sha256": "a321b1f82b76d9a99d5c905b974bff3f2c809d5f2dd3153cbba09ae44e43f291"
+    },
+    {
+      "bytes": 5061,
+      "path": "sprites/approved_blank_amber/walk_north-east_1.png",
+      "sha256": "f4d18d5273bac9609f32ccf986fde1f942925331db6ba5d2ba9031436552ef7f"
+    },
+    {
+      "bytes": 5736,
+      "path": "sprites/approved_blank_amber/walk_north-east_2.png",
+      "sha256": "cfd520a57bc8f7a62c1997f98319c0f8b86afdde8a666834bce461e457ff0c0b"
+    },
+    {
+      "bytes": 5390,
+      "path": "sprites/approved_blank_amber/walk_north-east_3.png",
+      "sha256": "0f944d604d75576be9bfdf12badee6f7e688f3a4327703dcf0a0d026f1efc4b0"
+    },
+    {
+      "bytes": 5033,
+      "path": "sprites/approved_blank_amber/walk_north-east_4.png",
+      "sha256": "f8791cc58c4767bbc6f32c51b9d1f28e2d85b9232a2eb04f7a3d088074373c0a"
+    },
+    {
+      "bytes": 5373,
+      "path": "sprites/approved_blank_amber/walk_north-east_5.png",
+      "sha256": "caddccb954ebed7ba88743e3def924abce9b47b6d3c47ea42a8ed78a4da0ec55"
+    },
+    {
+      "bytes": 5507,
+      "path": "sprites/approved_blank_amber/walk_north-east_6.png",
+      "sha256": "2f0e0170356c0a8f47e1e60acb3c1cf9907cd4d8b220683fd811ab36aac59886"
+    },
+    {
+      "bytes": 5128,
+      "path": "sprites/approved_blank_amber/walk_north-west_1.png",
+      "sha256": "9652e8132f25ba00977574514cbf57a510eadee7064e3f4fb57acb063d460189"
+    },
+    {
+      "bytes": 5333,
+      "path": "sprites/approved_blank_amber/walk_north-west_2.png",
+      "sha256": "3965ec3d58252204ae0bfa6e3d3c46d715cd4fce703cf9fa7adb1a65e19967ab"
+    },
+    {
+      "bytes": 5227,
+      "path": "sprites/approved_blank_amber/walk_north-west_3.png",
+      "sha256": "80b74358689fe2ac452cacd2588f5fb0e39e06a0592a4bf879431003b16d794f"
+    },
+    {
+      "bytes": 4885,
+      "path": "sprites/approved_blank_amber/walk_north-west_4.png",
+      "sha256": "812321c6bb760a732a0015c6dd1ca3d611e6023be15f98a0695fec4a05e4b4a9"
+    },
+    {
+      "bytes": 5770,
+      "path": "sprites/approved_blank_amber/walk_north-west_5.png",
+      "sha256": "7a0692df1708e1c11df1c6ab3b76f5a99ce9e87dde9ba456cad08610e6f8583a"
+    },
+    {
+      "bytes": 5271,
+      "path": "sprites/approved_blank_amber/walk_north-west_6.png",
+      "sha256": "8f01f378a784e9a8469021768be5e9899b975ff3a3904bdc483324a10d0e5a89"
+    },
+    {
+      "bytes": 5502,
+      "path": "sprites/approved_blank_amber/walk_north_1.png",
+      "sha256": "371646095078fc5b164040f323bb6d4aa65ab2847e6e72b39df7a530819754a2"
+    },
+    {
+      "bytes": 5044,
+      "path": "sprites/approved_blank_amber/walk_north_2.png",
+      "sha256": "a616402a104f2746863fb82157688397dc6a4b1f2c4d3596948e176bccb1eff0"
+    },
+    {
+      "bytes": 5044,
+      "path": "sprites/approved_blank_amber/walk_north_3.png",
+      "sha256": "7018b5d0ae6244ffbb9c1bc9472a30beb5e0ba4975d76caece6159462f81fbb4"
+    },
+    {
+      "bytes": 5362,
+      "path": "sprites/approved_blank_amber/walk_north_4.png",
+      "sha256": "348c91cb44b2759cffc6436619f9322b1c35786cf9f504c95922d8e0b0c21847"
+    },
+    {
+      "bytes": 5049,
+      "path": "sprites/approved_blank_amber/walk_north_5.png",
+      "sha256": "a9f391ed91abb365f18558837454148264fda622d41b08022b6271e9a53019e5"
+    },
+    {
+      "bytes": 5136,
+      "path": "sprites/approved_blank_amber/walk_north_6.png",
+      "sha256": "baa9b442794def378481e320509f983a2cd027293f847f6c82affdf22fc55fe9"
+    },
+    {
+      "bytes": 5546,
+      "path": "sprites/approved_blank_amber/walk_south-east_1.png",
+      "sha256": "674660595e38576f183fa665bd5e42e83ed18c7feee0cea5987c24c0ef6b9429"
+    },
+    {
+      "bytes": 5528,
+      "path": "sprites/approved_blank_amber/walk_south-east_2.png",
+      "sha256": "bf63f9eb333c5fcebe50087f20b4e2d16c0c2e40c0698a26b2c7a9196311109c"
+    },
+    {
+      "bytes": 5515,
+      "path": "sprites/approved_blank_amber/walk_south-east_3.png",
+      "sha256": "43be38b8880820470523f518a4d8bd6c9586caf327301a1e9d1ed2a35813f6a4"
+    },
+    {
+      "bytes": 5238,
+      "path": "sprites/approved_blank_amber/walk_south-east_4.png",
+      "sha256": "20ae633a6a3c826f165659e2e1acb1d6cf9ff5754b6779d2d9accd57f3ce6292"
+    },
+    {
+      "bytes": 5880,
+      "path": "sprites/approved_blank_amber/walk_south-east_5.png",
+      "sha256": "23a71324c28c962af62888be7cef3de124f2ea54e15b9735eddf8dc5f8420860"
+    },
+    {
+      "bytes": 5529,
+      "path": "sprites/approved_blank_amber/walk_south-east_6.png",
+      "sha256": "9c1dc5fb556e725bf234e28c2fceba8c83affcca245bf771e6e1a4175fea5eaf"
+    },
+    {
+      "bytes": 5455,
+      "path": "sprites/approved_blank_amber/walk_south-west_1.png",
+      "sha256": "294af24e44f74f201e151c69b0bd3eb4b491a44d32186c59887c7b14d03a7f7c"
+    },
+    {
+      "bytes": 6047,
+      "path": "sprites/approved_blank_amber/walk_south-west_2.png",
+      "sha256": "80dc66d0d75d20de9f8e11ccea7eecf79867d6c120e518707089bd7dea653507"
+    },
+    {
+      "bytes": 5836,
+      "path": "sprites/approved_blank_amber/walk_south-west_3.png",
+      "sha256": "d40382cef401e17874e3f115a46c5e615f6da8ff3c07f54f2d178b60dcc5e245"
+    },
+    {
+      "bytes": 5418,
+      "path": "sprites/approved_blank_amber/walk_south-west_4.png",
+      "sha256": "925f7590d709d57c0fc14b08c5d6f3ab108ad7321c9f6e657597cf086e665581"
+    },
+    {
+      "bytes": 5644,
+      "path": "sprites/approved_blank_amber/walk_south-west_5.png",
+      "sha256": "00afb71d2b4686b8305972d31d7e09c46e37d438ff75785a41a9413468b6ef8a"
+    },
+    {
+      "bytes": 5655,
+      "path": "sprites/approved_blank_amber/walk_south-west_6.png",
+      "sha256": "c21e7baa47eac418c7d977dfb98463629cf3ec4ee13f0c007bda759eaf70699e"
+    },
+    {
+      "bytes": 2060,
+      "path": "sprites/approved_blank_amber/walk_south_1.png",
+      "sha256": "1eb434f6ccc4526805b050d6ce735772f4bc265de6b1164b61e34d6ea172f78a"
+    },
+    {
+      "bytes": 2015,
+      "path": "sprites/approved_blank_amber/walk_south_2.png",
+      "sha256": "9a4a60b12d5b2dc501da22b990b3c358b71fd419e6f49bf57384f350b168219b"
+    },
+    {
+      "bytes": 2019,
+      "path": "sprites/approved_blank_amber/walk_south_3.png",
+      "sha256": "20d03d7de2224900009a095002321c65ba4780f2c7c3db682afc6ff12b4c2584"
+    },
+    {
+      "bytes": 2052,
+      "path": "sprites/approved_blank_amber/walk_south_4.png",
+      "sha256": "b4ae903220abe68f8a8e4a6fb047c7115c525b9d77651f0e6ac191d31dd05e32"
+    },
+    {
+      "bytes": 1960,
+      "path": "sprites/approved_blank_amber/walk_south_5.png",
+      "sha256": "38bc0844fd31c2dc296e7da6689cd99ef010925c5f7a1448192d495a6fee2e6e"
+    },
+    {
+      "bytes": 1969,
+      "path": "sprites/approved_blank_amber/walk_south_6.png",
+      "sha256": "34550a3bd4e26116f9b4d68e5404d2cb80da60609f7e6b8f13b204c3cad0f6d4"
+    },
+    {
+      "bytes": 4768,
+      "path": "sprites/approved_blank_amber/walk_west_1.png",
+      "sha256": "8bcb0241103b513484eb48e733d2efa9194e92ff9fc3dbcada6b3cac3ad607fd"
+    },
+    {
+      "bytes": 5772,
+      "path": "sprites/approved_blank_amber/walk_west_2.png",
+      "sha256": "7c2a6b52cdbec7e76d7a3db946f48f604bec0ae3ff5627a3c3ebe04a7c193b54"
+    },
+    {
+      "bytes": 5490,
+      "path": "sprites/approved_blank_amber/walk_west_3.png",
+      "sha256": "4add1f801190f36a2d4783ef07dd894fb4cd8b68a66e790bf924c3be96ac23c8"
+    },
+    {
+      "bytes": 4724,
+      "path": "sprites/approved_blank_amber/walk_west_4.png",
+      "sha256": "f2529a8f3cc0464cf9a5befdac8fe79980d467aa28ff73a66808ec73db9f40d7"
+    },
+    {
+      "bytes": 5738,
+      "path": "sprites/approved_blank_amber/walk_west_5.png",
+      "sha256": "422701bbee437a76fa6c1a513050bcb560de100eec606d8ef43514425a05e56b"
+    },
+    {
+      "bytes": 5484,
+      "path": "sprites/approved_blank_amber/walk_west_6.png",
+      "sha256": "663cbf2c4aa24c2a4f97d331799dd0a6a614a9a79f1e550bc53454607423117a"
+    },
+    {
+      "bytes": 4447,
+      "path": "sprites/approved_blank_blue/rot_east.png",
+      "sha256": "e61ae3464d2181d170cdb82feda642f2248fa168f50ad3f8d817ed43e951ccd5"
+    },
+    {
+      "bytes": 6003,
+      "path": "sprites/approved_blank_blue/rot_north-east.png",
+      "sha256": "aa00a447c3e5ffbb2377399d86c90e7e1dca9916e59251f1947c9efc57801297"
+    },
+    {
+      "bytes": 6052,
+      "path": "sprites/approved_blank_blue/rot_north-west.png",
+      "sha256": "207be0ac94e06da5f52e7d9b96a35ad0ffb73ed4fc406e79171ee4704dcc1ccf"
+    },
+    {
+      "bytes": 6583,
+      "path": "sprites/approved_blank_blue/rot_north.png",
+      "sha256": "e68646c5f8d06beeb5c36f3ba01059131fdb510dcc745c37b56a1d4458d4ed21"
+    },
+    {
+      "bytes": 5906,
+      "path": "sprites/approved_blank_blue/rot_south-east.png",
+      "sha256": "a103c58bced9e464750d22f25b585e4a9f2a0c225e5baceb6e3ab77f772af934"
+    },
+    {
+      "bytes": 6197,
+      "path": "sprites/approved_blank_blue/rot_south-west.png",
+      "sha256": "78fdd47f5134b8179e56536e9e76730d48ea07d51e0fabebcb2e2f6478be1668"
+    },
+    {
+      "bytes": 7210,
+      "path": "sprites/approved_blank_blue/rot_south.png",
+      "sha256": "3b312b6d7bfe5c48de57c3dff284cb0b76de88fa413523e471475781c9ead9bc"
+    },
+    {
+      "bytes": 4482,
+      "path": "sprites/approved_blank_blue/rot_west.png",
+      "sha256": "afea2a293cec458b2fe7241cc2ed35697a114fffefb8cfb60326e2bf64769e43"
+    },
+    {
+      "bytes": 1762,
+      "path": "sprites/approved_blank_blue/sit_east_4.png",
+      "sha256": "dc839b7acba2b05e3333966da32be7531bbca747111df2caa227ed9d2121144b"
+    },
+    {
+      "bytes": 1797,
+      "path": "sprites/approved_blank_blue/sit_north_4.png",
+      "sha256": "52763e5448e313b9764cc0ae8d81d084302757365887fb17d30b32f8d9adf4fb"
+    },
+    {
+      "bytes": 1777,
+      "path": "sprites/approved_blank_blue/sit_south_4.png",
+      "sha256": "5e9b0a25948dbe9a8dd01d21c858f99eb9336978d6d8578dfb9db0ac763b86ed"
+    },
+    {
+      "bytes": 1691,
+      "path": "sprites/approved_blank_blue/sit_west_4.png",
+      "sha256": "14d74d795b8515919f64af53705fb9611bd44b39cbc8501c337138436b587ac8"
+    },
+    {
+      "bytes": 1757,
+      "path": "sprites/approved_blank_blue/type_north_1.png",
+      "sha256": "ce96beff5b60359f7d01141aa48e061e0ab3ab47a600de8d10db215d53c39f34"
+    },
+    {
+      "bytes": 1773,
+      "path": "sprites/approved_blank_blue/type_north_2.png",
+      "sha256": "81e6afc892ceec1258854df440f55baa3d63770753df5e90fdc34e35b84d28ae"
+    },
+    {
+      "bytes": 1744,
+      "path": "sprites/approved_blank_blue/type_north_3.png",
+      "sha256": "5e1c09deda8b9e5feea3721c680c778ef761bd09018491291c8f1a432aece6c7"
+    },
+    {
+      "bytes": 1724,
+      "path": "sprites/approved_blank_blue/type_north_4.png",
+      "sha256": "9ab4d278bd8caf85ba6d929959640549e41449ae3682fa60b7542756a6b9165a"
+    },
+    {
+      "bytes": 4945,
+      "path": "sprites/approved_blank_blue/walk_east_1.png",
+      "sha256": "8994106c1253221f56c293baa733a121785a3b856bd07c2fe3610aefb9c80b49"
+    },
+    {
+      "bytes": 5826,
+      "path": "sprites/approved_blank_blue/walk_east_2.png",
+      "sha256": "b0430e9d075db9f813128fbb0e525ec423847e28148a083d517b413a3270aa87"
+    },
+    {
+      "bytes": 5406,
+      "path": "sprites/approved_blank_blue/walk_east_3.png",
+      "sha256": "075690ea48ec1584760fe8c5d2825679b754be7dcbb27729a31f95a94d48d026"
+    },
+    {
+      "bytes": 4735,
+      "path": "sprites/approved_blank_blue/walk_east_4.png",
+      "sha256": "d35f26d8049765aea48b9a285964304a2eefdbc4f59e3ff75f1458938a3a08c8"
+    },
+    {
+      "bytes": 5638,
+      "path": "sprites/approved_blank_blue/walk_east_5.png",
+      "sha256": "39436f03588683f8a605f3cca0f18fd63322440d1957424cb98ae02b6af645c2"
+    },
+    {
+      "bytes": 5307,
+      "path": "sprites/approved_blank_blue/walk_east_6.png",
+      "sha256": "81515107366fabe89e37f3b8d2fe27091c879cb0917148e41b0fe9254f91f6b7"
+    },
+    {
+      "bytes": 5605,
+      "path": "sprites/approved_blank_blue/walk_north-east_1.png",
+      "sha256": "828cd68e1e9c258ef1a8a3e5d45a70f3912609cb7120e9870e80cf03bc28ed74"
+    },
+    {
+      "bytes": 6031,
+      "path": "sprites/approved_blank_blue/walk_north-east_2.png",
+      "sha256": "724479f74d2cd6e782da3b0b235bfcdd8b25ac6922b2a9d37009aa4c71339622"
+    },
+    {
+      "bytes": 5782,
+      "path": "sprites/approved_blank_blue/walk_north-east_3.png",
+      "sha256": "fe6fda203a92c13d3eb8b33a0a4cf9caabc0d1c1d437f5d772de5e6c8ccc734a"
+    },
+    {
+      "bytes": 5558,
+      "path": "sprites/approved_blank_blue/walk_north-east_4.png",
+      "sha256": "43bbf40e5de2a53dfa5503b5fb483f329baeb69b8094936530d3561f95944eae"
+    },
+    {
+      "bytes": 5661,
+      "path": "sprites/approved_blank_blue/walk_north-east_5.png",
+      "sha256": "864d46ef93670b521a273ea00971c3af7084c8f605d51acb4dc986f6ebfb7f7a"
+    },
+    {
+      "bytes": 6043,
+      "path": "sprites/approved_blank_blue/walk_north-east_6.png",
+      "sha256": "3dfd7196d107874153ec6da5b0f8a66713d178826399912516e46adf578e88f4"
+    },
+    {
+      "bytes": 5429,
+      "path": "sprites/approved_blank_blue/walk_north-west_1.png",
+      "sha256": "634ac58b53516b06bb072da6fb01957af6b7a18f976a0b11fd15f9a2ea04d3e5"
+    },
+    {
+      "bytes": 5412,
+      "path": "sprites/approved_blank_blue/walk_north-west_2.png",
+      "sha256": "c598099d8f5e716432bf062dd99c92d01ea257fc319f002cf28158501f0c8dcc"
+    },
+    {
+      "bytes": 5392,
+      "path": "sprites/approved_blank_blue/walk_north-west_3.png",
+      "sha256": "e8568b74bd578ede3a83b59c28a67e59b189d042979c01d1652609a2d5e716b8"
+    },
+    {
+      "bytes": 5168,
+      "path": "sprites/approved_blank_blue/walk_north-west_4.png",
+      "sha256": "5f8cd37db6790735ef74ee3819f2958449dee07e62080d940f46a22ea14926ff"
+    },
+    {
+      "bytes": 5976,
+      "path": "sprites/approved_blank_blue/walk_north-west_5.png",
+      "sha256": "6faffd6bae5a99fb2f194777d98e1eabc9f4426d348a3cedd106329df41d4157"
+    },
+    {
+      "bytes": 5414,
+      "path": "sprites/approved_blank_blue/walk_north-west_6.png",
+      "sha256": "dd8bc5b28af47322f75392beef45f237fa47d994824fb87c0b244d1ccee3c16b"
+    },
+    {
+      "bytes": 5584,
+      "path": "sprites/approved_blank_blue/walk_north_1.png",
+      "sha256": "64fee2852993a4154299529f3b0064066e733d10eb09f14d018b48a50fc78533"
+    },
+    {
+      "bytes": 5268,
+      "path": "sprites/approved_blank_blue/walk_north_2.png",
+      "sha256": "c0acb7ec02641bf6b94e63932f612edf68c3ff8cb96cc72a6b4836286189aba9"
+    },
+    {
+      "bytes": 5326,
+      "path": "sprites/approved_blank_blue/walk_north_3.png",
+      "sha256": "771a89f2ccae12830c057efa804bb56908291c187eb3d03e8c65fa9c109f7639"
+    },
+    {
+      "bytes": 5551,
+      "path": "sprites/approved_blank_blue/walk_north_4.png",
+      "sha256": "e13d4d6ffd0d560e71bb6c8ac26c74948b62f03dde1513cab1493a02bb77de22"
+    },
+    {
+      "bytes": 5207,
+      "path": "sprites/approved_blank_blue/walk_north_5.png",
+      "sha256": "23f52465640c3b418c91e29a10fe6daad5c8e76e4b95471de677659e2d070688"
+    },
+    {
+      "bytes": 5413,
+      "path": "sprites/approved_blank_blue/walk_north_6.png",
+      "sha256": "6443673a2dd04c9b4516a01cb1b265254541b98fb6db724b016b112cc893f7ef"
+    },
+    {
+      "bytes": 5707,
+      "path": "sprites/approved_blank_blue/walk_south-east_1.png",
+      "sha256": "09014515ac118eea988e0d0c953808cf8fd11a7165d3db21223857024833b0d6"
+    },
+    {
+      "bytes": 5677,
+      "path": "sprites/approved_blank_blue/walk_south-east_2.png",
+      "sha256": "52c8fd00482beec637c201c082566e70fdaa9420ecf292f1f900ec44531e752d"
+    },
+    {
+      "bytes": 5480,
+      "path": "sprites/approved_blank_blue/walk_south-east_3.png",
+      "sha256": "0718150be04aaa48dc8fc54dd97325df3c4a16fc1a949b09bead5f26c0d813e8"
+    },
+    {
+      "bytes": 5223,
+      "path": "sprites/approved_blank_blue/walk_south-east_4.png",
+      "sha256": "def46a88e065a1b78ab9a51e160828a8aa50a9d5e4531da0cbe9945e31d3a3c9"
+    },
+    {
+      "bytes": 6078,
+      "path": "sprites/approved_blank_blue/walk_south-east_5.png",
+      "sha256": "5134e60e2fb2af86415e39762c91927dad87ba7e155cf9318dd2de7d53cf7d4d"
+    },
+    {
+      "bytes": 5552,
+      "path": "sprites/approved_blank_blue/walk_south-east_6.png",
+      "sha256": "c770574481d47e259064b5e00cf57ce63c9c6f5575b92c7685ac96a4c5060d93"
+    },
+    {
+      "bytes": 5435,
+      "path": "sprites/approved_blank_blue/walk_south-west_1.png",
+      "sha256": "8b0d312c7fee3cac86a88f2877e5bfcc1192b1cd70bc2295d37453a811f22d36"
+    },
+    {
+      "bytes": 5943,
+      "path": "sprites/approved_blank_blue/walk_south-west_2.png",
+      "sha256": "c6b3961c97e365a463769cc03aca877ece23bb8a248fbb107ed1362963eb1d02"
+    },
+    {
+      "bytes": 5743,
+      "path": "sprites/approved_blank_blue/walk_south-west_3.png",
+      "sha256": "f793642588ef55a451c0cdbb72a4ab920573e98293f6f3f6efde09d31964c058"
+    },
+    {
+      "bytes": 5528,
+      "path": "sprites/approved_blank_blue/walk_south-west_4.png",
+      "sha256": "c387ab331d7017251d88396cc3d252de4fab4bab53ef2a6a78c0244b694f1b11"
+    },
+    {
+      "bytes": 5752,
+      "path": "sprites/approved_blank_blue/walk_south-west_5.png",
+      "sha256": "285291bd49d64442ab7c797596eea753d65be81fef3c267fe8dff2299f459ce3"
+    },
+    {
+      "bytes": 5692,
+      "path": "sprites/approved_blank_blue/walk_south-west_6.png",
+      "sha256": "862ec0b866e2b76d7599ebc9f4a125ba32f7a831611627c32015dfd03f937933"
+    },
+    {
+      "bytes": 2207,
+      "path": "sprites/approved_blank_blue/walk_south_1.png",
+      "sha256": "af4733d01178f7033007b6ce5026c267bfeff511e56ab6758c82bf2424433c67"
+    },
+    {
+      "bytes": 2151,
+      "path": "sprites/approved_blank_blue/walk_south_2.png",
+      "sha256": "68de56960e7815c5994f202714b7200b1dd59ef060fea45e176c37a3f9bb8239"
+    },
+    {
+      "bytes": 2080,
+      "path": "sprites/approved_blank_blue/walk_south_3.png",
+      "sha256": "71c856f3c002b5cb912c65ea880c620b89082812d594f0afebd271c3cb80649e"
+    },
+    {
+      "bytes": 2170,
+      "path": "sprites/approved_blank_blue/walk_south_4.png",
+      "sha256": "0c4e63ece4bdaad32ca4fa9047184a7212c8118b4313eb326f6b7da4b8cba62d"
+    },
+    {
+      "bytes": 2027,
+      "path": "sprites/approved_blank_blue/walk_south_5.png",
+      "sha256": "16d48a31551722cdecd4695ce29447bdc7ab5226965d3b544cf980148fdbcae0"
+    },
+    {
+      "bytes": 2113,
+      "path": "sprites/approved_blank_blue/walk_south_6.png",
+      "sha256": "b44b72ff2aa59688b13026dd574284aa0c95c60242b580db32268153e12582ef"
+    },
+    {
+      "bytes": 5046,
+      "path": "sprites/approved_blank_blue/walk_west_1.png",
+      "sha256": "d93673dc135e10ce51a845f3c50f63fb89fd139739f161332880293d6d8e2823"
+    },
+    {
+      "bytes": 5924,
+      "path": "sprites/approved_blank_blue/walk_west_2.png",
+      "sha256": "1be24e26dcc384d98510160fb32b1f5aca85c4302ead78a3e5de26d74dfcdbda"
+    },
+    {
+      "bytes": 5669,
+      "path": "sprites/approved_blank_blue/walk_west_3.png",
+      "sha256": "59c00256dd78b2f14c6ad6fa16c85ecd2c7e06fac642162354c85feb1bbf42b7"
+    },
+    {
+      "bytes": 4702,
+      "path": "sprites/approved_blank_blue/walk_west_4.png",
+      "sha256": "9d6307818b7970bc08eb897e250f9739d5f427b32036eb6c8c99fc47a24bae37"
+    },
+    {
+      "bytes": 5859,
+      "path": "sprites/approved_blank_blue/walk_west_5.png",
+      "sha256": "62bc3419a8da8e11a5f58df9a1110f52b17eb486ff72fa74f1b007d0462655da"
+    },
+    {
+      "bytes": 5435,
+      "path": "sprites/approved_blank_blue/walk_west_6.png",
+      "sha256": "5aefb087b263e4ee290657f6ddc25c1b14ecac11e828fd674a5825edc43ecc5a"
+    },
+    {
+      "bytes": 3779,
+      "path": "sprites/approved_blank_green/rot_east.png",
+      "sha256": "d060a531be33e50c1918abdd1197842ca2e9f58e937edcf9dbd10cd60902a517"
+    },
+    {
+      "bytes": 5649,
+      "path": "sprites/approved_blank_green/rot_north-east.png",
+      "sha256": "fc319ae4df314d18dc79ec317d9030ae2f08abbf2603e10fd4b4f8531e36de28"
+    },
+    {
+      "bytes": 5467,
+      "path": "sprites/approved_blank_green/rot_north-west.png",
+      "sha256": "7072d7eb8bc2a203d2fd0300b1793ff4f8206a874175cd7a02882b7b7d80505b"
+    },
+    {
+      "bytes": 6194,
+      "path": "sprites/approved_blank_green/rot_north.png",
+      "sha256": "35cdead452d46e90e631f0bf136117213049c2130d5ef0506d2ff5871113de46"
+    },
+    {
+      "bytes": 5460,
+      "path": "sprites/approved_blank_green/rot_south-east.png",
+      "sha256": "9de6941d39ec2edb7c5a45e0c785702ffdaddec6ad664e5d30822a379ad3dfde"
+    },
+    {
+      "bytes": 5915,
+      "path": "sprites/approved_blank_green/rot_south-west.png",
+      "sha256": "3cdab7ef0e928322f7dbd4e8d1a528170098c7498b5b9fba8099ca000641cf97"
+    },
+    {
+      "bytes": 6962,
+      "path": "sprites/approved_blank_green/rot_south.png",
+      "sha256": "bf78070d2670b1b151cfaab63b5bda1627309651eb36cb411853060f61b91380"
+    },
+    {
+      "bytes": 3871,
+      "path": "sprites/approved_blank_green/rot_west.png",
+      "sha256": "60263716ef14afce86188de9335ad7e8f18330e764f9d2848e2bdf8623ac3ebf"
+    },
+    {
+      "bytes": 1590,
+      "path": "sprites/approved_blank_green/sit_east_4.png",
+      "sha256": "e464f3c0542b61a986f542f96961204e1f5d8577b83acca8a45c37074846a2ce"
+    },
+    {
+      "bytes": 1706,
+      "path": "sprites/approved_blank_green/sit_north_4.png",
+      "sha256": "78f39861104990dc4f071461073e2e142ff772af76e91b4951a7132ee50a582b"
+    },
+    {
+      "bytes": 1657,
+      "path": "sprites/approved_blank_green/sit_south_4.png",
+      "sha256": "04d371c4f208814841203163951f80d85b1dde2e89ebd1546919e22eb7766da2"
+    },
+    {
+      "bytes": 1565,
+      "path": "sprites/approved_blank_green/sit_west_4.png",
+      "sha256": "5e3a67ca2d79e09c238c5de37d0b35a6360103d7fb8d7c2649c0a9f7c82f75a1"
+    },
+    {
+      "bytes": 1628,
+      "path": "sprites/approved_blank_green/type_north_1.png",
+      "sha256": "e29abe89f09eb1d3bcf293456022c73f788add0287be716158e4faed6b973455"
+    },
+    {
+      "bytes": 1613,
+      "path": "sprites/approved_blank_green/type_north_2.png",
+      "sha256": "0b77d7b24129ea50dee96916a725881a5cb9735dd111ab929cba2d5af1d4a5df"
+    },
+    {
+      "bytes": 1612,
+      "path": "sprites/approved_blank_green/type_north_3.png",
+      "sha256": "3b006de025d7acb2856089179e39eb77f4c3fb20772aa53448f915b7cd94052e"
+    },
+    {
+      "bytes": 1656,
+      "path": "sprites/approved_blank_green/type_north_4.png",
+      "sha256": "c00ff7ec41dbd339fc08409adcac6aecdf91fcb3f2e2c1a042771e5538e7f22d"
+    },
+    {
+      "bytes": 4933,
+      "path": "sprites/approved_blank_green/walk_east_1.png",
+      "sha256": "7bab19ae833e4dbed91601146d92a208d96c1b20507dce36868db4b0a0a27a43"
+    },
+    {
+      "bytes": 5858,
+      "path": "sprites/approved_blank_green/walk_east_2.png",
+      "sha256": "f9df59736dc7bc2f72c1bf4a27e0b1e5778d78bb006ee5134d54a3212d06ff59"
+    },
+    {
+      "bytes": 5408,
+      "path": "sprites/approved_blank_green/walk_east_3.png",
+      "sha256": "1da842bf376a3b6c8388a1f67972a9275d877fff9962d30e1f812ffc502a94ae"
+    },
+    {
+      "bytes": 4645,
+      "path": "sprites/approved_blank_green/walk_east_4.png",
+      "sha256": "604399cec13942b5a811e4acdd2ba5cf5b8496ef1fb784917e3f586be6e5f844"
+    },
+    {
+      "bytes": 5632,
+      "path": "sprites/approved_blank_green/walk_east_5.png",
+      "sha256": "64afdd933ce78f9b25383842c92f8710eba5bdcb52d6665d339cd8c08e5b2698"
+    },
+    {
+      "bytes": 5332,
+      "path": "sprites/approved_blank_green/walk_east_6.png",
+      "sha256": "181c01f4277a80ff0bc4fe2478a5fa44d518b6bf7a6663e5e8cc4cb9e164ced6"
+    },
+    {
+      "bytes": 5291,
+      "path": "sprites/approved_blank_green/walk_north-east_1.png",
+      "sha256": "8f1069c7b339bc7bd0bb92f08720ca31d45af7f89e27442a737424f4aa53e3e7"
+    },
+    {
+      "bytes": 5844,
+      "path": "sprites/approved_blank_green/walk_north-east_2.png",
+      "sha256": "d83d4b75769fc5243cb32fa6234362d424c8d4ae2264dcac3c51d10160c84a0e"
+    },
+    {
+      "bytes": 5586,
+      "path": "sprites/approved_blank_green/walk_north-east_3.png",
+      "sha256": "cceef9b2985357c5538a0aff5083fb179f7f34bc5b080e56d0ce9701140d7c3e"
+    },
+    {
+      "bytes": 5208,
+      "path": "sprites/approved_blank_green/walk_north-east_4.png",
+      "sha256": "7d2e035f21d26998d991674e1067ed6010cbb77b249d212e866a91c61db5ccc3"
+    },
+    {
+      "bytes": 5574,
+      "path": "sprites/approved_blank_green/walk_north-east_5.png",
+      "sha256": "94ebf2b4814f4658381ef9a28d763e1dadea8963a81ee99c085ca1bd111887f7"
+    },
+    {
+      "bytes": 5753,
+      "path": "sprites/approved_blank_green/walk_north-east_6.png",
+      "sha256": "6caa9fc9a32acf0ac2722d7502be20944ba7a8950dca0c6f0eed5e6d176ebc22"
+    },
+    {
+      "bytes": 5213,
+      "path": "sprites/approved_blank_green/walk_north-west_1.png",
+      "sha256": "ffcf1befa5f3032390348122ecb09c969fddb460b8c849f25c93c79409ca9518"
+    },
+    {
+      "bytes": 5288,
+      "path": "sprites/approved_blank_green/walk_north-west_2.png",
+      "sha256": "c1f8e396496626001f82863d7e08dd2783fd38d0d3a7bacc3db7cf375111a4b8"
+    },
+    {
+      "bytes": 5192,
+      "path": "sprites/approved_blank_green/walk_north-west_3.png",
+      "sha256": "704be893b0b59c0de6b7dd56a1746115c40a509da3c801b7029822a9745761ea"
+    },
+    {
+      "bytes": 4998,
+      "path": "sprites/approved_blank_green/walk_north-west_4.png",
+      "sha256": "60f6e6808afa10f2f8ae9d7e0ee991cbc23f00126fa85926efbe33e3aaa71454"
+    },
+    {
+      "bytes": 5563,
+      "path": "sprites/approved_blank_green/walk_north-west_5.png",
+      "sha256": "9bdc58a5ac88da4123cc64396e702191aaf81f8f43b2a9220b45e96cbf116d41"
+    },
+    {
+      "bytes": 5106,
+      "path": "sprites/approved_blank_green/walk_north-west_6.png",
+      "sha256": "a617a921b837862d0ca5c9b4a4229e857a7df026c2a521ad556ae86f691899ec"
+    },
+    {
+      "bytes": 5673,
+      "path": "sprites/approved_blank_green/walk_north_1.png",
+      "sha256": "c1f9bdc3c27715af0ed1260a0c4728f26cc4499cbc838fd315fa419aca364c85"
+    },
+    {
+      "bytes": 5234,
+      "path": "sprites/approved_blank_green/walk_north_2.png",
+      "sha256": "638eeadc47a888410f524de3034acc5b971ea3c4ff2b3244c1ff3a6c8a42a0cb"
+    },
+    {
+      "bytes": 5196,
+      "path": "sprites/approved_blank_green/walk_north_3.png",
+      "sha256": "d9649dc28d0e19d038a3709246aeacdd5b8b47d20bf5c674d2600215520f836b"
+    },
+    {
+      "bytes": 5645,
+      "path": "sprites/approved_blank_green/walk_north_4.png",
+      "sha256": "a0df3b39ce824e425bbde19f1eb7b0795b9d3688d8771c0b80fa42dc0c5b78d3"
+    },
+    {
+      "bytes": 5406,
+      "path": "sprites/approved_blank_green/walk_north_5.png",
+      "sha256": "4ea2bd22565ce2e8d03c58e8811cf8cf00bc9455dcc6831ea618040f74bacaa1"
+    },
+    {
+      "bytes": 5381,
+      "path": "sprites/approved_blank_green/walk_north_6.png",
+      "sha256": "461c113e14d0277982b676b5365fb3f64fe2f3e932dbb853244be4aa67a11ffc"
+    },
+    {
+      "bytes": 5298,
+      "path": "sprites/approved_blank_green/walk_south-east_1.png",
+      "sha256": "43a60c2068a9b147661a0c774f82da93043c48b1c0d8dfe7958a830a9f2924a9"
+    },
+    {
+      "bytes": 5660,
+      "path": "sprites/approved_blank_green/walk_south-east_2.png",
+      "sha256": "4accaa18b46d1d65b589312099448e9a496f45dcac09afd1fe8a0de203b0b2e2"
+    },
+    {
+      "bytes": 5536,
+      "path": "sprites/approved_blank_green/walk_south-east_3.png",
+      "sha256": "3af6c734e156692689126c80bfaf8bec26a5e81eccc2ca3916401f2caae69d78"
+    },
+    {
+      "bytes": 5247,
+      "path": "sprites/approved_blank_green/walk_south-east_4.png",
+      "sha256": "df3eaab40d74a1f02aa740599ce8ae7015268ccc1007c7b25bf3f7ed46b8696e"
+    },
+    {
+      "bytes": 6027,
+      "path": "sprites/approved_blank_green/walk_south-east_5.png",
+      "sha256": "fe088c66640d2c1f411647d08e6363f6c45435a3e9c303c759a60f55ba107212"
+    },
+    {
+      "bytes": 5464,
+      "path": "sprites/approved_blank_green/walk_south-east_6.png",
+      "sha256": "b7a05b97eb796f67bdd7f549addb7f026fc387b4f2e77828bb1a267a5ae73535"
+    },
+    {
+      "bytes": 5186,
+      "path": "sprites/approved_blank_green/walk_south-west_1.png",
+      "sha256": "9437df51c9db4d635b15c6e66f9bf6f96fa094b5c9f7bf779b17244a7fdb6cb9"
+    },
+    {
+      "bytes": 5783,
+      "path": "sprites/approved_blank_green/walk_south-west_2.png",
+      "sha256": "74e6720dce2e7022df3176104aa0c8b8bed952016afde9abb81f99f8748e1975"
+    },
+    {
+      "bytes": 5617,
+      "path": "sprites/approved_blank_green/walk_south-west_3.png",
+      "sha256": "ad31aa263154ed6e6fd7a3ec665dfa6dc9216d0dc57c8b2efd40a9af52438fcf"
+    },
+    {
+      "bytes": 5091,
+      "path": "sprites/approved_blank_green/walk_south-west_4.png",
+      "sha256": "6f05007124c7086addd095dbf58f119bfe1bd9b2df472e87ccee4cfba30b8435"
+    },
+    {
+      "bytes": 5491,
+      "path": "sprites/approved_blank_green/walk_south-west_5.png",
+      "sha256": "14c769862981a18b389026ebd58c868ea2ef4109221900dddfc76a85194f7a88"
+    },
+    {
+      "bytes": 5360,
+      "path": "sprites/approved_blank_green/walk_south-west_6.png",
+      "sha256": "739d4df8a1c2c2293a8d24fef1a4158d97a1ca0263559336b3a4ef9ca1fe5483"
+    },
+    {
+      "bytes": 1946,
+      "path": "sprites/approved_blank_green/walk_south_1.png",
+      "sha256": "a5ddccdf42d7998a6688a805c2825a681dd2c07d302b2c51d6132a6dcd3f9915"
+    },
+    {
+      "bytes": 1869,
+      "path": "sprites/approved_blank_green/walk_south_2.png",
+      "sha256": "a886a7193c7560b56df0e36846bcd58c286fd1c945b695116c1f0f58a71bf46b"
+    },
+    {
+      "bytes": 1811,
+      "path": "sprites/approved_blank_green/walk_south_3.png",
+      "sha256": "e3e0bdbb1da30449816f5a932e70bba0c45cdd09284e2bad31529d809614486b"
+    },
+    {
+      "bytes": 1889,
+      "path": "sprites/approved_blank_green/walk_south_4.png",
+      "sha256": "82acf4c643ca085846a8503bb122c68a3cd2f5c33ccc8bdcb2b3c0e93c5608ef"
+    },
+    {
+      "bytes": 1823,
+      "path": "sprites/approved_blank_green/walk_south_5.png",
+      "sha256": "47ebd3fc991a0f9348cdea3ff8e7757459bf79418036d9bb150b2511b9019dce"
+    },
+    {
+      "bytes": 1827,
+      "path": "sprites/approved_blank_green/walk_south_6.png",
+      "sha256": "269f081e7422099a972cbc7479ad8d9e55934009e4055555dae0266db4055e60"
+    },
+    {
+      "bytes": 4840,
+      "path": "sprites/approved_blank_green/walk_west_1.png",
+      "sha256": "18f7d3fa5dc7d69cfff533002ca06542d002e6476cae87c8a20da310460983fb"
+    },
+    {
+      "bytes": 5521,
+      "path": "sprites/approved_blank_green/walk_west_2.png",
+      "sha256": "6f51c92d5424891dd388276558cff63c5cbc26a9bdc5225274ce060f15f96532"
+    },
+    {
+      "bytes": 5272,
+      "path": "sprites/approved_blank_green/walk_west_3.png",
+      "sha256": "f55ccb6bbf4c7305b9707627f67bf82b9692daf007b8f10ca0ceb8df84e0f123"
+    },
+    {
+      "bytes": 4594,
+      "path": "sprites/approved_blank_green/walk_west_4.png",
+      "sha256": "1c81928a008bc9745976376a790f850d5d0ca3d2bb49f21e68acefa23206bc8a"
+    },
+    {
+      "bytes": 5654,
+      "path": "sprites/approved_blank_green/walk_west_5.png",
+      "sha256": "28c425ae974d2b2aa9dd22c6bbc6e40ee69a724246d14f7409e1a1425c592ff3"
+    },
+    {
+      "bytes": 5159,
+      "path": "sprites/approved_blank_green/walk_west_6.png",
+      "sha256": "6bc7573773c4d7b6e8a0fd76fae88c742abc81d71eaf2497450d45118506f801"
+    },
+    {
+      "bytes": 4524,
+      "path": "sprites/approved_blank_red/rot_east.png",
+      "sha256": "8d3d02e6842385e7a961a5b77e7cd4626d6d7e87cf20dc973661daa4c881f29d"
+    },
+    {
+      "bytes": 6049,
+      "path": "sprites/approved_blank_red/rot_north-east.png",
+      "sha256": "716622638b1286850be37b347150598a3ec5e8fa345df9335e86503a2fc61907"
+    },
+    {
+      "bytes": 5999,
+      "path": "sprites/approved_blank_red/rot_north-west.png",
+      "sha256": "068165844d90adc7be5e37b82bb8dab191715b7168ae055f0581dbf06860a39f"
+    },
+    {
+      "bytes": 6680,
+      "path": "sprites/approved_blank_red/rot_north.png",
+      "sha256": "623afe8695e2f1704bae691460755925fab6b9836ecb946d3b9595bab730ef8d"
+    },
+    {
+      "bytes": 6258,
+      "path": "sprites/approved_blank_red/rot_south-east.png",
+      "sha256": "fe47cebb815ec7d6efc6f65af08475fe675a33e2ee22c9338bfade6aa42bbd1a"
+    },
+    {
+      "bytes": 6410,
+      "path": "sprites/approved_blank_red/rot_south-west.png",
+      "sha256": "5e5d41dd617ea1f4f07c2964b9cc93182a977702ff395f1d396c852b6fdae92e"
+    },
+    {
+      "bytes": 6852,
+      "path": "sprites/approved_blank_red/rot_south.png",
+      "sha256": "151886d8084a91240ac7b51af6c04f4ea63ae7b297062a1f6b3ef88b4352a30a"
+    },
+    {
+      "bytes": 4568,
+      "path": "sprites/approved_blank_red/rot_west.png",
+      "sha256": "857c79e4b2baf331a57a8abe9f4b7022b00ff7b46175baa1fb017c60d06a0413"
+    },
+    {
+      "bytes": 1676,
+      "path": "sprites/approved_blank_red/sit_east_4.png",
+      "sha256": "1a0c927c2a2b5abf93dc1685c69812560102bdcebd9fd9711ad6b6291c0b8b27"
+    },
+    {
+      "bytes": 1550,
+      "path": "sprites/approved_blank_red/sit_north_4.png",
+      "sha256": "6b9fd4bd4d404fa2b0a9e9229035071c31f54332214207409d677c16adbefa35"
+    },
+    {
+      "bytes": 1581,
+      "path": "sprites/approved_blank_red/sit_south_4.png",
+      "sha256": "004a2e14eee92ce21462071ec37d3f84cd253b6e96e82dc888d2ce513252d1fe"
+    },
+    {
+      "bytes": 1467,
+      "path": "sprites/approved_blank_red/sit_west_4.png",
+      "sha256": "07b3fb77c74942c66a58585fb8bc5ac8505bb5ad92f61fc847f85e8e8dc6c315"
+    },
+    {
+      "bytes": 1481,
+      "path": "sprites/approved_blank_red/type_north_1.png",
+      "sha256": "287ac67d6a4d821f277ee633e2ab0b126d532493832b63ef52b543be9e2d2dab"
+    },
+    {
+      "bytes": 1494,
+      "path": "sprites/approved_blank_red/type_north_2.png",
+      "sha256": "da680271cda0a881c74c07736387feaeee7016e90571f0656f6ee27ed2c63186"
+    },
+    {
+      "bytes": 1482,
+      "path": "sprites/approved_blank_red/type_north_3.png",
+      "sha256": "db0c7c33754bb8235f720adf65e86d518841476b111ded06b645c29c41e49a11"
+    },
+    {
+      "bytes": 1468,
+      "path": "sprites/approved_blank_red/type_north_4.png",
+      "sha256": "c0fe3f41797227a4b37cbca0a764c7d0b78a7a7831a21214dbf28d04ff6e5d8c"
+    },
+    {
+      "bytes": 1730,
+      "path": "sprites/approved_blank_red/walk_east_1.png",
+      "sha256": "07c4793b700c4bb6def358ed77014286e6266b4954ca5787f23d2e0020f69a0f"
+    },
+    {
+      "bytes": 1962,
+      "path": "sprites/approved_blank_red/walk_east_2.png",
+      "sha256": "04f55011ca26eab99c2ac7b0130fe5ddc4df635214b640b09b46d6536432d9e6"
+    },
+    {
+      "bytes": 1811,
+      "path": "sprites/approved_blank_red/walk_east_3.png",
+      "sha256": "74aeda13fb1d39f00f6c85ae9cdd7a81696d341343a62dbf71e0bdf07db23b87"
+    },
+    {
+      "bytes": 1627,
+      "path": "sprites/approved_blank_red/walk_east_4.png",
+      "sha256": "9be8c75c5ffc114e81b41557a6afed919c47b2f6f773b9a18f0ce215a8d4d233"
+    },
+    {
+      "bytes": 1879,
+      "path": "sprites/approved_blank_red/walk_east_5.png",
+      "sha256": "1c725e67f367d4a710be4565d3346cf7cf0fdf327faa14052b9106cce2a789c2"
+    },
+    {
+      "bytes": 1766,
+      "path": "sprites/approved_blank_red/walk_east_6.png",
+      "sha256": "55fd40c278f6cd105874f527f295969662ea17b7869894adc63f886501fcf352"
+    },
+    {
+      "bytes": 4200,
+      "path": "sprites/approved_blank_red/walk_north-east_1.png",
+      "sha256": "7208d0d05581f2b0f89d0b8d630a02faa929ccddeed612bc545e12f055fcf00b"
+    },
+    {
+      "bytes": 4515,
+      "path": "sprites/approved_blank_red/walk_north-east_2.png",
+      "sha256": "8ad7b8eb313d4d43024f33704a4fc6d18ea545870276303b3ea0d999e8d60aa8"
+    },
+    {
+      "bytes": 4367,
+      "path": "sprites/approved_blank_red/walk_north-east_3.png",
+      "sha256": "35039fa4da163478e07dd6271ae41e298d18b52fea776ee498ff519f8c4ed6e7"
+    },
+    {
+      "bytes": 4086,
+      "path": "sprites/approved_blank_red/walk_north-east_4.png",
+      "sha256": "a0298ac4564ee681374a53bd2972fdf5a2b00cacad41ab31ed6c6859fc097d69"
+    },
+    {
+      "bytes": 4293,
+      "path": "sprites/approved_blank_red/walk_north-east_5.png",
+      "sha256": "d81aa779582b1dc183bacf3174ace8b928893edca4cccd463762884f55ce42ed"
+    },
+    {
+      "bytes": 4454,
+      "path": "sprites/approved_blank_red/walk_north-east_6.png",
+      "sha256": "491edf8083982e778f2aeb3bb373b58df7460b6f210dd447d455d27eac306448"
+    },
+    {
+      "bytes": 4323,
+      "path": "sprites/approved_blank_red/walk_north-west_1.png",
+      "sha256": "2f8f1140c49bab73cafaa07cb8a42a455676f138f06eae8e340b109aa2f98d58"
+    },
+    {
+      "bytes": 4324,
+      "path": "sprites/approved_blank_red/walk_north-west_2.png",
+      "sha256": "989243927f048275caf5825eef005eb519e1cd8e810e7bee940b146df8c74f8a"
+    },
+    {
+      "bytes": 4266,
+      "path": "sprites/approved_blank_red/walk_north-west_3.png",
+      "sha256": "175b5b0068138d3348c826588018225007f1b55c40bec83e452fa25f1c6cb949"
+    },
+    {
+      "bytes": 4038,
+      "path": "sprites/approved_blank_red/walk_north-west_4.png",
+      "sha256": "cebbcbfdde04b287b70f163b726c5c8e0e2f795fae7b46fd3d118ae1ae4ed36c"
+    },
+    {
+      "bytes": 4512,
+      "path": "sprites/approved_blank_red/walk_north-west_5.png",
+      "sha256": "041efa87644092256757b9230770815305a697c5972c3f60c143091a0733fa54"
+    },
+    {
+      "bytes": 4339,
+      "path": "sprites/approved_blank_red/walk_north-west_6.png",
+      "sha256": "3ebbfd310af3d9dd319e4fcf43e106ba4cecbb3bb486f5cd5eac1b0680aba7cf"
+    },
+    {
+      "bytes": 4335,
+      "path": "sprites/approved_blank_red/walk_north_1.png",
+      "sha256": "926d19f272fe1a1660a3de6464adc7e5b28c132a74c50178ab301c1864b9ed81"
+    },
+    {
+      "bytes": 4102,
+      "path": "sprites/approved_blank_red/walk_north_2.png",
+      "sha256": "dd5798eeb0ac7899bbf13671780b7afd3dafd8364b522ce53399bca71a41dd86"
+    },
+    {
+      "bytes": 3998,
+      "path": "sprites/approved_blank_red/walk_north_3.png",
+      "sha256": "06f4c9e830ae7ef7ddd58cf0407c2f3152316ce9c65e25281ca9f86386f2e75a"
+    },
+    {
+      "bytes": 4346,
+      "path": "sprites/approved_blank_red/walk_north_4.png",
+      "sha256": "2ee7f6bce4d5d9814802b448f452ec1f7aeb255226342733e8d919a06280ccac"
+    },
+    {
+      "bytes": 4035,
+      "path": "sprites/approved_blank_red/walk_north_5.png",
+      "sha256": "ab4ef40ef3949ba6c22869d1c6a556e2c09a4c5afde33be82a3393a65fd6c0e9"
+    },
+    {
+      "bytes": 4081,
+      "path": "sprites/approved_blank_red/walk_north_6.png",
+      "sha256": "6616b5d9a67121faa649a1c03849d20ffb923119415012a1aa271bfb312723ca"
+    },
+    {
+      "bytes": 5081,
+      "path": "sprites/approved_blank_red/walk_south-east_1.png",
+      "sha256": "9f93471b53922dbdc5031ea94fe27f789a7263f5df5297bced474ae51f16dfb6"
+    },
+    {
+      "bytes": 4998,
+      "path": "sprites/approved_blank_red/walk_south-east_2.png",
+      "sha256": "7b424fdb3f59d17384b924b7b51df42246115ad09efab61361bbc66e63537d9a"
+    },
+    {
+      "bytes": 4905,
+      "path": "sprites/approved_blank_red/walk_south-east_3.png",
+      "sha256": "d45610e56fde136ffaa34768bf80e17420498ab639d67036857f18e184419bed"
+    },
+    {
+      "bytes": 4924,
+      "path": "sprites/approved_blank_red/walk_south-east_4.png",
+      "sha256": "938bcba03d5a0d03b280b4cb35ecf65f338db0de933445e0526a019b8ca3d9a7"
+    },
+    {
+      "bytes": 5513,
+      "path": "sprites/approved_blank_red/walk_south-east_5.png",
+      "sha256": "ea39ca0bb4634bdb572270e7aa1e8e107ab9b43166e977a9f5cb309813ff7abe"
+    },
+    {
+      "bytes": 5314,
+      "path": "sprites/approved_blank_red/walk_south-east_6.png",
+      "sha256": "11a703a14649c3bbae56696c18224879749bc97101904cafe95528b9b899d49c"
+    },
+    {
+      "bytes": 4706,
+      "path": "sprites/approved_blank_red/walk_south-west_1.png",
+      "sha256": "2cdaf68c19d23d3eed4d55441e389e3db24919194041bdd62ad66dd77559397f"
+    },
+    {
+      "bytes": 5264,
+      "path": "sprites/approved_blank_red/walk_south-west_2.png",
+      "sha256": "551b5eb7f43d1d0d358744e68469fa6dff5431712046fab38f1895d277637eeb"
+    },
+    {
+      "bytes": 5205,
+      "path": "sprites/approved_blank_red/walk_south-west_3.png",
+      "sha256": "ccd6da2cb32cf975d0165a9b7aec5d7bc5d8a14108561abd66ff42858bb9c016"
+    },
+    {
+      "bytes": 4686,
+      "path": "sprites/approved_blank_red/walk_south-west_4.png",
+      "sha256": "50cfe8d846979a61a075076f76b725ff4a225bfdd80ebf4dd03f8131e412ba19"
+    },
+    {
+      "bytes": 4934,
+      "path": "sprites/approved_blank_red/walk_south-west_5.png",
+      "sha256": "b041b578de06783cf381c0023f04bf7c974da54029d3af3867c0cf0a5e227263"
+    },
+    {
+      "bytes": 5066,
+      "path": "sprites/approved_blank_red/walk_south-west_6.png",
+      "sha256": "dd11b84169a9c9886cfd074017b497dec584a06eb235a419b3ed3abcc12bd776"
+    },
+    {
+      "bytes": 2044,
+      "path": "sprites/approved_blank_red/walk_south_1.png",
+      "sha256": "b20865bd510a1b3a03cdf5d5d569644c79c342a31f4b8d5c4688d5df42353936"
+    },
+    {
+      "bytes": 1965,
+      "path": "sprites/approved_blank_red/walk_south_2.png",
+      "sha256": "d5fbf49658499db8f06bb240353429c5537efade09a44ee1e3bda26b48a20b93"
+    },
+    {
+      "bytes": 1934,
+      "path": "sprites/approved_blank_red/walk_south_3.png",
+      "sha256": "fe3a01ef11764bab67441dd729081e92586ec8c82400674d11589cae662ce2a6"
+    },
+    {
+      "bytes": 2023,
+      "path": "sprites/approved_blank_red/walk_south_4.png",
+      "sha256": "56567303ea6d7f16179f0bdbc8f3ee147aaf4c4111f0a2d5b19be4005f928731"
+    },
+    {
+      "bytes": 1928,
+      "path": "sprites/approved_blank_red/walk_south_5.png",
+      "sha256": "37550f7113d473fe0e2177f796052cce7ee649c9b59a8ec22b12bb80ba704635"
+    },
+    {
+      "bytes": 1962,
+      "path": "sprites/approved_blank_red/walk_south_6.png",
+      "sha256": "4a72b6a86b3031babc948e4f0070aa7534d1a2e6fa2dfcb4e77fe6ca21d58171"
+    },
+    {
+      "bytes": 1686,
+      "path": "sprites/approved_blank_red/walk_west_1.png",
+      "sha256": "aaf5ad1b52a72353af2c46cee9404dfebaf5134e37009e58b3e1ef6e9fc276d2"
+    },
+    {
+      "bytes": 1905,
+      "path": "sprites/approved_blank_red/walk_west_2.png",
+      "sha256": "f1dbbe78c904bcb1406135b48b5797c0f0b478849dc6ab712208316392621508"
+    },
+    {
+      "bytes": 1855,
+      "path": "sprites/approved_blank_red/walk_west_3.png",
+      "sha256": "191d850a34d7969aaf4eec7080cdcdd31f085ccdeedbf7307160974ed0572180"
+    },
+    {
+      "bytes": 1666,
+      "path": "sprites/approved_blank_red/walk_west_4.png",
+      "sha256": "c8cd673f6d183a0c77b32ffe7e0059487da3bafc5ed563b3ebdd8dc96c3f1881"
+    },
+    {
+      "bytes": 1888,
+      "path": "sprites/approved_blank_red/walk_west_5.png",
+      "sha256": "0a22f7425c33f585c1260e6c4cbc867beefc7ce5f0eb137874661b65251244c1"
+    },
+    {
+      "bytes": 1852,
+      "path": "sprites/approved_blank_red/walk_west_6.png",
+      "sha256": "7d98e34c315af31fb0fe571a317eb257011358e6434cd146fc805fd6c8ec3b15"
+    },
+    {
+      "bytes": 233639,
+      "path": "tiles/buildings/Alchemist.png",
+      "sha256": "a5efb5891a8fd8287928531e558ab4ce9f18d97e802855ee930353a6e13ce005"
+    },
+    {
+      "bytes": 185971,
+      "path": "tiles/buildings/Arena.png",
+      "sha256": "4499bd7a194307062daf9f0dfbca604914ddd6f2249b85073ac9446680ff6a01"
+    },
+    {
+      "bytes": 167988,
+      "path": "tiles/buildings/Castle.png",
+      "sha256": "bd9e139d19fbf3f4beae842937fe0a1edff209c91348e41956d0819b67683025"
+    },
+    {
+      "bytes": 158428,
+      "path": "tiles/buildings/Chapel.png",
+      "sha256": "e5ced86236ca3f90f5e64209cfe672633373eb19dd3ade352dc30b5f3be9deb6"
+    },
+    {
+      "bytes": 215880,
+      "path": "tiles/buildings/Forge.png",
+      "sha256": "e05e4f30e058ade769fbccea0eb72713b88d0db4179719bc974de0bd9d71aa22"
+    },
+    {
+      "bytes": 124419,
+      "path": "tiles/buildings/Library.png",
+      "sha256": "703e5ddf43414c077b87c018b675904c847128171f1db1b0d93da9939b3233b9"
+    },
+    {
+      "bytes": 137470,
+      "path": "tiles/buildings/Tavern.png",
+      "sha256": "b733c4935b5dcfe2de23e8caf3517f9abc9fce330691fceafd0678a2472db3e7"
+    },
+    {
+      "bytes": 120188,
+      "path": "tiles/buildings/Tower.png",
+      "sha256": "d25fab0f149bccdb137350172617d3ae8fffc8db9ba97b57a7ab9e0bdb7b8af1"
+    },
+    {
+      "bytes": 6694,
+      "path": "tiles/terrain/Bridge/Bridge_All.png",
+      "sha256": "816de342b39f03eeb97bc5d8837ece9d9fcc1936110207158b3ba01a1db3c95f"
+    },
+    {
+      "bytes": 640,
+      "path": "tiles/terrain/Ground/Shadows.png",
+      "sha256": "e6b60e7445c67f3d42f50113353e3065e790168550dd07e7e0b54b9f2a4d9eb8"
+    },
+    {
+      "bytes": 20530,
+      "path": "tiles/terrain/Ground/Tilemap_Elevation.png",
+      "sha256": "dab562d922d81e4de500dc9e2cb480e35825e6202728b2a0825714b8885daee1"
+    },
+    {
+      "bytes": 28783,
+      "path": "tiles/terrain/Ground/Tilemap_Flat.png",
+      "sha256": "683b4ebc6dff10d2bf6e2bd34c24d732defdc65abcb0f5b9f509655aff8bec56"
+    },
+    {
+      "bytes": 4910,
+      "path": "tiles/terrain/Water/Foam/Foam.png",
+      "sha256": "eaeaab4c2211ce5babac0da55d3da096eb68ead4137a1fa060cbd93aece995c9"
+    },
+    {
+      "bytes": 2197,
+      "path": "tiles/terrain/Water/Rocks/Rocks_01.png",
+      "sha256": "56a85a84754200c9db1b20ff7f56ac20b9a65076ebdb4b60c468e38babaf66a5"
+    },
+    {
+      "bytes": 2970,
+      "path": "tiles/terrain/Water/Rocks/Rocks_02.png",
+      "sha256": "02b5dea7d26c1b9ad5e4dcbfb952888255b466f201f38402f33075c5292a3445"
+    },
+    {
+      "bytes": 4395,
+      "path": "tiles/terrain/Water/Rocks/Rocks_03.png",
+      "sha256": "cb407bf96983b55356074d3de9164e1e1e8d0803bcf7f8536eaf505c0852fef0"
+    },
+    {
+      "bytes": 5509,
+      "path": "tiles/terrain/Water/Rocks/Rocks_04.png",
+      "sha256": "7c3d7f8db1d18fe516081174b0043156d43d06e2d5c1e209218ec86949ee9216"
+    },
+    {
+      "bytes": 222,
+      "path": "tiles/terrain/Water/Water.png",
+      "sha256": "5ef30a00bbff22590eabb5acabb8aca6cc415557e7ab5f60db07714f01a4dba1"
+    },
+    {
+      "bytes": 3907,
+      "path": "ui/banners/Banner_Connection_Down.png",
+      "sha256": "08304c0fa07c5bcab11cbb3fad36782ba571d4975a441098915b0fdb5657481c"
+    },
+    {
+      "bytes": 4516,
+      "path": "ui/banners/Banner_Connection_Left.png",
+      "sha256": "d2a801b3e7c3bd4114a4eee245d5979430bf6d374ac035eb0a5e71dc62a8655c"
+    },
+    {
+      "bytes": 4640,
+      "path": "ui/banners/Banner_Connection_Right.png",
+      "sha256": "e2e544c5891e587603d388d75bd735144a6e8d18c439e8a12c2a3af6cdcea80f"
+    },
+    {
+      "bytes": 4347,
+      "path": "ui/banners/Banner_Connection_Up.png",
+      "sha256": "8f4d70e811ec23f662b415df69b52c2ef82b19fa16692d69019dc8445b05aa61"
+    },
+    {
+      "bytes": 4674,
+      "path": "ui/banners/Banner_Horizontal.png",
+      "sha256": "426d431ca15f5885a8aec7b64f99c42e6950e0608a64d9aa0e64b9a9ac0a17e9"
+    },
+    {
+      "bytes": 4190,
+      "path": "ui/banners/Banner_Vertical.png",
+      "sha256": "0d6bcf94a72cba6f055b60f5f05d3cda50ddf447f432eb1c5276be2a01d1c9d2"
+    },
+    {
+      "bytes": 1973,
+      "path": "ui/banners/Carved_3Slides.png",
+      "sha256": "8e303439a59ac5fa739f8a27049d737a4b1308c87f7892d9f5297c9532f340f1"
+    },
+    {
+      "bytes": 4886,
+      "path": "ui/banners/Carved_9Slides.png",
+      "sha256": "4792041b526cbf8824959b56ff2b820dafbfb7fc6423415b1d035599608f8e3d"
+    },
+    {
+      "bytes": 1196,
+      "path": "ui/banners/Carved_Regular.png",
+      "sha256": "93a7a5247c018e6b034f6d1f2d6d1da00ea50729f9ceee28f81b223ffe686168"
+    },
+    {
+      "bytes": 978,
+      "path": "ui/buttons/Button_Blue.png",
+      "sha256": "a51065cd306e908bb8db04d9f7e28be82fed3b9a18fff7e6d103189102c1e87e"
+    },
+    {
+      "bytes": 1827,
+      "path": "ui/buttons/Button_Blue_3Slides.png",
+      "sha256": "e49daebb8844d601850e8290e413aa150b09272435eee20f0b98f7cd14f67268"
+    },
+    {
+      "bytes": 1421,
+      "path": "ui/buttons/Button_Blue_3Slides_Pressed.png",
+      "sha256": "245dd607087b9972488c466994dc5d4beb627f713b5debe760c051b3f140ef53"
+    },
+    {
+      "bytes": 3048,
+      "path": "ui/buttons/Button_Blue_9Slides.png",
+      "sha256": "59ef888dc5094f206615916ba4ff15a42dc43fc2d1d50cc9c820fc6390e72ecc"
+    },
+    {
+      "bytes": 2522,
+      "path": "ui/buttons/Button_Blue_9Slides_Pressed.png",
+      "sha256": "f9f08dc6e0900c80c6096291224a375ed6246e5b4f615e9d404cba9eebe3e38c"
+    },
+    {
+      "bytes": 816,
+      "path": "ui/buttons/Button_Blue_Pressed.png",
+      "sha256": "2497d1bce401e5a441bc6bf6b30d903dfdedbce98971ba16ec062193502a1050"
+    },
+    {
+      "bytes": 812,
+      "path": "ui/buttons/Button_Disable.png",
+      "sha256": "a742cd415477345b8d74b8d094e8f937753c526c6124f4148732729bcd839f8a"
+    },
+    {
+      "bytes": 1464,
+      "path": "ui/buttons/Button_Disable_3Slides.png",
+      "sha256": "115bf5fdf0faaff6b2d4aac4e943ef2727af1ef9250897678549568333ed5809"
+    },
+    {
+      "bytes": 2578,
+      "path": "ui/buttons/Button_Disable_9Slides.png",
+      "sha256": "8060425562fde2d68062191712b811896f86e91087e12e9d083cf08ea39f2cb8"
+    },
+    {
+      "bytes": 997,
+      "path": "ui/buttons/Button_Hover.png",
+      "sha256": "2039d15e85a3edd3cd7cf03eb8eafb1a64b078573d4168fa3858f1bdf9985e16"
+    },
+    {
+      "bytes": 1856,
+      "path": "ui/buttons/Button_Hover_3Slides.png",
+      "sha256": "d5c177db0519f3c39e5f8ceadfcfa9e17fb097ae28ef1a5e676a36eee7cb6141"
+    },
+    {
+      "bytes": 3070,
+      "path": "ui/buttons/Button_Hover_9Slides.png",
+      "sha256": "07a704762d6aba5675f1d9e6a313bec61040ac15182c17fbc56ad7137c0d5fd8"
+    },
+    {
+      "bytes": 986,
+      "path": "ui/buttons/Button_Red.png",
+      "sha256": "a13d01711bef82705bb37af82c16ac220163d7cba35f00a2833ab05efa1461e1"
+    },
+    {
+      "bytes": 1875,
+      "path": "ui/buttons/Button_Red_3Slides.png",
+      "sha256": "801a7834d4860d3b28d36849dae3b0b2d507b305e99afb929fd8944c954d6597"
+    },
+    {
+      "bytes": 1391,
+      "path": "ui/buttons/Button_Red_3Slides_Pressed.png",
+      "sha256": "30f688c5a7e2c22c7c3657887ca998b46ca83608d7397cba21f7231a4bd96084"
+    },
+    {
+      "bytes": 3077,
+      "path": "ui/buttons/Button_Red_9Slides.png",
+      "sha256": "ca73dcb672fb10a461c2f466722fcccb9f5fa8e937be39ac8527d4402ff8dfef"
+    },
+    {
+      "bytes": 2487,
+      "path": "ui/buttons/Button_Red_9Slides_Pressed.png",
+      "sha256": "762f7fbd255ce3e40eacae8856c881075482a00f963a88d531f012756066340a"
+    },
+    {
+      "bytes": 789,
+      "path": "ui/buttons/Button_Red_Pressed.png",
+      "sha256": "0a5b809f4b43146669f9cea566d9937641e3802be960689c13886fbb6d087263"
+    },
+    {
+      "bytes": 720,
+      "path": "ui/icons/Disable_01.png",
+      "sha256": "83310f0b0857620387a2e6c142d3f7d8d6013e3425c7ff35fa8bcb80a022888b"
+    },
+    {
+      "bytes": 673,
+      "path": "ui/icons/Disable_02.png",
+      "sha256": "024cbc545b9b9889b702657800958334c44eb3af08e241b9774f864c44b3f6e1"
+    },
+    {
+      "bytes": 512,
+      "path": "ui/icons/Disable_03.png",
+      "sha256": "2f200c33d0cfdf7ef716f6a151ab8971cebdad0d481a558f24df52d9d0d46bf0"
+    },
+    {
+      "bytes": 341,
+      "path": "ui/icons/Disable_04.png",
+      "sha256": "0af9c8174872e272844121aba0fddc78034fd943a720ef696a22b58e00ab6e7c"
+    },
+    {
+      "bytes": 475,
+      "path": "ui/icons/Disable_05.png",
+      "sha256": "15ae57931406f385fc61f472865465db769224ab427a3a65df4d0100d5652efe"
+    },
+    {
+      "bytes": 484,
+      "path": "ui/icons/Disable_06.png",
+      "sha256": "adf26124a5d1ea2844d719ed1077d6efcf1fbe6dcd51c9197bc289d1f471705f"
+    },
+    {
+      "bytes": 437,
+      "path": "ui/icons/Disable_07.png",
+      "sha256": "3add017394d137fa55d78aea28679c76cc2fdc136a3c673892277266ffd9c693"
+    },
+    {
+      "bytes": 435,
+      "path": "ui/icons/Disable_08.png",
+      "sha256": "70807b492c3f106b61d71aac947a9accb311a380797b1253ad9873248e5fe86a"
+    },
+    {
+      "bytes": 292,
+      "path": "ui/icons/Disable_09.png",
+      "sha256": "5584a5e43ac6e2008990f7025e2b1d0dc3e28d6457d49e68ace982582311486a"
+    },
+    {
+      "bytes": 520,
+      "path": "ui/icons/Disable_10.png",
+      "sha256": "41fedae0ee56a391f9c605a3a428101c558980bb1d57cc5d12bf505f6779e143"
+    },
+    {
+      "bytes": 598,
+      "path": "ui/icons/Pressed_01.png",
+      "sha256": "5a06426a237c04ce6c323138516c4dfd84b1d3314897a51976326405b104afd7"
+    },
+    {
+      "bytes": 622,
+      "path": "ui/icons/Pressed_02.png",
+      "sha256": "dfa1abd4cc535fe3c3628c7db943d9a2f5fc4747214f4e88ef4a8c113de9757a"
+    },
+    {
+      "bytes": 527,
+      "path": "ui/icons/Pressed_03.png",
+      "sha256": "46d5abfb4544675e6d9687028144d5b9ef3ee2488f8f607c5f67eaede66c94ff"
+    },
+    {
+      "bytes": 332,
+      "path": "ui/icons/Pressed_04.png",
+      "sha256": "ca5832cdb9e844d1d67b6db95a27436dafe59548a43c77a449a9ae75c262ee3c"
+    },
+    {
+      "bytes": 483,
+      "path": "ui/icons/Pressed_05.png",
+      "sha256": "770d92a0ff7d46d99dbf1915e56cc9c9105a766c630e4a3f723d6f89a60244fe"
+    },
+    {
+      "bytes": 480,
+      "path": "ui/icons/Pressed_06.png",
+      "sha256": "cd7de50e904d65d2de52d170f3195d1de8ad4e35e2dffba3712accb40f43d688"
+    },
+    {
+      "bytes": 423,
+      "path": "ui/icons/Pressed_07.png",
+      "sha256": "e2e1f2810e4bd561194bf1a962be363f40aa928826ad7257d10077b78976c058"
+    },
+    {
+      "bytes": 444,
+      "path": "ui/icons/Pressed_08.png",
+      "sha256": "f4fbfe4b3ca319b5b33e4bbc4778d347ebc4a18605787672d680f714771c9d66"
+    },
+    {
+      "bytes": 288,
+      "path": "ui/icons/Pressed_09.png",
+      "sha256": "44cb23aee1e1fc6d2392e3fdcc8f43efc625fd592046d096a003a9cee52b9061"
+    },
+    {
+      "bytes": 523,
+      "path": "ui/icons/Pressed_10.png",
+      "sha256": "1c475e89db39ba36fc30bb8d3485c71f45c27b87f69959331a3f585f59e16a5e"
+    },
+    {
+      "bytes": 594,
+      "path": "ui/icons/Regular_01.png",
+      "sha256": "669838a491605df137c854d88554bf4f55a5f25ecdac85637906594732bbf959"
+    },
+    {
+      "bytes": 626,
+      "path": "ui/icons/Regular_02.png",
+      "sha256": "d137e50a9d5a498e6c39dd803e874a5bbc37faf788d5e7560459ac20dee383b5"
+    },
+    {
+      "bytes": 546,
+      "path": "ui/icons/Regular_03.png",
+      "sha256": "ed72caa1a095ef5d8bbfe287e0e96ce04aec1c8f5065b7f323fa5b2bf45607a0"
+    },
+    {
+      "bytes": 326,
+      "path": "ui/icons/Regular_04.png",
+      "sha256": "6476cb039d40eb84b03000891ef34f5822db4d6af1392a3837fb932770e18bb2"
+    },
+    {
+      "bytes": 466,
+      "path": "ui/icons/Regular_05.png",
+      "sha256": "ecd318ddcc1094142478bc7887d165ec02b33bf1fc026eaf1aacd04fd63fc8f5"
+    },
+    {
+      "bytes": 482,
+      "path": "ui/icons/Regular_06.png",
+      "sha256": "1e15b325de40677ea8bd7cdf8223dec062f39cecc9029ca92406c4f209835738"
+    },
+    {
+      "bytes": 420,
+      "path": "ui/icons/Regular_07.png",
+      "sha256": "d348b24d85a2911bf6c948448862194dd92827d92352cdfc315fa185bb92f304"
+    },
+    {
+      "bytes": 428,
+      "path": "ui/icons/Regular_08.png",
+      "sha256": "cfd9ddc8d9c7f71feffa9d1de8a6e4d2b69d3d80e0cc7425c8beae6e70ebdf87"
+    },
+    {
+      "bytes": 280,
+      "path": "ui/icons/Regular_09.png",
+      "sha256": "f15712c1e28bfefca16a9a8c2df7b39821c86c5f6d34c201ae39e68836e62fb7"
+    },
+    {
+      "bytes": 510,
+      "path": "ui/icons/Regular_10.png",
+      "sha256": "be37b2775da5537d01371a0e38d12934716be7dba34d0f1f4f3836c5084e59a0"
+    },
+    {
+      "bytes": 597,
+      "path": "ui/pointers/01.png",
+      "sha256": "50935fc696b3924a3af642c5a368bb6b8e9bd31f166a44ddb0b9e61e082148bf"
+    },
+    {
+      "bytes": 868,
+      "path": "ui/pointers/02.png",
+      "sha256": "77568d226a8c7dfea81f6d23a810491cd65754334ea9367e08da59ca4d606d24"
+    },
+    {
+      "bytes": 440,
+      "path": "ui/pointers/03.png",
+      "sha256": "c61a526373b25c4dd3e0f6367672c48dd56eba4df99ab0cd9de3cd0ca54e8b53"
+    },
+    {
+      "bytes": 461,
+      "path": "ui/pointers/04.png",
+      "sha256": "b308b71da5ff97d0be24ecdc06e95ea61ca7895a62564bd5ecf094c143249b24"
+    },
+    {
+      "bytes": 434,
+      "path": "ui/pointers/05.png",
+      "sha256": "f856f9cbbee65630db63d17540a1a6ec4b126099623993b70ad477bf8757827c"
+    },
+    {
+      "bytes": 428,
+      "path": "ui/pointers/06.png",
+      "sha256": "b5cbdde1ebcc50b7c9894027619bbff1d4a1a010c6bc2716d2b18d5fce326281"
+    },
+    {
+      "bytes": 2775,
+      "path": "ui/ribbons/Ribbon_Blue_3Slides.png",
+      "sha256": "92cf22843a9e156b6c46f58a4d7e66ee819143012e672d1e9bcefe11879c0c12"
+    },
+    {
+      "bytes": 1029,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Down.png",
+      "sha256": "c25f939422ef456d6af8581b2d2b540a843193c9fd1834ce23ec825d83219afb"
+    },
+    {
+      "bytes": 816,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Down_Pressed.png",
+      "sha256": "f47f428bd0f5e38e8eadc7883ec2f3e085fe764f69ed1d391703b5375df1fa83"
+    },
+    {
+      "bytes": 1114,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Left.png",
+      "sha256": "d2fca3c11415dd2b7522d75d9b99e66f7b2633ea8b4fe20dbd8960211361196b"
+    },
+    {
+      "bytes": 867,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Left_Pressed.png",
+      "sha256": "8dfd390401999fc1d2272dd9fdab9f084ccd0ed36c053fc24f3e465e45665ae2"
+    },
+    {
+      "bytes": 1095,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Right.png",
+      "sha256": "4cd396d5de6fe01d0421ff1880642fec8d56446fb55f8152b57883ef6dcbfe19"
+    },
+    {
+      "bytes": 864,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Right_Pressed.png",
+      "sha256": "e8e1b92a2a0620a7391efab04f959d089030851c0e5ada210cc92c0b9cde0d63"
+    },
+    {
+      "bytes": 1041,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Up.png",
+      "sha256": "f0bb9f5226a0fde18d3ce8e52e0d348a8a6c05abe1d182813711340d1eb0da90"
+    },
+    {
+      "bytes": 752,
+      "path": "ui/ribbons/Ribbon_Blue_Connection_Up_Pressed.png",
+      "sha256": "00e059a8f2e1a430c02fe916a7de68bc878912e09e50df772cbb12628378806c"
+    },
+    {
+      "bytes": 2783,
+      "path": "ui/ribbons/Ribbon_Red_3Slides.png",
+      "sha256": "35c36a44bcdfaa6ebc1d12178775e28f2db4c54a5414d4d131b8fa4dbed98f0a"
+    },
+    {
+      "bytes": 1035,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Down.png",
+      "sha256": "ef7a5a8921ef9289c626108f952883ccf4bd499d1949347cc414c130636e196f"
+    },
+    {
+      "bytes": 811,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Down_Pressed.png",
+      "sha256": "cdb12b48934e1ec4dd451bbf39aa82206683954b47c6cfb5a5785f9bda1f68c7"
+    },
+    {
+      "bytes": 1129,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Left.png",
+      "sha256": "53b091a3a987035abfa460a04c0cd4cf07d9838fdfef2d9162016d25f99fad10"
+    },
+    {
+      "bytes": 872,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Left_Pressed.png",
+      "sha256": "4f1669c25a0f24021bdc1fee0ceea1612fb87c99b793ccdf0554efa7bdc6cdb9"
+    },
+    {
+      "bytes": 1101,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Right.png",
+      "sha256": "ed76c77a15d5e5626edb733978ee311ae1ff95ba12e7f52c50f1f630e7396b94"
+    },
+    {
+      "bytes": 859,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Right_Pressed.png",
+      "sha256": "ceaa87781349fcf96e9d60ea6aa0f137c2a6229a069e9c1c05798eba9c2ee379"
+    },
+    {
+      "bytes": 1051,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Up.png",
+      "sha256": "ac2cbac2480efff973ff4cc8faef115ec0d43fd9f17dc9bf32394596b46d3536"
+    },
+    {
+      "bytes": 753,
+      "path": "ui/ribbons/Ribbon_Red_Connection_Up_Pressed.png",
+      "sha256": "38bf73636e99f55405d2a74f00ae14dab701447d22472b3feb19865638aeea6f"
+    },
+    {
+      "bytes": 2804,
+      "path": "ui/ribbons/Ribbon_Yellow_3Slides.png",
+      "sha256": "2c3d4256f8b29a66fef15c5d805d2635288a7fcb81a0100dbb83a9db0bed63e4"
+    },
+    {
+      "bytes": 1047,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Down.png",
+      "sha256": "e7650eeb4a9457ed4cedc95b7d38b5de6175a2fe39befd27d8edcf33725df03d"
+    },
+    {
+      "bytes": 824,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Down_Pressed.png",
+      "sha256": "ba03369adaf661753cdbcbc5212d68037689600dafca86d8d4a353d17ea74e74"
+    },
+    {
+      "bytes": 1123,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Left.png",
+      "sha256": "1e03c391d7902c457d2658e2a31c3acf9be6c70278aaf1c8f8f9639981341830"
+    },
+    {
+      "bytes": 858,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Left_Pressed.png",
+      "sha256": "f876aa7478abb8d144e10b6ba78444e12e9a1a6561922bc459d4c54564c1aa04"
+    },
+    {
+      "bytes": 1119,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Right.png",
+      "sha256": "a0298677f9aa43d38f433a8d48754418064eaab14d7b60ba4236665c3c932e72"
+    },
+    {
+      "bytes": 864,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Right_Pressed.png",
+      "sha256": "b45cde2ee0333051d1c8058b9825cc8ea40195e5f74bf48afe2bf31cb554c6b6"
+    },
+    {
+      "bytes": 1056,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Up.png",
+      "sha256": "2b9f82d88603e19d708e12bed5f8a6cbbbd2ab5b1968ff0a9bca4e1e4068e27c"
+    },
+    {
+      "bytes": 761,
+      "path": "ui/ribbons/Ribbon_Yellow_Connection_Up_Pressed.png",
+      "sha256": "8de97cb5bc2ccebb4f13f285b5d5c82a95a8aed5332a1f1f21c97b2b0356a800"
+    }
+  ],
+  "max_total_bytes": 104857600,
+  "schema": "qubit-office-assets/1",
+  "source": "/refs (staging; never served, never imported)",
+  "targets": [
+    "frontend/qubit-web/public/plugins/qubit-office/assets",
+    "frontend/qubit-dist/plugins/qubit-office/assets"
+  ],
+  "total_bytes": 3729588
+}

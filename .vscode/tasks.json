@@ -30,7 +30,7 @@
     {
       "label": "report: generate professional report",
       "type": "shell",
-      "command": "python ~/Projects/Repos/openclaw-voice-bridge/scripts/generate_report.py --task \"${input:taskTitle}\" --summary \"${input:summary}\" --files \"${input:files}\" --verify \"${input:verify}\" --project \"${workspaceFolder}\"",
+      "command": "python ~/Projects/Repos/Qubit/scripts/generate_report.py --task \"${input:taskTitle}\" --summary \"${input:summary}\" --files \"${input:files}\" --verify \"${input:verify}\" --project \"${workspaceFolder}\"",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",

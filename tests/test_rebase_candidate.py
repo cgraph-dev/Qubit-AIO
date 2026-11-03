@@ -48,7 +48,7 @@ PINNED_SOURCE = Path(os.environ.get(
 REFERENCE_HOME = Path(os.environ.get(
     "QUBIT_REFERENCE_HOME", "/home/trick/.hermes/hermes-agent"))
 LIVE_ROOT = Path(os.environ.get(
-    "QUBIT_LIVE_ROOT", "/home/trick/Projects/Repos/qubit-voicebridge"))
+    "QUBIT_LIVE_ROOT", str(Path(__file__).resolve().parents[1])))
 
 MARKER_NAME = ".rebase_v0215_state.json"
 

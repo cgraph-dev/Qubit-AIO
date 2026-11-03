@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 
 PIN = Path("/home/trick/.cache/qubit-pins/hermes-agent")
-REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")
+REPO = Path(__file__).resolve().parents[1]
 QR = REPO / "qubit_runtime"
 PIN_SHA = "69948c0057"
 BASE_SHA = "bd0affe5"

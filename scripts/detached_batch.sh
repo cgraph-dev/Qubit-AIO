@@ -3,7 +3,7 @@
 # Runs OUTSIDE qubit-voicebridge.service via scripts/detached_run.py, so a
 # bridge restart cannot kill it. Each agent writes its own findings file.
 set -u
-REPO=/home/trick/Projects/Repos/qubit-voicebridge
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT=/home/trick/.local/state/qubit-voicebridge/runtime/detached/reports
 mkdir -p "$OUT"
 cd "$REPO" || exit 1
@@ -116,8 +116,8 @@ PY
   systemctl --user list-units --type=service --all 2>/dev/null | grep qubit-detached || echo "  (none)"
   echo
   echo "## detached runs"
-  /home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/python \
-    /home/trick/Projects/Repos/qubit-voicebridge/scripts/detached_run.py --list 2>&1
+  "$REPO/.venv/bin/python" \
+    "$REPO/scripts/detached_run.py" --list 2>&1
 } > "$OUT/service.md"
 
 echo "=== batch done $(date +%H:%M:%S) ==="

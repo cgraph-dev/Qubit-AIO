@@ -215,7 +215,7 @@ def _self_test() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo", default="/home/trick/Projects/Repos/qubit-voicebridge",
+    ap.add_argument("--repo", default=str(Path(__file__).resolve().parents[1]),
                     help="checkout the running processes execute from")
     ap.add_argument("--json")
     ap.add_argument("--self-test", action="store_true",

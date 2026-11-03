@@ -817,9 +817,8 @@ def test_live_canonical_unit_points_at_canonical_tree():
         pytest.skip("canonical unit not installed here")
     text = unit.read_text()
     assert "/qubit-voicebridge/.venv/bin/python -m voicebridge run" in text
-    assert "WorkingDirectory=/home/trick/Projects/Repos/qubit-voicebridge" \
-        in text or "WorkingDirectory=%h/Projects/Repos/qubit-voicebridge" \
-        in text
+    root = Path(__file__).resolve().parents[1]
+    assert f"WorkingDirectory={root}" in text or         "WorkingDirectory=%h/Projects/Repos/Qubit" in text
     assert "qubit-voicebridge/voice.yaml" in text
     assert "openclaw-voice-bridge" not in text.replace(
         "openclaw-voice-bridge.service", "")

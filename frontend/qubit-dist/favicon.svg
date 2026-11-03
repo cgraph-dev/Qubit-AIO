@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <defs>
+    <linearGradient id="a" x1="6" y1="34" x2="34" y2="6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2dd4bf"/><stop offset="1" stop-color="#ffe6cb"/>
+    </linearGradient>
+    <radialGradient id="g" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2dd4bf" stop-opacity="0.40"/>
+      <stop offset="0.28" stop-color="#2dd4bf" stop-opacity="0.22"/>
+      <stop offset="0.55" stop-color="#2dd4bf" stop-opacity="0.12"/>
+      <stop offset="0.78" stop-color="#2dd4bf" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#2dd4bf" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="core" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#f4fffc"/>
+      <stop offset="0.16" stop-color="#d9fff8"/>
+      <stop offset="0.38" stop-color="#7ef0e0"/>
+      <stop offset="0.64" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#0e7490" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="0.9"/>
+    </filter>
+  </defs>
+  <rect width="40" height="40" rx="9" fill="#041c1c"/>
+  <circle cx="20" cy="20" r="15" fill="url(#g)"/>
+  <g>
+    <ellipse cx="20" cy="20" rx="15" ry="6.4" fill="none" stroke="#2dd4bf" stroke-opacity="0.85"
+             stroke-width="2.1" transform="rotate(-32 20 20)"/>
+    <ellipse cx="20" cy="20" rx="15" ry="6.4" fill="none" stroke="#2dd4bf" stroke-opacity="0.9"
+             stroke-width="2.6" transform="rotate(-32 20 20)" filter="url(#blur)"/>
+  </g>
+  <g>
+    <ellipse cx="20" cy="20" rx="15" ry="6.4" fill="none" stroke="#2dd4bf" stroke-opacity="0.5"
+             stroke-width="2.1" transform="rotate(32 20 20)"/>
+    <ellipse cx="20" cy="20" rx="15" ry="6.4" fill="none" stroke="#2dd4bf" stroke-opacity="0.55"
+             stroke-width="2.6" transform="rotate(32 20 20)" filter="url(#blur)"/>
+  </g>
+  <circle cx="34.2" cy="14.9" r="2.6" fill="#e8fffb"/>
+  <circle cx="5.8" cy="25.1" r="2.2" fill="#ffe2c0"/>
+  <circle cx="20" cy="20" r="6.6" fill="url(#core)"/>
+</svg>

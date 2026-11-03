@@ -26,7 +26,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-REPO = Path("/home/trick/Projects/Repos/qubit-voicebridge")
+REPO = Path(__file__).resolve().parents[1]
 
 # Branches carrying the 926-commit port, by subsystem.
 BRANCHES = {

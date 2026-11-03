@@ -264,3 +264,53 @@ class TestCliBrandingHelpers:
         overrides = get_prompt_toolkit_style_overrides()
         assert overrides["status-bar"] == f"bg:{skin.get_color('status_bar_bg')} {skin.get_color('banner_text')}"
         assert overrides["voice-status"] == f"bg:{skin.get_color('voice_status_bg')} {skin.get_color('ui_label')}"
+
+
+def test_cyberpunk_skin_exists_and_is_green_on_black():
+    """Regression: `display.skin: cyberpunk` fell back to the default amber skin
+    because the built-in never existed, so the whole TUI stayed gold while the
+    user had picked the cyberpunk dashboard theme."""
+    from qubit_cli.skin_engine import load_skin
+
+    skin = load_skin("cyberpunk")
+
+    # It must be the cyberpunk skin, not the default fallback.
+    assert skin.name == "cyberpunk"
+    # The picker's own palette (presets.ts cyberpunkTheme): mint on near-black.
+    assert skin.colors["banner_title"] == "#9bffcf"
+    assert skin.colors["ui_accent"] == "#00ff88"
+    # Green dominates every headline ink: G > R and G >= B.
+    for key in ("banner_title", "ui_accent", "banner_text", "prompt"):
+        value = skin.colors[key].lstrip("#")
+        r, g, b = (int(value[i : i + 2], 16) for i in (0, 2, 4))
+        assert g > r and g >= b, f"{key} is not green: {skin.colors[key]}"
+
+
+def test_every_dashboard_theme_has_a_skin():
+    """Regression: choosing a theme in the dashboard picker left the TUI on the
+    default gold, because several picker themes had no skin at all. Every theme
+    the picker offers must resolve to a real skin (not the default fallback).
+
+    `qubit` is the overlay theme's id and its picker label is "Qubit Command".
+    """
+    from qubit_cli.skin_engine import load_skin
+
+    picker_themes = {
+        "default": "default",
+        "default-large": "default-large",
+        "qubit-blue": "qubit-blue",
+        "midnight": "midnight",
+        "ember": "ember",
+        "mono": "mono",
+        "cyberpunk": "cyberpunk",
+        "rose": "rose",
+        "qubit": "qubit-command",
+    }
+
+    for theme, skin_name in picker_themes.items():
+        skin = load_skin(skin_name)
+        assert skin.name == skin_name, f"{theme} fell back to {skin.name}"
+
+    # The teal pair share a palette; the overlay keeps its signal lime.
+    assert load_skin("default-large").colors == load_skin("default").colors
+    assert load_skin("qubit-command").colors["banner_title"] == "#a3e635"

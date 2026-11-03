@@ -19,7 +19,7 @@ import subprocess
 from pathlib import Path
 
 PIN = Path("/home/trick/.cache/qubit-pins/hermes-agent")
-QR = Path("/home/trick/Projects/Repos/qubit-voicebridge/qubit_runtime")
+QR = Path(__file__).resolve().parents[1] / "qubit_runtime"
 PIN_SHA = "69948c0057"
 BASE_SHA = "bd0affe5"
 

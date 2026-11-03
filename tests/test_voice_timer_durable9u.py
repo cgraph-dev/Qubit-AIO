@@ -136,7 +136,7 @@ def test_main_entry_fires_timer(scratch):
         [sys.executable, "-m", "voicebridge.local.actions",
          "--fire-timer", rec["id"]],
         capture_output=True, text=True, timeout=60, env=env,
-        cwd="/home/trick/Projects/Repos/qubit-voicebridge")
+        cwd=str(Path(__file__).resolve().parents[1]))
     assert proc.returncode == 0, proc.stderr[-500:]
     assert LA.timer_status(rec["id"])["status"] == "fired"
 
@@ -187,7 +187,7 @@ def test_main_entry_unknown_id_exits_two(scratch):
         [sys.executable, "-m", "voicebridge.local.actions",
          "--fire-timer", "no-such-timer"],
         capture_output=True, text=True, timeout=60, env=env,
-        cwd="/home/trick/Projects/Repos/qubit-voicebridge")
+        cwd=str(Path(__file__).resolve().parents[1]))
     assert proc.returncode == 2, proc.stderr[-500:]
 
 
@@ -197,7 +197,7 @@ def test_main_entry_already_fired_exits_zero(scratch):
     args = [sys.executable, "-m", "voicebridge.local.actions",
             "--fire-timer", rec["id"]]
     kw = dict(capture_output=True, text=True, timeout=60, env=env,
-              cwd="/home/trick/Projects/Repos/qubit-voicebridge")
+              cwd=str(Path(__file__).resolve().parents[1]))
     assert subprocess.run(args, **kw).returncode == 0
     assert subprocess.run(args, **kw).returncode == 0  # idempotent no-op
     assert LA.timer_status(rec["id"])["status"] == "fired"
