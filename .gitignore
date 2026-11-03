@@ -166,3 +166,5 @@ graphify-out.*/
 
 # bunshin/impeccable run state (local only)
 .bunshin/
+
+/.venv
