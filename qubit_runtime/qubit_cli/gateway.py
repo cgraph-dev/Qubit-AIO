@@ -3521,6 +3521,25 @@ def _normalize_launchd_plist_for_comparison(text: str) -> str:
     )
 
 
+_SHIPPED_GATEWAY_DAEMON_MODULE = "voicebridge.gateway_daemon"
+
+
+def _unit_launches_shipped_gateway_daemon(unit_text: str) -> bool:
+    """True when an ``ExecStart=`` line launches Qubit's bundled messaging-gateway daemon.
+
+    Two Qubit installers write the SAME ``qubit-gateway.service`` name with deliberately different
+    definitions: ``qubit gateway install`` generates the CLI unit (``qubit gateway run``), while
+    ``scripts/install_gateway_unit.sh`` renders ``systemd/qubit-gateway.service``
+    (``python -m voicebridge.gateway_daemon``). Only ``ExecStart`` lines count, so comments and
+    ``Environment=`` values cannot make an unrelated unit look like ours.
+    """
+    for line in unit_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("ExecStart=") and _SHIPPED_GATEWAY_DAEMON_MODULE in stripped:
+            return True
+    return False
+
+
 def systemd_unit_is_current(system: bool = False) -> bool:
     # QUBIT_HOME sync chokepoint for every compare/regenerate path: under `sudo … --system` it is often
     # stripped to /root/.hermes, so refresh would rewrite a correct unit and status warn forever.
@@ -3532,6 +3551,12 @@ def systemd_unit_is_current(system: bool = False) -> bool:
         return False
 
     installed = unit_path.read_text(encoding="utf-8-sig")
+    if _unit_launches_shipped_gateway_daemon(installed):
+        # A shipped daemon unit is current by its own installer; comparing it to this CLI's
+        # generator (a different launcher) flagged every healthy daemon install as "outdated" and
+        # let `gateway restart` overwrite it. Ownership is still required: the unit must pin this
+        # install's home (or the account's default), exactly like the lifecycle verbs.
+        return _unit_home_is_operative(unit_path)
     expected_user = _read_systemd_user_from_unit(unit_path) if system else None
     expected = generate_systemd_unit(system=system, run_as_user=expected_user)
     # Ignore directives older systemd drops (RestartMaxDelaySec, RestartSteps) to avoid a perpetual "outdated" flag.
