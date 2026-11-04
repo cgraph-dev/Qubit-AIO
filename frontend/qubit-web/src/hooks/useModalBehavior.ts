@@ -25,6 +25,10 @@ export function useModalBehavior({
   initialFocusSelector?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +49,7 @@ export function useModalBehavior({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       trapTabKey(container, e);
@@ -76,7 +80,7 @@ export function useModalBehavior({
       document.body.style.overflow = prevOverflow;
       prevActive?.focus?.();
     };
-  }, [open, onClose, initialFocusSelector]);
+  }, [open, initialFocusSelector]);
 
   return containerRef;
 }
