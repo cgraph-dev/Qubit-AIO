@@ -3237,9 +3237,9 @@ def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     import platform as _pl
     try:
         from . import distribution as D
-        qv = str(getattr(D, "VERSION", "1.0.0"))
+        qv = str(getattr(D, "PACKAGE_VERSION", "0.0.1"))
     except Exception:
-        qv = "1.0.0"
+        qv = "0.0.1"
     # SystemStats wire shape; hermes_version carries the Qubit product
     # version (wire-compat label, honest value + provenance in detail).
     # psutil enriches CPU / memory / disk / uptime / load / process when it is
