@@ -156,3 +156,76 @@ def test_misconfigured_oauth_parks_terminal_without_self_probing(monkeypatch, tm
         await asyncio.wait_for(run, 5)
 
     asyncio.run(scenario())
+
+
+_MEMELORD = "https://www.memelord.com/api/mcp"
+_MEMELORD_CONFIG = {"url": _MEMELORD, "auth": "oauth", "connect_timeout": 1, "skip_preflight": True}
+
+
+@pytest.mark.no_isolate
+def test_login_required_oauth_parks_terminal_without_self_probing(monkeypatch, tmp_path):
+    """A configured OAuth server with no cached token cannot log in non-interactively.
+
+    The real live case: ``memelord`` is configured ``auth: oauth`` but the
+    gateway process has no cached token and cannot open the browser flow. It
+    used to re-run the OAuth setup on every bounded self-probe (a repeating
+    warning in the gateway log). It must park terminal with the exact
+    ``qubit mcp login <name>`` guidance instead, and only an explicit
+    reconnect/login or a token-file change may revive it.
+    """
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    from tools import mcp_tool
+    from tools import mcp_tool_config as _config
+    from tools import mcp_tool_discovery as _discovery
+    from tools.mcp_oauth import OAuthNonInteractiveError
+
+    monkeypatch.setattr(mcp_tool, "_PARKED_RETRY_INTERVAL", 0.05)
+    monkeypatch.setattr(_config, "_load_mcp_config",
+                        lambda: {"memelord": dict(_MEMELORD_CONFIG)})
+
+    attempts = []
+
+    class _Task(MCPServerTask):
+        def _is_http(self):
+            return True
+
+        def _deregister_tools(self):
+            self._registered_tool_names = []
+
+        async def _run_http(self, config):
+            attempts.append(config["url"])
+            raise OAuthNonInteractiveError(
+                "MCP OAuth for 'memelord': non-interactive environment and no cached "
+                "tokens found. Run `qubit mcp login memelord` interactively first to "
+                "complete initial authorization.")
+
+    async def scenario():
+        task = _Task("memelord")
+        run = asyncio.ensure_future(task.run(dict(_MEMELORD_CONFIG)))
+        for _ in range(200):
+            await asyncio.sleep(0)
+            if task._was_parked:
+                break
+
+        assert task._was_parked, "login-required OAuth server never parked"
+        assert task._auth_park_terminal is True
+        assert task._auth_park_rejection is True
+        assert task._auth_self_probes == 0, "a terminal park must not self-probe"
+        assert not run.done(), "run task exited instead of staying revivable"
+        reason = str(mcp_tool._server_unavailable.get(task._unavailable_key) or "")
+        assert "qubit mcp login memelord" in reason, reason
+
+        # Several self-probe intervals pass: NOTHING retries (the storm is gone).
+        await asyncio.sleep(mcp_tool._PARKED_RETRY_INTERVAL * 4)
+        assert attempts == [_MEMELORD], attempts
+
+        # Discovery leaves the terminal park alone while the token cache is unchanged.
+        _discovery._select_new_servers({"memelord": dict(_MEMELORD_CONFIG)})
+        await asyncio.sleep(0)
+        assert attempts == [_MEMELORD], attempts
+
+        task._shutdown_event.set()
+        task._reconnect_event.set()
+        await asyncio.wait_for(run, 5)
+
+    asyncio.run(scenario())

@@ -495,6 +495,13 @@ class MCPServerRunMixin:
         # typed reason and wait for an explicit reconnect/config change (no retry storm).
         if isinstance(root, _errors.OAuthRequiredError):
             return await self._on_misconfigured_oauth(root, budget)
+        # A configured OAuth server with no cached token in a non-interactive
+        # process cannot complete the browser flow. Retrying (a self-probe) is
+        # guaranteed to fail the same way, so park terminal with the exact
+        # `qubit mcp login <name>` guidance. A credential-file change or an
+        # explicit reconnect revives it.
+        if _errors.is_login_required_error(root):
+            return await self._on_login_required(root, budget)
         failure_class = _errors._classify_mcp_failure(root)
         if self._is_recycled_stdio():
             logger.warning("MCP server '%s': lazy reconnect after stdio recycle failed, marking unavailable "
@@ -548,6 +555,26 @@ class MCPServerRunMixin:
             self.name, reason)
         return await self._park_initial_failure(
             root, "misconfigured OAuth server (auth: oauth not configured)", budget,
+            auth_rejection=True)
+
+    async def _on_login_required(self, root: BaseException,
+                                 budget: _RetryBudget) -> bool:
+        """A configured OAuth server with no cached token: terminal login-required park.
+
+        The process is non-interactive, so it cannot open the browser flow. An
+        unattended self-probe would repeat the same failure forever (the live
+        log storm this replaces); instead record the exact `qubit mcp login`
+        command and wait for an explicit reconnect/login or a token-file change.
+        """
+        reason = _errors.login_required_reason(self.name, root)
+        self._record_unavailable(reason)
+        self._auth_park_rejection = True
+        self._auth_park_terminal = True
+        self._log_park(
+            "MCP server '%s': %s (state: connecting → login required)",
+            self.name, reason)
+        return await self._park_initial_failure(
+            root, "after permanent login-required failure (interactive OAuth)", budget,
             auth_rejection=True)
 
     async def _on_initial_connect_error(self, exc: Exception, root: BaseException,
