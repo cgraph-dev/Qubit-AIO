@@ -51,11 +51,17 @@ git clone https://github.com/cgraph-dev/Qubit.git && cd Qubit && ./scripts/insta
 For options, prerequisites, profiles, and offline notes, see
 [INSTALL.md](INSTALL.md).
 
-Release-asset bootstrap (once a release publishes its assets):
-`scripts/bootstrap.sh <release-base>` downloads `install.sh` and the
-`qubit-release.tar.gz` source archive, verifies both SHA-256 values, extracts
-the archive, and runs the verified installer from that extracted tree. It never
-reads the source checkout to install. See
+Release-asset bootstrap (no checkout, verified source archive):
+
+```bash
+curl -fsSL https://github.com/cgraph-dev/Qubit/releases/latest/download/bootstrap.sh \
+  -o /tmp/qubit-bootstrap.sh
+bash /tmp/qubit-bootstrap.sh https://github.com/cgraph-dev/Qubit/releases/latest/download
+```
+
+The bootstrap downloads `install.sh` and `qubit-release.tar.gz`, verifies both
+SHA-256 values against `SHA256SUMS`, extracts the archive, and runs the verified
+installer from that extracted tree. See
 [INSTALL.md](INSTALL.md#bootstrap-installer-release-assets).
 
 New installs keep runtime state and voice under `$QUBIT_HOME`

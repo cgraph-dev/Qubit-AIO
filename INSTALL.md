@@ -99,11 +99,12 @@ invalid archive. `--dry-run` downloads, extracts, executes, and writes nothing;
 it validates the local assets and checksum names. Linux is supported now;
 macOS and Windows are typed refusals until their bootstrap paths exist.
 
-**Remaining public-hosting prerequisite:** the release must publish the
-bootstrap script itself plus `install.sh`, `qubit-release.tar.gz`, and a
-`SHA256SUMS` naming both assets at a stable public release base. This
-repository does not yet host a public one-line URL; the bootstrap reads only
-`<release-base>`.
+**Public release base:** the Qubit release publishes `bootstrap.sh`,
+`install.sh`, `qubit-release.tar.gz`, and a `SHA256SUMS` naming the installer
+and archive. The stable base is
+`https://github.com/cgraph-dev/Qubit/releases/latest/download`; use it with
+`bootstrap.sh` as shown above (download the script first rather than piping an
+unverified URL into a shell).
 
 ## Options
 
