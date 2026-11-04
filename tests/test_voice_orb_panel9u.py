@@ -161,3 +161,36 @@ def test_settings_panel_contract_live():
     back = w.current_options()
     assert back.size_px == 250 and back.locked is True
     del app
+
+
+def test_panel_rows_include_local_brain_actions_first():
+    """Settings has the same brain controls as the tray menu and voice."""
+    from voicebridge.orb import options as O
+    from voicebridge.orb import panel
+    rows = panel.panel_rows(O.OrbOptions())
+    assert [(r["id"], r["kind"], r["label"]) for r in rows[:2]] == [
+        ("brain_unload", "action", "Unload local brain (free VRAM)"),
+        ("brain_warm", "action", "Load local brain"),
+    ]
+
+
+@pytest.mark.skipif(NO_DISPLAY, reason="needs a display (X11) for a widget")
+def test_settings_panel_action_button_routes_on_action():
+    from voicebridge.orb import options as O
+    from voicebridge.orb import panel
+    if panel.SettingsPanel is None:
+        pytest.skip("PySide6 not importable")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = None
+    try:
+        from PySide6.QtWidgets import QApplication, QPushButton
+        app = QApplication.instance() or QApplication([])
+    except Exception:
+        pytest.skip("no Qt application available")
+    rec = []
+    w = panel.SettingsPanel(O.OrbOptions(), on_action=rec.append)
+    buttons = {b.text(): b for b in w.findChildren(QPushButton)}
+    buttons["Unload local brain (free VRAM)"].click()
+    buttons["Load local brain"].click()
+    assert rec == ["brain_unload", "brain_warm"]
+    del app
