@@ -3317,6 +3317,43 @@ def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return h_mcp_servers(cfg, q, b, p)
 
 
+def _catalog_install_fields(entry: Any, *, inline: Dict[str, str],
+                            enabled: bool) -> Dict[str, Any]:
+    """The runtime ``mcp_servers`` block a catalog install persists.
+
+    Mirrors the CLI's ``mcp_catalog._build_server_config`` for the fields the
+    dashboard owns. Critically it carries the OAuth marker for an
+    ``auth.type: oauth`` manifest — the registry record's ``auth`` alone is not
+    enough, because the runtime client reads only ``config.yaml`` and never
+    builds an OAuth provider without ``auth: oauth`` (Airtable's shipped entry
+    installed from the dashboard used to 401 forever until an operator edited
+    the file by hand).
+    """
+    transport = str(getattr(getattr(entry, "transport", None), "type", "") or "").lower()
+    fields: Dict[str, Any] = {"transport": transport, "enabled": bool(enabled),
+                              "source": "mcp-catalog"}
+    if transport == "http":
+        url = str(getattr(entry.transport, "url", "") or "")
+        for key, value in inline.items():
+            url = url.replace("${" + key + "}", value)
+        fields["url"] = url
+    else:
+        command = str(getattr(entry.transport, "command", "") or "")
+        args = list(getattr(entry.transport, "args", None) or [])
+        for key, value in inline.items():
+            command = command.replace("${" + key + "}", value)
+            args = [a.replace("${" + key + "}", value) for a in args]
+        fields["command"] = command
+        fields["args"] = args
+    auth = getattr(entry, "auth", None)
+    if str(getattr(auth, "type", "") or "").lower() == "oauth":
+        fields["auth"] = "oauth"
+        oauth_cfg = getattr(auth, "oauth", None) or {}
+        if isinstance(oauth_cfg, dict) and oauth_cfg:
+            fields["oauth"] = dict(oauth_cfg)
+    return fields
+
+
 def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/mcp/catalog/install -> register a catalog server (real).
@@ -3408,25 +3445,10 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": _redact(str(exc))[:200],
                      "qubit_counterpart": "GET /api/mcp/catalog"}
     transport = str(getattr(entry.transport, "type", "") or "").lower()
-    fields: Dict[str, Any] = {"transport": transport, "enabled": True,
-                              "source": "mcp-catalog"}
-    if transport == "http":
-        url = str(getattr(entry.transport, "url", "") or "")
-        for key, value in inline.items():
-            url = url.replace("${" + key + "}", value)
-        fields["url"] = url
-    else:
-        command = str(getattr(entry.transport, "command", "") or "")
-        args = list(getattr(entry.transport, "args", None) or [])
-        for key, value in inline.items():
-            command = command.replace("${" + key + "}", value)
-            args = [a.replace("${" + key + "}", value) for a in args]
-        fields["command"] = command
-        fields["args"] = args
+    enabled = _truthy(b.get("enable", True)) is not False
+    fields = _catalog_install_fields(entry, inline=inline, enabled=enabled)
     if refs:
         fields["env"] = refs
-    if _truthy(b.get("enable", True)) is False:
-        fields["enabled"] = False
     try:
         out = MS.upsert(cfg, name, fields, confirmed=True)
     except Exception as exc:
@@ -3489,6 +3511,11 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "tools": None,
         "connected": bool(s.get("connected")),
         "status": str(s.get("status", "")),
+        # The typed parked/unavailable reason (e.g. "run `qubit mcp login
+        # memelord`") is part of the row, not log-only. Redacted and bounded;
+        # an absent reason stays None rather than a fabricated one.
+        "error": (MS._redact_probe(str(s.get("error")))[:240]
+                  if s.get("error") else None),
         "source": str(s.get("source", "qubit-registry")),
         "policy": "config registry; no unauthenticated mount",
     } for s in listing.get("servers", [])]
