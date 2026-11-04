@@ -1000,12 +1000,12 @@ export default function McpPage() {
             <Card key={server.name}>
               <CardContent
                 className={cn(
-                  "flex items-start gap-4 py-4",
+                  "flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-4",
                   !server.enabled && "opacity-60",
                 )}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span className="font-medium text-sm truncate">
                       {server.name}
                     </span>
@@ -1025,7 +1025,12 @@ export default function McpPage() {
                       <Badge tone="success">invocable</Badge>
                     ) : (
                       server.invocation_code && (
-                        <Badge tone="warning">{server.invocation_code}</Badge>
+                        <Badge
+                          tone="warning"
+                          className="max-w-full whitespace-normal break-all"
+                        >
+                          {server.invocation_code}
+                        </Badge>
                       )
                     )}
                     {server.capabilities && server.capabilities.length > 0 && (
@@ -1035,13 +1040,13 @@ export default function McpPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     {server.transport === "http" ? (
-                      <span className="font-mono truncate">
+                      <span className="min-w-0 font-mono truncate">
                         {server.url ?? "—"}
                       </span>
                     ) : (
-                      <span className="font-mono truncate">
+                      <span className="min-w-0 font-mono truncate">
                         {[server.command, ...(server.args ?? [])]
                           .filter(Boolean)
                           .join(" ") || "—"}
@@ -1072,7 +1077,7 @@ export default function McpPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
                   {server.auth === "oauth" && (
                     <Button
                       ghost

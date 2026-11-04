@@ -7,8 +7,6 @@
  * a new tab. No secret values are ever rendered: the gateway API key lives
  * in the Qubit runtime `.env` as `OMNIROUTE_API_KEY` and is only referenced.
  */
-import { useEffect, useState } from "react";
-
 import { copyTextToClipboard } from "@/lib/clipboard";
 
 import {
@@ -29,23 +27,6 @@ const QUBIT_PROFILES = [
   "omniroute-cheap",
 ];
 
-type Health = "checking" | "running" | "unreachable";
-
-async function probeGateway(timeoutMs = 5000): Promise<Health> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(`${GATEWAY_DASHBOARD}/api/health`, {
-      signal: ctrl.signal,
-    });
-    return res.ok ? "running" : "unreachable";
-  } catch {
-    return "unreachable";
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 function copyText(value: string) {
   // The one shared helper (lib/clipboard.ts): the guard forbids direct
   // navigator.clipboard writes outside it.
@@ -53,25 +34,6 @@ function copyText(value: string) {
 }
 
 export default function OmniRoutePage() {
-  const [health, setHealth] = useState<Health>("checking");
-
-  useEffect(() => {
-    let live = true;
-    probeGateway().then((next) => {
-      if (live) setHealth(next);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  const statusText =
-    health === "checking"
-      ? "Probing the gateway…"
-      : health === "running"
-        ? "Running — the gateway answered /api/health."
-        : "Unreachable — start it with `omniroute serve --daemon --no-open`.";
-
   return (
     <SettingsPage>
       <SettingsPageHeader
@@ -92,7 +54,7 @@ export default function OmniRoutePage() {
       <SettingsSection title="Gateway status" testId="omniroute-status">
         <SettingsRow
           title="Server"
-          description={statusText}
+          description="Open the OmniRoute dashboard to confirm the gateway is running. The Qubit dashboard cannot query it directly: this page runs under a same-origin Content-Security-Policy, so a cross-origin request to the gateway is blocked."
           testId="omniroute-status-row"
         />
         <SettingsRow

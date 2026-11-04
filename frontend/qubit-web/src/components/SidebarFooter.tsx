@@ -1,4 +1,5 @@
 import type { StatusResponse } from "@/lib/api";
+import { formatProductVersion } from "@/lib/format";
 import { useI18n } from "@/i18n";
 
 /**
@@ -12,7 +13,7 @@ export function SidebarFooter({ status }: SidebarFooterProps) {
   return (
     <div className="flex w-full items-center justify-between gap-2">
       <span className="tabular-nums">
-        {status?.version != null ? `v${status.version}` : "—"}
+        {formatProductVersion(status?.version)}
       </span>
 
       <span>{t.app.footer.org}</span>

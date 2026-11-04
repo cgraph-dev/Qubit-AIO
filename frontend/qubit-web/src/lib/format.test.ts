@@ -3,6 +3,7 @@ import {
   formatDurationCompact,
   formatDurationLong,
   formatEpochTimestamp,
+  formatProductVersion,
   formatTokenCount,
   toEpochMilliseconds,
 } from "./format";
@@ -112,5 +113,24 @@ describe("toEpochMilliseconds / formatEpochTimestamp", () => {
     const formatted = formatEpochTimestamp(1_700_000_000, "en-US");
     expect(formatted).toBe(new Date(1_700_000_000_000).toLocaleString("en-US"));
     expect(formatted).not.toContain("1970");
+  });
+});
+
+describe("formatProductVersion", () => {
+  it("never doubles the product prefix or the v", () => {
+    expect(formatProductVersion("qubit-0.0.1")).toBe("v0.0.1");
+    expect(formatProductVersion("qubit-1.0.0")).toBe("v1.0.0");
+    expect(formatProductVersion("0.0.1")).toBe("v0.0.1");
+    expect(formatProductVersion("v0.0.1")).toBe("v0.0.1");
+  });
+
+  it("passes non-version strings through unchanged", () => {
+    expect(formatProductVersion("unknown")).toBe("unknown");
+  });
+
+  it("renders an em dash for absent or empty values", () => {
+    expect(formatProductVersion(undefined)).toBe("—");
+    expect(formatProductVersion(null)).toBe("—");
+    expect(formatProductVersion("   ")).toBe("—");
   });
 });

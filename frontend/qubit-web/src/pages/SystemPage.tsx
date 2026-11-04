@@ -45,7 +45,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { QubitConsoleModal } from "@/components/QubitConsoleModal";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { cn, themedBody } from "@/lib/utils";
-import { formatEpochTimestamp } from "@/lib/format";
+import { formatEpochTimestamp, formatProductVersion } from "@/lib/format";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import { parsePolicyRefusal, policyRefusalMessage, refusalOrError } from "@/lib/policy-refusal";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -1053,7 +1053,7 @@ export default function SystemPage() {
               <div>
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Qubit</div>
                 <div className="flex items-center gap-2">
-                  <span>v{stats?.qubit_version}</span>
+                  <span>{formatProductVersion(stats?.qubit_version)}</span>
                   {canUpdateQubit &&
                     updateInfo &&
                     (updateInfo.update_available ? (

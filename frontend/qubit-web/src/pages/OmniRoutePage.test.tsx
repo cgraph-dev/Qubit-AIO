@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 /**
  * /omniroute — gateway status, wiring rows, and dashboard links.
- * `fetch` is stubbed (no backend); the health probe resolves through the
- * stubbed response.
+ *
+ * The dashboard runs under `connect-src 'self'`, so it must NOT fire a
+ * cross-origin probe at the gateway (the browser blocks it and the page used
+ * to claim "Unreachable" even while the gateway was healthy). The page points
+ * at the dashboard instead, and the URLs it names stay secret-free.
  */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -15,22 +18,18 @@ let root: Root;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
 
-function okHealth() {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({ status: "ok" }),
-    text: async () => '{"status":"ok"}',
-  };
-}
-
 const fetchUrls: string[] = [];
 
 function stubFetch() {
   fetchUrls.length = 0;
   vi.stubGlobal("fetch", async (url: string) => {
     fetchUrls.push(String(url));
-    return okHealth();
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "ok" }),
+      text: async () => '{"status":"ok"}',
+    };
   });
 }
 
@@ -71,18 +70,9 @@ describe("OmniRoutePage", () => {
     // Wiring rows name the Qubit profiles, never a secret value.
     expect(text()).toContain("omniroute-auto");
     expect(text()).not.toContain("sk-");
-    // The health probe hits the local gateway.
+    // The CSP forbids a cross-origin probe; the page must not attempt one.
     await act(async () => {});
-    expect(fetchUrls).toContain("http://127.0.0.1:20128/api/health");
-    expect(text()).toContain("Running");
-  });
-
-  it("reports unreachable when the probe fails", async () => {
-    vi.stubGlobal("fetch", async () => {
-      throw new Error("refused");
-    });
-    renderPage(<OmniRoutePage />);
-    await act(async () => {});
-    expect(text()).toContain("Unreachable");
+    expect(fetchUrls).toEqual([]);
+    expect(text()).toContain("cannot query it directly");
   });
 });

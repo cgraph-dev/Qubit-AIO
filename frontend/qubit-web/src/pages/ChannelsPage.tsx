@@ -114,6 +114,23 @@ function normalizeWhatsAppMode(mode: unknown): "bot" | "self-chat" | null {
   return mode === "bot" || mode === "self-chat" ? mode : null;
 }
 
+/**
+ * The platform payload reuses `description` for its install hint. On a channel
+ * that is already connected that hint is stale and contradictory ("Connected"
+ * beside "Run `qubit setup` to install … support"), so hide the install-only
+ * shapes there. Real descriptions (e.g. the WhatsApp bridge note) still show.
+ */
+const INSTALL_HINT_RE =
+  /^(?:Run `qubit setup` to install .+ support\.|pip install .+)$/i;
+
+function platformDescription(platform: MessagingPlatform): string {
+  const description = platform.description.trim();
+  if (platform.state === "connected" && INSTALL_HINT_RE.test(description)) {
+    return "";
+  }
+  return rebrand(description);
+}
+
 export default function ChannelsPage() {
   const [platforms, setPlatforms] = useState<MessagingPlatform[]>([]);
   const [envPath, setEnvPath] = useState("~/.qubit/.env");
@@ -631,9 +648,11 @@ export default function ChannelsPage() {
                         </span>
                         <Badge tone={badge.tone}>{badge.label}</Badge>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {rebrand(platform.description)}
-                      </span>
+                      {platformDescription(platform) ? (
+                        <span className="text-xs text-muted-foreground">
+                          {platformDescription(platform)}
+                        </span>
+                      ) : null}
                       {platform.error_message && (
                         <span className="text-xs text-destructive">
                           {platform.error_message}
