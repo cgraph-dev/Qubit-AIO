@@ -617,7 +617,9 @@ exclude = [
   "docs/STARNET_VOICE_STUDY.md",
   "docs/TEST-HONESTY-AUDIT.md",
   "docs/TEST_PORT_RECOVERY_2026-10-19.md",
-  "docs/VOICE-BRIDGE-AUDIT.md",
+  # docs/VOICE-BRIDGE-AUDIT.md is NOT excluded: it is force-included into the
+  # wheel as the installed AUDIO_SETUP guide, so the sdist must carry it or a
+  # wheel rebuilt from the sdist dies with "Forced include not found".
   "docs/game-office",
   # The whole vendored fork is excluded from the default sdist tree walk; the
   # runtime subset is force-included below at its original qubit_runtime/
@@ -630,9 +632,10 @@ exclude = [
 # Files land at their original qubit_runtime/ paths so a wheel can be rebuilt
 # from the sdist with the wheel force-include table above.
 [tool.hatch.build.targets.sdist.force-include]
-# The generated provenance manifest is currently absent (see the wheel note);
-# no mapping is declared until it exists, so the sdist never promises a file
-# it cannot carry.
+# The generated provenance manifest is carried via the sdist ``artifacts`` list
+# above (docs/generated/ is git-ignored, so a force-include source there would
+# be dropped by the VCS file selection). Every other runtime mapping below
+# mirrors the wheel so the sdist rebuilds it without the checkout.
 "qubit_runtime/qubit_cli" = "qubit_runtime/qubit_cli"
 "qubit_runtime/agent" = "qubit_runtime/agent"
 "qubit_runtime/tools" = "qubit_runtime/tools"

@@ -204,32 +204,47 @@ def _git_ignored(path: str) -> bool:
     ).returncode == 0
 
 
-def test_gitignored_force_include_sources_are_declared_as_sdist_artifacts():
-    """Every force-included source that .gitignore hides must ship in the
-    sdist via ``artifacts``.
+def test_every_wheel_force_include_source_survives_in_the_sdist():
+    """Every wheel force-include source must also reach the sdist.
 
-    Hatchling's sdist uses VCS file selection, so a git-ignored (but tracked)
-    source is omitted from the sdist. The wheel then force-includes a path the
-    sdist does not carry, and a downstream ``pip install <sdist>`` (or a wheel
-    rebuilt from it) fails with "Forced include not found". This is the
-    concrete regression for the generated vendor manifest under the ignored
-    ``docs/generated/`` tree.
+    Two hatchling behaviours make a source disappear from the sdist even
+    though the wheel needs it: the sdist's default file selection is VCS-based
+    (a git-ignored but tracked path is dropped), and an entry in the sdist
+    ``exclude`` list removes a tracked path outright. Either way a wheel
+    rebuilt from the sdist dies with "Forced include not found", so the sdist
+    is not self-contained.
+
+    A source survives when it is declared as an sdist artifact (the generated
+    vendor manifest under the ignored docs/generated/ tree), mirrored in the
+    sdist force-include table (the vendored runtime), or left in the default
+    tracked tree walk (the shipped docs).
     """
     wheel, sdist = _targets()
     artifacts = set(sdist.get("artifacts", []))
-    ignored_sources = [
+    sforce = sdist.get("force-include", {})
+    excluded = [e.rstrip("/") for e in sdist.get("exclude", [])]
+
+    def _excluded(source: str) -> bool:
+        return any(source == e or source.startswith(e + "/") for e in excluded)
+
+    broken = [
         source for source in wheel["force-include"]
-        if source != "frontend" and _git_ignored(source)
+        if source != "frontend"
+        and source not in artifacts
+        and source not in sforce
+        and (_git_ignored(source) or _excluded(source))
     ]
-    missing = [source for source in ignored_sources if source not in artifacts]
-    assert not missing, (
-        "git-ignored force-include source(s) missing from the sdist "
-        f"artifacts list (sdist cannot rebuild a wheel): {missing}")
+    assert not broken, (
+        "wheel force-include source(s) cannot survive in the sdist (a wheel "
+        f"rebuilt from it fails): {broken}")
 
     manifest = "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
-    assert manifest in ignored_sources
+    assert _git_ignored(manifest)
     assert manifest in artifacts
     assert (REPO / manifest).is_file()
+    # The installed AUDIO_SETUP guide is force-included from a tracked doc;
+    # exclusions must never remove a force-include source.
+    assert "docs/VOICE-BRIDGE-AUDIT.md" not in excluded
 
 
 # ===========================================================================
