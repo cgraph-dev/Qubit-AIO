@@ -1168,7 +1168,8 @@ class TestSenderAuthentication(unittest.TestCase):
             msg["Authentication-Results"] = ar
         return msg
 
-    def _verify(self, from_addr, auth_results=None, authserv_id=""):
+    def _verify(self, from_addr, auth_results=None, authserv_id="mx.ourserver.com"):
+        """Rows stamp the pinned receiver's id, so a verdict is judged on its content, not on a pin mismatch."""
         from plugins.platforms.email.adapter import (
             _verify_sender_authentication,
             _extract_email_address,
@@ -1180,7 +1181,7 @@ class TestSenderAuthentication(unittest.TestCase):
     def test_dmarc_pass_authenticates(self):
         ok, reason = self._verify(
             "Admin <admin@example.com>",
-            ["mx.google.com; dmarc=pass header.from=example.com; spf=pass"],
+            ["mx.ourserver.com; dmarc=pass header.from=example.com; spf=pass"],
         )
         self.assertTrue(ok, reason)
 
@@ -1188,7 +1189,7 @@ class TestSenderAuthentication(unittest.TestCase):
     def test_dkim_pass_aligned_authenticates(self):
         ok, reason = self._verify(
             "admin@example.com",
-            ["mx.google.com; dkim=pass header.d=example.com"],
+            ["mx.ourserver.com; dkim=pass header.d=example.com"],
         )
         self.assertTrue(ok, reason)
 
@@ -1196,10 +1197,48 @@ class TestSenderAuthentication(unittest.TestCase):
         # SPF passes for the envelope domain, but it doesn't match From: domain.
         ok, reason = self._verify(
             "admin@example.com",
-            ["mx.google.com; spf=pass smtp.mailfrom=bounce@evil.com"],
+            ["mx.ourserver.com; spf=pass smtp.mailfrom=bounce@evil.com"],
         )
         self.assertFalse(ok, reason)
 
+
+    def test_missing_authserv_id_fails_closed(self):
+        """Without an operator pin the topmost header may be one the sender wrote, so even a
+        sender-supplied dmarc=pass must not authenticate (opt out is require_authenticated_sender)."""
+        from plugins.platforms.email.adapter import _MISSING_AUTHSERV_REASON
+        ok, reason = self._verify(
+            "owner@allowed.example",
+            ["attacker.self; dmarc=pass header.from=allowed.example"],
+            authserv_id="",
+        )
+        self.assertEqual((ok, reason), (False, _MISSING_AUTHSERV_REASON))
+
+    def test_mismatched_authserv_id_is_rejected(self):
+        """An exact pin never searches a lower field and never relaxes to a related domain:
+        a different authserv-id, a child subdomain, or a comment-smuggled id all fail closed."""
+        from plugins.platforms.email.adapter import _UNTRUSTED_AUTHSERV_REASON
+        forged_lower = "mx.ourserver.com; dmarc=pass header.from=example.com"
+        for topmost in (
+            "edge.receiver.test; dmarc=pass header.from=example.com",
+            "child.mx.ourserver.com; dmarc=pass header.from=example.com",
+            "(mx.ourserver.com) edge.receiver.test; dmarc=pass header.from=example.com",
+        ):
+            with self.subTest(topmost=topmost):
+                ok, reason = self._verify(
+                    "admin@example.com", [topmost, forged_lower],
+                    authserv_id="mx.ourserver.com",
+                )
+                self.assertEqual((ok, reason), (False, _UNTRUSTED_AUTHSERV_REASON))
+
+    def test_matching_authserv_id_authenticates(self):
+        """An exact pin still matches case-insensitively and accepts RFC 8601 CFWS comments,
+        including a semicolon inside a nested comment."""
+        ok, reason = self._verify(
+            "admin@example.com",
+            ["MX.OURSERVER.COM (receiver (a;b)); dmarc=pass header.from=example.com"],
+            authserv_id="mx.ourserver.com",
+        )
+        self.assertTrue(ok, reason)
 
     def test_injected_header_below_trusted_does_not_authenticate(self):
         """An attacker-injected Authentication-Results sorts BELOW the receiving
