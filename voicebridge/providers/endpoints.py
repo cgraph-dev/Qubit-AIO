@@ -530,15 +530,19 @@ def _allow_profile(cfg: Any, profile_id: str) -> bool:
         entry["allowlisted"] = True
         overrides[profile_id] = entry
         path.parent.mkdir(parents=True, exist_ok=True)
+        from ..config import secure_config_permissions
+
         if path.is_file():
             bak = path.with_name(
                 f"{path.name}.endpoint-activate.{int(time.time())}.bak")
             try:
                 bak.write_bytes(path.read_bytes())
+                secure_config_permissions(bak, raw)
             except OSError:
                 pass
         tmp = path.with_name(path.name + ".qubit-tmp")
         tmp.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        secure_config_permissions(tmp, raw)
         tmp.replace(path)
         return True
     except Exception:  # noqa: BLE001 - in-memory activation still applies
@@ -591,8 +595,11 @@ def _persist_runtime_model(cfg: Any, *, provider: str, model: str,
             _frames = []
         _logger.info("runtime model slot <- %s/%s via %s",
                      provider, model, ">".join(_frames))
+        from ..config import secure_config_permissions
+
         tmp = path.with_name(path.name + ".qubit-tmp")
         tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        secure_config_permissions(tmp, data)
         tmp.replace(path)
         return True
     except Exception:  # noqa: BLE001 - profile registry is the authority
@@ -954,8 +961,11 @@ def _clear_runtime_model(cfg: Any, *, provider: str, model: str) -> bool:
                 str(provider or ""), str(model or "")):
             return False
         data.pop("model", None)
+        from ..config import secure_config_permissions
+
         tmp = path.with_name(path.name + ".qubit-tmp")
         tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        secure_config_permissions(tmp, data)
         tmp.replace(path)
         return True
     except Exception:  # noqa: BLE001 - cleanup is best-effort

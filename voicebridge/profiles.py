@@ -515,9 +515,12 @@ def _write_config(cfg: Any, update: Dict[str, Any]) -> Path:
             node[section].update(values)
         else:
             node[section] = values
+    from .config import secure_config_permissions
+
     bak = path.with_name(f"{path.name}.profile.{int(time.time())}.bak")
     if path.exists():
         shutil.copy2(path, bak)
+        secure_config_permissions(bak, merged)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.",
                                suffix=".tmp")
     try:

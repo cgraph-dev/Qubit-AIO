@@ -309,9 +309,12 @@ def write_audio_config(cfg: Any, *, mic_name: Any = _UNSET,
         audio[OUTPUT_LEGACY_INDEX_KEY[1]] = ""   # empty pins -> default sink
     data["mic"] = mic
     data["audio"] = audio
+    from ..config import secure_config_permissions
+
     bak = path.with_name(f"{path.name}.audio.{int(time.time())}.bak")
     if path.exists():
         shutil.copy2(path, bak)
+        secure_config_permissions(bak, data)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.",
                                suffix=".tmp")
     try:

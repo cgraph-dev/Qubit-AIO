@@ -172,6 +172,42 @@ def resolve_config_path(path: Optional[Path | str] = None) -> Path:
     return candidate
 
 
+def config_holds_webui_token(data: Any) -> bool:
+    """True when a config mapping carries a usable ``webui.token``.
+
+    Only a non-empty *string* token is a credential. Missing/mistyped values
+    are not treated as secrets, so a config that merely lists the default
+    ``token: ""`` keeps normal permissions.
+    """
+    if not isinstance(data, dict):
+        return False
+    webui = data.get("webui")
+    if not isinstance(webui, dict):
+        return False
+    token = webui.get("token")
+    return isinstance(token, str) and bool(token.strip())
+
+
+def secure_config_permissions(path: Path | str, data: Any) -> bool:
+    """Tighten a written config file to ``0600`` when it holds ``webui.token``.
+
+    Call this on the TEMPORARY file immediately before the atomic replace, so
+    the final config never appears world-readable even for one rename. A
+    config without a token is left untouched: ordinary config writes keep the
+    permissions they already had, so this never broadens into a global chmod.
+
+    Returns True when the mode was applied, False for a token-free config or a
+    chmod failure.
+    """
+    if not config_holds_webui_token(data):
+        return False
+    try:
+        os.chmod(path, 0o600)
+        return True
+    except OSError:
+        return False
+
+
 def detect_legacy_configs() -> List[Dict[str, Any]]:
     """Explicit compatibility detection for legacy config locations.
 

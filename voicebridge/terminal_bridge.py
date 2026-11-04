@@ -77,9 +77,17 @@ def _atomic_write(path: Path, data: Dict[str, Any]) -> None:
     """Serialize *data* and replace *path* atomically."""
     import yaml
 
+    from .config import secure_config_permissions
+
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + TMP_SUFFIX)
     tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    secure_config_permissions(tmp, data)
+    # The sibling backup is another copy of the same config; it carries the
+    # token too when the source did.
+    backup = path.with_name(path.name + BACKUP_SUFFIX)
+    if backup.exists():
+        secure_config_permissions(backup, data)
     os.replace(tmp, path)
 
 

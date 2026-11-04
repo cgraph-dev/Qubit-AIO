@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import gzip
+import hmac
 import json
 import re
 import struct
@@ -1296,6 +1297,49 @@ def debrand_theme_style_id(markup: str) -> str:
     return markup.replace(LEGACY_THEME_CSS_STYLE_ID, QUBIT_THEME_CSS_STYLE_ID)
 
 
+def security_headers(*, allow_same_origin_frame: bool = False) -> list:
+    """Browser hardening headers emitted on every ``_send`` response.
+
+    The dashboard is a local-first SPA. Its built shell carries two inline
+    bootstrap blocks (the pre-hydration splash style/script and the server
+    token injector), so ``script-src``/``style-src`` must permit inline code;
+    everything executable is otherwise same-origin. The external font
+    stylesheet the theme presets load is the only third-party style source,
+    and its font files are the only third-party font source.
+
+    ``allow_same_origin_frame`` is used for exactly ONE document: the plugin
+    application HTML (Office) that the dashboard embeds in a same-origin
+    iframe. Emitting ``DENY`` there would break that intentional embedding,
+    so it gets ``SAMEORIGIN`` + ``frame-ancestors 'self'`` instead. Every
+    other response refuses framing outright.
+    """
+    frame_ancestors = "'self'" if allow_same_origin_frame else "'none'"
+    x_frame_options = "SAMEORIGIN" if allow_same_origin_frame else "DENY"
+    csp = (
+        "default-src 'self'; "
+        "base-uri 'self'; "
+        "object-src 'none'; "
+        "form-action 'self'; "
+        f"frame-ancestors {frame_ancestors}; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "img-src 'self' data: blob:; "
+        "media-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "worker-src 'self' blob:; "
+        "frame-src 'self' https://www.youtube.com "
+        "https://www.youtube-nocookie.com http://127.0.0.1:1933 "
+        "http://localhost:1933"
+    )
+    return [
+        ("Content-Security-Policy", csp),
+        ("X-Frame-Options", x_frame_options),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    ]
+
+
 class WebUIHandler(BaseHTTPRequestHandler):
     server_version = "VoiceDashboard/1.0"
 
@@ -1311,6 +1355,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            for k, v in security_headers(
+                    allow_same_origin_frame=getattr(
+                        self, "_allow_same_origin_frame", False)):
+                self.send_header(k, v)
             # Caller-supplied headers (e.g. the office nonce Set-Cookie). Kept
             # explicit and narrow so the general response shape is unchanged.
             for k, v in (extra_headers or []):
@@ -1794,8 +1842,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 query_token = (parse_qs(urlsplit(self.path).query).get("token") or [""])[0]
             except (TypeError, ValueError):
                 return False
-            configured_token = getattr(self.app, "api_token", "") or ""
-            return bool(configured_token and query_token == configured_token)
+            configured_token = str(getattr(self.app, "api_token", "") or "")
+            if not configured_token or not query_token:
+                return False
+            try:
+                return hmac.compare_digest(
+                    str(query_token).encode("utf-8"),
+                    configured_token.encode("utf-8"))
+            except (TypeError, ValueError, UnicodeError):
+                return False
 
         configured_token = getattr(self.app, "api_token", "") or ""
         if self._qubit_token_ok():
@@ -2146,12 +2201,23 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def _serve_qubit_static(self, sub: str) -> None:
         dist = self._qubit_dist()
-        rel = sub.lstrip("/").split("?")[0]
+        from urllib.parse import unquote
+
+        # The route suffix is request-controlled. Decode once, normalise the
+        # separators, then confine the resolved real path to the build root so
+        # encoded traversal and a symlink planted in the dist tree cannot read
+        # outside it.
+        rel = unquote(str(sub or "")).split("?")[0].replace("\\", "/").lstrip("/")
         if not rel or ".." in rel.split("/"):
             self._send(404, b"not found")
             return
-        fp = dist / rel
-        if not fp.is_file():
+        try:
+            base = Path(dist).resolve()
+            fp = (base / rel).resolve()
+            if not fp.is_relative_to(base) or not fp.is_file():
+                self._send(404, b"not found")
+                return
+        except (OSError, RuntimeError, ValueError):
             self._send(404, b"not found")
             return
         low = fp.name.lower()
@@ -2542,8 +2608,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 html = html.replace("</head>", inject + "</head>", 1)
             else:
                 html = inject + html
-        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8",
-                   extra_headers=extra_headers)
+        # This document is the ONE same-origin iframe the dashboard embeds
+        # (the Office plugin app). It gets SAMEORIGIN rather than DENY so the
+        # intentional embedding keeps working; everything else refuses frames.
+        self._allow_same_origin_frame = True
+        try:
+            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8",
+                       extra_headers=extra_headers)
+        finally:
+            self._allow_same_origin_frame = False
 
     def _serve_qubit_plugin(self, sub: str) -> None:
         from . import resources as _resources
@@ -5408,13 +5481,24 @@ def token_ok(cfg_token: str, header_token: str,
              query_token_present: bool) -> tuple[bool, str]:
     """Packet 1B auth contract. Query-string tokens are ALWAYS rejected.
     With no configured token only loopback callers may pass (caller checks
-    peer address); with a configured token the X-Api-Token header must match."""
+    peer address); with a configured token the X-Api-Token header must match.
+
+    The comparison is constant-time: a byte-by-byte early-exit comparison on a
+    credential leaks its matching prefix through timing to a caller that can
+    make repeated requests. ``hmac.compare_digest`` compares the full value
+    regardless of where the first difference is.
+    """
     if query_token_present:
         return False, "query-token-rejected"
     if not cfg_token:
         return True, "loopback-open"
-    return (header_token == cfg_token), ("ok" if header_token == cfg_token
-                                         else "bad-or-missing-header")
+    try:
+        ok = hmac.compare_digest(
+            str(header_token or "").encode("utf-8"),
+            str(cfg_token).encode("utf-8"))
+    except (TypeError, ValueError, UnicodeError):
+        ok = False
+    return ok, ("ok" if ok else "bad-or-missing-header")
 
 
 def cors_headers_for(allowed_origins, request_origin: str) -> list:
