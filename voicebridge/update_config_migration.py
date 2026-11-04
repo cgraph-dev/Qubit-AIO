@@ -160,11 +160,18 @@ def migrate_config(cfg: Any, *, dry_run: bool = False, override: Any = None
                 "code": MIGRATION_FAILED_CODE,
                 "detail": f"cannot back up config before migration: {path}"}
     try:
+        from .config import secure_config_permissions
+
+        if backup:
+            # The pre-migration copy carries the same webui.token when the
+            # source did; never leave a world-readable credential copy behind.
+            secure_config_permissions(backup, loaded)
         text = yaml.safe_dump(migrated, sort_keys=False)
         if not text.endswith("\n"):
             text += "\n"
         tmp = path.with_name(path.name + ".tmp")
         tmp.write_text(text, encoding="utf-8")
+        secure_config_permissions(tmp, migrated)
         os.replace(tmp, path)
     except OSError as exc:
         return {**base, "ok": False, "state": "FAILED",

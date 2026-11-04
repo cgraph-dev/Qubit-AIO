@@ -2683,15 +2683,19 @@ def _write_terminal_profile_locked(cfg: Any, pid: str, *, actor: str,
     node["profile"] = pid
     data["terminal"] = node
     target.parent.mkdir(parents=True, exist_ok=True)
+    from .config import secure_config_permissions
+
     if target.is_file():
         bak = target.with_name(
             f"{target.name}.terminal-profile.{int(time.time())}.bak")
         bak.write_bytes(target.read_bytes())
+        secure_config_permissions(bak, data)
     tmp = target.with_name(target.name + ".qubit-tmp")
     import yaml
 
     tmp.write_text(yaml.safe_dump(data, sort_keys=False),
                    encoding="utf-8")
+    secure_config_permissions(tmp, data)
     tmp.replace(target)
     if hasattr(cfg, "data") and isinstance(getattr(cfg, "data"), dict):
         node = cfg.data.get("terminal")
@@ -15576,8 +15580,11 @@ def _persist_overrides_to_home(values: Dict[str, Any], cfg: Any = None) -> bool:
                 continue
         import yaml  # type: ignore
 
+        from .config import secure_config_permissions
+
         tmp = path.with_name(path.name + ".qubit-tmp")
         tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        secure_config_permissions(tmp, data)
         os.replace(tmp, path)
         return True
     except Exception:

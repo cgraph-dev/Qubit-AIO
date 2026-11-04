@@ -154,8 +154,11 @@ def write_config_with_backup(path: Path, update: Dict[str, Any],
             data[k] = {**data[k], **v}
         else:
             data[k] = v
+    from .config import secure_config_permissions
+
     bak = path.with_name(f"{path.name}.{prefix}.{int(time.time())}.bak")
     shutil.copy2(path, bak)
+    secure_config_permissions(bak, data)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as fh:

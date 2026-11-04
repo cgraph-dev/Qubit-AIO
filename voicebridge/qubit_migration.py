@@ -783,6 +783,8 @@ def _import_skill_state(cfg: Any, home: Path) -> Dict[str, Any]:
     tmp.write_text(
         yaml.safe_dump(dest_data, sort_keys=False, allow_unicode=True),
         encoding="utf-8")
+    from .config import secure_config_permissions
+    secure_config_permissions(tmp, dest_data)
     os.replace(tmp, dest_yaml)
     report["added"] = added
     report["path"] = str(dest_yaml)

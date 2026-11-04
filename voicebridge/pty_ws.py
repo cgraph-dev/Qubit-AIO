@@ -521,8 +521,11 @@ def _write_terminal_profile_config(qubit_home: Any,
             model_cfg.pop("base_url", None)
         data["model"] = model_cfg
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        from .config import secure_config_permissions
+
         tmp = cfg_path.with_name(cfg_path.name + ".qubit-tmp")
         tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        secure_config_permissions(tmp, data)
         os.replace(tmp, cfg_path)
         return True
     except Exception:

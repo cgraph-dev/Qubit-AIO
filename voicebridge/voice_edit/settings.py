@@ -119,6 +119,8 @@ def _write_yaml(path: Path, data: Dict[str, Any]) -> Path:
         pass
     tmp = path.with_name(f".{path.name}.voice-edit.tmp")
     tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    from ..config import secure_config_permissions
+    secure_config_permissions(tmp, data)
     os.replace(tmp, path)
     return bak
 
