@@ -1041,7 +1041,7 @@ DEFAULT_CONFIG = {
 
     "dashboard": {
         # Visual theme: "default" (Q1) | "q1-l" | "q2" | "q2-l" | "q3" | "q3-l"
-        #                | "q4" | "q4-l" | "q5" | "q5-l" | "q6" | "q6-l"
+        #                | "q4" | "q4-l" | "q5" | "q5-l"
         "theme": "default",
         # Process-isolation rollout controls. Read via the raw config loader, so tui_gateway.server
         # also owns explicit defaults.

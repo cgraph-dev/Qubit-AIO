@@ -2170,16 +2170,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
         _boot_palettes = {
             "default": ("#041c1c", "#0a2e2e", "#7dd3c8"),
             "q1-l": ("#041c1c", "#0a2e2e", "#7dd3c8"),
-            "q2": ("#f4f0e8", "#e7e1d2", "#1f4f8f"),
-            "q2-l": ("#f4f0e8", "#e7e1d2", "#1f4f8f"),
-            "q3": ("#0a0a1f", "#171033", "#d4c8ff"),
-            "q3-l": ("#0a0a1f", "#171033", "#d4c8ff"),
-            "q4": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
-            "q4-l": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
-            "q5": ("#040608", "#07140b", "#9bffcf"),
-            "q5-l": ("#040608", "#07140b", "#9bffcf"),
-            "q6": ("#000000", "#0b0b0b", "#e8ff8f"),
-            "q6-l": ("#000000", "#0b0b0b", "#e8ff8f"),
+            "q2": ("#0a0a1f", "#171033", "#d4c8ff"),
+            "q2-l": ("#0a0a1f", "#171033", "#d4c8ff"),
+            "q3": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
+            "q3-l": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
+            "q4": ("#040608", "#07140b", "#9bffcf"),
+            "q4-l": ("#040608", "#07140b", "#9bffcf"),
+            "q5": ("#000000", "#0b0b0b", "#e8ff8f"),
+            "q5-l": ("#000000", "#0b0b0b", "#e8ff8f"),
         }
         _boot_bg, _boot_mid, _boot_fg = _boot_palettes.get(
             theme_name, ("#041c1c", "#0a2e2e", "#7dd3c8"))

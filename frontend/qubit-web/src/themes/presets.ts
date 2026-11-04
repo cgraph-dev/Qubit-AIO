@@ -7,8 +7,8 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme ids are Qubit-owned (`q1`..`q6`); the picker shows Q1..Q6. Every
- * theme ships a "-L" large variant (Q1-L .. Q6-L) that keeps the same look
+ * Theme ids are Qubit-owned (`q1`..`q5`); the picker shows Q1..Q5. Every
+ * theme ships a "-L" large variant (Q1-L .. Q5-L) that keeps the same look
  * with a bigger root size and roomier spacing. Theme names must stay in sync
  * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
  * `qubit_cli/web_server_dashboard.py`.
@@ -71,34 +71,11 @@ export const defaultTheme: DashboardTheme = {
   terminalBackground: "#000000",
 };
 
-/** Q2 — light mode: vivid blue accents on a pale canvas. */
-export const qubitBlueTheme: DashboardTheme = {
+/** Q2 — deep blue-violet night canvas. */
+export const midnightTheme: DashboardTheme = {
   name: "q2",
   label: "Q2",
-  description: "Q2 — pale blue canvas with a saturated blue accent",
-  palette: {
-    background: { hex: "#E8F2FD", alpha: 1 },
-    midground: { hex: "#0053FD", alpha: 1 },
-    foreground: { hex: "#170d02", alpha: 0 },
-    warmGlow: "rgba(0, 83, 253, 0.12)",
-    noiseOpacity: 0,
-  },
-  typography: DEFAULT_TYPOGRAPHY,
-  layout: DEFAULT_LAYOUT,
-  terminalBackground: "#f5f8fc",
-  terminalForeground: "#170d02",
-  seriesColors: {
-    inputTokenAccent: "#001934",
-    outputTokenAccent: "#0053fd",
-  },
-  swatchColors: ["#170d02", "#0053FD", "#E8F2FD"],
-};
-
-/** Q3 — deep blue-violet night canvas. */
-export const midnightTheme: DashboardTheme = {
-  name: "q3",
-  label: "Q3",
-  description: "Q3 — near-black navy canvas with a lilac tint and violet glow",
+  description: "Q2 — near-black navy canvas with a lilac tint and violet glow",
   palette: {
     background: { hex: "#0a0a1f", alpha: 1 },
     midground: { hex: "#d4c8ff", alpha: 1 },
@@ -120,11 +97,11 @@ export const midnightTheme: DashboardTheme = {
   },
 };
 
-/** Q4 — grayscale, square corners. */
+/** Q3 — grayscale, square corners. */
 export const monoTheme: DashboardTheme = {
-  name: "q4",
-  label: "Q4",
-  description: "Q4 — neutral greyscale canvas with square corners and no accent hue",
+  name: "q3",
+  label: "Q3",
+  description: "Q3 — neutral greyscale canvas with square corners and no accent hue",
   palette: {
     background: { hex: "#0e0e0e", alpha: 1 },
     midground: { hex: "#eaeaea", alpha: 1 },
@@ -145,11 +122,11 @@ export const monoTheme: DashboardTheme = {
   },
 };
 
-/** Q5 — high-chroma terminal look, monospace throughout. */
+/** Q4 — high-chroma terminal look, monospace throughout. */
 export const cyberpunkTheme: DashboardTheme = {
-  name: "q5",
-  label: "Q5",
-  description: "Q5 — black canvas, monospace throughout, bright mint signal colour",
+  name: "q4",
+  label: "Q4",
+  description: "Q4 — black canvas, monospace throughout, bright mint signal colour",
   palette: {
     background: { hex: "#040608", alpha: 1 },
     midground: { hex: "#9bffcf", alpha: 1 },
@@ -175,11 +152,11 @@ export const cyberpunkTheme: DashboardTheme = {
   },
 };
 
-/** Q6 — maximum-contrast accessibility preset. */
+/** Q5 — maximum-contrast accessibility preset. */
 export const contrastTheme: DashboardTheme = {
-  name: "q6",
-  label: "Q6",
-  description: "Q6 — pure black canvas, pure white ink, maximum contrast",
+  name: "q5",
+  label: "Q5",
+  description: "Q5 — pure black canvas, pure white ink, maximum contrast",
   palette: {
     background: { hex: "#000000", alpha: 1 },
     midground: { hex: "#e8ff8f", alpha: 1 },
@@ -223,23 +200,20 @@ function largeVariant(base: DashboardTheme, name: string, num: number): Dashboar
 }
 
 export const bigDefaultTheme = largeVariant(defaultTheme, "q1-l", 1);
-export const bigQubitBlueTheme = largeVariant(qubitBlueTheme, "q2-l", 2);
-export const bigMidnightTheme = largeVariant(midnightTheme, "q3-l", 3);
-export const bigMonoTheme = largeVariant(monoTheme, "q4-l", 4);
-export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q5-l", 5);
-export const bigContrastTheme = largeVariant(contrastTheme, "q6-l", 6);
+export const bigMidnightTheme = largeVariant(midnightTheme, "q2-l", 2);
+export const bigMonoTheme = largeVariant(monoTheme, "q3-l", 3);
+export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q4-l", 4);
+export const bigContrastTheme = largeVariant(contrastTheme, "q5-l", 5);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
   "q1-l": bigDefaultTheme,
-  q2: qubitBlueTheme,
-  "q2-l": bigQubitBlueTheme,
-  q3: midnightTheme,
-  "q3-l": bigMidnightTheme,
-  q4: monoTheme,
-  "q4-l": bigMonoTheme,
-  q5: cyberpunkTheme,
-  "q5-l": bigCyberpunkTheme,
-  q6: contrastTheme,
-  "q6-l": bigContrastTheme,
+  q2: midnightTheme,
+  "q2-l": bigMidnightTheme,
+  q3: monoTheme,
+  "q3-l": bigMonoTheme,
+  q4: cyberpunkTheme,
+  "q4-l": bigCyberpunkTheme,
+  q5: contrastTheme,
+  "q5-l": bigContrastTheme,
 };

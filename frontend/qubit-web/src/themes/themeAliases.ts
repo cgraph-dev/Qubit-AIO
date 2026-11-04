@@ -12,16 +12,17 @@
  * `qubit_cli/web_server_dashboard.py`.
  */
 export const THEME_NAME_ALIASES: Record<string, string> = {
-  // Pre-Qubit ids for light blue, now Q2.
-  "nous-blue": "q2",
-  "lens-5i": "q2",
-  "qubit-blue": "q2",
+  // The old light-blue-ish ids were the greyscale/light family; they now
+  // resolve to Q3 (greyscale), the closest surviving look.
+  "nous-blue": "q3",
+  "lens-5i": "q3",
+  "qubit-blue": "q3",
   // The old roomier Q1 is now a real theme: Q1-L.
   "default-large": "q1-l",
-  midnight: "q3",
-  mono: "q4",
-  cyberpunk: "q5",
-  "qubit-contrast": "q6",
+  midnight: "q2",
+  mono: "q3",
+  cyberpunk: "q4",
+  "qubit-contrast": "q5",
 };
 
 export function migrateThemeName(name: string): string {
