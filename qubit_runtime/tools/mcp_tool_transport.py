@@ -12,7 +12,7 @@ from typing import Dict, Optional, Set
 from utils import normalize_proxy_url
 from agent.proxy_bypass import is_loopback_host, should_bypass_proxy
 from agent import runtime_cwd as _runtime_cwd
-from tools.mcp_tool_errors import _MCP_HTTP_MAX_BODY_BYTES, NonMcpEndpointError, _apply_identity_header, _describe_http_failure, _handshake_answered_with_unsupported_version, _handshake_rejected_as_modern, _is_streamable_http_rejection, _make_http_rejection_recorder, _make_mcp_body_cap_transport, _make_redirect_header_stripper, _resolve_client_cert, _unwrap_exception_group
+from tools.mcp_tool_errors import _MCP_HTTP_MAX_BODY_BYTES, NonMcpEndpointError, OAuthRequiredError, _apply_identity_header, _describe_http_failure, _handshake_answered_with_unsupported_version, _handshake_rejected_as_modern, _is_streamable_http_rejection, _make_http_rejection_recorder, _make_mcp_body_cap_transport, _make_redirect_header_stripper, _resolve_client_cert, _unwrap_exception_group, is_oauth_challenge
 from tools.mcp_tool_lifecycle import _filter_mcp_children, _leader_start_time, _orphan_stdio_pid_servers, _orphan_stdio_pids, _stdio_pgids, _stdio_pids, _stdio_starttimes
 from tools.mcp_tool_common import _core
 from tools.mcp_tool_node_abi import node_abi_error
@@ -695,6 +695,20 @@ class MCPServerTransportMixin:
             # The SDK folds a non-2xx it cannot parse into ``-32603 Server returned an error response``;
             # the recorder hook kept the status/URL/body the server actually sent (#114350, #113359).
             http_detail = _describe_http_failure(exc, self._http_rejection)
+            # A remote endpoint that answers 401 with an OAuth challenge is misconfigured
+            # when the entry has no ``auth: oauth``: the transport never built a provider,
+            # so neither this attempt nor any self-probe can acquire a token. Fail typed and
+            # terminal (the run task records "unavailable" and parks without self-probing)
+            # instead of retrying a server like the shipped ``airtable`` entry forever.
+            if (not self._ever_connected and self._auth_type != "oauth"
+                    and is_oauth_challenge(self._http_rejection.get("status"),
+                                           self._http_rejection.get("www_authenticate"))):
+                challenge = self._http_rejection.get("www_authenticate") or "OAuth"
+                raise OAuthRequiredError(
+                    f"MCP server '{self.name}' requires OAuth (HTTP 401: {challenge}). "
+                    f"Set mcp_servers.{self.name}.auth: oauth in config.yaml, then run "
+                    f"`qubit mcp login {self.name}`; retrying without a provider cannot succeed."
+                ) from exc
             # SSE-only servers (or their load balancers) reject the Streamable HTTP chunked
             # ``initialize`` POST — with a 400-family status or an opaque SDK INTERNAL_ERROR —
             # previously a permanent failure with 0 active tools unless the user set

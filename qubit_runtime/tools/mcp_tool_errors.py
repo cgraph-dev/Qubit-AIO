@@ -71,6 +71,40 @@ class NonMcpEndpointError(ConnectionError):
     so broad catches still see a connection problem."""
 
 
+class OAuthRequiredError(NonMcpEndpointError):
+    """A remote MCP endpoint answered 401 with an OAuth challenge, but the server entry has no
+    ``auth: oauth`` configured (for example the shipped ``airtable`` entry, whose
+    ``https://mcp.airtable.com/mcp`` endpoint requires OAuth).
+
+    Retrying cannot fix this: the transport never built an OAuth provider, so no
+    self-probe can acquire a token. It is permanent *and* terminal — the run task
+    records a typed unavailable reason and parks without self-probing until an
+    explicit reconnect or a config change. The message names the exact fix so it
+    reaches ``qubit mcp list`` / the dashboard instead of a generic 401.
+    """
+
+
+# A 401 that advertises OAuth. The MCP spec's protected-resource challenge is
+# ``WWW-Authenticate: Bearer resource_metadata="..."``; Airtable and other hosted
+# servers also send ``error="invalid_token"``/``scope=``. Anchoring on both
+# ``bearer`` and an OAuth-specific parameter avoids treating a bare
+# ``WWW-Authenticate: Basic`` endpoint as an OAuth misconfiguration.
+_OAUTH_CHALLENGE_RE = re.compile(
+    r"\bbearer\b.*(?:resource_metadata|authorization_uri|oauth|scope\s*=|error\s*=\s*\"?invalid_token)",
+    re.IGNORECASE,
+)
+
+
+def is_oauth_challenge(status: Any, www_authenticate: Any) -> bool:
+    """True when an HTTP rejection is an OAuth challenge the transport must answer with a provider."""
+    try:
+        if int(status) != 401:
+            return False
+    except (TypeError, ValueError):
+        return False
+    return bool(_OAUTH_CHALLENGE_RE.search(str(www_authenticate or "")))
+
+
 # Streamable-HTTP rejection statuses an SSE-only server (or its load balancer) produces for the
 # chunked ``initialize`` POST: Bad Request, Method Not Allowed, Not Acceptable, Length Required.
 _STREAMABLE_REJECT_STATUSES = (400, 405, 406, 411)
@@ -113,6 +147,13 @@ def _make_http_rejection_recorder(sink: dict):
                 body = ""
         sink.update(status=response.status_code, method=response.request.method,
                     url=str(response.request.url), body=body[:_HTTP_REJECTION_BODY_CHARS])
+        # A 401 OAuth challenge lives only in this header; without it the transport
+        # cannot tell "requires OAuth, misconfigured" from a generic rejected request.
+        # Recorded only when present, so the existing (body/status) shape is unchanged
+        # for every other rejection.
+        challenge = str(response.headers.get("www-authenticate", ""))[:_HTTP_REJECTION_BODY_CHARS]
+        if challenge:
+            sink["www_authenticate"] = challenge
 
     return _record
 
