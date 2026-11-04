@@ -37,9 +37,11 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -121,6 +123,31 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+@contextlib.contextmanager
+def fixed_git_dates(repo: Path, ref: str):
+    """Pin author/committer dates to the source commit's date.
+
+    The seed commit and its annotated tag then depend only on the source
+    commit, version and tag, not on when the promotion happened. Re-running
+    the same promotion produces the same seed commit and archive checksum.
+    """
+    stamp = _git(repo, "show", "-s", "--format=%cI", ref).stdout.strip()
+    if not stamp:
+        stamp = "2000-01-01T00:00:00+00:00"
+    keys = ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE")
+    previous = {key: os.environ.get(key) for key in keys}
+    os.environ["GIT_AUTHOR_DATE"] = stamp
+    os.environ["GIT_COMMITTER_DATE"] = stamp
+    try:
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def resolve_commit(repo: Path, ref: str) -> str:
@@ -475,13 +502,14 @@ def main(argv: list[str] | None = None) -> int:
             % (report["source"]["commit"], source_commit)
         )
 
-    seed_commit = seed.init_git(
-        dest,
-        source_commit,
-        tag,
-        checks,
-        int(report["included_files"]) + 2,
-    )
+    with fixed_git_dates(repo, source_commit):
+        seed_commit = seed.init_git(
+            dest,
+            source_commit,
+            tag,
+            checks,
+            int(report["included_files"]) + 2,
+        )
     checks.finish()
 
     archive = seed.archive_seed(dest, tag, version, work / "artifacts")

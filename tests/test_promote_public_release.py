@@ -370,3 +370,25 @@ def test_existing_release_tag_is_never_rewritten(tmp_path: Path):
     assert _git(bare, "rev-parse", "refs/tags/v0.0.1^{}") == tag_commit
     # The failed run still leaves the dry-run evidence report behind.
     assert (tmp_path / "tag-2.json").is_file()
+
+
+def test_the_same_source_commit_produces_the_same_seed_and_checksum(tmp_path: Path):
+    module = _load()
+    repo, first, _ = _source_repo(tmp_path)
+    reports = []
+    for name in ("one", "two"):
+        report = tmp_path / ("%s.md" % name)
+        assert _promote(
+            module,
+            "--repo", str(repo),
+            "--source-commit", first,
+            "--dest", str(tmp_path / ("seed-" + name)),
+            "--report", str(report),
+        ) == 0
+        reports.append(json.loads(report.with_suffix(".json").read_text()))
+    assert reports[0]["seed"]["commit"] == reports[1]["seed"]["commit"]
+    assert reports[0]["seed"]["tree"] == reports[1]["seed"]["tree"]
+    assert (
+        reports[0]["checksums"]["archive_sha256"]
+        == reports[1]["checksums"]["archive_sha256"]
+    )
