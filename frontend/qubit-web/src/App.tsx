@@ -125,6 +125,7 @@ class AmbientFailSafe extends Component<
 // every admin surface (and heavy deps like xterm) up front.
 const ConfigPage = lazy(() => import("@/pages/ConfigPage"));
 const DocsPage = lazy(() => import("@/pages/DocsPage"));
+const GuidePage = lazy(() => import("@/pages/GuidePage"));
 const EnvPage = lazy(() => import("@/pages/EnvPage"));
 const FilesPage = lazy(() => import("@/pages/FilesPage"));
 const SessionsPage = lazy(() => import("@/pages/SessionsPage"));
@@ -315,6 +316,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/config": ConfigPage,
   "/env": EnvPage,
   "/docs": DocsPage,
+  "/guide": GuidePage,
   "/voice-edit": VoiceEditPage,
   "/agent-workspace": AgentWorkspacePage,
   "/nodes": NodesPage,
@@ -402,12 +404,11 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
   { path: "/system", labelKey: "system", label: "System", icon: Wrench },
   { path: "/agents", labelKey: "agents", label: "Agents", icon: Users },
-  {
-    path: "/docs",
-    labelKey: "documentation",
-    label: "Documentation",
-    icon: BookOpen,
-  },
+  // `/docs` is deliberately NOT here: it rendered the served OpenAPI document
+  // (450 paths / 520 operations) as a browsable endpoint dump — accurate, but
+  // useless to the person using Qubit. The route stays mounted as the API
+  // reference for developers; the sidebar entry is `/guide` (see below), a
+  // usage page that answers "how do I work this thing".
   // ---- Qubit groups -------------------------------------------------------
   // These below replace what used to be ~20 flat look-alike rows. Every route
   // is UNCHANGED and still reachable; grouping only changes what the sidebar
@@ -496,8 +497,12 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // Ungrouped Qubit surfaces, each one of a kind.
   // NB: /computer is a CopilotKit/openmuse port whose backend is a typed
   // COMPUTER_USE_NO_DRIVER refusal (no AT-SPI actuator) — visible on purpose
-  // so the capability gap stays stated rather than hidden.
+  // so the capability gap stays stated rather than hidden. It is grouped in
+  // the System section (sidebar-sections.ts), not top-level: a stated gap is
+  // system information, not a workflow surface.
   { path: "/computer", labelKey: "computer", label: "Computer", icon: Monitor },
+  // Canvas / Bot / Harness Router / Kitchen are agent tooling and are grouped
+  // into the Agents section (sidebar-sections.ts).
   { path: "/kitchen", labelKey: "kitchen", label: "Kitchen", icon: ChefHat },
   { path: "/omniroute", labelKey: "omniroute", label: "OmniRoute", icon: Network },
   { path: "/qubit-tv", labelKey: "qubitTv", label: "Qubit TV", icon: Tv },
@@ -505,9 +510,21 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/qubit-bot", labelKey: "qubitBot", label: "Qubit Bot", icon: Bot },
   { path: "/qubit-harness-router", labelKey: "harnessRouter", label: "Harness Router", icon: Workflow },
   { path: "/qubit-office", labelKey: "office", label: "Qubit Office", icon: Users, exactEnd: true },
-  { path: "/qubit-office2", labelKey: "quest", label: "Agent Quest", icon: Star, exactEnd: true },
-  { path: "/qubit-office3", labelKey: "voiceChat", label: "Voice Chat", icon: Mic, exactEnd: true },
+  // `/qubit-office2` (Agent Quest) and `/qubit-office3` (Voice Chat) are no
+  // longer listed: office2 duplicates the Office roster under a colliding
+  // "office" name, and office3 is a second voice-conversation surface beside
+  // Voice & Speech. Both routes stay mounted and reachable by URL.
 ];
+
+// The usage guide that replaces the raw OpenAPI dump in the sidebar. `/docs`
+// stays mounted as the developer API reference; `/guide` is the page a person
+// actually opens.
+const GUIDE_NAV_ITEM: NavItem = {
+  path: "/guide",
+  labelKey: "guide",
+  label: "Guide",
+  icon: BookOpen,
+};
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Activity,
@@ -796,8 +813,8 @@ export default function App() {
   const builtinNav = useMemo(
     () =>
       embeddedChat
-        ? [CHAT_NAV_ITEM, QUBIT_CHAT_NAV_ITEM, ...BUILTIN_NAV_REST]
-        : BUILTIN_NAV_REST,
+        ? [CHAT_NAV_ITEM, QUBIT_CHAT_NAV_ITEM, ...BUILTIN_NAV_REST, GUIDE_NAV_ITEM]
+        : [...BUILTIN_NAV_REST, GUIDE_NAV_ITEM],
     [embeddedChat],
   );
 
@@ -1310,6 +1327,7 @@ const ROUTE_IMPORTERS: Record<string, () => Promise<unknown>> = {
   "/config": () => import("@/pages/ConfigPage"),
   "/env": () => import("@/pages/EnvPage"),
   "/docs": () => import("@/pages/DocsPage"),
+  "/guide": () => import("@/pages/GuidePage"),
   "/voice-edit": () => import("@/pages/VoiceEditPage"),
   "/agent-workspace": () => import("@/pages/AgentWorkspacePage"),
   "/nodes": () => import("@/pages/NodesPage"),

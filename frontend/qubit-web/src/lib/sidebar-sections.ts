@@ -49,13 +49,8 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
     paths: [
       "/qubit-talk",
       "/qubit-tv",
-      "/canvas",
       "/qubit-office",
-      "/qubit-office2",
-      "/qubit-office3",
       "/omniroute",
-      "/kitchen",
-      "/computer",
     ],
   },
   {
@@ -71,6 +66,8 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
       "/qubit-harness-router",
       "/qubit-memory",
       "/agent-cards",
+      "/canvas",
+      "/kitchen",
       "/qubit-task-inbox",
       "/qubit-board-admin",
       "/qubit-tasks",
@@ -87,7 +84,16 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
     id: "system",
     label: "System",
     index: "06",
-    paths: ["/system", "/config", "/env", "/profiles", "/agents", "/docs", "/admin/skills-review"],
+    paths: [
+      "/system",
+      "/config",
+      "/env",
+      "/profiles",
+      "/agents",
+      "/computer",
+      "/guide",
+      "/admin/skills-review",
+    ],
   },
 ];
 
@@ -118,8 +124,6 @@ export const NAV_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/qubit-tv": "Media playback surface",
   "/canvas": "Qubit Canvas board",
   "/qubit-office": "Office — agent roster view",
-  "/qubit-office2": "Agent Quest",
-  "/qubit-office3": "Voice conversation view",
   "/omniroute": "Router and provider mesh",
   "/skills": "Installed skills",
   "/plugins": "Plugin surface and installs",
@@ -133,7 +137,8 @@ export const NAV_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/env": "API keys and secrets",
   "/profiles": "Profile isolation",
   "/system": "Machine and runtime status",
-  "/docs": "Documentation",
+  "/docs": "API reference (endpoint list)",
+  "/guide": "How to use Qubit",
 };
 
 export interface SectionedEntry<T> {
