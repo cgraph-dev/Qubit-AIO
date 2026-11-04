@@ -181,14 +181,15 @@ function Resolve-VoiceLayout {
     # Mirrors voicebridge/paths.py. A fresh install gets $QUBIT_HOME\voice;
     # a checkout that still carries the previous Windows XDG-style tree is
     # preserved read-old (never migrated, copied, or deleted).
-    $newRoot = Join-Path $HomePath 'voice'
+    $homePath = $HomePath
+    $voiceRoot = Join-Path $homePath 'voice'
     $new = [pscustomobject]@{
-        Root   = $newRoot
-        Config = Join-Path $newRoot 'config'
-        Data   = Join-Path $newRoot 'data'
-        State  = Join-Path $newRoot 'state'
-        Cache  = Join-Path $newRoot 'cache'
-        Models = Join-Path $newRoot 'models'
+        Root   = $voiceRoot
+        Config = Join-Path $voiceRoot 'config'
+        Data   = Join-Path $voiceRoot 'data'
+        State  = Join-Path $voiceRoot 'state'
+        Cache  = Join-Path $voiceRoot 'cache'
+        Models = Join-Path $voiceRoot 'models'
     }
 
     $bases = [ordered]@{
@@ -217,7 +218,7 @@ function Resolve-VoiceLayout {
         Models = (Join-Path (Join-Path $bases.Data $legacyName) 'models')
     }
 
-    $newReady = Test-Path -LiteralPath $newRoot
+    $newReady = Test-Path -LiteralPath $voiceRoot
     foreach ($path in @($new.Config, $new.Data, $new.State, $new.Cache, $new.Models)) {
         if ($newReady) { break }
         $newReady = Test-Path -LiteralPath $path

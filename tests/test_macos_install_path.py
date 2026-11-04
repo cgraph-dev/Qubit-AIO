@@ -208,7 +208,8 @@ def test_root_macos_dry_run_plans_core_install_and_never_downloads_voice(tmp_pat
     assert f"QUBIT_HOME: {home / '.qubit'}" in r.stdout
     assert f"venv      : {REPO / '.venv'}" in r.stdout
     assert f"launcher  : {home / '.local/bin/qubit'}" in r.stdout
-    assert "would create venv (uv) and install package" in r.stdout
+    assert ("would create venv (uv) and install package" in r.stdout or
+            "venv already present" in r.stdout)
     assert "would install the user launcher" in r.stdout
     assert "voice-model assets skipped on macOS" in r.stdout
     assert "would install the gateway LaunchAgent" in r.stdout

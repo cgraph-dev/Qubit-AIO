@@ -298,12 +298,12 @@ def test_runtime_config_example_falls_back_to_the_vendored_tree():
 
 def test_qubit_home_contains_the_new_voice_tree():
     src = _ps1()
-    assert "$newRoot = Join-Path $HomePath 'voice'" in src
-    assert "Join-Path $newRoot 'config'" in src
-    assert "Join-Path $newRoot 'data'" in src
-    assert "Join-Path $newRoot 'state'" in src
-    assert "Join-Path $newRoot 'cache'" in src
-    assert "Join-Path $newRoot 'models'" in src
+    assert "$voiceRoot = Join-Path $homePath 'voice'" in src
+    assert "Join-Path $voiceRoot 'config'" in src
+    assert "Join-Path $voiceRoot 'data'" in src
+    assert "Join-Path $voiceRoot 'state'" in src
+    assert "Join-Path $voiceRoot 'cache'" in src
+    assert "Join-Path $voiceRoot 'models'" in src
     assert "VoiceLayout = $voice.Mode" in src
     assert "'read-old'" in src
     # The launcher exports the resolved roots, not the old fixed names.
@@ -317,7 +317,25 @@ def test_qubit_home_contains_the_new_voice_tree():
 # ---------------------------------------------------------------------------
 
 def _powershell_host() -> str | None:
-    return shutil.which("pwsh") or shutil.which("powershell")
+    """Return a working PowerShell host, or None so the test skips.
+
+    A mise shim can exist while having no configured version; treating that
+    as a host would turn an environment problem into a false failure.
+    """
+    for candidate in (shutil.which("pwsh"), shutil.which("powershell")):
+        if not candidate:
+            continue
+        try:
+            probe = subprocess.run(
+                [candidate, "-NoProfile", "-Command", "exit 0"],
+                capture_output=True, text=True, timeout=20,
+                stdin=subprocess.DEVNULL,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0:
+            return candidate
+    return None
 
 
 def test_install_ps1_parses_with_the_real_powershell_parser(tmp_path: Path):
