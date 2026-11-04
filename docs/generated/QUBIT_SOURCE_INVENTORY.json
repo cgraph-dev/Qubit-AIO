@@ -5519,67 +5519,67 @@
    },
    {
     "path": "locales/af.tui.yaml",
-    "local_sha256": "4a8c2b463578c445dae101d0c27c7b95ede5e367de3b52960776ebecbe47033e"
+    "local_sha256": "a841592dc2e3b63447bb1dd6ca97fb76c9625b911fc1cade9040f57f7ec79789"
    },
    {
     "path": "locales/ar.tui.yaml",
-    "local_sha256": "94b22855099b759b79ec00b4050966196814ab988bac50e23635a973e78f226f"
+    "local_sha256": "a30679b9acfe93ad4da4c4714617a3c7067450d15af17fdca1952eafc0837429"
    },
    {
     "path": "locales/de.tui.yaml",
-    "local_sha256": "2e454ae16a9227b8f48d20a96e214744e4b45348828ce2d2746a4bf123c48f86"
+    "local_sha256": "bb72b81ecc108144f7cf41ac405ebaa6fd5969fbc289a16a1f6b66a881dba1ba"
    },
    {
     "path": "locales/es.tui.yaml",
-    "local_sha256": "69c4f1d2ee96e7da007104ee1cc34f4605db9df117120a5d2973dfd5d126d613"
+    "local_sha256": "c1be24934102e26c5981ba0e87010bca85e0c77cb151012070534cc12cd7ceb1"
    },
    {
     "path": "locales/fr.tui.yaml",
-    "local_sha256": "987bbcd0ffd95d3b3aefd385a0f7e77da53ca3002775475777aa61ade3f8a745"
+    "local_sha256": "2b66a5b107605df29a468b4cb5f39783875d4f4b014e6e53068402c25fe07f44"
    },
    {
     "path": "locales/ga.tui.yaml",
-    "local_sha256": "8e5723c6130ddee66bedc5bec8d1da61cc79c57e7ffeb5b007121ee8c6fd11c3"
+    "local_sha256": "5058d1fe875f111d9a6a7e7d468718924fe5a85b3902f083ecf4e49c59ba4e90"
    },
    {
     "path": "locales/hu.tui.yaml",
-    "local_sha256": "0ea314a2a93031f78f9ea03c8b9378bd2b6d5604474680b6f6245f5d60e0c17f"
+    "local_sha256": "6776bbf38e5abe2ad6dad8661fb199c0556bac95e80f04cce4fa6bec9cae9a63"
    },
    {
     "path": "locales/it.tui.yaml",
-    "local_sha256": "478fe12c69494c1661aa99c211b6ecb3620aeec2e9005bcb06436511bf48517a"
+    "local_sha256": "2d0b4946f52f7d08b2cb8d3fb0abbc3bcaa495b5efb6901d1b03d16118b18b56"
    },
    {
     "path": "locales/ja.tui.yaml",
-    "local_sha256": "c67f3697fe2cd451a62faed64bbff4c403c1878bc294a46984753294f59fe77c"
+    "local_sha256": "5336089e2e264cec7bf47be30bd3a3821a65706865772440716cf6e74d2d2a8e"
    },
    {
     "path": "locales/ko.tui.yaml",
-    "local_sha256": "f0767ad607d2432334fccc1fd34e0e7b079ba9f2ccc438ce36e2fbd71c3425a6"
+    "local_sha256": "b69f02c843e5a3a4b4b38a385ae72eb2f4c617b2ea5882a7401a82847a44edbc"
    },
    {
     "path": "locales/pt.tui.yaml",
-    "local_sha256": "33d38d618fcb81f83c8fc57a6a60b19b8cfcbca113e8f8e4ffafb8c27f57f6b3"
+    "local_sha256": "38557ac93e6b5390e2556e0f697a50e47679b2e540820b5e06487bf5db58e656"
    },
    {
     "path": "locales/ru.tui.yaml",
-    "local_sha256": "c5378ed671f8419b9da7dc21377a31f7d80d5c9c7798b6a01274e17204cf8dbb"
+    "local_sha256": "895e4bfae40189abbe566111e38adcbc78d4eec6cf33c4cf435fbda4285ecfd5"
    },
    {
     "path": "locales/tr.tui.yaml",
-    "local_sha256": "bec6fedcb4b2c3ff6d3b64587f2bb30533f6be7f93aa120e7f4c84c05e5a92ee"
+    "local_sha256": "296b176068071a6ea24ad194bf669a7714d6180ea5d3cb021c3256e4afdca706"
    },
    {
     "path": "locales/uk.tui.yaml",
-    "local_sha256": "662f5ac473b6a91e4c43ecfe1d1d6d3cbaf9f8f139c3750edaa377d62491cd75"
+    "local_sha256": "c99aec5712c5b1acc1def3d8ce09b0e4c149dd9e7fdf5d4079f3448293ca0d9a"
    },
    {
     "path": "locales/zh-hant.tui.yaml",
-    "local_sha256": "50ce569438c282785534bd5a01aeb5db0c4bb32625203da01f8d59000fca62af"
+    "local_sha256": "034c1f2ca0aaf23c336722109f2af0890ddc45db9f7752026a8d1498c9f2fba6"
    },
    {
     "path": "locales/zh.tui.yaml",
-    "local_sha256": "f5862b6e5649e4bae0c98475d1faba352fed0a59c658e739f93c68b9907271e7"
+    "local_sha256": "a78f529aa24eab83c52bd543f829bb787fb0572d7441e7a0913f7dd3b9985088"
    },
    {
     "path": "nix/qubit-agent.nix",
