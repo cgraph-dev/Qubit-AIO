@@ -71,17 +71,17 @@ def test_canonical_journey_prog_still_journey():
 
 
 # ------------------------------------------------------------- claw migration
-def test_claw_help_does_not_read_qubit_to_qubit():
-    text = _fork_help(["claw", "--help"])
-    assert "Qubit to Qubit" not in text, text
-    assert "legacy assistant" in text, text
+def test_claw_is_install_gated_when_its_plugin_is_absent():
+    """`qubit claw` left core for the agent-importers plugin. The Qubit surface
+    must name the install command instead of advertising a command that cannot
+    run (the old forwarded help was captured from a plugin that is not shipped)."""
+    from voicebridge import cli_qubit_forward as HF
 
-
-def test_claw_migrate_help_is_coherent():
-    text = _fork_help(["claw", "migrate", "--help"])
-    assert "Qubit to Qubit" not in text, text
-    assert "from an Qubit installation" not in text, text
-    assert "legacy-assistant installation" in text, text
+    route = HF.family_refusal(["claw"])
+    assert route is not None
+    assert route.code == "QUBIT_CLAW_PLUGIN_REQUIRED"
+    assert "qubit plugins install agent-importers" in route.detail
+    assert "qubit import-agent" in route.detail
 
 
 def test_rebrand_pure_migration_phrases():

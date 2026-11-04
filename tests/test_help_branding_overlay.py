@@ -43,7 +43,6 @@ FORWARDED_FAMILIES = {
     "agent": ["--help"],
     "hermes": ["--help"],
     "bundles": ["bundles", "--help"],
-    "claw": ["claw", "--help"],
     "console": ["console", "--help"],
     "debug": ["debug", "--help"],
     "desktop": ["desktop", "--help"],

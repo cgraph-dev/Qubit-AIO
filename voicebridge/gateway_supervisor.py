@@ -1018,20 +1018,26 @@ def _recover_impl(cfg: Any, *, confirmed: bool = False, confirmation_id: str = "
 # bounce.
 
 #: The fleet units, in restart order: the bridge owns the mic/PTT loop, the
-#: gateway owns the messaging backend, the orb is the X11 voice surface.
+#: gateway owns the messaging backend, the voice-typing helper owns global
+#: dictation/selection editing, and the orb is the X11 voice surface (it is
+#: ordered after the typing helper because its unit declares
+#: ``After=qubit-voice-typing.service``).
 #: ``qubit-voice-agent.service`` is NOT a fleet member: it is the 7D
 #: intermediate LEGACY name for the bridge (see voicebridge/profiles.py and
 #: systemd/qubit-voice-agent.service, kept as a "LEGACY REFERENCE ONLY — DO
 #: NOT INSTALL" diagnostic). Listing it here made ``--only all`` name a unit
 #: that does not exist on a migrated host, so the fleet reported an
-#: unavailable member on every restart.
+#: unavailable member on every restart. There is likewise no ``agent`` unit:
+#: the vendored agent runs inside the bridge/gateway, so ``--only agent`` is
+#: not a fleet selector.
 FLEET_UNITS = {
     "voicebridge": "qubit-voicebridge.service",
     "gateway": DEFAULT_DAEMON_UNIT,
+    "typing": "qubit-voice-typing.service",
     "orb": "qubit-voice-orb.service",
 }
 #: Ordered selection for ``--only all`` (alias: the whole fleet).
-FLEET_ORDER = ("voicebridge", "gateway", "orb")
+FLEET_ORDER = ("voicebridge", "gateway", "typing", "orb")
 
 
 def _fleet_selection(only: str) -> Tuple[Optional[List[str]], Optional[str]]:
@@ -1058,9 +1064,9 @@ def restart_fleet(cfg: Any, *, only: str = "all", confirmed: bool = False,
     Convenience fan-out, NOT a new authority path: every unit is restarted
     through :func:`control`, so the e-stop latch, the single-use target-bound
     confirmation, the policy Decision, and the audit receipt are unchanged and
-    shared. ``only`` selects ``voicebridge`` | ``gateway`` | ``orb`` | ``agent``
-    | ``all`` (default: all — the whole fleet, since that is what an operator
-    typing ``qubit restart`` means).
+    shared. ``only`` selects ``voicebridge`` | ``gateway`` | ``typing`` |
+    ``orb`` | ``all`` (default: all — the whole fleet, since that is what an
+    operator typing ``qubit restart`` means).
 
     Confirmation is per-unit and target-bound, so the fleet call issues its own
     confirmation for each unit it is about to transition; without it, every

@@ -166,8 +166,6 @@ _OP_LEAF_CLI = (
 _FAMILY_FORWARD_HELP = (
     ("bundles", "list/show/create/delete/reload skill bundles "
                 "(read-only list/show; writes need --confirm)"),
-    ("claw", "legacy-assistant migration tools (confirm-gated; no silent "
-             "secret import)"),
     ("console", "safe command console REPL (confirm-gated interactive)"),
     ("debug", "diagnostics share/delete (confirm-gated; nothing uploaded "
               "without confirmation)"),
@@ -199,7 +197,6 @@ _CLI_COVERAGE = {
     # Wave 1 fork-backed families: no voice execution surface yet, so they
     # carry an explicit voice-impossible reason (CLI/dashboard only).
     "bundles": (),
-    "claw": (),
     "console": (),
     "debug": (),
     "desktop": (),
@@ -232,8 +229,6 @@ _CLI_VOICE_IMPOSSIBLE = {
                     "`qubit backup restore` in a terminal or the dashboard form",
     "bundles.voice": "skill-bundle bundles are a CLI/dashboard operation; no "
                      "spoken command mutates the bundle registry",
-    "claw.voice": "Legacy-assistant migration is an attended CLI/dashboard "
-                  "operation and never runs from a spoken command",
     "console.voice": "an interactive console REPL cannot run over the voice "
                      "surface; use `qubit console --confirm` in a terminal",
     "debug.voice": "debug bundles may contain logs; sharing is a confirm-gated "
@@ -429,8 +424,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="restart the Qubit service fleet (preview unless --confirm)")
     _restart_p.add_argument(
         "--only", default="all",
-        choices=["all", "voicebridge", "gateway", "orb", "agent"],
-        help="which unit(s) to restart (default: all — the whole fleet)")
+        choices=["all", "voicebridge", "gateway", "typing", "orb"],
+        help="which unit(s) to restart (default: all — the whole fleet; "
+             "there is no 'agent' unit)")
     _restart_p.add_argument(
         "--confirm", action="store_true",
         help="actually dispatch the restart (a restart drops live "

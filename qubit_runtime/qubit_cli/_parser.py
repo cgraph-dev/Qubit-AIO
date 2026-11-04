@@ -91,13 +91,13 @@ _EPILOGUE = """
 Examples:
     qubit                        Start interactive chat
     qubit chat -q "Hello"        Single query mode
-    qubit --tui                  Launch the modern TUI (or set display.interface: tui)
-    qubit --cli                  Force the classic REPL (overrides display.interface: tui)
-    qubit -c                     Resume the most recent session
-    qubit -c "my project"        Resume a session by name (latest in lineage)
-    qubit --resume <session_id>  Resume a specific session by ID
-    qubit --resume latest        Resume the most recent session (same as -c)
-    qubit --tui --resume latest --in ./dir   Resume ./dir's latest session in the TUI
+    qubit agent --tui            Launch the modern TUI (or set display.interface: tui)
+    qubit agent --cli            Force the classic REPL (overrides display.interface: tui)
+    qubit agent -c               Resume the most recent session
+    qubit agent -c "my project"  Resume a session by name (latest in lineage)
+    qubit agent --resume <session_id>  Resume a specific session by ID
+    qubit agent --resume latest  Resume the most recent session (same as -c)
+    qubit agent --tui --resume latest --in ./dir   Resume ./dir's latest session in the TUI
     qubit setup                  Run setup wizard
     qubit logout                 Clear stored authentication
     qubit auth add <provider>    Add a pooled credential

@@ -170,7 +170,7 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
     try:
         from toolsets import validate_toolset
     except Exception as exc:
-        return None, f"qubit -z: failed to validate --toolsets: {exc}\n"
+        return None, f"qubit agent -z: failed to validate --toolsets: {exc}\n"
 
     built_in = [name for name in normalized if validate_toolset(name)]
     unresolved = [name for name in normalized if name not in built_in]
@@ -190,7 +190,7 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
         ignored = [name for name in normalized if name not in _ALL_TOOLSETS]
         if ignored:
             sys.stderr.write(
-                "qubit -z: --toolsets all enables every toolset; "
+                "qubit agent -z: --toolsets all enables every toolset; "
                 f"ignoring additional entries: {', '.join(ignored)}\n"
             )
         return None, None
@@ -202,14 +202,14 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
     valid = built_in + mcp_valid
 
     if unknown:
-        sys.stderr.write(f"qubit -z: ignoring unknown --toolsets entries: {', '.join(unknown)}\n")
+        sys.stderr.write(f"qubit agent -z: ignoring unknown --toolsets entries: {', '.join(unknown)}\n")
     if disabled:
         sys.stderr.write(
-            "qubit -z: ignoring disabled MCP servers (set enabled: true in config.yaml to use): "
+            "qubit agent -z: ignoring disabled MCP servers (set enabled: true in config.yaml to use): "
             f"{', '.join(disabled)}\n"
         )
     if not valid:
-        return None, "qubit -z: --toolsets did not contain any valid toolsets.\n"
+        return None, "qubit agent -z: --toolsets did not contain any valid toolsets.\n"
     return valid, None
 
 
@@ -283,7 +283,7 @@ def run_oneshot(
     # Engine selection is validated before the redirect so its diagnostic is visible.
     engine_error = _validate_engine(engine)
     if engine_error:
-        sys.stderr.write(f"qubit -z: {engine_error}\n")
+        sys.stderr.write(f"qubit agent -z: {engine_error}\n")
         return 2
 
     if engine != "native":
@@ -301,7 +301,7 @@ def run_oneshot(
         ]
         if unsupported:
             sys.stderr.write(
-                f"qubit -z: --engine {engine} does not accept "
+                f"qubit agent -z: --engine {engine} does not accept "
                 f"{', '.join(unsupported)} yet; configure the engine with its own "
                 "environment (QUBIT_OPENJARVIS_MODEL / QUBIT_OPENJARVIS_TOOLS) "
                 "or omit these flags.\n"
@@ -313,7 +313,7 @@ def run_oneshot(
     env_model_early = os.getenv("HERMES_INFERENCE_MODEL", "").strip()
     if provider and not ((model or "").strip() or env_model_early):
         sys.stderr.write(
-            "qubit -z: --provider requires --model (or HERMES_INFERENCE_MODEL). "
+            "qubit agent -z: --provider requires --model (or HERMES_INFERENCE_MODEL). "
             "Pass both explicitly, or neither to use your configured defaults.\n"
         )
         return 2
@@ -371,7 +371,7 @@ def run_oneshot(
             _write_usage_file(usage_file, result, failure=repr(failure))
             raise failure
         _write_usage_file(usage_file, result, failure=str(failure))
-        real_stderr.write(f"qubit -z: agent failed: {failure}\n")
+        real_stderr.write(f"qubit agent -z: agent failed: {failure}\n")
         real_stderr.flush()
         return 1
 
@@ -383,7 +383,7 @@ def run_oneshot(
         refusal = str(result.get("refusal"))
         error = str(result.get("error") or refusal)
         prefix = f"[{refusal}] " if error != refusal else ""
-        real_stderr.write(f"qubit -z: {prefix}{error}\n")
+        real_stderr.write(f"qubit agent -z: {prefix}{error}\n")
         hint = str(result.get("hint") or "")
         if hint:
             real_stderr.write(hint if hint.endswith("\n") else hint + "\n")
@@ -410,14 +410,14 @@ def run_oneshot(
         if result.get("failed") or result.get("partial") or result.get("completed") is False:
             error = str(result.get("error") or "")
             if error:
-                real_stderr.write(f"qubit -z: {error}\n")
+                real_stderr.write(f"qubit agent -z: {error}\n")
                 real_stderr.flush()
             return 1
         return 0 if (response or "").strip() else 1
 
     exit_code = _oneshot_exit_code(response, result)
     if exit_code == 1:
-        real_stderr.write("qubit -z: no final response was produced; treating the run as failed.\n")
+        real_stderr.write("qubit agent -z: no final response was produced; treating the run as failed.\n")
         real_stderr.flush()
     return exit_code
 

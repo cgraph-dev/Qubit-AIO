@@ -147,7 +147,7 @@ qubit restart --only voicebridge --confirm   # just the push-to-talk bridge
 ```
 
 `qubit restart` is a convenience fan-out over the same systemd units
-(`qubit-voicebridge`, `qubit-gateway`, `qubit-voice-orb`, `qubit-voice-agent`).
+(`qubit-voicebridge`, `qubit-gateway`, `qubit-voice-typing`, `qubit-voice-orb`).
 It goes through the same authority path as `qubit gateway restart` (e-stop gate,
 confirmation, audit) and is a preview unless `--confirm` — a restart replaces
 the serving process and drops LIVE voice/terminal sessions. The raw equivalent

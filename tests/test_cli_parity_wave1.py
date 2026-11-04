@@ -118,8 +118,6 @@ CONFIRM_ROUTES = (
     (["moa", "delete", "preset1"], ["moa", "delete", "preset1"]),
     (["moa", "rm", "preset1"], ["moa", "rm", "preset1"]),
     (["worktree", "prune", "--dry-run"], ["worktree", "prune", "--dry-run"]),
-    (["claw", "migrate", "--dry-run"], ["claw", "migrate", "--dry-run"]),
-    (["claw", "cleanup"], ["claw", "cleanup"]),
     (["console"], ["console"]),
     (["desktop", "--build-only"], ["desktop", "--build-only"]),
     (["gui", "--skip-build"], ["gui", "--skip-build"]),
@@ -180,6 +178,7 @@ def test_confirm_flag_stripped_and_globals_ignored(monkeypatch):
 # ---------------------------------------------------------------------------
 REFUSED_ROUTES = (
     (["pause"], "ESTOP_QUBIT_OWNED"),
+    (["claw"], "QUBIT_CLAW_PLUGIN_REQUIRED"),
     (["bundles", "bogus"], "FORK_SUB_UNCLASSIFIED"),
     (["worktree", "add", "x"], "FORK_SUB_UNCLASSIFIED"),
     (["worktree", "remove"], "FORK_SUB_UNCLASSIFIED"),
@@ -228,7 +227,6 @@ def test_inline_confirm_family_argv_evidence(monkeypatch):
         (["memory-graph", "edit"], ["memory-graph", "edit"]),
         (["moa", "configure", "preset1"], ["moa", "configure", "preset1"]),
         (["worktree", "prune", "--dry-run"], ["worktree", "prune", "--dry-run"]),
-        (["claw", "migrate", "--dry-run"], ["claw", "migrate", "--dry-run"]),
         (["console"], ["console"]),
         (["desktop", "--build-only"], ["desktop", "--build-only"]),
         (["gui", "--skip-build"], ["gui", "--skip-build"]),
@@ -331,7 +329,7 @@ def test_wave1_family_names_confirmed_in_parser():
     for action in CLI.build_parser()._actions:
         if isinstance(action, argparse._SubParsersAction):
             names.update(action.choices)
-    for family in ("bundles", "claw", "console", "debug", "desktop", "dump",
+    for family in ("bundles", "console", "debug", "desktop", "dump",
                    "gui", "memory-graph", "moa", "pause", "portal",
                    "prompt-size", "worktree"):
         assert family in names, family
