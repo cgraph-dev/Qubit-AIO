@@ -291,6 +291,8 @@ def test_export_manifest_summarizes_docs_and_surfaces(
         assert f"`{label}`: present" in manifest
     assert "## Local model recipe" in manifest
     assert "`Modelfile.qubit.example`" in manifest
+    assert "## Packaging" in manifest
+    assert "git add -A -f" in manifest
     assert os.path.join("/home", "trick") not in manifest
 
 

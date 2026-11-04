@@ -613,6 +613,12 @@ def _public_manifest(report: dict) -> str:
         "sources when the exported manifest marker is present; any other missing",
         "force-include source still fails the build. A wheel built here therefore",
         "ships the public docs and product surfaces without the internal set.",
+        "",
+        "Some exported product assets (the committed TUI and plugin `dist`",
+        "bundles) are force-tracked in the origin despite the exported",
+        "`.gitignore`, which still matches them. If you initialise a Git",
+        "repository from this snapshot, stage with `git add -A -f`; a plain",
+        "`git add -A` would silently drop those assets.",
     ]
     lines += ["", "## Residual risks", ""]
     if not report["residual_risks"]:
