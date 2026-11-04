@@ -1535,8 +1535,27 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             id="chat-side-panel"
             role="complementary"
             aria-label={modelToolsLabel}
-            className="qchat__side qplate flex max-h-[50vh] min-h-0 shrink-0 flex-col overflow-hidden lg:h-full lg:max-h-none lg:w-60"
+            className="qchat__side qplate relative isolate flex max-h-[50vh] min-h-0 shrink-0 flex-col overflow-hidden lg:h-full lg:max-h-none lg:w-60"
           >
+            {/* Rail backdrop clip — mirrors the nav rail's
+                (.qagent-sidebar__backdrop): the same muted, darkened loop sits
+                behind the modules so both plates share one ambient layer.
+                z-index:-2 puts it behind the `.qchat__side` panel fill, which
+                is why that fill is transparent in qplate.css; the scrim below
+                is what actually carries label contrast. */}
+            <div className="qchat-side__backdrop" aria-hidden="true">
+              <video
+                autoPlay
+                disablePictureInPicture
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                poster="/media/sidebar-backdrop-poster.jpg"
+                src="/media/sidebar-backdrop.mp4"
+              />
+              <div className="qchat-side__backdrop-scrim" />
+            </div>
             <div className="flex shrink-0 items-center justify-end px-2 pt-1.5">
               <Button
                 ghost

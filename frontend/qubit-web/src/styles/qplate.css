@@ -236,15 +236,78 @@
   overflow: hidden;
   padding: 0;
   border-left: 1px solid var(--qplate-rule);
-  background: var(--qplate-panel);
+  /* Transparent, NOT var(--qplate-panel) — same reason the nav rail is: the
+   * panel carries a backdrop clip at z-index:-2 and `isolate` makes it its own
+   * stacking context, so a negative-z child paints BEHIND an opaque fill and
+   * would never be seen. .qchat-side__backdrop-scrim is what puts the panel
+   * colour back on top, so contrast is unchanged. */
+  background: transparent !important;
 }
-/* Each side module is one block on the plate. */
-.qchat__side > div {
+
+/* ── Side panel backdrop clip ─────────────────────────────────────────────
+   The nav rail's ambient layer, on the other plate. Same file, same
+   treatment, same layering, so the two rails read as one system:
+
+     video      dimmed + desaturated at the source
+     scrim      the plate's own panel colour, near-opaque — carries contrast
+
+   z-index:-2 sits behind the module rules and every label; `isolate` on the
+   panel keeps it contained. Pinned on all four edges AND sized 100% because a
+   flex parent measures an absolutely-positioned child against the PADDING box
+   (the nav rail collapsed to content height without this). */
+.qchat__side .qchat-side__backdrop {
+  position: absolute;
+  z-index: -2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 78%,
+    rgb(0 0 0 / 35%) 94%,
+    transparent 100%
+  );
+}
+
+.qchat__side .qchat-side__backdrop video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.55) brightness(0.55) contrast(1.06);
+}
+
+.qchat__side .qchat-side__backdrop-scrim {
+  position: absolute;
+  inset: 0;
+  /* The plate fill this panel used to paint directly. */
+  background: var(--qplate-panel);
+  opacity: 0.62;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qchat__side .qchat-side__backdrop video {
+    display: none;
+  }
+}
+/* Each side module is one block on the plate. The backdrop clip is a direct
+   child too, so it is excluded here — it must stay full-bleed with no padding
+   and no module rule. */
+.qchat__side > div:not(.qchat-side__backdrop) {
   min-width: 0;
   padding: 0.55rem var(--qplate-gutter);
   border-bottom: 1px solid var(--qplate-rule-soft);
 }
-.qchat__side > div > * { position: relative; }
+/* Keep every module's content above the backdrop clip. Scoped away from the
+   clip itself: its children already carry their own absolute stacking, and
+   forcing `relative` on them would detach the scrim from the video. */
+.qchat__side > div:not(.qchat-side__backdrop) > * { position: relative; }
 /* Module headings reuse the rail's label register. */
 .qchat__side .qchat__side-head {
   display: flex;
