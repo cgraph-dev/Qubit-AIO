@@ -67678,7 +67678,7 @@ var bootFilePath, isTestRun, looksLikeTheme, writeTimer, seeded, boot, bootSeede
 var init_themeBoot = __esm({
   "src/lib/themeBoot.ts"() {
     "use strict";
-    bootFilePath = () => join4(process.env.QUBIT_HOME ?? join4(homedir3(), ".hermes"), "tui-theme-boot.json");
+    bootFilePath = () => join4(process.env.QUBIT_HOME ?? join4(homedir3(), ".qubit"), "tui-theme-boot.json");
     isTestRun = () => !!process.env.VITEST || process.env.NODE_ENV === "test";
     looksLikeTheme = (value) => {
       if (typeof value !== "object" || value === null) {
@@ -78474,7 +78474,7 @@ var resolveHermesBin, launchHermesCommand;
 var init_externalCli = __esm({
   "src/lib/externalCli.ts"() {
     "use strict";
-    resolveHermesBin = () => process.env.HERMES_BIN?.trim() || "hermes";
+    resolveHermesBin = () => process.env.QUBIT_BIN?.trim() || process.env.HERMES_BIN?.trim() || "qubit";
     launchHermesCommand = (args) => new Promise((resolve3) => {
       const child = spawn5(resolveHermesBin(), args, { stdio: "inherit" });
       child.on("error", (err) => resolve3({ code: null, error: err.message }));
