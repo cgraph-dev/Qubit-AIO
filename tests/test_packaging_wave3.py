@@ -191,6 +191,47 @@ def test_force_include_sources_are_tracked_so_a_clean_clone_can_build():
     assert tracked_dirs  # git produced a real listing
 
 
+def _git_ignored(path: str) -> bool:
+    """True when ``path`` matches .gitignore (tracked files included).
+
+    ``git check-ignore`` hides tracked files by default, so ``--no-index`` is
+    required: hatchling's sdist selection is VCS-based and drops ignored paths
+    even when they are committed.
+    """
+    return subprocess.run(
+        ["git", "check-ignore", "--no-index", "-q", "--", path],
+        cwd=REPO,
+    ).returncode == 0
+
+
+def test_gitignored_force_include_sources_are_declared_as_sdist_artifacts():
+    """Every force-included source that .gitignore hides must ship in the
+    sdist via ``artifacts``.
+
+    Hatchling's sdist uses VCS file selection, so a git-ignored (but tracked)
+    source is omitted from the sdist. The wheel then force-includes a path the
+    sdist does not carry, and a downstream ``pip install <sdist>`` (or a wheel
+    rebuilt from it) fails with "Forced include not found". This is the
+    concrete regression for the generated vendor manifest under the ignored
+    ``docs/generated/`` tree.
+    """
+    wheel, sdist = _targets()
+    artifacts = set(sdist.get("artifacts", []))
+    ignored_sources = [
+        source for source in wheel["force-include"]
+        if source != "frontend" and _git_ignored(source)
+    ]
+    missing = [source for source in ignored_sources if source not in artifacts]
+    assert not missing, (
+        "git-ignored force-include source(s) missing from the sdist "
+        f"artifacts list (sdist cannot rebuild a wheel): {missing}")
+
+    manifest = "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
+    assert manifest in ignored_sources
+    assert manifest in artifacts
+    assert (REPO / manifest).is_file()
+
+
 # ===========================================================================
 # 2. No hardcoded developer-home path in packaging surfaces
 # ===========================================================================

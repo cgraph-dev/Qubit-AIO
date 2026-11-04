@@ -429,7 +429,17 @@ path = "scripts/hatch_build_qubit.py"
 # been built before packaging; scripts/install.sh builds it deterministically
 # from a clean clone when node/npm are available and otherwise fails typed
 # (see the wheel comment above and docs/CLEAN_CLONE_AUDIT_WAVE5.md).
-artifacts = ["frontend/qubit-dist"]
+#
+# docs/generated/ is git-ignored, so hatchling's VCS file selection omits a
+# tracked file there even though ``git ls-files`` reports it. The vendor
+# manifest is force-included by the wheel, so without this ``artifacts`` entry
+# a wheel rebuilt from the sdist fails with "Forced include not found" — the
+# sdist would not be self-contained. Declare it here so the generated
+# provenance record ships and a downstream ``pip install <sdist>`` works.
+artifacts = [
+  "frontend/qubit-dist",
+  "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
+]
 # NEVER ship the developer's live config, private browser state, or accidental
 # dirty/untracked files (Packet 8K "no private developer state in the release").
 # The sdist carries the portable example config only.
