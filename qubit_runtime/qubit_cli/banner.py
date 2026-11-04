@@ -198,7 +198,7 @@ def format_banner_version_label() -> str:
 
     stamp = read_install_stamp(get_project_root())
     if stamp.get("distribution") == "desktop-app":
-        label = f"Qubit Agent v{get_version_info().derived_version}"
+        label = f"Qubit Agent v{get_version_info().base_version}"
         if stamp.get("source") == "commit-build":
             return f"{label} · commit-build · {str(stamp.get('commit') or '')[:12]}"
         if stamp.get("tag"):
@@ -211,7 +211,7 @@ def format_banner_version_label() -> str:
             return f"{label} · installer"
         return label
 
-    base = f"Qubit Agent v{get_version_info().derived_version} ({RELEASE_DATE})"
+    base = f"Qubit Agent v{get_version_info().base_version} ({RELEASE_DATE})"
     from qubit_cli.config import load_config
     from qubit_cli.update_channel import resolve_update_channel
 
