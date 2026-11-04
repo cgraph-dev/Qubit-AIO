@@ -311,6 +311,29 @@ def test_qubit_home_contains_the_new_voice_tree():
     assert "$($script:Layout.XdgData)" in src
 
 
+def test_dashboard_is_built_before_the_package_is_installed():
+    """A one-pass install must not ship a dashboard-less non-editable package.
+
+    ``scripts/install.sh`` was fixed to build the bundle before installing the
+    package; the Windows twin must keep the same order. ``voicebridge``
+    resolves the dashboard from package data first, so a package installed
+    before ``frontend/qubit-dist`` exists can never see the later build.
+    """
+    src = _ps1()
+    install = src[src.index("function Invoke-QubitInstall"):]
+    install = install[:install.index("if ($script:IsDotSourced)")]
+    assert "Install-Dashboard" in install
+    assert "Install-Venv" in install
+    assert install.index("Install-Dashboard") < install.index("Install-Venv"), (
+        "scripts/install.ps1 installs the package before building the dashboard; "
+        "a clean one-pass install would serve a STALE/BROKEN dashboard"
+    )
+    # Keep the POSIX installer's contract in the same assertion so the two
+    # entry points cannot drift apart silently.
+    sh = INSTALL_SH.read_text(encoding="utf-8")
+    assert sh.index("install_dashboard\ninstall_venv_and_package") > 0
+
+
 # ---------------------------------------------------------------------------
 # Executed checks. These skip on hosts without a PowerShell parser; the
 # Windows installer workflow always has one.
@@ -490,6 +513,43 @@ def test_install_config_initializes_the_new_voice_tree(tmp_path: Path):
         "config.yaml",
     ):
         assert (home / rel).exists(), f"Install-Config did not create {rel}"
+
+
+def test_install_phase_order_is_dashboard_then_venv(tmp_path: Path):
+    """Execute the real control flow with stubbed phases and record the order.
+
+    This runs on any PowerShell host (Linux pwsh in the focused suite, Windows
+    PowerShell in the installer workflow), so the ordering contract is proven
+    by execution, not only by a source grep.
+    """
+    host = _powershell_host()
+    if not host:
+        pytest.skip("no PowerShell host (pwsh/powershell) on this runner")
+    home = tmp_path / "home"
+    wrapper = tmp_path / "order.ps1"
+    wrapper.write_text(
+        f". '{PS1}' -QubitHome '{home}' -NoModels -NoDashboard -NonInteractive\n"
+        "$script:order = @()\n"
+        "function Write-Layout { param([string]$Mode) }\n"
+        "function Write-Step { param([string]$Message) }\n"
+        "function Write-Ok { param([string]$Message) }\n"
+        "function Write-PathReloadHint { }\n"
+        "function Test-Prerequisite { }\n"
+        "function Resolve-Source { param([string]$ProjectDir) return $ProjectDir }\n"
+        "function Install-Dashboard { $script:order += 'dashboard'; $script:DashboardState = 'skipped' }\n"
+        "function Install-Venv { $script:order += 'venv' }\n"
+        "function Install-ModelAssets { $script:order += 'models' }\n"
+        "function Install-OllamaModels { $script:order += 'ollama' }\n"
+        "function Install-Config { $script:order += 'config' }\n"
+        "function Install-Launcher { $script:order += 'launcher' }\n"
+        "Invoke-QubitInstall\n"
+        "Write-Output ($script:order -join ',')\n",
+        encoding="utf-8",
+    )
+    result = _run_ps_file(host, wrapper, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    order = result.stdout.strip().splitlines()[-1].split(",")
+    assert order[:2] == ["dashboard", "venv"], order
 
 
 def test_get_latest_stable_tag_selects_the_latest_semver(tmp_path: Path):

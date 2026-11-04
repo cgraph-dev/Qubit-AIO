@@ -818,10 +818,10 @@ function Invoke-QubitInstall {
         }
         $layout.SourceDir = $source
         Write-Layout 'dry-run (no changes)'
-        Write-Step "[dry-run] would install the Qubit package into $($layout.VenvDir)"
         if (-not $NoDashboard) {
             Write-Step '[dry-run] would verify/build frontend/qubit-dist when missing'
         }
+        Write-Step "[dry-run] would install the Qubit package into $($layout.VenvDir)"
         if (-not $NoModels) {
             Write-Step "[dry-run] would verify/download pinned model assets under $($layout.ModelsDir)"
         }
@@ -837,8 +837,14 @@ function Invoke-QubitInstall {
     $script:Layout.SourceDir = $script:SourceDir
     Write-Layout 'install'
 
-    Install-Venv
+    # Build the dashboard BEFORE installing the package, matching
+    # scripts/install.sh. The package is installed non-editable and
+    # voicebridge/resources.py resolves the bundle from package data first; a
+    # package installed before frontend/qubit-dist exists can never see a later
+    # checkout build, so a one-pass clean install would serve a STALE/BROKEN
+    # dashboard until the installer was run a second time.
     Install-Dashboard
+    Install-Venv
     if ($script:DashboardState -eq 'toolchain_missing' -or $script:DashboardState -eq 'build_failed') {
         Fail-Typed 4 'QUBIT_INSTALL_DASHBOARD_UNAVAILABLE' "the dashboard bundle is missing ($($script:DashboardState)); install node/npm + bash and rerun, or pass -NoDashboard"
     }
