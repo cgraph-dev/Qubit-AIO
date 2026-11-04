@@ -99,17 +99,23 @@ def test_manifest_covers_every_file_on_disk():
             continue
         rel = p.relative_to(FORK).as_posix()
         # Tool/cache dirs are never part of the vendored source snapshot; this
-        # mirrors the manifest generator's _SKIP_DIR_PARTS.
-        if ({"__pycache__", ".git", ".pytest_cache", ".pytest-cache"}
-                & set(Path(rel).parts)
+        # mirrors the manifest generator's _SKIP_DIR_PARTS / _SKIP_FILE_NAMES.
+        # ``MagicMock`` is a test-only artifact: a test that patches a home
+        # resolver with ``MagicMock`` makes ``Path(MagicMock())`` a relative
+        # ``MagicMock/mock/<id>`` tree under the working directory. The
+        # generator already excludes it, so the on-disk check must too.
+        if ({"__pycache__", ".git", ".pytest_cache", ".pytest-cache",
+             "MagicMock"} & set(Path(rel).parts)
+                or Path(rel).name in {"test_durations.json", ".coverage",
+                                      "coverage.xml"}
                 or rel.endswith((".pyc", ".pyo"))):
             continue
         # Disposable dependency/build/cache trees are not part of the vendored
         # source snapshot unless upstream tracks them (e.g. plugin dashboard
         # ``dist/*`` bundles). Skip only untracked disposable paths, exactly as
         # the manifest generator does.
-        if ({"node_modules", "dist", "build", ".cache", ".venv", "venv"}
-                & set(Path(rel).parts) and rel not in expected):
+        if ({"node_modules", "dist", "build", "release", ".cache", ".venv",
+             "venv"} & set(Path(rel).parts) and rel not in expected):
             continue
         actual.add(rel)
     assert actual <= expected, f"unmanifested files: {sorted(actual - expected)[:5]}"

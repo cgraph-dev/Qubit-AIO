@@ -78,18 +78,34 @@ def _sha256(path: Path) -> str:
 
 @pytest.fixture(scope="module")
 def served_manifest() -> dict:
-    mp = SERVED_ROOT / "MANIFEST.json"
-    assert mp.is_file(), f"missing {mp} — run scripts/vendor_office_assets.py"
-    return json.loads(mp.read_text(encoding="utf-8"))
+    # Prefer the served dist copy; fall back to the git-tracked durable copy
+    # when dist has not been built yet (a clean checkout has no dist/).
+    for _label, root in reversed(TREES):
+        mp = root / "MANIFEST.json"
+        if mp.is_file():
+            return json.loads(mp.read_text(encoding="utf-8"))
+    pytest.fail("no vendored Office asset manifest found — run "
+                "scripts/vendor_office_assets.py")
 
 
 def test_both_trees_exist():
+    durable = VENDOR.TARGETS[0]
+    assert durable.is_dir(), (
+        f"durable vendored asset tree absent: "
+        f"{durable.relative_to(REPO).as_posix()}")
     for label, root in TREES:
-        assert root.is_dir(), f"vendored asset tree absent: {label}"
+        if root.is_dir():
+            continue
+        # The served dist tree is a regenerable build output; a clean clone
+        # legitimately has no dist/ until build_dashboard.sh runs.
+        assert root == VENDOR.TARGETS[-1], (
+            f"vendored asset tree absent: {label}")
 
 
 @pytest.mark.parametrize("label,root", TREES, ids=[t[0] for t in TREES])
 def test_manifest_schema(label, root):
+    if not root.is_dir():
+        pytest.skip(f"{label} absent (clean checkout / unbuilt dashboard)")
     m = json.loads((root / "MANIFEST.json").read_text(encoding="utf-8"))
     assert m["schema"] == "qubit-office-assets/1"
     assert m["asset_base_url"] == "/plugins/qubit-office"
@@ -100,6 +116,8 @@ def test_manifest_schema(label, root):
 @pytest.mark.parametrize("label,root", TREES, ids=[t[0] for t in TREES])
 def test_every_manifest_file_exists_and_hashes(label, root):
     """The core contract: recorded path exists and matches its recorded sha256."""
+    if not root.is_dir():
+        pytest.skip(f"{label} absent (clean checkout / unbuilt dashboard)")
     m = json.loads((root / "MANIFEST.json").read_text(encoding="utf-8"))
     bad = []
     for entry in m["files"]:
@@ -117,6 +135,8 @@ def test_every_manifest_file_exists_and_hashes(label, root):
 @pytest.mark.parametrize("label,root", TREES, ids=[t[0] for t in TREES])
 def test_no_unlisted_files_present(label, root):
     """Any file under assets/ not in the manifest is a drop or an unnoticed add."""
+    if not root.is_dir():
+        pytest.skip(f"{label} absent (clean checkout / unbuilt dashboard)")
     m = json.loads((root / "MANIFEST.json").read_text(encoding="utf-8"))
     listed = {e["path"] for e in m["files"]}
     on_disk = {
@@ -137,6 +157,8 @@ def test_reproducible_from_script_plan(served_manifest):
     expected = {dest for _, dest in plan}
     expected_bytes = sum(s.stat().st_size for s, _ in plan)
     for label, root in TREES:
+        if not root.is_dir():
+            continue
         actual = {
             f.relative_to(root).as_posix()
             for f in root.rglob("*")

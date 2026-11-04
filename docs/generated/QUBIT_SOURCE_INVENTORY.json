@@ -11,7 +11,7 @@
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/tmp/nonexistent-openclaw"
+   "path": "/tmp/opencode/pinned/openclaw"
   }
  },
  "counts_by_category": {
@@ -55,10 +55,10 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 16078,
-   "local_files": 20131,
+   "local_files": 20137,
    "identical": 7122,
    "missing": 321,
-   "extra": 4374,
+   "extra": 4380,
    "changed": 8635
   },
   "missing": [
@@ -4907,7 +4907,7 @@
    },
    {
     "path": "gateway/run_bootstrap.py",
-    "local_sha256": "525db3fbc6454c2897af75382afe5e6ac69798a2058f1a85a371d97a1e3d64ae"
+    "local_sha256": "3ca2267dc21e26d0a9bb21066d4daa3e93f281a9f254d38a0897c1f5cdc2cfb1"
    },
    {
     "path": "gateway/run_housekeeping_disk.py",
@@ -6774,6 +6774,10 @@
     "local_sha256": "8940c3bca0827c74bf04f268b9b866beeb227a12616b130741dab387160fca5a"
    },
    {
+    "path": "plugins/platforms/whatsapp/bridge_security.py",
+    "local_sha256": "2056b6187ebba2498211af8e76789bcd3e1ff8b818fffc4161b730963cf28da3"
+   },
+   {
     "path": "plugins/platforms/whatsapp/gateway_env.py",
     "local_sha256": "b226c99b88ff78a0a2da1277c2a76b992b28ebcb0bfcf2a2cbbc81867c73493e"
    },
@@ -7159,7 +7163,7 @@
    },
    {
     "path": "qubit_cli/gateway_runtime_service_identity.py",
-    "local_sha256": "d4ca0d0bba66987fc5206443ac47402f0623717bd75c09ee272cf4f64ab1810a"
+    "local_sha256": "26d1123dbb05a7e70deba96ef4a53c2e971c1974a570cd76a3c4c540ced3cc6b"
    },
    {
     "path": "qubit_cli/gateway_runtime_start.py",
@@ -8344,6 +8348,14 @@
    {
     "path": "scripts/whatsapp-bridge/bridge_helpers.timestamp.test.mjs",
     "local_sha256": "424669ada032c6081fa9029d00af63957c03580824280a3cccd2fbda762d932c"
+   },
+   {
+    "path": "scripts/whatsapp-bridge/bridge_security.js",
+    "local_sha256": "b75080779af8762427e0842b0d75aa829cf071e1ce9f655f366f8d9591ee136c"
+   },
+   {
+    "path": "scripts/whatsapp-bridge/bridge_security.test.mjs",
+    "local_sha256": "ca3f469108ae8b8a6a12b71789c32d316edeedee63774d60a5e0fd7e4ca1192a"
    },
    {
     "path": "setup-hermes.ps1",
@@ -13850,6 +13862,10 @@
     "local_sha256": "d3f61d093b53bd3ad24186451efd996ec07fa02bf3722612bc991260be88320a"
    },
    {
+    "path": "tests/plugins/platforms/test_whatsapp_bridge_security.py",
+    "local_sha256": "659e01deefab0744a9d79b2a36172e36de2dff6524761c3f7be9f8f44d70a9a8"
+   },
+   {
     "path": "tests/plugins/test_a2a_forwarded_cancel_retry.py",
     "local_sha256": "68f199bfc0484d9592f16aabdf223dbb52586375d2ac1b1258fbd475fc277e7d"
    },
@@ -14791,7 +14807,7 @@
    },
    {
     "path": "tests/qubit_cli/test_gateway_unit_paths.py",
-    "local_sha256": "141fce7b9f72b39e01e7cee5ca850f12ceb4a47d07f61f27171984c08b7d40ca"
+    "local_sha256": "6bcc5aeab49c8d7225d32913162a7397ead13f4f0d982ba0a0d986d354596596"
    },
    {
     "path": "tests/qubit_cli/test_gateway_unnamed_default_home_verbs.py",
@@ -17510,6 +17526,10 @@
     "local_sha256": "058de485aa8a50d3fd744e8928b5277c875f661dc1f6972bd71125745e6528ea"
    },
    {
+    "path": "tests/tools/test_mcp_oauth_required_misconfig.py",
+    "local_sha256": "c2122e9c66fe0407f60c906b2f678821562e9140f7cd0f41a36340ab583f037f"
+   },
+   {
     "path": "tests/tools/test_mcp_restart_on_new_inputs.py",
     "local_sha256": "721494afb179301506acbe2dca219d9efdb626cefa02aa325de9b4bd1da47be7"
    },
@@ -19164,6 +19184,10 @@
    {
     "path": "website/docs/user-guide/skills/optional/productivity/productivity-initiate-setup.md",
     "local_sha256": "a5d2e7faa51bf628afb48eff1bc42a35b0f704659b7464a59f816bc31d93bde5"
+   },
+   {
+    "path": "website/static/api/plugin-catalog.json",
+    "local_sha256": "3892b4393cf2cb80e760d35422fb3d520288ea0c2739d1330a10fe00ec103561"
    }
   ],
   "changed": [
@@ -19424,7 +19448,7 @@
     "upstream_path": ".gitignore",
     "upstream_blob": "56781d5f0b415a3f2facc7bf6228e69a7ced1a76",
     "upstream_sha256": "d02a7486328b329df0c1bd8a3c6cd2cbf129057643cdb86c48e5e19148e7f737",
-    "local_sha256": "352567911428fbab5c7a7ef34537f1eebc1cab34c36122942acb366cb6017b4b"
+    "local_sha256": "19f325b75ee48b9590b43f3d432e923c24ea1462b662d80617cdc548b00a8087"
    },
    {
     "path": ".hadolint.yaml",
@@ -33130,7 +33154,7 @@
     "upstream_path": "gateway/restart.py",
     "upstream_blob": "57732284c3d985e7169f6f9841dc7847dbc3f972",
     "upstream_sha256": "6488830693ced1695d7d4ab0a060c09a475d75d29874efcbb621dcb15002a19b",
-    "local_sha256": "4d29688c100665a27b4d1ef29b58026bd14d28785939d65e8cb54627216065e4"
+    "local_sha256": "404df12ec8b868fd702c0309f508c2d2c8e6cc20d740312209d89f6d42f18597"
    },
    {
     "path": "gateway/restart_loop_guard.py",
@@ -38499,7 +38523,7 @@
     "upstream_path": "plugins/platforms/whatsapp/adapter.py",
     "upstream_blob": "424bb87c77745def9292fd795d7eab6d8c936dda",
     "upstream_sha256": "1835d9f3364c5b3e4ed73aba32de225add698bdd78dedc809c301d2d22bc7d9f",
-    "local_sha256": "f907a40094238d576b5385b8edd4d516b7f7eb59b441adf91028543982d0c1b2"
+    "local_sha256": "8f0dd7243570a283e81f786d680297b3e0f9c1dd3c9b37e3251c711c26179153"
    },
    {
     "path": "plugins/platforms/whatsapp/plugin.yaml",
@@ -40200,7 +40224,7 @@
     "upstream_path": "hermes_cli/gateway.py",
     "upstream_blob": "6410d392e078c276d56a476c28e38534c802da51",
     "upstream_sha256": "771375a6f8053ef6f80df97acaed4c09b54b9889e0ccb0a08fec7dd052c1c3b0",
-    "local_sha256": "d584eef35d509a6b3ebde9d580310280cb8ff6ffb91ade095d5f0a5a5e7c11be"
+    "local_sha256": "3125771407ebaa35aab5d9437e45a81c890d97c71045850ae21ad38c34b6d0af"
    },
    {
     "path": "qubit_cli/gateway_command_errors.py",
@@ -41068,7 +41092,7 @@
     "upstream_path": "hermes_cli/observability/shared_metrics.py",
     "upstream_blob": "cc8a51d851fb3ebf9facf97c8e096d52ef13209e",
     "upstream_sha256": "caa0d6c75a437fa060a9a53ace6959253c59e8ed4f650fb1ed2377e5d5337a96",
-    "local_sha256": "9d6289d6fd41b9450390d939008cfa1e10580500010baf314ddabed82b3a07cb"
+    "local_sha256": "0d5de443ad037394f0c074447ba5cc45ba0c51c85fcb2c7b565767b8075cacab"
    },
    {
     "path": "qubit_cli/observability/shared_metrics_contract.py",
@@ -44393,7 +44417,7 @@
     "upstream_path": "scripts/whatsapp-bridge/bridge.js",
     "upstream_blob": "26489896e22436f52ed42c1902fa04ae7ed76767",
     "upstream_sha256": "ea12266d0900294e9ccb98b35cc4a7204e8dbb7e50d975268f39c13a9bbe47b7",
-    "local_sha256": "7f79bc89a3ef1735a13449415987694f1ceb87e44b946fd572cc8ece76d24920"
+    "local_sha256": "b8b1aff64ff2deb7075f0279ee5150de1cb40423371a6c0c92735900dcb22a71"
    },
    {
     "path": "scripts/whatsapp-bridge/bridge_helpers.js",
@@ -53500,7 +53524,7 @@
     "upstream_path": "tests/gateway/test_planned_stop_watcher.py",
     "upstream_blob": "f5486cfcaf71b9ca0b8fe406ebc8c16f1d2f9b2d",
     "upstream_sha256": "52960a2d36367e87f5df228182eb67a8cf72c9925677fda16f4d4ea4220a6887",
-    "local_sha256": "68a6d443ac43fd8be7e112cbc47e44d2975f1d6bc873433d419d53668bca54da"
+    "local_sha256": "798168aa5c72fe26e605e03540442ba6cc44681e6e9f0fdc7efb4f577aad6cf7"
    },
    {
     "path": "tests/gateway/test_platform_base.py",
@@ -61823,7 +61847,7 @@
     "upstream_path": "tests/hermes_cli/test_plugin_catalog.py",
     "upstream_blob": "de8edcbe6230afd570d5b0664e29393459088198",
     "upstream_sha256": "5cbe82b7f530db55cb94e28e2f42320cb6a896d4688def3b6caa27429d62173c",
-    "local_sha256": "65e0e903c40308da3b2f0395c4236db392e6912d74d7b1e27bf9bac88a2b24c4"
+    "local_sha256": "82a32c3baaff8d94174e5c2d199694aa490ef88f196d781c5e939d8212b0ee16"
    },
    {
     "path": "tests/qubit_cli/test_plugin_catalog_presence.py",
@@ -62663,7 +62687,7 @@
     "upstream_path": "tests/hermes_cli/test_relay_shared_metrics.py",
     "upstream_blob": "16189a1e5879b79b6375e95e1da4996cb992bc3a",
     "upstream_sha256": "1df6fe96129e9cdcfb873456573e976c064eddf81ed4e8fd1835b49b8a18921f",
-    "local_sha256": "8a3b770175c85b521132886cbdfa935f17b2e12bdc555512d8b9e4ab3adb1f68"
+    "local_sha256": "b848198280fc8de133a2eb59d5eb309af7b1d36e9129e71fc0f8ee4b9b423a1b"
    },
    {
     "path": "tests/qubit_cli/test_relay_shared_metrics_runtime.py",
@@ -72645,14 +72669,14 @@
     "upstream_path": "tools/mcp_tool_discovery.py",
     "upstream_blob": "0ae4be65a785fa87073cf8dbfb3310202269bca5",
     "upstream_sha256": "35696a2dac1262b983cb904401f48b5962452bab197fbce3f70a4ffc7a4d8b7f",
-    "local_sha256": "2634372329b26fc52a8ee189a7fb7956f90bf3ee4acd4c5095372be5c62272c5"
+    "local_sha256": "ef9f358663b964e1dca6df3d15bf7e5ed94c38093366e45d14eedd488b1b0f83"
    },
    {
     "path": "tools/mcp_tool_errors.py",
     "upstream_path": "tools/mcp_tool_errors.py",
     "upstream_blob": "1d73820eedfed680f2cb927a6e5b7ed9f99bc792",
     "upstream_sha256": "b42a61212bd2d38818cef4a0e32311596facdeeb4ff1e6ec9be29028fca28872",
-    "local_sha256": "b35a79f523bb25c502513171cfaf32337fd1f17d001339fee3d043a4a0048f0a"
+    "local_sha256": "5ae63a79687a825eac545cacf6777525c8d15fe6f8380f92e2f06d9cfd45742c"
    },
    {
     "path": "tools/mcp_tool_handlers.py",
@@ -72715,14 +72739,14 @@
     "upstream_path": "tools/mcp_tool_server_run.py",
     "upstream_blob": "db6d7f83fcfa4ebfc7d96f3795e731f99a8c4bec",
     "upstream_sha256": "030e1deb23bcb8ec30594c89816517662ec4696f53e7081ac9755591db813f84",
-    "local_sha256": "dd77f4852e10a8202af54b5ab21e042fe5503e2c66723360fea9a02b09cce1c6"
+    "local_sha256": "ba6c565e66e71533cea4363b79040f350d10013f428e78456746647ccdacf162"
    },
    {
     "path": "tools/mcp_tool_transport.py",
     "upstream_path": "tools/mcp_tool_transport.py",
     "upstream_blob": "6ebcd85c60402bc6908b297027f3bc303919cc40",
     "upstream_sha256": "915023c572f5cb56d0a99e7709a9d358be3a3c00cbd9f02fe7327815ffa7a8a0",
-    "local_sha256": "d67f4052ebe0b3d8fc2a270ac36d681b61ba7c04cd3d719fdada776b5cf85c30"
+    "local_sha256": "f8f79d794518bd1a1f946f8184adb95ba7908f5d37cc2d08ae016763b36a59f8"
    },
    {
     "path": "tools/memory_tool.py",
