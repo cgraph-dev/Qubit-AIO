@@ -769,6 +769,10 @@ function Stage-Repository {
     }
     if (Test-Path (Join-Path $InstallDir ".git")) {
         Log "Updating $InstallDir ($Branch)"
+        # A checkout cloned before longpaths was set: a deep path past MAX_PATH
+        # fails checkout. Windows ignores the setting elsewhere; writing it on
+        # every host keeps reruns idempotent and matches the fresh-clone path.
+        Invoke-Native { git -C $InstallDir config core.longpaths true } | Out-Null
         # An explicit QUBIT_REPO_URL (or the legacy HERMES_REPO_URL) names the
         # source for reruns too, not just the first clone.
         if ($env:QUBIT_REPO_URL -or $env:HERMES_REPO_URL) {
@@ -871,6 +875,10 @@ function Stage-Repository {
         # prints none to a pipe unless asked.
         $progress = @()
         if (Test-QuietOutput) { $progress = @('--progress') }
+        # Staging dir + deepest tracked path pass MAX_PATH (260) once the
+        # profile root is long enough, and checkout dies with "Filename too
+        # long". --config lands before checkout and stays for `qubit update`.
+        $longPaths = @('--config', 'core.longpaths=true')
         try {
             $cloned = $false
             foreach ($attempt in 1..3) {
@@ -880,7 +888,7 @@ function Stage-Repository {
                 # download stays close to a --depth 1 clone.
                 $cloneLabel = "Cloning $RepoUrl ($Branch) into $InstallDir"
                 if ($attempt -gt 1) { $cloneLabel += " (attempt $attempt of 3)" }
-                Invoke-Logged $cloneLabel { git clone @progress --filter=tree:0 --branch $Branch $RepoUrl $tree }
+                Invoke-Logged $cloneLabel { git clone @progress @longPaths --filter=tree:0 --branch $Branch $RepoUrl $tree }
                 if (-not $LASTEXITCODE) { $cloned = $true; break }
                 Remove-Item -LiteralPath $tree -Recurse -Force -ErrorAction SilentlyContinue
                 if ($attempt -lt 3) { Start-Sleep -Seconds ($attempt * 5) }
@@ -889,7 +897,7 @@ function Stage-Repository {
                 # The checkout step is where throttled downloads die: clone the
                 # graph alone, then retry materializing the tree separately.
                 Write-Warn "direct clone failed; trying deferred checkout"
-                Invoke-Logged "Cloning history" { git clone @progress --filter=tree:0 --no-checkout --branch $Branch $RepoUrl $tree }
+                Invoke-Logged "Cloning history" { git clone @progress @longPaths --filter=tree:0 --no-checkout --branch $Branch $RepoUrl $tree }
                 if (-not $LASTEXITCODE) {
                     foreach ($attempt in 1..2) {
                         Invoke-Logged "Checking out files (attempt $attempt of 2)" { git -C $tree reset --hard HEAD }

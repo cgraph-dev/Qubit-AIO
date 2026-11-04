@@ -51,7 +51,8 @@ Remove-PSBreakpoint $breakpoint
         [POWERSHELL, "-NoProfile", "-NonInteractive", "-File", str(harness),
          "-HandoffPath", str(ROOT / "scripts/desktop-update/windows.ps1"),
          "-Install", str(install), "-Run", run_id],
-        env={**os.environ, "HOME": str(home), "HERMES_HOME": str(home),
+        env={**os.environ, "HOME": str(home), "QUBIT_HOME": str(home),
+             "HERMES_HOME": str(home),
              "TEMP": str(tmp_path), "TMP": str(tmp_path)},
         capture_output=True, text=True, timeout=60,
     )
@@ -70,3 +71,32 @@ Remove-PSBreakpoint $breakpoint
     if run_id:
         assert receipt["run_id"] == run_id
     assert not (home / ".hermes-update-in-progress").exists(), "normal release still runs"
+
+
+@pytest.mark.platforms("any")
+@pytest.mark.live_system_guard_bypass
+def test_powershell_legacy_hermes_home_still_receives_the_result(tmp_path: Path) -> None:
+    """A pre-rebrand host exports HERMES_HOME only; the handoff must not write elsewhere."""
+    if not POWERSHELL:
+        pytest.skip("PowerShell is not installed")
+    home = tmp_path / "home"
+    home.mkdir()
+    install = tmp_path / "checkout"
+    (install / "pm").mkdir(parents=True)
+    harness = tmp_path / "legacy-receipt.ps1"
+    harness.write_text(r'''
+param([string]$HandoffPath, [string]$Install)
+& $HandoffPath -InstallRoot $Install -NoUi
+''', encoding="utf-8")
+    env = {**os.environ, "HOME": str(home), "HERMES_HOME": str(home),
+           "TEMP": str(tmp_path), "TMP": str(tmp_path)}
+    env.pop("QUBIT_HOME", None)
+    result = subprocess.run(
+        [POWERSHELL, "-NoProfile", "-NonInteractive", "-File", str(harness),
+         "-HandoffPath", str(ROOT / "scripts/desktop-update/windows.ps1"),
+         "-Install", str(install)],
+        env=env, capture_output=True, text=True, timeout=60,
+    )
+    receipt = json.loads((home / ".hermes-update-result.json").read_text(encoding="utf-8"))
+    assert receipt["ok"] is False, (receipt, result.stdout, result.stderr)
+    assert not (tmp_path / ".hermes-update-result.json").exists(), "result followed the install parent, not HERMES_HOME"
