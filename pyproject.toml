@@ -584,6 +584,11 @@ exclude = [
   # node_modules tree (3655 members), and the Playwright/agent scratch files
   # are internal. None may enter the release (Packet 8K sdist privacy).
   ".opencode",
+  ".bunshin",
+  "**/node_modules",
+  "**/.vite",
+  "qubit_runtime/evals/browser_use/results",
+  "qubit_runtime/qubit_cli/web_dist",
   ".playwright-mcp",
   "opencode.json.backup",
   "deintegratecuritate.md",
