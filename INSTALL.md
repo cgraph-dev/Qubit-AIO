@@ -38,6 +38,34 @@ cd Qubit-AIO
 
 The installer is idempotent and can be re-run to repair an installation.
 
+## Bootstrap installer (release assets)
+
+`scripts/bootstrap.sh` is the checkout-free entry point for a published
+release. It downloads the release installer (`install.sh`) and its checksum
+into a temporary directory, verifies the SHA-256, and executes **only** the
+verified copy. It never reads a source checkout.
+
+```bash
+./scripts/bootstrap.sh --help
+./scripts/bootstrap.sh --dry-run --prefix "$HOME/qubit" <release-base>
+./scripts/bootstrap.sh --prefix "$HOME/qubit" <release-base>
+```
+
+`<release-base>` is an HTTPS URL, a `file://` URL, or a local directory that
+contains `install.sh` and `SHA256SUMS` (or `install.sh.sha256`).
+`--checksum FILE` overrides checksum discovery. `--profile NAME` is exported
+to the verified installer as `QUBIT_PROFILE`; `--prefix DIR` is forwarded as
+`--prefix DIR`.
+
+The bootstrap fails closed on a missing download, missing/invalid checksum, or
+a checksum mismatch. `--dry-run` downloads nothing, executes nothing, and does
+not touch `QUBIT_HOME`. Linux is supported now; macOS and Windows are typed
+refusals until their bootstrap paths exist.
+
+**Remaining public-hosting prerequisite:** the release must publish the
+bootstrap script itself plus the `install.sh` asset and its SHA-256 checksum at
+the release base. This repository does not yet host a public one-line URL.
+
 ## Options
 
 | Option | Meaning |

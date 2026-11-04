@@ -40,6 +40,11 @@ git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scrip
 Use the Qubit download URL if it differs from the repository above. For options,
 prerequisites, profiles, and offline notes, see [INSTALL.md](INSTALL.md).
 
+Checkout-free path (once a release publishes its installer asset):
+`scripts/bootstrap.sh <release-base>` downloads the release installer, verifies
+its SHA-256, and runs only the verified copy. See
+[INSTALL.md](INSTALL.md#bootstrap-installer-release-assets).
+
 Windows entry (Qubit-owned; never clones the upstream tree):
 
 ```powershell
