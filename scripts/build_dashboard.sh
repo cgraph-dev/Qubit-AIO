@@ -19,6 +19,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_DIR="$REPO_ROOT/frontend/qubit-web"
+SHARED_DIR="$REPO_ROOT/frontend/qubit-shared"
 APPS_DIR="$REPO_ROOT/frontend/apps"
 DIST_DIR="$REPO_ROOT/frontend/qubit-dist"
 DIST_INDEX="$DIST_DIR/index.html"
@@ -76,6 +77,16 @@ if [ ! -x "$WEB_DIR/node_modules/.bin/tsc" ] || \
    [ ! -x "$WEB_DIR/node_modules/.bin/vite" ]; then
   build_failed "npm install omitted devDependencies (tsc/vite missing from node_modules/.bin); check NODE_ENV/npm_config_omit in the build environment"
 fi
+# tsconfig.app.json includes ../qubit-shared/src, and those modules import
+# react/lucide-react. Node resolves from the shared source tree upward, so a
+# clean clone needs frontend/qubit-shared/node_modules as well; the web install
+# only links the package. Its versions are pinned in package.json, and no
+# lockfile is committed for this private package: do not write one into the
+# checkout (release_qualify.py blocks a dirty tree).
+cd "$SHARED_DIR"
+npm install --include=dev --legacy-peer-deps --no-audit --no-fund --no-package-lock \
+  || build_failed "frontend/qubit-shared dependency install failed"
+cd "$WEB_DIR"
 npx tsc -p . --noEmit || build_failed "TypeScript typecheck failed"
 npx vite build --base=/ --outDir "$DIST_DIR" --emptyOutDir \
   || build_failed "vite build failed"
@@ -85,8 +96,8 @@ npx vite build --base=/ --outDir "$DIST_DIR" --emptyOutDir \
 # ~400 MB of build tooling and trip the release content scan. Remove it after
 # a successful build unless KEEP_NODE_MODULES=1 (faster incremental rebuilds).
 if [ "${KEEP_NODE_MODULES:-0}" != "1" ]; then
-  rm -rf "$WEB_DIR/node_modules"
-  echo "removed $WEB_DIR/node_modules (KEEP_NODE_MODULES=1 to keep)"
+  rm -rf "$WEB_DIR/node_modules" "$SHARED_DIR/node_modules"
+  echo "removed $WEB_DIR/node_modules and $SHARED_DIR/node_modules (KEEP_NODE_MODULES=1 to keep)"
 fi
 
 echo "DASHBOARD_BUILT: $DIST_DIR"
