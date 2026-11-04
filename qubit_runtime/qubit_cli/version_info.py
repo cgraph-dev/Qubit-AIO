@@ -311,15 +311,6 @@ def get_version_info() -> VersionInfo:
     if info is None:
         info = VersionInfo("unknown", "unknown", None, None, None, "unknown")
 
-    # The Qubit product release is the user-visible identity, not the git tag
-    # inherited from upstream/older releases (a checkout described from v1.0.0
-    # after the product moved to 0.0.1 must still report 0.0.1).
-    try:
-        from voicebridge.product import PRODUCT_VERSION as _product_version
-        if _product_version and info.base_version != _product_version:
-            info = replace(info, base_version=_product_version)
-    except Exception:
-        pass
 
     _cached_version_info = info
     return info

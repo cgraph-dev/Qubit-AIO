@@ -28556,6 +28556,18 @@
             "default": null,
             "title": "Queued"
           },
+          "submission_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Submission Id"
+          },
           "surface": {
             "anyOf": [
               {

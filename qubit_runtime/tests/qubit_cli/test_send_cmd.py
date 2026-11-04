@@ -99,10 +99,10 @@ def whatsapp_bridge(monkeypatch):
         async def __aexit__(self, *_args):
             return False
 
-        def get(self, url, *, timeout):
+        def get(self, url, *, timeout, headers=None):
             return BridgeResponse(health=True)
 
-        def post(self, url, *, json, timeout):
+        def post(self, url, *, json, timeout, headers=None):
             calls.append((url.rsplit("/", 1)[-1], json))
             return BridgeResponse()
 

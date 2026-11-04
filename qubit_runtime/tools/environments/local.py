@@ -691,7 +691,13 @@ def _prepend_qubit_bin_dir(existing_path: str) -> str:
     if bin_dir and _HERMES_BIN_DIR_IS_PAYLOAD:
         rest = [entry for entry in existing_path.split(os.pathsep) if entry and entry != bin_dir]
         return os.pathsep.join([bin_dir, *rest])
-    return _prepend_missing_path_entries(existing_path, [bin_dir] if bin_dir else [])
+    # A caller-supplied PATH stays authoritative (the gateway proves a local
+    # attach's client env); only add the install dir when it is absent. This
+    # keeps bare ``qubit`` available without shadowing a client's own PATH
+    # prefix in the terminal/session contract.
+    if bin_dir and bin_dir not in existing_path.split(os.pathsep):
+        return os.pathsep.join([*filter(None, existing_path.split(os.pathsep)), bin_dir])
+    return existing_path
 
 
 def _managed_runtime_path_entries() -> list[str]:
