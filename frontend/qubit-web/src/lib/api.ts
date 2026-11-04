@@ -4542,6 +4542,20 @@ export interface ModelOptionProvider {
   source?: string;
   warning?: string;
   authenticated?: boolean;
+  // Reference picker shape: the backend forwards these verbatim when the
+  // vendored builder exposes them. They are optional because most providers
+  // report no account-usage snapshot; the client never fabricates a value.
+  auth_type?: string | null;
+  aliases?: string[] | null;
+  api_url?: string | null;
+  capabilities?: Record<string, unknown> | null;
+  pricing?: Record<string, unknown> | null;
+  pricing_pending?: boolean | null;
+  free_tier?: boolean | null;
+  plan_usage?: Record<string, unknown> | null;
+  usage_levels?: Record<string, string> | null;
+  limit?: Record<string, unknown> | null;
+  usage?: { windows?: unknown[]; accounts?: unknown[] } | null;
 }
 
 export interface ModelOptionsResponse {
