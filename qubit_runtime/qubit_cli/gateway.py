@@ -3050,7 +3050,7 @@ def get_systemd_linger_status(username: str | None = None) -> tuple[bool | None,
 
 
 def get_launchd_plist_path() -> Path:
-    """``~/Library/LaunchAgents/ai.hermes.gateway[-<profile>].plist`` under the real account home."""
+    """``~/Library/LaunchAgents/ai.qubit.gateway[-<profile>].plist`` under the real account home."""
     import pwd
     suffix = _profile_suffix()
     name = f"ai.qubit.gateway-{suffix}" if suffix else "ai.qubit.gateway"

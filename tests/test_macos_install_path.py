@@ -135,8 +135,6 @@ def test_read_old_launchd_cleanup_survives():
 
 
 def test_macos_launchd_dry_run_prints_core_only_plan(tmp_path):
-    if sys.platform == "darwin":
-        pytest.skip("typed non-Darwin refusal is the branch under test")
     home = tmp_path / "home"
     home.mkdir()
     path = _darwin_path(tmp_path)
@@ -183,6 +181,41 @@ def test_root_macos_dry_run_uses_launchagent_and_skips_voice_models(tmp_path):
     assert not (home / "Library").exists()
     assert not (home / ".config").exists()
     assert not (home / ".local").exists()
+    assert not (home / ".qubit").exists()
+
+
+@needs_uv
+def test_root_macos_dry_run_plans_core_install_and_never_downloads_voice(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    path = _darwin_path(tmp_path)
+    # No --without-models: the platform boundary alone must skip the Linux-only
+    # voice-model assets while still planning the core venv/CLI/dashboard.
+    r = subprocess.run(
+        [
+            BASH,
+            str(ROOT_INSTALL),
+            "--dry-run",
+            "--with-launchd",
+            "--without-dashboard",
+        ],
+        capture_output=True,
+        text=True,
+        env=_env(home, str(path)),
+        cwd=str(REPO),
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert f"QUBIT_HOME: {home / '.qubit'}" in r.stdout
+    assert f"venv      : {REPO / '.venv'}" in r.stdout
+    assert f"launcher  : {home / '.local/bin/qubit'}" in r.stdout
+    assert "would create venv (uv) and install package" in r.stdout
+    assert "would install the user launcher" in r.stdout
+    assert "voice-model assets skipped on macOS" in r.stdout
+    assert "would install the gateway LaunchAgent" in r.stdout
+    assert "voice bridge/orb/typing: UNSUPPORTED on macOS" in r.stdout
+    # No model/voice download is even attempted in a macOS dry-run.
+    assert "downloading" not in r.stdout
+    assert not (home / "Library").exists()
     assert not (home / ".qubit").exists()
 
 
