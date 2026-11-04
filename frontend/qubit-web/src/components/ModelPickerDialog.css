@@ -179,3 +179,9 @@
 .qmodel-picker__state-graphic text { fill: var(--qmp-muted); font: 6px var(--theme-font-mono, monospace); letter-spacing: .4px; }
 .qmodel-picker__footer { min-height: 4.6rem; }
 .qmodel-picker .qmodel-picker__action--confirm { box-shadow: 0 6px 22px color-mix(in srgb, var(--qmp-accent) 18%, transparent); }
+
+@media (max-width: 680px) {
+  .qmodel-picker__body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(7.5rem, 32%) minmax(0, 1fr); }
+  .qmodel-picker__provider-column { border-right: 0; border-bottom: 1px solid var(--qmp-line); }
+  .qmodel-picker__current-name { min-width: 0; justify-self: stretch; text-align: right; }
+}

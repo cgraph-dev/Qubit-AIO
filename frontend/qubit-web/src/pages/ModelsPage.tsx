@@ -1088,6 +1088,10 @@ function ModelSettingsPanel({
 
   const mainProv = activeProfile?.provider ?? aux?.main?.provider ?? "";
   const mainModel = activeProfile?.model ?? aux?.main?.model ?? "";
+  const mainModelLine =
+    mainProv && mainModel
+      ? `${mainProv} · ${mainModel}`
+      : mainProv || mainModel || "(unset)";
 
   const applyAssignment = async ({
     scope,
@@ -1141,9 +1145,7 @@ function ModelSettingsPanel({
               </span>
             </div>
             <div className="text-xs font-mono text-text-secondary truncate">
-              {mainProv || "(unset)"}
-              {mainProv && mainModel && " · "}
-              {mainModel || "(unset)"}
+              {mainModelLine}
             </div>
           </div>
           <Button
@@ -1240,6 +1242,10 @@ function ModelSettingsPanel({
             loader={api.getModelOptions}
             alwaysGlobal
             title="Set Main Model"
+            currentOverride={
+              mainModel ? { provider: mainProv, model: mainModel } : null
+            }
+            currentOverrideLabel="CURRENT MODEL"
             onApply={async ({ provider, model, confirmExpensiveModel }) => {
               const result = await applyAssignment({
                 confirmExpensiveModel,
