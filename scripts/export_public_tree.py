@@ -49,6 +49,7 @@ PERSONAL_PATH_MARKERS = (os.path.join("/home", "trick"),)
 ALLOWED_TOP_LEVEL_DIRS = frozenset({
     "adapters",
     "benchmarks",
+    ".github",
     "config",
     "docs",
     "frontend",
@@ -344,6 +345,11 @@ def _classify(path: str) -> tuple[bool, str]:
     else:
         if top not in ALLOWED_TOP_LEVEL_DIRS:
             return False, "not_allowlisted"
+
+    if path.startswith((".github/agents/", ".github/skills/", ".github/hooks/")):
+        return False, "excluded_dir"
+    if path == ".github/copilot-instructions.md":
+        return False, "excluded_file"
 
     for segment in parts[1:]:
         if segment not in EXCLUDED_DIR_SEGMENTS:
