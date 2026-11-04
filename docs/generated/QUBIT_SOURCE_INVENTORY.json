@@ -11,7 +11,7 @@
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/tmp/opencode/pinned/openclaw"
+   "path": "/tmp/nonexistent-openclaw"
   }
  },
  "counts_by_category": {
@@ -55,10 +55,10 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 16078,
-   "local_files": 20137,
+   "local_files": 20721,
    "identical": 7122,
    "missing": 321,
-   "extra": 4380,
+   "extra": 4964,
    "changed": 8635
   },
   "missing": [
@@ -1684,6 +1684,10 @@
    {
     "path": ".github/workflows/windows-install-update-e2e.yml",
     "local_sha256": "e2d50e330ef3e15b856bcaa67e498a463b91e853930aded9e0254593127c6b5c"
+   },
+   {
+    "path": ".hermes-update.lock",
+    "local_sha256": "f5fef77419d084030f1ab171f17db6487096ae737c71c71112749fac475f90eb"
    },
    {
     "path": "INVESTIGATION-local-viewer-prompt-cluster.md",
@@ -4654,6 +4658,10 @@
     "local_sha256": "4cfc1d37424b38ee105953158d1cd8c8d57e67472cb8fa0590aaccfcfb181fe8"
    },
    {
+    "path": "evals/browser_use/results/results.jsonl",
+    "local_sha256": "708be376075e908898b97068dcbbed2e3f206c3af1d7146ae457503a0119b9c8"
+   },
+   {
     "path": "evals/core_tool_deferral/sandbox.py",
     "local_sha256": "7582a6afd5bae510f6bd68ed13db0d48602ab3fe962f84153c6927357da28e8c"
    },
@@ -5610,24 +5618,172 @@
     "local_sha256": "67f6bfb103a2627ca68769b85e2777d933a77d90a1f8ee69e8488d6a2f77ffc3"
    },
    {
+    "path": "plugin-catalog/aave-mcp.yaml",
+    "local_sha256": "c784dd3c4d29b80077e0ed505920456fdd507549d5f7bd01af2b7ecfdd6db115"
+   },
+   {
+    "path": "plugin-catalog/abstract-provider.yaml",
+    "local_sha256": "e2b5034bd532b86f916b4bcb4dd4d05910925cd96027e102d90bcc78d897d830"
+   },
+   {
+    "path": "plugin-catalog/accent-picker.yaml",
+    "local_sha256": "fab7be5306726c1a226fd61c6fe5adb97bf155b098b9ad820a753e878cfb5a14"
+   },
+   {
+    "path": "plugin-catalog/account-pool.yaml",
+    "local_sha256": "5a62326108a9ffd6460500cfdf2d9f2aa3ab73fd5fe0c25ea106549b74c12a37"
+   },
+   {
+    "path": "plugin-catalog/account-switcher.yaml",
+    "local_sha256": "c70ace095b3dd82f973b89a4bd42d2981bf897df689001319ed000e19cffb745"
+   },
+   {
+    "path": "plugin-catalog/acedatacloud-media.yaml",
+    "local_sha256": "e415569c16099b50192f0827d92a26bafb62d294a4158c24d45642757f190d08"
+   },
+   {
+    "path": "plugin-catalog/acedatacloud.yaml",
+    "local_sha256": "06f20708526e28850e1a2d7d3f528fa4db55b572e77a56c729d12f49866ddecf"
+   },
+   {
+    "path": "plugin-catalog/actvox.yaml",
+    "local_sha256": "3029e5161fbead138b2e31706c20f785c44a1240ba70c05e3da3961370189803"
+   },
+   {
+    "path": "plugin-catalog/adaption.yaml",
+    "local_sha256": "b121d2a1e99aab1ad830a27074d60bcf5ea4055aed22bb16b26f9360b5e86f44"
+   },
+   {
+    "path": "plugin-catalog/adaptive-inference-routing.yaml",
+    "local_sha256": "b665ab2f5c27d361541d35c055cb9c0008cc3e35e5ac61fe38709b79b75d079b"
+   },
+   {
+    "path": "plugin-catalog/adkit.yaml",
+    "local_sha256": "beea516f04bf108d4451855edb01db008ea1caec8a1d9a72b4b979c29cacf196"
+   },
+   {
+    "path": "plugin-catalog/advanced-delegation.yaml",
+    "local_sha256": "f74923677d65a59794508faa2f595b3a42e276a76d6a35d1d83e5b31149d0d92"
+   },
+   {
+    "path": "plugin-catalog/advisor.yaml",
+    "local_sha256": "c185b8842f83e2c509334258370281cc9572887c12569db21f0db6846152cd11"
+   },
+   {
+    "path": "plugin-catalog/adwhispr.yaml",
+    "local_sha256": "408b21c11f589c372ed0eb636409cf485cd2f74955d44aff86de8fa7c4d3d52c"
+   },
+   {
+    "path": "plugin-catalog/agent-batch.yaml",
+    "local_sha256": "519b13ad93011179ba0dc3d6db938383b0ae8de7c59e17223a9767e09f316807"
+   },
+   {
+    "path": "plugin-catalog/agent-hint.yaml",
+    "local_sha256": "229fc0fd77591525d9e0f1bc92fafcb60b955a11e55bad6bacd8ad9b21e4cc9d"
+   },
+   {
+    "path": "plugin-catalog/agent-hold-em.yaml",
+    "local_sha256": "e3177cf459858b51b521620a143e6d91433eaf4c656f2443a9ee9be1a5cfe24e"
+   },
+   {
+    "path": "plugin-catalog/agent-importers.yaml",
+    "local_sha256": "c7e918a7aa860b708c7c304d8f3a6581148cc6571b2ade49402fb3321a7b5a1f"
+   },
+   {
+    "path": "plugin-catalog/agent-janitor.yaml",
+    "local_sha256": "b32ebe96d9c50569ab3f30951f6fbed9a6558f62c5a114ca9bf8bacd959990dd"
+   },
+   {
+    "path": "plugin-catalog/agent-ledger.yaml",
+    "local_sha256": "1bb29a6a12ece259b0a8d0b6771ab83dca55cf48872427ec25053409dfbce7ca"
+   },
+   {
     "path": "plugin-catalog/agent-mail-gateway.yaml",
     "local_sha256": "86111e4e98af4823b3ca0004f2374b0661a97fa8395b96bbd64234858c47a672"
+   },
+   {
+    "path": "plugin-catalog/agent-run-debugger.yaml",
+    "local_sha256": "90a9a6590a025cb962914649c7c493d7e1a167f501792b03f5542e059f9cd385"
+   },
+   {
+    "path": "plugin-catalog/agent-station.yaml",
+    "local_sha256": "4182b2d6e400dd7b291f33152e95a8c0fc4a4391bc13f508c51953e421cbd5e6"
    },
    {
     "path": "plugin-catalog/agent_memory_es.yaml",
     "local_sha256": "e16ddf8caeb62838810e8065f4fda05b73862334120f22357ed72dd89566af85"
    },
    {
+    "path": "plugin-catalog/agentplaybooks-memory.yaml",
+    "local_sha256": "39fb8b82c588bb3789b55ced4a5e9527b770b96b4204b473fd0bdb9e974e518e"
+   },
+   {
     "path": "plugin-catalog/agentplaybooks-tools.yaml",
     "local_sha256": "844c2da53b5f6b1ea586629b250b90315f63e9291bb768f78ab445a814025712"
+   },
+   {
+    "path": "plugin-catalog/agentvault.yaml",
+    "local_sha256": "aa7aebfe52cabd2078325068a89740f15c0917bbd5ef7524ed7fe682dc94768b"
+   },
+   {
+    "path": "plugin-catalog/agentwalletapi.yaml",
+    "local_sha256": "9fec70e8c929be62c346b94c473a85da28e67890eb4cfd75b3de5c07f48503ae"
    },
    {
     "path": "plugin-catalog/agora.yaml",
     "local_sha256": "b96b63c3a6cd3563ff2642e66b2190a6eeee215cd4db50cfefb323e5398b37ca"
    },
    {
+    "path": "plugin-catalog/ai-subscriptions.yaml",
+    "local_sha256": "7b34e97e6ee48abc07c3014bf1d83520abc380dc16a567876685948893f672e7"
+   },
+   {
+    "path": "plugin-catalog/aichipmunk.yaml",
+    "local_sha256": "fc6694d3e37b8986dfddaa9594598e8beda3e33d7df40818a1e93747893009c6"
+   },
+   {
+    "path": "plugin-catalog/airlock.yaml",
+    "local_sha256": "684e7043966d3e8e66e5f7b0f030c418cdffd0c35da4d3ed73ccd427ff89b404"
+   },
+   {
+    "path": "plugin-catalog/aistupidlevel.yaml",
+    "local_sha256": "ef7fe9d718c50e27078735aae648688230f4d02a9a6e80fe6cf2f12e90d01c65"
+   },
+   {
+    "path": "plugin-catalog/aixy.yaml",
+    "local_sha256": "505151daf10daaa7f5034081904e4edd46fb7d252d2ec45542c59ccf0ccb0b0c"
+   },
+   {
+    "path": "plugin-catalog/alans-way-computer.yaml",
+    "local_sha256": "e0e37f311092893e84aee1c160190ca9311ba5c98a928c9be236344b5fb0674b"
+   },
+   {
+    "path": "plugin-catalog/alans-way.yaml",
+    "local_sha256": "b4b34c1f99986aa4faf5a6df98a43196adc5d2c5e4fc7b1c49391dd3d284cc99"
+   },
+   {
+    "path": "plugin-catalog/alice-voice.yaml",
+    "local_sha256": "cffa803eb4639ae17cccb08d118141eceb57e5fbec2647932034566cb03d3e60"
+   },
+   {
+    "path": "plugin-catalog/ample.yaml",
+    "local_sha256": "06e1c633d3fa1e102ec111b2d663191c993ca01b5cd62e35dcfb5106fc90fae7"
+   },
+   {
+    "path": "plugin-catalog/anatomy-museum.yaml",
+    "local_sha256": "1e11d0f5ca15b3c2ca2c80b4259699f9d87fa863abb451f04db1ca2b96f9c0a3"
+   },
+   {
+    "path": "plugin-catalog/ando-platform.yaml",
+    "local_sha256": "b1bf8550fc09ff548203cfba1d0e6633e711b482b44599d4d4029f95aabf8b43"
+   },
+   {
     "path": "plugin-catalog/android-emulator.yaml",
     "local_sha256": "c5450471482c799d13fa1e185609885900ef0f15107df4ed3f1a0e632f631ded"
+   },
+   {
+    "path": "plugin-catalog/antenna.yaml",
+    "local_sha256": "c87307bc05768d05fe8fe73d7f2f132d39edb5a9d1d462fb3b5c9d3125cc9379"
    },
    {
     "path": "plugin-catalog/antigravity-agy.yaml",
@@ -5638,6 +5794,10 @@
     "local_sha256": "855f88ce84d9f6c488d7fe0335b7907012eed520925e55ae014411dab3cc461a"
    },
    {
+    "path": "plugin-catalog/anyapi.yaml",
+    "local_sha256": "f6a8c58519fb32495b9eef58d1cce2d1d663837b3e79566cab2d8b9a8d6e56bb"
+   },
+   {
     "path": "plugin-catalog/anyrouter.yaml",
     "local_sha256": "3aeab511b7bc67709c8abe5f11cb5bf7a751c9e5d018c0c41e7e08c929a44f95"
    },
@@ -5646,8 +5806,80 @@
     "local_sha256": "e9834145495dc3c307058efdfa8f70443043d6e27b2c763b530ab8e7dd254cad"
    },
    {
+    "path": "plugin-catalog/approval-ledger.yaml",
+    "local_sha256": "7a0d80f913b0b68a5718e487a1a0113b51e02e05a489f6ebd134744687c10d16"
+   },
+   {
+    "path": "plugin-catalog/artifacts.yaml",
+    "local_sha256": "5b2ea4b7199f4d6cf053a6544e954e4ae29e517aa13ea089bcf066d5987c1d89"
+   },
+   {
+    "path": "plugin-catalog/aside-browser.yaml",
+    "local_sha256": "80eef9ba75c3180a3b3d868783fb743a08b116e032b248109649ec9549935e83"
+   },
+   {
+    "path": "plugin-catalog/astro-agents.yaml",
+    "local_sha256": "2ca20879149446b334e930e16e57e3569c503d212e90e05fcf1901aeffa7f16f"
+   },
+   {
+    "path": "plugin-catalog/athletedata.yaml",
+    "local_sha256": "3ad684edbfc651148a4585367feec52a975189e9ee9627fdb07f627f470a0719"
+   },
+   {
+    "path": "plugin-catalog/atmorouter.yaml",
+    "local_sha256": "f02a3ca47389f88ae57dd12ad1e2e188adf07b7e6c9563132c411b3b5bc17459"
+   },
+   {
+    "path": "plugin-catalog/author-feed.yaml",
+    "local_sha256": "d0a7415eef06d075e770a776948d87abbd0411c247f5336ed81fec474ef06a20"
+   },
+   {
+    "path": "plugin-catalog/auto-pin.yaml",
+    "local_sha256": "67322162498c8d1a28819d5a267ea13bdfd8572ab77deed1e1577b9554afdacc"
+   },
+   {
+    "path": "plugin-catalog/aux-ledger.yaml",
+    "local_sha256": "8df03f04db73fb319f5ef7b817cf6fb2db9c7efe3df1f4b475801d441a91ddba"
+   },
+   {
+    "path": "plugin-catalog/b64-ref.yaml",
+    "local_sha256": "f188f44603514de88308a7a58ac69baa84e931ee1d39cf6ee1205fefc1f4b9cc"
+   },
+   {
+    "path": "plugin-catalog/background-review-watch.yaml",
+    "local_sha256": "0756037d6c3e34f17c8eda8c0ebdd00ad1b3fe8a26945cda2202756c58c1cadc"
+   },
+   {
+    "path": "plugin-catalog/backupdrill.yaml",
+    "local_sha256": "35a7f24ec103971aeea2794db404f74011e1a414cf20234a172fbd3279211dfc"
+   },
+   {
+    "path": "plugin-catalog/beam.yaml",
+    "local_sha256": "79766090be014502adac5dfcc6e93d2380d3b6bd8c8831c69377b6e235e61706"
+   },
+   {
+    "path": "plugin-catalog/bento.yaml",
+    "local_sha256": "9f83ba2085d6f0bc3c39be3943f42671b710929d942a3cc028ec67829991cbd2"
+   },
+   {
+    "path": "plugin-catalog/better-capabilities.yaml",
+    "local_sha256": "f84ca34b1d93893413b88ba656bf6a3a1b8f1a789e2f5f58b50e9bd4a075255d"
+   },
+   {
     "path": "plugin-catalog/better-session-appearance.yaml",
     "local_sha256": "a90663367189b8ef11030dd292521316439c706b6a8097bc22d94c1e9baa414c"
+   },
+   {
+    "path": "plugin-catalog/betterdb.yaml",
+    "local_sha256": "b5b9fe01e88ec4368e332aa97bb3e677d153d8b812de87a16866c0fc04f64e89"
+   },
+   {
+    "path": "plugin-catalog/bharatcode-provider.yaml",
+    "local_sha256": "e578557a9a3532a1a00aad0bbaed848b2fdc749f597237b308859540a27364b7"
+   },
+   {
+    "path": "plugin-catalog/bilinc.yaml",
+    "local_sha256": "019c2b4723ec43659c80111eff203bcad8e7f46f14f50cc200316fc5c4b9e5ba"
    },
    {
     "path": "plugin-catalog/biomimetic-brain.yaml",
@@ -5658,32 +5890,224 @@
     "local_sha256": "64fe1c0bd82f01e4e4d9be6137a1779b8ffd98db93a4b98be88ce717f2fc5653"
    },
    {
+    "path": "plugin-catalog/blackbox.yaml",
+    "local_sha256": "e99b77977ccdafe0f4061433677f68b95003d66949ee9c0d9df8db05dc7fb25a"
+   },
+   {
+    "path": "plugin-catalog/bot-activity.yaml",
+    "local_sha256": "4e8cf8730e3b43e007b3ff9b88632c880d46ed122c38c0c23268053c78aa797b"
+   },
+   {
+    "path": "plugin-catalog/bot-cabinet-v2.yaml",
+    "local_sha256": "396cdad32d0bee5498944845a9e44cc4e223743c2250a47c9f14ae822ca125ec"
+   },
+   {
     "path": "plugin-catalog/brain-graph.yaml",
     "local_sha256": "90524f173261d1b75352744c6e6367acb1fe074e7f8d8e362d1d100f9c771363"
+   },
+   {
+    "path": "plugin-catalog/brethof-brain.yaml",
+    "local_sha256": "afa9a9609e3124b0a9e540b818e01017aa605a61f31ab1de9f07511b8ad1be33"
+   },
+   {
+    "path": "plugin-catalog/browser-toggle.yaml",
+    "local_sha256": "ac998f0870cb72b2721bae61ec8a1746aa90d2b7352a698a4fcd73b022170ed2"
+   },
+   {
+    "path": "plugin-catalog/browserless.yaml",
+    "local_sha256": "b7d7fc28313fe6a5bf2e78354b51874201463425012a7ce72479d18d8f94c446"
    },
    {
     "path": "plugin-catalog/browserpaw.yaml",
     "local_sha256": "9bd8b8222afe1694e1963ce6e173ba151a186db709b3b01705cf0f15329ba0c3"
    },
    {
+    "path": "plugin-catalog/bubblewrap.yaml",
+    "local_sha256": "62eb31142e3ef462857289a5814f3d3adbf941f3b56e9d18c630e894af1be186"
+   },
+   {
     "path": "plugin-catalog/bunny_space-platform.yaml",
     "local_sha256": "cf2f0ea0deabfa06477b0d49b7a8848cee64ba63f264b4ae983b3c2eb8069863"
+   },
+   {
+    "path": "plugin-catalog/burnclock.yaml",
+    "local_sha256": "433cec203aa0f9badd294436c5707947c07917d0e6f4709ebaa6c1e194b235f1"
+   },
+   {
+    "path": "plugin-catalog/call-me.yaml",
+    "local_sha256": "3f83630cac9c1f4f6cac62f34d05a10a273fc6394f811a7199848603242214e1"
+   },
+   {
+    "path": "plugin-catalog/camofox.yaml",
+    "local_sha256": "df92a742d6bfabdf9542562cd1d2ffbe241718e91a7cade6a584a18dc89661fc"
+   },
+   {
+    "path": "plugin-catalog/canadian-primary-care.yaml",
+    "local_sha256": "a1417a13e745162ab56aadc54f61d3bdbb376324f146cb0bff39289c865d09a0"
+   },
+   {
+    "path": "plugin-catalog/catalogo-it.yaml",
+    "local_sha256": "e9e3966e05d27d7b57e24329be4ecebacc2463bd78b3f72b7fc32c8201872252"
+   },
+   {
+    "path": "plugin-catalog/channel3.yaml",
+    "local_sha256": "d0ba8bf1548e24e787ba3415f6718ee34db1c037f32a0a58ccdc126d4a415734"
+   },
+   {
+    "path": "plugin-catalog/chat-length.yaml",
+    "local_sha256": "34d6e57e94cae361473200b7cd0b2628f3917d51c2989c0ffbcfe38f8ece87db"
+   },
+   {
+    "path": "plugin-catalog/chat-studio.yaml",
+    "local_sha256": "f04f1eca27281a07f1e5a749ef55230976819162317d1f891e943deb9b284a9f"
+   },
+   {
+    "path": "plugin-catalog/cheatsheet.yaml",
+    "local_sha256": "e61435c937ad7f38c5d7fc23e2b8dcdad001366ddd8a2bc030577dd6f4fae6db"
+   },
+   {
+    "path": "plugin-catalog/chorepilot.yaml",
+    "local_sha256": "c8fdde0a214694a6a2eb03bd1dbe74c96b4fe28293a9597300109630371d6cb1"
+   },
+   {
+    "path": "plugin-catalog/chrome-tab-watchdog.yaml",
+    "local_sha256": "4a65fdd1a0ddbdd7cf5138c5344357e9fcacde5efe5f7bd4ef156b35f85715ba"
+   },
+   {
+    "path": "plugin-catalog/chutes-provider.yaml",
+    "local_sha256": "67c30fda3e20e3a2a13b61aa670d5ebc59c63f38832f0077ed93cdff79bfc8a6"
+   },
+   {
+    "path": "plugin-catalog/claude-code-theme.yaml",
+    "local_sha256": "3159db3410d7dd1050b47b1c3010288f2ef65e6da216ba0ee295ff608dfc6ad0"
+   },
+   {
+    "path": "plugin-catalog/cli-session-tabs.yaml",
+    "local_sha256": "fc219cf1ba589b576bb91090c175922464fe42b33f56c93e1f5ca9018b2d8616"
+   },
+   {
+    "path": "plugin-catalog/cliproxyapi-provider.yaml",
+    "local_sha256": "e0d0eafbd25d24eb4d7feff07d8de677a3a3b6bf8896f8c1363276e2f9eed1a7"
    },
    {
     "path": "plugin-catalog/cloudflare-sandbox.yaml",
     "local_sha256": "a3886874aa146af12d588855afa35a0c3367f733e7d9005438c746a0a3860347"
    },
    {
+    "path": "plugin-catalog/cloudflare-web-search.yaml",
+    "local_sha256": "917a73030802625f65c19bc94ec09582a3ae1d7785f9b9d13771b5f76c03159c"
+   },
+   {
     "path": "plugin-catalog/cloudflare-workers-ai-provider.yaml",
     "local_sha256": "a73cacd5a441a705db41e615bcf59449f798290985e1b19ff5191ff0c26b3ee6"
+   },
+   {
+    "path": "plugin-catalog/cloudgpu-provider.yaml",
+    "local_sha256": "b13a0963cc2c29e3961d8958896c501fc33511ee3209c4a388c46fca1dd0c23d"
+   },
+   {
+    "path": "plugin-catalog/codex-chat-look.yaml",
+    "local_sha256": "cf6ad7da0446bd7a8e3b84790a3855e23459839f19261d1c67aaf53d59d0b532"
+   },
+   {
+    "path": "plugin-catalog/codex-theme.yaml",
+    "local_sha256": "eb0221d3461433b7955046f858e908b4cc939ba9e71f32dfdcbbb14e021dd097"
+   },
+   {
+    "path": "plugin-catalog/codex-truly.yaml",
+    "local_sha256": "b7c563407812dd55f96013f412221f1a1d67a88fa3d350ac66655f309c8f3987"
+   },
+   {
+    "path": "plugin-catalog/cognition.yaml",
+    "local_sha256": "f34d083c82dcaa77e332f6bdf3bae4ac8804fbdb3d0f18a636b42207d2ae2456"
+   },
+   {
+    "path": "plugin-catalog/colorado-traffic.yaml",
+    "local_sha256": "139631180af55ce77ce6b7e08bd37f15a96ae0b7a3a9e4c81528c6b357713179"
+   },
+   {
+    "path": "plugin-catalog/comfyrizz.yaml",
+    "local_sha256": "5d64f5853c827584c5bc80c4dfb16504efda6435d1b7e3f1c0c34767773ec804"
+   },
+   {
+    "path": "plugin-catalog/command-ledger.yaml",
+    "local_sha256": "61da6dfcc50a5e86af9d351326fdc06b6c4ac414618a558836608ac4c3988ce5"
    },
    {
     "path": "plugin-catalog/commandcode-oauth.yaml",
     "local_sha256": "8c5cfe25f00f8c2c8bf37c50bf067f9fdfdc1d34a4f15f96bee5716fe1214844"
    },
    {
+    "path": "plugin-catalog/comment-scraper.yaml",
+    "local_sha256": "ffa4f0d75a92115a5be632f91454617ebf7a1c665663c62272f56656347edd71"
+   },
+   {
+    "path": "plugin-catalog/completion-sound.yaml",
+    "local_sha256": "455d2ca1df6e53e846c0410795211cc480eee1db8aa6a62dee4e921dd0de455b"
+   },
+   {
+    "path": "plugin-catalog/composio-connections.yaml",
+    "local_sha256": "98be84392ac4e9531b077bd1948b9afb1a8193844d288f9276401e7c5b8611a7"
+   },
+   {
+    "path": "plugin-catalog/context-audit.yaml",
+    "local_sha256": "4942ef0a4fcd53a5f30bdc5342ca60209585a8e050c95f95b26ddd4d7192ff1c"
+   },
+   {
+    "path": "plugin-catalog/conxt.yaml",
+    "local_sha256": "14e1e416f62861dd879802770cad8aa62c30452de9e9e4542d6e93ac9b8ac5bc"
+   },
+   {
+    "path": "plugin-catalog/coreweave.yaml",
+    "local_sha256": "44aef05f7e2fe8a19dd950b961bdac760e3687e20e21cf39788c0c8bef3fe5d2"
+   },
+   {
     "path": "plugin-catalog/cortexlayer.yaml",
     "local_sha256": "3b156b38af2fc8f6e6955ae9dfcd16a6383ff272a6e774dc5fc53b808854e3b5"
+   },
+   {
+    "path": "plugin-catalog/crew.yaml",
+    "local_sha256": "879971329589cdb839132fd787192ac3b1c7da974a7a6e6b487a4e1ab5d4d7a9"
+   },
+   {
+    "path": "plugin-catalog/crontab-ref.yaml",
+    "local_sha256": "66c1bf129bb389497af93bbe839f423cfd31bfe4851ae3f5749560cf0bc40afe"
+   },
+   {
+    "path": "plugin-catalog/csharp-game-editor.yaml",
+    "local_sha256": "864856042ad780d0e57c62da960f6bedb29d70550bc749d587a16aff1a1322b0"
+   },
+   {
+    "path": "plugin-catalog/ctx_checkpoint.yaml",
+    "local_sha256": "85933ce7173238985b7fa5c8412e93be8225ad92c7ff1301230a57f206615f88"
+   },
+   {
+    "path": "plugin-catalog/cua-spaces.yaml",
+    "local_sha256": "8953a3f862a021fb3e70898dc4c9f6721f70fa9b21e8972c93c867b7737ed77a"
+   },
+   {
+    "path": "plugin-catalog/cursor-acp.yaml",
+    "local_sha256": "460b4daa24755956dd8b624450c5b36e7cb3e3d69b0829303faad6a407f08923"
+   },
+   {
+    "path": "plugin-catalog/cursor-provider.yaml",
+    "local_sha256": "f133868140477e9af69d230a187640816b3f6fe147ce636cc29e6e70353f8716"
+   },
+   {
+    "path": "plugin-catalog/cursor-sdk.yaml",
+    "local_sha256": "0ae990f8aa20316100925dd6f75f9ba85ac6697b93790d6588befe995dec64b5"
+   },
+   {
+    "path": "plugin-catalog/cut-sprite-sheet.yaml",
+    "local_sha256": "b5d7c8ba3aad23ad599d7a0deac7e930de3b6e69d095254b78fc2504932419b9"
+   },
+   {
+    "path": "plugin-catalog/darkmoon.yaml",
+    "local_sha256": "25337c40ee1253dea99c2c27dc0324d609a4544574d496deb9dfec645d31a085"
+   },
+   {
+    "path": "plugin-catalog/dashboard-auth-feishu.yaml",
+    "local_sha256": "ede870aac4892f34abd685b231bb903629c7febb46e75e6badeda7bfba94f858"
    },
    {
     "path": "plugin-catalog/dashboard-auth-ldap.yaml",
@@ -5694,8 +6118,32 @@
     "local_sha256": "8bc23262fecb5809f9eaa6cbe880ca55a06f149982b030034a8918db8f2fef79"
    },
    {
+    "path": "plugin-catalog/day-panel.yaml",
+    "local_sha256": "6327cd0c9e38628713be5c718a4b5438545d5829f0f48828f7605449d03ba23a"
+   },
+   {
+    "path": "plugin-catalog/de-law.yaml",
+    "local_sha256": "511a1bf90c6699df47a5a3d09710ce1e05113f3dc4167c97efd198bae4cd0ca3"
+   },
+   {
+    "path": "plugin-catalog/deadbolt.yaml",
+    "local_sha256": "7ddfd2ba7b61f7059f1c05f1704ff3ffaf8ca6416c2c930928ac35f798c85930"
+   },
+   {
     "path": "plugin-catalog/deepinfra-sandbox.yaml",
     "local_sha256": "93e6158849b26e1d4e2f82b71a7f6ca7a7e4f412f45b45d9d60d72de81554f9e"
+   },
+   {
+    "path": "plugin-catalog/deepseek-search-fetch.yaml",
+    "local_sha256": "39641bcf7ebb3d34a3b0573bb685eeb011406d1fcb0dcd03d95f946e42fe0750"
+   },
+   {
+    "path": "plugin-catalog/deferred-questions.yaml",
+    "local_sha256": "90dd99ee5f2c6122002acba00e804d9e992b609f1fc053209cc7b13e4957f998"
+   },
+   {
+    "path": "plugin-catalog/degeneracy-guard.yaml",
+    "local_sha256": "90d5f9733ce7d7bef6587e3437eeacc29bafcb8b6fbfc0cd25580291143016e9"
    },
    {
     "path": "plugin-catalog/deja-memory.yaml",
@@ -5706,6 +6154,14 @@
     "local_sha256": "e7f165d082806b9283595ab0f9c202ddac57bc0add28568d003f82353596da66"
    },
    {
+    "path": "plugin-catalog/devin.yaml",
+    "local_sha256": "56bcba2a493406e87230271e2a7dfbc773958c4b0108781a07b87b1d5343649f"
+   },
+   {
+    "path": "plugin-catalog/devkit.yaml",
+    "local_sha256": "c7433cf8b797ddee08537dc68b973562d8e9ea8941178c3d5c4bc46e92ee9401"
+   },
+   {
     "path": "plugin-catalog/dexio.yaml",
     "local_sha256": "6e75896839770bf9a9ce588e23d373a8dcb0c09fc297b7e3f02e88ca95c65626"
    },
@@ -5714,36 +6170,156 @@
     "local_sha256": "3ac132bb74ad455524e55eecbb336748365d6ec199212ee189b5901967218676"
    },
    {
+    "path": "plugin-catalog/digital-marketing-pro.yaml",
+    "local_sha256": "e8cade0fdeef48bca866e78ea787edec52df6ffca8e768fb0ffffc2f04ee0e3e"
+   },
+   {
+    "path": "plugin-catalog/discord-tps.yaml",
+    "local_sha256": "cd6cbf3e420307c04950050c2c8bf3db405b58737c862bd1360a078ac10bb60f"
+   },
+   {
+    "path": "plugin-catalog/doc-markdown.yaml",
+    "local_sha256": "468883d4a205691b843663297cbe32337431550909eae95960954a1b3ff0b748"
+   },
+   {
+    "path": "plugin-catalog/doctorpack.yaml",
+    "local_sha256": "b062cbc8a0e5d38225b2e1a12d54e0f47b991cbb1fcacdb9487bb01f82597e6b"
+   },
+   {
+    "path": "plugin-catalog/draft-cards.yaml",
+    "local_sha256": "7963e25eac29cf617517b517964df5f3aa442e53e8487cf6f97f6872ce49bf78"
+   },
+   {
     "path": "plugin-catalog/drag-to-pin-session.yaml",
     "local_sha256": "bae88c52d17845754b477968d6746fa1130f5148d7ab874a96e4b88fbf594004"
+   },
+   {
+    "path": "plugin-catalog/dsers.yaml",
+    "local_sha256": "5446a8f420e7ed706f9969a7b08adaf6b6badb6cd8124de2cb6daf5721b9511b"
+   },
+   {
+    "path": "plugin-catalog/duty-board.yaml",
+    "local_sha256": "1f9760bbbe8b27838a687e1314ec508f5bff0a8a96ad318f60872d1da8acbccc"
    },
    {
     "path": "plugin-catalog/echarts-in-chat.yaml",
     "local_sha256": "3e522ecdb640b1953a37aeff89425416558b726744becbafcc4aa6af3bfe4652"
    },
    {
+    "path": "plugin-catalog/edit-ledger.yaml",
+    "local_sha256": "9ccb755070fb19fd019e39532c5c1551dc8833bf1647db1386f393a80556bfe1"
+   },
+   {
+    "path": "plugin-catalog/effortless-hermes.yaml",
+    "local_sha256": "f55960a7f9e3f8d01da6ddc8d9ef783b30975c338e1c63f6ab2968c2791525d9"
+   },
+   {
+    "path": "plugin-catalog/elevenlabs-music.yaml",
+    "local_sha256": "bf8c3caa707408e9dc1131307960c6f79b71e0bec50a30a9f220d092534bed70"
+   },
+   {
+    "path": "plugin-catalog/elevenlabs-sound-effects.yaml",
+    "local_sha256": "9e539eab88f00e32797e584ad77c493849cc2514fb25925a8fbf7ae0a461f85f"
+   },
+   {
+    "path": "plugin-catalog/empiriolabs-media.yaml",
+    "local_sha256": "17c651b9681a4d51ee8019c113709e2dff9d3de6c92f684a2cd6b7cec4df9b65"
+   },
+   {
+    "path": "plugin-catalog/empiriolabs.yaml",
+    "local_sha256": "3ae5c9792c78672207775bcbc6fc254e61a7c9e9c51754b8b79f55fea515153d"
+   },
+   {
+    "path": "plugin-catalog/enchanted-composer.yaml",
+    "local_sha256": "c9966893006c678146803526b20c09b2de60e7f63fa78487b8171f7687ccc7ad"
+   },
+   {
     "path": "plugin-catalog/error-ledger.yaml",
     "local_sha256": "66f613b5cd856aecb62c1d9e8f541d45d0ff8c52b0aa3860bb5282d7927c381b"
+   },
+   {
+    "path": "plugin-catalog/eu-mode.yaml",
+    "local_sha256": "d6ff72e72b9a5bc6dd53208b9d4627d1021218d1ae2ed0b899c1eed5162043e9"
    },
    {
     "path": "plugin-catalog/evalroute.yaml",
     "local_sha256": "68fd0b718cff32146165eb19764371fc861ca7623958444d87ce9b571ec13f49"
    },
    {
+    "path": "plugin-catalog/event-read.yaml",
+    "local_sha256": "6d81f2edf6a095b3434622424329f47ea9535203ec059ddbd233fa18b76851b8"
+   },
+   {
+    "path": "plugin-catalog/field-academy.yaml",
+    "local_sha256": "9d807fe602756fa59488396014948785108f25b0f129cc76efbd4aae458e879d"
+   },
+   {
+    "path": "plugin-catalog/fish-audio.yaml",
+    "local_sha256": "7413d418349afe58b1893d2a1a2425586633dfac6bf40bb9675d3e09a01863ab"
+   },
+   {
+    "path": "plugin-catalog/flashdata-plugin.yaml",
+    "local_sha256": "4eac44aabffdddc90673a9075a889edcd065388f8ba0629ea70885136c98dd8c"
+   },
+   {
+    "path": "plugin-catalog/fleet-policy.yaml",
+    "local_sha256": "cf5d94dfbad880ba4f3e8e659557b7db65e8c69759d37daaa7792cebbc1c0616"
+   },
+   {
     "path": "plugin-catalog/foresee.yaml",
     "local_sha256": "6d92a10464e353c76d157b10542a6d0d308581701999bf935d8351143a7cb8d1"
+   },
+   {
+    "path": "plugin-catalog/found.yaml",
+    "local_sha256": "92c5a1d44ba60e95472f0982744eaa0cc2c83e6a5d454b93660981dea31ae12c"
    },
    {
     "path": "plugin-catalog/freight-reconciliation.yaml",
     "local_sha256": "66884dd9c691838f88c6ef2b28c092e570b42050514e293ca644519aa6249eb7"
    },
    {
+    "path": "plugin-catalog/freshdesk.yaml",
+    "local_sha256": "f60011e41cd848a14b8527282e2716054f641cea73056b8ab9b4feae58cf4030"
+   },
+   {
     "path": "plugin-catalog/frihet.yaml",
     "local_sha256": "bba0080eac56c091793873d2c34b6dd2aac5eafa6a0109aff6b7e2880067abc5"
    },
    {
+    "path": "plugin-catalog/fxmacrodata.yaml",
+    "local_sha256": "58e1aaa9dd2e81538c984d57e1faf7554d9d0ae9cae9ffb42c7a1d5951cccc14"
+   },
+   {
+    "path": "plugin-catalog/gadget.yaml",
+    "local_sha256": "f38efacd623cc0b004bdc0669e61040a90c337d9051c36aed11e93707ca5ae58"
+   },
+   {
+    "path": "plugin-catalog/game-dev.yaml",
+    "local_sha256": "33785207e35b7795b05500c8a74acbce274e71206a381f56a2bcda681b7ff42e"
+   },
+   {
+    "path": "plugin-catalog/game-editor.yaml",
+    "local_sha256": "782d23c7bf0de2d2285d5f12f0ed6e92a9c77eadd03efc51202c1fccc17ebdbf"
+   },
+   {
+    "path": "plugin-catalog/gbrain-pointer.yaml",
+    "local_sha256": "2cbcae47fbe09543c2234a3c3d490b37b9b21a61360b1cbfce2fe330e32d739b"
+   },
+   {
     "path": "plugin-catalog/gbrain-retrieval-reflex.yaml",
     "local_sha256": "857152df5ee5ed03d9a159d7d729f7dc2c9cd7e34fe3f54fb3692dd1eac6bb84"
+   },
+   {
+    "path": "plugin-catalog/gemini-media.yaml",
+    "local_sha256": "e1f23d0cc936b1f55194999ab738e8cc0e89d37e63897ce0cea02a15dff995ed"
+   },
+   {
+    "path": "plugin-catalog/genealogy-research-recipes.yaml",
+    "local_sha256": "cf58994f9ac0d3d5a8040284e1632f99e14226ea5df09f9aa6c4b251b414cf45"
+   },
+   {
+    "path": "plugin-catalog/genesispay-catalog.yaml",
+    "local_sha256": "89647270b5ddc0892be1c6021232b9e25eeca12ae778b37434b5a0e1322efe27"
    },
    {
     "path": "plugin-catalog/gh-ref.yaml",
@@ -5754,12 +6330,32 @@
     "local_sha256": "2d46c981c391fd19231710a4fcc23df6f5fb99fa9be88152046a21a76978601e"
    },
    {
+    "path": "plugin-catalog/git-autosave.yaml",
+    "local_sha256": "0f656ebada4cc2c1b067f2bbf8ad63a9bea0e4ea00eb51ef75230693452c1ce6"
+   },
+   {
     "path": "plugin-catalog/git-hook.yaml",
     "local_sha256": "40dec3d2b390e24d6a2fa7ba1b895b4c70e12b87210271fe412663a8d7e1daa0"
    },
    {
+    "path": "plugin-catalog/git-review.yaml",
+    "local_sha256": "f898bb31b33427fa0998b025062247d33b9c59f00c1ee816b814b66c9f1b583f"
+   },
+   {
+    "path": "plugin-catalog/git-tasks.yaml",
+    "local_sha256": "dceccd483b8f61302d163806c34d7de92970835c63e76f6e949783145b043906"
+   },
+   {
+    "path": "plugin-catalog/github-copilot.yaml",
+    "local_sha256": "f42aa525e9e290c3de293baac29d081df1dd3f5f170962f1eec59a43fb8164f8"
+   },
+   {
     "path": "plugin-catalog/github_app.yaml",
     "local_sha256": "af68da4bffb9ab1bcc1a6911edf24507d6aed5d3d1d14f1d5c95aedccb749a01"
+   },
+   {
+    "path": "plugin-catalog/glass-theme.yaml",
+    "local_sha256": "0dac5f23eed1e8bb6c558c2686fceca4055ebf4c8f5fbdbc98af53d63b1ce8fd"
    },
    {
     "path": "plugin-catalog/gmail.yaml",
@@ -5770,6 +6366,10 @@
     "local_sha256": "0eca320ec84ab449f0f4cec520c8047008d47ecf4352efeee9755714c9538925"
    },
    {
+    "path": "plugin-catalog/godot-studio.yaml",
+    "local_sha256": "5499d4d6118360a507fd0a5a6d9c7679f3ae0be15c3330c488e2286f8e669566"
+   },
+   {
     "path": "plugin-catalog/gods-eye-view.yaml",
     "local_sha256": "75ebb218db26b92c96ec12289e16684fe090bf2482cb1f089407e1008c00e6ee"
    },
@@ -5778,8 +6378,24 @@
     "local_sha256": "a58ce5df575ae9a5569acd56bc145c3fe9c697c6c7f1c4a12f05a58cd201fb24"
    },
    {
+    "path": "plugin-catalog/greyridge-token-safety.yaml",
+    "local_sha256": "a39c2afe3006dedbf4779ce9fd751609d9645d61eb8af7a7169033e7a1c26500"
+   },
+   {
     "path": "plugin-catalog/groq-provider.yaml",
     "local_sha256": "7da623a1f7d8d8d64954605caa3b9e8593b3a5e3971af60f150f262387b6ce75"
+   },
+   {
+    "path": "plugin-catalog/gurusup-brain.yaml",
+    "local_sha256": "70aede47ae7bf8ed60b6d65aa530e01a249b8d18473ed4449e50f79d6a89a44b"
+   },
+   {
+    "path": "plugin-catalog/hardlight-ui.yaml",
+    "local_sha256": "7f03fe2cb59bfb7a847481a069150c91b23b6b45b6bc567fa18e6ce901804abe"
+   },
+   {
+    "path": "plugin-catalog/hashtree-git.yaml",
+    "local_sha256": "29f41903f414f14c0bdc48a1607e2b41608fd0d9e950faf590564df2e394e7fc"
    },
    {
     "path": "plugin-catalog/health-insights.yaml",
@@ -5794,20 +6410,512 @@
     "local_sha256": "42b2c4101c86a6c75cab373211451c52c2736d9396eed5c8ba97fec73f2bcc64"
    },
    {
+    "path": "plugin-catalog/heartbeat2.yaml",
+    "local_sha256": "c726027f76b12163ce7750e45f63d1c986f3a418b012959e4871dd697a368afc"
+   },
+   {
+    "path": "plugin-catalog/hermes-aac.yaml",
+    "local_sha256": "c1bf55a59368a7136ae50c2a272e965e7d1e88b5e41a0c6084454042f675babf"
+   },
+   {
+    "path": "plugin-catalog/hermes-activity.yaml",
+    "local_sha256": "c910cab48463f487c62c84baa83817afb8d539efef83883d319fcbeed9343920"
+   },
+   {
+    "path": "plugin-catalog/hermes-adaptive-effort.yaml",
+    "local_sha256": "9a67bfd809c2f3d62cbe2c8e6cb60b31711ae6774979d36c496a609937683fa2"
+   },
+   {
+    "path": "plugin-catalog/hermes-agent-builder.yaml",
+    "local_sha256": "daed6e9ff7815b8a295be91ca41f3ca7a87af7a1f218d348036d1eac97988e22"
+   },
+   {
+    "path": "plugin-catalog/hermes-agent-mixer.yaml",
+    "local_sha256": "b71a736242dc9bf040f9ed1f69f734b36bf716b2d00e05379e74eadd9f408226"
+   },
+   {
+    "path": "plugin-catalog/hermes-anilist.yaml",
+    "local_sha256": "b3a4224fba66d5a8bd7ce8f3b028bc7251f04660ea37ae7e77743b71b9223762"
+   },
+   {
+    "path": "plugin-catalog/hermes-asgard.yaml",
+    "local_sha256": "e8e2d3e5abec2f3902cd23e78737f631c423a8af9678d9f2e523b86aea67b677"
+   },
+   {
+    "path": "plugin-catalog/hermes-atoll.yaml",
+    "local_sha256": "7aca9d544a7949d690742375b9c9defb60445909e656d2a6e003affd52dbc068"
+   },
+   {
+    "path": "plugin-catalog/hermes-beads.yaml",
+    "local_sha256": "ad606c65482c0bc8796102736a55a24d76eeff5f3796fd0112836e096bc28a60"
+   },
+   {
+    "path": "plugin-catalog/hermes-blogwatcher.yaml",
+    "local_sha256": "c435de831d27ff10195afd978b5db1a811a38dbe55cfe9adf38790d9bb85febb"
+   },
+   {
+    "path": "plugin-catalog/hermes-board.yaml",
+    "local_sha256": "414e63d414ea58a25b8d9cd80ea9ef37f8e5da77fb63d87d3825b2b44e494f2c"
+   },
+   {
+    "path": "plugin-catalog/hermes-boot-screen.yaml",
+    "local_sha256": "b721956a8db7357e18bed27b060c37d972b5468b979ea2fa2e96a88b33d0af01"
+   },
+   {
+    "path": "plugin-catalog/hermes-bot-hq.yaml",
+    "local_sha256": "9cf10ea3759e59a7d439a822d0cb129ce00224adbc68a46b0568bf1a9526fd7f"
+   },
+   {
+    "path": "plugin-catalog/hermes-call-ledger.yaml",
+    "local_sha256": "e368648d21e78908fc1db5f84cdd5ad8e9c9eb85dbfd906177a459bd4ac6aeaf"
+   },
+   {
+    "path": "plugin-catalog/hermes-chat-share.yaml",
+    "local_sha256": "ede05e207ecf9d6acfec5b1dfdd5a114715cc04d97c7aa9207419f0755a175a1"
+   },
+   {
+    "path": "plugin-catalog/hermes-cloud-file-manager.yaml",
+    "local_sha256": "92a99d67f54b9ccdd9c23e931896eb7d5be816a277ffa7aefbfc3646e369b1f2"
+   },
+   {
+    "path": "plugin-catalog/hermes-codex-resets.yaml",
+    "local_sha256": "195b14d9d828d46964f42ec94b22318959c55620ca660748df35324b20388db3"
+   },
+   {
+    "path": "plugin-catalog/hermes-context-overview.yaml",
+    "local_sha256": "4487ac395855db87401dbe1897047400d24a6001a7aa215ae345354bdf747213"
+   },
+   {
+    "path": "plugin-catalog/hermes-council.yaml",
+    "local_sha256": "08b7a80cfd6278159482629152794b9685f6c88a058de36b51f82891d8fc230b"
+   },
+   {
+    "path": "plugin-catalog/hermes-cron.yaml",
+    "local_sha256": "2bbdcf7868fa800b92108c801aaa69fbb0029e98a9be7156fdba6b37d995294d"
+   },
+   {
+    "path": "plugin-catalog/hermes-dpapi-secrets.yaml",
+    "local_sha256": "e2034839f04698d892bf4c84a736bcd591bbcb8115c965157751ec8316e9ed8a"
+   },
+   {
+    "path": "plugin-catalog/hermes-dreaming.yaml",
+    "local_sha256": "b5aeda301b1434ede8c1d271ece34ec0f9b4e320cbbfd06b9b94c989ac9f88ca"
+   },
+   {
+    "path": "plugin-catalog/hermes-experientiallabs.yaml",
+    "local_sha256": "22ee64757476dc424ea0168c0b1972a5e26519d6a8e63154938b29341484a3ef"
+   },
+   {
+    "path": "plugin-catalog/hermes-federated-search.yaml",
+    "local_sha256": "3f451a6f172ae72c79079d2afa1cb3c81c42f96508451dc5df142fd3aa7fdfaf"
+   },
+   {
+    "path": "plugin-catalog/hermes-field-notes.yaml",
+    "local_sha256": "a8a69b835c3e662e31c60aa56e510ea938f6440905b6a1be690ec9c89dac14fc"
+   },
+   {
+    "path": "plugin-catalog/hermes-finance.yaml",
+    "local_sha256": "c85a0827d19e4ffad8a90c2fb0f5dddfa45f91718dfac8e84666c2052aa4dad9"
+   },
+   {
+    "path": "plugin-catalog/hermes-fleet-connector.yaml",
+    "local_sha256": "21009688212364f49a335b82fa8a4a9c9a2f7021394969379f91be7c28805aed"
+   },
+   {
+    "path": "plugin-catalog/hermes-gemini-live.yaml",
+    "local_sha256": "4c5470fd7ed2e5741ed97b74916169fe41176b34567f5d9388911b8cfd6b02c7"
+   },
+   {
+    "path": "plugin-catalog/hermes-gensyn-delphi.yaml",
+    "local_sha256": "3f07da85657ccad8c9a873ef3bd3e5ce8764f857f051d2306b00d0c2aefba0fc"
+   },
+   {
+    "path": "plugin-catalog/hermes-gensyn-ree.yaml",
+    "local_sha256": "7c0da40f663bdb24d2d8309dd95e95967243e0ecd0ddf44f84a1aadbca3a9adc"
+   },
+   {
+    "path": "plugin-catalog/hermes-github-mentions.yaml",
+    "local_sha256": "f2961530fe089b35f1b666fdbe8a3315e8788f473da9bb177953cef7a8e53de7"
+   },
+   {
+    "path": "plugin-catalog/hermes-guide.yaml",
+    "local_sha256": "7bbc1f669f51c442d56f552dbfdc2097539a3301768c76e35a59dfa1715dbb4f"
+   },
+   {
+    "path": "plugin-catalog/hermes-handoff.yaml",
+    "local_sha256": "0eb3662fdd0a021c7dc3ae96d1de6aeeaaec8503709dcfbd7fa7efb636500ef8"
+   },
+   {
+    "path": "plugin-catalog/hermes-honcho-plugin.yaml",
+    "local_sha256": "ac67c5036037f9fc244eae10b9404caef2437b566ea92d23dc5c4bb47e555ace"
+   },
+   {
+    "path": "plugin-catalog/hermes-insight.yaml",
+    "local_sha256": "3264acdd673a26a5f334def37fd0aa6cae457764b15a44e6dde1ba01f0dc9d14"
+   },
+   {
+    "path": "plugin-catalog/hermes-jetstream.yaml",
+    "local_sha256": "9fb9a9d87e7c9889a1cc095e0a214ced1e88a187f2f4c4002f37b8e93fa6f028"
+   },
+   {
+    "path": "plugin-catalog/hermes-jev-routing.yaml",
+    "local_sha256": "c004920ad7d2927a62685ba1eeaf0dd29f6d76af92ce14a597a18942273d6ea1"
+   },
+   {
+    "path": "plugin-catalog/hermes-jina.yaml",
+    "local_sha256": "b483631445003168fcd390c6cb1d900b91acac2e57d293eb2eee0a0e86bc6618"
+   },
+   {
+    "path": "plugin-catalog/hermes-kame-provider.yaml",
+    "local_sha256": "92d8e7a51874af01af851eb631cb4da3fa7bfba4c6356c4ec18995ce252b34d4"
+   },
+   {
+    "path": "plugin-catalog/hermes-kemet.yaml",
+    "local_sha256": "ef879ac605bdda17b1e9f6f8323487a94f586282f0e67d25237fb87c42cb6db9"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-ca.yaml",
+    "local_sha256": "1560810bc51fd3bf669eaf4ea6f545a5b2ea3e6564babbfc661e477f535fe4e5"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-cs.yaml",
+    "local_sha256": "e14f227bca3e0e4f83f654263752378ecceed4923dbb1e06f833c905cc8d8ca7"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-el.yaml",
+    "local_sha256": "5995f45169c4371497003ed34515c1d283e7112ab692d0c02f0b30a54dfa7447"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-he.yaml",
+    "local_sha256": "c40804fa56c5a872bfec7e200d2a41dd304037801e86b70bf1bbd23faca475cf"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-it-full.yaml",
+    "local_sha256": "df7f1c43ef96c38265d9d8bfd8785c2767c4a4c2f2799074f08a41c43659a4f7"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-it.yaml",
+    "local_sha256": "a5cd1908497ae0d418421715a3a14827f09252ecacf6409daad66a6a4e9ada51"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-ko.yaml",
+    "local_sha256": "df0cd84f89723f455245a42a95c797907419520c0eeef7cd37e5a4f4cd916914"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-pt-br.yaml",
+    "local_sha256": "bcc600e0e94d008ab7911fb61ebeca1a0640a9741880faa04c9a2fd1a4a4cbbb"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-th.yaml",
+    "local_sha256": "911d345728f5579ab9349572282a4addf5a060df76e3b9906d1012158501bbcd"
+   },
+   {
+    "path": "plugin-catalog/hermes-lang-vi.yaml",
+    "local_sha256": "b837533af810447869df7a6ccc0d9a22b075d425467e774df8cd620a2ffbf46f"
+   },
+   {
+    "path": "plugin-catalog/hermes-lcm-x.yaml",
+    "local_sha256": "8c1a5382ec0806f098f8268f2f688899f9cba81975d2ba360cc687dc70918a56"
+   },
+   {
+    "path": "plugin-catalog/hermes-memory-pane.yaml",
+    "local_sha256": "b530d27207139ff6ed2927bc8791a5a627c624d52b7f3791c47583be7ef2962d"
+   },
+   {
+    "path": "plugin-catalog/hermes-minimizer.yaml",
+    "local_sha256": "c973d54371249d68bd1ed528e4e8d447ada351929d981afe38d87f1b9eeabf2b"
+   },
+   {
+    "path": "plugin-catalog/hermes-mobile.yaml",
+    "local_sha256": "a44e0142199d3cf119e3b4bbd63ec5280aff1b8510044204b0070b718bc1b53d"
+   },
+   {
+    "path": "plugin-catalog/hermes-model-switcher.yaml",
+    "local_sha256": "f4b1671e0bcb14a6b40b7937a6563aa8bb0e2874ec09fe48552b85b5acf528ee"
+   },
+   {
+    "path": "plugin-catalog/hermes-monitoring-dashboard.yaml",
+    "local_sha256": "fc509e00c92f6600f65b03e66585d6933322d8895510bb1a3dd0610dda6375ae"
+   },
+   {
+    "path": "plugin-catalog/hermes-muse.yaml",
+    "local_sha256": "9b001f7dac9babb036c2a6ee6826e425f25d06a15b5e067465a690647146d1d8"
+   },
+   {
+    "path": "plugin-catalog/hermes-openwhispr.yaml",
+    "local_sha256": "9b1a11cc7348e7fef57f3747a93eb89b11a929e5aa7a4a6593176241fa10c7c4"
+   },
+   {
+    "path": "plugin-catalog/hermes-osint-map.yaml",
+    "local_sha256": "2a14d9438f12fcc78f87df4223a01a238563463978227be7e22f7ff8f664e947"
+   },
+   {
+    "path": "plugin-catalog/hermes-pantheon.yaml",
+    "local_sha256": "7d2ed5765e064d2ea44e883d859cc037c5d5e6f467733f68a70a2265ffa5c9c8"
+   },
+   {
+    "path": "plugin-catalog/hermes-pickup.yaml",
+    "local_sha256": "983f2a2a8c55a7fd71511ed29d2f30056ce044a6876ddb2d2dea890a948fef5e"
+   },
+   {
+    "path": "plugin-catalog/hermes-pii.yaml",
+    "local_sha256": "fde66fd816e1cdeb633cbf16dfc514c6c939faf5e0e7daeff4bc08519479de7c"
+   },
+   {
+    "path": "plugin-catalog/hermes-plex-music.yaml",
+    "local_sha256": "177e76a55ad59b61c246b83484c527d977286a5505529b33f74fc317141de34d"
+   },
+   {
+    "path": "plugin-catalog/hermes-pokemon.yaml",
+    "local_sha256": "1c1bfb6e4a6eca1705fc3a7d893683138daf11da603caa1304768c8ed26f607b"
+   },
+   {
+    "path": "plugin-catalog/hermes-pr-studio.yaml",
+    "local_sha256": "d24fda8d6c5f6854eb2901b0428c4921bb71e9b2ae8ee636b1123f5a815b3e2d"
+   },
+   {
+    "path": "plugin-catalog/hermes-profile-switcher.yaml",
+    "local_sha256": "ef00e9e353cc8c3858dba2648c4c947dcc010f6265fae6845836073e4af918a3"
+   },
+   {
+    "path": "plugin-catalog/hermes-proton.yaml",
+    "local_sha256": "7ba022c33206ff18f23b543ec8a82d35d17e817aa3920498a8c373e78b31fb7b"
+   },
+   {
+    "path": "plugin-catalog/hermes-quest.yaml",
+    "local_sha256": "61f75156a7d5deb43b8f7bd2999f3fbff50f778cf0b8e2ea7895390f15863786"
+   },
+   {
+    "path": "plugin-catalog/hermes-rich-ui.yaml",
+    "local_sha256": "281ef8b10c4dcd0ef105bfc9cf7d8abc54638abe19066635839277d85082a94f"
+   },
+   {
+    "path": "plugin-catalog/hermes-routines.yaml",
+    "local_sha256": "2dba773d9eb69344da3c5f88d8291ab7a5153a506a277dba56e4224a0fe5b76c"
+   },
+   {
+    "path": "plugin-catalog/hermes-self-healing-context.yaml",
+    "local_sha256": "62a014e682e5b9c0e9110f17aa44bb64040433839adc91a1a4c92ede5990936e"
+   },
+   {
+    "path": "plugin-catalog/hermes-seo.yaml",
+    "local_sha256": "615216c17342a502c8034b0b018ba2e51d2d580657a7aadd21aa2b336221608c"
+   },
+   {
+    "path": "plugin-catalog/hermes-session-reset-policy.yaml",
+    "local_sha256": "15623675b0a131e7e46ce2785a678c6785989d2be60874e2131ed7f90256be0c"
+   },
+   {
+    "path": "plugin-catalog/hermes-slash-router.yaml",
+    "local_sha256": "9dd07810feeee61bd005bef9c44072352996eaf6f6ccb01054da2d8a374641b9"
+   },
+   {
+    "path": "plugin-catalog/hermes-soniox.yaml",
+    "local_sha256": "52c59082a79fe460e8ad1fcc13deadbda1d68979506318a2f843236697707e76"
+   },
+   {
+    "path": "plugin-catalog/hermes-stt-enhance.yaml",
+    "local_sha256": "33275a04e23204dc153c32e0fc36a62719f868370b4729dc8c36903a72797a25"
+   },
+   {
+    "path": "plugin-catalog/hermes-switchyard.yaml",
+    "local_sha256": "5b54e4941344280542e7ef3004986fd7e9853f9ed06dd385816f322e3f228226"
+   },
+   {
+    "path": "plugin-catalog/hermes-tabular.yaml",
+    "local_sha256": "8aef3394a69df5823f2ff482edf281ee0042d859607246f2e9afe39dfec49903"
+   },
+   {
+    "path": "plugin-catalog/hermes-taskbar-badge.yaml",
+    "local_sha256": "c60f357bf3dc6d69f53bdd01e1cf4dbccd70f1689c2c5a0daff6c0cfe5fb68f5"
+   },
+   {
+    "path": "plugin-catalog/hermes-teammates.yaml",
+    "local_sha256": "fff6f49d42dbe6f66955c576e1118277284e38a230e2695740e4c8a0f1583eb4"
+   },
+   {
+    "path": "plugin-catalog/hermes-telemetry-dashboard.yaml",
+    "local_sha256": "1e032861423e2b6c087840b31d496d323710b1bd70218aee868619f58d404d1e"
+   },
+   {
+    "path": "plugin-catalog/hermes-tenuo.yaml",
+    "local_sha256": "4b9732064fcf54c3b09b12aa95603771bcdfb34d01af40177bd178c25033b545"
+   },
+   {
+    "path": "plugin-catalog/hermes-themes-pack.yaml",
+    "local_sha256": "a1a6a2f6977a3b10a44cc7f16606677b8ca8812badefd6a37c40537193d85b18"
+   },
+   {
+    "path": "plugin-catalog/hermes-token-speed.yaml",
+    "local_sha256": "121647204fcd41fd70c5a12acec8383738bec554c64532619f7507bd0ed30b8a"
+   },
+   {
+    "path": "plugin-catalog/hermes-tripo.yaml",
+    "local_sha256": "bc650ac935f33781ec796eed93ff7c52a36f6d145fb7be16018fb05d40b616d9"
+   },
+   {
+    "path": "plugin-catalog/hermes-vcc-engine.yaml",
+    "local_sha256": "ec2dffc3c1dfc49a9b4b7852fb067ade9a4aacca3524f74d8bb30374016b3d8c"
+   },
+   {
+    "path": "plugin-catalog/hermes-vcc.yaml",
+    "local_sha256": "5d97667451c84c454c05290900872de237d726726dafdca08a8ee9d91af6797d"
+   },
+   {
+    "path": "plugin-catalog/hermes-verifier.yaml",
+    "local_sha256": "1b2a5d4c3fc692b798cc48bf722767fd134e6fef1328ae0574523253a45e0419"
+   },
+   {
+    "path": "plugin-catalog/hermes-video-editor.yaml",
+    "local_sha256": "8b306ad07f387fcfbdbc9a058f43b92dd1e9be1d58e28707e24523f4a01d0845"
+   },
+   {
+    "path": "plugin-catalog/hermes-vision-inline.yaml",
+    "local_sha256": "3e9cef14bdca12bb3151c4ea19d051a5e20d927e35555ce17f1302fcac92c504"
+   },
+   {
+    "path": "plugin-catalog/hermes-vitals-light.yaml",
+    "local_sha256": "1c948b129bbd9de2c67b54b9647484811d5cbc40dc177acad2a13ea718a41737"
+   },
+   {
+    "path": "plugin-catalog/hermes-vpn.yaml",
+    "local_sha256": "41ff3ad69f49fce41094f7b8c90d654c221b0af9b00cc4167010c72bf0bb58a5"
+   },
+   {
+    "path": "plugin-catalog/hermes-whatsapp-voice.yaml",
+    "local_sha256": "7b3f3102652a4e444e35ecefed726b78d3300f27dfff3ab3981e3ae40ad1d237"
+   },
+   {
+    "path": "plugin-catalog/hermes-wincred.yaml",
+    "local_sha256": "03cd81f9f9eff7ccd11cc3b858077e2d58e1e8cb3fc9887bbe47c972dbc3ee03"
+   },
+   {
+    "path": "plugin-catalog/hermes-windows-eventlog.yaml",
+    "local_sha256": "88bfd99ff7a5729566794148af121a6be098ff7de15604de6e8806c8d2455ca4"
+   },
+   {
+    "path": "plugin-catalog/hermes-windows-ops.yaml",
+    "local_sha256": "fc48d3617df1ebfac4ac2f04a9e4218aabc4cd1942ec15d4136dff254c0659a7"
+   },
+   {
+    "path": "plugin-catalog/hermes-windows-ports.yaml",
+    "local_sha256": "c6c6801acd8da46c512818dbcea2c604252b03fddcf6e80c841ae66d88083f2a"
+   },
+   {
+    "path": "plugin-catalog/hermes-windows-process.yaml",
+    "local_sha256": "a6cb5e79a635947453a877d6713e039033cc1b0297837cc80a0aae9754c409ff"
+   },
+   {
+    "path": "plugin-catalog/hermes-windows-tasks.yaml",
+    "local_sha256": "053338a7202f280aa87f71e61131c8eddfde6d17d6c179cc01af116ac4ce8daf"
+   },
+   {
+    "path": "plugin-catalog/hermes-worker-monitor.yaml",
+    "local_sha256": "897c70deaebf804bca3a219716e3f48af2507d6acbf494a1090ee15843310091"
+   },
+   {
+    "path": "plugin-catalog/hermes-workflows.yaml",
+    "local_sha256": "c1bcb79f4442c81ab443de1b1590ec34f5e2ea885a8dcb276d0dc73fdda663da"
+   },
+   {
+    "path": "plugin-catalog/hermes-wsl-terminal.yaml",
+    "local_sha256": "297680ca48b20e1da84d312b45a456044c637835109e964939c67a452fdbda08"
+   },
+   {
+    "path": "plugin-catalog/hermes-wslc-sandbox.yaml",
+    "local_sha256": "17e194612f0016df7956686166ab72cc18e335ab445a04bcc1e31ca00cf1ca5c"
+   },
+   {
+    "path": "plugin-catalog/hermes-xai.yaml",
+    "local_sha256": "82ecb224d8fa4bf3de22bfea46aaa77a04c9f75b0c145b729a46092c1a4551f1"
+   },
+   {
+    "path": "plugin-catalog/hermes_otel.yaml",
+    "local_sha256": "783bb595b41db826ea1cf1166f6cd723ec6dbe9f2c4d1fae970d8d586d2e8aeb"
+   },
+   {
+    "path": "plugin-catalog/hermetic.yaml",
+    "local_sha256": "7cad2aee364445b62398c9647bd65a3b30f3cd6e9c3a7144df2f2f84d6f29ecd"
+   },
+   {
     "path": "plugin-catalog/hicortex.yaml",
     "local_sha256": "646e3ab7ff02344d7365f60b68176bb4a751327b79b0d924f6f2aa5f9506c72c"
+   },
+   {
+    "path": "plugin-catalog/holographic.yaml",
+    "local_sha256": "d8e0f07ad8ca4a15a11e05d08e12836216a0a3faa2aef17bd1832d775d1f78a4"
+   },
+   {
+    "path": "plugin-catalog/homeassistant-statistics.yaml",
+    "local_sha256": "e391c2d79bdb949cb5788c69de64649acd32082573435373aa2ee47962fdcd53"
+   },
+   {
+    "path": "plugin-catalog/homeassistant.yaml",
+    "local_sha256": "2b341b3d31ceb639136f4d53c199fdcb05f9fb6ee802c0922f8a958062885ea1"
+   },
+   {
+    "path": "plugin-catalog/huddo.yaml",
+    "local_sha256": "f03bab49624b046e47865626ed8e724bedfc600e0f3b626fe51a0e5358130106"
+   },
+   {
+    "path": "plugin-catalog/hwiki.yaml",
+    "local_sha256": "ce51c9424fc33e9241e7bbd0321174d9615159a1925c56178f9f9b0472daa758"
    },
    {
     "path": "plugin-catalog/hyatlas.yaml",
     "local_sha256": "42d43decfa0082495d325e9c6a2ef0369a7e5fac917537f1fb4a5d4e7e966487"
    },
    {
+    "path": "plugin-catalog/hydradb.yaml",
+    "local_sha256": "cdc85d4ef63c1d1798c2621b6619032eeea6fdcb8e2a885689ae10fb56da5f64"
+   },
+   {
+    "path": "plugin-catalog/hypd-ai-ads.yaml",
+    "local_sha256": "9a658af32105e45303f5365e6c8b146827bf6f74081b4cf2468e051caef5e312"
+   },
+   {
+    "path": "plugin-catalog/inbox.yaml",
+    "local_sha256": "6114d6c348924641b93cdfefc84956740d661e4cec3bb6bf7053fd4c5a65b72a"
+   },
+   {
     "path": "plugin-catalog/index-network.yaml",
     "local_sha256": "558279c7764221c626c670953dcf7c253352deeeb7784dd7cbc7432ab6db30d0"
    },
    {
+    "path": "plugin-catalog/index-search.yaml",
+    "local_sha256": "cb58afcbe03e8d8e61bc63c0ff5cd5959208a4658c7bcaf74f08a1367d2d89ae"
+   },
+   {
     "path": "plugin-catalog/inline-platform.yaml",
     "local_sha256": "e7627f8174d6801cb794d1df42bbeb14f1c4a3397eb9e7c2f2c423e3571926dc"
+   },
+   {
+    "path": "plugin-catalog/inspeximus.yaml",
+    "local_sha256": "1df694dc8721203229a52e74be40800e187cb182577645cdf6eb33a61a925248"
+   },
+   {
+    "path": "plugin-catalog/interim-ledger.yaml",
+    "local_sha256": "02c4cb404ed582cbfaad9a4353eb7cff5c1ab65b802206982abaf2029b4d26c6"
+   },
+   {
+    "path": "plugin-catalog/invinoveritas-receipts.yaml",
+    "local_sha256": "752a42a36d73397fd369e1c6f34fccf4136de0e097c19a64fb012332a94cddb7"
+   },
+   {
+    "path": "plugin-catalog/iowap.yaml",
+    "local_sha256": "06429c4218abcfd7d8bfe5d1f933b9e652f8b8d7fc19480e4922bdf7d146aadd"
+   },
+   {
+    "path": "plugin-catalog/iris-chat.yaml",
+    "local_sha256": "20489211015de6685f306d85d30fdabf551b850162f6057ccf923346572e9bb0"
+   },
+   {
+    "path": "plugin-catalog/ja-writing-guard.yaml",
+    "local_sha256": "f22b5acea25b5466276161c92f85de544349bf96ecc4f44165de211a45fe466d"
+   },
+   {
+    "path": "plugin-catalog/jet-browser.yaml",
+    "local_sha256": "609b3a6ea5c16733d3dca441f43145765db34526bee8630d066b4368a4913f1e"
    },
    {
     "path": "plugin-catalog/jev-cron-gate.yaml",
@@ -5822,12 +6930,24 @@
     "local_sha256": "125bbde2abdcfcf44d28d6ff4f73582a37a8be58268878017da1aaeeb42a1d53"
    },
    {
+    "path": "plugin-catalog/jp-address.yaml",
+    "local_sha256": "c824368b79669656629f9229c1f3dda1f7b9879006b062bb5a3f8d380930dd52"
+   },
+   {
     "path": "plugin-catalog/jp-charts.yaml",
     "local_sha256": "c92a039e99b43f53431e05143642368f66b71726c5352dc41f11b3cf8e495920"
    },
    {
+    "path": "plugin-catalog/jp-chatwork.yaml",
+    "local_sha256": "925c9d32f1162e2e5e28f120333417bbcbe89c20e60305319c6e839920ecdd6e"
+   },
+   {
     "path": "plugin-catalog/jp-corporate.yaml",
     "local_sha256": "f5ce8965a4fb3d3da6570fcd1017feebda4938ddb3f5c8dc0d1be07ede325e2e"
+   },
+   {
+    "path": "plugin-catalog/jp-edinet.yaml",
+    "local_sha256": "a987ad289d50aa8c68d280dc5d5e39cb65e121ab7aae41e2522865f77f23ff2b"
    },
    {
     "path": "plugin-catalog/jp-egov-law.yaml",
@@ -5838,40 +6958,200 @@
     "local_sha256": "aacc4db781de1d7ccfd2ce9e727f1068ec4ab55ea22a3369b9e19dc19872be0e"
    },
    {
+    "path": "plugin-catalog/jp-kokkai.yaml",
+    "local_sha256": "465ec647600cc3e41651297125f00f19b72ac7e8eaf86d46273755c1cb09f52f"
+   },
+   {
+    "path": "plugin-catalog/jp-reinfolib.yaml",
+    "local_sha256": "1b7c0bfa50a9cd9d586f6dfb09e81f54159f6d7e3dba54e3e01d6d02cf58ba98"
+   },
+   {
+    "path": "plugin-catalog/jp-subsidies.yaml",
+    "local_sha256": "af2ead5b907422ee7f14e38a7020f393f8476ec041ea2dd702317a56811bb4b0"
+   },
+   {
+    "path": "plugin-catalog/jwt-ref.yaml",
+    "local_sha256": "a21b838658aa8ee835b6da0c02132250d8be6a197c1551fb3229a191f6a5c231"
+   },
+   {
+    "path": "plugin-catalog/kanban-graph.yaml",
+    "local_sha256": "f167db521e1e6546c68f8ffaeac84739ad59074ccd030ddc594a4ed9dec082e7"
+   },
+   {
     "path": "plugin-catalog/kanban-live-gantt.yaml",
     "local_sha256": "bfd1d4ad9f0148b589b4889e7166ab7eb9e4a92c5ffa7f7ef1cbbdcad8d3aa1f"
+   },
+   {
+    "path": "plugin-catalog/kanban-stream.yaml",
+    "local_sha256": "8f34ce743a92205ea85bed3a9694355ee4dec347377aa0b022b16707274e7547"
+   },
+   {
+    "path": "plugin-catalog/keenable-plugin.yaml",
+    "local_sha256": "072de41cd4ce299e5d3db7bd6c252b09d8c7079dae468475aedd58caf2a044ac"
+   },
+   {
+    "path": "plugin-catalog/kfchow-llm-value-router.yaml",
+    "local_sha256": "e455d1a0c5d433012abb08c30175079998b3dc27e1145ff5a01a816da65d34cc"
+   },
+   {
+    "path": "plugin-catalog/kimchi-acp-provider.yaml",
+    "local_sha256": "8823c9eee4c8e036e45ce99fccc764ef5ee5411952e094c735746bedbb6fca22"
+   },
+   {
+    "path": "plugin-catalog/kimchi-provider.yaml",
+    "local_sha256": "7a021d125876d321df119cb475da4ca7ab041526e6799cbfe62ec7ce8a602c19"
+   },
+   {
+    "path": "plugin-catalog/kinocut.yaml",
+    "local_sha256": "55077d95ec3b2db33ef8071d7be4f45160dcdd8c64d16e21a2f6b07fba54a417"
+   },
+   {
+    "path": "plugin-catalog/klipper-print-watch.yaml",
+    "local_sha256": "511c6579ef1343ed72f216662f06b08bca5aa69341f5376c7baeda93bec32392"
+   },
+   {
+    "path": "plugin-catalog/kokoro-tts.yaml",
+    "local_sha256": "41ba89f00c612cd16dd2da80bd039b10eea7f3bb79098d19f69a53f79c970001"
+   },
+   {
+    "path": "plugin-catalog/kubernetes.yaml",
+    "local_sha256": "b6ea7c24ce91049fa45364382c106b168e11903c6506c506f6b1a75c661e4404"
    },
    {
     "path": "plugin-catalog/kuma.yaml",
     "local_sha256": "c7a6e89d511e7c9fcbe6b354c43678c450594b11bacbc30f9540d360d067cfc7"
    },
    {
+    "path": "plugin-catalog/kumiho-memory.yaml",
+    "local_sha256": "3439be1919c183dad4c2003f99bf0e2ddfdb8ebb0162e97d86ff96752f0812b4"
+   },
+   {
+    "path": "plugin-catalog/langfuse.yaml",
+    "local_sha256": "e4e9864b4c1b4fb8b4131418c80275799919aea6f64886eefa6cdca5ae4c6293"
+   },
+   {
+    "path": "plugin-catalog/laso-finance.yaml",
+    "local_sha256": "dbdd615ebcefea8355f8b9f86028a864e8e4c871ce4b526f1207598fc91b11b4"
+   },
+   {
+    "path": "plugin-catalog/ld-workbench.yaml",
+    "local_sha256": "76a8a14a5548ba032f19f0e9ce959be0661f74cf019ac068c273bff3680eceb0"
+   },
+   {
     "path": "plugin-catalog/letsfg.yaml",
     "local_sha256": "9b1fe22c45aec211f3084a816d2436765b67ea02dbfd8b8e4370e3b5dad163b8"
+   },
+   {
+    "path": "plugin-catalog/levea-video-editor.yaml",
+    "local_sha256": "195a1bc5444634316084ae7182b1717b2954db529b4b857cd7cded3d0855b1bc"
+   },
+   {
+    "path": "plugin-catalog/lightkeeper.yaml",
+    "local_sha256": "5214385e1ed04c8e53ed9ff7b51276013117810a2af302436acfbef838fac706"
+   },
+   {
+    "path": "plugin-catalog/lightningai-rate-limit.yaml",
+    "local_sha256": "0c0937cbcf5b0db2158d5d657025d944690e130683326a28389f0262e459460d"
+   },
+   {
+    "path": "plugin-catalog/lightningai.yaml",
+    "local_sha256": "d5a800dbe3746c3af2804b9c1e022056a65fa1c85d4c3f675203eebe8d648c70"
    },
    {
     "path": "plugin-catalog/limbic.yaml",
     "local_sha256": "a262e7d73fa5c7f06596d17c8114a7102908f848082c6cf35650d0e20abc609f"
    },
    {
+    "path": "plugin-catalog/linkedcamp.yaml",
+    "local_sha256": "1b914d13dd453b98f2cebae327014698803a297c016bc9a893579b24ae2ac2c5"
+   },
+   {
     "path": "plugin-catalog/linkup.yaml",
     "local_sha256": "71949bd7df8e4ebd2caf47f2066fafbd27c0b5f26e9a1d9594a263b52d765b18"
+   },
+   {
+    "path": "plugin-catalog/liquid-inference-provider.yaml",
+    "local_sha256": "f66d12dc66ed3d292a1d16de3547ce4d9b8723946cbe65757c926fe18405edb6"
+   },
+   {
+    "path": "plugin-catalog/llm-antidote.yaml",
+    "local_sha256": "beabc584c20181ffa817a408a9ced715658101695593066459c66a96886a4068"
+   },
+   {
+    "path": "plugin-catalog/llmslim.yaml",
+    "local_sha256": "f22180039ed76c5b26623045dd6324594f1f1d47257cdad4333fa55b81dad13d"
+   },
+   {
+    "path": "plugin-catalog/loaded-skills-indicator.yaml",
+    "local_sha256": "b198873317915e287ecd5ae36f47c7e2555db4695f06c3198e50112a95eb7128"
    },
    {
     "path": "plugin-catalog/local-system-one-hermes.yaml",
     "local_sha256": "a6435c43d0631972f2f714d3aa33d92b31964b5806261a31753d51dc18af7f5a"
    },
    {
+    "path": "plugin-catalog/long-conversations.yaml",
+    "local_sha256": "ffea5060813624e30da2b6d2c887039c129f3358a0703fc4a7bbe658ac97518c"
+   },
+   {
+    "path": "plugin-catalog/looot.yaml",
+    "local_sha256": "5ee6efbf479bc1694f2b29427264eb0fec0c833c27ca868bf121bd5ff333e416"
+   },
+   {
+    "path": "plugin-catalog/loreconvo.yaml",
+    "local_sha256": "b2c0f03a321f70bac82780026af1a8d021fc94b3da9a75455a73eafffe55fac1"
+   },
+   {
+    "path": "plugin-catalog/lowrouter.yaml",
+    "local_sha256": "124920469364c60ebf9e693bbd9c0973e736c22ded8c6fe2678a9deabd059e24"
+   },
+   {
     "path": "plugin-catalog/lumberroom.yaml",
     "local_sha256": "6c1c72f3f66e90d57e8539c6698dfa5e1d4fa3d5a176554f91a3f029b81c1d53"
+   },
+   {
+    "path": "plugin-catalog/machine-library.yaml",
+    "local_sha256": "9b20cb6573bd5ba2b8c745721ae6ff726910717daa1cbcdbada702af67415011"
+   },
+   {
+    "path": "plugin-catalog/machine-spirit.yaml",
+    "local_sha256": "223711d49637a3658c0edb180eff3810577b249d6abee83001b4dca7be59f49a"
    },
    {
     "path": "plugin-catalog/made-shelf.yaml",
     "local_sha256": "1603c158dc07fb11e6a38d5e06bfbfed2a2b4a33a12e61c5cd6e1aaa1f52f392"
    },
    {
+    "path": "plugin-catalog/magi.yaml",
+    "local_sha256": "c2b352bef4f620bf02526dbbaf9c5c0a2de680192d166c85a8083417df0b9b88"
+   },
+   {
+    "path": "plugin-catalog/make-parts-now.yaml",
+    "local_sha256": "d557a0aa12df69f71a45be92cd35f6d976443a1667d162454fd0d54086fa86d2"
+   },
+   {
+    "path": "plugin-catalog/maqami-travel.yaml",
+    "local_sha256": "91703d95d565ac481675f3406b08ba443b2e694878091e13a284e88d3b0a6daf"
+   },
+   {
     "path": "plugin-catalog/markdown-new.yaml",
     "local_sha256": "f9b4826e09a3b8137a0d402552811c107db1c2d862b36f473a752c62dad3003b"
+   },
+   {
+    "path": "plugin-catalog/max-platform.yaml",
+    "local_sha256": "459f8ec9ed38f9141c386b09db3abdeb1057e16fd126b9be82ab667508368257"
+   },
+   {
+    "path": "plugin-catalog/mcp-plugin-creator.yaml",
+    "local_sha256": "207d19915ad6e32420a134f6e47f26eb9c22f4aaf0bc0529a84e1e354bd67eda"
+   },
+   {
+    "path": "plugin-catalog/mcp-serve.yaml",
+    "local_sha256": "349a3226631868d0ba7d7979b617c8e9a512aefbf37953b1c8c1eacac969f5fc"
+   },
+   {
+    "path": "plugin-catalog/mem0.yaml",
+    "local_sha256": "0a426db3aa09199c07b52d31f1e941ad4e89f5b3ce866f2973194fad8ad606b4"
    },
    {
     "path": "plugin-catalog/memanto.yaml",
@@ -5882,36 +7162,208 @@
     "local_sha256": "c8a12db92b09cc80d877be76550197b4a061ecbb531dc39bcb3985e12fad89d5"
    },
    {
+    "path": "plugin-catalog/memoria.yaml",
+    "local_sha256": "3d1e6ff6989846cbbca88b13a878c1bcc3c28a60d1bdbef966353c0548e2874f"
+   },
+   {
     "path": "plugin-catalog/memory-rewind.yaml",
     "local_sha256": "99c23786a89b157b88845c03583092ce7425c368eac77be3430611220e84c646"
+   },
+   {
+    "path": "plugin-catalog/memory-shield.yaml",
+    "local_sha256": "68f2e1a962a8c307b5bc55f13c46d1ec608fb4f08606dfac7186f60a4b612bc4"
    },
    {
     "path": "plugin-catalog/memtomem.yaml",
     "local_sha256": "cf81ec102ee320481057e8c30eb9fd6e1a732944f1268c12db0e1a2f56b4429b"
    },
    {
+    "path": "plugin-catalog/meshy.yaml",
+    "local_sha256": "1f5d1a257c291efe14182400fcb84f45bc63e1aca5465da63ab3f558dc7659e6"
+   },
+   {
+    "path": "plugin-catalog/minimalist-themes.yaml",
+    "local_sha256": "345c5677661c711d7dd6fbc8801a0a51634806d27aad6f9256b2a02289794dcb"
+   },
+   {
     "path": "plugin-catalog/minimax-search.yaml",
     "local_sha256": "57d368c2f048b808e0f2a3ad6fa9c2d70f2f70de0cc0eb2498a66bc25a009dfd"
+   },
+   {
+    "path": "plugin-catalog/mistral-vibe.yaml",
+    "local_sha256": "d3141fa1e276c709f0efa1a0417ffb2f21c8ea4b979e3196245b14fbf2126514"
+   },
+   {
+    "path": "plugin-catalog/mixar.yaml",
+    "local_sha256": "addeb3dfd08be1cb96cbd1f513de71b2f34b596a882a1d226aae8b40ebf21e1d"
+   },
+   {
+    "path": "plugin-catalog/mnemoverse.yaml",
+    "local_sha256": "bf17d37f5e3d1a480af39d762809a90c6b3dbdf533b7f912866c17e9d66e02ab"
+   },
+   {
+    "path": "plugin-catalog/mock-review.yaml",
+    "local_sha256": "099344fdb027f66611a4c16ebccd2dd9983fa2fb9d7968698500a74e03788cd2"
+   },
+   {
+    "path": "plugin-catalog/model-drift-watch.yaml",
+    "local_sha256": "8d7dd00e0d5a5c7d7667860716cc68fba23c8639ab0defab2b63d244928f971c"
+   },
+   {
+    "path": "plugin-catalog/model-leaderboard.yaml",
+    "local_sha256": "f6c7552258f61d1dc048a054a49ce802e9a202aa5d2b305538ca24ba3fb556ff"
+   },
+   {
+    "path": "plugin-catalog/model-picker.yaml",
+    "local_sha256": "7c1a0bdb1cbe375e795ec3db29953701e0dda3320940670cc4978c1dd11c5fa0"
+   },
+   {
+    "path": "plugin-catalog/model-router.yaml",
+    "local_sha256": "9316c4a3aeb497c7e026a3610bf19c7312718e185ce55aa0fbf3abbb6d6ab189"
+   },
+   {
+    "path": "plugin-catalog/modernisation-engine.yaml",
+    "local_sha256": "b58a58f30ada458bcc84af26a95667a4c1fb0172a1044f3452be540a7d444137"
+   },
+   {
+    "path": "plugin-catalog/modular.yaml",
+    "local_sha256": "b4b589018801f628f371e5488d5f60615f73c46eaf58c6eb0f09b8cd6a6cb136"
+   },
+   {
+    "path": "plugin-catalog/monid.yaml",
+    "local_sha256": "17a89616d6b449915776ffa73d6f87a86a825b309ef69f768f4b2556694349b8"
+   },
+   {
+    "path": "plugin-catalog/ms-decision-provider.yaml",
+    "local_sha256": "ea6a230c6c0213e08a5a44ec433230585814abc26b7e9085efabb14fb77e0522"
+   },
+   {
+    "path": "plugin-catalog/myswarm.yaml",
+    "local_sha256": "d372e169a8d527cbca61698ae1b46182aff9044f53d55790330a1463a568d581"
    },
    {
     "path": "plugin-catalog/nachos.yaml",
     "local_sha256": "2e1d6eb87e86e838a29669b4c03711a81a33a65255c2a79328b9e4df51051909"
    },
    {
+    "path": "plugin-catalog/netmind-provider.yaml",
+    "local_sha256": "57072178d95e16a950b7e53ac193ec42421bee44aed48df8b3bb2679bdca9825"
+   },
+   {
+    "path": "plugin-catalog/netplane.yaml",
+    "local_sha256": "47fa45f1e13e68a27309ef881466bb3865cc74e8d7556f0eaa7db9828ae102ed"
+   },
+   {
     "path": "plugin-catalog/next-prompt.yaml",
     "local_sha256": "cbcd8e621145a3441397fa603ebed8b58f693a103e78f71b2b2d074573684abd"
+   },
+   {
+    "path": "plugin-catalog/next-steps.yaml",
+    "local_sha256": "0c1c7a66b3a12188daefae28ed71fb62651638ff41da68b89d7081dfae58d140"
+   },
+   {
+    "path": "plugin-catalog/nextcloud-talk-platform.yaml",
+    "local_sha256": "e6b04b308c5689d41ce8beef081908debdfd27a09562346b5804723983e89c92"
+   },
+   {
+    "path": "plugin-catalog/nextcloud-talk.yaml",
+    "local_sha256": "dec495073eba3918023b5514df2303b0a4c16e1fab40a9da591247edba72de6e"
+   },
+   {
+    "path": "plugin-catalog/nexus.yaml",
+    "local_sha256": "bade694b7c3b4926209b6b9c1fa206b1a2c1bb8cebb4f627fe3e1911eddc57f3"
+   },
+   {
+    "path": "plugin-catalog/ngrok-ai-gateway.yaml",
+    "local_sha256": "447d50c4a4490de02fea385b538c3b86560aaae8fc3d51918c74417f489efc71"
+   },
+   {
+    "path": "plugin-catalog/nine-balance-widget.yaml",
+    "local_sha256": "480ab0ab8a6c51588c32c71293c20cb3e0fce51a54c120df462271aeee75e9ad"
+   },
+   {
+    "path": "plugin-catalog/nord-theme.yaml",
+    "local_sha256": "4c0e54d5bc49afeadf828e4f3a91b6f35198c693c434a7837a60ffaf8c98eed4"
+   },
+   {
+    "path": "plugin-catalog/nostr-vpn.yaml",
+    "local_sha256": "1f50390bee7d58efa7013453c7769652dddeaacdb768c343ed0aae744b8b8b89"
+   },
+   {
+    "path": "plugin-catalog/nowstamp.yaml",
+    "local_sha256": "e9fadf3d30dd77afbdc7b608988b0efd8b22cb7ef4aeb38ab603ce1c1d65fa92"
    },
    {
     "path": "plugin-catalog/ntfy-approval.yaml",
     "local_sha256": "87669d22a77673844acdcf8f4b71bd7fc48a94405a00e912eab63e4b0158a276"
    },
    {
+    "path": "plugin-catalog/obscurify-provider.yaml",
+    "local_sha256": "b862c4463654429e0ae8d45d1a35652372c2a23b24dd53eca5b6ebbf74779919"
+   },
+   {
+    "path": "plugin-catalog/office-3d.yaml",
+    "local_sha256": "39be0357a6b8ad5257ccd83fba4966791f9740f35d2bf19b84d2413b9e628e15"
+   },
+   {
+    "path": "plugin-catalog/office-desk.yaml",
+    "local_sha256": "14b414149b93f17feb131582a5d891bcdbe2143705d8217796025f53aeb57181"
+   },
+   {
+    "path": "plugin-catalog/offpeak-bekci.yaml",
+    "local_sha256": "c9506fe24af24b41b11e2161d81ec9b42f4e12d9874d71bbcc9c60b05eaccc7f"
+   },
+   {
+    "path": "plugin-catalog/omh.yaml",
+    "local_sha256": "7048b399810ca25024f6f0e8b876f04aa640eacc369383fa5c0699e9dc046417"
+   },
+   {
+    "path": "plugin-catalog/onebot-platform.yaml",
+    "local_sha256": "a1ab23f78b0df3d4029bd88ae9867f2ede549b350a7a8170c976bb399cf459c3"
+   },
+   {
+    "path": "plugin-catalog/openai-compatible.yaml",
+    "local_sha256": "658628b6ca6a1b8ffd21a78af21e4dc3355aa9d289cc71c45ac939555ca19223"
+   },
+   {
+    "path": "plugin-catalog/opencode-free-acp.yaml",
+    "local_sha256": "eba41b3a1fb0f499b97139176db1bd8e767a5c7807aa0d915974a84cda14e11d"
+   },
+   {
+    "path": "plugin-catalog/opencode-shepherd.yaml",
+    "local_sha256": "27b9290fb5f1cc783dd4412d7dff7fa9422b9a6a02c2049131476bce4f56a252"
+   },
+   {
+    "path": "plugin-catalog/openinvest.yaml",
+    "local_sha256": "1360c20531c62b025e64b50d5204bce019f4991339e8ad173d3b02d557307aa4"
+   },
+   {
     "path": "plugin-catalog/openltm.yaml",
     "local_sha256": "b5509242bde623d22005106178dfae2073f4c59e4a5328b4615c1b620d68050f"
    },
    {
+    "path": "plugin-catalog/openpaths.yaml",
+    "local_sha256": "369f5eedfd70016b8513ae144e6aeef12e19a76c87425c37409e7e25fce67b88"
+   },
+   {
     "path": "plugin-catalog/openrouter-picker.yaml",
     "local_sha256": "8ae738e1cfeac752376fd6256a60b08f96d616a1c7a85c195323bca729d2923b"
+   },
+   {
+    "path": "plugin-catalog/openrouter-spend.yaml",
+    "local_sha256": "fabb4e76db06f34add08c9d37956aabf253640f731b99046501d67fc5fe6181c"
+   },
+   {
+    "path": "plugin-catalog/openviking.yaml",
+    "local_sha256": "9e6bbd88fdf59af65062db7cf051bba027ccc31969d47ea36b4a759838644ad5"
+   },
+   {
+    "path": "plugin-catalog/operations.yaml",
+    "local_sha256": "13a7b060ac6c8629f7ade581c0402e0b6f6c37ce9104f8d292fd8d9267e71d84"
+   },
+   {
+    "path": "plugin-catalog/optchat.yaml",
+    "local_sha256": "f3a7fee8d4634559badb8ac7a395ddb597e33b4ca8d925d6741220aa49fdea27"
    },
    {
     "path": "plugin-catalog/optmem-hermes.yaml",
@@ -5922,32 +7374,172 @@
     "local_sha256": "eb743d3ec32331c98f66767084cb922b26f04bc077347fc23b64bc8264bc6763"
    },
    {
+    "path": "plugin-catalog/orquehelx.yaml",
+    "local_sha256": "f3b1de72322f1d22bb92f8e0aa2b5355f1f43951855c12705e1076bcbfa1fb63"
+   },
+   {
     "path": "plugin-catalog/osv-ref.yaml",
     "local_sha256": "6c939feb65884877c1452cd19d3319efdab514b872d2b643c6055ad8cd166e02"
+   },
+   {
+    "path": "plugin-catalog/parcel-deliveries.yaml",
+    "local_sha256": "ad836f009140f42a129b97605ff48e1c4932bed5f59d8341ae372c226763112e"
+   },
+   {
+    "path": "plugin-catalog/parlor.yaml",
+    "local_sha256": "c4357a4db248dba1225adb4749202d10ab792e766c90ad7a418244ea66f248a6"
    },
    {
     "path": "plugin-catalog/parrotnotes.yaml",
     "local_sha256": "59e8866dbd873926e60091233e5c5c8a3c24397afa0a6b1e5f347dad35c44376"
    },
    {
+    "path": "plugin-catalog/pass-secrets.yaml",
+    "local_sha256": "30ce0c5562f3923ffbc6b74ab305f99365f45f698a0d18eef55c226e765c76e4"
+   },
+   {
+    "path": "plugin-catalog/pastdotdev.yaml",
+    "local_sha256": "ffb822d148c0ff1a90d1c46dc85c3039f0f589392b8cea46152abd8689db9951"
+   },
+   {
+    "path": "plugin-catalog/pay-cli.yaml",
+    "local_sha256": "c649892bc1a7766e830b05566f5ee3664030558ff3c581715a799c362b2d9d27"
+   },
+   {
+    "path": "plugin-catalog/pay.yaml",
+    "local_sha256": "07402a3429fc9f0861f37a8b60635f380d83bbd7a6420a38a751912a2e6b8737"
+   },
+   {
     "path": "plugin-catalog/pcs-security-tls-posture.yaml",
     "local_sha256": "742099991caf9a9b7a0197c95cafb09dca07c0f606f3f8a259aa969a33bffbd4"
+   },
+   {
+    "path": "plugin-catalog/pdf-surgeon.yaml",
+    "local_sha256": "e810278487c260ac14619e50e045912acfe1c60119c91226185a1f1661246904"
+   },
+   {
+    "path": "plugin-catalog/pending-queue-monitor.yaml",
+    "local_sha256": "b3e3f2d26e5aa42fdce5eae62590592ed30155c2b3c4a8c0d5017e65550918c4"
+   },
+   {
+    "path": "plugin-catalog/penny.yaml",
+    "local_sha256": "92b3471211e79144c6ea11eba84d2855e8eb7fea74fbc3eb31e572e2e21e338e"
    },
    {
     "path": "plugin-catalog/pep-ref.yaml",
     "local_sha256": "69f51c5d6ccfdc3f3ef635b42bc327fbb0b771271e4caebda9ff58aab604c896"
    },
    {
+    "path": "plugin-catalog/perf-hud.yaml",
+    "local_sha256": "880480951c44c22d2e3a51a0f26919699d569b10c3ea0ce857dac1ef326f76f2"
+   },
+   {
+    "path": "plugin-catalog/personae.yaml",
+    "local_sha256": "b3f58fe3e0b276cf4c7b8906a7f9237779ae03343e7baa3ee9ff4e5b070e46a0"
+   },
+   {
+    "path": "plugin-catalog/phone-harness.yaml",
+    "local_sha256": "cb2348dfdf1f34d20d421d9f07f78b40f35e67f580a0fe8bd547561de50fb37b"
+   },
+   {
+    "path": "plugin-catalog/photofresco.yaml",
+    "local_sha256": "47507e6993c61a2d0419042f74cd8d2b2e8d025068a219ec4ba167faa7541ecc"
+   },
+   {
+    "path": "plugin-catalog/pidgeon.yaml",
+    "local_sha256": "b8841528e42cb29838e2da0d994d65f55b53c2bf81bf15a71c24e1c16178415f"
+   },
+   {
     "path": "plugin-catalog/pinned-folders.yaml",
     "local_sha256": "1d0b4daeec373002564f105a397d994c0152f5d49eb0c31e2015d3a51ec810be"
+   },
+   {
+    "path": "plugin-catalog/post-cortex.yaml",
+    "local_sha256": "362b01f880e34161f989c954812cfcdc52714f3b3993c755be4214400df0feac"
+   },
+   {
+    "path": "plugin-catalog/ppq.yaml",
+    "local_sha256": "6e5cd80f083014c8dc23131efb8dd2167ef8b8476cb57f382bbc704b350e51cd"
+   },
+   {
+    "path": "plugin-catalog/precleared.yaml",
+    "local_sha256": "1ee239cf3ae8e3749c7d1c3dd6ee470b9571a56b32e6902a4bda994259428c02"
+   },
+   {
+    "path": "plugin-catalog/preview-text-size.yaml",
+    "local_sha256": "6232ad8e045437e3e52b471d6d6198c2218013ad2f2dc8139335de51ad91d870"
+   },
+   {
+    "path": "plugin-catalog/print-job-watch.yaml",
+    "local_sha256": "d11dd6b1e0ebbe3e5b94b8842b1292e27de9ca31e4b36fd0c848e87276dc707b"
+   },
+   {
+    "path": "plugin-catalog/print3d.yaml",
+    "local_sha256": "e5b77458a633771252f2f544c055a0ba6159232dc5809caf6a70a94b5b5a98e0"
+   },
+   {
+    "path": "plugin-catalog/privacy-gateway.yaml",
+    "local_sha256": "2d2519f37c26c882683cc8ac228f681070493bf3c590604aa801101dd991bcc9"
+   },
+   {
+    "path": "plugin-catalog/profile-models.yaml",
+    "local_sha256": "9fa16b818842abf123e470960f735eb35ad22d153fd3ca63d15915827c72564e"
+   },
+   {
+    "path": "plugin-catalog/profile-picker.yaml",
+    "local_sha256": "16c982a5a7552abe2d83d54903879e524a2f05ad5cc1d3818eacec0098b5a2ac"
+   },
+   {
+    "path": "plugin-catalog/profile-switcher.yaml",
+    "local_sha256": "36ecdd37ea58fcd66c6c977f1d2329f6bd786034b2e1167e4111f52881ad1ff7"
+   },
+   {
+    "path": "plugin-catalog/progress-squash.yaml",
+    "local_sha256": "8afa30dc67b9bb76001a6f2e7048da12ed169f9a22548bd713d9c2511d3e141c"
+   },
+   {
+    "path": "plugin-catalog/project-manager.yaml",
+    "local_sha256": "98e2e86afd0b1866de2aa633b1c148ab60bcfb3713de3ebe1f06272fff62ec0d"
+   },
+   {
+    "path": "plugin-catalog/promoat.yaml",
+    "local_sha256": "327d55e4b52e74463da4c5bba74c061040793395a2def0a7a715c1bd92c177d3"
+   },
+   {
+    "path": "plugin-catalog/prompt-queue.yaml",
+    "local_sha256": "ec8ce38c306d8414e6966ade3b5e1d703c4f44e88063f5a89b8d64a2f9ed1f8e"
    },
    {
     "path": "plugin-catalog/prompt-studio.yaml",
     "local_sha256": "ba5d4009c62d6d1d91496b1b42be0700721a653837eec40395ea8a804612351b"
    },
    {
+    "path": "plugin-catalog/proofable-mcp.yaml",
+    "local_sha256": "80d575d52d1e7a9017b89bf1b830ccc713ff3a15a4a0c9b6a4e14e3ee6a0ea90"
+   },
+   {
+    "path": "plugin-catalog/protonpass.yaml",
+    "local_sha256": "d0e1447114d2d5610abe3b72f12790f6b82507b0c5c5b22de3b1cf0b58173929"
+   },
+   {
+    "path": "plugin-catalog/provenance-gate.yaml",
+    "local_sha256": "80ace052f900f9829a239935ab5892a2f936270600eeab2f937d2324f6a2e21b"
+   },
+   {
     "path": "plugin-catalog/public-holidays.yaml",
     "local_sha256": "66643b4fdbb529a3090963edff8b8c88e87f0a38dd5c181c5e6362b8a5843f1b"
+   },
+   {
+    "path": "plugin-catalog/pushary.yaml",
+    "local_sha256": "adbb30b15b41a36cece2633922b36828c7e851af76a4053a16031733331f3ad8"
+   },
+   {
+    "path": "plugin-catalog/pushover-hermes-plugin.yaml",
+    "local_sha256": "c864400e197527f173c914c7d4371e3fd80c7e24ae92d6fd680dbff4f66b6350"
+   },
+   {
+    "path": "plugin-catalog/qdrant-memory.yaml",
+    "local_sha256": "72c50bf40d88b44588e9753092b3646aedbefc9c493b5eee26e56890dd65b317"
    },
    {
     "path": "plugin-catalog/qdrant.yaml",
@@ -6062,16 +7654,72 @@
     "local_sha256": "76df22c450d51972c18bf10a0800d1621f7bd272ba083061520eec581fe01326"
    },
    {
+    "path": "plugin-catalog/quote-ask.yaml",
+    "local_sha256": "38264714d4a989e0afbc8f5e2e21f375e20816e8dcdc8b4bc17a12369c1b97aa"
+   },
+   {
     "path": "plugin-catalog/quotum.yaml",
     "local_sha256": "8c2e049a1aee11d5ed198f97fc259376667c5277a7f6c7127a6322a9db3dacd9"
+   },
+   {
+    "path": "plugin-catalog/radio-dm-gateway.yaml",
+    "local_sha256": "ad0326a6d07d038decb113b25176a561c94c0c11d5dbeea4a877c5d9cb3a732d"
+   },
+   {
+    "path": "plugin-catalog/rea-captcha.yaml",
+    "local_sha256": "c517a0ff988999b9a9453ba9d114b4cc69f865270dd59dc121bda079a9ee90e1"
+   },
+   {
+    "path": "plugin-catalog/rea.yaml",
+    "local_sha256": "e5b905078bbeb1ed91420654cf8684ce16a6ab1f65cfc7536972df299ccb0d08"
    },
    {
     "path": "plugin-catalog/reaction-feedback.yaml",
     "local_sha256": "21578f1883476f544587c9dd3ac7aa4540c8b03c803be479fe01d2031e519d97"
    },
    {
+    "path": "plugin-catalog/reaction-ledger.yaml",
+    "local_sha256": "fc261badc16ea5fecbf62ed00ef1bc78f6c1538d0112faf82e53c4b9ec6cf68e"
+   },
+   {
+    "path": "plugin-catalog/redaction-pack.yaml",
+    "local_sha256": "49d9512d206b5009c0f44eed5fffd1950eec9b8ec8543396a17ac54fdc41688c"
+   },
+   {
+    "path": "plugin-catalog/redline.yaml",
+    "local_sha256": "555faf8e24f39bea122d0c55dc4e5c0cb089934721ba1b951bc620b3e165dc24"
+   },
+   {
+    "path": "plugin-catalog/refusal.yaml",
+    "local_sha256": "913b5f8e013bc4e38f85c76dd200b994f0086ad6c1595e95ab073ce8c07ebd1e"
+   },
+   {
+    "path": "plugin-catalog/reka-provider.yaml",
+    "local_sha256": "5cf74258f878590369edfbb221d65e83897c163b1efffde4b344dd30db0f473e"
+   },
+   {
+    "path": "plugin-catalog/remesher.yaml",
+    "local_sha256": "7f670dd9a68549ecfdd55f8d666453dd6cf91ae3843cd868a05110bb01857b3f"
+   },
+   {
+    "path": "plugin-catalog/render-platform.yaml",
+    "local_sha256": "f74d83d9d859d62c5c1fadb9600683b64f69b8a33c43e087e5f6d148f5f78705"
+   },
+   {
+    "path": "plugin-catalog/rentahuman.yaml",
+    "local_sha256": "3472d88c4a44467397c3d39cf69901701cc22f43f579b6204b0919092765e5f4"
+   },
+   {
+    "path": "plugin-catalog/requesty.yaml",
+    "local_sha256": "353e6754d2a012ace10623cbf72990faa515bcba43e886cb5ab115242bcbf009"
+   },
+   {
     "path": "plugin-catalog/rfc-ref.yaml",
     "local_sha256": "801be8a52369e10efa56cd83cb4403afa9d20219f8a8870832f0beb8258d6863"
+   },
+   {
+    "path": "plugin-catalog/rply-platform.yaml",
+    "local_sha256": "6f0eeaf406aa82191bbc38ac306dd1036636f21d61b6930e997c71bbb27d0e58"
    },
    {
     "path": "plugin-catalog/rtk-rewrite-docker.yaml",
@@ -6082,6 +7730,42 @@
     "local_sha256": "3bbde5c9a68c1f474242e4e5057dddb7ce8b76514fdc6312d5b87e5bebc30ea0"
    },
    {
+    "path": "plugin-catalog/ruapi.yaml",
+    "local_sha256": "0658ad3fa949a6957bdcce8431b2c235c3b131a3d76bea51098ef2df24b5861b"
+   },
+   {
+    "path": "plugin-catalog/runa.yaml",
+    "local_sha256": "ce36fb2e6d378738521a9379505b04dfeb7c173a847446b6d3daab21ea047683"
+   },
+   {
+    "path": "plugin-catalog/runbox.yaml",
+    "local_sha256": "1fa4bee7875f76d4c55f34513ab4711328130bcc035b7102021de5161429cde4"
+   },
+   {
+    "path": "plugin-catalog/runcrate-provider.yaml",
+    "local_sha256": "95fb0eb886b516351a770ac84eac1c1c91821cbf81e114990c303e74683cfe1d"
+   },
+   {
+    "path": "plugin-catalog/s2docs.yaml",
+    "local_sha256": "65709d8b7e39793104c5e4c5fa5237e6dc89db1d56107f2e797f91bf66692706"
+   },
+   {
+    "path": "plugin-catalog/safeailabs-provider.yaml",
+    "local_sha256": "fb6f31d44a9c6a07f48fd261cd7f3b448a294df3f8d31326f38e8d691629dc17"
+   },
+   {
+    "path": "plugin-catalog/salesforce-chatter.yaml",
+    "local_sha256": "52fb957e27974074b0faceb0f04ea640df545e4a4dc726580a4578c44489e98a"
+   },
+   {
+    "path": "plugin-catalog/scalekit.yaml",
+    "local_sha256": "6f6fccf848d0d22097f7b7e3cd2d73273f6f9b5dcbc19558a0d8f24d639ef60f"
+   },
+   {
+    "path": "plugin-catalog/scamgate.yaml",
+    "local_sha256": "709740b51cfa4d458e7c06aefacb8631cfbb6b33c6f4d93b214ec82f78dcd87f"
+   },
+   {
     "path": "plugin-catalog/secret-drop.yaml",
     "local_sha256": "4a2c0767fc4624f869e382c8fc2369bc60595a122246b8203c5f3eef319e2ad8"
    },
@@ -6090,8 +7774,52 @@
     "local_sha256": "82aff8800c7c7c202c2d83e0f881b611e23bc99aff5c9e8a5266466181d7a988"
    },
    {
+    "path": "plugin-catalog/sem-weave.yaml",
+    "local_sha256": "642ee300e50e0b7b47abe3d484e65819929c3e2f141baff56fa6de76e77ea3a3"
+   },
+   {
+    "path": "plugin-catalog/senler-io-user.yaml",
+    "local_sha256": "df8591b5bc28435fc50cdd7b649f60ff451249727c7b2b7b417367a7f6855667"
+   },
+   {
     "path": "plugin-catalog/serpapi.yaml",
     "local_sha256": "05f827bee749332e9c0a9b63185cf42c932a1bf033b8f83b17771d8aad752156"
+   },
+   {
+    "path": "plugin-catalog/session-find.yaml",
+    "local_sha256": "ad1f907082e34b93d16f15ba09c88079308a08cf307c338062de307a570a16ad"
+   },
+   {
+    "path": "plugin-catalog/session-flow.yaml",
+    "local_sha256": "782b28153c2ef18c8e781ed399186ac653adb1566c5deda57a2b39ad12ad20f9"
+   },
+   {
+    "path": "plugin-catalog/session-lens.yaml",
+    "local_sha256": "011919656864684e0ab64fd1806e10a7b3c82564b3735c610deccbdc8c4d1891"
+   },
+   {
+    "path": "plugin-catalog/session-mirror.yaml",
+    "local_sha256": "ae830f96f092c9def7e3f9ae4fc66f7e27e039058398c7a30d14d82b2a1e2bb2"
+   },
+   {
+    "path": "plugin-catalog/session-relay.yaml",
+    "local_sha256": "b43c8854594ae734dfcf91f08ef3a792f7d8d18fcc23413df71928b6d3d00fb5"
+   },
+   {
+    "path": "plugin-catalog/session-token-counter.yaml",
+    "local_sha256": "888bc2200a6e810a61cdea6a39e63f8a10aae27a5f0bd29a67211af0dd8ef120"
+   },
+   {
+    "path": "plugin-catalog/severian.yaml",
+    "local_sha256": "997752803738b3118371df2224a3122e5d9ed1f698fa32999bfa96a6fcf13523"
+   },
+   {
+    "path": "plugin-catalog/sgme.yaml",
+    "local_sha256": "ce72f5eb561ac91d1209ebdddd4e93758fbe681a6d8dee5d4ef1a83472fc9fb1"
+   },
+   {
+    "path": "plugin-catalog/showly.yaml",
+    "local_sha256": "152c6ab3d423cc5cf34e556774306863cbe9ec5ce8370355b9f8a1cfb478e17a"
    },
    {
     "path": "plugin-catalog/sidebar-cycle.yaml",
@@ -6102,16 +7830,88 @@
     "local_sha256": "5508165714cac5d67295d73c1ef5e267c7aea22a50f9501c4bafa88442941a84"
    },
    {
+    "path": "plugin-catalog/signal-notify.yaml",
+    "local_sha256": "00463963fd99db45c5be1625eddc52ddee730ef431cf9887a0ec34be5b4b4c39"
+   },
+   {
     "path": "plugin-catalog/sigrex.yaml",
     "local_sha256": "5cddda7aa55b8cf212038baf65c32879ec09e69cf760f652412abe3d3855f967"
+   },
+   {
+    "path": "plugin-catalog/singularity.yaml",
+    "local_sha256": "7d65f9c7f7b4d55a8b56787befb03c9e4a8d55fb9b82c69fd1ba334b139172d1"
+   },
+   {
+    "path": "plugin-catalog/skill-integrity.yaml",
+    "local_sha256": "bc02bd8b424239383cd2efd4117244c583db026a56c5792d0739860bd2a853ad"
+   },
+   {
+    "path": "plugin-catalog/skill-lineage.yaml",
+    "local_sha256": "a6af8fcbdf282da8919e7ced5c2a863971e857c39b9744d067d76775aa1779fe"
    },
    {
     "path": "plugin-catalog/skill-retrieval.yaml",
     "local_sha256": "740be7a4c211687f80ced1681ab0abf3f342360c3c4cc2c6411ccf47ddee0c3c"
    },
    {
+    "path": "plugin-catalog/smolmachines.yaml",
+    "local_sha256": "22fbb7146f9be50405207ab96234fb56a0bfbbc085fd88a25e030fc325d5c0d2"
+   },
+   {
     "path": "plugin-catalog/snag-shelf.yaml",
     "local_sha256": "845f7c54f6219a901584345ce2097342c3deb9b4c17dbaf55a4e7bef5fdd49c1"
+   },
+   {
+    "path": "plugin-catalog/specstream.yaml",
+    "local_sha256": "cb9a52fe7c824b6d4a02f455773c87dc920ec2a9a7c0e87f75dbd65ab2653935"
+   },
+   {
+    "path": "plugin-catalog/speechify.yaml",
+    "local_sha256": "ccd03f7a660e05f7c6d32b63bcc3735fa8f1a4be53ef0720461aea4831069ef9"
+   },
+   {
+    "path": "plugin-catalog/spotify.yaml",
+    "local_sha256": "3bc1b8ab2c49fd64c91db04d75f38aad46958bfb3347b8b7a833e45dcb5e9615"
+   },
+   {
+    "path": "plugin-catalog/stack.yaml",
+    "local_sha256": "5f7b6cddb6351e6d4009d00d0fd96c3fdc0aa82ecc656bd3459a275216489bf8"
+   },
+   {
+    "path": "plugin-catalog/stacktree.yaml",
+    "local_sha256": "3eaa6a8f43b95068a804ea506d2964207ba284c449118480cea08dd61cf543a1"
+   },
+   {
+    "path": "plugin-catalog/stalkchain.yaml",
+    "local_sha256": "f730d81835690134dc537c4924b4c9995cc22c864151651a30d48233cfac71ac"
+   },
+   {
+    "path": "plugin-catalog/stop-ledger.yaml",
+    "local_sha256": "0aff6f695d479a52ec0cdbc873c881f6c888e5acc24d13816aa9cdae3dc593a4"
+   },
+   {
+    "path": "plugin-catalog/stream-speed.yaml",
+    "local_sha256": "dd6aa7442dcd8e3c29221a879b9b1a75cdca7fc41ef91b5319dc9112146c4c71"
+   },
+   {
+    "path": "plugin-catalog/stt-vocab.yaml",
+    "local_sha256": "b142e408816383f4a1e24be5de1914a96811cb91eb3e79b9a5b3b755ccd9fac7"
+   },
+   {
+    "path": "plugin-catalog/sunshine-moonlight.yaml",
+    "local_sha256": "706eb8ff4be53a71648c416a1cd49b944fd005544acc9dc358755f575e8591d7"
+   },
+   {
+    "path": "plugin-catalog/super-artifacts.yaml",
+    "local_sha256": "0f379bc21c975672777129dcc6e4f2eb3f58c407da458331499e8bf6c7327cd6"
+   },
+   {
+    "path": "plugin-catalog/superlocalmemory.yaml",
+    "local_sha256": "34579ec8e69453011cd225a4145df600a76f83c38133e356c87d8955fdf056de"
+   },
+   {
+    "path": "plugin-catalog/surp-hermes-x402-llm.yaml",
+    "local_sha256": "0c275eca8520b6be441fe60b1a4e3e510887e0c1146c76a57fc8fde47420e881"
    },
    {
     "path": "plugin-catalog/switchbot-control.yaml",
@@ -6122,20 +7922,124 @@
     "local_sha256": "9a054ca24fdeb362b7e5d6c282d51c3d5cd23465cc993aad2f543b4161d9cd32"
    },
    {
+    "path": "plugin-catalog/tabella.yaml",
+    "local_sha256": "dfb9ab56ef32194d7c3f3df101f68fdca042bdf590a3f19bde0e256cbff14251"
+   },
+   {
+    "path": "plugin-catalog/talaria-webui.yaml",
+    "local_sha256": "a23482fc68dbf7f14a2f0f1b6dc3b18f196e34bf75b0346fdad31d3be10d1e40"
+   },
+   {
     "path": "plugin-catalog/tam.yaml",
     "local_sha256": "2f5cadac9efc97fa20f97136ad3f509131442c6cd903907c9df14a71ff784c60"
+   },
+   {
+    "path": "plugin-catalog/tameru.yaml",
+    "local_sha256": "232229192ed333641f29cfe6c7f982a2bd60fb05bcd1817fc549b00d699d23dd"
+   },
+   {
+    "path": "plugin-catalog/taskwatch.yaml",
+    "local_sha256": "f4d7651fa7ce041e82a6bd30f921888af1803ef17fdd229f665ceddfb4927f35"
+   },
+   {
+    "path": "plugin-catalog/tavily-plugin.yaml",
+    "local_sha256": "5bf442b70383a1f4f550ec1e2ee3e4de17406a8c7453a179c7be1e0e1e4e4dc8"
+   },
+   {
+    "path": "plugin-catalog/teamorouter.yaml",
+    "local_sha256": "53d5aaa98e660eb9723e57456b19d98d51b52be539726f974cfc16a160df33ce"
+   },
+   {
+    "path": "plugin-catalog/telegram-client.yaml",
+    "local_sha256": "838c17a53fd64099a52a1ab70ef82dffd2f808dbd77d3915f2d84f048626b328"
    },
    {
     "path": "plugin-catalog/telegram-notify.yaml",
     "local_sha256": "621507170418aeade7e890e27164e6f59a5b896838e79f57e6ddf1ba88e5afd3"
    },
    {
+    "path": "plugin-catalog/telegram-stickers.yaml",
+    "local_sha256": "c4107dc65bd4534a19fbf6bc4c0d2e585fee8ad7ff7b16745561a9f554a3255a"
+   },
+   {
     "path": "plugin-catalog/telegram_dashboard_probe.yaml",
     "local_sha256": "344e5e729bca00ed026c128b7936948878308cffeffd02b558f692d1ae797794"
    },
    {
+    "path": "plugin-catalog/telesec.yaml",
+    "local_sha256": "ca7b12be46e3b9bf6a799f6bbed66072766686add5693e1c6986c796f61ef14d"
+   },
+   {
+    "path": "plugin-catalog/terraform-drift.yaml",
+    "local_sha256": "33236c377b602a9e2a2c56c2b04d3b9a914d07face23aaaa65e6e65e21d9c3ca"
+   },
+   {
     "path": "plugin-catalog/thomas.yaml",
     "local_sha256": "5d5bc0616cbdc54038871e5db2b661dfec493ff09d84a2505e61968a48894b0a"
+   },
+   {
+    "path": "plugin-catalog/tidal.yaml",
+    "local_sha256": "76968b2394607272a4bc3e52f81b1b47d62fae564cc2cfefb78dfa0e0a40d7e4"
+   },
+   {
+    "path": "plugin-catalog/timestamp-ref.yaml",
+    "local_sha256": "ea74066e8aa48ac68c721ea24c865e7befe84e8d90c53b1fdb7509747d3276ff"
+   },
+   {
+    "path": "plugin-catalog/tinyfish.yaml",
+    "local_sha256": "a5be3df211cdd57e95036517403387e632e6cb759c2d4d6c52d68e7628c2c91e"
+   },
+   {
+    "path": "plugin-catalog/together.yaml",
+    "local_sha256": "9df6a82377803a5a1bbe58650e21f76663de145ed77d9beb6228253a46b5ac71"
+   },
+   {
+    "path": "plugin-catalog/token-cost-meter.yaml",
+    "local_sha256": "441b457a379d3bdc651a7d60361c069c0194d1ac52db05214b04e4b417d1a7b2"
+   },
+   {
+    "path": "plugin-catalog/token-lens.yaml",
+    "local_sha256": "981727ee6f082241826415c9cac19f659a0ebf4d3e85588ca08f77ce45b0100e"
+   },
+   {
+    "path": "plugin-catalog/token-rate.yaml",
+    "local_sha256": "2a226565ffdbe4385c1c68eb0a8fd603fec62a184b74f9819e9f5d8291b94776"
+   },
+   {
+    "path": "plugin-catalog/tokstat.yaml",
+    "local_sha256": "e00038ba6b0551d543350f9588b43b4fa122fbb1ccefd8caefb59155770eedc6"
+   },
+   {
+    "path": "plugin-catalog/tracekit.yaml",
+    "local_sha256": "e9fa6d8db0fb55f26496311bf32a3e51215fe1777d94d82d01c4938ae18e78b6"
+   },
+   {
+    "path": "plugin-catalog/traceverse_hermes_otel.yaml",
+    "local_sha256": "c28c4053bb92891ca11382d798c2fb729958ac18486a31f33f4fb1d14dee9999"
+   },
+   {
+    "path": "plugin-catalog/transcription-dashscope.yaml",
+    "local_sha256": "31148708a975c392ddedd4dafd880b59975629351888c3f9cf80935c84ce5724"
+   },
+   {
+    "path": "plugin-catalog/tripwire.yaml",
+    "local_sha256": "c376c9d74b65c17b644ef219b97f64ebcae6cd77813a5f32b2ebb251652e00a2"
+   },
+   {
+    "path": "plugin-catalog/true402-swap-guard.yaml",
+    "local_sha256": "3e905790d81c41bf48e302c601e288824da8849c000850ff017c35c6f451712e"
+   },
+   {
+    "path": "plugin-catalog/tsubasa.yaml",
+    "local_sha256": "fc8b3ad3cc23a08a0cf0aa385f521b5631f63689fe732b1caa952d52ff2639bc"
+   },
+   {
+    "path": "plugin-catalog/ttsbuddy.yaml",
+    "local_sha256": "83593c00272bf199f02f821ce2c5afdb6ef15a014203632ccc26c09774ce14b1"
+   },
+   {
+    "path": "plugin-catalog/turn-bell.yaml",
+    "local_sha256": "adc68f568c4b12f281b15a5e763a99571671605b51be5b8764f745c9f5cf3f19"
    },
    {
     "path": "plugin-catalog/turn-usage.yaml",
@@ -6146,8 +8050,40 @@
     "local_sha256": "f6de09be4abfbd84375f68229ff11c474cebc251cc7e818a408aaf548d0ab75a"
    },
    {
+    "path": "plugin-catalog/unibaseio-membase.yaml",
+    "local_sha256": "dc8390f26169a1df5ee6d0c2cf1633948bfe210fde1e7825df7822355112d190"
+   },
+   {
+    "path": "plugin-catalog/unicode-ref.yaml",
+    "local_sha256": "350430e276e7af3a20a47e225fb5b2e909ae9159d87024afab21b41e711abfb5"
+   },
+   {
     "path": "plugin-catalog/unitares.yaml",
     "local_sha256": "26b18cd6b4b57af7a545b659f1aa24576c81af48ca0f15c8c6d58445a937f79b"
+   },
+   {
+    "path": "plugin-catalog/unraid.yaml",
+    "local_sha256": "e9d28d65fd5aed9b31e6bae15cb1bb95c3878373a139fe48339ab5daf2af1230"
+   },
+   {
+    "path": "plugin-catalog/usage-flame.yaml",
+    "local_sha256": "def5d03fd1306dc04e99dd8ae7cdb548d6aec89a5e93536aed2ea1d7bb0d9119"
+   },
+   {
+    "path": "plugin-catalog/usage-guard.yaml",
+    "local_sha256": "c6dc53b9e18b7c5ee5b64262316b2a893f6c0f64eddf8442253b74b7aadf1519"
+   },
+   {
+    "path": "plugin-catalog/usage-ledger.yaml",
+    "local_sha256": "6157ce0b338e0be24b033f191809f706cf9a97f3e80997b86196c69f7dec9939"
+   },
+   {
+    "path": "plugin-catalog/uuid-ref.yaml",
+    "local_sha256": "de908f37837e72b248d355cf0298c6beb0498c4e61eb9d0e63fd984dba986413"
+   },
+   {
+    "path": "plugin-catalog/ux3-product-design-harness.yaml",
+    "local_sha256": "4feda6abda3d5e20e2e7c5f5ca2909b6282923974d691f1325167264db7d5b84"
    },
    {
     "path": "plugin-catalog/vault-view.yaml",
@@ -6158,12 +8094,56 @@
     "local_sha256": "52718fce0b7a314fbe18d99534670cf8aaf9f96913c183025a9b2361321c2d03"
    },
    {
+    "path": "plugin-catalog/viajante.yaml",
+    "local_sha256": "42c5350cc5cc7ac40c6c5e4855f630df5acdc2b55ca41a5f7689cf9d21096862"
+   },
+   {
     "path": "plugin-catalog/vidiq.yaml",
     "local_sha256": "d3e8c4ad7e14cd15de3e495b43a8ed6a3d50a436f477db76414803207a8aa800"
    },
    {
+    "path": "plugin-catalog/voice-ledger.yaml",
+    "local_sha256": "612d25b46dc0c96b50fe3113e5142eb7dad25054b7d7fb1311f6968c5c428fbf"
+   },
+   {
+    "path": "plugin-catalog/voicestudio.yaml",
+    "local_sha256": "ae0e923ea6586b055215958b74ae6d8191ec91a76f4b54071e9dd1344f64c351"
+   },
+   {
     "path": "plugin-catalog/vornik-companion.yaml",
     "local_sha256": "6684745fd298a3943acb7c893be810dd576bb881d5b1e0c6d88d714fead94924"
+   },
+   {
+    "path": "plugin-catalog/wait-ledger.yaml",
+    "local_sha256": "a77d756ffa937ff6d7477a21586d94056aa4f6d2a38f58f3a65e00661436fe57"
+   },
+   {
+    "path": "plugin-catalog/walkie-talkie.yaml",
+    "local_sha256": "e971376be5ec8e11fe435a08e6f26d4f7648e7da317b522f47e9c0110127f4ff"
+   },
+   {
+    "path": "plugin-catalog/wallaby-provider.yaml",
+    "local_sha256": "433ab5f022a3c7c98bb0091b2ca559e672ee53ee6c6c71af5ab783be8ed6a939"
+   },
+   {
+    "path": "plugin-catalog/wallpaper-theme.yaml",
+    "local_sha256": "595d96a91d66575fa5c7687379454f758adb02db182dcdc1a46b4edfb12e9b01"
+   },
+   {
+    "path": "plugin-catalog/waypoint.yaml",
+    "local_sha256": "9f5758ede1cb46bc90dac1d3f5bc3cb21c4febf87d4a198955b3a934da6b9ce7"
+   },
+   {
+    "path": "plugin-catalog/web-crawler-spider.yaml",
+    "local_sha256": "92b68f26190a9fdf2f8e47411abc00d89f06ba307b2a12a767e8b6f754b5c73d"
+   },
+   {
+    "path": "plugin-catalog/web-deepseek.yaml",
+    "local_sha256": "f347a1bc55f3174366c895335c4eea14c9798cd36c24d6e9ce1c015f12a7bd86"
+   },
+   {
+    "path": "plugin-catalog/web-local.yaml",
+    "local_sha256": "06f6b850602e80a7e1ab4080f25b30da346629387aa7aa0c4640619628a44279"
    },
    {
     "path": "plugin-catalog/web-meta-ai.yaml",
@@ -6174,16 +8154,80 @@
     "local_sha256": "ba8739534483f8cd9d1abc94d81bd188fc3f337c1a6d766e757b592dc1641881"
    },
    {
+    "path": "plugin-catalog/webly.yaml",
+    "local_sha256": "f792b8aefde2c9357eaf4a59d4923c1deb53c4d83d1adb27cd1d44f9ffe8990b"
+   },
+   {
     "path": "plugin-catalog/whatsapp-agent-platform.yaml",
     "local_sha256": "8406e723b11dffab2ce77bb3335e810293ac83c9e481721a44d3908f8234b9ce"
+   },
+   {
+    "path": "plugin-catalog/wicked-memory.yaml",
+    "local_sha256": "2039d36cbccf0eb2372ba18ec3990d8a33d0325b8dc9d92b24d37cfed3ca303c"
    },
    {
     "path": "plugin-catalog/wiki-ref.yaml",
     "local_sha256": "40d7cb9ec56c9d1649a128bda067f7483b71a7f9f2f6a8a02ea27960c23b0660"
    },
    {
+    "path": "plugin-catalog/wireguard.yaml",
+    "local_sha256": "7973a3aa2a79200fdcb4e8d96433c2f5182025f110315c4e7a371edbb89b282a"
+   },
+   {
+    "path": "plugin-catalog/wolfmarkdown.yaml",
+    "local_sha256": "a3b234b92d8ffc21a2534950107209e83005fa98aa85d2724fa4a75b6c1308ef"
+   },
+   {
     "path": "plugin-catalog/woof.yaml",
     "local_sha256": "108f1459f2a5dc8609a6952334b646e36f8ccc74ac4e6c35fed547e18adacaef"
+   },
+   {
+    "path": "plugin-catalog/workflow-record.yaml",
+    "local_sha256": "b6d14b36db41ccde8dff7efb1c7c2774197320fbcd546ecdd085d5d37d3eeb77"
+   },
+   {
+    "path": "plugin-catalog/world-clock.yaml",
+    "local_sha256": "d52be43a6bc98d0ccdc021a34db1c270c05bff473e0573846f369c95af795c53"
+   },
+   {
+    "path": "plugin-catalog/wyoming-voice-bridge.yaml",
+    "local_sha256": "92328f46c9dec18222ac807dfcba11728362177cc55f8bc76ed6f0d5da5f4cf8"
+   },
+   {
+    "path": "plugin-catalog/x-dashboard.yaml",
+    "local_sha256": "05c71175fca3d1a67ddde2f7eaf2d651732b42db3713054e52f1a379ab995a2b"
+   },
+   {
+    "path": "plugin-catalog/xchat.yaml",
+    "local_sha256": "efb690052120cbb50a10ba6a76dd5322fc4c32b62bfcceab4e926f2dc6f3749b"
+   },
+   {
+    "path": "plugin-catalog/yandex-disk.yaml",
+    "local_sha256": "9b0c9afd00114ba6808d47b953b53fe370c08c46951c1dfb037fe3bc36f8f999"
+   },
+   {
+    "path": "plugin-catalog/yandex.yaml",
+    "local_sha256": "fef595f40ec3d6cd73c5e56f27826804332e09cd0a6b38efbbd9bd78722315c4"
+   },
+   {
+    "path": "plugin-catalog/yandex_calendar.yaml",
+    "local_sha256": "52e2ae577907c5c5599d13e7c55c5440284dcb4e16a087944e2025e9ae8e84f6"
+   },
+   {
+    "path": "plugin-catalog/you-should-know.yaml",
+    "local_sha256": "4d3ba9e50920c16dc67d3c752cea8ffd92b2cd8b7adf15fe0aa0b9eb7f299ae3"
+   },
+   {
+    "path": "plugin-catalog/youtube-dock.yaml",
+    "local_sha256": "7bc6e97cb6983be455224809e21da40a0e93aef461f37f16a5b115c7ce5ffdbe"
+   },
+   {
+    "path": "plugin-catalog/zalo-platform.yaml",
+    "local_sha256": "cea64e8e9423b9272954af32fc6aa434749b9f80bf122422a409c113f346d8c0"
+   },
+   {
+    "path": "plugin-catalog/zoth.yaml",
+    "local_sha256": "9f0e90a19d62ce2ed00b0fd81bb4f0d0a4e3e0a36c59f8382f7e8ef412460729"
    },
    {
     "path": "plugins/computer_use/__init__.py",
@@ -6882,6 +8926,30 @@
     "local_sha256": "aef02ed34aa0762f6b2803e164a11a273080a38705725c048efc4a6a6fed621a"
    },
    {
+    "path": "qubit_agent.egg-info/PKG-INFO",
+    "local_sha256": "20c3b6e74161c9a55a32e7f1c602d447359cfe587e4dc9e8e06a166024db8b07"
+   },
+   {
+    "path": "qubit_agent.egg-info/SOURCES.txt",
+    "local_sha256": "9522fecd1d91221f51acf066b7e8aa8b858d6a4e7dd14ee5e5c73ca286436c55"
+   },
+   {
+    "path": "qubit_agent.egg-info/dependency_links.txt",
+    "local_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+   },
+   {
+    "path": "qubit_agent.egg-info/entry_points.txt",
+    "local_sha256": "e68794819fd39d5d73f3f991010b4764b9c23a6b750ea46c476226ff6d0ea13a"
+   },
+   {
+    "path": "qubit_agent.egg-info/requires.txt",
+    "local_sha256": "e7052e03f833bcddbcfb310115f829fcba9f0b9fcd06251b4df8dfd303e83d77"
+   },
+   {
+    "path": "qubit_agent.egg-info/top_level.txt",
+    "local_sha256": "f0c6f76bed1923bd9236d0633f34b2ecf441c3816833222d026b20f860ccb66f"
+   },
+   {
     "path": "qubit_cli/_early_recovery_zip.py",
     "local_sha256": "6af56daab93f664094631e56bc9e901b7b20a49ce71e8e55cbc1a96c253c9a9a"
    },
@@ -7071,7 +9139,7 @@
    },
    {
     "path": "qubit_cli/gateway_chat.py",
-    "local_sha256": "ea42a47584a1928543c2e542b08c2084d7657d32a18c68b537869cbaa245cce0"
+    "local_sha256": "b8610bfa193e4a5dd6916e798358c81664cc9c3286c6f298d8ed721d313c47bb"
    },
    {
     "path": "qubit_cli/gateway_chat_commands.py",
@@ -7091,7 +9159,7 @@
    },
    {
     "path": "qubit_cli/gateway_chat_view.py",
-    "local_sha256": "f83202f19f77f220cd874dd08464c887fb7ba865e782c77d54e0f5d33b71c0cc"
+    "local_sha256": "c576058b78a102fc5c397fe690e3d61f911616dacb805435b65bc0b8b2babfc0"
    },
    {
     "path": "qubit_cli/gateway_cli_commands.py",
@@ -7712,6 +9780,270 @@
    {
     "path": "qubit_cli/web_build_limits.py",
     "local_sha256": "0d6b8a5b55258c3876d56a7e1f8d50b1c0bb6d1845568d2852c9fdf2bf417f25"
+   },
+   {
+    "path": "qubit_cli/web_dist/.hermes-product",
+    "local_sha256": "7511f4df586ddc996d2af1a0e266e69e148069601e6812d5462e132269e32efc"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/AnalyticsPage-DVRdezXp.js",
+    "local_sha256": "1b445052f366813d8dba73df1d07d65d43226b45b1026e2d79dff5365b66432a"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ChannelsPage-CYCyCuWo.js",
+    "local_sha256": "dc639d371cfb9b1155e4111b476d73fa493e19607b90ebdfdd7026aebc1250fa"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ChatPage-D8x6sPSF.js",
+    "local_sha256": "bf0735af2a552f3263c6e648c8189d6d7e652a0416cf2fca4496821aa78354d5"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/Collapse-Bold-mgICk9-_.woff2",
+    "local_sha256": "cb1bc6803168cffb3ef7b8113f95f82480a6d0f46d6e37edc854259377c6c00b"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/Collapse-Regular-DysayoTY.woff2",
+    "local_sha256": "ce8c481f56da3a46074ab696c16481bea49ea83e75e7eb7cb42fd2114593f33a"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ConfigPage-C4YZ8Mbi.js",
+    "local_sha256": "680d1d55e7cf87a2336741e8bae0cf3d606e5295ba2556df69f5f209fc430582"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/CronPage-BM297avP.js",
+    "local_sha256": "5f4b403ccf3e1b641f42d336ad18b3d5ee04a6befa3be3cadb8ddd9c35344c31"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/DeleteConfirmDialog-Ef3apWk9.js",
+    "local_sha256": "1b40cf31d3bff7a9dd3be7e2d3ecfba6c3a77cf62a36bb7a72ff5bc1bae798dd"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/DocsPage-2ChkrB12.js",
+    "local_sha256": "ba0352e6b06abc9fafc7badf567bc07c40519ccf082a69517b6f37b9012b1274"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/EnvPage-Cp0OZ14m.js",
+    "local_sha256": "80bc0bf6eabe5c95587426325185628e1701359832db34df31b9a9c0e6fb724e"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/FilesPage-oIav5S9M.js",
+    "local_sha256": "27dd11c81a00b4f28fe3866f6b776f8569f07386e2d100b8cf2912fd498ea0f8"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/LoadErrorNotice-BwlrAWxE.js",
+    "local_sha256": "b76e7c18bcd93d59b095de93bbf568bdb297ea40b6eaf3584b8baf7823567b50"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/LogsPage-BAtg0awr.js",
+    "local_sha256": "9b2730aa41f1c8a904222ac324912822da807693fa1ad3e0d6e4b204e93558d4"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/McpPage-CmjFbIlB.js",
+    "local_sha256": "10fdabafb6f55237dfacd33efb3f93036c7226e65c8fecbc9f67c188631307a7"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ModelReloadConfirm-DA-zlRuN.js",
+    "local_sha256": "db9e2961c259df95701b1019604b664eed6c1788e06ad677006e6e08cf8bc3e2"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ModelsPage-C99yMgRT.js",
+    "local_sha256": "1177cd094cc7e62563856f2aeb914d0da415c275973ceb7f16d3329e539591a4"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/Mondwest-Regular-CWscgue7.woff2",
+    "local_sha256": "9cf6e6e1cba70f7e991a92ce4225785725b6cc9a48cc77cbfaabeba26c18f072"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/PairingPage-Cl6-A6pg.js",
+    "local_sha256": "adbfbb800e8ee6e275a57d7d31c87d424ad3150b0c9491232e6ddcc82372cd25"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/PluginsPage-DcCvPArG.js",
+    "local_sha256": "97c40eacbc83f7e49e202ec45215b72e1e9de85fffe38abb4a83dc792ea22d28"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ProfileBuilderPage-DCFeCs3a.js",
+    "local_sha256": "4650eca98b78c508b472eb533263d2eb9f9067ab7458fd93140ae0c5a60177c9"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ProfilesPage-C25ZKAuB.js",
+    "local_sha256": "ae464b877f382fac29ceb908f08eeabdd6be642a79bcc473c711f1fa6b625258"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/QubitAmbient-izxhXQMg.js",
+    "local_sha256": "d236fcdee9d2ef625a1d71d3728ad19e3e337e17086ca9244765fc73b099701c"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/RulesCompressed-Medium-CA76_CrB.woff2",
+    "local_sha256": "d865cf7154121265d3d65c0931ec27dc289aa438cd62ffad2f38e05ae79956a3"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/RulesCompressed-Regular-BSXFyF4x.woff2",
+    "local_sha256": "3bcbc330183f49cd49c72d4cdb3d1fbc675cf4e3000b06fd1c606ffc31b73e5f"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/RulesExpanded-Bold-DZA7s8Pa.woff2",
+    "local_sha256": "f2295406de2272086d5395af32b50ac51b15d75294c25a04094c8b1f85757931"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/RulesExpanded-Regular-l8uVympt.woff2",
+    "local_sha256": "e8062ac4889b0f05de94035571e86991b6efd03539775cfe0790e37da75434db"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/SessionsPage-C3z9Nc5G.js",
+    "local_sha256": "1e412d13ef2d43ebb5d6759c3ed0586bdc5051bc5c05c01d335e63164188887d"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/SkillsPage-D5PSi70j.js",
+    "local_sha256": "17c3b395b14c891d739a6ebece0da881eb8fefbf442394e75e615b2674433d97"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/SystemPage-6ZfjeVnC.js",
+    "local_sha256": "4e6b6bc0f6817a874f98060dea168f9206a2caa6942c6150248d7d1bbed535ab"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/WebhooksPage-1qWf_gGL.js",
+    "local_sha256": "56017caa2c8d909efe6db8e43945bfe985b940b3eb7be5c7f1f370fdba22c773"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/api-CNRw8IET.js",
+    "local_sha256": "77b9cb1401bcfef1bfd979288bc5155f2335d4834d98aa933ed7fd21e995b444"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/chat-activation-BiaqYo9D.js",
+    "local_sha256": "7004d70c867166566771fd7dba6147eaa80e12e0627ef58812b0a39d06d7dab0"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/clipboard-owkvc3zk.js",
+    "local_sha256": "5bab3f289333862bdf2e27f7e643d6c79db0162a606a644410d783fd858a104a"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/i18n-D7tgAhar.js",
+    "local_sha256": "723ecf9696355256203de6c5944ad744c9fc094cfb72b688e7a3cef9b9af38e8"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/index-4aJGqtTY.css",
+    "local_sha256": "ac14f6d721fc72caf77dec525ff76f41c2dcc9c17b083f8640751a3b6c90a4b9"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/index-BEUiwJkl.js",
+    "local_sha256": "82369ef0c74a5af17cf326ec8b1f5a535836618384c34896337a13881cdb889d"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/mcp-server-create-B0VgoYzF.js",
+    "local_sha256": "b86eab185584423fc1e5b3152afaf16e2c4306739fe159f21cb2459216d151d4"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/page-header-context-D8k6kq0p.js",
+    "local_sha256": "398d5596fa9054ab4d77998b168ac2b2f46da5f2fe3a8a5018388dbd808c36fa"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/plugins-BJvFSXb7.js",
+    "local_sha256": "e69928177b37d34538697fd0c4fca5488c66be0c63f8ef23317a0b9e04c461a0"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/react-vendor-DKHxIQbN.js",
+    "local_sha256": "093fec0ec53038f5fcf41197cbf83f32e9fee13e5cd9a981699e257da6008ba9"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/rolldown-runtime-hePW80VL.js",
+    "local_sha256": "580ad8c58061a4dde99bde0a56905e382f0568516ee2f5b84dbfb52085709021"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/terminal-font-refit-Dmois6_8.js",
+    "local_sha256": "e714d4ffc514de8fae089d55fedff494c7542eed3fee2d786cb15ddc102bd7fa"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/themes-BnesBGTV.js",
+    "local_sha256": "84ac9f0ad3d990cec09b1f75a0928db7551afaa4a964f8a35c843a4b795c0d04"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/three-Tc3iKPZF.js",
+    "local_sha256": "85b8fffceb46f48715ebe982086c8482778b497b0b1be8951e1bebbbc2fa38ea"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/ui--ms_rHmL.js",
+    "local_sha256": "981b35c7b3dde6c631d0a0134c17753a12787c81bd1b20120c8dc77fc2728311"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/useModalBehavior-C5ojdJTr.js",
+    "local_sha256": "4addb60fbade81eed00ced3d90ae6d35cedfa6172c454c71527bbf6cad492c18"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/usePageHeader-CJf9g3v1.js",
+    "local_sha256": "d7947e5b553b5dac321de3dad693ffa93521ae9772f3f102e4dc7b951bad8ca1"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/useProfileScope-qipzxaph.js",
+    "local_sha256": "af44c8f94c6c10ca9f91355f16b129943cbf8f9b7bd6c3ab9fb9fd6c3f7d807b"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/utils-BZEKuuUT.js",
+    "local_sha256": "9b967546df0648885542dfb7ed6525740afce6704ac21fa8d49de0832c0d91bb"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/vendor-D2e89vc9.js",
+    "local_sha256": "9f1dc9c64cf9a6ca39ba02fdbc6bd4456adcfabe3b998a42d5a751173d1bec65"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/xterm-BrP-ENHg.css",
+    "local_sha256": "0e5386f16cb4be78a2fe911e014a810da76ea2db47d8c8b2a966516b2fd5270b"
+   },
+   {
+    "path": "qubit_cli/web_dist/assets/xterm-CXxU4Y2B.js",
+    "local_sha256": "462aedc6a17c42fa884426a21bb3ac0108842d9ad7bd3270a0be29c7dda5b2db"
+   },
+   {
+    "path": "qubit_cli/web_dist/favicon.ico",
+    "local_sha256": "a5765ffc24a7f1f149ffe0732e2a67e78d3fb578f563271de7ad19aa188fda7a"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts-terminal/JetBrainsMono-Bold.woff2",
+    "local_sha256": "08863c7964612257a90bd821e3127dc5ccb0b5046f881673a1ade5809eb21d0f"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts-terminal/JetBrainsMono-Italic.woff2",
+    "local_sha256": "9f158b85eca345daeee01dfffa602709a905ea08b0cc60dbf6153cbbd97da08f"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts-terminal/JetBrainsMono-Regular.woff2",
+    "local_sha256": "f1a7a03672cdd494ce0d5543fac6e4360fe22403c6de297fdc2e55a815f7baff"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/Collapse-Bold.woff2",
+    "local_sha256": "cb1bc6803168cffb3ef7b8113f95f82480a6d0f46d6e37edc854259377c6c00b"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/Collapse-Regular.woff2",
+    "local_sha256": "ce8c481f56da3a46074ab696c16481bea49ea83e75e7eb7cb42fd2114593f33a"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/Mondwest-Regular.woff2",
+    "local_sha256": "9cf6e6e1cba70f7e991a92ce4225785725b6cc9a48cc77cbfaabeba26c18f072"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/RulesCompressed-Medium.woff2",
+    "local_sha256": "d865cf7154121265d3d65c0931ec27dc289aa438cd62ffad2f38e05ae79956a3"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/RulesCompressed-Regular.woff2",
+    "local_sha256": "3bcbc330183f49cd49c72d4cdb3d1fbc675cf4e3000b06fd1c606ffc31b73e5f"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/RulesExpanded-Bold.woff2",
+    "local_sha256": "f2295406de2272086d5395af32b50ac51b15d75294c25a04094c8b1f85757931"
+   },
+   {
+    "path": "qubit_cli/web_dist/fonts/RulesExpanded-Regular.woff2",
+    "local_sha256": "e8062ac4889b0f05de94035571e86991b6efd03539775cfe0790e37da75434db"
+   },
+   {
+    "path": "qubit_cli/web_dist/hermes-build.json",
+    "local_sha256": "296f4c7e20c82064cabd253f999a1f6ff10fdfb9c02710465b0ca21e0b75cb42"
+   },
+   {
+    "path": "qubit_cli/web_dist/index.html",
+    "local_sha256": "ee7febf9460819d3ea52ca3b02c402e5526b4188177e1d892691ff997973a86c"
    },
    {
     "path": "qubit_cli/web_host_terminal.py",
@@ -14543,7 +16875,7 @@
    },
    {
     "path": "tests/qubit_cli/test_gateway_chat.py",
-    "local_sha256": "8146574ad833a603aeca51238e96276cc341a527d7fe51490bf1b3eccb553cb5"
+    "local_sha256": "84e1dfb7c1c97fc6093e059d0520a8df92a13a15415970462c3c9efa20a7c2a8"
    },
    {
     "path": "tests/qubit_cli/test_gateway_chat_blocking_controls.py",
@@ -14555,7 +16887,7 @@
    },
    {
     "path": "tests/qubit_cli/test_gateway_chat_failures.py",
-    "local_sha256": "0f6b1e371f1f216c8d29b79e0ba58da3549d37ab0ac982d1fb07060e037b9f08"
+    "local_sha256": "86f11ecf4ed503313b52baec563e4320f422248dce7da115eac7e77570dcce71"
    },
    {
     "path": "tests/qubit_cli/test_gateway_chat_flags_live.py",
@@ -14796,6 +17128,10 @@
    {
     "path": "tests/qubit_cli/test_gateway_startup_validation.py",
     "local_sha256": "bee2d74a1f64cc4b297de55b327259cbf8987aa9122920c00f615157f717c0a3"
+   },
+   {
+    "path": "tests/qubit_cli/test_gateway_status_daemon_unit.py",
+    "local_sha256": "9eb0d3d7e35e06a5b60c08f65c62f67d76f0286ae3f7ba5b77b8d0ff7b2fd646"
    },
    {
     "path": "tests/qubit_cli/test_gateway_tools.py",
@@ -18907,11 +21243,11 @@
    },
    {
     "path": "ui-tui/dist/entry.js",
-    "local_sha256": "0a68816d06decb753b6d514955981c4994eb8f906e281fc576a40b9fefc93d22"
+    "local_sha256": "c24149e916b269d29f6d5a5d118e96311c4c32c3a7d98d6c20164df3a6a5804b"
    },
    {
     "path": "ui-tui/dist/hermes-build.json",
-    "local_sha256": "d6713b330f345d6317a43f8c874d8ce1048b3774c1a6b426c9389f79aeb7d2ea"
+    "local_sha256": "f8a395c6d4e6a110f37d5717f54f5791639148ec4013da89f31b3692eb236b15"
    },
    {
     "path": "ui-tui/scripts/bench-native-history.tsx",
@@ -19187,7 +21523,7 @@
    },
    {
     "path": "website/static/api/plugin-catalog.json",
-    "local_sha256": "3892b4393cf2cb80e760d35422fb3d520288ea0c2739d1330a10fe00ec103561"
+    "local_sha256": "5b35e2e68c3e9b391b5f744a64cc48ec765f4fcc0f7177f2864fef66b4eaf922"
    }
   ],
   "changed": [
@@ -20064,7 +22400,7 @@
     "upstream_path": "agent/display.py",
     "upstream_blob": "f317d25d7604601d3e2b877119c6c99467e959e0",
     "upstream_sha256": "e28e660cd7064b1f76c7f666178a174c6a695c8352336cb4e932612f646c3625",
-    "local_sha256": "bf3114dfa069f04869c59c2e497a2d9639b1f92bfce8248fd288848ca07aafcd"
+    "local_sha256": "ea5ea553f64754a9e0dc5c2039a06c5945d019635e277ef6658300d09570ac8a"
    },
    {
     "path": "agent/error_classifier.py",
@@ -28065,7 +30401,7 @@
     "upstream_path": "apps/desktop/src/lib/chat-runtime.ts",
     "upstream_blob": "363b188362ddc3c8b325116ac0bbba165e327d81",
     "upstream_sha256": "29596050f9416109ca110cda0f9e55f3e007b75dc687e8b134738d67aa87842f",
-    "local_sha256": "edbd077061ba3ba795a64a3b08be056fea163dc4cd30771561e3f7f94be2adc6"
+    "local_sha256": "f7ba58018d4caa86470223bd5f47f24e97701cd4f52e5bc5b2c7d467025ef4b8"
    },
    {
     "path": "apps/desktop/src/lib/cloud-agent-session.ts",
@@ -28681,7 +31017,7 @@
     "upstream_path": "apps/desktop/src/lib/speech-text.ts",
     "upstream_blob": "8504586f399c8ebe4464da9b27b80d4aaa21f127",
     "upstream_sha256": "0d4770b9b521476d5ff9fa668f9e8a9cd98c474ab864150f1d9c4230a838ffbd",
-    "local_sha256": "508eae39f13a960333e35dffa66406e05d0bc4eae6886f5bef572da5d4eb1c25"
+    "local_sha256": "67a127eba83370efa75f2a81d24a75c2ad84c35c319b4b7469f6ed582439fcd1"
    },
    {
     "path": "apps/desktop/src/lib/stale-transcript-guard.ts",
@@ -33630,7 +35966,7 @@
     "upstream_path": "locales/en.yaml",
     "upstream_blob": "28e4c1a38724e179a106c5756eaa024ddc479ad7",
     "upstream_sha256": "3d9f3259d36e9465e452388e894b168da1137ce95d8ca8249ea9d842628b9c58",
-    "local_sha256": "7b16d3ae6d11aff94974811029e5d1e6262f6efa66ffc78eef531e9020739df1"
+    "local_sha256": "8054b50fa51f5cd58f0e0f1396d5e3be453eba2f7980a15a69d1e806fbad34cf"
    },
    {
     "path": "locales/es.yaml",
@@ -38131,14 +40467,14 @@
     "upstream_path": "plugins/platforms/email/adapter.py",
     "upstream_blob": "c8e27c6955bd8bb8c0b6f5d9396ef4a84d2edd09",
     "upstream_sha256": "914246efd65158a1ce779d30ada8a7b6298da0d21271d90206cce449ca1d178e",
-    "local_sha256": "ddeec4ee7a1fd44334c71a36055f3a61b10ff23ab9152895c6b8c90561e6b059"
+    "local_sha256": "d27c692a75fa7f9ff4588a09eaa250087cedcd325ee496921b8544cd78dce6bb"
    },
    {
     "path": "plugins/platforms/email/plugin.yaml",
     "upstream_path": "plugins/platforms/email/plugin.yaml",
     "upstream_blob": "8e9ca3d877b9ba373b4ee7f59eef05dff3cce056",
     "upstream_sha256": "1c06d3479fb17b2aaabf89c8c3e97071f35d8da56e2c09302e0efaf72bcde618",
-    "local_sha256": "129d43e2d51b3b92dbf08e6f89be8cdecf19e4e0bf50003aabdd8ae9dfb82b3c"
+    "local_sha256": "8dcaccca3e2146029c17f3bf65c0f7819fa813d12014a9c06ad05d5200642016"
    },
    {
     "path": "plugins/platforms/feishu/adapter.py",
@@ -39195,7 +41531,7 @@
     "upstream_path": "hermes_cli/_parser.py",
     "upstream_blob": "dfa4bb301543fb6913c3713cbfecb6f61b79cb63",
     "upstream_sha256": "ee74d5f36e474e3ff6a3b248cbe0ae0f7f53af781f48b5c0c795d280671d187c",
-    "local_sha256": "b66c691cbfe702d7a8c37e1512d67f55f6176b9c89d0357a2cf2dadca583e4c0"
+    "local_sha256": "66bdf9044361d2b327945b5ffa0463bb6bf7412192827d0379dc7625c8856b4f"
    },
    {
     "path": "qubit_cli/_secrets_common.py",
@@ -40224,7 +42560,7 @@
     "upstream_path": "hermes_cli/gateway.py",
     "upstream_blob": "6410d392e078c276d56a476c28e38534c802da51",
     "upstream_sha256": "771375a6f8053ef6f80df97acaed4c09b54b9889e0ccb0a08fec7dd052c1c3b0",
-    "local_sha256": "3125771407ebaa35aab5d9437e45a81c890d97c71045850ae21ad38c34b6d0af"
+    "local_sha256": "f61dd2529365b3f7b12f4bd2272062447975bb7158ad521e67de3f6dd8c688b9"
    },
    {
     "path": "qubit_cli/gateway_command_errors.py",
@@ -40763,7 +43099,7 @@
     "upstream_path": "hermes_cli/main_tui_launch.py",
     "upstream_blob": "30983fe4405312da9a45f343c45300f6f62530f3",
     "upstream_sha256": "1fd47fc76c8bcce36c52a5035ebaf589dfff133e932de1827c5a5e61e7bcc458",
-    "local_sha256": "6af00dc8602154c153be7448758f0c22f9ea9e8a00680c465ea78c1567572f85"
+    "local_sha256": "a9f5c5707b92d213bfa032ac7ea27cd875596bccc9bb230d6af16caf49ae0cec"
    },
    {
     "path": "qubit_cli/main_web_build.py",
@@ -41148,7 +43484,7 @@
     "upstream_path": "hermes_cli/oneshot.py",
     "upstream_blob": "96c8227fad4af005a19adc4c82e1338ef2e5f20f",
     "upstream_sha256": "c62b7b55baa87416194a534a44d95fe104347996e79bf5350a401a36195443ad",
-    "local_sha256": "c7893e62265edfc262725eb8b9e5760bc4136a6dee1b2956af1eec5749531517"
+    "local_sha256": "2cbdfd160eeba4d04b681b002a7787523591c1083341fe55bdfaeed8f98dc679"
    },
    {
     "path": "qubit_cli/pairing.py",
@@ -41708,7 +44044,7 @@
     "upstream_path": "hermes_cli/send_cmd.py",
     "upstream_blob": "80739e78d6ad8d8764e358307168c41d41135b4d",
     "upstream_sha256": "7a0bfae4da94e0cc70735c635eee52fb35722d983e96a5f22702f3f82dec2cc3",
-    "local_sha256": "aa15c22357d9e87e00c82e7a9f7dd3a4a7941c74ca14b53ccc7d1ab240e7501a"
+    "local_sha256": "dd3eafa0bc0bbef348d3053b99f3fba125a5f36801691035542617c00b4d3eb4"
    },
    {
     "path": "qubit_cli/service_manager.py",
@@ -42009,7 +44345,7 @@
     "upstream_path": "hermes_cli/status.py",
     "upstream_blob": "aeaa2ebcac7b59d14d06329e1e3b8f89a54a51a0",
     "upstream_sha256": "ddfe63e786fc142d700fc530836c872fd01002c8ea9736eae7293e6318d6d90e",
-    "local_sha256": "570aff41259ae63203d5bbd53883f8a04df16603a9ac07cf5cbf21b94409705e"
+    "local_sha256": "04adc91c4cbef63814614258d1bea366fa5aa241be7c4cece95076698bbd589c"
    },
    {
     "path": "qubit_cli/status_auth.py",
@@ -52439,7 +54775,7 @@
     "upstream_path": "tests/gateway/test_email.py",
     "upstream_blob": "06be3037425ba3e4a2e3c157df3b03b7b28b4b2e",
     "upstream_sha256": "f80295c9eaa7e850a71c5b79e1a7097b323e618216692b61701595133ec9ff8b",
-    "local_sha256": "79bf359aa287c3a2f440a583de1d34eae6fd93f5db23575541e33db719319d69"
+    "local_sha256": "cb81472435bf4ef340fbd6a67d5299e151eda359b419d317f7e59b6a4eaef1b6"
    },
    {
     "path": "tests/gateway/test_email_imap_id_protocol.py",
@@ -59173,7 +61509,7 @@
     "upstream_path": "tests/hermes_cli/test_exit_summary_resume_hint.py",
     "upstream_blob": "997d39bf899b8dcb5c1f68efa31b2660f28c9fee",
     "upstream_sha256": "2f38a4536d835dbc4d23ee4444110d3cd0e3a8bdc691a3912ae0fa4b43b59941",
-    "local_sha256": "a76eb4df038e886b217d0016bff5200dd6c5dda7819a1c6e8529d804d008e7dc"
+    "local_sha256": "512855cd1d1bb407c0d6515a90fbc66d7f8ccd4e0075d66c464b2171cf2f47f9"
    },
    {
     "path": "tests/qubit_cli/test_external_process_auth_status.py",
@@ -61812,7 +64148,7 @@
     "upstream_path": "tests/hermes_cli/test_platform_plugin_env_injection.py",
     "upstream_blob": "349879fe7e4fb8382d4b442fea0b216a64465ede",
     "upstream_sha256": "317ce9df095ee4777345ea42eb462460a01ebd02837c130daf5d7004e3b4695a",
-    "local_sha256": "eada271ab224622d256fe61a782d0e95882b1d608f5239c2fac9847849419d2e"
+    "local_sha256": "a6db9a7ac78c352978e9829b42670b08632b4cfd035586f2f42beba09fb57d26"
    },
    {
     "path": "tests/qubit_cli/test_plugin_api_compat.py",
@@ -74566,7 +76902,7 @@
     "upstream_path": "ui-tui/src/__tests__/reasoning.test.ts",
     "upstream_blob": "5d661e0059d1ab9f585ebbee35bbf0c755b91d78",
     "upstream_sha256": "50ac7670535720e5a6ced8a9b864030c49f89414ed82a8419cc48b083fccd388",
-    "local_sha256": "39fd7b894be3d2380c39579e18ca962454d6dde95667abc73b4aee7cfe4d41f8"
+    "local_sha256": "6c165ab41ed7cbe807c73a2a72ebac36e46c32f19eb89512df3f1ad9afb92100"
    },
    {
     "path": "ui-tui/src/__tests__/scrollBoxRendererBounds.test.ts",
@@ -75322,7 +77658,7 @@
     "upstream_path": "ui-tui/src/content/verbs.ts",
     "upstream_blob": "41b441d5cd6aba237be436ce1d145b4295dbcc8c",
     "upstream_sha256": "c01678bfe9b9d93d6e15c910f52324219694a03431c0906f7313a801424d378c",
-    "local_sha256": "9509723dfe3516f5af67059bf0ae3c63707e4499d8a2b636f626e182ccc9a935"
+    "local_sha256": "3d644b4d3804415ad7f0e332293fbed50e29431b89f9990ea7e2ec0a690f896d"
    },
    {
     "path": "ui-tui/src/domain/attachments.ts",
@@ -77653,7 +79989,7 @@
     "upstream_path": "website/docs/user-guide/messaging/email.md",
     "upstream_blob": "16ac4251c04a50e833e1ea88f353818117d39280",
     "upstream_sha256": "a9d1ef01881eca9a406e769f9968b0d91e2c49234165932138779109706c0e90",
-    "local_sha256": "40c73b38f075a2835759d52fbf119b34f8985cfec2492176f7b86babb9164fc8"
+    "local_sha256": "e64472453734bc88ffea95878240c3432e451c78ad3541bf00828dd33d17a5cf"
    },
    {
     "path": "website/docs/user-guide/messaging/feishu.md",
