@@ -716,6 +716,7 @@ export default function SkillsPage() {
                 Local file or directory
               </label>
               <Input
+                aria-label="Local file or directory to learn from"
                 placeholder="~/projects/some-sdk  (read with read_file / search_files)"
                 value={learnDir}
                 onChange={(e) => setLearnDir(e.target.value)}

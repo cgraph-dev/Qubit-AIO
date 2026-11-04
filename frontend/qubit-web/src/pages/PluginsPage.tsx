@@ -1121,6 +1121,7 @@ export default function PluginsPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Input
                 className="max-w-sm"
+                aria-label="Search the plugin catalog"
                 placeholder={
                   t.pluginsPage.catalogSearchPlaceholder ??
                   "Search the catalog by name, description, or tool…"
