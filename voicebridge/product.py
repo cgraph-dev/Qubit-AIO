@@ -31,8 +31,9 @@ Design rules (all hermetic by default):
   ``voicebridge webui --open`` command that never starts a second bridge or
   listener and never places a token in a URL, argument, or file.
 - No token, secret, cookie, private URL, or raw audio ever appears in output.
-- Linux uses XDG locations; macOS/Windows return an explicit UNSUPPORTED
-  result before any install step.
+- Linux uses XDG locations. macOS is explicit core-only support (runtime/CLI/
+  dashboard + launchd gateway; voice remains UNSUPPORTED), and Windows returns
+  an explicit UNSUPPORTED result before any install step.
 - The wheel still contains Python implementation source: private-source
   distribution is NOT solved by this packet and is reported as a release
   blocker for that goal (obfuscation is not security).
@@ -133,13 +134,38 @@ def _fsync_file(path: Path) -> None:
 # 1. Portable path resolver
 # ---------------------------------------------------------------------------
 def platform_supported() -> Dict[str, Any]:
-    """Linux is the supported target; macOS/Windows return UNSUPPORTED
-    explicitly before any install step."""
-    if platform.system() == "Linux":
-        return {"state": "OK", "detail": f"Linux {platform.machine()}"}
+    """Report the platform support boundary explicitly.
+
+    Linux is the full install target. macOS is a PARTIAL target: the core
+    runtime/CLI/dashboard and the messaging-gateway LaunchAgent are supported,
+    while the voice bridge, push-to-talk hotkey, orb and voice-typing stay
+    UNSUPPORTED. Windows remains UNSUPPORTED. This product installer is the
+    voice product's installer, so ``install_steps`` still refuses a host whose
+    ``voice_supported`` is false (it must never stage a voice install it cannot
+    run)."""
+    system = platform.system()
+    if system == "Linux":
+        return {"state": "OK",
+                "detail": f"Linux {platform.machine()}",
+                "core_supported": True,
+                "voice_supported": True,
+                "gateway_manager": "systemd"}
+    if system == "Darwin":
+        return {"state": "PARTIAL",
+                "detail": "macOS: core runtime/CLI/dashboard and the gateway "
+                          "launchd LaunchAgent (ai.qubit.gateway*.plist under "
+                          "~/Library/LaunchAgents) are supported; the voice "
+                          "bridge, hotkey, orb and voice-typing are "
+                          "UNSUPPORTED on macOS and were not installed",
+                "core_supported": True,
+                "voice_supported": False,
+                "gateway_manager": "launchd"}
     return {"state": "UNSUPPORTED",
-            "detail": f"{platform.system()} is not a supported install target "
-                      f"(Linux/XDG only); no install step was run"}
+            "detail": f"{system} is not a supported install target "
+                      f"(Linux full, macOS core-only); no install step was run",
+            "core_supported": False,
+            "voice_supported": False,
+            "gateway_manager": None}
 
 
 def _xdg(env: str, default: str) -> Path:
@@ -641,7 +667,10 @@ def install_steps(paths: Optional[ProductPaths] = None, *,
     written (the only external interaction is read-only capability probing,
     which is injectable in tests)."""
     plat = platform_supported()
-    if plat["state"] == "UNSUPPORTED":
+    # The voice product is blocked whenever voice is unsupported (macOS is
+    # core-only; its supported core is installed by scripts/install.sh).
+    if plat["state"] == "UNSUPPORTED" or not plat.get(
+            "voice_supported", plat["state"] == "OK"):
         return [{"step": "platform", "state": "UNAVAILABLE",
                  "detail": plat["detail"]}]
     paths = paths or default_paths()
@@ -1804,6 +1833,21 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
     ``unit_dir`` is only used in hermetic tests to point at an isolated
     systemd user-unit directory; production resolves the real user unit."""
     paths = paths or default_paths()
+    if platform.system() == "Darwin":
+        return {
+            "state": "UNAVAILABLE",
+            "detail": ("macOS gateway supervision uses launchd, not systemd. "
+                       "Install the core gateway LaunchAgent with "
+                       "scripts/install_launchd_unit.sh "
+                       "(~/Library/LaunchAgents/ai.qubit.gateway*.plist). The "
+                       "voice bridge/systemd user unit is unsupported on macOS."),
+            "owner": "launchd (ai.qubit.gateway*.plist)",
+            "manager": "launchd",
+            "one_service_one_listener": True,
+            "tray_starts_second_bridge": False,
+            "shortcut_starts_second_bridge": False,
+            "platform": platform_supported(),
+        }
     if platform.system() != "Linux":
         return {"state": "UNAVAILABLE",
                 "detail": "systemd user units are Linux-only"}

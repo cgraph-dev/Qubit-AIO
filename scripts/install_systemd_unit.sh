@@ -16,6 +16,13 @@
 #        to $HOME/.config/systemd/user; override for hermetic tests/deploys)
 set -eu
 
+HOST_SYSTEM="$(uname -s 2>/dev/null || echo unknown)"
+if [ "$HOST_SYSTEM" = "Darwin" ]; then
+    echo "UNSUPPORTED_PLATFORM: systemd user units are Linux-only." >&2
+    echo "  macOS uses the gateway LaunchAgent: scripts/install_launchd_unit.sh" >&2
+    exit 2
+fi
+
 REPO="${1:?usage: install_systemd_unit.sh <repo-root>}"
 UNIT_NAME="${SYSTEMD_UNIT_NAME:-qubit-voicebridge.service}"
 

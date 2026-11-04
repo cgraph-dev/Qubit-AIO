@@ -485,7 +485,9 @@ check_platform() {
     fi
     case "$(uname -s 2>/dev/null)" in
         Linux*) : ;;
-        Darwin*) : ;;
+        Darwin*)
+            log "macOS core install: runtime/CLI/dashboard + gateway LaunchAgent (ai.qubit.gateway*.plist); the voice bridge, hotkey, orb and voice-typing are UNSUPPORTED on macOS"
+            ;;
         *) fail "unsupported platform: $(uname -s). On Windows use install.ps1." unsupported_platform ;;
     esac
 }
