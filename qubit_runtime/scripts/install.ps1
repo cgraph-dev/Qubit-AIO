@@ -20,6 +20,7 @@
 param(
     [string]$Branch = "main",
     [string]$Commit = "",
+    [Alias('HermesHome')]
     [string]$QubitHome = $(if ($env:QUBIT_HOME) { $env:QUBIT_HOME } else { "$env:LOCALAPPDATA\qubit" }),
     [string]$InstallDir = $(if ($env:QUBIT_HOME) { "$env:QUBIT_HOME\qubit" } else { "$env:LOCALAPPDATA\qubit\qubit" }),
     [switch]$Manifest,

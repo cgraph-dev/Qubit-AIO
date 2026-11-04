@@ -32,7 +32,7 @@
 
 [CmdletBinding(PositionalBinding = $false)]
 param(
-    [Alias('Home')]
+    [Alias('Home', 'HermesHome')]
     [string]$QubitHome = $(if ($env:QUBIT_HOME) {
             $env:QUBIT_HOME
         } elseif ($env:LOCALAPPDATA) {
