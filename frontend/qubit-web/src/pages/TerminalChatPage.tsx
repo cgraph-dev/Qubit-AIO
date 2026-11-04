@@ -34,6 +34,7 @@ import { PlateModuleHead } from "@/components/PlateModuleHead";
 import { ChatSessionArtifacts } from "@/components/ChatSessionArtifacts";
 import { PluginSlot } from "@/plugins";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { createPtyCompositionForwarder } from "@/lib/pty-composition";
 import { shouldRestoreTerminalFocus } from "@/lib/pty-focus";
 import { PtyResumeSanitizer } from "@/lib/pty-resume-sanitizer";
@@ -369,6 +370,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Right-side panel (model control + status + sessions), collapsible and open
   // by default, matching the Qubit `/qubit-chat` ChatPage panel.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  // The side panel plays the SAME backdrop file as the nav rail. Two elements
+  // on one duration lock in phase within seconds, which reads as one pulsing
+  // animation instead of two plates — so this one starts mid-clip and runs a
+  // hair faster, keeping them permanently out of step.
+  const rightBackdropRef = useBackdropPhase(7.5, { rate: 1.03 });
   // Bumped after a New chat so `ChatSessionList` remounts and refetches,
   // surfacing the freshly created session once the TUI registers it (its
   // internal fetch only runs on mount / manual Refresh).
@@ -1545,6 +1551,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 is what actually carries label contrast. */}
             <div className="qchat-side__backdrop" aria-hidden="true">
               <video
+                ref={rightBackdropRef}
                 autoPlay
                 disablePictureInPicture
                 loop

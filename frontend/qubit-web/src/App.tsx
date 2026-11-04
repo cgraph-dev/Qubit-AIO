@@ -74,6 +74,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { QubitMark } from "@/components/QubitMark";
 import { QubitAtomLoader } from "@/components/QubitAtomLoader";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
@@ -710,6 +711,10 @@ export default function App() {
   const { manifests, loading: pluginsLoading } = usePlugins();
   const { theme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // The right-hand panel plays this same file; two elements on one duration
+  // fall into lockstep and the two rails pulse together. Starting here at 0
+  // and letting the panel pick its own offset + rate keeps them out of phase.
+  const railBackdropRef = useBackdropPhase(0, { rate: 0.97 });
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   const [collapsed, setCollapsed] = useState(() => {
@@ -993,6 +998,7 @@ export default function App() {
                 labels keep their contrast on any theme. */}
             <div className="qagent-sidebar__backdrop" aria-hidden="true">
               <video
+                ref={railBackdropRef}
                 autoPlay
                 disablePictureInPicture
                 loop
