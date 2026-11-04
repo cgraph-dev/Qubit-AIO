@@ -65,12 +65,13 @@ jobs:
       - name: Build the dashboard bundle
         run: bash scripts/build_dashboard.sh
       - name: Prepare and verify release assets
+        env:
+          VERIFY: ${{ inputs.verify }}
         run: |
           set -euo pipefail
-          python3 scripts/prepare_production_release.py \
-            --out "$RUNNER_TEMP/qubit-production-release" \
-            --tag "${{ inputs.tag }}" \
-            --verify
+          args=(--out "$RUNNER_TEMP/qubit-production-release" --tag "${{ inputs.tag }}")
+          if [ "$VERIFY" = "true" ]; then args+=(--verify); fi
+          python3 scripts/prepare_production_release.py "${args[@]}"
       - name: Upload the prepared assets
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
