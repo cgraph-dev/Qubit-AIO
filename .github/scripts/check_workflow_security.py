@@ -8,7 +8,8 @@ security properties that YAML syntax cannot express:
 * a `concurrency` group;
 * no `pull_request_target`;
 * no self-hosted runners in a `pull_request` workflow;
-* no `secrets.*` references in the managed release surface;
+* no `secrets.*` references outside the explicit `SECRET_WORKFLOWS`
+  allowlist (currently only the environment-gated promotion workflow);
 * every remote action pinned to a full 40-hex commit SHA, and every Docker
   action pinned to a sha256 digest (local `./` actions are allowed);
 * a `v*`-tag release workflow creates drafts only (`gh release create --draft`).
@@ -34,6 +35,13 @@ LEGACY_WORKFLOWS = {
     "qubit-ci.yml",
     "windows-ci.yml",
     "windows-install-update-e2e.yml",
+}
+
+#: Workflows allowed to read repository secrets, and the exact secret names
+#: they may read. Every entry must be a manually dispatched workflow with a
+#: protected environment; nothing here runs on pull requests.
+SECRET_WORKFLOWS = {
+    "promote-public.yml": {"QUBIT_PUBLIC_PUSH_TOKEN"},
 }
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -125,9 +133,15 @@ def check_pins(doc: dict, path: Path, errors: list[str]) -> None:
 
 
 def check_secrets(doc: dict, path: Path, errors: list[str]) -> None:
+    allowed = SECRET_WORKFLOWS.get(path.name, set())
     for text in all_strings(doc):
-        if SECRET_REF.search(text):
-            errors.append(f"{path.name}: managed workflow references a secret: {text.strip()[:120]}")
+        match = SECRET_REF.search(text)
+        if not match:
+            continue
+        name = match.group(0).split(".", 1)[1]
+        if name in allowed:
+            continue
+        errors.append(f"{path.name}: managed workflow references a secret: {text.strip()[:120]}")
 
 
 def check_pull_request(doc: dict, path: Path, errors: list[str]) -> None:

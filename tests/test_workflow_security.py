@@ -33,7 +33,12 @@ NEW_MANAGED = {
     "install-e2e.yml",
     "lazy-deps-guard.yml",
     "osv-scanner.yml",
+    "promote-public.yml",
     "promote-release.yml",
+}
+
+EXPECTED_SECRET_WORKFLOWS = {
+    "promote-public.yml": {"QUBIT_PUBLIC_PUSH_TOKEN"},
 }
 
 
@@ -106,6 +111,21 @@ def test_managed_workflows_never_reference_repository_secrets():
         errors: list[str] = []
         POLICY_MODULE.check_secrets(doc, path, errors)
         assert not errors, errors
+
+
+def test_secret_allowlist_is_exact_and_environment_gated():
+    assert POLICY_MODULE.SECRET_WORKFLOWS == EXPECTED_SECRET_WORKFLOWS
+    for name, secrets in EXPECTED_SECRET_WORKFLOWS.items():
+        path = WORKFLOWS / name
+        assert path.is_file(), name
+        doc = POLICY_MODULE.load(path)
+        assert "workflow_dispatch" in POLICY_MODULE.trigger_names(doc), name
+        assert "pull_request" not in POLICY_MODULE.trigger_names(doc), name
+        # Every job that can read an allowed secret must be environment-gated.
+        for job_name, job in _jobs(doc):
+            text = "\n".join(POLICY_MODULE.all_strings(job))
+            if any("secrets." + secret in text for secret in secrets):
+                assert job.get("environment"), (name, job_name)
 
 
 def test_pull_request_workflows_are_hosted_read_only_and_bounded():
@@ -211,3 +231,19 @@ def test_policy_rejects_a_promote_workflow_that_could_create_a_tag():
     errors = []
     POLICY_MODULE.check_promote_shape(unsafe, Path("promote-release.yml"), errors)
     assert any("--verify-tag" in error for error in errors), errors
+
+
+def test_promote_public_is_manual_and_apply_is_environment_gated():
+    path = WORKFLOWS / "promote-public.yml"
+    doc = POLICY_MODULE.load(path)
+    triggers = POLICY_MODULE.trigger_names(doc)
+    assert "workflow_dispatch" in triggers
+    assert "pull_request" not in triggers
+    apply_job = doc["jobs"]["apply"]
+    assert apply_job["environment"] == "public-production"
+    assert apply_job["if"] == "${{ inputs.apply }}"
+    text = path.read_text(encoding="utf-8")
+    assert "scripts/promote_public_release.py" in text
+    assert "--apply" in text
+    assert "refs/heads/main" not in text
+    assert "--branch main" not in text

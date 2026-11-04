@@ -1,0 +1,138 @@
+name: promote-public
+
+# Repeatable Qubit-AIO -> cgraph-dev/Qubit promotion.
+#
+# Dry-run is the default. The apply job is gated behind the protected
+# `public-production` environment and only ever updates `production` with an
+# explicit `--force-with-lease`. `main` is refused by the script before any
+# network write. This workflow never touches Qubit-AIO itself.
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Qubit-AIO commit or ref to export
+        required: true
+        default: main
+      version:
+        description: Release version written to VERSION/pyproject
+        required: true
+        default: "0.0.1"
+      tag:
+        description: Release tag (empty = v<version>)
+        required: false
+        default: ""
+      apply:
+        description: Push the seed to cgraph-dev/Qubit production
+        type: boolean
+        default: false
+      push_tag:
+        description: Also push the release tag (never forced)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-public-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Build and verify the promotion (dry-run)
+    if: ${{ !inputs.apply }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Qubit-AIO
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Build the seed and report changed paths
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          args=(
+            --source-commit "$SOURCE_COMMIT"
+            --version "$VERSION"
+            --dest /tmp/qubit-promote
+            --remote-url https://github.com/cgraph-dev/Qubit.git
+            --report /tmp/qubit-promote-report.md
+          )
+          if [ -n "$TAG" ]; then args+=(--tag "$TAG"); fi
+          python3 scripts/promote_public_release.py "${args[@]}"
+      - name: Upload the promotion report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: promote-public-report
+          path: |
+            /tmp/qubit-promote-report.md
+            /tmp/qubit-promote-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  apply:
+    name: Promote to cgraph-dev/Qubit production
+    if: ${{ inputs.apply }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Manual approval gate and environment-scoped push token. No other job in
+    # this workflow may read this secret.
+    environment: public-production
+    steps:
+      - name: Checkout Qubit-AIO
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Configure the public push credential
+        env:
+          PUSH_TOKEN: ${{ secrets.QUBIT_PUBLIC_PUSH_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$PUSH_TOKEN"
+          # Keep the token out of argv; git rewrites the clean URL at request
+          # time. The credential lives only in this runner's git config.
+          git config --global \
+            url."https://x-access-token:${PUSH_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+      - name: Build the seed and update production
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
+          PUSH_TAG: ${{ inputs.push_tag }}
+        run: |
+          set -euo pipefail
+          args=(
+            --source-commit "$SOURCE_COMMIT"
+            --version "$VERSION"
+            --dest /tmp/qubit-promote
+            --remote-url https://github.com/cgraph-dev/Qubit.git
+            --report /tmp/qubit-promote-report.md
+            --apply
+          )
+          if [ -n "$TAG" ]; then args+=(--tag "$TAG"); fi
+          if [ "$PUSH_TAG" = "true" ]; then args+=(--push-tag); fi
+          python3 scripts/promote_public_release.py "${args[@]}"
+      - name: Upload the promotion report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: promote-public-applied-report
+          path: |
+            /tmp/qubit-promote-report.md
+            /tmp/qubit-promote-report.json
+          if-no-files-found: warn
+          retention-days: 30
