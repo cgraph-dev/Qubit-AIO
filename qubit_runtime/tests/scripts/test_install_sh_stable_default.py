@@ -1,6 +1,6 @@
 """A new or rerun install of the official repository lands on the latest stable release.
 
-`hermes update` already follows stable for an official checkout that never chose a channel;
+`qubit update` already follows stable for an official checkout that never chose a channel;
 the installer has to put a fresh install there too, or new users start on main's tip. The
 official URL is redirected to a local origin and `curl` answers the release lookup.
 """
@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-OFFICIAL = "https://github.com/NousResearch/hermes-agent.git"
+OFFICIAL = "https://github.com/cgraph-dev/Qubit.git"
 
 pytestmark = pytest.mark.platforms("posix")
 
@@ -32,14 +32,14 @@ def _git(cwd, *args, env=None):
     (False, None, [], False, None),                     # release tag unreachable: fail, publish nothing
     (False, "before", [], False, "before"),             # ... a rerun keeps its checkout instead
     # The release cut on a release branch, main past the fork point (v0.22.2's shape): main moves
-    # back only through `hermes update`, whose downgrade guard the installer cannot run.
+    # back only through `qubit update`, whose downgrade guard the installer cannot run.
     (True, "tip", [], True, "tip"),
     (True, "tip", ["--channel", "stable"], True, "tip"),
     (True, "before", [], True, "release"),
 ])
 def test_install_lands_on_the_latest_stable_release(tmp_path, side, start, args, tagged, lands):
     origin, home, bin_dir = tmp_path / "origin", tmp_path / "home", tmp_path / "bin"
-    install = home / ".hermes" / "hermes-agent"
+    install = home / ".qubit" / "qubit"
     for d in (origin, home, bin_dir):
         d.mkdir()
     _git(origin, "init", "-q", "-b", "main")
@@ -67,7 +67,7 @@ def test_install_lands_on_the_latest_stable_release(tmp_path, side, start, args,
 
     result = subprocess.run(
         ["bash", str(ROOT / "scripts" / "install.sh"), "--stage", "repository", "--dir", str(install),
-         "--hermes-home", str(home / ".hermes"), "--non-interactive", *args],
+         "-QubitHome", str(home / ".qubit"), "--non-interactive", *args],
         check=False, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120, env=env,
     )
 
