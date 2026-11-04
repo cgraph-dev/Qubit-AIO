@@ -154,11 +154,16 @@ def test_install_time_docs_are_packaged_under_package_data():
     ``voicebridge/_data/docs`` for the resolver fallback.
     """
     include = _targets()[0]["force-include"]
-    # source docs moved to docs/archive/2026-09-21/ in the docs reorg; the
-    # installed resource names (``_data/docs/<name>``) are unchanged.
+    # The installed resource names (``_data/docs/<name>``) are the contract;
+    # the source path is an implementation detail. The two JSON catalog records
+    # live under docs/archive/2026-09-21/, while MIGRATIONS.md is now sourced
+    # from the re-authored docs/README.md (the archive markdown was purged).
+    sources = {dest: src for src, dest in include.items()}
     for name in ("PARITY_HERMES.json", "MATRIX_8T_F.json", "MIGRATIONS.md"):
-        source = f"docs/archive/2026-09-21/{name}"
-        assert include.get(source) == f"voicebridge/_data/docs/{name}", source
+        dest = f"voicebridge/_data/docs/{name}"
+        source = sources.get(dest)
+        assert source, f"{name} is not force-included under {dest}"
+        assert (REPO / source).is_file(), f"{name} source missing: {source}"
 
 
 # ===========================================================================

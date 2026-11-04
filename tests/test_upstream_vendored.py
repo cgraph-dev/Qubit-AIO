@@ -293,6 +293,12 @@ def test_matrix_complete_and_honest():
         f"final parity leaves no BLOCKED rows: {[r['id'] for r in matrix['rows'] if r['status'] == 'BLOCKED']}"
     assert "REJECTED" not in {r["status"] for r in matrix["rows"]}, \
         "final parity leaves no REJECTED rows; unsafe variants stay refused by typed errors + absence tests"
-    companion = (REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.md").read_text()
+    companion = REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.md"
+    if not companion.is_file():
+        # The companion markdown was purged with the archive markdown
+        # (eafb54e26) and must not be re-authored; the JSON record above is the
+        # surviving authority.
+        return
+    companion_text = companion.read_text(encoding="utf-8")
     for row in matrix["rows"]:
-        assert row["id"] in companion, f"id missing from MD: {row['id']}"
+        assert row["id"] in companion_text, f"id missing from MD: {row['id']}"
