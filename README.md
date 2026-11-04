@@ -413,6 +413,18 @@ a reproducibility comparison. Quick hermetic smoke:
 python scripts/release_qualify.py --static --json   # no network
 qubit package certify                          # same, via the CLI
 python scripts/clean_venv_check.py --install         # opt-in clean-venv install
+
+# Artifact-install E2E: install a built wheel into a throwaway venv/HOME and
+# probe the INSTALLED artifact (entry points, qubit --version, dashboard
+# assets, GET /api/health, vendored runtime). Typed PASS/FAIL/DEGRADED and a
+# JSON report; the live QUBIT_HOME/HERMES_HOME is snapshotted and guarded.
+python scripts/artifact_install_e2e.py --build --require-network \
+    --require-clean --report dist/artifact-install-e2e.json
+# or test an already-built release wheel without rebuilding:
+python scripts/artifact_install_e2e.py --wheel dist/qubit_voicebridge-*.whl
+# minimal install profile (no dashboard assets, no model writes):
+python scripts/artifact_install_e2e.py --wheel ... \
+    --without-dashboard --without-models --profile minimal
 ```
 
 ## License / scope
