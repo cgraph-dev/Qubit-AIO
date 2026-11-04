@@ -6,7 +6,7 @@ type RequestGateway = <T>(method: string, params?: Record<string, unknown>) => P
 
 /** A backend predating #122899 (contract without `cwd_explicit`) rejects the
  *  whole create at admission (`tui_gateway/contracts/registry.py::validate_params`,
- *  code 4000, handler never runs) — e.g. a Hermes Cloud backend behind a
+ *  code 4000, handler never runs) — e.g. a Qubit Cloud backend behind a
  *  Desktop that updates from main (#128971). Those backends always honoured the
  *  client `cwd`, so resending without the flag reproduces their behaviour.
  *  Matched on the stable prefix, not `isOutOfSyncRpcParams`: v0.21.3 already

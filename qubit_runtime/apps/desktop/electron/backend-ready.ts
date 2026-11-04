@@ -120,7 +120,7 @@ function waitForDashboardPort(
           cleanup()
           reject(
             new Error(
-              `Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)${deadline ? ' while an update completion was in progress' : ''}`
+              `Timed out waiting for Qubit backend port announcement (${timeoutMs}ms)${deadline ? ' while an update completion was in progress' : ''}`
             )
           )
         },

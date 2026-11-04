@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, NoReturn, Optional, Set
 
+from qubit_cli import install_source as _install_source
 from qubit_cli.cli_output import print_info as _print_info
 from qubit_cli.colors import Colors, color
 from qubit_cli.config import cfg_get, load_config, save_config, get_env_value
@@ -1154,7 +1155,7 @@ def tools_command(args=None, first_install: bool = False, config: dict | None = 
     print(color("☤ Qubit Tool Configuration", Colors.CYAN, Colors.BOLD))
     print(color("  Enable or disable tools per platform.", Colors.DIM))
     print(color("  Tools that need API keys will be configured when enabled.", Colors.DIM))
-    print(color("  Guide: https://hermes-agent.nousresearch.com/docs/user-guide/features/tools", Colors.DIM))
+    print(color(f"  Guide: {_install_source.docs_url('user-guide/features/tools')}", Colors.DIM))
     print()
     if first_install:
         _first_install_flow(config, enabled_platforms)
@@ -1199,5 +1200,5 @@ def tools_command(args=None, first_install: bool = False, config: dict | None = 
     print()
     from qubit_constants import display_qubit_home
     print(color(f"  Tool configuration saved to {display_qubit_home()}/config.yaml", Colors.DIM))
-    print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
+    print(color("  Changes take effect on next 'qubit' or gateway restart.", Colors.DIM))
     print()

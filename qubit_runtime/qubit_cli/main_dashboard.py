@@ -754,16 +754,24 @@ def _read_ssh_session_token_file(path: str) -> str:
     if not os.path.isabs(path):
         raise SystemExit("--ssh-session-token-file must be absolute")
 
-    # The Desktop client writes the token under the account's $HOME/.hermes/
-    # desktop-ssh, independent of QUBIT_HOME and the active profile. Anchor
-    # validation there, NOT get_qubit_home(): a non-default profile or a Docker
-    # /opt/data root re-homes get_qubit_home() and would reject every token.
-    # See #69551.
-    token_root = Path.home() / ".hermes" / "desktop-ssh"
-    try:
-        relative = Path(path).relative_to(token_root)
-    except ValueError as exc:
-        raise SystemExit("--ssh-session-token-file must be under the desktop-ssh directory") from exc
+    # The Desktop client writes the token under the account's
+    # ``$HOME/.qubit/desktop-ssh`` (the pre-rebrand ``$HOME/.hermes`` spelling is
+    # accepted read-old for an installed older client), independent of
+    # QUBIT_HOME and the active profile. Anchor validation there, NOT
+    # get_qubit_home(): a non-default profile or a Docker /opt/data root
+    # re-homes get_qubit_home() and would reject every token. See #69551.
+    token_root = None
+    relative = None
+    for candidate in (Path.home() / ".qubit" / "desktop-ssh",
+                      Path.home() / ".hermes" / "desktop-ssh"):
+        try:
+            relative = Path(path).relative_to(candidate)
+        except ValueError:
+            continue
+        token_root = candidate
+        break
+    if token_root is None or relative is None:
+        raise SystemExit("--ssh-session-token-file must be under the desktop-ssh directory")
     if len(relative.parts) != 2 or not re.fullmatch(r"[0-9a-f]{32}", relative.parts[0]):
         raise SystemExit("--ssh-session-token-file has an invalid runtime path")
     if not re.fullmatch(r"[0-9a-f]{16}\.token", relative.parts[1]):

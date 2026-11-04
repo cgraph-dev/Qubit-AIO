@@ -132,7 +132,13 @@ def systemd_unit_qubit_home(scope_cmd: list, svc_name: str) -> str | None:
         if sep and key == "QUBIT_HOME" and value.strip():
             return value.strip()
     if "--user" in scope_cmd:
-        return str(Path.home() / ".hermes")
+        # A user unit with no ``QUBIT_HOME`` runs on the account's Qubit-owned
+        # platform default. Never attribute it to the pre-rebrand ``~/.hermes``.
+        try:
+            from qubit_constants import get_default_qubit_root
+            return str(get_default_qubit_root())
+        except Exception:  # noqa: BLE001 — the caller treats unreadable ownership as unknown
+            return None
     return None
 
 

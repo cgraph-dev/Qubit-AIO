@@ -55,7 +55,7 @@ test.skipIf(process.platform === 'win32')('each unsafe control-path refusal name
 
     await fs.chmod(home, 0o700)
     await fs.writeFile(sock, '', { mode: 0o600 })
-    expect(await failure()).toBe(`Unsafe gateway control path: '${sock}' should be a socket but is a regular file: remove it, then run hermes gateway restart`)
+    expect(await failure()).toBe(`Unsafe gateway control path: '${sock}' should be a socket but is a regular file: remove it, then run qubit gateway restart`)
 
     await fs.rm(sock)
     await fs.writeFile(pointer, '/nowhere/control.sock\n')

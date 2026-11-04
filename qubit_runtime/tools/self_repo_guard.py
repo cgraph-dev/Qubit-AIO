@@ -555,7 +555,7 @@ def detect_self_repo_git_mutation(
 
 def _block_message(operation: str, root: Path) -> str:
     qubit_home = os.environ.get("QUBIT_HOME", "").strip()
-    scratch = (Path(qubit_home).expanduser() if qubit_home else Path.home() / ".hermes") / "scratch"
+    scratch = (Path(qubit_home).expanduser() if qubit_home else Path.home() / ".qubit") / "scratch"
     return (
         f"Blocked: `{operation}` would rewrite Qubit's live source checkout "
         f"({root}) and can mix module versions in this running process. "

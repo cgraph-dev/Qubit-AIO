@@ -36,9 +36,9 @@ export function isHermesOwnedVenvDaemon(
 }
 
 /**
- * True when a process is an external Hermes process holding this install's venv
+ * True when a process is an external Qubit process holding this install's venv
  * (#62311): its exe lives under `<venv>\Scripts\` AND it is unambiguously a
- * Hermes program — the `qubit.exe` shim, `python -m qubit_cli...`, or
+ * Qubit program — the `qubit.exe` shim, `python -m qubit_cli...`, or
  * `python -m qubit ...`. These are the autostart holders (the gateway Startup
  * item, the dashboard Scheduled Task) that neither the desktop's backend
  * teardown nor the hindsight-daemon sweep reach, and that keep the venv shim

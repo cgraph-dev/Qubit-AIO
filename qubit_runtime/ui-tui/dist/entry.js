@@ -2824,7 +2824,7 @@ var init_env = __esm({
 });
 
 // ../apps/shared/src/json-rpc-channel.ts
-function jsonRpcErrorFromFrame(raw, fallbackMessage = "Hermes RPC failed") {
+function jsonRpcErrorFromFrame(raw, fallbackMessage = "Qubit RPC failed") {
   const err = raw && typeof raw === "object" ? raw : {};
   return new JsonRpcGatewayError(typeof err.message === "string" && err.message ? err.message : fallbackMessage, {
     code: typeof err.code === "number" ? err.code : void 0,

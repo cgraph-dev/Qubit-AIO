@@ -985,7 +985,7 @@ function managedSshDrainBlocker(
   return {
     reason: DARWIN_DRAIN_UNSUPPORTED,
     message:
-      `Skipped: Desktop cannot safely stop its running Hermes serve on this macOS remote (${blocked.join(', ')}). ` +
+      `Skipped: Desktop cannot safely stop its running Qubit serve on this macOS remote (${blocked.join(', ')}). ` +
       'Disconnect it, or run `qubit update` on the remote, then retry.'
   }
 }

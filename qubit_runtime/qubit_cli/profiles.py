@@ -2186,11 +2186,11 @@ def _profile_export_directory() -> Path:
 
     # A custom deployment may point QUBIT_HOME at its source checkout: use a sibling store,
     # falling back to the OS temp dir only when the user's home itself is a checkout (dotfiles
-    # repo). Per-uid temp name: a fixed /tmp/hermes-profile-exports is a predictable shared
+    # repo). Per-uid temp name: a fixed /tmp/qubit-profile-exports is a predictable shared
     # path another local user could pre-create (or symlink) first.
     uid_suffix = f"-{os.getuid()}" if hasattr(os, "getuid") else ""
     candidates = (
-        Path.home() / ".hermes-profile-exports", Path(tempfile.gettempdir()) / f"hermes-profile-exports{uid_suffix}"
+        Path.home() / ".qubit-profile-exports", Path(tempfile.gettempdir()) / f"qubit-profile-exports{uid_suffix}"
     )
     for candidate in candidates:
         if not _inside_git_checkout(candidate):

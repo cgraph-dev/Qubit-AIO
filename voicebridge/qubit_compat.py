@@ -7103,6 +7103,25 @@ def h_ops_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _confirm_payload(out)
 
 
+def _rebrand_nested(value: Any) -> Any:
+    """Rebrand product strings at every depth of a served value.
+
+    Persisted metadata nests display rows (``display_metadata.qubit_chat.model``)
+    that the top-level-only walk used to miss, leaking an upstream product name
+    into the served session/messages/export payloads. Keys are identifiers and
+    stay verbatim; only string values pass through the shared convention.
+    """
+    if isinstance(value, str):
+        return _qubit_plugins._rebrand_product(value)
+    if isinstance(value, list):
+        return [_rebrand_nested(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_rebrand_nested(item) for item in value)
+    if isinstance(value, dict):
+        return {key: _rebrand_nested(item) for key, item in value.items()}
+    return value
+
+
 def _rebrand_chat_message(message: Any) -> Any:
     """Render one persisted chat message as Qubit at the served boundary.
 
@@ -7119,10 +7138,7 @@ def _rebrand_chat_message(message: Any) -> Any:
         out["content"] = _qubit_plugins._rebrand_product(out["content"])
     meta = out.get("meta")
     if isinstance(meta, dict):
-        out["meta"] = {
-            key: (_qubit_plugins._rebrand_product(value)
-                  if isinstance(value, str) else value)
-            for key, value in meta.items()}
+        out["meta"] = _rebrand_nested(meta)
         # The persisted transcript nests the model's tool calls and reasoning
         # under ``meta`` (QubitSessionStore._msg). The Sessions SPA reads them
         # at the TOP level (api.ts SessionMessage: tool_calls/tool_name/
@@ -7147,9 +7163,16 @@ def _rebrand_chat_record(record: Any) -> Any:
     if not isinstance(record, dict):
         return record
     out = dict(record)
-    for key in ("name", "title", "preview"):
+    # Only served identity fields change: path fields (``cwd``/``path``) and
+    # every other wire key stay byte-exact for recovery/inspection callers.
+    for key in ("name", "title", "preview", "snippet"):
         if isinstance(out.get(key), str):
             out[key] = _qubit_plugins._rebrand_product(out[key])
+    # Display metadata can nest a product/model label one level deeper; rebrand
+    # its values, never its keys.
+    for key in ("meta", "display_metadata"):
+        if isinstance(out.get(key), dict):
+            out[key] = _rebrand_nested(out[key])
     return out
 
 

@@ -1556,7 +1556,7 @@ export const zh = defineLocale({
       sshKeyTitle: '密钥文件',
       sshKeyDesc: '私钥路径。留空 = ssh-agent 或 ~/.ssh/config。',
       sshHermesPathTitle: 'Qubit 路径（可选）',
-      sshHermesPathDesc: '远程 hermes 可执行文件的完整路径。留空 = 自动检测。',
+      sshHermesPathDesc: '远程 qubit 可执行文件的完整路径。留空 = 自动检测。',
       sshHermesPathPlaceholder: '自动检测',
       sshTestConnection: '测试 SSH',
       sshConnect: '连接',
@@ -2247,7 +2247,7 @@ export const zh = defineLocale({
     edit: '编辑',
     archive: '归档',
     skillArchivedTitle: '技能已归档',
-    skillArchivedMessage: '可通过 hermes curator restore 恢复。',
+    skillArchivedMessage: '可通过 qubit curator restore 恢复。',
     tabPlugins: '插件',
     plugins: {
       agentTitle: 'Agent 插件',
@@ -3496,7 +3496,7 @@ export const zh = defineLocale({
       '/resume': '恢复已保存的会话',
       '/details': '控制对话记录的详细程度',
       '/copy': '复制所选内容或最后一条助手消息',
-      '/quit': '退出 hermes',
+      '/quit': '退出 qubit',
       '/start': '确认平台启动请求，不发送回复',
       '/new': '开始新的桌面对话',
       '/topic': '启用或查看 Telegram 私聊话题会话',
@@ -3958,9 +3958,9 @@ export const zh = defineLocale({
     versionDetailsDistributionDesktopMsix: '桌面应用 (MSIX)',
     versionDetailsDistributionDesktopInstaller: '桌面应用（安装器）',
     versionDetailsDistributionSourceInstaller: '源码（安装脚本）',
-    versionDetailsDistributionSourceInstallerDesktop: '源码（安装脚本）+ hermes desktop',
+    versionDetailsDistributionSourceInstallerDesktop: '源码（安装脚本）+ qubit desktop',
     versionDetailsDistributionSource: '源码',
-    versionDetailsDistributionSourceDesktop: '源码 + hermes desktop',
+    versionDetailsDistributionSourceDesktop: '源码 + qubit desktop',
     versionDetailsDistributionStore: 'Microsoft Store',
     versionDetailsRuntime: '运行时',
     versionDetailsRuntimeEmbedded: '嵌入式（捆绑）',
@@ -5003,7 +5003,7 @@ export const zh = defineLocale({
       success: platform => `已移交到 ${platform}。随时可在此处恢复。`,
       systemNote: platform => `↻ 已移交到 ${platform} — 随时可在此处恢复。`,
       failed: error => `移交失败：${error}`,
-      timedOut: '等待网关超时。`hermes gateway` 是否正在运行？'
+      timedOut: '等待网关超时。`qubit gateway` 是否正在运行？'
     }
   },
 

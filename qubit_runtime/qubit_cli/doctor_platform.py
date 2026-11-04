@@ -594,7 +594,7 @@ def _check_command_installation(should_fix: bool, f: Finding) -> None:
 
     method = detect_install_method(PROJECT_ROOT)
     if is_nix_install_method(method) or method in ("docker", "apt"):
-        command = shutil.which("hermes")
+        command = shutil.which("qubit") or shutil.which("hermes")
         if command:
             check_ok(f"Qubit command managed by {method} ({command})")
         else:
@@ -610,7 +610,15 @@ def _check_command_installation(should_fix: bool, f: Finding) -> None:
         check_fail("Cannot resolve selected dependencies", str(exc))
         return f.manual_issues.append(_python_repair_hint())
     pm_launcher = selected != base_venv(PROJECT_ROOT) or resolve_store_python(PROJECT_ROOT) is not None
-    venv_bin = PROJECT_ROOT / "hermes" if pm_launcher else selected / "bin" / "hermes"
+    # Canonical ``qubit`` installed by this project first; a pre-rebrand
+    # ``hermes`` launcher is accepted only as the read-old fallback.
+    entry_candidates = (
+        [PROJECT_ROOT / ".qubit" / "bin" / "qubit", PROJECT_ROOT / "qubit",
+         PROJECT_ROOT / "hermes"]
+        if pm_launcher else
+        [selected / "bin" / "qubit", selected / "bin" / "hermes"]
+    )
+    venv_bin = next((p for p in entry_candidates if p.is_file()), entry_candidates[0])
     if not venv_bin.is_file():
         check_warn("Qubit entry point not found", f"({venv_bin})")
         return f.manual_issues.append("Repair or reinstall the Qubit launcher through the installation owner")

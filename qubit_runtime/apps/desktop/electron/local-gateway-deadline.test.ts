@@ -64,7 +64,7 @@ test('a stale-owner restart client that times out but obeys SIGTERM is logged an
   expect(logs).toEqual(['gateway restart exited 7: hermes gateway restart timed out'])
 })
 
-// `hermes gateway ensure` owns a 60 s startup deadline (hermes_cli/gateway_runtime.py
+// `qubit gateway ensure` owns a 60 s startup deadline (hermes_cli/gateway_runtime.py
 // DEFAULT_ENSURE_TIMEOUT) and always answers with a protocol verdict by then. Killing the client
 // earlier turned a slow-but-valid cold start into "produced no result … Update Hermes".
 test('the default ensure client outlives the protocol deadline and reads a late verdict', async () => {

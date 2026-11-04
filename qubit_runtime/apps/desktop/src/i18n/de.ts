@@ -2753,7 +2753,7 @@ export const deOverrides = {
     edit: 'Bearbeiten',
     archive: 'Archivieren',
     skillArchivedTitle: 'Skill archiviert',
-    skillArchivedMessage: 'Wiederherstellbar über „hermes curator restore“.',
+    skillArchivedMessage: 'Wiederherstellbar über „qubit curator restore“.',
     tabPlugins: 'Plugins',
     plugins: {
       agentTitle: 'Agent-Plugins',
@@ -4147,7 +4147,7 @@ export const deOverrides = {
       '/resume': 'Gespeicherte Session fortsetzen',
       '/details': 'Transkript-Detailgrad steuern',
       '/copy': 'Auswahl oder letzte Assistenten-Nachricht kopieren',
-      '/quit': 'hermes beenden',
+      '/quit': 'qubit beenden',
       '/start': 'Start-Pings der Plattform ohne Antwort bestätigen',
       '/new': 'Neuen Desktop-Chat starten',
       '/topic': 'Telegram-DM-Themen-Sessions aktivieren oder prüfen',
@@ -4510,9 +4510,9 @@ export const deOverrides = {
     versionDetailsDistributionDesktopMsix: 'Desktop-App (MSIX)',
     versionDetailsDistributionDesktopInstaller: 'Desktop-App (Installer)',
     versionDetailsDistributionSourceInstaller: 'Quellcode (Installationsskript)',
-    versionDetailsDistributionSourceInstallerDesktop: 'Quellcode (Installationsskript) + hermes desktop',
+    versionDetailsDistributionSourceInstallerDesktop: 'Quellcode (Installationsskript) + qubit desktop',
     versionDetailsDistributionSource: 'Quellcode',
-    versionDetailsDistributionSourceDesktop: 'Quellcode + hermes desktop',
+    versionDetailsDistributionSourceDesktop: 'Quellcode + qubit desktop',
     versionDetailsDistributionStore: 'Microsoft Store',
     versionDetailsRuntime: 'Laufzeit',
     versionDetailsRuntimeEmbedded: 'Eingebettete Laufzeit',
@@ -5969,7 +5969,7 @@ export const deOverrides = {
       success: platform => `Übergeben an ${platform}. Jederzeit hier fortsetzen.`,
       systemNote: platform => `↻ Übergeben an ${platform} — jederzeit hier fortsetzen.`,
       failed: error => `Übergabe fehlgeschlagen: ${error}`,
-      timedOut: 'Zeitüberschreitung beim Warten auf das Gateway. Läuft `hermes gateway`?',
+      timedOut: 'Zeitüberschreitung beim Warten auf das Gateway. Läuft `qubit gateway`?',
       startMessaging: 'Messaging starten'
     }
   },

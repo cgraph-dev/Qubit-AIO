@@ -4,7 +4,7 @@ import crypto from 'node:crypto'
 import { profileCollectionRoute, profileRouteSuffix } from './profile-routes'
 import { hiddenWindowsChildOptions, windowsShellCommand } from './windows-child-options'
 
-// `hermes gateway ensure` answers with a protocol verdict (ready, or `starting: deadline`) within
+// `qubit gateway ensure` answers with a protocol verdict (ready, or `starting: deadline`) within
 // its own startup deadline: `--timeout` defaults to 60 s (hermes_cli/gateway_runtime.py
 // DEFAULT_ENSURE_TIMEOUT). The client is killed only after that deadline plus interpreter start
 // and verdict output, so a slow-but-valid cold start is never reported as "produced no result".
@@ -14,7 +14,7 @@ const GATEWAY_ENSURE_CLIENT_GRACE_MS = 15_000
 /** Run one bounded `hermes ... gateway <verb>` client (`ensure` by default; `restart` for a stale owner). */
 export function runGatewayEnsure(
   backend, cwd: string, home: string, parentEnv: NodeJS.ProcessEnv = process.env,
-  { timeoutMs = GATEWAY_ENSURE_PROTOCOL_DEADLINE_MS + GATEWAY_ENSURE_CLIENT_GRACE_MS, label = 'hermes gateway ensure' }: { timeoutMs?: number; label?: string } = {}
+  { timeoutMs = GATEWAY_ENSURE_PROTOCOL_DEADLINE_MS + GATEWAY_ENSURE_CLIENT_GRACE_MS, label = 'qubit gateway ensure' }: { timeoutMs?: number; label?: string } = {}
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     // shell: true hands cmd.exe one command line it cuts at the first unquoted space,
@@ -37,7 +37,7 @@ export function runGatewayEnsure(
     child.stdout.on('data', data => { stdout += data.toString();
 
  if (stdout.length > 65536) { stdout = stdout.slice(0, 65536); expire(`${label} output exceeded limit`) } })
-    // Diagnostics only (never protocol): an older `hermes` without the subcommand, a missing
+    // Diagnostics only (never protocol): an older `qubit` without the subcommand, a missing
     // profile or an import crash explain themselves here while stdout stays empty.
     child.stderr.on('data', data => { stderr = (stderr + data.toString()).slice(-4096) })
     child.on('error', () => { clearTimeout(timer); clearTimeout(forceTimer); reject(new Error(`Could not run ${label}`)) })
@@ -120,12 +120,12 @@ export function createStaleGatewayRestarter(
     }
 
     if (pending) {
-      log(`[gateway] owner still runs ${stale.gateway} (this Hermes is ${stale.client}) after a restart; attaching as-is`)
+      log(`[gateway] owner still runs ${stale.gateway} (this Qubit is ${stale.client}) after a restart; attaching as-is`)
 
       return null
     }
 
-    log(`[gateway] owner runs ${stale.gateway} but this Hermes is ${stale.client}; restarting it`)
+    log(`[gateway] owner runs ${stale.gateway} but this Qubit is ${stale.client}; restarting it`)
     const entry = { done: false, promise: restart(gatewayOwnerProfile(endpoint)).catch(() => undefined) }
     restarts.set(key, entry)
     void entry.promise.then(() => { entry.done = true })
@@ -134,10 +134,10 @@ export function createStaleGatewayRestarter(
   }
 }
 
-/** The single-line JSON `hermes gateway ensure --json` prints, or a diagnosis of why there is none.
+/** The single-line JSON `qubit gateway ensure --json` prints, or a diagnosis of why there is none.
  *
  * Every protocol outcome (ready/starting/incompatible/...) is JSON on stdout. Empty or
- * non-JSON stdout means the command never reached the protocol boundary: an older `hermes`
+ * non-JSON stdout means the command never reached the protocol boundary: an older `qubit`
  * on PATH that has no `ensure` subcommand, a profile that does not exist, an interpreter
  * crash. A bare JSON.parse there surfaced as "Unexpected end of JSON input" with the real
  * reason discarded on stderr. */
@@ -150,7 +150,7 @@ export function parseGatewayEnsureOutput(result: { code: number; stdout: string;
 
   const reason = String(result.stderr ?? '').trim().split(/\r?\n/).filter(Boolean).pop()
 
-  throw new Error(`hermes gateway ensure produced no result (exit ${result.code})${reason ? `: ${reason}` : ''}. Update Hermes or check the profile, then retry.`)
+  throw new Error(`qubit gateway ensure produced no result (exit ${result.code})${reason ? `: ${reason}` : ''}. Update Qubit or check the profile, then retry.`)
 }
 
 /** `{ gateway, client }` commits when a ready owner provably runs other code than the ensure
@@ -237,12 +237,12 @@ export async function ensureLocalGateway(
   const restartWait = isRestartWait(payload)
 
   if (!restartWait && (result.code !== 0 || payload.state !== 'ready')) {
-    // A refused replacement (another install's or a newer Hermes's gateway) names its remedy in
+    // A refused replacement (another install's or a newer Qubit's gateway) names its remedy in
     // `detail`; a start that died carries its own output there. Either beats a pointer elsewhere.
     const detail = typeof payload.detail === 'string' && payload.detail.trim() ? ` ${payload.detail.trim().split(/\r?\n/)[0]}.` : ''
     const recovery = payload.reason_code === 'update_paused' ? 'restart' : 'status'
 
-    throw new Error(`Gateway ${payload.state || 'inaccessible'} (${payload.reason_code || 'ensure_failed'}).${detail} Use hermes gateway ${recovery} for recovery.`)
+    throw new Error(`Gateway ${payload.state || 'inaccessible'} (${payload.reason_code || 'ensure_failed'}).${detail} Use qubit gateway ${recovery} for recovery.`)
   }
 
   const endpoint: GatewayEndpoint = payload.endpoint
@@ -396,7 +396,7 @@ async function privateNode(file: string, kind: 'directory' | 'socket' | 'file' |
     // The socket, pointer and fallback directory are the gateway's to recreate; a home is not.
     throw new Error(kind === 'home'
       ? `Unsafe gateway control path: profile home ${quoted} is ${found}, not a directory: move it aside and recreate the profile`
-      : `Unsafe gateway control path: ${quoted} should be a ${kind} but is ${found}: remove it, then run hermes gateway restart`)
+      : `Unsafe gateway control path: ${quoted} should be a ${kind} but is ${found}: remove it, then run qubit gateway restart`)
   }
 
   if (node.uid !== uid) {

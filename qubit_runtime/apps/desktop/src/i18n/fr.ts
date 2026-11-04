@@ -1937,7 +1937,7 @@ export const frOverrides = {
       sshKeyTitle: "Fichier d'identité",
       sshKeyDesc: 'Chemin de la clé privée. Vide = ssh-agent ou ~/.ssh/config.',
       sshHermesPathTitle: 'Chemin Qubit (facultatif)',
-      sshHermesPathDesc: 'Chemin complet vers le binaire hermes distant. Vide = détection automatique.',
+      sshHermesPathDesc: 'Chemin complet vers le binaire qubit distant. Vide = détection automatique.',
       sshHermesPathPlaceholder: 'détection automatique',
       sshTestConnection: 'Tester SSH',
       sshConnect: 'Se connecter',
@@ -2761,7 +2761,7 @@ export const frOverrides = {
     edit: 'Modifier',
     archive: 'Archiver',
     skillArchivedTitle: 'Skill archivé',
-    skillArchivedMessage: 'Restaurable via hermes curator restore.',
+    skillArchivedMessage: 'Restaurable via qubit curator restore.',
     tabPlugins: 'Plugins',
     plugins: {
       agentTitle: "Plugins de l'agent",
@@ -4522,9 +4522,9 @@ export const frOverrides = {
     versionDetailsDistributionDesktopMsix: 'Application Desktop (MSIX)',
     versionDetailsDistributionDesktopInstaller: 'Application Desktop (installateur)',
     versionDetailsDistributionSourceInstaller: "Code source (script d'installation)",
-    versionDetailsDistributionSourceInstallerDesktop: "Code source (script d'installation) + hermes desktop",
+    versionDetailsDistributionSourceInstallerDesktop: "Code source (script d'installation) + qubit desktop",
     versionDetailsDistributionSource: 'Code source',
-    versionDetailsDistributionSourceDesktop: 'Code source + hermes desktop',
+    versionDetailsDistributionSourceDesktop: 'Code source + qubit desktop',
     versionDetailsDistributionStore: 'Microsoft Store',
     versionDetailsRuntime: "Environnement d'exécution",
     versionDetailsRuntimeEmbedded: "Environnement d'exécution intégré",
@@ -5981,7 +5981,7 @@ export const frOverrides = {
       success: platform => `Transféré vers ${platform}. Reprenez ici à tout moment.`,
       systemNote: platform => `↻ Transféré vers ${platform} — reprenez ici à tout moment.`,
       failed: error => `Échec du transfert : ${error}`,
-      timedOut: "Délai d'expiration en attendant la Gateway. `hermes gateway` est-il en cours d'exécution ?",
+      timedOut: "Délai d'expiration en attendant la Gateway. `qubit gateway` est-il en cours d'exécution ?",
       startMessaging: 'Démarrer la messagerie'
     }
   },
