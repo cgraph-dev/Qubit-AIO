@@ -308,7 +308,7 @@ def _finalize_child_env(env: dict) -> dict:
     return delegated_child_subprocess_env(env)
 
 
-def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
+def _scrubbed_env(parts, plugin_strip: frozenset, fix_path, *, append_qubit_bin: bool = False) -> dict:
     """Filter each ``(items, unwrap_force)`` in *parts* into one env, rewrite PATH via
     *fix_path* (always prepending the qubit install dir so bare ``qubit`` resolves
     for children of a systemd/cron-launched gateway), then apply the shared guards."""
@@ -326,7 +326,8 @@ def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
     # service manager or cron without the console script's directory on PATH. The terminal environment
     # already applies this invariant; Cron scripts use this sanitizer directly (#92998).
     if path_key is not None:
-        out[path_key] = _prepend_qubit_bin_dir(fix_path(out.get(path_key, "")))
+        out[path_key] = _prepend_qubit_bin_dir(
+            fix_path(out.get(path_key, "")), append=append_qubit_bin)
     return _finalize_child_env(out)
 
 
@@ -683,7 +684,7 @@ def _resolve_qubit_bin_dir() -> str | None:
     return _QUBIT_BIN_DIR
 
 
-def _prepend_qubit_bin_dir(existing_path: str) -> str:
+def _prepend_qubit_bin_dir(existing_path: str, *, append: bool = False) -> str:
     """Prepend the qubit install dir to ``existing_path`` if missing. A sealed payload's
     launcher dir moves to the front even when already listed: a login PATH can list
     another install's ``qubit`` ahead of it."""
@@ -691,12 +692,12 @@ def _prepend_qubit_bin_dir(existing_path: str) -> str:
     if bin_dir and _HERMES_BIN_DIR_IS_PAYLOAD:
         rest = [entry for entry in existing_path.split(os.pathsep) if entry and entry != bin_dir]
         return os.pathsep.join([bin_dir, *rest])
-    # A caller-supplied PATH stays authoritative (the gateway proves a local
-    # attach's client env); only add the install dir when it is absent. This
-    # keeps bare ``qubit`` available without shadowing a client's own PATH
-    # prefix in the terminal/session contract.
+    # Default child/sanitizer contract: prepend the install dir so bare
+    # ``qubit`` always resolves. A proven client-session PATH is the exception:
+    # append there so the client's own toolchain stays authoritative.
     if bin_dir and bin_dir not in existing_path.split(os.pathsep):
-        return os.pathsep.join([*filter(None, existing_path.split(os.pathsep)), bin_dir])
+        entries = [*filter(None, existing_path.split(os.pathsep))]
+        return os.pathsep.join([*entries, bin_dir] if append else [bin_dir, *entries])
     return existing_path
 
 
@@ -792,10 +793,16 @@ def _make_run_env(env: dict) -> dict:
     client toolchain (PATH, venv, nvm/pyenv/conda: ``agent.session_client_env``) replaces the daemon's
     beneath the backend's own ``env``."""
     from agent.session_client_env import toolchain_environ
+    from agent.session_client_env import bound_client_env, toolchain_environ
+    client_toolchain = toolchain_environ(strip_launch_profile_env(os.environ.copy()))
+    # A gateway-proven client attach keeps its own PATH prefix authoritative;
+    # ordinary terminal/sanitizer spawns still get the Qubit bin prepended.
+    append_qubit_bin = bound_client_env() is not None
     run_env = _scrubbed_env(
-        [(dict(toolchain_environ(strip_launch_profile_env(os.environ.copy())) | env), True)],
+        [(dict(client_toolchain | env), True)],
         frozenset(),
         lambda p: _user_tools_first(_append_missing_sane_path_entries(p)),
+        append_qubit_bin=append_qubit_bin,
     )
     # While this profile's Bot Desktop is running, its DISPLAY/XAUTHORITY/DBUS ride along so GUI
     # apps the agent launches from the terminal open on the Bot Screen the user is watching, not
