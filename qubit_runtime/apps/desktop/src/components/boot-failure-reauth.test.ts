@@ -120,7 +120,7 @@ describe('shouldApplyPostBootProgressError', () => {
     expect(shouldApplyPostBootProgressError('Your remote gateway session has expired.')).toBe(true)
     expect(
       shouldApplyPostBootProgressError(
-        'Could not reach the remote Hermes gateway while refreshing its WebSocket ticket. Try reconnecting.'
+        'Could not reach the remote Qubit gateway while refreshing its WebSocket ticket. Try reconnecting.'
       )
     ).toBe(false)
     expect(shouldApplyPostBootProgressError('Lost connection to the gateway')).toBe(false)

@@ -174,7 +174,7 @@ const RUNTIME_COMMAND_TIMEOUT_MS = 30_000
 /** Ask an installation launcher for its interpreter; it owns ABI and store selection. */
 function launcherRuntimePython(backend: ResolvedTicketBackend & { root: string }): Promise<string> {
   return new Promise((resolve, reject) => {
-    const fail = (detail: string) => reject(new Error(`Gateway ticket bootstrap could not resolve the installed Hermes Python runtime: ${detail}`))
+    const fail = (detail: string) => reject(new Error(`Gateway ticket bootstrap could not resolve the installed Qubit Python runtime: ${detail}`))
 
     // A .cmd override is a shell backend: quote it as the backend spawn does, or cmd.exe
     // splits a launcher path with a space at the first one (#74064).
@@ -241,7 +241,7 @@ export async function ticketRuntimeFor(backend: ResolvedTicketBackend): Promise<
     return { command: python, env: { ...backend.env, PYTHONPATH: backend.root } }
   }
 
-  throw new Error('Gateway ticket bootstrap requires the installed Hermes Python runtime')
+  throw new Error('Gateway ticket bootstrap requires the installed Qubit Python runtime')
 }
 
 export function createGatewayTicketResolver(resolveBackend: () => Promise<ResolvedTicketBackend>, cwd: () => string) {

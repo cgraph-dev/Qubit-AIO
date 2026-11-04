@@ -2207,7 +2207,7 @@ export const ar = defineLocale({
       '/resume': 'استئناف جلسة محفوظة',
       '/details': 'التحكم في مستوى تفاصيل النص',
       '/copy': 'نسخ التحديد أو آخر رسالة من المساعد',
-      '/quit': 'الخروج من hermes',
+      '/quit': 'الخروج من qubit',
       '/start': 'تأكيد طلب بدء المنصة دون إرسال رد',
       '/new': 'بدء محادثة جديدة في تطبيق سطح المكتب',
       '/topic': 'تفعيل مواضيع الرسائل الخاصة في Telegram أو عرضها',
@@ -2558,9 +2558,9 @@ export const ar = defineLocale({
     versionDetailsDistributionDesktopMsix: 'تطبيق سطح المكتب (MSIX)',
     versionDetailsDistributionDesktopInstaller: 'تطبيق سطح المكتب (المُثبِّت)',
     versionDetailsDistributionSourceInstaller: 'المصدر (سكربت التثبيت)',
-    versionDetailsDistributionSourceInstallerDesktop: 'المصدر (سكربت التثبيت) + hermes desktop',
+    versionDetailsDistributionSourceInstallerDesktop: 'المصدر (سكربت التثبيت) + qubit desktop',
     versionDetailsDistributionSource: 'المصدر',
-    versionDetailsDistributionSourceDesktop: 'المصدر + hermes desktop',
+    versionDetailsDistributionSourceDesktop: 'المصدر + qubit desktop',
     versionDetailsDistributionStore: 'Microsoft Store',
     versionDetailsRuntimeEmbedded: 'وقت تشغيل مضمّن',
     versionDetailsRuntimeExternal: 'خارجي (يستخدم وقت تشغيل الجهاز)',
@@ -3522,7 +3522,7 @@ export const ar = defineLocale({
       success: platform => `تم التسليم إلى ${platform}. استأنف هنا في أي وقت.`,
       systemNote: platform => `↻ تم التسليم إلى ${platform} — استأنف هنا في أي وقت.`,
       failed: error => `فشل التسليم: ${error}`,
-      timedOut: 'انتهت المهلة في انتظار البوابة. هل `hermes gateway` قيد التشغيل؟'
+      timedOut: 'انتهت المهلة في انتظار البوابة. هل `qubit gateway` قيد التشغيل؟'
     }
   },
   errors: {

@@ -619,7 +619,7 @@ test('an ensure refusal names its remedy instead of only a status pointer', asyn
 
   await expect(ensureLocalGateway(async () => ({
     code: 3, stdout: JSON.stringify({ state: 'incompatible', reason_code: 'runtime_protocol', detail, endpoint: null })
-  }))).rejects.toThrow(`Gateway incompatible (runtime_protocol). ${detail}. Use hermes gateway status for recovery.`)
+  }))).rejects.toThrow(`Gateway incompatible (runtime_protocol). ${detail}. Use qubit gateway status for recovery.`)
 })
 
 test('an elevated or other-session gateway is named with its remedy, not as authorization (#139845, #140252)', async () => {
@@ -641,5 +641,5 @@ test('an elevated or other-session gateway is named with its remedy, not as auth
 test('an update-paused ensure refusal points to the restart that completes its tail', async () => {
   await expect(ensureLocalGateway(async () => ({
     code: 6, stdout: JSON.stringify({ state: 'draining', reason_code: 'update_paused', endpoint: null })
-  }))).rejects.toThrow('Gateway draining (update_paused). Use hermes gateway restart for recovery.')
+  }))).rejects.toThrow('Gateway draining (update_paused). Use qubit gateway restart for recovery.')
 })

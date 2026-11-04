@@ -38,7 +38,7 @@ async function probeWindowsRemote(ssh, explicitHermesPath = '') {
     'if($explicit){Assert-NoReparse $explicit $false;$explicitPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($explicit), "python.exe");Assert-NoReparse $explicitPython $false}',
     // QUBIT_HOME is only trusted when it names a directory on the REMOTE: a stale User-scope
     // value (older install.ps1 persisted one) or a client path leaked over SSH otherwise fails
-    // assertSafeRemoteHome as "Unsafe remote Hermes home" (#118988).
+    // assertSafeRemoteHome as "Unsafe remote Qubit home" (#118988).
     '$hermesHome=$env:QUBIT_HOME',
     'if(-not $hermesHome -or -not (Test-Path -LiteralPath $hermesHome -PathType Container)){$hermesHome=Join-Path $env:LOCALAPPDATA "qubit"}',
     'Assert-NoReparse $hermesHome $true',

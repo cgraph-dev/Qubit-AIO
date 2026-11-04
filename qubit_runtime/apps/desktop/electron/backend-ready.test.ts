@@ -356,7 +356,7 @@ test(
     child.stdout.emit('data', 'qubit: finishing an interrupted source update...\n')
     await assert.rejects(
       wait,
-      /Timed out waiting for Hermes backend port announcement .* while an update completion was in progress/
+      /Timed out waiting for Qubit backend port announcement .* while an update completion was in progress/
     )
   },
   6 * 60_000

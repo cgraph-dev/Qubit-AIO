@@ -1,5 +1,5 @@
 /**
- * Canonical Hermes skin — the theme SDK's cross-surface contract.
+ * Canonical Qubit skin — the theme SDK's cross-surface contract.
  *
  * A skin is authored once as YAML in `$QUBIT_HOME/skins/<name>.yaml` (or a
  * built-in), resolved by the Python skin engine (`qubit_cli/skin_engine.py`),

@@ -22,7 +22,7 @@ function realpathOrNull(target: string): string | null {
 /**
  * The AppImage file this executable runs from, or undefined when it is not one.
  *
- * The AppImage runtime exports APPIMAGE/APPDIR to every descendant: Hermes
+ * The AppImage runtime exports APPIMAGE/APPDIR to every descendant: Qubit
  * started from a terminal or IDE AppImage inherits that app's values, and
  * acting on them would relaunch, or rm -rf on uninstall, the other app.
  * APPIMAGE is ours only when this executable runs from that image's mount:

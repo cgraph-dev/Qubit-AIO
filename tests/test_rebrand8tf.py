@@ -60,7 +60,9 @@ def test_dashboard_pages_qubit_branded_and_accessible():
     for page in PAGES:
         html = (FRONTEND / page).read_text()
         assert "<title>Qubit" in html, page
-        assert "Qubit Agent</a>" in html, page
+        # The dashboard's canonical wordmark is "Qubit AiO" (i18n en.brand);
+        # every page must carry it in the primary nav.
+        assert "Qubit AiO</a>" in html, page
         assert 'lang="en"' in html, page
         assert 'aria-label="Primary"' in html, page
     assert "Hermes" not in "".join((FRONTEND / p).read_text() for p in PAGES)
