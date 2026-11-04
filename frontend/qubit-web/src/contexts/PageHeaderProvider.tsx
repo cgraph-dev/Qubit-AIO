@@ -75,6 +75,14 @@ export function PageHeaderProvider({
             "bg-background-base",
             // Mobile stacks title + toolbar — fixed h-14 clips content; desktop stays one row.
             "min-h-0 overflow-x-hidden overflow-y-visible py-3 sm:h-14 sm:min-h-[3.5rem] sm:overflow-hidden sm:py-0",
+            // The chat route hides this bar outright: the embedded TUI draws its own
+            // title inside Ink, so a second "Chat" plate directly above it is pure
+            // duplicate chrome eating 56px of terminal height. `hidden` (display:none)
+            // rather than removing the node — the route outlet and its scroll
+            // containers are siblings here, and the PTY/xterm sizing is driven by the
+            // container it mounts into, so removing the element wholesale risks a
+            // zero-height terminal on the first measure.
+            isChatRoute && "hidden",
           )}
           style={{
             // Opaque plate: a translucent/backdrop header let the ambient scene
