@@ -147,7 +147,7 @@ export default function SessionOpsPage() {
       <section className="settings-section">
         <div className="settings-section__header">
           <div className="settings-section__copy">
-            <h1 className="settings-section__heading">Session operations</h1>
+            <h2 className="settings-section__heading">Session operations</h2>
             <p className="settings-section__desc">
               Lineage, compaction, goals, suggestions, groups, and companion for
               one selected session. Every destructive press asks first.

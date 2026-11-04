@@ -222,12 +222,11 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
                       href={p.docs_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex"
+                      className="inline-flex aspect-square items-center justify-center p-2 text-current transition-colors hover:bg-midground/10 [&>svg]:size-3.5"
                       title={`Open ${p.name} docs`}
+                      aria-label={`Open ${p.name} docs`}
                     >
-                      <Button ghost size="icon">
-                        <ExternalLink />
-                      </Button>
+                      <ExternalLink aria-hidden />
                     </a>
                   )}
                   {!p.status.logged_in && p.flow !== "external" && (

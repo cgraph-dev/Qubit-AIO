@@ -67,3 +67,46 @@ export function formatDurationLong(
     ),
   );
 }
+
+/**
+ * Normalize an epoch timestamp to milliseconds.
+ *
+ * Qubit backends are not consistent: most dates are ISO strings or already in
+ * milliseconds, but a few stores (notably the skill curator) publish epoch
+ * SECONDS. `new Date(seconds)` silently renders 1970, so callers go through
+ * this single normalizer instead. A 10-digit value is seconds, a 13-digit
+ * value is milliseconds; ISO strings are parsed as-is. Returns undefined for
+ * absent/unparseable input rather than inventing a date.
+ */
+export function toEpochMilliseconds(
+  value: number | string | null | undefined,
+): number | undefined {
+  if (value == null || value === "") return undefined;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    return value < 100_000_000_000 ? value * 1000 : value;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+    return numeric < 100_000_000_000 ? numeric * 1000 : numeric;
+  }
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/** Locale-formatted date for an epoch value that may be seconds or ms. */
+export function formatEpochTimestamp(
+  value: number | string | null | undefined,
+  locale?: string,
+): string | null {
+  const ms = toEpochMilliseconds(value);
+  if (ms === undefined) return null;
+  try {
+    return new Date(ms).toLocaleString(locale);
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
+}

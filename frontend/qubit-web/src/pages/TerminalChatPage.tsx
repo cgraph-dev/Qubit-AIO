@@ -39,6 +39,11 @@ import { shouldRestoreTerminalFocus } from "@/lib/pty-focus";
 import { PtyResumeSanitizer } from "@/lib/pty-resume-sanitizer";
 import { ptyAttachToken } from "@/lib/pty-attach-token";
 import {
+  TERMINAL_TRANSCRIPT_LIMIT,
+  TerminalTranscript,
+  announcementFor,
+} from "@/lib/terminal-transcript";
+import {
   PTY_CONNECTING_TIMEOUT_MS,
   PTY_RECONNECT_INPUT_MESSAGE,
   PTY_RESUME_RECONNECT_THROTTLE_MS,
@@ -285,6 +290,18 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     "idle",
   );
   const [copyBusy, setCopyBusy] = useState(false);
+  // The xterm canvas itself is not readable text. Mirror the PTY stream into a
+  // bounded plain-text transcript plus a polite live region so `/chat` is
+  // usable with a screen reader.
+  const srTranscriptRef = useRef(new TerminalTranscript(TERMINAL_TRANSCRIPT_LIMIT));
+  const [srTranscript, setSrTranscript] = useState("");
+  const [srAnnouncement, setSrAnnouncement] = useState("");
+  const pushTranscript = useCallback((chunk: string) => {
+    const text = srTranscriptRef.current.append(chunk);
+    setSrTranscript(text);
+    const announcement = announcementFor(chunk);
+    if (announcement) setSrAnnouncement(announcement);
+  }, []);
   // Mirror of the resume probe for `connect()` (a stable callback that must not
   // re-create on every probe transition). `connect` refuses to dial while a
   // resume id is still being verified or is known-missing.
@@ -523,6 +540,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
       } catch {
         /* terminal not open yet — nothing painted to wipe */
       }
+      srTranscriptRef.current.reset();
+      setSrTranscript("");
+      setSrAnnouncement("");
     }
     lastConnectTargetRef.current = connectTarget;
     const picked = profileId ?? selectedRef.current ?? undefined;
@@ -724,6 +744,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             ? () => termRef.current?.scrollToBottom()
             : undefined;
           term.write(rendered, followScroll);
+          pushTranscript(rendered);
           if (
             effectiveResume &&
             shouldFinishResumeHydrationOnChunk(rendered)
@@ -754,7 +775,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             const drained = sanitizerRef.current;
             if (drained) {
               try {
-                term.write(drained.flush());
+                const drainedText = drained.flush();
+                term.write(drainedText);
+                pushTranscript(drainedText);
               } catch {
                 /* terminal going away */
               }
@@ -820,7 +843,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           }, delay);
         }
       });
-  }, [attachToken, beginResumeReplay, clearPerConnectionTimers, finishResumeHydration]);
+  }, [attachToken, beginResumeReplay, clearPerConnectionTimers, finishResumeHydration, pushTranscript]);
 
   useEffect(() => {
     connectRef.current = (profileId, forceFresh, rotateAttach) =>
@@ -1028,9 +1051,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         if (!blockedInputNoticeRef.current) {
           blockedInputNoticeRef.current = true;
           try {
-            term.write(
-              `\\r\\n\\x1b[33m[${PTY_RECONNECT_INPUT_MESSAGE}]\\x1b[0m\\r\\n`,
-            );
+            const notice = `\\r\\n\\x1b[33m[${PTY_RECONNECT_INPUT_MESSAGE}]\\x1b[0m\\r\\n`;
+            term.write(notice);
+            pushTranscript(notice);
           } catch {
             /* terminal going away */
           }
@@ -1227,7 +1250,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [connect, clearPerConnectionTimers]);
+  }, [connect, clearPerConnectionTimers, pushTranscript]);
 
   // Soft-keyboard inset (phones): the keyboard overlays the layout viewport
   // instead of resizing it, so the host box never changes, fit() computes the
@@ -1460,6 +1483,26 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
               </div>
             </div>
           ) : null}
+          <div
+            className="sr-only"
+            role="log"
+            aria-live="off"
+            aria-label="Chat transcript"
+            aria-atomic="false"
+            data-testid="chat-sr-transcript"
+          >
+            {srTranscript}
+          </div>
+          <div
+            className="sr-only"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label="New chat output"
+            data-testid="chat-sr-announcer"
+          >
+            {srAnnouncement}
+          </div>
           <div
             ref={hostRef}
             aria-label="Qubit terminal"

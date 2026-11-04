@@ -1003,7 +1003,7 @@ export default function QubitBotPage() {
         </button>
         <div className="qb-below-body" hidden={!showWorkspace}>
         <div className="qb-thread-bar">
-          <h1 className="text-xl font-semibold">Qubit Bot workspace</h1>
+          <h2 className="text-xl font-semibold">Qubit Bot workspace</h2>
           <div className="qb-actions-row">
             <Button outlined size="sm" onClick={() => loadAll()} disabled={loading}>
               Reload

@@ -141,7 +141,7 @@ export default function McpCallsPage() {
       {/* ── Card header (upstream MCP summary header) ── */}
       <header className="flex flex-wrap items-start justify-between gap-2 rounded-none border border-border p-4">
         <div>
-          <h1 className="text-base font-semibold">MCP calls</h1>
+          <h2 className="text-base font-semibold">MCP calls</h2>
           <p className="text-xs text-muted-foreground">
             Call one tool on a configured server, list resources, read one
             resource. Tool calls are confirm-gated; button press confirms.

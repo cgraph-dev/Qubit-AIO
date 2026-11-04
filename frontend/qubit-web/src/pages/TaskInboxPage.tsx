@@ -258,7 +258,7 @@ export default function TaskInboxPage() {
       <div className="workboard-main space-y-6 p-4">
         <header className="workboard-heading">
           <div className="workboard-heading__identity">
-            <h1 className="workboard-page-title text-xl font-semibold">Task inbox</h1>
+            <h2 className="workboard-page-title text-xl font-semibold">Task inbox</h2>
             <p className="text-sm text-muted-foreground">
               Read-only ledger history and the live derived ideas inbox; cancel/retry run
               against a real receipt or session, and accept/dismiss record a real decision.

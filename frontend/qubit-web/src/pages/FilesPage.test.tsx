@@ -171,3 +171,114 @@ describe("FilesPage path navigation", () => {
     ).toBe(true);
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("FilesPage request ordering", () => {
+  it("aborts the previous listing and ignores its late response", async () => {
+    const initial = deferred<Record<string, unknown>>();
+    const firstNav = deferred<Record<string, unknown>>();
+    const secondNav = deferred<Record<string, unknown>>();
+    const secondPayload = {
+      ok: true,
+      root: "/repo",
+      path: "/repo/other",
+      locked_root: "/repo",
+      can_change_path: false,
+      entries: [
+        {
+          name: "second.txt",
+          path: "/repo/other/second.txt",
+          is_directory: false,
+          size: 1,
+          mtime: 0,
+          mime_type: null,
+        },
+      ],
+    };
+    apiMocks.listFiles
+      .mockImplementationOnce(() => initial.promise)
+      .mockImplementationOnce(() => firstNav.promise)
+      .mockImplementationOnce(() => secondNav.promise)
+      // The listing's own `setCurrentPath` schedules a refresh effect; keep
+      // it on the same view so the assertion measures the stale-response
+      // guard rather than that follow-up.
+      .mockResolvedValue(secondPayload);
+
+    await renderFiles();
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Path"]',
+    )!;
+    const form = input.closest("form")!;
+    const setPath = async (path: string) => {
+      await act(async () => {
+        const setValue = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set;
+        setValue?.call(input, path);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => {
+        form.dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+      });
+    };
+
+    await setPath("/repo/docs");
+    await waitFor(() => apiMocks.listFiles.mock.calls.length >= 2);
+    const firstSignal = apiMocks.listFiles.mock.calls[1][1] as AbortSignal;
+
+    await setPath("/repo/other");
+    await waitFor(() => apiMocks.listFiles.mock.calls.length >= 3);
+    expect(firstSignal.aborted).toBe(true);
+
+    await act(async () => {
+      secondNav.resolve(secondPayload);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    await waitFor(() => container.textContent?.includes("second.txt") === true);
+
+    // The stale response arrives last; it must not replace the newer view.
+    await act(async () => {
+      firstNav.resolve({
+        ok: true,
+        root: "/repo",
+        path: "/repo/docs",
+        locked_root: "/repo",
+        can_change_path: false,
+        entries: [
+          {
+            name: "first.txt",
+            path: "/repo/docs/first.txt",
+            is_directory: false,
+            size: 1,
+            mtime: 0,
+            mime_type: null,
+          },
+        ],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    expect(container.textContent).toContain("second.txt");
+    expect(container.textContent).not.toContain("first.txt");
+  });
+
+  it("announces a listing failure in a live alert region", async () => {
+    apiMocks.listFiles.mockRejectedValue(new Error("permission denied"));
+    await renderFiles();
+    await waitFor(() => container.querySelector('[role="alert"]') !== null);
+    const alert = container.querySelector('[role="alert"]')!;
+    expect(alert.getAttribute("aria-live")).toBe("assertive");
+    expect(alert.textContent?.trim().length).toBeGreaterThan(0);
+  });
+});

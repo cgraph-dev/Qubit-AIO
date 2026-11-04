@@ -96,7 +96,7 @@ export default function CheckpointsPage() {
       <section className="settings-section">
         <div className="settings-section__header">
           <div className="settings-section__copy">
-            <h1 className="settings-section__heading">Checkpoints</h1>
+            <h2 className="settings-section__heading">Checkpoints</h2>
             <p className="settings-section__desc">
               Journal list, verify, create, and prune. Prune asks first.
             </p>

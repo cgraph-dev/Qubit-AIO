@@ -240,7 +240,7 @@ export function WebChatPage() {
     <div className="qb-chat h-full p-4" data-testid="webchat-page">
       <header className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-semibold">WebChat</h1>
+          <h2 className="text-lg font-semibold">WebChat</h2>
           <p className="qb-bubble-meta" data-testid="webchat-session">
             {sessionId ? `Session ${sessionId}` : "Opening session…"}
           </p>

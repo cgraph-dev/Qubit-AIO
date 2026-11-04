@@ -63,6 +63,8 @@ export interface Translations {
     expand: string;
     general: string;
     messaging: string;
+    /** Skip-to-content link shown on keyboard focus. */
+    skipToContent?: string;
     // Optional: non-English locales fall back to the English literal in the
     // component until translated, matching the enriched-profiles keys.
     gateway?: string;
@@ -102,6 +104,19 @@ export interface Translations {
       plugins: string;
       sessions: string;
       skills: string;
+      /** Additional sidebar labels; unknown keys fall back in the component. */
+      [label: string]: string;
+    };
+    /** Sidebar section headings (see lib/sidebar-sections.ts). */
+    sections?: {
+      primary: string;
+      work: string;
+      voice: string;
+      agents: string;
+      connect: string;
+      system: string;
+      more: string;
+      [section: string]: string;
     };
     modelToolsSheetSubtitle: string;
     modelToolsSheetTitle: string;

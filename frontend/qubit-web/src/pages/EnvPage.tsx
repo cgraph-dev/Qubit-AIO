@@ -22,7 +22,6 @@ import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { OAuthProvidersCard } from "@/components/OAuthProvidersCard";
 import { Button } from "@nous-research/ui/ui/components/button";
-import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import {
   Card,
@@ -359,12 +358,16 @@ function ProviderGroupCard({
   return (
     <div className="border border-border">
       {/* Header — always visible */}
-      <ListItem
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-        className="justify-between gap-3 px-4 py-3 hover:bg-primary/5"
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex w-full items-center justify-between gap-3 px-4 py-3 hover:bg-primary/5">
+        {/* The disclosure is the button; the external key link is a SIBLING.
+            Nesting an <a> inside the old ListItem <button> produced invalid
+            interactive-inside-interactive markup and broke keyboard use. */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           ) : (
@@ -378,15 +381,14 @@ function ProviderGroupCard({
               {configuredCount} {t.common.set.toLowerCase()}
             </Badge>
           )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
           {keyUrl && (
             <a
               href={keyUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              onClick={(e) => e.stopPropagation()}
             >
               {t.env.getKey} <ExternalLink className="h-2.5 w-2.5" />
             </a>
@@ -397,7 +399,7 @@ function ProviderGroupCard({
               .replace("{s}", group.entries.length !== 1 ? "s" : "")}
           </span>
         </div>
-      </ListItem>
+      </div>
 
       {expanded && (
         <div className="border-t border-border px-4 py-3 grid gap-2">

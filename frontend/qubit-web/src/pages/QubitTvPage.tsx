@@ -84,10 +84,10 @@ export default function QubitTvPage() {
     <div className="settings-page" data-testid="qubit-tv-page">
       <header className="settings-page__header">
         <div className="settings-page__copy">
-          <h1 className="settings-page__title flex items-center gap-2">
+          <h2 className="settings-page__title flex items-center gap-2">
             <Tv className="h-5 w-5 text-primary" aria-hidden="true" />
             Qubit TV
-          </h1>
+          </h2>
           <p className="settings-page__desc">
             Subscription services open in a new browser window. Their
             DRM-protected playback cannot be embedded or controlled from this

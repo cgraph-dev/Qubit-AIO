@@ -591,7 +591,7 @@ export default function HarnessRouterPage() {
                 ) : null}
               </div>
               <div className="hx-title-row">
-                <h1 className="hx-title">{openHarnessId || "Harness Router"}</h1>
+                <h2 className="hx-title">{openHarnessId || "Harness Router"}</h2>
                 <span className={"hx-pill is-" + (openHarnessId ? "ok" : "neutral")}>
                   {openHarnessId ? "agent" : "index"}
                 </span>

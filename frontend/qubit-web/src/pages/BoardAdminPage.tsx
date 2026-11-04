@@ -231,7 +231,7 @@ export default function BoardAdminPage() {
       <div className="workboard-main space-y-6 p-4">
         <header className="workboard-heading">
           <div className="workboard-heading__identity">
-            <h1 className="workboard-page-title text-xl font-semibold">Board administration</h1>
+            <h2 className="workboard-page-title text-xl font-semibold">Board administration</h2>
             <p className="text-sm text-muted-foreground">
               Tabs, widgets, roles, and the board log for one Qubit board. Sandbox-gated
               widget verbs stay disabled with their reason.
