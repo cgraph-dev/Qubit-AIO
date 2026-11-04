@@ -13,6 +13,16 @@ def _manifest(path, text):
     (path / "plugin.yaml").write_text(text, encoding="utf-8")
 
 
+def test_bundled_email_manifest_exposes_the_authserv_id_setup_field():
+    """The strict authserv-id pin needs an operator-facing field: the bundled email manifest's
+    optional_env entry must reach the dashboard/config form as a non-secret messaging variable."""
+    meta = config_mod.OPTIONAL_ENV_VARS["EMAIL_AUTHSERV_ID"]
+    assert meta["category"] == "messaging"
+    assert meta["password"] is False
+    assert "authserv-id" in meta["description"]
+    assert meta["prompt"] == "Receiving MTA authserv-id"
+
+
 def test_user_platform_plugins_inject_env_metadata_but_non_platforms_do_not(monkeypatch, tmp_path):
     home = tmp_path / "hermes-home"
     _manifest(home / "plugins" / "demo-platform", (
