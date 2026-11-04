@@ -2169,13 +2169,17 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # the old palette before React applies the saved theme.
         _boot_palettes = {
             "default": ("#041c1c", "#0a2e2e", "#7dd3c8"),
-            "default-large": ("#041c1c", "#0a2e2e", "#7dd3c8"),
-            "midnight": ("#0a0a1f", "#171033", "#d4c8ff"),
-            "ember": ("#1a0a06", "#2a1008", "#ffd8b0"),
-            "mono": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
-            "cyberpunk": ("#040608", "#07140b", "#9bffcf"),
-            "rose": ("#1a0f15", "#2a1620", "#ffd4e1"),
-            "qubit-blue": ("#f4f0e8", "#e7e1d2", "#1f4f8f"),
+            "q1-l": ("#041c1c", "#0a2e2e", "#7dd3c8"),
+            "q2": ("#f4f0e8", "#e7e1d2", "#1f4f8f"),
+            "q2-l": ("#f4f0e8", "#e7e1d2", "#1f4f8f"),
+            "q3": ("#0a0a1f", "#171033", "#d4c8ff"),
+            "q3-l": ("#0a0a1f", "#171033", "#d4c8ff"),
+            "q4": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
+            "q4-l": ("#0e0e0e", "#1a1a1a", "#eaeaea"),
+            "q5": ("#040608", "#07140b", "#9bffcf"),
+            "q5-l": ("#040608", "#07140b", "#9bffcf"),
+            "q6": ("#000000", "#0b0b0b", "#e8ff8f"),
+            "q6-l": ("#000000", "#0b0b0b", "#e8ff8f"),
         }
         _boot_bg, _boot_mid, _boot_fg = _boot_palettes.get(
             theme_name, ("#041c1c", "#0a2e2e", "#7dd3c8"))

@@ -7,8 +7,15 @@ import type { DashboardTheme, ThemeTypography, ThemeLayout } from "./types";
  * themes produces visible changes beyond just color — fonts, density, and
  * corner-radius all shift to match the theme's personality.
  *
- * Theme names must stay in sync with the backend's
- * `_BUILTIN_DASHBOARD_THEMES` list in `qubit_cli/web_server.py`.
+ * Theme ids are Qubit-owned (`q1`..`q6`); the picker shows Q1..Q6. Every
+ * theme ships a "-L" large variant (Q1-L .. Q6-L) that keeps the same look
+ * with a bigger root size and roomier spacing. Theme names must stay in sync
+ * with the backend's `_BUILTIN_DASHBOARD_THEMES` list in
+ * `qubit_cli/web_server_dashboard.py`.
+ *
+ * `default` is the canonical first theme and keeps its id (it is the
+ * fallback in `resolveTheme`, the boot splash, and the persisted default);
+ * it is presented as Q1.
  */
 
 // ---------------------------------------------------------------------------
@@ -34,14 +41,24 @@ const DEFAULT_LAYOUT: ThemeLayout = {
   density: "comfortable",
 };
 
+/** The "large" treatment applied to every theme. */
+const LARGE_TYPOGRAPHY: Partial<ThemeTypography> = {
+  baseSize: "18px",
+  lineHeight: "1.65",
+};
+const LARGE_LAYOUT: Partial<ThemeLayout> = {
+  density: "spacious",
+};
+
 // ---------------------------------------------------------------------------
 // Themes
 // ---------------------------------------------------------------------------
 
+/** Q1 — the canonical deep-teal look and the dashboard default. */
 export const defaultTheme: DashboardTheme = {
   name: "default",
-  label: "Qubit Teal",
-  description: "Classic dark teal — the canonical Qubit look",
+  label: "Q1",
+  description: "Q1 — deep teal canvas with warm cream ink and an amber glow",
   palette: {
     background: { hex: "#041c1c", alpha: 1 },
     midground: { hex: "#ffe6cb", alpha: 1 },
@@ -54,10 +71,34 @@ export const defaultTheme: DashboardTheme = {
   terminalBackground: "#000000",
 };
 
+/** Q2 — light mode: vivid blue accents on a pale canvas. */
+export const qubitBlueTheme: DashboardTheme = {
+  name: "q2",
+  label: "Q2",
+  description: "Q2 — pale blue canvas with a saturated blue accent",
+  palette: {
+    background: { hex: "#E8F2FD", alpha: 1 },
+    midground: { hex: "#0053FD", alpha: 1 },
+    foreground: { hex: "#170d02", alpha: 0 },
+    warmGlow: "rgba(0, 83, 253, 0.12)",
+    noiseOpacity: 0,
+  },
+  typography: DEFAULT_TYPOGRAPHY,
+  layout: DEFAULT_LAYOUT,
+  terminalBackground: "#f5f8fc",
+  terminalForeground: "#170d02",
+  seriesColors: {
+    inputTokenAccent: "#001934",
+    outputTokenAccent: "#0053fd",
+  },
+  swatchColors: ["#170d02", "#0053FD", "#E8F2FD"],
+};
+
+/** Q3 — deep blue-violet night canvas. */
 export const midnightTheme: DashboardTheme = {
-  name: "midnight",
-  label: "Midnight",
-  description: "Deep blue-violet with cool accents",
+  name: "q3",
+  label: "Q3",
+  description: "Q3 — near-black navy canvas with a lilac tint and violet glow",
   palette: {
     background: { hex: "#0a0a1f", alpha: 1 },
     midground: { hex: "#d4c8ff", alpha: 1 },
@@ -79,38 +120,11 @@ export const midnightTheme: DashboardTheme = {
   },
 };
 
-export const emberTheme: DashboardTheme = {
-  name: "ember",
-  label: "Ember",
-  description: "Warm crimson and bronze — forge vibes",
-  palette: {
-    background: { hex: "#1a0a06", alpha: 1 },
-    midground: { hex: "#ffd8b0", alpha: 1 },
-    foreground: { hex: "#ffffff", alpha: 0 },
-    warmGlow: "rgba(249, 115, 22, 0.38)",
-    noiseOpacity: 1,
-  },
-  typography: {
-    ...DEFAULT_TYPOGRAPHY,
-    fontSans: `"Spectral", Georgia, "Times New Roman", serif`,
-    fontMono: `"IBM Plex Mono", ${SYSTEM_MONO}`,
-    fontUrl:
-      "https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap",
-  },
-  layout: {
-    ...DEFAULT_LAYOUT,
-    radius: "0.25rem",
-  },
-  colorOverrides: {
-    destructive: "#c92d0f",
-    warning: "#f97316",
-  },
-};
-
+/** Q4 — grayscale, square corners. */
 export const monoTheme: DashboardTheme = {
-  name: "mono",
-  label: "Mono",
-  description: "Clean grayscale — minimal and focused",
+  name: "q4",
+  label: "Q4",
+  description: "Q4 — neutral greyscale canvas with square corners and no accent hue",
   palette: {
     background: { hex: "#0e0e0e", alpha: 1 },
     midground: { hex: "#eaeaea", alpha: 1 },
@@ -131,10 +145,11 @@ export const monoTheme: DashboardTheme = {
   },
 };
 
+/** Q5 — high-chroma terminal look, monospace throughout. */
 export const cyberpunkTheme: DashboardTheme = {
-  name: "cyberpunk",
-  label: "Cyberpunk",
-  description: "Neon green on black — matrix terminal",
+  name: "q5",
+  label: "Q5",
+  description: "Q5 — black canvas, monospace throughout, bright mint signal colour",
   palette: {
     background: { hex: "#040608", alpha: 1 },
     midground: { hex: "#9bffcf", alpha: 1 },
@@ -160,81 +175,71 @@ export const cyberpunkTheme: DashboardTheme = {
   },
 };
 
-export const roseTheme: DashboardTheme = {
-  name: "rose",
-  label: "Rosé",
-  description: "Soft pink and warm ivory — easy on the eyes",
+/** Q6 — maximum-contrast accessibility preset. */
+export const contrastTheme: DashboardTheme = {
+  name: "q6",
+  label: "Q6",
+  description: "Q6 — pure black canvas, pure white ink, maximum contrast",
   palette: {
-    background: { hex: "#1a0f15", alpha: 1 },
-    midground: { hex: "#ffd4e1", alpha: 1 },
+    background: { hex: "#000000", alpha: 1 },
+    midground: { hex: "#e8ff8f", alpha: 1 },
     foreground: { hex: "#ffffff", alpha: 0 },
-    warmGlow: "rgba(249, 168, 212, 0.3)",
-    noiseOpacity: 0.9,
-  },
-  typography: {
-    ...DEFAULT_TYPOGRAPHY,
-    fontSans: `"Fraunces", Georgia, serif`,
-    fontMono: `"DM Mono", ${SYSTEM_MONO}`,
-    fontUrl:
-      "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=DM+Mono:wght@400;500&display=swap",
-  },
-  layout: {
-    ...DEFAULT_LAYOUT,
-    radius: "1rem",
-  },
-};
-
-/** Light mode — vivid Qubit-blue accents on a cream canvas. */
-export const qubitBlueTheme: DashboardTheme = {
-  name: "qubit-blue",
-  label: "Qubit Blue",
-  description: "Light mode — vivid Qubit-blue accents on cream canvas",
-  palette: {
-    background: { hex: "#E8F2FD", alpha: 1 },
-    midground: { hex: "#0053FD", alpha: 1 },
-    foreground: { hex: "#170d02", alpha: 0 },
-    warmGlow: "rgba(0, 83, 253, 0.12)",
+    warmGlow: "rgba(232, 255, 143, 0.22)",
     noiseOpacity: 0,
   },
-  typography: DEFAULT_TYPOGRAPHY,
-  layout: DEFAULT_LAYOUT,
-  terminalBackground: "#f5f8fc",
-  terminalForeground: "#170d02",
-  seriesColors: {
-    inputTokenAccent: "#001934",
-    outputTokenAccent: "#0053fd",
-  },
-  swatchColors: ["#170d02", "#0053FD", "#E8F2FD"],
-};
-
-/**
- * Same look as ``defaultTheme`` but with a larger root font size, looser
- * line-height, and ``spacious`` density so every rem-based size in the
- * dashboard scales up. For users who find the default 15px UI too dense.
- */
-export const defaultLargeTheme: DashboardTheme = {
-  name: "default-large",
-  label: "Qubit Teal (Large)",
-  description: "Qubit Teal with bigger fonts and roomier spacing",
-  palette: defaultTheme.palette,
   typography: {
     ...DEFAULT_TYPOGRAPHY,
-    baseSize: "18px",
-    lineHeight: "1.65",
+    lineHeight: "1.6",
   },
   layout: {
     ...DEFAULT_LAYOUT,
-    density: "spacious",
+    radius: "0.25rem",
+  },
+  colorOverrides: {
+    success: "#a5df7b",
+    warning: "#f0c56b",
+    destructive: "#ff8178",
   },
 };
+
+// ---------------------------------------------------------------------------
+// Large variants — same look, bigger type and roomier spacing
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive a theme's large variant. The palette and every other look-defining
+ * field are inherited by reference so a base-theme edit flows into its large
+ * sibling; only typography, layout, and the Q-number label change.
+ */
+function largeVariant(base: DashboardTheme, name: string, num: number): DashboardTheme {
+  return {
+    ...base,
+    name,
+    label: `Q${num}-L`,
+    description: `Q${num}-L — the Q${num} look with larger type and roomier spacing`,
+    typography: { ...base.typography, ...LARGE_TYPOGRAPHY },
+    layout: { ...base.layout, ...LARGE_LAYOUT },
+  };
+}
+
+export const bigDefaultTheme = largeVariant(defaultTheme, "q1-l", 1);
+export const bigQubitBlueTheme = largeVariant(qubitBlueTheme, "q2-l", 2);
+export const bigMidnightTheme = largeVariant(midnightTheme, "q3-l", 3);
+export const bigMonoTheme = largeVariant(monoTheme, "q4-l", 4);
+export const bigCyberpunkTheme = largeVariant(cyberpunkTheme, "q5-l", 5);
+export const bigContrastTheme = largeVariant(contrastTheme, "q6-l", 6);
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
-  "default-large": defaultLargeTheme,
-  "qubit-blue": qubitBlueTheme,
-  midnight: midnightTheme,
-  ember: emberTheme,
-  mono: monoTheme,
-  cyberpunk: cyberpunkTheme,
-  rose: roseTheme,
+  "q1-l": bigDefaultTheme,
+  q2: qubitBlueTheme,
+  "q2-l": bigQubitBlueTheme,
+  q3: midnightTheme,
+  "q3-l": bigMidnightTheme,
+  q4: monoTheme,
+  "q4-l": bigMonoTheme,
+  q5: cyberpunkTheme,
+  "q5-l": bigCyberpunkTheme,
+  q6: contrastTheme,
+  "q6-l": bigContrastTheme,
 };

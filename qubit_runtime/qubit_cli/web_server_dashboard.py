@@ -306,23 +306,38 @@ def mount_spa(application: FastAPI):
 # ---------------------------------------------------------------------------
 
 # Built-in themes — label + description only; colors live in web/src/themes/presets.ts.
+# Qubit-owned ids (Q1..Q6, each with a `-L` large variant); `default` stays the
+# canonical first theme and is presented as Q1. Keep in sync with
+# BUILTIN_THEMES in presets.ts (the client asserts the two lists agree).
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "default",       "label": "Qubit Teal",         "description": "Classic dark teal — the canonical Qubit look"},
-    {"name": "default-large", "label": "Qubit Teal (Large)", "description": "Qubit Teal with bigger fonts and roomier spacing"},
-    {"name": "qubit-blue",    "label": "Qubit Blue",           "description": "Light mode — vivid Qubit-blue accents on cream canvas"},
-    {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
-    {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
-    {"name": "mono",      "label": "Mono",           "description": "Clean grayscale — minimal and focused"},
-    {"name": "cyberpunk", "label": "Cyberpunk",      "description": "Neon green on black — matrix terminal"},
-    {"name": "rose",      "label": "Rosé",           "description": "Soft pink and warm ivory — easy on the eyes"},
+    {"name": "default", "label": "Q1",   "description": "Q1 — deep teal canvas with warm cream ink and an amber glow"},
+    {"name": "q1-l",    "label": "Q1-L", "description": "Q1-L — the Q1 look with larger type and roomier spacing"},
+    {"name": "q2",      "label": "Q2",   "description": "Q2 — pale blue canvas with a saturated blue accent"},
+    {"name": "q2-l",    "label": "Q2-L", "description": "Q2-L — the Q2 look with larger type and roomier spacing"},
+    {"name": "q3",      "label": "Q3",   "description": "Q3 — near-black navy canvas with a lilac tint and violet glow"},
+    {"name": "q3-l",    "label": "Q3-L", "description": "Q3-L — the Q3 look with larger type and roomier spacing"},
+    {"name": "q4",      "label": "Q4",   "description": "Q4 — neutral greyscale canvas with square corners and no accent hue"},
+    {"name": "q4-l",    "label": "Q4-L", "description": "Q4-L — the Q4 look with larger type and roomier spacing"},
+    {"name": "q5",      "label": "Q5",   "description": "Q5 — black canvas, monospace throughout, bright mint signal colour"},
+    {"name": "q5-l",    "label": "Q5-L", "description": "Q5-L — the Q5 look with larger type and roomier spacing"},
+    {"name": "q6",      "label": "Q6",   "description": "Q6 — pure black canvas, pure white ink, maximum contrast"},
+    {"name": "q6-l",    "label": "Q6-L", "description": "Q6-L — the Q6 look with larger type and roomier spacing"},
 ]
 
-# Theme ids renamed during the Qubit rebrand. Read-old so a preference
-# persisted under the pre-rebrand name (localStorage or server-side config)
-# still resolves to the canonical Qubit id instead of silently falling back
-# to the default theme. Keep entries until enough release cycles have passed.
+# Theme ids a preference may still carry from before the Q1..Q6 renaming.
+# Read-old so a persisted value (localStorage or server-side config) still
+# resolves to the Qubit theme it looks like instead of silently falling back
+# to the default. Retired themes (rose, ember, blue) have no successor and
+# deliberately fall back to the default.
 _THEME_NAME_ALIASES: Dict[str, str] = {
-    "nous-blue": "qubit-blue",
+    "nous-blue": "q2",
+    "lens-5i": "q2",
+    "qubit-blue": "q2",
+    "default-large": "q1-l",
+    "midnight": "q3",
+    "mono": "q4",
+    "cyberpunk": "q5",
+    "qubit-contrast": "q6",
 }
 
 

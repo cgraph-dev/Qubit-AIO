@@ -19901,9 +19901,12 @@ def themes_response(cfg: Any) -> Dict[str, Any]:
         stored = str(_prefs(cfg).get("theme", "") or "").strip()
     except Exception:  # noqa: BLE001 - prefs miss falls back to default
         stored = ""
-    # Read-old: a preference persisted under the legacy theme id resolves to
-    # its canonical Qubit id instead of silently falling back to the overlay.
-    stored = {"nous-blue": "qubit-blue"}.get(stored, stored)
+    # Read-old: a preference persisted under any pre-Q1..Q6 theme id resolves
+    # to the Qubit theme it looks like, instead of falling back to the
+    # overlay. Must mirror `web_server_dashboard._THEME_NAME_ALIASES`.
+    stored = {"nous-blue": "q2", "lens-5i": "q2", "qubit-blue": "q2",
+              "default-large": "q1-l", "midnight": "q3", "mono": "q4",
+              "cyberpunk": "q5", "qubit-contrast": "q6"}.get(stored, stored)
     if stored in names:
         active = stored
     elif "qubit" in names:
