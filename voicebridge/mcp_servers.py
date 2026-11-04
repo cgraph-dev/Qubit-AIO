@@ -771,7 +771,7 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
     # token cache, never a connection or a fabricated login result.
     catalog_oauth = _catalog_oauth_urls()
     for row in rows:
-        if row.get("connected"):
+        if row.get("connected") or not bool(row.get("enabled", False)):
             continue
         name = str(row.get("name") or "")
         status = str(row.get("status") or "")
