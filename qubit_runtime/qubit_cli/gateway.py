@@ -1248,9 +1248,17 @@ def _systemctl_show(properties: tuple[str, ...], *, system: bool) -> dict[str, s
     return _parse_kv_pairs(result.stdout.splitlines()) if result.returncode == 0 else {}
 
 
-def _unit_environment_value(unit_path: Path, name: str) -> str | None:
+def _unit_environment_value(
+    unit_path: Path, name: str, *, specifier_home: Path | str | None = None,
+) -> str | None:
     """Value of one ``Environment="NAME=…"`` directive in the unit file at *unit_path*, with
-    systemd's ``\\"``/``\\\\``/``%%`` quoting undone; None when the file or the key is absent."""
+    systemd's ``\\"``/``\\\\``/``%%`` quoting undone; None when the file or the key is absent.
+
+    ``specifier_home`` expands systemd's ``%h`` (the unit user's home) the way the manager
+    does at exec time. Installed units pin ``QUBIT_HOME=%h/...``; without the expansion an
+    ownership comparison sees a literal ``%h`` path that never equals the live home, so the
+    bare ``qubit-gateway`` unit is missed and the service name falls back to a path hash.
+    """
     try:
         text = unit_path.read_text(encoding="utf-8-sig")
     except OSError:
@@ -1261,15 +1269,42 @@ def _unit_environment_value(unit_path: Path, name: str) -> str | None:
             continue
         body = body[len("Environment=") :].strip()
         if body.startswith('"') and body.endswith('"'):
-            body = body[1:-1].replace('\\"', '"').replace("\\\\", "\\").replace("%%", "%")
+            body = body[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+        if specifier_home is not None:
+            # Keep an escaped literal ``%%h`` literal while expanding the real ``%h``.
+            body = body.replace("%%", "\x00").replace("%h", str(specifier_home)).replace("\x00", "%")
+        else:
+            body = body.replace("%%", "%")
         if body.startswith(f"{name}="):
             return body.split("=", 1)[1].strip() or None
     return None
 
 
+def _unit_specifier_home(unit_path: Path) -> Path:
+    """Account home systemd expands ``%h`` to for the unit at *unit_path*.
+
+    A system unit's ``%h`` is its ``User=`` home; a user unit's is the account home. Tests and
+    profile-isolated processes can point HOME elsewhere, so use the password database (and the
+    unit's own ``User=``) rather than ``Path.home()``.
+    """
+    from qubit_constants import get_real_home
+
+    if os.geteuid() == 0:  # windows-footgun: ok — only systemd units (Linux) have a User= specifier
+        user = _read_systemd_user_from_unit(unit_path)
+        if user:
+            try:
+                import pwd
+                return Path(pwd.getpwnam(user).pw_dir)
+            except (KeyError, ImportError):
+                pass
+    return Path(get_real_home())
+
+
 def _qubit_home_pinned_by_unit(unit_path: Path) -> str | None:
     """``QUBIT_HOME`` pinned by the unit file at *unit_path*, or None when absent/unreadable."""
-    return _unit_environment_value(unit_path, "QUBIT_HOME")
+    return _unit_environment_value(
+        unit_path, "QUBIT_HOME", specifier_home=_unit_specifier_home(unit_path)
+    )
 
 
 def _qubit_home_from_systemd_unit_file(system: bool = False) -> str | None:

@@ -1723,3 +1723,52 @@ def test_store_and_export_are_owner_only(tmp_path):
     assert stat.S_IMODE(outbox_directory.stat().st_mode) == 0o700
     assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
     assert stat.S_IMODE(package_path.stat().st_mode) == 0o600
+
+
+def test_due_export_defers_package_creation_when_the_store_is_busy(tmp_path):
+    """The finish-task hook must not raise ``database is locked``.
+
+    ``create_and_export_package_if_due`` is called from the interactive turn-finish
+    path; a sibling writer holding the store used to leak ``OperationalError`` out of
+    it. The package creation now joins the deferred-write queue and exports on the
+    next call.
+    """
+    store = SharedMetricsStore(tmp_path / "metrics.sqlite3", tmp_path / "outbox")
+    store.record_model_call(_dimensions(), _resource())
+    blocker = sqlite3.connect(tmp_path / "metrics.sqlite3")
+    blocker.execute("BEGIN IMMEDIATE")
+    try:
+        assert store.create_and_export_package_if_due() == []
+    finally:
+        blocker.rollback()
+        blocker.close()
+
+    paths = store.create_and_export_package_if_due()
+    assert len(paths) == 1
+    assert store.counter_snapshot()[0]["packaged_value"] == 1
+
+
+def test_an_export_claimed_by_another_process_is_not_reported_twice(tmp_path, monkeypatch):
+    """Two finishers exporting the same pending row: only the claim winner reports it."""
+    database_path = tmp_path / "metrics.sqlite3"
+    outbox_directory = tmp_path / "outbox"
+    first = SharedMetricsStore(database_path, outbox_directory)
+    first.record_model_call(_dimensions(), _resource())
+    with first._write() as connection:
+        payload = first._create_package_in_transaction(connection, shared_metrics_module._utc_now())
+    assert payload is not None
+
+    second = SharedMetricsStore(database_path, outbox_directory)
+    original_write = shared_metrics_module.atomic_json_write
+
+    def _competing_write(path, data, **kwargs):
+        original_write(path, data, **kwargs)
+        with second._write() as connection:
+            connection.execute(
+                "UPDATE package_outbox SET exported_at = ? WHERE package_id = ?",
+                (shared_metrics_module._isoformat(shared_metrics_module._utc_now()),
+                 payload["package_id"]),
+            )
+
+    monkeypatch.setattr(shared_metrics_module, "atomic_json_write", _competing_write)
+    assert first._export_pending_packages() == []

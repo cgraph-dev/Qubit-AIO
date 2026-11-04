@@ -209,3 +209,39 @@ def test_idle_detached_sweep_noop_when_all_fresh():
                                          key="a", session_id="S-a")
     assert srv._sweep_idle_detached() == 0
     assert "a" in srv._detached
+
+
+def test_new_session_evicts_detached_terminals_to_hold_the_total_budget():
+    """The ceiling is active + detached, not each set on its own.
+
+    Twelve active plus twelve detached TUIs (each with an MCP stack) was the
+    measured 15.8 GB cgroup amplification. A new chat reclaims the oldest
+    detached terminal instead of stacking a fresh process on top.
+    """
+    srv = _srv()
+    srv._max = 2
+    active = pty_ws._Session(bridge=_Bridge(), ticket=_ticket("live"),
+                             key="live")
+    with srv._lock:
+        srv._active[id(active)] = active
+    old_bridge = _Bridge()
+    srv._detached["old"] = pty_ws._Session(
+        bridge=old_bridge, ticket=_ticket("old"), key="old")
+
+    srv._evict_detached_for_room()
+
+    assert "old" not in srv._detached
+    assert old_bridge.closed is True
+    assert len(srv._active) + len(srv._detached) < srv._max
+
+
+def test_room_eviction_keeps_detached_terminals_under_the_budget():
+    srv = _srv()
+    srv._max = 3
+    for i in range(2):
+        srv._detached[f"d{i}"] = pty_ws._Session(
+            bridge=_Bridge(), ticket=_ticket(f"d{i}"), key=f"d{i}")
+
+    srv._evict_detached_for_room()
+
+    assert set(srv._detached) == {"d0", "d1"}, "nothing is evicted while there is room"

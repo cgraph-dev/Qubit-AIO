@@ -210,12 +210,14 @@ def test_cli_sigterm_after_watcher_consumed_the_marker_stays_planned(tmp_path, m
     from types import SimpleNamespace
 
     import gateway.run as run_mod
+    import gateway.restart as restart_mod
     import gateway.shutdown_forensics as forensics
 
     marker = tmp_path / ".gateway-planned-stop.json"
     monkeypatch.setattr(status_mod, "_get_planned_stop_marker_path", lambda: marker)
     monkeypatch.setattr(status_mod, "consume_takeover_marker_for_self", lambda: False)
     monkeypatch.setattr(forensics, "snapshot_shutdown_context", lambda *a, **k: None)
+    monkeypatch.setattr(restart_mod, "is_service_manager_stop", lambda *a, **k: False)
     monkeypatch.setattr(run_mod.asyncio, "create_task", lambda coro: coro.close())
 
     def _handler():
@@ -264,11 +266,13 @@ def test_bare_sigterm_still_reads_as_an_unexpected_kill(monkeypatch):
     from types import SimpleNamespace
 
     import gateway.run as run_mod
+    import gateway.restart as restart_mod
     import gateway.shutdown_forensics as forensics
 
     monkeypatch.setattr(status_mod, "consume_takeover_marker_for_self", lambda: False)
     monkeypatch.setattr(status_mod, "consume_planned_stop_marker_for_self", lambda: False)
     monkeypatch.setattr(forensics, "snapshot_shutdown_context", lambda *a, **k: None)
+    monkeypatch.setattr(restart_mod, "is_service_manager_stop", lambda *a, **k: False)
     monkeypatch.setattr(run_mod.asyncio, "create_task", lambda coro: coro.close())
 
     runner = SimpleNamespace(_signal_initiated_shutdown=False, stop=lambda: asyncio.sleep(0))
@@ -277,3 +281,44 @@ def test_bare_sigterm_still_reads_as_an_unexpected_kill(monkeypatch):
 
     assert flag[0] is True
     assert runner._signal_initiated_shutdown is True
+
+
+def test_service_manager_sigterm_is_a_planned_stop(monkeypatch):
+    """A systemd/launchd/s6 stop is planned even on a unit with no ExecStop marker.
+
+    Exiting 1 here makes systemd record ``Failed with result 'exit-code'`` on every normal
+    stop/restart and, with ``Restart=always``, produces restart churn for an operator stop.
+    """
+    import signal
+    from types import SimpleNamespace
+
+    import gateway.run as run_mod
+    import gateway.restart as restart_mod
+    import gateway.shutdown_forensics as forensics
+
+    monkeypatch.setattr(status_mod, "consume_takeover_marker_for_self", lambda: False)
+    monkeypatch.setattr(status_mod, "consume_planned_stop_marker_for_self", lambda: False)
+    monkeypatch.setattr(forensics, "snapshot_shutdown_context", lambda *a, **k: None)
+    monkeypatch.setattr(restart_mod, "is_service_manager_stop", lambda *a, **k: True)
+    monkeypatch.setattr(run_mod.asyncio, "create_task", lambda coro: coro.close())
+
+    runner = SimpleNamespace(_signal_initiated_shutdown=False, stop=lambda: asyncio.sleep(0))
+    flag = [False]
+    run_mod._start_gateway_make_shutdown_signal_handler(runner, flag)(signal.SIGTERM)
+
+    assert flag[0] is False
+    assert runner._signal_initiated_shutdown is False
+
+
+def test_service_manager_detection_requires_a_service_cgroup(monkeypatch):
+    import gateway.restart as restart_mod
+
+    assert restart_mod.is_service_manager_stop(
+        {"INVOCATION_ID": "abc"},
+        cgroup_text="0::/user.slice/user-1000.slice/user@1000.service/app.slice/qubit-gateway.service",
+    ) is True
+    assert restart_mod.is_service_manager_stop(
+        {"INVOCATION_ID": "abc"},
+        cgroup_text="0::/user.slice/user-1000.slice/session-2.scope",
+    ) is False
+    assert restart_mod.is_service_manager_stop({}, cgroup_text="0::/x.service") is False

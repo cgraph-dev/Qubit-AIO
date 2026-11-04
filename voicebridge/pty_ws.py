@@ -1040,7 +1040,17 @@ class PtyWsServer:
                         self._detach(session)
                 return
 
-        # 2) Spawn the real terminal behind the vendored PTY bridge.
+        # 2) Spawn the real terminal behind the vendored PTY bridge. A reattach
+        # above returns before this point; every path here is a NEW TUI, so make
+        # room against the total (active + detached) budget first. Counting only
+        # ``_active`` let 12 active plus 12 detached TUIs coexist, each with its
+        # own MCP stack (the measured cgroup-amplification defect).
+        self._evict_detached_for_room()
+        with self._lock:
+            if len(self._active) >= self._max:
+                _fail_chat_start(handler, RuntimeError(
+                    "Too many concurrent terminal sessions; close one first"))
+                return
         try:
             bridge, meta = self._request_spawn(cols, rows, resume, profile,
                                                workspace_cwd)
@@ -1269,7 +1279,7 @@ class PtyWsServer:
                 # lock: ``_teardown`` takes ``self._lock`` too, and a plain
                 # ``threading.Lock`` is not reentrant — calling it inside this
                 # block self-deadlocked the whole listener on the first eviction.
-                while len(self._detached) > self._max:
+                while len(self._active) + len(self._detached) > self._max:
                     old_key = next(iter(self._detached))
                     if old_key == session.key:
                         break
@@ -1280,6 +1290,26 @@ class PtyWsServer:
             self._teardown(old)
         log_event("webui.pty.session_detach", session=session.ticket.session,
                   pid=_safe_pid(session.bridge))
+
+    def _evict_detached_for_room(self) -> None:
+        """Retire the oldest detached terminals until a new active one fits.
+
+        The ceiling is the TOTAL live TUI count, not each set separately: a
+        detached terminal still runs its child, its session lease and its MCP
+        stack, so 12 active + 12 detached was a 24-process amplification. New
+        connections evict the oldest detached terminals instead of refusing a
+        fresh chat while orphans sit idle.
+        """
+        evicted: list[_Session] = []
+        with self._lock:
+            while (len(self._active) + len(self._detached) >= self._max
+                   and self._detached):
+                old_key = next(iter(self._detached))
+                old = self._detached.pop(old_key, None)
+                if old is not None:
+                    evicted.append(old)
+        for old in evicted:
+            self._teardown(old)
 
     def _reattach(self, key: str) -> Optional[_Session]:
         """Return a still-live detached session for ``key``, if any.

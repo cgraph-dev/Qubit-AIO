@@ -33,6 +33,7 @@ import re
 import tempfile
 import threading
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -667,7 +668,10 @@ def _write_active_record(cfg: Any, rec: Optional[Dict[str, Any]]) -> Path:
     if rec is None:
         reg.pop(ACTIVE_KEY, None)
     else:
-        reg[ACTIVE_KEY] = rec
+        # Stamp the write: a legacy pointer with no stamp cannot be distinguished
+        # from one superseded by a newer configured default, so it defers to that
+        # default instead of reporting a model the turn path no longer uses.
+        reg[ACTIVE_KEY] = {**rec, "updated_at": datetime.now(UTC).isoformat()}
     reg.setdefault("version", 1)
     _atomic_json(path, reg)
     return path
@@ -1152,7 +1156,17 @@ def _pick(cfg: Any, *, role: str, profile_id: Optional[str],
     if apid and str(active.get("role", "") or DEFAULT_ROLE) in (role, "*"):
         p = get_profile(cfg, apid)
         if p is not None and _usable_as_default(cfg, p, role):
-            return p, "active"
+            configured = configured_default_model(cfg)
+            cp = _profile_for_model(cfg, configured, role) if configured else None
+            same_route = (
+                cp is not None and cp.enabled
+                and cp.model == p.model and cp.provider == p.provider
+            )
+            if not configured or same_route or str(active.get("updated_at") or "").strip():
+                return p, "active"
+            # Legacy pointer (written before this timestamp existed) that names a
+            # different route than the configured default: the config slot is what
+            # the runtime actually boots, so it wins instead of the stale pointer.
     # The embedding role is a local embedding adapter, not the generative
     # default. Resolve it canonically without adding a second shipped profile
     # record (keeps the model-profile inventory unchanged).
@@ -1223,6 +1237,55 @@ def resolve_model(cfg: Any, requested: Optional[str] = None, *,
             f"policy_enabled={eff.policy_enabled} allowlisted={eff.allowlisted} "
             f"egress_allowed={eff.egress_allowed}")
     return out
+
+
+def model_identity(cfg: Any, *, role: str = DEFAULT_ROLE) -> Dict[str, Any]:
+    """The effective vs configured vs persisted-active model identity (typed, never raises).
+
+    The dashboard answers ``/api/model/info`` from the effective selection, while the
+    runtime config slot is what a cold process boots. This makes disagreement explicit
+    (``MODEL_IDENTITY_MISMATCH``) instead of silently reporting one side; a stamped
+    active selection still wins, while a legacy unstamped pointer that names another
+    route is reported as ``STALE_ACTIVE`` and the configured default is effective.
+    """
+    effective = resolve_model(cfg, role=role)
+    configured = configured_default_model(cfg) or ""
+    configured_profile = _profile_for_model(cfg, configured, role) if configured else None
+    rec = _read_active_record(cfg)
+    active_id = str(rec.get("profile", "") or "") if str(
+        rec.get("role", "") or DEFAULT_ROLE) in (role, "*") else ""
+    active_profile = get_profile(cfg, active_id) if active_id else None
+    active_model = active_profile.model if active_profile is not None else ""
+    active_provider = active_profile.provider if active_profile is not None else ""
+    effective_model = str(effective.get("model") or "")
+    effective_provider = str(effective.get("provider") or "")
+    state, code, detail = "OK", "", ""
+    if active_model and configured and active_model != configured:
+        state = ("MISMATCH" if effective.get("source") == "active"
+                 else "STALE_ACTIVE")
+        code = "MODEL_IDENTITY_MISMATCH"
+        detail = (
+            f"active profile {active_id!r} names {active_provider}/{active_model}, "
+            f"but the configured default is {configured!r}; effective selection is "
+            f"{effective_provider}/{effective_model} from {effective.get('source')!r}"
+        )
+    return {
+        "state": state,
+        "code": code,
+        "detail": detail,
+        "match": state == "OK",
+        "role": role,
+        "profile_id": str(effective.get("profile_id") or ""),
+        "effective_model": effective_model,
+        "effective_provider": effective_provider,
+        "effective_source": str(effective.get("source") or ""),
+        "configured_model": configured,
+        "configured_provider": str(getattr(configured_profile, "provider", "") or ""),
+        "active_profile": active_id,
+        "active_model": active_model,
+        "active_provider": active_provider,
+        "active_stamped": bool(str(rec.get("updated_at") or "").strip()),
+    }
 
 
 def terminal_min_context_tokens(cfg: Any) -> int:
@@ -1564,7 +1627,7 @@ __all__ = [
     "clone_model_profile", "session_overrides", "set_session_profile",
     "clear_session_profile", "get_active_profile", "set_active_profile",
     "clear_active_profile",
-    "resolve", "resolve_model", "resolve_embedding",
+    "resolve", "resolve_model", "resolve_embedding", "model_identity",
     "test_profile",
     "is_secret_ref", "looks_like_raw_secret",
     "list_speech_profiles", "show_speech_profile", "upsert_speech_profile",
