@@ -452,6 +452,9 @@ install_launcher() {
 # and never opens a second dashboard/bridge.
 set -euo pipefail
 
+# Qubit home: pinned by the installer for a --prefix / explicit-home install.
+__QUBIT_HOME_PIN__
+
 repo_for() {
   # Each branch prints the directory CONTAINING the real `qubit` console script.
   # 1) explicit operator override
@@ -485,10 +488,39 @@ echo "qubit: no Qubit installation found." >&2
 echo "  Run scripts/install.sh in the authoritative checkout, or set QUBIT_REPO." >&2
 exit 127
 QUBIT_LAUNCHER
-  local repo_sed
+  # Pin the resolved home only for a portable/explicit install. A default
+  # install keeps resolving ~/.qubit at run time (so moving HOME still works),
+  # but a --prefix install must not silently read the real HOME's ~/.qubit:
+  # INSTALL.md documents --prefix as equivalent to QUBIT_HOME=DIR. An explicit
+  # QUBIT_HOME in the environment still wins over the baked default.
+  local launcher_home=""
+  if [ -n "$PREFIX" ] || [ "$QUBIT_HOME_EXPLICIT" = "1" ]; then
+    launcher_home="$QUBIT_HOME"
+    case "$launcher_home" in
+      "~") launcher_home="$HOME" ;;
+      "~/"*) launcher_home="$HOME/${launcher_home#\~/}" ;;
+    esac
+    case "$launcher_home" in
+      /*) ;;
+      *) launcher_home="$(pwd)/$launcher_home" ;;
+    esac
+  fi
+  local repo_sed home_sed
   repo_sed="$(printf '%s' "$PROJECT_DIR" | sed -e 's/[\\&|]/\\&/g')"
-  sed -i "s|__QUBIT_REPO__|$repo_sed|g" "$tmp"
-  if grep -q '__QUBIT_REPO__' "$tmp"; then
+  if [ -n "$launcher_home" ]; then
+    # `export`, not a bare assignment: the launcher execs the real console
+    # script, which only sees an exported QUBIT_HOME.
+    home_sed="$(printf '%s' "export QUBIT_HOME=\"\${QUBIT_HOME:-$launcher_home}\"" | sed -e 's/[\\&|]/\\&/g')"
+  else
+    home_sed="# QUBIT_HOME resolves from the environment, defaulting to ~/.qubit."
+  fi
+  # Render to a NEW file instead of `sed -i`: BSD/macOS sed requires an
+  # explicit backup suffix, so GNU-style in-place editing breaks the supported
+  # macOS install at this exact step.
+  sed -e "s|__QUBIT_REPO__|$repo_sed|g" \
+      -e "s|__QUBIT_HOME_PIN__|$home_sed|g" "$tmp" > "$tmp.rendered"
+  mv -f "$tmp.rendered" "$tmp"
+  if grep -q '__QUBIT_REPO__' "$tmp" || grep -q '__QUBIT_HOME_PIN__' "$tmp"; then
     echo "ERROR: launcher render left an unexpanded placeholder" >&2
     rm -f "$tmp"; return 1
   fi
@@ -1044,8 +1076,15 @@ if ! preflight; then
   exit 1
 fi
 
-install_venv_and_package
+# Build the dashboard BEFORE installing the package. The package is installed
+# non-editable, and voicebridge/resources.py resolves the bundle from package
+# data (site-packages/voicebridge/_data/frontend/qubit-dist) first; a wheel
+# built before the bundle exists can never see a later checkout build. The
+# previous order installed a dashboard-less wheel and then built the bundle in
+# the checkout, so a one-pass clean source install served a STALE/BROKEN
+# dashboard until the installer was run a second time.
 install_dashboard
+install_venv_and_package
 
 install_voice_layout
 install_model_assets
