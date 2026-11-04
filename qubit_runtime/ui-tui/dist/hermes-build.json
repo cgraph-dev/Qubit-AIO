@@ -1,1 +1,1 @@
-{"schema":1,"product":"tui","platform":"linux","arch":"x64","node":"22.22.3","inputs":{"sourceHash":"3775512fcebd41d501a962308e65929912651f2738821f6892281ca90d5d06a1","prepared":[]},"outputHash":"b977dc0895d5dd97d8b8fad411cab7b4046d84a134e6d32b2c0bf2979983d50c"}
+{"schema":1,"product":"tui","platform":"linux","arch":"x64","node":"26.12.1","inputs":{"sourceHash":"3775512fcebd41d501a962308e65929912651f2738821f6892281ca90d5d06a1","prepared":[]},"outputHash":"b977dc0895d5dd97d8b8fad411cab7b4046d84a134e6d32b2c0bf2979983d50c"}
