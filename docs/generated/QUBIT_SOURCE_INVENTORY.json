@@ -20955,7 +20955,7 @@
    },
    {
     "path": "ui-tui/dist/hermes-build.json",
-    "local_sha256": "fb81be2821cf4c657c9050f3e615cc63ddaa0e5e60c5eaf74b0c49c306c065fc"
+    "local_sha256": "4228453767f1735ed69d283983711a0614a4e0b58f1f34796a5b5588255d66cf"
    },
    {
     "path": "ui-tui/scripts/bench-native-history.tsx",
