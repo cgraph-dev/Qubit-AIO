@@ -84,8 +84,8 @@ def resolve_journal_path(explicit: Optional[str] = None) -> Optional[Path]:
     except Exception:
         pass
     try:
-        from voicebridge.config import canonical_state_dir
-        return Path(canonical_state_dir()) / "events.jsonl"
+        from voicebridge.config import preferred_state_dir
+        return Path(preferred_state_dir()) / "events.jsonl"
     except Exception:
         return None
 

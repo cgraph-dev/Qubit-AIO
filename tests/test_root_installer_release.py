@@ -245,6 +245,55 @@ def test_dry_run_fresh_home_prints_new_qubit_home_layout(tmp_path: Path):
     assert f"models    : {qh}/voice/models" in r.stdout
     # Dry-run must not initialize the new tree.
     assert not qh.exists()
+    # ...and must not fall back to a fresh XDG voice tree either.
+    assert not (home / ".config").exists()
+    assert not (home / ".local").exists()
+
+
+@needs_uv
+def test_dry_run_prefix_wins_over_an_existing_xdg_home(tmp_path: Path):
+    """--prefix is a portable new install: it never adopts HOME's XDG tree."""
+    home = tmp_path / "home"
+    old = home / ".config" / "qubit-voicebridge"
+    old.mkdir(parents=True)
+    old_cfg = old / "voice.yaml"
+    old_cfg.write_text("logging:\n  jsonl: false\n", encoding="utf-8")
+    before = old_cfg.read_bytes()
+    prefix = tmp_path / "portable"
+
+    r = _run(
+        ["--dry-run", "--prefix", str(prefix), "--without-models", "--without-dashboard"],
+        _env(home),
+    )
+
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert f"QUBIT_HOME: {prefix}" in r.stdout
+    assert f"layout    : new ({prefix}/voice)" in r.stdout
+    assert f"config    : {prefix}/voice/config/voice.yaml" in r.stdout
+    assert f"state     : {prefix}/voice/state" in r.stdout
+    assert f"launcher  : {prefix}/bin/qubit" in r.stdout
+    # The real-home XDG install is neither used nor touched.
+    assert old_cfg.read_bytes() == before
+    assert not (home / ".qubit").exists()
+    assert not (home / ".local").exists()
+    assert not prefix.exists()
+
+
+@needs_uv
+def test_dry_run_with_systemd_plans_every_new_layout_dropin(tmp_path: Path):
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run(
+        ["--dry-run", "--with-systemd", "--without-models", "--without-dashboard"],
+        _env(home),
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "layout drop-ins:" in r.stdout
+    # The hotkey helper also pins QUBIT_HOME, so a new install must cover it.
+    assert "qubit-voicebridge.service.d/10-qubit-home.conf" in r.stdout
+    assert "qubit-voice-typing.service.d/10-qubit-home.conf" in r.stdout
+    src = INSTALL.read_text(encoding="utf-8")
+    assert "qubit-voice-typing.service" in src
 
 
 @needs_uv

@@ -923,8 +923,14 @@ def test_service_equivalent_environment(monkeypatch, tmp_path):
         monkeypatch.delenv(var, raising=False)
     assert C.canonical_data_dir() == \
         tmp_path / "home" / ".local/share" / "qubit-voicebridge"
+    # No existing XDG install: the effective config is the new QUBIT_HOME
+    # tree (the test harness pins QUBIT_HOME for isolation).
     assert C.resolve_config_path() == \
-        tmp_path / "home" / ".config" / "qubit-voicebridge" / "voice.yaml"
+        Path(os.environ["QUBIT_HOME"]) / "voice/config/voice.yaml"
+    # Once a legacy XDG install exists, the same process reads it in place.
+    legacy = tmp_path / "home" / ".config" / "qubit-voicebridge"
+    legacy.mkdir(parents=True)
+    assert C.resolve_config_path() == legacy / "voice.yaml"
 
 
 def test_active_environment_has_no_snap_fragmentation():

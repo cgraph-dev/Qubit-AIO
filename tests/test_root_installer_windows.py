@@ -105,6 +105,20 @@ def test_default_root_is_the_qubit_localappdata_path():
     assert "Join-Path $env:LOCALAPPDATA 'qubit'" in block
 
 
+def test_voice_bridge_lives_under_the_qubit_home_voice_tree():
+    """A new Windows install uses $QUBIT_HOME\\voice, like scripts/install.sh."""
+    src = _ps1()
+    assert "Join-Path $homePath 'voice'" in src
+    assert "Join-Path $voiceRoot 'config'" in src
+    assert "Join-Path $voiceRoot 'models'" in src
+    # The old per-identity XDG voice tree must not be the install target.
+    assert "Join-Path (Join-Path $data 'qubit-voicebridge') 'models'" not in src
+    assert "Join-Path $config 'qubit-voicebridge'" not in src
+    # All five voice directories are initialized on a real install.
+    for kind in ("'data'", "'state'", "'cache'", "'models'"):
+        assert kind in src
+
+
 def test_channel_is_stable_or_main():
     src = _ps1()
     assert "$Channel" in src
