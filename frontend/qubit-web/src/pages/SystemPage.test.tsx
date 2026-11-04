@@ -263,6 +263,29 @@ describe("SystemPage gateway control honesty", () => {
     expect(buttonByText("Start")!.disabled).toBe(false);
     expect(buttonByText("Stop")!.disabled).toBe(true);
   });
+
+  it("stacks the gateway status above the controls on narrow screens", async () => {
+    // At 390px the status line plus three buttons used to overflow the card
+    // and reach past the viewport edge. The card content stacks below `sm`,
+    // and the control group wraps instead of forcing a single clipped row.
+    apiMocks.getStatus.mockResolvedValue({
+      can_update_qubit: false,
+      active_sessions: 0,
+      gateway_running: true,
+      gateway_state: "OK",
+      gateway_pid: 4242,
+    });
+    await renderSystem();
+
+    await waitFor(() => buttonByText("Start") !== null);
+    const start = buttonByText("Start")!;
+    const controls = start.parentElement!;
+    const cardContent = controls.parentElement!;
+    expect(controls.className).toContain("flex-wrap");
+    expect(cardContent.className).toContain("flex-col");
+    expect(cardContent.className).toContain("sm:flex-row");
+    expect(cardContent.className).toContain("sm:items-center");
+  });
 });
 
 describe("SystemPage emergency stop", () => {

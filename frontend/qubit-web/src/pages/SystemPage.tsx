@@ -1255,17 +1255,17 @@ export default function SystemPage() {
           <Power className="h-4 w-4" /> Gateway
         </H2>
         <Card>
-          <CardContent className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
               <Badge tone={gatewayRunning ? "success" : "secondary"}>
                 {gatewayRunning ? "running" : "stopped"}
               </Badge>
-              <span className="text-sm text-muted-foreground">
+              <span className="min-w-0 break-words text-sm text-muted-foreground">
                 {status?.gateway_state ?? "—"}
                 {status?.gateway_pid ? ` · pid ${status.gateway_pid}` : ""}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 className="uppercase"
