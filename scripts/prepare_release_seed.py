@@ -420,14 +420,20 @@ def build_wheel(dest: Path, out_dir: Path, checks: Checks) -> Path | None:
     return wheels[-1] if wheels else None
 
 
-def make_release_base(dest: Path, base: Path) -> tuple[Path, Path]:
+def make_release_base(dest: Path, base: Path, archive: Path | None = None) -> tuple[Path, Path]:
     if base.exists():
         shutil.rmtree(base)
     base.mkdir(parents=True)
+    assets = [("install.sh", dest / "scripts" / "install.sh")]
+    if archive is not None:
+        assets.append(("qubit-release.tar.gz", archive))
+    lines = []
+    for name, source in assets:
+        shutil.copy2(source, base / name)
+        lines.append("%s  %s" % (_sha256(base / name), name))
     asset = base / "install.sh"
-    shutil.copy2(dest / "scripts" / "install.sh", asset)
     checksums = base / "SHA256SUMS"
-    checksums.write_text("%s  install.sh\n" % _sha256(asset), encoding="utf-8")
+    checksums.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return asset, checksums
 
 
@@ -602,8 +608,14 @@ def write_manifest(
     lines += ["", "## Checksums (SHA-256)", ""]
     lines.append("- Seed archive `%s`: `%s`" % (archive.name, _sha256(archive)))
     asset = release_base / "install.sh"
+    release_archive = release_base / "qubit-release.tar.gz"
     if asset.is_file():
         lines.append("- Release asset `install.sh`: `%s`" % _sha256(asset))
+        if release_archive.is_file():
+            lines.append(
+                "- Release archive `qubit-release.tar.gz`: `%s`"
+                % _sha256(release_archive)
+            )
         lines.append(
             "- Release `SHA256SUMS`: `%s`"
             % _sha256(release_base / "SHA256SUMS")
@@ -716,7 +728,7 @@ def main(argv: list[str] | None = None) -> int:
 
     archive = archive_seed(dest, tag, version, artifact_dir)
 
-    make_release_base(dest, release_base)
+    make_release_base(dest, release_base, archive)
 
     install_results: dict[str, str] = {}
     if not args.skip_install_check:

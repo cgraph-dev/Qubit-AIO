@@ -60,9 +60,11 @@ installation.
 ## Bootstrap installer (release assets)
 
 `scripts/bootstrap.sh` is the release-asset entry point for a published
-release. It downloads the release installer (`install.sh`) and its checksum
-into a temporary directory, verifies the SHA-256, and executes **only** the
-verified copy. It never reads a source checkout to install.
+release. It downloads the release installer and the release **source archive**
+plus their checksums into a temporary directory, verifies the SHA-256 of both,
+extracts the archive, verifies that the extracted `scripts/install.sh` is the
+same file, and executes **that extracted copy**. It never reads a source
+checkout to install.
 
 ```bash
 ./scripts/bootstrap.sh --help
@@ -70,29 +72,38 @@ verified copy. It never reads a source checkout to install.
 ./scripts/bootstrap.sh --prefix "$HOME/qubit" <release-base>
 ```
 
-`<release-base>` is an HTTPS URL, a `file://` URL, or a local directory that
-contains `install.sh` and `SHA256SUMS` (or `install.sh.sha256` /
-`install.sh.sha256sum`).
-`--checksum FILE` overrides checksum discovery. `--profile NAME` is exported
-to the verified installer as `QUBIT_PROFILE`; `--prefix DIR` is forwarded as
-`--prefix DIR`.
+### Release-asset contract
 
-The bootstrap fails closed on a missing download, missing/invalid checksum, or
-a checksum mismatch. `--dry-run` downloads nothing, executes nothing, and does
-not touch `QUBIT_HOME`. Linux is supported now; macOS and Windows are typed
-refusals until their bootstrap paths exist.
+`<release-base>` is an HTTPS URL, a `file://` URL, or a local directory. It
+must contain exactly these three assets:
 
-The published `install.sh` asset must be **self-contained**. The bootstrap runs
-only that downloaded file from a temporary directory, so a checkout-relative
-installer — this repository's `scripts/install.sh`, which builds its venv and
-installs the package from the source tree beside it (`PROJECT_DIR`) — is not a
-valid standalone release asset. Publish a release installer that fetches the
-release payload itself, or extend the bootstrap to download a release archive.
+| Asset | Meaning |
+|---|---|
+| `install.sh` | The installer asset. It is downloaded and checksum-verified; its hash must equal the `scripts/install.sh` inside the archive. |
+| `qubit-release.tar.gz` | The release source tree. It must extract to `scripts/install.sh`, either at the archive root or under exactly one top-level directory (for example `Qubit-0.0.1/scripts/install.sh`). Override the file name with `--archive NAME` (or `QUBIT_RELEASE_ARCHIVE`). |
+| `SHA256SUMS` | Standard `sha256  filename` lines naming **both** assets. `--checksum FILE` overrides discovery. |
+
+The archive is the install payload: its extracted tree is where `PROJECT_DIR`
+resolves, so the installer builds the venv, installs the package, builds/serves
+the dashboard, and reads `config/`, `scripts/`, and `qubit_runtime/` from the
+extracted release — not from the bootstrap directory. Archives with absolute
+paths or `..` traversal are rejected, and extraction never writes outside the
+temporary directory.
+
+`--profile NAME` is exported to the verified installer as `QUBIT_PROFILE`;
+`--prefix DIR` is forwarded as `--prefix DIR`.
+
+The bootstrap fails closed on a missing installer, missing archive,
+missing/invalid checksum, archive mismatch, extracted-installer mismatch, or an
+invalid archive. `--dry-run` downloads, extracts, executes, and writes nothing;
+it validates the local assets and checksum names. Linux is supported now;
+macOS and Windows are typed refusals until their bootstrap paths exist.
 
 **Remaining public-hosting prerequisite:** the release must publish the
-bootstrap script itself plus a self-contained `install.sh` asset and its
-SHA-256 checksum at the release base. This repository does not yet host a
-public one-line URL.
+bootstrap script itself plus `install.sh`, `qubit-release.tar.gz`, and a
+`SHA256SUMS` naming both assets at a stable public release base. This
+repository does not yet host a public one-line URL; the bootstrap reads only
+`<release-base>`.
 
 ## Options
 
