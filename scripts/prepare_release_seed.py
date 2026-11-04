@@ -364,12 +364,17 @@ def verify_export(dest: Path, report: dict, version: str, public_docs: set[str],
     )
 
 
-def init_git(dest: Path, source_commit: str, tag: str, checks: Checks) -> str:
+def init_git(
+    dest: Path, source_commit: str, tag: str, checks: Checks, expected_tracked: int
+) -> str:
     proc = _run(["git", "init", "-q", "-b", "main"], cwd=dest)
     _require_ok(proc, "git init")
     _run(["git", "config", "user.name", "Qubit Release Seed"], cwd=dest)
     _run(["git", "config", "user.email", "release@qubit.local"], cwd=dest)
-    proc = _run(["git", "add", "-A"], cwd=dest)
+    # The public export deliberately includes a few files the product's
+    # .gitignore ignores (e.g. the committed TUI dist). Force-add so the seed
+    # repository carries every exported file, not the .gitignore subset.
+    proc = _run(["git", "add", "-A", "-f"], cwd=dest)
     _require_ok(proc, "git add")
     message = (
         "release: Qubit %s public seed\n\n"
@@ -382,10 +387,18 @@ def init_git(dest: Path, source_commit: str, tag: str, checks: Checks) -> str:
     proc = _run(["git", "tag", "-a", tag, "-m", "Qubit %s release-candidate seed" % tag.lstrip("v")], cwd=dest)
     _require_ok(proc, "git tag")
     commit = _run(["git", "rev-parse", "HEAD"], cwd=dest).stdout.strip()
+    tracked = len(_run(["git", "ls-files"], cwd=dest).stdout.splitlines())
+    dirty = _run(["git", "status", "--porcelain"], cwd=dest).stdout.strip()
     count = int(_run(["git", "rev-list", "--count", "HEAD"], cwd=dest).stdout.strip())
     remotes = _run(["git", "remote"], cwd=dest).stdout.strip()
     tag_commit = _run(["git", "rev-parse", tag + "^{}"], cwd=dest).stdout.strip()
     checks.require("seed has exactly one commit", count == 1, "commits=%d" % count)
+    checks.require(
+        "seed commit carries every exported file",
+        tracked == expected_tracked,
+        "tracked=%d expected=%d" % (tracked, expected_tracked),
+    )
+    checks.require("seed commit is clean", dirty == "", dirty[:1000])
     checks.require("seed has no remotes", remotes == "", remotes)
     checks.require("tag points at seed commit", tag_commit == commit, "%s != %s" % (tag_commit, commit))
     checks.require(
@@ -687,7 +700,13 @@ def main(argv: list[str] | None = None) -> int:
     verify_export(dest, report, version, exporter.PUBLIC_DOC_FILES, checks)
     checks.finish()
 
-    seed_commit = init_git(dest, report["source"]["commit"], tag, checks)
+    seed_commit = init_git(
+        dest,
+        report["source"]["commit"],
+        tag,
+        checks,
+        int(report["included_files"]) + 2,
+    )
     checks.finish()
 
     wheel = None

@@ -89,7 +89,7 @@ def test_version_file_and_git_metadata(tmp_path: Path):
     module.write_version(dest, "0.0.1")
     assert (dest / "VERSION").read_text(encoding="utf-8") == "0.0.1\n"
     checks = module.Checks()
-    commit = module.init_git(dest, "deadbeef", "v0.0.1", checks)
+    commit = module.init_git(dest, "deadbeef", "v0.0.1", checks, 2)
     checks.finish()
     assert len(commit) == 40
     log = module._run(["git", "log", "--oneline"], cwd=dest).stdout
