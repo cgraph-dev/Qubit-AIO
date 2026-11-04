@@ -169,16 +169,23 @@ def _save_runtime_config(config: Dict[str, Any]) -> None:
 def _runtime_entry(record: Dict[str, Any], enabled: bool) -> Dict[str, Any]:
     """Translate a dashboard registry record into a runtime ``mcp_servers`` entry.
 
-    Only the connectivity fields the runtime reads plus ``enabled`` are mirrored.
-    Credential ``env:`` references and the dashboard-only capability allowlist are
-    the brokered client's concern; an existing runtime entry is never rewritten
-    with them (a new entry is created without them) so credentials cannot be
-    shadowed by a second format.
+    Mirrors the connectivity fields the runtime reads, ``enabled``, and the
+    non-secret OAuth marker (``auth: oauth`` plus an optional pre-registered
+    ``oauth`` block). The marker is not a credential: without it the runtime
+    never builds a provider, so a remote OAuth server (Airtable, Notion, …)
+    installed from the dashboard would 401 forever. Credential ``env:``
+    references and the dashboard-only capability allowlist stay the brokered
+    client's concern; an existing runtime entry is never rewritten with them.
     """
     entry: Dict[str, Any] = {"enabled": bool(enabled)}
     if str(record.get("transport") or "stdio").lower() == "http":
         if record.get("url"):
             entry["url"] = str(record["url"])
+        if str(record.get("auth") or "").lower() == "oauth":
+            entry["auth"] = "oauth"
+            oauth = record.get("oauth")
+            if isinstance(oauth, dict) and oauth:
+                entry["oauth"] = dict(oauth)
     else:
         if record.get("command"):
             entry["command"] = str(record["command"])
@@ -325,6 +332,27 @@ def _validate(record: Dict[str, Any]) -> Dict[str, Any]:
             raise McpServerError("MCP_BAD_INPUT",
                                  "an http server needs an http(s) url")
         out["url"] = url
+    oauth = record.get("oauth")
+    if oauth is not None:
+        if not isinstance(oauth, dict):
+            raise McpServerError("MCP_BAD_INPUT",
+                                 "oauth must be a mapping")
+        if auth != "oauth":
+            raise McpServerError("MCP_BAD_INPUT",
+                                 "oauth is only valid with auth 'oauth'")
+        clean_oauth: Dict[str, Any] = {}
+        for key, value in list(oauth.items())[:16]:
+            clean_key = _bounded(key, 64)
+            if not clean_key:
+                continue
+            if isinstance(value, bool) or not isinstance(value, (str, int)):
+                raise McpServerError(
+                    "MCP_BAD_INPUT",
+                    "oauth values must be strings or integers")
+            clean_oauth[clean_key] = (
+                _bounded(value, 512) if isinstance(value, str) else value)
+        if clean_oauth:
+            out["oauth"] = clean_oauth
     env = record.get("env") or {}
     if isinstance(env, dict):
         refs: Dict[str, str] = {}
@@ -623,6 +651,69 @@ def _cached_runtime_status(configured: Dict[str, Dict[str, Any]]
     return out
 
 
+_CATALOG_OAUTH_URLS: Optional[Dict[str, Dict[str, str]]] = None
+
+
+def _catalog_oauth_urls() -> Dict[str, Dict[str, str]]:
+    """Reviewed catalog HTTP entries keyed by normalized URL (read-only, cached).
+
+    Lets the inventory flag a legacy hand-written entry that points at a
+    reviewed OAuth server but lacks ``auth: oauth`` — the Airtable row the
+    dashboard catalog used to write. No network, no config write; failures
+    return ``{}`` and the row keeps its honest configured state.
+    """
+    global _CATALOG_OAUTH_URLS
+    if _CATALOG_OAUTH_URLS is not None:
+        return _CATALOG_OAUTH_URLS
+    out: Dict[str, Dict[str, str]] = {}
+    try:
+        from . import qubit_runtime as QR
+
+        QR.ensure_path()
+        from qubit_cli import mcp_catalog  # type: ignore
+
+        for entry in mcp_catalog.list_catalog():
+            if str(getattr(entry.transport, "type", "")).lower() != "http":
+                continue
+            url = str(getattr(entry.transport, "url", "") or "").strip().rstrip("/")
+            if url:
+                out[url] = {"name": str(getattr(entry, "name", "") or ""),
+                            "auth": str(getattr(entry.auth, "type", "") or "none").lower()}
+    except Exception:  # noqa: BLE001 - inventory must never fail on the catalog
+        out = {}
+    _CATALOG_OAUTH_URLS = out
+    return out
+
+
+def _oauth_login_hint(name: str, rec: Dict[str, Any]) -> Optional[str]:
+    """Typed guidance for an enabled OAuth server with no cached token.
+
+    Read-only: checks the token cache (one ``stat``/read of the per-server
+    token file) and never connects or starts a flow. A separate dashboard
+    process has no agent connection state, so without this a ``login-required``
+    server would render as a bare "not connected" with no actionable reason.
+    Returns ``None`` when tokens exist or the state cannot be read (fail-open —
+    never fabricate a login requirement).
+    """
+    if str(rec.get("auth") or "").lower() != "oauth":
+        return None
+    if not bool(rec.get("enabled", False)):
+        return None
+    try:
+        from . import qubit_runtime as QR
+
+        QR.ensure_path()
+        from tools.mcp_oauth import QubitTokenStorage  # type: ignore
+
+        if QubitTokenStorage(name).has_cached_tokens():
+            return None
+    except Exception:  # noqa: BLE001 - never fabricate a login-required state
+        return None
+    return (f"No cached OAuth credential for '{name}'. Run `qubit mcp login {name}` "
+            "in a terminal to authorize; this process cannot open the browser "
+            "flow.")
+
+
 def list_servers(cfg: Any) -> Dict[str, Any]:
     """Configured MCP servers (canonical registry + read-only config records).
 
@@ -670,7 +761,44 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
                 row["connected"] = True
             error = status_row.get("error")
             if error:
-                row["error"] = str(error)[:240]
+                try:
+                    row["error"] = _redact_probe(error)[:240]
+                except Exception:  # noqa: BLE001 - display must not fail
+                    row["error"] = str(error)[:240]
+    # Typed OAuth guidance for an entry with no runtime state here (the
+    # dashboard is a separate process) or a legacy entry that predates the
+    # OAuth marker. Both are read-only checks: the reviewed catalog and the
+    # token cache, never a connection or a fabricated login result.
+    catalog_oauth = _catalog_oauth_urls()
+    for row in rows:
+        if row.get("connected") or not bool(row.get("enabled", False)):
+            continue
+        name = str(row.get("name") or "")
+        status = str(row.get("status") or "")
+        error = str(row.get("error") or "")
+        if str(row.get("auth") or "").lower() != "oauth":
+            reviewed = catalog_oauth.get(
+                str(row.get("url") or "").strip().rstrip("/"))
+            if reviewed and reviewed.get("auth") == "oauth" and status not in (
+                    "connecting", "login-required", "misconfigured-oauth"):
+                if "auth: oauth" not in error:
+                    row["status"] = "misconfigured-oauth"
+                    row["error"] = (
+                        f"Reviewed catalog server '{reviewed.get('name') or name}' is an "
+                        f"OAuth 2.1 server, but this entry has no `auth: oauth`. Set "
+                        f"`mcp_servers.{name}.auth: oauth` in config.yaml, then run "
+                        f"`qubit mcp login {name}`; retrying without a provider cannot "
+                        "succeed.")
+            continue
+        hint = _oauth_login_hint(name, row)
+        if not hint:
+            continue
+        if status in ("failed", "unavailable", "login-required"):
+            if "mcp login" not in error.lower():
+                row["error"] = (error + " " + hint).strip()[:240]
+        elif status in ("", "configured", "configured-not-connected"):
+            row["status"] = "login-required"
+            row["error"] = hint
     return {"schema": SCHEMA, "servers": rows, "total": len(rows)}
 
 

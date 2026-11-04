@@ -105,6 +105,39 @@ def is_oauth_challenge(status: Any, www_authenticate: Any) -> bool:
     return bool(_OAUTH_CHALLENGE_RE.search(str(www_authenticate or "")))
 
 
+_LOGIN_REQUIRED_MARKER = "non-interactive environment and no cached tokens"
+
+
+def is_login_required_error(exc: BaseException) -> bool:
+    """True when an OAuth server needs an interactive login this process cannot start.
+
+    A non-interactive process with no cached token can never finish the browser
+    flow, so an unattended self-probe is guaranteed to fail the same way. Treat it
+    as terminal until the token cache changes or an explicit reconnect/login runs.
+    Matches the class by name and the marker text (the class lives in
+    ``tools.mcp_oauth`` and is imported lazily there, so this module never pulls
+    the SDK auth stack at import time).
+    """
+    for node in _iter_exception_nodes(exc):
+        if type(node).__name__ == "OAuthNonInteractiveError":
+            return True
+        if _LOGIN_REQUIRED_MARKER in str(node).lower():
+            return True
+    return False
+
+
+def login_required_reason(server_name: str, exc: BaseException) -> str:
+    """The typed, actionable reason for a login-required OAuth park.
+
+    Names the exact command a human must run; never claims the login succeeded.
+    """
+    detail = _sanitize_error(_exc_str(_unwrap_exception_group(exc))).strip()
+    reason = (f"MCP server '{server_name}' requires an interactive OAuth login and no cached "
+              f"OAuth credential was found. Run `qubit mcp login {server_name}` in a terminal "
+              "to authorize, then reconnect or restart the session.")
+    return f"{reason} Detail: {detail}" if detail else reason
+
+
 # Streamable-HTTP rejection statuses an SSE-only server (or its load balancer) produces for the
 # chunked ``initialize`` POST: Bad Request, Method Not Allowed, Not Acceptable, Length Required.
 _STREAMABLE_REJECT_STATUSES = (400, 405, 406, 411)

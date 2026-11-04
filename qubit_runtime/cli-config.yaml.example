@@ -1562,6 +1562,10 @@ platform_toolsets:
 # HTTP servers (connect to a URL):
 #   url: the MCP server endpoint
 #   headers: HTTP headers (e.g., for authentication)
+#   auth: oauth  required for a remote OAuth 2.1 server (Notion, Airtable,
+#     Linear, …). Without this marker a 401 OAuth challenge is a permanent
+#     misconfiguration, not a retry: run `qubit mcp login <name>` once in a
+#     terminal to finish the browser flow, then reconnect.
 #
 # Optional per-server settings:
 #   timeout: tool call timeout in seconds (default: 120)
@@ -1588,6 +1592,7 @@ platform_toolsets:
 #     args: ["-y", "@modelcontextprotocol/server-filesystem", "/home/user"]
 #   notion:
 #     url: https://mcp.notion.com/mcp
+#     auth: oauth
 #   github:
 #     command: npx
 #     args: ["-y", "@modelcontextprotocol/server-github"]
