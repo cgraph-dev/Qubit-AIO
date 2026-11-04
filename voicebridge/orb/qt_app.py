@@ -3287,13 +3287,29 @@ if QWidget is not None:
                 if getattr(self, "_panel", None) is None:
                     self._panel = cls(self._options,
                                       on_change=self.apply_options,
-                                      on_test=self.set_test_state)
+                                      on_test=self.set_test_state,
+                                      on_action=self._run_brain_action)
                 try:
                     self._panel.set_options(self._options)
                 except Exception:
                     pass
                 self._panel.show()
                 self._panel.raise_()
+            except Exception:
+                pass
+
+        def _run_brain_action(self, action: str) -> None:
+            """Run a settings-panel local-brain action off the UI thread."""
+            if action not in ("brain_unload", "brain_warm"):
+                return
+            try:
+                from voicebridge.local import actions as _local
+                entry = _local.ACTIONS.get(action)
+                if entry is None:
+                    return
+                import threading
+                threading.Thread(
+                    target=lambda: entry.fn({}), daemon=True).start()
             except Exception:
                 pass
 
