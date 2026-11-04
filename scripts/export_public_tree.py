@@ -67,9 +67,6 @@ ALLOWED_TOP_LEVEL_DIRS = frozenset({
 ALLOWED_ROOT_FILES = frozenset({
     ".env.example",
     ".gitignore",
-    "CHANGELOG.md",
-    "CODE_OF_CONDUCT.md",
-    "CODEOWNERS",
     "CONTRIBUTING.md",
     "INSTALL.md",
     "LICENSE",
