@@ -20,7 +20,7 @@ set -u
 # hygiene can't break the locked sync the way it used to before pm owned it.
 export UV_NO_CONFIG=1
 
-REPO_URL="${HERMES_REPO_URL:-https://github.com/NousResearch/hermes-agent.git}"
+REPO_URL="${QUBIT_REPO_URL:-${HERMES_REPO_URL:-https://github.com/cgraph-dev/Qubit.git}}"
 BRANCH="main"
 CHANNEL="${QUBIT_INSTALL_CHANNEL:-${HERMES_INSTALL_CHANNEL:-}}"
 INSTALL_COMMIT=""
@@ -190,21 +190,34 @@ github_repository() {
     esac
 }
 
-# Only the official source checkout follows published stable releases; a fork,
-# mirror or local-path origin keeps following its branch (same rule as
+# Only an official Qubit source checkout follows published stable releases; a
+# fork, mirror, local-path origin (or the retired Hermes upstream) keeps
+# following its branch (same rule as
 # `qubit_cli.update_channel.default_channel`).
 is_official_repository() {
     local repo
     repo="$(github_repository)" || return 1
-    [ "${repo,,}" = "nousresearch/hermes-agent" ]
+    case "${repo,,}" in
+        cgraph-dev/qubit|cgraph-dev/qubit-aio) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
-# True when a clone URL names the official source repository.
+# True when a clone URL names an official Qubit source repository. The Hermes
+# upstream is deliberately not accepted: it is not the Qubit source.
 official_origin_url() {
-    case "$1" in
-        https://github.com/NousResearch/hermes-agent|https://github.com/NousResearch/hermes-agent.git) return 0 ;;
-        http://github.com/NousResearch/hermes-agent|http://github.com/NousResearch/hermes-agent.git) return 0 ;;
-        git@github.com:NousResearch/hermes-agent.git) return 0 ;;
+    local url name
+    url="${1:-}"
+    url="${url,,}"
+    case "$url" in
+        https://github.com/cgraph-dev/*|http://github.com/cgraph-dev/*)
+            name="${url#*github.com/cgraph-dev/}" ;;
+        git@github.com:cgraph-dev/*)
+            name="${url#git@github.com:cgraph-dev/}" ;;
+        *) return 1 ;;
+    esac
+    case "${name%.git}" in
+        qubit|qubit-aio) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -233,7 +246,7 @@ print_banner() {
     printf '%s\n' "┌─────────────────────────────────────────────────────────┐"
     printf '%s\n' "│             ☤ Qubit Agent Installer                    │"
     printf '%s\n' "├─────────────────────────────────────────────────────────┤"
-    printf '%s\n' "│  An open source AI agent by Nous Research.              │"
+    printf '%s\n' "│  An open source personal AI agent.                      │"
     printf '%s\n' "└─────────────────────────────────────────────────────────┘"
     printf '%s\n' "$C_NC"
 }
@@ -708,9 +721,9 @@ stage_repository() {
             return 0
         fi
         log "Updating $INSTALL_DIR ($BRANCH)"
-        # An explicit HERMES_REPO_URL names the source for reruns too, not
-        # just the first clone.
-        if [ -n "${HERMES_REPO_URL:-}" ]; then
+        # An explicit QUBIT_REPO_URL (or the legacy HERMES_REPO_URL) names the
+        # source for reruns too, not just the first clone.
+        if [ -n "${QUBIT_REPO_URL:-}" ] || [ -n "${HERMES_REPO_URL:-}" ]; then
             git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL" || fail "cannot point origin at $REPO_URL" git_fetch_failed
         fi
         # Explicit refspec: a tag-pinned --single-branch checkout from an older

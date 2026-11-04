@@ -12,7 +12,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-OFFICIAL = "https://github.com/NousResearch/hermes-agent.git"
+OFFICIAL = "https://github.com/cgraph-dev/Qubit.git"
 
 pytestmark = pytest.mark.platforms("windows")
 
@@ -33,7 +33,7 @@ def _git(cwd, *args, env=None):
     (False, None, "", False, None),            # release tag unreachable: fail, publish nothing
     (False, "before", "", False, "before"),    # ... a rerun keeps its checkout instead
     # The release cut on a release branch, main past the fork point (v0.22.2's shape): main moves
-    # back only through `hermes update`, whose downgrade guard the installer cannot run.
+    # back only through `qubit update`, whose downgrade guard the installer cannot run.
     (True, "tip", "", True, "tip"),
     (True, "tip", "stable", True, "tip"),
     (True, "before", "", True, "release"),
@@ -43,7 +43,7 @@ def test_install_ps1_lands_on_the_latest_stable_release(tmp_path, side, start, c
     if not powershell:
         pytest.skip("Windows PowerShell is required")
     origin, home = tmp_path / "origin", tmp_path / "home"
-    install = home / "hermes-agent"
+    install = home / "qubit"
     origin.mkdir()
     home.mkdir()
     _git(origin, "init", "-q", "-b", "main")
