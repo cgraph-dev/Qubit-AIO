@@ -114,12 +114,17 @@ def test_catalog_joins_the_dashboard_store_and_live_gateway(tmp_path, monkeypatc
     assert row["dashboard_enabled"] is True
     assert row["gateway_state"] == "connected"
     assert row["connected"] is True
-    # A dashboard ref is not the inbound registry's own credential reference:
-    # the inbound row still honestly reports no credential of its own.
-    assert row["state"] == "UNCONFIGURED"
+    # The dashboard ref/config makes the channel *configured*; the inbound
+    # registry's own credential reference is still absent, so the row keeps
+    # the typed no-listener gate instead of claiming a transport.
+    assert row["configured"] is True
+    assert row["available"] is False
+    assert row["state"] == "UNAVAILABLE"
+    assert row["code"] == CI.UNAVAILABLE_CODE
 
     status = CI.status(cfg, gateway_reader=lambda: live)
     assert status["dashboard_configured"] == 1
+    assert status["configured"] == 1
     assert "teams" in status["connected_platforms"] or \
         "msteams" in status["connected_platforms"]
 

@@ -590,27 +590,103 @@ def _get(cfg: Any, channel: str) -> Dict[str, Any]:
     return rec
 
 
+def _dashboard_row_configured(dash: Dict[str, Any],
+                              connected: bool = False,
+                              env_present: bool = False) -> bool:
+    """Whether a dashboard Channels row represents a configured channel.
+
+    The dashboard store is a real config source (it is bridged into the
+    gateway ``config.yaml``/``.env``), so a row the operator gave a credential
+    reference to IS configured even when Qubit's separate inbound registry
+    holds no reference for it. A credential already sitting in the gateway
+    ``.env`` (``env_present``) counts too; that is the same store the bridge
+    writes. ``connected`` is the live gateway's own evidence and is never
+    inferred from the store. A merely enabled row with no credential and no
+    live connection is NOT a configuration and must not inflate the count.
+    """
+    if not dash:
+        return False
+    return bool(dash.get("has_refs") or env_present or connected)
+
+
+def _gateway_env_keys() -> set:
+    """Names with a non-empty value in the daemon's runtime ``.env``.
+
+    This is the gateway's real credential store (the one the dashboard bridge
+    writes). Only key NAMES are returned; secret values are never read into the
+    caller, logged, or served. Best-effort: absent/unreadable is an empty set.
+    """
+    try:
+        from .gateway_supervisor import _daemon_home
+        env_path = _daemon_home(None) / ".env"
+        text = env_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - no store -> no extra credential evidence
+        return set()
+    keys = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        if stripped.startswith("export "):
+            stripped = stripped[len("export "):].strip()
+        found, _, value = stripped.partition("=")
+        name = found.strip()
+        if name and value.strip().strip("\"'").strip():
+            keys.add(name)
+    return keys
+
+
+def _channel_env_present(channel: str, env_keys: Optional[set] = None) -> bool:
+    """True when the gateway ``.env`` carries a credential-looking key for a
+    channel (e.g. ``TELEGRAM_*`` for telegram, ``BLUEBUBBLES_*`` for the
+    iMessage runtime adapter). Both direct spellings and the runtime adapter id
+    are checked so aliases do not hide a real credential."""
+    if env_keys is None:
+        env_keys = _gateway_env_keys()
+    if not env_keys:
+        return False
+    names = {str(channel or "").strip().lower(),
+             runtime_platform_id(channel)}
+    for name in names:
+        prefix = re.sub(r"[^A-Z0-9]+", "_", name.upper()).strip("_")
+        if prefix and any(key.startswith(prefix + "_") for key in env_keys):
+            return True
+    return False
+
+
 def _public(rec: Dict[str, Any],
             gateway: Optional[Dict[str, Any]] = None,
-            dashboard: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            dashboard: Optional[Dict[str, Any]] = None,
+            env_keys: Optional[set] = None) -> Dict[str, Any]:
     caps = CHANNEL_CAPS.get(rec["channel"], {})
     from .providers.credentials import resolve_key
 
     key, code = resolve_key("channel", _resolve_ref(rec))
-    if rec.get("enabled") is False:
-        state, state_code = "DISABLED", "CHANNEL_DISABLED"
-    elif code or not key:
-        state, state_code = "NO_CREDENTIAL", NO_CREDENTIAL_CODE
-    else:
-        state, state_code = "UNAVAILABLE", UNAVAILABLE_CODE
     # The live gateway's own view of THIS channel (authoritative for
-    # ``connected``); a registry credential reference can never set it. The
-    # gateway view is already keyed by the canonical inbound id.
+    # ``connected``); a credential reference can never set it. The gateway view
+    # is already keyed by the canonical inbound id.
     gw_state = ""
     if isinstance(gateway, dict):
         gw_state = str((gateway.get("platforms") or {}).get(rec["channel"])
                        or "")
+    connected = gw_state in ("connected", "running", "ok")
     dash = dashboard or {}
+    # ``configured`` spans all real config sources: this registry's credential
+    # reference, the dashboard store the operator edits (bridged into the
+    # gateway), and a credential already in the gateway ``.env``. ``connected``
+    # is separate live evidence.
+    configured = bool((key and not code)
+                      or _dashboard_row_configured(
+                          dash, connected,
+                          _channel_env_present(rec["channel"], env_keys)))
+    if rec.get("enabled") is False:
+        state, state_code = "DISABLED", "CHANNEL_DISABLED"
+    elif not configured:
+        state, state_code = "NO_CREDENTIAL", NO_CREDENTIAL_CODE
+    else:
+        # Configured from references/config but Qubit starts no inbound
+        # listener here: keep the truthful typed gate, never CONNECTED.
+        state, state_code = "UNAVAILABLE", UNAVAILABLE_CODE
     return {"channel": rec["channel"], "label": caps.get("label", ""),
             "runtime_platform": runtime_platform_id(rec["channel"]),
             "events": list(rec.get("events", [])),
@@ -618,7 +694,8 @@ def _public(rec: Dict[str, Any],
             "transport": caps.get("transport", "none"),
             "available": False, "state": state, "code": state_code,
             "gateway_state": gw_state,
-            "connected": gw_state in ("connected", "running", "ok"),
+            "connected": connected,
+            "configured": configured,
             "dashboard_configured": bool(dash.get("platform")),
             "dashboard_enabled": bool(dash.get("enabled", False)),
             "configured_at": rec.get("configured_at"),
@@ -695,11 +772,15 @@ def accounts(cfg: Any, *, gateway_reader: Optional[Any] = None
     state = _load(cfg)
     gateway = _gateway_view(gateway_reader)
     dashboard = _dashboard_platforms(cfg)
-    rows = [_public(r, gateway, dashboard.get(r["channel"])) for r in
-            sorted(state["channels"].values(),
-                   key=lambda r: r.get("channel", ""))]
+    env_keys = _gateway_env_keys()
+    rows = [_public(r, gateway, dashboard.get(r["channel"]), env_keys)
+            for r in sorted(state["channels"].values(),
+                            key=lambda r: r.get("channel", ""))]
+    channel_ids = {r["channel"] for r in rows}
+    connected = [c for c in (gateway.get("connected_platforms") or [])
+                 if c in channel_ids]
     return {"state": "OK", "schema": SCHEMA, "accounts": rows,
-            "connected": [],
+            "connected": connected,
             "gateway": gateway,
             "dashboard_channels": sorted(dashboard)}
 
@@ -712,31 +793,48 @@ def catalog(cfg: Any, *, gateway_reader: Optional[Any] = None
     (read from the authoritative ``gateway_state.json``), not the registry.
     Rows also carry the runtime adapter id and the dashboard Channels store's
     enable/ref state, so the three stores agree on the same channel names
-    instead of a ``teams`` adapter being invisible under ``msteams``.
+    instead of a ``teams`` adapter being invisible under ``msteams``. A row is
+    ``configured`` when EITHER real config source has it; it is never
+    ``available`` and never ``connected`` without live gateway evidence.
     """
     configured = _load(cfg).get("channels", {})
     gateway = _gateway_view(gateway_reader)
     dashboard = _dashboard_platforms(cfg)
+    env_keys = _gateway_env_keys()
     gw_platforms = gateway.get("platforms") or {}
     rows: List[Dict[str, Any]] = []
     for cid, caps in CHANNEL_CAPS.items():
         gw_state = str(gw_platforms.get(cid) or "")
+        connected = gw_state in ("connected", "running", "ok")
         dash = dashboard.get(cid) or {}
         if cid in configured:
-            rows.append(_public(configured[cid], gateway, dash))
+            rows.append(_public(configured[cid], gateway, dash, env_keys))
+            continue
+        dash_configured = _dashboard_row_configured(
+            dash, connected, _channel_env_present(cid, env_keys))
+        configured_flag = bool(dash_configured or connected)
+        if dash.get("platform") and not dash.get("enabled", False) \
+                and not connected:
+            state, state_code = "DISABLED", "CHANNEL_DISABLED"
+        elif configured_flag:
+            # Configured in the dashboard/credential store, but Qubit's own
+            # inbound listener is still absent: the typed gate stays honest.
+            state, state_code = "UNAVAILABLE", UNAVAILABLE_CODE
         else:
-            rows.append({
-                "channel": cid, "label": caps.get("label", cid),
-                "runtime_platform": runtime_platform_id(cid),
-                "events": [], "credential": "missing",
-                "transport": caps.get("transport", "none"),
-                "available": False, "state": "UNCONFIGURED",
-                "code": NO_CREDENTIAL_CODE, "configured_at": None,
-                "gateway_state": gw_state,
-                "connected": gw_state in ("connected", "running", "ok"),
-                "dashboard_configured": bool(dash.get("platform")),
-                "dashboard_enabled": bool(dash.get("enabled", False)),
-                "updated_by": "", "detail": caps.get("detail", "")})
+            state, state_code = "UNCONFIGURED", NO_CREDENTIAL_CODE
+        rows.append({
+            "channel": cid, "label": caps.get("label", cid),
+            "runtime_platform": runtime_platform_id(cid),
+            "events": [], "credential": "missing",
+            "transport": caps.get("transport", "none"),
+            "available": False, "state": state,
+            "code": state_code, "configured_at": None,
+            "gateway_state": gw_state,
+            "connected": connected,
+            "configured": configured_flag,
+            "dashboard_configured": bool(dash.get("platform")),
+            "dashboard_enabled": bool(dash.get("enabled", False)),
+            "updated_by": "", "detail": caps.get("detail", "")})
     return {"state": "OK", "schema": SCHEMA, "channels": rows,
             "available": [r["channel"] for r in rows
                           if r["state"] == "AVAILABLE"],
@@ -750,22 +848,40 @@ def status(cfg: Any, *, gateway_reader: Optional[Any] = None
     """Typed inbound framework state + the LIVE gateway's connection view.
 
     ``connected`` is the gateway's own connected-platform count (the
-    authority); the framework registry is reported alongside, clearly
-    labelled, so the surface never shows ``0`` while the gateway is
-    demonstrably connected. ``configured`` is still the credential-reference
-    count -- a reference is not a transport.
+    authority). ``configured`` spans BOTH real config sources -- this
+    registry's credential references and the dashboard Channels store (which
+    is bridged into the gateway ``config.yaml``/``.env``) -- plus platforms the
+    live gateway proves connected, so a dashboard-configured channel is never
+    reported as ``configured: 0``. It is still only a config count: the
+    listener remains ``NONE`` and ``available`` stays empty, because Qubit
+    starts no inbound socket.
     """
     latched = estop_engaged(cfg)
     try:
-        configured = len(_load(cfg).get("channels", {}))
+        registry = _load(cfg).get("channels", {}) or {}
     except ChannelError:
-        configured = -1
+        registry = None
     gateway = _gateway_view(gateway_reader)
     dashboard = _dashboard_platforms(cfg)
+    env_keys = _gateway_env_keys()
+    connected_ids = set(gateway.get("connected_platforms") or [])
+    configured_ids = set(registry or ())
+    for cid, dash in dashboard.items():
+        if cid not in CHANNEL_CAPS:
+            continue
+        if _dashboard_row_configured(
+                dash, cid in connected_ids,
+                _channel_env_present(cid, env_keys)):
+            configured_ids.add(cid)
+    configured_ids.update(c for c in connected_ids if c in CHANNEL_CAPS)
+    configured = -1 if registry is None else len(configured_ids)
     return {"state": "ESTOP" if latched else "OK",
             "code": ESTOP_CODE if latched else "",
             "schema": SCHEMA, "channels": len(CHANNELS),
             "configured": configured,
+            "configured_platforms": sorted(configured_ids),
+            "registry_configured": (-1 if registry is None
+                                    else len(registry)),
             "dashboard_configured": len(dashboard),
             "connected": int(gateway.get("connected") or 0),
             "connected_platforms": list(
@@ -776,10 +892,13 @@ def status(cfg: Any, *, gateway_reader: Optional[Any] = None
             "listener_detail": LISTENER["detail"],
             "dashboard_config_wiring": dashboard_config_wiring(),
             "estop": latched,
-            "detail": "registry credential references are separate from the "
-                      "live gateway's transport connections; ``connected`` "
-                      "reflects the gateway's own platform state (translated "
-                      "through the runtime adapter aliases)"}
+            "detail": "``configured`` counts channels configured in the "
+                      "inbound registry and/or the dashboard Channels store "
+                      "(bridged into the gateway config/.env), plus platforms "
+                      "the live gateway proves connected; it is not a "
+                      "listener claim. ``connected`` reflects the gateway's "
+                      "own platform state (translated through the runtime "
+                      "adapter aliases)."}
 
 
 def _nonce_seen(cfg: Any, nonce: str) -> bool:

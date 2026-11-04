@@ -90,8 +90,10 @@ def test_status_top_level_connected_is_not_zero_when_gateway_connected(
     out = CI.status(cfg, gateway_reader=lambda: _live(_CONNECTED))
     # the honest top-level count comes from the authority, not the wrong store
     assert out["connected"] == 3, out
-    # and the framework registry is still reported separately + labelled
-    assert out["configured"] == 0
+    # a live connected platform is by definition configured, so the config
+    # count reflects it too; the separate inbound registry stays at zero.
+    assert out["configured"] == 3, out
+    assert out["registry_configured"] == 0, out
     assert out["listener"] == "NONE"
 
 
