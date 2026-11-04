@@ -271,6 +271,27 @@ DASHBOARD_STATE="present"
 # this path is printed so the install is predictable before it runs.
 LAUNCH_AGENTS_DIR="${QUBIT_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 
+# The runtime owns the LaunchAgent label and path: a profile or other
+# non-default QUBIT_HOME gets a home-scoped `ai.qubit.gateway-<suffix>.plist`
+# under the ACCOUNT home. Ask the runtime once its venv exists (repair runs and
+# post-install output); before that, the default-home path is the only
+# predictable plan. Hardcoding the default path made `--prefix` installs claim a
+# plist the runtime never writes.
+launchd_plist_path() {
+  if [ -x "$VENV/bin/python" ]; then
+    "$VENV/bin/python" -c 'from voicebridge import qubit_runtime; qubit_runtime.ensure_path(); from qubit_cli import gateway; print(gateway.get_launchd_plist_path())' 2>/dev/null && return 0
+  fi
+  printf '%s\n' "$LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist"
+}
+
+launchd_plist_display() {
+  if [ -x "$VENV/bin/python" ] || [ "$QUBIT_HOME" = "$HOME/.qubit" ]; then
+    launchd_plist_path
+  else
+    printf '%s/ai.qubit.gateway-<home-scoped>.plist\n' "$LAUNCH_AGENTS_DIR"
+  fi
+}
+
 # Child processes (uv, the runtime gateway installer, the bridge) must resolve
 # the same home the layout prints; without this the launchd plist could pin
 # ~/.qubit while the installer claims another QUBIT_HOME.
@@ -326,7 +347,7 @@ preflight_platform() {
         _ver="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
       fi
       echo "    OK       platform   macOS $_ver ($_arch)"
-      echo "    OK       gateway    launchd LaunchAgent ($LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist)"
+      echo "    OK       gateway    launchd LaunchAgent ($(launchd_plist_display))"
       check_required launchctl "loads and supervises the gateway LaunchAgent"
       echo "    INFO     voice      UNSUPPORTED on macOS (voice bridge, hotkey, orb, voice-typing)"
       ;;
@@ -413,7 +434,10 @@ print_layout() {
   printf '    cache     : %s\n' "$CACHE_DIR"
   printf '    launcher  : %s/qubit\n' "$LAUNCHER_DIR"
   if [ "$HOST_OS" = "macos" ]; then
-    printf '    gateway   : %s/ai.qubit.gateway.plist (LaunchAgent)\n' "$LAUNCH_AGENTS_DIR"
+    printf '    gateway   : %s (LaunchAgent)\n' "$(launchd_plist_display)"
+    if [ "$QUBIT_HOME" != "$HOME/.qubit" ] && [ ! -x "$VENV/bin/python" ]; then
+      echo "    note      : the gateway label is home-scoped; --with-launchd reports the exact plist"
+    fi
     echo "    voice     : UNSUPPORTED on macOS (no voicebridge/orb/typing service)"
   fi
   if [ "$QUBIT_HOME_EXPLICIT" = "1" ] && [ -n "$PREFIX" ] && [ "$QUBIT_HOME" != "$PREFIX" ]; then
@@ -1018,7 +1042,7 @@ install_launchd_services() {
     return 2
   fi
   if [ "$DRY_RUN" = "1" ]; then
-    echo "==> [dry-run] would install the gateway LaunchAgent: $LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist"
+    echo "==> [dry-run] would install the gateway LaunchAgent: $(launchd_plist_display)"
     echo "==> [dry-run] would load/start it through the runtime's launchd installer"
     echo "==> [dry-run] voice bridge/orb/typing: UNSUPPORTED on macOS (not installed)"
     return 0
@@ -1026,7 +1050,7 @@ install_launchd_services() {
 
   echo "==> installing the macOS gateway LaunchAgent (ai.qubit.gateway)"
   if "$PROJECT_DIR/scripts/install_launchd_unit.sh" "$PROJECT_DIR"; then
-    echo "==> gateway LaunchAgent ready: $LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist"
+    echo "==> gateway LaunchAgent ready: $(launchd_plist_path)"
   else
     echo "DEGRADED: the gateway LaunchAgent was not installed/started." >&2
     echo "  retry: $PROJECT_DIR/scripts/install_launchd_unit.sh $PROJECT_DIR" >&2

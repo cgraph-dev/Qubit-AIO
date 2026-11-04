@@ -13,7 +13,8 @@
 #
 # Usage: install_launchd_unit.sh [<repo-root>] [--dry-run] [--force]
 # Env:   QUBIT_HOME (pinned into the plist),
-#        QUBIT_LAUNCH_AGENTS_DIR (default ~/Library/LaunchAgents)
+#        QUBIT_LAUNCH_AGENTS_DIR (pre-venv dry-run fallback only; with a venv
+#        the runtime resolves the account ~/Library/LaunchAgents path)
 set -eu
 
 DRY_RUN=0
@@ -77,13 +78,33 @@ if ! command -v launchctl >/dev/null 2>&1; then
 fi
 
 AGENTS_DIR="${QUBIT_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
-PLIST="$AGENTS_DIR/ai.qubit.gateway.plist"
 PY="$REPO/.venv/bin/python"
 
 # Standalone runs use the same runtime home default as scripts/install.sh; an
 # explicit QUBIT_HOME (including a profile home) always wins.
 QUBIT_HOME="${QUBIT_HOME:-$HOME/.qubit}"
 export QUBIT_HOME
+
+# The runtime owns the plist path and label: a profile or other non-default
+# QUBIT_HOME installs a home-scoped `ai.qubit.gateway-<suffix>.plist` under the
+# ACCOUNT home. Resolve it from the same runtime before/after installing, so a
+# --prefix or profile install never reports the default-home path it did not
+# write. Before the venv exists (dry-run on a fresh host) the default-home path
+# is the only predictable fallback.
+resolve_plist() {
+    if [ -x "$PY" ]; then
+        local resolved
+        resolved="$("$PY" -c 'from voicebridge import qubit_runtime; qubit_runtime.ensure_path(); from qubit_cli import gateway; print(gateway.get_launchd_plist_path())' 2>/dev/null || true)"
+        if [ -n "$resolved" ]; then
+            printf '%s\n' "$resolved"
+            return 0
+        fi
+    fi
+    printf '%s\n' "$AGENTS_DIR/ai.qubit.gateway.plist"
+}
+
+PLIST="$(resolve_plist)"
+PLIST_DIR="$(dirname "$PLIST")"
 
 if [ "$DRY_RUN" = "1" ]; then
     echo "==> [dry-run] gateway LaunchAgent: $PLIST"
@@ -128,12 +149,25 @@ from voicebridge import qubit_runtime
 raise SystemExit(qubit_runtime.run(["gateway", "start"]))
 PY
 
+# A zero exit from the runtime is not proof the service exists: `gateway
+# install` can return early (already installed, refused temp home) or resolve a
+# different home-scoped path than the legacy default. Verify the resolved plist
+# before claiming success, so the caller's DEGRADED branch is truthful.
+if [ ! -f "$PLIST" ]; then
+    echo "LAUNCHD_PLIST_MISSING: the gateway LaunchAgent was not written at $PLIST." >&2
+    echo "  The runtime exited 0 but no plist exists; the gateway is NOT installed." >&2
+    echo "  run: $REPO/.venv/bin/qubit gateway status" >&2
+    exit 1
+fi
+
+LABEL="$(basename "$PLIST" .plist)"
+
 # Report (never remove) any legacy pre-rebrand agents. The runtime still
 # accepts these labels read-old, so deleting them here would break that path.
-for legacy in "$AGENTS_DIR"/ai.hermes.gateway*.plist; do
+for legacy in "$PLIST_DIR"/ai.hermes.gateway*.plist; do
     [ -e "$legacy" ] || continue
     echo "legacy ai.hermes LaunchAgent (read-old, left in place): $legacy"
 done
 
 echo "==> gateway LaunchAgent installed: $PLIST"
-echo "    status: launchctl print gui/$(id -u)/ai.qubit.gateway"
+echo "    status: launchctl print gui/$(id -u)/$LABEL"

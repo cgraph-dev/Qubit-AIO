@@ -95,6 +95,10 @@ def test_launchd_installer_targets_only_the_core_gateway():
     assert "Library/LaunchAgents" in src
     assert "ai.hermes" in src and "left in place" in src
     assert "UNSUPPORTED" in src  # voice bridge/orb/typing boundary
+    # The plist path is resolved through the runtime bootstrap, which puts
+    # the vendored qubit_cli on sys.path (a wheel install packages only
+    # voicebridge; a bare `from qubit_cli` would miss the home-scoped label).
+    assert "qubit_runtime.ensure_path()" in src
     # Voice units are never installed by the macOS path.
     for unit in (
         "qubit-voicebridge.service",
@@ -114,6 +118,7 @@ def test_root_installer_documents_macos_boundary():
     assert "ai.qubit.gateway.plist" in src
     assert "--with-launchd" in src
     assert "UNSUPPORTED on macOS" in src
+    assert "qubit_runtime.ensure_path()" in src
     assert "ai.hermes" in src  # read-old legacy agents are named, not deleted
 
 
@@ -311,3 +316,145 @@ def test_product_service_owner_macos_names_launchd(monkeypatch):
     assert out["manager"] == "launchd"
     assert "ai.qubit.gateway" in out["detail"]
     assert "systemd" in out["detail"]
+
+
+# ---------------------------------------------------------------------------
+# Real (hermetic) launchd install path
+# ---------------------------------------------------------------------------
+def _fake_launchd_repo(tmp_path: Path) -> tuple[Path, Path]:
+    """A temp checkout whose ``.venv/bin/python`` is a recording stub.
+
+    The stub answers the script's runtime path query (``-c ...``) from
+    ``FAKE_PLIST`` and records the ``gateway install``/``gateway start``
+    invocations. It deliberately does not execute the heredoc bodies.
+    """
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / ".venv" / "bin").mkdir(parents=True)
+    shutil.copy2(LAUNCHD_INSTALL, repo / "scripts" / "install_launchd_unit.sh")
+    fake = repo / ".venv" / "bin" / "python"
+    fake.write_text(
+        "#!/bin/sh\n"
+        'echo "argv=$* QUBIT_HOME=${QUBIT_HOME:-}" >> "$FAKE_LOG"\n'
+        'if [ "$1" = "-c" ]; then\n'
+        '  [ -n "${FAKE_PLIST:-}" ] && printf "%s\\n" "$FAKE_PLIST"\n'
+        "  exit 0\n"
+        "fi\n"
+        'if [ "$1" = "-" ] && [ -n "${FAKE_PLIST:-}" ] && [ "${FAKE_WRITE:-0}" = "1" ]; then\n'
+        '  mkdir -p "$(dirname "$FAKE_PLIST")"\n'
+        '  printf "<?xml version=\\"1.0\\"?><plist><dict><key>Label</key><string>ai.qubit.gateway</string></dict></plist>\\n" > "$FAKE_PLIST"\n'
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    return repo, fake
+
+
+def _run_launchd_install(tmp_path: Path, *args: str, extra_env: dict[str, str] | None = None):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo, _ = _fake_launchd_repo(tmp_path)
+    bindir = _fake_path(tmp_path, ("sh", "dirname", "mkdir", "basename", "id"))
+    _script(bindir, "uname", 'case "$1" in -m) echo arm64 ;; *) echo Darwin ;; esac')
+    _script(bindir, "launchctl", "exit 0")
+    env = _env(home, str(bindir))
+    env.update(extra_env or {})
+    return subprocess.run(
+        [SH, str(repo / "scripts" / "install_launchd_unit.sh"), str(repo), *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(repo),
+    ), home
+
+
+def test_launchd_install_fails_when_the_runtime_writes_no_plist(tmp_path):
+    """A zero runtime exit is not proof of installation (the old false success)."""
+    log = tmp_path / "log.txt"
+    r, home = _run_launchd_install(
+        tmp_path,
+        extra_env={"FAKE_LOG": str(log), "FAKE_WRITE": "0"},
+    )
+
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert "LAUNCHD_PLIST_MISSING" in r.stderr
+    assert "NOT installed" in r.stderr
+    assert not (home / "Library" / "LaunchAgents").exists()
+
+
+def test_launchd_install_verifies_and_reports_the_runtime_resolved_plist(tmp_path):
+    """A profile/prefix install must report the home-scoped plist, not the default."""
+    log = tmp_path / "log.txt"
+    plist = tmp_path / "account" / "Library" / "LaunchAgents" / "ai.qubit.gateway-work.plist"
+    r, _ = _run_launchd_install(
+        tmp_path,
+        extra_env={
+            "FAKE_LOG": str(log),
+            "FAKE_PLIST": str(plist),
+            "FAKE_WRITE": "1",
+            "QUBIT_HOME": str(tmp_path / "profile-home"),
+        },
+    )
+
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert f"gateway LaunchAgent installed: {plist}" in r.stdout
+    assert "status: launchctl print gui/" in r.stdout
+    assert "ai.qubit.gateway-work" in r.stdout
+    assert "ai.qubit.gateway.plist" not in r.stdout
+    assert plist.is_file()
+
+    calls = log.read_text(encoding="utf-8").splitlines()
+    assert any("argv=- if-missing" in line for line in calls)
+    assert any(line.startswith("argv=- ") for line in calls)
+    assert all(f"QUBIT_HOME={tmp_path / 'profile-home'}" in line for line in calls)
+
+
+def test_launchd_install_force_replaces_if_missing(tmp_path):
+    log = tmp_path / "log.txt"
+    plist = tmp_path / "account" / "Library" / "LaunchAgents" / "ai.qubit.gateway.plist"
+    r, _ = _run_launchd_install(
+        tmp_path,
+        "--force",
+        extra_env={
+            "FAKE_LOG": str(log),
+            "FAKE_PLIST": str(plist),
+            "FAKE_WRITE": "1",
+        },
+    )
+
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "argv=- force" in log.read_text(encoding="utf-8")
+    assert "would install with --force" not in r.stdout  # real, not dry-run
+
+
+@needs_uv
+def test_macos_prefix_dry_run_does_not_claim_the_default_plist(tmp_path):
+    """A portable --prefix install is home-scoped; the plan must say so."""
+    home = tmp_path / "home"
+    home.mkdir()
+    path = _darwin_path(tmp_path)
+    prefix = tmp_path / "prefix"
+    r = subprocess.run(
+        [
+            BASH,
+            str(ROOT_INSTALL),
+            "--dry-run",
+            "--prefix",
+            str(prefix),
+            "--with-launchd",
+            "--without-dashboard",
+        ],
+        capture_output=True,
+        text=True,
+        env=_env(home, str(path)),
+        cwd=str(REPO),
+    )
+
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert f"QUBIT_HOME: {prefix}" in r.stdout
+    assert "ai.qubit.gateway-<home-scoped>.plist" in r.stdout
+    assert f"{home}/Library/LaunchAgents/ai.qubit.gateway.plist" not in r.stdout
+    assert "the gateway label is home-scoped" in r.stdout
+    assert not (home / "Library").exists()
+    assert not prefix.exists()
