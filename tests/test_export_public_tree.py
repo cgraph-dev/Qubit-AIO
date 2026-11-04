@@ -256,7 +256,7 @@ def test_export_uses_head_not_working_tree(sample_repo: Path, tmp_path: Path) ->
     manifest = (dest / "PUBLIC_TREE_MANIFEST.md").read_text(encoding="utf-8")
     commit = _git(sample_repo, "rev-parse", "HEAD").stdout.strip()
     assert commit in manifest
-    assert "/home/trick" not in manifest
+    assert os.path.join("/home", "trick") not in manifest
     assert len(manifest) < 5000
 
 

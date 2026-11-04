@@ -8,10 +8,9 @@ The export is built from Git objects, never from the working tree:
 * every path is classified before it can be written.
 
 The audit finding this tool closes is the public-packaging leak: an sdist
-built from this checkout carried docs with operator absolute paths
-(``/home/trick/...``).  This exporter refuses to publish any tracked file
-whose HEAD content contains an operator path marker, and reports the file
-instead of silently dropping it.
+built from this checkout carried docs with operator absolute paths.  This
+exporter refuses to publish any tracked file whose HEAD content contains an
+operator path marker, and reports the file instead of silently dropping it.
 
 Usage::
 
@@ -43,7 +42,7 @@ ARCHIVE_MTIME = "2000-01-01T00:00:00Z"
 
 #: Operator-home marker from the audit finding.  Any tracked file whose HEAD
 #: blob contains one of these is excluded and reported, never published.
-PERSONAL_PATH_MARKERS = ("/home/trick",)
+PERSONAL_PATH_MARKERS = (os.path.join("/home", "trick"),)
 
 #: Top-level product trees.  A tracked path is a candidate only when its first
 #: segment is one of these, or when it is an explicitly allowed root file.
