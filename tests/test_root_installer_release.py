@@ -74,6 +74,7 @@ def test_help_lists_every_supported_option(tmp_path: Path):
     for flag in (
         "-h, --help",
         "-s, --with-systemd",
+        "--with-launchd",
         "--dry-run",
         "--without-models",
         "--without-dashboard",
@@ -81,6 +82,8 @@ def test_help_lists_every_supported_option(tmp_path: Path):
         "-y, --yes",
     ):
         assert flag in r.stdout, f"{flag} missing from --help"
+    assert "Linux and macOS" in r.stdout
+    assert "UNSUPPORTED" in r.stdout
 
 
 def test_unknown_option_exits_2_with_guidance(tmp_path: Path):

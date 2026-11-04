@@ -97,6 +97,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 
 `scripts\install.cmd` is the CMD wrapper for the same entry.
 
+### macOS: core only
+
+`scripts/install.sh` also installs the **core runtime, CLI and dashboard** on
+macOS. The messaging gateway is a launchd LaunchAgent at
+`~/Library/LaunchAgents/ai.qubit.gateway*.plist`:
+
+```bash
+./scripts/install.sh --dry-run --with-launchd   # printed layout, no writes
+./scripts/install.sh --with-launchd             # core install + gateway agent
+```
+
+The Qubit **voice bridge, push-to-talk hotkey, orb and voice-typing are NOT
+supported on macOS** and are reported as `UNSUPPORTED`; the voice-model assets
+are not downloaded there. `--with-systemd` is accepted on macOS only as a
+compatibility spelling for `--with-launchd`; Linux continues to use systemd
+user units. Legacy `ai.hermes.gateway*` LaunchAgents remain read-old and are
+never deleted by the installer.
+
 Release artifacts also expose the packaged surface:
 
 ```bash

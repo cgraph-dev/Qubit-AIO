@@ -17,12 +17,23 @@
 set -euo pipefail
 
 WITH_SYSTEMD=0
+WITH_LAUNCHD=0
 DRY_RUN=0
 WITHOUT_MODELS=0
 WITHOUT_DASHBOARD=0
 LAUNCHER_ONLY=0
 ASSUME_YES=0
 PREFIX=""
+
+# Host platform is decided once, before any preflight or path is printed.
+# Linux uses systemd user units; macOS uses launchd LaunchAgents for the
+# gateway. Anything else is a typed refusal (Windows uses install.ps1).
+HOST_SYSTEM="$(uname -s 2>/dev/null || /usr/bin/uname -s 2>/dev/null || echo unknown)"
+case "$HOST_SYSTEM" in
+  Linux) HOST_OS="linux" ;;
+  Darwin) HOST_OS="macos" ;;
+  *) HOST_OS="unknown" ;;
+esac
 
 usage() {
   cat <<'EOF'
@@ -31,11 +42,17 @@ Qubit installer
 Usage:
   ./scripts/install.sh [options]
 
+Core support: Linux and macOS. On macOS the core runtime, CLI, dashboard and
+the messaging-gateway LaunchAgent are installed; the voice bridge, hotkey
+capture, orb and voice-typing are NOT supported on macOS and are reported as
+UNSUPPORTED (they are installed only on Linux).
+
 Options:
   -h, --help            show this help without changing the machine
-  -s, --with-systemd    install the user units, then enable and start them
-                        (asks before enabling when interactive; non-interactive
-                        runs proceed because the option is explicit)
+  -s, --with-systemd    install the user services and start them (Linux: systemd
+                        user units; macOS: the gateway LaunchAgent only)
+  --with-launchd        install the macOS gateway LaunchAgent (typed refusal on
+                        Linux, which uses --with-systemd)
   --dry-run             run preflight and print the install layout; make no changes
   --without-models      skip model asset downloads and ollama model provisioning
   --without-dashboard   skip the dashboard bundle check/build (headless installs)
@@ -55,7 +72,8 @@ Environment:
 
 Requires: bash, curl, uv. Optional: ollama (local brain), node/npm (dashboard
 build when frontend/qubit-dist is absent), and sha256sum/shasum/openssl + tar
-for model assets (unless --without-models).
+for Linux voice-model assets (unless --without-models). macOS never installs
+the voice-model assets because the voice bridge is unsupported there.
 EOF
 }
 
@@ -67,6 +85,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     -s|--with-systemd)
       WITH_SYSTEMD=1
+      ;;
+    --with-launchd)
+      WITH_LAUNCHD=1
       ;;
     --dry-run)
       DRY_RUN=1
@@ -241,6 +262,26 @@ else
 fi
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 DASHBOARD_STATE="present"
+# macOS gateway supervision lives under the account LaunchAgents directory.
+# The runtime owns the plist body and label (ai.qubit.gateway[-<profile>]);
+# this path is printed so the install is predictable before it runs.
+LAUNCH_AGENTS_DIR="${QUBIT_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+
+# Child processes (uv, the runtime gateway installer, the bridge) must resolve
+# the same home the layout prints; without this the launchd plist could pin
+# ~/.qubit while the installer claims another QUBIT_HOME.
+export QUBIT_HOME
+
+if [ "$WITH_LAUNCHD" = "1" ] && [ "$HOST_OS" != "macos" ]; then
+  echo "UNSUPPORTED_PLATFORM: --with-launchd is macOS-only." >&2
+  echo "  Linux uses the systemd gateway unit: --with-systemd." >&2
+  exit 2
+fi
+if [ "$HOST_OS" = "unknown" ]; then
+  echo "UNSUPPORTED_PLATFORM: $HOST_SYSTEM is not a supported install target." >&2
+  echo "  Supported: Linux (systemd) and macOS (LaunchAgent gateway). On Windows use install.ps1." >&2
+  exit 2
+fi
 
 SR="https://github.com/k2-fsa/sherpa-onnx/releases/download"
 
@@ -268,13 +309,45 @@ check_optional() { # check_optional <tool> <why>
   fi
 }
 
+preflight_platform() {
+  case "$HOST_OS" in
+    linux)
+      echo "    OK       platform   Linux ($(uname -m 2>/dev/null || echo unknown))"
+      echo "    OK       gateway    systemd user unit"
+      ;;
+    macos)
+      local _ver="unknown" _arch="unknown"
+      _arch="$(uname -m 2>/dev/null || echo unknown)"
+      if have sw_vers; then
+        _ver="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
+      fi
+      echo "    OK       platform   macOS $_ver ($_arch)"
+      echo "    OK       gateway    launchd LaunchAgent ($LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist)"
+      check_required launchctl "loads and supervises the gateway LaunchAgent"
+      echo "    INFO     voice      UNSUPPORTED on macOS (voice bridge, hotkey, orb, voice-typing)"
+      ;;
+    *)
+      echo "    MISSING  platform   $HOST_SYSTEM (supported: Linux, macOS)"
+      MISSING_REQUIRED=1
+      ;;
+  esac
+}
+
 preflight() {
   echo "==> preflight"
+  preflight_platform
   check_required bash "the installer is a bash script"
   check_required curl "downloads model assets (skip with --without-models)"
   check_required uv "creates the Python venv and installs the package"
 
-  if [ "$WITHOUT_MODELS" = "1" ]; then
+  if [ "$HOST_OS" = "macos" ]; then
+    echo "    SKIP     models     voice-model assets are Linux-only (voice bridge unsupported on macOS)"
+    if [ "$WITHOUT_MODELS" = "1" ]; then
+      echo "    SKIP     ollama     model provisioning skipped (--without-models)"
+    else
+      check_optional ollama "local brain; DeepSeek API still works without it"
+    fi
+  elif [ "$WITHOUT_MODELS" = "1" ]; then
     echo "    SKIP     ollama     model provisioning skipped (--without-models)"
     echo "    SKIP     models     model assets skipped (--without-models)"
   else
@@ -305,6 +378,11 @@ preflight() {
 
 print_layout() {
   echo "==> Qubit Agent install layout"
+  case "$HOST_OS" in
+    linux) printf '    platform  : Linux (%s)\n' "$(uname -m 2>/dev/null || echo unknown)" ;;
+    macos) printf '    platform  : macOS (%s)\n' "$(uname -m 2>/dev/null || echo unknown)" ;;
+    *)     printf '    platform  : %s (unsupported)\n' "$HOST_SYSTEM" ;;
+  esac
   printf '    project   : %s\n' "$PROJECT_DIR"
   printf '    venv      : %s\n' "$VENV"
   if [ -n "$PREFIX" ]; then
@@ -321,11 +399,19 @@ print_layout() {
     printf '    layout    : new (%s/voice)\n' "$QUBIT_HOME"
   fi
   printf '    data      : %s\n' "$DATA_DIR"
-  printf '    models    : %s\n' "$MODELS"
+  if [ "$HOST_OS" = "macos" ]; then
+    echo "    models    : not installed (voice unsupported on macOS)"
+  else
+    printf '    models    : %s\n' "$MODELS"
+  fi
   printf '    config    : %s/voice.yaml\n' "$CONFIG_DIR"
   printf '    state     : %s\n' "$STATE_DIR"
   printf '    cache     : %s\n' "$CACHE_DIR"
   printf '    launcher  : %s/qubit\n' "$LAUNCHER_DIR"
+  if [ "$HOST_OS" = "macos" ]; then
+    printf '    gateway   : %s/ai.qubit.gateway.plist (LaunchAgent)\n' "$LAUNCH_AGENTS_DIR"
+    echo "    voice     : UNSUPPORTED on macOS (no voicebridge/orb/typing service)"
+  fi
   if [ "$QUBIT_HOME_EXPLICIT" = "1" ] && [ -n "$PREFIX" ] && [ "$QUBIT_HOME" != "$PREFIX" ]; then
     echo "    note      : QUBIT_HOME is explicit and differs from the prefix; runtime state stays at QUBIT_HOME"
   fi
@@ -575,6 +661,10 @@ dl() { # dl <dest> <url> <expected_sha256|-> [<source-label>]
 }
 
 install_model_assets() {
+  if [ "$HOST_OS" = "macos" ]; then
+    echo "==> voice-model assets skipped on macOS (voice bridge is unsupported; core CLI/dashboard/gateway need no mic/TTS models)"
+    return 0
+  fi
   if [ "$WITHOUT_MODELS" = "1" ]; then
     echo "==> models skipped (--without-models)"
     return 0
@@ -874,8 +964,45 @@ EOF
   fi
 }
 
+# ------------------------------------------------------------- launchd (opt)
+# macOS core support is the runtime/CLI/dashboard plus ONE gateway LaunchAgent
+# (ai.qubit.gateway[-<profile>].plist). The voice bridge/orb/typing units do
+# not exist on macOS and are deliberately never attempted.
+install_launchd_services() {
+  if [ "$HOST_OS" != "macos" ]; then
+    echo "UNSUPPORTED_PLATFORM: LaunchAgent services are macOS-only." >&2
+    return 2
+  fi
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "==> [dry-run] would install the gateway LaunchAgent: $LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist"
+    echo "==> [dry-run] would load/start it through the runtime's launchd installer"
+    echo "==> [dry-run] voice bridge/orb/typing: UNSUPPORTED on macOS (not installed)"
+    return 0
+  fi
+
+  echo "==> installing the macOS gateway LaunchAgent (ai.qubit.gateway)"
+  if "$PROJECT_DIR/scripts/install_launchd_unit.sh" "$PROJECT_DIR"; then
+    echo "==> gateway LaunchAgent ready: $LAUNCH_AGENTS_DIR/ai.qubit.gateway.plist"
+  else
+    echo "DEGRADED: the gateway LaunchAgent was not installed/started." >&2
+    echo "  retry: $PROJECT_DIR/scripts/install_launchd_unit.sh $PROJECT_DIR" >&2
+  fi
+  echo "==> voice bridge/orb/typing: UNSUPPORTED on macOS (not installed)"
+  echo "    legacy ai.hermes.gateway* plists stay read-old; they are never deleted here."
+}
+
 print_next_steps() {
   echo
+  if [ "$HOST_OS" = "macos" ]; then
+    echo "==> done (macOS core install). Run:"
+    echo "    $VENV/bin/qubit agent --help          # core runtime/CLI"
+    echo "    $VENV/bin/python -m voicebridge webui --open   # dashboard"
+    echo "    launchctl print gui/$(id -u)/ai.qubit.gateway # gateway status"
+    echo
+    echo "    Voice bridge, hotkey, orb and voice-typing are UNSUPPORTED on macOS."
+    echo "    Auto-start the gateway instead?  $0 --with-launchd"
+    return 0
+  fi
   echo "==> done. Run:"
   echo "    $VENV/bin/python -m voicebridge status"
   echo "    $VENV/bin/python -m voicebridge run        # hotkey PTT loop"
@@ -930,7 +1057,16 @@ if [ "$DASHBOARD_STATE" = "toolchain_missing" ] || \
   fi
 fi
 
-if [ "$WITH_SYSTEMD" = "1" ]; then
+if [ "$HOST_OS" = "macos" ]; then
+  if [ "$WITH_SYSTEMD" = "1" ]; then
+    echo "    note      : systemd is Linux-only; installing the macOS gateway LaunchAgent instead"
+  fi
+  if [ "$WITH_SYSTEMD" = "1" ] || [ "$WITH_LAUNCHD" = "1" ]; then
+    install_launchd_services
+  elif [ "$DRY_RUN" != "1" ]; then
+    print_next_steps
+  fi
+elif [ "$WITH_SYSTEMD" = "1" ]; then
   install_systemd_units
 elif [ "$DRY_RUN" != "1" ]; then
   print_next_steps

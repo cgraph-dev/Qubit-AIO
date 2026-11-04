@@ -37,6 +37,12 @@ def test_platform_supported_on_linux():
     st = P.platform_supported()
     if sys.platform.startswith("linux"):
         assert st["state"] == "OK"
+        assert st["voice_supported"] is True
+    elif sys.platform == "darwin":
+        # macOS is core-only: runtime/CLI/dashboard + launchd gateway.
+        assert st["state"] == "PARTIAL"
+        assert st["core_supported"] is True
+        assert st["voice_supported"] is False
     else:
         assert st["state"] == "UNSUPPORTED"
 
