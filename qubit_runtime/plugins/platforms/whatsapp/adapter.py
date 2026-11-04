@@ -474,12 +474,23 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
     def _bridge_req(self, method: str, path: str, timeout: float, **kwargs):
         """``session.<method>`` context manager for a bridge endpoint (caller must ``async with``)."""
         import aiohttp
-        return getattr(self._http_session, method)(self._bridge_url(path), **kwargs, timeout=aiohttp.ClientTimeout(total=timeout))
+        from .bridge_security import bridge_request_headers
+
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers.update(bridge_request_headers(self._session_path))
+        return getattr(self._http_session, method)(
+            self._bridge_url(path), headers=headers, **kwargs,
+            timeout=aiohttp.ClientTimeout(total=timeout))
 
     async def _probe_bridge_health(self) -> tuple[bool, Any]:
         """GET /health with a fresh session → ``(http_200, json)``; unparseable 200 body → ``(True, None)``; connection errors and timeouts propagate."""
         import aiohttp
-        async with aiohttp.ClientSession() as session, session.get(self._bridge_url("health"), timeout=aiohttp.ClientTimeout(total=2)) as resp:
+        from .bridge_security import bridge_request_headers
+
+        headers = bridge_request_headers(self._session_path)
+        async with aiohttp.ClientSession() as session, session.get(
+                self._bridge_url("health"), headers=headers,
+                timeout=aiohttp.ClientTimeout(total=2)) as resp:
             if resp.status != 200:
                 return False, None
             try:
@@ -599,8 +610,16 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             else:
                 bridge_env.pop(env_key, None)
         # Without these the bridge hardcodes ~/.hermes/{image,audio,document}_cache (wrong under QUBIT_HOME/profiles/cache layout).
-        img_dir, audio_dir, _video_dir, doc_dir = _cache_dirs()
-        bridge_env.update(HERMES_IMAGE_CACHE_DIR=str(img_dir), HERMES_AUDIO_CACHE_DIR=str(audio_dir), HERMES_DOCUMENT_CACHE_DIR=str(doc_dir))
+        img_dir, audio_dir, video_dir, doc_dir = _cache_dirs()
+        bridge_env.update(
+            HERMES_IMAGE_CACHE_DIR=str(img_dir),
+            HERMES_AUDIO_CACHE_DIR=str(audio_dir),
+            HERMES_VIDEO_CACHE_DIR=str(video_dir),
+            HERMES_DOCUMENT_CACHE_DIR=str(doc_dir))
+        from .bridge_security import bridge_media_roots, ensure_bridge_token
+
+        bridge_env["WHATSAPP_BRIDGE_TOKEN"] = ensure_bridge_token(self._session_path)
+        bridge_env["WHATSAPP_MEDIA_ROOTS"] = os.pathsep.join(str(root) for root in bridge_media_roots())
         return bridge_env
 
     def _bridge_died(self, detail: str, code: str = "whatsapp_bridge_exited") -> bool:
@@ -933,8 +952,15 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
 
     @_needs_bridge
     async def _send_media_to_bridge(self, chat_id: str, file_path: str, media_type: str, caption: Optional[str] = None, file_name: Optional[str] = None) -> SendResult:
+        from .bridge_security import is_media_path_allowed
+
         if not os.path.exists(file_path):
             return SendResult(success=False, error=f"File not found: {file_path}")
+        allowed, reason = is_media_path_allowed(file_path)
+        if not allowed:
+            return SendResult(
+                success=False,
+                error=f"WhatsApp media path refused: {reason} ({file_path})")
         jid = to_whatsapp_jid(chat_id)
         payload: Dict[str, Any] = {"chatId": jid, "filePath": file_path, "mediaType": media_type}
         payload.update({k: v for k, v in (("caption", caption), ("fileName", file_name)) if v})
@@ -1006,8 +1032,13 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             return
         with suppress(Exception):
             import aiohttp
+            from .bridge_security import bridge_request_headers
+
             # ``async with`` — a bare ``await session.post(...)`` leaves the response (and its CLOSE_WAIT socket) alive until GC.
-            async with self._http_session.post(self._bridge_url("typing"), json={"chatId": to_whatsapp_jid(chat_id)}, timeout=aiohttp.ClientTimeout(total=5)):
+            async with self._http_session.post(
+                    self._bridge_url("typing"), headers=bridge_request_headers(self._session_path),
+                    json={"chatId": to_whatsapp_jid(chat_id)},
+                    timeout=aiohttp.ClientTimeout(total=5)):
                 pass
 
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
@@ -1236,10 +1267,14 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
     try:
         from qubit_constants import get_qubit_home
         from .bridge_ownership import standalone_bridge_port
+        from .bridge_security import bridge_request_headers, is_media_path_allowed
+
         bridge_port = standalone_bridge_port(
             get_qubit_home(), (getattr(pconfig, "extra", {}) or {}).get("bridge_port")
         )
-        own_session = str(_session_dir(getattr(pconfig, "extra", {}) or {}))
+        session_dir = _session_dir(getattr(pconfig, "extra", {}) or {})
+        own_session = str(session_dir)
+        bridge_headers = bridge_request_headers(session_dir)
         normalized_chat_id = to_whatsapp_jid(chat_id)
         media = media_files or []
         # A caption only applies to a single media file — never repeat it across a multi-file send.
@@ -1258,7 +1293,7 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
             # Whose bridge holds the port is checked before anything is posted: on a shared port another profile's
             # bridge would deliver from that profile's WhatsApp account. A bridge without ``session`` predates the field.
             async with session.get(
-                f"http://localhost:{bridge_port}/health",
+                f"http://localhost:{bridge_port}/health", headers=bridge_headers,
                 timeout=aiohttp.ClientTimeout(total=5),
             ) as resp:
                 if resp.status != 200:
@@ -1279,7 +1314,7 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
             async def _post(path, payload, total, error_label=None):
                 """``(messageId, None)`` on 200, else ``(None, error_dict)`` (body read only when labelled)."""
                 url = f"http://localhost:{bridge_port}/{path}"
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=total)) as resp:
+                async with session.post(url, headers=bridge_headers, json=payload, timeout=aiohttp.ClientTimeout(total=total)) as resp:
                     if resp.status == 200:
                         return (await resp.json()).get("messageId"), None
                     return None, {} if error_label is None else send_error(f"WhatsApp {error_label} error ({resp.status}): {await resp.text()}")
@@ -1300,6 +1335,9 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
                         except Exception:
                             logger.warning("WhatsApp caption-fallback send failed for missing media")
                     return send_error(f"WhatsApp media file not found: {media_path}")
+                allowed, reason = is_media_path_allowed(media_path)
+                if not allowed:
+                    return send_error(f"WhatsApp media path refused: {reason} ({media_path})")
                 media_type = _bridge_media_type(media_path, is_voice, force_document)
                 payload: Dict[str, Any] = {"chatId": normalized_chat_id, "filePath": media_path, "mediaType": media_type}
                 payload.update({k: v for k, v in (("fileName", os.path.basename(media_path) if media_type == "document" else None), ("caption", media_caption)) if v})

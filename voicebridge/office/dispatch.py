@@ -30,13 +30,13 @@ loop is provable without spending anything.
 from __future__ import annotations
 
 import re
-import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional
 
 from . import store
 from . import work as W
 from .errors import BAD_INPUT_CODE, BAD_STATE_CODE, NOT_FOUND_CODE, OfficeError
+from .exit_check import run_exit_check
 
 EXIT_CHECK_TIMEOUT_S = 120
 VERDICT_RE = re.compile(r"^\s*VERDICT:\s*(accept|reject)\s*$", re.I | re.M)
@@ -49,16 +49,12 @@ def shell_checker(command: str, *, cwd: Optional[str] = None,
 
     The command is the *creator's* — the owner writes it when opening the task —
     so this runs what the owner asked to be checked, not what the agent claims.
+    It never reaches a shell: :mod:`voicebridge.office.exit_check` validates the
+    small allowlisted grammar and runs each argument vector directly, so a
+    prompt-injected proposal cannot turn a completion proof into code execution.
     """
     def _check(_result: Dict[str, Any]) -> bool:
-        try:
-            done = subprocess.run(command, shell=True, cwd=cwd, timeout=timeout,
-                                  capture_output=True, text=True)
-        except subprocess.TimeoutExpired:
-            return False
-        except Exception:                                  # noqa: BLE001
-            return False
-        return done.returncode == 0
+        return run_exit_check(command, cwd=cwd, timeout=timeout)
     return _check
 
 

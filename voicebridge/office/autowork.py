@@ -672,7 +672,7 @@ def _tick_exit_check(cfg: Any, ctx: Dict[str, Any], nonce: str) -> str:
            " ON r.run_id = t.run_id"
            " WHERE t.brief LIKE '%" + nonce + "%'"
            " AND r.status = 'settled' LIMIT 1")
-    return f"sqlite3 -readonly {db} {shlex.quote(sql)} | grep -q 1"
+    return f"sqlite3 -readonly -safe {db} {shlex.quote(sql)} | grep -q 1"
 
 
 def _propose(cfg: Any, ctx: Dict[str, Any]) -> Dict[str, Any]:
