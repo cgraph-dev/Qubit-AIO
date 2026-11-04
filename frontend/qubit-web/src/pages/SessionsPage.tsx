@@ -51,6 +51,8 @@ import type {
 } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
+import { StructuredReasoning } from "@/components/StructuredReasoning";
+import { shouldRenderStructuredReasoning } from "@/lib/reasoning-markup";
 import { PlatformsCard } from "@/components/PlatformsCard";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Button } from "@nous-research/ui/ui/components/button";
@@ -443,6 +445,11 @@ function MessageBubble({
           <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
             {msg.content}
           </div>
+        ) : shouldRenderStructuredReasoning(msg.role, msg.content) ? (
+          <StructuredReasoning
+            content={msg.content}
+            highlightTerms={highlightTerms}
+          />
         ) : (
           <Markdown content={msg.content} highlightTerms={highlightTerms} />
         ))}
