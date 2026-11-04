@@ -6,7 +6,8 @@ Requirements:
 
 - Linux (the supported release target is Ubuntu x86_64).
 - Python **3.12 or newer, below 3.15**.
-- Node.js **22 or newer** for the dashboard and desktop tooling.
+- Node.js **22.12 or newer** for the dashboard and desktop tooling (Vite 8
+  requires `^20.19` or `>=22.12`).
 - `git`, `bash`, and the usual build toolchain.
 
 Create a virtual environment and install the project with its development

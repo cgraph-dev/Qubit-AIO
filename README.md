@@ -37,9 +37,9 @@ One line (Linux, full install including voice):
 git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh
 ```
 
-A source install builds the dashboard bundle, so it needs Node.js 22+ and
-`npm`. Pass `--without-dashboard` for a headless install, or use a release
-archive that already contains `frontend/qubit-dist`.
+A source install builds the dashboard bundle with Vite 8, so it needs
+Node.js 22.12+ and `npm`. Pass `--without-dashboard` for a headless install,
+or use a release archive that already contains `frontend/qubit-dist`.
 
 macOS core install (runtime, CLI, dashboard and the gateway LaunchAgent; the
 voice bridge/orb/typing stay unsupported):
@@ -113,6 +113,7 @@ qubit enroll
 
 ## License
 
-Original Qubit material is covered by the terms in [LICENSE](LICENSE).
-Third-party and upstream-derived material keeps its original license; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Original Qubit material is covered by the terms in [LICENSE](LICENSE): a
+personal, non-commercial educational license, not an OSI-approved open-source
+license. Third-party and upstream-derived material keeps its original license;
+see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
