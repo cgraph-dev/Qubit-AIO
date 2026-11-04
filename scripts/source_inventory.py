@@ -1361,7 +1361,8 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
     # names (e.g. plugin dashboard ``dist/*`` bundles) stay in the comparison.
     disposable = {"node_modules", "dist", "build", ".cache", ".venv", "venv"}
     tracked: set[str] = set()
-    if (repo / ".git").exists():
+    have_index = (repo / ".git").exists()
+    if have_index:
         try:
             for line in _git(repo, "ls-files", "--", "qubit_runtime").splitlines():
                 line = line.strip()
@@ -1369,6 +1370,7 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
                     tracked.add(line[len("qubit_runtime/"):])
         except Exception:  # noqa: BLE001 - absent git index degrades to no skip
             tracked = set()
+            have_index = False
     local: dict[str, str] = {}
     if local_root.is_dir():
         for path in sorted(local_root.rglob("*")):
@@ -1377,7 +1379,12 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
             rel = path.relative_to(local_root).as_posix()
             if _byte_skipped(rel):
                 continue
-            if (disposable & set(Path(rel).parts)) and rel not in tracked:
+            if have_index:
+                # Only git-tracked files are part of the shipped source
+                # snapshot, exactly as the canonical vendor manifest records.
+                if rel not in tracked:
+                    continue
+            elif (disposable & set(Path(rel).parts)) and rel not in tracked:
                 continue
             local[rel] = _sha256_file(path)
 

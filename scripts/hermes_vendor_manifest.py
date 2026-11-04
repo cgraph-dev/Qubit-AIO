@@ -20,6 +20,16 @@ Usage:
         --out docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json \
         --openclaw /tmp/opencode/pinned/openclaw \
         --comparison-out docs/generated/HERMES_SOURCE_COMPARISON.json
+
+    # Finish-line drift report (separate artifact; never repoints the W9 pin)
+    scripts/hermes_vendor_manifest.py \
+        --upstream /tmp/opencode/hermes-pin-69948 \
+        --finish-line /tmp/opencode/hermes-pin \
+        --finish-line-only
+    scripts/hermes_vendor_manifest.py \
+        --upstream /tmp/opencode/hermes-pin-69948 \
+        --finish-line /tmp/opencode/hermes-pin \
+        --finish-line-check
 """
 from __future__ import annotations
 
@@ -82,6 +92,32 @@ UNEXPLAINED = "UNEXPLAINED"
 _CLASSIFICATIONS = (
     UNCHANGED, QUBIT_PATCHED, OPENCLAW_OVERLAY, QUBIT_ADDED,
     MISSING, INTENTIONALLY_OMITTED, EOL_NORMALIZED,
+)
+
+# ---------------------------------------------------------------------------
+# Finish-line provenance (separate artifact; never replaces the W9 manifest)
+#
+# The manifest above records where the vendored tree came FROM (PIN, the
+# v0.21.5 vendoring anchor). The finish line moves independently (FROZEN_REV in
+# scripts/frozen_target_progress.py). Repointing PIN at the finish line would
+# falsify the vendoring record: a file that differs could be a Qubit rebrand of
+# the old source OR an upstream change we have not ported, and a single-tree
+# hash comparison cannot tell which. This separate report compares three trees
+# (vendoring source, finish line, local) and classifies every finish-line file
+# by what the hashes actually prove. It never invents a patch classification.
+# ---------------------------------------------------------------------------
+FINISH_LINE_SCHEMA = "qubit-vendor-finish-line-provenance/1"
+
+FINISH_IDENTICAL = "IDENTICAL_AT_FINISH_LINE"
+FINISH_QUBIT_PATCHED = "QUBIT_PATCHED"
+FINISH_BEHIND = "BEHIND_FINISH_LINE"
+FINISH_DIVERGED = "DIVERGED_FROM_BOTH"
+FINISH_MISSING = "MISSING_FROM_LOCAL"
+FINISH_OMITTED = "INTENTIONALLY_OMITTED"
+
+_FINISH_CLASSIFICATIONS = (
+    FINISH_IDENTICAL, FINISH_QUBIT_PATCHED, FINISH_BEHIND, FINISH_DIVERGED,
+    FINISH_MISSING, FINISH_OMITTED,
 )
 
 # Documented Qubit patches (or intentional divergence) in the vendored runtime.
@@ -1317,6 +1353,36 @@ def _sha_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _blob_sha_table(repo: Path, blob_hashes) -> dict[str, str]:
+    """blob oid -> sha256 of its content, read in one ``git cat-file`` process.
+
+    The finish-line report needs both the vendoring-source and finish-line
+    content hashes for every file. Per-file ``git cat-file`` calls are far too
+    slow at this tree size, so batch them. Returns only hashes actually read.
+    """
+    oids = sorted({h for h in blob_hashes if h})
+    if not oids:
+        return {}
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "cat-file", "--batch"],
+        input=("".join(oid + "\n" for oid in oids)).encode(),
+        capture_output=True, check=True,
+    )
+    out = proc.stdout
+    result: dict[str, str] = {}
+    pos = 0
+    for oid in oids:
+        newline = out.index(b"\n", pos)
+        header = out[pos:newline].split()
+        if len(header) < 3:
+            raise SystemExit(f"cat-file --batch: unexpected header for {oid}")
+        size = int(header[2])
+        data = out[newline + 1:newline + 1 + size]
+        result[oid] = hashlib.sha256(data).hexdigest()
+        pos = newline + 1 + size + 1
+    return result
+
+
 def _rel(path: Path) -> str:
     try:
         return path.relative_to(REPO).as_posix()
@@ -1432,6 +1498,12 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
             continue
         if (_DISPOSABLE_DIR_PARTS & set(Path(rel).parts)
                 and rel not in local_git_modes):
+            continue
+        # The manifest describes the shipped source snapshot, which is what a
+        # fresh clone contains. Untracked build/run artifacts (web_dist
+        # bundles, egg-info, lock/result files) are not part of it and would
+        # make the committed artifact depend on the operator's working tree.
+        if rel not in local_git_modes:
             continue
         local_rels.append(rel)
     local_set = set(local_rels)
@@ -1645,6 +1717,215 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
     return manifest
 
 
+def build_finish_line_provenance(source_upstream: Path, finish_upstream: Path,
+                                 local: Path, local_label: str, *,
+                                 source_rev: str = PIN,
+                                 finish_rev: str | None = None) -> dict:
+    """Compare the vendored tree against the finish-line pin, honestly.
+
+    ``source_upstream`` is the tree the vendored code was copied from (PIN);
+    ``finish_upstream`` is the frozen finish line. Both must be checked out at
+    their exact revisions. For every finish-line file the report records what
+    the three content hashes prove:
+
+    * IDENTICAL_AT_FINISH_LINE -- local bytes equal the finish-line blob.
+    * QUBIT_PATCHED            -- upstream did not change since the vendoring
+                                 source, and local differs: a local patch.
+    * BEHIND_FINISH_LINE       -- local equals the vendoring source and the
+                                 finish line moved on: unported upstream work.
+    * DIVERGED_FROM_BOTH       -- local differs from the source AND upstream
+                                 changed: a local patch plus unported drift.
+                                 This is NOT credited as a documented patch.
+    * MISSING_FROM_LOCAL       -- no local counterpart at the mapped path.
+    * INTENTIONALLY_OMITTED    -- reference-only upstream tree, omitted by the
+                                 same documented policy as the W9 manifest.
+
+    The report is a sibling artifact. It never edits or replaces the 69948 W9
+    manifest, which remains the authority for where the code came from.
+    """
+    if finish_rev is None:
+        finish_rev = _frozen_rev()
+    _check_revision(source_upstream, source_rev, "vendoring source")
+    _check_revision(finish_upstream, finish_rev, "finish line")
+
+    source_tree = _ls_tree(source_upstream, source_rev)
+    finish_tree = _ls_tree(finish_upstream, finish_rev)
+    source_sha = _blob_sha_table(
+        source_upstream, [blob for _mode, blob in source_tree.values()])
+    finish_sha = _blob_sha_table(
+        finish_upstream, [blob for _mode, blob in finish_tree.values()])
+
+    # Local snapshot uses exactly the W9 manifest's skip rules so the two
+    # artifacts describe the same shipped tree.
+    local_git_modes = _git_tracked_modes(local_label, REPO)
+    local_set: list[str] = []
+    for path in sorted(local.rglob("*")):
+        if not path.is_file() and not path.is_symlink():
+            continue
+        rel = path.relative_to(local).as_posix()
+        if _is_skipped(rel):
+            continue
+        if (_DISPOSABLE_DIR_PARTS & set(Path(rel).parts)
+                and rel not in local_git_modes):
+            continue
+        # Provenance describes the shipped source snapshot. Untracked build and
+        # run artifacts (web_dist bundles, egg-info, lock/result files) are not
+        # represented in a fresh clone and would make the report depend on the
+        # operator's working tree, so they are excluded here.
+        if rel not in local_git_modes:
+            continue
+        local_set.append(rel)
+    local_lookup: dict[str, str] = {}
+    for rel in local_set:
+        p = local / rel
+        data = (p.read_bytes() if p.is_file()
+                else p.readlink().as_posix().encode())
+        local_lookup[rel] = _sha_bytes(data)
+    shipped = set(local_set)
+
+    finish_local = {
+        rel: _local_from_upstream(rel, shipped) for rel in finish_tree}
+    source_local = {
+        rel: _local_from_upstream(rel, shipped) for rel in source_tree}
+    # Deterministic reverse map: source path -> local path (first sorted wins
+    # when several source paths map to one shipped name).
+    source_by_local: dict[str, str] = {}
+    for rel in sorted(source_local):
+        source_by_local.setdefault(source_local[rel], rel)
+
+    counts = {c: 0 for c in _FINISH_CLASSIFICATIONS}
+    missing: list[dict] = []
+    omitted: list[dict] = []
+    behind: list[dict] = []
+    diverged: list[dict] = []
+    patched: list[str] = []
+
+    for rel in sorted(finish_tree):
+        lrel = finish_local[rel]
+        finish_blob_sha = finish_sha[finish_tree[rel][1]]
+        if lrel not in local_lookup:
+            reason = _intentional_omission_reason(rel)
+            if reason is None:
+                counts[FINISH_MISSING] += 1
+                missing.append({
+                    "path": rel,
+                    "upstream_blob": finish_tree[rel][1],
+                    "upstream_sha256": finish_blob_sha,
+                })
+            else:
+                counts[FINISH_OMITTED] += 1
+                omitted.append({"path": rel, "reason": reason})
+            continue
+
+        local_sha = local_lookup[lrel]
+        source_rel = source_by_local.get(lrel)
+        source_blob_sha = (
+            source_sha[source_tree[source_rel][1]]
+            if source_rel is not None and source_rel in source_tree else None)
+
+        if local_sha == finish_blob_sha:
+            counts[FINISH_IDENTICAL] += 1
+            continue
+        if source_blob_sha is not None and local_sha == source_blob_sha \
+                and source_blob_sha != finish_blob_sha:
+            counts[FINISH_BEHIND] += 1
+            behind.append({
+                "path": rel,
+                "local": lrel,
+                "local_sha256": local_sha,
+                "source_blob_sha256": source_blob_sha,
+                "finish_line_blob_sha256": finish_blob_sha,
+            })
+            continue
+        if source_blob_sha is not None and local_sha != source_blob_sha \
+                and source_blob_sha == finish_blob_sha:
+            counts[FINISH_QUBIT_PATCHED] += 1
+            patched.append(rel)
+            continue
+        # Local differs from the source AND upstream moved (or the source
+        # counterpart is unknown). Never call this a Qubit patch: that would
+        # hide unported upstream work behind a rebrand label.
+        counts[FINISH_DIVERGED] += 1
+        diverged.append({
+            "path": rel,
+            "local": lrel,
+            "local_sha256": local_sha,
+            "source_blob_sha256": source_blob_sha,
+            "finish_line_blob_sha256": finish_blob_sha,
+        })
+
+    covered_local = set(finish_local.values())
+    upstream_removed: list[str] = []
+    local_only: list[str] = []
+    for rel in local_set:
+        if rel in covered_local:
+            continue
+        source_rel = source_by_local.get(rel)
+        if source_rel is not None and source_rel not in finish_tree:
+            upstream_removed.append(rel)
+        else:
+            local_only.append(rel)
+
+    def _is_test(rel: str) -> bool:
+        return rel.startswith("tests/") or "/tests/" in rel
+
+    py_finish = [r for r in finish_tree if r.endswith(".py")]
+    py_prod = [r for r in py_finish if not _is_test(r)]
+    py_missing_prod = [r["path"] for r in missing
+                       if r["path"].endswith(".py")
+                       and not _is_test(r["path"])]
+    py_behind_prod = [r["path"] for r in behind
+                      if r["path"].endswith(".py")
+                      and not _is_test(r["path"])]
+    py_diverged_prod = [r["path"] for r in diverged
+                        if r["path"].endswith(".py")
+                        and not _is_test(r["path"])]
+
+    return {
+        "schema": FINISH_LINE_SCHEMA,
+        "generated_by": "scripts/hermes_vendor_manifest.py",
+        "note": (
+            "Finish-line drift report. The canonical W9 manifest remains "
+            "anchored at the vendoring source; this sibling artifact measures "
+            "the tree against the frozen finish line and records every "
+            "missing, omitted, behind and diverged file explicitly. A file "
+            "that differs from both the source and the finish line is "
+            "DIVERGED_FROM_BOTH, never credited as a documented Qubit patch."
+        ),
+        "canonical_vendor_manifest":
+            "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
+        "canonical_manifest_preserved": True,
+        "source": {
+            "repo": UPSTREAM_REPO,
+            "revision": source_rev,
+            "tag": UPSTREAM_TAG,
+        },
+        "finish_line": {
+            "repo": UPSTREAM_REPO,
+            "revision": finish_rev,
+        },
+        "local_root": local_label,
+        "local_snapshot": "git-tracked files only",
+        "local_file_count": len(local_set),
+        "upstream_file_count": len(finish_tree),
+        "classification_counts": counts,
+        "python": {
+            "finish_line_files": len(py_finish),
+            "finish_line_production_files": len(py_prod),
+            "missing_production": len(py_missing_prod),
+            "behind_production": len(py_behind_prod),
+            "diverged_production": len(py_diverged_prod),
+        },
+        "missing_from_local": missing,
+        "intentionally_omitted": omitted,
+        "behind_finish_line": behind,
+        "diverged_from_both": diverged,
+        "qubit_patched": patched,
+        "upstream_removed_since_source": sorted(upstream_removed),
+        "local_only": sorted(local_only),
+    }
+
+
 def _iter_upstream_files(root: Path) -> list[str]:
     out = []
     for p in sorted(root.rglob("*")):
@@ -1656,10 +1937,28 @@ def _iter_upstream_files(root: Path) -> list[str]:
     return out
 
 
-def build_comparison(upstream: Path, openclaw: Path) -> dict:
-    _check_revision(upstream, PIN, "upstream")
+def build_comparison(upstream: Path, openclaw: Path, *,
+                     rev: str | None = None,
+                     source_upstream: Path | None = None,
+                     source_rev: str | None = None) -> dict:
+    """Build the vendored-frontend comparison ledger.
+
+    With no keyword arguments this is the historical 69948 comparison and its
+    output is unchanged. ``rev``/``source_upstream`` switch it to a finish-line
+    comparison: each row also carries an explicit ``classification`` derived
+    from the local, finish-line and vendoring-source hashes, so an upstream
+    change is never mislabelled as a Qubit patch.
+    """
+    row_rev = rev or PIN
+    finish_mode = source_upstream is not None
+    _check_revision(upstream, row_rev, "upstream")
     _check_revision(openclaw, OPENCLAW_PIN, "openclaw")
+    if finish_mode:
+        _check_revision(source_upstream, source_rev or PIN, "vendoring source")
     roots = {"hermes": upstream, "openclaw": openclaw}
+    source_roots = (
+        {"hermes": source_upstream, "openclaw": openclaw}
+        if finish_mode else None)
     rows: list[dict] = []
     for spec in _COMPARISON_SCOPES:
         up_root = roots[spec["upstream_root"]] / spec["upstream_dir"]
@@ -1668,20 +1967,37 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
         rels = spec.get("select") or _iter_upstream_files(up_root)
         if spec.get("select"):
             rels = sorted(spec["select"])
+        # Only the Hermes scopes move to the finish line; OpenClaw stays on its
+        # own pin (a separate vendoring anchor, not the finish line).
+        spec_rev = row_rev if spec["upstream_root"] == "hermes" else spec["rev"]
         for rel in rels:
             up_path = up_root / rel
             # The comparison rows key ``upstream`` by the scope-relative path
             # (``shared/...``, ``apps/desktop/...``, ``web/...``, ``ui/...``),
             # which is what the vendor guard enumerates on disk.
             upstream_field = f"{spec['scope'].split('/', 1)[1]}/{rel}"
-            upstream_sha = _sha_file(up_path)
+            upstream_sha = _sha_file(up_path) if up_path.is_file() else None
             row = {
                 "scope": spec["scope"],
                 "category": spec["category"],
                 "upstream": upstream_field,
-                "upstream_rev": spec["rev"],
+                "upstream_rev": spec_rev,
                 "upstream_sha256": upstream_sha,
             }
+            if upstream_sha is None:
+                row.update({
+                    "qubit": None,
+                    "qubit_sha256": None,
+                    "patch": None,
+                    "reason": "not present at the audited revision: "
+                              f"{upstream_field} was removed upstream.",
+                    "upstream_blob_sha256": None,
+                    "affected_regression_test": None,
+                })
+                if finish_mode:
+                    row["classification"] = "REMOVED_UPSTREAM"
+                rows.append(row)
+                continue
             local_dir = spec.get("local_dir")
             if local_dir is None:
                 row.update({
@@ -1690,6 +2006,8 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
                     "patch": None,
                     "reason": spec["omit_reason"],
                 })
+                if finish_mode:
+                    row["classification"] = "NOT_SHIPPED"
                 rows.append(row)
                 continue
             if spec["scope"] == "hermes-agent/plugins":
@@ -1717,22 +2035,62 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
                     "upstream_blob_sha256": upstream_sha,
                     "affected_regression_test": None,
                 })
+                if finish_mode:
+                    row["classification"] = FINISH_MISSING
                 rows.append(row)
                 continue
+            qsha = _sha_file(qpath)
             patch = _PATCH_SPEC.get(qubit)
-            # Deep source rebrand: any content change in a vendored frontend
-            # file is a documented, owned Qubit patch (never silent drift).
-            if patch is None and _sha_file(qpath) != upstream_sha:
+            classification = None
+            if finish_mode:
+                if qsha == upstream_sha:
+                    classification = FINISH_IDENTICAL
+                    patch = None
+                else:
+                    src_root = (source_roots[spec["upstream_root"]]
+                                / spec["upstream_dir"])
+                    src_path = src_root / rel
+                    src_sha = (_sha_file(src_path)
+                               if src_path.is_file() else None)
+                    if src_sha is not None and src_sha == upstream_sha:
+                        classification = FINISH_QUBIT_PATCHED
+                        if patch is None:
+                            patch = _GENERIC_REBRAND
+                    elif src_sha is not None and src_sha == qsha:
+                        classification = FINISH_BEHIND
+                        patch = None
+                    else:
+                        classification = FINISH_DIVERGED
+                        patch = None
+                row["classification"] = classification
+            elif patch is None and qsha != upstream_sha:
+                # Deep source rebrand: any content change in a vendored
+                # frontend file is a documented, owned Qubit patch.
                 patch = _GENERIC_REBRAND
+            if patch is None:
+                if finish_mode and classification in (FINISH_BEHIND,
+                                                       FINISH_DIVERGED):
+                    reason = (
+                        "local bytes differ from the finish line and upstream "
+                        "changed since the vendoring source; not a documented "
+                        "Qubit patch (unported upstream drift).")
+                else:
+                    reason = spec["default_reason"]
+                if finish_mode:
+                    affected = (spec["default_test"]
+                                if classification == FINISH_IDENTICAL else None)
+                else:
+                    affected = spec["default_test"]
+            else:
+                reason = patch["reason"]
+                affected = patch["affected_regression_test"]
             row.update({
                 "qubit": qubit,
-                "qubit_sha256": _sha_file(qpath),
+                "qubit_sha256": qsha,
                 "patch": patch["patch"] if patch else None,
-                "reason": patch["reason"] if patch else spec["default_reason"],
+                "reason": reason,
                 "upstream_blob_sha256": upstream_sha,
-                "affected_regression_test":
-                    patch["affected_regression_test"] if patch
-                    else spec["default_test"],
+                "affected_regression_test": affected,
             })
             rows.append(row)
 
@@ -1766,10 +2124,10 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
             "role": role,
         })
 
-    return {
+    result = {
         "hermes": {
             "repo": UPSTREAM_REPO,
-            "rev": PIN,
+            "rev": row_rev,
             "tag": UPSTREAM_TAG,
             "license": "MIT (Copyright (c) 2025 Nous Research)",
         },
@@ -1794,6 +2152,15 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
         "rows": rows,
         "provenance_schema": _PROVENANCE_SCHEMA,
     }
+    if finish_mode:
+        result["finish_line"] = True
+        result["source"] = {
+            "repo": UPSTREAM_REPO,
+            "rev": source_rev or PIN,
+            "tag": UPSTREAM_TAG,
+        }
+        result["canonical_manifest_preserved"] = True
+    return result
 
 
 #: Read-only candidate sources for the pinned upstream tree, in preference
@@ -1820,8 +2187,41 @@ OPENCLAW_CANDIDATES = (
 ENV_UPSTREAM_CANDIDATE_VARS = ("QUBIT_PINNED_HERMES", "QUBIT_REFERENCE_HOME")
 ENV_OPENCLAW_CANDIDATE_VARS = ("QUBIT_PINNED_OPENCLAW", "QUBIT_OPENCLAW_HOME")
 
+#: Finish-line pin (the "where we must get to" revision, read from its single
+#: declared home). This is deliberately NOT ``PIN``: the two trees are compared
+#: in the finish-line report so neither the vendoring record nor the drift
+#: measurement has to lie.
+FINISH_LINE_REV_SOURCE = REPO / "scripts" / "frozen_target_progress.py"
+
+#: Read-only candidate sources for the finish-line tree, in preference order.
+FINISH_LINE_CANDIDATES = (
+    Path("/tmp/opencode/hermes-pin"),
+    Path("/tmp/opencode/pinned/hermes-agent-finish-line"),
+    Path.home() / ".hermes.pre-retirement" / "hermes-agent",
+    Path.home() / ".hermes" / "hermes-agent",
+)
+ENV_FINISH_LINE_CANDIDATE_VARS = (
+    "QUBIT_FINISH_LINE_HERMES", "QUBIT_PINNED_HERMES_FINISH_LINE")
+
 FALLBACK_UPSTREAM = Path("/tmp/opencode/pinned/hermes-agent")
 FALLBACK_OPENCLAW = Path("/tmp/opencode/pinned/openclaw")
+FALLBACK_FINISH_LINE = Path("/tmp/opencode/hermes-pin")
+
+
+def _frozen_rev() -> str:
+    """Read ``FROZEN_REV`` from its single home without importing the script."""
+    try:
+        text = FINISH_LINE_REV_SOURCE.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise SystemExit(
+            f"cannot read finish-line pin ({FINISH_LINE_REV_SOURCE}): {exc}")
+    match = re.search(r'^FROZEN_REV\s*=\s*"([0-9a-f]{40})"', text, re.M)
+    if match is None:
+        raise SystemExit(
+            f"no FROZEN_REV in {FINISH_LINE_REV_SOURCE}; finish-line provenance "
+            "needs the declared pin")
+    return match.group(1)
+
 
 
 def _env_candidate_paths(*var_names: str) -> tuple[Path, ...]:
@@ -1877,6 +2277,15 @@ def _resolve_openclaw(explicit: str | None = None) -> Path:
                            FALLBACK_OPENCLAW)
 
 
+def _resolve_finish_line(explicit: str | None = None,
+                         rev: str | None = None) -> Path:
+    pin = rev or _frozen_rev()
+    candidates = (_env_candidate_paths(*ENV_FINISH_LINE_CANDIDATE_VARS)
+                  + FINISH_LINE_CANDIDATES)
+    return _resolve_pinned(explicit, pin, candidates, "finish line (Hermes)",
+                           FALLBACK_FINISH_LINE)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--upstream", default=None,
@@ -1895,6 +2304,24 @@ def main(argv=None) -> int:
                          "candidate whose HEAD equals the pin)")
     ap.add_argument("--comparison-out",
                     default="docs/generated/HERMES_SOURCE_COMPARISON.json")
+    ap.add_argument("--finish-line", default=None,
+                    help="finish-line Hermes git clone (default: auto-resolve "
+                         "a candidate whose HEAD equals FROZEN_REV). Enables "
+                         "the sibling finish-line provenance report; the "
+                         "canonical W9 manifest is never repointed.")
+    ap.add_argument("--finish-line-rev", default=None,
+                    help="finish-line revision (default: FROZEN_REV from "
+                         "scripts/frozen_target_progress.py)")
+    ap.add_argument("--finish-line-out",
+                    default="docs/generated/QUBIT_HERMES_FINISH_LINE_PROVENANCE.json")
+    ap.add_argument("--finish-line-comparison-out",
+                    default="docs/generated/HERMES_SOURCE_COMPARISON_FINISH_LINE.json")
+    ap.add_argument("--finish-line-check", action="store_true",
+                    help="render the finish-line artifacts in memory, compare "
+                         "with their committed files, write nothing")
+    ap.add_argument("--finish-line-only", action="store_true",
+                    help="write only the finish-line artifacts; never touch "
+                         "the canonical W9 manifest/comparison")
     args = ap.parse_args(argv)
 
     upstream = _resolve_upstream(args.upstream)
@@ -1905,18 +2332,85 @@ def main(argv=None) -> int:
         print(f"local fork not found: {local}", file=sys.stderr)
         return 2
 
+    finish_artifacts = None
+    finish_rev = None
+    if args.finish_line or args.finish_line_check or args.finish_line_only:
+        finish_rev = args.finish_line_rev or _frozen_rev()
+        finish = _resolve_finish_line(args.finish_line, finish_rev)
+        provenance = build_finish_line_provenance(
+            upstream, finish, local, args.local,
+            source_rev=PIN, finish_rev=finish_rev)
+        finish_comparison = build_comparison(
+            finish, _resolve_openclaw(args.openclaw), rev=finish_rev,
+            source_upstream=upstream, source_rev=PIN)
+        finish_artifacts = (provenance, finish_comparison)
+
+    def _check_artifact(path: Path, payload: str, label: str) -> bool:
+        if not path.is_file():
+            print(f"{label} missing: {path}", file=sys.stderr)
+            return False
+        if path.read_text(encoding="utf-8") != payload:
+            print(f"{label} stale: {path}", file=sys.stderr)
+            return False
+        print(f"{label} up to date: {path}")
+        return True
+
+    if args.finish_line_check:
+        assert finish_artifacts is not None
+        provenance, finish_comparison = finish_artifacts
+        fl_out = (REPO / args.finish_line_out).resolve()
+        fl_comp_out = (REPO / args.finish_line_comparison_out).resolve()
+        ok = _check_artifact(
+            fl_out,
+            json.dumps(provenance, indent=1, sort_keys=True) + "\n",
+            "finish-line provenance")
+        ok = _check_artifact(
+            fl_comp_out,
+            json.dumps(finish_comparison, indent=1) + "\n",
+            "finish-line comparison") and ok
+        return 0 if ok else 1
+
+    if args.finish_line_only:
+        assert finish_artifacts is not None
+        provenance, finish_comparison = finish_artifacts
+        fl_out = (REPO / args.finish_line_out).resolve()
+        fl_comp_out = (REPO / args.finish_line_comparison_out).resolve()
+        fl_comp_out.parent.mkdir(parents=True, exist_ok=True)
+        fl_out.write_text(
+            json.dumps(provenance, indent=1, sort_keys=True) + "\n",
+            encoding="utf-8")
+        fl_comp_out.write_text(
+            json.dumps(finish_comparison, indent=1) + "\n", encoding="utf-8")
+        fcounts = provenance["classification_counts"]
+        print(f"wrote {_rel(fl_out)}")
+        print(f"  finish_line={provenance['finish_line']['revision']} "
+              f"source={provenance['source']['revision']} "
+              f"identical={fcounts[FINISH_IDENTICAL]} "
+              f"patched={fcounts[FINISH_QUBIT_PATCHED]} "
+              f"behind={fcounts[FINISH_BEHIND]} "
+              f"diverged={fcounts[FINISH_DIVERGED]} "
+              f"missing={fcounts[FINISH_MISSING]} "
+              f"omitted={fcounts[FINISH_OMITTED]}")
+        print(f"wrote {_rel(fl_comp_out)}")
+        print(f"  rows={len(finish_comparison['rows'])}")
+        return 0
+
     manifest = build_vendor_manifest(upstream, local, args.local)
     payload = json.dumps(manifest, indent=1, sort_keys=True) + "\n"
 
     if args.check:
-        if not out.is_file():
-            print(f"vendor manifest missing: {out}", file=sys.stderr)
-            return 1
-        if out.read_text(encoding="utf-8") != payload:
-            print(f"vendor manifest stale: {out}", file=sys.stderr)
-            return 1
-        print(f"vendor manifest up to date: {out}")
-        return 0
+        ok = _check_artifact(out, payload, "vendor manifest")
+        if finish_artifacts is not None:
+            provenance, finish_comparison = finish_artifacts
+            ok = _check_artifact(
+                (REPO / args.finish_line_out).resolve(),
+                json.dumps(provenance, indent=1, sort_keys=True) + "\n",
+                "finish-line provenance") and ok
+            ok = _check_artifact(
+                (REPO / args.finish_line_comparison_out).resolve(),
+                json.dumps(finish_comparison, indent=1) + "\n",
+                "finish-line comparison") and ok
+        return 0 if ok else 1
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(payload, encoding="utf-8")
@@ -1949,6 +2443,29 @@ def main(argv=None) -> int:
         print(f"  rows={len(comparison['rows'])} "
               f"wave3.added={len(comparison['wave3']['added'])} "
               f"wave3.overlay={len(comparison['wave3']['overlay'])}")
+
+    if finish_artifacts is not None:
+        provenance, finish_comparison = finish_artifacts
+        fl_out = (REPO / args.finish_line_out).resolve()
+        fl_comp_out = (REPO / args.finish_line_comparison_out).resolve()
+        fl_comp_out.parent.mkdir(parents=True, exist_ok=True)
+        fl_out.write_text(
+            json.dumps(provenance, indent=1, sort_keys=True) + "\n",
+            encoding="utf-8")
+        fl_comp_out.write_text(
+            json.dumps(finish_comparison, indent=1) + "\n", encoding="utf-8")
+        fcounts = provenance["classification_counts"]
+        print(f"wrote {_rel(fl_out)}")
+        print(f"  finish_line={provenance['finish_line']['revision']} "
+              f"source={provenance['source']['revision']} "
+              f"identical={fcounts[FINISH_IDENTICAL]} "
+              f"patched={fcounts[FINISH_QUBIT_PATCHED]} "
+              f"behind={fcounts[FINISH_BEHIND]} "
+              f"diverged={fcounts[FINISH_DIVERGED]} "
+              f"missing={fcounts[FINISH_MISSING]} "
+              f"omitted={fcounts[FINISH_OMITTED]}")
+        print(f"wrote {_rel(fl_comp_out)}")
+        print(f"  rows={len(finish_comparison['rows'])}")
 
     if manifest["blockers"]:
         print(f"BLOCKERS: {len(manifest['blockers'])} unexplained difference(s)",

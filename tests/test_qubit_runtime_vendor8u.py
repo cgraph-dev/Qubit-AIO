@@ -93,6 +93,20 @@ def test_manifest_pins_exact_revision_and_is_clean():
 def test_manifest_covers_every_file_on_disk():
     m = _manifest(MANIFEST)
     expected = set(m["files"])
+    # The manifest records the shipped source snapshot: git-tracked files.
+    # Untracked build/run artifacts (web_dist bundles, egg-info, lock/result
+    # files) are absent from a fresh clone, so they are not part of the
+    # contract and would otherwise make this test depend on the operator's
+    # working tree. This mirrors the generator's tracked-only snapshot.
+    tracked = set()
+    proc = subprocess.run(
+        ["git", "-C", str(REPO), "ls-files", "--", "qubit_runtime"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode == 0:
+        for line in proc.stdout.splitlines():
+            if line.startswith("qubit_runtime/"):
+                tracked.add(line[len("qubit_runtime/"):])
     actual = set()
     for p in FORK.rglob("*"):
         if not p.is_file():
@@ -110,12 +124,7 @@ def test_manifest_covers_every_file_on_disk():
                                       "coverage.xml"}
                 or rel.endswith((".pyc", ".pyo"))):
             continue
-        # Disposable dependency/build/cache trees are not part of the vendored
-        # source snapshot unless upstream tracks them (e.g. plugin dashboard
-        # ``dist/*`` bundles). Skip only untracked disposable paths, exactly as
-        # the manifest generator does.
-        if ({"node_modules", "dist", "build", "release", ".cache", ".venv",
-             "venv"} & set(Path(rel).parts) and rel not in expected):
+        if tracked and rel not in tracked:
             continue
         actual.add(rel)
     assert actual <= expected, f"unmanifested files: {sorted(actual - expected)[:5]}"

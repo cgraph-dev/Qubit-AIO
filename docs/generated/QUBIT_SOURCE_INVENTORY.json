@@ -55,10 +55,10 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 16078,
-   "local_files": 20721,
+   "local_files": 20647,
    "identical": 7122,
    "missing": 321,
-   "extra": 4964,
+   "extra": 4890,
    "changed": 8635
   },
   "missing": [
@@ -1684,10 +1684,6 @@
    {
     "path": ".github/workflows/windows-install-update-e2e.yml",
     "local_sha256": "e2d50e330ef3e15b856bcaa67e498a463b91e853930aded9e0254593127c6b5c"
-   },
-   {
-    "path": ".hermes-update.lock",
-    "local_sha256": "f5fef77419d084030f1ab171f17db6487096ae737c71c71112749fac475f90eb"
    },
    {
     "path": "INVESTIGATION-local-viewer-prompt-cluster.md",
@@ -4656,10 +4652,6 @@
    {
     "path": "evals/bench/runner.py",
     "local_sha256": "4cfc1d37424b38ee105953158d1cd8c8d57e67472cb8fa0590aaccfcfb181fe8"
-   },
-   {
-    "path": "evals/browser_use/results/results.jsonl",
-    "local_sha256": "708be376075e908898b97068dcbbed2e3f206c3af1d7146ae457503a0119b9c8"
    },
    {
     "path": "evals/core_tool_deferral/sandbox.py",
@@ -8926,30 +8918,6 @@
     "local_sha256": "aef02ed34aa0762f6b2803e164a11a273080a38705725c048efc4a6a6fed621a"
    },
    {
-    "path": "qubit_agent.egg-info/PKG-INFO",
-    "local_sha256": "20c3b6e74161c9a55a32e7f1c602d447359cfe587e4dc9e8e06a166024db8b07"
-   },
-   {
-    "path": "qubit_agent.egg-info/SOURCES.txt",
-    "local_sha256": "9522fecd1d91221f51acf066b7e8aa8b858d6a4e7dd14ee5e5c73ca286436c55"
-   },
-   {
-    "path": "qubit_agent.egg-info/dependency_links.txt",
-    "local_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
-   },
-   {
-    "path": "qubit_agent.egg-info/entry_points.txt",
-    "local_sha256": "e68794819fd39d5d73f3f991010b4764b9c23a6b750ea46c476226ff6d0ea13a"
-   },
-   {
-    "path": "qubit_agent.egg-info/requires.txt",
-    "local_sha256": "e7052e03f833bcddbcfb310115f829fcba9f0b9fcd06251b4df8dfd303e83d77"
-   },
-   {
-    "path": "qubit_agent.egg-info/top_level.txt",
-    "local_sha256": "f0c6f76bed1923bd9236d0633f34b2ecf441c3816833222d026b20f860ccb66f"
-   },
-   {
     "path": "qubit_cli/_early_recovery_zip.py",
     "local_sha256": "6af56daab93f664094631e56bc9e901b7b20a49ce71e8e55cbc1a96c253c9a9a"
    },
@@ -9780,270 +9748,6 @@
    {
     "path": "qubit_cli/web_build_limits.py",
     "local_sha256": "0d6b8a5b55258c3876d56a7e1f8d50b1c0bb6d1845568d2852c9fdf2bf417f25"
-   },
-   {
-    "path": "qubit_cli/web_dist/.hermes-product",
-    "local_sha256": "7511f4df586ddc996d2af1a0e266e69e148069601e6812d5462e132269e32efc"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/AnalyticsPage-DVRdezXp.js",
-    "local_sha256": "1b445052f366813d8dba73df1d07d65d43226b45b1026e2d79dff5365b66432a"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ChannelsPage-CYCyCuWo.js",
-    "local_sha256": "dc639d371cfb9b1155e4111b476d73fa493e19607b90ebdfdd7026aebc1250fa"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ChatPage-D8x6sPSF.js",
-    "local_sha256": "bf0735af2a552f3263c6e648c8189d6d7e652a0416cf2fca4496821aa78354d5"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/Collapse-Bold-mgICk9-_.woff2",
-    "local_sha256": "cb1bc6803168cffb3ef7b8113f95f82480a6d0f46d6e37edc854259377c6c00b"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/Collapse-Regular-DysayoTY.woff2",
-    "local_sha256": "ce8c481f56da3a46074ab696c16481bea49ea83e75e7eb7cb42fd2114593f33a"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ConfigPage-C4YZ8Mbi.js",
-    "local_sha256": "680d1d55e7cf87a2336741e8bae0cf3d606e5295ba2556df69f5f209fc430582"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/CronPage-BM297avP.js",
-    "local_sha256": "5f4b403ccf3e1b641f42d336ad18b3d5ee04a6befa3be3cadb8ddd9c35344c31"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/DeleteConfirmDialog-Ef3apWk9.js",
-    "local_sha256": "1b40cf31d3bff7a9dd3be7e2d3ecfba6c3a77cf62a36bb7a72ff5bc1bae798dd"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/DocsPage-2ChkrB12.js",
-    "local_sha256": "ba0352e6b06abc9fafc7badf567bc07c40519ccf082a69517b6f37b9012b1274"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/EnvPage-Cp0OZ14m.js",
-    "local_sha256": "80bc0bf6eabe5c95587426325185628e1701359832db34df31b9a9c0e6fb724e"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/FilesPage-oIav5S9M.js",
-    "local_sha256": "27dd11c81a00b4f28fe3866f6b776f8569f07386e2d100b8cf2912fd498ea0f8"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/LoadErrorNotice-BwlrAWxE.js",
-    "local_sha256": "b76e7c18bcd93d59b095de93bbf568bdb297ea40b6eaf3584b8baf7823567b50"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/LogsPage-BAtg0awr.js",
-    "local_sha256": "9b2730aa41f1c8a904222ac324912822da807693fa1ad3e0d6e4b204e93558d4"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/McpPage-CmjFbIlB.js",
-    "local_sha256": "10fdabafb6f55237dfacd33efb3f93036c7226e65c8fecbc9f67c188631307a7"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ModelReloadConfirm-DA-zlRuN.js",
-    "local_sha256": "db9e2961c259df95701b1019604b664eed6c1788e06ad677006e6e08cf8bc3e2"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ModelsPage-C99yMgRT.js",
-    "local_sha256": "1177cd094cc7e62563856f2aeb914d0da415c275973ceb7f16d3329e539591a4"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/Mondwest-Regular-CWscgue7.woff2",
-    "local_sha256": "9cf6e6e1cba70f7e991a92ce4225785725b6cc9a48cc77cbfaabeba26c18f072"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/PairingPage-Cl6-A6pg.js",
-    "local_sha256": "adbfbb800e8ee6e275a57d7d31c87d424ad3150b0c9491232e6ddcc82372cd25"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/PluginsPage-DcCvPArG.js",
-    "local_sha256": "97c40eacbc83f7e49e202ec45215b72e1e9de85fffe38abb4a83dc792ea22d28"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ProfileBuilderPage-DCFeCs3a.js",
-    "local_sha256": "4650eca98b78c508b472eb533263d2eb9f9067ab7458fd93140ae0c5a60177c9"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ProfilesPage-C25ZKAuB.js",
-    "local_sha256": "ae464b877f382fac29ceb908f08eeabdd6be642a79bcc473c711f1fa6b625258"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/QubitAmbient-izxhXQMg.js",
-    "local_sha256": "d236fcdee9d2ef625a1d71d3728ad19e3e337e17086ca9244765fc73b099701c"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/RulesCompressed-Medium-CA76_CrB.woff2",
-    "local_sha256": "d865cf7154121265d3d65c0931ec27dc289aa438cd62ffad2f38e05ae79956a3"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/RulesCompressed-Regular-BSXFyF4x.woff2",
-    "local_sha256": "3bcbc330183f49cd49c72d4cdb3d1fbc675cf4e3000b06fd1c606ffc31b73e5f"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/RulesExpanded-Bold-DZA7s8Pa.woff2",
-    "local_sha256": "f2295406de2272086d5395af32b50ac51b15d75294c25a04094c8b1f85757931"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/RulesExpanded-Regular-l8uVympt.woff2",
-    "local_sha256": "e8062ac4889b0f05de94035571e86991b6efd03539775cfe0790e37da75434db"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/SessionsPage-C3z9Nc5G.js",
-    "local_sha256": "1e412d13ef2d43ebb5d6759c3ed0586bdc5051bc5c05c01d335e63164188887d"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/SkillsPage-D5PSi70j.js",
-    "local_sha256": "17c3b395b14c891d739a6ebece0da881eb8fefbf442394e75e615b2674433d97"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/SystemPage-6ZfjeVnC.js",
-    "local_sha256": "4e6b6bc0f6817a874f98060dea168f9206a2caa6942c6150248d7d1bbed535ab"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/WebhooksPage-1qWf_gGL.js",
-    "local_sha256": "56017caa2c8d909efe6db8e43945bfe985b940b3eb7be5c7f1f370fdba22c773"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/api-CNRw8IET.js",
-    "local_sha256": "77b9cb1401bcfef1bfd979288bc5155f2335d4834d98aa933ed7fd21e995b444"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/chat-activation-BiaqYo9D.js",
-    "local_sha256": "7004d70c867166566771fd7dba6147eaa80e12e0627ef58812b0a39d06d7dab0"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/clipboard-owkvc3zk.js",
-    "local_sha256": "5bab3f289333862bdf2e27f7e643d6c79db0162a606a644410d783fd858a104a"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/i18n-D7tgAhar.js",
-    "local_sha256": "723ecf9696355256203de6c5944ad744c9fc094cfb72b688e7a3cef9b9af38e8"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/index-4aJGqtTY.css",
-    "local_sha256": "ac14f6d721fc72caf77dec525ff76f41c2dcc9c17b083f8640751a3b6c90a4b9"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/index-BEUiwJkl.js",
-    "local_sha256": "82369ef0c74a5af17cf326ec8b1f5a535836618384c34896337a13881cdb889d"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/mcp-server-create-B0VgoYzF.js",
-    "local_sha256": "b86eab185584423fc1e5b3152afaf16e2c4306739fe159f21cb2459216d151d4"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/page-header-context-D8k6kq0p.js",
-    "local_sha256": "398d5596fa9054ab4d77998b168ac2b2f46da5f2fe3a8a5018388dbd808c36fa"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/plugins-BJvFSXb7.js",
-    "local_sha256": "e69928177b37d34538697fd0c4fca5488c66be0c63f8ef23317a0b9e04c461a0"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/react-vendor-DKHxIQbN.js",
-    "local_sha256": "093fec0ec53038f5fcf41197cbf83f32e9fee13e5cd9a981699e257da6008ba9"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/rolldown-runtime-hePW80VL.js",
-    "local_sha256": "580ad8c58061a4dde99bde0a56905e382f0568516ee2f5b84dbfb52085709021"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/terminal-font-refit-Dmois6_8.js",
-    "local_sha256": "e714d4ffc514de8fae089d55fedff494c7542eed3fee2d786cb15ddc102bd7fa"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/themes-BnesBGTV.js",
-    "local_sha256": "84ac9f0ad3d990cec09b1f75a0928db7551afaa4a964f8a35c843a4b795c0d04"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/three-Tc3iKPZF.js",
-    "local_sha256": "85b8fffceb46f48715ebe982086c8482778b497b0b1be8951e1bebbbc2fa38ea"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/ui--ms_rHmL.js",
-    "local_sha256": "981b35c7b3dde6c631d0a0134c17753a12787c81bd1b20120c8dc77fc2728311"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/useModalBehavior-C5ojdJTr.js",
-    "local_sha256": "4addb60fbade81eed00ced3d90ae6d35cedfa6172c454c71527bbf6cad492c18"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/usePageHeader-CJf9g3v1.js",
-    "local_sha256": "d7947e5b553b5dac321de3dad693ffa93521ae9772f3f102e4dc7b951bad8ca1"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/useProfileScope-qipzxaph.js",
-    "local_sha256": "af44c8f94c6c10ca9f91355f16b129943cbf8f9b7bd6c3ab9fb9fd6c3f7d807b"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/utils-BZEKuuUT.js",
-    "local_sha256": "9b967546df0648885542dfb7ed6525740afce6704ac21fa8d49de0832c0d91bb"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/vendor-D2e89vc9.js",
-    "local_sha256": "9f1dc9c64cf9a6ca39ba02fdbc6bd4456adcfabe3b998a42d5a751173d1bec65"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/xterm-BrP-ENHg.css",
-    "local_sha256": "0e5386f16cb4be78a2fe911e014a810da76ea2db47d8c8b2a966516b2fd5270b"
-   },
-   {
-    "path": "qubit_cli/web_dist/assets/xterm-CXxU4Y2B.js",
-    "local_sha256": "462aedc6a17c42fa884426a21bb3ac0108842d9ad7bd3270a0be29c7dda5b2db"
-   },
-   {
-    "path": "qubit_cli/web_dist/favicon.ico",
-    "local_sha256": "a5765ffc24a7f1f149ffe0732e2a67e78d3fb578f563271de7ad19aa188fda7a"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts-terminal/JetBrainsMono-Bold.woff2",
-    "local_sha256": "08863c7964612257a90bd821e3127dc5ccb0b5046f881673a1ade5809eb21d0f"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts-terminal/JetBrainsMono-Italic.woff2",
-    "local_sha256": "9f158b85eca345daeee01dfffa602709a905ea08b0cc60dbf6153cbbd97da08f"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts-terminal/JetBrainsMono-Regular.woff2",
-    "local_sha256": "f1a7a03672cdd494ce0d5543fac6e4360fe22403c6de297fdc2e55a815f7baff"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/Collapse-Bold.woff2",
-    "local_sha256": "cb1bc6803168cffb3ef7b8113f95f82480a6d0f46d6e37edc854259377c6c00b"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/Collapse-Regular.woff2",
-    "local_sha256": "ce8c481f56da3a46074ab696c16481bea49ea83e75e7eb7cb42fd2114593f33a"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/Mondwest-Regular.woff2",
-    "local_sha256": "9cf6e6e1cba70f7e991a92ce4225785725b6cc9a48cc77cbfaabeba26c18f072"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/RulesCompressed-Medium.woff2",
-    "local_sha256": "d865cf7154121265d3d65c0931ec27dc289aa438cd62ffad2f38e05ae79956a3"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/RulesCompressed-Regular.woff2",
-    "local_sha256": "3bcbc330183f49cd49c72d4cdb3d1fbc675cf4e3000b06fd1c606ffc31b73e5f"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/RulesExpanded-Bold.woff2",
-    "local_sha256": "f2295406de2272086d5395af32b50ac51b15d75294c25a04094c8b1f85757931"
-   },
-   {
-    "path": "qubit_cli/web_dist/fonts/RulesExpanded-Regular.woff2",
-    "local_sha256": "e8062ac4889b0f05de94035571e86991b6efd03539775cfe0790e37da75434db"
-   },
-   {
-    "path": "qubit_cli/web_dist/hermes-build.json",
-    "local_sha256": "296f4c7e20c82064cabd253f999a1f6ff10fdfb9c02710465b0ca21e0b75cb42"
-   },
-   {
-    "path": "qubit_cli/web_dist/index.html",
-    "local_sha256": "ee7febf9460819d3ea52ca3b02c402e5526b4188177e1d892691ff997973a86c"
    },
    {
     "path": "qubit_cli/web_host_terminal.py",
@@ -21247,7 +20951,7 @@
    },
    {
     "path": "ui-tui/dist/hermes-build.json",
-    "local_sha256": "f8a395c6d4e6a110f37d5717f54f5791639148ec4013da89f31b3692eb236b15"
+    "local_sha256": "fb81be2821cf4c657c9050f3e615cc63ddaa0e5e60c5eaf74b0c49c306c065fc"
    },
    {
     "path": "ui-tui/scripts/bench-native-history.tsx",
