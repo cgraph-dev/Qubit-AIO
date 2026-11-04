@@ -43,6 +43,8 @@ def sample_repo(tmp_path: Path) -> Path:
 
     included = {
         "README.md": "committed\n",
+        "INSTALL.md": "# install\n",
+        "TROUBLESHOOTING.md": "# troubleshooting\n",
         "LICENSE": "MIT\n",
         ".env.example": "DEEPSEEK_API_KEY=\n",
         "pyproject.toml": "[project]\nname = 'x'\n",
@@ -152,6 +154,8 @@ def test_check_reports_allowlist_and_exclusions(sample_repo: Path) -> None:
 
     for rel in (
         "README.md",
+        "INSTALL.md",
+        "TROUBLESHOOTING.md",
         "LICENSE",
         ".env.example",
         "qubit_runtime/app.py",

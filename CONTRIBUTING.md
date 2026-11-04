@@ -1,40 +1,42 @@
 # Contributing
 
-## Development Setup
+## Development setup
 
 Requirements:
 
-- Linux with Python 3.14
-- Node.js 22+ for the frontend and desktop tooling
-- `git`, `make`, and the usual build toolchain
+- Linux (the supported target is Ubuntu x86_64).
+- Python **3.12 or newer, below 3.15**.
+- Node.js **22 or newer** for the dashboard and desktop tooling.
+- `git`, `bash`, and the usual build toolchain.
 
-Create a virtual environment and install the project in editable mode:
+Create a virtual environment and install the project with its development
+extras:
 
 ```bash
-python3.14 -m venv .venv
+python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -e .
+python -m pip install -e ".[hotkey,edge,test]"
 ```
 
-Run the focused test suite for the area you changed:
+Run the focused tests for the area you changed:
 
 ```bash
 python -m pytest tests -q
 ```
 
-The full matrix runner is available through the project’s documented test tooling. Do not
-run release-wide matrices for a small change.
+Do not run release-wide test matrices for a small change.
 
-## Pull Requests
+## Pull requests
 
 - Keep each pull request focused on one behavior or refactor.
 - Add or update tests for every behavior change.
-- Do not commit secrets, local runtime state, model caches, or generated build output.
+- Do not commit secrets, local runtime state, model caches, or generated build
+  output.
 - Update the public documentation when a user-facing surface changes.
 - Describe the evidence you ran, not just the change.
 
-## Commit Style
+## Commit style
 
 Use a concise conventional prefix, for example:
 

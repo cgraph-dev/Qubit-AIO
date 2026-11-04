@@ -72,11 +72,13 @@ ALLOWED_ROOT_FILES = frozenset({
     "CODEOWNERS",
     "CONTRIBUTING.md",
     "DESIGN.md",
+    "INSTALL.md",
     "LICENSE",
     "PRODUCT.md",
     "README.md",
     "SECURITY.md",
     "THIRD_PARTY_NOTICES.md",
+    "TROUBLESHOOTING.md",
     "pyproject.toml",
     "pytest.ini",
 })
