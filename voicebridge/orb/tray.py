@@ -47,6 +47,8 @@ TOGGLE_SHOW_LABEL = "Show orb"
 TOGGLE_HIDE_LABEL = "Hide orb"
 LOCK_LABEL = "Lock position"
 SETTINGS_LABEL = "Settings\u2026"  # "Settings…"
+BRAIN_UNLOAD_LABEL = "Unload local brain (free VRAM)"
+BRAIN_WARM_LABEL = "Load local brain"
 TEST_LABEL = "Test animation"
 QUIT_LABEL = "Quit orb"
 TRAY_TOOLTIP = "Qubit Voice Orb"
@@ -89,6 +91,8 @@ def menu_spec(options: Any = None) -> List[Dict[str, Any]]:
         {"id": "lock", "label": LOCK_LABEL, "kind": "check",
          "checked": checked},
         {"id": "settings", "label": SETTINGS_LABEL, "kind": "action"},
+        {"id": "brain_unload", "label": BRAIN_UNLOAD_LABEL, "kind": "action"},
+        {"id": "brain_warm", "label": BRAIN_WARM_LABEL, "kind": "action"},
         {"id": "test", "label": TEST_LABEL, "kind": "submenu",
          "children": children},
         {"id": "quit", "label": QUIT_LABEL, "kind": "action"},
@@ -142,7 +146,7 @@ def invoke(action_id: Any, callbacks: Any, value: Any = None) -> bool:
         return False
     if not aid:
         return False
-    if aid in ("toggle", "lock", "settings", "quit"):
+    if aid in ("toggle", "lock", "settings", "brain_unload", "brain_warm", "quit"):
         cb = _callback_for(callbacks, aid)
         if cb is None:
             return False
@@ -206,6 +210,8 @@ class OrbTray:
         *,
         on_toggle: Optional[Callable[..., Any]] = None,
         on_settings: Optional[Callable[..., Any]] = None,
+        on_brain_unload: Optional[Callable[..., Any]] = None,
+        on_brain_warm: Optional[Callable[..., Any]] = None,
         on_quit: Optional[Callable[..., Any]] = None,
         on_test: Optional[Callable[..., Any]] = None,
         on_lock: Optional[Callable[..., Any]] = None,
@@ -219,6 +225,8 @@ class OrbTray:
             "toggle": on_toggle,
             "lock": on_lock,
             "settings": on_settings,
+            "brain_unload": on_brain_unload,
+            "brain_warm": on_brain_warm,
             "quit": on_quit,
             "test": on_test,
         }
@@ -383,6 +391,8 @@ __all__ = [
     "TOGGLE_HIDE_LABEL",
     "LOCK_LABEL",
     "SETTINGS_LABEL",
+    "BRAIN_UNLOAD_LABEL",
+    "BRAIN_WARM_LABEL",
     "TEST_LABEL",
     "QUIT_LABEL",
     "TRAY_TOOLTIP",

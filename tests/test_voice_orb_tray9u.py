@@ -26,12 +26,16 @@ def test_menu_spec_ids_labels_kinds_and_lock_check():
     from voicebridge.orb.tray import menu_spec
     spec = menu_spec()
     assert [i["id"] for i in spec] == ["toggle", "lock", "settings",
-                                       "test", "quit"]
+                                       "brain_unload", "brain_warm", "test",
+                                       "quit"]
     assert [i["label"] for i in spec] == ["Show orb", "Lock position",
-                                          "Settings\u2026", "Test animation",
+                                          "Settings\u2026",
+                                          "Unload local brain (free VRAM)",
+                                          "Load local brain", "Test animation",
                                           "Quit orb"]
     assert [i["kind"] for i in spec] == ["action", "check", "action",
-                                         "submenu", "action"]
+                                         "action", "action", "submenu",
+                                         "action"]
     assert spec[1]["checked"] is False
     assert menu_spec(O.OrbOptions(locked=True))[1]["checked"] is True
     # None/garbage options fail closed to unchecked, never raise
@@ -60,14 +64,18 @@ def test_invoke_dispatches_each_id():
         return _cb
 
     cbs = {"toggle": rec("toggle"), "lock": rec("lock"),
-           "settings": rec("settings"), "quit": rec("quit"),
+           "settings": rec("settings"), "brain_unload": rec("brain_unload"),
+           "brain_warm": rec("brain_warm"), "quit": rec("quit"),
            "test": rec("test")}
     assert invoke("toggle", cbs) is True
     assert invoke("lock", cbs, value=True) is True
     assert invoke("settings", cbs) is True
+    assert invoke("brain_unload", cbs) is True
+    assert invoke("brain_warm", cbs) is True
     assert invoke("quit", cbs) is True
     assert invoke("test:speaking", cbs) is True
     assert calls == [("toggle", None), ("lock", True), ("settings", None),
+                     ("brain_unload", None), ("brain_warm", None),
                      ("quit", None), ("test", "speaking")]
 
 
