@@ -95,3 +95,24 @@ def test_version_file_and_git_metadata(tmp_path: Path):
     log = module._run(["git", "log", "--oneline"], cwd=dest).stdout
     assert log.count("\n") == 1
     assert module._run(["git", "tag"], cwd=dest).stdout.strip() == "v0.0.1"
+
+
+def test_release_base_publishes_installer_and_source_archive(tmp_path: Path):
+    module = _load()
+    dest = tmp_path / "seed"
+    (dest / "scripts").mkdir(parents=True)
+    installer = dest / "scripts" / "install.sh"
+    installer.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    archive = tmp_path / "Qubit-0.0.1-seed.tar.gz"
+    archive.write_bytes(b"fake archive bytes")
+    base = tmp_path / "release"
+
+    asset, checksums = module.make_release_base(dest, base, archive)
+
+    assert asset == base / "install.sh"
+    assert asset.read_bytes() == installer.read_bytes()
+    release_archive = base / "qubit-release.tar.gz"
+    assert release_archive.read_bytes() == archive.read_bytes()
+    lines = checksums.read_text(encoding="utf-8").splitlines()
+    assert f"{module._sha256(asset)}  install.sh" in lines
+    assert f"{module._sha256(release_archive)}  qubit-release.tar.gz" in lines
