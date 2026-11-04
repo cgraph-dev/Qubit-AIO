@@ -54,7 +54,10 @@ param(
     [switch]$SelfTestUi,
     [switch]$SelfTestPipeDrain,
     [switch]$SelfTestMarker,
-    [switch]$SelfTestWorkingDirectory
+    [switch]$SelfTestWorkingDirectory,
+    # Protocol 2: the run id of the Desktop's bridge claim. Recorded in the
+    # marker and the result so a relaunched Desktop can correlate the two.
+    [string]$HandoffRun = ""
 )
 
 if ($PSBoundParameters.ContainsKey("Branch") -and $PSBoundParameters.ContainsKey("Channel")) {
@@ -128,12 +131,27 @@ try {
     $OutputEncoding = [System.Text.Encoding]::UTF8
 } catch {}
 $TempDir = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
-$QubitHome = if ($env:QUBIT_HOME) { $env:QUBIT_HOME } elseif ($InstallRoot) { Split-Path -Parent $InstallRoot } else { $TempDir }
+$QubitHome = if ($env:QUBIT_HOME) { $env:QUBIT_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } elseif ($InstallRoot) { Split-Path -Parent $InstallRoot } else { $TempDir }
 $env:QUBIT_HOME = $QubitHome
+# Read-old: the Desktop and pre-rebrand updates keep their state under
+# HERMES_HOME. Export it pointing at the same root so a child that still reads
+# the legacy name never writes a second marker/result file elsewhere.
+$env:HERMES_HOME = $QubitHome
 $MarkerPath = Join-Path $QubitHome ".hermes-update-in-progress"
 $LogDir = Join-Path $QubitHome "logs"
 $LogPath = Join-Path $LogDir "desktop-update-handoff.log"
 $ResultPath = Join-Path $QubitHome ".hermes-update-result.json"
+# Run identity survives the marker's heartbeat rewrites so the result and the
+# marker always agree. An explicit -HandoffRun (protocol 2) wins; otherwise a
+# stable per-handoff id is minted once.
+$script:ResultRunId = if ($HandoffRun) {
+    $HandoffRun
+} elseif ($env:HERMES_UPDATE_CORRELATION_ID) {
+    $env:HERMES_UPDATE_CORRELATION_ID
+} else {
+    "qubit-handoff-$PID-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+}
+$script:StartedAt = 0L
 $script:Ui = $null
 $script:UiStage = "Qubit will open once done."   # until the first gate; matches ui.html
 $script:UiStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
@@ -613,6 +631,21 @@ function Close-ProgressWindow {
     }
 }
 
+function Update-MarkerHeartbeat {
+    # Rewrites the marker's timestamp line in place. The relaying Desktop
+    # treats a stale second line as a dead hand-off, so a long update must
+    # prove it is still alive without losing the pid/run identity.
+    try {
+        if (-not (Test-Path -LiteralPath $MarkerPath)) { return }
+        $lines = @(Get-Content -LiteralPath $MarkerPath -ErrorAction Stop)
+        if ($lines.Count -lt 1) { return }
+        $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        if ($lines.Count -ge 2) { $lines[1] = "$now" } else { $lines += "$now" }
+        [System.IO.File]::WriteAllText($MarkerPath, (($lines -join "`n") + "`n"))
+        $script:MarkerLastHeartbeat = Get-Date
+    } catch {}
+}
+
 function Write-Result([bool]$Ok, [int]$Code, [string]$Message, [bool]$ManualAction = $false) {
     # Consumed (read + deleted) by the relaunched Desktop on boot so the
     # user actually SEES how a detached update ended. $ManualAction marks an
@@ -626,6 +659,10 @@ function Write-Result([bool]$Ok, [int]$Code, [string]$Message, [bool]$ManualActi
             message    = $Message
             branch     = $Branch
             channel    = $Channel
+            run_id     = $script:ResultRunId
+            # Protocol 1 consumers read this; it is the hand-off's start, not
+            # the heartbeat, so a rewritten marker stays strictly newer.
+            started_at = $script:StartedAt
             finished_at = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
         } | ConvertTo-Json -Compress
         [System.IO.File]::WriteAllText($ResultPath, $obj)
@@ -1528,10 +1565,10 @@ $savedConsoleInputMode = if ($script:ConsoleInput) { [QubitHandoff.ConsoleInput]
 try {
     New-Item -ItemType Directory -Path $LogDir -Force -ErrorAction SilentlyContinue | Out-Null
     Remove-Item -LiteralPath $ResultPath -Force -ErrorAction SilentlyContinue
-    Show-ProgressWindow
-    Write-HandoffLog "hand-off start: root=$InstallRoot branch=$Branch channel=$Channel desktopPid=$DesktopPid pid=$PID"
 
     # -- 0. Claim the update marker with OUR pid ---------------------------
+    # Before any UI/log write: on a POSIX pwsh the console helpers cannot run,
+    # and a log call aborting early must not leave the hand-off unclaimed.
     try {
         $epoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
         $startedAt = 0L
@@ -1539,9 +1576,11 @@ try {
         if (-not $hasStartedAt -or $startedAt -gt $epoch -or ($epoch - $startedAt) -gt 1200) {
             $startedAt = $epoch
         }
+        $script:StartedAt = $startedAt
         # WriteAllText for byte-exact LF framing: Set-Content emits CRLF and
         # the marker contract (Rust/TS/Python readers) is "<pid>\n<ts>\n".
-        [System.IO.File]::WriteAllText($MarkerPath, "$PID`n$startedAt`n")
+        # The run line is additive metadata read by newer Desktops.
+        [System.IO.File]::WriteAllText($MarkerPath, "$PID`n$startedAt`nrun:$($script:ResultRunId)`n")
         Write-HandoffLog "claimed update marker (pid $PID)"
     } catch {
         Write-HandoffLog "WARNING: could not write update marker: $($_.Exception.Message)"
@@ -1552,6 +1591,9 @@ try {
         $finalMsg = "marker self-test complete"
         exit 0
     }
+
+    Show-ProgressWindow
+    Write-HandoffLog "hand-off start: root=$InstallRoot branch=$Branch channel=$Channel desktopPid=$DesktopPid pid=$PID"
 
     # StartAssigned passes a null CreateProcess currentDirectory, so children
     # inherit the hand-off process directory rather than PowerShell's $PWD.

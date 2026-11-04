@@ -25,7 +25,7 @@ def _run_repository_stage(installer: str, tmp_path: Path, install: Path, origin_
         for name in ("git.exe", "git"):
             if not (cmd / name).exists():
                 (cmd / name).symlink_to(shutil.which("git"))
-        env.update(QUBIT_RUNTIME_DIR=str(tmp_path / "tools"), PATH=str(cmd) + os.pathsep + env["PATH"])
+        env.update(HERMES_RUNTIME_DIR=str(tmp_path / "tools"), PATH=str(cmd) + os.pathsep + env["PATH"])
     return subprocess.run([POWERSHELL, "-NoProfile", "-File", str(ROOT / "scripts" / "install.ps1"),
                            "-Stage", "repository", "-NonInteractive", "-InstallDir", str(install),
                            "-HermesHome", str(tmp_path / "home")],
