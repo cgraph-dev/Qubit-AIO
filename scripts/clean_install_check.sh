@@ -54,6 +54,7 @@ export XDG_DATA_HOME="$HOME_DIR/.local/share"
 export XDG_STATE_HOME="$HOME_DIR/.local/state"
 export XDG_CACHE_HOME="$HOME_DIR/.cache"
 unset PYTHONPATH || true
+unset QUBIT_HOME HERMES_HOME VIRTUAL_ENV || true
 
 degrade() { echo "DEGRADED: $*" >&2; exit 4; }
 fail() { echo "FAIL: $*" >&2; exit 2; }
@@ -224,8 +225,8 @@ def raw(path, headers=None):
 
 try:
     st, loc, _ = raw("/")
-    assert (st, loc) == (302, "/sessions"), (st, loc)
-    st, _, body = raw("/sessions")
+    assert (st, loc) == (302, "/chat"), (st, loc)
+    st, _, body = raw("/chat")
     assert st == 200 and b"__QUBIT_BASE_PATH__" in body, st
     assert b'__QUBIT_BASE_PATH__=""' in body, "base path not root"
     asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()

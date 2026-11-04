@@ -11,6 +11,30 @@
 # PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env — see .env.example.
 set -euo pipefail
 
+case "${1:-}" in
+  ""|--with-systemd|-s) ;;
+  -h|--help)
+    cat <<'EOF'
+Qubit installer
+
+Usage:
+  ./scripts/install.sh [--with-systemd]
+
+  --with-systemd, -s   install the user systemd units after the base install
+  -h, --help           show this help without changing the machine
+
+Requires: bash, curl, uv, ollama (for the local brain), and node/npm (for the
+dashboard build when frontend/qubit-dist is absent).
+EOF
+    exit 0
+    ;;
+  *)
+    echo "unknown option: $1" >&2
+    echo "run ./scripts/install.sh --help" >&2
+    exit 2
+    ;;
+esac
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voicebridge"
@@ -342,7 +366,7 @@ if command -v ollama >/dev/null; then
     for i in $(seq 1 15); do ollama list >/dev/null 2>&1 && break; sleep 1; done
   fi
   # Optional EN-only smart mode. NOT the default brain (that is
-  # ``qubit-brain4``, built below); pull only when the operator opts in.
+  # ``qubit-brain``, built below); pull only when the operator opts in.
   if [ "${QUBIT_OPTIONAL_PHI4:-0}" = "1" ]; then
     if ! ollama list | grep -q "huihui_ai/phi4-mini-abliterated"; then
       echo "==> pulling huihui_ai/phi4-mini-abliterated (optional EN-only smart mode, 3.1GB)"
@@ -352,7 +376,7 @@ if command -v ollama >/dev/null; then
     fi
   fi
   # NOTE: the 3B alias (huihui_ai/llama3.2-abliterate:3b) is retired and is
-  # intentionally not installed; the configured default is qubit-brain4 below.
+  # intentionally not installed; the configured default is qubit-brain below.
   # Qubit gateway memory embeddings need this tiny model (274 MB CPU) —
   # the gateway spins on 'memory embeddings retryable error' without it
   if ! ollama list | grep -q "nomic-embed-text"; then
@@ -370,20 +394,20 @@ if command -v ollama >/dev/null; then
   if [ ! -f "$BRAIN_MODEFILE" ]; then
     BRAIN_MODEFILE="$PROJECT_DIR/tests/fixtures/modelfiles/qubit4.sanitized"
   fi
-  if ! ollama list | grep -q "^qubit-brain4"; then
+  if ! ollama list | grep -q "^qubit-brain"; then
     if [ -f "$BRAIN_MODEFILE" ]; then
-      echo "==> creating qubit-brain4 (Qwen3-4B default brain)"
-      ollama create qubit-brain4 -f "$BRAIN_MODEFILE" \
-        || echo "    WARNING: could not create qubit-brain4; run 'ollama create qubit-brain4 -f $BRAIN_MODEFILE'"
+      echo "==> creating qubit-brain (Qwen3-4B default brain)"
+      ollama create qubit-brain -f "$BRAIN_MODEFILE" \
+        || echo "    WARNING: could not create qubit-brain; run 'ollama create qubit-brain -f $BRAIN_MODEFILE'"
     else
-      echo "    WARNING: no Modelfile found for qubit-brain4; run 'ollama create qubit-brain4 -f Modelfile.qubit4'"
+      echo "    WARNING: no Modelfile found for qubit-brain; run 'ollama create qubit-brain -f Modelfile.qubit4'"
     fi
   else
-    echo "    have   qubit-brain4"
+    echo "    have   qubit-brain"
   fi
 else
   echo "    WARNING: ollama not found — install https://ollama.com then re-run"
-  echo "    (local short replies need qubit-brain4; DeepSeek API still works)"
+  echo "    (local short replies need qubit-brain; DeepSeek API still works)"
 fi
 
 # ------------------------------------------------------------------ config

@@ -264,9 +264,9 @@ port = ui._server.server_address[1]
 try:
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     c.request("GET", "/"); r = c.getresponse(); body = r.read()
-    assert (r.status, r.getheader("Location")) == (302, "/sessions"), (r.status, r.getheader("Location"))
+    assert (r.status, r.getheader("Location")) == (302, "/chat"), (r.status, r.getheader("Location"))
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    c.request("GET", "/sessions"); r = c.getresponse(); body = r.read()
+    c.request("GET", "/chat"); r = c.getresponse(); body = r.read()
     assert r.status == 200, r.status
     assert b"__QUBIT_BASE_PATH__" in body
     asset = re.search(rb"/(assets/[^\"]+\.js)", body)
