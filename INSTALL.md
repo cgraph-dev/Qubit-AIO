@@ -81,9 +81,17 @@ a checksum mismatch. `--dry-run` downloads nothing, executes nothing, and does
 not touch `QUBIT_HOME`. Linux is supported now; macOS and Windows are typed
 refusals until their bootstrap paths exist.
 
+The published `install.sh` asset must be **self-contained**. The bootstrap runs
+only that downloaded file from a temporary directory, so a checkout-relative
+installer — this repository's `scripts/install.sh`, which builds its venv and
+installs the package from the source tree beside it (`PROJECT_DIR`) — is not a
+valid standalone release asset. Publish a release installer that fetches the
+release payload itself, or extend the bootstrap to download a release archive.
+
 **Remaining public-hosting prerequisite:** the release must publish the
-bootstrap script itself plus the `install.sh` asset and its SHA-256 checksum at
-the release base. This repository does not yet host a public one-line URL.
+bootstrap script itself plus a self-contained `install.sh` asset and its
+SHA-256 checksum at the release base. This repository does not yet host a
+public one-line URL.
 
 ## Options
 
