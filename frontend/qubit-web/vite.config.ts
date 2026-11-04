@@ -26,6 +26,25 @@ const BACKEND = process.env.HERMES_DASHBOARD_URL ?? "http://127.0.0.1:9119";
  * load, scrapes the `window.__QUBIT_SESSION_TOKEN__` assignment, and
  * re-injects it into the dev HTML. No-op in production builds.
  */
+/** React Compiler records an absolute source filename for some memoized
+ *  components. A release bundle must not carry the developer's checkout path,
+ *  so rewrite the repo prefix to a relative one at emit time. */
+function stripRepoPaths(): Plugin {
+  const repoRoot = path.resolve(__dirname, "../..") + path.sep;
+  return {
+    name: "qubit:strip-repo-paths",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      for (const item of Object.values(bundle)) {
+        if (item.type === "chunk" && item.code.includes(repoRoot)) {
+          item.code = item.code.split(repoRoot).join("");
+        }
+      }
+    },
+  };
+}
+
 function hermesDevToken(): Plugin {
   const TOKEN_RE = /window\.__QUBIT_SESSION_TOKEN__\s*=\s*"([^"]+)"/;
   const EMBEDDED_RE =
@@ -77,6 +96,7 @@ export default defineConfig({
     babel({ presets: [compilerPreset()] }),
     tailwindcss(),
     hermesDevToken(),
+    stripRepoPaths(),
   ],
   resolve: {
     alias: {
