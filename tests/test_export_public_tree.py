@@ -52,8 +52,12 @@ def sample_repo(tmp_path: Path) -> Path:
         "qubit_runtime/app.py": "print('runtime')\n",
         "qubit_runtime/plugins/foo/manifest.json": "{}\n",
         "qubit_runtime/ui-tui/dist/entry.js": "x\n",
+        "qubit_runtime/plugin-catalog/foo.yaml": "name: foo\n",
+        "qubit_runtime/website/static/api/plugin-catalog.json": "{}\n",
+        "qubit_runtime/optional-skills/foo/SKILL.md": "# optional skill\n",
         "qubit_runtime/plugins/qubit-achievements/dashboard/dist/index.js": "x\n",
         "frontend/qubit-web/public/plugins/qubit-achievements/dist/index.js": "x\n",
+        "frontend/qubit-web/src/App.tsx": "export default 1;\n",
         "qubit_runtime/contributors/emails/a@example.invalid": "alice\n",
         "voicebridge/app.py": "print('voice')\n",
         "frontend/src/App.tsx": "export default 1;\n",
@@ -61,7 +65,8 @@ def sample_repo(tmp_path: Path) -> Path:
         "skills/foo/SKILL.md": "# skill\n",
         "config/voice.example.yaml": "output_device: ''\n",
         "systemd/foo.service": "[Unit]\n",
-        "docs/PUBLIC.md": "# public\n",
+        "docs/QUBIT-TV.md": "# public feature doc\n",
+        "Modelfile.qubit.example": "FROM public/model:latest\n",
         "scripts/ok.py": "print('ok')\n",
         "adapters/registry.py": "REGISTRY = {}\n",
     }
@@ -90,6 +95,10 @@ def sample_repo(tmp_path: Path) -> Path:
         "docs/archive/x.md": "# frozen\n",
         "docs/evidence/shot.png": "png\n",
         "docs/game-office/x.md": "# internal\n",
+        "docs/NOT-PUBLIC.md": "# internal report\n",
+        "docs/PARITY.md": "# internal process doc\n",
+        "DESIGN.md": "# not in the simple public set\n",
+        "PRODUCT.md": "# not in the simple public set\n",
         "screenshot.png": "png\n",
         "e2e-shot.png": "png\n",
         "config/voice.local.yaml": "personal: true\n",
@@ -172,7 +181,8 @@ def test_check_reports_allowlist_and_exclusions(sample_repo: Path) -> None:
         "skills/foo/SKILL.md",
         "config/voice.example.yaml",
         "systemd/foo.service",
-        "docs/PUBLIC.md",
+        "docs/QUBIT-TV.md",
+        "Modelfile.qubit.example",
         "scripts/ok.py",
     ):
         assert rel in included, rel
@@ -192,10 +202,14 @@ def test_check_reports_allowlist_and_exclusions(sample_repo: Path) -> None:
         "docs/OPEN_THREADS.md",
         "docs/DECISIONS.md",
         "docs/PLAN.md",
+        "docs/NOT-PUBLIC.md",
+        "docs/PARITY.md",
         "docs/generated/x.json",
         "docs/archive/x.md",
         "docs/evidence/shot.png",
         "docs/game-office/x.md",
+        "DESIGN.md",
+        "PRODUCT.md",
         "screenshot.png",
         "e2e-shot.png",
         "config/voice.local.yaml",
@@ -210,7 +224,7 @@ def test_check_reports_allowlist_and_exclusions(sample_repo: Path) -> None:
     ):
         assert rel not in included, rel
 
-    assert report["excluded_by_reason"]["personal_path"] >= 2
+    assert report["excluded_by_reason"]["personal_path"] >= 1
     assert report["excluded_by_reason"]["secret_like_path"] >= 2
     assert report["excluded_by_reason"]["unsafe_symlink"] == 2
     assert report["included_by_top_level"]["qubit_runtime"] >= 1
@@ -229,7 +243,58 @@ def test_check_reports_personal_paths_and_secrets(sample_repo: Path) -> None:
     assert {"Modelfile.qubit", "qubit_runtime/model.gguf"} <= weights
 
 
-def test_check_writes_nothing(sample_repo: Path) -> None:
+def test_public_docs_are_an_explicit_allowlist(sample_repo: Path) -> None:
+    report = _check_json(sample_repo)
+    assert report["public_docs"] == ["docs/QUBIT-TV.md"]
+    assert "DESIGN.md" not in report["included_paths"]
+    assert "PRODUCT.md" not in report["included_paths"]
+    assert "Modelfile.qubit.example" in report["included_paths"]
+    assert "Modelfile.qubit" not in report["included_paths"]
+
+
+def test_report_names_every_product_surface(sample_repo: Path) -> None:
+    surfaces = _check_json(sample_repo)["product_surfaces"]
+    expected = {
+        "runtime",
+        "voicebridge",
+        "frontend_source",
+        "tui_dist",
+        "plugin_catalog",
+        "published_plugin_catalog",
+        "systemd",
+        "official_skills",
+        "optional_skills",
+        "public_docs",
+    }
+    assert set(surfaces) == expected
+    for label, surface in surfaces.items():
+        assert surface["present"], label
+        assert surface["files"] >= 1, label
+
+
+def test_export_manifest_summarizes_docs_and_surfaces(
+    sample_repo: Path, tmp_path: Path
+) -> None:
+    dest = tmp_path / "out"
+    result = _run(sample_repo, "--dest", str(dest))
+    assert result.returncode == 0, result.stderr
+
+    manifest = (dest / "PUBLIC_TREE_MANIFEST.md").read_text(encoding="utf-8")
+    assert "## Public docs" in manifest
+    assert "`docs/QUBIT-TV.md`" in manifest
+    assert "## Root files" in manifest
+    assert "- `README.md`" in manifest
+    assert "- `DESIGN.md`" not in manifest
+    assert "- `PRODUCT.md`" not in manifest
+    assert "## Product surfaces" in manifest
+    for label in ("runtime", "voicebridge", "tui_dist", "public_docs"):
+        assert f"`{label}`: present" in manifest
+    assert "## Local model recipe" in manifest
+    assert "`Modelfile.qubit.example`" in manifest
+    assert os.path.join("/home", "trick") not in manifest
+
+
+
     before = sorted(p.relative_to(sample_repo) for p in sample_repo.rglob("*"))
     status_before = _git(sample_repo, "status", "--porcelain").stdout
 

@@ -71,16 +71,28 @@ ALLOWED_ROOT_FILES = frozenset({
     "CODE_OF_CONDUCT.md",
     "CODEOWNERS",
     "CONTRIBUTING.md",
-    "DESIGN.md",
     "INSTALL.md",
     "LICENSE",
-    "PRODUCT.md",
+    "Modelfile.qubit.example",
     "README.md",
     "SECURITY.md",
     "THIRD_PARTY_NOTICES.md",
     "TROUBLESHOOTING.md",
     "pyproject.toml",
     "pytest.ini",
+})
+
+#: The complete public docs set under ``docs/``.  Everything else there is an
+#: internal report, audit, plan, handoff, generated ledger, or frozen history.
+#: This is an allowlist on purpose: new internal docs must not leak by default.
+PUBLIC_DOC_FILES = frozenset({
+    "docs/ARCHITECTURE.md",
+    "docs/BRAND.md",
+    "docs/IDENTITY.md",
+    "docs/OFFICE-CLI-COMPLETENESS.md",
+    "docs/OFFICE-DEPLOYMENT-CONTRACT.md",
+    "docs/ORB_FX_SPEC.md",
+    "docs/QUBIT-TV.md",
 })
 
 #: Tracked product build output that MUST ship even though it lives under a
@@ -131,68 +143,9 @@ EXCLUDED_DIR_SEGMENTS = frozenset({
     "venv",
 })
 
-#: Internal planning/status documents.  Their names are intentionally kept out
-#: of a public source snapshot; the product docs beside them stay.
-INTERNAL_DOC_NAMES = frozenset({
-    "CHECKLIST.md",
-    "DECISIONS.md",
-    "EXECUTION_PLAN.md",
-    "FROZEN_TARGET.md",
-    "FROZEN_TARGET_WORKLIST.md",
-    "HANDOFF_PROMPT.md",
-    "OPEN_THREADS.md",
-    "PLAN.md",
-    "STATUS.md",
-})
-
-#: Doc families (measured reports, audits, session handoffs, plans) that stay
-#: out of a public source snapshot.  Matched case-insensitively on the file
-#: name for top-level ``docs/*.md`` files.
-INTERNAL_DOC_SUBSTRINGS = (
-    "AUDIT",
-    "BASELINE",
-    "FINDINGS",
-    "HANDOFF",
-    "INVENTORY",
-    "MATRIX",
-    "OPEN_THREADS",
-    "PLAN",
-    "PROGRESS",
-    "READINESS",
-    "REBRAND",
-    "RECONCILIATION",
-    "RECOVERY",
-    "REPORT",
-    "RETIREMENT",
-    "ROOT_CAUSE",
-    "SNAPSHOT",
-    "STATUS",
-    "STUDY",
-    "SYNC_",
-    "TEST-HONESTY",
-    "TRIAGE",
-    "UNBLOCK",
-    "VENDOR",
-    "VERIFICATION",
-    "WORKLIST",
-)
-
-INTERNAL_DOC_PREFIXES = (
-    "FROZEN_TARGET",
-    "HANDOFF",
-    "LEFTOVER_",
-    "MATRIX-",
-    "PHASE8-",
-    "PORT-",
-    "REBRAND-",
-    "REPORT-",
-    "SESSION_",
-    "SYNC_REMAINING",
-    "TEST-HONESTY",
-)
-
 #: Doc subdirectories that are frozen history, generated data, evidence
-#: captures, or internal design/plan material.
+#: captures, or internal design/plan material.  They are rejected before the
+#: explicit ``PUBLIC_DOC_FILES`` allowlist so the report keeps a clear reason.
 EXCLUDED_DOC_DIRS = frozenset({
     "archive",
     "e2e",
@@ -242,6 +195,23 @@ MODEL_WEIGHT_SUFFIXES = (
 #: plugin artwork) are kept; ad-hoc captures are not.
 SCREENSHOT_PREFIXES = ("e2e-", "screen-shot", "screenshot")
 SCREENSHOT_SUFFIXES = ("-e2e.png", "-capture.png", "-screenshot.png")
+
+#: Product surfaces the public export must retain.  ``prefix`` is a directory
+#: or a single file; the summary reports presence and file count.
+PRODUCT_SURFACES = (
+    ("runtime", "qubit_runtime"),
+    ("voicebridge", "voicebridge"),
+    ("frontend_source", "frontend/qubit-web/src"),
+    ("tui_dist", "qubit_runtime/ui-tui/dist"),
+    ("plugin_catalog", "qubit_runtime/plugin-catalog"),
+    (
+        "published_plugin_catalog",
+        "qubit_runtime/website/static/api/plugin-catalog.json",
+    ),
+    ("systemd", "systemd"),
+    ("official_skills", "skills"),
+    ("optional_skills", "qubit_runtime/optional-skills"),
+)
 
 
 def _run_git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -347,24 +317,14 @@ def _config_allowed(path: str) -> bool:
     return name == "dialogs.md" or ".example." in name
 
 
-def _docs_excluded(path: str) -> bool:
+def _docs_allowed(path: str) -> bool:
+    """True only for the explicit public docs allowlist."""
     parts = PurePosixPath(path).parts
     if len(parts) < 2:
         return False
     if parts[1] in EXCLUDED_DOC_DIRS:
-        return True
-    if len(parts) == 2:
-        name = parts[1]
-        if name in INTERNAL_DOC_NAMES:
-            return True
-        if name.startswith(INTERNAL_DOC_PREFIXES):
-            return True
-        if name.endswith(".txt"):
-            return True
-        upper = name.upper()
-        if any(part in upper for part in INTERNAL_DOC_SUBSTRINGS):
-            return True
-    return False
+        return False
+    return path in PUBLIC_DOC_FILES
 
 
 def _is_product_dist(path: str) -> bool:
@@ -400,12 +360,12 @@ def _classify(path: str) -> tuple[bool, str]:
     if top == "config" and not _config_allowed(path):
         return False, "excluded_file"
 
-    if top == "docs" and _docs_excluded(path):
+    if top == "docs" and not _docs_allowed(path):
         return False, "excluded_dir" if (
             len(parts) > 1 and parts[1] in EXCLUDED_DOC_DIRS
         ) else "excluded_file"
 
-    if name.startswith(LOCAL_MODEL_PREFIXES):
+    if name.startswith(LOCAL_MODEL_PREFIXES) and name not in ALLOWED_ROOT_FILES:
         return False, "excluded_file"
 
     if name.endswith(MODEL_WEIGHT_SUFFIXES):
@@ -507,12 +467,31 @@ def _build_report(
     )
     model_weights = sorted(
         p for p in tracked
-        if PurePosixPath(p).name.endswith(MODEL_WEIGHT_SUFFIXES)
-        or PurePosixPath(p).name.startswith(LOCAL_MODEL_PREFIXES)
+        if p not in ALLOWED_ROOT_FILES
+        and (
+            PurePosixPath(p).name.endswith(MODEL_WEIGHT_SUFFIXES)
+            or PurePosixPath(p).name.startswith(LOCAL_MODEL_PREFIXES)
+        )
     )
     contributor_emails = [
         p for p in included if p.startswith("qubit_runtime/contributors/emails/")
     ]
+
+    included_set = set(included)
+    public_docs = sorted(p for p in included if p in PUBLIC_DOC_FILES)
+    public_root_files = sorted(p for p in included if "/" not in p)
+    surfaces = {}
+    for label, prefix in PRODUCT_SURFACES:
+        if prefix in included_set:
+            count = 1
+        else:
+            count = sum(1 for p in included if p.startswith(prefix + "/"))
+        surfaces[label] = {"path": prefix, "files": count, "present": count > 0}
+    surfaces["public_docs"] = {
+        "path": "docs + root docs",
+        "files": len(public_docs),
+        "present": bool(public_docs),
+    }
 
     risks: list[dict] = []
     if personal:
@@ -572,6 +551,9 @@ def _build_report(
             reason: paths[:10] for reason, paths in sorted(excluded.items())
         },
         "residual_risks": risks,
+        "public_docs": public_docs,
+        "public_root_files": public_root_files,
+        "product_surfaces": surfaces,
         "included_paths": included,
     }
 
@@ -602,6 +584,30 @@ def _public_manifest(report: dict) -> str:
     lines += ["", "### Excluded by reason", ""]
     for reason, count in report["excluded_by_reason"].items():
         lines.append(f"- {reason}: {count}")
+    lines += ["", "## Public docs", ""]
+    for path in report.get("public_docs", []):
+        lines.append(f"- `{path}`")
+    lines += ["", "## Root files", ""]
+    for path in report.get("public_root_files", []):
+        lines.append(f"- `{path}`")
+    lines += ["", "## Product surfaces", ""]
+    for label, surface in report.get("product_surfaces", {}).items():
+        state = "present" if surface["present"] else "MISSING"
+        lines.append(
+            f"- `{label}`: {state} ({surface['files']} file(s) under "
+            f"`{surface['path']}`)"
+        )
+    lines += ["", "## Local model recipe", ""]
+    if "Modelfile.qubit.example" in report.get("included_paths", []):
+        lines.append(
+            "- `Modelfile.qubit.example` ships as the sanitized public recipe. "
+            "The operator-specific `Modelfile.qubit` is excluded."
+        )
+    else:
+        lines.append(
+            "- No public model recipe is included; local model setup is not "
+            "part of this export."
+        )
     lines += ["", "## Residual risks", ""]
     if not report["residual_risks"]:
         lines.append("- None recorded.")
