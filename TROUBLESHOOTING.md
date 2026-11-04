@@ -97,7 +97,8 @@ Common fixes:
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
-- Install Node.js 22+ and `npm` when the dashboard must be built.
+- Install Node.js 22.12+ (Vite 8 requires `^20.19` or `>=22.12`) and `npm`
+  when the dashboard must be built.
 - Install `tar` and a SHA-256 tool (`sha256sum`, `shasum`, or `openssl`) when
   model assets are downloaded.
 - For development dependencies:

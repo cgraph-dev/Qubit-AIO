@@ -23,10 +23,11 @@ Required:
   `>=3.12,<3.15`.
 - At least **4 GB RAM** and **2 GB free disk** for the base install. Model
   assets need additional disk space.
-- Node.js **22 or newer** and `npm` for a source install that serves the
-  dashboard: the source tree does not include the built bundle
-  (`frontend/qubit-dist`). Skip with `--without-dashboard`, or use a release
-  archive that already contains the bundle.
+- Node.js **22.12 or newer** and `npm` for a source install that serves the
+  dashboard (Vite 8 requires `^20.19` or `>=22.12`): the source tree does not
+  include the built bundle (`frontend/qubit-dist`). Skip with
+  `--without-dashboard`, or use a release archive that already contains the
+  bundle.
 
 Optional:
 
