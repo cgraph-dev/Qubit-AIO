@@ -150,8 +150,16 @@ website/static/api/skills-meta.json
 # website/scripts/extract-plugins.py during prebuild (Plugin Catalog page).
 website/static/api/plugins.json
 website/static/api/plugin-stars.json
-website/static/api/plugin-catalog.json
 website/static/api/plugins-meta.json
+# plugin-catalog.json is deliberately COMMITTED (not ignored): installed
+# clients fetch it from the raw repository path
+# (qubit_cli.plugin_catalog.LIVE_CATALOG_URL) for live catalog refresh. The
+# upstream docs deploy that publishes it for some repositories is gated to a
+# different GitHub org here, so without the committed artifact every install
+# 404s and silently pins itself to the in-tree catalog forever. Regenerate it
+# with `python website/scripts/extract-plugins.py` whenever plugin-catalog/
+# changes; qubit_runtime/tests/qubit_cli/test_plugin_catalog.py fails if it
+# drifts.
 # automation-blueprints-index.json is a build artifact emitted by
 # website/scripts/extract-automation-blueprints.py during prebuild.
 website/static/api/automation-blueprints-index.json
