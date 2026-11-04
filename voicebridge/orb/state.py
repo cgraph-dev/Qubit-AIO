@@ -43,6 +43,7 @@ end instead of ~34 s.
 """
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 ORB_STATES = ("idle", "listening", "thinking", "working", "speaking")
@@ -290,7 +291,8 @@ def _activity_is_active(activity: Any, now: float) -> bool:
 
 def resolve_orb_state(status: Any, events: Any, now: float,
                       heartbeat: Any = None, activity: Any = None,
-                      talk_events: Any = None) -> str:
+                      talk_events: Any = None,
+                      now_mono: Any = None) -> str:
     """Map a status payload + recent journal events to one orb state.
 
     ``heartbeat`` (optional) is the desktop-helper heartbeat mapping. It
@@ -331,6 +333,13 @@ def resolve_orb_state(status: Any, events: Any, now: float,
     or TTS edge while still honoring the pinned "talk idle overrides
     heartbeat/status" contract.
 
+    ``now`` is the wall-clock second the journal/events use; ``now_mono``
+    (optional) is the same instant on the monotonic clock the helper stamps
+    ``spec_tts_ts`` with. The two clocks have different epochs, so the TTS
+    timeline is compared by AGE, never by raw timestamp: a reply is speaking
+    while its timeline is younger than the newest done marker. ``now_mono``
+    defaults to ``time.monotonic()`` for callers that only pass wall time.
+
     Never raises on malformed input; unknown/unreachable -> ``"idle"``.
     """
     try:
@@ -346,7 +355,8 @@ def resolve_orb_state(status: Any, events: Any, now: float,
         if authoritative is not None:
             if authoritative == "idle" and now_f is not None:
                 try:
-                    inferred = resolve_orb_state({}, events, now_f)
+                    inferred = resolve_orb_state({}, events, now_f,
+                                                 now_mono=now_mono_f)
                 except Exception:
                     inferred = "idle"
                 if inferred != "idle":
@@ -355,6 +365,11 @@ def resolve_orb_state(status: Any, events: Any, now: float,
     if now_f is None:
         return "idle"
     now_f = float(now_f)
+    try:
+        now_mono_f = (float(now_mono) if now_mono is not None
+                      else time.monotonic())
+    except (TypeError, ValueError):
+        now_mono_f = time.monotonic()
     hb = heartbeat if isinstance(heartbeat, dict) else {}
     try:
         hb_state = str(hb.get("state") or "").strip().lower()
@@ -409,8 +424,24 @@ def resolve_orb_state(status: Any, events: Any, now: float,
         if hb_tts_aware and tts_active:
             done_ts = _latest_event_ts(events, now_f, _SPEAK_DONE_EVENTS,
                                        3600.0)
-            if done_ts is None or done_ts <= tts_ts:
+            # ``spec_tts_ts`` is monotonic (helper process clock); the journal/
+            # ``now`` are wall-clock. Compare ages, not raw stamps: an epoch
+            # stamp is ~1e9 while a monotonic one is uptime (~1e5), so the old
+            # raw comparison either kept green after the reply or dropped it
+            # immediately depending on which side of the epoch it saw.
+            tts_age = now_mono_f - tts_ts
+            if not (0.0 <= tts_age <= 3600.0):
+                # Older/synthetic feeds may stamp wall-clock here; accept that
+                # domain too instead of treating a valid timeline as ancient.
+                wall_age = now_f - tts_ts
+                if 0.0 <= wall_age <= 3600.0:
+                    tts_age = wall_age
+            if done_ts is None:
                 speaking = True
+            else:
+                done_age = now_f - done_ts
+                if done_age >= tts_age:
+                    speaking = True
         if not speaking:
             speak_ts = _latest_event_ts(events, now_f, _SPEAKING_EVENTS,
                                         SPEAK_WINDOW_S)

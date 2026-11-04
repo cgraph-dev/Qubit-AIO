@@ -5,7 +5,10 @@ export interface LaunchResult {
   error?: string
 }
 
-const resolveHermesBin = () => process.env.HERMES_BIN?.trim() || 'hermes'
+// The installed product launcher is `qubit`; HERMES_BIN remains honoured as
+// the legacy override (an existing install may still publish it).
+const resolveHermesBin = () =>
+  process.env.QUBIT_BIN?.trim() || process.env.HERMES_BIN?.trim() || 'qubit'
 
 export const launchHermesCommand = (args: string[]): Promise<LaunchResult> =>
   new Promise(resolve => {

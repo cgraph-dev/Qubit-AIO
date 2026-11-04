@@ -62,6 +62,22 @@ def _int_param(params: dict, key: str, default: int) -> int:
         return default
 
 
+#: Widths are rendered server-side (diff/message wrapping) and forwarded to
+#: PTY-backed terminals, so a broken client probe must not record a zero or an
+#: absurd size. This is the same 1..1000 sane bound the terminal bridge uses.
+_COLS_MIN = 1
+_COLS_MAX = 1000
+
+
+def _clamp_cols(value, default: int = 80) -> int:
+    """Clamp a client column width into ``[_COLS_MIN, _COLS_MAX]``."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError, OverflowError):
+        n = default
+    return max(_COLS_MIN, min(n, _COLS_MAX))
+
+
 def _new_runtime_ids(params: dict) -> tuple[str, str]:
     """Fresh runtime sid + resolved DB ``source`` for a session minted from ``params``."""
     return uuid.uuid4().hex[:8], _resolve_session_source(_str_param(params, "source") or None)
@@ -415,7 +431,7 @@ def _create_session(rid, params: dict, *, copy_parent_history: bool = False) -> 
             "agent": None, "agent_error": None, "agent_ready": threading.Event(), "attached_images": [],
             "close_on_disconnect": _flag(params, "close_on_disconnect"),
             "active_session_lease": None,  # claimed lazily on the first turn (_ensure_active_session_slot)
-            "cols": int(params.get("cols", 80)), "created_at": now, "edit_snapshots": {},
+            "cols": _clamp_cols(params.get("cols", 80)), "created_at": now, "edit_snapshots": {},
             "explicit_cwd": explicit_cwd,
             "history": history, "history_lock": threading.Lock(), "history_version": 0, "image_counter": 0,
             "seeded": bool(history),  # gates _persist_branch_seed: only create-time history is unpersisted
@@ -2327,7 +2343,7 @@ def _(rid, params: dict) -> dict:
 # ── terminal / event replay ──────────────────────────────────────────
 @_session_method("terminal.resize")
 def _(rid, params: dict, session: dict) -> dict:
-    session["cols"] = cols = int(params.get("cols", 80))
+    session["cols"] = cols = _clamp_cols(params.get("cols", 80))
     return _ok(rid, {"cols": cols})
 
 

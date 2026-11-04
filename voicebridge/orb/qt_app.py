@@ -3682,7 +3682,7 @@ if QWidget is not None:
                 raw = _state.resolve_orb_state(
                     status, events, time.time(), heartbeat=heartbeat,
                     activity=getattr(self, "_activity", None),
-                    talk_events=_talk_events)
+                    talk_events=_talk_events, now_mono=time.monotonic())
                 try:
                     if self._display is not None:
                         self.orb_state = self._display.update(

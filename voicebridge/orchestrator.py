@@ -1814,6 +1814,15 @@ class VoiceOrchestrator:
         if hasattr(self, "hotkey"):
             self.hotkey.stop()
         self.playback.stop()
+        # Service exit: the killable TTS worker is a child process. Leaving it
+        # behind after an orderly stop/restart orphans a model copy (and can
+        # keep the GPU busy). ``shutdown`` is idempotent and a no-op when no
+        # worker was ever started, so it is safe on every stop path.
+        try:
+            from .tts.synth_worker import shutdown as _shutdown_synth_worker
+            _shutdown_synth_worker()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ speak
     def speak(self, text: str, name: str = "assistant", interruptible: bool = True,

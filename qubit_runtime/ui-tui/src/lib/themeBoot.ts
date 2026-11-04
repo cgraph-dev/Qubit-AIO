@@ -36,10 +36,10 @@ interface BootThemeFile {
 
 // Profile-aware: the Python launcher exports QUBIT_HOME (set by
 // _apply_profile_override) before spawning the TUI. Falling back to
-// ~/.hermes matches get_qubit_home()'s default.
-const bootFilePath = () => join(process.env.QUBIT_HOME ?? join(homedir(), '.hermes'), 'tui-theme-boot.json')
+// ~/.qubit matches get_qubit_home()'s canonical default.
+const bootFilePath = () => join(process.env.QUBIT_HOME ?? join(homedir(), '.qubit'), 'tui-theme-boot.json')
 
-// Never touch the user's real ~/.hermes from test runs (the TS suite has no
+// Never touch the user's real ~/.qubit from test runs (the TS suite has no
 // QUBIT_HOME isolation fixture).
 const isTestRun = () => !!process.env.VITEST || process.env.NODE_ENV === 'test'
 

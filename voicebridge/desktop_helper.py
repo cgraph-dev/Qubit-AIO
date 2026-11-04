@@ -635,6 +635,19 @@ class HelperClient:
         """Ask the Qubit brain a question and return its answer (no tools)."""
         return str(self.ask_result(text, request_id).get("answer", "") or "")
 
+    def clear_turn(self) -> None:
+        """Forget the previous turn's request id at a new turn's start.
+
+        ``_turn_rid`` keys the reply's voice-only ``/api/audio/speak`` synth to
+        the ask turn. A STOP marks that turn cancelled service-side, so
+        carrying the stale id into the NEXT turn made its prompt refuse as a
+        stopped reply (``AUDIO_SPEAK_CANCELLED``) even though the new turn was
+        live. ``ask_result`` still installs the current id when a turn asks;
+        this only guarantees a turn that never asks (a direct reply/prompt)
+        speaks under the empty id instead of the previous stopped one.
+        """
+        self._turn_rid = ""
+
     def ask_result(self, text: str, request_id: str = "") -> Dict[str, Any]:
         """Ask and return the full result (answer + whether it was spoken).
 
@@ -2061,10 +2074,7 @@ class DesktopHelper:
             except Exception:
                 pass
             if proc is not None:
-                try:
-                    proc.terminate()
-                except Exception:
-                    pass
+                self._terminate_player(proc)
             _trace("speak.stop")
             try:
                 self._request_service_cancel()
@@ -3425,6 +3435,17 @@ class DesktopHelper:
             pass
 
     def _process_transcript(self, transcript: str = "") -> None:
+        # New reply turn: forget the previous turn's ask id BEFORE anything can
+        # speak. The prior turn may have been stopped (service-side cancelled),
+        # and reusing its id would make this turn's TTS synth look stopped.
+        try:
+            clear_turn = getattr(self.client, "clear_turn", None)
+            if callable(clear_turn):
+                clear_turn()
+            else:
+                self.client._turn_rid = ""
+        except Exception:
+            pass
         # New reply turn: bump the epoch. A stop marker from an earlier turn
         # is scoped to that epoch, so an idle stop can never silence this
         # turn's reply; the per-turn stop announcement also resets.
@@ -3852,6 +3873,37 @@ class DesktopHelper:
             min_ms = 200
         return enabled, threshold, max(150, min(300, min_ms))
 
+    @staticmethod
+    def _terminate_player(proc: Any) -> None:
+        """Terminate the playback child AND reap it (SIGTERM -> wait -> SIGKILL).
+
+        A bare ``terminate()`` leaves the player unreaped until the owning
+        wait happens to run; on the explicit orb STOP that wait may already be
+        blocked on the lock or the helper may exit first, leaving a zombie.
+        Wait briefly for the SIGTERM to land, then escalate and reap again.
+        Never raises; a fake process without ``wait``/``kill`` is tolerated.
+        """
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+        wait = getattr(proc, "wait", None)
+        if callable(wait):
+            try:
+                wait(timeout=1.0)
+                return
+            except Exception:
+                pass
+        try:
+            proc.kill()
+        except Exception:
+            return
+        if callable(wait):
+            try:
+                wait(timeout=2.0)
+            except Exception:
+                pass
+
     def _wait_playback(self, proc: Any) -> bool:
         """Wait out ``proc``; True when the explicit stop flag ended it.
 
@@ -3873,10 +3925,7 @@ class DesktopHelper:
         while True:
             try:
                 if stop.is_set():
-                    try:
-                        proc.terminate()
-                    except Exception:
-                        pass
+                    self._terminate_player(proc)
                     return True
             except Exception:
                 pass
@@ -3976,10 +4025,7 @@ class DesktopHelper:
         if stop is not None:
             try:
                 if stop.is_set():
-                    try:
-                        proc.terminate()
-                    except Exception:
-                        pass
+                    self._terminate_player(proc)
                     return True
             except Exception:
                 pass
@@ -4011,10 +4057,7 @@ class DesktopHelper:
                 if stop is not None:
                     try:
                         if stop.is_set():
-                            try:
-                                proc.terminate()
-                            except Exception:
-                                pass
+                            self._terminate_player(proc)
                             interrupted = True
                             break
                     except Exception:
@@ -4062,10 +4105,7 @@ class DesktopHelper:
                                 proc.send_signal(_signal.SIGCONT)
                             except Exception:
                                 pass
-                        try:
-                            proc.terminate()
-                        except Exception:
-                            pass
+                        self._terminate_player(proc)
                         self._barge_wake_command = wake_cmd
                         interrupted = True
                         _trace("speak.barge_in", threshold=threshold,
