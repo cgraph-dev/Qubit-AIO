@@ -311,3 +311,100 @@ def test_generic_fallback_stays_unverified(tmp_path, monkeypatch):
     assert out["context_verified"] is False
     assert out["context_window_source"] == "fallback"
     assert out["context_tokens"] == 200000
+
+
+def test_legacy_active_pointer_defers_to_the_configured_default(tmp_path, monkeypatch):
+    """An unstamped active record is not proof the turn path still runs it.
+
+    The live install had ``active_model_profile=muse-spark`` while the runtime
+    ``model`` slot (and 391/500 recent sessions) was ``deepseek``. A pointer
+    written before timestamping cannot be shown to be newer than the config
+    slot, so the configured default is effective and the mismatch is typed.
+    """
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch,
+               "intent:\n  frontier:\n    enabled: true\n    allowlist: "
+               "['opencode-go/deepseek-v4-flash', 'opencode-go/muse-spark-1.3-contributor']\n")
+    _write_runtime_model(cfg, "deepseek-v4-flash")
+    R.upsert_model_profile(cfg, _api_profile(
+        "qubit-go", "opencode-go", "deepseek-v4-flash",
+        base_url="https://opencode.ai/zen/go/v1", ctx=200000), confirm=True)
+    R.upsert_model_profile(cfg, _api_profile(
+        "qubit-muse", "opencode-go", "muse-spark-1.3-contributor",
+        base_url="https://opencode.ai/zen/go/v1", ctx=200000), confirm=True)
+
+    # A pre-timestamp pointer, written the way the live install has it.
+    registry = R._read_registry(cfg)
+    registry["active_model_profile"] = {
+        "schema": R.ACTIVE_SCHEMA, "role": "chat", "profile": "qubit-muse"}
+    R._atomic_json(R._registry_file(cfg), registry)
+
+    out = R.resolve_model(cfg)
+    assert out["ok"] is True, out
+    assert out["profile_id"] == "qubit-go"
+    assert out["model"] == "deepseek-v4-flash"
+    assert out["source"] == "configured-default"
+
+    identity = R.model_identity(cfg)
+    assert identity["state"] == "STALE_ACTIVE"
+    assert identity["code"] == "MODEL_IDENTITY_MISMATCH"
+    assert identity["active_model"] == "muse-spark-1.3-contributor"
+    assert identity["configured_model"] == "deepseek-v4-flash"
+    assert identity["active_stamped"] is False
+
+
+def test_a_stamped_active_selection_still_wins_and_reports_the_mismatch(tmp_path, monkeypatch):
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch,
+               "intent:\n  frontier:\n    enabled: true\n    allowlist: "
+               "['opencode-go/deepseek-v4-flash', 'opencode-go/muse-spark-1.3-contributor']\n")
+    _write_runtime_model(cfg, "deepseek-v4-flash")
+    R.upsert_model_profile(cfg, _api_profile(
+        "qubit-go", "opencode-go", "deepseek-v4-flash",
+        base_url="https://opencode.ai/zen/go/v1", ctx=200000), confirm=True)
+    R.upsert_model_profile(cfg, _api_profile(
+        "qubit-muse", "opencode-go", "muse-spark-1.3-contributor",
+        base_url="https://opencode.ai/zen/go/v1", ctx=200000), confirm=True)
+    R.set_active_profile(cfg, "qubit-muse", confirm=True)
+
+    out = R.resolve_model(cfg)
+    assert out["profile_id"] == "qubit-muse"
+    assert out["source"] == "active"
+
+    identity = R.model_identity(cfg)
+    assert identity["state"] == "MISMATCH"
+    assert identity["code"] == "MODEL_IDENTITY_MISMATCH"
+    assert identity["active_stamped"] is True
+
+
+def test_model_info_reports_the_stale_active_identity_instead_of_hiding_it(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as QC
+    from voicebridge.providers import resolver as R
+
+    cfg = _cfg(tmp_path, monkeypatch,
+               "intent:\n  frontier:\n    enabled: true\n    allowlist: "
+               "['opencode-go/deepseek-v4-flash', 'opencode-go/muse-spark-1.3-contributor']\n")
+    _write_runtime_model(cfg, "deepseek-v4-flash")
+    R.upsert_model_profile(cfg, _api_profile(
+        "qubit-go", "opencode-go", "deepseek-v4-flash",
+        base_url="https://opencode.ai/zen/go/v1", ctx=200000), confirm=True)
+    R.upsert_model_profile(cfg, _api_profile(
+        "qubit-muse", "opencode-go", "muse-spark-1.3-contributor",
+        base_url="https://opencode.ai/zen/go/v1", ctx=200000), confirm=True)
+    registry = R._read_registry(cfg)
+    registry["active_model_profile"] = {
+        "schema": R.ACTIVE_SCHEMA, "role": "chat", "profile": "qubit-muse"}
+    R._atomic_json(R._registry_file(cfg), registry)
+    monkeypatch.setattr(QC, "_auto_context_length", lambda *a, **k: 0)
+    monkeypatch.setattr(QC, "_model_capabilities",
+                        lambda *a, **k: {"context_window": 200000})
+
+    status, body = QC.h_model_info(cfg, {}, {}, {})
+
+    assert status == 200
+    assert body["model"] == "deepseek-v4-flash"
+    assert body["identity_match"] is False
+    assert body["identity_code"] == "MODEL_IDENTITY_MISMATCH"
+    assert body["identity"]["state"] == "STALE_ACTIVE"

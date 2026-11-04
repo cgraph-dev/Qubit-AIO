@@ -195,10 +195,22 @@ def _start_gateway_make_shutdown_signal_handler(runner, _signal_initiated_shutdo
         # stopped).
         marker_planned_stop = bool(_best_effort(
             _planned_stop, "Planned stop marker check failed: %s"))
+
+        def _service_manager_stop() -> bool:
+            from gateway.restart import is_service_manager_stop
+            return is_service_manager_stop()
+
+        # systemd/launchd/s6 own this process: their SIGTERM is a planned stop even on an
+        # installed unit that predates the ExecStop marker. Without this the gateway exits 1
+        # and the journal records FAILURE after every normal `systemctl stop/restart`.
+        supervised_sigterm = (
+            received_signal == signal.SIGTERM
+            and bool(_best_effort(_service_manager_stop, "Service-manager stop check failed: %s"))
+        )
         planned_stop = (
             received_signal is None
             or received_signal == signal.SIGINT
-            or (not planned_takeover and marker_planned_stop)
+            or (not planned_takeover and (marker_planned_stop or supervised_sigterm))
         )
         # `qubit gateway stop` writes the marker, THEN signals: the planned-stop watcher can consume
         # the marker in between, and the CLI's own SIGTERM must not then read as an external kill.

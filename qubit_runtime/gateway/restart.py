@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
+from pathlib import Path
 
 from gateway.supervisor_markers import (  # noqa: F401 — re-exported for existing importers
     EXTERNAL_GATEWAY_SUPERVISOR_ENV,
@@ -282,6 +283,32 @@ def is_supervised_gateway_launch(environ: Mapping[str, str] | None = None) -> bo
     if supervised_child_marker_present(env):
         return True
     return is_gateway_supervisor_process(environ)
+
+
+def is_service_manager_stop(environ: Mapping[str, str] | None = None,
+                            *, cgroup_text: str | None = None) -> bool:
+    """Whether a SIGTERM came from a service manager rather than a bare kill.
+
+    systemd sets ``INVOCATION_ID`` for the service and places the process in a ``.service``
+    cgroup. Requiring both keeps a terminal shell that merely inherited ``INVOCATION_ID`` from
+    its own session (a ``.scope``) from being mistaken for the supervised gateway. The
+    distinction matters for exit code: a manager-initiated SIGTERM is a planned stop (exit 0,
+    no ``Failed with result 'exit-code'`` churn under ``Restart=always``); a bare SIGTERM with
+    no marker stays an unexpected kill so ``Restart=on-failure`` still revives a wedged process.
+    """
+    env = os.environ if environ is None else environ
+    if not env.get("INVOCATION_ID"):
+        return False
+    if cgroup_text is None:
+        try:
+            cgroup_text = Path("/proc/self/cgroup").read_text(encoding="utf-8")
+        except OSError:
+            return False
+    return any(
+        part.endswith(".service")
+        for line in cgroup_text.splitlines()
+        for part in line.replace("\n", "").rsplit(":", 1)[-1].split("/")
+    )
 
 
 def is_container_restart_context() -> bool:

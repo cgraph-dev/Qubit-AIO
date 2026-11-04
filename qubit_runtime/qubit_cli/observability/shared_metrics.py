@@ -187,6 +187,11 @@ def drain_deferring_stores(deadline: float) -> None:
         store.drain_deferred(busy_timeout_ms=remaining_ms)
 
 
+def _is_busy_error(exc: sqlite3.OperationalError) -> bool:
+    """True for lock contention (deferrable), False for a real store failure."""
+    return "locked" in str(exc) or "busy" in str(exc)
+
+
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
@@ -462,7 +467,7 @@ class SharedMetricsStore:
                 for item in pending:
                     item(connection)
         except sqlite3.OperationalError as exc:
-            busy = "locked" in str(exc) or "busy" in str(exc)
+            busy = _is_busy_error(exc)
             with self._deferred_lock:
                 # A failure that is not contention drops only this write: the earlier ones stay queued.
                 self._deferred = [*(pending if busy else pending[:-1]), *self._deferred][-_DEFERRED_WRITES_MAX:]
@@ -485,7 +490,7 @@ class SharedMetricsStore:
                 for item in pending:
                     item(connection)
         except Exception as exc:
-            if isinstance(exc, sqlite3.OperationalError) and ("locked" in str(exc) or "busy" in str(exc)):
+            if isinstance(exc, sqlite3.OperationalError) and _is_busy_error(exc):
                 with self._deferred_lock:  # still contended: keep them for the next write or exit drain
                     self._deferred = [*pending, *self._deferred][-_DEFERRED_WRITES_MAX:]
                 return
@@ -623,17 +628,25 @@ class SharedMetricsStore:
         return None if parsed.tzinfo is None else parsed.astimezone(UTC)
 
     def _create_pending_packages_if_due(self) -> None:
-        now = _utc_now()
-        with self._write() as connection:
-            # Gate on the committed package, not its file write, so a failed
-            # outbox export can be retried without packaging deltas twice.
-            package_created_today = connection.execute(
-                "SELECT 1 FROM package_outbox WHERE substr(created_at, 1, 10) >= ? LIMIT 1",
-                (now.date().isoformat(),),
-            ).fetchone()
-            if package_created_today is None:
-                while self._create_package_in_transaction(connection, now) is not None:
-                    pass
+        # The finish-task hook must never raise on contention: a busy store queues the
+        # creation like every other metric write and runs it with the next write (or the
+        # exit drain). ``create_and_export_package`` stays fail-fast for interactive callers.
+        self._write_or_defer(
+            lambda connection: self._create_pending_packages_in_transaction(connection, _utc_now())
+        )
+
+    def _create_pending_packages_in_transaction(
+        self, connection: sqlite3.Connection, now: datetime
+    ) -> None:
+        # Gate on the committed package, not its file write, so a failed
+        # outbox export can be retried without packaging deltas twice.
+        package_created_today = connection.execute(
+            "SELECT 1 FROM package_outbox WHERE substr(created_at, 1, 10) >= ? LIMIT 1",
+            (now.date().isoformat(),),
+        ).fetchone()
+        if package_created_today is None:
+            while self._create_package_in_transaction(connection, now) is not None:
+                pass
 
     def _create_package(self) -> dict[str, Any] | None:
         with self._write() as connection:
@@ -771,13 +784,23 @@ class SharedMetricsStore:
                 path, json.loads(row["payload_json"]), indent=None, separators=(",", ":"),
                 sort_keys=True, mode=0o600,
             )
-            with self._connection() as connection:
-                connection.execute(
-                    "UPDATE package_outbox SET exported_at = ?"
-                    " WHERE package_id = ? AND exported_at IS NULL",
-                    (_isoformat(_utc_now()), package_id),
-                )
-            exported.append(path)
+            # Claim the row in one IMMEDIATE transaction and report the file only to the
+            # process that won it: two gateways finishing a turn together used to both
+            # "export" the same package. Contention leaves the row pending for the next
+            # hook instead of raising out of the finish-task path.
+            try:
+                with self._write() as connection:
+                    claimed = connection.execute(
+                        "UPDATE package_outbox SET exported_at = ?"
+                        " WHERE package_id = ? AND exported_at IS NULL",
+                        (_isoformat(_utc_now()), package_id),
+                    ).rowcount
+            except sqlite3.OperationalError as exc:
+                if _is_busy_error(exc):
+                    break
+                raise
+            if claimed:
+                exported.append(path)
         return exported
 
     def _prune_expired_history(self, *, now: datetime | None = None) -> None:

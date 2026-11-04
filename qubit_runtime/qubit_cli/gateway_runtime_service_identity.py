@@ -207,7 +207,15 @@ def verify_systemd(props: dict[str, str], manager_env: str, home: Path, *, syste
             env.pop(key, None)
     configured = env.get("QUBIT_HOME", "").strip()
     if not configured:
-        configured = str(_absolute(env.get("HOME") or pwd.getpwuid(uid).pw_dir) / ".hermes")
+        # Units installed before QUBIT_HOME was pinned fall back to the account's
+        # default home. The canonical name is ``.qubit``; ``.hermes`` is read-old,
+        # accepted only when it is the actual home this unit serves.
+        base = _absolute(env.get("HOME") or pwd.getpwuid(uid).pw_dir)
+        candidates = (base / ".qubit", base / ".hermes")
+        served = os.path.normcase(str(home.resolve()))
+        configured = str(next(
+            (c for c in candidates if os.path.normcase(str(c)) == served),
+            candidates[0]))
     verify_home(home, configured)
     match = re.fullmatch(r"\{ path=(.*?) ; argv\[\]=(.*?) ; ignore_errors=(?:yes|no) ;(?:.*?)\}", props["ExecStart"])
     if not match or any(char in match[2] for char in ("$", "\\", "{", "}")):

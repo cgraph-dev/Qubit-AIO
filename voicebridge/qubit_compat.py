@@ -1832,10 +1832,24 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # effective carries the value. Unknown auto (0) never masks a configured
     # window.
     config_out = ctx if ctx != auto_ctx else 0
-    # ModelInfoResponse wire shape.
+    # ModelInfoResponse wire shape. ``identity`` is additive: it names the configured,
+    # persisted-active and effective routes so a stale active pointer (the live
+    # ``muse-spark`` vs configured ``deepseek`` disagreement) is typed instead of
+    # silently presented as the only truth. Older clients ignore the extra fields.
+    identity = None
+    try:
+        from .providers import resolver as _R
+
+        identity = _R.model_identity(cfg)
+    except Exception:  # noqa: BLE001 - identity is diagnostic, never fatal
+        identity = None
+    extra = {}
+    if isinstance(identity, dict):
+        extra = {"identity": identity, "identity_match": bool(identity.get("match")),
+                 "identity_code": str(identity.get("code") or "")}
     return _ok(model=model, provider=provider,
                auto_context_length=auto_ctx, config_context_length=config_out,
-               effective_context_length=effective, capabilities=caps)
+               effective_context_length=effective, capabilities=caps, **extra)
 
 
 #: Internal record/error tokens that must never reach the model picker
