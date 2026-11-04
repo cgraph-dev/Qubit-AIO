@@ -247,6 +247,42 @@ class TestEstimateRequestTokensRough:
         assert len(mm._TOOLS_TOKENS_CACHE) == cap
 
 
+class TestToolsTokenCacheKeyHardening:
+    def _tools(self, names):
+        return [
+            {"type": "function", "function": {
+                "name": name, "description": "d", "parameters": {"type": "object"}}}
+            for name in names
+        ]
+
+    def test_an_in_place_middle_tool_change_is_not_served_stale(self):
+        """The old signature only hashed the first/last names, so a same-length edit to a middle
+        tool kept the stale count. The full-name signature forces a recompute."""
+        import agent.model_metadata as mm
+
+        mm._TOOLS_TOKENS_CACHE.clear()
+        tools = self._tools(["alpha", "beta", "gamma"])
+        first = mm._estimate_tools_tokens_rough(tools)
+
+        tools[1]["function"]["name"] = "beta" + ("x" * 400)
+        second = mm._estimate_tools_tokens_rough(tools)
+
+        assert second > first + 50
+
+    def test_a_cached_entry_is_bound_to_the_exact_list_object(self):
+        """``id()`` reuse must never return another list's count: the cache keeps the list alive
+        and re-checks identity before serving a hit."""
+        import agent.model_metadata as mm
+
+        mm._TOOLS_TOKENS_CACHE.clear()
+        tools = self._tools(["alpha", "beta"])
+        expected = mm._estimate_tools_tokens_rough(tools)
+
+        mm._TOOLS_TOKENS_CACHE[id(tools)] = (
+            (len(tools), ("alpha", "beta")), ["not-the-list"], 999_999)
+        assert mm._estimate_tools_tokens_rough(tools) == expected
+
+
 # =========================================================================
 # Default context lengths
 # =========================================================================

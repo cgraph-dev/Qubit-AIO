@@ -1904,25 +1904,31 @@ def _close_durable_failed_turn(agent, result: Any) -> None:
     compensates with ``_hmwa_close_failed_turn``; CLI, TUI/Desktop and ACP hosts hand
     ``result["messages"]`` straight back as history, so the seam is here.
 
-    Excluded: the context-pressure classes (``compression_exhausted``, ``compression_deferred``,
-    ``failure_reason == "context_overflow"``) — appending to an already-oversized session is the
-    #1630 growth loop; their repair is rotation or a retry. Idempotence is keyed on the DURABLE
+    Context-pressure classes (``compression_exhausted``, ``compression_deferred``,
+    ``failure_reason == "context_overflow"``) do not grow the session with a user-tail boundary —
+    their repair is rotation or a retry (#1630). They DO close an open ``tool`` tail: that tail is
+    already oversized evidence and leaving it open makes the next prompt ``tool → user``, which
+    strict providers reject and alternation repair rewrites. Idempotence is keyed on the DURABLE
     tail (``SessionDB.latest_conversation_role``), so a redelivery or a tail already closed by
     another writer is a no-op, and the gateway's own closer then no-ops in turn.
     """
     try:
         if not isinstance(result, dict) or result.get("completed") is True:
             return
-        if (
+        context_pressure = bool(
             result.get("compression_exhausted") or result.get("compression_deferred")
             or result.get("failure_reason") == "context_overflow"
-        ):
-            return
+        )
         messages = result.get("messages")
         db, session_id = getattr(agent, "_session_db", None), getattr(agent, "session_id", None)
         if not isinstance(messages, list) or not messages or db is None or not session_id:
             return
-        if getattr(agent, "_persist_disabled", False) or db.latest_conversation_role(session_id) not in OPEN_TURN_TAIL_ROLES:
+        if getattr(agent, "_persist_disabled", False):
+            return
+        tail_role = db.latest_conversation_role(session_id)
+        if tail_role not in OPEN_TURN_TAIL_ROLES:
+            return
+        if context_pressure and tail_role != "tool":
             return
         # Scope the "did a tool run" scan to this turn when its boundary is proven; otherwise
         # hedge over the whole list rather than under-report a possible side effect.

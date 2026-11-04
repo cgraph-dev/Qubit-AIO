@@ -7,12 +7,63 @@ is the inverse that ``restore_primary_runtime`` runs once its gates pass.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Any, Dict, Optional, Tuple
 
 from utils import base_url_host_matches
 
 logger = logging.getLogger(__name__)
+
+_BIND_MISSING = object()
+# Fields the fallback swap mutates that ``_snapshot_switch_state`` does not cover. The switch
+# snapshot owns identity/client/pool; these are the rest of the route surface a late bind step
+# (compressor, LM Studio preload, extra_body scoping) can leave behind on failure.
+_BIND_EXTRA_FIELDS = (
+    "_fallback_activated", "_use_prompt_caching", "_use_native_cache_layout",
+    "request_overrides", "reasoning_config", "_bedrock_region", "_bedrock_guardrail_config",
+)
+
+
+def _snapshot_bind_state(agent: Any) -> Dict[str, Any]:
+    """Pre-swap state for a transactional route bind (restored if a late step raises)."""
+    from agent.agent_runtime_helpers import _snapshot_switch_state
+
+    state: Dict[str, Any] = {
+        "switch": _snapshot_switch_state(agent),
+        "extra": {name: getattr(agent, name, _BIND_MISSING) for name in _BIND_EXTRA_FIELDS},
+        "compressor": None,
+        "transport_cache": None,
+    }
+    compressor = getattr(agent, "context_compressor", None)
+    if compressor is not None and hasattr(compressor, "__dict__"):
+        state["compressor"] = (compressor, dict(compressor.__dict__))
+    cache = getattr(agent, "_transport_cache", None)
+    if isinstance(cache, dict):
+        state["transport_cache"] = (cache, dict(cache))
+    return state
+
+
+def _restore_bind_state(agent: Any, state: Dict[str, Any]) -> None:
+    """Put back every field a failed ``bind_route_entry`` touched (best-effort, never raises)."""
+    from agent.agent_runtime_helpers import _restore_switch_snapshot
+
+    _restore_switch_snapshot(agent, state["switch"])
+    for name, value in state["extra"].items():
+        if value is _BIND_MISSING:
+            continue
+        with contextlib.suppress(Exception):
+            setattr(agent, name, value)
+    if state["compressor"] is not None:
+        compressor, saved = state["compressor"]
+        with contextlib.suppress(Exception):
+            compressor.__dict__.clear()
+            compressor.__dict__.update(saved)
+    if state["transport_cache"] is not None:
+        cache, saved = state["transport_cache"]
+        with contextlib.suppress(Exception):
+            cache.clear()
+            cache.update(saved)
 
 
 def bind_route_entry(agent: Any, entry: Dict[str, Any], provider: str, model: str) -> Optional[Tuple[str, str]]:
@@ -59,38 +110,47 @@ def bind_route_entry(agent: Any, entry: Dict[str, Any], provider: str, model: st
         elif not api_mode_explicit and api_mode == "chat_completions":
             api_mode = _fallback_api_mode_resolved(agent, provider, model, base_url)
 
-    old_model, old_provider, old_base_url = agent.model, agent.provider, agent.base_url
-    # Clear the per-config context_length override so the new model's own context window is
-    # resolved instead of the previous model's stale value (#22387).
-    agent._config_context_length = None
-    agent.model, agent.provider, agent.requested_provider = model, provider, provider
-    agent.base_url, agent.api_mode = base_url, api_mode
-    # reasoning_content echo opt-in travels with the active provider; restore_primary_runtime reverts it.
-    agent._reasoning_echo_flag = bool(entry.get("reasoning_echo", False))
-    if hasattr(agent, "_transport_cache"):
-        agent._transport_cache.clear()
-    from agent.turn_recovery import reset_codex_reasoning_replay
-    reset_codex_reasoning_replay(agent)
-    agent._fallback_activated = True
+    # Everything below mutates the live agent. A late failure (client rebuild, LM Studio preload,
+    # compressor probe, extra_body scoping) used to leave it half-bound: a new model/provider
+    # identity paired with the old client/pool, so the retry loop kept dispatching the failed
+    # route. Snapshot first, restore on ANY failure, then re-raise for the caller's chain walk.
+    snapshot = _snapshot_bind_state(agent)
+    try:
+        old_model, old_provider, old_base_url = agent.model, agent.provider, agent.base_url
+        # Clear the per-config context_length override so the new model's own context window is
+        # resolved instead of the previous model's stale value (#22387).
+        agent._config_context_length = None
+        agent.model, agent.provider, agent.requested_provider = model, provider, provider
+        agent.base_url, agent.api_mode = base_url, api_mode
+        # reasoning_content echo opt-in travels with the active provider; restore_primary_runtime reverts it.
+        agent._reasoning_echo_flag = bool(entry.get("reasoning_echo", False))
+        if hasattr(agent, "_transport_cache"):
+            agent._transport_cache.clear()
+        from agent.turn_recovery import reset_codex_reasoning_replay
+        reset_codex_reasoning_replay(agent)
+        agent._fallback_activated = True
 
-    _rebind_fallback_credential_pool(agent, provider, model)
-    if provider == "moa":
-        from agent.moa_loop import bind_moa_runtime
-        bind_moa_runtime(agent, model)
-    else:
-        from agent.client_lifecycle import _swap_fallback_clients
-        _swap_fallback_clients(agent, client, provider, model, base_url, api_mode)
+        _rebind_fallback_credential_pool(agent, provider, model)
+        if provider == "moa":
+            from agent.moa_loop import bind_moa_runtime
+            bind_moa_runtime(agent, model)
+        else:
+            from agent.client_lifecycle import _swap_fallback_clients
+            _swap_fallback_clients(agent, client, provider, model, base_url, api_mode)
 
-    from agent.agent_runtime_helpers import sync_credential_pool_entry_id
-    sync_credential_pool_entry_id(agent)
+        from agent.agent_runtime_helpers import sync_credential_pool_entry_id
+        sync_credential_pool_entry_id(agent)
 
-    agent._use_prompt_caching, agent._use_native_cache_layout = agent._anthropic_prompt_cache_policy(
-        provider=provider, base_url=base_url, api_mode=api_mode, model=model)
-    agent._ensure_lmstudio_runtime_loaded()  # LM Studio: preload before probing context length
-    _update_fallback_context_compressor(agent)
-    _reresolve_fallback_reasoning_config(agent)
-    _rescope_fallback_extra_body(agent, old_model, old_provider, old_base_url)
-    return old_model, old_provider
+        agent._use_prompt_caching, agent._use_native_cache_layout = agent._anthropic_prompt_cache_policy(
+            provider=provider, base_url=base_url, api_mode=api_mode, model=model)
+        agent._ensure_lmstudio_runtime_loaded()  # LM Studio: preload before probing context length
+        _update_fallback_context_compressor(agent)
+        _reresolve_fallback_reasoning_config(agent)
+        _rescope_fallback_extra_body(agent, old_model, old_provider, old_base_url)
+        return old_model, old_provider
+    except BaseException:
+        _restore_bind_state(agent, snapshot)
+        raise
 
 
 def reinstall_runtime_snapshot(agent: Any, rt: Dict[str, Any]) -> None:

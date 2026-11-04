@@ -76,3 +76,28 @@ class TestResetDelayOneTable:
 
         assert reset_delay_from_message("resets in the future, maybe") is None
         assert "reset_at" not in _normalize_error_context({"message": "resets in the future, maybe"})
+
+
+class TestStructuredResetHints:
+    def test_reset_seconds_relative_field_feeds_the_429_window(self):
+        from agent.error_classifier import _rate_limit_reset_seconds
+
+        seconds = _rate_limit_reset_seconds(
+            "", {"error": {"type": "rate_limit_exceeded", "reset_seconds": 45}}, {})
+        assert seconds == 45.0
+
+    def test_iso_reset_at_field_feeds_the_429_window(self):
+        from datetime import datetime, timedelta, timezone
+        from agent.error_classifier import _rate_limit_reset_seconds
+
+        when = datetime.now(timezone.utc) + timedelta(seconds=300)
+        seconds = _rate_limit_reset_seconds(
+            "", {"error": {"resets_at": when.strftime("%Y-%m-%dT%H:%M:%SZ")}}, {})
+        assert 295 <= seconds <= 301
+
+    def test_resets_in_seconds_wins_over_a_short_retry_after(self):
+        from agent.error_classifier import _rate_limit_reset_seconds
+
+        seconds = _rate_limit_reset_seconds(
+            "", {"error": {"retry_after": 5, "resets_in_seconds": 900}}, {})
+        assert seconds == 900.0

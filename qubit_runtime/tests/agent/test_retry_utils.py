@@ -164,3 +164,61 @@ class TestParseRetryAfterSeconds:
                 raise RuntimeError("boom")
 
         assert parse_retry_after_seconds(Explosive()) is None
+
+
+class TestProviderCooldownHints:
+    """Provider reset hints are parsed across their live shapes and preferred over retry_after."""
+
+    def test_iso8601_retry_after_is_a_duration(self):
+        from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
+
+        from agent.retry_utils import parse_retry_after_seconds, provider_retry_after_seconds
+
+        when = datetime.now(timezone.utc) + timedelta(seconds=95)
+        error = SimpleNamespace(body={"error": {"retry_after": when.strftime("%Y-%m-%dT%H:%M:%SZ")}})
+
+        assert 90 <= parse_retry_after_seconds(when.strftime("%Y-%m-%dT%H:%M:%SZ")) <= 96
+        assert 90 <= provider_retry_after_seconds(error) <= 96
+
+    def test_reset_seconds_and_resets_in_seconds_are_relative(self):
+        from types import SimpleNamespace
+
+        from agent.retry_utils import provider_retry_after_seconds
+
+        assert provider_retry_after_seconds(
+            SimpleNamespace(body={"error": {"reset_seconds": 45}})) == 45.0
+        assert provider_retry_after_seconds(
+            SimpleNamespace(body={"error": {"resets_in_seconds": 756}})) == 756.0
+
+    def test_iso_resets_at_becomes_a_duration(self):
+        from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
+
+        from agent.retry_utils import provider_retry_after_seconds
+
+        when = datetime.now(timezone.utc) + timedelta(seconds=120)
+        error = SimpleNamespace(body={"error": {"resets_at": when.isoformat()}})
+        assert 115 <= provider_retry_after_seconds(error) <= 121
+
+    def test_provider_reset_wins_over_a_short_retry_after(self):
+        from types import SimpleNamespace
+
+        from agent.retry_utils import provider_retry_after_seconds
+
+        error = SimpleNamespace(body={"error": {
+            "retry_after": 5,
+            "resets_in_seconds": 900,
+        }})
+        assert provider_retry_after_seconds(error) == 900.0
+
+    def test_header_still_wins_when_the_body_names_no_reset(self):
+        from types import SimpleNamespace
+
+        from agent.retry_utils import provider_retry_after_seconds
+
+        error = SimpleNamespace(
+            body={"error": {"message": "rate limited"}},
+            response=SimpleNamespace(headers={"Retry-After": "30"}),
+        )
+        assert provider_retry_after_seconds(error) == 30.0

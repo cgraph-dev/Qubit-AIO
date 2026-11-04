@@ -124,3 +124,35 @@ def test_keyword_is_never_passed_to_the_plugin(tmp_path, monkeypatch):
 
     assert plugin.initialize_calls == [({}, _MISSING)]
     assert plugin.validate_calls == [({}, _MISSING)]
+
+
+class _ReportlessPlugin:
+    """Older Relay binding: no ``plugin.report`` API to preflight against."""
+
+
+class _AsyncReportPlugin:
+    def __init__(self, report):
+        self._report = report
+
+    async def report(self):
+        return self._report
+
+
+class _MappingReportPlugin:
+    report = {"resolved_config": {"components": []}, "dynamic_plugins": []}
+
+
+def test_preflight_proceeds_when_the_binding_has_no_report_api():
+    owner = relay_runtime._ProcessRelayPluginConfiguration()
+    assert owner._preflight(SimpleNamespace(plugin=_ReportlessPlugin())) is None
+
+
+@pytest.mark.parametrize("plugin, expected", [
+    (_AsyncReportPlugin(None), None),
+    (_AsyncReportPlugin({"resolved_config": {"components": []}, "dynamic_plugins": []}),
+     relay_runtime._RelayPluginConfigurationState.FOREIGN),
+    (_MappingReportPlugin(), relay_runtime._RelayPluginConfigurationState.FOREIGN),
+])
+def test_preflight_accepts_awaitable_and_mapping_report_shapes(plugin, expected):
+    owner = relay_runtime._ProcessRelayPluginConfiguration()
+    assert owner._preflight(SimpleNamespace(plugin=plugin)) is expected

@@ -157,6 +157,21 @@ _RelayPluginConfigurationState = Enum(
 )
 
 
+_REPORT_MISSING = object()
+
+
+def _plugin_configuration_report(plugin: Any) -> Any:
+    """The process-global plugin configuration report, or ``_REPORT_MISSING`` for a binding that
+    predates it. Accepts the report as a callable, a mapping attribute, or an awaitable (Relay
+    releases disagree), so an older/compatible binding does not disable Relay with an
+    AttributeError/TypeError crash."""
+    getter = getattr(plugin, "report", _REPORT_MISSING)
+    if getter is _REPORT_MISSING:
+        return _REPORT_MISSING
+    report = getter() if callable(getter) else getter
+    return _resolve_plugin_awaitable(report)
+
+
 class _RelayPluginConfigurationLoadError(RuntimeError):
     """An explicitly selected Relay plugin configuration could not be loaded."""
 
@@ -345,14 +360,20 @@ class _ProcessRelayPluginConfiguration:
             )
             return _RelayPluginConfigurationState.FAILED
         try:
-            existing_report = relay.plugin.report()
+            existing_report = _plugin_configuration_report(relay.plugin)
         except Exception:
             logger.warning(
                 "Qubit could not determine whether a process-global Relay plugin configuration is already "
                 "active; refusing to replace it", exc_info=True,
             )
             return _RelayPluginConfigurationState.FAILED
-        if existing_report is not None:
+        if existing_report is _REPORT_MISSING:
+            # Older Relay bindings predate the plugin-host report. There is no process-global
+            # configuration API to protect, so proceed; if a newer binding is present its
+            # initialize/validate path still raises the host-conflict error `_activate` maps to
+            # FOREIGN, and the process is never silently doubled-up by this preflight.
+            logger.debug("Relay binding has no plugin.report(); skipping the foreign-configuration preflight")
+        elif existing_report is not None:
             logger.warning(
                 "A process-global Relay plugin configuration is already active outside Qubit native ownership; "
                 "leaving it unchanged and disabling Qubit-managed Relay middleware for this process"

@@ -340,3 +340,78 @@ def test_failed_turn_after_a_tool_row_is_closed_with_its_error_card(tmp_path, mo
     metadata = boundary["display_metadata"]
     assert (metadata if isinstance(metadata, dict) else json.loads(metadata))["error_surface"]["code"] == "rate_limit"
     db.close()
+
+
+@pytest.mark.parametrize("pressure", [
+    {"failure_reason": "context_overflow"},
+    {"compression_deferred": True},
+    {"compression_exhausted": True},
+])
+def test_context_pressure_closes_an_open_tool_tail(tmp_path, monkeypatch, pressure):
+    """Context-pressure results skip the USER tail (rotation, not a row — #1630), but a TOOL tail
+    must still be closed: leaving it makes the next prompt ``tool → user`` and the failed tool
+    pair is replayed into an unrelated turn."""
+    from types import SimpleNamespace
+
+    from agent.conversation_loop import _close_durable_failed_turn
+    from agent.turn_failure_copy import PARTIAL_FAILED_TURN_NOTICE
+    from qubit_state import SessionDB
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    db = SessionDB(tmp_path / "state.db")
+    sid = "s1"
+    db.create_session(session_id=sid, source="acp", model="m")
+    db.append_message(sid, "user", "delete the build directory")
+    db.append_message(sid, "tool", "removed")
+
+    written: list[list[dict]] = []
+
+    def flush(messages):
+        db.append_message(sid, messages[-1]["role"], messages[-1]["content"])
+        written.append(list(messages))
+
+    agent = SimpleNamespace(_session_db=db, session_id=sid, _flush_messages_to_session_db=flush)
+    messages = [
+        {"role": "user", "content": "delete the build directory"},
+        {"role": "tool", "tool_call_id": "t1", "content": "removed"},
+    ]
+    result = {"completed": False, "failed": True, "messages": messages, **pressure}
+
+    _close_durable_failed_turn(agent, result)
+
+    assert len(written) == 1
+    assert (messages[-1]["role"], messages[-1]["content"]) == ("assistant", PARTIAL_FAILED_TURN_NOTICE)
+    assert db.latest_conversation_role(sid) == "assistant"
+    db.close()
+
+
+@pytest.mark.parametrize("pressure", [
+    {"compression_deferred": True},
+    {"compression_exhausted": True},
+])
+def test_context_pressure_still_leaves_a_user_tail_unclosed(tmp_path, monkeypatch, pressure):
+    """The #1630 growth-loop guard: an accepted user row on an oversized session is not grown by a
+    boundary row; only an already-open tool pair is repaired."""
+    from types import SimpleNamespace
+
+    from agent.conversation_loop import _close_durable_failed_turn
+    from qubit_state import SessionDB
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    db = SessionDB(tmp_path / "state.db")
+    sid = "s1"
+    db.create_session(session_id=sid, source="acp", model="m")
+    db.append_message(sid, "user", "a very large request")
+
+    written: list[list[dict]] = []
+    agent = SimpleNamespace(
+        _session_db=db, session_id=sid,
+        _flush_messages_to_session_db=lambda messages: written.append(list(messages)))
+    result = {"completed": False, "failed": False,
+              "messages": [{"role": "user", "content": "a very large request"}], **pressure}
+
+    _close_durable_failed_turn(agent, result)
+
+    assert written == []
+    assert db.latest_conversation_role(sid) == "user"
+    db.close()

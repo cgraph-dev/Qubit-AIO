@@ -2680,7 +2680,10 @@ def estimate_request_tokens_rough(
 
 # Keyed by ``id(tools)``; bounded, oldest-first eviction. Repeated ``str(tools)`` on
 # large schemas stalls GUI event loops under GIL pressure.
-_TOOLS_TOKENS_CACHE: dict[int, Tuple[int, str, str, int]] = {}
+# The value keeps the list object alive (so its id cannot be recycled while cached) and a
+# signature of EVERY tool name (not just the first/last, which a same-length replacement — or
+# an in-place middle edit — could leave unchanged).
+_TOOLS_TOKENS_CACHE: dict[int, Tuple[Tuple[int, Tuple[str, ...]], List[Dict[str, Any]], int]] = {}
 _TOOLS_TOKENS_CACHE_MAX = 256
 
 
@@ -2697,10 +2700,10 @@ def _estimate_tools_tokens_rough(tools: List[Dict[str, Any]]) -> int:
     if not tools:
         return 0
     key = id(tools)
-    signature = (len(tools), _tool_name_for_cache(tools[0]), _tool_name_for_cache(tools[-1]))
+    signature = (len(tools), tuple(_tool_name_for_cache(tool) for tool in tools))
     cached = _TOOLS_TOKENS_CACHE.get(key)
-    if cached is not None and cached[:3] == signature:
-        return cached[3]
+    if cached is not None and cached[0] == signature and cached[1] is tools:
+        return cached[2]
     # Sum the major schema fields (descriptions + parameters dominate).
     total_chars = 0
     for tool in tools:
@@ -2717,5 +2720,5 @@ def _estimate_tools_tokens_rough(tools: List[Dict[str, Any]]) -> int:
     tokens = (total_chars + 3) // 4
     if len(_TOOLS_TOKENS_CACHE) >= _TOOLS_TOKENS_CACHE_MAX:
         _TOOLS_TOKENS_CACHE.pop(next(iter(_TOOLS_TOKENS_CACHE)), None)
-    _TOOLS_TOKENS_CACHE[key] = (*signature, tokens)
+    _TOOLS_TOKENS_CACHE[key] = (signature, tools, tokens)
     return tokens
