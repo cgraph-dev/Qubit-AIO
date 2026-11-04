@@ -187,15 +187,26 @@ def _ensure_dashboard(repo: Path, log: dict) -> None:
     index = repo / "frontend" / "qubit-dist" / "index.html"
     if index.is_file():
         log["dashboard"] = "present"
-        return
-    script = repo / "scripts" / "build_dashboard.sh"
-    proc = _run(["bash", str(script)], timeout=3600, cwd=repo)
-    if proc.returncode != 0 or not index.is_file():
-        raise ReleaseError(
-            "dashboard build failed (rc=%s): %s"
-            % (proc.returncode, (proc.stderr or proc.stdout)[-2000:])
-        )
-    log["dashboard"] = "built"
+    else:
+        script = repo / "scripts" / "build_dashboard.sh"
+        proc = _run(["bash", str(script)], timeout=3600, cwd=repo)
+        if proc.returncode != 0 or not index.is_file():
+            raise ReleaseError(
+                "dashboard build failed (rc=%s): %s"
+                % (proc.returncode, (proc.stderr or proc.stdout)[-2000:])
+            )
+        log["dashboard"] = "built"
+
+    # Record which commit produced the dashboard. This is part of the
+    # component manifest, so a stale bundle is visible rather than guessed.
+    info_script = repo / "frontend" / "qubit-web" / "scripts" / "write-build-info.mjs"
+    if info_script.is_file():
+        proc = _run(["node", str(info_script)], timeout=120, cwd=repo)
+        if proc.returncode != 0:
+            raise ReleaseError(
+                "dashboard build-info failed: %s"
+                % (proc.stderr or proc.stdout)[-1000:]
+            )
 
 
 def _release_qualify(repo: Path, out: Path, tag: str, verify: bool) -> dict:
@@ -430,8 +441,8 @@ def _release_notes(release: dict, tree: dict, artifacts: list[dict]) -> str:
         "",
         "## Notes",
         "",
-        "- The wheel/sdist are unsigned (`NOT_SIGNED`, explicit `--unsigned-ok`",
-        "  policy). Verify `SHA256SUMS` before installing.",
+        "- The wheel/sdist are unsigned (no detached signature; explicit",
+        "  `--unsigned-ok` policy). Verify `SHA256SUMS` before installing.",
         "- The source archive is the sanitized public export; internal reports,",
         "  operator paths and local build artifacts are excluded.",
         "- This draft build is not a behavioral release verdict; owner release",

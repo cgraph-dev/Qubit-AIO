@@ -202,6 +202,7 @@ def test_release_notes_never_claim_verified_or_publish(tmp_path: Path):
     )
     assert "Qubit 0.0.2" in notes
     assert "sha256sum -c SHA256SUMS" in notes
-    assert "NOT_SIGNED" in notes
+    assert "unsigned" in notes
+    assert "--unsigned-ok" in notes
     assert "VERIFIED" not in notes
     assert "gh release" not in notes
