@@ -1,0 +1,144 @@
+name: promote-release
+
+# Operator-driven promotion of an already existing release tag to a DRAFT
+# GitHub release. This workflow never creates or moves a tag and never
+# publishes a release: `gh release create --verify-tag --draft` refuses a
+# missing tag, and an existing release is only modified while it is still a
+# draft. A human approves the `release` environment and publishes the draft
+# manually after reviewing the assets.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to promote (v*), e.g. v0.0.2"
+        required: true
+        type: string
+      verify:
+        description: "Run the full release qualifier (build+install+reproduce)"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Build and verify production release assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+    steps:
+      - name: Validate the release tag
+        id: validate
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            v[0-9]*) ;;
+            *) echo "::error::not a v* release tag: $TAG"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Checkout the existing tag (no tag creation)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/qubit-web/package-lock.json
+      - name: Build the dashboard bundle
+        run: bash scripts/build_dashboard.sh
+      - name: Prepare and verify release assets
+        env:
+          VERIFY: ${{ inputs.verify }}
+        run: |
+          set -euo pipefail
+          args=(--out "$RUNNER_TEMP/qubit-production-release" --tag "${{ inputs.tag }}")
+          if [ "$VERIFY" = "true" ]; then args+=(--verify); fi
+          python3 scripts/prepare_production_release.py "${args[@]}"
+      - name: Upload the prepared assets
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: production-release-assets
+          path: |
+            ${{ runner.temp }}/qubit-production-release/*.whl
+            ${{ runner.temp }}/qubit-production-release/*.tar.gz
+            ${{ runner.temp }}/qubit-production-release/SHA256SUMS
+            ${{ runner.temp }}/qubit-production-release/component-manifest.json
+            ${{ runner.temp }}/qubit-production-release/release-notes.md
+            ${{ runner.temp }}/qubit-production-release/release-summary.json
+          if-no-files-found: error
+          retention-days: 30
+
+  draft:
+    name: Create or update a DRAFT release (never publishes)
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Manual approval gate. Do not add secrets here. Publishing is
+    # intentionally absent; the only write is a draft release.
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Download the prepared assets
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: production-release-assets
+          path: release-assets
+      - name: Create or update the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          test -n "$TAG"
+          case "$TAG" in
+            v[0-9]*) ;;
+            *) echo "::error::invalid release tag: $TAG"; exit 1 ;;
+          esac
+          shopt -s nullglob
+          assets=(release-assets/*.whl release-assets/*.tar.gz \
+                  release-assets/SHA256SUMS \
+                  release-assets/component-manifest.json \
+                  release-assets/release-notes.md \
+                  release-assets/release-summary.json)
+          test "${#assets[@]}" -ge 6
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+                      --json isDraft --jq '.isDraft')"
+            if [ "$draft" != "true" ]; then
+              echo "::error::release $TAG is published; refusing to modify it"
+              exit 1
+            fi
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Qubit ${TAG#v}" \
+              --notes-file release-assets/release-notes.md
+            gh release upload "$TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            echo "updated existing draft release $TAG"
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft --verify-tag \
+              --title "Qubit ${TAG#v}" \
+              --notes-file release-assets/release-notes.md
+            echo "created draft release $TAG (never published)"
+          fi

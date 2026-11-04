@@ -39,8 +39,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_VERSION = "0.0.1"
-DEFAULT_TAG = "v0.0.1"
+DEFAULT_VERSION = None
+DEFAULT_TAG = None
 
 TABLE_RE = re.compile(r"^\s*\[([^\]]+)\]\s*$")
 FORCE_INCLUDE_LINE_RE = re.compile(r'^(\s*)"([^"]+)"\s*=\s*"([^"]*)"\s*$')
@@ -93,6 +93,17 @@ MODEL_SUFFIXES = (
     ".pth",
     ".safetensors",
 )
+
+
+def _root_version(repo: Path) -> str | None:
+    """Read the product version from the root ``pyproject.toml``."""
+    try:
+        import tomllib
+
+        with open(repo / "pyproject.toml", "rb") as fh:
+            return str((tomllib.load(fh).get("project") or {}).get("version") or "")
+    except Exception:
+        return None
 
 
 class SeedError(SystemExit):
@@ -437,7 +448,8 @@ def make_release_base(dest: Path, base: Path, archive: Path | None = None) -> tu
     return asset, checksums
 
 
-def verify_installs(dest: Path, work: Path, release_base: Path, checks: Checks) -> dict:
+def verify_installs(dest: Path, work: Path, release_base: Path, checks: Checks,
+                   version: str) -> dict:
     results: dict[str, str] = {}
     for label, cmd in (
         ("installer --help", [str(dest / "scripts" / "install.sh"), "--help"]),
@@ -502,8 +514,8 @@ def verify_installs(dest: Path, work: Path, release_base: Path, checks: Checks) 
             timeout=120,
         )
         checks.require(
-            "installed qubit --version reports 0.0.1",
-            version_proc.returncode == 0 and "0.0.1" in version_proc.stdout,
+            "installed qubit --version reports %s" % version,
+            version_proc.returncode == 0 and version in version_proc.stdout,
             version_proc.stdout.strip(),
         )
         results["qubit --version"] = version_proc.stdout.strip()
@@ -679,7 +691,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build a clean Qubit release-candidate seed.")
     parser.add_argument("--repo", type=Path, default=REPO)
     parser.add_argument("--dest", type=Path, required=True)
-    parser.add_argument("--version", default=DEFAULT_VERSION)
+    parser.add_argument(
+        "--version",
+        default=DEFAULT_VERSION,
+        help="release version; defaults to the root pyproject [project].version",
+    )
     parser.add_argument("--tag", default=None)
     parser.add_argument("--manifest", type=Path, default=None)
     parser.add_argument("--force", action="store_true")
@@ -689,8 +705,10 @@ def main(argv: list[str] | None = None) -> int:
 
     repo = args.repo.resolve()
     dest = args.dest.resolve()
-    tag = args.tag or ("v" + args.version)
-    version = args.version.lstrip("v")
+    version = (args.version or _root_version(repo)).lstrip("v")
+    if not version:
+        raise SeedError("no version: pass --version or set [project].version")
+    tag = args.tag or ("v" + version)
     manifest_path = args.manifest or Path(str(dest) + "-manifest.md")
     work = Path(str(dest) + "-verify")
     release_base = Path(str(dest) + "-release")
@@ -732,7 +750,7 @@ def main(argv: list[str] | None = None) -> int:
 
     install_results: dict[str, str] = {}
     if not args.skip_install_check:
-        install_results = verify_installs(dest, work, release_base, checks)
+        install_results = verify_installs(dest, work, release_base, checks, version)
         checks.finish()
     else:
         # Still prove the two help surfaces even when the heavy install is skipped.
