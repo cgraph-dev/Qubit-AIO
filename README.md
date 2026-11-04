@@ -22,7 +22,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 │                          │                                                          │
 │                          ▼                                                          │
 │                   intent router (heuristic, ~0 ms)                                  │
-│                    ├─ CONVERSATION ──► short: qubit-brain4 (local, ~0.3s)           │
+│                    ├─ CONVERSATION ──► short: qubit-brain (local, ~0.3s)           │
 │                    │                   long/complex: DeepSeek API (~1s)             │
 │                    │                   web/current: Perplexity API                  │
 │                    ├─ CODING TASK ────► Qubit worker (agent turns, tools,        │
@@ -43,7 +43,7 @@ long coding output, and can be interrupted mid-speech — **only by your voice**
 | VAD (Silero v5) | **local, CPU** | neural endpointing, far better than webrtcvad |
 | Voice-ID (eres2net) | **local, CPU** | ~50ms/check; self 0.72-0.96 vs strangers ~0.3 |
 | TTS (piper amy) | **local, CPU** | Kokoro-82M optional (`tts.provider: kokoro`) |
-| Chat (all questions) | **local, GPU, ~3 GB** | `qubit-brain4` (Qwen3-4B) — English-only replies, 24/7 resident |
+| Chat (all questions) | **local, GPU, ~3 GB** | `qubit-brain` (Qwen3-4B) — English-only replies, 24/7 resident |
 | Task execution | **Qubit worker** | only TASKS go here (coding, files, terminal, browser, repos), brokered through Qubit policy |
 | Cloud APIs | **fallback only** | DeepSeek/Perplexity when the local model or gateway is down |
 
@@ -63,53 +63,41 @@ agent task routing; only long/web conversational answers fall back.
 
 ## Install on a fresh PC
 
-The **one supported installer** is the packaged product surface. It works from
-a release artifact — no source checkout or repository-local virtualenv — and is
-lock + journal guarded, idempotent, and typed:
-
-```bash
-pip install qubit-voicebridge        # from the release artifact
-qubit product install          # typed prerequisite probe (dry-run, zero writes)
-qubit product install --apply  # stage config/resources + compat aliases
-qubit product first-run        # beginner-friendly status wizard (read-only)
-qubit product repair           # one diagnostic/repair command (read-only)
-```
-
-The canonical launcher is `qubit`. `voicebridge` remains as a
-compatibility alias (same commands, same backend); `python -m voicebridge`
-works when neither entry point is on `PATH`.
-
-The desktop shortcut and `qubit webui --open` open the real local
-dashboard when the bridge is running — they never start a second bridge or
-listener, and a token is never placed in a URL, argument, or file. Dashboard
-pairing is reported truthfully (`REQUIRES_PAIRING` / `PAIRED`), never as a
-fabricated "token generated".
-
-Existing installations on legacy install paths keep working
-and migrate with a reversible, backed-up flow:
-
-```bash
-qubit product migration        # status (FRESH / LEGACY_ONLY / MIGRATED)
-qubit product migrate --apply  # backed-up migration + compat alias
-```
-
-For a developer checkout the classic scripted installer remains available:
+From a source checkout (the supported path in this repository):
 
 ```bash
 git clone https://github.com/cgraph-dev/Qubit-AIO.git
 cd Qubit-AIO
 
-# prereqs (one-time): uv, ollama
+# one-time prerequisites: uv, and ollama for the local brain
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -fsSL https://ollama.com/install.sh | sh      # then: ollama serve
 
-./scripts/install.sh
+./scripts/install.sh --help       # options; changes nothing
+./scripts/install.sh --dry-run    # typed preflight + resolved layout; no writes
+./scripts/install.sh              # venv, deps, verified models, config, launcher
+./scripts/install.sh --with-systemd   # also install, enable, and start user services
 ```
 
-The installer (idempotent) creates the venv, installs deps, downloads the
-models (piper voice, Moonshine ASR, Silero VAD, eres2net voice-ID), builds
-`qubit-brain4` into ollama from the pinned Modelfile, and writes
-`~/.config/qubit-voicebridge/voice.yaml` from `config/voice.example.yaml`.
+The installer is idempotent and verifies every downloaded model against a
+pinned sha256. Useful flags: `--without-models` (skip model downloads),
+`--without-dashboard` (headless install), and `--prefix DIR` (put data/config/
+state under `DIR` instead of the XDG defaults).
+
+Release artifacts also expose the packaged surface:
+
+```bash
+pip install qubit-voicebridge
+qubit product install --apply
+```
+
+Existing installations on legacy paths keep working and migrate with a
+reversible, backed-up flow (`qubit product migration` for status,
+`qubit product migrate --apply` to migrate).
+
+The canonical launcher is `qubit`; `voicebridge` remains a compatibility alias
+(same commands, same backend), and `python -m voicebridge` works when neither
+entry point is on `PATH`.
 
 Optional keys for the cloud paths:
 
@@ -134,7 +122,7 @@ qubit enroll        # record 5s of YOUR voice — arms voice-ID
 Auto-start (optional):
 
 ```bash
-./scripts/install.sh --with-systemd     # renders + enables the user service
+./scripts/install.sh --with-systemd     # install, enable, and start the user services
 systemctl --user status qubit-voicebridge
 ```
 
@@ -202,7 +190,7 @@ See `tests/README.md` for the policy's details.
 
 ## Capabilities (voiced)
 
-The local agent (`qubit-brain4` model) + the bridge can do these by
+The local agent (`qubit-brain` model) + the bridge can do these by
 voice, fast and low-resource (no GPU training):
 
 - **Play YouTube / YouTube Music**: `play <song/video> on youtube` resolves the
@@ -251,7 +239,7 @@ what the agent is doing live.
 - **Chat page**: `http://<this-pc-ip>:8890/` — hold/tap the button, speak,
   hear the reply (audio comes back to the phone; the PC speakers stay
   silent unless `webui.speak_web_locally` is on). Same pipeline as the mic:
-  ASR → route → agent runtime/local → **the local brain's (qubit-brain4) ≤40-word summary** → TTS.
+  ASR → route → agent runtime/local → **the local brain's (qubit-brain) ≤40-word summary** → TTS.
 - **Audio on the PC (opt-in)**: web/dashboard requests play in the browser once;
   they also speak through the PC speakers ONLY when `webui.speak_web_locally:
   true` is explicitly set. The tuned setup keeps it `false` so nothing
@@ -291,7 +279,7 @@ origins so the hosted page can call the PC API.
 **Summarize-first workflow (why it feels smart):** recurring tool tasks are
 `local-script` templates — the bridge runs the tool itself (Perplexity
 browser search, graphify graph queries, …), feeds the raw output to the
-local ollama model (`summarizer.provider: ollama`, default qubit-brain4), and speaks ONLY the summary.
+local ollama model (`summarizer.provider: ollama`, default qubit-brain), and speaks ONLY the summary.
 The phone/dashboard shows the raw result as reference, but the voice never
 reads it out. Zero API cost, ~0.3s for the compression step.
 
@@ -305,7 +293,7 @@ Full reference: `config/voice.example.yaml` (installed to
 | `asr.provider` / `asr.engine` | `sherpa` / `moonshine` | `parakeet` = max English accuracy; `whisper` = old fallback |
 | `vad.backend` | `silero` | `webrtc` fallback |
 | `tts.provider` | `piper` | `kokoro` = quality voice (~1s/reply CPU) |
-| `intent.local_llm.model` | `qubit-brain4` | local short-turn model (non-thinking) |
+| `intent.local_llm.model` | `qubit-brain` | local short-turn model (non-thinking) |
 | `speaker_verify.threshold` | `0.65` | voice-ID strictness (0.7-0.96 self / ~0.3 strangers) |
 | `mic.gain` / `mic.channels` | `1.0` / `1` | tune to YOUR mic (~3.0 mono suits USB headsets; high gain adds hiss) |
 | `safety.dry_run_first` | `false` | `true` = coding tasks plan first, ask before applying |
