@@ -684,7 +684,8 @@ class VoiceOrb:
         _prev_state = str(getattr(self, "state", ""))
         if status is not None:
             raw = _state.resolve_orb_state(status, events, time.time(),
-                                           heartbeat=heartbeat)
+                                           heartbeat=heartbeat,
+                                           now_mono=time.monotonic())
             try:
                 if self._display is not None:
                     self.state = self._display.update(

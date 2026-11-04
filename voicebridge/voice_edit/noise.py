@@ -110,6 +110,26 @@ def resolve_capture_device(cfg: Any) -> str:
         mode = "auto"
     if mode == "aec":
         return ensure(cfg)
+    # ``mic.device_name`` is the stable input-name pin (the same one the
+    # orchestrator re-asserts before every capture). Honour it here so the
+    # desktop helper and the wake loop — both resolve their capture device
+    # through this function — record the configured source even when they are
+    # started without the orchestrator's per-capture re-pin. The pin returns
+    # the matched Pulse source (partial/display names are normalised); an
+    # unmatched name stays a no-op so capture follows the default, never a
+    # guessed device.
+    try:
+        mic_name = str(cfg.get("mic", "device_name", default="") or "").strip()
+    except Exception:
+        mic_name = ""
+    if mic_name:
+        try:
+            from ..audio.mic import pin_pulse_default_source
+            pinned = pin_pulse_default_source(mic_name)
+        except Exception:
+            pinned = None
+        if pinned:
+            return pinned
     # "auto" and "raw" both use the plain device: its native capture already
     # reaches a usable level, while the echo-cancel source measured ~8x quieter.
     # When noise_suppression is ON the raw device is kept AND the software
