@@ -268,6 +268,15 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/plugin-catalog" = "voicebridge/_data/qubit_runtime/plugin-catalog"
 "qubit_runtime/cron" = "voicebridge/_data/qubit_runtime/cron"
 "qubit_runtime/providers" = "voicebridge/_data/qubit_runtime/providers"
+# Runtime packages imported by the CLI/runtime: roles (``qubit agent``),
+# recipes (``qubit recipe``), traces/evals (``qubit traces``/``qubit evals``/
+# ``qubit optimize``) and connectors (``qubit connectors``). Without these the
+# wheel installs but the corresponding commands fail at import.
+"qubit_runtime/roles" = "voicebridge/_data/qubit_runtime/roles"
+"qubit_runtime/recipes" = "voicebridge/_data/qubit_runtime/recipes"
+"qubit_runtime/traces" = "voicebridge/_data/qubit_runtime/traces"
+"qubit_runtime/evals" = "voicebridge/_data/qubit_runtime/evals"
+"qubit_runtime/connectors" = "voicebridge/_data/qubit_runtime/connectors"
 "qubit_runtime/ui-tui" = "voicebridge/_data/qubit_runtime/ui-tui"
 "qubit_runtime/tui_gateway" = "voicebridge/_data/qubit_runtime/tui_gateway"
 "qubit_runtime/native" = "voicebridge/_data/qubit_runtime/native"
@@ -347,6 +356,45 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/toolsets.py" = "voicebridge/_data/qubit_runtime/toolsets.py"
 "qubit_runtime/trajectory_compressor.py" = "voicebridge/_data/qubit_runtime/trajectory_compressor.py"
 "qubit_runtime/utils.py" = "voicebridge/_data/qubit_runtime/utils.py"
+"qubit_runtime/hermes_constants.py" = "voicebridge/_data/qubit_runtime/hermes_constants.py"
+"qubit_runtime/hermes_constants_scratch_detach.py" = "voicebridge/_data/qubit_runtime/hermes_constants_scratch_detach.py"
+"qubit_runtime/qubit_constants_scratch_detach.py" = "voicebridge/_data/qubit_runtime/qubit_constants_scratch_detach.py"
+"qubit_runtime/qubit_constants_scratch_stuck.py" = "voicebridge/_data/qubit_runtime/qubit_constants_scratch_stuck.py"
+"qubit_runtime/qubit_dir_acl.py" = "voicebridge/_data/qubit_runtime/qubit_dir_acl.py"
+"qubit_runtime/qubit_state_api_content.py" = "voicebridge/_data/qubit_runtime/qubit_state_api_content.py"
+"qubit_runtime/qubit_state_compaction_display.py" = "voicebridge/_data/qubit_runtime/qubit_state_compaction_display.py"
+"qubit_runtime/qubit_state_coverage.py" = "voicebridge/_data/qubit_runtime/qubit_state_coverage.py"
+"qubit_runtime/qubit_state_detached_results.py" = "voicebridge/_data/qubit_runtime/qubit_state_detached_results.py"
+"qubit_runtime/qubit_state_identity.py" = "voicebridge/_data/qubit_runtime/qubit_state_identity.py"
+"qubit_runtime/qubit_state_keys.py" = "voicebridge/_data/qubit_runtime/qubit_state_keys.py"
+"qubit_runtime/qubit_state_local.py" = "voicebridge/_data/qubit_runtime/qubit_state_local.py"
+"qubit_runtime/qubit_state_local_lineage.py" = "voicebridge/_data/qubit_runtime/qubit_state_local_lineage.py"
+"qubit_runtime/qubit_state_local_migration.py" = "voicebridge/_data/qubit_runtime/qubit_state_local_migration.py"
+"qubit_runtime/qubit_state_media.py" = "voicebridge/_data/qubit_runtime/qubit_state_media.py"
+"qubit_runtime/qubit_state_mutation_binding.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_binding.py"
+"qubit_runtime/qubit_state_mutation_branch.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_branch.py"
+"qubit_runtime/qubit_state_mutation_chat_pick.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_chat_pick.py"
+"qubit_runtime/qubit_state_mutation_compress.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_compress.py"
+"qubit_runtime/qubit_state_mutation_guards.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_guards.py"
+"qubit_runtime/qubit_state_mutation_prepared.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_prepared.py"
+"qubit_runtime/qubit_state_mutation_reset.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_reset.py"
+"qubit_runtime/qubit_state_mutation_retirement.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_retirement.py"
+"qubit_runtime/qubit_state_mutation_transcript.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutation_transcript.py"
+"qubit_runtime/qubit_state_mutations.py" = "voicebridge/_data/qubit_runtime/qubit_state_mutations.py"
+"qubit_runtime/qubit_state_pidns.py" = "voicebridge/_data/qubit_runtime/qubit_state_pidns.py"
+"qubit_runtime/qubit_state_prompt_refresh.py" = "voicebridge/_data/qubit_runtime/qubit_state_prompt_refresh.py"
+"qubit_runtime/qubit_state_prune_rewrite.py" = "voicebridge/_data/qubit_runtime/qubit_state_prune_rewrite.py"
+"qubit_runtime/qubit_state_reconcile.py" = "voicebridge/_data/qubit_runtime/qubit_state_reconcile.py"
+"qubit_runtime/qubit_state_runtime.py" = "voicebridge/_data/qubit_runtime/qubit_state_runtime.py"
+"qubit_runtime/qubit_state_runtime_workers.py" = "voicebridge/_data/qubit_runtime/qubit_state_runtime_workers.py"
+"qubit_runtime/qubit_state_session_list.py" = "voicebridge/_data/qubit_runtime/qubit_state_session_list.py"
+"qubit_runtime/qubit_state_sessions_model_config.py" = "voicebridge/_data/qubit_runtime/qubit_state_sessions_model_config.py"
+"qubit_runtime/qubit_state_terminal.py" = "voicebridge/_data/qubit_runtime/qubit_state_terminal.py"
+"qubit_runtime/qubit_state_todo.py" = "voicebridge/_data/qubit_runtime/qubit_state_todo.py"
+"qubit_runtime/qubit_state_tool_retries.py" = "voicebridge/_data/qubit_runtime/qubit_state_tool_retries.py"
+"qubit_runtime/qubit_state_worker_compression.py" = "voicebridge/_data/qubit_runtime/qubit_state_worker_compression.py"
+"qubit_runtime/qubit_state_worker_context.py" = "voicebridge/_data/qubit_runtime/qubit_state_worker_context.py"
+"qubit_runtime/qubit_state_worker_lifecycle.py" = "voicebridge/_data/qubit_runtime/qubit_state_worker_lifecycle.py"
 "qubit_runtime/LICENSE" = "voicebridge/_data/qubit_runtime/LICENSE"
 "qubit_runtime/pyproject.toml" = "voicebridge/_data/qubit_runtime/pyproject.toml"
 # ``qubit_runtime.status()`` reads the provenance manifest from the canonical
@@ -354,6 +402,14 @@ path = "scripts/hatch_build_qubit.py"
 # fallback (see voicebridge/qubit_runtime.manifest_path()); ship the canonical
 # manifest at the archive destination so a clean install reports
 # upstream_revision/patched/file_count.
+#
+# BLOCKED: the generated manifest is absent from this checkout and the pinned
+# upstream tree needed to regenerate it is not available. It is intentionally
+# not fabricated and the force-include below is omitted until it is recovered
+# and verified, so status() honestly reports no revision instead of a stale
+# record. Restore this mapping once a fresh manifest exists:
+#   "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json" =
+#       "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
 # Wave 5: ship the small, secret-free matrices/docs that install-time code
 # reads. They land under package data so the resolver can reach them with the
 # installed path preferred and the checkout as fallback. voicebridge/
@@ -499,10 +555,41 @@ exclude = [
   "opencode.json.backup",
   "deintegratecuritate.md",
   "docs/OPENCODE_WORKFLOW.md",
+  # Live/internal docs that still record the developer's real home path.
+  # They stay in the repo (and every explicitly force-included doc above still
+  # ships), but the release sdist must not sweep these working-tree copies in.
+  "docs/ASSET_VERIFICATION.md",
+  "docs/BROWSER-PARITY-FINDINGS.md",
+  "docs/HANDOFF_PROMPT.md",
+  "docs/HERMES_RESIDUE_INVENTORY.md",
+  "docs/MATRIX-BASELINE-2026-10-27.md",
+  "docs/MATRIX-READINESS-2026-10-30.md",
+  "docs/MATRIX-W69-2026-10-28.md",
+  "docs/OFFICE-ACCEPTANCE-AND-RISK.md",
+  "docs/OFFICE-ACCEPTANCE-CLOSEOUT.md",
+  "docs/OFFICE-ACCEPTANCE-VERIFIED-2026-10-16.md",
+  "docs/OFFICE-DOC-RECONCILIATION.md",
+  "docs/OFFICE-GROWTH-REPORT.md",
+  "docs/OFFICE-INVARIANT-AUDIT.md",
+  "docs/OFFICE-INVARIANT-FIX-VERIFICATION.md",
+  "docs/OFFICE-SURFACE-SECURITY-AUDIT.md",
+  "docs/OFFICE23_SPEC.md",
+  "docs/OMNIROUTE_CHAT_FALLBACK.md",
+  "docs/OPEN_THREADS.md",
+  "docs/PHASE8-SIGNOFF-PACK.md",
+  "docs/POST_RESTART_VERIFICATION_2026-10-10.md",
+  "docs/REBRAND_AUDIT.md",
+  "docs/REBRAND_INVENTORY.md",
+  "docs/RETIREMENT-READINESS.md",
+  "docs/STARNET_VOICE_STUDY.md",
+  "docs/TEST-HONESTY-AUDIT.md",
+  "docs/TEST_PORT_RECOVERY_2026-10-19.md",
+  "docs/VOICE-BRIDGE-AUDIT.md",
+  "docs/game-office",
   # The whole vendored fork is excluded from the default sdist tree walk; the
   # runtime subset is force-included below at its original qubit_runtime/
   # layout (mirrors the wheel subset) so the sdist still rebuilds the wheel
-  # without shipping the fork's tests/, apps/, website/, evals/, lockfiles, etc.
+  # without shipping the fork's tests/, apps/, website/, lockfiles, etc.
   "qubit_runtime",
 ]
 
@@ -510,6 +597,9 @@ exclude = [
 # Files land at their original qubit_runtime/ paths so a wheel can be rebuilt
 # from the sdist with the wheel force-include table above.
 [tool.hatch.build.targets.sdist.force-include]
+# The generated provenance manifest is currently absent (see the wheel note);
+# no mapping is declared until it exists, so the sdist never promises a file
+# it cannot carry.
 "qubit_runtime/qubit_cli" = "qubit_runtime/qubit_cli"
 "qubit_runtime/agent" = "qubit_runtime/agent"
 "qubit_runtime/tools" = "qubit_runtime/tools"
@@ -524,6 +614,13 @@ exclude = [
 "qubit_runtime/plugin-catalog" = "qubit_runtime/plugin-catalog"
 "qubit_runtime/cron" = "qubit_runtime/cron"
 "qubit_runtime/providers" = "qubit_runtime/providers"
+# Mirror the wheel's runtime packages: roles/recipes/traces/evals/connectors
+# are imported by CLI commands and must survive a wheel rebuilt from the sdist.
+"qubit_runtime/roles" = "qubit_runtime/roles"
+"qubit_runtime/recipes" = "qubit_runtime/recipes"
+"qubit_runtime/traces" = "qubit_runtime/traces"
+"qubit_runtime/evals" = "qubit_runtime/evals"
+"qubit_runtime/connectors" = "qubit_runtime/connectors"
 "qubit_runtime/ui-tui" = "qubit_runtime/ui-tui"
 "qubit_runtime/tui_gateway" = "qubit_runtime/tui_gateway"
 "qubit_runtime/native" = "qubit_runtime/native"
@@ -590,6 +687,45 @@ exclude = [
 "qubit_runtime/toolsets.py" = "qubit_runtime/toolsets.py"
 "qubit_runtime/trajectory_compressor.py" = "qubit_runtime/trajectory_compressor.py"
 "qubit_runtime/utils.py" = "qubit_runtime/utils.py"
+"qubit_runtime/hermes_constants.py" = "qubit_runtime/hermes_constants.py"
+"qubit_runtime/hermes_constants_scratch_detach.py" = "qubit_runtime/hermes_constants_scratch_detach.py"
+"qubit_runtime/qubit_constants_scratch_detach.py" = "qubit_runtime/qubit_constants_scratch_detach.py"
+"qubit_runtime/qubit_constants_scratch_stuck.py" = "qubit_runtime/qubit_constants_scratch_stuck.py"
+"qubit_runtime/qubit_dir_acl.py" = "qubit_runtime/qubit_dir_acl.py"
+"qubit_runtime/qubit_state_api_content.py" = "qubit_runtime/qubit_state_api_content.py"
+"qubit_runtime/qubit_state_compaction_display.py" = "qubit_runtime/qubit_state_compaction_display.py"
+"qubit_runtime/qubit_state_coverage.py" = "qubit_runtime/qubit_state_coverage.py"
+"qubit_runtime/qubit_state_detached_results.py" = "qubit_runtime/qubit_state_detached_results.py"
+"qubit_runtime/qubit_state_identity.py" = "qubit_runtime/qubit_state_identity.py"
+"qubit_runtime/qubit_state_keys.py" = "qubit_runtime/qubit_state_keys.py"
+"qubit_runtime/qubit_state_local.py" = "qubit_runtime/qubit_state_local.py"
+"qubit_runtime/qubit_state_local_lineage.py" = "qubit_runtime/qubit_state_local_lineage.py"
+"qubit_runtime/qubit_state_local_migration.py" = "qubit_runtime/qubit_state_local_migration.py"
+"qubit_runtime/qubit_state_media.py" = "qubit_runtime/qubit_state_media.py"
+"qubit_runtime/qubit_state_mutation_binding.py" = "qubit_runtime/qubit_state_mutation_binding.py"
+"qubit_runtime/qubit_state_mutation_branch.py" = "qubit_runtime/qubit_state_mutation_branch.py"
+"qubit_runtime/qubit_state_mutation_chat_pick.py" = "qubit_runtime/qubit_state_mutation_chat_pick.py"
+"qubit_runtime/qubit_state_mutation_compress.py" = "qubit_runtime/qubit_state_mutation_compress.py"
+"qubit_runtime/qubit_state_mutation_guards.py" = "qubit_runtime/qubit_state_mutation_guards.py"
+"qubit_runtime/qubit_state_mutation_prepared.py" = "qubit_runtime/qubit_state_mutation_prepared.py"
+"qubit_runtime/qubit_state_mutation_reset.py" = "qubit_runtime/qubit_state_mutation_reset.py"
+"qubit_runtime/qubit_state_mutation_retirement.py" = "qubit_runtime/qubit_state_mutation_retirement.py"
+"qubit_runtime/qubit_state_mutation_transcript.py" = "qubit_runtime/qubit_state_mutation_transcript.py"
+"qubit_runtime/qubit_state_mutations.py" = "qubit_runtime/qubit_state_mutations.py"
+"qubit_runtime/qubit_state_pidns.py" = "qubit_runtime/qubit_state_pidns.py"
+"qubit_runtime/qubit_state_prompt_refresh.py" = "qubit_runtime/qubit_state_prompt_refresh.py"
+"qubit_runtime/qubit_state_prune_rewrite.py" = "qubit_runtime/qubit_state_prune_rewrite.py"
+"qubit_runtime/qubit_state_reconcile.py" = "qubit_runtime/qubit_state_reconcile.py"
+"qubit_runtime/qubit_state_runtime.py" = "qubit_runtime/qubit_state_runtime.py"
+"qubit_runtime/qubit_state_runtime_workers.py" = "qubit_runtime/qubit_state_runtime_workers.py"
+"qubit_runtime/qubit_state_session_list.py" = "qubit_runtime/qubit_state_session_list.py"
+"qubit_runtime/qubit_state_sessions_model_config.py" = "qubit_runtime/qubit_state_sessions_model_config.py"
+"qubit_runtime/qubit_state_terminal.py" = "qubit_runtime/qubit_state_terminal.py"
+"qubit_runtime/qubit_state_todo.py" = "qubit_runtime/qubit_state_todo.py"
+"qubit_runtime/qubit_state_tool_retries.py" = "qubit_runtime/qubit_state_tool_retries.py"
+"qubit_runtime/qubit_state_worker_compression.py" = "qubit_runtime/qubit_state_worker_compression.py"
+"qubit_runtime/qubit_state_worker_context.py" = "qubit_runtime/qubit_state_worker_context.py"
+"qubit_runtime/qubit_state_worker_lifecycle.py" = "qubit_runtime/qubit_state_worker_lifecycle.py"
 "qubit_runtime/LICENSE" = "qubit_runtime/LICENSE"
 "qubit_runtime/pyproject.toml" = "qubit_runtime/pyproject.toml"
 

@@ -69,7 +69,7 @@ def test_force_included_sources_exist_and_hold_their_runtime_payload():
         assert root.is_dir(), source
         assert any(p.is_file() for p in root.rglob("*")), source
     # the trees carry the exact files their readers expect
-    assert (REPO / "qubit_runtime/optional-mcps/n8n/manifest.yaml").is_file()
+    assert (REPO / "qubit_runtime/optional-mcps/n8n-official/manifest.yaml").is_file()
     assert any((REPO / "qubit_runtime/plugin-catalog").glob("*.yaml"))
     assert (REPO / "qubit_runtime/acp_adapter/entry.py").is_file()
 
@@ -98,20 +98,23 @@ def _script_targets() -> dict:
 
 def test_qubit_acp_script_points_at_the_packaged_vendored_entry():
     scripts = _script_targets()
-    assert scripts.get("qubit-acp") == "acp_adapter.entry:main"
-    module_path, _, attr = scripts["qubit-acp"].partition(":")
-    assert attr, scripts["qubit-acp"]
+    # The console script goes through the product wrapper so it can pin
+    # QUBIT_HOME/sys.path before importing the vendored adapter from package
+    # data; the wrapper delegates to ``acp_adapter.entry:main``.
+    assert scripts.get("qubit-acp") == "voicebridge.qubit_runtime:acp_entry"
+    wrapper = REPO / "voicebridge" / "qubit_runtime.py"
+    assert wrapper.is_file(), wrapper
+    wrapper_text = wrapper.read_text(encoding="utf-8")
+    assert "from acp_adapter.entry import main" in wrapper_text
 
-    # Resolve ``acp_adapter.entry`` to the real vendored source file and prove
-    # the callable exists (AST, no import of the vendored runtime).
-    source = REPO / "qubit_runtime" / Path(*module_path.split(".")).with_suffix(".py")
+    source = REPO / "qubit_runtime" / "acp_adapter" / "entry.py"
     assert source.is_file(), source
     tree = ast.parse(source.read_text(encoding="utf-8"))
     callables = {
         node.name for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert attr in callables, (attr, sorted(callables))
+    assert "main" in callables, sorted(callables)
     # the adapter is a package, not a loose module
     assert (source.parent / "__init__.py").is_file()
 

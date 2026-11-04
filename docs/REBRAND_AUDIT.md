@@ -91,7 +91,7 @@ path category, token shape, and a known-deliberate wire-contract allowlist. Buck
 ### (a) CLI `qubit --help` — **CLEAN**
 - METHOD: ran `python3 -m voicebridge.cli --help` **and every one of the 115 subcommands' `--help`**,
   grep `-i hermes`.
-- RESULT: **0 user-visible `hermes` strings**. `qubit --version` prints `qubit 1.0.0`.
+- RESULT: **0 user-visible `hermes` strings**. `qubit --version` prints `qubit 0.0.1`.
 - (`voicebridge.cli:main` is the `qubit` entry point per `pyproject.toml:173`.)
 
 ### (b) Dashboard `frontend/qubit-web/src/**/*.tsx` — **CLEAN for user-visible text**

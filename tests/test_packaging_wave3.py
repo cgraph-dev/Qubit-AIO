@@ -123,7 +123,7 @@ def test_every_runtime_resource_is_reachable_from_package_data():
         "config/local-actions.example.yaml":
             "config/local-actions.example.yaml",
         "docs/archive/2026-09-21/QUBIT_MIGRATION.md":
-            "docs/archive/2026-09-21/QUBIT_MIGRATION.md",
+            "docs/MIGRATION.md",
         # Canonical vendor-manifest source is docs/generated/ (Owner Decision
         # #24: docs/archive/ is historical-only); the installed destination is
         # unchanged so qubit_runtime.manifest_path() keeps resolving.
