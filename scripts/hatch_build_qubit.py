@@ -20,12 +20,22 @@ This hook:
 It is a no-op on a clean clone (no dev trees present) and keeps every
 runtime-served file. It touches no static ``pyproject.toml`` mapping, so the
 packaging contract tests that read the mapping table are unaffected.
+
+A public release candidate exported by ``scripts/export_public_tree.py``
+intentionally omits some internal docs/provenance sources that the full wheel
+force-includes.  In that tree only (detected by the exported manifest) the
+hook drops those known sources so the snapshot can build; any other missing
+source still raises.  See ``scripts/public_export_packaging.py``.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from public_export_packaging import drop_missing_optional_sources  # noqa: E402
 
 # Directory names that are dev/build-only at ANY depth. ``node_modules`` is the
 # big one; the dot-caches are editor/bundler scratch. Plugin bundles under
@@ -74,6 +84,25 @@ class CustomBuildHook(BuildHookInterface):
         root = Path(self.root)
         force = build_data.setdefault("force_include", {})
         added = 0
+
+        # Static ``pyproject.toml`` force-include entries live in the builder
+        # config, not in ``build_data`` (which can only add/override), so wrap
+        # ``get_force_include`` to drop the public export's known omissions.
+        config = self.build_config
+        if not getattr(config, "_qubit_public_export_filtered", False):
+            original = config.get_force_include
+
+            def _filtered_force_include():
+                mapping = original()
+                dropped = drop_missing_optional_sources(root, mapping)
+                if dropped:
+                    self.app.display_info(
+                        "[qubit] public export omits intentionally-internal "
+                        f"force-include source(s): {dropped}")
+                return mapping
+
+            config.get_force_include = _filtered_force_include
+            config._qubit_public_export_filtered = True
 
         if self.target_name == "wheel":
             # The wheel reparents the frontend tree under ``_data``; stage it
