@@ -1084,7 +1084,11 @@ print_next_steps() {
   echo "    $VENV/bin/python -m voicebridge run        # hotkey PTT loop"
   echo "    $VENV/bin/python -m voicebridge enroll     # enroll YOUR voice (voice-ID)"
   echo
-  echo "    Auto-start instead?  $0 --with-systemd"
+  if [ "${QUBIT_BOOTSTRAP:-0}" = "1" ]; then
+    echo "    Auto-start instead?  re-run the bootstrap with --with-systemd"
+  else
+    echo "    Auto-start instead?  $0 --with-systemd"
+  fi
 }
 
 # ---------------------------------------------------------------- main flow

@@ -92,7 +92,7 @@ temporary directory.
 
 `--profile NAME` is exported to the verified installer as `QUBIT_PROFILE`;
 `--prefix DIR` is forwarded as `--prefix DIR`. `--without-models`,
-`--without-dashboard`, and `--yes` are forwarded too. A bootstrapped install
+`--without-dashboard`, `--yes`, and `--with-systemd` are forwarded too. A bootstrapped install
 puts its venv under the persistent `$QUBIT_HOME`, so the launcher remains valid
 after the temporary extraction is removed.
 

@@ -30,6 +30,7 @@ CHECKSUM_FILE=""
 WITHOUT_MODELS=0
 WITHOUT_DASHBOARD=0
 ASSUME_YES=0
+WITH_SYSTEMD=0
 BASE=""
 
 usage() {
@@ -54,6 +55,7 @@ Options:
   --without-dashboard
                      skip the dashboard build (forwarded to the installer)
   --yes              non-interactive install (forwarded to the installer)
+  --with-systemd     install/enable the user services (forwarded)
   --archive NAME     release source archive file name under <release-base>
                      (default: qubit-release.tar.gz)
   --checksum FILE    use FILE instead of <release-base>/SHA256SUMS
@@ -143,6 +145,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --yes|-y)
       ASSUME_YES=1
+      ;;
+    --with-systemd)
+      WITH_SYSTEMD=1
       ;;
     --)
       shift
@@ -527,6 +532,7 @@ fi
 [ "$WITHOUT_MODELS" = "1" ] && INSTALL_ARGS+=("--without-models")
 [ "$WITHOUT_DASHBOARD" = "1" ] && INSTALL_ARGS+=("--without-dashboard")
 [ "$ASSUME_YES" = "1" ] && INSTALL_ARGS+=("--yes")
+[ "$WITH_SYSTEMD" = "1" ] && INSTALL_ARGS+=("--with-systemd")
 if [ -n "$PROFILE" ]; then
   export QUBIT_PROFILE="$PROFILE"
 fi
