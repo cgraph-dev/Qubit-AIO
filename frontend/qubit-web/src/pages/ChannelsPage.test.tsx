@@ -145,7 +145,7 @@ async function renderChannels() {
 beforeEach(() => {
   for (const fn of Object.values(apiMocks)) fn.mockReset();
   apiMocks.getMessagingPlatforms.mockResolvedValue({
-    env_path: "/home/u/.local/state/qubit-voicebridge/runtime/.env",
+    env_path: "/home/example/.local/state/qubit-voicebridge/runtime/.env",
     gateway_start_command: "qubit gateway start",
     platforms: [platform()],
   });
@@ -237,7 +237,7 @@ describe("ChannelsPage broker-confirm round-trip (audit AI10 item 1)", () => {
 describe("ChannelsPage reference-only credentials (audit AI10 item 2)", () => {
   it("refuses a raw secret client-side before any PUT and shows the reference contract", async () => {
     apiMocks.getMessagingPlatforms.mockResolvedValue({
-      env_path: "/home/u/.local/state/qubit-voicebridge/runtime/.env",
+      env_path: "/home/example/.local/state/qubit-voicebridge/runtime/.env",
       gateway_start_command: "qubit gateway start",
       platforms: [
         platform({
@@ -274,7 +274,7 @@ describe("ChannelsPage reference-only credentials (audit AI10 item 2)", () => {
 
   it("shows the read-back is_set state as a stored-reference badge", async () => {
     apiMocks.getMessagingPlatforms.mockResolvedValue({
-      env_path: "/home/u/.local/state/qubit-voicebridge/runtime/.env",
+      env_path: "/home/example/.local/state/qubit-voicebridge/runtime/.env",
       gateway_start_command: "qubit gateway start",
       platforms: [
         platform({
@@ -302,7 +302,7 @@ describe("ChannelsPage reference-only credentials (audit AI10 item 2)", () => {
 describe("ChannelsPage connected-state copy", () => {
   it("hides a stale install hint beside a connected channel", async () => {
     apiMocks.getMessagingPlatforms.mockResolvedValue({
-      env_path: "/home/u/.local/state/qubit-voicebridge/runtime/.env",
+      env_path: "/home/example/.local/state/qubit-voicebridge/runtime/.env",
       gateway_start_command: "qubit gateway start",
       platforms: [
         platform({

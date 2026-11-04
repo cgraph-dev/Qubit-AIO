@@ -120,8 +120,8 @@ const apiMocks = vi.hoisted(() => ({
   getChatWorkspaces: vi.fn(async () => ({
     projects: [],
     repos: [],
-    default_cwd: "/home/trick",
-    home: "/home/trick",
+    default_cwd: "/home/example",
+    home: "/home/example",
     scan_enabled: false,
   })),
 }));
@@ -511,13 +511,13 @@ describe("Qubit TerminalChatPage right-side panel", () => {
   it("restores the picked workspace after a refresh", async () => {    // Regression: the WORKSPACE picker reset to Default on every refresh
     // (plain useState), silently moving the next fresh chat's directory.
     // The pick is per-tab persisted, so a remount restores it.
-    window.sessionStorage.setItem("qubit.chat.workspace", "/home/trick/Projects");
+    window.sessionStorage.setItem("qubit.chat.workspace", "/home/example/Projects");
     await renderTerminal();
     await vi.waitFor(() =>
       expect(container.textContent).toContain("Panel session"),
     );
     expect(window.sessionStorage.getItem("qubit.chat.workspace")).toBe(
-      "/home/trick/Projects",
+      "/home/example/Projects",
     );
     window.sessionStorage.removeItem("qubit.chat.workspace");
   });

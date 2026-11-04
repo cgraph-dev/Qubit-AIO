@@ -56,6 +56,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -111,9 +112,56 @@ def _run(cmd: list[str], timeout: int, cwd: Path | None = None,
                           cwd=str(cwd) if cwd else None, env=env)
 
 
-def static_report() -> dict:
+def static_report(tag: str | None = None) -> dict:
     from voicebridge import release as R
-    return R.certify(REPO)
+    return R.certify(REPO, tag=tag)
+
+
+def resolve_release_tag(explicit: str | None = None) -> str | None:
+    """The release tag to bind the version identity to.
+
+    Precedence: ``--tag``, ``QUBIT_RELEASE_TAG``, then ``GITHUB_REF_NAME`` when
+    it is a ``v*`` tag. A branch name is never treated as a release tag.
+    """
+    if explicit:
+        return explicit.strip() or None
+    env_tag = (os.environ.get("QUBIT_RELEASE_TAG") or "").strip()
+    if env_tag:
+        return env_tag
+    ref = (os.environ.get("GITHUB_REF_NAME") or "").strip()
+    if ref.startswith("v") and len(ref) > 1:
+        return ref
+    return None
+
+
+def _artifact_metadata_version(artifact: Path) -> str | None:
+    """Read ``Version:`` from a wheel METADATA or sdist PKG-INFO member."""
+    try:
+        if str(artifact).endswith((".whl", ".zip")):
+            with zipfile.ZipFile(artifact) as z:
+                for name in z.namelist():
+                    if name.endswith(".dist-info/METADATA"):
+                        text = z.read(name).decode("utf-8", "replace")
+                        return _metadata_version(text)
+        elif str(artifact).endswith((".tar.gz", ".tgz")):
+            import tarfile
+            with tarfile.open(artifact, "r:gz") as t:
+                for member in t.getmembers():
+                    if member.isfile() and member.name.endswith("/PKG-INFO"):
+                        f = t.extractfile(member)
+                        if f is not None:
+                            return _metadata_version(
+                                f.read().decode("utf-8", "replace"))
+    except Exception:
+        return None
+    return None
+
+
+def _metadata_version(text: str) -> str | None:
+    for line in text.splitlines():
+        if line.startswith("Version:"):
+            return line.split(":", 1)[1].strip() or None
+    return None
 
 
 def tree_clean_state() -> dict:
@@ -187,6 +235,7 @@ def build_artifacts(out_dir: Path) -> dict:
 
 def inspect_artifacts(build_dir: Path) -> dict:
     from voicebridge import release as R
+    expected_version = R.version_identity(REPO)["pyproject_version"]
     records = []
     all_ok = True
     for name in ("wheel", "sdist"):
@@ -212,6 +261,9 @@ def inspect_artifacts(build_dir: Path) -> dict:
         forbidden = [m for m in raw_forbidden if not _is_vendored_member(m)]
         vendored_exempt = len(raw_forbidden) - len(forbidden)
         content = R.artifact_content_scan(art)
+        metadata_version = _artifact_metadata_version(art)
+        version_ok = (metadata_version is None
+                      or metadata_version == expected_version)
 
         def _is_fixture(rel: str) -> bool:
             # tests/ and the eval corpus intentionally contain fake/example
@@ -252,6 +304,10 @@ def inspect_artifacts(build_dir: Path) -> dict:
             reasons.append(
                 f"non-generic personal path in core/docs/tests: "
                 f"core={bad_core} noncore={bad_noncore}")
+        if not version_ok:
+            reasons.append(
+                f"artifact metadata Version={metadata_version} != "
+                f"pyproject.version={expected_version}")
         dirty_private = bool(reasons)
         # Packet 8K closure: verify the ACTUAL detached signature (never
         # fabricate one). NOT_SIGNED is a typed result, not a pass.
@@ -261,6 +317,9 @@ def inspect_artifacts(build_dir: Path) -> dict:
             "file": art.name,
             "size_bytes": art.stat().st_size,
             "sha256": R.sha256(art),
+            "metadata_version": metadata_version,
+            "expected_version": expected_version,
+            "version_matches": version_ok,
             "members": len(members),
             "forbidden_members": forbidden,
             "vendored_members_exempt": vendored_exempt,
@@ -352,6 +411,20 @@ def install_step(out_dir: Path) -> dict:
         checks.append(run_check(
             f"import.{mod}",
             py + ["-c", f"import {mod}"]))
+
+    # installed distribution version must equal the project version (proves the
+    # wheel metadata and the package __version__ agree with pyproject/tag).
+    expected_version = R.version_identity()["pyproject_version"]
+    version_code = (
+        "import importlib.metadata as md, sys;\n"
+        "import voicebridge;\n"
+        f"expected = {expected_version!r};\n"
+        "dist = md.version('qubit-voicebridge');\n"
+        "assert voicebridge.__version__ == expected, (voicebridge.__version__, expected);\n"
+        "assert dist == expected, (dist, expected);\n"
+        "print('version-ok', dist);\n"
+    )
+    checks.append(run_check("version.installed", py + ["-c", version_code]))
 
     # entry points + module entry (canonical `qubit` launcher included)
     checks.append(run_check("entrypoint.voicebridge", py + ["-m", "voicebridge",
@@ -465,8 +538,15 @@ def reproduce_step(out_dir: Path) -> dict:
         b1 = out_dir / "build1"
         b2 = out_dir / "build2"
         b2.mkdir(parents=True, exist_ok=True)
-        _run([sys.executable, "-m", "build", "--wheel", "--outdir", str(b2),
-              str(REPO)], timeout=900)
+        r = _run([sys.executable, "-m", "build", "--wheel", "--outdir", str(b2),
+                  str(REPO)], timeout=900)
+        if r.returncode != 0:
+            # Same uv fallback as build_artifacts: a uv-managed venv may ship
+            # without pip/build.
+            uv = shutil.which("uv")
+            if uv:
+                _run([uv, "build", "--wheel", "--out-dir", str(b2), str(REPO)],
+                     timeout=900)
         wheels1 = sorted(b1.glob("*.whl"))
         wheels2 = sorted(b2.glob("*.whl"))
         if not wheels1 or not wheels2:
@@ -542,6 +622,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--all", action="store_true", help="static+build+install+reproduce+sign+verify")
     ap.add_argument("--out", type=Path, default=None,
                     help="artifact/report dir (default ./dist/release-8k)")
+    ap.add_argument("--tag", default=None,
+                    help="release tag to bind the version identity to "
+                         "(e.g. v0.0.1); defaults to QUBIT_RELEASE_TAG or a "
+                         "v* GITHUB_REF_NAME")
     ap.add_argument("--json", action="store_true", help="print JSON report")
     ap.add_argument("--allow-dirty", action="store_true",
                     help="explicitly build/inspect artifacts from a DIRTY tree "
@@ -561,6 +645,28 @@ def main(argv: list[str] | None = None) -> int:
     any_step = any((args.static, args.build, args.install, args.reproduce,
                     args.sign, args.verify_signatures, args.all))
     report: dict = {"packet": "8K", "out_dir": str(out_dir), "steps": {}}
+
+    # Version identity: the tag, root pyproject version, and
+    # voicebridge.__version__ must agree. Missing tag is allowed for a
+    # non-release diagnostic; a supplied tag must be v<version>.
+    from voicebridge import release as R
+    tag = resolve_release_tag(args.tag)
+    version = R.version_identity(REPO, tag)
+    report["release_tag"] = tag
+    report["version_identity"] = version
+    artifact_requested = bool(args.build or args.install or args.reproduce
+                              or args.sign or args.all)
+    if version["state"] != "OK" and artifact_requested:
+        detail = f"release version identity mismatch: {version['detail']}"
+        report["verdict"] = "FAIL"
+        for name in ("build", "install", "reproduce", "sign"):
+            report["steps"][name] = {"state": "FAIL", "detail": detail}
+        if args.json:
+            _print_report(report)
+        else:
+            print(f"verdict: {report['verdict']}")
+            print(f"  FAIL — {detail}")
+        return EXIT_FAIL
 
     # Packet 8K closure: a dirty tree can never yield a clean release. The
     # static hermetic diagnostic is allowed (it records provenance), but the
@@ -592,7 +698,7 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_BLOCKED
 
     if args.all or args.static or not any_step:
-        report["steps"]["static"] = static_report()
+        report["steps"]["static"] = static_report(tag)
     if args.all or args.build:
         report["steps"]["build"] = build_step(out_dir)
     if args.all or args.install:
@@ -610,6 +716,7 @@ def main(argv: list[str] | None = None) -> int:
     # DEGRADED is typed (never a silent pass).
     states = [s.get("state") for s in report["steps"].values()
               if isinstance(s, dict) and "state" in s]
+    states.append(version["state"])
     if "static" in report["steps"] and "state" not in report["steps"]["static"]:
         try:
             from voicebridge import release as R

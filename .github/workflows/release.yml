@@ -59,11 +59,48 @@ jobs:
       - name: Install build tooling
         run: python -m pip install --upgrade pip build
       - name: Build, install, and reproduce artifacts
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           set -o pipefail
           python scripts/release_qualify.py \
-            --build --install --reproduce --json \
-            --out dist/release | tee dist/release-report.json
+            --build --install --reproduce --unsigned-ok --json \
+            --tag "$TAG" --out dist/release \
+            | tee dist/release-report.json
+      - name: Report the release verdict
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          path = pathlib.Path("dist/release-report.json")
+          if not path.is_file():
+              print("no release report produced")
+              raise SystemExit(1)
+          report = json.loads(path.read_text())
+          version = report.get("version_identity", {})
+          lines = [
+              f"verdict: {report.get('verdict')}",
+              f"tree: {report.get('tree', {}).get('state')}",
+              "version: tag={tag} pyproject={pyproject} package={package} "
+              "state={state}".format(
+                  tag=version.get("tag"),
+                  pyproject=version.get("pyproject_version"),
+                  package=version.get("package_version"),
+                  state=version.get("state"),
+              ),
+          ]
+          for name, step in report.get("steps", {}).items():
+              lines.append(f"{name}: {step.get('state', '?')}")
+          text = "\n".join(lines)
+          print(text)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("```\n" + text + "\n```\n")
+          PY
       - name: Write SHA256SUMS
         run: |
           set -euo pipefail

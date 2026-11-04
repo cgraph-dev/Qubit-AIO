@@ -1,6 +1,6 @@
 # Voice Bridge Audit — interrupt ordering, worker crash-resilience, routing lanes
 
-Auditor: Qubit Agent (subagent). Repo: `/home/trick/Projects/Repos/qubit-voicebridge`
+Auditor: Qubit Agent (subagent). Repo: the Qubit checkout.
 HEAD at audit: `17da98198`. Method: drive the **real** handlers on a stub object
 (`tests/test_voice_bridge_contract.py`), plus reading the source at exact lines.
 No service was restarted; no audio device or `voice.yaml` key was touched.

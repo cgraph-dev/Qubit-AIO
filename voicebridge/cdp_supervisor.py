@@ -17,6 +17,7 @@ file every round) or ``--once`` for a single reconcile.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 import urllib.parse
@@ -154,7 +155,21 @@ def _spawn(argv: List[str]) -> int:
     return p.pid
 
 
-def launch(user_data_dir: str = "/home/trick/snap/chromium/common/chromium",
+def _default_user_data_dir() -> str:
+    """Resolve the Chromium profile root without embedding a developer home.
+
+    ``QUBIT_CDP_USER_DATA_DIR`` / ``CHROME_USER_DATA_DIR`` win; otherwise use
+    the conventional Snap location under the current user's home. No literal
+    user name is compiled into the product.
+    """
+    for key in ("QUBIT_CDP_USER_DATA_DIR", "CHROME_USER_DATA_DIR"):
+        value = os.environ.get(key)
+        if value:
+            return value
+    return str(Path.home() / "snap" / "chromium" / "common" / "chromium")
+
+
+def launch(user_data_dir: Optional[str] = None,
            profile_directory: str = "Default",
            tabs: List[str] = list(PINNED_TABS)) -> Dict[str, Any]:
     """Start Chromium with the debug port on the owner's profile.
@@ -162,6 +177,8 @@ def launch(user_data_dir: str = "/home/trick/snap/chromium/common/chromium",
     REFUSES while any chromium process runs (never orphans/strands the
     owner's session, never double-locks the profile). Returns a typed dict.
     """
+    if user_data_dir is None:
+        user_data_dir = _default_user_data_dir()
     running = chromium_processes()
     if running:
         return {"ok": False, "code": "SUPERVISOR_REFUSES_RUNNING_INSTANCE",

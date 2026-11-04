@@ -27,7 +27,7 @@ fix is on disk but the daemon predates it".
 USAGE
 -----
     python3 scripts/check_stale_daemons.py [--repo DIR] [--json out.json]
-    python3 scripts/check_stale_daemons.py --repo /home/trick/Projects/Repos/qubit-voicebridge
+    python3 scripts/check_stale_daemons.py --repo /path/to/qubit
 Exit 0 always (advisory); the STALE count is the signal.
 """
 from __future__ import annotations
