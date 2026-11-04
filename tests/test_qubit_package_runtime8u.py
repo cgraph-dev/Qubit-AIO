@@ -42,9 +42,16 @@ RUNTIME_DIRS = [
     "locales",
     "assets",
     "web",
+    # Imported by shipped CLI/runtime commands (`qubit agent`, `qubit recipe`,
+    # `qubit traces`, `qubit evals`/`qubit optimize`, `qubit connectors`).
+    "roles",
+    "recipes",
+    "traces",
+    "evals",
+    "connectors",
 ]
 
-NON_RUNTIME_DIRS = ["tests", "apps", "website", "contributors", "evals"]
+NON_RUNTIME_DIRS = ["tests", "apps", "website", "contributors"]
 NON_RUNTIME_FILES = ["package-lock.json", "uv.lock"]
 
 

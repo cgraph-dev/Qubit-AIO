@@ -75,7 +75,9 @@ def test_vendored_release_date_matches_the_pin():
 
 
 def test_version_bump_left_the_product_version_alone():
-    assert _load_toml(PRODUCT_PYPROJECT)["project"]["version"] == "1.0.0"
+    # The vendored runtime pin is v0.21.5, but the Qubit product distribution
+    # has its own version (0.0.1) and must not inherit the vendored bump.
+    assert _load_toml(PRODUCT_PYPROJECT)["project"]["version"] == "0.0.1"
 
 
 # --------------------------------------------------------------------------- #
