@@ -2144,12 +2144,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # deployment this dashboard is meant to serve (it is a local-first tool;
         # `webui.host` may be 0.0.0.0 for LAN convenience, but the token is not
         # a LAN credential).
+        bootstrap_ok = self._peer_is_loopback() and self._token_bootstrap_allowed()
         inject = ('<script>window.__QUBIT_SESSION_TOKEN__=%s;'
                   'window.__QUBIT_BASE_PATH__="";'
                   'window.__QUBIT_API_PREFIX__="/agent";'
                   'window.__QUBIT_THEME__=%s;'
                   'window.__QUBIT_THEME_DEF__=%s;</script>'
-                  % ("\"\"" if not self._peer_is_loopback() else safe,
+                  % (safe if bootstrap_ok else "\"\"",
                      json.dumps(theme_name), json.dumps(theme_def)))
         # Paint the pre-hydration splash in the ACTIVE theme, not the hardcoded
         # default teal. The splash is visible for 1-2 s while the SPA chunks
@@ -2555,6 +2556,43 @@ class WebUIHandler(BaseHTTPRequestHandler):
         host = (self.headers.get("Host", "") or "").split(":")[0]
         return host in ("127.0.0.1", "localhost", "::1")
 
+    def _token_bootstrap_allowed(self) -> bool:
+        """Whether this request may receive the dashboard session token in HTML.
+
+        Loopback is necessary but not sufficient in a browser: a cross-site
+        subresource request can reach 127.0.0.1 and would be handed the token in
+        the body even though it cannot read a normal JSON API response. Fetch
+        Metadata lets the browser declare the initiator, so a request a browser
+        marks as cross-site is served the shell without the credential. A
+        header-less local client (curl, the TUI/dashboard launcher) keeps
+        working: absence is not evidence of a cross-site origin, and such a
+        client already has local access.
+
+        This is not an OS authentication boundary. A same-UID local process,
+        or a non-browser client that forges these headers, can still obtain the
+        token; loopback TCP exposes no peer-UID primitive. See the security
+        note in ``docs/STATUS.md`` for the owner decision and residual risk.
+        """
+        headers = getattr(self, "headers", None) or {}
+        site = str(headers.get("Sec-Fetch-Site", "") or "").strip().lower()
+        if site and site not in ("none", "same-origin"):
+            return False
+        mode = str(headers.get("Sec-Fetch-Mode", "") or "").strip().lower()
+        if mode and mode not in ("navigate", "no-cors", "same-origin"):
+            return False
+        origin = str(headers.get("Origin", "") or "").strip()
+        if origin:
+            from urllib.parse import urlsplit
+            try:
+                parsed = urlsplit(origin)
+            except ValueError:
+                return False
+            if parsed.scheme not in ("http", "https"):
+                return False
+            if (parsed.hostname or "").lower() not in ("127.0.0.1", "localhost", "::1"):
+                return False
+        return True
+
     def _serve_app_html(self, target: Path) -> None:
         """Serve a plugin-app HTML document with the session token injected.
 
@@ -2584,6 +2622,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         token = getattr(self.app, "api_token", "") or ""
         extra_headers: list = []
         loopback = self._peer_is_loopback()
+        bootstrap_ok = loopback and self._token_bootstrap_allowed()
         if loopback:
             # Issue the office load nonce for the document the iframe is about
             # to evaluate. The browser attaches this HttpOnly cookie to every
@@ -2595,7 +2634,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             extra_headers.append(("Set-Cookie",
                 "%s=%s; Path=/; HttpOnly; SameSite=Strict"
                 % (self.OFFICE_NONCE_COOKIE, nonce)))
-        if token and loopback:
+        if token and bootstrap_ok:
             from urllib.parse import quote
             stream_url = "/api/stream?token=" + quote(token, safe="")
             inject = (

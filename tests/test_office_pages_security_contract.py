@@ -87,10 +87,11 @@ def _make_handler(*, path="", headers=None, peer="127.0.0.1", host="127.0.0.1",
     h.server = type("S", (), {"app": _FakeApp()})()
     captured: dict = {}
 
-    def _send(code, body, ctype="text/plain"):
+    def _send(code, body, ctype="text/plain", extra_headers=None):
         captured["code"] = code
         captured["body"] = body
         captured["ctype"] = ctype
+        captured["extra_headers"] = extra_headers
 
     h._send = _send  # type: ignore[method-assign]
     h._captured = captured
