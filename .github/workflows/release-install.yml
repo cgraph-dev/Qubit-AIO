@@ -1,0 +1,98 @@
+name: release-install
+
+# Installs Qubit from a PUBLISHED release asset (the wheel attached by
+# release.yml), never from the checkout. There is deliberately no checkout step:
+# a regression that makes the installed package depend on the source tree fails
+# here.
+#
+# Windows is deferred. `qubit_runtime/scripts/install.ps1` is a checkout/git
+# bootstrap, not a root installer that consumes a release artifact, so there is
+# no honest Windows variant yet.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published release tag to install (v*)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-install-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  install-linux:
+    name: Install from release asset (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Resolve the release tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-$INPUT_TAG}"
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::invalid release tag: $TAG"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Download the published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.whl' \
+            --pattern '*.tar.gz' \
+            --pattern 'SHA256SUMS' \
+            --dir "$RUNNER_TEMP/release"
+          ls -l "$RUNNER_TEMP/release"
+      - name: Verify the release checksums
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/release"
+          sha256sum -c SHA256SUMS
+      - name: Install into a clean virtualenv
+        run: |
+          set -euo pipefail
+          if [ -e "$GITHUB_WORKSPACE/pyproject.toml" ]; then
+            echo "::error::a checkout is present; this job must install from the release artifact"
+            exit 1
+          fi
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/venv/bin/python" -m pip install "$RUNNER_TEMP"/release/*.whl
+          "$RUNNER_TEMP/venv/bin/qubit" --help >/dev/null
+          "$RUNNER_TEMP/venv/bin/qubit" --version
+      - name: Prove the installed package serves its own resources
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          from pathlib import Path
+
+          from voicebridge import qubit_runtime, resources
+
+          index = Path(resources.resource_path("frontend/qubit-dist/index.html"))
+          assert index.is_file(), f"dashboard missing from install: {index}"
+          status = qubit_runtime.status()
+          assert status.get("present") is True, status
+          assert status.get("importable") is True, status
+          runtime_root = Path(qubit_runtime.runtime_root())
+          assert runtime_root.is_dir(), runtime_root
+          print("release-install-ok", index, runtime_root)
+          PY
