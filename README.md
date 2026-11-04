@@ -84,6 +84,19 @@ pinned sha256. Useful flags: `--without-models` (skip model downloads),
 `--without-dashboard` (headless install), and `--prefix DIR` (put data/config/
 state under `DIR` instead of the XDG defaults).
 
+On Windows, use the Qubit-owned PowerShell entry. It installs the runtime
+under `%LOCALAPPDATA%\qubit` (override with `-QubitHome`) and never clones the
+upstream tree:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Help
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+# flags: -Channel stable|main, -QubitHome DIR, -NoModels, -NoDashboard
+```
+
+`scripts\install.cmd` is the CMD wrapper for the same entry.
+
 Release artifacts also expose the packaged surface:
 
 ```bash
