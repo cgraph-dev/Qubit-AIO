@@ -1043,6 +1043,9 @@ install_launchd_services() {
   fi
   if [ "$DRY_RUN" = "1" ]; then
     echo "==> [dry-run] would install the gateway LaunchAgent: $(launchd_plist_display)"
+    if [ -n "$PREFIX" ]; then
+      echo "    note      : the gateway label is home-scoped"
+    fi
     echo "==> [dry-run] would load/start it through the runtime's launchd installer"
     echo "==> [dry-run] voice bridge/orb/typing: UNSUPPORTED on macOS (not installed)"
     return 0

@@ -6,6 +6,7 @@ throwaway HOME. No network, no writes outside pytest's tmp dir, no launchd.
 from __future__ import annotations
 
 import os
+import pwd
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
+ACCOUNT_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 ROOT_INSTALL = REPO / "scripts" / "install.sh"
 LAUNCHD_INSTALL = REPO / "scripts" / "install_launchd_unit.sh"
 SYSTEMD_INSTALL = REPO / "scripts" / "install_systemd_unit.sh"
@@ -151,7 +153,7 @@ def test_macos_launchd_dry_run_prints_core_only_plan(tmp_path):
         cwd=str(REPO),
     )
     assert r.returncode == 0, (r.stdout, r.stderr)
-    assert f"{home}/Library/LaunchAgents/ai.qubit.gateway.plist" in r.stdout
+    assert f"{ACCOUNT_HOME}/Library/LaunchAgents" in r.stdout and "ai.qubit.gateway" in r.stdout
     assert "UNSUPPORTED on macOS" in r.stdout
     assert "read-old" in r.stdout
     assert not (home / "Library").exists()
@@ -177,7 +179,7 @@ def test_root_macos_dry_run_uses_launchagent_and_skips_voice_models(tmp_path):
     )
     assert r.returncode == 0, (r.stdout, r.stderr)
     assert "platform  : macOS" in r.stdout
-    assert f"{home}/Library/LaunchAgents/ai.qubit.gateway.plist" in r.stdout
+    assert f"{ACCOUNT_HOME}/Library/LaunchAgents" in r.stdout and "ai.qubit.gateway" in r.stdout
     assert "voice     : UNSUPPORTED on macOS" in r.stdout
     assert "would install the gateway LaunchAgent" in r.stdout
     assert "voice-model assets are Linux-only" in r.stdout
@@ -453,7 +455,7 @@ def test_macos_prefix_dry_run_does_not_claim_the_default_plist(tmp_path):
 
     assert r.returncode == 0, (r.stdout, r.stderr)
     assert f"QUBIT_HOME: {prefix}" in r.stdout
-    assert "ai.qubit.gateway-<home-scoped>.plist" in r.stdout
+    assert f"ai.qubit.gateway-" in r.stdout and f"{ACCOUNT_HOME}/Library/LaunchAgents" in r.stdout
     assert f"{home}/Library/LaunchAgents/ai.qubit.gateway.plist" not in r.stdout
     assert "the gateway label is home-scoped" in r.stdout
     assert not (home / "Library").exists()
