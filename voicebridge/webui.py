@@ -1480,13 +1480,26 @@ class WebUIHandler(BaseHTTPRequestHandler):
             pass
 
     def _frontend_file(self, name: str) -> Optional[Path]:
-        """Resolve a frontend file from the ACTIVE frontend dir, falling back
-        to the repository frontend when absent (Packet 8E serving fix)."""
-        p = self.app._frontend_dir / name
-        if p.is_file():
-            return p
-        repo = REPO_FRONTEND / name
-        return repo if repo.is_file() else None
+        """Resolve a frontend file inside one of the two frontend roots.
+
+        `name` arrives from request paths (`/static/...`, `/classic/...`) and is
+        untrusted. Reject absolute paths, traversal, encoded traversal, and
+        symlinks that resolve outside the root before opening anything.
+        """
+        from urllib.parse import unquote
+
+        raw = unquote(str(name or "")).strip().replace("\\", "/")
+        if not raw or raw.startswith("/") or ".." in Path(raw).parts:
+            return None
+        for root in (self.app._frontend_dir, REPO_FRONTEND):
+            try:
+                base = Path(root).resolve()
+                candidate = (base / raw).resolve()
+                if candidate.is_relative_to(base) and candidate.is_file():
+                    return candidate
+            except (OSError, RuntimeError, ValueError):
+                continue
+        return None
 
     def do_OPTIONS(self) -> None:  # noqa: N802  (CORS preflight)
         self.send_response(204)
