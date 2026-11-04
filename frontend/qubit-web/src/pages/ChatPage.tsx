@@ -469,6 +469,9 @@ function SandboxedHtmlPreview({ html }: { html: string }) {
   );
 }
 
+/** Upper bound on assistant-report rows in the Ctrl-K catalog. */
+const MAX_PALETTE_REPORTS = 50;
+
 export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const { setTitle } = usePageHeader();
   const { t } = useI18n();
@@ -505,7 +508,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     null,
   );
   const [voiceSessionInfoError, setVoiceSessionInfoError] = useState(false);
-  const followLiveVoice = isVoiceSession && followVoice;
+  const followLiveVoice = isActive && isVoiceSession && followVoice;
   // The number of server rows already merged into `messages` for the open
   // session (index-based dedupe: a poll appends only `slice(known)`).
   const voiceSyncedRef = useRef(0);
@@ -975,6 +978,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       },
       [session, refreshModelLive],
     ),
+    // The host stays mounted while the operator visits other routes; a
+    // hidden page must not hold the whole event feed open.
+    { enabled: isActive },
   );
 
   // Resolve the selected speech input engine once from the canonical config
@@ -1300,7 +1306,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // C1: live agent/todo activity for this session, shown in ChatWorkPanel.
   // Fail-soft by contract — a dead feed yields an empty roster, never an error
   // that could disturb the transcript or composer.
-  const activity = useChatActivity(session);
+  const activity = useChatActivity(session, isActive);
 
   // Reset the highlight whenever the token changes (new filter = new list).
   useEffect(() => {
@@ -1778,15 +1784,23 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         keywords: "slash",
       });
     }
-    for (const m of messages) {
+    // Cap the report rows so a long session cannot build a thousands-row
+    // palette on every Ctrl-K; the newest replies are the useful ones. The id
+    // includes the message index because `taskKey` is optional and identical
+    // text from two replies previously produced duplicate React keys.
+    let reportCount = 0;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (reportCount >= MAX_PALETTE_REPORTS) break;
+      const m = messages[index];
       if (m.role !== "assistant" || !m.text) continue;
       rows.push({
-        id: `report:${m.taskKey || m.text.slice(0, 24)}`,
+        id: `report:${index}:${m.taskKey || m.text.slice(0, 24)}`,
         kind: "report",
         label: m.text.slice(0, 80),
         detail: "Read aloud",
         keywords: "report speak voice",
       });
+      reportCount += 1;
     }
     return rows;
   }, [debugOpen, messages, selectedMessages.size, slashCatalog]);
@@ -1824,6 +1838,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   );
 
   useEffect(() => {
+    // Only the visible chat surface owns the global shortcut. The persistent
+    // host is mounted but hidden on other routes, so an un-gated listener there
+    // would intercept Ctrl-K on every dashboard page.
+    if (!isActive) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -1832,7 +1850,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [isActive]);
+
+  // Leaving the route closes a palette opened while the page was active.
+  useEffect(() => {
+    if (!isActive) setPaletteOpen(false);
+  }, [isActive]);
 
   // The controller owns the committed text; the composer keeps what was typed
   // before the utterance. On each new final we append only the delta.

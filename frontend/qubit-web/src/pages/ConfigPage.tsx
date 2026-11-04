@@ -174,6 +174,7 @@ export default function ConfigPage() {
         <Input
           className="h-8 pl-8 pr-7 text-xs"
           placeholder={t.common.search}
+          aria-label={t.common.search}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />

@@ -1,4 +1,10 @@
-import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useLocation } from "react-router";
 import { PageHeaderContext } from "./page-header-context";
 import { resolvePageTitle } from "@/lib/resolve-page-title";
@@ -34,6 +40,16 @@ export function PageHeaderProvider({
     [pathname, t, pluginTabs],
   );
   const displayTitle = titleOverride ?? defaultTitle;
+
+  // Keep the browser tab in step with the routed page. Without this the tab
+  // stayed on the static index.html title for the whole session, so every page
+  // had the same title in history/bookmarks. Per-page usePageHeader overrides
+  // (setTitle) flow through `displayTitle` too.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const brand = t.app.brand || "Qubit AiO";
+    document.title = displayTitle ? `${displayTitle} · ${brand}` : brand;
+  }, [displayTitle, t.app.brand]);
 
   const isChatRoute = isChatPath(pathname);
   /** Env jump-nav is wide — stack below title on small screens so KEYS stays readable. */

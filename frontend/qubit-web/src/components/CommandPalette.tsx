@@ -28,6 +28,13 @@ const KIND_LABEL: Record<PaletteItem["kind"], string> = {
   report: "report",
 };
 
+/**
+ * Hard ceiling on rendered rows. The palette catalog can grow with session
+ * history; an unbounded listbox makes keyboard navigation unusable and keeps
+ * thousands of DOM rows mounted. The first N ranked rows are the relevant N.
+ */
+const MAX_PALETTE_RESULTS = 50;
+
 export interface CommandPaletteProps {
   open: boolean;
   /** Full catalog for the current page state (built by the host). */
@@ -60,8 +67,12 @@ export function CommandPalette({
   }, [open]);
 
   const ranked = useMemo(() => rankPaletteItems(items, query), [items, query]);
+  const visible = useMemo(
+    () => ranked.slice(0, MAX_PALETTE_RESULTS),
+    [ranked],
+  );
   // Clamp the active row when the filtered list shrinks under it.
-  const activeIndex = ranked.length > 0 ? active % ranked.length : 0;
+  const activeIndex = visible.length > 0 ? active % visible.length : 0;
 
   useEffect(() => {
     setActive(0);
@@ -100,7 +111,7 @@ export function CommandPalette({
             aria-label="Search commands"
             aria-controls="command-palette-listbox"
             aria-activedescendant={
-              ranked[activeIndex] ? `palette-${ranked[activeIndex].id}` : undefined
+              visible[activeIndex] ? `palette-${visible[activeIndex].id}` : undefined
             }
             autoComplete="off"
             spellCheck={false}
@@ -109,17 +120,17 @@ export function CommandPalette({
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
                 event.preventDefault();
-                setActive((i) => movePaletteIndex(i, 1, ranked.length));
+                setActive((i) => movePaletteIndex(i, 1, visible.length));
                 return;
               }
               if (event.key === "ArrowUp") {
                 event.preventDefault();
-                setActive((i) => movePaletteIndex(i, -1, ranked.length));
+                setActive((i) => movePaletteIndex(i, -1, visible.length));
                 return;
               }
               if (event.key === "Enter") {
                 event.preventDefault();
-                commit(ranked[activeIndex]);
+                commit(visible[activeIndex]);
                 return;
               }
               if (event.key === "Escape") {
@@ -140,14 +151,14 @@ export function CommandPalette({
           className="max-h-80 overflow-y-auto py-1"
           data-testid="command-palette-list"
         >
-          {ranked.length === 0 ? (
+          {visible.length === 0 ? (
             <p className="px-3 py-2 text-xs text-text-tertiary">
               {loadingLabel ?? "No matching items."}
             </p>
           ) : (
-            ranked.map((item, i) => (
+            visible.map((item, i) => (
               <button
-                key={item.id}
+                key={`${item.kind}:${item.id}:${i}`}
                 id={`palette-${item.id}`}
                 type="button"
                 role="option"

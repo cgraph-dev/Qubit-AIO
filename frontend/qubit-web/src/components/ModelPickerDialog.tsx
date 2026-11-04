@@ -417,6 +417,7 @@ export function ModelPickerDialog(props: Props) {
             <Input
               autoFocus
               placeholder="Filter providers and models…"
+              aria-label="Filter providers and models"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="qmodel-picker__input"

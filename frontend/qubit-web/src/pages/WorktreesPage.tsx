@@ -104,7 +104,7 @@ export default function WorktreesPage() {
       setWorktrees(wt?.worktrees ?? []);
       setBranches(br?.branches ?? []);
     } catch (e) {
-      setErrorText(refusalOrError(e, `Load failed: ${e}`));
+      setErrorText(refusalOrError(e, "Could not load worktrees."));
     }
   }, []);
 
@@ -121,7 +121,7 @@ export default function WorktreesPage() {
       setResultText(formatResult(out));
       await refresh();
     } catch (e) {
-      setErrorText(refusalOrError(e, `Operation failed: ${e}`));
+      setErrorText(refusalOrError(e, "The worktree operation failed."));
     } finally {
       setBusy(false);
       setPending(null);

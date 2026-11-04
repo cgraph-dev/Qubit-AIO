@@ -20,7 +20,7 @@ import mimetypes
 import os
 import stat
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 CONFIRM_CODE = "FILES_CONFIRM_REQUIRED"
 NOT_FOUND_CODE = "FILES_NOT_FOUND"
@@ -83,6 +83,64 @@ def approved_roots(cfg: Any) -> List[Path]:
     return roots
 
 
+def _fallback_root(cfg: Any) -> Optional[Path]:
+    """Last-resort read root when the active project's folders all vanished.
+
+    A stale active-project pointer (folder deleted or moved after it was
+    registered) used to make every scoped read answer an out-of-root error.
+    When the project still exists but none of its recorded folders do, the
+    dashboard falls back to the backend's working directory (the install
+    checkout) so Files, Agent Workspace and Worktrees keep a usable root.
+    An unset project never falls back: ``inspect("")`` still answers EMPTY.
+    """
+    try:
+        from . import projects as PJ
+
+        active = PJ.active_project(cfg)
+        if active.get("state") != "OK" or not active.get("project"):
+            return None
+        folders = active["project"].get("folders", []) or []
+        if not folders:
+            return None
+        for folder in folders:
+            try:
+                if Path(str(folder)).expanduser().is_dir():
+                    return None
+            except OSError:
+                continue
+        cwd = Path.cwd().resolve()
+        return cwd if cwd.is_dir() else None
+    except Exception:
+        return None
+
+
+def read_roots(cfg: Any) -> List[Path]:
+    """Approved project folders plus the stale-project cwd fallback."""
+    roots = approved_roots(cfg)
+    fallback = _fallback_root(cfg)
+    if fallback is not None and fallback not in roots:
+        roots = roots + [fallback]
+    return roots
+
+
+def active_root(cfg: Any) -> str:
+    """The default read root: first live project folder, else a safe fallback.
+
+    An unset project deliberately answers ``""`` (callers render their EMPTY
+    state); only a project whose recorded folders have all vanished reaches
+    the cwd fallback.
+    """
+    from . import projects as PJ
+
+    folder = PJ.active_folder(cfg)
+    if folder:
+        return folder
+    fallback = _fallback_root(cfg)
+    if fallback is not None:
+        return str(fallback)
+    return ""
+
+
 def _resolve_inside(cfg: Any, path: str) -> Path:
     """Resolve ``path`` strictly inside an approved root (or raise).
 
@@ -95,26 +153,20 @@ def _resolve_inside(cfg: Any, path: str) -> Path:
         raise FilesError(BAD_INPUT_CODE, "a folder or file path is required")
     candidate = Path(text).expanduser()
     if not candidate.is_absolute():
-        from . import projects as PJ
-
-        active = PJ.active_project(cfg)
-        if active.get("state") != "OK" or not active.get("project"):
+        base = active_root(cfg)
+        if not base:
             raise FilesError(BAD_INPUT_CODE,
                              "relative paths need an active project; pass an "
                              "absolute path or set one with "
                              "`qubit project use <slug> --confirm`")
-        folders = active["project"].get("folders", []) or []
-        if not folders:
-            raise FilesError(BAD_INPUT_CODE,
-                             "the active project has no folders")
-        candidate = Path(str(folders[0])) / candidate
+        candidate = Path(base) / candidate
     try:
         resolved = candidate.resolve()
     except (OSError, RuntimeError) as exc:
         raise FilesError(IO_CODE, f"cannot resolve path ({exc})")
     if not resolved.exists() and not resolved.parent.exists():
         raise FilesError(NOT_FOUND_CODE, "no such file or folder")
-    for root in approved_roots(cfg):
+    for root in read_roots(cfg):
         try:
             resolved.relative_to(root)
             return resolved
@@ -311,21 +363,20 @@ def inspect(cfg: Any, path: str = "") -> Dict[str, Any]:
     if not str(path or "").strip():
         from . import projects as PJ
 
-        active = PJ.active_project(cfg)
-        if active.get("state") != "OK" or not active.get("project"):
-            return {"state": "EMPTY", "code": "NO_ACTIVE_PROJECT",
-                    "detail": "no active project; set one with "
-                              "`qubit project use <slug> --confirm`, or pass "
-                              "an explicit project folder path",
-                    "owner": "qubit-policy",
-                    "rollback": "nothing to inspect; nothing to roll back"}
-        folders = active["project"].get("folders", []) or []
-        if not folders:
+        path = active_root(cfg)
+        if not path:
+            active = PJ.active_project(cfg)
+            if active.get("state") != "OK" or not active.get("project"):
+                return {"state": "EMPTY", "code": "NO_ACTIVE_PROJECT",
+                        "detail": "no active project; set one with "
+                                  "`qubit project use <slug> --confirm`, or pass "
+                                  "an explicit project folder path",
+                        "owner": "qubit-policy",
+                        "rollback": "nothing to inspect; nothing to roll back"}
             return {"state": "EMPTY", "code": "PROJECT_HAS_NO_FOLDERS",
                     "detail": "the active project has no folders",
                     "owner": "qubit-policy",
                     "rollback": "nothing to inspect; nothing to roll back"}
-        path = str(folders[0])
     target = _resolve_inside(cfg, path)
     _refuse_special(target)
     if target.is_dir():

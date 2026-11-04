@@ -1189,6 +1189,7 @@ export default function PluginsPage() {
               <Input
                 className="max-w-sm"
                 placeholder={"Search the pinned index by name, source, or capability…"}
+                aria-label="Search the pinned plugin index"
                 spellCheck={false}
                 value={indexQuery}
                 onChange={(e) => setIndexQuery(e.target.value)}
