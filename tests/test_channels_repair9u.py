@@ -159,11 +159,14 @@ def test_route_telegram_test_is_honest(tmp_path, monkeypatch):
 
 
 # -------------------------------------------------- documentation: defect 3
-def test_channels_inbound_documents_dashboard_store_gap(tmp_path, monkeypatch):
+def test_channels_inbound_documents_dashboard_store_bridge(tmp_path, monkeypatch):
     from voicebridge import channels_inbound as CI
 
     cfg = _cfg(tmp_path, monkeypatch)
     wiring = CI.status(cfg)["dashboard_config_wiring"]
     assert wiring["dashboard_store"] == "msg-platforms.json"
-    assert wiring["consumed_by_adapter"] is False
-    assert "msg-platforms.json" in wiring["operator_prerequisite"]
+    assert wiring["bridge"] == "voicebridge.messaging.bridge_platform_to_gateway"
+    # The code-side bridge exists, so the dashboard config is no longer an
+    # unconsumed store: msg_update writes the gateway config/.env it reads.
+    assert wiring["consumed_by_adapter"] is True
+    assert "config.yaml" in wiring["transport_store"]

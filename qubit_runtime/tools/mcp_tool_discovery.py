@@ -473,7 +473,10 @@ def _select_new_servers(servers: Dict[str, dict]) -> Dict[str, dict]:
         # discovery nudge would wake it on every pass (bypassing that budget) and hammer the
         # endpoint forever; an explicit reload/login still tears it down and reconnects. An
         # OAuth park whose credential files just changed is the login landing: nudge it.
-        if getattr(srv, "_auth_park_rejection", False) and not credentials_changed:
+        # A terminal park (bounded budget spent, or a misconfigured OAuth server) has no
+        # self-probe left either: nudging it here is the retry storm this gate prevents.
+        if (getattr(srv, "_auth_park_rejection", False)
+                or getattr(srv, "_auth_park_terminal", False)) and not credentials_changed:
             continue
         _loop._signal_reconnect(srv)
     return new_servers

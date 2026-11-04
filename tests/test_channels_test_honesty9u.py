@@ -237,11 +237,12 @@ def test_only_slack_and_whatsapp_cloud_ship_a_transport():
         assert M.PROVIDER_CAPS[pid]["available"] is False, pid
 
 
-def test_channels_inbound_records_dashboard_config_gap(tmp_path, monkeypatch):
+def test_channels_inbound_records_dashboard_config_bridge(tmp_path, monkeypatch):
     from voicebridge import channels_inbound as CI
 
     cfg = _cfg(tmp_path, monkeypatch)
     wiring = CI.status(cfg)["dashboard_config_wiring"]
     assert wiring["dashboard_store"] == "msg-platforms.json"
-    assert wiring["transport_store"] == "msg-accounts.json"
-    assert wiring["consumed_by_adapter"] is False
+    assert "config.yaml" in wiring["transport_store"]
+    assert wiring["bridge"] == "voicebridge.messaging.bridge_platform_to_gateway"
+    assert wiring["consumed_by_adapter"] is True

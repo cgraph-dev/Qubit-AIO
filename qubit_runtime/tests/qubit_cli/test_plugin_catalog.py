@@ -333,3 +333,40 @@ def test_live_catalog_url_targets_the_runtime_website_assets(monkeypatch):
     # The directory the URL names exists in this checkout.
     assert (Path(pc.__file__).resolve().parents[1]
             / "website" / "static" / "api").is_dir()
+
+
+def test_published_catalog_artifact_is_committed_and_current():
+    """The raw URL a client fetches must resolve to a committed document.
+
+    ``plugin-catalog.json`` is a build artifact, but the live-refresh loader
+    fetches it from the raw repository path, not from a docs host, and the
+    upstream docs deploy is gated to a different GitHub org here. Leaving it
+    gitignored made ``LIVE_CATALOG_URL`` a permanent 404, so every install
+    silently pinned itself to the in-tree catalog. Regenerate it with
+    ``python website/scripts/extract-plugins.py`` whenever ``plugin-catalog/``
+    changes; this test fails if the committed copy drifts.
+    """
+    from pathlib import Path
+
+    # LIVE_CATALOG_PATH is repo-root relative; the artifact lives beside this
+    # runtime package.
+    artifact = (Path(pc.__file__).resolve().parents[1]
+                / "website" / "static" / "api" / "plugin-catalog.json")
+    assert artifact.is_file(), (
+        f"missing published catalog at {artifact}; run "
+        "`python qubit_runtime/website/scripts/extract-plugins.py` and commit it")
+
+    data = json.loads(artifact.read_text(encoding="utf-8"))
+    assert isinstance(data, dict)
+    assert isinstance(data.get("entries"), list) and data["entries"]
+    assert isinstance(data.get("removed"), list)
+    assert data.get("generated_at")
+
+    in_tree = {e.name: e.sha for e in pc.load_catalog()}
+    published = {e["name"]: e["sha"] for e in data["entries"]}
+    assert published == in_tree, (
+        "published plugin catalog is stale; regenerate it from plugin-catalog/")
+
+    in_tree_removed = {e.name for e in pc.load_removed_list()}
+    published_removed = {e.get("name") for e in data["removed"]}
+    assert published_removed == in_tree_removed

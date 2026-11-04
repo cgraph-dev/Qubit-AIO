@@ -490,6 +490,11 @@ class MCPServerRunMixin:
         """Transport raised: classify, then run the initial-connect or reconnect ladder. False = exit."""
         # Unwrap anyio TaskGroup wrappers: the group's str() hides the root cause.
         root = _errors._unwrap_exception_group(exc)
+        # A 401 OAuth challenge on an entry with no provider is a configuration error,
+        # not a transient outage: no self-probe can ever acquire a credential. Record the
+        # typed reason and wait for an explicit reconnect/config change (no retry storm).
+        if isinstance(root, _errors.OAuthRequiredError):
+            return await self._on_misconfigured_oauth(root, budget)
         failure_class = _errors._classify_mcp_failure(root)
         if self._is_recycled_stdio():
             logger.warning("MCP server '%s': lazy reconnect after stdio recycle failed, marking unavailable "
@@ -523,6 +528,27 @@ class MCPServerRunMixin:
                      type(root).__name__, root)
         await self._backoff_sleep(budget)
         return not self._shutdown_event.is_set()
+
+    async def _on_misconfigured_oauth(self, root: BaseException,
+                                      budget: _RetryBudget) -> bool:
+        """A 401 OAuth challenge on an entry with no provider: terminal, typed, no self-probe.
+
+        The endpoint cannot be reached without OAuth and the entry never built a provider,
+        so every unattended probe would repeat the same 401 (the retry storm this method
+        exists to prevent). The typed reason is published for discovery/status; the task
+        parks with no timer and revives only on an explicit reconnect (``/reload-mcp``,
+        ``qubit mcp login``) or after the config/file signature changes.
+        """
+        reason = str(root)
+        self._record_unavailable(reason)
+        self._auth_park_rejection = True
+        self._auth_park_terminal = True
+        self._log_park(
+            "MCP server '%s': %s (state: connecting → unavailable for this process)",
+            self.name, reason)
+        return await self._park_initial_failure(
+            root, "misconfigured OAuth server (auth: oauth not configured)", budget,
+            auth_rejection=True)
 
     async def _on_initial_connect_error(self, exc: Exception, root: BaseException,
                                         failure_class: str, budget: _RetryBudget) -> bool:

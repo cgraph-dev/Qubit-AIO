@@ -230,10 +230,63 @@ CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
     "zalouser": {"label": "Zalo User", "transport": "oa-webhook",
                  "credential_kind": "oa-token", "available": False,
                  "detail": "bounded user message normalized; no Zalo transport"},
+    # ---- runtime adapters whose catalog id differs from the inbound spellings ----
+    # These are first-class entries (not aliases) because the runtime ships a
+    # distinct adapter for each: WhatsApp Cloud is not the paired-device session,
+    # WeCom is not the WeChat Official Account, and Weixin/iLink is not either.
+    "whatsapp-cloud": {"label": "WhatsApp Cloud API",
+                       "transport": "https", "credential_kind": "bearer-token",
+                       "available": False,
+                       "detail": "no Qubit inbound webhook listener; the "
+                                 "runtime adapter is the gateway's own"},
+    "wecom": {"label": "WeCom (WeChat Work)", "transport": "webhook",
+              "credential_kind": "app-secret", "available": False,
+              "detail": "bounded WeCom event normalized; no live callback "
+                        "transport runs in Qubit"},
+    "weixin": {"label": "Weixin / iLink", "transport": "webhook",
+               "credential_kind": "app-token", "available": False,
+               "detail": "bounded iLink message normalized; no live bot "
+                         "transport runs in Qubit"},
 }
 
 # Single source of truth for channel membership (order preserved).
 CHANNELS = tuple(CHANNEL_CAPS)
+
+# Runtime adapter / dashboard-catalog platform ids whose spelling differs from
+# the inbound registry key above. The vendored gateway publishes its live state
+# (``gateway_state.json``) and its Channels catalog under these ids, so without
+# this translation a connected ``teams`` adapter could never light up the
+# ``msteams`` row (and ``bluebubbles``/``google_chat``/``whatsapp_cloud`` had the
+# same blind spot). Keep this aligned with ``voicebridge.messaging.PLATFORM_ALIASES``
+# and ``voicebridge.qubit_compat._ACCOUNT_PROVIDER_TO_PLATFORM``.
+RUNTIME_PLATFORM_ALIASES: Dict[str, str] = {
+    "teams": "msteams",
+    "bluebubbles": "imessage",
+    "google_chat": "googlechat",
+    "whatsapp_cloud": "whatsapp-cloud",
+}
+
+# Reverse direction (inbound channel id -> the runtime adapter id the gateway
+# reports). Explicit so identity ids such as ``whatsapp`` are never re-mapped
+# to a sibling (``whatsapp_cloud``).
+_CHANNEL_RUNTIME_ID: Dict[str, str] = {
+    "msteams": "teams",
+    "imessage": "bluebubbles",
+    "googlechat": "google_chat",
+    "whatsapp-cloud": "whatsapp_cloud",
+}
+
+
+def canonical_channel_id(platform_id: str) -> str:
+    """Inbound-registry id for a runtime/dashboard platform id (unchanged when unknown)."""
+    clean = (platform_id or "").strip().lower()
+    return RUNTIME_PLATFORM_ALIASES.get(clean, clean)
+
+
+def runtime_platform_id(channel: str) -> str:
+    """The runtime adapter id that backs an inbound channel id (identity when native)."""
+    clean = (channel or "").strip().lower()
+    return _CHANNEL_RUNTIME_ID.get(clean, clean)
 
 LISTENER = {
     "state": "NONE",
@@ -242,27 +295,48 @@ LISTENER = {
               "already-authenticated payload",
 }
 
-# Documented root cause for "no catalog channel can reach connected" (audit
-# fix-channels defect 3): the dashboard writes channel config to
-# ``msg-platforms.json`` (``voicebridge.qubit_compat``), but NO transport
-# adapter reads it. The outbound transport resolves accounts from
-# ``msg-accounts.json`` (``voicebridge.messaging``) and the vendored gateway
-# reads its own ``config.yaml``/``.env``; ``channels_inbound`` starts no
-# listener. Until an operator/architecture bridge joins the dashboard store to
-# a real transport, a dashboard-configured channel honestly stays
-# ``UNAVAILABLE`` rather than a fabricated ``connected``.
+# The dashboard writes channel config to ``msg-platforms.json``
+# (``voicebridge.qubit_compat``). A prior audit correctly recorded that no
+# inbound adapter read that file directly. The code-side bridge now exists:
+# every dashboard PUT routes catalog platforms through
+# ``voicebridge.messaging.bridge_platform_to_gateway``, which resolves the
+# stored ``env:``/``file:`` references server-side and writes the REAL gateway
+# stores (``config.yaml`` ``platforms.<id>.enabled`` + credential ``.env``).
+# The vendored gateway reads those, so the dashboard config now reaches a
+# transport without asking the operator for anything beyond the references
+# they already supplied. The bridge stays best-effort (a failed write is a
+# typed ``UNAVAILABLE``), so this record is a capability statement, not a
+# claim that every live channel is connected.
 DASHBOARD_CONFIG_WIRING = {
     "dashboard_store": "msg-platforms.json",
     "dashboard_store_writer": "voicebridge.qubit_compat.msg_update",
-    "transport_store": "msg-accounts.json",
-    "transport_reader": "voicebridge.messaging",
-    "consumed_by_adapter": False,
-    "operator_prerequisite": "bridge the dashboard channel config "
-                             "(msg-platforms.json) to the transport account "
-                             "store / gateway config, or make the gateway read "
-                             "msg-platforms.json; no Qubit transport reads it "
-                             "today",
+    "transport_store": "config.yaml platforms.<id>.enabled + .env credentials",
+    "transport_reader": "gateway.config_env._apply_env_overrides",
+    "bridge": "voicebridge.messaging.bridge_platform_to_gateway",
+    "bridge_writer": "voicebridge.qubit_compat.msg_update",
+    "consumed_by_adapter": True,
+    "via": "bridge",
+    "operator_prerequisite": "none for reference-shaped credentials; a raw "
+                             "value the operator never saved and that resolves "
+                             "from no configured source stays unresolved "
+                             "(typed UNAVAILABLE) instead of becoming a bogus "
+                             "token",
 }
+
+
+def _dashboard_bridge_available() -> bool:
+    """True when the dashboard->gateway bridge is importable in this install."""
+    try:
+        from . import messaging as _messaging
+        return callable(getattr(_messaging, "bridge_platform_to_gateway", None))
+    except Exception:  # noqa: BLE001 - a stripped install keeps the honest gap
+        return False
+
+
+def dashboard_config_wiring() -> Dict[str, Any]:
+    """The dashboard->runtime bridge record, with a live capability flag."""
+    return {**DASHBOARD_CONFIG_WIRING,
+            "consumed_by_adapter": _dashboard_bridge_available()}
 
 
 class ChannelError(Exception):
@@ -337,6 +411,7 @@ def _gateway_view(reader: Optional[Any] = None) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         rec = None
     platforms: Dict[str, str] = {}
+    aliases: Dict[str, str] = {}
     if isinstance(rec, dict):
         raw = rec.get("platforms_map")
         if isinstance(raw, dict):
@@ -346,7 +421,11 @@ def _gateway_view(reader: Optional[Any] = None) -> Dict[str, Any]:
                     state = str(info.get("state") or info.get("status") or "")
                 else:
                     state = str(info or "")
-                platforms[str(name)] = state.lower()
+                runtime_id = str(name)
+                channel_id = canonical_channel_id(runtime_id)
+                if channel_id != runtime_id:
+                    aliases[runtime_id] = channel_id
+                platforms[channel_id] = state.lower()
     connected = sorted(
         name for name, state in platforms.items()
         if state in ("connected", "running", "ok"))
@@ -355,6 +434,7 @@ def _gateway_view(reader: Optional[Any] = None) -> Dict[str, Any]:
         "readable": isinstance(rec, dict),
         "state": (rec.get("gateway_state") if isinstance(rec, dict) else None),
         "platforms": platforms,
+        "aliases": aliases,
         "connected": len(connected),
         "connected_platforms": connected,
     }
@@ -462,6 +542,43 @@ def _check_events(events: Optional[List[str]]) -> List[str]:
     return sorted(set(clean))[:32] or ["message"]
 
 
+def _dashboard_platforms(cfg: Any) -> Dict[str, Dict[str, Any]]:
+    """Read the dashboard Channels store (``msg-platforms.json``), keyed by
+    canonical inbound-registry id.
+
+    Read-only and reference-only: the store holds ``enabled`` plus credential
+    ``env:``/``file:`` references (never values). Best-effort -- a missing or
+    malformed store resolves to ``{}`` so the inbound view never invents
+    configuration. Runtime spellings are translated through
+    :data:`RUNTIME_PLATFORM_ALIASES` so ``teams`` lights up ``msteams``.
+    """
+    path = Path(cfg.state_dir()) / "msg-platforms.json"
+    try:
+        if not path.is_file() or path.stat().st_size > MAX_FILE_BYTES:
+            return {}
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    platforms = raw.get("platforms") if isinstance(raw, dict) else None
+    if not isinstance(platforms, dict):
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for platform_id, rec in platforms.items():
+        if not isinstance(rec, dict):
+            continue
+        refs = rec.get("refs") if isinstance(rec.get("refs"), dict) else {}
+        channel_id = canonical_channel_id(str(platform_id))
+        out[channel_id] = {
+            "platform": str(platform_id),
+            "enabled": bool(rec.get("enabled", True)),
+            "ref_keys": sorted(str(k) for k in refs),
+            "has_refs": bool(refs),
+            "updated_at": rec.get("updated_at"),
+            "updated_by": rec.get("updated_by", ""),
+        }
+    return out
+
+
 def _get(cfg: Any, channel: str) -> Dict[str, Any]:
     clean = (channel or "").strip().lower()
     if clean not in CHANNELS:
@@ -474,7 +591,8 @@ def _get(cfg: Any, channel: str) -> Dict[str, Any]:
 
 
 def _public(rec: Dict[str, Any],
-            gateway: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            gateway: Optional[Dict[str, Any]] = None,
+            dashboard: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     caps = CHANNEL_CAPS.get(rec["channel"], {})
     from .providers.credentials import resolve_key
 
@@ -486,18 +604,23 @@ def _public(rec: Dict[str, Any],
     else:
         state, state_code = "UNAVAILABLE", UNAVAILABLE_CODE
     # The live gateway's own view of THIS channel (authoritative for
-    # ``connected``); a registry credential reference can never set it.
+    # ``connected``); a registry credential reference can never set it. The
+    # gateway view is already keyed by the canonical inbound id.
     gw_state = ""
     if isinstance(gateway, dict):
         gw_state = str((gateway.get("platforms") or {}).get(rec["channel"])
                        or "")
+    dash = dashboard or {}
     return {"channel": rec["channel"], "label": caps.get("label", ""),
+            "runtime_platform": runtime_platform_id(rec["channel"]),
             "events": list(rec.get("events", [])),
             "credential": _redact_secret_kind(_resolve_ref(rec)),
             "transport": caps.get("transport", "none"),
             "available": False, "state": state, "code": state_code,
             "gateway_state": gw_state,
             "connected": gw_state in ("connected", "running", "ok"),
+            "dashboard_configured": bool(dash.get("platform")),
+            "dashboard_enabled": bool(dash.get("enabled", False)),
             "configured_at": rec.get("configured_at"),
             "updated_by": rec.get("updated_by", "")}
 
@@ -571,12 +694,14 @@ def accounts(cfg: Any, *, gateway_reader: Optional[Any] = None
     """Configured inbound channels (redacted, honest derived state)."""
     state = _load(cfg)
     gateway = _gateway_view(gateway_reader)
-    rows = [_public(r, gateway) for r in
+    dashboard = _dashboard_platforms(cfg)
+    rows = [_public(r, gateway, dashboard.get(r["channel"])) for r in
             sorted(state["channels"].values(),
                    key=lambda r: r.get("channel", ""))]
     return {"state": "OK", "schema": SCHEMA, "accounts": rows,
             "connected": [],
-            "gateway": gateway}
+            "gateway": gateway,
+            "dashboard_channels": sorted(dashboard)}
 
 
 def catalog(cfg: Any, *, gateway_reader: Optional[Any] = None
@@ -585,24 +710,32 @@ def catalog(cfg: Any, *, gateway_reader: Optional[Any] = None
 
     ``connected`` lists the platforms the LIVE gateway reports connected
     (read from the authoritative ``gateway_state.json``), not the registry.
+    Rows also carry the runtime adapter id and the dashboard Channels store's
+    enable/ref state, so the three stores agree on the same channel names
+    instead of a ``teams`` adapter being invisible under ``msteams``.
     """
     configured = _load(cfg).get("channels", {})
     gateway = _gateway_view(gateway_reader)
+    dashboard = _dashboard_platforms(cfg)
     gw_platforms = gateway.get("platforms") or {}
     rows: List[Dict[str, Any]] = []
     for cid, caps in CHANNEL_CAPS.items():
         gw_state = str(gw_platforms.get(cid) or "")
+        dash = dashboard.get(cid) or {}
         if cid in configured:
-            rows.append(_public(configured[cid], gateway))
+            rows.append(_public(configured[cid], gateway, dash))
         else:
             rows.append({
                 "channel": cid, "label": caps.get("label", cid),
+                "runtime_platform": runtime_platform_id(cid),
                 "events": [], "credential": "missing",
                 "transport": caps.get("transport", "none"),
                 "available": False, "state": "UNCONFIGURED",
                 "code": NO_CREDENTIAL_CODE, "configured_at": None,
                 "gateway_state": gw_state,
                 "connected": gw_state in ("connected", "running", "ok"),
+                "dashboard_configured": bool(dash.get("platform")),
+                "dashboard_enabled": bool(dash.get("enabled", False)),
                 "updated_by": "", "detail": caps.get("detail", "")})
     return {"state": "OK", "schema": SCHEMA, "channels": rows,
             "available": [r["channel"] for r in rows
@@ -628,21 +761,25 @@ def status(cfg: Any, *, gateway_reader: Optional[Any] = None
     except ChannelError:
         configured = -1
     gateway = _gateway_view(gateway_reader)
+    dashboard = _dashboard_platforms(cfg)
     return {"state": "ESTOP" if latched else "OK",
             "code": ESTOP_CODE if latched else "",
             "schema": SCHEMA, "channels": len(CHANNELS),
             "configured": configured,
+            "dashboard_configured": len(dashboard),
             "connected": int(gateway.get("connected") or 0),
             "connected_platforms": list(
                 gateway.get("connected_platforms") or []),
             "gateway": gateway,
+            "runtime_aliases": dict(RUNTIME_PLATFORM_ALIASES),
             "listener": LISTENER["state"],
             "listener_detail": LISTENER["detail"],
-            "dashboard_config_wiring": dict(DASHBOARD_CONFIG_WIRING),
+            "dashboard_config_wiring": dashboard_config_wiring(),
             "estop": latched,
             "detail": "registry credential references are separate from the "
                       "live gateway's transport connections; ``connected`` "
-                      "reflects the gateway's own platform state"}
+                      "reflects the gateway's own platform state (translated "
+                      "through the runtime adapter aliases)"}
 
 
 def _nonce_seen(cfg: Any, nonce: str) -> bool:
