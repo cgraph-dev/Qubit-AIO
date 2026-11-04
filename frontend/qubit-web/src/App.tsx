@@ -274,11 +274,12 @@ const CHAT_NAV_ITEM: NavItem = {
 // three chat surfaces adjacent without hiding either.
 const QUBIT_CHAT_NAV_ITEM: NavItem = {
   path: "/qubit-chat",
+  labelKey: "qubitChat",
   label: "Qubit Chat",
   icon: Terminal,
   exactEnd: true,
   children: [
-    { path: "/webchat", label: "WebChat", icon: MessageSquare },
+    { path: "/webchat", labelKey: "webchat", label: "WebChat", icon: MessageSquare },
   ],
 };
 
@@ -375,7 +376,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
     label: "Sessions",
     icon: MessageSquare,
   },
-  { path: "/files", label: "Files", icon: FolderOpen },
+  { path: "/files", labelKey: "files", label: "Files", icon: FolderOpen },
   {
     path: "/analytics",
     labelKey: "analytics",
@@ -392,15 +393,15 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
   { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
   { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle },
-  { path: "/mcp", label: "MCP", icon: Plug },
-  { path: "/channels", label: "Channels", icon: Radio },
-  { path: "/webhooks", label: "Webhooks", icon: Webhook },
-  { path: "/pairing", label: "Pairing", icon: ShieldCheck },
+  { path: "/mcp", labelKey: "mcp", label: "MCP", icon: Plug },
+  { path: "/channels", labelKey: "channels", label: "Channels", icon: Radio },
+  { path: "/webhooks", labelKey: "webhooks", label: "Webhooks", icon: Webhook },
+  { path: "/pairing", labelKey: "pairing", label: "Pairing", icon: ShieldCheck },
   { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users },
   { path: "/config", labelKey: "config", label: "Config", icon: Settings },
   { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
-  { path: "/system", label: "System", icon: Wrench },
-  { path: "/agents", label: "Agents", icon: Users },
+  { path: "/system", labelKey: "system", label: "System", icon: Wrench },
+  { path: "/agents", labelKey: "agents", label: "Agents", icon: Users },
   {
     path: "/docs",
     labelKey: "documentation",
@@ -418,23 +419,25 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // is a primary chat surface, not a voice sub-page.
   {
     path: "/qubit-talk",
+    labelKey: "voice",
     label: "Voice & Speech",
     icon: Mic,
     exactEnd: true,
     children: [
-      { path: "/voice-edit", label: "Voice Editing", icon: Sparkles },
+      { path: "/voice-edit", labelKey: "voiceEditing", label: "Voice Editing", icon: Sparkles },
     ],
   },
   {
     path: "/qubit-scheduler",
+    labelKey: "tasksScheduling",
     label: "Tasks & Scheduling",
     icon: Clock,
     exactEnd: true,
     children: [
-      { path: "/qubit-taskflows", label: "Taskflows", icon: Zap },
-      { path: "/qubit-tasks", label: "Tasks", icon: FileText },
-      { path: "/qubit-task-inbox", label: "Inbox", icon: Heart },
-      { path: "/qubit-board-admin", label: "Board Admin", icon: Star },
+      { path: "/qubit-taskflows", labelKey: "taskflows", label: "Taskflows", icon: Zap },
+      { path: "/qubit-tasks", labelKey: "tasks", label: "Tasks", icon: FileText },
+      { path: "/qubit-task-inbox", labelKey: "inbox", label: "Inbox", icon: Heart },
+      { path: "/qubit-board-admin", labelKey: "boardAdmin", label: "Board Admin", icon: Star },
     ],
   },
   // Memory family: the external provider picker and Qubit's OWN local context
@@ -442,18 +445,21 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // `connection: "local"`), so they stay distinct rows under one parent.
   {
     path: "/qubit-memory",
+    labelKey: "memory",
     label: "Memory",
     icon: Database,
     exactEnd: true,
     children: [
       {
         path: "/open-viking",
+        labelKey: "openViking",
         label: "Open Viking Studio",
         icon: Ship,
         exactEnd: true,
       },
       {
         path: "/open-viking/context-store",
+        labelKey: "contextStore",
         label: "Context Store",
         icon: Database,
       },
@@ -462,43 +468,45 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // Workspace family: agent/desktop administration surfaces.
   {
     path: "/agent-workspace",
+    labelKey: "workspace",
     label: "Workspace",
     icon: Code,
     exactEnd: true,
     children: [
-      { path: "/nodes", label: "Nodes", icon: Globe },
-      { path: "/devices", label: "Devices", icon: Shield },
-      { path: "/session-ops", label: "Session Ops", icon: Activity },
-      { path: "/worktrees", label: "Worktrees", icon: FolderOpen },
-      { path: "/checkpoints", label: "Checkpoints", icon: Database },
-      { path: "/agent-cards", label: "Agent Cards", icon: Bot },
+      { path: "/nodes", labelKey: "nodes", label: "Nodes", icon: Globe },
+      { path: "/devices", labelKey: "devices", label: "Devices", icon: Shield },
+      { path: "/session-ops", labelKey: "sessionOps", label: "Session Ops", icon: Activity },
+      { path: "/worktrees", labelKey: "worktrees", label: "Worktrees", icon: FolderOpen },
+      { path: "/checkpoints", labelKey: "checkpoints", label: "Checkpoints", icon: Database },
+      { path: "/agent-cards", labelKey: "agentCards", label: "Agent Cards", icon: Bot },
     ],
   },
   // Admin family: operator-only surfaces.
   {
     path: "/admin/skills-review",
+    labelKey: "admin",
     label: "Admin",
     icon: Package,
     exactEnd: true,
     children: [
-      { path: "/admin/mcp-calls", label: "MCP Calls", icon: Plug },
-      { path: "/admin/users", label: "Users", icon: Users },
+      { path: "/admin/mcp-calls", labelKey: "mcpCalls", label: "MCP Calls", icon: Plug },
+      { path: "/admin/users", labelKey: "users", label: "Users", icon: Users },
     ],
   },
   // Ungrouped Qubit surfaces, each one of a kind.
   // NB: /computer is a CopilotKit/openmuse port whose backend is a typed
   // COMPUTER_USE_NO_DRIVER refusal (no AT-SPI actuator) — visible on purpose
   // so the capability gap stays stated rather than hidden.
-  { path: "/computer", label: "Computer", icon: Monitor },
-  { path: "/kitchen", label: "Kitchen", icon: ChefHat },
-  { path: "/omniroute", label: "OmniRoute", icon: Network },
-  { path: "/qubit-tv", label: "Qubit TV", icon: Tv },
-  { path: "/canvas", label: "Qubit Canvas", icon: Eye },
-  { path: "/qubit-bot", label: "Qubit Bot", icon: Bot },
-  { path: "/qubit-harness-router", label: "Harness Router", icon: Workflow },
-  { path: "/qubit-office", label: "Qubit Office", icon: Users, exactEnd: true },
-  { path: "/qubit-office2", label: "Agent Quest", icon: Star, exactEnd: true },
-  { path: "/qubit-office3", label: "Voice Chat", icon: Mic, exactEnd: true },
+  { path: "/computer", labelKey: "computer", label: "Computer", icon: Monitor },
+  { path: "/kitchen", labelKey: "kitchen", label: "Kitchen", icon: ChefHat },
+  { path: "/omniroute", labelKey: "omniroute", label: "OmniRoute", icon: Network },
+  { path: "/qubit-tv", labelKey: "qubitTv", label: "Qubit TV", icon: Tv },
+  { path: "/canvas", labelKey: "canvas", label: "Qubit Canvas", icon: Eye },
+  { path: "/qubit-bot", labelKey: "qubitBot", label: "Qubit Bot", icon: Bot },
+  { path: "/qubit-harness-router", labelKey: "harnessRouter", label: "Harness Router", icon: Workflow },
+  { path: "/qubit-office", labelKey: "office", label: "Qubit Office", icon: Users, exactEnd: true },
+  { path: "/qubit-office2", labelKey: "quest", label: "Agent Quest", icon: Star, exactEnd: true },
+  { path: "/qubit-office3", labelKey: "voiceChat", label: "Voice Chat", icon: Mic, exactEnd: true },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -864,6 +872,12 @@ export default function App() {
       data-layout-variant={layoutVariant}
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-background-base text-text-primary antialiased"
     >
+      <a
+        href="#qubit-main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[300] focus:border focus:border-midground focus:bg-background-base focus:px-3 focus:py-2 focus:text-sm focus:text-foreground"
+      >
+        {t.common.skipToContent ?? "Skip to content"}
+      </a>
       <SelectionSwitcher />
 
       <div
@@ -1039,7 +1053,9 @@ export default function App() {
                       id={`qubit-sidebar-section-${section.id}`}
                     >
                       <span className="qagent-sidebar__section-index">{section.index}</span>
-                      <span className={cn(collapsed && "lg:hidden")}>{section.label}</span>
+                      <span className={cn(collapsed && "lg:hidden")}>
+                        {t.app.sections?.[section.id] ?? section.label}
+                      </span>
                       {!collapsed && (
                         <span aria-hidden className="qagent-sidebar__section-rule" />
                       )}

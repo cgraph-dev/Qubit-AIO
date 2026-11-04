@@ -108,3 +108,11 @@ export function errorMessage(err: unknown): string {
   if (typeof err === "string") return err;
   return String(err);
 }
+
+/** True when a request was cancelled by the caller (navigation/unmount). */
+export function isAbortError(err: unknown): boolean {
+  return (
+    (err instanceof DOMException && err.name === "AbortError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
+}

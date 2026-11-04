@@ -1284,9 +1284,9 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path }),
     }),
-  listFiles: (path?: string) => {
+  listFiles: (path?: string, signal?: AbortSignal) => {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
-    return fetchJSON<ManagedFilesResponse>(`/api/files${query}`);
+    return fetchJSON<ManagedFilesResponse>(`/api/files${query}`, { signal });
   },
   readFile: (path: string) =>
     fetchJSON<ManagedFileReadResponse>(
@@ -3493,7 +3493,7 @@ export interface CuratorStatus {
   enabled: boolean;
   paused: boolean;
   interval_hours: number | null;
-  last_run_at: string | null;
+  last_run_at: number | string | null;
   min_idle_hours: number | null;
   stale_after_days: number | null;
   archive_after_days: number | null;

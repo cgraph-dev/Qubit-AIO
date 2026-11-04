@@ -1,7 +1,8 @@
 import { Button } from "@nous-research/ui/ui/components/button";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useId } from "react";
 import { createPortal } from "react-dom";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { cn, themedBody } from "@/lib/utils";
 
 interface ConfirmDialogProps {
@@ -27,33 +28,13 @@ export function ConfirmDialog({
   open,
   title,
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const prevActive = document.activeElement as HTMLElement | null;
-    dialogRef.current
-      ?.querySelector<HTMLButtonElement>("[data-confirm]")
-      ?.focus();
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
-    };
-
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-      prevActive?.focus?.();
-    };
-  }, [open, onCancel]);
+  const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useModalBehavior({
+    open,
+    onClose: onCancel,
+    initialFocusSelector: "[data-confirm]",
+  });
 
   if (!open) return null;
 
@@ -61,8 +42,8 @@ export function ConfirmDialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby={description ? "confirm-dialog-desc" : undefined}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -84,7 +65,7 @@ export function ConfirmDialog({
 
           <div className="flex-1 min-w-0 flex flex-col gap-1">
             <h2
-              id="confirm-dialog-title"
+              id={titleId}
               className="font-mondwest text-display text-base tracking-wider"
             >
               {title}
@@ -92,7 +73,7 @@ export function ConfirmDialog({
 
             {description && (
               <p
-                id="confirm-dialog-desc"
+                id={descriptionId}
                 className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line"
               >
                 {description}

@@ -389,50 +389,50 @@ export function ChatSessionList({
           // folded into activeRowId as a fallback, never a second highlight.
           const isActive = s.id === activeRowId;
           return (
-            <ListItem
-              key={s.id}
-              onClick={() => pick(s.id)}
-              aria-current={isActive ? "true" : undefined}
-              className={cn(
-                "flex-col items-start gap-0.5 rounded px-2 py-1.5",
-                "normal-case tracking-normal",
-                isActive
-                  ? "qchat__session-row--active bg-primary/15 font-medium text-foreground"
-                  : "text-text-secondary hover:bg-midground/5 hover:text-foreground",
-              )}
-            >
-              <span className="w-full truncate text-sm font-medium">
-                {rowLabel(s, t.sessions.untitledSession)}
-              </span>
-              <span className="flex w-full items-center gap-1.5 text-[0.6875rem] text-text-tertiary">
-                <span>{timeAgo(s.last_active ?? s.started_at ?? 0)}</span>
-                {(s.message_count ?? 0) > 0 && (
-                  <>
-                    <span aria-hidden>·</span>
-                    <span>{s.message_count} msgs</span>
-                  </>
+            <div key={s.id} className="relative">
+              <ListItem
+                onClick={() => pick(s.id)}
+                aria-current={isActive ? "true" : undefined}
+                className={cn(
+                  "flex-col items-start gap-0.5 rounded px-2 py-1.5 pr-14",
+                  "normal-case tracking-normal",
+                  isActive
+                    ? "qchat__session-row--active bg-primary/15 font-medium text-foreground"
+                    : "text-text-secondary hover:bg-midground/5 hover:text-foreground",
                 )}
-                {s.source && s.source !== "cli" && (
-                  <>
-                    <span aria-hidden>·</span>
-                    <span className="truncate">{s.source}</span>
-                  </>
-                )}
-                {/* Reach the terminal session where the agent actually runs
-                    (the /chat PTY). stopPropagation keeps the row's own
-                    "resume in this page" click intact. */}
-                <a
-                  href={`/chat?resume=${encodeURIComponent(s.id)}`}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Open session ${s.id} in the /chat terminal`}
-                  title="Open in /chat"
-                  className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-midground hover:bg-midground/10"
-                >
-                  <Terminal className="h-3 w-3" />
-                  /chat
-                </a>
-              </span>
-            </ListItem>
+              >
+                <span className="w-full truncate text-sm font-medium">
+                  {rowLabel(s, t.sessions.untitledSession)}
+                </span>
+                <span className="flex w-full items-center gap-1.5 text-[0.6875rem] text-text-tertiary">
+                  <span>{timeAgo(s.last_active ?? s.started_at ?? 0)}</span>
+                  {(s.message_count ?? 0) > 0 && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>{s.message_count} msgs</span>
+                    </>
+                  )}
+                  {s.source && s.source !== "cli" && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span className="truncate">{s.source}</span>
+                    </>
+                  )}
+                </span>
+              </ListItem>
+              {/* Reach the terminal session where the agent actually runs
+                  (the /chat PTY). A SIBLING of ListItem's <button>, never a
+                  child: a link inside a button is invalid and unreachable. */}
+              <a
+                href={`/chat?resume=${encodeURIComponent(s.id)}`}
+                aria-label={`Open session ${s.id} in the /chat terminal`}
+                title="Open in /chat"
+                className="absolute right-2 top-2 inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-midground hover:bg-midground/10"
+              >
+                <Terminal className="h-3 w-3" />
+                /chat
+              </a>
+            </div>
           );
         })}
         {source === "canonical" &&

@@ -45,6 +45,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { QubitConsoleModal } from "@/components/QubitConsoleModal";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { cn, themedBody } from "@/lib/utils";
+import { formatEpochTimestamp } from "@/lib/format";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import { parsePolicyRefusal, policyRefusalMessage, refusalOrError } from "@/lib/policy-refusal";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -1228,7 +1229,7 @@ export default function SystemPage() {
               </Badge>
               <span className="text-sm text-muted-foreground">
                 {curator?.interval_hours ? `every ${curator.interval_hours}h` : ""}
-                {curator?.last_run_at ? ` · last run ${new Date(curator.last_run_at).toLocaleString()}` : " · never run"}
+                {curator?.last_run_at ? ` · last run ${formatEpochTimestamp(curator.last_run_at) ?? "unknown"}` : " · never run"}
               </span>
             </div>
             <div className="flex items-center gap-2">

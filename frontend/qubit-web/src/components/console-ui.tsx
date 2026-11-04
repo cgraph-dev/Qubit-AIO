@@ -53,7 +53,7 @@ export function SettingsPageHeader({
   return (
     <header className="settings-page__header">
       <div className="settings-page__copy">
-        <h1 className="settings-page__title">{title}</h1>
+        <h2 className="settings-page__title">{title}</h2>
         {description ? (
           <p className="settings-page__desc">{description}</p>
         ) : null}

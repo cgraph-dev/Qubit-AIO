@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Check } from "lucide-react";
+import { Check, Languages } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { BottomSheet } from "@nous-research/ui/ui/components/bottom-sheet";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
@@ -27,6 +27,26 @@ import { cn } from "@/lib/utils";
  * viewport / overflow ancestors. Below the `sm` breakpoint, `dropUp` uses a
  * bottom sheet portaled to `document.body` instead of an anchored dropdown.
  */
+const LOCALE_SHORT: Record<Locale, string> = {
+  en: "EN",
+  zh: "简体",
+  "zh-hant": "繁體",
+  ja: "日本語",
+  de: "DE",
+  es: "ES",
+  fr: "FR",
+  tr: "TR",
+  uk: "УКР",
+  af: "AF",
+  ko: "한국",
+  it: "IT",
+  ga: "GA",
+  pt: "PT",
+  ru: "РУС",
+  hu: "HU",
+  ar: "ع",
+};
+
 export function LanguageSwitcher({ collapsed = false, dropUp = false }: LanguageSwitcherProps) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -77,6 +97,13 @@ export function LanguageSwitcher({ collapsed = false, dropUp = false }: Language
         )}
       >
         <span className="inline-flex items-center gap-1.5">
+          {/* Below `sm` the endonym was hidden, leaving an empty-looking
+              control with only an aria-label. Keep an icon + short code visible
+              so the language control is discoverable on phones. */}
+          <Languages aria-hidden className="h-3.5 w-3.5 sm:hidden" />
+          <span className="text-display text-xs tracking-wide sm:hidden">
+            {LOCALE_SHORT[locale]}
+          </span>
           <Typography
             className="hidden sm:inline text-display tracking-wide text-xs"
           >

@@ -252,7 +252,7 @@ export default function KitchenPage() {
       <header className="kitchen-intro">
         <div className="flex items-center gap-3">
           <ChefHat className="h-6 w-6 text-midground" aria-hidden />
-          <h1 className="text-lg font-bold tracking-[0.04em] text-midground">Kitchen</h1>
+          <h2 className="text-lg font-bold tracking-[0.04em] text-midground">Kitchen</h2>
         </div>
         <p className="mt-2 max-w-3xl text-sm text-text-secondary">
           Bring in another agent or app and turn it into Qubit. Paste a repo or

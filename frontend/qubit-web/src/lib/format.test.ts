@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatDurationCompact, formatDurationLong, formatTokenCount } from "./format";
+import {
+  formatDurationCompact,
+  formatDurationLong,
+  formatEpochTimestamp,
+  formatTokenCount,
+  toEpochMilliseconds,
+} from "./format";
 
 /**
  * Elapsed-time formatting for completed-work summaries. Compact for dense rows,
@@ -74,5 +80,37 @@ describe("formatTokenCount (unchanged)", () => {
     expect(formatTokenCount(128_000)).toBe("128K");
     expect(formatTokenCount(1_000_000)).toBe("1M");
     expect(formatTokenCount(999)).toBe("999");
+  });
+});
+
+describe("toEpochMilliseconds / formatEpochTimestamp", () => {
+  it("treats 10-digit epoch values as seconds", () => {
+    expect(toEpochMilliseconds(1_700_000_000)).toBe(1_700_000_000_000);
+    expect(toEpochMilliseconds("1700000000")).toBe(1_700_000_000_000);
+  });
+
+  it("leaves millisecond values alone", () => {
+    expect(toEpochMilliseconds(1_700_000_000_000)).toBe(1_700_000_000_000);
+    expect(toEpochMilliseconds("1700000000000")).toBe(1_700_000_000_000);
+  });
+
+  it("parses ISO timestamps", () => {
+    expect(toEpochMilliseconds("2026-10-24T10:00:00Z")).toBe(
+      Date.parse("2026-10-24T10:00:00Z"),
+    );
+  });
+
+  it("returns undefined for absent/invalid input", () => {
+    expect(toEpochMilliseconds(null)).toBeUndefined();
+    expect(toEpochMilliseconds(undefined)).toBeUndefined();
+    expect(toEpochMilliseconds("")).toBeUndefined();
+    expect(toEpochMilliseconds("not-a-date")).toBeUndefined();
+    expect(toEpochMilliseconds(Number.NaN)).toBeUndefined();
+  });
+
+  it("formats seconds-valued timestamps in the requested locale", () => {
+    const formatted = formatEpochTimestamp(1_700_000_000, "en-US");
+    expect(formatted).toBe(new Date(1_700_000_000_000).toLocaleString("en-US"));
+    expect(formatted).not.toContain("1970");
   });
 });

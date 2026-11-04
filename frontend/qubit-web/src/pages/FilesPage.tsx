@@ -41,6 +41,7 @@ import {
 } from "@/lib/api";
 import type { ManagedFileEntry, ManagedFilesResponse } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { isAbortError } from "@/lib/api-error";
 import { PluginSlot } from "@/plugins";
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
@@ -133,12 +134,24 @@ export default function FilesPage() {
   const emptyReason =
     emptyDetail ?? noRootReason ?? (loading ? "Loading…" : "No files");
 
+  // Folder clicks and the Go form can lap each other (slow disk, quick
+  // double-click). Each request owns an AbortController + monotonic id, so a
+  // stale response can never overwrite a newer listing or clear its spinner.
+  const loadSeqRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
+
   const load = useCallback(
     async (path = currentPath) => {
+      const seq = ++loadSeqRef.current;
+      loadAbortRef.current?.abort();
+      const controller = new AbortController();
+      loadAbortRef.current = controller;
+
       setLoading(true);
       setError(null);
       try {
-        const result = await api.listFiles(path);
+        const result = await api.listFiles(path, controller.signal);
+        if (seq !== loadSeqRef.current || controller.signal.aborted) return;
         setListing(result);
         setCurrentPath(result.path);
         setPathInput(result.path);
@@ -147,10 +160,17 @@ export default function FilesPage() {
         // perpetual "Loading".
         setEmptyDetail(result.detail ?? null);
       } catch (e) {
+        if (
+          seq !== loadSeqRef.current ||
+          controller.signal.aborted ||
+          isAbortError(e)
+        ) {
+          return;
+        }
         setError(refusalOrError(e, "Could not list this folder."));
         setEmptyDetail(null);
       } finally {
-        setLoading(false);
+        if (seq === loadSeqRef.current) setLoading(false);
       }
     },
     [currentPath],
@@ -161,6 +181,11 @@ export default function FilesPage() {
     // until the shared lint profile is updated for async page loaders.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load(currentPath);
+    return () => {
+      // The route (or folder) changed: the in-flight listing is no longer
+      // relevant, and its rejection must not paint an error on the new view.
+      loadAbortRef.current?.abort();
+    };
   }, [currentPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -457,7 +482,11 @@ export default function FilesPage() {
       <Card className="min-w-0 max-w-full overflow-hidden">
         <CardContent className="overflow-x-auto p-0">
           {error && (
-            <div className="border-b border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="border-b border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+            >
               {error}
             </div>
           )}

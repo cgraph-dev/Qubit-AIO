@@ -871,7 +871,7 @@ export default function VoiceEditPage() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-4" data-testid="voice-edit-page">
       <header>
-        <h1 className="text-lg font-semibold">Voice Typing &amp; Editing</h1>
+        <h2 className="text-lg font-semibold">Voice Typing &amp; Editing</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           System-wide: hold Right-Ctrl anywhere to dictate, or select text and speak an
           editing command. Disabled by default. No selected text is logged or persisted.
