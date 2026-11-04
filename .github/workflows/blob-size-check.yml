@@ -1,36 +1,32 @@
 name: Blob Size Check
 
-# Rejects PRs that add or modify a binary over 500 KiB, or add any new file over 500 KiB.
-#
-# Every blob a merge adds stays in every clone and every CI checkout forever, even after a
-# later commit deletes it. Exact-path exceptions live in .github/blob-size-allowlist.txt
-# (CODEOWNERS-reviewed). Local: `python qubit_runtime/scripts/check --only blob-size`.
-#
-# Runs unconditionally (no change-classifier gate): a docs-only or asset-only PR skips the
-# Python and frontend lanes, and that is exactly the kind of PR that commits a screenshot.
-
+# Rejects PRs that add or modify a binary over 500 KiB, or add any new file
+# over 500 KiB. Every blob a merge adds stays in every clone forever, even
+# after a later commit deletes it. Exact-path exceptions live in
+# .github/blob-size-allowlist.txt (CODEOWNERS-reviewed).
 on:
-  workflow_call:
-    inputs:
-      commit:
-        description: Commit to test and build. Empty keeps the triggering commit.
-        type: string
-        default: ''
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: blob-size-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check-blob-size:
     name: Reject large binaries
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: ${{ inputs.commit }}
-          fetch-depth: 2 # the merge commit and its first parent (the base branch tip)
-
+          # The merge commit and its first parent (the base branch tip).
+          fetch-depth: 2
       - name: Judge files added or modified against the base branch tip
         run: python3 qubit_runtime/scripts/ci/check_blob_size.py --base HEAD^1
