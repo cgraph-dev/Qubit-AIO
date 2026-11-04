@@ -230,7 +230,8 @@ def toolset_rows(cfg: Any, names: List[str]) -> List[Dict[str, Any]]:
             "name": str(name), "label": str(name),
             "description": "Qubit broker capability",
             "platform": "qubit", "platform_label": "Qubit",
-            "enabled": enabled, "configured": True, "tools": [str(name)],
+            "enabled": enabled, "available": enabled,
+            "configured": True, "tools": [str(name)],
         })
     return rows
 

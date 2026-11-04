@@ -1644,6 +1644,7 @@ def _pin_toolset_rows(cfg: Any) -> list:
     # platform-disabled toolset as enabled.
     for row in rows:
         row["enabled"] = TS.effective_toolset_enabled(cfg, str(row.get("name")))
+        row["available"] = bool(row["enabled"])
     return rows
 
 
