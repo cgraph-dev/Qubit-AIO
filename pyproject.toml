@@ -44,7 +44,7 @@ dependencies = [
     # pinned upstream core dependencies (qubit_runtime/pyproject.toml), declared
     # here so a clean install runs the runtime with no external upstream install.
     "openai==2.24.0",
-    "certifi==2026.5.20",
+    "certifi==2026.10.18",
     "python-dotenv==1.2.2",
     # OS certificate-store trust injection at process start (agent/ssl_verify.py);
     # certifi stays declared too, but truststore is the trust source.
@@ -65,8 +65,8 @@ dependencies = [
     "snowballstemmer==3.1.1",
     "packaging==26.0",
     "Markdown==3.10.2",
-    "PyJWT[crypto]==2.13.0",
-    "urllib3>=2.7.0,<3",
+    "PyJWT[crypto]==2.15.0",
+    "urllib3>=2.8.0,<3",
     "cryptography==50.0.1",
     "psutil==7.2.2",
     "pathspec==1.1.1",
@@ -91,7 +91,7 @@ dependencies = [
     # (reportlab/xref-offset streams, multi-page, object streams); pypdf is the
     # preferred backend and pdf_backend() resolves it first. The stdlib path
     # stays as the zero-dependency fallback for installs that lack pypdf.
-    "pypdf>=6,<7",
+    "pypdf>=6.21.4,<7",
 ]
 
 [project.optional-dependencies]

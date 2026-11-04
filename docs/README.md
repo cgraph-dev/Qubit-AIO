@@ -61,6 +61,7 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `BROWSER-PARITY-FINDINGS.md` | Habblaud-in-Qubit-Office — Browser Parity Findings |
 | `CHECKLIST.md` | Qubit CHECKLIST — the tick-list that is machine-measured |
 | `DECISIONS.md` | Qubit DECISIONS — owner rulings in force |
+| `DEPENDENCY-RISK-2026-11-04.md` | Dependency-risk triage — Dependabot alerts, safe fixes, owner decisions |
 | `EXECUTION_PLAN.md` | Qubit EXECUTION_PLAN — how work is sequenced and dispatched |
 | `FIREFOX-PARITY-FINDINGS.md` | Firefox parity — the Habblaud office page in Firefox |
 | `FLAKY-TEST-FINDINGS.md` | Flaky-test findings — `test_office_vendor_habblaud.py` (OPEN_THREADS §4.15) |
