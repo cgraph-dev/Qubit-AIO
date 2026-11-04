@@ -257,7 +257,7 @@ def test_uninstall_plan_is_read_only(tmp_path):
 # ===========================================================================
 def test_service_templates_are_portable_and_correct():
     canonical = (SYSTEMD / "qubit-voicebridge.service").read_text(encoding="utf-8")
-    assert "ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge run" in canonical
+    assert 'ExecStart="__PROJECT_DIR__/.venv/bin/python" -m voicebridge run' in canonical
     assert "WantedBy=default.target" in canonical
     assert "Restart=on-failure" in canonical
     assert "__PROJECT_DIR__" in canonical

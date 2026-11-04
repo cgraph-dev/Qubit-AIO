@@ -13,7 +13,7 @@ Wants=ollama.service
 [Service]
 Type=simple
 # __PROJECT_DIR__ is replaced with the actual path by scripts/install.sh
-ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge run
+ExecStart="__PROJECT_DIR__/.venv/bin/python" -m voicebridge run
 WorkingDirectory=__PROJECT_DIR__
 Restart=on-failure
 RestartSec=3
