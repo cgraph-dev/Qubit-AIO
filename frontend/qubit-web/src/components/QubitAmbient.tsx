@@ -41,9 +41,13 @@ export const BACKDROP_POSTER_SRC = "/media/qubit-backdrop-poster.jpg";
  * Polarity is read from the theme engine's `--qplate-contrast` custom property
  * (it is `#ffffff` on dark themes, `#000000` on light), which the theme provider
  * already maintains — the app has no other light/dark signal to pass in.
+ *
+ * The dark scrim is stronger than a flat ambient clip needs: the backdrop is
+ * now a high-contrast illustration with near-white highlights, so anything less
+ * lets those highlights punch through the panels and fight body text.
  */
-export const BACKDROP_SCRIM_DARK = 0.58;
-export const BACKDROP_SCRIM_LIGHT = 0.9;
+export const BACKDROP_SCRIM_DARK = 0.74;
+export const BACKDROP_SCRIM_LIGHT = 0.93;
 
 function prefersReducedMotion(): boolean {
   return (
@@ -110,6 +114,14 @@ export function QubitAmbient() {
         preload="metadata"
         poster={BACKDROP_POSTER_SRC}
         src={BACKDROP_VIDEO_SRC}
+        // Desaturate and dim the clip itself, before the scrim. The scrim alone
+        // only lowers overall luminance; at 74% it flattens the artwork into
+        // grey mud while bright highlights still bleed through. Pushing the
+        // saturation down here keeps the panels' colour hierarchy intact and
+        // leaves the backdrop as texture rather than artwork competing with it.
+        style={{
+          filter: `saturate(${still ? 0.55 : 0.42}) brightness(0.62) contrast(1.05)`,
+        }}
       />
       {/* Scrim: the skin's canvas over the video. Tinted from --background-base
           so every theme clamps it toward its OWN surface instead of a fixed

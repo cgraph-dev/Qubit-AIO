@@ -103,6 +103,22 @@ const SPARKS: Spark[] = [
   { plane: "far", seed: 198, rx: 47, ry: 17, size: 1.5, dur: 27.1 },
   { plane: "far", seed: 256, rx: 43, ry: 16, size: 1.6, dur: 24.4 },
   { plane: "far", seed: 314, rx: 45, ry: 16, size: 1.7, dur: 26.3 },
+  // Third near band: very tight, very fast motes hugging the glyph edges. These
+  // are the "bright dust" that makes the cloud feel dense right at the text
+  // rather than only in wide arcs; their periods are the shortest in the table.
+  { plane: "near", seed: 51, rx: 13, ry: 4.5, size: 1.5, dur: 5.9 },
+  { plane: "near", seed: 117, rx: 12, ry: 4, size: 1.4, dur: 6.7 },
+  { plane: "near", seed: 183, rx: 14, ry: 5, size: 1.6, dur: 7.3 },
+  { plane: "near", seed: 249, rx: 12.5, ry: 4.5, size: 1.3, dur: 6.2 },
+  { plane: "near", seed: 303, rx: 13.5, ry: 4.8, size: 1.5, dur: 7.9 },
+  // Third far band: the outermost halo, period 30s+. Reads as the slow drift of
+  // a large orbital shell enclosing the whole wordmark.
+  { plane: "far", seed: 31, rx: 52, ry: 19, size: 1.3, dur: 31.7 },
+  { plane: "far", seed: 99, rx: 55, ry: 20, size: 1.2, dur: 34.9 },
+  { plane: "far", seed: 163, rx: 50, ry: 18, size: 1.4, dur: 29.3 },
+  { plane: "far", seed: 231, rx: 54, ry: 20, size: 1.2, dur: 33.1 },
+  { plane: "far", seed: 277, rx: 51, ry: 19, size: 1.3, dur: 37.3 },
+  { plane: "far", seed: 341, rx: 53, ry: 19, size: 1.2, dur: 30.2 },
 ];
 
 /**

@@ -75,23 +75,69 @@ interface Particle {
 /**
  * Beads ride their ring's projected plane, so they need no faked depth of their
  * own: the ring's `scaleY` applies to them too. Seeds are spread so every ring
- * always carries at least two visible travellers.
+ * always carries at least three visible travellers, and each plane has its own
+ * bead scale — the near rings carry larger, brighter beads than the deep ones,
+ * which adds depth without a second transform.
  */
 const PARTICLES: Particle[] = [
-  { orbit: "a", seed: 18, r: 1.15 },
-  { orbit: "a", seed: 112, r: 0.95 },
-  { orbit: "a", seed: 205, r: 1.05 },
-  { orbit: "a", seed: 298, r: 0.85 },
-  { orbit: "b", seed: 46, r: 1.0 },
-  { orbit: "b", seed: 158, r: 0.9 },
-  { orbit: "b", seed: 262, r: 1.05 },
-  { orbit: "c", seed: 72, r: 0.95 },
-  { orbit: "c", seed: 196, r: 0.85 },
-  { orbit: "c", seed: 310, r: 0.9 },
-  { orbit: "d", seed: 34, r: 0.85 },
-  { orbit: "d", seed: 216, r: 0.9 },
-  { orbit: "e", seed: 128, r: 0.8 },
-  { orbit: "e", seed: 288, r: 0.85 },
+  // a — outer ring.
+  { orbit: "a", seed: 12, r: 1.2 },
+  { orbit: "a", seed: 74, r: 0.85 },
+  { orbit: "a", seed: 132, r: 1.05 },
+  { orbit: "a", seed: 196, r: 0.75 },
+  { orbit: "a", seed: 258, r: 1.1 },
+  { orbit: "a", seed: 316, r: 0.9 },
+  // b — second plane.
+  { orbit: "b", seed: 28, r: 1.0 },
+  { orbit: "b", seed: 92, r: 0.8 },
+  { orbit: "b", seed: 158, r: 1.05 },
+  { orbit: "b", seed: 224, r: 0.7 },
+  { orbit: "b", seed: 288, r: 0.95 },
+  // c — third plane, the lattice's spine.
+  { orbit: "c", seed: 44, r: 0.95 },
+  { orbit: "c", seed: 118, r: 0.75 },
+  { orbit: "c", seed: 186, r: 0.9 },
+  { orbit: "c", seed: 252, r: 0.7 },
+  { orbit: "c", seed: 324, r: 0.85 },
+  // d — inner plane.
+  { orbit: "d", seed: 18, r: 0.85 },
+  { orbit: "d", seed: 96, r: 0.7 },
+  { orbit: "d", seed: 174, r: 0.8 },
+  { orbit: "d", seed: 250, r: 0.65 },
+  { orbit: "d", seed: 330, r: 0.75 },
+  // e — innermost plane, smallest beads so the centre stays readable.
+  { orbit: "e", seed: 62, r: 0.7 },
+  { orbit: "e", seed: 142, r: 0.6 },
+  { orbit: "e", seed: 222, r: 0.72 },
+  { orbit: "e", seed: 302, r: 0.58 },
+];
+
+/** Free-floating motes: they do not ride an orbit, they drift in the mark's own
+ *  field and cross every plane. Two jobs — they fill the dead gaps between rings
+ *  so the lattice reads as a cloud rather than five wires, and their independent
+ *  periods keep the mark from ever looking frozen even when the planes are slow. */
+interface Mote {
+  /** Position at t=0, in viewBox units. */
+  cx: number;
+  cy: number;
+  /** Radius in viewBox units — deliberately small; motes are dust, not beads. */
+  r: number;
+  /** Drift amplitude in units and the seconds for one drift cycle. */
+  drift: number;
+  dur: number;
+  /** Offset into the drift so no two motes start together. */
+  phase: number;
+}
+
+const MOTES: Mote[] = [
+  { cx: 9.4, cy: 25.2, r: 0.4, drift: 1.6, dur: 17.3, phase: 0.05 },
+  { cx: 30.8, cy: 13.6, r: 0.34, drift: 1.9, dur: 23.1, phase: 0.31 },
+  { cx: 14.2, cy: 11.8, r: 0.46, drift: 1.3, dur: 29.7, phase: 0.62 },
+  { cx: 26.4, cy: 28.6, r: 0.32, drift: 2.1, dur: 19.4, phase: 0.18 },
+  { cx: 6.2, cy: 16.4, r: 0.3, drift: 1.5, dur: 26.5, phase: 0.77 },
+  { cx: 33.6, cy: 22.8, r: 0.42, drift: 1.7, dur: 21.8, phase: 0.44 },
+  { cx: 18.6, cy: 32.2, r: 0.28, drift: 1.2, dur: 31.2, phase: 0.9 },
+  { cx: 22.2, cy: 7.4, r: 0.36, drift: 1.8, dur: 25.3, phase: 0.12 },
 ];
 
 const CENTRE = 20;
@@ -150,6 +196,20 @@ export function QubitMark({ className }: { className?: string }) {
       viewBox="0 0 40 40"
       xmlns="http://www.w3.org/2000/svg"
     >
+      {MOTES.map((m) => (
+        <circle
+          key={`mote-${m.cx}-${m.cy}`}
+          className="qubit-mark__mote"
+          cx={m.cx}
+          cy={m.cy}
+          r={m.r}
+          style={{
+            animationDuration: `${m.dur}s`,
+            animationDelay: `${-m.phase * m.dur}s`,
+            ["--mote-drift" as string]: `${m.drift}`,
+          }}
+        />
+      ))}
       {PAINT_ORDER.slice(0, 3).map(ring)}
       <circle className="qubit-mark__nucleus" cx={CENTRE} cy={CENTRE} r="2.1" />
       {PAINT_ORDER.slice(3).map(ring)}

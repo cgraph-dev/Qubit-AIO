@@ -147,6 +147,31 @@
   fill-opacity: 0.92;
 }
 
+/* Free motes — dust drifting through the lattice. A slow vertical drift plus an
+ * opacity breath, on eight non-harmonic periods, so there is always some part of
+ * the mark in motion even at the slowest ring phase. `--mote-drift` carries the
+ * per-mote amplitude so the keyframes stay one shared rule. */
+.qubit-mark__mote {
+  fill: currentColor;
+  fill-opacity: 0.55;
+  animation-name: qubit-mark-mote-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes qubit-mark-mote-drift {
+  from {
+    transform: translateY(calc(var(--mote-drift, 1.5) * -1px)) scale(0.75);
+    opacity: 0.2;
+  }
+  to {
+    transform: translateY(calc(var(--mote-drift, 1.5) * 1px)) scale(1.15);
+    opacity: 0.75;
+  }
+}
+
 /* ---------- Nucleus ---------- */
 
 .qubit-mark__nucleus {
@@ -225,6 +250,11 @@
 .qagent-sidebar__brand-row:hover .qubit-mark__plane,
 .qagent-sidebar__brand-row:focus-within .qubit-mark__plane {
   animation-duration: 7.5s !important;
+}
+
+.qagent-sidebar__brand-row:hover .qubit-mark__mote,
+.qagent-sidebar__brand-row:focus-within .qubit-mark__mote {
+  animation-duration: 6.2s !important;
 }
 
 /* ---------- Wordmark ----------
@@ -528,6 +558,7 @@
   .qubit-mark__ring,
   .qubit-mark__nucleus,
   .qubit-mark__bead,
+  .qubit-mark__mote,
   .qubit-mark__field,
   .qbrand-sparks__dot,
   .qagent-sidebar .qagent-sidebar__brand-name,
